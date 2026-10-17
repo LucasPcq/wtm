@@ -110,7 +110,7 @@ type Standing struct {
 // ----------------------------------------------------------------------------
 // Run
 
-// Run carries out the request under its operation: it takes the locks, plans under them, fingerprints the plan, stops on a dry run or when there is nothing to extract, refuses a stale plan and applies it between the operation's started and finished events. An error returned is a refusal before the apply; a failure during the apply is in the Outcome's Result.
+// Run carries out the request under its operation: it takes the locks, plans under them, fingerprints the plan, stops on a dry run, refuses a stale plan, stops when there is nothing to extract and applies it between the operation's started and finished events. An error returned is a refusal before the apply; a failure during the apply is in the Outcome's Result.
 func (u UseCase) Run(ctx context.Context, req Request, opts operation.Options) (Outcome, error) {
 	// 1. Take the operation's locks before reading anything, so the facts cannot change under the plan.
 	op, err := u.Operations.Begin(name, req.Locks(), opts)
@@ -134,14 +134,14 @@ func (u UseCase) Run(ctx context.Context, req Request, opts operation.Options) (
 		return outcome, err
 	}
 
-	// 4. A source with no uncommitted change is not a failure: the run ends with no apply and no events, nothing created.
-	if plan.Nothing() {
-		return outcome, nil
-	}
-
-	// 5. A preview made on other facts is refused rather than applied.
+	// 4. A preview made on other facts is refused rather than applied, even when nothing is left to extract.
 	if err := op.Expect(outcome.Fingerprint); err != nil {
 		return outcome, err
+	}
+
+	// 5. A source with no uncommitted change is not a failure: the run ends with no apply and no events, nothing created.
+	if plan.Nothing() {
+		return outcome, nil
 	}
 
 	// 6. Apply between the started and finished events other processes listen to.
@@ -181,7 +181,7 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // ----------------------------------------------------------------------------
 // Apply
 
-// Apply carries out the plan, reporting each step: it fast-forwards the source asked, makes the target when it does not exist, moves or copies the changes into it, and remembers the answers asked once a target is created. Once ctx is cancelled, what is not yet started is skipped.
+// Apply carries out the plan, reporting each step: it fast-forwards the source asked, makes the target when it does not exist, moves or copies the changes into it, and remembers the answers asked once the changes reached a target it created. Once ctx is cancelled, what is not yet started is skipped.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	warnings := u.fastForward(ctx, plan, report)
 	if ctx.Err() != nil {
@@ -195,7 +195,7 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	}
 	report(domain.UnitFinished{Subject: item.Subject, Status: item.Status})
 
-	if plan.Target.creates() && item.Detail != nil {
+	if plan.Target.creates() && item.Status == domain.StatusDone {
 		warnings = append(warnings, u.remember(ctx, plan)...)
 	}
 
@@ -324,6 +324,14 @@ func (u UseCase) advance(ctx context.Context, plan Plan, subject string) (domain
 		return domain.Warning{
 			Code:    "extract.ff_dirty",
 			Message: "couldn't fast-forward " + subject + ": its worktree has uncommitted changes — the target starts from your local branch",
+			Params:  domain.Params{"branch": subject},
+		}, true
+	}
+
+	if forwarded.Busy {
+		return domain.Warning{
+			Code:    "extract.ff_busy",
+			Message: "couldn't fast-forward " + subject + ": its worktree is in the middle of a rebase or a bisect — the target starts from your local branch",
 			Params:  domain.Params{"branch": subject},
 		}, true
 	}

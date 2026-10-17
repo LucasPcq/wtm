@@ -276,6 +276,14 @@ func (u UseCase) advance(ctx context.Context, plan Plan, subject string) (domain
 		}, true
 	}
 
+	if forwarded.Busy {
+		return domain.Warning{
+			Code:    "create.ff_busy",
+			Message: "couldn't fast-forward " + subject + ": its worktree is in the middle of a rebase or a bisect — it starts from your local branch",
+			Params:  domain.Params{"branch": subject},
+		}, true
+	}
+
 	return notAdvanced(subject, forwarded.Err)
 }
 

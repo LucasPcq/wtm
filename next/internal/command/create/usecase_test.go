@@ -530,3 +530,73 @@ func TestAPreviewIsStaleOnceTheIsolationItWouldRecordChanged(t *testing.T) {
 	assert.Equal(t, operation.CodePlanStale, failureOf(t, staleErr).Code)
 	assert.NoDirExists(t, w.path(branchName))
 }
+
+func TestNothingIsRememberedWhenTheOnlyBranchFailsToProvision(t *testing.T) {
+	w := newWorld(t, seed{Run: jobsToml, Config: withHook("exit 1")})
+
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Isolation: project.Verbatim, Remember: []string{"isolation"}})
+
+	require.Equal(t, domain.StatusFailed, result.Items[0].Status)
+	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "isolation")
+}
+
+func TestAChangeToWhatTheApplyRunsMakesThePreviewStale(t *testing.T) {
+	for name, change := range map[string]func(w world){
+		"hooks": func(w world) { writeFile(t, filepath.Join(w.stateDir, "config.toml"), withHook("touch hooked")) },
+		"run": func(w world) {
+			writeFile(t, filepath.Join(w.stateDir, "run.toml"), strings.Replace(jobsToml, "3000", "4000", 1))
+		},
+		"env": func(w world) {
+			writeFile(t, filepath.Join(w.stateDir, "config.toml"), projectToml+"\n[[env.file]]\ntarget = \"web/.env\"\n")
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t, seed{Run: jobsToml})
+			req := create.Request{Branches: []string{branchName}}
+			preview, err := w.usecase.Run(t.Context(), req, operation.Options{DryRun: true, Report: (&recorder{}).add})
+			require.NoError(t, err)
+			change(w)
+
+			_, err = w.usecase.Run(t.Context(), req, operation.Options{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
+
+			assert.Equal(t, operation.CodePlanStale, failureOf(t, err).Code)
+			assert.NoDirExists(t, w.path(branchName))
+		})
+	}
+}
+
+func TestACancelDuringTheFastForwardIsNoWarningAndSkipsEveryBranch(t *testing.T) {
+	w := newWorld(t, seed{Behind: true, NoEnv: true})
+	planned, _ := w.plan(t, create.Request{Branches: []string{branchName, other}, FastForward: new(true)})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	result := w.usecase.Apply(ctx, planned, func(event domain.Event) {
+		if started, ok := event.(domain.PhaseStarted); ok && started.Phase == "fast_forward" {
+			cancel()
+		}
+	})
+
+	assert.Empty(t, result.Warnings)
+	assert.Equal(t, []create.Item{
+		{Subject: branchName, Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted},
+		{Subject: other, Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted},
+	}, result.Items)
+	assert.Equal(t, domain.CodeInterrupted, result.Failure().Code)
+	assert.NoDirExists(t, w.path(branchName))
+}
+
+func TestASourceInTheMiddleOfARebaseIsNotFastForwardedAndSaysSo(t *testing.T) {
+	w := newWorld(t, seed{})
+	behindOrigin(t, w, existing)
+	rebasing(t, w, existing)
+
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, From: existing, FastForward: new(true)})
+
+	assert.Equal(t, []domain.Warning{{
+		Code:    "create.ff_busy",
+		Message: "couldn't fast-forward feature: its worktree is in the middle of a rebase or a bisect — it starts from your local branch",
+		Params:  domain.Params{"branch": existing},
+	}}, result.Warnings)
+	assert.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
+}

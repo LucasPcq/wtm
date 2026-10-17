@@ -228,7 +228,7 @@ func (f Facts) subjectAt(req Request, standing worktree.Divergence) string {
 	return subject
 }
 
-// conflictCheck asks which selected changes would conflict in the target: in its worktree when it exists, else in the tree of the ref it will start from.
+// conflictCheck asks which selected changes would conflict in the target: in its worktree when it exists, else in the tree of the ref it will start from, as origin has it when the apply fast-forwards that ref first.
 func (f Facts) conflictCheck(req Request) worktree.ConflictCheck {
 	check := worktree.ConflictCheck{Source: f.CheckedOutAt(req.Source), Changes: f.selected(req)}
 	target, _ := f.planned(req)
@@ -241,6 +241,10 @@ func (f Facts) conflictCheck(req Request) worktree.ConflictCheck {
 		check.TargetRef = target.Upstream
 	case ActionCreate:
 		check.TargetRef = req.From
+	}
+
+	if slices.Contains(f.fastForwarded(req), check.TargetRef) {
+		check.TargetRef = worktree.OriginPrefix + check.TargetRef
 	}
 
 	return check
@@ -431,12 +435,26 @@ func (p Plan) Locks() []domain.Lock {
 	return locksOf(append([]string{p.Source, p.Target.Branch}, p.FastForward...))
 }
 
-// Fingerprinted is what the plan's fingerprint covers: the plan, and the isolation as resolved.
+// Fingerprinted is what the plan's fingerprint covers: the plan, the isolation as resolved, and what the apply reads of the project to provision a created target (its env files and strategy, its on_create hooks, its run.toml and the global settings).
 func (p Plan) Fingerprinted() any {
+	f := p.facts
 	return struct {
 		Plan      Plan              `json:"plan"`
 		Isolation project.Isolation `json:"isolation"`
-	}{Plan: p, Isolation: p.isolation}
+		Env       project.Env       `json:"env"`
+		OnCreate  []project.Hook    `json:"on_create"`
+		Run       project.Run       `json:"run"`
+		RunErr    string            `json:"run_err,omitempty"`
+		Global    project.Global    `json:"global"`
+	}{Plan: p, Isolation: p.isolation, Env: f.Config.Env, OnCreate: f.Config.OnCreate, Run: f.Run, RunErr: errorText(f.RunErr), Global: f.Global}
+}
+
+func errorText(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	return err.Error()
 }
 
 // Locks are the locks taken before planning: the repository shared, and the source and target given exclusive.

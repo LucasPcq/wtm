@@ -200,3 +200,15 @@ func TestAnAnswerOutsideItsChoicesIsRefused(t *testing.T) {
 
 	assert.Equal(t, map[string]string{"on_conflict": "one_of", "isolation": "one_of", "remember[0]": "one_of"}, problems(err))
 }
+
+func TestARecordedParentThatNoLongerExistsFallsBackToTheBaseBranch(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+	w.record(t, source, worktree.Meta{SourceBranch: "feat/base"})
+	req := extract.Request{Source: source, Files: []string{"a.txt"}, To: split}
+
+	resolved, err := extract.Resolve(w.facts(t, req), req)
+
+	require.NoError(t, err)
+	assert.Equal(t, "main", resolved.From)
+}

@@ -7,9 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"sync"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -168,4 +170,31 @@ func valuesOf(options []domain.Option) []string {
 
 func removeFile(path string) error {
 	return os.Remove(path)
+}
+
+// behindOrigin puts origin's copy of the branch name one commit ahead of the local branch.
+func behindOrigin(t *testing.T, w world, name string) {
+	t.Helper()
+	ahead := gittest.Output(t, w.main, "commit-tree", name+"^{tree}", "-p", name, "-m", "upstream "+name)
+	gittest.Git(t, w.main, "update-ref", "refs/remotes/origin/"+name, ahead)
+}
+
+func withHook(command string) string {
+	return projectToml + "\n[hooks]\non_create = [{ cmd = " + strconv.Quote(command) + " }]\n"
+}
+
+func targetRefs(checks []worktree.ConflictCheck) []string {
+	found := make([]string, 0, len(checks))
+	for _, check := range checks {
+		found = append(found, check.TargetRef)
+	}
+	return found
+}
+
+// rebasing checks the branch name out, detached, in a worktree stopped in the middle of a rebase of it.
+func rebasing(t *testing.T, w world, name string) {
+	t.Helper()
+	path := filepath.Join(w.root, "wt-rebasing")
+	gittest.Git(t, w.main, "worktree", "add", "-q", "--detach", path, name)
+	writeFile(t, filepath.Join(gittest.Output(t, path, "rev-parse", "--absolute-git-dir"), "rebase-merge", "head-name"), "refs/heads/"+name+"\n")
 }

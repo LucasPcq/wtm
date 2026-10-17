@@ -215,3 +215,11 @@ func containsKind[T domain.Event](events []domain.Event) bool {
 		return is
 	})
 }
+
+// rebasing checks the branch name out, detached, in a worktree stopped in the middle of a rebase of it.
+func rebasing(t *testing.T, w world, name string) {
+	t.Helper()
+	path := filepath.Join(w.root, "wt-rebasing")
+	gittest.Git(t, w.main, "worktree", "add", "-q", "--detach", path, name)
+	writeFile(t, filepath.Join(gittest.Output(t, path, "rev-parse", "--absolute-git-dir"), "rebase-merge", "head-name"), "refs/heads/"+name+"\n")
+}

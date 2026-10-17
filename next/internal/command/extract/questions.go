@@ -150,9 +150,12 @@ func (f Facts) targetOptions(source string) []domain.Option {
 	return options
 }
 
-// from answers the source branch with the source's recorded parent, else the base branch; it leaves it unanswered for an existing target, and for a branch checked out as it exists, whose parent must be named.
+// from answers the source branch with the source's recorded parent while it still exists, else the base branch; it leaves it unanswered for an existing target, and for a branch checked out as it exists, whose parent must be named.
 func (f Facts) from(req Request) From {
 	recorded := f.parent(req.Source)
+	if !f.Candidate(recorded) {
+		recorded = ""
+	}
 	base := f.Config.Worktrees.BaseBranch
 	question := From{Options: f.fromOptions(req.To), Pinned: cmp.Or(recorded, base)}
 	target, decided := f.planned(req)

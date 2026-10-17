@@ -2,6 +2,7 @@ package extract_test
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -149,4 +150,24 @@ func (i interrupting) Move(ctx context.Context, move worktree.Move) (worktree.Mo
 	i.cancel()
 	*i.seen = ctx.Err()
 	return i.Repo.Move(ctx, move)
+}
+
+// checking records the conflict checks the use case asks.
+type checking struct {
+	git.Repo
+	checks *[]worktree.ConflictCheck
+}
+
+func (c checking) Conflicts(ctx context.Context, check worktree.ConflictCheck) ([]worktree.Conflict, error) {
+	*c.checks = append(*c.checks, check)
+	return c.Repo.Conflicts(ctx, check)
+}
+
+// halfMoving copies the changes into the target, then fails to remove them from the source.
+type halfMoving struct {
+	git.Repo
+}
+
+func (halfMoving) Move(context.Context, worktree.Move) (worktree.Moved, error) {
+	return worktree.Moved{}, &worktree.HalfMoved{Cause: errors.New("source busy")}
 }

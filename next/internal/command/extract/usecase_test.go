@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
@@ -238,4 +239,160 @@ func TestAMoveRefusedSinceThePlanIsAConflictOfTheRun(t *testing.T) {
 	assert.Equal(t, extract.CodeConflict, result.Item.Err.Code)
 	assert.Equal(t, result.Item.Err, result.Failure())
 	assert.Equal(t, "source\n", readFile(t, filepath.Join(w.at(source), "a.txt")))
+}
+
+func TestARefTheApplyFastForwardsIsCheckedForConflictsAsOriginHasIt(t *testing.T) {
+	w := newWorld(t, seed{Behind: true})
+	w.change(t, source, "a.txt", "a\n")
+	behindOrigin(t, w, existing)
+	var checks []worktree.ConflictCheck
+	w.usecase.Git = checking{Repo: w.repo, checks: &checks}
+
+	w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, FastForward: new(true)})
+	w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, FastForward: new(false)})
+	w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: existing, From: "main", FastForward: new(true)})
+
+	assert.Equal(t, []string{"origin/main", "main", "origin/" + existing}, targetRefs(checks))
+}
+
+func TestNothingIsRememberedNorMovedWhenTheTargetFailsToProvision(t *testing.T) {
+	w := newWorld(t, seed{Run: jobsToml, Config: withHook("exit 1")})
+	w.change(t, source, "a.txt", "a\n")
+
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Isolation: project.Verbatim, Remember: []string{"isolation"}})
+
+	require.Equal(t, domain.StatusFailed, result.Item.Status)
+	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "isolation")
+	assert.FileExists(t, filepath.Join(w.at(source), "a.txt"))
+	assert.NoFileExists(t, filepath.Join(w.path(split), "a.txt"))
+}
+
+func TestNothingIsRememberedWhenTheMoveIsRefused(t *testing.T) {
+	w := newWorld(t, seed{Run: jobsToml})
+	w.change(t, source, "a.txt", "a\n")
+	w.usecase.Git = halfMoving{Repo: w.repo}
+
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Isolation: project.Verbatim, Remember: []string{"isolation"}})
+
+	require.Equal(t, domain.StatusFailed, result.Item.Status)
+	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "isolation")
+}
+
+func TestAChangeToWhatTheApplyRunsMakesThePreviewStale(t *testing.T) {
+	for name, change := range map[string]func(w world){
+		"hooks": func(w world) { writeFile(t, filepath.Join(w.stateDir, "config.toml"), withHook("touch hooked")) },
+		"run": func(w world) {
+			writeFile(t, filepath.Join(w.stateDir, "run.toml"), strings.Replace(jobsToml, "3000", "4000", 1))
+		},
+		"env": func(w world) {
+			writeFile(t, filepath.Join(w.stateDir, "config.toml"), projectToml+"\n[[env.file]]\ntarget = \".env\"\n")
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t, seed{Run: jobsToml})
+			w.change(t, source, "a.txt", "a\n")
+			req := extract.Request{Source: source, Files: []string{"a.txt"}, To: split}
+			preview, err := w.usecase.Run(t.Context(), req, operation.Options{DryRun: true, Report: (&recorder{}).add})
+			require.NoError(t, err)
+			change(w)
+
+			_, err = w.usecase.Run(t.Context(), req, operation.Options{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
+
+			assert.Equal(t, operation.CodePlanStale, failureOf(t, err).Code)
+			assert.NoDirExists(t, w.path(split))
+		})
+	}
+}
+
+func TestAPreviewOfChangesCommittedSinceIsStaleRatherThanNothingToExtract(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+	req := moving("a.txt")
+	preview, err := w.usecase.Run(t.Context(), req, operation.Options{DryRun: true, Report: (&recorder{}).add})
+	require.NoError(t, err)
+	gittest.Git(t, w.at(source), "add", "a.txt")
+	gittest.Git(t, w.at(source), "commit", "-q", "-m", "a")
+
+	_, err = w.usecase.Run(t.Context(), req, operation.Options{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
+
+	assert.Equal(t, operation.CodePlanStale, failureOf(t, err).Code)
+}
+
+func TestAMoveThatLeavesTheChangesInBothWorktreesIsHalfMoved(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+	w.usecase.Git = halfMoving{Repo: w.repo}
+
+	result, _ := w.apply(t, moving("a.txt"))
+
+	assert.Equal(t, domain.StatusFailed, result.Item.Status)
+	assert.Equal(t, extract.CodeHalfMoved, result.Item.Err.Code)
+	assert.Equal(t, `the changes are in "feat/other" but "feat/login" still holds them`, result.Item.Err.Message)
+	assert.Equal(t, result.Item.Err, result.Failure())
+}
+
+func TestACancelOnceTheTargetStandsSkipsTheMove(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+	planned, _ := w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	result := w.usecase.Apply(ctx, planned, func(event domain.Event) {
+		if _, provisioned := event.(domain.WorktreeProvisioned); provisioned {
+			cancel()
+		}
+	})
+
+	assert.Equal(t, domain.StatusCancelled, result.Item.Status)
+	assert.Equal(t, domain.ReasonInterrupted, result.Item.Reason)
+	assert.Equal(t, domain.CodeInterrupted, result.Failure().Code)
+	assert.DirExists(t, w.path(split))
+	assert.NoFileExists(t, filepath.Join(w.path(split), "a.txt"))
+	assert.FileExists(t, filepath.Join(w.at(source), "a.txt"))
+}
+
+func TestASourceWithUncommittedChangesIsNotFastForwardedAndSaysSo(t *testing.T) {
+	w := newWorld(t, seed{Behind: true})
+	w.change(t, source, "a.txt", "a\n")
+	writeFile(t, filepath.Join(w.main, "dirty"), "dirty\n")
+
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, FastForward: new(true)})
+
+	assert.Equal(t, []domain.Warning{{
+		Code:    "extract.ff_dirty",
+		Message: "couldn't fast-forward main: its worktree has uncommitted changes — the target starts from your local branch",
+		Params:  domain.Params{"branch": "main"},
+	}}, result.Warnings)
+	assert.Equal(t, domain.StatusDone, result.Item.Status, result.Item.Err)
+}
+
+func TestAFastForwardThatFailsIsAWarningAndTheTargetStillStarts(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+	behindOrigin(t, w, existing)
+	gittest.Git(t, w.main, "remote", "set-url", "origin", w.root+"/gone")
+
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, From: existing, FastForward: new(true)})
+
+	assert.Equal(t, []string{"extract.ff_failed"}, codes(result.Warnings))
+	assert.Contains(t, result.Warnings[0].Message, "couldn't fast-forward feature: ")
+	assert.Contains(t, result.Warnings[0].Message, " — the target starts from your local branch")
+	assert.Equal(t, domain.StatusDone, result.Item.Status, result.Item.Err)
+}
+
+func TestASourceInTheMiddleOfARebaseIsNotFastForwardedAndSaysSo(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+	behindOrigin(t, w, existing)
+	rebasing(t, w, existing)
+
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, From: existing, FastForward: new(true)})
+
+	assert.Equal(t, []domain.Warning{{
+		Code:    "extract.ff_busy",
+		Message: "couldn't fast-forward feature: its worktree is in the middle of a rebase or a bisect — the target starts from your local branch",
+		Params:  domain.Params{"branch": existing},
+	}}, result.Warnings)
+	assert.Equal(t, domain.StatusDone, result.Item.Status, result.Item.Err)
 }
