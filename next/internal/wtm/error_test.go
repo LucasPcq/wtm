@@ -72,7 +72,7 @@ func TestATypedNilErrorPrintsWithoutPanicking(t *testing.T) {
 }
 
 func TestAnInvalidRequestListsItsFields(t *testing.T) {
-	fields := []FieldError{{Path: "from", Code: "not_found", Message: "--from: ghost not found", Params: Params{"value": "ghost"}}}
+	fields := []FieldError{{Path: "from", Code: "not_found", Template: "{path}: {value} not found", Params: Params{"value": "ghost"}}}
 
 	invalid := Invalid(fields)
 
@@ -80,4 +80,14 @@ func TestAnInvalidRequestListsItsFields(t *testing.T) {
 	assert.Equal(t, CodeInvalidRequest, invalid.Code)
 	assert.Equal(t, "the request is invalid", invalid.Error())
 	assert.Equal(t, fields, invalid.Fields)
+}
+
+func TestAFieldErrorSpellsItsPathAsTheSurfaceDoesAndNeverReadsAValueTwice(t *testing.T) {
+	notFound := FieldError{Path: "from", Code: "not_found", Template: "{path}: {value} not found", Params: Params{"value": "x{path}{value}"}}
+	oneOf := FieldError{Path: "isolation", Code: "one_of", Template: "{path} must be one of {accepted}, not {value}", Params: Params{"value": "keep"}, Accepted: []string{"isolated", "verbatim"}}
+	located := FieldError{Path: "branches[0]", Code: "create.path_exists", Template: "worktree path already exists: {path}", Params: Params{"path": "/trees/x"}}
+
+	assert.Equal(t, "--from: x{path}{value} not found", notFound.Message("--from"))
+	assert.Equal(t, "--isolation must be one of isolated, verbatim, not keep", oneOf.Message("--isolation"))
+	assert.Equal(t, "worktree path already exists: /trees/x", located.Message("<branches>[0]"))
 }

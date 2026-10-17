@@ -62,7 +62,7 @@ func TestIsolationIsAskedOnlyWhenTheRunHasSomethingToIsolate(t *testing.T) {
 	asked := isolating.questions(t, create.Request{Branches: []string{branchName}})
 
 	assert.Equal(t, "run.toml declares nothing a worktree isolates", skipped.Isolation.Skip)
-	assert.Equal(t, create.Answer[run.Isolation]{}, skipped.Isolation.Answer)
+	assert.Equal(t, create.Answer[run.Isolation]{Value: run.Isolated, Origin: create.OriginDefault}, skipped.Isolation.Answer)
 	assert.Empty(t, asked.Isolation.Skip)
 	assert.Equal(t, []run.Isolation{run.Isolated, run.Verbatim}, asked.Isolation.Options)
 }

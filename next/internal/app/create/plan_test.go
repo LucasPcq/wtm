@@ -89,6 +89,14 @@ func TestTheParentStrategyWithoutTheSourcesWorktreeFallsBackToMainAndSaysSo(t *t
 	assert.Empty(t, unchanged)
 }
 
+func TestAPlanOfARequestNeverResolvedRefusesItAsInvalid(t *testing.T) {
+	w := newWorld(t, seed{})
+
+	_, _, err := create.Plan(w.facts(t, "  "), create.Request{Branches: []string{"  "}, From: "main", EnvFrom: project.EnvMain})
+
+	assert.Equal(t, []wtm.FieldError{{Path: "branches[0]", Code: "required", Template: "{path} is required"}}, fieldsOf(t, err))
+}
+
 func TestAFolderTakenSinceTheRequestWasResolvedIsAConflict(t *testing.T) {
 	w := newWorld(t, seed{})
 	facts := w.facts(t, branchName)

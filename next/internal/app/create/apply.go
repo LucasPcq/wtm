@@ -111,7 +111,7 @@ func (a applying) provisionParams(planned BranchPlan) provision.Params {
 			Source:     req.From,
 			ParentPath: f.checkedOutAt(req.From),
 			Strategy:   req.EnvFrom,
-			Isolation:  f.isolationOf(req.Isolation),
+			Isolation:  req.Isolation,
 		},
 		Report: a.Report,
 	}

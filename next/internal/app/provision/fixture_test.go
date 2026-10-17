@@ -2,6 +2,7 @@ package provision_test
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"path/filepath"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+	"github.com/LucasPcq/wtm/next/internal/wtm/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 	"github.com/LucasPcq/wtm/next/internal/wtm/run"
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
@@ -137,4 +139,10 @@ type unlocked struct{ provision.Meta }
 
 func (unlocked) LockOrdinals(_ context.Context, do func() error) (bool, error) {
 	return false, do()
+}
+
+type unreadable struct{ provision.EnvFiles }
+
+func (unreadable) Read(string) ([]dotenv.Line, error) {
+	return nil, errors.New("read .env: permission denied")
 }

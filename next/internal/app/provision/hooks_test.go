@@ -66,6 +66,23 @@ func TestAHookInterruptedLeavesTheWorktreeCancelledAndIncomplete(t *testing.T) {
 	assert.False(t, provisioned.OK)
 }
 
+func TestAComposeEnvThatCannotBeReadIsSaidAndTheHooksRunWithoutIt(t *testing.T) {
+	w := onDisk(t)
+	report := &recorder{}
+	params := hooked(composed(w.params(report)), "echo project=$COMPOSE_PROJECT_NAME")
+	params.Deps.EnvFiles = unreadable{EnvFiles: params.Deps.EnvFiles}
+
+	outcome := provision.Run(t.Context(), params)
+
+	require.Equal(t, wtm.StatusDone, outcome.Status, outcome.Err)
+	assert.Equal(t, []string{"project="}, report.lines())
+	assert.Equal(t, []wtm.Warning{{
+		Code:    "provision.hook_env_unavailable",
+		Message: "read .env: permission denied — on_create hooks run without the worktree's environment",
+		Params:  wtm.Params{"cause": "read .env: permission denied"},
+	}}, outcome.Warnings)
+}
+
 func TestAHookReadsTheRunEnvironmentOnlyWhenTheRunReachesHooks(t *testing.T) {
 	t.Setenv("WTM_PORT_OFFSET", "90")
 	echo := "echo offset=$WTM_PORT_OFFSET project=$COMPOSE_PROJECT_NAME"

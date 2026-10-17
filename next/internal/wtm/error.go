@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 type Kind string
@@ -41,9 +42,20 @@ type Error struct {
 type FieldError struct {
 	Path     string
 	Code     string
-	Message  string
+	Template string
 	Params   Params
 	Accepted []string
+}
+
+func (f FieldError) Message(path string) string {
+	pairs := []string{"{accepted}", strings.Join(f.Accepted, ", ")}
+	for key, value := range f.Params {
+		pairs = append(pairs, "{"+key+"}", value)
+	}
+	if _, named := f.Params["path"]; !named {
+		pairs = append(pairs, "{path}", path)
+	}
+	return strings.NewReplacer(pairs...).Replace(f.Template)
 }
 
 type FollowUp struct {

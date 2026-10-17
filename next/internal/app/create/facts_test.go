@@ -37,9 +37,12 @@ func TestTheFactsLocateTheFolderOfEachBranchAsked(t *testing.T) {
 	w := newWorld(t, seed{})
 	require.NoError(t, os.MkdirAll(w.path("plain"), 0o755))
 
-	facts := w.facts(t, "plain", " "+branchName+" ", "  ")
+	facts := w.facts(t, "plain", branchName, "  ")
 
-	assert.Equal(t, map[string]worktree.Location{w.path("plain"): {Path: w.path("plain"), Exists: true}}, facts.Taken)
+	assert.Equal(t, map[string]worktree.Location{
+		w.path("plain"):    {Path: w.path("plain"), Exists: true},
+		w.path(branchName): {Path: w.path(branchName)},
+	}, facts.Folders)
 }
 
 func TestARunConfigThatDoesNotLoadIsAFactNotAFailure(t *testing.T) {

@@ -36,6 +36,11 @@ func (p *provisioning) hookEnv(ordinal *int) map[string]string {
 	for _, path := range jobenv.ComposeEnvPaths(p.Project.Run) {
 		lines, err := p.Deps.EnvFiles.Read(filepath.Join(p.Worktree.Path, path))
 		if err != nil {
+			p.warn(wtm.Warning{
+				Code:    "provision.hook_env_unavailable",
+				Message: err.Error() + " — on_create hooks run without the worktree's environment",
+				Params:  wtm.Params{"cause": err.Error()},
+			})
 			return nil
 		}
 		compose = append(compose, lines)

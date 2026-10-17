@@ -37,13 +37,20 @@ type BranchPlan struct {
 
 func Plan(f Facts, req Request) (Planned, []wtm.Warning, error) {
 	branches := make([]BranchPlan, 0, len(req.Branches))
-	for _, d := range f.decisions(req) {
+	var invalid []wtm.FieldError
+	for index, d := range f.decisions(req) {
 		switch decided := d.(type) {
 		case refusal:
-			return Planned{}, nil, &wtm.Error{Kind: wtm.KindConflict, Code: decided.Code, Message: decided.Message, Params: decided.Params}
+			if decided.Kind != wtm.KindInvalid {
+				return Planned{}, nil, &wtm.Error{Kind: decided.Kind, Code: decided.Code, Message: decided.field(index).Message(branchPath(index)), Params: decided.Params}
+			}
+			invalid = append(invalid, decided.field(index))
 		case BranchPlan:
 			branches = append(branches, decided)
 		}
+	}
+	if len(invalid) > 0 {
+		return Planned{}, nil, wtm.Invalid(invalid)
 	}
 	planned := Planned{
 		Branches:    branches,
@@ -56,18 +63,11 @@ func Plan(f Facts, req Request) (Planned, []wtm.Warning, error) {
 	return planned, append(f.divergedWarnings(req), f.fallbackWarnings(planned)...), nil
 }
 
-func (f Facts) isolationOf(given run.Isolation) run.Isolation {
-	if given != "" {
-		return given
-	}
-	return f.Run.Isolation.Effective()
-}
-
 func (f Facts) plannedIsolation(given run.Isolation) run.Isolation {
 	if !f.Run.IsolationApplies() {
 		return ""
 	}
-	return f.isolationOf(given)
+	return given
 }
 
 func (f Facts) fastForwarded(req Request) []string {

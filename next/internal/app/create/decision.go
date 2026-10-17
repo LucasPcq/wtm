@@ -1,7 +1,9 @@
 package create
 
 import (
+	"fmt"
 	"path/filepath"
+	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
@@ -12,13 +14,18 @@ import (
 type decision interface{ decision() }
 
 type refusal struct {
-	Code    string
-	Message string
-	Params  wtm.Params
+	Kind     wtm.Kind
+	Code     string
+	Template string
+	Params   wtm.Params
 }
 
 func (BranchPlan) decision() {}
 func (refusal) decision()    {}
+
+func (r refusal) field(index int) wtm.FieldError {
+	return wtm.FieldError{Path: branchPath(index), Code: r.Code, Template: r.Template, Params: r.Params}
+}
 
 type entry struct {
 	name        string
@@ -36,23 +43,21 @@ func (f Facts) decisions(req Request) []decision {
 }
 
 func (f Facts) decide(e entry) decision {
-	if branch.Blank(e.name) {
-		return refusal{Code: codeRequired, Message: "{path} is required"}
-	}
-	if err := branch.Problem(e.name); err != nil {
-		return refusal{Code: "create.branch_name_invalid", Message: err.Error(), Params: wtm.Params{"problem": err.Error()}}
-	}
-	if clash, found := f.clash(branch.ClashParams{Branch: e.name, Live: e.earlier}); found {
-		return e.clashed(clash)
+	if refused, found := f.invalid(e); found {
+		return refused
 	}
 	if at := f.checkedOutAt(e.name); at != "" {
 		return e.open(at)
 	}
-	if location, taken := f.Taken[e.path]; taken {
+	location, located := f.Folders[e.path]
+	if !located {
+		panic(fmt.Sprintf("create: the folder of %s was never located: observe with the branches of the request", e.name))
+	}
+	if location.Exists {
 		return e.occupied(f.occupant(location))
 	}
 	if clash, found := f.clash(branch.ClashParams{Branch: e.name, Live: f.live()}); found {
-		return e.clashed(clash)
+		return e.clashed(clash).as(wtm.KindConflict)
 	}
 	switch {
 	case f.local(e.name):
@@ -61,6 +66,25 @@ func (f Facts) decide(e entry) decision {
 		return BranchPlan{Branch: e.name, Path: e.path, Action: ActionResume, Upstream: remotePrefix + e.name}
 	}
 	return BranchPlan{Branch: e.name, Path: e.path, Action: ActionCreate}
+}
+
+func (f Facts) invalid(e entry) (refusal, bool) {
+	if branch.Blank(e.name) {
+		return refusal{Kind: wtm.KindInvalid, Code: codeRequired, Template: "{path} is required"}, true
+	}
+	if slices.Contains(e.earlier, e.name) {
+		return refusal{Kind: wtm.KindInvalid, Code: "distinct", Template: "{path}: {value} is given twice", Params: wtm.Params{"value": e.name}}, true
+	}
+	if err := branch.Problem(e.name); err != nil {
+		return refusal{Kind: wtm.KindInvalid, Code: "create.branch_name_invalid", Template: "{problem}", Params: wtm.Params{"problem": err.Error()}}, true
+	}
+	if at := slices.IndexFunc(e.earlier, func(earlier string) bool { return f.pathOf(earlier) == e.path }); at >= 0 {
+		return e.clashed(branch.Clash{Branch: e.earlier[at], Name: filepath.Base(e.path)}), true
+	}
+	if clash, found := f.clash(branch.ClashParams{Branch: e.name, Live: e.earlier}); found {
+		return e.clashed(clash), true
+	}
+	return refusal{}, false
 }
 
 func (f Facts) clash(params branch.ClashParams) (branch.Clash, bool) {
@@ -75,28 +99,33 @@ func (e entry) open(at string) decision {
 		return BranchPlan{Branch: e.name, Path: at, Action: ActionUnchanged}
 	}
 	return refusal{
-		Code:    "create.checked_out_elsewhere",
-		Message: "branch " + e.name + " is checked out at " + at + " — run `wtm go " + e.name + "` to jump in",
-		Params:  wtm.Params{"branch": e.name, "path": at},
+		Kind:     wtm.KindConflict,
+		Code:     "create.checked_out_elsewhere",
+		Template: "branch {branch} is checked out at {path} — run `wtm go {branch}` to jump in",
+		Params:   wtm.Params{"branch": e.name, "path": at},
 	}
 }
 
 func (e entry) occupied(occupant string) decision {
-	path := e.path
 	switch {
 	case e.ifNotExists && occupant == e.name:
-		return BranchPlan{Branch: e.name, Path: path, Action: ActionUnchanged}
+		return BranchPlan{Branch: e.name, Path: e.path, Action: ActionUnchanged}
 	case occupant == "" || occupant == e.name:
-		return refusal{Code: "create.path_exists", Message: "worktree path already exists: " + path, Params: wtm.Params{"path": path}}
+		return refusal{Kind: wtm.KindConflict, Code: "create.path_exists", Template: "worktree path already exists: {path}", Params: wtm.Params{"path": e.path}}
 	}
-	return e.clashed(branch.Clash{Branch: occupant, Name: filepath.Base(path)})
+	return e.clashed(branch.Clash{Branch: occupant, Name: filepath.Base(e.path)}).as(wtm.KindConflict)
 }
 
 func (e entry) clashed(clash branch.Clash) refusal {
-	name := e.name
 	return refusal{
-		Code:    "create.name_clash",
-		Message: "branch " + name + " would share its name with " + clash.Branch + " (" + clash.Name + ") — pick another name",
-		Params:  wtm.Params{"branch": name, "other": clash.Branch, "name": clash.Name},
+		Kind:     wtm.KindInvalid,
+		Code:     "create.name_clash",
+		Template: "branch {branch} would share its name with {other} ({name}) — pick another name",
+		Params:   wtm.Params{"branch": e.name, "other": clash.Branch, "name": clash.Name},
 	}
+}
+
+func (r refusal) as(kind wtm.Kind) refusal {
+	r.Kind = kind
+	return r
 }

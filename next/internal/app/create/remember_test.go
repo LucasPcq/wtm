@@ -35,6 +35,14 @@ func TestAnIsolationNotAskedIsNotRemembered(t *testing.T) {
 	assert.NotContains(t, config, "isolation")
 }
 
+func TestAFastForwardNotAskedNeverOverwritesTheOneRemembered(t *testing.T) {
+	w := newWorld(t, seed{Config: projectToml + "\n[wizard.remembered]\nsource_update = \"ff\"\n"})
+
+	w.apply(t, create.Request{Branches: []string{branchName}, FastForward: new(false), Remember: []string{"fast_forward"}})
+
+	assert.Contains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), `source_update = "ff"`)
+}
+
 func TestNothingIsRememberedWhenNoBranchWasCreated(t *testing.T) {
 	w := newWorld(t, seed{Linked: []string{"linked"}})
 

@@ -25,7 +25,7 @@ type Facts struct {
 	Worktrees  []worktree.Worktree
 	Branches   branch.Branches
 	Divergence map[string]branch.AheadBehind
-	Taken      map[string]worktree.Location
+	Folders    map[string]worktree.Location
 }
 
 func (d Deps) Observe(ctx context.Context, branches []string) (Facts, error) {
@@ -49,11 +49,11 @@ func (d Deps) Observe(ctx context.Context, branches []string) (Facts, error) {
 		return Facts{}, err
 	}
 	facts := Facts{MainPath: d.MainPath, Config: config, Global: global, Worktrees: worktrees, Branches: refs, Divergence: divergence}
-	taken, err := d.taken(ctx, facts.pathsOf(branches))
+	folders, err := d.locate(ctx, facts.pathsOf(branches))
 	if err != nil {
 		return Facts{}, err
 	}
-	facts.Taken = taken
+	facts.Folders = folders
 	facts.Run, facts.RunErr = d.LoadRun()
 	return facts, nil
 }
@@ -74,25 +74,23 @@ func (d Deps) divergence(ctx context.Context, refs branch.Branches) (map[string]
 	return found, nil
 }
 
-func (d Deps) taken(ctx context.Context, paths []string) (map[string]worktree.Location, error) {
-	taken := map[string]worktree.Location{}
+func (d Deps) locate(ctx context.Context, paths []string) (map[string]worktree.Location, error) {
+	folders := make(map[string]worktree.Location, len(paths))
 	for _, path := range paths {
 		location, err := d.Git.Locate(ctx, path)
 		if err != nil {
 			return nil, err
 		}
-		if location.Exists {
-			taken[path] = location
-		}
+		folders[path] = location
 	}
-	return taken, nil
+	return folders, nil
 }
 
 func (f Facts) pathsOf(branches []string) []string {
 	var paths []string
 	for _, name := range branches {
 		if !branch.Blank(name) {
-			paths = append(paths, f.pathOf(strings.TrimSpace(name)))
+			paths = append(paths, f.pathOf(name))
 		}
 	}
 	return paths

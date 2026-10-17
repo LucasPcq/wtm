@@ -3,7 +3,6 @@ package create
 import (
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
@@ -67,7 +66,6 @@ func Form(f Facts, req Request) Questions {
 	if req.Ask {
 		f.Config.Remembered = nil
 	}
-	req.Branches = trimmed(req.Branches)
 	from := f.from(req)
 	req.From = from.Value
 	questions := Questions{
@@ -81,17 +79,6 @@ func Form(f Facts, req Request) Questions {
 	}
 	questions.Errors = f.problems(questions)
 	return questions
-}
-
-func trimmed(branches []string) []string {
-	if branches == nil {
-		return nil
-	}
-	trimmed := make([]string, 0, len(branches))
-	for _, name := range branches {
-		trimmed = append(trimmed, strings.TrimSpace(name))
-	}
-	return trimmed
 }
 
 func (f Facts) branchOptions() []Option {
@@ -175,7 +162,6 @@ func (f Facts) isolation(given run.Isolation) Choice[run.Isolation] {
 	switch {
 	case given != "":
 		question.Answer = Answer[run.Isolation]{Value: given, Origin: OriginRequest}
-	case question.Skip != "":
 	case found:
 		question.Answer = Answer[run.Isolation]{Value: run.Isolation(remembered), Origin: OriginRemembered}
 	case f.Run.Isolation != "":
