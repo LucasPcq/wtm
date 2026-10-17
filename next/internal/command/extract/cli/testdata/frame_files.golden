@@ -1,0 +1,13 @@
+
+  Step 2/10 • Files
+
+  ✓ Source worktree: feat/login
+
+  Space to toggle, a to select all, / to filter, enter to confirm, esc to go back.
+
+▌› [ ] apps/api/a.txt                                                                          mod
+   [ ] apps/api/new.txt                                                                        new
+   [ ] README.md → DOC.md                                                                      ren
+   [ ] old.txt                                                                                 del
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc back

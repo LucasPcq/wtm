@@ -1,0 +1,52 @@
+## branches
+feat/api
+feat/login
+feat/misc
+main
+topic
+## acme status
+## feat-api status
+?? apps/api/new/deep/y.txt
+?? apps/api/new/x.txt
+   apps/api/new/deep/y.txt 9063a9f0e032
+   apps/api/new/x.txt 6fcf9dfbd479
+## feat-login status
+ M README.md
+?? apps/web/login.ts
+   apps/web/login.ts 2baaedadd43f
+   README.md 190b171b0321
+## feat-misc status
+D  apps/web/package.json
+R  scripts/dev.py -> scripts/serve.py
+   scripts/serve.py facb9fb29297
+## topic status
+?? apps/web/login.ts
+   apps/web/login.ts 2baaedadd43f
+## .git/wtm/worktrees/feat%2Fapi/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 3,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Flogin/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 1,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fmisc/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 4,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/topic/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 2,
+  "isolation": "isolated"
+}

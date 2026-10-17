@@ -1,0 +1,39 @@
+#:schema ./schemas/project.schema.json
+
+# wtm — Worktree Manager configuration
+# Docs: https://github.com/LucasPcq/wtm
+
+[worktrees]
+# Directory where worktrees are created (relative to repo root)
+base_path = "../.trees"
+
+# Branch used as the default base for new worktrees
+base_branch = ""
+
+[env]
+# Strategy for provisioning .env files in new worktrees:
+#   example — copy .env.example and rename to .env
+#   main    — copy .env from the main checkout
+#   parent  — copy .env from the source worktree
+# strategy = "example"
+
+# Each value file to provision, with its committed template (if any).
+
+[[env.file]]
+target = ".env"
+
+[hooks]
+# Commands run after creating a new worktree
+on_create = [
+]
+
+# Commands run right before removing a worktree (e.g. tear down external
+# resources like Docker). A non-zero exit aborts the removal unless the entry
+# sets continue_on_error.
+on_clean = [
+]
+
+# Answers the wizard no longer asks, kept by "Always use this answer".
+# --ask asks them again; deleting a line forgets it.
+[wizard.remembered]
+isolation = "verbatim"

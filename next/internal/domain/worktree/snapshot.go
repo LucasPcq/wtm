@@ -1,0 +1,129 @@
+package worktree
+
+import (
+	"slices"
+	"strconv"
+	"strings"
+)
+
+// OriginPrefix spells a branch of origin the way a user names it: origin/<branch>.
+const OriginPrefix = "origin/"
+
+// Snapshot is the repository at one moment: its worktrees as git lists them, its local and remote branches, and the ahead/behind counts of each local branch whose origin tip differs.
+type Snapshot struct {
+	Worktrees  []Worktree
+	Branches   Branches
+	Divergence map[string]AheadBehind
+}
+
+// Local reports whether name is a local branch.
+func (s Snapshot) Local(name string) bool {
+	return slices.ContainsFunc(s.Branches.Local, func(b Branch) bool { return b.Name == name })
+}
+
+// Remote reports whether name is a branch of origin.
+func (s Snapshot) Remote(name string) bool {
+	return slices.ContainsFunc(s.Branches.Remote, func(b Branch) bool { return b.Name == name })
+}
+
+// Candidate reports whether name can be started from: a local branch, or origin/<branch> of a branch on origin.
+func (s Snapshot) Candidate(name string) bool {
+	remote, onOrigin := strings.CutPrefix(name, OriginPrefix)
+	return s.Local(name) || onOrigin && s.Remote(remote)
+}
+
+// Ref returns the ref a new branch starts from when asked to start from from: origin's branch for origin/<branch> without a local branch of that name, the local branch otherwise.
+func (s Snapshot) Ref(from string) Ref {
+	if remote, onOrigin := strings.CutPrefix(from, OriginPrefix); onOrigin && !s.Local(from) {
+		return RemoteBranch{Name: remote}
+	}
+
+	return LocalBranch{Name: from}
+}
+
+// CheckedOutAt returns the path of the worktree name is checked out in, or "" when none is.
+func (s Snapshot) CheckedOutAt(name string) string {
+	at := slices.IndexFunc(s.Worktrees, func(w Worktree) bool { return w.Branch() == name })
+	if at < 0 {
+		return ""
+	}
+
+	return s.Worktrees[at].Path
+}
+
+// Occupant returns the branch of the worktree at location, or "" when no worktree is there.
+func (s Snapshot) Occupant(location Location) string {
+	at := slices.IndexFunc(s.Worktrees, func(w Worktree) bool { return w.Path == location.Path })
+	if at < 0 {
+		return ""
+	}
+
+	return s.Worktrees[at].Branch()
+}
+
+// AheadBehind returns the counts of the commits name has that origin's branch lacks, and the reverse; zero when their tips agree.
+func (s Snapshot) AheadBehind(name string) AheadBehind {
+	return s.Divergence[name]
+}
+
+// Standing returns where name stands against origin: NoOrigin when origin has no such branch.
+func (s Snapshot) Standing(name string) Divergence {
+	if !s.Remote(name) {
+		return NoOrigin
+	}
+
+	return s.AheadBehind(name).Divergence()
+}
+
+// Live returns the branch of each worktree, "" for one on no branch.
+func (s Snapshot) Live() []string {
+	names := make([]string, 0, len(s.Worktrees))
+	for _, w := range s.Worktrees {
+		names = append(names, w.Branch())
+	}
+
+	return names
+}
+
+// Differing returns the local branches whose origin tip is another commit: the ones a snapshot counts ahead and behind.
+func (b Branches) Differing() []string {
+	var names []string
+	for _, local := range b.Local {
+		at := slices.IndexFunc(b.Remote, func(remote Branch) bool { return remote.Name == local.Name })
+		if at >= 0 && b.Remote[at].Tip != local.Tip {
+			names = append(names, local.Name)
+		}
+	}
+
+	return names
+}
+
+// Badge is the badge a branch offered as a source carries: how far behind or ahead of origin it is, both when it has diverged, none when it is up to date or not on origin.
+func (s Snapshot) Badge(name string) string {
+	counts := s.AheadBehind(name)
+	switch s.Standing(name) {
+	case Behind:
+		return strconv.Itoa(counts.Behind) + " behind"
+	case Ahead:
+		return strconv.Itoa(counts.Ahead) + " ahead"
+	case Diverged:
+		return counts.String()
+	case NoOrigin, UpToDate:
+	}
+
+	return ""
+}
+
+// StandingOf is where the branch of a placed worktree stood against origin: the counts of an existing branch it checks out, the branch of origin it resumes, nothing for a new branch.
+func (s Snapshot) StandingOf(branch string, placed Placed) Standing {
+	switch placed.Start {
+	case StartCheckOut:
+		counts := s.AheadBehind(branch)
+		return Standing{ExistingBranch: true, OriginState: s.Standing(branch), OriginAhead: counts.Ahead, OriginBehind: counts.Behind}
+	case StartResume:
+		return Standing{Upstream: placed.Upstream}
+	case StartCreate:
+	}
+
+	return Standing{}
+}

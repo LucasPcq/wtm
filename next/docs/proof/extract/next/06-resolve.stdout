@@ -1,0 +1,12 @@
+
+  ! Applied to topic with conflicts
+
+  Conflicts to resolve
+    README.md
+
+  Nothing was removed from feat/login: to undo, discard the applied files in topic.
+
+  path  ../acme.trees/topic
+
+  → wtm go topic   resolve the conflicts, then discard the same files in feat/login
+

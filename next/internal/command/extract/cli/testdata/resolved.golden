@@ -1,0 +1,13 @@
+
+  ! Applied to feat/other with conflicts
+
+  Conflicts to resolve
+    apps/api/a.txt
+
+  The other files were applied cleanly.
+  Nothing was removed from feat/login: to undo, discard the applied files in feat/other.
+
+  path  ../wt-feat-other
+
+  → wtm go feat/other   resolve the conflicts, then discard the same files in feat/login
+

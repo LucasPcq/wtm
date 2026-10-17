@@ -1,0 +1,13 @@
+
+  ✓ Moved 4 files to feat/other
+
+    mod  apps/api/a.txt
+    new  apps/api/new.txt
+    ren  DOC.md
+    del  old.txt
+
+  source  feat/login · files removed
+  path    ../wt-feat-other
+
+  → wtm go feat/other
+

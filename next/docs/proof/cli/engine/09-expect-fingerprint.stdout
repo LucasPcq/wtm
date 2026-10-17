@@ -1,0 +1,12 @@
+
+  ✓ create: 1 done
+
+  Branches   feat/dry
+  From       main
+  Env        main
+  Isolation  isolated
+  Remember   env_from
+  feat/dry   ../acme.trees/feat-dry · 3 ports settled (offset +80)
+
+  → wtm go feat/dry
+

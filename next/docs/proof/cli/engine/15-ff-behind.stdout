@@ -1,0 +1,12 @@
+
+  ✓ create: 1 done
+
+  Branches      feat/ff
+  From          main
+  Env           main
+  Isolation     isolated
+  Fast-forward  main
+  feat/ff       ../acme.trees/feat-ff · 3 ports settled (offset +110)
+
+  → wtm go feat/ff
+

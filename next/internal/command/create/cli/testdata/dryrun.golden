@@ -1,0 +1,11 @@
+  create · dry run, nothing applied
+  Branches      feat/a, feat/b
+  From          main
+  Env           example
+  Fast-forward  main
+  Remember      env_from
+
+  ! The "parent" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main.
+
+  fingerprint  0123456789abcdef01234567
+  → wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567   apply this plan
