@@ -294,3 +294,25 @@ func TestAFlagErrorIsInTheEnvelopeOnlyWhenTheArgumentsAskForJSON(t *testing.T) {
 		assert.Equal(t, "the request is invalid: unknown flag: --nope", doc.Error.Message, name)
 	}
 }
+
+func TestTheCommandOpensTheProjectDirAndRunsWithTheCorrelationID(t *testing.T) {
+	w := newWorld(seed{Env: uicli.Env{Cwd: "/elsewhere", ProjectDir: "/named", CorrelationID: "corr-1"}})
+
+	got := runCreate(t, w, "feat/a", "--yes")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	assert.Equal(t, []string{"/named"}, w.seen.dirs)
+	require.Len(t, w.seen.ops, 1)
+	assert.Equal(t, "corr-1", w.seen.ops[0].CorrelationID)
+	assert.Contains(t, got.Stdout, "../repo/.trees/feat-a", "paths are shown from Env.Cwd")
+}
+
+func TestAnInvalidCorrelationIDIsRefusedBeforeTheProjectIsOpened(t *testing.T) {
+	w := newWorld(seed{Env: uicli.Env{Cwd: mainPath, ProjectDir: mainPath, CorrelationID: "bad\x01id"}})
+
+	got := runCreate(t, w, "feat/a", "--yes")
+
+	assert.Equal(t, uicli.ExitUsage, got.Code)
+	assert.Contains(t, got.Stderr, "$WTM_CORRELATION_ID contains a control character: invalid correlation id")
+	assert.Empty(t, w.seen.dirs)
+}

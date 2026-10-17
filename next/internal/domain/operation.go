@@ -87,6 +87,7 @@ type RunOptions struct {
 	DryRun            bool   // plan without taking locks, stop after the fingerprint
 	ExpectFingerprint string // refuse to apply a plan whose fingerprint differs; empty accepts any
 	Surface           string // the surface that started the operation (cli, ui…), recorded in its events
+	CorrelationID     string // ties the operation's events to the caller's own run; checked by [CorrelationProblem]
 	Report            Report // receives each event as it is published; may be nil
 }
 

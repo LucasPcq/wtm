@@ -10,26 +10,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// A Run is what a command prints its run with: its name, its streams, the --output format and --quiet the user gave, the flags its failures are spelled with and the exit codes of its own codes.
+// A Run is what a command prints its run with: its name, its streams, the environment of its process, the --output format and --quiet the user gave, the flags its failures are spelled with and the exit codes of its own codes.
 type Run struct {
 	Command string // the name the envelope reports
 	Streams *output.Streams
+	Env     Env
 	Output  string // bound to the command's --output flag
 	Quiet   bool   // read from --quiet by [Run.Begin]
 	Flags   output.Flags
 	Exits   map[string]int
 }
 
-// Begin reads --quiet and refuses an --output format other than text or json, printed as text, the one format sure to be understood, followed by the way to cmd's help.
+// Begin reads --quiet and refuses an --output format other than text or json, printed as text, the one format sure to be understood, followed by the way to cmd's help; then it refuses an invalid $WTM_CORRELATION_ID, before any repository is looked up.
 func (r *Run) Begin(cmd *cobra.Command) error {
 	r.Quiet, _ = cmd.Flags().GetBool(FlagQuiet)
-	if r.Output == OutputText || r.Output == OutputJSON {
-		return nil
+	if r.Output != OutputText && r.Output != OutputJSON {
+		refused := domain.InvalidMessage(`invalid --output "` + r.Output + `": expected one of text, json`)
+		r.Output = OutputText
+		return r.FailWith(refused, []output.NextStep{HelpStep(cmd)})
 	}
 
-	refused := domain.InvalidMessage(`invalid --output "` + r.Output + `": expected one of text, json`)
-	r.Output = OutputText
-	return r.FailWith(refused, []output.NextStep{HelpStep(cmd)})
+	if err := domain.CorrelationProblem(r.Env.CorrelationID); err != nil {
+		return r.FailWith(domain.InvalidMessage("$"+CorrelationIDEnv+" "+err.Error()+": invalid correlation id"), nil)
+	}
+
+	return nil
 }
 
 // Human reports whether the output is for a person, not the JSON envelope.

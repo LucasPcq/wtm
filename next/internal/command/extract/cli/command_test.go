@@ -243,3 +243,14 @@ func TestAnUnknownOutputFormatIsRefusedAsText(t *testing.T) {
 	assert.Empty(t, got.Stdout)
 	assert.Equal(t, "\n  ✗ invalid --output \"yaml\": expected one of text, json\n  → wtm-next extract --help\n\n", got.Stderr)
 }
+
+func TestTheCommandOpensTheProjectDirAndRunsWithTheCorrelationID(t *testing.T) {
+	w := newWorld(seed{Env: uicli.Env{Cwd: mainPath, ProjectDir: "/named", CorrelationID: "corr-1"}})
+
+	got := runExtract(t, w, source, "--files", "apps/api/new.txt", "--to", split, "--from", source, "--keep")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	assert.Equal(t, []string{"/named"}, w.seen.dirs)
+	require.Len(t, w.seen.ops, 1)
+	assert.Equal(t, "corr-1", w.seen.ops[0].CorrelationID)
+}

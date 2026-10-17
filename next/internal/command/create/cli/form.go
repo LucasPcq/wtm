@@ -19,8 +19,7 @@ type useCase interface {
 type formParams struct {
 	App     useCase
 	Request create.Request
-	DryRun  bool
-	Report  domain.Report
+	Options domain.RunOptions // DryRun, CorrelationID and Report; the wizard sets the surface and the fingerprint
 	In      io.Reader
 	Out     *output.Stream
 }
@@ -33,7 +32,7 @@ type ran struct {
 
 // runForm runs the wizard on the terminal through to the apply; it returns the request as answered and its outcome, with form.Run's error: a cancel, a failed read of the repository, or the refusal of the run.
 func runForm(ctx context.Context, params formParams) (ran, error) {
-	w := newWizard(ctx, wizardParams{App: params.App, Request: params.Request, DryRun: params.DryRun, Report: params.Report})
+	w := newWizard(ctx, wizardParams{App: params.App, Request: params.Request, Options: params.Options})
 	err := form.Run(ctx, w.form(), params.In, params.Out)
 
 	return ran{Outcome: w.outcome, Request: w.req}, err

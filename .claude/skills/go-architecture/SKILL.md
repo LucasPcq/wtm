@@ -34,7 +34,7 @@ Why a package per command, when the Go guides prefer a package per concept and B
 `wtm-next create feat/x --from main`, hop by hop:
 
 1. `cmd/wtm-next/main.go`: the root runs with each command's CLI registered.
-2. `command/create/cli/command.go`: flags → `create.Request` + `domain.RunOptions`; the wizard on a terminal, else `UseCase.Run`.
+2. `command/create/cli/command.go`: flags → `create.Request` + `domain.RunOptions` (the correlation ID from the process's `uicli.Env`, read once by `main`), the repository opened from `Env.ProjectDir`; the wizard on a terminal, else `UseCase.Run`.
 3. `command/create/usecase.go` → `Run`: begin the operation (locks), plan under the locks, fingerprint, stop on a dry run, refuse a stale plan, apply between the events.
 4. `Plan`: `Observe` reads the repository through the ports of `port.go`; `Resolve` (`questions.go`) settles the request; `Decide` (`rules.go`) makes the plan.
 5. `Apply`: its steps, calling `service/provision` for each new worktree.

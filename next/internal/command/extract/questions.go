@@ -39,7 +39,7 @@ type Request struct {
 	Keep        *bool             `json:"keep"` // copy rather than move; nil when not given
 	OnConflict  OnConflict        `json:"on_conflict"`
 	Remember    []string          `json:"remember"` // the fields whose answer is remembered for the next runs
-	Ask         bool              `json:"-"`        // ignore the remembered answers for this run
+	Ask         bool              `json:"ask"`      // ignore the remembered answers for this run
 }
 
 // Answer is the request with the field at path answered by values, spelled as the field's Answer spells them; the path "remember" answers the fields whose answer is remembered. A value the field cannot take leaves the request as it was.

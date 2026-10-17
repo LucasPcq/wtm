@@ -17,9 +17,9 @@ func TestRunKeepsTheOperationContract(t *testing.T) {
 		w := newWorld(t, seed{})
 		w.usecase.Operations = ops
 		return operationtest.Subject{
-			Run: func(ctx context.Context, opts domain.RunOptions) (string, error) {
+			Run: func(ctx context.Context, opts domain.RunOptions) (operationtest.Ran, error) {
 				outcome, err := w.usecase.Run(ctx, create.Request{Branches: []string{branchName}}, opts)
-				return outcome.Fingerprint, err
+				return operationtest.Ran{Op: outcome.Op, Fingerprint: outcome.Fingerprint}, err
 			},
 			Stale: func(t *testing.T) {
 				writeFile(t, filepath.Join(w.stateDir, "config.toml"), strings.Replace(projectToml, `strategy = "main"`, `strategy = "example"`, 1))

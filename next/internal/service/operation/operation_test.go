@@ -15,12 +15,27 @@ import (
 func TestBeginRecordsTheOperationAndTakesItsLocks(t *testing.T) {
 	l := &locker{hold: &hold{}}
 
-	op, err := service(l, &publisher{}).Begin("create", []domain.Lock{repoLock}, domain.RunOptions{Surface: "cli"})
+	op, err := service(l, &publisher{}).Begin("create", []domain.Lock{repoLock}, domain.RunOptions{Surface: "cli", CorrelationID: "corr-1"})
 
 	require.NoError(t, err)
 	assert.Equal(t, "op-1", op.ID)
 	want := domain.Operation{ID: "op-1", PID: os.Getpid(), Command: "create", Surface: "cli", CorrelationID: "corr-1", StartedAt: startedAt, Locks: []domain.Lock{repoLock}}
 	assert.Equal(t, []domain.Operation{want}, l.taken)
+}
+
+func TestBeginRefusesAnInvalidCorrelationIDBeforeTakingAnyLock(t *testing.T) {
+	l := &locker{hold: &hold{}}
+
+	op, err := service(l, &publisher{}).Begin("create", []domain.Lock{repoLock}, domain.RunOptions{CorrelationID: "bad\x01id"})
+
+	found, ok := errors.AsType[*domain.Error](err)
+	require.True(t, ok, "Begin = %v, want a *domain.Error", err)
+	assert.Equal(t, domain.KindInvalid, found.Kind)
+	assert.Equal(t, "the correlation id contains a control character", found.Message)
+	require.NotNil(t, op)
+	assert.Equal(t, "op-1", op.ID)
+	assert.Empty(t, l.taken)
+	op.End()
 }
 
 func TestBeginOnADryRunTakesNoLock(t *testing.T) {

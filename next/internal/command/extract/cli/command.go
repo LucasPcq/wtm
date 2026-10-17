@@ -51,15 +51,9 @@ const (
 	exitConflict = 15
 )
 
-// A Project is what the command runs against, found by New's open once the flags are valid: the use case wired to the repository, and the directory the command runs in, from which paths are shown.
-type Project struct {
-	UseCase extract.UseCase
-	Cwd     string
-}
-
 type extractCommand struct {
 	io         uicli.Run
-	open       func(ctx context.Context) (Project, error)
+	open       func(ctx context.Context, dir string) (extract.UseCase, error)
 	files      []string
 	to         string
 	from       string
@@ -75,10 +69,10 @@ type extractCommand struct {
 }
 
 // New returns the extract command: its flags become an extract.Request, answered in the wizard when the user can see and answer it, else run unattended; it draws the outcome on streams, or the v2 JSON envelope with --output json.
-func New(streams *output.Streams, open func(ctx context.Context) (Project, error)) *cobra.Command {
+func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (extract.UseCase, error)) *cobra.Command {
 	// exits are the exit codes of extract's own codes, ahead of those of their kind.
 	exits := map[string]int{extract.CodeConfigNotFound: uicli.ExitConfigNotFound, extract.CodeConflict: exitConflict}
-	c := &extractCommand{io: uicli.Run{Command: commandName, Streams: streams, Flags: extractFlags, Exits: exits}, open: open}
+	c := &extractCommand{io: uicli.Run{Command: commandName, Streams: streams, Env: env, Flags: extractFlags, Exits: exits}, open: open}
 	cmd := &cobra.Command{Use: "extract [source]", Short: extractShort, Long: extractLong, Example: extractExample, Args: cobra.MaximumNArgs(1), RunE: c.run}
 
 	flags := cmd.Flags()
@@ -110,16 +104,16 @@ func (c *extractCommand) run(cmd *cobra.Command, args []string) error {
 	req := c.request(cmd, args)
 
 	ctx := cmd.Context()
-	project, err := c.open(ctx)
+	useCase, err := c.open(ctx, c.io.Env.ProjectDir)
 	if err != nil {
 		return c.io.Refuse(domain.AsError(domain.AsErrorParams{Err: err}), extractLine{Command: cmd.CommandPath(), Request: req}.String())
 	}
 
 	progress := c.io.Progress(ctx)
-	ran, err := c.extract(cmd, project.UseCase, req, progress.Report)
+	ran, err := c.extract(cmd, useCase, req, progress.Report)
 	progress.Close()
 
-	return c.conclude(cmd, concluded{Outcome: ran.Outcome, Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: ran.Request, Cwd: project.Cwd})
+	return c.conclude(cmd, concluded{Outcome: ran.Outcome, Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: ran.Request, Cwd: c.io.Env.Cwd})
 }
 
 // extract runs the request in the wizard when the user can answer it, else unattended; it returns the request that ran, the wizard's answers included.
@@ -127,10 +121,10 @@ func (c *extractCommand) extract(cmd *cobra.Command, useCase extract.UseCase, re
 	ctx := cmd.Context()
 
 	if c.interactive() {
-		return runForm(ctx, formParams{App: useCase, Request: req, DryRun: c.dryRun, Report: report, In: c.io.Streams.In, Out: c.io.Streams.Err})
+		return runForm(ctx, formParams{App: useCase, Request: req, Options: domain.RunOptions{DryRun: c.dryRun, CorrelationID: c.io.Env.CorrelationID, Report: report}, In: c.io.Streams.In, Out: c.io.Streams.Err})
 	}
 
-	outcome, err := useCase.Run(ctx, req, domain.RunOptions{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, Report: report})
+	outcome, err := useCase.Run(ctx, req, domain.RunOptions{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, CorrelationID: c.io.Env.CorrelationID, Report: report})
 	return ran{Outcome: outcome, Request: req}, err
 }
 

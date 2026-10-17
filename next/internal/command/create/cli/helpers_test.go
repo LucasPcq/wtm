@@ -42,7 +42,7 @@ func runOn(t *testing.T, w world, setUp func(*output.Streams), args ...string) p
 	t.Helper()
 	streams, _, stdout, stderr := output.Test()
 	setUp(streams)
-	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.open)})
+	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.env(), w.open)})
 	code := uicli.Execute(t.Context(), root, args)
 	return printed{Stdout: stdout.String(), Stderr: stderr.String(), Code: code}
 }

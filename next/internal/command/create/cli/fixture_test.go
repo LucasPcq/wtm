@@ -33,6 +33,7 @@ const (
 var createdAt = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 
 type seed struct {
+	Env        uicli.Env // zero runs in the main worktree
 	Remembered map[string]string
 	OnCreate   []project.Hook
 	Linked     []string
@@ -48,6 +49,20 @@ type world struct {
 	git   *gittest.Fake
 	store *storetest.Fake
 	seed  seed
+	seen  *seen
+}
+
+// seen is what the use case was given: the directory it was opened from and the operations it locked.
+type seen struct {
+	dirs []string
+	ops  []domain.Operation
+}
+
+func (w world) env() uicli.Env {
+	if w.seed.Env != (uicli.Env{}) {
+		return w.seed.Env
+	}
+	return uicli.Env{Cwd: mainPath, ProjectDir: mainPath}
 }
 
 func newWorld(s seed) world {
@@ -69,19 +84,21 @@ func newWorld(s seed) world {
 		git:   gittest.NewFake(gittest.FakeParams{Main: mainPath, Branch: "main", Remote: []string{"main"}, Worktrees: linked, Commits: commits, Fail: s.GitFails}),
 		store: storetest.NewFake(storetest.FakeParams{Config: &config, Fail: s.StoreFails}),
 		seed:  s,
+		seen:  &seen{},
 	}
 }
 
 func (w world) params(args []string) uicli.Params {
 	streams := output.System()
-	return uicli.Params{Version: "1.2.3", Streams: streams, Args: args, Commands: []*cobra.Command{New(streams, w.open)}, KillCancelled: shell.KillCancelled, AwaitShields: shell.AwaitShields}
+	return uicli.Params{Version: "1.2.3", Streams: streams, Args: args, Commands: []*cobra.Command{New(streams, w.env(), w.open)}, KillCancelled: shell.KillCancelled, AwaitShields: shell.AwaitShields}
 }
 
-func (w world) open(context.Context) (Project, error) {
+func (w world) open(_ context.Context, dir string) (create.UseCase, error) {
+	w.seen.dirs = append(w.seen.dirs, dir)
 	if w.seed.Open != nil {
-		return Project{}, w.seed.Open
+		return create.UseCase{}, w.seed.Open
 	}
-	return Project{UseCase: w.usecase(), Cwd: mainPath}, nil
+	return w.usecase(), nil
 }
 
 func (w world) usecase() create.UseCase {
@@ -94,7 +111,7 @@ func (w world) usecase() create.UseCase {
 		Config:  stored{w.store},
 		Answers: w.store,
 		Operations: operation.Service{
-			Locker:    locker{err: w.seed.Locks},
+			Locker:    locker{err: w.seed.Locks, seen: w.seen},
 			Publisher: locker{},
 			NewOpID:   func() string { return "op-1" },
 			Now:       func() time.Time { return createdAt },
@@ -129,10 +146,14 @@ func (s stored) Load() (project.Config, project.Global, error) {
 func (stored) LoadRun() (project.Run, error) { return project.Run{}, nil }
 
 type locker struct {
-	err error
+	err  error
+	seen *seen
 }
 
-func (l locker) Take(domain.Operation) (operation.Hold, error) {
+func (l locker) Take(op domain.Operation) (operation.Hold, error) {
+	if l.seen != nil {
+		l.seen.ops = append(l.seen.ops, op)
+	}
 	if l.err != nil {
 		return nil, l.err
 	}
@@ -296,9 +317,11 @@ type previewing struct {
 	previews int
 	errs     []error
 	held     []string
+	ids      []string // the correlation ID of each run, previews included
 }
 
 func (p *previewing) Run(ctx context.Context, req create.Request, opts domain.RunOptions) (create.Outcome, error) {
+	p.ids = append(p.ids, opts.CorrelationID)
 	if opts.DryRun {
 		p.previews++
 		outcome, err := p.useCase.Run(ctx, req, opts)

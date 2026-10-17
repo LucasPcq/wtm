@@ -155,7 +155,7 @@ func TestAStaleRunAsksNothingAgainAndSaysWhy(t *testing.T) {
 }
 
 func TestADryRunAsksTheQuestionsAndNoConfirmation(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{}), DryRun: true})
+	d := open(t, wizardParams{App: newApp(seed{}), Options: domain.RunOptions{DryRun: true}})
 
 	assert.Contains(t, d.screen(), "Step 1/6 • Branches")
 	d.keys("feat/a", "enter", "enter", "enter")
