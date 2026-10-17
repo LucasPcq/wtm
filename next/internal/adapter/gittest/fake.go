@@ -163,6 +163,27 @@ func (f *Fake) AheadBehind(_ context.Context, name string) (worktree.AheadBehind
 	return worktree.AheadBehind{Ahead: len(of) - shared, Behind: len(against) - shared}, nil
 }
 
+func (f *Fake) Snapshot(ctx context.Context) (worktree.Snapshot, error) {
+	worktrees, err := f.Worktrees(ctx)
+	if err != nil {
+		return worktree.Snapshot{}, err
+	}
+
+	branches, err := f.Branches(ctx)
+	if err != nil {
+		return worktree.Snapshot{}, err
+	}
+
+	divergence := map[string]worktree.AheadBehind{}
+	for _, name := range branches.Differing() {
+		divergence[name], err = f.AheadBehind(ctx, name)
+		if err != nil {
+			return worktree.Snapshot{}, err
+		}
+	}
+	return worktree.Snapshot{Worktrees: worktrees, Branches: branches, Divergence: divergence}, nil
+}
+
 func (f *Fake) Dirty(_ context.Context, path string) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

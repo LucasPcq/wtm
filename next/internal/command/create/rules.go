@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
@@ -13,18 +12,14 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-const remotePrefix = "origin/"
-
 type Facts struct {
-	MainPath   string
-	Config     project.Config
-	Global     project.Global
-	Run        project.Run
-	RunErr     error
-	Worktrees  []worktree.Worktree
-	Branches   worktree.Branches
-	Divergence map[string]worktree.AheadBehind
-	Folders    map[string]worktree.Location
+	MainPath string
+	Config   project.Config
+	Global   project.Global
+	Run      project.Run
+	RunErr   error
+	worktree.Snapshot
+	Folders map[string]worktree.Location
 }
 
 func (f Facts) pathsOf(branches []string) []string {
@@ -41,56 +36,8 @@ func (f Facts) pathOf(name string) string {
 	return filepath.Join(f.MainPath, f.Config.Worktrees.BasePath, worktree.PathSegment(name))
 }
 
-func (f Facts) local(name string) bool {
-	return slices.ContainsFunc(f.Branches.Local, func(b worktree.Branch) bool { return b.Name == name })
-}
-
-func (f Facts) remote(name string) bool {
-	return slices.ContainsFunc(f.Branches.Remote, func(b worktree.Branch) bool { return b.Name == name })
-}
-
-func (f Facts) candidate(name string) bool {
-	remote, onOrigin := cutRemote(name)
-	return f.local(name) || onOrigin && f.remote(remote)
-}
-
-func (f Facts) checkedOutAt(name string) string {
-	at := slices.IndexFunc(f.Worktrees, func(w worktree.Worktree) bool { return w.Branch() == name })
-	if at < 0 {
-		return ""
-	}
-	return f.Worktrees[at].Path
-}
-
-func (f Facts) occupant(location worktree.Location) string {
-	at := slices.IndexFunc(f.Worktrees, func(w worktree.Worktree) bool { return w.Path == location.Path })
-	if at < 0 {
-		return ""
-	}
-	return f.Worktrees[at].Branch()
-}
-
-func (f Facts) standing(name string) worktree.Divergence {
-	if !f.remote(name) {
-		return worktree.NoOrigin
-	}
-	return f.Divergence[name].Divergence()
-}
-
 func (f Facts) namesWorktrees() bool {
 	return f.RunErr != nil || len(f.Run.Jobs) > 0 || len(f.Run.Profiles) > 0
-}
-
-func (f Facts) live() []string {
-	names := make([]string, 0, len(f.Worktrees))
-	for _, w := range f.Worktrees {
-		names = append(names, w.Branch())
-	}
-	return names
-}
-
-func cutRemote(name string) (string, bool) {
-	return strings.CutPrefix(name, remotePrefix)
 }
 
 func aheadAndBehind(counts worktree.AheadBehind) string {
@@ -134,23 +81,23 @@ func (f Facts) decide(e entry) decision {
 	if refused, found := f.invalid(e); found {
 		return refused
 	}
-	at := f.checkedOutAt(e.name)
+	at := f.CheckedOutAt(e.name)
 	location, located := f.Folders[e.path]
 	if !located && at == "" {
 		panic(fmt.Sprintf("create: the folder of %s was never located: observe with the branches of the request", e.name))
 	}
 	var live []string
 	if f.namesWorktrees() {
-		live = f.live()
+		live = f.Live()
 	}
 	return e.placed(worktree.Place(worktree.PlacementParams{
 		Branch:       e.name,
 		Path:         e.path,
 		CheckedOutAt: at,
 		Location:     location,
-		Occupant:     f.occupant(location),
-		Local:        f.local(e.name),
-		Remote:       f.remote(e.name),
+		Occupant:     f.Occupant(location),
+		Local:        f.Local(e.name),
+		Remote:       f.Remote(e.name),
 		Live:         live,
 		IfNotExists:  e.ifNotExists,
 	}))
@@ -233,10 +180,10 @@ func (f Facts) subjectsAt(req Request, standing worktree.Divergence) []string {
 		case !isPlanned:
 		case planned.Action == ActionCheckOut:
 			subject = planned.Branch
-		case planned.Action == ActionCreate && f.local(req.From):
+		case planned.Action == ActionCreate && f.Local(req.From):
 			subject = req.From
 		}
-		if subject != "" && f.standing(subject) == standing && !slices.Contains(subjects, subject) {
+		if subject != "" && f.Standing(subject) == standing && !slices.Contains(subjects, subject) {
 			subjects = append(subjects, subject)
 		}
 	}
@@ -291,7 +238,7 @@ func (f Facts) fastForwarded(req Request) []string {
 func (f Facts) divergedWarnings(req Request) []domain.Warning {
 	var warnings []domain.Warning
 	for _, subject := range f.subjectsAt(req, worktree.Diverged) {
-		counts := f.Divergence[subject]
+		counts := f.AheadBehind(subject)
 		warnings = append(warnings, domain.Warning{
 			Code:    "create.source_diverged",
 			Message: "branch " + subject + " has diverged from origin (" + aheadAndBehind(counts) + ") and can't be fast-forwarded: the worktree starts from your local branch, missing commits that are on origin — you may have to rebase or resolve conflicts later",
@@ -306,7 +253,7 @@ func (f Facts) fallbackWarnings(planned Plan) []domain.Warning {
 	fallsBack := env.ParentFallsBackToMain(env.ParentFallbackParams{
 		Strategy:          planned.EnvFrom,
 		HasFiles:          len(f.Config.Env.Files) > 0,
-		SourceHasWorktree: f.checkedOutAt(planned.From) != "",
+		SourceHasWorktree: f.CheckedOutAt(planned.From) != "",
 	})
 	if !creates || !fallsBack {
 		return nil
@@ -378,21 +325,14 @@ func (p Plan) checkout(planned BranchPlan) worktree.Checkout {
 		return worktree.TrackingBranch{Name: planned.Branch}
 	case ActionCreate, ActionUnchanged:
 	}
-	return worktree.NewBranch{Name: planned.Branch, From: p.facts.ref(p.From)}
-}
-
-func (f Facts) ref(from string) worktree.Ref {
-	if remote, onOrigin := cutRemote(from); onOrigin && !f.local(from) {
-		return worktree.RemoteBranch{Name: remote}
-	}
-	return worktree.LocalBranch{Name: from}
+	return worktree.NewBranch{Name: planned.Branch, From: p.facts.Ref(p.From)}
 }
 
 func (f Facts) standingOf(planned BranchPlan) Standing {
 	switch planned.Action {
 	case ActionCheckOut:
-		counts := f.Divergence[planned.Branch]
-		return Standing{ExistingBranch: true, OriginState: f.standing(planned.Branch), OriginAhead: counts.Ahead, OriginBehind: counts.Behind}
+		counts := f.AheadBehind(planned.Branch)
+		return Standing{ExistingBranch: true, OriginState: f.Standing(planned.Branch), OriginAhead: counts.Ahead, OriginBehind: counts.Behind}
 	case ActionResume:
 		return Standing{Upstream: planned.Upstream}
 	case ActionCreate, ActionUnchanged:

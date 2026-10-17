@@ -121,19 +121,11 @@ func (u UseCase) Observe(ctx context.Context, branches []string) (Facts, error) 
 	if err != nil {
 		return Facts{}, err
 	}
-	worktrees, err := u.Git.Worktrees(ctx)
+	snapshot, err := u.Git.Snapshot(ctx)
 	if err != nil {
 		return Facts{}, err
 	}
-	refs, err := u.Git.Branches(ctx)
-	if err != nil {
-		return Facts{}, err
-	}
-	divergence, err := u.divergence(ctx, refs)
-	if err != nil {
-		return Facts{}, err
-	}
-	facts := Facts{MainPath: u.MainPath, Config: config, Global: global, Worktrees: worktrees, Branches: refs, Divergence: divergence}
+	facts := Facts{MainPath: u.MainPath, Config: config, Global: global, Snapshot: snapshot}
 	folders, err := u.locate(ctx, facts.pathsOf(branches))
 	if err != nil {
 		return Facts{}, err
@@ -141,22 +133,6 @@ func (u UseCase) Observe(ctx context.Context, branches []string) (Facts, error) 
 	facts.Folders = folders
 	facts.Run, facts.RunErr = u.Config.LoadRun()
 	return facts, nil
-}
-
-func (u UseCase) divergence(ctx context.Context, refs worktree.Branches) (map[string]worktree.AheadBehind, error) {
-	found := map[string]worktree.AheadBehind{}
-	for _, local := range refs.Local {
-		at := slices.IndexFunc(refs.Remote, func(remote worktree.Branch) bool { return remote.Name == local.Name })
-		if at < 0 || refs.Remote[at].Tip == local.Tip {
-			continue
-		}
-		counts, err := u.Git.AheadBehind(ctx, local.Name)
-		if err != nil {
-			return nil, err
-		}
-		found[local.Name] = counts
-	}
-	return found, nil
 }
 
 func (u UseCase) locate(ctx context.Context, paths []string) (map[string]worktree.Location, error) {
@@ -232,7 +208,7 @@ func (u UseCase) fastForward(ctx context.Context, plan Plan, report domain.Repor
 }
 
 func (u UseCase) advance(ctx context.Context, plan Plan, subject string) (domain.Warning, bool) {
-	forwarded := u.Provision.FastForward(ctx, provision.FastForwardParams{Subject: subject, CheckedOutAt: plan.facts.checkedOutAt(subject)})
+	forwarded := u.Provision.FastForward(ctx, provision.FastForwardParams{Subject: subject, CheckedOutAt: plan.facts.CheckedOutAt(subject)})
 	if forwarded.Dirty {
 		return domain.Warning{
 			Code:    "create.ff_dirty",
@@ -299,7 +275,7 @@ func (u UseCase) provisionParams(plan Plan, planned BranchPlan, report domain.Re
 			Path:       planned.Path,
 			Checkout:   plan.checkout(planned),
 			Source:     plan.From,
-			ParentPath: f.checkedOutAt(plan.From),
+			ParentPath: f.CheckedOutAt(plan.From),
 			Strategy:   plan.EnvFrom,
 			Isolation:  plan.isolation,
 		},

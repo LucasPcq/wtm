@@ -26,6 +26,7 @@ type port interface {
 	FetchRef(ctx context.Context, name string) error
 	FastForwardRef(ctx context.Context, name string) error
 	MergeFFOnly(ctx context.Context, merge worktree.Merge) error
+	Snapshot(ctx context.Context) (worktree.Snapshot, error)
 }
 
 type implementation struct {

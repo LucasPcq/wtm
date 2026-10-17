@@ -57,13 +57,13 @@ func (f Facts) branchOptions() []domain.Option {
 	options := make([]domain.Option, 0, len(f.Branches.Local)+len(f.Branches.Remote))
 	for _, local := range f.Branches.Local {
 		badge := "existing"
-		if f.checkedOutAt(local.Name) != "" {
+		if f.CheckedOutAt(local.Name) != "" {
 			badge = "worktree exists"
 		}
 		options = append(options, domain.Option{Value: local.Name, Badge: badge})
 	}
 	for _, remote := range f.Branches.Remote {
-		if !f.local(remote.Name) {
+		if !f.Local(remote.Name) {
 			options = append(options, domain.Option{Value: remote.Name, Badge: "on origin"})
 		}
 	}
@@ -89,16 +89,16 @@ func (f Facts) sourceOptions(creating []string) []domain.Option {
 		}
 	}
 	for _, remote := range f.Branches.Remote {
-		if !f.local(remote.Name) && !slices.Contains(creating, remote.Name) {
-			options = append(options, domain.Option{Value: remotePrefix + remote.Name})
+		if !f.Local(remote.Name) && !slices.Contains(creating, remote.Name) {
+			options = append(options, domain.Option{Value: worktree.OriginPrefix + remote.Name})
 		}
 	}
 	return options
 }
 
 func (f Facts) badge(name string) string {
-	counts := f.Divergence[name]
-	switch f.standing(name) {
+	counts := f.AheadBehind(name)
+	switch f.Standing(name) {
 	case worktree.Behind:
 		return strconv.Itoa(counts.Behind) + " behind"
 	case worktree.Ahead:
@@ -219,7 +219,7 @@ func (q Questions) skipped(field string) bool {
 
 func (f Facts) problems(q Questions) []domain.FieldError {
 	problems := f.branchProblems(q)
-	if from := q.From.Value; from != "" && !f.candidate(from) {
+	if from := q.From.Value; from != "" && !f.Candidate(from) {
 		problems = append(problems, domain.FieldError{Path: "from", Code: "not_found", Template: "{path}: {value} not found", Params: domain.Params{"value": from}})
 	}
 	problems = append(problems, oneOf(choice{Path: "env_from", Value: string(q.EnvFrom.Value), Accepted: Names(project.EnvStrategies())})...)

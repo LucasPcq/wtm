@@ -171,9 +171,9 @@ type counted struct {
 	observed *int
 }
 
-func (c counted) Worktrees(ctx context.Context) ([]worktree.Worktree, error) {
+func (c counted) Snapshot(ctx context.Context) (worktree.Snapshot, error) {
 	*c.observed++
-	return c.Repo.Worktrees(ctx)
+	return c.Repo.Snapshot(ctx)
 }
 
 type unprotected struct{}

@@ -9,9 +9,7 @@ import (
 )
 
 type Git interface {
-	Worktrees(ctx context.Context) ([]worktree.Worktree, error)
-	Branches(ctx context.Context) (worktree.Branches, error)
-	AheadBehind(ctx context.Context, name string) (worktree.AheadBehind, error)
+	Snapshot(ctx context.Context) (worktree.Snapshot, error)
 	Locate(ctx context.Context, path string) (worktree.Location, error)
 	Changes(ctx context.Context, dir string) ([]worktree.Change, error)
 	Conflicts(ctx context.Context, check worktree.ConflictCheck) ([]worktree.Conflict, error)

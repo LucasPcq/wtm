@@ -154,16 +154,16 @@ func (f Facts) fromOptions(to string) []domain.Option {
 		}
 	}
 	for _, remote := range f.Branches.Remote {
-		if !f.local(remote.Name) && remote.Name != to {
-			options = append(options, domain.Option{Value: remotePrefix + remote.Name})
+		if !f.Local(remote.Name) && remote.Name != to {
+			options = append(options, domain.Option{Value: worktree.OriginPrefix + remote.Name})
 		}
 	}
 	return options
 }
 
 func (f Facts) badge(name string) string {
-	counts := f.Divergence[name]
-	switch f.standing(name) {
+	counts := f.AheadBehind(name)
+	switch f.Standing(name) {
 	case worktree.Behind:
 		return strconv.Itoa(counts.Behind) + " behind"
 	case worktree.Ahead:
@@ -318,7 +318,7 @@ func (f Facts) sourceProblems(source string) []domain.FieldError {
 	switch {
 	case source == "":
 		return []domain.FieldError{{Path: "source", Code: codeRequired, Template: "{path} is required"}}
-	case f.checkedOutAt(source) == "":
+	case f.CheckedOutAt(source) == "":
 		return []domain.FieldError{{Path: "source", Code: codeNotFound, Template: "{path}: no worktree holds {value}", Params: domain.Params{"value": source}}}
 	}
 	return nil
@@ -326,7 +326,7 @@ func (f Facts) sourceProblems(source string) []domain.FieldError {
 
 func (f Facts) fileProblems(req Request) []domain.FieldError {
 	switch {
-	case f.checkedOutAt(req.Source) == "":
+	case f.CheckedOutAt(req.Source) == "":
 		return nil
 	case len(req.Files) == 0:
 		return []domain.FieldError{{Path: "files", Code: codeRequired, Template: "{path} is required"}}
@@ -354,7 +354,7 @@ func (f Facts) fromProblems(req Request) []domain.FieldError {
 		return []domain.FieldError{{Path: "from", Code: codeRequired, Template: "{path} is required: no parent is recorded for the source and no base branch is configured"}}
 	case from == target.Branch:
 		return []domain.FieldError{{Path: "from", Code: "self_parent", Template: "{value} cannot be its own parent: pass another value to {path}", Params: domain.Params{"value": from}, With: []string{"to"}}}
-	case !f.candidate(from):
+	case !f.Candidate(from):
 		return []domain.FieldError{{Path: "from", Code: codeNotFound, Template: "{path}: {value} not found", Params: domain.Params{"value": from}}}
 	}
 	return nil
