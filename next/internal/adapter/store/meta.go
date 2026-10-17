@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
 const (
@@ -45,10 +45,10 @@ func (m Meta) Load(branch string) (worktree.Meta, error) {
 	return decodeMeta(data)
 }
 
-func (m Meta) Update(ctx context.Context, update worktree.MetaUpdate) (wtm.Written, error) {
+func (m Meta) Update(ctx context.Context, update worktree.MetaUpdate) (domain.Written, error) {
 	path, err := m.path(update.Branch)
 	if err != nil {
-		return wtm.Written{}, err
+		return domain.Written{}, err
 	}
 	return statefile.Update(ctx, statefile.UpdateParams{
 		Path: path,

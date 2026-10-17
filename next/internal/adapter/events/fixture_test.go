@@ -3,9 +3,9 @@ package events
 import (
 	"time"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
 func identity() worktree.Identity {

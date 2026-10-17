@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/surface/output"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
 )
 
 func (w *wizard) View() string {
@@ -103,6 +103,6 @@ func (w *wizard) canGoBack() bool {
 	return false
 }
 
-func asError(err error) *wtm.Error {
-	return wtm.AsError(wtm.AsErrorParams{Err: err})
+func asError(err error) *domain.Error {
+	return domain.AsError(domain.AsErrorParams{Err: err})
 }

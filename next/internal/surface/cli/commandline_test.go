@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -32,7 +32,7 @@ func TestAnUnsetRequestIsTheBareCommand(t *testing.T) {
 }
 
 func TestAFollowUpIsTheCommandItNamesWithItsBranchesFirst(t *testing.T) {
-	line := followUpLine(&wtm.FollowUp{Command: "clean", Request: json.RawMessage(`{"branches":["feat/x"],"force":true}`)})
+	line := followUpLine(&domain.FollowUp{Command: "clean", Request: json.RawMessage(`{"branches":["feat/x"],"force":true}`)})
 
 	assert.Equal(t, "wtm clean feat/x --force", line)
 }

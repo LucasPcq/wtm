@@ -8,10 +8,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -147,7 +147,7 @@ func TestARecordAtANewerSchemaIsReadButNeverRewritten(t *testing.T) {
 
 	require.NoError(t, loadErr)
 	assert.Equal(t, 99, got.Schema)
-	var newer *wtm.SchemaNewer
+	var newer *domain.SchemaNewer
 	require.ErrorAs(t, err, &newer)
 	assert.Equal(t, 99, newer.Found)
 	assert.Equal(t, 1, newer.Supported)

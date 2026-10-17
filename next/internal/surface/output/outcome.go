@@ -6,24 +6,23 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/app"
-	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
 const (
 	commandName = "create"
 )
 
-var reasonLabels = map[wtm.Reason]string{
-	wtm.ReasonUnchanged:   "unchanged",
-	wtm.ReasonIncomplete:  "left incomplete",
-	wtm.ReasonInterrupted: "interrupted",
-	wtm.ReasonNotReached:  "not reached",
+var reasonLabels = map[domain.Reason]string{
+	domain.ReasonUnchanged:   "unchanged",
+	domain.ReasonIncomplete:  "left incomplete",
+	domain.ReasonInterrupted: "interrupted",
+	domain.ReasonNotReached:  "not reached",
 }
 
 type OutcomeParams struct {
-	Outcome   app.CreateOutcome
+	Outcome   create.Outcome
 	FollowUps []NextStep
 	Cwd       string
 }
@@ -64,7 +63,7 @@ func Outcome(w io.Writer, params OutcomeParams) {
 			warningLine(w, text)
 		}
 	}
-	unfinished := slices.DeleteFunc(slices.Clone(items), func(item create.Item) bool { return item.Status == wtm.StatusDone })
+	unfinished := slices.DeleteFunc(slices.Clone(items), func(item create.Item) bool { return item.Status == domain.StatusDone })
 	if len(unfinished) > 0 {
 		blank(w)
 	}
@@ -79,7 +78,7 @@ func Outcome(w io.Writer, params OutcomeParams) {
 }
 
 func standing(item create.Item) bool {
-	return item.Status == wtm.StatusDone || item.Reason == wtm.ReasonIncomplete
+	return item.Status == domain.StatusDone || item.Reason == domain.ReasonIncomplete
 }
 
 func headline(w io.Writer, items []create.Item) {
@@ -111,7 +110,7 @@ func headline(w io.Writer, items []create.Item) {
 }
 
 func tallyKey(item create.Item) string {
-	if item.Status == wtm.StatusDone && item.Reason == wtm.ReasonUnchanged {
+	if item.Status == domain.StatusDone && item.Reason == domain.ReasonUnchanged {
 		return "unchanged"
 	}
 	return string(item.Status)
@@ -119,7 +118,7 @@ func tallyKey(item create.Item) string {
 
 func unfinishedLine(w io.Writer, item create.Item) {
 	line := item.Subject + "  " + itemWhy(item)
-	if item.Status == wtm.StatusFailed {
+	if item.Status == domain.StatusFailed {
 		errorLine(w, line)
 		return
 	}
@@ -131,7 +130,7 @@ func itemWhy(item create.Item) string {
 		return reasonLabels[item.Reason]
 	}
 	why := errorText(item.Err)
-	if item.Reason != wtm.ReasonIncomplete {
+	if item.Reason != domain.ReasonIncomplete {
 		return why
 	}
 	return why + dot + reasonLabels[item.Reason]

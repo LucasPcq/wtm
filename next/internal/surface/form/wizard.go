@@ -5,11 +5,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/app"
-	"github.com/LucasPcq/wtm/next/internal/app/create"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/surface/output"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -77,8 +76,8 @@ type wizard struct {
 	isolate  *selectList
 	ff       *confirm
 	recap    *selectList
-	preview  *app.CreateOutcome
-	failure  *wtm.Error
+	preview  *create.Outcome
+	failure  *domain.Error
 	loading  string
 	spinner  spinner.Model
 	size     size
@@ -115,7 +114,7 @@ type questionsMsg struct {
 }
 
 type previewMsg struct {
-	outcome app.CreateOutcome
+	outcome create.Outcome
 	err     error
 }
 
@@ -131,7 +130,7 @@ func (w *wizard) load(text string) tea.Cmd {
 func (w *wizard) observe(refresh bool) tea.Cmd {
 	req := w.req
 	return func() tea.Msg {
-		questions, err := w.app.CreateQuestions(w.ctx, req)
+		questions, err := w.app.Questions(w.ctx, req)
 		return questionsMsg{questions: questions, err: err, refresh: refresh}
 	}
 }
@@ -323,7 +322,7 @@ func (w *wizard) confirmed() tea.Cmd {
 }
 
 func (w *wizard) reobserve() error {
-	questions, err := w.app.CreateQuestions(w.ctx, w.req)
+	questions, err := w.app.Questions(w.ctx, w.req)
 	w.q = questions
 	return err
 }

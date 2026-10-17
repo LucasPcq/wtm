@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
 //go-sumtype:decl Change
@@ -35,9 +35,9 @@ type UpdateParams struct {
 	Mutate   func(current []byte) (Change, error)
 }
 
-func Update(ctx context.Context, params UpdateParams) (wtm.Written, error) {
+func Update(ctx context.Context, params UpdateParams) (domain.Written, error) {
 	if err := os.MkdirAll(filepath.Dir(params.Path), 0o755); err != nil {
-		return wtm.Written{}, fmt.Errorf("create %s: %w", filepath.Dir(params.Path), err)
+		return domain.Written{}, fmt.Errorf("create %s: %w", filepath.Dir(params.Path), err)
 	}
 	lockPath := cmp.Or(params.LockPath, params.Path+lockSuffix)
 	changed := false
@@ -45,7 +45,7 @@ func Update(ctx context.Context, params UpdateParams) (wtm.Written, error) {
 		changed, err = update(params)
 		return err
 	}})
-	return wtm.Written{Changed: changed, Unlocked: !held}, err
+	return domain.Written{Changed: changed, Unlocked: !held}, err
 }
 
 func update(params UpdateParams) (bool, error) {

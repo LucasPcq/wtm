@@ -13,7 +13,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
 type Fake struct {

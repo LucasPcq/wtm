@@ -8,8 +8,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
 const (
@@ -25,9 +25,9 @@ type RememberParams struct {
 	Answers  map[string]string
 }
 
-func Remember(ctx context.Context, params RememberParams) (wtm.Written, error) {
+func Remember(ctx context.Context, params RememberParams) (domain.Written, error) {
 	if len(params.Answers) == 0 {
-		return wtm.Written{}, nil
+		return domain.Written{}, nil
 	}
 	path := filepath.Join(params.StateDir, configFileName)
 	written, err := statefile.Update(ctx, statefile.UpdateParams{
@@ -41,7 +41,7 @@ func Remember(ctx context.Context, params RememberParams) (wtm.Written, error) {
 		},
 	})
 	if err != nil {
-		return wtm.Written{}, err
+		return domain.Written{}, err
 	}
 	return written, writeSchema(ctx, params.StateDir)
 }

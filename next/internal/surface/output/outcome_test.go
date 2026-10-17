@@ -4,8 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/app"
-	"github.com/LucasPcq/wtm/next/internal/app/create"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
 )
 
 func TestTwoBranchesCreatedAreCountedRowedAndPointedAt(t *testing.T) {
@@ -31,5 +30,5 @@ func TestARunOfOnlyOpenBranchesIsUnchanged(t *testing.T) {
 }
 
 func TestARunWithNothingToDoSaysSo(t *testing.T) {
-	golden(t, "outcome_nothing", rendered(func(w *bytes.Buffer) { Outcome(w, OutcomeParams{Outcome: app.CreateOutcome{Result: &create.Result{}}}) }))
+	golden(t, "outcome_nothing", rendered(func(w *bytes.Buffer) { Outcome(w, OutcomeParams{Outcome: create.Outcome{Result: &create.Result{}}}) }))
 }

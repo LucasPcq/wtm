@@ -8,7 +8,7 @@ import (
 	"text/template"
 
 	"github.com/BurntSushi/toml"
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
 //go:embed config.toml.tmpl

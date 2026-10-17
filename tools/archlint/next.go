@@ -23,14 +23,14 @@ type nextLayer string
 
 const (
 	nextDomain  nextLayer = "domain"
-	nextSlice   nextLayer = "slice"
-	nextApp     nextLayer = "app"
+	nextService nextLayer = "service"
+	nextCommand nextLayer = "command"
 	nextAdapter nextLayer = "adapter"
 	nextSurface nextLayer = "surface"
 	nextCmd     nextLayer = "cmd"
 )
 
-const sharedSlice = "provision"
+const surfaceService = "operation"
 
 var sharedAdapters = []string{"statefile", "shell"}
 
@@ -40,11 +40,11 @@ type nextPackage struct {
 }
 
 var nextWhy = map[nextLayer]string{
-	nextDomain:  "the domain is pure: the stdlib and wtm/* only",
-	nextSlice:   "a use case reaches the world through the interfaces it declares: wtm/*, app/provision and the stdlib, never another slice, an adapter, a surface or app",
-	nextApp:     "the API every surface calls: app/*, wtm/* and the stdlib, never an adapter",
-	nextAdapter: "an adapter reaches wtm/*, adapter/statefile, adapter/shell, the stdlib and third parties, never app/*, a surface or another adapter",
-	nextSurface: "a surface calls the app: app, app/<slice>, wtm/*, surface/* and third parties, never an adapter",
+	nextDomain:  "the domain is pure: the stdlib and domain/* only",
+	nextService: "a service reaches the world through the ports it declares: domain/* and the stdlib, never another service, a command, an adapter or a surface",
+	nextCommand: "a use case orchestrates services and reaches the world through the ports it declares: domain/*, service/* and the stdlib, never another command, an adapter or a surface",
+	nextAdapter: "an adapter reaches domain/*, adapter/statefile, adapter/shell, the stdlib and third parties, never a service, a command, a surface or another adapter",
+	nextSurface: "a surface calls the use cases: command/*, service/operation, domain/*, surface/* and third parties, never an adapter",
 	nextCmd:     "the composition root wires what is under next/",
 }
 
@@ -65,7 +65,7 @@ func runNext(pass *analysis.Pass, testsOf testFiles) (any, error) {
 	}
 	from, ok := nextPackageOf(rel)
 	if !ok {
-		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under wtm/, app/, adapter/, surface/ or cmd/ (next/README.md)", rel)
+		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under domain/, service/, command/, adapter/, surface/ or cmd/ (next/README.md)", rel)
 		return nil, nil
 	}
 	sources := slices.DeleteFunc(slices.Clone(pass.Files), func(file *ast.File) bool { return isTestFile(pass, file) })
@@ -127,12 +127,12 @@ func nextPackageOf(rel string) (nextPackage, bool) {
 		return nextPackage{layer: nextCmd}, true
 	case parts[0] != "internal":
 		return nextPackage{}, false
-	case parts[1] == "wtm":
+	case parts[1] == "domain":
 		return nextPackage{layer: nextDomain}, true
-	case parts[1] == "app" && !nested:
-		return nextPackage{layer: nextApp}, true
-	case parts[1] == "app":
-		return nextPackage{layer: nextSlice, unit: unit}, true
+	case parts[1] == "service" && nested:
+		return nextPackage{layer: nextService, unit: unit}, true
+	case parts[1] == "command" && nested:
+		return nextPackage{layer: nextCommand, unit: unit}, true
 	case parts[1] == "adapter" && nested:
 		return nextPackage{layer: nextAdapter, unit: unit}, true
 	case parts[1] == "surface" && nested:
@@ -177,14 +177,14 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 	switch from.layer {
 	case nextDomain:
 		return stdlib || in(nextDomain)
-	case nextSlice:
-		return stdlib || in(nextDomain) || in(nextSlice) && (to.pkg.unit == from.unit || to.pkg.unit == sharedSlice)
-	case nextApp:
-		return stdlib || in(nextDomain, nextSlice)
+	case nextService:
+		return stdlib || in(nextDomain)
+	case nextCommand:
+		return stdlib || in(nextDomain, nextService) || in(nextCommand) && to.pkg.unit == from.unit
 	case nextAdapter:
 		return stdlib || thirdParty || in(nextDomain) || in(nextAdapter) && admitsAdapter(imp, to.pkg)
 	case nextSurface:
-		return stdlib || thirdParty || in(nextDomain, nextApp, nextSlice, nextSurface)
+		return stdlib || thirdParty || in(nextDomain, nextCommand, nextSurface) || in(nextService) && to.pkg.unit == surfaceService
 	case nextCmd:
 		return stdlib || thirdParty || to.inNext
 	}

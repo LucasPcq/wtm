@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/app"
-	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +16,7 @@ func TestAnInvalidRequestNamesEachFieldAsTheCommandLineSpellsIt(t *testing.T) {
 }
 
 func TestAStalePlanPointsAtThePlanTheFactsGiveNow(t *testing.T) {
-	stale := &wtm.Error{Kind: wtm.KindPrecondition, Code: app.CodePlanStale, Message: "the facts changed since the preview", Params: wtm.Params{"expected": "a", "found": "b"}}
+	stale := &domain.Error{Kind: domain.KindPrecondition, Code: operation.CodePlanStale, Message: "the facts changed since the preview", Params: domain.Params{"expected": "a", "found": "b"}}
 
 	golden(t, "failure_stale", rendered(func(w *bytes.Buffer) {
 		Failure(w, FailureParams{Err: stale, Next: []NextStep{{Command: "wtm create feat/x --dry-run", Note: "the plan the facts give now"}}})
@@ -24,8 +24,8 @@ func TestAStalePlanPointsAtThePlanTheFactsGiveNow(t *testing.T) {
 }
 
 func TestAQuietFailureIsOneLineWithItsFields(t *testing.T) {
-	internal := &wtm.Error{Kind: wtm.KindInternal, Code: "internal", Message: "internal error", Cause: errors.New("disk full")}
-	notFound := &wtm.Error{Kind: wtm.KindPrecondition, Code: create.CodeConfigNotFound, Message: "no wtm config found — run `wtm init` first", Cause: errors.New("project config: config file not found")}
+	internal := &domain.Error{Kind: domain.KindInternal, Code: "internal", Message: "internal error", Cause: errors.New("disk full")}
+	notFound := &domain.Error{Kind: domain.KindPrecondition, Code: create.CodeConfigNotFound, Message: "no wtm config found — run `wtm init` first", Cause: errors.New("project config: config file not found")}
 
 	assert.Equal(t, "the request is invalid: branch feat/x is checked out at /p — run `wtm go feat/x` to jump in; <branches>[1]: feat/x is given twice; --env-from must be one of example, main, parent, not copy; --from is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)", failureLine(invalid()))
 	assert.Equal(t, "internal error: disk full", failureLine(internal))

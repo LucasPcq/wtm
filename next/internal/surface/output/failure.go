@@ -4,11 +4,11 @@ import (
 	"io"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
 type FailureParams struct {
-	Err  *wtm.Error
+	Err  *domain.Error
 	Next []NextStep
 }
 
@@ -20,11 +20,11 @@ func Failure(w io.Writer, params FailureParams) {
 	nextSteps(w, params.Next)
 }
 
-func QuietFailure(w io.Writer, err *wtm.Error) {
+func QuietFailure(w io.Writer, err *domain.Error) {
 	errorLine(w, failureLine(err))
 }
 
-func failureLine(err *wtm.Error) string {
+func failureLine(err *domain.Error) string {
 	fields := fieldLines(err)
 	if len(fields) == 0 {
 		return errorText(err)
@@ -32,7 +32,7 @@ func failureLine(err *wtm.Error) string {
 	return errorText(err) + ": " + strings.Join(fields, "; ")
 }
 
-func fieldLines(err *wtm.Error) []string {
+func fieldLines(err *domain.Error) []string {
 	lines := make([]string, 0, len(err.Fields))
 	for _, field := range err.Fields {
 		lines = append(lines, field.Message(Flag(field.Path)))
@@ -40,8 +40,8 @@ func fieldLines(err *wtm.Error) []string {
 	return lines
 }
 
-func errorText(err *wtm.Error) string {
-	keepsCause := err.Kind == wtm.KindInternal || err.Kind == wtm.KindInvalid && len(err.Fields) == 0
+func errorText(err *domain.Error) string {
+	keepsCause := err.Kind == domain.KindInternal || err.Kind == domain.KindInvalid && len(err.Fields) == 0
 	if err.Cause == nil || !keepsCause {
 		return err.Message
 	}

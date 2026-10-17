@@ -3,9 +3,9 @@ package form
 import (
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -131,7 +131,7 @@ func TestEachWayOutCancels(t *testing.T) {
 }
 
 func TestAPlanThatCannotApplySaysWhyAndOffersOnlyToCancel(t *testing.T) {
-	refused := wtm.Invalid([]wtm.FieldError{{Path: "from", Code: "not_found", Template: "{path}: {value} not found", Params: wtm.Params{"value": "ghost"}}})
+	refused := domain.Invalid([]domain.FieldError{{Path: "from", Code: "not_found", Template: "{path}: {value} not found", Params: domain.Params{"value": "ghost"}}})
 	d := open(t, wizardParams{App: refusing{App: newApp(seed{}), err: refused}, Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}})
 
 	screen := d.screen()

@@ -3,5 +3,5 @@
 # so a ceiling only goes down by itself and goes up in review.
 internal/adapter/statefile 2
 internal/adapter/oplock 1
-internal/app 1
+internal/service/operation 1
 internal/surface/output 2

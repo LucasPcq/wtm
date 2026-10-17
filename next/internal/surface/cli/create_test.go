@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -131,7 +131,7 @@ func TestWithoutConfigCreateExitsOnItsOwnCode(t *testing.T) {
 }
 
 func TestAHeldLockIsAConflict(t *testing.T) {
-	held := &wtm.Error{Kind: wtm.KindConflict, Code: "lock.held", Message: "repo is held by create (pid 42)"}
+	held := &domain.Error{Kind: domain.KindConflict, Code: "lock.held", Message: "repo is held by create (pid 42)"}
 
 	got := runCreate(t, newWorld(seed{Locks: held}), branchName)
 
@@ -181,7 +181,7 @@ func TestAFailedHookExitsOneAndNamesTheBranch(t *testing.T) {
 }
 
 func TestTheProjectThatCannotBeOpenedIsTheFailure(t *testing.T) {
-	notARepo := &wtm.Error{Kind: wtm.KindPrecondition, Code: wtm.CodeNotARepository, Message: "/tmp is not a git repository"}
+	notARepo := &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodeNotARepository, Message: "/tmp is not a git repository"}
 
 	got := runCreate(t, newWorld(seed{Open: notARepo}), branchName)
 

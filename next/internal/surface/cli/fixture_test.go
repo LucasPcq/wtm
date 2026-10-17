@@ -6,19 +6,19 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
-	"github.com/LucasPcq/wtm/next/internal/app"
-	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/app/provision"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/service/operation"
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
 const (
@@ -78,55 +78,70 @@ func (w world) open(context.Context) (Project, error) {
 	if w.seed.Open != nil {
 		return Project{}, w.seed.Open
 	}
-	return Project{App: app.New(w.deps()), Cwd: mainPath}, nil
+	return Project{Create: w.usecase(), Cwd: mainPath}, nil
 }
 
-func (w world) deps() app.Deps {
+func (w world) usecase() create.UseCase {
 	runHooks := w.seed.RunHooks
 	if runHooks == nil {
 		runHooks = func(context.Context, env.HookChain) error { return nil }
 	}
-	return app.Deps{
-		Create: create.Deps{
-			Git: w.git,
-			LoadConfig: func() (project.Config, project.Global, error) {
-				config, found := w.store.Config()
-				if !found {
-					return project.Config{}, project.Global{}, project.ErrConfigNotFound
-				}
-				return config, project.Global{}, nil
-			},
-			LoadRun:  func() (project.Run, error) { return project.Run{}, nil },
-			Remember: w.store.Remember,
-			Provision: provision.Deps{
-				Git:        w.git,
-				Meta:       w.store,
-				EnvFiles:   w.store,
-				RunHooks:   runHooks,
-				PublicPort: func(context.Context, int) int { return 0 },
-				Shield:     shell.Shield,
-				Now:        func() time.Time { return createdAt },
-			},
-			MainPath: mainPath,
-			StateDir: stateDir,
+	return create.UseCase{
+		Git:     w.git,
+		Config:  stored{w.store},
+		Answers: w.store,
+		Operations: operation.Service{
+			Locker:    locker{err: w.seed.Locks},
+			Publisher: locker{},
+			NewOpID:   func() string { return "op-1" },
+			Now:       func() time.Time { return createdAt },
 		},
-		TakeLocks: func(wtm.Operation) (app.Hold, error) {
-			if w.seed.Locks != nil {
-				return nil, w.seed.Locks
-			}
-			return held{}, nil
+		Provision: provision.Deps{
+			Git:        w.git,
+			Meta:       w.store,
+			EnvFiles:   w.store,
+			RunHooks:   runHooks,
+			PublicPort: func(context.Context, int) int { return 0 },
+			Shield:     shell.Shield,
+			Now:        func() time.Time { return createdAt },
 		},
-		Publisher: func(wtm.Operation) wtm.Report { return func(wtm.Event) {} },
-		NewOpID:   func() string { return "op-1" },
-		Now:       func() time.Time { return createdAt },
+		MainPath: mainPath,
+		StateDir: stateDir,
 	}
 }
 
+type stored struct {
+	*storetest.Fake
+}
+
+func (s stored) Load() (project.Config, project.Global, error) {
+	config, found := s.Config()
+	if !found {
+		return project.Config{}, project.Global{}, project.ErrConfigNotFound
+	}
+	return config, project.Global{}, nil
+}
+
+func (stored) LoadRun() (project.Run, error) { return project.Run{}, nil }
+
+type locker struct {
+	err error
+}
+
+func (l locker) Take(domain.Operation) (operation.Hold, error) {
+	if l.err != nil {
+		return nil, l.err
+	}
+	return held{}, nil
+}
+
+func (locker) Open(domain.Operation) domain.Report { return func(domain.Event) {} }
+
 type held struct{}
 
-func (held) Grow([]wtm.Lock) (bool, error) { return false, nil }
-func (held) Protected() bool               { return true }
-func (held) Release()                      {}
+func (held) Grow([]domain.Lock) (bool, error) { return false, nil }
+func (held) Protected() bool                  { return true }
+func (held) Release()                         {}
 
 func hookFails(context.Context, env.HookChain) error {
 	return errors.New("hook failed: exit status 3")

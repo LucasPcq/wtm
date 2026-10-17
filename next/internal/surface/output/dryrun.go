@@ -3,11 +3,11 @@ package output
 import (
 	"io"
 
-	"github.com/LucasPcq/wtm/next/internal/app"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
 )
 
 type DryRunParams struct {
-	Outcome app.CreateOutcome
+	Outcome create.Outcome
 	Apply   string
 }
 

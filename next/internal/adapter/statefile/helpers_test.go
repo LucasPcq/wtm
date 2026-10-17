@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +17,7 @@ const (
 	envGrowPath      = "WTM_NEXT_TEST_GROW_PATH"
 )
 
-func increment(t testing.TB, path string) wtm.Written {
+func increment(t testing.TB, path string) domain.Written {
 	t.Helper()
 	written, err := Update(t.Context(), UpdateParams{
 		Path: path,

@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/dotenv"
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/require"
 )
 
@@ -51,7 +51,7 @@ func addNamespace(job string) worktree.MetaUpdate {
 	}}
 }
 
-func errOf(_ wtm.Written, err error) error {
+func errOf(_ domain.Written, err error) error {
 	return err
 }
 

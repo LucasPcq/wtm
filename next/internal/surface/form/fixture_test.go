@@ -4,19 +4,19 @@ import (
 	"context"
 	"time"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
-	"github.com/LucasPcq/wtm/next/internal/app"
-	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/app/provision"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/service/operation"
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
 const mainPath = "/repo/main"
@@ -29,7 +29,7 @@ type seed struct {
 	Linked     []string
 }
 
-func newApp(s seed) *app.App {
+func newApp(s seed) create.UseCase {
 	commits := map[worktree.Ref][]string{}
 	if s.Behind {
 		commits[worktree.RemoteBranch{Name: "main"}] = []string{"upstream main"}
@@ -49,42 +49,53 @@ func newApp(s seed) *app.App {
 		Remembered: s.Remembered,
 	}
 	store := storetest.NewFake(storetest.FakeParams{Config: &config})
-	return app.New(app.Deps{
-		Create: create.Deps{
-			Git:        git,
-			LoadConfig: func() (project.Config, project.Global, error) { return config, project.Global{}, nil },
-			LoadRun:    func() (project.Run, error) { return project.Run{}, nil },
-			Remember:   store.Remember,
-			Provision: provision.Deps{
-				Git:        git,
-				Meta:       store,
-				EnvFiles:   store,
-				RunHooks:   func(context.Context, env.HookChain) error { return nil },
-				PublicPort: func(context.Context, int) int { return 0 },
-				Shield:     shell.Shield,
-				Now:        func() time.Time { return createdAt },
-			},
-			MainPath: mainPath,
-			StateDir: mainPath + "/.git/wtm",
+	return create.UseCase{
+		Git:     git,
+		Config:  loaded{config: config},
+		Answers: store,
+		Operations: operation.Service{
+			Locker:    held{},
+			Publisher: held{},
+			NewOpID:   func() string { return "op-1" },
+			Now:       func() time.Time { return createdAt },
 		},
-		TakeLocks: func(wtm.Operation) (app.Hold, error) { return held{}, nil },
-		Publisher: func(wtm.Operation) wtm.Report { return func(wtm.Event) {} },
-		NewOpID:   func() string { return "op-1" },
-		Now:       func() time.Time { return createdAt },
-	})
+		Provision: provision.Deps{
+			Git:        git,
+			Meta:       store,
+			EnvFiles:   store,
+			RunHooks:   func(context.Context, env.HookChain) error { return nil },
+			PublicPort: func(context.Context, int) int { return 0 },
+			Shield:     shell.Shield,
+			Now:        func() time.Time { return createdAt },
+		},
+		MainPath: mainPath,
+		StateDir: mainPath + "/.git/wtm",
+	}
 }
+
+type loaded struct {
+	config project.Config
+}
+
+func (l loaded) Load() (project.Config, project.Global, error) {
+	return l.config, project.Global{}, nil
+}
+func (loaded) LoadRun() (project.Run, error) { return project.Run{}, nil }
 
 type held struct{}
 
-func (held) Grow([]wtm.Lock) (bool, error) { return false, nil }
-func (held) Protected() bool               { return true }
-func (held) Release()                      {}
+func (held) Grow([]domain.Lock) (bool, error) { return false, nil }
+func (held) Protected() bool                  { return true }
+func (held) Release()                         {}
+
+func (held) Take(domain.Operation) (operation.Hold, error) { return held{}, nil }
+func (held) Open(domain.Operation) domain.Report           { return func(domain.Event) {} }
 
 type refusing struct {
 	App
 	err error
 }
 
-func (r refusing) Create(context.Context, app.CreateParams) (app.CreateOutcome, error) {
-	return app.CreateOutcome{}, r.err
+func (r refusing) Run(context.Context, create.Request, operation.Options) (create.Outcome, error) {
+	return create.Outcome{}, r.err
 }

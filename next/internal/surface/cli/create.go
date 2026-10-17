@@ -7,12 +7,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/app"
-	"github.com/LucasPcq/wtm/next/internal/app/create"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/surface/form"
 	"github.com/LucasPcq/wtm/next/internal/surface/output"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -94,7 +94,7 @@ func newCreate(open func(ctx context.Context) (Project, error)) *cobra.Command {
 	_ = cmd.RegisterFlagCompletionFunc("env-from", cobra.FixedCompletions(create.Names(project.EnvStrategies()), cobra.ShellCompDirectiveNoFileComp))
 	_ = cmd.RegisterFlagCompletionFunc("isolation", cobra.FixedCompletions(create.Names(project.Isolations()), cobra.ShellCompDirectiveNoFileComp))
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		invalid := wtm.Invalid(nil)
+		invalid := domain.Invalid(nil)
 		invalid.Cause = err
 		return c.fail(cmd, refusal{Err: invalid})
 	})
@@ -105,34 +105,34 @@ func (c *createCommand) run(cmd *cobra.Command, args []string) error {
 	c.quiet, _ = cmd.Flags().GetBool(flagQuiet)
 	req := c.request(cmd, args)
 	if c.output != outputText && c.output != outputJSON {
-		refused := wtm.InvalidMessage(`invalid --output "` + c.output + `": expected one of text, json`)
+		refused := domain.InvalidMessage(`invalid --output "` + c.output + `": expected one of text, json`)
 		c.output = outputText
 		return c.fail(cmd, refusal{Err: refused, Request: req})
 	}
 	ctx := cmd.Context()
 	project, err := c.open(ctx)
 	if err != nil {
-		return c.fail(cmd, refusal{Err: wtm.AsError(wtm.AsErrorParams{Err: err}), Request: req})
+		return c.fail(cmd, refusal{Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: req})
 	}
 	_, stderr := c.streams(cmd)
 	progress := output.NewProgress(ctx, output.ProgressParams{W: stderr, Human: c.human(), Live: output.IsTerminal(stderr)})
-	ran, err := c.create(cmd, creating{App: project.App, Request: req, Report: progress.Report})
+	ran, err := c.create(cmd, creating{UseCase: project.Create, Request: req, Report: progress.Report})
 	progress.Close()
-	return c.conclude(cmd, concluded{Outcome: ran.Outcome, Err: wtm.AsError(wtm.AsErrorParams{Err: err}), Request: ran.Request, Cwd: project.Cwd})
+	return c.conclude(cmd, concluded{Outcome: ran.Outcome, Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: ran.Request, Cwd: project.Cwd})
 }
 
 type creating struct {
-	App     *app.App
+	UseCase create.UseCase
 	Request create.Request
-	Report  wtm.Report
+	Report  domain.Report
 }
 
 func (c *createCommand) create(cmd *cobra.Command, params creating) (form.Ran, error) {
 	ctx := cmd.Context()
 	if c.interactive(cmd) {
-		return form.Run(ctx, form.Params{App: params.App, Request: params.Request, DryRun: c.dryRun, Report: params.Report, In: cmd.InOrStdin(), Out: cmd.ErrOrStderr()})
+		return form.Run(ctx, form.Params{App: params.UseCase, Request: params.Request, DryRun: c.dryRun, Report: params.Report, In: cmd.InOrStdin(), Out: cmd.ErrOrStderr()})
 	}
-	outcome, err := params.App.Create(ctx, app.CreateParams{Request: params.Request, DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: surfaceCLI, Report: params.Report})
+	outcome, err := params.UseCase.Run(ctx, params.Request, operation.Options{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: surfaceCLI, Report: params.Report})
 	return form.Ran{Outcome: outcome, Request: params.Request}, err
 }
 
@@ -171,8 +171,8 @@ func (c *createCommand) streams(cmd *cobra.Command) (io.Writer, io.Writer) {
 }
 
 type concluded struct {
-	Outcome app.CreateOutcome
-	Err     *wtm.Error
+	Outcome create.Outcome
+	Err     *domain.Error
 	Request create.Request
 	Cwd     string
 }
@@ -199,7 +199,7 @@ func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
 }
 
 type refusal struct {
-	Err     *wtm.Error
+	Err     *domain.Error
 	Request create.Request
 }
 
@@ -210,7 +210,7 @@ func (c *createCommand) fail(cmd *cobra.Command, refused refusal) error {
 	}
 	_, stderr := c.streams(cmd)
 	var next []output.NextStep
-	if failure.Code == app.CodePlanStale {
+	if failure.Code == operation.CodePlanStale {
 		next = []output.NextStep{{Command: createLine{Command: cmd.CommandPath(), Request: refused.Request}.String() + " --dry-run", Note: replanNote}}
 	}
 	output.Frame(stderr, func(w io.Writer) { output.Failure(w, output.FailureParams{Err: failure, Next: next}) })
@@ -219,12 +219,12 @@ func (c *createCommand) fail(cmd *cobra.Command, refused refusal) error {
 
 func (c *createCommand) envelope(cmd *cobra.Command, doc output.EnvelopeParams) error {
 	if err := output.Envelope(cmd.OutOrStdout(), doc); err != nil {
-		return c.failed(wtm.AsError(wtm.AsErrorParams{Err: err}))
+		return c.failed(domain.AsError(domain.AsErrorParams{Err: err}))
 	}
 	return c.failed(cmp.Or(doc.Err, doc.Outcome.Failure()))
 }
 
-func (c *createCommand) failed(failure *wtm.Error) error {
+func (c *createCommand) failed(failure *domain.Error) error {
 	if failure == nil {
 		return nil
 	}

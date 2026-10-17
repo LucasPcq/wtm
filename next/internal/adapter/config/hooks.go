@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
 type hooksFile struct {

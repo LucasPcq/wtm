@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/surface/cli"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
 )
 
 const (
@@ -19,8 +19,8 @@ const (
 )
 
 func open(ctx context.Context) (cli.Project, error) {
-	if err := wtm.CorrelationProblem(os.Getenv(correlationIDEnv)); err != nil {
-		return cli.Project{}, wtm.InvalidMessage("$" + correlationIDEnv + " " + err.Error() + ": invalid correlation id")
+	if err := domain.CorrelationProblem(os.Getenv(correlationIDEnv)); err != nil {
+		return cli.Project{}, domain.InvalidMessage("$" + correlationIDEnv + " " + err.Error() + ": invalid correlation id")
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -34,26 +34,26 @@ func open(ctx context.Context) (cli.Project, error) {
 	if err != nil {
 		return cli.Project{}, err
 	}
-	return cli.Project{App: newApp(params), Cwd: resolved}, nil
+	return cli.Project{Create: wire(params), Cwd: resolved}, nil
 }
 
-func locate(ctx context.Context, cwd string) (appParams, error) {
+func locate(ctx context.Context, cwd string) (wireParams, error) {
 	root, err := projectRoot(ctx, cwd)
 	if err != nil {
-		return appParams{}, notARepository(cwd, err)
+		return wireParams{}, notARepository(cwd, err)
 	}
 	commonDir, err := git.Repo{Dir: root}.CommonDir(ctx)
 	if err != nil {
-		return appParams{}, notARepository(root, err)
+		return wireParams{}, notARepository(root, err)
 	}
-	return appParams{MainPath: root, StateDir: cmp.Or(os.Getenv(stateDirEnv), filepath.Join(commonDir, stateDirName)), CommonDir: commonDir}, nil
+	return wireParams{MainPath: root, StateDir: cmp.Or(os.Getenv(stateDirEnv), filepath.Join(commonDir, stateDirName)), CommonDir: commonDir}, nil
 }
 
 func notARepository(dir string, err error) error {
 	if !errors.Is(err, git.ErrNotRepository) {
 		return err
 	}
-	return &wtm.Error{Kind: wtm.KindPrecondition, Code: wtm.CodeNotARepository, Message: dir + " is not a git repository", Cause: err}
+	return &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodeNotARepository, Message: dir + " is not a git repository", Cause: err}
 }
 
 func projectRoot(ctx context.Context, cwd string) (string, error) {

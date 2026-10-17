@@ -3,7 +3,7 @@ package git
 import (
 	"context"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
 func (r Repo) FetchRef(ctx context.Context, name string) error {

@@ -47,7 +47,7 @@ package output
 import "github.com/charmbracelet/lipgloss"
 
 var Accent = lipgloss.NewStyle()
--- github.com/LucasPcq/wtm/next/internal/wtm/assert/assert.go --
+-- github.com/LucasPcq/wtm/next/internal/domain/assert/assert.go --
 // Package assert holds an unguarded assertion.
 package assert
 

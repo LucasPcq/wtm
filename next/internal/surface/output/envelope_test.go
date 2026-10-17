@@ -5,9 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/app"
-	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +15,7 @@ func TestAnAppliedRunWritesEachItemWithItsDetail(t *testing.T) {
 	outcome := twoCreated("/trees")
 	outcome.Result.Items[1].Detail.Standing = create.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2}
 	outcome.Result.Items[1].Detail.Ordinal = new(2)
-	outcome.Warnings = []wtm.Warning{{Code: "locks.unavailable", Message: "ran without operation locks"}}
+	outcome.Warnings = []domain.Warning{{Code: "locks.unavailable", Message: "ran without operation locks"}}
 
 	assert.JSONEq(t, `{
 		"v": 2, "command": "create", "ok": true, "op": "op-1",
@@ -49,7 +48,7 @@ func TestAFailedRunIsNotOkAndNamesItsFirstFailure(t *testing.T) {
 func TestADryRunWritesThePlanAndItsFingerprintInsteadOfItems(t *testing.T) {
 	outcome := twoCreated("/trees")
 	outcome.Result = nil
-	outcome.Warnings = []wtm.Warning{{Code: "create.env_parent_fallback", Message: "from main"}}
+	outcome.Warnings = []domain.Warning{{Code: "create.env_parent_fallback", Message: "from main"}}
 
 	assert.JSONEq(t, `{
 		"v": 2, "command": "create", "ok": true, "op": "op-1",
@@ -70,13 +69,13 @@ func TestAnInvalidRequestNamesEachFieldByItsPathAndItsFlag(t *testing.T) {
 			{"path": "env_from", "code": "one_of", "params": {"value": "copy"}, "accepted": ["example", "main", "parent"], "flag": "--env-from", "message": "--env-from must be one of example, main, parent, not copy"},
 			{"path": "from", "code": "required", "params": {"because": "create.parent_required"}, "flag": "--from", "message": "--from is required: a branch that already exists locally needs its parent named (it can't be inferred, and `+"`wtm sync`"+` needs it)"}
 		]}
-	}`, envelopeOf(t, EnvelopeParams{Outcome: app.CreateOutcome{Op: "op-3"}, Err: invalid()}))
+	}`, envelopeOf(t, EnvelopeParams{Outcome: create.Outcome{Op: "op-3"}, Err: invalid()}))
 }
 
 func TestAFailureLeftBehindCarriesItsFollowUp(t *testing.T) {
-	stuck := &wtm.Error{
-		Kind: wtm.KindInternal, Code: "unit.undo_failed", Message: "could not remove the worktree, left behind: worktree", Params: wtm.Params{"left": "worktree"},
-		FollowUp: &wtm.FollowUp{Command: "clean", Request: json.RawMessage(`{"branches":["feat/x"],"force":true}`), Code: "provision.left_behind", Message: "branch feat/x is left half-created", Params: wtm.Params{"branch": "feat/x", "path": "/p"}},
+	stuck := &domain.Error{
+		Kind: domain.KindInternal, Code: "unit.undo_failed", Message: "could not remove the worktree, left behind: worktree", Params: domain.Params{"left": "worktree"},
+		FollowUp: &domain.FollowUp{Command: "clean", Request: json.RawMessage(`{"branches":["feat/x"],"force":true}`), Code: "provision.left_behind", Message: "branch feat/x is left half-created", Params: domain.Params{"branch": "feat/x", "path": "/p"}},
 		Cause:    errors.New("env failed: disk full"),
 	}
 
@@ -96,7 +95,7 @@ func TestAnEnvelopeNeverEscapesItsHTMLAndNeverLeavesAPlaceholder(t *testing.T) {
 }
 
 func TestAFieldNamesTheOtherFieldsItIsCheckedWith(t *testing.T) {
-	selfParent := wtm.Invalid([]wtm.FieldError{{Path: "from", Code: "self_parent", Template: "{value} cannot be its own parent: pass another value to {path}", Params: wtm.Params{"value": "feat/x"}, With: []string{"branches"}}})
+	selfParent := domain.Invalid([]domain.FieldError{{Path: "from", Code: "self_parent", Template: "{value} cannot be its own parent: pass another value to {path}", Params: domain.Params{"value": "feat/x"}, With: []string{"branches"}}})
 
 	assert.Contains(t, envelopeOf(t, EnvelopeParams{Err: selfParent}), `"with": [
           "branches"

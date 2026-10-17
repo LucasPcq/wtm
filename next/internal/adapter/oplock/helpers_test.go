@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,9 +19,9 @@ func take(t *testing.T, taken func() (*Held, error)) *Held {
 	return held
 }
 
-func refusal(t *testing.T, err error) *wtm.Error {
+func refusal(t *testing.T, err error) *domain.Error {
 	t.Helper()
-	failure, ok := errors.AsType[*wtm.Error](err)
+	failure, ok := errors.AsType[*domain.Error](err)
 	require.True(t, ok, err)
 	return failure
 }

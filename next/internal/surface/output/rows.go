@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 
-	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
 const (
@@ -61,7 +61,7 @@ func sourceLabel(branches []create.BranchPlan) string {
 
 func itemNote(item create.Item) string {
 	note := settlementNote(item.Detail.EnvPorts)
-	if item.Reason == wtm.ReasonUnchanged {
+	if item.Reason == domain.ReasonUnchanged {
 		note = "already open"
 	}
 	if note == "" {

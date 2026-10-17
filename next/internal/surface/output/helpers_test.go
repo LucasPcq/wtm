@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,15 +51,15 @@ const (
 )
 
 func hookRun(progress *Progress, lines ...string) {
-	progress.Report(wtm.UnitStarted{Subject: "feat/x"})
-	progress.Report(wtm.PhaseStarted{Subject: "feat/x", Phase: "worktree"})
-	progress.Report(wtm.PhaseFinished{Subject: "feat/x", Phase: "worktree"})
-	progress.Report(wtm.PhaseStarted{Subject: "feat/x", Phase: "on_create", Log: "/state/hooks/on_create-feat%2Fx.log"})
+	progress.Report(domain.UnitStarted{Subject: "feat/x"})
+	progress.Report(domain.PhaseStarted{Subject: "feat/x", Phase: "worktree"})
+	progress.Report(domain.PhaseFinished{Subject: "feat/x", Phase: "worktree"})
+	progress.Report(domain.PhaseStarted{Subject: "feat/x", Phase: "on_create", Log: "/state/hooks/on_create-feat%2Fx.log"})
 	for _, line := range lines {
-		progress.Report(wtm.Output{Subject: "feat/x", Line: line})
+		progress.Report(domain.Output{Subject: "feat/x", Line: line})
 	}
-	progress.Report(wtm.PhaseFinished{Subject: "feat/x", Phase: "on_create"})
-	progress.Report(wtm.UnitFinished{Subject: "feat/x", Status: wtm.StatusDone})
+	progress.Report(domain.PhaseFinished{Subject: "feat/x", Phase: "on_create"})
+	progress.Report(domain.UnitFinished{Subject: "feat/x", Status: domain.StatusDone})
 }
 
 func finalScreen(raw string) []string {

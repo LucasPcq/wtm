@@ -11,14 +11,14 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/dotenv"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
 const metaSchema = 1
@@ -119,40 +119,40 @@ func (f *Fake) Load(branch string) (worktree.Meta, error) {
 	return meta, nil
 }
 
-func (f *Fake) Update(_ context.Context, update worktree.MetaUpdate) (wtm.Written, error) {
+func (f *Fake) Update(_ context.Context, update worktree.MetaUpdate) (domain.Written, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.enter("Update", update.Branch); err != nil {
-		return wtm.Written{}, err
+		return domain.Written{}, err
 	}
 	if err := segmentOf(update.Branch); err != nil {
-		return wtm.Written{}, err
+		return domain.Written{}, err
 	}
 	stored, err := f.stored(update.Branch)
 	if err != nil {
-		return wtm.Written{}, err
+		return domain.Written{}, err
 	}
 	next := stored
 	if err := update.Change(&next); err != nil {
-		return wtm.Written{}, err
+		return domain.Written{}, err
 	}
 	next.Schema = 0
 	written, err := json.MarshalIndent(next, "", "  ")
 	if err != nil {
-		return wtm.Written{}, err
+		return domain.Written{}, err
 	}
 	previous, held := f.meta[update.Branch]
 	before, _ := json.MarshalIndent(previous, "", "  ")
 	if held && !f.unreadable[update.Branch] && bytes.Equal(before, written) {
-		return wtm.Written{}, nil
+		return domain.Written{}, nil
 	}
 	var reread worktree.Meta
 	if err := json.Unmarshal(written, &reread); err != nil {
-		return wtm.Written{}, err
+		return domain.Written{}, err
 	}
 	f.meta[update.Branch] = reread
 	delete(f.unreadable, update.Branch)
-	return wtm.Written{Changed: true}, nil
+	return domain.Written{Changed: true}, nil
 }
 
 func segmentOf(branch string) error {
@@ -183,32 +183,32 @@ func (f *Fake) LockOrdinals(_ context.Context, do func() error) (bool, error) {
 	return true, do()
 }
 
-func (f *Fake) Remember(_ context.Context, answers map[string]string) (wtm.Written, error) {
+func (f *Fake) Remember(_ context.Context, answers map[string]string) (domain.Written, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.enter("Remember", ""); err != nil {
-		return wtm.Written{}, err
+		return domain.Written{}, err
 	}
 	if len(answers) == 0 {
-		return wtm.Written{}, nil
+		return domain.Written{}, nil
 	}
 	if f.config == nil {
-		return wtm.Written{}, project.ErrConfigNotFound
+		return domain.Written{}, project.ErrConfigNotFound
 	}
 	if f.configUnreadable {
-		return wtm.Written{}, fmt.Errorf("storetest: config.toml does not parse")
+		return domain.Written{}, fmt.Errorf("storetest: config.toml does not parse")
 	}
 	if err := statefile.Refusal(statefile.Schema{Path: "config.toml", Found: f.configSchema, Supported: 1}); err != nil {
-		return wtm.Written{}, err
+		return domain.Written{}, err
 	}
 	remembered := map[string]string{}
 	maps.Copy(remembered, f.config.Remembered)
 	maps.Copy(remembered, answers)
 	if maps.Equal(remembered, f.config.Remembered) {
-		return wtm.Written{}, nil
+		return domain.Written{}, nil
 	}
 	f.config.Remembered = remembered
-	return wtm.Written{Changed: true}, nil
+	return domain.Written{Changed: true}, nil
 }
 
 func (f *Fake) Read(path string) ([]dotenv.Line, error) {
@@ -245,11 +245,11 @@ func (f *Fake) Copy(_ context.Context, request env.CopyRequest) (env.Copied, err
 	return copied, nil
 }
 
-func (f *Fake) Edit(_ context.Context, edit dotenv.Edit) (wtm.Written, error) {
+func (f *Fake) Edit(_ context.Context, edit dotenv.Edit) (domain.Written, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.enter("Edit", edit.Path); err != nil {
-		return wtm.Written{}, err
+		return domain.Written{}, err
 	}
 	var current []byte
 	if content, ok := f.files[edit.Path]; ok {
@@ -257,10 +257,10 @@ func (f *Fake) Edit(_ context.Context, edit dotenv.Edit) (wtm.Written, error) {
 	}
 	next, write := edit.Over(current)
 	if !write {
-		return wtm.Written{}, nil
+		return domain.Written{}, nil
 	}
 	f.files[edit.Path] = string(next)
-	return wtm.Written{Changed: true}, nil
+	return domain.Written{Changed: true}, nil
 }
 
 func (f *Fake) exists(path string) (bool, error) {

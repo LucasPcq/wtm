@@ -7,9 +7,9 @@ import (
 	"errors"
 	"io"
 
-	"github.com/LucasPcq/wtm/next/internal/app"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/surface/output"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/spf13/cobra"
 )
 
@@ -27,8 +27,8 @@ type Params struct {
 }
 
 type Project struct {
-	App *app.App
-	Cwd string
+	Create create.UseCase
+	Cwd    string
 }
 
 func Main(params Params) int {
@@ -76,13 +76,13 @@ func Execute(ctx context.Context, root *cobra.Command) int {
 		}
 		return exitCode(exitParams{Failure: failure.Err, Signalled: ctx.Err() != nil})
 	}
-	usage := wtm.InvalidMessage(err.Error())
+	usage := domain.InvalidMessage(err.Error())
 	output.Frame(stderr, func(w io.Writer) { output.Failure(w, output.FailureParams{Err: usage}) })
 	return exitUsage
 }
 
 type failed struct {
-	Err   *wtm.Error
+	Err   *domain.Error
 	Quiet bool
 }
 

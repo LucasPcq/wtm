@@ -11,9 +11,9 @@ import (
 func TestANextPackageImportsOnlyWhatItsRowAllows(t *testing.T) {
 	runTxtar(t, newNextAnalyzer(loadedTests), "next",
 		nextModule,
-		nextPrefix+"internal/wtm/branch",
-		nextPrefix+"internal/app/create",
-		nextPrefix+"internal/app",
+		nextPrefix+"internal/domain/branch",
+		nextPrefix+"internal/service/provision",
+		nextPrefix+"internal/command/create",
 		nextPrefix+"internal/adapter/git",
 		nextPrefix+"internal/adapter/gittest",
 		nextPrefix+"internal/adapter/store",
@@ -25,26 +25,26 @@ func TestANextPackageImportsOnlyWhatItsRowAllows(t *testing.T) {
 
 func TestANextPackageKeepsItsCommentsUnderItsCeiling(t *testing.T) {
 	ceilings := map[string]int{
-		"internal/wtm/dotenv":     2,
-		"internal/wtm/envcopy":    1,
+		"internal/domain/dotenv":  2,
+		"internal/domain/envcopy": 1,
 		"internal/adapter/shell":  1,
 		"internal/adapter/oplock": 2,
 	}
 	runTxtar(t, newNextCommentsAnalyzer(nextCommentsParams{Tests: loadedTests, Ceilings: func() (map[string]int, error) { return ceilings, nil }}), "nextcomments",
-		nextPrefix+"internal/wtm/branch",
-		nextPrefix+"internal/wtm/dotenv",
-		nextPrefix+"internal/wtm/envcopy",
+		nextPrefix+"internal/domain/branch",
+		nextPrefix+"internal/domain/dotenv",
+		nextPrefix+"internal/domain/envcopy",
 		nextPrefix+"internal/adapter/shell",
 		nextPrefix+"internal/adapter/oplock",
 	)
 }
 
 func TestTheCeilingsFileReadsOnePackageAndItsCountPerLine(t *testing.T) {
-	ceilings, err := parseNextCeilings("# why each one earns its place: review\n\ninternal/adapter/shell 3\ninternal/wtm/dotenv   1\n")
+	ceilings, err := parseNextCeilings("# why each one earns its place: review\n\ninternal/adapter/shell 3\ninternal/domain/dotenv   1\n")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := map[string]int{"internal/adapter/shell": 3, "internal/wtm/dotenv": 1}; !maps.Equal(ceilings, want) {
+	if want := map[string]int{"internal/adapter/shell": 3, "internal/domain/dotenv": 1}; !maps.Equal(ceilings, want) {
 		t.Errorf("ceilings = %v, want %v", ceilings, want)
 	}
 }
@@ -73,7 +73,7 @@ func TestTheRulesWrittenForInternalLeaveNextAlone(t *testing.T) {
 }
 
 func TestALanguageRuleStillActsOnNext(t *testing.T) {
-	runTxtar(t, typeassertAnalyzer, "nextlegacy", nextPrefix+"internal/wtm/assert")
+	runTxtar(t, typeassertAnalyzer, "nextlegacy", nextPrefix+"internal/domain/assert")
 }
 
 func TestACeilingWithoutItsPackageIsStale(t *testing.T) {

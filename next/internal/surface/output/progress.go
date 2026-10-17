@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
 type ProgressParams struct {
@@ -78,13 +78,13 @@ func (p *Progress) cancellingMessage() string {
 	return "Cancelling — Ctrl+C again to stop now"
 }
 
-func (p *Progress) Report(event wtm.Event) {
+func (p *Progress) Report(event domain.Event) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.human {
 		p.announce()
 	}
-	if output, ok := event.(wtm.Output); ok {
+	if output, ok := event.(domain.Output); ok {
 		p.output(output.Line)
 		return
 	}
@@ -92,17 +92,17 @@ func (p *Progress) Report(event wtm.Event) {
 		return
 	}
 	switch e := event.(type) {
-	case wtm.PhaseStarted:
+	case domain.PhaseStarted:
 		p.phase, p.phaseLog, p.phaseOpen, p.started = e.Phase, e.Log, false, time.Now()
-	case wtm.PhaseFinished:
+	case domain.PhaseFinished:
 		p.phaseFinished(e.Failed)
-	case wtm.UnitStarted:
+	case domain.UnitStarted:
 		p.unit, p.status = e.Subject, ""
 		p.paint()
-	case wtm.UnitFinished:
+	case domain.UnitFinished:
 		p.unit, p.status = "", ""
 		p.erase()
-	case wtm.Output, wtm.WorktreeCreated, wtm.WorktreeNumbered, wtm.WorktreeProvisioned, wtm.OperationStarted, wtm.OperationFinished:
+	case domain.Output, domain.WorktreeCreated, domain.WorktreeNumbered, domain.WorktreeProvisioned, domain.OperationStarted, domain.OperationFinished:
 	}
 }
 

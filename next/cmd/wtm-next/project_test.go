@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +22,7 @@ func TestTheProjectIsTheMainWorktreeOfWhereverItRuns(t *testing.T) {
 	params, err := locate(t.Context(), linked)
 
 	require.NoError(t, err)
-	assert.Equal(t, appParams{MainPath: main, StateDir: filepath.Join(main, ".git", "wtm"), CommonDir: filepath.Join(main, ".git")}, params)
+	assert.Equal(t, wireParams{MainPath: main, StateDir: filepath.Join(main, ".git", "wtm"), CommonDir: filepath.Join(main, ".git")}, params)
 }
 
 func TestTheProjectAndStateDirsCanBeNamed(t *testing.T) {
@@ -35,7 +35,7 @@ func TestTheProjectAndStateDirsCanBeNamed(t *testing.T) {
 	params, err := locate(t.Context(), t.TempDir())
 
 	require.NoError(t, err)
-	assert.Equal(t, appParams{MainPath: main, StateDir: "/state", CommonDir: filepath.Join(main, ".git")}, params)
+	assert.Equal(t, wireParams{MainPath: main, StateDir: "/state", CommonDir: filepath.Join(main, ".git")}, params)
 }
 
 func TestAFolderOutsideAnyRepositoryIsRefused(t *testing.T) {
@@ -44,9 +44,9 @@ func TestAFolderOutsideAnyRepositoryIsRefused(t *testing.T) {
 
 	_, err := locate(t.Context(), outside)
 
-	failure, ok := errors.AsType[*wtm.Error](err)
+	failure, ok := errors.AsType[*domain.Error](err)
 	require.True(t, ok, "%v", err)
-	assert.Equal(t, wtm.CodeNotARepository, failure.Code)
+	assert.Equal(t, domain.CodeNotARepository, failure.Code)
 	assert.Equal(t, outside+" is not a git repository", failure.Message)
 }
 
@@ -56,9 +56,9 @@ func TestANamedProjectDirOutsideAnyRepositoryIsRefused(t *testing.T) {
 
 	_, err := locate(t.Context(), t.TempDir())
 
-	failure, ok := errors.AsType[*wtm.Error](err)
+	failure, ok := errors.AsType[*domain.Error](err)
 	require.True(t, ok, "%v", err)
-	assert.Equal(t, wtm.CodeNotARepository, failure.Code)
+	assert.Equal(t, domain.CodeNotARepository, failure.Code)
 	assert.Equal(t, gittest.Resolved(t, named)+" is not a git repository", failure.Message)
 }
 
@@ -67,8 +67,8 @@ func TestACorrelationIDWithAControlCharacterIsAUsageError(t *testing.T) {
 
 	_, err := open(t.Context())
 
-	failure, ok := errors.AsType[*wtm.Error](err)
+	failure, ok := errors.AsType[*domain.Error](err)
 	require.True(t, ok, "%v", err)
-	assert.Equal(t, wtm.KindInvalid, failure.Kind)
+	assert.Equal(t, domain.KindInvalid, failure.Kind)
 	assert.Equal(t, "$WTM_CORRELATION_ID contains a control character: invalid correlation id", failure.Message)
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,7 +13,7 @@ import (
 func TestAWorktreeCreatedIsPublishedAsTheDaemonRelaysIt(t *testing.T) {
 	daemon := listen(t)
 
-	publisherOn(t, daemon).Publish(wtm.WorktreeCreated{Worktree: identity()})
+	publisherOn(t, daemon).Publish(domain.WorktreeCreated{Worktree: identity()})
 
 	request := daemon.next(t)
 	assert.JSONEq(t, `{"action":"publish","repo":"`+daemon.commonDir+`","payload":{}}`, withoutPayload(t, request))
@@ -25,7 +25,7 @@ func TestAWorktreeNumberedIsAnUpdateOfItsOrdinal(t *testing.T) {
 	numbered := identity()
 	numbered.Ordinal = new(3)
 
-	publisherOn(t, daemon).Publish(wtm.WorktreeNumbered{Worktree: numbered})
+	publisherOn(t, daemon).Publish(domain.WorktreeNumbered{Worktree: numbered})
 
 	payload := decoded(t, payloadOf(t, daemon.next(t)))
 	assert.Equal(t, "worktree.updated", payload["type"])
@@ -38,8 +38,8 @@ func TestAWorktreeProvisionedSaysWhetherItWorkedAndWhichHookFailed(t *testing.T)
 	exit := 3
 	publisher := publisherOn(t, daemon)
 
-	publisher.Publish(wtm.WorktreeProvisioned{Worktree: identity(), OK: true})
-	publisher.Publish(wtm.WorktreeProvisioned{Worktree: identity(), Hook: "exit 3", ExitCode: &exit})
+	publisher.Publish(domain.WorktreeProvisioned{Worktree: identity(), OK: true})
+	publisher.Publish(domain.WorktreeProvisioned{Worktree: identity(), Hook: "exit 3", ExitCode: &exit})
 
 	ok := decoded(t, payloadOf(t, daemon.next(t)))
 	failed := decoded(t, payloadOf(t, daemon.next(t)))
@@ -56,9 +56,9 @@ func TestAnOperationIsAnnouncedStartedUnitByUnitAndFinished(t *testing.T) {
 	daemon := listen(t)
 	publisher := publisherOn(t, daemon)
 
-	publisher.Publish(wtm.OperationStarted{Command: "create", Surface: "cli"})
-	publisher.Publish(wtm.UnitFinished{Subject: "feat/a", Status: wtm.StatusDone})
-	publisher.Publish(wtm.OperationFinished{Command: "create", Surface: "cli", Code: "lock.held"})
+	publisher.Publish(domain.OperationStarted{Command: "create", Surface: "cli"})
+	publisher.Publish(domain.UnitFinished{Subject: "feat/a", Status: domain.StatusDone})
+	publisher.Publish(domain.OperationFinished{Command: "create", Surface: "cli", Code: "lock.held"})
 
 	assert.JSONEq(t, `{"v":1,"type":"operation.started","ts":"2026-10-16T12:00:00Z","correlation_id":"popup-1","repo":{"root":"/repo","common_dir":"`+daemon.commonDir+`"},"op_id":"op-1","operation":{"command":"create","surface":"cli"}}`, payloadOf(t, daemon.next(t)))
 	assert.JSONEq(t, `{"v":1,"type":"unit.finished","ts":"2026-10-16T12:00:00Z","correlation_id":"popup-1","repo":{"root":"/repo","common_dir":"`+daemon.commonDir+`"},"op_id":"op-1","unit":{"subject":"feat/a","status":"done"}}`, payloadOf(t, daemon.next(t)))
@@ -68,7 +68,7 @@ func TestAnOperationIsAnnouncedStartedUnitByUnitAndFinished(t *testing.T) {
 func TestAnOperationThatEndedWellCarriesNoCode(t *testing.T) {
 	daemon := listen(t)
 
-	publisherOn(t, daemon).Publish(wtm.OperationFinished{Command: "create", Surface: "cli", OK: true})
+	publisherOn(t, daemon).Publish(domain.OperationFinished{Command: "create", Surface: "cli", OK: true})
 
 	payload := decoded(t, payloadOf(t, daemon.next(t)))
 	assert.Equal(t, true, payload["ok"])
@@ -80,7 +80,7 @@ func TestAnUncorrelatedEventCarriesNoCorrelation(t *testing.T) {
 	publisher := publisherOn(t, daemon)
 	publisher.correlationID = ""
 
-	publisher.Publish(wtm.WorktreeCreated{Worktree: identity()})
+	publisher.Publish(domain.WorktreeCreated{Worktree: identity()})
 
 	assert.NotContains(t, decoded(t, payloadOf(t, daemon.next(t))), "correlation_id")
 }
@@ -89,11 +89,11 @@ func TestProgressIsNeverPublished(t *testing.T) {
 	daemon := listen(t)
 	publisher := publisherOn(t, daemon)
 
-	publisher.Publish(wtm.UnitStarted{Subject: "feat/a"})
-	publisher.Publish(wtm.PhaseStarted{Subject: "feat/a", Phase: "on_create"})
-	publisher.Publish(wtm.Output{Subject: "feat/a", Line: "installing"})
-	publisher.Publish(wtm.PhaseFinished{Subject: "feat/a", Phase: "on_create"})
-	publisher.Publish(wtm.WorktreeCreated{Worktree: identity()})
+	publisher.Publish(domain.UnitStarted{Subject: "feat/a"})
+	publisher.Publish(domain.PhaseStarted{Subject: "feat/a", Phase: "on_create"})
+	publisher.Publish(domain.Output{Subject: "feat/a", Line: "installing"})
+	publisher.Publish(domain.PhaseFinished{Subject: "feat/a", Phase: "on_create"})
+	publisher.Publish(domain.WorktreeCreated{Worktree: identity()})
 
 	assert.Equal(t, "worktree.created", decoded(t, payloadOf(t, daemon.next(t)))["type"])
 }
@@ -102,21 +102,21 @@ func TestPublishingWithNoDaemonListeningReturnsQuietlyAndFast(t *testing.T) {
 	publisher := NewPublisher(PublisherParams{Root: "/repo", CommonDir: t.TempDir(), SocketPath: filepath.Join(t.TempDir(), "wtm.sock")})
 	begin := time.Now()
 
-	publisher.Publish(wtm.WorktreeCreated{Worktree: identity()})
+	publisher.Publish(domain.WorktreeCreated{Worktree: identity()})
 
 	assert.Less(t, time.Since(begin), publishTimeout)
 }
 
 func TestAPublisherWithNoSocketPublishesNothing(t *testing.T) {
 	assert.NotPanics(t, func() {
-		NewPublisher(PublisherParams{Root: "/repo", CommonDir: t.TempDir()}).Publish(wtm.WorktreeCreated{Worktree: identity()})
+		NewPublisher(PublisherParams{Root: "/repo", CommonDir: t.TempDir()}).Publish(domain.WorktreeCreated{Worktree: identity()})
 	})
 }
 
 func TestADaemonThatRefusesTheEventDoesNotStopThePublisher(t *testing.T) {
 	daemon := listenAnswering(t, `{"status":"error","message":"no"}`)
 
-	publisherOn(t, daemon).Publish(wtm.WorktreeCreated{Worktree: identity()})
+	publisherOn(t, daemon).Publish(domain.WorktreeCreated{Worktree: identity()})
 
 	require.NotEmpty(t, daemon.next(t))
 }

@@ -3,6 +3,7 @@ package config
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"maps"
@@ -11,7 +12,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
 const (
@@ -44,6 +46,23 @@ type projectFile struct {
 type savedProject struct {
 	Config  project.Config
 	OnClean []project.Hook
+}
+
+type Project struct {
+	StateDir   string
+	GlobalPath string
+}
+
+func (p Project) Load() (project.Config, project.Global, error) {
+	return Load(LoadParams(p))
+}
+
+func (p Project) LoadRun() (project.Run, error) {
+	return LoadRun(p.StateDir)
+}
+
+func (p Project) Remember(ctx context.Context, answers map[string]string) (domain.Written, error) {
+	return Remember(ctx, RememberParams{StateDir: p.StateDir, Answers: answers})
 }
 
 type LoadParams struct {

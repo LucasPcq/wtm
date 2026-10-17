@@ -7,12 +7,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/dotenv"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +24,7 @@ func TestAnOwnedKeyChangesNothingElseInTheFile(t *testing.T) {
 	written, err := EnvFiles{}.Edit(t.Context(), dotenv.Edit{Path: path, Edit: upsert("WEB_PORT", "3100")})
 
 	require.NoError(t, err)
-	assert.Equal(t, wtm.Written{Changed: true}, written)
+	assert.Equal(t, domain.Written{Changed: true}, written)
 	assert.Equal(t, "# database\nDB_HOST=localhost\nWEB_PORT=3100 # the dev server\n\nexport API_KEY=secret\r\n", readFile(t, path))
 }
 

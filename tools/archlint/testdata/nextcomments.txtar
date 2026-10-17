@@ -1,8 +1,8 @@
--- github.com/LucasPcq/wtm/next/internal/wtm/branch/branch.go --
+-- github.com/LucasPcq/wtm/next/internal/domain/branch/branch.go --
 //go:build !plan9
 
 // Package branch names branches.
-package branch // want `next/internal/wtm/branch has 6 comment lines, above its ceiling of 0 in .next-comments`
+package branch // want `next/internal/domain/branch has 6 comment lines, above its ceiling of 0 in .next-comments`
 
 import "strings"
 
@@ -31,7 +31,7 @@ type clash struct{}
 func (clash) Name() string { return "" }
 
 func trimmed(name string) string { return strings.TrimSpace(name) + essay + unusedName }
--- github.com/LucasPcq/wtm/next/internal/wtm/branch/branch_test.go --
+-- github.com/LucasPcq/wtm/next/internal/domain/branch/branch_test.go --
 package branch
 
 import "testing"
@@ -40,8 +40,8 @@ func TestProblem(t *testing.T) {
 	_ = Problem("x")
 	_ = trimmed("x")
 }
--- github.com/LucasPcq/wtm/next/internal/wtm/dotenv/dotenv.go --
-// Package dotenv parses .env files. // want `next/internal/wtm/dotenv has a package doc of 2 lines`
+-- github.com/LucasPcq/wtm/next/internal/domain/dotenv/dotenv.go --
+// Package dotenv parses .env files. // want `next/internal/domain/dotenv has a package doc of 2 lines`
 // It keeps their format.
 package dotenv
 
@@ -52,8 +52,8 @@ func Parse(data string) lines {
 	// a CRLF file stays CRLF
 	return lines{data}
 }
--- github.com/LucasPcq/wtm/next/internal/wtm/envcopy/envcopy.go --
-package envcopy // want `next/internal/wtm/envcopy has no package doc`
+-- github.com/LucasPcq/wtm/next/internal/domain/envcopy/envcopy.go --
+package envcopy // want `next/internal/domain/envcopy has no package doc`
 
 func Sources() []string { return nil }
 -- github.com/LucasPcq/wtm/next/internal/adapter/shell/shell.go --

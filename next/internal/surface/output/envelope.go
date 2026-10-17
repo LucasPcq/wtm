@@ -5,16 +5,15 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/LucasPcq/wtm/next/internal/app"
-	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
 const envelopeVersion = 2
 
 type EnvelopeParams struct {
-	Outcome app.CreateOutcome
-	Err     *wtm.Error
+	Outcome create.Outcome
+	Err     *domain.Error
 }
 
 type envelope struct {
@@ -26,43 +25,43 @@ type envelope struct {
 	Plan        *create.Plan     `json:"plan,omitempty"`
 	Fingerprint string           `json:"fingerprint,omitempty"`
 	FollowUps   []envelopeFollow `json:"follow_ups"`
-	Warnings    []wtm.Warning    `json:"warnings"`
+	Warnings    []domain.Warning `json:"warnings"`
 	Error       *envelopeError   `json:"error,omitempty"`
 }
 
 type envelopeItem struct {
-	Subject  string         `json:"subject"`
-	Status   wtm.Status     `json:"status"`
-	Reason   wtm.Reason     `json:"reason,omitempty"`
-	Error    *envelopeError `json:"error,omitempty"`
-	Warnings []wtm.Warning  `json:"warnings,omitempty"`
-	Detail   any            `json:"detail"`
+	Subject  string           `json:"subject"`
+	Status   domain.Status    `json:"status"`
+	Reason   domain.Reason    `json:"reason,omitempty"`
+	Error    *envelopeError   `json:"error,omitempty"`
+	Warnings []domain.Warning `json:"warnings,omitempty"`
+	Detail   any              `json:"detail"`
 }
 
 type envelopeFollow struct {
 	Command string          `json:"command"`
 	Request json.RawMessage `json:"request,omitempty"`
 	Code    string          `json:"code"`
-	Params  wtm.Params      `json:"params,omitempty"`
+	Params  domain.Params   `json:"params,omitempty"`
 }
 
 type envelopeError struct {
-	Kind     wtm.Kind        `json:"kind"`
+	Kind     domain.Kind     `json:"kind"`
 	Code     string          `json:"code"`
 	Message  string          `json:"message"`
-	Params   wtm.Params      `json:"params,omitempty"`
+	Params   domain.Params   `json:"params,omitempty"`
 	FollowUp *envelopeFollow `json:"follow_up,omitempty"`
 	Fields   []envelopeField `json:"fields,omitempty"`
 }
 
 type envelopeField struct {
-	Path     string     `json:"path"`
-	Code     string     `json:"code"`
-	Params   wtm.Params `json:"params,omitempty"`
-	Accepted []string   `json:"accepted,omitempty"`
-	With     []string   `json:"with,omitempty"`
-	Flag     string     `json:"flag"`
-	Message  string     `json:"message"`
+	Path     string        `json:"path"`
+	Code     string        `json:"code"`
+	Params   domain.Params `json:"params,omitempty"`
+	Accepted []string      `json:"accepted,omitempty"`
+	With     []string      `json:"with,omitempty"`
+	Flag     string        `json:"flag"`
+	Message  string        `json:"message"`
 }
 
 func Envelope(w io.Writer, params EnvelopeParams) error {
@@ -80,7 +79,7 @@ func Envelope(w io.Writer, params EnvelopeParams) error {
 		doc.Plan, doc.Fingerprint, doc.Warnings = &outcome.Plan, outcome.Fingerprint, outcome.Warnings
 	}
 	if doc.Warnings == nil {
-		doc.Warnings = []wtm.Warning{}
+		doc.Warnings = []domain.Warning{}
 	}
 	doc.OK, doc.Error = failure == nil, errorOf(failure)
 	encoder := json.NewEncoder(w)
@@ -98,7 +97,7 @@ func itemOf(item create.Item) envelopeItem {
 	return doc
 }
 
-func errorOf(err *wtm.Error) *envelopeError {
+func errorOf(err *domain.Error) *envelopeError {
 	if err == nil {
 		return nil
 	}

@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -80,7 +80,7 @@ func TestNoAnswerWritesNothing(t *testing.T) {
 	written, err := Remember(t.Context(), RememberParams{StateDir: stateDir})
 
 	require.NoError(t, err)
-	assert.Equal(t, wtm.Written{}, written)
+	assert.Equal(t, domain.Written{}, written)
 	assert.NoFileExists(t, filepath.Join(stateDir, "config.toml"))
 	assert.NoDirExists(t, filepath.Join(stateDir, "schemas"))
 }
@@ -100,7 +100,7 @@ func TestAConfigAtANewerSchemaIsNeverRewritten(t *testing.T) {
 
 	_, err := Remember(t.Context(), RememberParams{StateDir: stateDir, Answers: map[string]string{project.RememberIsolation: "verbatim"}})
 
-	var newer *wtm.SchemaNewer
+	var newer *domain.SchemaNewer
 	require.ErrorAs(t, err, &newer)
 	assert.Equal(t, 99, newer.Found)
 	assert.Equal(t, 1, newer.Supported)

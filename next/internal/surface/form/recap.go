@@ -3,7 +3,7 @@ package form
 import (
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/app"
+	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/surface/output"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -19,7 +19,7 @@ func (w *wizard) previewing() tea.Cmd {
 	w.recap = newSelectList(selectParams{})
 	req := w.req
 	return tea.Batch(w.load(planText), func() tea.Msg {
-		outcome, err := w.app.Create(w.ctx, app.CreateParams{Request: req, DryRun: true, Surface: surface})
+		outcome, err := w.app.Run(w.ctx, req, operation.Options{DryRun: true, Surface: surface})
 		return previewMsg{outcome: outcome, err: err}
 	})
 }

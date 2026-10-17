@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/app/create"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/surface/output"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
 )
 
 type step int
@@ -101,7 +101,7 @@ func (w *wizard) summarized(a answer) string {
 }
 
 func (w *wizard) erred(path string) bool {
-	return slices.ContainsFunc(w.q.Errors, func(problem wtm.FieldError) bool {
+	return slices.ContainsFunc(w.q.Errors, func(problem domain.FieldError) bool {
 		return problem.Path == path || strings.HasPrefix(problem.Path, path+"[")
 	})
 }
@@ -150,7 +150,7 @@ func (w *wizard) choices(s step) choiceParams {
 func (w *wizard) branchProblem(check entryCheck) error {
 	req := w.req
 	req.Branches = check.Entries
-	questions, err := w.app.CreateQuestions(w.ctx, req)
+	questions, err := w.app.Questions(w.ctx, req)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func (w *wizard) branchProblem(check entryCheck) error {
 	return nil
 }
 
-func problem(found wtm.FieldError) error {
+func problem(found domain.FieldError) error {
 	return errors.New(found.Message(label(found.Path)))
 }
 

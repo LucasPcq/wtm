@@ -4,8 +4,8 @@ import (
 	"cmp"
 	"errors"
 
-	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
 const (
@@ -23,19 +23,19 @@ const (
 
 var exitByCode = map[string]int{
 	create.CodeConfigNotFound: exitConfigNotFound,
-	wtm.CodeNotARepository:    exitNotGitRepo,
+	domain.CodeNotARepository: exitNotGitRepo,
 }
 
-var exitByKind = map[wtm.Kind]int{
-	wtm.KindInvalid:      exitUsage,
-	wtm.KindCancelled:    exitCancelled,
-	wtm.KindRefused:      exitRefused,
-	wtm.KindConflict:     exitConflict,
-	wtm.KindPrecondition: exitPrecondition,
+var exitByKind = map[domain.Kind]int{
+	domain.KindInvalid:      exitUsage,
+	domain.KindCancelled:    exitCancelled,
+	domain.KindRefused:      exitRefused,
+	domain.KindConflict:     exitConflict,
+	domain.KindPrecondition: exitPrecondition,
 }
 
 type exitParams struct {
-	Failure   *wtm.Error
+	Failure   *domain.Error
 	Signalled bool
 }
 
@@ -46,7 +46,7 @@ func exitCode(params exitParams) int {
 	if code, own := exitByCode[params.Failure.Code]; own {
 		return code
 	}
-	if _, newer := errors.AsType[*wtm.SchemaNewer](params.Failure); newer {
+	if _, newer := errors.AsType[*domain.SchemaNewer](params.Failure); newer {
 		return exitStateSchemaNewer
 	}
 	return cmp.Or(exitByKind[params.Failure.Kind], exitError)

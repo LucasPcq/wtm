@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 )
 
 func settlementNote(plan env.Redacted) string {

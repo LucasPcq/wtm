@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/dotenv"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 )
 
 const ownerOnly os.FileMode = 0o600
@@ -47,7 +47,7 @@ func (EnvFiles) Copy(ctx context.Context, request env.CopyRequest) (env.Copied, 
 	return copied, nil
 }
 
-func (EnvFiles) Edit(ctx context.Context, edit dotenv.Edit) (wtm.Written, error) {
+func (EnvFiles) Edit(ctx context.Context, edit dotenv.Edit) (domain.Written, error) {
 	return statefile.Update(ctx, statefile.UpdateParams{
 		Path:     edit.Path,
 		LockPath: statefile.ScratchLockPath(edit.Path),
@@ -70,14 +70,14 @@ func exists(path string) (bool, error) {
 	return err == nil, err
 }
 
-func copyFile(ctx context.Context, source env.Source) (wtm.Written, error) {
+func copyFile(ctx context.Context, source env.Source) (domain.Written, error) {
 	data, err := os.ReadFile(source.From)
 	if err != nil {
-		return wtm.Written{}, fmt.Errorf("read %s: %w", source.From, err)
+		return domain.Written{}, fmt.Errorf("read %s: %w", source.From, err)
 	}
 	info, err := os.Stat(source.From)
 	if err != nil {
-		return wtm.Written{}, fmt.Errorf("read %s: %w", source.From, err)
+		return domain.Written{}, fmt.Errorf("read %s: %w", source.From, err)
 	}
 	return statefile.Update(ctx, statefile.UpdateParams{
 		Path:     source.To,

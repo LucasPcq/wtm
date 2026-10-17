@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
 const (
@@ -62,7 +62,7 @@ func SocketPath() string {
 	return filepath.Join(dir, globalDirName, socketName)
 }
 
-func (p Publisher) Publish(event wtm.Event) {
+func (p Publisher) Publish(event domain.Event) {
 	message, published := messageOf(event)
 	if !published || p.socketPath == "" {
 		return

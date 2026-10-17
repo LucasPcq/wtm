@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,8 +45,8 @@ func TestAnInterruptSaysWhatIsBeingFinished(t *testing.T) {
 	var out bytes.Buffer
 	ctx, cancel := context.WithCancel(t.Context())
 	progress := NewProgress(ctx, ProgressParams{W: &out, Human: true})
-	progress.Report(wtm.UnitStarted{Subject: "feat/x"})
-	progress.Report(wtm.PhaseStarted{Subject: "feat/x", Phase: "env"})
+	progress.Report(domain.UnitStarted{Subject: "feat/x"})
+	progress.Report(domain.PhaseStarted{Subject: "feat/x", Phase: "env"})
 
 	cancel()
 	assert.Eventually(t, func() bool {
@@ -63,12 +63,12 @@ func TestAnInterruptIsSaidBeforeTheEventsThatFollowIt(t *testing.T) {
 	var out bytes.Buffer
 	ctx, cancel := context.WithCancel(t.Context())
 	progress := NewProgress(ctx, ProgressParams{W: &out, Human: true})
-	progress.Report(wtm.UnitStarted{Subject: "feat/x"})
-	progress.Report(wtm.PhaseStarted{Subject: "feat/x", Phase: "on_create"})
+	progress.Report(domain.UnitStarted{Subject: "feat/x"})
+	progress.Report(domain.PhaseStarted{Subject: "feat/x", Phase: "on_create"})
 
 	cancel()
-	progress.Report(wtm.PhaseFinished{Subject: "feat/x", Phase: "on_create", Failed: true})
-	progress.Report(wtm.UnitFinished{Subject: "feat/x", Status: wtm.StatusCancelled})
+	progress.Report(domain.PhaseFinished{Subject: "feat/x", Phase: "on_create", Failed: true})
+	progress.Report(domain.UnitFinished{Subject: "feat/x", Status: domain.StatusCancelled})
 	progress.Close()
 
 	assert.Equal(t, "  Cancelling — finishing on_create of feat/x; Ctrl+C again to stop now\n", out.String())
@@ -94,9 +94,9 @@ func TestALiveInterruptDuringAHookIsSaidInsideItsViewAndLosesNoLine(t *testing.T
 	var out bytes.Buffer
 	ctx, cancel := context.WithCancel(t.Context())
 	progress := NewProgress(ctx, ProgressParams{W: &out, Human: true, Live: true})
-	progress.Report(wtm.UnitStarted{Subject: "feat/x"})
-	progress.Report(wtm.PhaseStarted{Subject: "feat/x", Phase: "on_create", Log: "/state/hooks/x.log"})
-	progress.Report(wtm.Output{Subject: "feat/x", Line: "before"})
+	progress.Report(domain.UnitStarted{Subject: "feat/x"})
+	progress.Report(domain.PhaseStarted{Subject: "feat/x", Phase: "on_create", Log: "/state/hooks/x.log"})
+	progress.Report(domain.Output{Subject: "feat/x", Line: "before"})
 
 	cancel()
 	assert.Eventually(t, func() bool {
@@ -105,9 +105,9 @@ func TestALiveInterruptDuringAHookIsSaidInsideItsViewAndLosesNoLine(t *testing.T
 		return strings.Contains(out.String(), "Cancelling")
 	}, time2s, tick)
 	during := finalScreen(out.String())
-	progress.Report(wtm.Output{Subject: "feat/x", Line: "after"})
-	progress.Report(wtm.PhaseFinished{Subject: "feat/x", Phase: "on_create", Failed: true})
-	progress.Report(wtm.UnitFinished{Subject: "feat/x", Status: wtm.StatusCancelled})
+	progress.Report(domain.Output{Subject: "feat/x", Line: "after"})
+	progress.Report(domain.PhaseFinished{Subject: "feat/x", Phase: "on_create", Failed: true})
+	progress.Report(domain.UnitFinished{Subject: "feat/x", Status: domain.StatusCancelled})
 	progress.Close()
 
 	assert.Equal(t, []string{"  → on_create · feat/x", "  Cancelling — finishing on_create of feat/x; Ctrl+C again to stop now", "    before"}, during)
@@ -121,7 +121,7 @@ func TestALiveInterruptBetweenPhasesIsTheOnlyLine(t *testing.T) {
 	var out bytes.Buffer
 	ctx, cancel := context.WithCancel(t.Context())
 	progress := NewProgress(ctx, ProgressParams{W: &out, Human: true, Live: true})
-	progress.Report(wtm.UnitStarted{Subject: "feat/x"})
+	progress.Report(domain.UnitStarted{Subject: "feat/x"})
 
 	cancel()
 	assert.Eventually(t, func() bool {
@@ -141,8 +141,8 @@ func TestALiveLineIsErasedAloneSoNoScreenIsClearedIntoTheScrollback(t *testing.T
 	var out bytes.Buffer
 	progress := NewProgress(t.Context(), ProgressParams{W: &out, Human: true, Live: true})
 
-	progress.Report(wtm.UnitStarted{Subject: "feat/x"})
-	progress.Report(wtm.UnitFinished{Subject: "feat/x", Status: wtm.StatusDone})
+	progress.Report(domain.UnitStarted{Subject: "feat/x"})
+	progress.Report(domain.UnitFinished{Subject: "feat/x", Status: domain.StatusDone})
 	progress.Close()
 
 	assert.True(t, strings.HasSuffix(out.String(), "\x1b[1F\x1b[2K"), "%q", out.String())

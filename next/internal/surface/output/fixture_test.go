@@ -4,14 +4,13 @@ import (
 	"errors"
 	"path/filepath"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 
-	"github.com/LucasPcq/wtm/next/internal/app"
-	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
 var meta = worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvExample, Isolation: project.Isolated}
@@ -21,8 +20,8 @@ const (
 	trees = "/repo/main/.trees"
 )
 
-func twoCreated(trees string) app.CreateOutcome {
-	return app.CreateOutcome{
+func twoCreated(trees string) create.Outcome {
+	return create.Outcome{
 		Op: "op-1",
 		Plan: create.Plan{
 			Branches: []create.BranchPlan{
@@ -34,15 +33,15 @@ func twoCreated(trees string) app.CreateOutcome {
 		},
 		Fingerprint: "0123456789abcdef01234567",
 		Result: &create.Result{Items: []create.Item{
-			{Subject: "feat/a", Status: wtm.StatusDone, Detail: &create.Detail{Path: filepath.Join(trees, "feat-a"), Metadata: meta}},
-			{Subject: "feat/b", Status: wtm.StatusDone, Detail: &create.Detail{Path: filepath.Join(trees, "feat-b"), Metadata: meta}},
+			{Subject: "feat/a", Status: domain.StatusDone, Detail: &create.Detail{Path: filepath.Join(trees, "feat-a"), Metadata: meta}},
+			{Subject: "feat/b", Status: domain.StatusDone, Detail: &create.Detail{Path: filepath.Join(trees, "feat-b"), Metadata: meta}},
 		}},
 	}
 }
 
-func mixed(trees string) app.CreateOutcome {
-	hook := &wtm.Error{Kind: wtm.KindInternal, Code: "unit.phase_failed", Message: "on_create failed", Params: wtm.Params{"phase": "on_create"}, Cause: errors.New("hook failed: exit status 3")}
-	return app.CreateOutcome{
+func mixed(trees string) create.Outcome {
+	hook := &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed", Params: domain.Params{"phase": "on_create"}, Cause: errors.New("hook failed: exit status 3")}
+	return create.Outcome{
 		Op: "op-2",
 		Plan: create.Plan{
 			Branches: []create.BranchPlan{
@@ -56,9 +55,9 @@ func mixed(trees string) app.CreateOutcome {
 			EnvFrom:   project.EnvMain,
 			Isolation: project.Isolated,
 		},
-		Warnings: []wtm.Warning{{Code: "create.ff_dirty", Message: "couldn't fast-forward main: its worktree has uncommitted changes — it starts from your local branch", Params: wtm.Params{"branch": "main"}}},
+		Warnings: []domain.Warning{{Code: "create.ff_dirty", Message: "couldn't fast-forward main: its worktree has uncommitted changes — it starts from your local branch", Params: domain.Params{"branch": "main"}}},
 		Result: &create.Result{Items: []create.Item{
-			{Subject: "feature", Status: wtm.StatusDone, Detail: &create.Detail{
+			{Subject: "feature", Status: domain.StatusDone, Detail: &create.Detail{
 				Path: filepath.Join(trees, "feature"), Metadata: meta,
 				Standing: create.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2},
 				EnvPorts: env.Redacted{Offset: 10, Applied: true, Entries: []env.Entry{
@@ -66,19 +65,19 @@ func mixed(trees string) app.CreateOutcome {
 					{File: ".env", Key: "DB", Port: "pg", Base: 5432, Status: env.StatusMissingKey},
 				}},
 			}},
-			{Subject: "linked", Status: wtm.StatusDone, Reason: wtm.ReasonUnchanged, Detail: &create.Detail{Path: "/repo/main/elsewhere/linked", Metadata: worktree.Meta{SourceBranch: "main"}}},
-			{Subject: "feat/c", Status: wtm.StatusFailed, Reason: wtm.ReasonIncomplete, Err: hook, Warnings: []wtm.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping", Params: wtm.Params{"target": ".env"}}}, Detail: &create.Detail{Path: filepath.Join(trees, "feat-c"), Metadata: meta}},
-			{Subject: "feat/d", Status: wtm.StatusCancelled, Reason: wtm.ReasonIncomplete, Err: &wtm.Error{Kind: wtm.KindCancelled, Code: "unit.interrupted", Message: "interrupted", Params: wtm.Params{"phase": "on_create"}}, Detail: &create.Detail{Path: filepath.Join(trees, "feat-d"), Metadata: meta}},
-			{Subject: "remote-only", Status: wtm.StatusSkipped, Reason: wtm.ReasonInterrupted},
+			{Subject: "linked", Status: domain.StatusDone, Reason: domain.ReasonUnchanged, Detail: &create.Detail{Path: "/repo/main/elsewhere/linked", Metadata: worktree.Meta{SourceBranch: "main"}}},
+			{Subject: "feat/c", Status: domain.StatusFailed, Reason: domain.ReasonIncomplete, Err: hook, Warnings: []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping", Params: domain.Params{"target": ".env"}}}, Detail: &create.Detail{Path: filepath.Join(trees, "feat-c"), Metadata: meta}},
+			{Subject: "feat/d", Status: domain.StatusCancelled, Reason: domain.ReasonIncomplete, Err: &domain.Error{Kind: domain.KindCancelled, Code: "unit.interrupted", Message: "interrupted", Params: domain.Params{"phase": "on_create"}}, Detail: &create.Detail{Path: filepath.Join(trees, "feat-d"), Metadata: meta}},
+			{Subject: "remote-only", Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted},
 		}},
 	}
 }
 
-func invalid() *wtm.Error {
-	return wtm.Invalid([]wtm.FieldError{
-		{Path: "branches[0]", Code: "create.checked_out_elsewhere", Template: "branch {branch} is checked out at {path} — run `wtm go {branch}` to jump in", Params: wtm.Params{"branch": "feat/x", "path": "/p"}},
-		{Path: "branches[1]", Code: "distinct", Template: "{path}: {value} is given twice", Params: wtm.Params{"value": "feat/x"}},
-		{Path: "env_from", Code: "one_of", Template: "{path} must be one of {accepted}, not {value}", Params: wtm.Params{"value": "copy"}, Accepted: []string{"example", "main", "parent"}},
-		{Path: "from", Code: "required", Template: "{path} is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)", Params: wtm.Params{"because": "create.parent_required"}},
+func invalid() *domain.Error {
+	return domain.Invalid([]domain.FieldError{
+		{Path: "branches[0]", Code: "create.checked_out_elsewhere", Template: "branch {branch} is checked out at {path} — run `wtm go {branch}` to jump in", Params: domain.Params{"branch": "feat/x", "path": "/p"}},
+		{Path: "branches[1]", Code: "distinct", Template: "{path}: {value} is given twice", Params: domain.Params{"value": "feat/x"}},
+		{Path: "env_from", Code: "one_of", Template: "{path} must be one of {accepted}, not {value}", Params: domain.Params{"value": "copy"}, Accepted: []string{"example", "main", "parent"}},
+		{Path: "from", Code: "required", Template: "{path} is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)", Params: domain.Params{"because": "create.parent_required"}},
 	})
 }

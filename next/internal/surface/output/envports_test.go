@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 
 	"github.com/stretchr/testify/assert"
 )

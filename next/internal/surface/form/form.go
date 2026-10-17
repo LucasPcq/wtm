@@ -6,30 +6,30 @@ import (
 	"errors"
 	"io"
 
-	"github.com/LucasPcq/wtm/next/internal/app"
-	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 const surface = "tui"
 
 type App interface {
-	CreateQuestions(ctx context.Context, req create.Request) (create.Questions, error)
-	Create(ctx context.Context, params app.CreateParams) (app.CreateOutcome, error)
+	Questions(ctx context.Context, req create.Request) (create.Questions, error)
+	Run(ctx context.Context, req create.Request, opts operation.Options) (create.Outcome, error)
 }
 
 type Params struct {
 	App     App
 	Request create.Request
 	DryRun  bool
-	Report  wtm.Report
+	Report  domain.Report
 	In      io.Reader
 	Out     io.Writer
 }
 
 type Ran struct {
-	Outcome app.CreateOutcome
+	Outcome create.Outcome
 	Request create.Request
 }
 
@@ -40,7 +40,7 @@ func Run(ctx context.Context, params Params) (Ran, error) {
 			return Ran{Request: params.Request}, err
 		}
 		if !w.asks() {
-			outcome, err := params.App.Create(ctx, app.CreateParams{Request: params.Request, DryRun: true, Surface: surface})
+			outcome, err := params.App.Run(ctx, params.Request, operation.Options{DryRun: true, Surface: surface})
 			return Ran{Outcome: outcome, Request: params.Request}, err
 		}
 	}
@@ -49,12 +49,12 @@ func Run(ctx context.Context, params Params) (Ran, error) {
 		if err != nil {
 			return Ran{Request: w.req}, err
 		}
-		create := app.CreateParams{Request: answered.req, DryRun: params.DryRun, Surface: surface, Report: params.Report}
+		opts := operation.Options{DryRun: params.DryRun, Surface: surface, Report: params.Report}
 		if !params.DryRun {
-			create.ExpectFingerprint = answered.preview.Fingerprint
+			opts.ExpectFingerprint = answered.preview.Fingerprint
 		}
-		outcome, err := params.App.Create(ctx, create)
-		if stale, ok := errors.AsType[*wtm.Error](err); !ok || stale.Code != app.CodePlanStale || params.DryRun {
+		outcome, err := params.App.Run(ctx, answered.req, opts)
+		if stale, ok := errors.AsType[*domain.Error](err); !ok || stale.Code != operation.CodePlanStale || params.DryRun {
 			return Ran{Outcome: outcome, Request: answered.req}, err
 		}
 		w = answered.again()
@@ -84,6 +84,6 @@ func ask(ctx context.Context, params askParams) (*wizard, error) {
 	return w, nil
 }
 
-func interrupted(cause error) *wtm.Error {
-	return &wtm.Error{Kind: wtm.KindCancelled, Code: wtm.CodeInterrupted, Message: "interrupted", Cause: cause}
+func interrupted(cause error) *domain.Error {
+	return &domain.Error{Kind: domain.KindCancelled, Code: domain.CodeInterrupted, Message: "interrupted", Cause: cause}
 }

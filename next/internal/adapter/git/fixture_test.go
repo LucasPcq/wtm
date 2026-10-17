@@ -7,7 +7,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
 const remote = "origin"
