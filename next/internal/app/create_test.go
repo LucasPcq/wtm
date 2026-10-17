@@ -52,15 +52,15 @@ func TestAWorktreeIsCreatedUnderItsLocksAndAnnouncedFromStartToFinish(t *testing
 	w := newWorld(t, seed{Run: jobsToml})
 	report := &recorder{}
 
-	outcome, err := app.New(w.deps).Create(t.Context(), app.CreateParams{Request: create.Request{Branches: []string{branchName}}, Report: report.add})
+	outcome, err := app.New(w.deps).Create(t.Context(), app.CreateParams{Request: create.Request{Branches: []string{branchName}}, Surface: "tui", Report: report.add})
 
 	require.NoError(t, err)
 	require.NotNil(t, outcome.Result)
 	assert.Equal(t, wtm.StatusDone, outcome.Result.Items[0].Status, outcome.Result.Items[0].Err)
 	assert.Equal(t, "2026-10-16T12:00:00Z", outcome.Result.Items[0].Detail.Metadata.CreatedAt)
 	events := w.published.all()
-	assert.Equal(t, wtm.OperationStarted{Command: "create", Surface: "cli"}, events[0])
-	assert.Equal(t, wtm.OperationFinished{Command: "create", Surface: "cli", OK: true}, events[len(events)-1])
+	assert.Equal(t, wtm.OperationStarted{Command: "create", Surface: "tui"}, events[0])
+	assert.Equal(t, wtm.OperationFinished{Command: "create", Surface: "tui", OK: true}, events[len(events)-1])
 	assert.Contains(t, events, wtm.Event(wtm.UnitFinished{Subject: branchName, Status: wtm.StatusDone}))
 	assert.True(t, containsKind[wtm.WorktreeCreated](events))
 	assert.True(t, containsKind[wtm.WorktreeNumbered](events))
@@ -72,7 +72,7 @@ func TestAWorktreeIsCreatedUnderItsLocksAndAnnouncedFromStartToFinish(t *testing
 func TestARunWhoseBranchFailsFinishesNotOkWithItsCode(t *testing.T) {
 	w := newWorld(t, seed{Config: projectToml + "\n[hooks]\non_create = [{ cmd = \"exit 3\" }]\n"})
 
-	outcome, err := app.New(w.deps).Create(t.Context(), app.CreateParams{Request: create.Request{Branches: []string{branchName}}, Report: (&recorder{}).add})
+	outcome, err := app.New(w.deps).Create(t.Context(), app.CreateParams{Request: create.Request{Branches: []string{branchName}}, Surface: "cli", Report: (&recorder{}).add})
 
 	require.NoError(t, err)
 	assert.Equal(t, wtm.StatusFailed, outcome.Result.Items[0].Status)

@@ -20,6 +20,7 @@ type CreateParams struct {
 	Request           create.Request
 	DryRun            bool
 	ExpectFingerprint string
+	Surface           string
 	Report            wtm.Report
 }
 
@@ -47,7 +48,7 @@ func (a *App) CreateQuestions(ctx context.Context, req create.Request) (create.Q
 }
 
 func (a *App) Create(ctx context.Context, params CreateParams) (CreateOutcome, error) {
-	op := a.operation(params.Request.Locks())
+	op := a.operation(params)
 	if params.DryRun {
 		settled, err := a.settle(ctx, settling{Request: params.Request})
 		if err != nil {
@@ -76,7 +77,7 @@ func (a *App) Create(ctx context.Context, params CreateParams) (CreateOutcome, e
 			Params:  wtm.Params{"expected": params.ExpectFingerprint, "found": outcome.Fingerprint},
 		}
 	}
-	result := a.apply(ctx, applying{Settled: settled, Plan: outcome.Plan, Report: a.report(op, params.Report)})
+	result := a.apply(ctx, applying{Op: op, Settled: settled, Plan: outcome.Plan, Report: a.report(op, params.Report)})
 	outcome.Result = &result
 	outcome.Warnings = append(outcome.Warnings, result.Warnings...)
 	if !held.Protected() {
@@ -86,15 +87,15 @@ func (a *App) Create(ctx context.Context, params CreateParams) (CreateOutcome, e
 	return outcome, nil
 }
 
-func (a *App) operation(locks []operation.Lock) operation.Operation {
+func (a *App) operation(params CreateParams) operation.Operation {
 	return operation.Operation{
 		ID:            a.deps.NewOpID(),
 		PID:           os.Getpid(),
 		Command:       commandCreate,
-		Surface:       a.deps.Surface,
+		Surface:       params.Surface,
 		CorrelationID: a.deps.CorrelationID,
 		StartedAt:     a.deps.Now().UTC(),
-		Locks:         locks,
+		Locks:         params.Request.Locks(),
 	}
 }
 
@@ -144,6 +145,7 @@ func (a *App) planned(op operation.Operation, s settled) (CreateOutcome, error) 
 }
 
 type applying struct {
+	Op      operation.Operation
 	Settled settled
 	Plan    create.Planned
 	Report  wtm.Report
@@ -160,7 +162,7 @@ func (a *App) report(op operation.Operation, surface wtm.Report) wtm.Report {
 }
 
 func (a *App) apply(ctx context.Context, run applying) create.Result {
-	run.Report(wtm.OperationStarted{Command: commandCreate, Surface: a.deps.Surface})
+	run.Report(wtm.OperationStarted{Command: commandCreate, Surface: run.Op.Surface})
 	result := create.Apply(ctx, create.ApplyParams{
 		Deps:        a.deps.Create,
 		Facts:       run.Settled.Facts,
@@ -169,7 +171,7 @@ func (a *App) apply(ctx context.Context, run applying) create.Result {
 		FastForward: *run.Settled.Request.FastForward,
 		Report:      run.Report,
 	})
-	finished := wtm.OperationFinished{Command: commandCreate, Surface: a.deps.Surface, OK: true}
+	finished := wtm.OperationFinished{Command: commandCreate, Surface: run.Op.Surface, OK: true}
 	if failure := result.Failure(); failure != nil {
 		finished.OK, finished.Code = false, failure.Code
 	}

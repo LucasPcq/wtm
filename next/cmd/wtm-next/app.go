@@ -25,7 +25,6 @@ import (
 
 const (
 	remote           = "origin"
-	surface          = "cli"
 	correlationIDEnv = "WTM_CORRELATION_ID"
 	opIDBytes        = 8
 )
@@ -68,7 +67,6 @@ func newApp(params appParams) *app.App {
 		},
 		NewOpID:       newOpID,
 		Now:           time.Now,
-		Surface:       surface,
 		CorrelationID: os.Getenv(correlationIDEnv),
 	})
 }

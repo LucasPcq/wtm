@@ -44,19 +44,15 @@ const (
   # For a script or an agent: idempotent, with the v2 JSON envelope
   wtm create feat/login --if-not-exists --output json`
 
-	fromUsage        = "The branch a new branch starts from, or the parent recorded for wtm sync of one that already exists"
-	envFromUsage     = "How the .env files of the new worktrees are provisioned: example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy"
-	isolationUsage   = "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated"
-	ffUsage          = "Fast-forward to origin first the branch each worktree starts from, when it is behind; one that has diverged or holds uncommitted changes starts as it is"
-	ifNotExistsUsage = "Succeed without a change when the worktree already exists (idempotent)"
-	rememberUsage    = "The answers to always use in this repository: env_from, isolation, fast_forward (repeatable)"
-	yesUsage         = "Run unattended: no question, no confirmation; what is not given takes its default"
-	outputUsage      = "Output format: text or json"
-	dryRunUsage      = "Show the plan and its fingerprint, apply nothing"
-	expectUsage      = "Apply only if the facts still have this fingerprint, the one --dry-run printed"
-	askUsage         = "Ask again the questions this repository remembers an answer to, to change or forget it"
+	rememberUsage = "The answers to always use in this repository: env_from, isolation, fast_forward (repeatable)"
+	yesUsage      = "Run unattended: no question, no confirmation; what is not given takes its default"
+	outputUsage   = "Output format: text or json"
+	dryRunUsage   = "Show the plan and its fingerprint, apply nothing"
+	expectUsage   = "Apply only if the facts still have this fingerprint, the one --dry-run printed"
+	askUsage      = "Ask again the questions this repository remembers an answer to, to change or forget it"
 
 	flagFF     = "ff"
+	surfaceCLI = "cli"
 	outputText = "text"
 	outputJSON = "json"
 	applyNote  = "apply this plan"
@@ -83,11 +79,11 @@ func newCreate(open func(ctx context.Context) (Project, error)) *cobra.Command {
 	c := &createCommand{open: open}
 	cmd := &cobra.Command{Use: "create [branch...]", Short: createShort, Long: createLong, Example: createExample, Args: cobra.ArbitraryArgs, RunE: c.run}
 	flags := cmd.Flags()
-	flags.StringVar(&c.from, "from", "", fromUsage)
-	flags.StringVar(&c.envFrom, "env-from", "", envFromUsage)
-	flags.StringVar(&c.isolation, "isolation", "", isolationUsage)
-	flags.BoolVar(&c.ff, flagFF, false, ffUsage)
-	flags.BoolVar(&c.ifNotExists, "if-not-exists", false, ifNotExistsUsage)
+	flags.StringVar(&c.from, "from", "", output.Describe("from"))
+	flags.StringVar(&c.envFrom, "env-from", "", output.Describe("env_from"))
+	flags.StringVar(&c.isolation, "isolation", "", output.Describe("isolation"))
+	flags.BoolVar(&c.ff, flagFF, false, output.Describe("fast_forward"))
+	flags.BoolVar(&c.ifNotExists, "if-not-exists", false, output.Describe("if_not_exists"))
 	flags.StringArrayVar(&c.remember, "remember", nil, rememberUsage)
 	flags.BoolVarP(&c.yes, "yes", "y", false, yesUsage)
 	flags.StringVar(&c.output, "output", outputText, outputUsage)
@@ -122,7 +118,7 @@ func (c *createCommand) run(cmd *cobra.Command, args []string) error {
 	}
 	_, stderr := c.streams(cmd)
 	progress := output.NewProgress(ctx, output.ProgressParams{W: stderr, Human: c.human(), Live: output.IsTerminal(stderr)})
-	outcome, err := project.App.Create(ctx, app.CreateParams{Request: req, DryRun: c.dryRun, ExpectFingerprint: c.expect, Report: progress.Report})
+	outcome, err := project.App.Create(ctx, app.CreateParams{Request: req, DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: surfaceCLI, Report: progress.Report})
 	progress.Close()
 	return c.conclude(cmd, concluded{Outcome: outcome, Err: wtm.AsError(wtm.AsErrorParams{Err: err}), Request: req, Cwd: project.Cwd})
 }

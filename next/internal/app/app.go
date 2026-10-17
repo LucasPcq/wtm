@@ -21,7 +21,6 @@ type Deps struct {
 	Publisher     func(op operation.Operation) wtm.Report
 	NewOpID       func() string
 	Now           func() time.Time
-	Surface       string
 	CorrelationID string
 }
 

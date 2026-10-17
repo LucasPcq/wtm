@@ -119,7 +119,6 @@ func (w world) deps() app.Deps {
 		Publisher: func(operation.Operation) wtm.Report { return func(wtm.Event) {} },
 		NewOpID:   func() string { return "op-1" },
 		Now:       func() time.Time { return createdAt },
-		Surface:   "cli",
 	}
 }
 

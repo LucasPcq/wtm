@@ -109,8 +109,7 @@ func newWorld(t *testing.T, s seed) world {
 				ids++
 				return "op-" + string(rune('0'+ids))
 			},
-			Now:     func() time.Time { return clock },
-			Surface: "cli",
+			Now: func() time.Time { return clock },
 		},
 	}
 }

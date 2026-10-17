@@ -4,6 +4,9 @@ import (
 	"io"
 	"strings"
 
+	"github.com/LucasPcq/wtm/next/internal/app/create"
+	"github.com/LucasPcq/wtm/next/internal/wtm"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -97,6 +100,24 @@ func wrapped(value string, width int) []string {
 		}
 	}
 	return append(lines, line)
+}
+
+type PlanTextParams struct {
+	Plan     create.Planned
+	Warnings []wtm.Warning
+	Width    int
+}
+
+func PlanText(params PlanTextParams) string {
+	return strings.Join(renderPlan(planParams{Rows: planRowsOf(params.Plan), Warnings: messages(params.Warnings), Width: params.Width}), "\n")
+}
+
+func messages(warnings []wtm.Warning) []string {
+	texts := make([]string, 0, len(warnings))
+	for _, warned := range warnings {
+		texts = append(texts, warned.Message)
+	}
+	return texts
 }
 
 func drawPlan(w io.Writer, params planParams) {
