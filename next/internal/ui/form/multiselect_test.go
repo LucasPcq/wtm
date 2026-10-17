@@ -34,7 +34,7 @@ func TestAFilterNarrowsWhatAPicks(t *testing.T) {
 }
 
 func TestEnterRefusesAnEmptySelectionWithTheCallersMessage(t *testing.T) {
-	m := NewMultiSelect(MultiSelectParams{Options: picks(), Empty: "pick at least one file"})
+	m := NewMultiSelect(MultiSelectParams{Options: picks(), Empty: "Pick at least one file"})
 
 	assert.Equal(t, Stay, pressed(m, "enter"))
 	assert.Contains(t, plain(m.View(Size{Width: 40}, plainStyles())), "✗ Pick at least one file")

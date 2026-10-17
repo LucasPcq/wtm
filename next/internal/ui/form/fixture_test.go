@@ -98,7 +98,7 @@ func (enters) Read(p []byte) (int, error) {
 
 func refusingBad(value string) error {
 	if value == "bad" {
-		return errors.New("not a valid name")
+		return errors.New("Not a valid name")
 	}
 	return nil
 }

@@ -189,5 +189,5 @@ func TestABranchAWorktreeHoldsIsRefusedAsANewTarget(t *testing.T) {
 	d.keys("enter", other, "enter")
 
 	assert.Equal(t, int(stepBranch), d.w.Current())
-	assert.Contains(t, d.screen(), "already has a worktree — pick it as the target worktree")
+	assert.Contains(t, d.screen(), "✗ feat/other already has a worktree — pick it as the target worktree")
 }

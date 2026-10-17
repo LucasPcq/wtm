@@ -2,7 +2,6 @@ package cli
 
 import (
 	"cmp"
-	"errors"
 	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -43,7 +42,7 @@ func steps(form domain.Form) (labels, paths [stepCount]string) {
 const (
 	createTarget = "\x00new-worktree"
 	newWorktree  = "new worktree"
-	emptyFiles   = "select at least one file"
+	emptyFiles   = "Select at least one file"
 )
 
 // field is the field step s answers, on the questions observed last; nil for the recap.
@@ -251,19 +250,19 @@ func tone(status worktree.ChangeStatus) form.Tone {
 // branchProblem checks the branch typed for a created target against the repository, as the wizard shows it.
 func (w *wizard) branchProblem(branch string) error {
 	if held := w.q.NewTarget(branch); len(held) > 0 {
-		return errors.New(held[0].Message(stepLabels[stepBranch]))
+		return form.Problem(held[0], stepLabels[stepBranch])
 	}
 
 	req := w.req
 	req.To = branch
 	questions, err := w.app.Questions(w.ctx, req)
 	if err != nil {
-		return err
+		return form.Sentence(err)
 	}
 
 	for _, found := range questions.Errors {
 		if found.Path == stepPaths[stepBranch] {
-			return errors.New(found.Message(stepLabels[stepBranch]))
+			return form.Problem(found, stepLabels[stepBranch])
 		}
 	}
 

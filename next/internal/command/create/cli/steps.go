@@ -2,7 +2,6 @@ package cli
 
 import (
 	"cmp"
-	"errors"
 	"slices"
 	"strconv"
 	"strings"
@@ -132,7 +131,7 @@ func (w *wizard) branchProblem(check form.EntryCheck) error {
 	req.Branches = check.Entries
 	questions, err := w.app.Questions(w.ctx, req)
 	if err != nil {
-		return err
+		return form.Sentence(err)
 	}
 
 	for _, found := range questions.Errors {
@@ -151,7 +150,7 @@ func (w *wizard) branchProblem(check form.EntryCheck) error {
 }
 
 func problem(found domain.FieldError) error {
-	return errors.New(found.Message(label(found.Path)))
+	return form.Problem(found, label(found.Path))
 }
 
 // label spells a field path with its step's label, keeping an entry's index: branches[1] reads Branches[1].
