@@ -29,3 +29,27 @@ func TestACorrelationIDIsShortAndPrintable(t *testing.T) {
 	assert.EqualError(t, CorrelationProblem("bad\x01id"), "contains a control character")
 	assert.EqualError(t, CorrelationProblem(strings.Repeat("x", 257)), "is longer than 256 bytes")
 }
+
+func TestWorktreeLocksHoldTheRepositoryAndEachWorktreeOnceInOrder(t *testing.T) {
+	cases := map[string]struct {
+		worktrees []string
+		want      []Lock
+	}{
+		"none":                 {nil, []Lock{{Scope: ScopeRepo, Mode: LockShared}}},
+		"an empty name":        {[]string{""}, []Lock{{Scope: ScopeRepo, Mode: LockShared}}},
+		"sorted and compacted": {[]string{"b", "", "a", "b"}, []Lock{{Scope: ScopeRepo, Mode: LockShared}, {Scope: ScopeWorktree, Name: "a", Mode: LockExclusive}, {Scope: ScopeWorktree, Name: "b", Mode: LockExclusive}}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.want, WorktreeLocks(c.worktrees))
+		})
+	}
+}
+
+func TestWorktreeLocksLeaveTheirArgumentAsItWas(t *testing.T) {
+	worktrees := []string{"b", "", "a"}
+
+	WorktreeLocks(worktrees)
+
+	assert.Equal(t, []string{"b", "", "a"}, worktrees)
+}

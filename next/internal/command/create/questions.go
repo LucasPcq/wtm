@@ -101,7 +101,7 @@ func (f Facts) sourceOptions(creating []string) []domain.Option {
 	options := make([]domain.Option, 0, len(f.Branches.Local)+len(f.Branches.Remote))
 	for _, local := range f.Branches.Local {
 		if !slices.Contains(creating, local.Name) {
-			options = append(options, domain.Option{Value: local.Name, Badge: f.badge(local.Name)})
+			options = append(options, domain.Option{Value: local.Name, Badge: f.Badge(local.Name)})
 		}
 	}
 
@@ -112,21 +112,6 @@ func (f Facts) sourceOptions(creating []string) []domain.Option {
 	}
 
 	return options
-}
-
-func (f Facts) badge(name string) string {
-	counts := f.AheadBehind(name)
-	switch f.Standing(name) {
-	case worktree.Behind:
-		return strconv.Itoa(counts.Behind) + " behind"
-	case worktree.Ahead:
-		return strconv.Itoa(counts.Ahead) + " ahead"
-	case worktree.Diverged:
-		return aheadAndBehind(counts)
-	case worktree.NoOrigin, worktree.UpToDate:
-	}
-
-	return ""
 }
 
 func (f Facts) envFrom(given project.EnvStrategy) domain.Choice[project.EnvStrategy] {
@@ -150,39 +135,21 @@ func (f Facts) isolation(given project.Isolation) domain.Choice[project.Isolatio
 		question.Skip = "run.toml declares nothing a worktree isolates"
 	}
 
-	remembered, found := f.remembered(project.RememberIsolation)
-	switch {
-	case given != "":
+	question.Answer = domain.IsolationAnswer(project.Isolation(f.Config.Remembered[project.RememberIsolation]), f.Run)
+	if given != "" {
 		question.Answer = domain.Answer[project.Isolation]{Value: given, Origin: domain.OriginRequest}
-	case found && question.Skip == "":
-		question.Answer = domain.Answer[project.Isolation]{Value: project.Isolation(remembered), Origin: domain.OriginRemembered}
-	case f.Run.Isolation != "":
-		question.Answer = domain.Answer[project.Isolation]{Value: f.Run.Isolation.Effective(), Origin: domain.OriginConfig}
-	default:
-		question.Answer = domain.Answer[project.Isolation]{Value: project.Isolated, Origin: domain.OriginDefault}
 	}
 
 	return question
 }
 
 func (f Facts) fastForward(req Request) domain.Confirm {
-	question := domain.Confirm{}
+	params := domain.FastForwardParams{Given: req.FastForward, Remembered: f.Config.Remembered[project.RememberSourceUpdate]}
 	if len(f.subjectsAt(req, worktree.Behind)) == 0 {
-		question.Skip = "nothing to fast-forward: no branch it starts from is behind origin"
+		params.Skip = "nothing to fast-forward: no branch it starts from is behind origin"
 	}
 
-	remembered, found := f.remembered(project.RememberSourceUpdate)
-	switch {
-	case req.FastForward != nil:
-		question.Answer = domain.Answer[bool]{Value: *req.FastForward, Origin: domain.OriginRequest}
-	case question.Skip != "":
-	case found:
-		question.Answer = domain.Answer[bool]{Value: remembered == project.SourceUpdateFastForward, Origin: domain.OriginRemembered}
-	default:
-		question.Answer = domain.Answer[bool]{Origin: domain.OriginDefault}
-	}
-
-	return question
+	return domain.FastForwardAnswer(params)
 }
 
 func ifNotExists(given bool) domain.Confirm {
@@ -202,26 +169,12 @@ func (f Facts) remembered(id string) (string, bool) {
 // ----------------------------------------------------------------------------
 // Resolve and validation
 
-// The field-error codes create spells as every command does, with no create. prefix.
-const (
-	codeRequired = "required"
-	codeOneOf    = "one_of"
-)
+// codeRequired is the field-error code create spells as every command does, with no create. prefix.
+const codeRequired = "required"
 
-// remembered pairs each field whose answer can be remembered with its id in config.toml.
-var remembered = []struct{ field, id string }{
-	{"env_from", project.RememberEnvStrategy},
-	{"isolation", project.RememberIsolation},
-	{"fast_forward", project.RememberSourceUpdate},
-}
-
+// rememberable are the fields whose answer can be remembered.
 func rememberable() []string {
-	fields := make([]string, 0, len(remembered))
-	for _, r := range remembered {
-		fields = append(fields, r.field)
-	}
-
-	return fields
+	return []string{"env_from", "isolation", "fast_forward"}
 }
 
 // Resolve settles the request on the facts, every field answered as Form answers it; a request with problems is refused with all of them, by domain.Invalid.
@@ -257,13 +210,13 @@ func (f Facts) problems(q Questions) []domain.FieldError {
 		problems = append(problems, domain.FieldError{Path: "from", Code: "not_found", Template: "{path}: {value} not found", Params: domain.Params{"value": from}})
 	}
 
-	problems = append(problems, oneOf(choice{Path: "env_from", Value: string(q.EnvFrom.Value), Accepted: Names(project.EnvStrategies())})...)
+	problems = append(problems, domain.OneOf(domain.OneOfParams{Path: "env_from", Value: string(q.EnvFrom.Value), Accepted: domain.Names(project.EnvStrategies())})...)
 	if q.Isolation.Origin == domain.OriginRequest {
-		problems = append(problems, oneOf(choice{Path: "isolation", Value: string(q.Isolation.Value), Accepted: Names(project.Isolations())})...)
+		problems = append(problems, domain.OneOf(domain.OneOfParams{Path: "isolation", Value: string(q.Isolation.Value), Accepted: domain.Names(project.Isolations())})...)
 	}
 
 	for index, id := range q.Remember {
-		problems = append(problems, oneOf(choice{Path: "remember[" + strconv.Itoa(index) + "]", Value: id, Accepted: rememberable()})...)
+		problems = append(problems, domain.OneOf(domain.OneOfParams{Path: "remember[" + strconv.Itoa(index) + "]", Value: id, Accepted: rememberable()})...)
 	}
 
 	return append(problems, f.crossProblems(q)...)
@@ -304,37 +257,6 @@ func (f Facts) crossProblems(q Questions) []domain.FieldError {
 	}
 
 	return problems
-}
-
-type choice struct {
-	Path     string
-	Value    string
-	Accepted []string
-}
-
-// oneOf is the problem of a value that is not one of those accepted; an empty value is none.
-func oneOf(c choice) []domain.FieldError {
-	if c.Value == "" || slices.Contains(c.Accepted, c.Value) {
-		return nil
-	}
-
-	return []domain.FieldError{{
-		Path:     c.Path,
-		Code:     codeOneOf,
-		Template: "{path} must be one of {accepted}, not {value}",
-		Params:   domain.Params{"value": c.Value},
-		Accepted: c.Accepted,
-	}}
-}
-
-// Names spells each of values as a string, in order: the accepted values of a field, for its validation and its completion.
-func Names[T ~string](values []T) []string {
-	found := make([]string, 0, len(values))
-	for _, value := range values {
-		found = append(found, string(value))
-	}
-
-	return found
 }
 
 func branchPath(index int) string {

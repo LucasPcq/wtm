@@ -95,16 +95,7 @@ type Detail struct {
 	Conflicts []string          `json:"conflicts"`
 	Isolation project.Isolation `json:"isolation,omitempty"`
 	EnvPorts  env.Redacted      `json:"env_ports,omitzero"`
-	Standing
-}
-
-// Standing is where an existing branch the target checks out stood against origin, or the remote branch it resumes.
-type Standing struct {
-	ExistingBranch bool                `json:"existing_branch"`
-	OriginState    worktree.Divergence `json:"origin_state,omitempty"`
-	OriginAhead    int                 `json:"origin_ahead,omitempty"`
-	OriginBehind   int                 `json:"origin_behind,omitempty"`
-	Upstream       string              `json:"upstream,omitempty"`
+	worktree.Standing
 }
 
 // ----------------------------------------------------------------------------
@@ -230,7 +221,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 
 // Observe reads what extract decides from: the project's config, the repository's snapshot, the uncommitted changes of the source (of every worktree when none is given), the meta records of the source and target, and what lies at the path a new target would take. A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
-	config, global, err := u.Config.Load()
+	repo, err := provision.Observe(ctx, provision.ObserveParams{Config: u.Config, Git: u.Git, MainPath: u.MainPath})
 	if errors.Is(err, project.ErrConfigNotFound) {
 		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeConfigNotFound, Message: "no wtm config found — run `wtm init` first", Cause: err}
 	}
@@ -238,12 +229,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, err
 	}
 
-	snapshot, err := u.Git.Snapshot(ctx)
-	if err != nil {
-		return Facts{}, err
-	}
-
-	facts := Facts{MainPath: u.MainPath, Config: config, Global: global, Snapshot: snapshot}
+	facts := Facts{Repository: repo}
 	if facts.Changes, err = u.changes(ctx, facts.sources(req.Source)); err != nil {
 		return Facts{}, err
 	}
@@ -254,8 +240,6 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, err
 	}
 
-	// A run.toml that fails to load does not stop the plan: its error travels with the facts to where run.toml is used.
-	facts.Run, facts.RunErr = u.Config.LoadRun()
 	return facts, nil
 }
 
@@ -300,51 +284,35 @@ func (u UseCase) locate(ctx context.Context, path string) (worktree.Location, er
 // fastForward fast-forwards the source the plan names; one that cannot be is a warning, the target starting from the local branch.
 func (u UseCase) fastForward(ctx context.Context, plan Plan, report domain.Report) []domain.Warning {
 	var warnings []domain.Warning
-	for _, subject := range plan.FastForward {
-		if ctx.Err() != nil {
-			return warnings
-		}
-
-		report(domain.PhaseStarted{Subject: subject, Phase: "fast_forward"})
-		warning, failed := u.advance(ctx, plan, subject)
-		report(domain.PhaseFinished{Subject: subject, Phase: "fast_forward", Failed: failed})
-
-		// A fast-forward cut short by a cancel is not worth a warning: the run reports the interruption.
-		if failed && ctx.Err() == nil {
-			warnings = append(warnings, warning)
-		}
+	for _, missed := range u.Provision.FastForwardEach(ctx, provision.FastForwardEachParams{Subjects: plan.FastForward, Snapshot: plan.facts.Snapshot, Report: report}) {
+		warnings = append(warnings, notAdvanced(missed))
 	}
 
 	return warnings
 }
 
-func (u UseCase) advance(ctx context.Context, plan Plan, subject string) (domain.Warning, bool) {
-	forwarded := u.Provision.FastForward(ctx, provision.FastForwardParams{Subject: subject, CheckedOutAt: plan.facts.CheckedOutAt(subject)})
-	if forwarded.Dirty {
+func notAdvanced(missed provision.Missed) domain.Warning {
+	subject := missed.Subject
+	switch {
+	case missed.Dirty:
 		return domain.Warning{
 			Code:    "extract.ff_dirty",
 			Message: "couldn't fast-forward " + subject + ": its worktree has uncommitted changes — the target starts from your local branch",
 			Params:  domain.Params{"branch": subject},
-		}, true
-	}
-
-	if forwarded.Busy {
+		}
+	case missed.Busy:
 		return domain.Warning{
 			Code:    "extract.ff_busy",
 			Message: "couldn't fast-forward " + subject + ": its worktree is in the middle of a rebase or a bisect — the target starts from your local branch",
 			Params:  domain.Params{"branch": subject},
-		}, true
-	}
-
-	if forwarded.Err == nil {
-		return domain.Warning{}, false
+		}
 	}
 
 	return domain.Warning{
 		Code:    "extract.ff_failed",
-		Message: "couldn't fast-forward " + subject + ": " + forwarded.Err.Error() + " — the target starts from your local branch",
-		Params:  domain.Params{"branch": subject, "cause": forwarded.Err.Error()},
-	}, true
+		Message: "couldn't fast-forward " + subject + ": " + missed.Err.Error() + " — the target starts from your local branch",
+		Params:  domain.Params{"branch": subject, "cause": missed.Err.Error()},
+	}
 }
 
 // target makes the target worktree whole when the plan creates it, or takes the existing one as it stands.
@@ -360,7 +328,7 @@ func (u UseCase) target(ctx context.Context, plan Plan, report domain.Report) It
 	if outcome.Provisioned.Meta.CreatedAt != "" {
 		item.Detail = detail(plan.Target.Path, outcome.Provisioned.Meta.Isolation)
 		item.Detail.EnvPorts = outcome.Provisioned.EnvPorts
-		item.Detail.Standing = plan.facts.standingOf(plan.Target)
+		item.Detail.Standing = plan.facts.StandingOf(plan.Target.Branch, plan.Target.placement())
 	}
 
 	return item
@@ -369,19 +337,11 @@ func (u UseCase) target(ctx context.Context, plan Plan, report domain.Report) It
 func (u UseCase) provisionParams(plan Plan, report domain.Report) provision.Params {
 	f := plan.facts
 	return provision.Params{
-		Project: provision.Project{
-			MainPath: f.MainPath,
-			StateDir: u.StateDir,
-			EnvFiles: f.Config.Env.Files,
-			OnCreate: f.Config.OnCreate,
-			Run:      f.Run,
-			RunErr:   f.RunErr,
-			Global:   f.Global,
-		},
+		Project: provision.ProjectOf(f.Repository, u.StateDir),
 		Worktree: provision.Worktree{
 			Branch:     plan.Target.Branch,
 			Path:       plan.Target.Path,
-			Checkout:   plan.checkout(),
+			Checkout:   plan.Target.placement().Checkout(plan.Target.Branch, f.Ref(plan.From)),
 			Source:     plan.From,
 			ParentPath: f.CheckedOutAt(plan.From),
 			Strategy:   f.Config.Env.Strategy,

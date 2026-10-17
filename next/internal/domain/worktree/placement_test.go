@@ -31,3 +31,10 @@ func TestWhereABranchAskedForANewWorktreeLands(t *testing.T) {
 		})
 	}
 }
+
+func TestAPlacedBranchIsCheckedOutAsItStarts(t *testing.T) {
+	from := LocalBranch{Name: "main"}
+	assert.Equal(t, ExistingBranch{Name: "feat/x"}, Placed{Start: StartCheckOut}.Checkout("feat/x", from))
+	assert.Equal(t, TrackingBranch{Name: "feat/x"}, Placed{Start: StartResume, Upstream: "origin/feat/x"}.Checkout("feat/x", from))
+	assert.Equal(t, NewBranch{Name: "feat/x", From: from}, Placed{Start: StartCreate}.Checkout("feat/x", from))
+}

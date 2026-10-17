@@ -1,5 +1,7 @@
 package worktree
 
+import "strconv"
+
 // Branch is a branch as git lists it: its name, without `origin/` for a branch of origin, and the commit at its tip.
 type Branch struct {
 	Name string
@@ -56,4 +58,9 @@ func (ab AheadBehind) Divergence() Divergence {
 	}
 
 	return UpToDate
+}
+
+// String spells the counts as a user reads them: `1 ahead, 2 behind`.
+func (ab AheadBehind) String() string {
+	return strconv.Itoa(ab.Ahead) + " ahead, " + strconv.Itoa(ab.Behind) + " behind"
 }

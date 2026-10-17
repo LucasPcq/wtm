@@ -81,3 +81,26 @@ func TestTheRememberedIdsAndValuesAreTheOnesWtmWrites(t *testing.T) {
 	assert.Equal(t, "ff", SourceUpdateFastForward)
 	assert.Equal(t, "keep", SourceUpdateKeep)
 }
+
+func TestTheSourceUpdateRememberedSaysWhetherToFastForward(t *testing.T) {
+	assert.Equal(t, SourceUpdateFastForward, SourceUpdate(true))
+	assert.Equal(t, SourceUpdateKeep, SourceUpdate(false))
+}
+
+func TestTheAnswersRememberedAreTheFieldsAskedThatHaveAValue(t *testing.T) {
+	values := map[string]string{"env_from": "main", "isolation": "", "fast_forward": SourceUpdateKeep}
+	cases := map[string]struct {
+		remember []string
+		want     map[string]string
+	}{
+		"none asked":         {nil, map[string]string{}},
+		"each with a value":  {[]string{"env_from", "fast_forward"}, map[string]string{RememberEnvStrategy: "main", RememberSourceUpdate: SourceUpdateKeep}},
+		"one with no value":  {[]string{"isolation"}, map[string]string{}},
+		"a field none knows": {[]string{"keep"}, map[string]string{}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.want, RememberedAnswers(values, c.remember))
+		})
+	}
+}

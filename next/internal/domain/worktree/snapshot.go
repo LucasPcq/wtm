@@ -1,8 +1,8 @@
 package worktree
 
 import (
-	"context"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -14,37 +14,6 @@ type Snapshot struct {
 	Worktrees  []Worktree
 	Branches   Branches
 	Divergence map[string]AheadBehind
-}
-
-// SnapshotSource is what ReadSnapshot reads a repository through.
-type SnapshotSource interface {
-	Worktrees(ctx context.Context) ([]Worktree, error)
-	Branches(ctx context.Context) (Branches, error)
-	AheadBehind(ctx context.Context, name string) (AheadBehind, error)
-}
-
-// ReadSnapshot returns the repository source reads: its worktrees, its local
-// and remote branches, and how far ahead and behind its origin each local
-// branch is when their tips differ.
-func ReadSnapshot(ctx context.Context, source SnapshotSource) (Snapshot, error) {
-	worktrees, err := source.Worktrees(ctx)
-	if err != nil {
-		return Snapshot{}, err
-	}
-
-	branches, err := source.Branches(ctx)
-	if err != nil {
-		return Snapshot{}, err
-	}
-
-	divergence := map[string]AheadBehind{}
-	for _, name := range branches.Differing() {
-		divergence[name], err = source.AheadBehind(ctx, name)
-		if err != nil {
-			return Snapshot{}, err
-		}
-	}
-	return Snapshot{Worktrees: worktrees, Branches: branches, Divergence: divergence}, nil
 }
 
 // Local reports whether name is a local branch.
@@ -127,4 +96,34 @@ func (b Branches) Differing() []string {
 	}
 
 	return names
+}
+
+// Badge is the badge a branch offered as a source carries: how far behind or ahead of origin it is, both when it has diverged, none when it is up to date or not on origin.
+func (s Snapshot) Badge(name string) string {
+	counts := s.AheadBehind(name)
+	switch s.Standing(name) {
+	case Behind:
+		return strconv.Itoa(counts.Behind) + " behind"
+	case Ahead:
+		return strconv.Itoa(counts.Ahead) + " ahead"
+	case Diverged:
+		return counts.String()
+	case NoOrigin, UpToDate:
+	}
+
+	return ""
+}
+
+// StandingOf is where the branch of a placed worktree stood against origin: the counts of an existing branch it checks out, the branch of origin it resumes, nothing for a new branch.
+func (s Snapshot) StandingOf(branch string, placed Placed) Standing {
+	switch placed.Start {
+	case StartCheckOut:
+		counts := s.AheadBehind(branch)
+		return Standing{ExistingBranch: true, OriginState: s.Standing(branch), OriginAhead: counts.Ahead, OriginBehind: counts.Behind}
+	case StartResume:
+		return Standing{Upstream: placed.Upstream}
+	case StartCreate:
+	}
+
+	return Standing{}
 }

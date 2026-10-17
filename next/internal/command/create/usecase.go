@@ -97,18 +97,9 @@ type Item struct {
 type Detail struct {
 	Path     string        `json:"path"`
 	Metadata worktree.Meta `json:"metadata"`
-	Standing
+	worktree.Standing
 	Ordinal  *int         `json:"ordinal,omitempty"`
 	EnvPorts env.Redacted `json:"env_ports,omitzero"`
-}
-
-// Standing is where an existing branch the worktree checks out stood against origin, or the remote branch it resumes.
-type Standing struct {
-	ExistingBranch bool                `json:"existing_branch"`
-	OriginState    worktree.Divergence `json:"origin_state,omitempty"`
-	OriginAhead    int                 `json:"origin_ahead,omitempty"`
-	OriginBehind   int                 `json:"origin_behind,omitempty"`
-	Upstream       string              `json:"upstream,omitempty"`
 }
 
 // ----------------------------------------------------------------------------
@@ -168,7 +159,8 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 		return Plan{}, nil, err
 	}
 
-	return Decide(facts, resolved)
+	planned, warnings := Decide(facts, resolved)
+	return planned, warnings, nil
 }
 
 // ----------------------------------------------------------------------------
@@ -204,7 +196,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 
 // Observe reads what create decides from: the project's config, the repository's snapshot and what lies at the path each of branches would take. A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, branches []string) (Facts, error) {
-	config, global, err := u.Config.Load()
+	repo, err := provision.Observe(ctx, provision.ObserveParams{Config: u.Config, Git: u.Git, MainPath: u.MainPath})
 	if errors.Is(err, project.ErrConfigNotFound) {
 		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeConfigNotFound, Message: "no wtm config found — run `wtm init` first", Cause: err}
 	}
@@ -212,20 +204,12 @@ func (u UseCase) Observe(ctx context.Context, branches []string) (Facts, error) 
 		return Facts{}, err
 	}
 
-	snapshot, err := u.Git.Snapshot(ctx)
+	facts := Facts{Repository: repo}
+	facts.Folders, err = u.locate(ctx, facts.pathsOf(branches))
 	if err != nil {
 		return Facts{}, err
 	}
 
-	facts := Facts{MainPath: u.MainPath, Config: config, Global: global, Snapshot: snapshot}
-	folders, err := u.locate(ctx, facts.pathsOf(branches))
-	if err != nil {
-		return Facts{}, err
-	}
-	facts.Folders = folders
-
-	// A run.toml that fails to load does not stop the plan: its error travels with the facts to where run.toml is used.
-	facts.Run, facts.RunErr = u.Config.LoadRun()
 	return facts, nil
 }
 
@@ -248,55 +232,35 @@ func (u UseCase) locate(ctx context.Context, paths []string) (map[string]worktre
 // fastForward fast-forwards each source the plan names; one that cannot be is a warning, its worktrees starting from the local branch.
 func (u UseCase) fastForward(ctx context.Context, plan Plan, report domain.Report) []domain.Warning {
 	var warnings []domain.Warning
-	for _, subject := range plan.FastForward {
-		if ctx.Err() != nil {
-			return warnings
-		}
-
-		report(domain.PhaseStarted{Subject: subject, Phase: "fast_forward"})
-		warning, failed := u.advance(ctx, plan, subject)
-		report(domain.PhaseFinished{Subject: subject, Phase: "fast_forward", Failed: failed})
-
-		// A fast-forward cut short by a cancel is not worth a warning: the run reports the interruption.
-		if failed && ctx.Err() == nil {
-			warnings = append(warnings, warning)
-		}
+	for _, missed := range u.Provision.FastForwardEach(ctx, provision.FastForwardEachParams{Subjects: plan.FastForward, Snapshot: plan.facts.Snapshot, Report: report}) {
+		warnings = append(warnings, notAdvanced(missed))
 	}
 
 	return warnings
 }
 
-func (u UseCase) advance(ctx context.Context, plan Plan, subject string) (domain.Warning, bool) {
-	forwarded := u.Provision.FastForward(ctx, provision.FastForwardParams{Subject: subject, CheckedOutAt: plan.facts.CheckedOutAt(subject)})
-	if forwarded.Dirty {
+func notAdvanced(missed provision.Missed) domain.Warning {
+	subject := missed.Subject
+	switch {
+	case missed.Dirty:
 		return domain.Warning{
 			Code:    "create.ff_dirty",
 			Message: "couldn't fast-forward " + subject + ": its worktree has uncommitted changes — it starts from your local branch",
 			Params:  domain.Params{"branch": subject},
-		}, true
-	}
-
-	if forwarded.Busy {
+		}
+	case missed.Busy:
 		return domain.Warning{
 			Code:    "create.ff_busy",
 			Message: "couldn't fast-forward " + subject + ": its worktree is in the middle of a rebase or a bisect — it starts from your local branch",
 			Params:  domain.Params{"branch": subject},
-		}, true
-	}
-
-	return notAdvanced(subject, forwarded.Err)
-}
-
-func notAdvanced(subject string, err error) (domain.Warning, bool) {
-	if err == nil {
-		return domain.Warning{}, false
+		}
 	}
 
 	return domain.Warning{
 		Code:    "create.ff_failed",
-		Message: "couldn't fast-forward " + subject + ": " + err.Error() + " — it starts from your local branch",
-		Params:  domain.Params{"branch": subject, "cause": err.Error()},
-	}, true
+		Message: "couldn't fast-forward " + subject + ": " + missed.Err.Error() + " — it starts from your local branch",
+		Params:  domain.Params{"branch": subject, "cause": missed.Err.Error()},
+	}
 }
 
 // item provisions one planned branch between its unit events; a worktree already open is reported as it stands, and a branch reached after a cancel is skipped.
@@ -317,7 +281,7 @@ func (u UseCase) item(ctx context.Context, plan Plan, planned BranchPlan, report
 		item.Detail = &Detail{
 			Path:     planned.Path,
 			Metadata: outcome.Provisioned.Meta,
-			Standing: plan.facts.standingOf(planned),
+			Standing: plan.facts.StandingOf(planned.Branch, planned.placement()),
 			Ordinal:  outcome.Provisioned.Ordinal,
 			EnvPorts: outcome.Provisioned.EnvPorts,
 		}
@@ -336,19 +300,11 @@ func (u UseCase) unchanged(planned BranchPlan) Item {
 func (u UseCase) provisionParams(plan Plan, planned BranchPlan, report domain.Report) provision.Params {
 	f := plan.facts
 	return provision.Params{
-		Project: provision.Project{
-			MainPath: f.MainPath,
-			StateDir: u.StateDir,
-			EnvFiles: f.Config.Env.Files,
-			OnCreate: f.Config.OnCreate,
-			Run:      f.Run,
-			RunErr:   f.RunErr,
-			Global:   f.Global,
-		},
+		Project: provision.ProjectOf(f.Repository, u.StateDir),
 		Worktree: provision.Worktree{
 			Branch:     planned.Branch,
 			Path:       planned.Path,
-			Checkout:   plan.checkout(planned),
+			Checkout:   planned.placement().Checkout(planned.Branch, f.Ref(plan.From)),
 			Source:     plan.From,
 			ParentPath: f.CheckedOutAt(plan.From),
 			Strategy:   plan.EnvFrom,

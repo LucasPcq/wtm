@@ -78,3 +78,29 @@ func TestOnlyTheLocalBranchesWhoseOriginTipDiffersAreCounted(t *testing.T) {
 	assert.Equal(t, []string{"main", "ahead"}, snapshot.Branches.Differing())
 	assert.Nil(t, Branches{Local: []Branch{{Name: "main", Tip: "a"}}, Remote: []Branch{{Name: "main", Tip: "a"}}}.Differing())
 }
+
+func TestASourceBadgeSaysHowFarItIsFromOrigin(t *testing.T) {
+	diverged := Snapshot{Branches: Branches{Remote: []Branch{{Name: "both"}}}, Divergence: map[string]AheadBehind{"both": {Ahead: 1, Behind: 3}}}
+	assert.Equal(t, "2 behind", snapshot.Badge("main"))
+	assert.Equal(t, "1 ahead", snapshot.Badge("ahead"))
+	assert.Equal(t, "1 ahead, 3 behind", diverged.Badge("both"))
+	assert.Empty(t, snapshot.Badge("same"))
+	assert.Empty(t, snapshot.Badge("feat/x"))
+}
+
+func TestTheStandingOfAPlacedBranchIsItsCountsWhenCheckedOutAndItsUpstreamWhenResumed(t *testing.T) {
+	cases := map[string]struct {
+		branch string
+		placed Placed
+		want   Standing
+	}{
+		"checked out": {"main", Placed{Start: StartCheckOut}, Standing{ExistingBranch: true, OriginState: Behind, OriginBehind: 2}},
+		"resumed":     {"remote-only", Placed{Start: StartResume, Upstream: "origin/remote-only"}, Standing{Upstream: "origin/remote-only"}},
+		"created":     {"main", Placed{Start: StartCreate}, Standing{}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.want, snapshot.StandingOf(c.branch, c.placed))
+		})
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
@@ -20,6 +21,47 @@ type FastForwarded struct {
 	Dirty bool
 	Busy  bool
 	Err   error
+}
+
+// Failed reports whether the branch was left where it was.
+func (f FastForwarded) Failed() bool {
+	return f.Dirty || f.Busy || f.Err != nil
+}
+
+// FastForwardEachParams names the branches to fast-forward, in order, the snapshot that says where each is checked out, and where their events go.
+type FastForwardEachParams struct {
+	Subjects []string
+	Snapshot worktree.Snapshot
+	Report   domain.Report
+}
+
+// A Missed is a branch FastForwardEach left where it was, and why.
+type Missed struct {
+	Subject string
+	FastForwarded
+}
+
+// FastForwardEach fast-forwards each subject in turn between its fast_forward
+// phase events, starting none once ctx is cancelled. It returns the subjects
+// left where they were, except one cut short by a cancel: the run reports the
+// interruption instead.
+func (s Service) FastForwardEach(ctx context.Context, params FastForwardEachParams) []Missed {
+	var missed []Missed
+	for _, subject := range params.Subjects {
+		if ctx.Err() != nil {
+			return missed
+		}
+
+		params.Report(domain.PhaseStarted{Subject: subject, Phase: "fast_forward"})
+		forwarded := s.FastForward(ctx, FastForwardParams{Subject: subject, CheckedOutAt: params.Snapshot.CheckedOutAt(subject)})
+		params.Report(domain.PhaseFinished{Subject: subject, Phase: "fast_forward", Failed: forwarded.Failed()})
+
+		if forwarded.Failed() && ctx.Err() == nil {
+			missed = append(missed, Missed{Subject: subject, FastForwarded: forwarded})
+		}
+	}
+
+	return missed
 }
 
 // FastForward brings params.Subject up to its origin branch, never merging:

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -50,6 +51,18 @@ func (l Lock) Key() string {
 	}
 
 	return string(l.Scope)
+}
+
+// WorktreeLocks are the locks of an operation on worktrees: the repository shared, and each worktree named exclusive, once, sorted so that two operations always take their locks in the same order; an empty name is none.
+func WorktreeLocks(worktrees []string) []Lock {
+	locks := []Lock{{Scope: ScopeRepo, Mode: LockShared}}
+	names := slices.DeleteFunc(slices.Clone(worktrees), func(name string) bool { return name == "" })
+	slices.Sort(names)
+	for _, name := range slices.Compact(names) {
+		locks = append(locks, Lock{Scope: ScopeWorktree, Name: name, Mode: LockExclusive})
+	}
+
+	return locks
 }
 
 const correlationIDMaxBytes = 256

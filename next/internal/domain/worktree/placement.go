@@ -89,3 +89,25 @@ func (params PlacementParams) occupied() Placement {
 
 	return Clash{Branch: params.Occupant, Name: filepath.Base(params.Path)}
 }
+
+// Standing is where an existing branch a new worktree checks out stood against origin, or the branch of origin it resumes, as the JSON envelope reports it.
+type Standing struct {
+	ExistingBranch bool       `json:"existing_branch"`
+	OriginState    Divergence `json:"origin_state,omitempty"`
+	OriginAhead    int        `json:"origin_ahead,omitempty"`
+	OriginBehind   int        `json:"origin_behind,omitempty"`
+	Upstream       string     `json:"upstream,omitempty"`
+}
+
+// Checkout is how the worktree of the placed branch gets it: the local branch as it is, a local branch tracking origin's, or a new branch from from.
+func (p Placed) Checkout(branch string, from Ref) Checkout {
+	switch p.Start {
+	case StartCheckOut:
+		return ExistingBranch{Name: branch}
+	case StartResume:
+		return TrackingBranch{Name: branch}
+	case StartCreate:
+	}
+
+	return NewBranch{Name: branch, From: from}
+}

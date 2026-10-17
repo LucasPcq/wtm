@@ -48,13 +48,13 @@ func TestEachItemDetailsItsWorktreeAndWhereItsBranchStands(t *testing.T) {
 
 	meta := worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Isolation: project.Isolated}
 	assert.Equal(t, &create.Detail{Path: w.path(branchName), Metadata: meta}, result.Items[0].Detail)
-	assert.Equal(t, &create.Detail{Path: w.path(existing), Metadata: meta, Standing: create.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 1}}, result.Items[1].Detail)
-	assert.Equal(t, &create.Detail{Path: w.path(remote), Metadata: meta, Standing: create.Standing{Upstream: "origin/" + remote}}, result.Items[2].Detail)
+	assert.Equal(t, &create.Detail{Path: w.path(existing), Metadata: meta, Standing: worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 1}}, result.Items[1].Detail)
+	assert.Equal(t, &create.Detail{Path: w.path(remote), Metadata: meta, Standing: worktree.Standing{Upstream: "origin/" + remote}}, result.Items[2].Detail)
 }
 
 func TestTheDetailIsTheJSONOfTheEnvelope(t *testing.T) {
 	ordinal := 2
-	detail := create.Detail{Path: "/trees/feat-x", Metadata: worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Isolation: project.Isolated}, Standing: create.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 1}, Ordinal: &ordinal}
+	detail := create.Detail{Path: "/trees/feat-x", Metadata: worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Isolation: project.Isolated}, Standing: worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 1}, Ordinal: &ordinal}
 
 	assert.JSONEq(t, `{"path":"/trees/feat-x","metadata":{"source_branch":"main","created_at":"2026-10-16T12:00:00Z","env_strategy":"main","isolation":"isolated"},"existing_branch":true,"origin_state":"behind","origin_behind":1,"ordinal":2}`, jsonOf(t, detail))
 }
@@ -292,8 +292,7 @@ func TestALocalSourceNamedLikeARemoteOneIsLockedWhenItIsFastForwarded(t *testing
 	req := create.Request{Branches: []string{branchName}, From: "origin/foo", FastForward: new(true)}
 	facts := w.facts(t, branchName)
 
-	planned, _, err := create.Decide(facts, req)
-	require.NoError(t, err)
+	planned, _ := create.Decide(facts, req)
 
 	assert.Equal(t, []string{"origin/foo"}, planned.FastForward)
 	assert.Contains(t, planned.Locks(), domain.Lock{Scope: domain.ScopeWorktree, Name: "origin/foo", Mode: domain.LockExclusive})

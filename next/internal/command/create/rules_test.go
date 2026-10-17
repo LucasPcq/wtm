@@ -129,27 +129,3 @@ func TestTheParentStrategyWithoutTheSourcesWorktreeFallsBackToMainAndSaysSo(t *t
 	assert.Equal(t, []domain.Warning{{Code: "create.env_parent_fallback", Message: "The \"parent\" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main."}}, fromExisting)
 	assert.Empty(t, unchanged)
 }
-
-func TestAPlanOfARequestNeverResolvedRefusesItAsInvalid(t *testing.T) {
-	w := newWorld(t, seed{})
-
-	_, _, err := create.Decide(w.facts(t, "  "), create.Request{Branches: []string{"  "}, From: "main", EnvFrom: project.EnvMain})
-
-	assert.Equal(t, []domain.FieldError{{Path: "branches[0]", Code: "required", Template: "{path} is required"}}, fieldsOf(t, err))
-}
-
-func TestAFolderTakenSinceTheRequestWasResolvedIsAConflict(t *testing.T) {
-	w := newWorld(t, seed{})
-	facts := w.facts(t, branchName)
-	resolved, err := create.Resolve(facts, create.Request{Branches: []string{branchName}})
-	require.NoError(t, err)
-	require.NoError(t, os.MkdirAll(w.path(branchName), 0o755))
-
-	_, _, planErr := create.Decide(w.facts(t, branchName), resolved)
-
-	failure, ok := errors.AsType[*domain.Error](planErr)
-	require.True(t, ok, planErr)
-	assert.Equal(t, domain.KindConflict, failure.Kind)
-	assert.Equal(t, "create.path_exists", failure.Code)
-	assert.Equal(t, "worktree path already exists: "+w.path(branchName), failure.Message)
-}

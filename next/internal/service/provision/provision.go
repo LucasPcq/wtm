@@ -1,4 +1,4 @@
-// Package provision makes a new worktree whole: added with its env and its record, then numbered, its ports settled and its hooks run; and fast-forwards the source it starts from.
+// Package provision makes a new worktree whole: added with its env and its record, then numbered, its ports settled and its hooks run; fast-forwards the source it starts from; and reads the repository a command creating one decides from.
 package provision
 
 import (

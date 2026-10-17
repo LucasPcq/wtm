@@ -142,3 +142,12 @@ func (c Run) IsolationApplies() bool {
 	isolates := func(job Job) bool { return len(job.Ports) > 0 || job.hasNamespace() || job.RunsCompose() }
 	return len(c.EnvPorts) > 0 || len(c.EnvValues) > 0 || slices.ContainsFunc(c.Jobs, isolates)
 }
+
+// PlannedIsolation is the isolation a plan shows for the isolation given: none when run.toml declares nothing a worktree isolates.
+func (c Run) PlannedIsolation(given Isolation) Isolation {
+	if !c.IsolationApplies() {
+		return ""
+	}
+
+	return given
+}

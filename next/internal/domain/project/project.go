@@ -140,3 +140,25 @@ func RememberableValues(id string) ([]string, bool) {
 func RememberIDs() []string {
 	return []string{RememberEnvStrategy, RememberIsolation, RememberSourceUpdate}
 }
+
+// SourceUpdate is the remembered answer of the source-update question for whether the source is fast-forwarded first.
+func SourceUpdate(fastForward bool) string {
+	if fastForward {
+		return SourceUpdateFastForward
+	}
+
+	return SourceUpdateKeep
+}
+
+// RememberedAnswers are the answers to remember, keyed by their id in config.toml: the value of each field of remember, as the request names it (env_from, isolation, fast_forward), taken from values, those with no value left out.
+func RememberedAnswers(values map[string]string, remember []string) map[string]string {
+	ids := map[string]string{"env_from": RememberEnvStrategy, "isolation": RememberIsolation, "fast_forward": RememberSourceUpdate}
+	answers := map[string]string{}
+	for _, field := range remember {
+		if id, value := ids[field], values[field]; id != "" && value != "" {
+			answers[id] = value
+		}
+	}
+
+	return answers
+}

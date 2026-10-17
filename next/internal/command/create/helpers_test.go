@@ -62,8 +62,7 @@ func (w world) plan(t *testing.T, req create.Request) (create.Plan, []domain.War
 
 func decided(t *testing.T, facts create.Facts, req create.Request) create.Plan {
 	t.Helper()
-	planned, _, err := create.Decide(facts, req)
-	require.NoError(t, err)
+	planned, _ := create.Decide(facts, req)
 	return planned
 }
 
