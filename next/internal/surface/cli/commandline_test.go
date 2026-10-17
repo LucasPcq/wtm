@@ -7,7 +7,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +16,7 @@ func TestTheRequestIsSpelledWithItsFlagsSortedAndQuoted(t *testing.T) {
 		Branches:    []string{"feat/a", "it's"},
 		From:        "two words",
 		EnvFrom:     project.EnvMain,
-		Isolation:   run.Verbatim,
+		Isolation:   project.Verbatim,
 		FastForward: new(true),
 		IfNotExists: true,
 		Remember:    []string{"env_from", "isolation"},

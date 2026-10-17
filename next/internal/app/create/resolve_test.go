@@ -6,7 +6,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +17,7 @@ func TestANewBranchStartsFromTheBaseBranchAndTheConfiguredEnv(t *testing.T) {
 	resolved, err := resolve(t, w, create.Request{Branches: []string{branchName}})
 
 	require.NoError(t, err)
-	assert.Equal(t, create.Request{Branches: []string{branchName}, From: "main", EnvFrom: project.EnvMain, Isolation: run.Isolated, FastForward: new(false)}, resolved)
+	assert.Equal(t, create.Request{Branches: []string{branchName}, From: "main", EnvFrom: project.EnvMain, Isolation: project.Isolated, FastForward: new(false)}, resolved)
 }
 
 func TestABlankBranchIsRequiredAndANameIsTakenAsGiven(t *testing.T) {
@@ -160,11 +160,11 @@ func TestAnIsolationGivenIsCheckedEvenWhenNothingIsIsolated(t *testing.T) {
 	w := newWorld(t, seed{})
 
 	_, refused := resolve(t, w, create.Request{Branches: []string{branchName}, Isolation: "keep"})
-	kept, err := resolve(t, w, create.Request{Branches: []string{branchName}, Isolation: run.Verbatim})
+	kept, err := resolve(t, w, create.Request{Branches: []string{branchName}, Isolation: project.Verbatim})
 
 	assert.Equal(t, map[string]string{"isolation": "one_of"}, problems(refused))
 	require.NoError(t, err)
-	assert.Equal(t, run.Verbatim, kept.Isolation)
+	assert.Equal(t, project.Verbatim, kept.Isolation)
 }
 
 func TestAnAnswerToASkippedQuestionIsNeverRemembered(t *testing.T) {

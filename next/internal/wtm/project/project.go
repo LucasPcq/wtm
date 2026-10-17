@@ -1,9 +1,10 @@
-// Package project is what a slice reads of a repository's config.toml and of the global settings.
+// Package project is what a use case reads of config.toml, run.toml and the global settings.
 package project
 
 import (
 	"errors"
 	"fmt"
+	"slices"
 )
 
 var ErrConfigNotFound = errors.New("config file not found")
@@ -73,4 +74,47 @@ func (p Proxy) Problem() error {
 		return nil
 	}
 	return fmt.Errorf("invalid [proxy] port %d in config.toml — use %d-%d, or leave it out for %d", p.Port, portMin, portMax, defaultProxyPort)
+}
+
+type EnvStrategy string
+
+const (
+	EnvExample EnvStrategy = "example"
+	EnvMain    EnvStrategy = "main"
+	EnvParent  EnvStrategy = "parent"
+)
+
+const DefaultEnvStrategy = EnvExample
+
+func EnvStrategies() []EnvStrategy {
+	return []EnvStrategy{EnvExample, EnvMain, EnvParent}
+}
+
+func (s EnvStrategy) Valid() bool {
+	return slices.Contains(EnvStrategies(), s)
+}
+
+const (
+	RememberEnvStrategy  = "env_strategy"
+	RememberIsolation    = "isolation"
+	RememberSourceUpdate = "source_update"
+
+	SourceUpdateFastForward = "ff"
+	SourceUpdateKeep        = "keep"
+)
+
+func RememberableValues(id string) ([]string, bool) {
+	switch id {
+	case RememberEnvStrategy:
+		return []string{string(EnvExample), string(EnvMain), string(EnvParent)}, true
+	case RememberIsolation:
+		return []string{"isolated", "verbatim"}, true
+	case RememberSourceUpdate:
+		return []string{SourceUpdateFastForward, SourceUpdateKeep}, true
+	}
+	return nil, false
+}
+
+func RememberIDs() []string {
+	return []string{RememberEnvStrategy, RememberIsolation, RememberSourceUpdate}
 }

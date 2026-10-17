@@ -17,7 +17,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/app"
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/operation"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,7 @@ import (
 
 func TestADryRunTakesNoLockWritesNothingAndPublishesNothing(t *testing.T) {
 	w := newWorld(t, seed{})
-	held, err := oplock.Locks{StateDir: w.stateDir}.Take(operation.Operation{ID: "other", Locks: []operation.Lock{{Scope: operation.ScopeWorktree, Name: branchName, Mode: operation.Exclusive}}})
+	held, err := oplock.Locks{StateDir: w.stateDir}.Take(wtm.Operation{ID: "other", Locks: []wtm.Lock{{Scope: wtm.ScopeWorktree, Name: branchName, Mode: wtm.LockExclusive}}})
 	require.NoError(t, err)
 	defer held.Release()
 	report := &recorder{}
@@ -110,7 +110,7 @@ func TestHelperProcess(t *testing.T) {
 	if stateDir == "" {
 		t.Skip("run by TestARepositoryHeldByAnotherProcessRefusesTheRunAndChangesNothing")
 	}
-	held, err := oplock.Locks{StateDir: stateDir}.Take(operation.Operation{ID: "child", PID: os.Getpid(), Command: "create", Locks: []operation.Lock{{Scope: operation.ScopeRepo, Mode: operation.Exclusive}}})
+	held, err := oplock.Locks{StateDir: stateDir}.Take(wtm.Operation{ID: "child", PID: os.Getpid(), Command: "create", Locks: []wtm.Lock{{Scope: wtm.ScopeRepo, Mode: wtm.LockExclusive}}})
 	require.NoError(t, err)
 	defer held.Release()
 	os.Stdout.WriteString(readyLine + "\n")
@@ -152,7 +152,7 @@ func TestALockTheDefaultsNameIsTakenThenTheFactsObservedAgain(t *testing.T) {
 	w := newWorld(t, seed{Behind: true, Config: projectToml + "\n[wizard.remembered]\nsource_update = \"ff\"\n"})
 	observed := 0
 	w.deps.Create.Git = counted{Repo: w.repo, observed: &observed}
-	held, err := oplock.Locks{StateDir: w.stateDir}.Take(operation.Operation{ID: "other", Command: "sync", PID: 7, Locks: []operation.Lock{{Scope: operation.ScopeWorktree, Name: "main", Mode: operation.Exclusive}}})
+	held, err := oplock.Locks{StateDir: w.stateDir}.Take(wtm.Operation{ID: "other", Command: "sync", PID: 7, Locks: []wtm.Lock{{Scope: wtm.ScopeWorktree, Name: "main", Mode: wtm.LockExclusive}}})
 	require.NoError(t, err)
 
 	_, refused := app.New(w.deps).Create(t.Context(), app.CreateParams{Request: create.Request{Branches: []string{branchName}}, Report: (&recorder{}).add})
@@ -168,7 +168,7 @@ func TestALockTheDefaultsNameIsTakenThenTheFactsObservedAgain(t *testing.T) {
 
 func TestARunWithoutItsLocksSaysSoOnce(t *testing.T) {
 	w := newWorld(t, seed{})
-	w.deps.TakeLocks = func(operation.Operation) (app.Hold, error) { return unprotected{}, nil }
+	w.deps.TakeLocks = func(wtm.Operation) (app.Hold, error) { return unprotected{}, nil }
 
 	outcome, err := app.New(w.deps).Create(t.Context(), app.CreateParams{Request: create.Request{Branches: []string{branchName}}, Report: (&recorder{}).add})
 
@@ -208,7 +208,7 @@ func TestAnInvalidRequestIsRefusedBeforeAnythingIsLockedOrWritten(t *testing.T) 
 
 func TestARunWithoutLocksThatRemembersSaysSoOnce(t *testing.T) {
 	w := newWorld(t, seed{})
-	w.deps.TakeLocks = func(operation.Operation) (app.Hold, error) { return unprotected{}, nil }
+	w.deps.TakeLocks = func(wtm.Operation) (app.Hold, error) { return unprotected{}, nil }
 	w.deps.Create.Remember = func(context.Context, map[string]string) (wtm.Written, error) {
 		return wtm.Written{Changed: true, Unlocked: true}, nil
 	}

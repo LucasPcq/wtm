@@ -9,7 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,7 +37,7 @@ func TestEachItemDetailsItsWorktreeAndWhereItsBranchStands(t *testing.T) {
 
 	result, _ := w.apply(t, create.Request{Branches: []string{branchName, existing, remote}, From: "main"})
 
-	meta := worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Isolation: run.Isolated}
+	meta := worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Isolation: project.Isolated}
 	assert.Equal(t, &create.Detail{Path: w.path(branchName), Metadata: meta}, result.Items[0].Detail)
 	assert.Equal(t, &create.Detail{Path: w.path(existing), Metadata: meta, Standing: create.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 1}}, result.Items[1].Detail)
 	assert.Equal(t, &create.Detail{Path: w.path(remote), Metadata: meta, Standing: create.Standing{Upstream: "origin/" + remote}}, result.Items[2].Detail)
@@ -45,7 +45,7 @@ func TestEachItemDetailsItsWorktreeAndWhereItsBranchStands(t *testing.T) {
 
 func TestTheDetailIsTheJSONOfTheEnvelope(t *testing.T) {
 	ordinal := 2
-	detail := create.Detail{Path: "/trees/feat-x", Metadata: worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Isolation: run.Isolated}, Standing: create.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 1}, Ordinal: &ordinal}
+	detail := create.Detail{Path: "/trees/feat-x", Metadata: worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Isolation: project.Isolated}, Standing: create.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 1}, Ordinal: &ordinal}
 
 	assert.JSONEq(t, `{"path":"/trees/feat-x","metadata":{"source_branch":"main","created_at":"2026-10-16T12:00:00Z","env_strategy":"main","isolation":"isolated"},"existing_branch":true,"origin_state":"behind","origin_behind":1,"ordinal":2}`, jsonOf(t, detail))
 }
@@ -125,7 +125,7 @@ func TestTheRecordKeepsTheRunIsolationEvenWhereNothingIsIsolated(t *testing.T) {
 	require.Equal(t, wtm.StatusDone, result.Items[0].Status, result.Items[0].Err)
 	recorded, err := w.meta.Load(branchName)
 	require.NoError(t, err)
-	assert.Equal(t, run.Verbatim, recorded.Isolation)
+	assert.Equal(t, project.Verbatim, recorded.Isolation)
 }
 
 func TestAnIsolationNothingAppliesToIgnoresTheRememberedOne(t *testing.T) {
@@ -136,7 +136,7 @@ func TestAnIsolationNothingAppliesToIgnoresTheRememberedOne(t *testing.T) {
 	require.Equal(t, wtm.StatusDone, result.Items[0].Status, result.Items[0].Err)
 	recorded, err := w.meta.Load(branchName)
 	require.NoError(t, err)
-	assert.Equal(t, run.Isolated, recorded.Isolation)
+	assert.Equal(t, project.Isolated, recorded.Isolation)
 }
 
 func TestTheFailureOfARunIsItsFirstInterruptElseItsFirstFailure(t *testing.T) {

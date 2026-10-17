@@ -4,8 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/envcopy"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -46,7 +48,7 @@ func (p *provisioning) copyEnv(ctx context.Context) error {
 	if len(p.Project.EnvFiles) == 0 {
 		return nil
 	}
-	copied, err := p.Deps.EnvFiles.Copy(ctx, envcopy.Request{
+	copied, err := p.Deps.EnvFiles.Copy(ctx, env.CopyRequest{
 		Strategy:   p.Worktree.Strategy,
 		Files:      p.Project.EnvFiles,
 		TargetDir:  p.Worktree.Path,
@@ -63,13 +65,13 @@ func (p *provisioning) copyEnv(ctx context.Context) error {
 	return nil
 }
 
-func copyWarning(warning envcopy.Warning) wtm.Warning {
+func copyWarning(warning env.CopyWarning) wtm.Warning {
 	switch w := warning.(type) {
-	case envcopy.NoTemplate:
+	case env.NoTemplate:
 		return wtm.Warning{Code: "provision.env_no_template", Message: "no template found for " + w.Target + ", skipping", Params: wtm.Params{"target": w.Target}}
-	case envcopy.SourceMissing:
+	case env.SourceMissing:
 		return wtm.Warning{Code: "provision.env_source_missing", Message: "file " + w.Target + " not found in " + w.Dir + ", skipping", Params: wtm.Params{"target": w.Target, "dir": w.Dir}}
-	case envcopy.ParentFallback:
+	case env.ParentFallback:
 		return wtm.Warning{Code: "provision.env_parent_fallback", Message: "file " + w.Target + " not found in the parent worktree, copied from main", Params: wtm.Params{"target": w.Target}}
 	}
 	return wtm.Warning{}

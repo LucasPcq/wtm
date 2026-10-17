@@ -8,7 +8,6 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/operation"
 )
 
 const (
@@ -87,8 +86,8 @@ func (a *App) Create(ctx context.Context, params CreateParams) (CreateOutcome, e
 	return outcome, nil
 }
 
-func (a *App) operation(params CreateParams) operation.Operation {
-	return operation.Operation{
+func (a *App) operation(params CreateParams) wtm.Operation {
+	return wtm.Operation{
 		ID:            a.deps.NewOpID(),
 		PID:           os.Getpid(),
 		Command:       commandCreate,
@@ -132,7 +131,7 @@ func (a *App) settle(ctx context.Context, s settling) (settled, error) {
 	return a.settle(ctx, s)
 }
 
-func (a *App) planned(op operation.Operation, s settled) (CreateOutcome, error) {
+func (a *App) planned(op wtm.Operation, s settled) (CreateOutcome, error) {
 	plan, warnings, err := create.Plan(s.Facts, s.Request)
 	if err != nil {
 		return CreateOutcome{Op: op.ID}, err
@@ -145,13 +144,13 @@ func (a *App) planned(op operation.Operation, s settled) (CreateOutcome, error) 
 }
 
 type applying struct {
-	Op      operation.Operation
+	Op      wtm.Operation
 	Settled settled
 	Plan    create.Planned
 	Report  wtm.Report
 }
 
-func (a *App) report(op operation.Operation, surface wtm.Report) wtm.Report {
+func (a *App) report(op wtm.Operation, surface wtm.Report) wtm.Report {
 	publish := a.deps.Publisher(op)
 	return func(event wtm.Event) {
 		publish(event)

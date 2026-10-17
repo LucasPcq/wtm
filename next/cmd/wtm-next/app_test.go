@@ -9,7 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/app"
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/operation"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,5 +36,5 @@ func TestTheAppIsWiredOntoTheRealAdapters(t *testing.T) {
 func TestEventsAreFiledUnderGitsCommonDirWhereverTheStateLives(t *testing.T) {
 	params := appParams{MainPath: "/repo", StateDir: "/elsewhere/state", CommonDir: "/repo/.git"}
 
-	assert.Equal(t, "/repo/.git", params.publisherParams(operation.Operation{ID: "op-1"}).CommonDir)
+	assert.Equal(t, "/repo/.git", params.publisherParams(wtm.Operation{ID: "op-1"}).CommonDir)
 }

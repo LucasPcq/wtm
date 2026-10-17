@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -21,11 +21,11 @@ type Facts struct {
 	MainPath   string
 	Config     project.Config
 	Global     project.Global
-	Run        run.Config
+	Run        project.Run
 	RunErr     error
 	Worktrees  []worktree.Worktree
-	Branches   branch.Branches
-	Divergence map[string]branch.AheadBehind
+	Branches   worktree.Branches
+	Divergence map[string]worktree.AheadBehind
 	Folders    map[string]worktree.Location
 }
 
@@ -59,10 +59,10 @@ func (d Deps) Observe(ctx context.Context, branches []string) (Facts, error) {
 	return facts, nil
 }
 
-func (d Deps) divergence(ctx context.Context, refs branch.Branches) (map[string]branch.AheadBehind, error) {
-	found := map[string]branch.AheadBehind{}
+func (d Deps) divergence(ctx context.Context, refs worktree.Branches) (map[string]worktree.AheadBehind, error) {
+	found := map[string]worktree.AheadBehind{}
 	for _, local := range refs.Local {
-		at := slices.IndexFunc(refs.Remote, func(remote branch.Branch) bool { return remote.Name == local.Name })
+		at := slices.IndexFunc(refs.Remote, func(remote worktree.Branch) bool { return remote.Name == local.Name })
 		if at < 0 || refs.Remote[at].Tip == local.Tip {
 			continue
 		}
@@ -90,7 +90,7 @@ func (d Deps) locate(ctx context.Context, paths []string) (map[string]worktree.L
 func (f Facts) pathsOf(branches []string) []string {
 	var paths []string
 	for _, name := range branches {
-		if !branch.Blank(name) {
+		if !worktree.BlankBranch(name) {
 			paths = append(paths, f.pathOf(name))
 		}
 	}
@@ -98,15 +98,15 @@ func (f Facts) pathsOf(branches []string) []string {
 }
 
 func (f Facts) pathOf(name string) string {
-	return filepath.Join(f.MainPath, f.Config.Worktrees.BasePath, branch.PathSegment(name))
+	return filepath.Join(f.MainPath, f.Config.Worktrees.BasePath, worktree.PathSegment(name))
 }
 
 func (f Facts) local(name string) bool {
-	return slices.ContainsFunc(f.Branches.Local, func(b branch.Branch) bool { return b.Name == name })
+	return slices.ContainsFunc(f.Branches.Local, func(b worktree.Branch) bool { return b.Name == name })
 }
 
 func (f Facts) remote(name string) bool {
-	return slices.ContainsFunc(f.Branches.Remote, func(b branch.Branch) bool { return b.Name == name })
+	return slices.ContainsFunc(f.Branches.Remote, func(b worktree.Branch) bool { return b.Name == name })
 }
 
 func (f Facts) candidate(name string) bool {
@@ -130,9 +130,9 @@ func (f Facts) occupant(location worktree.Location) string {
 	return f.Worktrees[at].Branch()
 }
 
-func (f Facts) standing(name string) branch.Divergence {
+func (f Facts) standing(name string) worktree.Divergence {
 	if !f.remote(name) {
-		return branch.NoOrigin
+		return worktree.NoOrigin
 	}
 	return f.Divergence[name].Divergence()
 }
@@ -153,6 +153,6 @@ func cutRemote(name string) (string, bool) {
 	return strings.CutPrefix(name, remotePrefix)
 }
 
-func aheadAndBehind(counts branch.AheadBehind) string {
+func aheadAndBehind(counts worktree.AheadBehind) string {
 	return strconv.Itoa(counts.Ahead) + " ahead, " + strconv.Itoa(counts.Behind) + " behind"
 }

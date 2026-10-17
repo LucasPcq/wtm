@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -43,7 +43,7 @@ func (p ApplyParams) advance(ctx context.Context, subject string) (wtm.Warning, 
 			Params:  wtm.Params{"branch": subject},
 		}, true
 	}
-	return notAdvanced(subject, p.Deps.Git.MergeFFOnly(ctx, worktree.Merge{Path: at, Onto: branch.RemoteBranch{Name: subject}}))
+	return notAdvanced(subject, p.Deps.Git.MergeFFOnly(ctx, worktree.Merge{Path: at, Onto: worktree.RemoteBranch{Name: subject}}))
 }
 
 func notAdvanced(subject string, err error) (wtm.Warning, bool) {

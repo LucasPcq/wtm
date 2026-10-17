@@ -7,9 +7,9 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,7 +21,7 @@ func TestAWorktreeIsAddedWithItsEnvAndItsRecord(t *testing.T) {
 	outcome := provision.Run(t.Context(), w.params(&recorder{}))
 
 	require.Equal(t, wtm.StatusDone, outcome.Status, outcome.Err)
-	meta := worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Isolation: run.Isolated}
+	meta := worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Isolation: project.Isolated}
 	assert.Equal(t, provision.Provisioned{Meta: meta}, outcome.Provisioned)
 	assert.Empty(t, outcome.Warnings)
 	assert.Equal(t, mainEnv, readFile(t, filepath.Join(w.path(branchName), ".env")))
@@ -51,7 +51,7 @@ func TestATemplateOrAParentThatIsMissingIsNamed(t *testing.T) {
 	example.Worktree.Strategy = project.EnvExample
 	parent := w.params(&recorder{})
 	parent.Worktree.Branch, parent.Worktree.Path = "feat/y", w.path("feat/y")
-	parent.Worktree.Checkout = worktree.NewBranch{Name: "feat/y", From: branch.LocalBranch{Name: "main"}}
+	parent.Worktree.Checkout = worktree.NewBranch{Name: "feat/y", From: worktree.LocalBranch{Name: "main"}}
 	parent.Worktree.Strategy = project.EnvParent
 	parent.Worktree.ParentPath = w.path("elsewhere")
 

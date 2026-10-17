@@ -18,9 +18,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/operation"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
 )
 
 const (
@@ -43,7 +42,7 @@ func newApp(params appParams) *app.App {
 			LoadConfig: func() (project.Config, project.Global, error) {
 				return config.Load(config.LoadParams{StateDir: params.StateDir, GlobalPath: config.GlobalPath()})
 			},
-			LoadRun: func() (run.Config, error) { return config.LoadRun(params.StateDir) },
+			LoadRun: func() (project.Run, error) { return config.LoadRun(params.StateDir) },
 			Remember: func(ctx context.Context, answers map[string]string) (wtm.Written, error) {
 				return config.Remember(ctx, config.RememberParams{StateDir: params.StateDir, Answers: answers})
 			},
@@ -59,10 +58,10 @@ func newApp(params appParams) *app.App {
 			MainPath: params.MainPath,
 			StateDir: params.StateDir,
 		},
-		TakeLocks: func(op operation.Operation) (app.Hold, error) {
+		TakeLocks: func(op wtm.Operation) (app.Hold, error) {
 			return oplock.Locks{StateDir: params.StateDir}.Take(op)
 		},
-		Publisher: func(op operation.Operation) wtm.Report {
+		Publisher: func(op wtm.Operation) wtm.Report {
 			return events.NewPublisher(params.publisherParams(op)).Publish
 		},
 		NewOpID:       newOpID,
@@ -71,7 +70,7 @@ func newApp(params appParams) *app.App {
 	})
 }
 
-func (p appParams) publisherParams(op operation.Operation) events.PublisherParams {
+func (p appParams) publisherParams(op wtm.Operation) events.PublisherParams {
 	return events.PublisherParams{
 		Root:          p.MainPath,
 		CommonDir:     p.CommonDir,

@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"slices"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/jobenv"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 )
 
 const (
@@ -39,7 +39,7 @@ func (f runFile) portProblems() []string {
 }
 
 func (f runFile) collisions() []string {
-	block := jobenv.OffsetBlock(run.Config{PortOffsetBlock: f.PortOffsetBlock})
+	block := env.OffsetBlock(project.Run{PortOffsetBlock: f.PortOffsetBlock})
 	decls := f.declarations()
 	var problems []string
 	for i, a := range decls {
@@ -66,7 +66,7 @@ func (f runFile) declarations() []declaration {
 	var decls []declaration
 	for _, job := range f.Jobs {
 		for _, name := range slices.Sorted(maps.Keys(job.Ports)) {
-			decls = append(decls, declaration{Job: job.Name, Name: name, Base: job.Ports[name], Shared: job.Scope == string(run.Shared)})
+			decls = append(decls, declaration{Job: job.Name, Name: name, Base: job.Ports[name], Shared: job.Scope == string(project.Shared)})
 		}
 	}
 	return decls

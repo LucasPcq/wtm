@@ -11,10 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
-	"github.com/LucasPcq/wtm/next/internal/wtm/operation"
 )
 
 const (
@@ -33,13 +33,13 @@ type Locks struct {
 
 type Held struct {
 	locks     Locks
-	operation operation.Operation
+	operation wtm.Operation
 	holder    holder
 	files     []*os.File
 	protected bool
 }
 
-func (l Locks) Take(op operation.Operation) (*Held, error) {
+func (l Locks) Take(op wtm.Operation) (*Held, error) {
 	taken := &Held{locks: l, operation: op}
 	if l.StateDir == "" {
 		return taken, nil
@@ -62,9 +62,9 @@ func (h *Held) Protected() bool {
 	return h.protected
 }
 
-func (h *Held) Grow(locks []operation.Lock) (bool, error) {
-	missing := slices.DeleteFunc(slices.Clone(locks), func(lock operation.Lock) bool {
-		return slices.ContainsFunc(h.operation.Locks, func(held operation.Lock) bool { return held.Key() == lock.Key() })
+func (h *Held) Grow(locks []wtm.Lock) (bool, error) {
+	missing := slices.DeleteFunc(slices.Clone(locks), func(lock wtm.Lock) bool {
+		return slices.ContainsFunc(h.operation.Locks, func(held wtm.Lock) bool { return held.Key() == lock.Key() })
 	})
 	if len(missing) == 0 || !h.protected {
 		return false, nil
@@ -75,7 +75,7 @@ func (h *Held) Grow(locks []operation.Lock) (bool, error) {
 	}
 	h.files, h.protected = append(h.files, files...), protected
 	h.operation.Locks = append(h.operation.Locks, missing...)
-	slices.SortFunc(h.operation.Locks, func(a, b operation.Lock) int { return cmp.Compare(a.Key(), b.Key()) })
+	slices.SortFunc(h.operation.Locks, func(a, b wtm.Lock) int { return cmp.Compare(a.Key(), b.Key()) })
 	h.holder = h.holder.rehold(h.operation)
 	return true, nil
 }
@@ -87,14 +87,14 @@ func (h *Held) Release() {
 }
 
 type tried struct {
-	Locks []operation.Lock
-	Asked operation.Operation
+	Locks []wtm.Lock
+	Asked wtm.Operation
 }
 
 func (l Locks) try(t tried) ([]*os.File, bool, error) {
 	var files []*os.File
 	for _, lock := range t.Locks {
-		file, err := statefile.TryLock(statefile.TryLockParams{Path: l.lockPath(lock), Shared: lock.Mode == operation.Shared})
+		file, err := statefile.TryLock(statefile.TryLockParams{Path: l.lockPath(lock), Shared: lock.Mode == wtm.LockShared})
 		if err != nil {
 			closeAll(files)
 		}
@@ -117,15 +117,15 @@ func closeAll(files []*os.File) {
 }
 
 type busy struct {
-	Lock  operation.Lock
-	Asked operation.Operation
+	Lock  wtm.Lock
+	Asked wtm.Operation
 }
 
 func (l Locks) held(b busy) error {
 	key := b.Lock.Key()
 	params := wtm.Params{"key": key, "op": unknown, "command": unknown, "pid": unknown}
 	for _, holder := range running(filepath.Join(l.StateDir, locksDir, operationsDir)) {
-		if holder.ID == b.Asked.ID || !slices.ContainsFunc(holder.Locks, func(lock operation.Lock) bool { return lock.Key() == key }) {
+		if holder.ID == b.Asked.ID || !slices.ContainsFunc(holder.Locks, func(lock wtm.Lock) bool { return lock.Key() == key }) {
 			continue
 		}
 		params = wtm.Params{
@@ -150,9 +150,9 @@ func (l Locks) holderPath(id string) string {
 	return filepath.Join(l.StateDir, locksDir, operationsDir, id+holderExt)
 }
 
-func (l Locks) lockPath(lock operation.Lock) string {
-	if lock.Scope == operation.ScopeWorktree {
-		return filepath.Join(l.StateDir, locksDir, worktreesDir, branch.StateSegment(lock.Name)+lockExt)
+func (l Locks) lockPath(lock wtm.Lock) string {
+	if lock.Scope == wtm.ScopeWorktree {
+		return filepath.Join(l.StateDir, locksDir, worktreesDir, worktree.StateSegment(lock.Name)+lockExt)
 	}
 	return filepath.Join(l.StateDir, locksDir, repoLock+lockExt)
 }

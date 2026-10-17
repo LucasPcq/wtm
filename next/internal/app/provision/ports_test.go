@@ -5,10 +5,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -57,7 +59,7 @@ func TestAVerbatimWorktreeKeepsItsEnvAsCopiedAndHasNoNumber(t *testing.T) {
 	w := onDisk(t)
 	report := &recorder{}
 	params := portLinked(w.params(report))
-	params.Worktree.Isolation = run.Verbatim
+	params.Worktree.Isolation = project.Verbatim
 
 	outcome := provision.Run(t.Context(), params)
 
@@ -70,7 +72,7 @@ func TestAVerbatimWorktreeKeepsItsEnvAsCopiedAndHasNoNumber(t *testing.T) {
 func TestAnEnvValueThatCannotBeExpandedIsSaidAsARunTomlToFix(t *testing.T) {
 	w := onDisk(t)
 	params := portLinked(w.params(&recorder{}))
-	params.Project.Run.EnvValues = []run.EnvValueLink{{File: ".env", Key: "API", Job: "ghost", Value: "x"}}
+	params.Project.Run.EnvValues = []project.EnvValueLink{{File: ".env", Key: "API", Job: "ghost", Value: "x"}}
 
 	outcome := provision.Run(t.Context(), params)
 
@@ -92,8 +94,8 @@ func TestAProxyPortOutOfRangeIsSaidAsAConfigToFix(t *testing.T) {
 func TestALinkToAnEnvConfigTomlDoesNotDeclareIsNamedAndLeftOut(t *testing.T) {
 	w := onDisk(t)
 	params := portLinked(w.params(&recorder{}))
-	params.Project.Run.EnvPorts = append(params.Project.Run.EnvPorts, run.EnvPortLink{File: "web/.env", Key: "WEB_PORT", Job: "web", Port: "http"})
-	params.Project.Run.EnvValues = []run.EnvValueLink{{File: "api/.env", Key: "API", Job: "web", Value: "x"}}
+	params.Project.Run.EnvPorts = append(params.Project.Run.EnvPorts, project.EnvPortLink{File: "web/.env", Key: "WEB_PORT", Job: "web", Port: "http"})
+	params.Project.Run.EnvValues = []project.EnvValueLink{{File: "api/.env", Key: "API", Job: "web", Value: "x"}}
 
 	outcome := provision.Run(t.Context(), params)
 
@@ -116,9 +118,9 @@ func TestALinkToAnEnvConfigTomlDoesNotDeclareIsNamedAndLeftOut(t *testing.T) {
 func TestAnOriginWithoutTheRunProxyIsAProxyToFixNotARunToml(t *testing.T) {
 	w := onDisk(t)
 	params := portLinked(w.params(&recorder{}))
-	params.Project.Run.Addressing = run.AddressNames
-	params.Project.Run.Jobs[0].URL = &run.URL{Port: "http"}
-	params.Project.Run.EnvValues = []run.EnvValueLink{{File: ".env", Key: "API", Job: "web", Value: "{origin}"}}
+	params.Project.Run.Addressing = project.AddressNames
+	params.Project.Run.Jobs[0].URL = &project.URL{Port: "http"}
+	params.Project.Run.EnvValues = []project.EnvValueLink{{File: ".env", Key: "API", Job: "web", Value: "{origin}"}}
 
 	outcome := provision.Run(t.Context(), params)
 

@@ -4,10 +4,11 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
 )
 
 type Origin string
@@ -33,7 +34,7 @@ type Questions struct {
 	Branches    Branches
 	From        From
 	EnvFrom     Choice[project.EnvStrategy]
-	Isolation   Choice[run.Isolation]
+	Isolation   Choice[project.Isolation]
 	FastForward Confirm
 	IfNotExists Confirm
 	Remember    []string
@@ -80,7 +81,7 @@ func Form(f Facts, req Request) Questions {
 		Remember:    req.Remember,
 	}
 	questions.EnvFrom.Remembered = project.EnvStrategy(recalled[project.RememberEnvStrategy])
-	questions.Isolation.Remembered = run.Isolation(recalled[project.RememberIsolation])
+	questions.Isolation.Remembered = project.Isolation(recalled[project.RememberIsolation])
 	questions.Errors = f.problems(questions)
 	return questions
 }
@@ -131,13 +132,13 @@ func (f Facts) sourceOptions(creating []string) []Option {
 func (f Facts) badge(name string) string {
 	counts := f.Divergence[name]
 	switch f.standing(name) {
-	case branch.Behind:
+	case worktree.Behind:
 		return strconv.Itoa(counts.Behind) + " behind"
-	case branch.Ahead:
+	case worktree.Ahead:
 		return strconv.Itoa(counts.Ahead) + " ahead"
-	case branch.Diverged:
+	case worktree.Diverged:
 		return aheadAndBehind(counts)
-	case branch.NoOrigin, branch.UpToDate:
+	case worktree.NoOrigin, worktree.UpToDate:
 	}
 	return ""
 }
@@ -156,28 +157,28 @@ func (f Facts) envFrom(given project.EnvStrategy) Choice[project.EnvStrategy] {
 	return question
 }
 
-func (f Facts) isolation(given run.Isolation) Choice[run.Isolation] {
-	question := Choice[run.Isolation]{Options: run.Isolations()}
+func (f Facts) isolation(given project.Isolation) Choice[project.Isolation] {
+	question := Choice[project.Isolation]{Options: project.Isolations()}
 	if !f.Run.IsolationApplies() {
 		question.Skip = "run.toml declares nothing a worktree isolates"
 	}
 	remembered, found := f.remembered(project.RememberIsolation)
 	switch {
 	case given != "":
-		question.Answer = Answer[run.Isolation]{Value: given, Origin: OriginRequest}
+		question.Answer = Answer[project.Isolation]{Value: given, Origin: OriginRequest}
 	case found && question.Skip == "":
-		question.Answer = Answer[run.Isolation]{Value: run.Isolation(remembered), Origin: OriginRemembered}
+		question.Answer = Answer[project.Isolation]{Value: project.Isolation(remembered), Origin: OriginRemembered}
 	case f.Run.Isolation != "":
-		question.Answer = Answer[run.Isolation]{Value: f.Run.Isolation.Effective(), Origin: OriginConfig}
+		question.Answer = Answer[project.Isolation]{Value: f.Run.Isolation.Effective(), Origin: OriginConfig}
 	default:
-		question.Answer = Answer[run.Isolation]{Value: run.Isolated, Origin: OriginDefault}
+		question.Answer = Answer[project.Isolation]{Value: project.Isolated, Origin: OriginDefault}
 	}
 	return question
 }
 
 func (f Facts) fastForward(req Request) Confirm {
 	question := Confirm{}
-	if len(f.subjectsAt(req, branch.Behind)) == 0 {
+	if len(f.subjectsAt(req, worktree.Behind)) == 0 {
 		question.Skip = "nothing to fast-forward: no branch it starts from is behind origin"
 	}
 	remembered, found := f.remembered(project.RememberSourceUpdate)

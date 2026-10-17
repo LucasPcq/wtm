@@ -5,9 +5,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
 )
 
 const (
@@ -73,11 +74,11 @@ func anomaliesOf(item create.Item) []string {
 	var anomalies []string
 	standing := item.Detail.Standing
 	switch standing.OriginState {
-	case branch.Behind:
+	case worktree.Behind:
 		anomalies = append(anomalies, fmt.Sprintf("%s is %d commit(s) behind origin — the worktree starts from your local branch.", item.Subject, standing.OriginBehind))
-	case branch.Diverged:
+	case worktree.Diverged:
 		anomalies = append(anomalies, fmt.Sprintf("%s has diverged from origin (%d ahead, %d behind) — the worktree starts from your local branch, missing commits that are on origin.", item.Subject, standing.OriginAhead, standing.OriginBehind))
-	case branch.NoOrigin, branch.UpToDate, branch.Ahead:
+	case worktree.NoOrigin, worktree.UpToDate, worktree.Ahead:
 	}
 	if lines := anomalyLines(item.Detail.EnvPorts); len(lines) > 0 {
 		anomalies = append(anomalies, anomaliesTitle+"\n"+strings.Join(lines, "\n"))

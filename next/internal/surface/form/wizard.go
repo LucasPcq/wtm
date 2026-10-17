@@ -10,7 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/surface/output"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -301,7 +301,7 @@ type chosen struct {
 
 func (w *wizard) choose(c chosen) string {
 	if c.Step == stepIsolation {
-		w.req.Isolation = run.Isolation(c.Value)
+		w.req.Isolation = project.Isolation(c.Value)
 	} else {
 		w.req.EnvFrom = project.EnvStrategy(c.Value)
 	}

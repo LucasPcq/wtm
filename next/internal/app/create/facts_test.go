@@ -6,10 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +32,7 @@ func TestARepositoryWithoutConfigIsAPrecondition(t *testing.T) {
 func TestTheFactsCountOnlyTheBranchesThatDifferFromOrigin(t *testing.T) {
 	w := newWorld(t, seed{Behind: true})
 
-	assert.Equal(t, map[string]branch.AheadBehind{"main": {Behind: 1}}, w.facts(t).Divergence)
+	assert.Equal(t, map[string]worktree.AheadBehind{"main": {Behind: 1}}, w.facts(t).Divergence)
 }
 
 func TestTheFactsLocateTheFolderOfEachBranchAsked(t *testing.T) {
@@ -52,5 +53,5 @@ func TestARunConfigThatDoesNotLoadIsAFactNotAFailure(t *testing.T) {
 	facts := w.facts(t)
 
 	assert.Error(t, facts.RunErr)
-	assert.Equal(t, run.Config{}, facts.Run)
+	assert.Equal(t, project.Run{}, facts.Run)
 }

@@ -1,4 +1,4 @@
-// Package wtm is the contract every use case speaks: errors, warnings, events and outcomes.
+// Package wtm is the contract every use case speaks: errors, warnings, events, outcomes, and the operations in progress with the locks they hold.
 package wtm
 
 import (

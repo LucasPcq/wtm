@@ -9,7 +9,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 	"github.com/stretchr/testify/require"
 )
@@ -83,44 +83,44 @@ func paths(worktrees []worktree.Worktree) []string {
 	return all
 }
 
-func tipsOf(t *testing.T, reader port) map[branch.Ref]string {
+func tipsOf(t *testing.T, reader port) map[worktree.Ref]string {
 	t.Helper()
 	branches, err := reader.Branches(t.Context())
 	require.NoError(t, err)
-	tips := map[branch.Ref]string{}
+	tips := map[worktree.Ref]string{}
 	for _, b := range branches.Local {
-		tips[branch.LocalBranch{Name: b.Name}] = b.Tip
+		tips[worktree.LocalBranch{Name: b.Name}] = b.Tip
 	}
 	for _, b := range branches.Remote {
-		tips[branch.RemoteBranch{Name: b.Name}] = b.Tip
+		tips[worktree.RemoteBranch{Name: b.Name}] = b.Tip
 	}
 	return tips
 }
 
-func has(t *testing.T, reader port, ref branch.Ref) bool {
+func has(t *testing.T, reader port, ref worktree.Ref) bool {
 	t.Helper()
 	_, ok := tipsOf(t, reader)[ref]
 	return ok
 }
 
-func tip(t *testing.T, reader port, ref branch.Ref) string {
+func tip(t *testing.T, reader port, ref worktree.Ref) string {
 	t.Helper()
 	commit, ok := tipsOf(t, reader)[ref]
 	require.True(t, ok, "no ref %v", ref)
 	return commit
 }
 
-func aheadBehind(t *testing.T, reader port, name string) branch.AheadBehind {
+func aheadBehind(t *testing.T, reader port, name string) worktree.AheadBehind {
 	t.Helper()
 	counts, err := reader.AheadBehind(t.Context(), name)
 	require.NoError(t, err)
 	return counts
 }
 
-func named(names ...string) []branch.Branch {
-	branches := make([]branch.Branch, 0, len(names))
+func named(names ...string) []worktree.Branch {
+	branches := make([]worktree.Branch, 0, len(names))
 	for _, name := range names {
-		branches = append(branches, branch.Branch{Name: name})
+		branches = append(branches, worktree.Branch{Name: name})
 	}
 	return branches
 }

@@ -13,7 +13,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/surface/output"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -92,7 +92,7 @@ func newCreate(open func(ctx context.Context) (Project, error)) *cobra.Command {
 	flags.StringVar(&c.expect, "expect-fingerprint", "", expectUsage)
 	flags.BoolVar(&c.ask, "ask", false, askUsage)
 	_ = cmd.RegisterFlagCompletionFunc("env-from", cobra.FixedCompletions(create.Names(project.EnvStrategies()), cobra.ShellCompDirectiveNoFileComp))
-	_ = cmd.RegisterFlagCompletionFunc("isolation", cobra.FixedCompletions(create.Names(run.Isolations()), cobra.ShellCompDirectiveNoFileComp))
+	_ = cmd.RegisterFlagCompletionFunc("isolation", cobra.FixedCompletions(create.Names(project.Isolations()), cobra.ShellCompDirectiveNoFileComp))
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		invalid := wtm.Invalid(nil)
 		invalid.Cause = err
@@ -140,7 +140,7 @@ func (c *createCommand) request(cmd *cobra.Command, args []string) create.Reques
 	req := create.Request{
 		From:        c.from,
 		EnvFrom:     project.EnvStrategy(c.envFrom),
-		Isolation:   run.Isolation(c.isolation),
+		Isolation:   project.Isolation(c.isolation),
 		IfNotExists: c.ifNotExists,
 		Remember:    c.remember,
 		Ask:         c.ask,

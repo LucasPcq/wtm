@@ -9,8 +9,9 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
-	"github.com/LucasPcq/wtm/next/internal/wtm/operation"
 )
 
 const heldTempPrefix = "."
@@ -20,7 +21,7 @@ type holder struct {
 	file *os.File
 }
 
-func hold(path string, op operation.Operation) (holder, error) {
+func hold(path string, op wtm.Operation) (holder, error) {
 	data, err := json.Marshal(op)
 	if err != nil {
 		return holder{}, err
@@ -44,7 +45,7 @@ func hold(path string, op operation.Operation) (holder, error) {
 	return holder{path: path, file: file}, nil
 }
 
-func (h holder) rehold(op operation.Operation) holder {
+func (h holder) rehold(op wtm.Operation) holder {
 	next, err := hold(h.path, op)
 	if err != nil {
 		return h
@@ -66,18 +67,18 @@ func discard(file *os.File, cause error) error {
 	return errors.Join(cause, os.Remove(file.Name()))
 }
 
-func running(dir string) []operation.Operation {
+func running(dir string) []wtm.Operation {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil
 	}
-	var found []operation.Operation
+	var found []wtm.Operation
 	for _, entry := range entries {
 		if entry.IsDir() || strings.HasPrefix(entry.Name(), heldTempPrefix) {
 			continue
 		}
 		data, live := readHeld(filepath.Join(dir, entry.Name()))
-		var op operation.Operation
+		var op wtm.Operation
 		if live && json.Unmarshal(data, &op) == nil {
 			found = append(found, op)
 		}

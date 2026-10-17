@@ -3,7 +3,7 @@ package create
 import (
 	"slices"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
 func (f Facts) checksOut(req Request) bool {
@@ -13,7 +13,7 @@ func (f Facts) checksOut(req Request) bool {
 	})
 }
 
-func (f Facts) subjectsAt(req Request, standing branch.Divergence) []string {
+func (f Facts) subjectsAt(req Request, standing worktree.Divergence) []string {
 	var subjects []string
 	for _, d := range f.decisions(req) {
 		planned, isPlanned := d.(BranchPlan)

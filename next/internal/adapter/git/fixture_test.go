@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -17,8 +17,8 @@ type port interface {
 	MainWorktree(ctx context.Context) (worktree.Worktree, error)
 	CommonDir(ctx context.Context) (string, error)
 	Locate(ctx context.Context, path string) (worktree.Location, error)
-	Branches(ctx context.Context) (branch.Branches, error)
-	AheadBehind(ctx context.Context, name string) (branch.AheadBehind, error)
+	Branches(ctx context.Context) (worktree.Branches, error)
+	AheadBehind(ctx context.Context, name string) (worktree.AheadBehind, error)
 	Dirty(ctx context.Context, path string) (bool, error)
 	AddWorktree(ctx context.Context, addition worktree.Addition) error
 	RemoveWorktree(ctx context.Context, path string) error
@@ -61,10 +61,10 @@ func seed(root string) gittest.FakeParams {
 		Folders: []string{filepath.Join(root, "taken")},
 		Empty:   []string{filepath.Join(root, "empty")},
 		Dirty:   []string{filepath.Join(root, "dirty")},
-		Commits: map[branch.Ref][]string{
-			branch.LocalBranch{Name: "unmerged"}: {"unmerged work"},
-			branch.LocalBranch{Name: "linked"}:   {"linked work"},
-			branch.LocalBranch{Name: "diverged"}: {"diverged here"},
+		Commits: map[worktree.Ref][]string{
+			worktree.LocalBranch{Name: "unmerged"}: {"unmerged work"},
+			worktree.LocalBranch{Name: "linked"}:   {"linked work"},
+			worktree.LocalBranch{Name: "diverged"}: {"diverged here"},
 		},
 		Origin: map[string][]string{
 			"main":     {"upstream main"},

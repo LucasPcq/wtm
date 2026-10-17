@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -42,7 +42,7 @@ type FakeParams struct {
 	Empty     []string
 	Dir       string
 	Dirty     []string
-	Commits   map[branch.Ref][]string
+	Commits   map[worktree.Ref][]string
 	Origin    map[string][]string
 	Fail      map[string]error
 }
@@ -63,17 +63,17 @@ func NewFake(params FakeParams) *Fake {
 		fail:      params.Fail,
 	}
 	for _, name := range append([]string{params.Branch}, params.Local...) {
-		f.local[name] = historyOf(params.Commits, branch.LocalBranch{Name: name})
+		f.local[name] = historyOf(params.Commits, worktree.LocalBranch{Name: name})
 	}
 	for _, w := range params.Worktrees {
 		w.Path = realPath(w.Path)
 		f.worktrees = append(f.worktrees, w)
 		if name := w.Branch(); name != "" {
-			f.local[name] = historyOf(params.Commits, branch.LocalBranch{Name: name})
+			f.local[name] = historyOf(params.Commits, worktree.LocalBranch{Name: name})
 		}
 	}
 	for _, name := range params.Remote {
-		f.remote[name] = historyOf(params.Commits, branch.RemoteBranch{Name: name})
+		f.remote[name] = historyOf(params.Commits, worktree.RemoteBranch{Name: name})
 		f.origin[name] = f.remote[name]
 	}
 	for name, commits := range params.Origin {
@@ -129,28 +129,28 @@ func (f *Fake) Locate(_ context.Context, path string) (worktree.Location, error)
 	return worktree.Location{Path: resolved, Exists: f.taken(resolved) || slices.Contains(f.empty, resolved)}, nil
 }
 
-func (f *Fake) Branches(context.Context) (branch.Branches, error) {
+func (f *Fake) Branches(context.Context) (worktree.Branches, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.enter("Branches", ""); err != nil {
-		return branch.Branches{}, err
+		return worktree.Branches{}, err
 	}
-	return branch.Branches{Local: branchesOf(f.local), Remote: branchesOf(f.remote)}, nil
+	return worktree.Branches{Local: branchesOf(f.local), Remote: branchesOf(f.remote)}, nil
 }
 
-func (f *Fake) AheadBehind(_ context.Context, name string) (branch.AheadBehind, error) {
+func (f *Fake) AheadBehind(_ context.Context, name string) (worktree.AheadBehind, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.enter("AheadBehind", name); err != nil {
-		return branch.AheadBehind{}, err
+		return worktree.AheadBehind{}, err
 	}
-	of, ofOK := f.historyOf(branch.LocalBranch{Name: name})
-	against, againstOK := f.historyOf(branch.RemoteBranch{Name: name})
+	of, ofOK := f.historyOf(worktree.LocalBranch{Name: name})
+	against, againstOK := f.historyOf(worktree.RemoteBranch{Name: name})
 	if !ofOK || !againstOK {
-		return branch.AheadBehind{}, fmt.Errorf("gittest: unknown ref %s or its remote", name)
+		return worktree.AheadBehind{}, fmt.Errorf("gittest: unknown ref %s or its remote", name)
 	}
 	shared := sharedLength(of, against)
-	return branch.AheadBehind{Ahead: len(of) - shared, Behind: len(against) - shared}, nil
+	return worktree.AheadBehind{Ahead: len(of) - shared, Behind: len(against) - shared}, nil
 }
 
 func (f *Fake) Dirty(_ context.Context, path string) (bool, error) {
@@ -343,12 +343,12 @@ func (f *Fake) listed() []worktree.Worktree {
 	return worktrees
 }
 
-func (f *Fake) historyOf(ref branch.Ref) (history, bool) {
+func (f *Fake) historyOf(ref worktree.Ref) (history, bool) {
 	switch b := ref.(type) {
-	case branch.LocalBranch:
+	case worktree.LocalBranch:
 		commits, ok := f.local[b.Name]
 		return commits, ok
-	case branch.RemoteBranch:
+	case worktree.RemoteBranch:
 		commits, ok := f.remote[b.Name]
 		return commits, ok
 	}
@@ -368,15 +368,15 @@ func (f *Fake) checkedOut(name string) bool {
 	return slices.ContainsFunc(f.worktrees, func(w worktree.Worktree) bool { return w.Branch() == name })
 }
 
-func branchesOf(refs map[string]history) []branch.Branch {
-	branches := make([]branch.Branch, 0, len(refs))
+func branchesOf(refs map[string]history) []worktree.Branch {
+	branches := make([]worktree.Branch, 0, len(refs))
 	for _, name := range slices.Sorted(maps.Keys(refs)) {
-		branches = append(branches, branch.Branch{Name: name, Tip: refs[name].tip()})
+		branches = append(branches, worktree.Branch{Name: name, Tip: refs[name].tip()})
 	}
 	return branches
 }
 
-func historyOf(commits map[branch.Ref][]string, ref branch.Ref) history {
+func historyOf(commits map[worktree.Ref][]string, ref worktree.Ref) history {
 	return append(history{Root}, commits[ref]...)
 }
 

@@ -4,16 +4,17 @@ import (
 	"errors"
 	"path/filepath"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+
 	"github.com/LucasPcq/wtm/next/internal/app"
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
-	"github.com/LucasPcq/wtm/next/internal/wtm/settle"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
-var meta = worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvExample, Isolation: run.Isolated}
+var meta = worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvExample, Isolation: project.Isolated}
 
 const (
 	cwd   = "/repo/main"
@@ -53,16 +54,16 @@ func mixed(trees string) app.CreateOutcome {
 			},
 			From:      "main",
 			EnvFrom:   project.EnvMain,
-			Isolation: run.Isolated,
+			Isolation: project.Isolated,
 		},
 		Warnings: []wtm.Warning{{Code: "create.ff_dirty", Message: "couldn't fast-forward main: its worktree has uncommitted changes — it starts from your local branch", Params: wtm.Params{"branch": "main"}}},
 		Result: &create.Result{Items: []create.Item{
 			{Subject: "feature", Status: wtm.StatusDone, Detail: &create.Detail{
 				Path: filepath.Join(trees, "feature"), Metadata: meta,
 				Standing: create.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2},
-				EnvPorts: settle.Redacted{Offset: 10, Applied: true, Entries: []settle.Entry{
-					{File: ".env", Key: "PORT", Port: "http", Base: 3000, Resolved: 3010, Status: settle.StatusRewrite},
-					{File: ".env", Key: "DB", Port: "pg", Base: 5432, Status: settle.StatusMissingKey},
+				EnvPorts: env.Redacted{Offset: 10, Applied: true, Entries: []env.Entry{
+					{File: ".env", Key: "PORT", Port: "http", Base: 3000, Resolved: 3010, Status: env.StatusRewrite},
+					{File: ".env", Key: "DB", Port: "pg", Base: 5432, Status: env.StatusMissingKey},
 				}},
 			}},
 			{Subject: "linked", Status: wtm.StatusDone, Reason: wtm.ReasonUnchanged, Detail: &create.Detail{Path: "/repo/main/elsewhere/linked", Metadata: worktree.Meta{SourceBranch: "main"}}},

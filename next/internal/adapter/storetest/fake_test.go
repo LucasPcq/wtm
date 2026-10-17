@@ -4,9 +4,11 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/dotenv"
-	"github.com/LucasPcq/wtm/next/internal/wtm/envcopy"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 	"github.com/stretchr/testify/assert"
@@ -54,7 +56,7 @@ func TestAFakeRecordAtANewerSchemaIsNeverRewritten(t *testing.T) {
 func TestAFakeCopiesAndEditsTheFilesItHolds(t *testing.T) {
 	fake := NewFake(FakeParams{Files: map[string]string{"/main/.env": "PORT=3000\n"}})
 
-	copied, copyErr := fake.Copy(t.Context(), envcopy.Request{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: "/wt", MainPath: "/main"})
+	copied, copyErr := fake.Copy(t.Context(), env.CopyRequest{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: "/wt", MainPath: "/main"})
 	written, editErr := fake.Edit(t.Context(), dotenv.Edit{Path: "/wt/.env", Edit: func(lines []dotenv.Line) []dotenv.Line {
 		updated, _ := dotenv.Set(dotenv.SetParams{Lines: lines, Key: "PORT", Value: "3010"})
 		return updated

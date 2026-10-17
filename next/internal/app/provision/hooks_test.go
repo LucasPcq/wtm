@@ -5,9 +5,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/hook"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +22,7 @@ func TestOnCreateRunsInTheNewWorktreeAndKeepsItsLog(t *testing.T) {
 
 	require.Equal(t, wtm.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{w.path(branchName), "from main on feat/x"}, report.lines())
-	assert.Equal(t, hook.LogPath(hook.LogPathParams{StateDir: w.stateDir, Branch: branchName}), report.logOf("on_create"))
+	assert.Equal(t, env.HookLogPath(env.HookLogPathParams{StateDir: w.stateDir, Branch: branchName}), report.logOf("on_create"))
 	assert.Contains(t, report.all(), wtm.Output{Subject: branchName, Line: "from main on feat/x"})
 }
 

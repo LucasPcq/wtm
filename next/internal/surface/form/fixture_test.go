@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
@@ -11,11 +13,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
-	"github.com/LucasPcq/wtm/next/internal/wtm/hook"
-	"github.com/LucasPcq/wtm/next/internal/wtm/operation"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -30,13 +30,13 @@ type seed struct {
 }
 
 func newApp(s seed) *app.App {
-	commits := map[branch.Ref][]string{}
+	commits := map[worktree.Ref][]string{}
 	if s.Behind {
-		commits[branch.RemoteBranch{Name: "main"}] = []string{"upstream main"}
+		commits[worktree.RemoteBranch{Name: "main"}] = []string{"upstream main"}
 	}
 	var linked []worktree.Worktree
 	for _, name := range s.Linked {
-		linked = append(linked, worktree.Worktree{Path: "/elsewhere/" + branch.PathSegment(name), State: worktree.OnBranch{Branch: name}})
+		linked = append(linked, worktree.Worktree{Path: "/elsewhere/" + worktree.PathSegment(name), State: worktree.OnBranch{Branch: name}})
 	}
 	var remote []string
 	if s.Behind {
@@ -53,13 +53,13 @@ func newApp(s seed) *app.App {
 		Create: create.Deps{
 			Git:        git,
 			LoadConfig: func() (project.Config, project.Global, error) { return config, project.Global{}, nil },
-			LoadRun:    func() (run.Config, error) { return run.Config{}, nil },
+			LoadRun:    func() (project.Run, error) { return project.Run{}, nil },
 			Remember:   store.Remember,
 			Provision: provision.Deps{
 				Git:        git,
 				Meta:       store,
 				EnvFiles:   store,
-				RunHooks:   func(context.Context, hook.Chain) error { return nil },
+				RunHooks:   func(context.Context, env.HookChain) error { return nil },
 				PublicPort: func(context.Context, int) int { return 0 },
 				Shield:     shell.Shield,
 				Now:        func() time.Time { return createdAt },
@@ -67,8 +67,8 @@ func newApp(s seed) *app.App {
 			MainPath: mainPath,
 			StateDir: mainPath + "/.git/wtm",
 		},
-		TakeLocks: func(operation.Operation) (app.Hold, error) { return held{}, nil },
-		Publisher: func(operation.Operation) wtm.Report { return func(wtm.Event) {} },
+		TakeLocks: func(wtm.Operation) (app.Hold, error) { return held{}, nil },
+		Publisher: func(wtm.Operation) wtm.Report { return func(wtm.Event) {} },
 		NewOpID:   func() string { return "op-1" },
 		Now:       func() time.Time { return createdAt },
 	})
@@ -76,9 +76,9 @@ func newApp(s seed) *app.App {
 
 type held struct{}
 
-func (held) Grow([]operation.Lock) (bool, error) { return false, nil }
-func (held) Protected() bool                     { return true }
-func (held) Release()                            {}
+func (held) Grow([]wtm.Lock) (bool, error) { return false, nil }
+func (held) Protected() bool               { return true }
+func (held) Release()                      {}
 
 type refusing struct {
 	App

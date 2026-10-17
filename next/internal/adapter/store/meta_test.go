@@ -10,7 +10,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,7 +23,7 @@ func TestARecordWithoutSchemaReadsAsItAlwaysDid(t *testing.T) {
 	meta, err := Meta{StateDir: stateDir}.Load("feat/a")
 
 	require.NoError(t, err)
-	assert.Equal(t, worktree.Meta{SourceBranch: "main", CreatedAt: "2026-01-02T03:04:05Z", EnvStrategy: project.EnvParent, Ordinal: 3, Namespaces: []string{"db"}, Isolation: run.Verbatim}, meta)
+	assert.Equal(t, worktree.Meta{SourceBranch: "main", CreatedAt: "2026-01-02T03:04:05Z", EnvStrategy: project.EnvParent, Ordinal: 3, Namespaces: []string{"db"}, Isolation: project.Verbatim}, meta)
 }
 
 func TestARecordIsWrittenByteForByteAsWtmWritesIt(t *testing.T) {
@@ -34,7 +34,7 @@ func TestARecordIsWrittenByteForByteAsWtmWritesIt(t *testing.T) {
 		m.SourceBranch = "0.30.0"
 		m.CreatedAt = "2026-10-16T20:37:05Z"
 		m.EnvStrategy = project.EnvParent
-		m.Isolation = run.Isolated
+		m.Isolation = project.Isolated
 		return nil
 	}})
 
@@ -44,7 +44,7 @@ func TestARecordIsWrittenByteForByteAsWtmWritesIt(t *testing.T) {
 	assert.Equal(t, realRecord, readFile(t, path))
 	loaded, err := meta.Load("refactor/next-create-pilot")
 	require.NoError(t, err)
-	assert.Equal(t, worktree.Meta{SourceBranch: "0.30.0", CreatedAt: "2026-10-16T20:37:05Z", EnvStrategy: project.EnvParent, Isolation: run.Isolated}, loaded)
+	assert.Equal(t, worktree.Meta{SourceBranch: "0.30.0", CreatedAt: "2026-10-16T20:37:05Z", EnvStrategy: project.EnvParent, Isolation: project.Isolated}, loaded)
 }
 
 func TestARecordWtmWroteReadsAndRewritesToTheSameBytes(t *testing.T) {
@@ -94,13 +94,13 @@ func TestUpdateChangesOnlyWhatItIsAskedTo(t *testing.T) {
 	meta := Meta{StateDir: stateDir}
 
 	require.NoError(t, errOf(meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(m *worktree.Meta) error {
-		m.Isolation = run.Verbatim
+		m.Isolation = project.Verbatim
 		return nil
 	}})))
 
 	got, err := meta.Load("feat/a")
 	require.NoError(t, err)
-	assert.Equal(t, worktree.Meta{SourceBranch: "main", CreatedAt: "2026-01-02T03:04:05Z", Ordinal: 2, Isolation: run.Verbatim}, got)
+	assert.Equal(t, worktree.Meta{SourceBranch: "main", CreatedAt: "2026-01-02T03:04:05Z", Ordinal: 2, Isolation: project.Verbatim}, got)
 }
 
 func TestUpdateOfAnAbsentRecordCreatesIt(t *testing.T) {

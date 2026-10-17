@@ -5,23 +5,23 @@ import (
 	"errors"
 	"path/filepath"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/dotenv"
-	"github.com/LucasPcq/wtm/next/internal/wtm/jobenv"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
-	"github.com/LucasPcq/wtm/next/internal/wtm/settle"
 )
 
 func (p *provisioning) settlesPorts() bool {
 	switch {
 	case p.Project.RunErr != nil || len(p.ignored) > 0:
 		return true
-	case p.Worktree.Isolation == run.Verbatim:
+	case p.Worktree.Isolation == project.Verbatim:
 		return false
 	case len(p.kept.EnvPorts) > 0 || len(p.kept.EnvValues) > 0:
 		return true
 	}
-	return len(settle.OwnedTargets(settle.OwnedTargetsParams{Run: p.kept, Files: p.Project.EnvFiles})) > 0
+	return len(env.OwnedTargets(env.OwnedTargetsParams{Run: p.kept, Files: p.Project.EnvFiles})) > 0
 }
 
 func (p *provisioning) settle(ctx context.Context, provisioned *Provisioned) error {
@@ -32,16 +32,16 @@ func (p *provisioning) settle(ctx context.Context, provisioned *Provisioned) err
 	for _, link := range p.ignored {
 		p.warn(ignoredWarning(link))
 	}
-	if p.Worktree.Isolation == run.Verbatim || p.portsNeedOrdinal() && provisioned.Ordinal == nil {
+	if p.Worktree.Isolation == project.Verbatim || p.portsNeedOrdinal() && provisioned.Ordinal == nil {
 		return nil
 	}
-	writes, err := settle.Resolve(settle.ResolveParams{
-		Params:     p.jobParams(provisioned.Ordinal),
+	writes, err := env.Resolve(env.ResolveParams{
+		JobParams:  p.jobParams(provisioned.Ordinal),
 		Files:      p.Project.EnvFiles,
 		Proxy:      p.Project.Global.Proxy,
 		PublicPort: p.Deps.PublicPort(ctx, p.Project.Global.ProxyPort()),
 	})
-	if _, inRunToml := errors.AsType[*settle.ValueError](err); inRunToml {
+	if _, inRunToml := errors.AsType[*env.ValueError](err); inRunToml {
 		p.warn(p.notSettled(notSettled{Cause: err, InRunToml: true}))
 		return nil
 	}
@@ -57,19 +57,19 @@ func (p *provisioning) settle(ctx context.Context, provisioned *Provisioned) err
 		p.warn(p.notSettled(notSettled{Cause: err}))
 		return nil
 	}
-	provisioned.EnvPorts = settle.Redact(plan)
+	provisioned.EnvPorts = env.Redact(plan)
 	return nil
 }
 
-func (p *provisioning) jobParams(ordinal *int) jobenv.Params {
-	params := jobenv.Params{Branch: p.Worktree.Branch, ProjectDir: p.Project.MainPath, Isolation: p.Worktree.Isolation, Run: p.Project.Run}
+func (p *provisioning) jobParams(ordinal *int) env.JobParams {
+	params := env.JobParams{Branch: p.Worktree.Branch, ProjectDir: p.Project.MainPath, Isolation: p.Worktree.Isolation, Run: p.Project.Run}
 	if ordinal != nil {
 		params.Ordinal = *ordinal
 	}
 	return params
 }
 
-func (p *provisioning) apply(ctx context.Context, writes settle.Writes) (settle.Plan, error) {
+func (p *provisioning) apply(ctx context.Context, writes env.Writes) (env.Plan, error) {
 	read := map[string][]dotenv.Line{}
 	for _, file := range writes.Files() {
 		written, err := p.Deps.EnvFiles.Edit(ctx, dotenv.Edit{
@@ -77,11 +77,11 @@ func (p *provisioning) apply(ctx context.Context, writes settle.Writes) (settle.
 			Create: writes.Creates(file),
 			Edit: func(lines []dotenv.Line) []dotenv.Line {
 				read[file] = lines
-				return writes.Edit(settle.EditParams{File: file, Lines: lines})
+				return writes.Edit(env.EditParams{File: file, Lines: lines})
 			},
 		})
 		if err != nil {
-			return settle.Plan{}, err
+			return env.Plan{}, err
 		}
 		p.unlocked = p.unlocked || written.Unlocked
 	}
@@ -106,9 +106,9 @@ func (p *provisioning) notSettled(n notSettled) wtm.Warning {
 	}
 }
 
-func ignoredWarning(link settle.Ignored) wtm.Warning {
+func ignoredWarning(link env.Ignored) wtm.Warning {
 	code := "provision.env_port_ignored"
-	if link.Kind == settle.LinkValue {
+	if link.Kind == env.LinkValue {
 		code = "provision.env_value_ignored"
 	}
 	return wtm.Warning{

@@ -3,7 +3,8 @@ package config
 import (
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,7 +13,7 @@ func TestAnAbsentRunTomlIsAnEmptyRunConfig(t *testing.T) {
 	cfg, err := LoadRun(t.TempDir())
 
 	require.NoError(t, err)
-	assert.Equal(t, run.Config{}, cfg)
+	assert.Equal(t, project.Run{}, cfg)
 }
 
 func TestATypoedSectionIsRefusedByName(t *testing.T) {
@@ -111,8 +112,8 @@ ports = { PG_PORT = 5432 }
 `))
 
 	require.NoError(t, err)
-	assert.Equal(t, &run.URL{Port: "PORT"}, cfg.Jobs[0].URL)
-	assert.Equal(t, &run.URL{Port: "PORT", Host: "api.app-1"}, cfg.Jobs[1].URL)
+	assert.Equal(t, &project.URL{Port: "PORT"}, cfg.Jobs[0].URL)
+	assert.Equal(t, &project.URL{Port: "PORT", Host: "api.app-1"}, cfg.Jobs[1].URL)
 	assert.Nil(t, cfg.Jobs[2].URL)
 }
 
@@ -170,21 +171,21 @@ value = "{namespace}"
 `))
 
 	require.NoError(t, err)
-	assert.Equal(t, run.Config{
+	assert.Equal(t, project.Run{
 		PortOffsetBlock: 20,
-		Jobs: []run.Job{
+		Jobs: []project.Job{
 			{
-				Name: "db", Kind: run.Service, Cmd: "docker compose up -d db", Stop: "docker compose stop db", Cwd: "infra",
-				Ports: map[string]int{"PG_PORT": 5432}, URL: &run.URL{Port: "PG_PORT", Host: "pg"}, Scope: run.Shared,
-				Namespace: &run.Namespace{Name: "app_{worktree}", Create: "createdb {namespace}", Remove: "dropdb {namespace}", Env: map[string]string{"PGDATABASE": "app_{worktree}"}},
+				Name: "db", Kind: project.Service, Cmd: "docker compose up -d db", Stop: "docker compose stop db", Cwd: "infra",
+				Ports: map[string]int{"PG_PORT": 5432}, URL: &project.URL{Port: "PG_PORT", Host: "pg"}, Scope: project.Shared,
+				Namespace: &project.Namespace{Name: "app_{worktree}", Create: "createdb {namespace}", Remove: "dropdb {namespace}", Env: map[string]string{"PGDATABASE": "app_{worktree}"}},
 			},
-			{Name: "migrate", Kind: run.Task, Cmd: "pnpm migrate"},
+			{Name: "migrate", Kind: project.Task, Cmd: "pnpm migrate"},
 		},
-		Profiles:   []run.Profile{{Name: "full", Jobs: []string{"db", "migrate"}, Default: true}},
-		EnvPorts:   []run.EnvPortLink{{File: ".env", Key: "DATABASE_URL", Job: "db", Port: "PG_PORT"}},
-		EnvValues:  []run.EnvValueLink{{File: ".env", Key: "PGDATABASE", Job: "db", Value: "{namespace}"}},
-		Addressing: run.AddressPorts,
-		Isolation:  run.Verbatim,
+		Profiles:   []project.Profile{{Name: "full", Jobs: []string{"db", "migrate"}, Default: true}},
+		EnvPorts:   []project.EnvPortLink{{File: ".env", Key: "DATABASE_URL", Job: "db", Port: "PG_PORT"}},
+		EnvValues:  []project.EnvValueLink{{File: ".env", Key: "PGDATABASE", Job: "db", Value: "{namespace}"}},
+		Addressing: project.AddressPorts,
+		Isolation:  project.Verbatim,
 	}, cfg)
 }
 

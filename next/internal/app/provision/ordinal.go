@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/jobenv"
-	"github.com/LucasPcq/wtm/next/internal/wtm/settle"
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -18,11 +18,11 @@ func (p *provisioning) needsOrdinal() bool {
 }
 
 func (p *provisioning) portsNeedOrdinal() bool {
-	return settle.NeedsOrdinal(settle.NeedsOrdinalParams{Isolation: p.Worktree.Isolation, Run: p.kept})
+	return env.NeedsOrdinal(env.NeedsOrdinalParams{Isolation: p.Worktree.Isolation, Run: p.kept})
 }
 
 func (p *provisioning) hooksReadRun() bool {
-	return len(p.Project.OnCreate) > 0 && jobenv.HooksReadRun(jobenv.HooksReadRunParams{Run: p.Project.Run, Isolation: p.Worktree.Isolation})
+	return len(p.Project.OnCreate) > 0 && env.HooksReadRun(env.HooksReadRunParams{Run: p.Project.Run, Isolation: p.Worktree.Isolation})
 }
 
 func (p *provisioning) number(ctx context.Context, provisioned *Provisioned) error {

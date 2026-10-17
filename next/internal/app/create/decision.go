@@ -5,8 +5,9 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
 )
 
 //go-sumtype:decl decision
@@ -56,7 +57,7 @@ func (f Facts) decide(e entry) decision {
 	if location.Exists {
 		return e.occupied(f.occupant(location))
 	}
-	if clash, found := f.clash(branch.ClashParams{Branch: e.name, Live: f.live()}); found {
+	if clash, found := f.clash(worktree.ClashParams{Branch: e.name, Live: f.live()}); found {
 		return e.clashed(clash).as(wtm.KindConflict)
 	}
 	switch {
@@ -69,29 +70,29 @@ func (f Facts) decide(e entry) decision {
 }
 
 func (f Facts) invalid(e entry) (refusal, bool) {
-	if branch.Blank(e.name) {
+	if worktree.BlankBranch(e.name) {
 		return refusal{Kind: wtm.KindInvalid, Code: codeRequired, Template: "{path} is required"}, true
 	}
 	if slices.Contains(e.earlier, e.name) {
 		return refusal{Kind: wtm.KindInvalid, Code: "distinct", Template: "{path}: {value} is given twice", Params: wtm.Params{"value": e.name}}, true
 	}
-	if err := branch.Problem(e.name); err != nil {
+	if err := worktree.BranchProblem(e.name); err != nil {
 		return refusal{Kind: wtm.KindInvalid, Code: "create.branch_name_invalid", Template: "{problem}", Params: wtm.Params{"problem": err.Error()}}, true
 	}
 	if at := slices.IndexFunc(e.earlier, func(earlier string) bool { return f.pathOf(earlier) == e.path }); at >= 0 {
-		return e.clashed(branch.Clash{Branch: e.earlier[at], Name: filepath.Base(e.path)}), true
+		return e.clashed(worktree.Clash{Branch: e.earlier[at], Name: filepath.Base(e.path)}), true
 	}
-	if clash, found := f.clash(branch.ClashParams{Branch: e.name, Live: e.earlier}); found {
+	if clash, found := f.clash(worktree.ClashParams{Branch: e.name, Live: e.earlier}); found {
 		return e.clashed(clash), true
 	}
 	return refusal{}, false
 }
 
-func (f Facts) clash(params branch.ClashParams) (branch.Clash, bool) {
+func (f Facts) clash(params worktree.ClashParams) (worktree.Clash, bool) {
 	if !f.namesWorktrees() {
-		return branch.Clash{}, false
+		return worktree.Clash{}, false
 	}
-	return branch.ClashWith(params)
+	return worktree.ClashWith(params)
 }
 
 func (e entry) open(at string) decision {
@@ -113,10 +114,10 @@ func (e entry) occupied(occupant string) decision {
 	case occupant == "" || occupant == e.name:
 		return refusal{Kind: wtm.KindConflict, Code: "create.path_exists", Template: "worktree path already exists: {path}", Params: wtm.Params{"path": e.path}}
 	}
-	return e.clashed(branch.Clash{Branch: occupant, Name: filepath.Base(e.path)}).as(wtm.KindConflict)
+	return e.clashed(worktree.Clash{Branch: occupant, Name: filepath.Base(e.path)}).as(wtm.KindConflict)
 }
 
-func (e entry) clashed(clash branch.Clash) refusal {
+func (e entry) clashed(clash worktree.Clash) refusal {
 	return refusal{
 		Kind:     wtm.KindInvalid,
 		Code:     "create.name_clash",

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -101,7 +100,7 @@ func (r Repo) AddWorktree(ctx context.Context, addition worktree.Addition) error
 	if !creates {
 		return r.add(ctx, addition)
 	}
-	existed, err := r.refExists(ctx, branch.LocalBranch{Name: created})
+	existed, err := r.refExists(ctx, worktree.LocalBranch{Name: created})
 	if err != nil {
 		return err
 	}
@@ -113,7 +112,7 @@ func (r Repo) AddWorktree(ctx context.Context, addition worktree.Addition) error
 }
 
 func (r Repo) dropLeft(ctx context.Context, name string) error {
-	left, err := r.refExists(ctx, branch.LocalBranch{Name: name})
+	left, err := r.refExists(ctx, worktree.LocalBranch{Name: name})
 	if err != nil || !left {
 		return err
 	}
@@ -130,7 +129,7 @@ func (r Repo) add(ctx context.Context, addition worktree.Addition) error {
 		_, err = r.git(ctx, "worktree", "add", "--no-track", "-b", checkout.Name, "--", addition.Path, from)
 		return err
 	case worktree.ExistingBranch:
-		local, err := r.refExists(ctx, branch.LocalBranch{Name: checkout.Name})
+		local, err := r.refExists(ctx, worktree.LocalBranch(checkout))
 		if err != nil {
 			return err
 		}

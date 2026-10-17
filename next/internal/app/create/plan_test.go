@@ -8,7 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,12 +35,12 @@ func TestThePlanNamesTheIsolationOnlyWhenTheRunIsolatesSomething(t *testing.T) {
 	isolating := newWorld(t, seed{Run: jobsToml})
 	bare := newWorld(t, seed{})
 
-	given, _ := isolating.plan(t, create.Request{Branches: []string{branchName}, Isolation: run.Verbatim})
+	given, _ := isolating.plan(t, create.Request{Branches: []string{branchName}, Isolation: project.Verbatim})
 	defaulted, _ := isolating.plan(t, create.Request{Branches: []string{branchName}})
-	ignored, _ := bare.plan(t, create.Request{Branches: []string{branchName}, Isolation: run.Verbatim})
+	ignored, _ := bare.plan(t, create.Request{Branches: []string{branchName}, Isolation: project.Verbatim})
 
-	assert.Equal(t, run.Verbatim, given.Isolation)
-	assert.Equal(t, run.Isolated, defaulted.Isolation)
+	assert.Equal(t, project.Verbatim, given.Isolation)
+	assert.Equal(t, project.Isolated, defaulted.Isolation)
 	assert.Empty(t, ignored.Isolation)
 }
 

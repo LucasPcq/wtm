@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
@@ -13,11 +15,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
-	"github.com/LucasPcq/wtm/next/internal/wtm/hook"
-	"github.com/LucasPcq/wtm/next/internal/wtm/operation"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -35,7 +35,7 @@ type seed struct {
 	OnCreate   []project.Hook
 	Linked     []string
 	Behind     bool
-	RunHooks   func(ctx context.Context, chain hook.Chain) error
+	RunHooks   func(ctx context.Context, chain env.HookChain) error
 	Locks      error
 	Open       error
 	GitFails   map[string]error
@@ -49,13 +49,13 @@ type world struct {
 }
 
 func newWorld(s seed) world {
-	commits := map[branch.Ref][]string{}
+	commits := map[worktree.Ref][]string{}
 	if s.Behind {
-		commits[branch.RemoteBranch{Name: "main"}] = []string{"upstream main"}
+		commits[worktree.RemoteBranch{Name: "main"}] = []string{"upstream main"}
 	}
 	var linked []worktree.Worktree
 	for _, name := range s.Linked {
-		linked = append(linked, worktree.Worktree{Path: filepath.Join("/elsewhere", branch.PathSegment(name)), State: worktree.OnBranch{Branch: name}})
+		linked = append(linked, worktree.Worktree{Path: filepath.Join("/elsewhere", worktree.PathSegment(name)), State: worktree.OnBranch{Branch: name}})
 	}
 	config := project.Config{
 		Worktrees:  project.Worktrees{BasePath: project.DefaultBasePath, BaseBranch: project.DefaultBaseBranch},
@@ -84,7 +84,7 @@ func (w world) open(context.Context) (Project, error) {
 func (w world) deps() app.Deps {
 	runHooks := w.seed.RunHooks
 	if runHooks == nil {
-		runHooks = func(context.Context, hook.Chain) error { return nil }
+		runHooks = func(context.Context, env.HookChain) error { return nil }
 	}
 	return app.Deps{
 		Create: create.Deps{
@@ -96,7 +96,7 @@ func (w world) deps() app.Deps {
 				}
 				return config, project.Global{}, nil
 			},
-			LoadRun:  func() (run.Config, error) { return run.Config{}, nil },
+			LoadRun:  func() (project.Run, error) { return project.Run{}, nil },
 			Remember: w.store.Remember,
 			Provision: provision.Deps{
 				Git:        w.git,
@@ -110,13 +110,13 @@ func (w world) deps() app.Deps {
 			MainPath: mainPath,
 			StateDir: stateDir,
 		},
-		TakeLocks: func(operation.Operation) (app.Hold, error) {
+		TakeLocks: func(wtm.Operation) (app.Hold, error) {
 			if w.seed.Locks != nil {
 				return nil, w.seed.Locks
 			}
 			return held{}, nil
 		},
-		Publisher: func(operation.Operation) wtm.Report { return func(wtm.Event) {} },
+		Publisher: func(wtm.Operation) wtm.Report { return func(wtm.Event) {} },
 		NewOpID:   func() string { return "op-1" },
 		Now:       func() time.Time { return createdAt },
 	}
@@ -124,10 +124,10 @@ func (w world) deps() app.Deps {
 
 type held struct{}
 
-func (held) Grow([]operation.Lock) (bool, error) { return false, nil }
-func (held) Protected() bool                     { return true }
-func (held) Release()                            {}
+func (held) Grow([]wtm.Lock) (bool, error) { return false, nil }
+func (held) Protected() bool               { return true }
+func (held) Release()                      {}
 
-func hookFails(context.Context, hook.Chain) error {
+func hookFails(context.Context, env.HookChain) error {
 	return errors.New("hook failed: exit status 3")
 }

@@ -12,7 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/hook"
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,13 +51,13 @@ func TestTheSecondInterruptStopsAtOnce(t *testing.T) {
 	assert.Equal(t, syscall.SIGINT, status.Signal())
 }
 
-func armedUntilCancelled(ctx context.Context, _ hook.Chain) error {
+func armedUntilCancelled(ctx context.Context, _ env.HookChain) error {
 	fmt.Println("armed")
 	<-ctx.Done()
 	return ctx.Err()
 }
 
-func armedForever(context.Context, hook.Chain) error {
+func armedForever(context.Context, env.HookChain) error {
 	fmt.Println("armed")
 	select {}
 }

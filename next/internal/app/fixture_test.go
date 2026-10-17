@@ -17,10 +17,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
-	"github.com/LucasPcq/wtm/next/internal/wtm/operation"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -61,9 +60,9 @@ func newWorld(t *testing.T, s seed) world {
 	t.Helper()
 	root := gittest.TempDir(t)
 	main := filepath.Join(root, "main")
-	commits := map[branch.Ref][]string{}
+	commits := map[worktree.Ref][]string{}
 	if s.Behind {
-		commits[branch.RemoteBranch{Name: "main"}] = []string{"upstream main"}
+		commits[worktree.RemoteBranch{Name: "main"}] = []string{"upstream main"}
 	}
 	repo := gittest.Build(t, gittest.FakeParams{Main: main, Branch: "main", Local: []string{"feature"}, Remote: []string{"main"}, Commits: commits})
 	stateDir := filepath.Join(main, ".git", "wtm")
@@ -87,7 +86,7 @@ func newWorld(t *testing.T, s seed) world {
 				LoadConfig: func() (project.Config, project.Global, error) {
 					return config.Load(config.LoadParams{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")})
 				},
-				LoadRun: func() (run.Config, error) { return config.LoadRun(stateDir) },
+				LoadRun: func() (project.Run, error) { return config.LoadRun(stateDir) },
 				Remember: func(ctx context.Context, answers map[string]string) (wtm.Written, error) {
 					return config.Remember(ctx, config.RememberParams{StateDir: stateDir, Answers: answers})
 				},
@@ -103,8 +102,8 @@ func newWorld(t *testing.T, s seed) world {
 				MainPath: main,
 				StateDir: stateDir,
 			},
-			TakeLocks: func(op operation.Operation) (app.Hold, error) { return oplock.Locks{StateDir: stateDir}.Take(op) },
-			Publisher: func(operation.Operation) wtm.Report { return events.add },
+			TakeLocks: func(op wtm.Operation) (app.Hold, error) { return oplock.Locks{StateDir: stateDir}.Take(op) },
+			Publisher: func(wtm.Operation) wtm.Report { return events.add },
 			NewOpID: func() string {
 				ids++
 				return "op-" + string(rune('0'+ids))
@@ -115,7 +114,7 @@ func newWorld(t *testing.T, s seed) world {
 }
 
 func (w world) path(name string) string {
-	return filepath.Join(w.root, ".trees", branch.PathSegment(name))
+	return filepath.Join(w.root, ".trees", worktree.PathSegment(name))
 }
 
 const (
@@ -125,6 +124,6 @@ const (
 
 type unprotected struct{}
 
-func (unprotected) Grow([]operation.Lock) (bool, error) { return false, nil }
-func (unprotected) Protected() bool                     { return false }
-func (unprotected) Release()                            {}
+func (unprotected) Grow([]wtm.Lock) (bool, error) { return false, nil }
+func (unprotected) Protected() bool               { return false }
+func (unprotected) Release()                      {}

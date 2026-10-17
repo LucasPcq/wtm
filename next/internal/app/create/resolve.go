@@ -6,7 +6,6 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
 )
 
 const (
@@ -59,7 +58,7 @@ func (f Facts) problems(q Questions) []wtm.FieldError {
 	}
 	problems = append(problems, oneOf(choice{Path: "env_from", Value: string(q.EnvFrom.Value), Accepted: Names(project.EnvStrategies())})...)
 	if q.Isolation.Origin == OriginRequest {
-		problems = append(problems, oneOf(choice{Path: "isolation", Value: string(q.Isolation.Value), Accepted: Names(run.Isolations())})...)
+		problems = append(problems, oneOf(choice{Path: "isolation", Value: string(q.Isolation.Value), Accepted: Names(project.Isolations())})...)
 	}
 	for index, id := range q.Remember {
 		problems = append(problems, oneOf(choice{Path: "remember[" + strconv.Itoa(index) + "]", Value: id, Accepted: rememberable()})...)

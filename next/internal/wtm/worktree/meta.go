@@ -4,9 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
 )
 
 const metaDirName = "worktrees"
@@ -18,7 +16,7 @@ type Meta struct {
 	EnvStrategy  project.EnvStrategy `json:"env_strategy"`
 	Ordinal      int                 `json:"ordinal,omitempty"`
 	Namespaces   []string            `json:"namespaces,omitempty"`
-	Isolation    run.Isolation       `json:"isolation,omitempty"`
+	Isolation    project.Isolation   `json:"isolation,omitempty"`
 }
 
 type MetaDirParams struct {
@@ -27,7 +25,7 @@ type MetaDirParams struct {
 }
 
 func MetaDir(params MetaDirParams) (string, bool) {
-	segment := branch.StateSegment(params.Branch)
+	segment := StateSegment(params.Branch)
 	if params.StateDir == "" || segment == "" || segment == "." || segment == ".." || strings.ContainsAny(segment, `/\`) {
 		return "", false
 	}
@@ -37,4 +35,14 @@ func MetaDir(params MetaDirParams) (string, bool) {
 type MetaUpdate struct {
 	Branch string
 	Change func(*Meta) error
+}
+
+type Identity struct {
+	Branch    string            `json:"branch"`
+	Path      string            `json:"path"`
+	Parent    string            `json:"parent"`
+	Ordinal   *int              `json:"ordinal"`
+	Isolation project.Isolation `json:"isolation"`
+	Main      bool              `json:"is_main"`
+	CreatedAt string            `json:"created_at"`
 }

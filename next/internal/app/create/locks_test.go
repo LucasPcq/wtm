@@ -3,28 +3,30 @@ package create_test
 import (
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/stretchr/testify/require"
 
 	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/wtm/operation"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestARunHoldsTheRepositoryAndEachBranchItCreates(t *testing.T) {
 	locks := create.Request{Branches: []string{"feat/b", existing, ""}, From: "main"}.Locks()
 
-	assert.Equal(t, []operation.Lock{
-		{Scope: operation.ScopeRepo, Mode: operation.Shared},
-		{Scope: operation.ScopeWorktree, Name: "feat/b", Mode: operation.Exclusive},
-		{Scope: operation.ScopeWorktree, Name: existing, Mode: operation.Exclusive},
+	assert.Equal(t, []wtm.Lock{
+		{Scope: wtm.ScopeRepo, Mode: wtm.LockShared},
+		{Scope: wtm.ScopeWorktree, Name: "feat/b", Mode: wtm.LockExclusive},
+		{Scope: wtm.ScopeWorktree, Name: existing, Mode: wtm.LockExclusive},
 	}, locks)
 }
 
 func TestARunThatFastForwardsTheSourceHoldsItToo(t *testing.T) {
 	w := newWorld(t, seed{Behind: true})
 	facts := w.facts(t, branchName, "main")
-	source := operation.Lock{Scope: operation.ScopeWorktree, Name: "main", Mode: operation.Exclusive}
+	source := wtm.Lock{Scope: wtm.ScopeWorktree, Name: "main", Mode: wtm.LockExclusive}
 
 	moved := create.Locks(facts, create.Request{Branches: []string{branchName}, From: "main", FastForward: new(true)})
 	kept := create.Locks(facts, create.Request{Branches: []string{branchName}, From: "main", FastForward: new(false)})
@@ -32,7 +34,7 @@ func TestARunThatFastForwardsTheSourceHoldsItToo(t *testing.T) {
 
 	assert.Contains(t, moved, source)
 	assert.NotContains(t, kept, source)
-	assert.Equal(t, []operation.Lock{{Scope: operation.ScopeRepo, Mode: operation.Shared}, {Scope: operation.ScopeWorktree, Name: branchName, Mode: operation.Exclusive}}, fromRemote)
+	assert.Equal(t, []wtm.Lock{{Scope: wtm.ScopeRepo, Mode: wtm.LockShared}, {Scope: wtm.ScopeWorktree, Name: branchName, Mode: wtm.LockExclusive}}, fromRemote)
 }
 
 func TestALocalSourceNamedLikeARemoteOneIsLockedWhenItIsFastForwarded(t *testing.T) {
@@ -47,12 +49,12 @@ func TestALocalSourceNamedLikeARemoteOneIsLockedWhenItIsFastForwarded(t *testing
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"origin/foo"}, planned.FastForward)
-	assert.Contains(t, create.Locks(facts, req), operation.Lock{Scope: operation.ScopeWorktree, Name: "origin/foo", Mode: operation.Exclusive})
+	assert.Contains(t, create.Locks(facts, req), wtm.Lock{Scope: wtm.ScopeWorktree, Name: "origin/foo", Mode: wtm.LockExclusive})
 }
 
 func TestASourceThatWillNotMoveIsNotLocked(t *testing.T) {
 	w := newWorld(t, seed{})
 	req := create.Request{Branches: []string{branchName}, From: "main", FastForward: new(true)}
 
-	assert.NotContains(t, create.Locks(w.facts(t, branchName), req), operation.Lock{Scope: operation.ScopeWorktree, Name: "main", Mode: operation.Exclusive})
+	assert.NotContains(t, create.Locks(w.facts(t, branchName), req), wtm.Lock{Scope: wtm.ScopeWorktree, Name: "main", Mode: wtm.LockExclusive})
 }

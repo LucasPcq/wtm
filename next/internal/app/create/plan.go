@@ -4,11 +4,12 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
-	"github.com/LucasPcq/wtm/next/internal/wtm/envcopy"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
 )
 
 type Action string
@@ -24,7 +25,7 @@ type Planned struct {
 	Branches    []BranchPlan        `json:"branches"`
 	From        string              `json:"from,omitempty"`
 	EnvFrom     project.EnvStrategy `json:"env_from"`
-	Isolation   run.Isolation       `json:"isolation,omitempty"`
+	Isolation   project.Isolation   `json:"isolation,omitempty"`
 	FastForward []string            `json:"fast_forward,omitempty"`
 	Remember    []string            `json:"remember,omitempty"`
 }
@@ -64,7 +65,7 @@ func Plan(f Facts, req Request) (Planned, []wtm.Warning, error) {
 	return planned, append(f.divergedWarnings(req), f.fallbackWarnings(planned)...), nil
 }
 
-func (f Facts) plannedIsolation(given run.Isolation) run.Isolation {
+func (f Facts) plannedIsolation(given project.Isolation) project.Isolation {
 	if !f.Run.IsolationApplies() {
 		return ""
 	}
@@ -75,12 +76,12 @@ func (f Facts) fastForwarded(req Request) []string {
 	if req.FastForward == nil || !*req.FastForward {
 		return nil
 	}
-	return f.subjectsAt(req, branch.Behind)
+	return f.subjectsAt(req, worktree.Behind)
 }
 
 func (f Facts) divergedWarnings(req Request) []wtm.Warning {
 	var warnings []wtm.Warning
-	for _, subject := range f.subjectsAt(req, branch.Diverged) {
+	for _, subject := range f.subjectsAt(req, worktree.Diverged) {
 		counts := f.Divergence[subject]
 		warnings = append(warnings, wtm.Warning{
 			Code:    "create.source_diverged",
@@ -93,7 +94,7 @@ func (f Facts) divergedWarnings(req Request) []wtm.Warning {
 
 func (f Facts) fallbackWarnings(planned Planned) []wtm.Warning {
 	creates := slices.ContainsFunc(planned.Branches, func(b BranchPlan) bool { return b.Action != ActionUnchanged })
-	fallsBack := envcopy.ParentFallsBackToMain(envcopy.ParentFallbackParams{
+	fallsBack := env.ParentFallsBackToMain(env.ParentFallbackParams{
 		Strategy:          planned.EnvFrom,
 		HasFiles:          len(f.Config.Env.Files) > 0,
 		SourceHasWorktree: f.checkedOutAt(planned.From) != "",

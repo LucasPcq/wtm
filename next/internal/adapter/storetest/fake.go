@@ -11,10 +11,12 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/dotenv"
-	"github.com/LucasPcq/wtm/next/internal/wtm/envcopy"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
@@ -222,17 +224,17 @@ func (f *Fake) Read(path string) ([]dotenv.Line, error) {
 	return dotenv.Parse([]byte(content)), nil
 }
 
-func (f *Fake) Copy(_ context.Context, request envcopy.Request) (envcopy.Copied, error) {
+func (f *Fake) Copy(_ context.Context, request env.CopyRequest) (env.Copied, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.enter("Copy", request.TargetDir); err != nil {
-		return envcopy.Copied{}, err
+		return env.Copied{}, err
 	}
-	sources, warnings, err := envcopy.Sources(envcopy.SourcesParams{Request: request, Exists: f.exists})
+	sources, warnings, err := env.Sources(env.SourcesParams{Request: request, Exists: f.exists})
 	if err != nil {
-		return envcopy.Copied{}, err
+		return env.Copied{}, err
 	}
-	copied := envcopy.Copied{Warnings: warnings}
+	copied := env.Copied{Warnings: warnings}
 	for _, source := range sources {
 		if current, held := f.files[source.To]; held && current == f.files[source.From] {
 			continue

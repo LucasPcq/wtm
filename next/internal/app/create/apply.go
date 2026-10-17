@@ -5,11 +5,12 @@ import (
 	"context"
 	"slices"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
-	"github.com/LucasPcq/wtm/next/internal/wtm/settle"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -17,7 +18,7 @@ type ApplyParams struct {
 	Deps        Deps
 	Facts       Facts
 	Plan        Planned
-	Isolation   run.Isolation
+	Isolation   project.Isolation
 	FastForward bool
 	Report      wtm.Report
 }
@@ -54,16 +55,16 @@ type Detail struct {
 	Path     string        `json:"path"`
 	Metadata worktree.Meta `json:"metadata"`
 	Standing
-	Ordinal  *int            `json:"ordinal,omitempty"`
-	EnvPorts settle.Redacted `json:"env_ports,omitzero"`
+	Ordinal  *int         `json:"ordinal,omitempty"`
+	EnvPorts env.Redacted `json:"env_ports,omitzero"`
 }
 
 type Standing struct {
-	ExistingBranch bool              `json:"existing_branch"`
-	OriginState    branch.Divergence `json:"origin_state,omitempty"`
-	OriginAhead    int               `json:"origin_ahead,omitempty"`
-	OriginBehind   int               `json:"origin_behind,omitempty"`
-	Upstream       string            `json:"upstream,omitempty"`
+	ExistingBranch bool                `json:"existing_branch"`
+	OriginState    worktree.Divergence `json:"origin_state,omitempty"`
+	OriginAhead    int                 `json:"origin_ahead,omitempty"`
+	OriginBehind   int                 `json:"origin_behind,omitempty"`
+	Upstream       string              `json:"upstream,omitempty"`
 }
 
 func Apply(ctx context.Context, params ApplyParams) Result {
@@ -140,11 +141,11 @@ func (p ApplyParams) checkout(planned BranchPlan) worktree.Checkout {
 	return worktree.NewBranch{Name: planned.Branch, From: p.Facts.ref(p.Plan.From)}
 }
 
-func (f Facts) ref(from string) branch.Ref {
+func (f Facts) ref(from string) worktree.Ref {
 	if remote, onOrigin := cutRemote(from); onOrigin && !f.local(from) {
-		return branch.RemoteBranch{Name: remote}
+		return worktree.RemoteBranch{Name: remote}
 	}
-	return branch.LocalBranch{Name: from}
+	return worktree.LocalBranch{Name: from}
 }
 
 func (f Facts) standingOf(planned BranchPlan) Standing {

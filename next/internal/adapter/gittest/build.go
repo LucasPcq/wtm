@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -96,7 +96,7 @@ func Symlinked(t testing.TB) string {
 	return link
 }
 
-func Names(branches []branch.Branch) []string {
+func Names(branches []worktree.Branch) []string {
 	names := make([]string, 0, len(branches))
 	for _, b := range branches {
 		names = append(names, b.Name)
@@ -106,12 +106,12 @@ func Names(branches []branch.Branch) []string {
 
 type State struct {
 	Worktrees []worktree.Worktree
-	Branches  branch.Branches
+	Branches  worktree.Branches
 }
 
 type reader interface {
 	Worktrees(ctx context.Context) ([]worktree.Worktree, error)
-	Branches(ctx context.Context) (branch.Branches, error)
+	Branches(ctx context.Context) (worktree.Branches, error)
 }
 
 func StateOf(t testing.TB, repo reader) State {
@@ -124,10 +124,10 @@ func StateOf(t testing.TB, repo reader) State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return State{Worktrees: worktrees, Branches: branch.Branches{Local: untipped(branches.Local), Remote: untipped(branches.Remote)}}
+	return State{Worktrees: worktrees, Branches: worktree.Branches{Local: untipped(branches.Local), Remote: untipped(branches.Remote)}}
 }
 
-func untipped(branches []branch.Branch) []branch.Branch {
+func untipped(branches []worktree.Branch) []worktree.Branch {
 	for i := range branches {
 		branches[i].Tip = ""
 	}
@@ -150,7 +150,7 @@ func Build(t testing.TB, params FakeParams) git.Repo {
 	}
 	commits := builder{t: t, dir: main, made: map[string]string{Root: Output(t, main, "rev-parse", "HEAD")}}
 	for _, name := range localBranches(params) {
-		Git(t, main, "update-ref", "refs/heads/"+name, commits.tip(params.Commits[branch.LocalBranch{Name: name}]))
+		Git(t, main, "update-ref", "refs/heads/"+name, commits.tip(params.Commits[worktree.LocalBranch{Name: name}]))
 	}
 	Git(t, main, "reset", "-q", "--hard")
 	buildRemote(t, buildRemoteParams{Main: main, Commits: commits, Seed: params})
@@ -214,7 +214,7 @@ func buildRemote(t testing.TB, params buildRemoteParams) {
 	Git(t, bare, "init", "-q", "--bare", "-b", params.Seed.Branch)
 	Git(t, params.Main, "remote", "add", origin, bare)
 	for _, name := range params.Seed.Remote {
-		Git(t, params.Main, "push", "-q", origin, params.Commits.tip(params.Seed.Commits[branch.RemoteBranch{Name: name}])+":refs/heads/"+name)
+		Git(t, params.Main, "push", "-q", origin, params.Commits.tip(params.Seed.Commits[worktree.RemoteBranch{Name: name}])+":refs/heads/"+name)
 	}
 	for name, commits := range params.Seed.Origin {
 		Git(t, params.Main, "push", "-q", "-f", origin, params.Commits.tip(commits)+":refs/heads/"+name)
@@ -223,7 +223,7 @@ func buildRemote(t testing.TB, params buildRemoteParams) {
 		Git(t, params.Main, "update-ref", "-d", remoteRef(name))
 	}
 	for _, name := range params.Seed.Remote {
-		Git(t, params.Main, "update-ref", remoteRef(name), params.Commits.tip(params.Seed.Commits[branch.RemoteBranch{Name: name}]))
+		Git(t, params.Main, "update-ref", remoteRef(name), params.Commits.tip(params.Seed.Commits[worktree.RemoteBranch{Name: name}]))
 	}
 }
 

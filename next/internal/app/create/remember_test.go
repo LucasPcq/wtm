@@ -9,14 +9,14 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTheAnswersAskedToBeRememberedAreKeptOnceABranchIsCreated(t *testing.T) {
 	w := newWorld(t, seed{Run: jobsToml, Behind: true})
 
-	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, EnvFrom: project.EnvExample, Isolation: run.Verbatim, FastForward: new(false), Remember: []string{"env_from", "isolation", "fast_forward"}})
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, EnvFrom: project.EnvExample, Isolation: project.Verbatim, FastForward: new(false), Remember: []string{"env_from", "isolation", "fast_forward"}})
 
 	assert.Empty(t, result.Warnings)
 	config := readFile(t, filepath.Join(w.stateDir, "config.toml"))

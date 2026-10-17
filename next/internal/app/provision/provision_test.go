@@ -7,9 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,7 +34,7 @@ func TestAWorktreeIsCreatedNumberedThenProvisionedInThatOrder(t *testing.T) {
 	outcome := provision.Run(t.Context(), portLinked(w.params(report)))
 
 	require.Equal(t, wtm.StatusDone, outcome.Status, outcome.Err)
-	created := worktree.Identity{Branch: branchName, Path: w.path(branchName), Parent: "main", Isolation: run.Isolated, CreatedAt: "2026-10-16T12:00:00Z"}
+	created := worktree.Identity{Branch: branchName, Path: w.path(branchName), Parent: "main", Isolation: project.Isolated, CreatedAt: "2026-10-16T12:00:00Z"}
 	numbered := created
 	numbered.Ordinal = new(1)
 	assert.Equal(t, []wtm.Event{
@@ -122,5 +124,5 @@ func TestAnInterruptDuringTheAddFinishesItsEnvAndRecordThenStops(t *testing.T) {
 	assert.Zero(t, recorded.Ordinal)
 	assert.Nil(t, outcome.Provisioned.Ordinal)
 	assert.Empty(t, report.lines())
-	assert.Equal(t, wtm.WorktreeProvisioned{Worktree: worktree.Identity{Branch: branchName, Path: w.path(branchName), Parent: "main", Isolation: run.Isolated, CreatedAt: "2026-10-16T12:00:00Z"}}, report.worktreeEvents()[1])
+	assert.Equal(t, wtm.WorktreeProvisioned{Worktree: worktree.Identity{Branch: branchName, Path: w.path(branchName), Parent: "main", Isolation: project.Isolated, CreatedAt: "2026-10-16T12:00:00Z"}}, report.worktreeEvents()[1])
 }

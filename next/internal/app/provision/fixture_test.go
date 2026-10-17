@@ -13,10 +13,10 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -30,7 +30,7 @@ var createdAt = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 
 type repo interface {
 	provision.Git
-	Branches(ctx context.Context) (branch.Branches, error)
+	Branches(ctx context.Context) (worktree.Branches, error)
 }
 
 type world struct {
@@ -93,7 +93,7 @@ func (w world) params(report *recorder) provision.Params {
 		Worktree: provision.Worktree{
 			Branch:   branchName,
 			Path:     w.path(branchName),
-			Checkout: worktree.NewBranch{Name: branchName, From: branch.LocalBranch{Name: "main"}},
+			Checkout: worktree.NewBranch{Name: branchName, From: worktree.LocalBranch{Name: "main"}},
 			Source:   "main",
 			Strategy: project.EnvMain,
 		},
@@ -114,16 +114,16 @@ func (w world) path(name string) string {
 }
 
 func portLinked(params provision.Params) provision.Params {
-	params.Project.Run = run.Config{
-		Jobs:     []run.Job{{Name: "web", Kind: run.Service, Cmd: "npm start", Ports: map[string]int{"http": 3000}}},
-		EnvPorts: []run.EnvPortLink{{File: ".env", Key: "PORT", Job: "web", Port: "http"}},
+	params.Project.Run = project.Run{
+		Jobs:     []project.Job{{Name: "web", Kind: project.Service, Cmd: "npm start", Ports: map[string]int{"http": 3000}}},
+		EnvPorts: []project.EnvPortLink{{File: ".env", Key: "PORT", Job: "web", Port: "http"}},
 	}
 	return params
 }
 
 func composed(params provision.Params) provision.Params {
-	params.Project.Run = run.Config{
-		Jobs: []run.Job{{Name: "db", Kind: run.Service, Cmd: "docker compose up -d", Ports: map[string]int{"pg": 5432}}},
+	params.Project.Run = project.Run{
+		Jobs: []project.Job{{Name: "db", Kind: project.Service, Cmd: "docker compose up -d", Ports: map[string]int{"pg": 5432}}},
 	}
 	return params
 }

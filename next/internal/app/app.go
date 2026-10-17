@@ -6,19 +6,18 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/operation"
 )
 
 type Hold interface {
-	Grow(locks []operation.Lock) (bool, error)
+	Grow(locks []wtm.Lock) (bool, error)
 	Protected() bool
 	Release()
 }
 
 type Deps struct {
 	Create        create.Deps
-	TakeLocks     func(op operation.Operation) (Hold, error)
-	Publisher     func(op operation.Operation) wtm.Report
+	TakeLocks     func(op wtm.Operation) (Hold, error)
+	Publisher     func(op wtm.Operation) wtm.Report
 	NewOpID       func() string
 	Now           func() time.Time
 	CorrelationID string

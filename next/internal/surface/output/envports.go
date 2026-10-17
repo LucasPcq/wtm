@@ -5,12 +5,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/wtm/settle"
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
 )
 
-func settlementNote(plan settle.Redacted) string {
+func settlementNote(plan env.Redacted) string {
 	var parts []string
-	if shifted := len(settle.Plan(plan).Rewrites()); shifted > 0 {
+	if shifted := len(env.Plan(plan).Rewrites()); shifted > 0 {
 		parts = append(parts, fmt.Sprintf("%d %s settled (offset +%d)", shifted, noun(shifted, "port"), plan.Offset))
 	}
 	if written := changedOwned(plan.Owned); written > 0 {
@@ -19,8 +19,8 @@ func settlementNote(plan settle.Redacted) string {
 	return strings.Join(parts, dot)
 }
 
-func anomalyLines(plan settle.Redacted) []string {
-	entries := settle.Plan(plan).Anomalies()
+func anomalyLines(plan env.Redacted) []string {
+	entries := env.Plan(plan).Anomalies()
 	if len(entries) == 0 {
 		return nil
 	}
@@ -51,22 +51,22 @@ func anomalyLines(plan settle.Redacted) []string {
 	return lines
 }
 
-func anomalyReason(entry settle.Entry) string {
+func anomalyReason(entry env.Entry) string {
 	switch entry.Status {
-	case settle.StatusMissingKey:
+	case env.StatusMissingKey:
 		return "no such key in this file"
-	case settle.StatusAmbiguous:
+	case env.StatusAmbiguous:
 		return fmt.Sprintf("%d appears more than once", entry.Base)
-	case settle.StatusForeignHost:
+	case env.StatusForeignHost:
 		return "points at another host, which no job here serves"
-	case settle.StatusSecureScheme:
+	case env.StatusSecureScheme:
 		return "https — the run proxy serves plain HTTP"
-	case settle.StatusNotFound, settle.StatusRewrite, settle.StatusUnchanged:
+	case env.StatusNotFound, env.StatusRewrite, env.StatusUnchanged:
 	}
 	return fmt.Sprintf("no %d to shift in the value", entry.Base)
 }
 
-func filesOf(entries []settle.Entry) []string {
+func filesOf(entries []env.Entry) []string {
 	files := make([]string, 0, len(entries))
 	for _, entry := range entries {
 		files = append(files, entry.File)
@@ -79,7 +79,7 @@ func pad(s string, width int) string {
 	return s + strings.Repeat(" ", max(0, width-len([]rune(s))))
 }
 
-func changedOwned(owned []settle.OwnedEntry) int {
+func changedOwned(owned []env.OwnedEntry) int {
 	count := 0
 	for _, entry := range owned {
 		if entry.Changed {

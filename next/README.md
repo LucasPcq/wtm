@@ -7,26 +7,19 @@
 ```
 cmd/wtm-next/          wires the adapters into app.New and runs the command line
 internal/
-  wtm/                 the contract every use case speaks: errors, warnings, events and their stream, outcomes — pure, stdlib only
-    branch/            branch names, refs, tips, where a branch stands against origin
-    worktree/          a worktree as git lists it, its checkout, its meta.json record and its identity
-    project/           what a slice reads of config.toml and the global settings
-    run/               what a slice reads of run.toml, isolation included
+  wtm/                 the contract every use case speaks: errors, warnings, events and their stream, outcomes, operations and their locks — pure, stdlib only
+    worktree/          branches and worktrees as git lists them: names, refs, where a branch stands against origin, a checkout, meta.json, identity
+    project/           what a use case reads of config.toml, run.toml (isolation included) and the global settings
     dotenv/            .env files parsed and rendered byte for byte
-    envcopy/           where each .env of a new worktree is copied from
-    jobenv/            the environment a job or a hook of a worktree runs with
-    settle/            what wtm writes into a new worktree's .env files (imports jobenv)
-    hookvars/          the template variables of a hook command
-    hook/              a chain of hook commands as a worktree runs it: its log and how it fails
-    operation/         an operation in progress as its holder file records it, and the locks it holds
-                       (worktree may import branch, project and run, which import nothing else of the domain)
+    env/               a worktree's environment: where its .env files come from, what wtm writes into them, what its jobs and hooks run with, its hook chain
+                       (env imports worktree, project and dotenv; worktree imports project; wtm imports worktree)
   app/                 the API every surface calls: locks, fingerprint, events around each use case
     <slice>/           one use case (create); provision/ is the one shared by several (a new worktree made whole)
   adapter/             what the app reaches out to: git, statefile, store, config, shell, oplock, events, proxyport
     <name>test/        a stateful fake of an adapter, for tests
   surface/             what calls the app: cli, output (what wtm-next prints), form
 ```
-No file format lives in `wtm/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `wtm/project` and `wtm/run`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
+No file format lives in `wtm/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `wtm/project`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
 
 ## Import rules
 

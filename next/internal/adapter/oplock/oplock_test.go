@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/operation"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +21,7 @@ func TestAnOperationHoldsItsLocksAndRecordsItselfWhereWtmLooks(t *testing.T) {
 	assert.True(t, held.Protected())
 	assert.FileExists(t, filepath.Join(locks.StateDir, "locks", "repo.lock"))
 	assert.FileExists(t, filepath.Join(locks.StateDir, "locks", "wt", "feat%2Fa.lock"))
-	var recorded operation.Operation
+	var recorded wtm.Operation
 	require.NoError(t, json.Unmarshal(read(t, filepath.Join(locks.StateDir, "locks", "ops", "op-1.json")), &recorded))
 	assert.Equal(t, op("op-1", repoShared, featA), recorded)
 	held.Release()
@@ -61,16 +61,16 @@ func TestGrowingTakesTheLocksMissingAndRecordsThemAll(t *testing.T) {
 	locks := Locks{StateDir: t.TempDir()}
 	held := take(t, func() (*Held, error) { return locks.Take(op("op-1", repoShared, featA)) })
 
-	grown, err := held.Grow([]operation.Lock{repoShared, featA, featB})
-	unchanged, sameErr := held.Grow([]operation.Lock{repoShared, featA, featB})
+	grown, err := held.Grow([]wtm.Lock{repoShared, featA, featB})
+	unchanged, sameErr := held.Grow([]wtm.Lock{repoShared, featA, featB})
 
 	require.NoError(t, err)
 	require.NoError(t, sameErr)
 	assert.True(t, grown)
 	assert.False(t, unchanged)
-	var recorded operation.Operation
+	var recorded wtm.Operation
 	require.NoError(t, json.Unmarshal(read(t, filepath.Join(locks.StateDir, "locks", "ops", "op-1.json")), &recorded))
-	assert.Equal(t, []operation.Lock{repoShared, featA, featB}, recorded.Locks)
+	assert.Equal(t, []wtm.Lock{repoShared, featA, featB}, recorded.Locks)
 	_, busy := locks.Take(op("op-2", featB))
 	assert.Equal(t, "lock.held", refusal(t, busy).Code)
 }
@@ -83,7 +83,7 @@ func TestAStateDirThatRefusesLocksRunsUnprotected(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.False(t, held.Protected())
-	grown, err := held.Grow([]operation.Lock{repoShared, featA, featB})
+	grown, err := held.Grow([]wtm.Lock{repoShared, featA, featB})
 	require.NoError(t, err)
 	assert.False(t, grown)
 	held.Release()
@@ -106,14 +106,14 @@ func TestGrowingKeepsWhatIsHeldWhenTheDefaultsMove(t *testing.T) {
 	locks := Locks{StateDir: t.TempDir()}
 	held := take(t, func() (*Held, error) { return locks.Take(op("op-1", repoShared, featA)) })
 
-	moved, movedErr := held.Grow([]operation.Lock{repoShared, featB})
-	back, backErr := held.Grow([]operation.Lock{repoShared, featA})
+	moved, movedErr := held.Grow([]wtm.Lock{repoShared, featB})
+	back, backErr := held.Grow([]wtm.Lock{repoShared, featA})
 
 	require.NoError(t, movedErr)
 	require.NoError(t, backErr)
 	assert.True(t, moved)
 	assert.False(t, back)
-	var recorded operation.Operation
+	var recorded wtm.Operation
 	require.NoError(t, json.Unmarshal(read(t, filepath.Join(locks.StateDir, "locks", "ops", "op-1.json")), &recorded))
-	assert.Equal(t, []operation.Lock{repoShared, featA, featB}, recorded.Locks)
+	assert.Equal(t, []wtm.Lock{repoShared, featA, featB}, recorded.Locks)
 }

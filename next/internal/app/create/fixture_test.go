@@ -14,9 +14,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -84,7 +84,7 @@ func newWorld(t *testing.T, s seed) world {
 			LoadConfig: func() (project.Config, project.Global, error) {
 				return config.Load(config.LoadParams{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")})
 			},
-			LoadRun: func() (run.Config, error) { return config.LoadRun(stateDir) },
+			LoadRun: func() (project.Run, error) { return config.LoadRun(stateDir) },
 			Remember: func(ctx context.Context, answers map[string]string) (wtm.Written, error) {
 				return config.Remember(ctx, config.RememberParams{StateDir: stateDir, Answers: answers})
 			},
@@ -112,7 +112,7 @@ func linkedUnder(root string, branches []string) []worktree.Worktree {
 }
 
 func linkedPath(root, name string) string {
-	return filepath.Join(root, "wt-"+branch.PathSegment(name))
+	return filepath.Join(root, "wt-"+worktree.PathSegment(name))
 }
 
 func configOf(s seed) string {
@@ -122,22 +122,22 @@ func configOf(s seed) string {
 	return projectToml
 }
 
-func commitsOf(s seed) map[branch.Ref][]string {
-	commits := map[branch.Ref][]string{
-		branch.LocalBranch{Name: existing}:  {"feature work"},
-		branch.RemoteBranch{Name: existing}: {"feature work"},
-		branch.RemoteBranch{Name: remote}:   {"remote work"},
+func commitsOf(s seed) map[worktree.Ref][]string {
+	commits := map[worktree.Ref][]string{
+		worktree.LocalBranch{Name: existing}:  {"feature work"},
+		worktree.RemoteBranch{Name: existing}: {"feature work"},
+		worktree.RemoteBranch{Name: remote}:   {"remote work"},
 	}
 	if s.Behind {
-		commits[branch.RemoteBranch{Name: "main"}] = []string{"upstream main"}
+		commits[worktree.RemoteBranch{Name: "main"}] = []string{"upstream main"}
 	}
 	if s.Diverged {
-		commits[branch.LocalBranch{Name: "main"}] = []string{"local main"}
-		commits[branch.RemoteBranch{Name: "main"}] = []string{"upstream main"}
+		commits[worktree.LocalBranch{Name: "main"}] = []string{"local main"}
+		commits[worktree.RemoteBranch{Name: "main"}] = []string{"upstream main"}
 	}
 	return commits
 }
 
 func (w world) path(name string) string {
-	return filepath.Join(w.trees, branch.PathSegment(name))
+	return filepath.Join(w.trees, worktree.PathSegment(name))
 }

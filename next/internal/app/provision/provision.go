@@ -6,13 +6,13 @@ import (
 	"errors"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/env"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/dotenv"
-	"github.com/LucasPcq/wtm/next/internal/wtm/envcopy"
-	"github.com/LucasPcq/wtm/next/internal/wtm/hook"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
-	"github.com/LucasPcq/wtm/next/internal/wtm/settle"
+
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
@@ -31,7 +31,7 @@ type Meta interface {
 
 type EnvFiles interface {
 	Read(path string) ([]dotenv.Line, error)
-	Copy(ctx context.Context, request envcopy.Request) (envcopy.Copied, error)
+	Copy(ctx context.Context, request env.CopyRequest) (env.Copied, error)
 	Edit(ctx context.Context, edit dotenv.Edit) (wtm.Written, error)
 }
 
@@ -39,7 +39,7 @@ type Deps struct {
 	Git        Git
 	Meta       Meta
 	EnvFiles   EnvFiles
-	RunHooks   func(ctx context.Context, chain hook.Chain) error
+	RunHooks   func(ctx context.Context, chain env.HookChain) error
 	PublicPort func(ctx context.Context, configured int) int
 	Shield     func(ctx context.Context) (context.Context, func())
 	Now        func() time.Time
@@ -50,7 +50,7 @@ type Project struct {
 	StateDir string
 	EnvFiles []project.EnvFile
 	OnCreate []project.Hook
-	Run      run.Config
+	Run      project.Run
 	RunErr   error
 	Global   project.Global
 }
@@ -62,7 +62,7 @@ type Worktree struct {
 	Source     string
 	ParentPath string
 	Strategy   project.EnvStrategy
-	Isolation  run.Isolation
+	Isolation  project.Isolation
 }
 
 type Params struct {
@@ -75,7 +75,7 @@ type Params struct {
 type Provisioned struct {
 	Meta     worktree.Meta
 	Ordinal  *int
-	EnvPorts settle.Redacted
+	EnvPorts env.Redacted
 }
 
 type Outcome struct {
@@ -88,8 +88,8 @@ type Outcome struct {
 
 func Run(ctx context.Context, params Params) Outcome {
 	params.Worktree.Isolation = params.Worktree.Isolation.Effective()
-	p := &provisioning{Params: params, hookLog: hook.LogPath(hook.LogPathParams{StateDir: params.Project.StateDir, Branch: params.Worktree.Branch})}
-	p.kept, p.ignored = settle.Targets(settle.TargetsParams{Run: params.Project.Run, Files: params.Project.EnvFiles})
+	p := &provisioning{Params: params, hookLog: env.HookLogPath(env.HookLogPathParams{StateDir: params.Project.StateDir, Branch: params.Worktree.Branch})}
+	p.kept, p.ignored = env.Targets(env.TargetsParams{Run: params.Project.Run, Files: params.Project.EnvFiles})
 	if err := ctx.Err(); err != nil {
 		return p.outcome(Outcome{Status: wtm.StatusCancelled, Reason: wtm.ReasonInterrupted, Err: interrupted(interruption{Err: err})})
 	}
@@ -105,8 +105,8 @@ func Run(ctx context.Context, params Params) Outcome {
 
 type provisioning struct {
 	Params
-	kept     run.Config
-	ignored  []settle.Ignored
+	kept     project.Run
+	ignored  []env.Ignored
 	hookLog  string
 	warnings []wtm.Warning
 	unlocked bool
@@ -206,7 +206,7 @@ func (p *provisioning) identity(provisioned Provisioned) worktree.Identity {
 
 func (p *provisioning) provisionedEvent(outcome Outcome) wtm.WorktreeProvisioned {
 	event := wtm.WorktreeProvisioned{Worktree: p.identity(outcome.Provisioned), OK: outcome.Status == wtm.StatusDone}
-	if failure, ok := errors.AsType[*hook.Failure](outcome.Err); ok {
+	if failure, ok := errors.AsType[*env.HookFailure](outcome.Err); ok {
 		event.Hook, event.ExitCode = failure.Cmd, failure.ExitCode
 	}
 	return event

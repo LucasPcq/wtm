@@ -5,15 +5,16 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+
 	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/wtm/run"
 )
 
 const fingerprintBytes = 12
 
 type fingerprinted struct {
-	Plan      create.Planned `json:"plan"`
-	Isolation run.Isolation  `json:"isolation"`
+	Plan      create.Planned    `json:"plan"`
+	Isolation project.Isolation `json:"isolation"`
 }
 
 func fingerprintOf(applied fingerprinted) (string, error) {
