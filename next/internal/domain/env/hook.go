@@ -1,12 +1,12 @@
 package env
 
 import (
-	"net/url"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
 // A HookChain is the hooks a new worktree runs, in order, and how they run: in WorkDir, with Env set and the Unset variables removed from the inherited environment, each line of output passed to Output and appended to the log file Log (none when empty).
@@ -50,7 +50,7 @@ func HookLogPath(params HookLogPathParams) string {
 	if params.StateDir == "" {
 		return ""
 	}
-	return filepath.Join(params.StateDir, logDir, logPhase+"-"+url.PathEscape(params.Branch)+logExt)
+	return filepath.Join(params.StateDir, logDir, logPhase+"-"+worktree.StateSegment(params.Branch)+logExt)
 }
 
 // HookVars are the values a hook's {{worktree}}, {{branch}}, {{root}} and {{from_branch}} placeholders stand for.
@@ -63,18 +63,18 @@ type HookVars struct {
 
 // Hook returns hook with its placeholders replaced: quoted for the shell in its command, as they are in its working directory.
 func (v HookVars) Hook(hook project.Hook) project.Hook {
-	hook.Cmd = v.Shell(hook.Cmd)
-	hook.Cwd = v.Plain(hook.Cwd)
+	hook.Cmd = v.shell(hook.Cmd)
+	hook.Cwd = v.plain(hook.Cwd)
 	return hook
 }
 
-// Plain returns s with its placeholders replaced by their values as they are.
-func (v HookVars) Plain(s string) string {
+// plain returns s with its placeholders replaced by their values as they are.
+func (v HookVars) plain(s string) string {
 	return strings.NewReplacer(v.placeholders()...).Replace(s)
 }
 
-// Shell returns the shell command s with its placeholders replaced by their values, each quoted for where it stands — unquoted, inside single quotes or inside double quotes — so a value is always one word the shell reads literally.
-func (v HookVars) Shell(s string) string {
+// shell returns the shell command s with its placeholders replaced by their values, each quoted for where it stands — unquoted, inside single quotes or inside double quotes — so a value is always one word the shell reads literally.
+func (v HookVars) shell(s string) string {
 	pairs := v.placeholders()
 	var b strings.Builder
 	state := unquoted

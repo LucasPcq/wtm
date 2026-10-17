@@ -44,7 +44,7 @@ func Resolve(params ResolveParams) (Writes, error) {
 	}
 
 	kept, _ := Targets(params.Run, params.Files)
-	owned := ownedWrites(kept, params.Files, params.ComposeProject())
+	owned := ownedWrites(kept, params.Files, params.composeProject())
 	if len(kept.EnvPorts) == 0 && len(kept.EnvValues) == 0 {
 		return Writes{owned: owned}, nil
 	}
@@ -60,7 +60,7 @@ func Resolve(params ResolveParams) (Writes, error) {
 		PublicPort: params.PublicPort,
 		Ordinal:    params.Ordinal,
 		Offset:     params.Offset(),
-		Shared:     SharedJobs(kept),
+		Shared:     sharedJobs(kept),
 	}
 
 	values, err := settled.valueWrites(kept.EnvValues)

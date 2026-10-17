@@ -13,9 +13,6 @@ import (
 const (
 	portMin = 1
 	portMax = 65535
-	// collisionHorizon is how many worktrees apart a collision of two ports is
-	// still reported; further apart, no project reaches it.
-	collisionHorizon = 20
 )
 
 var envVarName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -62,7 +59,7 @@ func (f runFile) collisions() []string {
 
 			apart := gap / block
 			switch {
-			case !meets || apart > collisionHorizon:
+			case !meets || apart > env.CollisionHorizon:
 			case apart == 0:
 				problems = append(problems, fmt.Sprintf("ports %s (job %q) and %s (job %q) both declare base %d — they would bind the same port in every worktree", a.Name, a.Job, b.Name, b.Job, a.Base))
 			default:

@@ -46,7 +46,7 @@ func TestAWorktreeLearnsItsIdentityItsOffsetAndItsComposeProject(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, JobEnv(tc.params))
+			assert.Equal(t, tc.want, jobEnv(tc.params))
 		})
 	}
 }
@@ -54,7 +54,7 @@ func TestAWorktreeLearnsItsIdentityItsOffsetAndItsComposeProject(t *testing.T) {
 func TestALinkedWorktreesJobsRunOffsetByItsNumber(t *testing.T) {
 	t.Setenv("COMPOSE_PROJECT_NAME", "launched-from-another-worktree")
 
-	env := JobEnv(shopParams("feat/a", 2, ""))
+	env := jobEnv(shopParams("feat/a", 2, ""))
 
 	assert.Equal(t, "20", env["WTM_PORT_OFFSET"])
 	assert.Equal(t, shopProject+"-feat-a", env["COMPOSE_PROJECT_NAME"])
@@ -62,11 +62,11 @@ func TestALinkedWorktreesJobsRunOffsetByItsNumber(t *testing.T) {
 }
 
 func TestAVerbatimWorktreesJobsRunOnTheBasePorts(t *testing.T) {
-	assert.Equal(t, "3000", JobEnv(shopParams("feat/a", 2, project.Verbatim))["http"])
+	assert.Equal(t, "3000", jobEnv(shopParams("feat/a", 2, project.Verbatim))["http"])
 }
 
 func TestTheKeysAreEveryKeyAJobEnvironmentHoldsBesideItsPorts(t *testing.T) {
-	env := JobEnv(JobParams{Branch: "feat/x", ProjectDir: "/src/app"})
+	env := jobEnv(JobParams{Branch: "feat/x", ProjectDir: "/src/app"})
 
 	assert.ElementsMatch(t, JobKeys(), slices.Collect(maps.Keys(env)))
 }
@@ -108,12 +108,12 @@ func TestAPortNameTwoJobsDeclareHasNoLifecycleAnswer(t *testing.T) {
 }
 
 func TestAResolvedPortShiftsUnlessTheJobIsShared(t *testing.T) {
-	assert.Equal(t, 5452, ResolvedPort(ResolvedPortParams{Base: 5432, Offset: 20}))
-	assert.Equal(t, 5432, ResolvedPort(ResolvedPortParams{Base: 5432, Offset: 20, Shared: true}))
+	assert.Equal(t, 5452, resolvedPort(resolvedPortParams{Base: 5432, Offset: 20}))
+	assert.Equal(t, 5432, resolvedPort(resolvedPortParams{Base: 5432, Offset: 20, Shared: true}))
 }
 
 func TestTheSharedJobsAreThoseScopedShared(t *testing.T) {
-	assert.Equal(t, map[string]bool{"db": true}, SharedJobs(project.Run{Jobs: []project.Job{{Name: "db", Scope: project.Shared}, {Name: "web"}}}))
+	assert.Equal(t, map[string]bool{"db": true}, sharedJobs(project.Run{Jobs: []project.Job{{Name: "db", Scope: project.Shared}, {Name: "web"}}}))
 }
 
 func TestTheDeclaredComposeProjectIsTheFirstEnvToNameOne(t *testing.T) {
@@ -131,8 +131,8 @@ func TestTheComposeDirectoriesAreWhereAStackStartsOnceEach(t *testing.T) {
 		{Name: "web", Cmd: "pnpm dev", Cwd: "apps/web"},
 	}}
 
-	assert.Equal(t, []string{"infra", "."}, ComposeDirs(config))
-	assert.Empty(t, ComposeDirs(project.Run{}))
+	assert.Equal(t, []string{"infra", "."}, composeDirs(config))
+	assert.Empty(t, composeDirs(project.Run{}))
 }
 
 func TestTheComposeEnvPathsAreTheEnvOfEachComposeDirectoryElseTheRoot(t *testing.T) {

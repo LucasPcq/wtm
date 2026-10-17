@@ -123,7 +123,7 @@ func countPairs(lines []Line) int {
 	return count
 }
 
-// valueSpan locates a pair's value in its Raw, between start and end, and records how it was written: its quote (0 for none), whether it held a `$`, whether it held a blank.
+// valueSpan locates a pair's value in its Raw, between start and end, and records how it was written: its quote (0 for none) and, unquoted, whether it held a `$` or a blank.
 type valueSpan struct {
 	start, end int
 	quote      byte
@@ -181,7 +181,7 @@ func (l Line) quotedSpan(start int) (valueSpan, bool) {
 		return valueSpan{}, false
 	}
 
-	return valueSpan{start: start, end: end + 1, quote: quote, dollar: strings.Contains(l.Value, interpolation)}, true
+	return valueSpan{start: start, end: end + 1, quote: quote}, true
 }
 
 // reparsesTo reports whether raw parses as one pair with want's key, value and export.

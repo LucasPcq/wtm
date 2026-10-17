@@ -79,12 +79,12 @@ type profileFile struct {
 	Default bool     `toml:"default"`
 }
 
-// LoadRun returns the run.toml in stateDir; a missing file is an empty run
+// LoadRun returns the project's run.toml; a missing file is an empty run
 // config. An unknown key is an error, and so is an invalid value: the error
 // lists every problem found (ports, addressing, isolation, kinds, scopes,
 // namespaces), not only the first.
-func LoadRun(stateDir string) (project.Run, error) {
-	path := filepath.Join(stateDir, runFileName)
+func (p Project) LoadRun() (project.Run, error) {
+	path := filepath.Join(p.StateDir, runFileName)
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return project.Run{}, nil

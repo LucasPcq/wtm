@@ -58,7 +58,7 @@ func TestABadProxyPortDoesNotStopTheLoad(t *testing.T) {
 }
 
 func TestNoGlobalPathMeansNoGlobalConfig(t *testing.T) {
-	_, global, err := Load(LoadParams{StateDir: stateWithConfig(t, minimalConfig)})
+	_, global, err := Project{StateDir: stateWithConfig(t, minimalConfig)}.Load()
 
 	require.NoError(t, err)
 	assert.Equal(t, project.Global{}, global)
@@ -74,8 +74,8 @@ func TestTheProjectIsCheckedBeforeTheShellAndTheShellErrorStandsAlone(t *testing
 	globalPath := filepath.Join(t.TempDir(), "config.toml")
 	writeFile(t, globalPath, "shell = \"powershell\"\n")
 
-	_, _, bad := Load(LoadParams{StateDir: stateWithConfig(t, "[env]\nstrategy = \"bogus\"\n"), GlobalPath: globalPath})
-	_, _, shell := Load(LoadParams{StateDir: stateWithConfig(t, minimalConfig), GlobalPath: globalPath})
+	_, _, bad := Project{StateDir: stateWithConfig(t, "[env]\nstrategy = \"bogus\"\n"), GlobalPath: globalPath}.Load()
+	_, _, shell := Project{StateDir: stateWithConfig(t, minimalConfig), GlobalPath: globalPath}.Load()
 
 	assert.EqualError(t, bad, "invalid env strategy: must be example, main, or parent")
 	assert.EqualError(t, shell, "invalid shell type: must be zsh, bash, or fish")

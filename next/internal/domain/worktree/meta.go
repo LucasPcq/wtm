@@ -2,7 +2,6 @@ package worktree
 
 import (
 	"path/filepath"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
@@ -29,7 +28,7 @@ type MetaDirParams struct {
 // MetaDir returns the directory holding the branch's meta.json, and reports whether the branch has one: false for an empty state directory or a branch whose segment would leave the worktrees directory.
 func MetaDir(params MetaDirParams) (string, bool) {
 	segment := StateSegment(params.Branch)
-	if params.StateDir == "" || segment == "" || segment == "." || segment == ".." || strings.ContainsAny(segment, `/\`) {
+	if params.StateDir == "" || segment == "" || segment == "." || segment == ".." {
 		return "", false
 	}
 

@@ -93,8 +93,8 @@ const (
 	AddressNames Addressing = "names"
 )
 
-// HasNamespace reports whether the job declares a namespace it creates.
-func (job Job) HasNamespace() bool {
+// hasNamespace reports whether the job declares a namespace it creates.
+func (job Job) hasNamespace() bool {
 	return job.Namespace != nil && job.Namespace.Name != "" && job.Namespace.Create != ""
 }
 
@@ -139,6 +139,6 @@ func (i Isolation) Effective() Isolation {
 
 // IsolationApplies reports whether run.toml declares anything a worktree isolates: an env link, or a job with ports, a namespace or Compose.
 func (c Run) IsolationApplies() bool {
-	isolates := func(job Job) bool { return len(job.Ports) > 0 || job.HasNamespace() || job.RunsCompose() }
+	isolates := func(job Job) bool { return len(job.Ports) > 0 || job.hasNamespace() || job.RunsCompose() }
 	return len(c.EnvPorts) > 0 || len(c.EnvValues) > 0 || slices.ContainsFunc(c.Jobs, isolates)
 }

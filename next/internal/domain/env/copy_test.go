@@ -6,7 +6,6 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSourcesNameWhatTheyCouldNotFind(t *testing.T) {
@@ -55,15 +54,20 @@ func TestTheParentStrategyWithoutAParentWorktreeCopiesFromMainSilently(t *testin
 	assert.Empty(t, warnings)
 }
 
-func TestCandidatesAreEveryPathSourcesMayLookAt(t *testing.T) {
+func TestSourcesAsksAboutEveryPathTheStrategyMayCopyFrom(t *testing.T) {
 	files := []project.EnvFile{{Target: ".env"}}
+	asked := func(request CopyRequest) []string {
+		var paths []string
+		sources(t, request, func(path string) (bool, error) {
+			paths = append(paths, path)
+			return false, nil
+		})
+		return paths
+	}
 
-	example, err := candidates(CopyRequest{Strategy: project.EnvExample, Files: files, MainPath: "/main"})
-	require.NoError(t, err)
-	parent, err := candidates(CopyRequest{Strategy: project.EnvParent, Files: files, MainPath: "/main", ParentPath: "/parent"})
-	require.NoError(t, err)
-	main, err := candidates(CopyRequest{Strategy: project.EnvMain, Files: files, MainPath: "/main"})
-	require.NoError(t, err)
+	example := asked(CopyRequest{Strategy: project.EnvExample, Files: files, MainPath: "/main"})
+	parent := asked(CopyRequest{Strategy: project.EnvParent, Files: files, MainPath: "/main", ParentPath: "/parent"})
+	main := asked(CopyRequest{Strategy: project.EnvMain, Files: files, MainPath: "/main"})
 
 	assert.Equal(t, []string{"/main/.env.example", "/main/.env.dist", "/main/.env.sample", "/main/.env.template", "/main/.env.tmpl"}, example)
 	assert.Equal(t, []string{"/parent/.env", "/main/.env"}, parent)
@@ -74,8 +78,6 @@ func TestAnUnknownStrategyIsRefused(t *testing.T) {
 	request := CopyRequest{Strategy: "elsewhere", Files: []project.EnvFile{{Target: ".env"}}}
 
 	_, _, err := Sources(request, nil)
-	assert.EqualError(t, err, "unknown env strategy: elsewhere")
-	_, err = candidates(request)
 	assert.EqualError(t, err, "unknown env strategy: elsewhere")
 }
 

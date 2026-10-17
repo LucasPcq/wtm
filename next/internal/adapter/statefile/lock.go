@@ -17,13 +17,12 @@ const (
 	scratchLockDir = "wtm-locks"
 )
 
-// The errors of [TryLock]: ErrUnlockable when the lock file cannot be opened
-// or locked at all (a read-only or lock-less filesystem), ErrBusy when another
-// process holds the lock.
-var (
-	ErrUnlockable = errors.New("lock unavailable")
-	ErrBusy       = errors.New("lock held")
-)
+// ErrBusy is the error of [TryLock] when another process holds the lock.
+var ErrBusy = errors.New("lock held")
+
+// errUnlockable is the error of [TryLock] when the lock file cannot be opened
+// or locked at all (a read-only or lock-less filesystem).
+var errUnlockable = errors.New("lock unavailable")
 
 // WithLock runs do while holding the exclusive flock of the file at path,
 // waiting for it until ctx is done, and returns do's error. It reports whether
@@ -32,7 +31,7 @@ var (
 // do.
 func WithLock(ctx context.Context, path string, do func() error) (bool, error) {
 	file, err := acquire(ctx, path)
-	if errors.Is(err, ErrUnlockable) {
+	if errors.Is(err, errUnlockable) {
 		return false, do()
 	}
 	if err != nil {
@@ -70,12 +69,12 @@ type TryLockParams struct {
 // TryLock takes the flock of the file at params.Path without waiting,
 // creating the file and its directory if needed, and returns the open file
 // that holds it; the caller unlocks it with [Flock] and closes it. It returns
-// ErrBusy when another process holds the lock and ErrUnlockable when it cannot
+// ErrBusy when another process holds the lock and errUnlockable when it cannot
 // be taken at all. A lock file that is a symbolic link is not followed.
 func TryLock(params TryLockParams) (*os.File, error) {
 	file, err := openLock(params.Path)
 	if err != nil {
-		return nil, ErrUnlockable
+		return nil, errUnlockable
 	}
 
 	how := syscall.LOCK_EX
@@ -91,7 +90,7 @@ func TryLock(params TryLockParams) (*os.File, error) {
 	if errors.Is(err, syscall.EWOULDBLOCK) {
 		return nil, ErrBusy
 	}
-	return nil, ErrUnlockable
+	return nil, errUnlockable
 }
 
 func openLock(path string) (*os.File, error) {

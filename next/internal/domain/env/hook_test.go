@@ -34,7 +34,7 @@ func TestAPlainStringTakesEveryVariableAsIs(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, vars.Plain(tc.input))
+			assert.Equal(t, tc.want, vars.plain(tc.input))
 		})
 	}
 }
@@ -76,7 +76,7 @@ func TestAShellLineQuotesEachValueForItsSpot(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, vars.Shell(tc.input))
+			assert.Equal(t, tc.want, vars.shell(tc.input))
 		})
 	}
 }

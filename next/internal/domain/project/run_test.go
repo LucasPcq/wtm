@@ -13,9 +13,9 @@ func TestAJobRunsComposeInEitherSpellingOfItsStartOrStop(t *testing.T) {
 }
 
 func TestAJobHasANamespaceOnlyWhenItNamesAndCreatesOne(t *testing.T) {
-	assert.True(t, Job{Namespace: &Namespace{Name: "{worktree}", Create: "createdb {namespace}"}}.HasNamespace())
-	assert.False(t, Job{Namespace: &Namespace{Name: "{worktree}"}}.HasNamespace())
-	assert.False(t, Job{}.HasNamespace())
+	assert.True(t, Job{Namespace: &Namespace{Name: "{worktree}", Create: "createdb {namespace}"}}.hasNamespace())
+	assert.False(t, Job{Namespace: &Namespace{Name: "{worktree}"}}.hasNamespace())
+	assert.False(t, Job{}.hasNamespace())
 }
 
 func TestAnUnsetIsolationIsEffectivelyIsolated(t *testing.T) {

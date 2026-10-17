@@ -10,20 +10,20 @@ import (
 )
 
 func TestAnAbsentRunTomlIsAnEmptyRunConfig(t *testing.T) {
-	cfg, err := LoadRun(t.TempDir())
+	cfg, err := Project{StateDir: t.TempDir()}.LoadRun()
 
 	require.NoError(t, err)
 	assert.Equal(t, project.Run{}, cfg)
 }
 
 func TestATypoedSectionIsRefusedByName(t *testing.T) {
-	_, err := LoadRun(stateWithRun(t, "[[job]]\nname = \"dev\"\nkind = \"service\"\ncmd = \"pnpm dev\"\n\n[[profiles]]\nname = \"full\"\njobs = [\"dev\"]\n"))
+	_, err := Project{StateDir: stateWithRun(t, "[[job]]\nname = \"dev\"\nkind = \"service\"\ncmd = \"pnpm dev\"\n\n[[profiles]]\nname = \"full\"\njobs = [\"dev\"]\n")}.LoadRun()
 
 	assert.ErrorContains(t, err, "profiles")
 }
 
 func TestPortsAreReadAsASubTableOrInline(t *testing.T) {
-	cfg, err := LoadRun(stateWithRun(t, `
+	cfg, err := Project{StateDir: stateWithRun(t, `
 port_offset_block = 100
 
 [[job]]
@@ -38,7 +38,7 @@ name = "db"
 kind = "service"
 cmd = "docker compose up -d"
 ports = { DB_PORT = 5432 }
-`))
+`)}.LoadRun()
 
 	require.NoError(t, err)
 	assert.Equal(t, 100, cfg.PortOffsetBlock)
@@ -59,7 +59,7 @@ func TestAPortRunTomlWouldWriteWrongIsRefused(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := LoadRun(stateWithRun(t, tc.jobs))
+			_, err := Project{StateDir: stateWithRun(t, tc.jobs)}.LoadRun()
 
 			assert.EqualError(t, err, tc.want)
 		})
@@ -67,13 +67,13 @@ func TestAPortRunTomlWouldWriteWrongIsRefused(t *testing.T) {
 }
 
 func TestTwoSharedJobsOnDifferentBasesNeverCollide(t *testing.T) {
-	_, err := LoadRun(stateWithRun(t, "[[job]]\nname = \"pg\"\nscope = \"shared\"\nports = { PG = 5432 }\n\n[[job]]\nname = \"redis\"\nscope = \"shared\"\nports = { REDIS = 5442 }\n"))
+	_, err := Project{StateDir: stateWithRun(t, "[[job]]\nname = \"pg\"\nscope = \"shared\"\nports = { PG = 5432 }\n\n[[job]]\nname = \"redis\"\nscope = \"shared\"\nports = { REDIS = 5442 }\n")}.LoadRun()
 
 	assert.NoError(t, err)
 }
 
 func TestADuplicateJobNameStillLoads(t *testing.T) {
-	_, err := LoadRun(stateWithRun(t, "[[job]]\nname = \"dev\"\nkind = \"service\"\ncmd = \"pnpm dev\"\n\n[[job]]\nname = \"dev\"\nkind = \"service\"\ncmd = \"echo dup\"\n"))
+	_, err := Project{StateDir: stateWithRun(t, "[[job]]\nname = \"dev\"\nkind = \"service\"\ncmd = \"pnpm dev\"\n\n[[job]]\nname = \"dev\"\nkind = \"service\"\ncmd = \"echo dup\"\n")}.LoadRun()
 
 	assert.NoError(t, err)
 }
@@ -81,7 +81,7 @@ func TestADuplicateJobNameStillLoads(t *testing.T) {
 func TestANegativeOrZeroBlockLoadsAndReadsAsTheDefault(t *testing.T) {
 	for _, block := range []string{"-10", "0"} {
 		t.Run(block, func(t *testing.T) {
-			_, err := LoadRun(stateWithRun(t, "port_offset_block = "+block+"\n\n[[job]]\nname = \"web\"\nkind = \"service\"\ncmd = \"pnpm dev\"\n"))
+			_, err := Project{StateDir: stateWithRun(t, "port_offset_block = "+block+"\n\n[[job]]\nname = \"web\"\nkind = \"service\"\ncmd = \"pnpm dev\"\n")}.LoadRun()
 
 			assert.NoError(t, err)
 		})
@@ -89,7 +89,7 @@ func TestANegativeOrZeroBlockLoadsAndReadsAsTheDefault(t *testing.T) {
 }
 
 func TestAJobURLIsReadWithItsOptionalHost(t *testing.T) {
-	cfg, err := LoadRun(stateWithRun(t, `
+	cfg, err := Project{StateDir: stateWithRun(t, `
 [[job]]
 name  = "web"
 kind  = "service"
@@ -109,7 +109,7 @@ name  = "db"
 kind  = "service"
 cmd   = "docker compose up"
 ports = { PG_PORT = 5432 }
-`))
+`)}.LoadRun()
 
 	require.NoError(t, err)
 	assert.Equal(t, &project.URL{Port: "PORT"}, cfg.Jobs[0].URL)
@@ -118,7 +118,7 @@ ports = { PG_PORT = 5432 }
 }
 
 func TestEveryKeyWtmWritesInRunTomlIsReadIntoTheRunConfig(t *testing.T) {
-	cfg, err := LoadRun(stateWithRun(t, `
+	cfg, err := Project{StateDir: stateWithRun(t, `
 schema = 1
 port_offset_block = 20
 port_probe_timeout = 5
@@ -168,7 +168,7 @@ file = ".env"
 key = "PGDATABASE"
 job = "db"
 value = "{namespace}"
-`))
+`)}.LoadRun()
 
 	require.NoError(t, err)
 	assert.Equal(t, project.Run{
@@ -190,14 +190,14 @@ value = "{namespace}"
 }
 
 func TestARunTomlAtANewerSchemaIsStillRead(t *testing.T) {
-	cfg, err := LoadRun(stateWithRun(t, newerSchema+"[[job]]\nname = \"web\"\ncmd = \"npm run dev\"\n"))
+	cfg, err := Project{StateDir: stateWithRun(t, newerSchema+"[[job]]\nname = \"web\"\ncmd = \"npm run dev\"\n")}.LoadRun()
 
 	require.NoError(t, err)
 	assert.Len(t, cfg.Jobs, 1)
 }
 
 func TestARunTomlThatIsNotTOMLIsAnErrorTheCallerKeeps(t *testing.T) {
-	_, err := LoadRun(stateWithRun(t, "[[job]\nname = \n"))
+	_, err := Project{StateDir: stateWithRun(t, "[[job]\nname = \n")}.LoadRun()
 
 	assert.Error(t, err)
 }
@@ -219,7 +219,7 @@ func TestAnInvalidRunTomlIsRefusedSayingWhy(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := LoadRun(stateWithRun(t, tc.content))
+			_, err := Project{StateDir: stateWithRun(t, tc.content)}.LoadRun()
 
 			assert.EqualError(t, err, tc.want)
 		})
@@ -227,7 +227,7 @@ func TestAnInvalidRunTomlIsRefusedSayingWhy(t *testing.T) {
 }
 
 func TestEveryProblemOfARunTomlIsNamedAtOnce(t *testing.T) {
-	_, err := LoadRun(stateWithRun(t, "addressing = \"nope\"\nisolation = \"keep\"\n"))
+	_, err := Project{StateDir: stateWithRun(t, "addressing = \"nope\"\nisolation = \"keep\"\n")}.LoadRun()
 
 	assert.EqualError(t, err, `invalid run config: unknown addressing "nope" (expected "ports" or "names"); unknown isolation "keep" (expected "isolated" or "verbatim")`)
 }

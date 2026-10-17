@@ -3,7 +3,6 @@ package config
 
 import (
 	"cmp"
-	"context"
 	"errors"
 	"fmt"
 	"maps"
@@ -12,7 +11,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
@@ -52,31 +50,8 @@ type savedProject struct {
 }
 
 // Project reads and writes the config of the project whose state lives in
-// StateDir, with the global config at GlobalPath.
+// StateDir, with the global config at GlobalPath ("" for none).
 type Project struct {
-	StateDir   string
-	GlobalPath string
-}
-
-// Load returns the project's config, defaults applied, and the global config,
-// as [Load] does.
-func (p Project) Load() (project.Config, project.Global, error) {
-	return Load(LoadParams(p))
-}
-
-// LoadRun returns the project's run.toml, as [LoadRun] does.
-func (p Project) LoadRun() (project.Run, error) {
-	return LoadRun(p.StateDir)
-}
-
-// Remember records answers in the project's config.toml, as [Remember] does.
-func (p Project) Remember(ctx context.Context, answers map[string]string) (domain.Written, error) {
-	return Remember(ctx, p.StateDir, answers)
-}
-
-// LoadParams locates the files [Load] reads: config.toml in StateDir and the
-// global config at GlobalPath ("" for none).
-type LoadParams struct {
 	StateDir   string
 	GlobalPath string
 }
@@ -85,8 +60,8 @@ type LoadParams struct {
 // global config. A missing config.toml is project.ErrConfigNotFound, wrapped;
 // a missing global config is an empty one. An unknown key, a malformed hook or
 // an invalid value in either file is an error naming it.
-func Load(params LoadParams) (project.Config, project.Global, error) {
-	path := filepath.Join(params.StateDir, configFileName)
+func (p Project) Load() (project.Config, project.Global, error) {
+	path := filepath.Join(p.StateDir, configFileName)
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return project.Config{}, project.Global{}, fmt.Errorf("project config: %w", project.ErrConfigNotFound)
@@ -100,7 +75,7 @@ func Load(params LoadParams) (project.Config, project.Global, error) {
 		return project.Config{}, project.Global{}, fmt.Errorf("project config: %w", err)
 	}
 
-	global, err := loadGlobal(params.GlobalPath)
+	global, err := loadGlobal(p.GlobalPath)
 	if err != nil {
 		return project.Config{}, project.Global{}, fmt.Errorf("global config: %w", err)
 	}

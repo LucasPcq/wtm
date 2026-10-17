@@ -42,7 +42,7 @@ func stateWithRun(t *testing.T, content string) string {
 // loadState loads the config of stateDir with no global config on disk.
 func loadState(t *testing.T, stateDir string) (project.Config, project.Global, error) {
 	t.Helper()
-	return Load(LoadParams{StateDir: stateDir, GlobalPath: filepath.Join(t.TempDir(), "config.toml")})
+	return Project{StateDir: stateDir, GlobalPath: filepath.Join(t.TempDir(), "config.toml")}.Load()
 }
 
 // loadWithGlobal loads a minimal project with global written as the global
@@ -51,7 +51,7 @@ func loadWithGlobal(t *testing.T, global string) (project.Global, error) {
 	t.Helper()
 	globalPath := filepath.Join(t.TempDir(), "config.toml")
 	writeFile(t, globalPath, global)
-	_, loaded, err := Load(LoadParams{StateDir: stateWithConfig(t, minimalConfig), GlobalPath: globalPath})
+	_, loaded, err := Project{StateDir: stateWithConfig(t, minimalConfig), GlobalPath: globalPath}.Load()
 	return loaded, err
 }
 

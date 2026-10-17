@@ -244,7 +244,7 @@ func (f *Fake) LockOrdinals(_ context.Context, do func() error) (bool, error) {
 }
 
 // Remember merges answers over config.toml's remembered answers as
-// config.Remember does: project.ErrConfigNotFound without a config.toml, an
+// config.Project.Remember does: project.ErrConfigNotFound without a config.toml, an
 // error when it does not parse or carries a newer schema, no change when every
 // answer is already remembered.
 func (f *Fake) Remember(_ context.Context, answers map[string]string) (domain.Written, error) {

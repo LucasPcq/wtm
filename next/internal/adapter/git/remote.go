@@ -30,6 +30,6 @@ func (r Repo) MergeFFOnly(ctx context.Context, merge worktree.Merge) error {
 		return err
 	}
 
-	_, err = Repo{Dir: merge.Path, Remote: r.Remote}.git(ctx, "merge", "--ff-only", onto)
+	_, err = r.at(merge.Path).git(ctx, "merge", "--ff-only", onto)
 	return err
 }

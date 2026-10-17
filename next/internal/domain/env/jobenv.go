@@ -38,8 +38,8 @@ type JobParams struct {
 	Run        project.Run
 }
 
-// JobEnv returns the variables a job of the worktree runs with: the WTM_ variables, COMPOSE_PROJECT_NAME unless the isolation is verbatim, and each port declared by exactly one job, offset for this worktree unless that job is shared.
-func JobEnv(params JobParams) map[string]string {
+// jobEnv returns the variables a job of the worktree runs with: the WTM_ variables, COMPOSE_PROJECT_NAME unless the isolation is verbatim, and each port declared by exactly one job, offset for this worktree unless that job is shared.
+func jobEnv(params JobParams) map[string]string {
 	env := map[string]string{
 		worktreeKey:   worktree.Slug(params.Branch),
 		branchKey:     params.Branch,
@@ -48,7 +48,7 @@ func JobEnv(params JobParams) map[string]string {
 		projectKey:    worktree.HostLabel(params.Project()),
 		isolationKey:  string(params.Isolation.Effective()),
 	}
-	if name := params.ComposeProject(); name != "" {
+	if name := params.composeProject(); name != "" {
 		env[ComposeProjectKey] = name
 	}
 	for name, port := range params.ports() {
@@ -70,8 +70,8 @@ func (p JobParams) Project() string {
 	return filepath.Base(p.ProjectDir)
 }
 
-// ComposeProject returns the docker compose project name of the worktree, <project>-<branch> slugged, or empty when the isolation is verbatim.
-func (p JobParams) ComposeProject() string {
+// composeProject returns the docker compose project name of the worktree, <project>-<branch> slugged, or empty when the isolation is verbatim.
+func (p JobParams) composeProject() string {
 	if p.Isolation.Effective() == project.Verbatim {
 		return ""
 	}
@@ -88,23 +88,23 @@ func OffsetBlock(cfg project.Run) int {
 	return cfg.PortOffsetBlock
 }
 
-// ResolvedPortParams describes a port: its base, the worktree's offset, and whether the job declaring it is shared by every worktree.
-type ResolvedPortParams struct {
+// resolvedPortParams describes a port: its base, the worktree's offset, and whether the job declaring it is shared by every worktree.
+type resolvedPortParams struct {
 	Base   int
 	Offset int
 	Shared bool
 }
 
-// ResolvedPort returns the port the worktree uses: the base for a shared job, the base plus the offset otherwise.
-func ResolvedPort(params ResolvedPortParams) int {
+// resolvedPort returns the port the worktree uses: the base for a shared job, the base plus the offset otherwise.
+func resolvedPort(params resolvedPortParams) int {
 	if params.Shared {
 		return params.Base
 	}
 	return params.Base + params.Offset
 }
 
-// SharedJobs returns the set of the jobs of cfg whose scope is shared.
-func SharedJobs(cfg project.Run) map[string]bool {
+// sharedJobs returns the set of the jobs of cfg whose scope is shared.
+func sharedJobs(cfg project.Run) map[string]bool {
 	shared := map[string]bool{}
 	for _, job := range cfg.Jobs {
 		if job.Scope == project.Shared {
@@ -127,15 +127,15 @@ func (p JobParams) ports() map[string]int {
 	for _, job := range p.Run.Jobs {
 		for name, base := range job.Ports {
 			if declaring[name] == 1 {
-				ports[name] = ResolvedPort(ResolvedPortParams{Base: base, Offset: p.Offset(), Shared: job.Scope == project.Shared})
+				ports[name] = resolvedPort(resolvedPortParams{Base: base, Offset: p.Offset(), Shared: job.Scope == project.Shared})
 			}
 		}
 	}
 	return ports
 }
 
-// ComposeDirs returns the directories, relative to the worktree, of the jobs that run docker compose, each once, in the order of the jobs.
-func ComposeDirs(cfg project.Run) []string {
+// composeDirs returns the directories, relative to the worktree, of the jobs that run docker compose, each once, in the order of the jobs.
+func composeDirs(cfg project.Run) []string {
 	var dirs []string
 	seen := map[string]bool{}
 	for _, job := range cfg.Jobs {
@@ -151,7 +151,7 @@ func ComposeDirs(cfg project.Run) []string {
 
 // ComposeEnvPaths returns the .env file docker compose reads in each of the compose directories, or the worktree's root .env when no job runs compose.
 func ComposeEnvPaths(cfg project.Run) []string {
-	dirs := ComposeDirs(cfg)
+	dirs := composeDirs(cfg)
 	if len(dirs) == 0 {
 		dirs = []string{"."}
 	}
@@ -176,7 +176,7 @@ func declaredComposeProject(files [][]dotenv.Line) string {
 
 // HookEnv returns the variables a hook runs with: the job environment of the worktree, with the COMPOSE_PROJECT_NAME declared in the compose .env files, read as composeEnv, winning over wtm's own.
 func HookEnv(job JobParams, composeEnv [][]dotenv.Line) map[string]string {
-	env := JobEnv(job)
+	env := jobEnv(job)
 	if name := declaredComposeProject(composeEnv); name != "" {
 		env[ComposeProjectKey] = name
 	}
@@ -185,5 +185,5 @@ func HookEnv(job JobParams, composeEnv [][]dotenv.Line) map[string]string {
 
 // HooksReadRun reports whether the hooks' environment depends on run.toml: an isolation is set and some job runs docker compose.
 func HooksReadRun(run project.Run, isolation project.Isolation) bool {
-	return isolation != "" && len(ComposeDirs(run)) > 0
+	return isolation != "" && len(composeDirs(run)) > 0
 }

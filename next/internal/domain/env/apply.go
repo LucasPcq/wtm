@@ -7,8 +7,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 )
 
-// collisionHorizon is how many offset blocks above a base port a number may sit and still be read as that port shifted by an earlier worktree.
-const collisionHorizon = 20
+// CollisionHorizon is how many offset blocks above a base port a number may sit and still be read as that port shifted by an earlier worktree; a collision of two ports further apart than that many worktrees is not reported, since no project reaches it.
+const CollisionHorizon = 20
 
 // applyPorts returns lines with the value of every key an entry rewrites replaced by its new value; lines no entry rewrites are returned as they are.
 func applyPorts(lines []dotenv.Line, entries []Entry) []dotenv.Line {
@@ -51,7 +51,7 @@ func reducePortValue(params reducePortParams) string {
 	var at []number
 	for _, n := range numbers(params.Value) {
 		gap := n.value - params.Base
-		if gap >= 0 && gap%params.Block == 0 && gap/params.Block <= collisionHorizon {
+		if gap >= 0 && gap%params.Block == 0 && gap/params.Block <= CollisionHorizon {
 			at = append(at, n)
 		}
 	}

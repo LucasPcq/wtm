@@ -105,7 +105,7 @@ func (w settling) expandPorts(link project.EnvValueLink, job project.Job) (strin
 			return "", fmt.Errorf("env %s in %s: job %q declares no port named %q", link.Key, link.File, job.Name, name)
 		}
 
-		port := ResolvedPort(ResolvedPortParams{Base: base, Offset: w.Offset, Shared: job.Scope == project.Shared})
+		port := resolvedPort(resolvedPortParams{Base: base, Offset: w.Offset, Shared: job.Scope == project.Shared})
 		value = before + strconv.Itoa(port) + after
 	}
 }

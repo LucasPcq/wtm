@@ -21,16 +21,16 @@ const (
 var projectSchemaJSON []byte
 
 // Remember merges answers into the [wizard.remembered] table of the
-// config.toml in stateDir, re-rendering the file, then writes the JSON schema
+// project's config.toml, re-rendering the file, then writes the JSON schema
 // beside it. It returns what it wrote; no answers write nothing. A missing
 // config.toml is project.ErrConfigNotFound, and a config.toml written by a
 // newer wtm is refused with the statefile's schema error.
-func Remember(ctx context.Context, stateDir string, answers map[string]string) (domain.Written, error) {
+func (p Project) Remember(ctx context.Context, answers map[string]string) (domain.Written, error) {
 	if len(answers) == 0 {
 		return domain.Written{}, nil
 	}
 
-	path := filepath.Join(stateDir, configFileName)
+	path := filepath.Join(p.StateDir, configFileName)
 	written, err := statefile.Update(ctx, statefile.UpdateParams{
 		Path: path,
 		Mutate: func(current []byte) (statefile.Change, error) {
@@ -45,7 +45,7 @@ func Remember(ctx context.Context, stateDir string, answers map[string]string) (
 		return domain.Written{}, err
 	}
 
-	return written, writeSchema(ctx, stateDir)
+	return written, writeSchema(ctx, p.StateDir)
 }
 
 // remembered returns the config.toml current with answers merged over the

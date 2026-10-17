@@ -166,7 +166,7 @@ func (k keyPlan) entry(lines []dotenv.Line) Entry {
 
 // resolved returns the port the link at index resolves to in the worktree.
 func (k keyPlan) resolved(index int) int {
-	return ResolvedPort(ResolvedPortParams{Base: k.Group.Bases[index], Offset: k.worktree.Offset, Shared: k.worktree.Shared[k.Group.Links[index].Job]})
+	return resolvedPort(resolvedPortParams{Base: k.Group.Bases[index], Offset: k.worktree.Offset, Shared: k.worktree.Shared[k.Group.Links[index].Job]})
 }
 
 // move returns where the link at index moves, entry being what was planned for it.

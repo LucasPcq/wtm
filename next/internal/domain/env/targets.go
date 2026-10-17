@@ -65,7 +65,7 @@ func OwnedTargets(run project.Run, files []project.EnvFile) []string {
 	}
 
 	var targets []string
-	for _, dir := range ComposeDirs(run) {
+	for _, dir := range composeDirs(run) {
 		if target, ok := declared[path.Join(dir, ".env")]; ok {
 			targets = append(targets, target)
 		}

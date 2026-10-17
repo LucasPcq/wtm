@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"slices"
 	"strings"
 )
@@ -13,6 +14,37 @@ type Snapshot struct {
 	Worktrees  []Worktree
 	Branches   Branches
 	Divergence map[string]AheadBehind
+}
+
+// SnapshotSource is what ReadSnapshot reads a repository through.
+type SnapshotSource interface {
+	Worktrees(ctx context.Context) ([]Worktree, error)
+	Branches(ctx context.Context) (Branches, error)
+	AheadBehind(ctx context.Context, name string) (AheadBehind, error)
+}
+
+// ReadSnapshot returns the repository source reads: its worktrees, its local
+// and remote branches, and how far ahead and behind its origin each local
+// branch is when their tips differ.
+func ReadSnapshot(ctx context.Context, source SnapshotSource) (Snapshot, error) {
+	worktrees, err := source.Worktrees(ctx)
+	if err != nil {
+		return Snapshot{}, err
+	}
+
+	branches, err := source.Branches(ctx)
+	if err != nil {
+		return Snapshot{}, err
+	}
+
+	divergence := map[string]AheadBehind{}
+	for _, name := range branches.Differing() {
+		divergence[name], err = source.AheadBehind(ctx, name)
+		if err != nil {
+			return Snapshot{}, err
+		}
+	}
+	return Snapshot{Worktrees: worktrees, Branches: branches, Divergence: divergence}, nil
 }
 
 // Local reports whether name is a local branch.

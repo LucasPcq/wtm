@@ -208,25 +208,7 @@ func (f *Fake) AheadBehind(_ context.Context, name string) (worktree.AheadBehind
 // Snapshot returns the worktrees, the branches and the divergence of each
 // local branch whose remote tip differs, as git.Repo.Snapshot does.
 func (f *Fake) Snapshot(ctx context.Context) (worktree.Snapshot, error) {
-	worktrees, err := f.Worktrees(ctx)
-	if err != nil {
-		return worktree.Snapshot{}, err
-	}
-
-	branches, err := f.Branches(ctx)
-	if err != nil {
-		return worktree.Snapshot{}, err
-	}
-
-	divergence := map[string]worktree.AheadBehind{}
-	for _, name := range branches.Differing() {
-		divergence[name], err = f.AheadBehind(ctx, name)
-		if err != nil {
-			return worktree.Snapshot{}, err
-		}
-	}
-
-	return worktree.Snapshot{Worktrees: worktrees, Branches: branches, Divergence: divergence}, nil
+	return worktree.ReadSnapshot(ctx, f)
 }
 
 // Dirty reports whether the worktree at path was seeded dirty; it fails for a
