@@ -48,3 +48,37 @@ func ErrorText(err *domain.Error) string {
 	}
 	return err.Message + ": " + err.Cause.Error()
 }
+
+var reasonLabels = map[domain.Reason]string{
+	domain.ReasonUnchanged:   "unchanged",
+	domain.ReasonIncomplete:  "left incomplete",
+	domain.ReasonInterrupted: "interrupted",
+	domain.ReasonNotReached:  "not reached",
+}
+
+type Unfinished struct {
+	Subject string
+	Status  domain.Status
+	Reason  domain.Reason
+	Err     *domain.Error
+}
+
+func UnfinishedLine(w io.Writer, item Unfinished) {
+	line := item.Subject + "  " + unfinishedWhy(item)
+	if item.Status == domain.StatusFailed {
+		ErrorLine(w, line)
+		return
+	}
+	WarningLine(w, line)
+}
+
+func unfinishedWhy(item Unfinished) string {
+	if item.Err == nil {
+		return reasonLabels[item.Reason]
+	}
+	why := ErrorText(item.Err)
+	if item.Reason != domain.ReasonIncomplete {
+		return why
+	}
+	return why + Dot + reasonLabels[item.Reason]
+}

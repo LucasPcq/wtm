@@ -305,9 +305,9 @@ func (f Facts) problems(req Request, q Questions) []domain.FieldError {
 	}
 	problems = append(problems, f.fromProblems(req)...)
 	if q.Isolation.Origin == domain.OriginRequest {
-		problems = append(problems, oneOf(choice{Path: "isolation", Value: string(q.Isolation.Value), Accepted: names(project.Isolations())})...)
+		problems = append(problems, oneOf(choice{Path: "isolation", Value: string(q.Isolation.Value), Accepted: Names(project.Isolations())})...)
 	}
-	problems = append(problems, oneOf(choice{Path: "on_conflict", Value: string(q.OnConflict.Value), Accepted: names(OnConflicts())})...)
+	problems = append(problems, oneOf(choice{Path: "on_conflict", Value: string(q.OnConflict.Value), Accepted: Names(OnConflicts())})...)
 	for index, id := range q.Remember {
 		problems = append(problems, oneOf(choice{Path: "remember[" + strconv.Itoa(index) + "]", Value: id, Accepted: rememberable()})...)
 	}
@@ -379,7 +379,7 @@ func oneOf(c choice) []domain.FieldError {
 	}}
 }
 
-func names[T ~string](values []T) []string {
+func Names[T ~string](values []T) []string {
 	found := make([]string, 0, len(values))
 	for _, value := range values {
 		found = append(found, string(value))

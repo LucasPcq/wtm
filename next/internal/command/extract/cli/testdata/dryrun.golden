@@ -1,0 +1,11 @@
+
+  extract · dry run, nothing applied
+  Source       feat/login
+  Files        apps/api/a.txt, apps/api/new.txt
+  Target       new worktree feat/split from main
+  Mode         move
+  Conflicts    apps/api/a.txt (modified)
+  On conflict  resolve
+  fingerprint  92904b3452df281ed193a3cc
+  → wtm-next extract feat/login --files apps/api --to feat/split --on-conflict resolve --expect-fingerprint 92904b3452df281ed193a3cc   apply this plan
+

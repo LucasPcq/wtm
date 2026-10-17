@@ -44,6 +44,13 @@ type Outcome struct {
 	Result      *Result
 }
 
+func (o Outcome) Failure() *domain.Error {
+	if o.Result == nil {
+		return nil
+	}
+	return o.Result.Failure()
+}
+
 func (u UseCase) Run(ctx context.Context, req Request, opts operation.Options) (Outcome, error) {
 	op, err := u.Operations.Begin(operation.BeginParams{Command: name, Locks: req.Locks(), Options: opts})
 	if err != nil {

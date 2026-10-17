@@ -9,6 +9,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	createcli "github.com/LucasPcq/wtm/next/internal/command/create/cli"
+	extractcli "github.com/LucasPcq/wtm/next/internal/command/extract/cli"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
@@ -29,6 +30,14 @@ func openCreate(ctx context.Context) (createcli.Project, error) {
 		return createcli.Project{}, err
 	}
 	return createcli.Project{UseCase: wire(opened.Wire).Create, Cwd: opened.Cwd}, nil
+}
+
+func openExtract(ctx context.Context) (extractcli.Project, error) {
+	opened, err := open(ctx)
+	if err != nil {
+		return extractcli.Project{}, err
+	}
+	return extractcli.Project{UseCase: wire(opened.Wire).Extract, Cwd: opened.Cwd}, nil
 }
 
 func open(ctx context.Context) (project, error) {

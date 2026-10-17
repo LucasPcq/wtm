@@ -1,0 +1,53 @@
+
+  Move a subset of a worktree's uncommitted changes to another worktree
+  (new or existing) to split an oversized PR or isolate unrelated work.
+
+  The source worktree is the first thing chosen: pass its branch as [source],
+  or omit it to pick interactively from the worktrees that have changes. A source
+  is required when there is no terminal or with --output json.
+
+  A --to branch that already exists locally is checked out as-is, keeping its
+  commits. Its parent can't be inferred, so --from then names the branch recorded
+  for `wtm sync` — asked in the wizard, required without it.
+
+  Untracked files are listed one by one, including inside brand-new directories,
+  so you can take part of a new folder; gitignored files are never listed.
+
+  Conflicts are found before anything is created or moved. It aborts by default,
+  leaving both worktrees untouched; --on-conflict resolve writes conflict markers
+  in the target so you can resolve them like a rebase. A file that merely already
+  exists in the target with other content counts as a conflict too.
+  --dry-run shows the plan, its conflicts and a fingerprint.
+
+  Usage:
+    wtm-next extract [source] [flags]
+
+  Examples:
+    # Pick the source, the files and the target
+    wtm extract
+
+    # Move a directory's changes to a new branch
+    wtm extract feat/login --files apps/api --to feat/login-api --yes
+
+    # Copy one file instead, onto a branch stacked on the source
+    wtm extract feat/login --files apps/web/login.ts --to feat/login-web --from feat/login --keep --yes
+
+  Flags:
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+        --dry-run                     Show the plan and its fingerprint, apply nothing
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+        --ff                          Fast-forward the parent branch to origin before creating the target (answers the wizard's question; skipped when it has diverged)
+        --files strings               Files to extract, or a directory to take everything below it (skips interactive selection)
+        --from string                 Parent branch when creating the target worktree
+    -h, --help                        help for extract
+        --isolation string            How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated
+        --keep                        Copy instead of move (keep the changes in the source)
+        --on-conflict string          On conflict: abort (default) or resolve (write conflict markers in the target)
+        --output string               Output format: text or json (default "text")
+        --remember stringArray        The answers to always use in this repository: isolation, fast_forward (repeatable)
+        --to string                   Target worktree branch; created if it does not exist
+    -y, --yes                         Skip all prompts; resolve every decision from flags and safe defaults (requires a source arg, --files and --to; --from is also required when --to already exists locally; errors if a selection is missing)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

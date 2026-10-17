@@ -48,18 +48,9 @@ const (
 
 	rememberUsage = "The answers to always use in this repository: env_from, isolation, fast_forward (repeatable)"
 	yesUsage      = "Run unattended: no question, no confirmation; what is not given takes its default"
-	outputUsage   = "Output format: text or json"
-	dryRunUsage   = "Show the plan and its fingerprint, apply nothing"
-	expectUsage   = "Apply only if the facts still have this fingerprint, the one --dry-run printed"
-	askUsage      = "Ask again the questions this repository remembers an answer to, to change or forget it"
 
 	flagFF             = "ff"
 	exitConfigNotFound = 12
-	surfaceCLI         = "cli"
-	outputText         = "text"
-	outputJSON         = "json"
-	applyNote          = "apply this plan"
-	replanNote         = "the plan the facts give now"
 )
 
 var exits = map[string]int{create.CodeConfigNotFound: exitConfigNotFound}
@@ -96,10 +87,10 @@ func New(open func(ctx context.Context) (Project, error)) *cobra.Command {
 	flags.BoolVar(&c.ifNotExists, "if-not-exists", false, descriptions["if_not_exists"])
 	flags.StringArrayVar(&c.remember, "remember", nil, rememberUsage)
 	flags.BoolVarP(&c.yes, "yes", "y", false, yesUsage)
-	flags.StringVar(&c.output, "output", outputText, outputUsage)
-	flags.BoolVar(&c.dryRun, "dry-run", false, dryRunUsage)
-	flags.StringVar(&c.expect, "expect-fingerprint", "", expectUsage)
-	flags.BoolVar(&c.ask, "ask", false, askUsage)
+	flags.StringVar(&c.output, "output", uicli.OutputText, uicli.OutputUsage)
+	flags.BoolVar(&c.dryRun, "dry-run", false, uicli.DryRunUsage)
+	flags.StringVar(&c.expect, "expect-fingerprint", "", uicli.ExpectUsage)
+	flags.BoolVar(&c.ask, "ask", false, uicli.AskUsage)
 	_ = cmd.RegisterFlagCompletionFunc("env-from", cobra.FixedCompletions(create.Names(project.EnvStrategies()), cobra.ShellCompDirectiveNoFileComp))
 	_ = cmd.RegisterFlagCompletionFunc("isolation", cobra.FixedCompletions(create.Names(project.Isolations()), cobra.ShellCompDirectiveNoFileComp))
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
@@ -113,9 +104,9 @@ func New(open func(ctx context.Context) (Project, error)) *cobra.Command {
 func (c *createCommand) run(cmd *cobra.Command, args []string) error {
 	c.quiet, _ = cmd.Flags().GetBool(uicli.FlagQuiet)
 	req := c.request(cmd, args)
-	if c.output != outputText && c.output != outputJSON {
+	if c.output != uicli.OutputText && c.output != uicli.OutputJSON {
 		refused := domain.InvalidMessage(`invalid --output "` + c.output + `": expected one of text, json`)
-		c.output = outputText
+		c.output = uicli.OutputText
 		return c.fail(cmd, refusal{Err: refused, Request: req})
 	}
 	ctx := cmd.Context()
@@ -141,7 +132,7 @@ func (c *createCommand) create(cmd *cobra.Command, params creating) (ran, error)
 	if c.interactive(cmd) {
 		return runForm(ctx, formParams{App: params.UseCase, Request: params.Request, DryRun: c.dryRun, Report: params.Report, In: cmd.InOrStdin(), Out: cmd.ErrOrStderr()})
 	}
-	outcome, err := params.UseCase.Run(ctx, params.Request, operation.Options{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: surfaceCLI, Report: params.Report})
+	outcome, err := params.UseCase.Run(ctx, params.Request, operation.Options{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, Report: params.Report})
 	return ran{Outcome: outcome, Request: params.Request}, err
 }
 
@@ -164,7 +155,7 @@ func (c *createCommand) request(cmd *cobra.Command, args []string) create.Reques
 }
 
 func (c *createCommand) human() bool {
-	return c.output == outputText
+	return c.output == uicli.OutputText
 }
 
 func (c *createCommand) interactive(cmd *cobra.Command) bool {
@@ -220,7 +211,7 @@ func (c *createCommand) fail(cmd *cobra.Command, refused refusal) error {
 	_, stderr := c.streams(cmd)
 	var next []output.NextStep
 	if failure.Code == operation.CodePlanStale {
-		next = []output.NextStep{{Command: createLine{Command: cmd.CommandPath(), Request: refused.Request}.String() + " --dry-run", Note: replanNote}}
+		next = []output.NextStep{{Command: createLine{Command: cmd.CommandPath(), Request: refused.Request}.String() + " --dry-run", Note: output.ReplanNote}}
 	}
 	output.Frame(stderr, func(w io.Writer) {
 		output.Failure(w, output.FailureParams{Err: failure, Next: next, Flags: createFlags})
@@ -249,7 +240,7 @@ func itemFollowUps(items []create.Item) []output.NextStep {
 		if item.Err == nil || item.Err.FollowUp == nil {
 			continue
 		}
-		steps = append(steps, output.NextStep{Command: followUpLine(item.Err.FollowUp), Note: item.Err.FollowUp.Message})
+		steps = append(steps, output.NextStep{Command: output.FollowUpLine(item.Err.FollowUp), Note: item.Err.FollowUp.Message})
 	}
 	return steps
 }

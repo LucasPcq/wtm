@@ -1,0 +1,173 @@
+package cli
+
+import (
+	"testing"
+
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+var conflicting = map[string]worktree.ConflictKind{"apps/api/a.txt": worktree.ConflictModified}
+
+func TestTheHelpOfExtractIsTheLegacyOnesWithNextsContract(t *testing.T) {
+	got := runExtract(t, newWorld(seed{}), "--help")
+
+	require.Equal(t, uicli.ExitOK, got.Code)
+	golden(t, "extract_help", got.Stdout)
+}
+
+func TestADryRunOfANewTargetShowsItsConflictsAndTheLineThatAppliesIt(t *testing.T) {
+	got := runExtract(t, newWorld(seed{Conflicts: conflicting}), source, "--files", "apps/api", "--to", split, "--on-conflict", "resolve", "--dry-run")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	golden(t, "dryrun", got.Stdout)
+}
+
+func TestAMoveToAnExistingWorktreeListsEachFileAndPointsAtIt(t *testing.T) {
+	got := runExtract(t, newWorld(seed{}), source, "--files", "apps/api,DOC.md,old.txt", "--to", other)
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	golden(t, "moved", got.Stdout)
+}
+
+func TestACopyToANewBranchKeepsTheSourceAndShowsWhereTheTargetIs(t *testing.T) {
+	w := newWorld(seed{})
+
+	got := runExtract(t, w, source, "--files", "apps/api/new.txt", "--to", split, "--from", source, "--keep")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	golden(t, "copied", got.Stdout)
+	assert.Equal(t, []string{"apps/api/new.txt"}, paths(w.git.Moves()[0].Changes))
+	assert.True(t, w.git.Moves()[0].Keep)
+}
+
+func TestAResolvedConflictNamesWhatToResolveAndHowToUndo(t *testing.T) {
+	got := runExtract(t, newWorld(seed{Conflicts: conflicting}), source, "--files", "apps/api", "--to", other, "--on-conflict", "resolve")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	golden(t, "resolved", got.Stdout)
+}
+
+func TestACleanSourceHasNothingToExtract(t *testing.T) {
+	got := runExtract(t, newWorld(seed{Clean: true}), source, "--yes")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	golden(t, "nothing", got.Stdout)
+}
+
+func TestAConflictIsRefusedOnItsOwnExitCodeBeforeAnythingMoves(t *testing.T) {
+	w := newWorld(seed{Conflicts: conflicting})
+
+	got := runExtract(t, w, source, "--files", "apps/api", "--to", other)
+
+	assert.Equal(t, exitConflict, got.Code)
+	assert.Empty(t, got.Stdout)
+	assert.Equal(t, "\n  ✗ cannot apply the selected changes: apps/api/a.txt was also modified in \"feat/other\" — resolve it there, extract to another worktree, or re-run with --on-conflict resolve\n\n", got.Stderr)
+	assert.Empty(t, w.git.Moves())
+}
+
+func TestAConflictRefusedInJSONIsTheEnvelopesError(t *testing.T) {
+	got := runExtract(t, newWorld(seed{Conflicts: conflicting}), source, "--files", "apps/api", "--to", other, "--output", "json")
+
+	assert.Equal(t, exitConflict, got.Code)
+	doc := decoded(t, got.Stdout)
+	require.NotNil(t, doc.Error)
+	assert.False(t, doc.OK)
+	assert.Equal(t, "extract.conflict", doc.Error.Code)
+	assert.Equal(t, "conflict", doc.Error.Kind)
+}
+
+func TestMissingFilesAreRequiredAndNamedByTheirFlag(t *testing.T) {
+	got := runExtract(t, newWorld(seed{}), source, "--to", other)
+
+	assert.Equal(t, uicli.ExitUsage, got.Code)
+	assert.Equal(t, "\n  ✗ the request is invalid\n    --files is required\n\n", got.Stderr)
+}
+
+func TestMissingFilesInJSONNameTheFlag(t *testing.T) {
+	got := runExtract(t, newWorld(seed{}), source, "--to", other, "--output", "json")
+
+	assert.Equal(t, uicli.ExitUsage, got.Code)
+	doc := decoded(t, got.Stdout)
+	require.NotNil(t, doc.Error)
+	assert.Equal(t, "required", doc.Error.Fields[0].Code)
+	assert.Equal(t, "--files", doc.Error.Fields[0].Flag)
+}
+
+func TestASuccessInJSONIsOneItemWithItsDetail(t *testing.T) {
+	got := runExtract(t, newWorld(seed{}), source, "--files", "apps/api/new.txt", "--to", other, "--output", "json")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stdout)
+	doc := decoded(t, got.Stdout)
+	assert.Equal(t, 2, doc.V)
+	assert.Equal(t, "extract", doc.Command)
+	assert.True(t, doc.OK)
+	require.Len(t, doc.Items, 1)
+	assert.Equal(t, other, doc.Items[0].Subject)
+	assert.Equal(t, "done", doc.Items[0].Status)
+	assert.JSONEq(t, `{"path": "/repo/wt-feat-other", "files": [{"path": "apps/api/new.txt", "status": "untracked"}], "kept": false, "conflicts": [], "isolation": "isolated", "existing_branch": false}`, string(doc.Items[0].Detail))
+}
+
+func TestADryRunInJSONIsThePlanAndItsFingerprint(t *testing.T) {
+	got := runExtract(t, newWorld(seed{}), source, "--files", "old.txt", "--to", split, "--keep", "--dry-run", "--output", "json")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stdout)
+	doc := decoded(t, got.Stdout)
+	require.NotNil(t, doc.Plan)
+	assert.Equal(t, source, doc.Plan.Source)
+	assert.Equal(t, split, doc.Plan.Target.Branch)
+	assert.Equal(t, "create", doc.Plan.Target.Action)
+	assert.True(t, doc.Plan.Keep)
+	assert.Len(t, doc.Fingerprint, len(fingerprint))
+	assert.Empty(t, doc.Items)
+}
+
+func TestWithoutConfigExtractExitsOnItsOwnCode(t *testing.T) {
+	got := runExtract(t, newWorld(seed{NoConfig: true}), source, "--files", "old.txt", "--to", other)
+
+	assert.Equal(t, exitConfigNotFound, got.Code)
+	assert.Contains(t, got.Stderr, "run `wtm init` first")
+}
+
+func TestAnUnknownConflictModeIsAUsageErrorNamingItsFlag(t *testing.T) {
+	got := runExtract(t, newWorld(seed{}), source, "--files", "old.txt", "--to", other, "--on-conflict", "theirs")
+
+	assert.Equal(t, uicli.ExitUsage, got.Code)
+	assert.Contains(t, got.Stderr, "--on-conflict must be one of abort, resolve, not theirs")
+}
+
+func TestASecondPositionalIsAUsageError(t *testing.T) {
+	got := runExtract(t, newWorld(seed{}), source, other)
+
+	assert.Equal(t, uicli.ExitUsage, got.Code)
+	assert.Contains(t, got.Stderr, "accepts at most 1 arg(s), received 2")
+}
+
+func TestAStalePlanIsRefusedAndPointsAtThePlanTheFactsGiveNow(t *testing.T) {
+	got := runExtract(t, newWorld(seed{}), source, "--files", "old.txt", "--to", other, "--expect-fingerprint", fingerprint)
+
+	assert.Equal(t, uicli.ExitPrecondition, got.Code)
+	assert.Contains(t, got.Stderr, "✗ the facts changed since the preview")
+	assert.Contains(t, got.Stderr, "→ wtm-next extract feat/login --files old.txt --to feat/other --dry-run   the plan the facts give now")
+}
+
+func TestAFailedHookInTheCreatedTargetExitsOneAndNamesIt(t *testing.T) {
+	w := newWorld(seed{OnCreate: []project.Hook{{Cmd: "make setup"}}, RunHooks: hookFails})
+
+	got := runExtract(t, w, source, "--files", "old.txt", "--to", split)
+
+	assert.Equal(t, uicli.ExitError, got.Code)
+	assert.Contains(t, got.Stdout, "✗ feat/split  on_create failed")
+	assert.Empty(t, w.git.Moves())
+}
+
+func TestQuietSilencesASuccess(t *testing.T) {
+	got := runExtract(t, newWorld(seed{}), "-q", source, "--files", "old.txt", "--to", other)
+
+	require.Equal(t, uicli.ExitOK, got.Code)
+	assert.Empty(t, got.Stdout)
+	assert.Empty(t, got.Stderr)
+}

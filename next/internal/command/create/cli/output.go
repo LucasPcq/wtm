@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"fmt"
 	"io"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -91,26 +90,6 @@ func anomaliesOf(item create.Item) []string {
 	return anomalies
 }
 
-type shown struct {
-	Cwd  string
-	Path string
-}
-
-func shownPath(s shown) string {
-	relative, err := filepath.Rel(s.Cwd, s.Path)
-	if err != nil || s.Cwd == "" {
-		return s.Path
-	}
-	return relative
-}
-
-var reasonLabels = map[domain.Reason]string{
-	domain.ReasonUnchanged:   "unchanged",
-	domain.ReasonIncomplete:  "left incomplete",
-	domain.ReasonInterrupted: "interrupted",
-	domain.ReasonNotReached:  "not reached",
-}
-
 type outcomeParams struct {
 	Outcome   create.Outcome
 	FollowUps []output.NextStep
@@ -130,7 +109,7 @@ func drawOutcome(w io.Writer, params outcomeParams) {
 		if !stands(item) || item.Detail == nil {
 			continue
 		}
-		path := shownPath(shown{Cwd: params.Cwd, Path: item.Detail.Path})
+		path := output.ShownPath(output.Shown{Cwd: params.Cwd, Path: item.Detail.Path})
 		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + itemNote(item)}})
 		anomalies = append(anomalies, anomaliesOf(item)...)
 		next = append(next, output.NextStep{Command: "wtm go " + item.Subject})
@@ -158,7 +137,7 @@ func drawOutcome(w io.Writer, params outcomeParams) {
 		output.Blank(w)
 	}
 	for _, item := range unfinished {
-		unfinishedLine(w, item)
+		output.UnfinishedLine(w, output.Unfinished{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err})
 	}
 	next = append(next, params.FollowUps...)
 	if len(next) > 0 {
@@ -206,26 +185,6 @@ func tallyKey(item create.Item) string {
 	return string(item.Status)
 }
 
-func unfinishedLine(w io.Writer, item create.Item) {
-	line := item.Subject + "  " + itemWhy(item)
-	if item.Status == domain.StatusFailed {
-		output.ErrorLine(w, line)
-		return
-	}
-	output.WarningLine(w, line)
-}
-
-func itemWhy(item create.Item) string {
-	if item.Err == nil {
-		return reasonLabels[item.Reason]
-	}
-	why := output.ErrorText(item.Err)
-	if item.Reason != domain.ReasonIncomplete {
-		return why
-	}
-	return why + output.Dot + reasonLabels[item.Reason]
-}
-
 type dryRunParams struct {
 	Outcome create.Outcome
 	Apply   string
@@ -239,7 +198,7 @@ func drawDryRun(w io.Writer, params dryRunParams) {
 		output.Blank(w)
 	}
 	output.InfoLine(w, output.Info{Label: "fingerprint", Value: params.Outcome.Fingerprint})
-	output.NextSteps(w, []output.NextStep{{Command: params.Apply, Note: applyNote}})
+	output.NextSteps(w, []output.NextStep{{Command: params.Apply, Note: output.ApplyNote}})
 }
 
 type planTextParams struct {

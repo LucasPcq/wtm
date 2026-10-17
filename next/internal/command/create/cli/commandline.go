@@ -1,14 +1,11 @@
 package cli
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
-	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
-
-const shellSpecial = " \t\n'\"$`\\|&;<>()*?[]{}~#!"
 
 type createLine struct {
 	Command string
@@ -17,8 +14,8 @@ type createLine struct {
 
 func (l createLine) String() string {
 	req := l.Request
-	words := append([]string{l.Command}, quoted(req.Branches)...)
-	words = append(words, flagWords(flagValue{Name: "env-from", Value: string(req.EnvFrom)})...)
+	words := append([]string{l.Command}, output.Quoted(req.Branches)...)
+	words = append(words, output.FlagWords(output.FlagValue{Name: "env-from", Value: string(req.EnvFrom)})...)
 	switch {
 	case req.FastForward == nil:
 	case *req.FastForward:
@@ -26,53 +23,16 @@ func (l createLine) String() string {
 	default:
 		words = append(words, "--ff=false")
 	}
-	words = append(words, flagWords(flagValue{Name: "from", Value: req.From})...)
+	words = append(words, output.FlagWords(output.FlagValue{Name: "from", Value: req.From})...)
 	if req.IfNotExists {
 		words = append(words, "--if-not-exists")
 	}
-	words = append(words, flagWords(flagValue{Name: "isolation", Value: string(req.Isolation)})...)
+	words = append(words, output.FlagWords(output.FlagValue{Name: "isolation", Value: string(req.Isolation)})...)
 	for _, answer := range req.Remember {
-		words = append(words, flagWords(flagValue{Name: "remember", Value: answer})...)
+		words = append(words, output.FlagWords(output.FlagValue{Name: "remember", Value: answer})...)
 	}
 	if req.Ask {
 		words = append(words, "--ask")
 	}
 	return strings.Join(words, " ")
-}
-
-func followUpLine(followUp *domain.FollowUp) string {
-	var request domain.CleanRequest
-	_ = json.Unmarshal(followUp.Request, &request)
-	words := append([]string{"wtm", followUp.Command}, quoted(request.Branches)...)
-	if request.Force {
-		words = append(words, "--force")
-	}
-	return strings.Join(words, " ")
-}
-
-type flagValue struct {
-	Name  string
-	Value string
-}
-
-func flagWords(flag flagValue) []string {
-	if flag.Value == "" {
-		return nil
-	}
-	return []string{"--" + flag.Name, quote(flag.Value)}
-}
-
-func quoted(words []string) []string {
-	out := make([]string, 0, len(words))
-	for _, word := range words {
-		out = append(out, quote(word))
-	}
-	return out
-}
-
-func quote(word string) string {
-	if word != "" && !strings.ContainsAny(word, shellSpecial) {
-		return word
-	}
-	return "'" + strings.ReplaceAll(word, "'", `'\''`) + "'"
 }

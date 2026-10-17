@@ -1,11 +1,9 @@
 package cli
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 
 	"github.com/stretchr/testify/assert"
@@ -29,10 +27,4 @@ func TestTheRequestIsSpelledWithItsFlagsSortedAndQuoted(t *testing.T) {
 func TestAnUnsetRequestIsTheBareCommand(t *testing.T) {
 	assert.Equal(t, "wtm-next create feat/a", createLine{Command: "wtm-next create", Request: create.Request{Branches: []string{"feat/a"}}}.String())
 	assert.Equal(t, "wtm-next create feat/a --ff=false", createLine{Command: "wtm-next create", Request: create.Request{Branches: []string{"feat/a"}, FastForward: new(false)}}.String())
-}
-
-func TestAFollowUpIsTheCommandItNamesWithItsBranchesFirst(t *testing.T) {
-	line := followUpLine(&domain.FollowUp{Command: "clean", Request: json.RawMessage(`{"branches":["feat/x"],"force":true}`)})
-
-	assert.Equal(t, "wtm clean feat/x --force", line)
 }
