@@ -51,9 +51,11 @@ func TestARememberedConfigDefaultFollowsTheConfiguredEnvStrategy(t *testing.T) {
 func TestIfNotExistsIsSetByItsFlagOnly(t *testing.T) {
 	w := newWorld(t, seed{})
 
-	questions := w.questions(t, create.Request{Branches: []string{branchName}, IfNotExists: true})
+	given := w.questions(t, create.Request{Branches: []string{branchName}, IfNotExists: true})
+	unset := w.questions(t, create.Request{Branches: []string{branchName}})
 
-	assert.Equal(t, domain.Confirm{Answer: domain.Answer[bool]{Value: true, Origin: domain.OriginRequest}, Skip: "set by its flag only"}, questions.IfNotExists)
+	assert.Equal(t, domain.Confirm{Answer: domain.Answer[bool]{Value: true, Origin: domain.OriginRequest}}, given.IfNotExists)
+	assert.Equal(t, domain.Confirm{Answer: domain.Answer[bool]{Origin: domain.OriginDefault}, Skip: "set by its flag only"}, unset.IfNotExists)
 }
 
 func TestAnAnswerGivenWinsOverARememberedOne(t *testing.T) {
@@ -385,4 +387,21 @@ func TestAnAnswerTheRequestCannotTakeIsRefusedAndChangesNothing(t *testing.T) {
 			assert.Equal(t, req, got)
 		})
 	}
+}
+
+func TestEachAnswerReadsBackAsAnswerTakesIt(t *testing.T) {
+	req := create.Request{Branches: []string{"feat/a", "feat/b"}, From: "main", EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(false), IfNotExists: true, Remember: []string{"env_from"}, Ask: true}
+	paths := []string{domain.PathRemember, domain.PathAsk}
+	for _, field := range (create.Questions{}).Form().Fields {
+		paths = append(paths, field.Spec().Path)
+	}
+
+	var answers []domain.Answered
+	for _, path := range paths {
+		answers = append(answers, domain.Answered{Path: path, Values: req.Values(path)})
+	}
+	got, err := domain.Fold(create.Request{}, answers)
+
+	require.NoError(t, err)
+	assert.Equal(t, req, got)
 }

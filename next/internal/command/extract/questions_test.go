@@ -301,3 +301,30 @@ func TestAConfirmationsOptionsAreItsAnswers(t *testing.T) {
 		}
 	}
 }
+
+func TestEachAnswerReadsBackAsAnswerTakesIt(t *testing.T) {
+	req := extract.Request{Source: "feat/login", Files: []string{"a.txt"}, To: "feat/split", From: "main", FastForward: new(true), Isolation: project.Verbatim, Keep: new(false), OnConflict: extract.OnConflictResolve, Remember: []string{"isolation"}, Ask: true}
+	paths := []string{domain.PathRemember, domain.PathAsk}
+	for _, field := range (extract.Questions{}).Form().Fields {
+		paths = append(paths, field.Spec().Path)
+	}
+
+	var answers []domain.Answered
+	for _, path := range paths {
+		answers = append(answers, domain.Answered{Path: path, Values: req.Values(path)})
+	}
+	got, err := domain.Fold(extract.Request{}, answers)
+
+	require.NoError(t, err)
+	assert.Equal(t, req, got)
+}
+
+func TestARememberedSourceUpdateIsShownEvenWhenAskedAgain(t *testing.T) {
+	w := newWorld(t, seed{Config: remembering, Behind: true})
+	w.change(t, source, "a.txt", "a\n")
+
+	asked := w.questions(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Ask: true}).FastForward
+
+	assert.Equal(t, new(true), asked.Remembered)
+	assert.Equal(t, domain.OriginDefault, asked.Origin)
+}

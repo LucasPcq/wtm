@@ -12,7 +12,7 @@ import (
 )
 
 func TestTheFormDrawsEachStepAsTheEngineDid(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{})})
+	d := open(t, sessionParams{App: newApp(seed{})})
 	d.looksLike("1_branches")
 
 	d.keys("feat/a", "tab", "feature", "tab")
@@ -32,17 +32,17 @@ func TestTheFormDrawsEachStepAsTheEngineDid(t *testing.T) {
 }
 
 func TestTheRequestIsWhatWasAnswered(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{})})
+	d := open(t, sessionParams{App: newApp(seed{})})
 
 	d.keys("feat/a", "enter", "enter", "down", "tab", "enter", "enter")
 
 	require.Equal(t, form.Finished, d.w.Ending())
-	assert.Equal(t, create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvMain, Remember: []string{"env_from"}}, d.c.req)
-	assert.NotEmpty(t, d.c.preview.Fingerprint)
+	assert.Equal(t, create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvMain, Remember: []string{"env_from"}}, d.s.Request())
+	assert.NotEmpty(t, d.s.Preview().Fingerprint)
 }
 
 func TestAKeptDefaultSaysWhereItCameFrom(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{})})
+	d := open(t, sessionParams{App: newApp(seed{})})
 
 	d.keys("feat/a", "enter", "enter", "enter")
 
@@ -50,7 +50,7 @@ func TestAKeptDefaultSaysWhereItCameFrom(t *testing.T) {
 }
 
 func TestAnEntryIsCheckedAsItIsAdded(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{Linked: []string{"feat/x"}})})
+	d := open(t, sessionParams{App: newApp(seed{Linked: []string{"feat/x"}})})
 
 	d.keys("bad..name", "tab")
 	assert.Contains(t, d.screen(), `✗ "bad..name" is not a valid branch name: it cannot hold .. or end with .`)
@@ -59,11 +59,11 @@ func TestAnEntryIsCheckedAsItIsAdded(t *testing.T) {
 	assert.Contains(t, d.screen(), "✗ Branch feat/x is checked out at /elsewhere/feat-x — run `wtm go feat/x` to jump in")
 
 	d.keys("enter")
-	assert.Equal(t, int(stepBranches), d.w.Current())
+	assert.Equal(t, stepBranches, d.w.Current())
 }
 
 func TestNoEntryIsRequired(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{})})
+	d := open(t, sessionParams{App: newApp(seed{})})
 
 	d.keys("enter")
 
@@ -71,9 +71,9 @@ func TestNoEntryIsRequired(t *testing.T) {
 }
 
 func TestWhatAFlagOrARememberedAnswerSettledIsNotAsked(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: "main"}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main"}})
+	d := open(t, sessionParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: "main"}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main"}})
 
-	assert.Equal(t, int(stepRecap), d.w.Current())
+	assert.Equal(t, stepRecap, d.w.Current())
 	screen := d.screen()
 	assert.Contains(t, screen, "✓ Branches: feat/a · <branches>")
 	assert.Contains(t, screen, "✓ Source branch: main · --from")
@@ -82,33 +82,33 @@ func TestWhatAFlagOrARememberedAnswerSettledIsNotAsked(t *testing.T) {
 }
 
 func TestAskAsksARememberedAnswerAgainStartingOnIt(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: "main"}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Ask: true}})
+	d := open(t, sessionParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: "main"}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Ask: true}})
 
-	assert.Equal(t, int(stepEnvFrom), d.w.Current())
-	assert.Equal(t, "main", d.c.envFrom.list.Value())
+	assert.Equal(t, stepEnvFrom, d.w.Current())
+	assert.Contains(t, d.screen(), "▌› main")
 	assert.Contains(t, d.screen(), "[x] Always use this answer in this repo")
 }
 
 func TestASourceBehindOriginIsOfferedAFastForward(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{Behind: true}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}})
+	d := open(t, sessionParams{App: newApp(seed{Behind: true}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}})
 
-	assert.Equal(t, int(stepFastForward), d.w.Current())
+	assert.Equal(t, stepFastForward, d.w.Current())
 	d.keys("up", "enter")
 
-	assert.Equal(t, new(true), d.c.req.FastForward)
+	assert.Equal(t, new(true), d.s.Request().FastForward)
 	assert.Contains(t, d.screen(), "Fast-forward  main")
 }
 
 func TestTheSourceListPinsTheBaseBranchAndRefreshes(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{Behind: true}), Request: create.Request{Branches: []string{"feat/a"}}})
+	d := open(t, sessionParams{App: newApp(seed{Behind: true}), Request: create.Request{Branches: []string{"feat/a"}}})
 
-	assert.Equal(t, int(stepFrom), d.w.Current())
+	assert.Equal(t, stepFrom, d.w.Current())
 	assert.Contains(t, d.screen(), "▌› main")
 	assert.Contains(t, d.screen(), "1 behind")
 
 	d.keys("down", "r")
 
-	assert.Equal(t, "feature", d.c.from.list.Value())
+	assert.Contains(t, d.screen(), "▌› feature")
 	assert.NotContains(t, d.screen(), "Refreshing")
 }
 
@@ -123,7 +123,7 @@ func TestEachWayOutCancels(t *testing.T) {
 		"ctrl+c":                    {Keys: []string{"ctrl+c"}},
 	}
 	for name, c := range cases {
-		d := open(t, wizardParams{App: newApp(seed{}), Request: c.Request})
+		d := open(t, sessionParams{App: newApp(seed{}), Request: c.Request})
 
 		d.keys(c.Keys...)
 
@@ -133,7 +133,7 @@ func TestEachWayOutCancels(t *testing.T) {
 
 func TestAPlanThatCannotApplySaysWhyAndOffersOnlyToCancel(t *testing.T) {
 	refused := domain.Invalid([]domain.FieldError{{Path: "from", Code: "not_found", Template: "{path}: {value} not found", Params: domain.Params{"value": "ghost"}}})
-	d := open(t, wizardParams{App: refusing{useCase: newApp(seed{}), err: refused}, Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}})
+	d := open(t, sessionParams{App: refusing{useCase: newApp(seed{}), err: refused}, Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}})
 
 	screen := d.screen()
 	assert.Contains(t, screen, "Step 7/7 • Cannot apply this plan")
@@ -142,31 +142,40 @@ func TestAPlanThatCannotApplySaysWhyAndOffersOnlyToCancel(t *testing.T) {
 }
 
 func TestAStaleRunAsksNothingAgainAndSaysWhy(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{})})
+	d := open(t, sessionParams{App: newApp(seed{})})
 	d.keys("feat/a", "enter", "enter", "enter")
-	require.Equal(t, int(stepRecap), d.w.Current())
+	require.Equal(t, stepRecap, d.w.Current())
 
-	again := start(t, d.c, d.w.Again())
+	again := start(t, d.s, d.w.Again())
 
-	assert.Equal(t, int(stepRecap), again.w.Current())
+	assert.Equal(t, stepRecap, again.w.Current())
 	screen := again.screen()
 	assert.Contains(t, screen, "✓ Source branch: main\n")
 	assert.Contains(t, screen, "! the facts changed since the preview")
 }
 
 func TestADryRunAsksTheQuestionsAndNoConfirmation(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{}), Options: domain.RunOptions{DryRun: true}})
+	d := open(t, sessionParams{App: newApp(seed{}), Options: domain.RunOptions{DryRun: true}})
 
 	assert.Contains(t, d.screen(), "Step 1/6 • Branches")
 	d.keys("feat/a", "enter", "enter", "enter")
 
 	assert.Equal(t, form.Finished, d.w.Ending())
-	assert.Nil(t, d.c.preview)
+	assert.Nil(t, d.s.Preview())
 }
 
 func TestIfNotExistsGivenByItsFlagStandsInTheTrail(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample, IfNotExists: true}})
+	d := open(t, sessionParams{App: newApp(seed{}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample, IfNotExists: true}})
 
-	assert.Equal(t, int(stepRecap), d.w.Current())
+	assert.Equal(t, stepRecap, d.w.Current())
 	assert.Contains(t, d.screen(), "✓ If not exists: yes · --if-not-exists")
+}
+
+func TestAskAsksARememberedSourceUpdateAgainStartingOnIt(t *testing.T) {
+	remembered := map[string]string{project.RememberSourceUpdate: project.SourceUpdateFastForward}
+	d := open(t, sessionParams{App: newApp(seed{Behind: true, Remembered: remembered}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample, Ask: true}})
+
+	require.Equal(t, stepFastForward, d.w.Current())
+	assert.Contains(t, d.screen(), "▌› Yes")
+	assert.Contains(t, d.screen(), "[x] Always use this answer in this repo")
 }

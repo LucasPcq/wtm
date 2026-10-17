@@ -4,12 +4,11 @@ package cli
 import (
 	"context"
 	"io"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
 	"github.com/spf13/cobra"
@@ -46,151 +45,55 @@ const (
 
 	yesUsage = "Run unattended: no question, no confirmation; what is not given takes its default (a source, --files and --to are required, and --from when --to already exists locally)"
 
-	flagFF       = "ff"
-	flagKeep     = "keep"
 	exitConflict = 15
 )
 
 type extractCommand struct {
-	io         uicli.Run
-	open       func(ctx context.Context, dir string) (extract.UseCase, error)
-	files      []string
-	to         string
-	from       string
-	isolation  string
-	ff         bool
-	keep       bool
-	onConflict string
-	remember   []string
-	dryRun     bool
-	expect     string
-	ask        bool
-	yes        bool
+	io   uicli.Run
+	form *extractForm
 }
 
 // New returns the extract command: its flags become an extract.Request, answered in the wizard when the user can see and answer it, else run unattended; it draws the outcome on streams, or the v2 JSON envelope with --output json.
 func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (extract.UseCase, error)) *cobra.Command {
 	// exits are the exit codes of extract's own codes, ahead of those of their kind.
 	exits := map[string]int{extract.CodeConfigNotFound: uicli.ExitConfigNotFound, extract.CodeConflict: exitConflict}
-	c := &extractCommand{io: uicli.Run{Command: commandName, Streams: streams, Env: env, Flags: extractFlags, Exits: exits}, open: open}
+	c := &extractCommand{io: uicli.Run{Command: commandName, Streams: streams, Env: env, Flags: extractFlags, Exits: exits}, form: newForm(open)}
 	cmd := &cobra.Command{Use: "extract [source]", Short: extractShort, Long: extractLong, Example: extractExample, Args: cobra.MaximumNArgs(1), RunE: c.run}
-
-	flags := cmd.Flags()
-	flags.StringSliceVar(&c.files, "files", nil, descriptions["files"])
-	flags.StringVar(&c.to, "to", "", descriptions["to"])
-	flags.StringVar(&c.isolation, "isolation", "", descriptions["isolation"])
-	flags.StringVar(&c.from, "from", "", descriptions["from"])
-	flags.BoolVar(&c.ff, flagFF, false, descriptions["fast_forward"])
-	flags.BoolVar(&c.keep, flagKeep, false, descriptions["keep"])
-	flags.StringVar(&c.onConflict, "on-conflict", "", descriptions["on_conflict"])
-	flags.StringArrayVar(&c.remember, "remember", nil, descriptions["remember"])
-	flags.BoolVar(&c.ask, "ask", false, uicli.AskUsage)
-	flags.BoolVarP(&c.yes, "yes", "y", false, yesUsage)
-	flags.StringVar(&c.io.Output, "output", uicli.OutputText, uicli.OutputUsage)
-	flags.BoolVarP(&c.dryRun, "dry-run", "n", false, uicli.DryRunUsage)
-	flags.StringVar(&c.expect, "expect-fingerprint", "", uicli.ExpectUsage)
-
-	_ = cmd.RegisterFlagCompletionFunc("isolation", cobra.FixedCompletions(domain.Names(project.Isolations()), cobra.ShellCompDirectiveNoFileComp))
-	_ = cmd.RegisterFlagCompletionFunc("on-conflict", cobra.FixedCompletions(domain.Names(extract.OnConflicts()), cobra.ShellCompDirectiveNoFileComp))
+	c.form.Bind(cmd, &c.io)
 
 	return cmd
 }
 
 func (c *extractCommand) run(cmd *cobra.Command, args []string) error {
-	if err := c.io.Begin(cmd); err != nil {
-		return err
-	}
-
-	req := c.request(cmd, args)
-
-	ctx := cmd.Context()
-	useCase, err := c.open(ctx, c.io.Env.ProjectDir)
-	if err != nil {
-		return c.io.Refuse(domain.AsError(domain.AsErrorParams{Err: err}), extractLine{Command: cmd.CommandPath(), Request: req}.Argv())
-	}
-
-	progress := c.io.Progress(ctx)
-	ran, err := c.extract(cmd, useCase, req, progress.Report)
-	progress.Close()
-
-	return c.conclude(cmd, concluded{Outcome: ran.Outcome, Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: ran.Request, Cwd: c.io.Env.Cwd})
-}
-
-// extract runs the request in the wizard when the user can answer it, else unattended; it returns the request that ran, the wizard's answers included.
-func (c *extractCommand) extract(cmd *cobra.Command, useCase extract.UseCase, req extract.Request, report domain.Report) (ran, error) {
-	ctx := cmd.Context()
-
-	if c.interactive() {
-		return runForm(ctx, formParams{App: useCase, Request: req, Options: domain.RunOptions{DryRun: c.dryRun, CorrelationID: c.io.Env.CorrelationID, Report: report}, In: c.io.Streams.In, Out: c.io.Streams.Err})
-	}
-
-	outcome, err := useCase.Run(ctx, req, domain.RunOptions{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, CorrelationID: c.io.Env.CorrelationID, Report: report})
-	return ran{Outcome: outcome, Request: req}, err
-}
-
-// interactive reports whether the wizard runs: the user can see and answer it, the output is for a human, and neither --yes nor a previewed plan to apply asks for an unattended run.
-func (c *extractCommand) interactive() bool {
-	return c.io.Streams.CanPrompt() && c.expect == "" && c.io.Human() && !c.yes
-}
-
-func (c *extractCommand) request(cmd *cobra.Command, args []string) extract.Request {
-	req := extract.Request{
-		Files:      c.files,
-		To:         c.to,
-		From:       c.from,
-		Isolation:  project.Isolation(c.isolation),
-		OnConflict: extract.OnConflict(c.onConflict),
-		Remember:   c.remember,
-		Ask:        c.ask,
-	}
-
-	if len(args) > 0 {
-		req.Source = strings.TrimSpace(args[0])
-	}
-
-	if cmd.Flags().Changed(flagFF) {
-		req.FastForward = new(c.ff)
-	}
-	if cmd.Flags().Changed(flagKeep) {
-		req.Keep = new(c.keep)
-	}
-
-	return req
-}
-
-// concluded is how a run ended, for conclude: its outcome, its refusal, the request that ran and where.
-type concluded struct {
-	Outcome extract.Outcome
-	Err     *domain.Error
-	Request extract.Request
-	Cwd     string
+	return c.form.Launch(cmd, args, c.conclude)
 }
 
 // conclude prints how the run ended — the JSON envelope, a refusal, nothing to extract, the dry run and the line that applies it, or the outcome — and returns the failure that sets the exit code.
-func (c *extractCommand) conclude(cmd *cobra.Command, done concluded) error {
-	outcome := done.Outcome
-	line := extractLine{Command: cmd.CommandPath(), Request: done.Request}
+func (c *extractCommand) conclude(cmd *cobra.Command, ran form.Ran[extract.Request, extract.Outcome], err error) error {
+	failure := domain.AsError(domain.AsErrorParams{Err: err})
+	argv := c.form.Argv(cmd.CommandPath(), ran.Request)
+	outcome := ran.Outcome
 	if !c.io.Human() {
-		doc := done.Outcome.Envelope(done.Err)
-		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, line.Argv())...)
+		doc := ran.Outcome.Envelope(failure)
+		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, argv)...)
 		return c.io.Envelope(doc)
 	}
 
 	stdout, _ := c.io.Writers()
 	switch {
-	case done.Err != nil:
-		return c.io.Refuse(done.Err, line.Argv())
+	case failure != nil:
+		return c.io.Refuse(failure, argv)
 	case outcome.Result == nil && outcome.Plan.Nothing():
 		output.Frame(stdout, func(w io.Writer) { drawNothing(w, outcome.Plan) })
 		return nil
 	case outcome.Result == nil:
-		apply := line.String() + " --expect-fingerprint " + outcome.Fingerprint
+		apply := output.Line(argv) + " --expect-fingerprint " + outcome.Fingerprint
 		output.Frame(stdout, func(w io.Writer) {
 			output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(outcome.Plan), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: apply})
 		})
 		return nil
 	}
 
-	output.Frame(stdout, func(w io.Writer) { drawOutcome(w, outcome, done.Cwd) })
+	output.Frame(stdout, func(w io.Writer) { drawOutcome(w, outcome, c.io.Env.Cwd) })
 	return c.io.Failed(outcome.Failure())
 }

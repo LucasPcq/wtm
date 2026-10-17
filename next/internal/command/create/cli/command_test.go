@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"cmp"
 	"errors"
 	"strings"
 	"testing"
@@ -202,31 +201,6 @@ func TestAWorktreeLeftHalfCreatedPointsAtTheCleanThatRemovesIt(t *testing.T) {
 
 	assert.Equal(t, uicli.ExitError, got.Code)
 	assert.Contains(t, got.Stdout, "→ wtm clean feat/x --force   branch feat/x is left half-created at /repo/.trees/feat-x")
-}
-
-func TestARunAsksOnlyWhenTheUserCanSeeTheQuestionsAndAnswerThem(t *testing.T) {
-	cases := map[string]struct {
-		In, Err, Dumb, Yes bool
-		Output, Expect     string
-		Asks               bool
-	}{
-		"stdin and stderr terminals": {In: true, Err: true, Asks: true},
-		"stdin piped":                {Err: true},
-		"stderr redirected":          {In: true},
-		"TERM=dumb":                  {In: true, Err: true, Dumb: true},
-		"--yes":                      {In: true, Err: true, Yes: true},
-		"--output json":              {In: true, Err: true, Output: uicli.OutputJSON},
-		"--expect-fingerprint":       {In: true, Err: true, Expect: fingerprint},
-	}
-	for name, c := range cases {
-		streams, _, _, _ := output.Test()
-		streams.SetStdinTerminal(c.In)
-		streams.Err.SetTerminal(c.Err)
-		streams.SetDumbTerminal(c.Dumb)
-		cmd := &createCommand{io: uicli.Run{Streams: streams, Output: cmp.Or(c.Output, uicli.OutputText)}, yes: c.Yes, expect: c.Expect}
-
-		assert.Equal(t, c.Asks, cmd.interactive(), name)
-	}
 }
 
 func TestTheProgressDrawsLiveOnlyOnAStderrTerminalOfAKnownKind(t *testing.T) {

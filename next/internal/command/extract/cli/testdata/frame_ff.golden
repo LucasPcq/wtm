@@ -8,7 +8,7 @@
   ✓ Source branch: main · config
   ✓ Isolation: isolated · default
 
-  The branch the new worktree starts from is behind origin — fast-forward it before creating?
+  Fast-forward the parent branch to origin before creating the target; skipped when it has diverged
 
    Fast-forward to origin
   ────────────────────────────────────────────────────────────────────────────────────────────────

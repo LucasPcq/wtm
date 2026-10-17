@@ -202,14 +202,7 @@ func rebasing(t *testing.T, w world, name string) {
 // answered is the request the fields of form answer, built by Request.Answer from an empty one, the fields it remembers included.
 func answered(t *testing.T, form domain.Form) extract.Request {
 	t.Helper()
-	var req extract.Request
-	for _, field := range form.Fields {
-		var err error
-		req, err = req.Answer(field.Spec().Path, field.Answer())
-		require.NoError(t, err, field.Spec().Path)
-	}
-
-	req, err := req.Answer("remember", form.Remembering())
+	req, err := domain.Fold(extract.Request{}, form.Answers())
 	require.NoError(t, err)
 	return req
 }

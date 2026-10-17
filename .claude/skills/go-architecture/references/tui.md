@@ -80,3 +80,14 @@ What huh does **not** give, or not without custom code:
 - **A version line:** huh v2 needs Bubble Tea v2 (see Versions).
 
 **When to use huh:** a fixed or mildly dynamic questionnaire whose fields are stock types, where accessibility and theming for free outweigh a custom look. **When to hand-roll:** the flow is driven by facts that change with each answer and need I/O to recompute, steps are settled by several sources (flag, remembered answer, default) that must stay visible, or the last step is a preview of an effect rather than a question. A middle path, used by gh: hide prompting behind a small interface (`Prompter`), implement it with huh, keep the flow logic in the command.
+
+## 8. How `ui/form` applies this
+
+`next/`'s wizard is hand-rolled, for the reasons of §7 (facts read again after each answer, steps settled by a flag, a remembered answer or a default shown in the trail, a recap that previews the plan). It renders any command's schema:
+
+- **`form.Command[R, Q, O]`** is what a command's `cli/` hands its use case to: `Open`, a closure that opens the project's use case as a `form.UseCase[R, Q, O]` (its `Questions` and `Run`), and how the recap draws its plan. From the schema (`Q{}.Form()`) it registers the flags by field kind, builds `R` from the flags and args (`domain.Fold` of `R.Answer`), launches (the wizard on a terminal, else `Run`) and spells the command line (`Argv`, from `R.Values`).
+- **The `Wizard`** is the state machine of §4: the current step is data, every transition happens in `Update`, the repository is read off the loop after each answer (`Script.Observe` in a `tea.Cmd`), and the recap previews the plan the same way.
+- **The `Session`** holds what the wizard asked: the request is the one given with each step's answer folded in step order, so going back forgets an answer without a reset per step.
+- **A step per field kind** (select, confirmation, text list, text, multi-select) reads its label, help, options, pinned, remembered, skip and problems from the form observed last; a command gives its own step only where its question is its own (`Special`: extract's file picker, its target picked as a worktree then typed as a branch), embedding `form.Asked`, `form.TextStep` or `form.MultiSelectStep` and overriding only what differs (its standing, its check, its tone).
+- **Problems** are shown as their templates write them, the step's label standing for `{path}`; only a template's own first word is capitalised, never a value it starts with.
+

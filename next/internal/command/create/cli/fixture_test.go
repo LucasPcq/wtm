@@ -20,6 +20,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
@@ -28,6 +29,25 @@ const (
 	stateDir    = "/repo/main/.git/wtm"
 	branchName  = "feat/x"
 	fingerprint = "0123456789abcdef01234567"
+)
+
+// useCase is what the form calls of create's use case, so a test can stand in for it.
+type useCase = form.UseCase[create.Request, create.Questions, create.Outcome]
+
+type (
+	session       = form.Session[create.Request, create.Questions, create.Outcome]
+	sessionParams = form.SessionParams[create.Request, create.Questions, create.Outcome]
+)
+
+// The steps of create's form, in the order asked, then the recap.
+const (
+	stepBranches = iota
+	stepFrom
+	stepEnvFrom
+	stepIsolation
+	stepFastForward
+	stepIfNotExists
+	stepRecap
 )
 
 var createdAt = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)

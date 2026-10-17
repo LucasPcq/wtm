@@ -10,7 +10,7 @@ $ wtmx extract; echo EXIT=$?
   ✓ Isolation: isolated · default
   · Source update — nothing to fast-forward: the branch it starts from is not behind origin
 
-  Move removes the files from the source; copy keeps them.
+  Copy instead of move (keep the changes in the source)
 
 ▌› Move — remove the files from feat/form
    Copy — keep the files in feat/form

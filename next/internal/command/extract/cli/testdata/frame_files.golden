@@ -3,7 +3,7 @@
 
   ✓ Source worktree: feat/login
 
-  Space to toggle, a to select all, / to filter, enter to confirm, esc to go back.
+  Files to extract, or a directory to take everything below it
 
 ▌› [ ] apps/api/a.txt                                                                          mod
    [ ] apps/api/new.txt                                                                        new

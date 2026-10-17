@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
@@ -17,7 +18,7 @@ func TestADryRunWithNothingToAskDrawsNothing(t *testing.T) {
 	streams, _, _, out := output.Test()
 	req := create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}
 
-	ran, err := runForm(t.Context(), formParams{App: newApp(seed{}), Request: req, Options: domain.RunOptions{DryRun: true}, In: streams.In, Out: streams.Err})
+	ran, err := newForm(nil).Ask(t.Context(), form.AskParams[create.Request, create.Questions, create.Outcome]{App: newApp(seed{}), Request: req, Options: domain.RunOptions{DryRun: true}, In: streams.In, Out: streams.Err})
 
 	require.NoError(t, err)
 	assert.Equal(t, req, ran.Request)
@@ -31,7 +32,7 @@ func TestTheFormAppliesThePlanItPreviewedAndPreviewsAgainWhenItTurnedStale(t *te
 	streams, _, _, _ := output.Test()
 	req := create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}
 
-	_, err := runForm(t.Context(), formParams{App: app, Request: req, In: enters{}, Out: streams.Err})
+	_, err := newForm(nil).Ask(t.Context(), form.AskParams[create.Request, create.Questions, create.Outcome]{App: app, Request: req, In: enters{}, Out: streams.Err})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"preview-1", "preview-2"}, app.held)
@@ -43,7 +44,7 @@ func TestAFailedApplyEndsTheFormWithoutAskingAgain(t *testing.T) {
 	streams, _, _, _ := output.Test()
 	req := create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}
 
-	_, err := runForm(t.Context(), formParams{App: app, Request: req, In: enters{}, Out: streams.Err})
+	_, err := newForm(nil).Ask(t.Context(), form.AskParams[create.Request, create.Questions, create.Outcome]{App: app, Request: req, In: enters{}, Out: streams.Err})
 
 	assert.ErrorIs(t, err, failed)
 	assert.Equal(t, []string{"preview-1"}, app.held)
@@ -54,7 +55,7 @@ func TestTheFormRunsThePreviewAndTheApplyWithTheCorrelationID(t *testing.T) {
 	streams, _, _, _ := output.Test()
 	req := create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}
 
-	_, err := runForm(t.Context(), formParams{App: app, Request: req, Options: domain.RunOptions{CorrelationID: "corr-1"}, In: enters{}, Out: streams.Err})
+	_, err := newForm(nil).Ask(t.Context(), form.AskParams[create.Request, create.Questions, create.Outcome]{App: app, Request: req, Options: domain.RunOptions{CorrelationID: "corr-1"}, In: enters{}, Out: streams.Err})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"corr-1", "corr-1"}, app.ids)

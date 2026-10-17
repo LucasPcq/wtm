@@ -6,7 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
@@ -17,7 +19,7 @@ func TestTheRecapAppliesThePlanItPreviewedAndPreviewsAgainWhenItTurnedStale(t *t
 	req := settled()
 	req.Keep = new(false)
 
-	_, err := runForm(t.Context(), formParams{App: app, Request: req, In: enters{}, Out: streams.Err})
+	_, err := newForm(nil).Ask(t.Context(), form.AskParams[extract.Request, extract.Questions, extract.Outcome]{App: app, Request: req, In: enters{}, Out: streams.Err})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"preview-1", "preview-2"}, app.held)
@@ -28,7 +30,7 @@ func TestADryRunWithNothingToAskDrawsNothing(t *testing.T) {
 	req := settled()
 	req.Keep = new(false)
 
-	ran, err := runForm(t.Context(), formParams{App: newWorld(seed{}).usecase(), Request: req, Options: domain.RunOptions{DryRun: true}, In: streams.In, Out: streams.Err})
+	ran, err := newForm(nil).Ask(t.Context(), form.AskParams[extract.Request, extract.Questions, extract.Outcome]{App: newWorld(seed{}).usecase(), Request: req, Options: domain.RunOptions{DryRun: true}, In: streams.In, Out: streams.Err})
 
 	require.NoError(t, err)
 	assert.Equal(t, req, ran.Request)
@@ -42,7 +44,7 @@ func TestTheRecapRunsThePreviewAndTheApplyWithTheCorrelationID(t *testing.T) {
 	req := settled()
 	req.Keep = new(false)
 
-	_, err := runForm(t.Context(), formParams{App: app, Request: req, Options: domain.RunOptions{CorrelationID: "corr-1"}, In: enters{}, Out: streams.Err})
+	_, err := newForm(nil).Ask(t.Context(), form.AskParams[extract.Request, extract.Questions, extract.Outcome]{App: app, Request: req, Options: domain.RunOptions{CorrelationID: "corr-1"}, In: enters{}, Out: streams.Err})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"corr-1", "corr-1"}, app.ids)

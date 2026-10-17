@@ -44,6 +44,11 @@ type Outcome struct {
 	Result      *Result
 }
 
+// PlanFingerprint is the fingerprint of the plan the run previewed or applied, the one a preview's apply is held to.
+func (o Outcome) PlanFingerprint() string {
+	return o.Fingerprint
+}
+
 // Failure is the error the apply ended on, nil when it succeeded or did not run.
 func (o Outcome) Failure() *domain.Error {
 	if o.Result == nil {

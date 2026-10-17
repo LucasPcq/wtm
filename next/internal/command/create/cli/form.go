@@ -2,38 +2,26 @@ package cli
 
 import (
 	"context"
-	"io"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
-// useCase is what the wizard calls of create's use case, so a test can stand in for it.
-type useCase interface {
-	Questions(ctx context.Context, req create.Request) (create.Questions, error)
-	Run(ctx context.Context, req create.Request, opts domain.RunOptions) (create.Outcome, error)
-}
+// createForm is create over the ui/form engine, which asks every field of create's form by its kind.
+type createForm = form.Command[create.Request, create.Questions, create.Outcome]
 
-type formParams struct {
-	App     useCase
-	Request create.Request
-	Options domain.RunOptions // DryRun, CorrelationID and Report; the wizard sets the surface and the fingerprint
-	In      io.Reader
-	Out     *output.Stream
-}
+// createFlags spells each field path of the request as the argument or flag that sets it, for the failures and the wizard.
+var createFlags = newForm(nil).Flags()
 
-// ran is how a run went and the request it ran, which the wizard's answers may have changed.
-type ran struct {
-	Outcome create.Outcome
-	Request create.Request
-}
-
-// runForm runs the wizard on the terminal through to the apply; it returns the request as answered and its outcome, with form.Run's error: a cancel, a failed read of the repository, or the refusal of the run.
-func runForm(ctx context.Context, params formParams) (ran, error) {
-	w := newWizard(ctx, wizardParams{App: params.App, Request: params.Request, Options: params.Options})
-	err := form.Run(ctx, w.form(), params.In, params.Out)
-
-	return ran{Outcome: w.outcome, Request: w.req}, err
+func newForm(open func(ctx context.Context, dir string) (create.UseCase, error)) *createForm {
+	return &createForm{
+		YesUsage: yesUsage,
+		Open: func(ctx context.Context, dir string) (form.UseCase[create.Request, create.Questions, create.Outcome], error) {
+			return open(ctx, dir)
+		},
+		Plan: func(previewed create.Outcome, width int, st *output.Styles) string {
+			return planTextOf(previewed.Plan, previewed.Warnings, width, st)
+		},
+	}
 }

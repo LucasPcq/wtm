@@ -18,11 +18,11 @@ next/
       port.go           the driven ports it calls (interfaces)
       rules.go          pure: facts → plan
       questions.go      pure: the request, its form model, its validation
-      cli/              its driving adapter: cobra command, flags, wizard steps, output
+      cli/              its driving adapter: cobra command over form.Command, its own wizard steps, output
     service/            what use cases call: operation (locks, plan under them, fingerprint, events), provision (a new worktree made whole), repository (the facts a command decides from) + <name>test contracts (operationtest)
     domain/             the model, pure: errors, events, operations and their run options, question vocabulary; worktree/ (with the stack graph), project/, env/, dotenv/
     adapter/<name>/     driven adapters implementing the ports (git, store, config, shell, oplock, events…) + <name>test fakes
-    ui/                 the presentation kit, knowing no command: cli (root, exit codes, signals), output (frames, envelope), form (wizard engine, components)
+    ui/                 the presentation kit, knowing no command: cli (root, exit codes, signals), output (frames, envelope), form (form.Command: flags, launch and wizard of any command's schema; components)
     api/                the catalogue of the commands for a surface other than the CLI: name, schema, execution (JSON request → domain.Envelope + status); domain and stdlib only
 ```
 
@@ -35,7 +35,7 @@ Why a package per command, when the Go guides prefer a package per concept and B
 `wtm-next create feat/x --from main`, hop by hop:
 
 1. `cmd/wtm-next/main.go`: the root runs with each command's CLI registered.
-2. `command/create/cli/command.go`: flags → `create.Request` + `domain.RunOptions` (the correlation ID from the process's `uicli.Env`, read once by `main`), the repository opened from `Env.ProjectDir`; the wizard on a terminal, else `UseCase.Run`.
+2. `command/create/cli/command.go` → `ui/form` `Command.Launch`: flags (registered from create's schema) → `create.Request` + `domain.RunOptions` (the correlation ID from the process's `uicli.Env`, read once by `main`), the repository opened from `Env.ProjectDir`; the wizard on a terminal, else `UseCase.Run`.
 3. `command/create/usecase.go` → `Run`: begin the operation (locks), plan under the locks, fingerprint, stop on a dry run, refuse a stale plan, apply between the events.
 4. `Plan`: `Observe` reads the repository through the ports of `port.go`; `Resolve` (`questions.go`) settles the request; `Decide` (`rules.go`) makes the plan.
 5. `Apply`: its steps, calling `service/provision` for each new worktree.
@@ -50,7 +50,8 @@ Why a package per command, when the Go guides prefer a package per concept and B
 | validates or defaults the request, builds the form model and its schema (labels, help, flag names, option labels) | `command/<name>/questions.go` |
 | sequences the request, calls ports and services | `command/<name>/usecase.go` |
 | is an interface to the outside world one command needs | `command/<name>/port.go` |
-| registers flags, renders output, draws the wizard steps of one command from its schema | `command/<name>/cli/` |
+| renders output, asks a step of one command its own way | `command/<name>/cli/` |
+| registers flags, builds the request, launches, asks a field of any kind, from the schema | `ui/form` |
 | is a pure rule or a type two commands need | `domain/…` |
 | orchestrates I/O two commands need | `service/<name>` (with its own `port.go`) |
 | is presentation two commands need | `ui/…` |

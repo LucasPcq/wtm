@@ -17,8 +17,8 @@ internal/
     usecase.go         the story: Run (operation, plan, fingerprint, apply), Plan, Apply, Observe, Questions
     port.go            the driven ports it reaches the world through
     rules.go           pure: facts → plan
-    questions.go       its form model, its schema (Questions.Form, Request.Answer: what the flags, --help and wizard read) and its validation
-    cli/               its driving adapter: the cobra command, its wizard, its human output and its JSON
+    questions.go       its form model, its schema (Questions.Form, Request.Answer and Request.Values: what the flags, --help, the command line and the wizard read) and its validation
+    cli/               its driving adapter: the cobra command over form.Command, the steps it asks its own way, its human output and its JSON
   service/             what the use cases call
     operation/         the operation every mutating use case goes through: its record, its locks, its plan under them and fingerprinted, its events
     operationtest/     the contract every mutating use case's Run passes (no lock nor event on a dry run, a stale plan refused before any event, events in order), for tests
@@ -29,7 +29,7 @@ internal/
   ui/                  the presentation kit every command's cli shares, knowing no command
     cli/               the root: version, --quiet, help, signals, the exit code a command's failure sets
     output/            the streams (stdin, stdout, stderr, whether each is a terminal, a colour renderer each), frames and blocks, progress, failures, plans, the hook view, the v2 envelope writer
-    form/              a command's form: the wizard that walks its steps to a recap and applies, select list, multi-select, text field, text list, confirm, their styles
+    form/              a command's form, generic over its schema: form.Command (its flags, its request, its launch, its command line), the session and a step per field kind, the wizard that walks them to a recap and applies, select list, multi-select, text field, text list, their styles
   api/                 the catalogue of the commands, knowing none of them: each one's name, its schema (domain.Form) and its execution, a JSON request in and a domain.Envelope out with the status of its kind, for a surface other than the command line
 ```
 No file format lives in `domain/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `domain/project`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
@@ -61,7 +61,7 @@ A use case or a service declares the interfaces it needs in its `port.go`; an ad
 `wtm-next create feat/x --from main`, hop by hop:
 
 1. `cmd/wtm-next/main.go → main`: `ui/output.System()` reads the process's streams and `ui/cli.ReadEnv()` its environment once (the working directory, `$WTM_PROJECT_DIR`, `$WTM_CORRELATION_ID`), and `ui/cli.Main` runs the root with `command/create/cli.New(streams, env, openCreate)` registered on it; `ui/cli/root.go → Execute` maps the failure a command returns onto its exit code.
-2. `command/create/cli/command.go → createCommand.run`: `uicli.Run.Begin` refuses an invalid correlation ID before any repository is looked up, the flags become a `create.Request`, `openCreate(ctx, env.ProjectDir)` (`cmd/wtm-next/project.go`) finds the repository of that directory, always from its main worktree, and wires the use case (`cmd/wtm-next/wire.go → wire`), then `createCommand.create` runs the wizard when the user can see and answer it (stdin and stderr terminals, `TERM` not `dumb`, human output, no `--yes` nor `--expect-fingerprint`: `output.Streams.CanPrompt`, `form.go → runForm`), else `create.UseCase.Run` with its `domain.RunOptions`, the correlation ID among them.
+2. `command/create/cli/command.go → createCommand.run` hands the command line to `ui/form/command.go → Command.Launch`: `uicli.Run.Begin` refuses an invalid correlation ID before any repository is looked up, the flags, registered from create's schema, become a `create.Request`, `openCreate(ctx, env.ProjectDir)` (`cmd/wtm-next/project.go`) finds the repository of that directory, always from its main worktree, and wires the use case (`cmd/wtm-next/wire.go → wire`), then it runs the wizard when the user can see and answer it (stdin and stderr terminals, `TERM` not `dumb`, human output, no `--yes` nor `--expect-fingerprint`: `output.Streams.CanPrompt`, `Command.Ask`), else `create.UseCase.Run` with its `domain.RunOptions`, the correlation ID among them; `Launch` hands the run to `createCommand.conclude`.
 3. `command/create/usecase.go → UseCase.Run`: `operation.Service.Begin` records the operation with the options' correlation ID, refusing an invalid one, and takes its locks (`service/operation/operation.go`), `operation.PlanUnderLocks` plans under them, `operation.Fingerprint` fingerprints the plan, a dry run stops there, `Op.Expect` refuses a stale plan, then `Apply` runs between the started and finished events.
 4. `command/create/usecase.go → UseCase.Plan`: `Observe` reads the repository (`repository.Observe`: config, snapshot, run.toml, through the ports of `port.go`), `Resolve` (`questions.go`) settles the request on those facts, `Decide` (`rules.go`) turns them into the plan.
 5. `command/create/usecase.go → UseCase.Apply`: an optional fast-forward of the source (`provision.Service.FastForwardEach`, `service/provision/fastforward.go`, each outcome worded as create's own warning), then `provision.Service.Run` (`service/provision/provision.go`) per branch: the worktree, its env, its meta record, its hooks.

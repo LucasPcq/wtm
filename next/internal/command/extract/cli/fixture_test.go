@@ -7,6 +7,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
@@ -18,6 +20,25 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+)
+
+// useCase is what the form calls of extract's use case, so a test can stand in for it.
+type useCase = form.UseCase[extract.Request, extract.Questions, extract.Outcome]
+
+type sessionParams = form.SessionParams[extract.Request, extract.Questions, extract.Outcome]
+
+// The steps of extract's form, in the order asked, then the recap.
+const (
+	stepSource = iota
+	stepFiles
+	stepTarget
+	stepBranch
+	stepFrom
+	stepIsolation
+	stepFastForward
+	stepMode
+	stepOnConflict
+	stepRecap
 )
 
 const (

@@ -17,7 +17,7 @@ func TestEachAskedStepIsEnteredThenTheRecapApplies(t *testing.T) {
 
 	assert.Contains(t, d.screen(), "Step 1/3 • First")
 	assert.Contains(t, d.screen(), "What First asks")
-	assert.Contains(t, d.screen(), "↑↓ navigate • enter confirm • esc cancel")
+	assert.Contains(t, d.screen(), "↑↓ navigate • / filter • enter confirm • esc cancel")
 
 	d.keys("enter")
 	assert.Contains(t, d.screen(), "Step 2/3 • Second")

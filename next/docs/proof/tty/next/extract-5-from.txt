@@ -7,7 +7,7 @@ $ wtmx extract; echo EXIT=$?
   ✓ Target worktree: new worktree
   ✓ Branch name: feat/moved
 
-  Branch to base the new worktree on
+  Parent branch when creating the target worktree
 
 ▌› main
    feat/a

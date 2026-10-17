@@ -46,6 +46,8 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 		next.FastForward = &yes
 	case "if_not_exists":
 		next.IfNotExists, err = domain.Yes(answer)
+	case domain.PathAsk:
+		next.Ask, err = domain.Yes(answer)
 	default:
 		err = domain.Unknown(path)
 	}
@@ -55,6 +57,30 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 	}
 
 	return next, nil
+}
+
+// Values is the request's answer to the field at path, spelled as Answer takes it; nil when the request leaves the field to its default.
+func (r Request) Values(path string) []string {
+	switch path {
+	case "branches":
+		return r.Branches
+	case domain.PathRemember:
+		return r.Remember
+	case "from":
+		return domain.Spelled(r.From)
+	case "env_from":
+		return domain.Spelled(r.EnvFrom)
+	case "isolation":
+		return domain.Spelled(r.Isolation)
+	case "fast_forward":
+		return domain.Said(r.FastForward)
+	case "if_not_exists":
+		return domain.SaidYes(r.IfNotExists)
+	case domain.PathAsk:
+		return domain.SaidYes(r.Ask)
+	}
+
+	return nil
 }
 
 // ----------------------------------------------------------------------------
@@ -108,6 +134,7 @@ func NewQuestions(f Facts, req Request) Questions {
 	// Even under --ask, the wizard shows what is remembered, so the user can keep or untick it.
 	questions.EnvFrom.Remembered = project.RememberedEnvStrategy(recalled[project.RememberEnvStrategy], f.Config.Env.Strategy)
 	questions.Isolation.Remembered = project.Isolation(recalled[project.RememberIsolation])
+	questions.FastForward.Remembered = domain.RememberedFastForward(recalled[project.RememberSourceUpdate])
 	questions.Errors = f.problems(questions)
 	return questions
 }
@@ -121,10 +148,11 @@ func (q Questions) Form() domain.Form {
 			Options:   q.Branches.Options,
 		},
 		domain.SelectField{
-			FieldSpec: domain.FieldSpec{Path: "from", Flag: "--from", Label: "Source branch", Help: "The branch a new branch starts from, or the parent recorded for wtm sync of one that already exists", Origin: q.From.Origin},
-			Value:     q.From.Value,
-			Options:   q.From.Options,
-			Pinned:    q.From.Pinned,
+			FieldSpec:   domain.FieldSpec{Path: "from", Flag: "--from", Label: "Source branch", Help: "The branch a new branch starts from, or the parent recorded for wtm sync of one that already exists", Origin: q.From.Origin},
+			Value:       q.From.Value,
+			Options:     q.From.Options,
+			Pinned:      q.From.Pinned,
+			Refreshable: true,
 		},
 		domain.SelectField{
 			FieldSpec:    domain.FieldSpec{Path: "env_from", Flag: "--env-from", Label: "Env strategy", Help: "How the .env files of the new worktrees are provisioned: example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy", Origin: q.EnvFrom.Origin},
@@ -145,6 +173,7 @@ func (q Questions) Form() domain.Form {
 		domain.ConfirmField{
 			FieldSpec:    domain.FieldSpec{Path: "fast_forward", Flag: "--ff", Label: "Source update", Help: "Fast-forward to origin first the branch each worktree starts from, when it is behind; one that has diverged or holds uncommitted changes starts as it is", Origin: q.FastForward.Origin, Skip: q.FastForward.Skip},
 			Value:        q.FastForward.Value,
+			Remembered:   q.FastForward.Remembered,
 			Rememberable: true,
 			Remember:     q.remembers("fast_forward"),
 		},
@@ -243,13 +272,13 @@ func (f Facts) fastForward(req Request) domain.Confirm {
 	return domain.FastForwardAnswer(params)
 }
 
+// ifNotExists is never asked, its flag the only way to set it; given, it stands in the trail with its flag.
 func ifNotExists(given bool) domain.Confirm {
-	question := domain.Confirm{Answer: domain.Answer[bool]{Value: given, Origin: domain.OriginDefault}, Skip: "set by its flag only"}
 	if given {
-		question.Origin = domain.OriginRequest
+		return domain.Confirm{Answer: domain.Answer[bool]{Value: true, Origin: domain.OriginRequest}}
 	}
 
-	return question
+	return domain.Confirm{Answer: domain.Answer[bool]{Origin: domain.OriginDefault}, Skip: "set by its flag only"}
 }
 
 // ----------------------------------------------------------------------------

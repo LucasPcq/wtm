@@ -2,7 +2,6 @@ package form
 
 import (
 	"strings"
-	"unicode"
 
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/charmbracelet/lipgloss"
@@ -67,20 +66,11 @@ func Indented(text string) string {
 // errorBanner draws message as a field's error, wrapped to width under the failure glyph.
 func errorBanner(message string, width int, st *Styles) string {
 	hang := output.Indent + "  "
-	lines := strings.Split(Wrap(capitalized(message), width-len(hang)-1), "\n")
+	lines := strings.Split(Wrap(message, width-len(hang)-1), "\n")
 
 	for i := 1; i < len(lines); i++ {
 		lines[i] = hang + st.Danger.Render(lines[i])
 	}
 	lines[0] = output.Indent + st.Danger.Render(output.GlyphFailure) + " " + st.Danger.Render(lines[0])
 	return strings.Join(lines, "\n")
-}
-
-func capitalized(text string) string {
-	if text == "" {
-		return text
-	}
-	runes := []rune(text)
-	runes[0] = unicode.ToUpper(runes[0])
-	return string(runes)
 }
