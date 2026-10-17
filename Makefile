@@ -59,10 +59,10 @@ next-lint:
 	go tool revive -config next/revive.toml -formatter plain ./next/...
 
 # dupl reports token-level clones in internal/ and next/. It is not part of
-# `lint`: a clone is a judgement call — two parallel families over unrelated
-# types (create and extract in next/) read better duplicated than behind a
-# generic — so it informs a review rather than gating one. Raise the threshold
-# to see only the large ones.
+# `lint`: a clone is a judgement call — two use cases of next/ telling the same
+# story (each Run) read better side by side than behind a generic, while what
+# every form shares already lives in ui/form — so it informs a review rather
+# than gating one. Raise the threshold to see only the large ones.
 DUPL_THRESHOLD ?= 75
 dupl:
 	@find internal next -name '*.go' ! -name '*_test.go' > /tmp/wtm-dupl-files
