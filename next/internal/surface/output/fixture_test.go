@@ -3,7 +3,6 @@ package output
 import (
 	"errors"
 	"path/filepath"
-	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/app"
 	"github.com/LucasPcq/wtm/next/internal/app/create"
@@ -16,15 +15,10 @@ import (
 
 var meta = worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvExample, Isolation: run.Isolated}
 
-func inTrees(t *testing.T) string {
-	t.Helper()
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Chdir(root)
-	return filepath.Join(root, ".trees")
-}
+const (
+	cwd   = "/repo/main"
+	trees = "/repo/main/.trees"
+)
 
 func twoCreated(trees string) app.CreateOutcome {
 	return app.CreateOutcome{
@@ -52,7 +46,7 @@ func mixed(trees string) app.CreateOutcome {
 		Plan: create.Planned{
 			Branches: []create.BranchPlan{
 				{Branch: "feature", Path: filepath.Join(trees, "feature"), Action: create.ActionCheckOut},
-				{Branch: "linked", Path: filepath.Join(filepath.Dir(trees), "elsewhere", "linked"), Action: create.ActionUnchanged},
+				{Branch: "linked", Path: "/repo/main/elsewhere/linked", Action: create.ActionUnchanged},
 				{Branch: "feat/c", Path: filepath.Join(trees, "feat-c"), Action: create.ActionCreate},
 				{Branch: "feat/d", Path: filepath.Join(trees, "feat-d"), Action: create.ActionCreate},
 				{Branch: "remote-only", Path: filepath.Join(trees, "remote-only"), Action: create.ActionResume, Upstream: "origin/remote-only"},
@@ -71,7 +65,7 @@ func mixed(trees string) app.CreateOutcome {
 					{File: ".env", Key: "DB", Port: "pg", Base: 5432, Status: settle.StatusMissingKey},
 				}},
 			}},
-			{Subject: "linked", Status: wtm.StatusDone, Reason: wtm.ReasonUnchanged, Detail: &create.Detail{Path: filepath.Join(filepath.Dir(trees), "elsewhere", "linked"), Metadata: worktree.Meta{SourceBranch: "main"}}},
+			{Subject: "linked", Status: wtm.StatusDone, Reason: wtm.ReasonUnchanged, Detail: &create.Detail{Path: "/repo/main/elsewhere/linked", Metadata: worktree.Meta{SourceBranch: "main"}}},
 			{Subject: "feat/c", Status: wtm.StatusFailed, Reason: wtm.ReasonIncomplete, Err: hook, Warnings: []wtm.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping", Params: wtm.Params{"target": ".env"}}}, Detail: &create.Detail{Path: filepath.Join(trees, "feat-c"), Metadata: meta}},
 			{Subject: "feat/d", Status: wtm.StatusCancelled, Reason: wtm.ReasonIncomplete, Err: &wtm.Error{Kind: wtm.KindCancelled, Code: "unit.interrupted", Message: "interrupted", Params: wtm.Params{"phase": "on_create"}}, Detail: &create.Detail{Path: filepath.Join(trees, "feat-d"), Metadata: meta}},
 			{Subject: "remote-only", Status: wtm.StatusSkipped, Reason: wtm.ReasonInterrupted},

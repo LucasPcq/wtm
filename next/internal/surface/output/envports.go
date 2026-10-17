@@ -1,4 +1,3 @@
-// Package output is what wtm-next prints: human frames and blocks, and the JSON envelope.
 package output
 
 import (
@@ -9,18 +8,18 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/wtm/settle"
 )
 
-func SettlementNote(plan settle.Redacted) string {
+func settlementNote(plan settle.Redacted) string {
 	var parts []string
 	if shifted := len(settle.Plan(plan).Rewrites()); shifted > 0 {
-		parts = append(parts, fmt.Sprintf("%d %s settled (offset +%d)", shifted, plural(pluralParams{Count: shifted, One: "port", Many: "ports"}), plan.Offset))
+		parts = append(parts, fmt.Sprintf("%d %s settled (offset +%d)", shifted, noun(shifted, "port"), plan.Offset))
 	}
 	if written := changedOwned(plan.Owned); written > 0 {
-		parts = append(parts, fmt.Sprintf("%d owned %s written", written, plural(pluralParams{Count: written, One: "value", Many: "values"})))
+		parts = append(parts, fmt.Sprintf("%d owned %s written", written, noun(written, "value")))
 	}
-	return strings.Join(parts, " · ")
+	return strings.Join(parts, dot)
 }
 
-func AnomalyLines(plan settle.Redacted) []string {
+func anomalyLines(plan settle.Redacted) []string {
 	entries := settle.Plan(plan).Anomalies()
 	if len(entries) == 0 {
 		return nil
@@ -41,7 +40,8 @@ func AnomalyLines(plan settle.Redacted) []string {
 		if i > 0 {
 			lines = append(lines, "")
 		}
-		lines = append(lines, fileRule(fileRuleParams{File: file, Width: widest}))
+		head := fmt.Sprintf("── %s ", file)
+		lines = append(lines, head+strings.Repeat("─", max(widest-len([]rune(head)), 0)))
 		for j, entry := range entries {
 			if entry.File == file {
 				lines = append(lines, rows[j])
@@ -75,19 +75,6 @@ func filesOf(entries []settle.Entry) []string {
 	return slices.Compact(files)
 }
 
-type fileRuleParams struct {
-	File  string
-	Width int
-}
-
-func fileRule(params fileRuleParams) string {
-	head := fmt.Sprintf("── %s ", params.File)
-	if fill := params.Width - len([]rune(head)); fill > 0 {
-		return head + strings.Repeat("─", fill)
-	}
-	return head
-}
-
 func pad(s string, width int) string {
 	return s + strings.Repeat(" ", max(0, width-len([]rune(s))))
 }
@@ -102,15 +89,9 @@ func changedOwned(owned []settle.OwnedEntry) int {
 	return count
 }
 
-type pluralParams struct {
-	Count int
-	One   string
-	Many  string
-}
-
-func plural(params pluralParams) string {
-	if params.Count == 1 {
-		return params.One
+func noun(count int, one string) string {
+	if count == 1 {
+		return one
 	}
-	return params.Many
+	return one + "s"
 }

@@ -68,7 +68,7 @@ func (v *hookView) finish(end hookEnd) {
 	}
 	errorLine(v.w, result)
 	for _, line := range failed {
-		message(v.w, indent+truncate(expandTabs(line), max(v.width()-len(indent), hookMinWidth)))
+		message(v.w, indent+truncate(expandTabs(line), max(blockWidth(v.w)-len(indent), hookMinWidth)))
 	}
 	if v.logPath != "" {
 		infoLine(v.w, hookLogLabel, v.logPath)
@@ -108,7 +108,7 @@ func (v *hookView) flush() {
 
 func (v *hookView) repaint() {
 	v.clear()
-	width := v.width()
+	width := blockWidth(v.w)
 	fmt.Fprintf(v.w, "%s%s\n", indent, truncate(v.header, width))
 	v.painted++
 	if v.notice != "" {
@@ -128,14 +128,6 @@ func (v *hookView) clear() {
 	}
 	fmt.Fprintf(v.w, ansiPrevLine+ansiClearBelow, v.painted)
 	v.painted = 0
-}
-
-func (v *hookView) width() int {
-	cols := terminalWidth(v.w)
-	if cols <= 0 {
-		return hookFallbackWidth
-	}
-	return cols - 2*len(indent)
 }
 
 func cutSegment(buf *bytes.Buffer) (string, byte, bool) {

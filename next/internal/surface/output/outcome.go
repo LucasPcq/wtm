@@ -12,9 +12,7 @@ import (
 )
 
 const (
-	commandName     = "create"
-	reasonSeparator = " · "
-	tallySeparator  = " · "
+	commandName = "create"
 )
 
 var reasonLabels = map[wtm.Reason]string{
@@ -27,6 +25,7 @@ var reasonLabels = map[wtm.Reason]string{
 type OutcomeParams struct {
 	Outcome   app.CreateOutcome
 	FollowUps []NextStep
+	Cwd       string
 }
 
 func Outcome(w io.Writer, params OutcomeParams) {
@@ -42,8 +41,10 @@ func Outcome(w io.Writer, params OutcomeParams) {
 		if !standing(item) || item.Detail == nil {
 			continue
 		}
-		view := viewOf(item)
-		rows, anomalies, next = append(rows, view.row), append(anomalies, view.anomalies...), append(next, view.next)
+		path := shownPath(shown{Cwd: params.Cwd, Path: item.Detail.Path})
+		rows = append(rows, planRow{Label: item.Subject, Values: []string{path + itemNote(item)}})
+		anomalies = append(anomalies, anomaliesOf(item)...)
+		next = append(next, NextStep{Command: "wtm go " + item.Subject})
 	}
 	for _, item := range items {
 		for _, warned := range item.Warnings {
@@ -55,7 +56,7 @@ func Outcome(w io.Writer, params OutcomeParams) {
 	}
 	if len(rows) > 0 {
 		blank(w)
-		writePlan(w, renderPlan(planParams{Rows: rows, Warnings: anomalies, Width: max(terminalWidth(w)-len(indent), 0)}))
+		drawPlan(w, planParams{Rows: rows, Warnings: anomalies})
 	}
 	if len(rows) == 0 && len(anomalies) > 0 {
 		blank(w)
@@ -96,7 +97,7 @@ func headline(w io.Writer, items []create.Item) {
 			parts = append(parts, strconv.Itoa(count[key])+" "+key)
 		}
 	}
-	line := commandName + ": " + strings.Join(parts, tallySeparator)
+	line := commandName + ": " + strings.Join(parts, dot)
 	switch {
 	case count["failed"] > 0:
 		errorLine(w, line)
@@ -133,13 +134,5 @@ func itemWhy(item create.Item) string {
 	if item.Reason != wtm.ReasonIncomplete {
 		return why
 	}
-	return why + reasonSeparator + reasonLabels[item.Reason]
-}
-
-func errorText(err *wtm.Error) string {
-	keepsCause := err.Kind == wtm.KindInternal || err.Kind == wtm.KindInvalid && len(err.Fields) == 0
-	if err.Cause == nil || !keepsCause {
-		return err.Message
-	}
-	return err.Message + ": " + err.Cause.Error()
+	return why + dot + reasonLabels[item.Reason]
 }

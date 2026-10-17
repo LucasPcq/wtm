@@ -35,3 +35,11 @@ func fieldLines(err *wtm.Error) []string {
 	}
 	return lines
 }
+
+func errorText(err *wtm.Error) string {
+	keepsCause := err.Kind == wtm.KindInternal || err.Kind == wtm.KindInvalid && len(err.Fields) == 0
+	if err.Cause == nil || !keepsCause {
+		return err.Message
+	}
+	return err.Message + ": " + err.Cause.Error()
+}

@@ -18,31 +18,25 @@ type EnvelopeParams struct {
 }
 
 type envelope struct {
-	V           int               `json:"v"`
-	Command     string            `json:"command"`
-	OK          bool              `json:"ok"`
-	Op          string            `json:"op,omitempty"`
-	Items       []envelopeItem    `json:"items,omitempty"`
-	Plan        *create.Planned   `json:"plan,omitempty"`
-	Fingerprint string            `json:"fingerprint,omitempty"`
-	FollowUps   []envelopeFollow  `json:"follow_ups"`
-	Warnings    []envelopeWarning `json:"warnings"`
-	Error       *envelopeError    `json:"error,omitempty"`
+	V           int              `json:"v"`
+	Command     string           `json:"command"`
+	OK          bool             `json:"ok"`
+	Op          string           `json:"op,omitempty"`
+	Items       []envelopeItem   `json:"items,omitempty"`
+	Plan        *create.Planned  `json:"plan,omitempty"`
+	Fingerprint string           `json:"fingerprint,omitempty"`
+	FollowUps   []envelopeFollow `json:"follow_ups"`
+	Warnings    []wtm.Warning    `json:"warnings"`
+	Error       *envelopeError   `json:"error,omitempty"`
 }
 
 type envelopeItem struct {
-	Subject  string            `json:"subject"`
-	Status   wtm.Status        `json:"status"`
-	Reason   wtm.Reason        `json:"reason,omitempty"`
-	Error    *envelopeError    `json:"error,omitempty"`
-	Warnings []envelopeWarning `json:"warnings,omitempty"`
-	Detail   any               `json:"detail"`
-}
-
-type envelopeWarning struct {
-	Code    string     `json:"code"`
-	Params  wtm.Params `json:"params,omitempty"`
-	Message string     `json:"message"`
+	Subject  string         `json:"subject"`
+	Status   wtm.Status     `json:"status"`
+	Reason   wtm.Reason     `json:"reason,omitempty"`
+	Error    *envelopeError `json:"error,omitempty"`
+	Warnings []wtm.Warning  `json:"warnings,omitempty"`
+	Detail   any            `json:"detail"`
 }
 
 type envelopeFollow struct {
@@ -81,12 +75,12 @@ func Envelope(w io.Writer, params EnvelopeParams) error {
 		for _, item := range outcome.Result.Items {
 			doc.Items = append(doc.Items, itemOf(item))
 		}
-		doc.Warnings = warningsOf(outcome.Warnings)
+		doc.Warnings = outcome.Warnings
 	case failure == nil:
-		doc.Plan, doc.Fingerprint, doc.Warnings = &outcome.Plan, outcome.Fingerprint, warningsOf(outcome.Warnings)
+		doc.Plan, doc.Fingerprint, doc.Warnings = &outcome.Plan, outcome.Fingerprint, outcome.Warnings
 	}
 	if doc.Warnings == nil {
-		doc.Warnings = []envelopeWarning{}
+		doc.Warnings = []wtm.Warning{}
 	}
 	doc.OK, doc.Error = failure == nil, errorOf(failure)
 	encoder := json.NewEncoder(w)
@@ -100,19 +94,8 @@ func itemOf(item create.Item) envelopeItem {
 	if item.Detail != nil {
 		detail = item.Detail
 	}
-	doc := envelopeItem{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Error: errorOf(item.Err), Detail: detail}
-	if len(item.Warnings) > 0 {
-		doc.Warnings = warningsOf(item.Warnings)
-	}
+	doc := envelopeItem{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Error: errorOf(item.Err), Warnings: item.Warnings, Detail: detail}
 	return doc
-}
-
-func warningsOf(warnings []wtm.Warning) []envelopeWarning {
-	out := make([]envelopeWarning, 0, len(warnings))
-	for _, warned := range warnings {
-		out = append(out, envelopeWarning{Code: warned.Code, Params: warned.Params, Message: warned.Message})
-	}
-	return out
 }
 
 func errorOf(err *wtm.Error) *envelopeError {

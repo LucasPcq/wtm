@@ -12,6 +12,7 @@ import (
 
 const (
 	indent         = "  "
+	dot            = " · "
 	glyphSuccess   = "✓"
 	glyphAttention = "!"
 	glyphFailure   = "✗"
@@ -80,6 +81,14 @@ func nextSteps(w io.Writer, steps []NextStep) {
 		}
 		fmt.Fprintf(w, "%s%s %s\n", indent, primary.Render(glyphNext), line)
 	}
+}
+
+func blockWidth(w io.Writer) int {
+	cols := terminalWidth(w)
+	if cols <= 0 {
+		return hookFallbackWidth
+	}
+	return max(cols-2*len(indent), hookMinWidth)
 }
 
 func truncate(value string, width int) string {

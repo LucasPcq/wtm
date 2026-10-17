@@ -23,20 +23,20 @@ func TestTheAnomalyLinesNameEachRefusalGroupedByFile(t *testing.T) {
 		"",
 		"── api/.env ──────────────────────────────────────",
 		"ELSEWHERE  DB_PORT   no 5432 to shift in the value",
-	}, AnomalyLines(plan))
+	}, anomalyLines(plan))
 }
 
 func TestAnAnomalyLineNeverNamesAForeignHost(t *testing.T) {
 	plan := settle.Redact(settle.Plan{Entries: []settle.Entry{{File: ".env", Key: "API", Port: "P", Status: settle.StatusForeignHost, ForeignHost: "u:pw@api.staging.example.com"}}})
 
-	joined := strings.Join(AnomalyLines(plan), "\n")
+	joined := strings.Join(anomalyLines(plan), "\n")
 
 	assert.Contains(t, joined, "points at another host, which no job here serves")
 	assert.NotContains(t, joined, "staging")
 }
 
 func TestAPlanWithNoRefusalHasNoAnomalyLine(t *testing.T) {
-	assert.Empty(t, AnomalyLines(settle.Redacted{Entries: []settle.Entry{{File: ".env", Key: "PORT", Status: settle.StatusRewrite}}}))
+	assert.Empty(t, anomalyLines(settle.Redacted{Entries: []settle.Entry{{File: ".env", Key: "PORT", Status: settle.StatusRewrite}}}))
 }
 
 func TestTheSettlementNoteCountsPortsAndOwnedValues(t *testing.T) {
@@ -57,7 +57,7 @@ func TestTheSettlementNoteCountsPortsAndOwnedValues(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, SettlementNote(tc.plan))
+			assert.Equal(t, tc.want, settlementNote(tc.plan))
 		})
 	}
 }

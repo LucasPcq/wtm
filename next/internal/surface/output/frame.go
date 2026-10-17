@@ -1,3 +1,4 @@
+// Package output is what wtm-next prints: human frames and blocks, the progress of a run, and the JSON envelope.
 package output
 
 import (

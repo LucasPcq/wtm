@@ -8,7 +8,7 @@ import (
 )
 
 func TestADryRunShowsThePlanItsWarningsItsFingerprintAndHowToApplyIt(t *testing.T) {
-	outcome := twoCreated(inTrees(t))
+	outcome := twoCreated(trees)
 	outcome.Result = nil
 	outcome.Plan.FastForward = []string{"main"}
 	outcome.Plan.Remember = []string{"env_from"}

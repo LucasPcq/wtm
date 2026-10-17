@@ -99,8 +99,9 @@ func wrapped(value string, width int) []string {
 	return append(lines, line)
 }
 
-func writePlan(w io.Writer, lines []string) {
-	for _, line := range lines {
+func drawPlan(w io.Writer, params planParams) {
+	params.Width = max(terminalWidth(w)-len(indent), 0)
+	for _, line := range renderPlan(params) {
 		if line == "" {
 			blank(w)
 			continue

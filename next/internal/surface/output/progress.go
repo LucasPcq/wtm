@@ -100,7 +100,7 @@ func (p *Progress) Report(event wtm.Event) {
 }
 
 func (p *Progress) label() string {
-	return p.phase + " · " + p.unit
+	return p.phase + dot + p.unit
 }
 
 func (p *Progress) output(line string) {
@@ -143,16 +143,8 @@ func (p *Progress) paint() {
 		return
 	}
 	p.erase()
-	loadingLine(p.w, truncate(p.line(), p.width()))
+	loadingLine(p.w, truncate(p.line(), blockWidth(p.w)))
 	p.painted = true
-}
-
-func (p *Progress) width() int {
-	cols := terminalWidth(p.w)
-	if cols <= 0 {
-		return hookFallbackWidth
-	}
-	return max(cols-2*len(indent), hookMinWidth)
 }
 
 func (p *Progress) line() string {

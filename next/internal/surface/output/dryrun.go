@@ -12,13 +12,12 @@ type DryRunParams struct {
 }
 
 func DryRun(w io.Writer, params DryRunParams) {
-	sectionTitle(w, commandName+" · dry run, nothing applied")
+	sectionTitle(w, commandName+dot+"dry run, nothing applied")
 	warnings := make([]string, 0, len(params.Outcome.Warnings))
 	for _, warned := range params.Outcome.Warnings {
 		warnings = append(warnings, warned.Message)
 	}
-	rows := planRowsOf(params.Outcome.Plan)
-	writePlan(w, renderPlan(planParams{Rows: rows, Warnings: warnings, Width: max(terminalWidth(w)-len(indent), 0)}))
+	drawPlan(w, planParams{Rows: planRowsOf(params.Outcome.Plan), Warnings: warnings})
 	if len(warnings) > 0 {
 		blank(w)
 	}
