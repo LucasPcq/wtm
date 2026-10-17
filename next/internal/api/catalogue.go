@@ -6,13 +6,17 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
+	"path/filepath"
+	"strconv"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
-// SurfaceAPI is the surface an operation records when its call names none.
-const SurfaceAPI = "api"
+// surfaceAPI is the surface an operation records when its call names none.
+const surfaceAPI = "api"
 
 // A Catalogue lists the commands a surface can run, in the order it shows them.
 type Catalogue []Command
@@ -61,15 +65,18 @@ func Bind[U, Req any, Out Outcome](name string, form domain.Form, open func(ctx 
 	}
 
 	execute := func(ctx context.Context, call Call) Response {
-		var req Req
-		decoder := json.NewDecoder(bytes.NewReader(call.Request))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&req); err != nil {
+		// A relative directory would resolve against the server process's own working directory.
+		if !filepath.IsAbs(call.Dir) {
+			return refused(domain.InvalidMessage("the directory of a " + name + " call must be absolute, not " + strconv.Quote(call.Dir)))
+		}
+
+		req, err := decoded[Req](call.Request)
+		if err != nil {
 			return refused(domain.InvalidMessage("invalid " + name + " request: " + err.Error()))
 		}
 
 		opts := call.Options
-		opts.Surface = cmp.Or(opts.Surface, SurfaceAPI)
+		opts.Surface = cmp.Or(opts.Surface, surfaceAPI)
 
 		useCase, err := open(ctx, call.Dir)
 		if err != nil {
@@ -81,6 +88,22 @@ func Bind[U, Req any, Out Outcome](name string, form domain.Form, open func(ctx 
 	}
 
 	return Command{Name: name, Form: form, Execute: execute}
+}
+
+// decoded is the one JSON object of data as a Req, refusing a field Req does not have and anything after the object.
+func decoded[Req any](data []byte) (Req, error) {
+	var req Req
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		return req, err
+	}
+
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return req, errors.New("unexpected data after the request")
+	}
+
+	return req, nil
 }
 
 // statusClientClosed is the status of an operation its caller cancelled: nginx's 499, which net/http does not name.

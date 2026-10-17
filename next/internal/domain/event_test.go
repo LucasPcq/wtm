@@ -3,25 +3,12 @@ package domain
 import (
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestEveryEventComesBackAsItWasEncoded(t *testing.T) {
-	identity := worktree.Identity{Path: "/trees/feat-x", Branch: "feat/x"}
-	for _, event := range []Event{
-		UnitStarted{Subject: "feat/x"},
-		PhaseStarted{Subject: "feat/x", Phase: "on_create", Log: "/logs/on_create.log"},
-		PhaseFinished{Subject: "feat/x", Phase: "on_create", Failed: true},
-		Output{Subject: "feat/x", Line: "set up <feat/x>"},
-		UnitFinished{Subject: "feat/x", Status: StatusDone},
-		WorktreeCreated{Worktree: identity},
-		WorktreeNumbered{Worktree: identity},
-		WorktreeProvisioned{Worktree: identity, Hook: "make setup", ExitCode: new(3)},
-		OperationStarted{Command: "create", Surface: "cli"},
-		OperationFinished{Command: "create", Surface: "cli", Code: "unit.phase_failed"},
-	} {
+	for _, event := range everyEvent {
 		t.Run(EventType(event), func(t *testing.T) {
 			data, err := MarshalEvent(event)
 			require.NoError(t, err)
@@ -33,6 +20,19 @@ func TestEveryEventComesBackAsItWasEncoded(t *testing.T) {
 			assert.Regexp(t, `^\{"type":"`+EventType(event)+`",`, string(data))
 		})
 	}
+}
+
+func TestEachTypeOfEventHasItsDecoder(t *testing.T) {
+	types := map[string]bool{}
+	for _, event := range everyEvent {
+		types[EventType(event)] = true
+	}
+
+	assert.Len(t, types, len(everyEvent), "two events share a type")
+	for name := range eventDecoders {
+		assert.True(t, types[name], "no event of type %s is checked", name)
+	}
+	assert.Len(t, eventDecoders, len(types), "an event type has no decoder")
 }
 
 func TestAnUnknownEventTypeIsRefused(t *testing.T) {

@@ -1,5 +1,23 @@
 package domain
 
+import "github.com/LucasPcq/wtm/next/internal/domain/worktree"
+
+var identity = worktree.Identity{Path: "/trees/feat-x", Branch: "feat/x"}
+
+// everyEvent holds one event of each variant of Event.
+var everyEvent = []Event{
+	UnitStarted{Subject: "feat/x"},
+	PhaseStarted{Subject: "feat/x", Phase: "on_create", Log: "/logs/on_create.log"},
+	PhaseFinished{Subject: "feat/x", Phase: "on_create", Failed: true},
+	Output{Subject: "feat/x", Line: "set up <feat/x>"},
+	UnitFinished{Subject: "feat/x", Status: StatusDone},
+	WorktreeCreated{Worktree: identity},
+	WorktreeNumbered{Worktree: identity},
+	WorktreeProvisioned{Worktree: identity, Hook: "make setup", ExitCode: new(3)},
+	OperationStarted{Command: "create", Surface: "cli"},
+	OperationFinished{Command: "create", Surface: "cli", Code: "unit.phase_failed"},
+}
+
 // wrapper is an error that wraps inner, so a test sees whether AsError looks through wrapping.
 type wrapper struct{ inner error }
 

@@ -172,7 +172,7 @@ func (c *extractCommand) conclude(cmd *cobra.Command, done concluded) error {
 	line := extractLine{Command: cmd.CommandPath(), Request: done.Request}
 	if !c.io.Human() {
 		doc := done.Outcome.Envelope(done.Err)
-		doc.FollowUps = uicli.Replan(doc.Err, line.Argv())
+		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, line.Argv())...)
 		return c.io.Envelope(doc)
 	}
 

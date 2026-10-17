@@ -29,8 +29,8 @@ internal/
   ui/                  the presentation kit every command's cli shares, knowing no command
     cli/               the root: version, --quiet, help, signals, the exit code a command's failure sets
     output/            the streams (stdin, stdout, stderr, whether each is a terminal, a colour renderer each), frames and blocks, progress, failures, plans, the hook view, the v2 envelope writer
-  api/                 the catalogue of the commands, knowing none of them: each one's name, its schema (domain.Form) and its execution, a JSON request in and a domain.Envelope out with the status of its kind, for a surface other than the command line
     form/              a command's form: the wizard that walks its steps to a recap and applies, select list, multi-select, text field, text list, confirm, their styles
+  api/                 the catalogue of the commands, knowing none of them: each one's name, its schema (domain.Form) and its execution, a JSON request in and a domain.Envelope out with the status of its kind, for a surface other than the command line
 ```
 No file format lives in `domain/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `domain/project`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
 

@@ -43,3 +43,10 @@ func TestAnItemWithoutDetailHasAnEmptyOne(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(data), `"items":[{"subject":"feat/x","status":"skipped","detail":{}}]`)
 }
+
+func TestANilDetailIsNoDetail(t *testing.T) {
+	var none *struct{ Path string }
+
+	assert.Nil(t, DetailOf(none))
+	assert.Equal(t, &struct{ Path string }{"/p"}, DetailOf(&struct{ Path string }{"/p"}))
+}

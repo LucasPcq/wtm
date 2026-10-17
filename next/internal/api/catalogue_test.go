@@ -33,7 +33,7 @@ func TestARefusalHasTheStatusOfItsKind(t *testing.T) {
 		refusing := useCase{refusal: &domain.Error{Kind: kind, Code: "greet.refused"}}
 		greet := Bind("greet", domain.Form{}, func(context.Context, string) (useCase, error) { return refusing, nil }, useCase.Run)
 
-		got := greet.Execute(t.Context(), Call{Request: json.RawMessage(`{}`)})
+		got := greet.Execute(t.Context(), Call{Dir: "/repo", Request: json.RawMessage(`{}`)})
 
 		assert.Equal(t, status, got.Status, kind)
 		assert.Equal(t, "greet.refused", got.Envelope.Err.Code, kind)
@@ -41,12 +41,34 @@ func TestARefusalHasTheStatusOfItsKind(t *testing.T) {
 }
 
 func TestARequestIsDecodedStrictly(t *testing.T) {
-	greet := Bind("greet", domain.Form{}, func(context.Context, string) (useCase, error) { return useCase{}, nil }, useCase.Run)
+	opened := false
+	greet := Bind("greet", domain.Form{}, func(context.Context, string) (useCase, error) { opened = true; return useCase{}, nil }, useCase.Run)
 
-	got := greet.Execute(t.Context(), Call{Request: json.RawMessage(`{"nmae": "x"}`)})
+	for request, message := range map[string]string{
+		`{"nmae": "x"}`:               `invalid greet request: json: unknown field "nmae"`,
+		`{"name": "x"}{"evil": 1}`:    "invalid greet request: unexpected data after the request",
+		`{"name": "x"}garbage`:        "invalid greet request: unexpected data after the request",
+		`{"name": "x"} {"name": "y"}`: "invalid greet request: unexpected data after the request",
+	} {
+		got := greet.Execute(t.Context(), Call{Dir: "/repo", Request: json.RawMessage(request)})
 
-	assert.Equal(t, http.StatusBadRequest, got.Status)
-	assert.Equal(t, `invalid greet request: json: unknown field "nmae"`, got.Envelope.Err.Message)
+		assert.Equal(t, http.StatusBadRequest, got.Status, request)
+		assert.Equal(t, message, got.Envelope.Err.Message, request)
+	}
+	assert.False(t, opened)
+}
+
+func TestADirectoryThatIsNotAbsoluteIsRefusedBeforeAnythingOpens(t *testing.T) {
+	opened := false
+	greet := Bind("greet", domain.Form{}, func(context.Context, string) (useCase, error) { opened = true; return useCase{}, nil }, useCase.Run)
+
+	for _, dir := range []string{"", ".", "repo/main"} {
+		got := greet.Execute(t.Context(), Call{Dir: dir, Request: json.RawMessage(`{"name": "x"}`)})
+
+		assert.Equal(t, http.StatusBadRequest, got.Status, dir)
+		assert.Equal(t, domain.CodeInvalidRequest, got.Envelope.Err.Code, dir)
+	}
+	assert.False(t, opened)
 }
 
 func TestACommandIsFoundByItsName(t *testing.T) {

@@ -25,6 +25,14 @@ type Item struct {
 	Detail   any // what the command reports of the subject, encoded as {} when nil
 }
 
+// DetailOf is detail as an Item's Detail: nil when detail is, rather than a nil pointer in an interface, encoded null instead of {}.
+func DetailOf[T any](detail *T) any {
+	if detail == nil {
+		return nil
+	}
+	return detail
+}
+
 // Spell spells the path of a request's field as a surface names it: a flag on the command line. A nil Spell leaves the path as it is.
 type Spell func(path string) string
 

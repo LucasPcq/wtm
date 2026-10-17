@@ -17,7 +17,8 @@ type Form struct {
 func (f Form) MarshalJSON() ([]byte, error) {
 	fields := make([]json.RawMessage, 0, len(f.Fields))
 	for _, field := range f.Fields {
-		raw, err := discriminated("kind", fieldKind(field), field)
+		kind, listed := fieldKind(field)
+		raw, err := discriminated("kind", kind, listed)
 		if err != nil {
 			return nil, err
 		}
@@ -26,24 +27,35 @@ func (f Form) MarshalJSON() ([]byte, error) {
 
 	return encoded(struct {
 		Fields   []json.RawMessage `json:"fields"`
-		Problems []FieldError      `json:"problems,omitempty"`
-	}{fields, f.Problems})
+		Problems []FieldError      `json:"problems"`
+	}{fields, orEmpty(f.Problems)})
 }
 
-func fieldKind(field Field) string {
-	switch field.(type) {
+// fieldKind returns the kind of field and the field with each of its lists an array, never null, so a surface iterates them as they are.
+func fieldKind(field Field) (string, Field) {
+	switch field := field.(type) {
 	case SelectField:
-		return "select"
+		field.Options = orEmpty(field.Options)
+		return "select", field
 	case MultiSelectField:
-		return "multi_select"
+		field.Picked, field.Options = orEmpty(field.Picked), orEmpty(field.Options)
+		return "multi_select", field
 	case TextField:
-		return "text"
+		return "text", field
 	case TextListField:
-		return "text_list"
+		field.Entries, field.Options = orEmpty(field.Entries), orEmpty(field.Options)
+		return "text_list", field
 	case ConfirmField:
-		return "confirm"
+		return "confirm", field
 	}
-	return ""
+	return "", field
+}
+
+func orEmpty[T any](list []T) []T {
+	if list == nil {
+		return []T{}
+	}
+	return list
 }
 
 // PathRemember is the path of the fields whose answer is remembered: the contract's --remember, accepting the paths of the form's rememberable fields.

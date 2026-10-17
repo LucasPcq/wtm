@@ -28,3 +28,9 @@ func TestTheRequestIsSpelledWithItsFlagsInOrderAndQuoted(t *testing.T) {
 func TestAnUnsetRequestIsTheBareCommand(t *testing.T) {
 	assert.Equal(t, "wtm-next extract", extractLine{Command: "wtm-next extract"}.String())
 }
+
+func TestTheArgvKeepsEachWordAsTheRequestHasIt(t *testing.T) {
+	req := extract.Request{Source: "it's", Files: []string{"two words.txt"}}
+
+	assert.Equal(t, []string{"wtm-next", "extract", "it's", "--files", "two words.txt"}, extractLine{Command: "wtm-next extract", Request: req}.Argv())
+}

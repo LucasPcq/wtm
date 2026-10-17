@@ -116,14 +116,7 @@ type Detail struct {
 }
 
 func (i Item) envelopeItem() domain.Item {
-	doc := domain.Item{Subject: i.Subject, Status: i.Status, Reason: i.Reason, Err: i.Err, Warnings: i.Warnings}
-
-	// Set only when there is one: a nil *Detail would make the field a non-nil interface, encoded null instead of {}.
-	if i.Detail != nil {
-		doc.Detail = i.Detail
-	}
-
-	return doc
+	return domain.Item{Subject: i.Subject, Status: i.Status, Reason: i.Reason, Err: i.Err, Warnings: i.Warnings, Detail: domain.DetailOf(i.Detail)}
 }
 
 // ----------------------------------------------------------------------------
