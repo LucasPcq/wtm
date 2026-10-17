@@ -3,7 +3,6 @@ package store
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -15,8 +14,6 @@ import (
 
 // EnvFiles are the .env files of a worktree, written under a lock kept outside the user's tree.
 type EnvFiles interface {
-	// Read is the file's lines; an absent file reads as none.
-	Read(path string) ([]domain.EnvLine, error)
 	// Template is the template provisioning copies for file from dir, "" when none is on disk.
 	Template(dir string, file domain.EnvFile) (string, error)
 	Copy(ctx context.Context, request envcopy.Request) (EnvCopied, error)
@@ -40,17 +37,6 @@ type EnvEdit struct {
 type EnvDisk struct{}
 
 var _ EnvFiles = EnvDisk{}
-
-func (EnvDisk) Read(path string) ([]domain.EnvLine, error) {
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", path, err)
-	}
-	return rules.ParseEnv(string(data)), nil
-}
 
 func (EnvDisk) Template(dir string, file domain.EnvFile) (string, error) {
 	candidates := envcopy.TemplateCandidates(dir, file)

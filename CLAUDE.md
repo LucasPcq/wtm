@@ -1,28 +1,23 @@
 # CLAUDE.md — Go CLI Development Principles
 
-Mandatory coding standards for `wtm`. When in doubt, consult the `go-cli` skill (`.claude/skills/go-cli/SKILL.md`). Use the fff MCP tools for all file search operations instead of default tools.
+Mandatory coding standards for `wtm`. For Go idioms and their sources, consult the `go-style` skill (`.claude/skills/go-style/SKILL.md`). Use the fff MCP tools for all file search operations instead of default tools.
 
 **Read on demand** — `docs/dev/` is the developer reference; open the page before working on its topic:
 
 | Read | Before |
 | -- | -- |
 | [`docs/dev/architecture.md`](docs/dev/architecture.md) | adding a package, an import between layers, or a `service→service` edge (annotated package map) |
-| [`docs/dev/commands.md`](docs/dev/commands.md) | touching `internal/kernel/`: the engine's contract (fields, rules, errors and their codes, results, `Each` / sagas) |
-| [`docs/dev/dispatch.md`](docs/dev/dispatch.md) | touching `internal/dispatch/`: the registry, the run order, operation locks and holders, the fingerprint, operation events, the test bench |
-| [`docs/dev/git.md`](docs/dev/git.md) | touching `internal/infra/git` or reaching git from a layer on the engine (`git.Repo`, `Reader` / `Writer`, `Ref`, `*git.Error`, the double `gittest.Fake`, `gitexec`) |
-| [`docs/dev/services.md`](docs/dev/services.md) | touching `service/gitwt`, `service/identity`, `service/runenv` or `hooks.Execute`, the services a command on the engine reaches a worktree through (reader or mutator, the snapshot, `Allocate`, what publishes) |
-| [`docs/dev/store.md`](docs/dev/store.md) | writing `meta.json`, `config.toml` or a managed `.env` (`store.Meta`, `ProjectConfig`, `EnvFiles`, the double `storetest.Fake`) |
+| [`docs/dev/store.md`](docs/dev/store.md) | writing `meta.json`, `config.toml` or a managed `.env` (`store.Meta`, `ProjectConfig`, `EnvFiles`) |
 | [`docs/dev/state-files.md`](docs/dev/state-files.md) | writing any file, or changing the format of a state file (`fs.UpdateFile`, `fs.Change`, locks, schema versions) |
-| [`docs/dev/form.md`](docs/dev/form.md) | touching `internal/surface/tui/form`: the interactive form of a command on the engine (its loop over `dispatch`, which field it asks, a field per type, remembering, the recap and the run) |
 | [`docs/dev/flow-layer.md`](docs/dev/flow-layer.md) | touching anything under `internal/flow/`, a Prompter/Presenter, a step kind, or the dashboard's run of a flow |
-| [`docs/dev/adding-a-mutation-command.md`](docs/dev/adding-a-mutation-command.md) | adding a worktree-mutating command or moving one onto the engine: the recipe of a command in `internal/command/` (ports, `Observe`, fields, codes, saga, events, registry, `cli.Bind`, tests), the `flow/legacy` bridge, the recipe of a command still on `flow/` |
-| [`docs/dev/cli.md`](docs/dev/cli.md) | touching `internal/surface/cli` itself: the root (signals, `--quiet`, exit code), a command generated from the registry (`cli.Bind`, its flags, its run), parity |
-| [`docs/dev/output.md`](docs/dev/output.md) | adding a command or changing what one prints (frame, glyphs, block helpers, `--quiet`, JSON contract, hook view, the generic rendering and the v2 envelope of a command on the engine) |
+| [`docs/dev/adding-a-mutation-command.md`](docs/dev/adding-a-mutation-command.md) | adding a worktree-mutating command: vocabulary, rules, the flow package, its wiring, presenter, tests |
+| [`docs/dev/cli.md`](docs/dev/cli.md) | touching `internal/surface/cli` itself: the root (signals, `--quiet`, exit code), flag wiring |
+| [`docs/dev/output.md`](docs/dev/output.md) | adding a command or changing what one prints (frame, glyphs, block helpers, `--quiet`, JSON contract, hook view) |
 | [`docs/dev/lint.md`](docs/dev/lint.md) | adding an `archlint` rule or an exception, or when `make lint` fails and the reason is unclear |
 | [`docs/dev/changelog.md`](docs/dev/changelog.md) | writing a `CHANGELOG.md` entry |
 | [`docs/dev/run-addressing.md`](docs/dev/run-addressing.md), [`docs/dev/shared-services.md`](docs/dev/shared-services.md) | touching the run proxy / addressing, or `scope = "shared"` jobs |
 
-**Self-maintaining docs:** when a structural decision changes (new package, renamed layer, new dependency, new convention), update this file, the relevant `docs/dev/` page and/or the skills (`go-cli`, `build-validator`) in the same session. Standards must reflect the actual codebase.
+**Self-maintaining docs:** when a structural decision changes (new package, renamed layer, new dependency, new convention), update this file, the relevant `docs/dev/` page and/or the `build-validator` agent in the same session. Standards must reflect the actual codebase.
 
 ## Docs & README
 
@@ -60,15 +55,15 @@ func Connect(params ConnectParams) error
 
 ## 3. Shared types — no duplication
 
-Types, enums, sentinel errors and constants are defined once in `internal/domain/`. Pure functions with no I/O (lookups, transforms, classification) live in `internal/rules/`. The engine's contract is the exception: `internal/kernel/` declares its own vocabulary (`Kind`, `Status`, `Reason`, `FieldType`, the `kernel.Code` constants), and a command on the engine declares its codes as `kernel.Code` constants beside it, each with its message in its `text.Messages`, handed to `dispatch.Register` with its own exit codes (`docs/dev/commands.md`).
+Types, enums, sentinel errors and constants are defined once in `internal/domain/`. Pure functions with no I/O (lookups, transforms, classification) live in `internal/rules/`.
 
 ## 4. Validate all external input
 
-Config files, CLI flags and environment variables are validated at the boundary (`config/` or command entry) with guard clauses. A command on the engine declares its checks as data: per-field `Constraints` in its `FieldSpec`, rules across fields as `kernel.Rules` combinators, both producing `kernel.FieldError` codes (`docs/dev/commands.md`). The service layer receives only clean data.
+Config files, CLI flags and environment variables are validated at the boundary (`config/` or command entry) with guard clauses. The service layer receives only clean data.
 
 ## 5. Centralized constants — no magic strings or numbers
 
-Every string key, exit code, flag name, env var name and format identifier is a named constant in `internal/domain/constants.go`, except the engine's codes and params, which live in `internal/kernel/` and beside each command on the engine, and what only the generated command line knows (`--expect-fingerprint`, the exit codes 23–25 of the engine's kinds), declared in `internal/surface/cli`.
+Every string key, exit code, flag name, env var name and format identifier is a named constant in `internal/domain/constants.go`.
 
 ```go
 // ❌ os.Exit(1); cmd.Flags().String("output", ...)
@@ -81,16 +76,16 @@ Every error or guard returns immediately; the happy path is last. Never nest `if
 
 ## 7. No unsafe type assertions
 
-Always comma-ok (`s, ok := v.(string); if !ok { return fmt.Errorf("expected string, got %T", v) }`). Prefer typed interfaces and concrete structs over `any`. Type at the source, not downstream. A value that takes one of a closed set of shapes is a sealed interface (an unexported method) with one type per shape, declared `//go-sumtype:decl` on a line of its own so `make lint` checks every type switch over it (`kernel.Error`, `kernel.Value`) — never one struct whose fields are valid only for some value of another.
+Always comma-ok (`s, ok := v.(string); if !ok { return fmt.Errorf("expected string, got %T", v) }`). Prefer typed interfaces and concrete structs over `any`. Type at the source, not downstream. A value that takes one of a closed set of shapes is a sealed interface (an unexported method) with one type per shape, declared `//go-sumtype:decl` on a line of its own so `make lint` checks every type switch over it (`fs.Change`, `envcopy.Warning`) — never one struct whose fields are valid only for some value of another.
 
 ## 8. Comments — the exception, not the rule
 
-The engine is the reference (`kernel/` holds one comment line in 1,500 of code): encode meaning in names and signatures (`Skip func(Answers) (skip bool, reason string)` needs no prose).
+Encode meaning in names and signatures (`Skip func(Answers) (skip bool, reason string)` needs no prose).
 
 - **What stays:** a quirk of git, macOS or `flock` the code cannot show; a workaround with its reference; an ordering invariant or a non-obvious decision (**why, never what**); a one-line package doc; godoc on an exported symbol whose name and signature leave a caller guessing.
 - **What goes:** a comment that restates the name or the code; a doc comment on an unexported declaration (its why moves into the body, beside the line it explains); architecture prose (→ `docs/dev/`); section banners and copied headers in test files.
 
-On the engine's packages (`kernel`, `dispatch`, `command`, `query`, `registry`, `flow/legacy`, `store`, `infra/git|fs|proc`, the engine's services, `rules/<subject>`, `domain/<subject>`, `surface/tui/form`) `make lint` holds the shapes and a per-package ceiling of comment lines that only goes down (`comments`, `docs/dev/lint.md`). When you modify any file, delete the comments in it that restate the code.
+When you modify any file, delete the comments in it that restate the code.
 
 ## 9. Clean architecture layers
 
@@ -100,34 +95,18 @@ internal/
   domain/       types, errors, constants only; a new one goes in the sub-package of its subject
                 (domain/statefile), never at the root, which only shrinks
   rules/        pure functions (stdlib + domain only, no I/O); a new decision goes in the sub-package
-                of its subject (rules/worktree, rules/runenv, rules/statefile), never at the root
-  kernel/       the command engine's skeleton (stdlib only): fields, rules, errors, results, Each / sagas;
-                text/ its message catalogue, kerneltest/ the checks every command runs
-  dispatch/     the engine's impure half, the one way a surface reaches a command: registry,
-                locks, Observe → Validate → Plan → fingerprint → Apply, operation events
-  command/      the mutations on the engine, one package per command (create/ is the first,
-                written by its pilot): request, facts, fields, plan, Apply, its codes
-  query/        the reads on the engine (operations/)
-  registry/     the composition root: every command and query with its real ports, handed to
-                dispatch; the only importer of command/ and query/
+                of its subject (rules/statefile, rules/envcopy), never at the root
   config/       load & validate config.toml, run.toml, global config; writes the JSON schema beside each
   store/        the one writer of each state file: meta.json, config.toml's changes, the managed .env files
-  flow/         the flow of each command not yet on the engine, surface-independent (one package
-                per command); legacy/ the one-way bridge of those that use a command on the engine
-                (written by the create pilot)
-  service/      impure orchestration: git exec, I/O, hooks, the run daemon, the event bus; gitwt,
-                identity, runenv and hooks.Execute are the engine's, a reader or a mutator each
+  flow/         the flow of each command, surface-independent (one package per command)
+  service/      impure orchestration: git exec, I/O, hooks, the run daemon, the event bus
   styles/       all Lipgloss styles
-  infra/        git/ the one way the engine reaches git (git.Repo); fs/ the only writer of state files
-                (UpdateFile), proc/ processes and the Shield; at its root, the git functions of the
-                commands still on flow/
+  infra/        git, filesystem and process wrappers; fs/ the only writer of state files (UpdateFile),
+                proc/ processes and the Shield
   surface/      the interfaces
-    cli/        the root (signals, --quiet, exit code); the commands generated from the
-                dispatch registry (cli.Bind); flag wiring → flow for the others (zero business logic)
-      render/   format and print results (zero decision logic); the generic rendering of a
-                kernel result and the v2 envelope
-    tui/        Bubbletea models (rendering only): form (the form of a command on the engine),
-                flowui (the wizard of a command on flow/), dashboard (`wtm ui`), runview
+    cli/        the root (signals, --quiet, exit code); flag wiring → flow (zero business logic)
+      render/   format and print results (zero decision logic)
+    tui/        Bubbletea models (rendering only): flowui (the wizard of a command), dashboard (`wtm ui`), runview
 ```
 
 The annotated map of every sub-package is in `docs/dev/architecture.md`.
@@ -136,45 +115,36 @@ The annotated map of every sub-package is in `docs/dev/architecture.md`.
 - `surface/cli/` has zero business logic.
 - `domain/` has types, errors and constants only — no methods, no free functions.
 - `rules/` imports only stdlib and `internal/domain` — no I/O, no side effects.
-- `kernel/` imports only the stdlib — no `domain/`, no business vocabulary: a command composes `kernel` with `domain`, never the reverse. I/O reaches it only as functions it is handed (`Observe`, `Apply`, the `Shield`). The engine writes no text: an error, a warning or a progress event is a `kernel.Code` plus params, and `kernel/text` holds the English.
-- `dispatch/` imports only `kernel/`, `domain/`, `rules/` and `infra/`: a command's ports reach it as interfaces, and `internal/registry` builds the production registry (`registry.Production`), the only package importing `command/` and `query/` and building their real ports (`testutil/`'s doubles aside), itself imported only by `surface/cli`. `command/` and `query/` never import `dispatch/` or `surface/`, `surface/` never imports them, and `command/` never calls `context.Background()`/`context.TODO()` (`engine`). See `docs/dev/dispatch.md`.
 - `service/` never imports `cobra`, `bubbletea`, `lipgloss`.
-- `surface/cli/render/` and `surface/tui/` have zero decision logic — only rendering. `render` reads results from `kernel/`, never runs anything through `dispatch/`.
-- `surface/tui/form` reaches a command through `dispatch/` only (`Entry.Fillable`), never `flow/` or `service/`: it asks `State` and `Choices` what a field is rather than deciding it.
+- `surface/cli/render/` and `surface/tui/` have zero decision logic — only rendering.
 - `styles/` is the only package allowed to instantiate `lipgloss.Style`.
-- `flow/` imports **only** `internal/service/`, `internal/rules/`, `internal/domain/` and the stdlib — never cobra, bubbletea, lipgloss, `surface/`, `config/` or `infra/`. Need something from `infra/`? Add a thin `service/` wrapper (e.g. `worktree.FindByBranch`). `flow/legacy`, the bridge the create pilot writes, is the one package of `flow/` allowed to reach `kernel/` and `dispatch/`, never `command/`; nothing on the engine imports it, and its consumers get it through an interface they declare, built by `surface/cli`.
+- `flow/` imports **only** `internal/service/`, `internal/rules/`, `internal/domain/` and the stdlib — never cobra, bubbletea, lipgloss, `surface/`, `config/` or `infra/`. Need something from `infra/`? Add a thin `service/` wrapper (e.g. `worktree.FindByBranch`).
 - `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`).
 - The daemon (`service/process`, `service/proxy`) is blind to git: no `service/worktree|branch|github|events`, no `config`, only allow-listed `infra/` functions.
-- A service **mutator** of the commands on `flow/` (the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`, never from `command/`.
-- On the engine a function is a **reader or a mutator**, inferred from the code (`writesink`): one that reaches a write sink (a write of `store/`, a method of `git.Writer`, `infra/proc`, `infra/fs`) is a mutator. Nothing in `query/` nor in a reader of a command (`Observe`, `Choices`, `Plan`…) reaches one; a mutator of the engine's services (`engineServices`) is called from `command/` or another service only. In the engine only `dispatch` publishes (`publish`): a mutator returns what it changed, the command reports it.
-- Every package of `service/`, `infra/`, `store/` and of the engine has a package doc stating its one responsibility (`pkgdoc`). The roots of `rules/` and `domain/` only shrink (`rootfreeze`): no new file nor exported symbol there.
-- git is run by `infra/git` only (`gitexec`): a layer on the engine reaches it through `git.Reader` / `git.Writer`; the git functions at the root of `infra/`, for the commands still on `flow/`, are tracked in `.archlint-migrating` and leave with their last caller. See `docs/dev/git.md`.
-- `meta.json`, the changes to `config.toml` (the remembered answers, `base_path`, the `.env` targets) and the managed `.env` files are written by `store/` only, each through its interface (`store.Meta`, `ProjectConfig`, `EnvFiles`) doubled by `storetest.Fake`; `config/` loads and validates, `init`'s full render stays in `config/` until `init` is on the engine. See `docs/dev/store.md`.
-- **A file is named after what it declares**, and a port lives with its implementation: its interface, the types it takes and returns and the implementation share one file (`infra/git/read.go`, `store/meta.go`), never an interfaces-only file beside the code. A type a whole package turns around (`dispatch.Handle`) has its own file; options sit beside the call that takes them.
+- A service **mutator** (the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`.
+- Every package of `service/`, `infra/` and `store/` has a package doc stating its one responsibility (`pkgdoc`). The roots of `rules/` and `domain/` only shrink (`rootfreeze`): no new file nor exported symbol there.
+- `meta.json`, the changes to `config.toml` (the remembered answers, `base_path`, the `.env` targets) and the managed `.env` files are written by `store/` only, each through its interface (`store.Meta`, `ProjectConfig`, `EnvFiles`); `config/` loads and validates, and keeps `init`'s full render. See `docs/dev/store.md`.
+- **A file is named after what it declares**, and a port lives with its implementation: its interface, the types it takes and returns and the implementation share one file (`store/meta.go`), never an interfaces-only file beside the code. A type a whole package turns around has its own file; options sit beside the call that takes them.
 - A file is written through `infra/fs` only: `fs.UpdateFile(ctx, {Path, Mutate})` (lock, read, `Mutate` decides an `fs.Change`, atomic rename), never `os.WriteFile`/`os.Create`/`os.Rename`/`os.Remove`/`os.RemoveAll`/a writing `os.OpenFile` outside `infra/` (`statewrite`), and `fs.UpdateFile` only from `store/`, the owner of each state file (`stateowner`). A state file carries `schema` (absent = 1, written from 2 on) and a write refuses a newer one (`*statefile.NewerError`, exit 22). See `docs/dev/state-files.md`.
 
-**Every new worktree-mutating command is written on the engine** — a `kernel.Command` in `internal/command/<name>/` (its ports, `Observe`, fields, rules, locks, codes, `Plan`, `Apply` as a saga through `kernel.Each`, its events), its line in `registry.Production`, its command line from `cli.Bind`; a command still on `flow/` moves there the same way. Recipe: `docs/dev/adding-a-mutation-command.md`. A change to a command still on `flow/` keeps its model: `Request`/`Outcome`/`Presenter`/`Params`/`Run` in `internal/flow/<cmd>/`, its questions as `flow.Step` in `steps.go`, a runner that is only flags → `Request` → Prompter and Presenter → `<cmd>.Run`; a flow never frames, never picks a stream, and **returns** errors (`docs/dev/flow-layer.md`).
+**Every worktree-mutating command goes through `flow/`** — `Request`/`Outcome`/`Presenter`/`Params`/`Run` in `internal/flow/<cmd>/`, its questions as `flow.Step` in `steps.go`, a runner that is only flags → `Request` → Prompter and Presenter → `<cmd>.Run`; a flow never frames, never picks a stream, and **returns** errors. Recipe: `docs/dev/adding-a-mutation-command.md`; model: `docs/dev/flow-layer.md`.
 
 **Output** — each command frames its human output exactly once (`render.Frame`, or `FrameStart`/`FrameEnd`) and the body writes to the writer `Frame` hands it; JSON and machine output are never framed. A block prints only if it changes what the reader does next: success contracts to a count, anomalies are named one by one. Glyph runes come from `domain` constants, the glyph carries the only colour on its line, and `Muted` is for chrome and non-event lines only. Full rules: `docs/dev/output.md`.
-
-**A command on the engine** gets its command line from `cli.Bind` (`surface/cli/<name>.go`): a flag per field, one run, the generic rendering and the v2 envelope for all. It adds only its `cli.Doc`, a positional, a renamed flag, and its `render.Detail` or `GenericDetail()`; every entry of the registry is bound or declared unbound (parity test). See `docs/dev/cli.md`.
 
 **Designating a worktree** — the subject is **positional**; a worktree that is not the subject is a **flag named after its role** (`extract [source] --to`, `create --from`, `run up [worktree] --profile`). Omitted positional → the current directory when that is a safe default for the command (`run`), a picker otherwise (`clean`). A resolved worktree is always the root as git spells it (`infra.Toplevel`), never `os.Getwd()`.
 
 ### Bypass flags — two orthogonal axes
 
-Every worktree-mutating command still on `flow/` (`create`, `clean`, `sync`, `fast-forward`, `prune`, `relocate`, `reparent`, `extract`, `checkout`, `env`), and `init`/`run init`, which are off `flow/` and wire it by hand, follow this model:
+Every worktree-mutating command (`create`, `clean`, `sync`, `fast-forward`, `prune`, `relocate`, `reparent`, `extract`, `checkout`, `env`), and `init`/`run init`, which wire it by hand, follow this model:
 
 - **`--yes` / `-y` — the confirmation axis: fully unattended, zero prompts.** Each input resolves as:
   1. **Decision / confirmation** → its flag, else the **remembered answer** (`[wizard.remembered]`, ticked "Always use this answer" in the wizard), else a documented **safe default**, never destructive (`sync --yes` does not push; `extract --yes` aborts on conflict; `clean`/`prune --yes` leave orphans unless `--reparent-children`). Only a `StepSelect` opting in with `Step.Memory` remembers, never a confirmation or a destructive option (`rules.RememberableValues`); `--ask` ignores the memory for one run.
   2. **Required selection with no safe default** → its flag/arg, else an **error naming the missing flag**. Never fall back to a picker.
   3. A picker runs only in a **fully interactive** run (no `--yes`, TTY, human output).
-- `--yes` is the only spelling of that axis — no `--non-interactive`. JSON mode requires `--yes` on a command still on `flow/`; on a command on the engine JSON is unattended already, and `--yes` is accepted without effect.
+- `--yes` is the only spelling of that axis — no `--non-interactive`. JSON mode requires `--yes`.
 - **`--force` — the safety axis, strictly separate.** It only lifts safety refusals (dirty / unpushed / open PR / locked). It does **not** imply `--yes`: `--force` alone still runs the wizard and asks to confirm, with `--force` threaded in as a preset.
 
-Implementation: `interactive := isTTY && rules.IsHumanFormat(format) && !yes`; a command on `flow/` expresses case 2 as a step `Resolve` that names the flag (see `internal/flow/sync/steps.go`). Decision defaults go through a pure rule where one exists (`rules.DecidePush`).
-
-**On the engine** the same model is data: a field left empty takes its `Default` (a `FieldSpec.Rememberable` field's remembered answer first, kept through `kernel.Remember`, ignored for one run by `--ask`), a field with no default is a `422 required` naming its flag, `--yes` only keeps the form away, and is accepted without effect in JSON, which is unattended already.
+Implementation: `interactive := isTTY && rules.IsHumanFormat(format) && !yes`; a command expresses case 2 as a step `Resolve` that names the flag (see `internal/flow/sync/steps.go`). Decision defaults go through a pure rule where one exists (`rules.DecidePush`).
 
 **Recap completeness:** a flag or a remembered answer never makes a recap line disappear, nor its line in the wizard trail — the recap reads the step's answer, else the flag/arg that resolved it (`Session.Presets`, or `Step.Given` for a step its `Skip` can rule out). A flag answers its step, never only preselects it. **Re-init completeness:** a re-init step shows the complete candidate list, pre-filled from the config on disk, and reads an answer that may be empty as `(value, asked)` so a step never reinstates what the user removed. Details: `docs/dev/flow-layer.md`.
 
@@ -193,7 +163,7 @@ make release-notes VERSION=x.y.z   # print a CHANGELOG section as release notes
 make dupl          # clone report, informative only
 ```
 
-- Tests of the engine and of the layers built for it (`internal/kernel/`, `infra/fs`, `infra/git`, the `statefile` packages, `dispatch`, the generated command line in `surface/cli` and its rendering, the form in `surface/tui/form`, `store/`, the engine's services `service/gitwt`, `identity`, `runenv`, `hooks.Execute` and the `rules/` sub-packages…) use testify (`assert`, `require`); each test file holds only `Test…` functions, the example and fakes in `fixture_test.go`, shared helpers in `helpers_test.go`. The rest of the repository keeps stdlib `testing`.
+- Tests of `infra/fs`, `store/`, the `statefile` packages and the `rules/` sub-packages use testify (`assert`, `require`); each test file holds only `Test…` functions, the example and fakes in `fixture_test.go`, shared helpers in `helpers_test.go`. The rest of the repository keeps stdlib `testing`.
 - A new architectural rule goes into `tools/archlint`, not into a paragraph here. `.archlint-migrating` and `.deadcode-ignore` may only shrink; a new entry needs a stated reason. See `docs/dev/lint.md`.
 - `.claude/hooks/pre-commit-gates.sh` runs `make lint` and a `go mod tidy` check on every `git commit` and blocks it on failure. It does not run the tests. `WTM_SKIP_GATES=1 git commit …` only when the gate itself is wrong.
 - **Invoke the `build-validator` subagent before marking any task done** — it adds the `-race` test suite, dependency hygiene and the duplication report.

@@ -384,16 +384,6 @@ func TestRunRefusesABranchHeldElsewhereBeforeAsking(t *testing.T) {
 	}
 }
 
-func TestFastForwardSubjectIsSharedWithTheOtherFlows(t *testing.T) {
-	if got := decide.FastForwardSubject(decide.FastForwardSubjectParams{
-		Target:     domain.BranchTarget{State: domain.BranchTargetExisting},
-		FromBranch: "main",
-		Branch:     "feat/x",
-	}); got != "feat/x" {
-		t.Errorf("subject = %q, want the reused branch", got)
-	}
-}
-
 // withRunConfig gives the flow a state dir holding this run.toml.
 func withRunConfig(t *testing.T, f *createFlow, cfg domain.RunConfig) *createFlow {
 	t.Helper()

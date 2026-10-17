@@ -14,8 +14,8 @@ import (
 // Step defines one step in a wizard.
 // Model must be a SelectListModel, TextInputModel, ConfirmModel, MultiSelectModel,
 // TextListModel, ReorderListModel, HookListModel, EnvResolveModel, PortListModel, RouteListModel,
-// ProfileListModel, KindListModel, ScopeListModel, NamespaceListModel, EnvValueListModel,
-// CmdListModel or DecisionListModel. Adding one means teaching every switch below about it —
+// ProfileListModel, KindListModel, ScopeListModel, NamespaceListModel, EnvValueListModel
+// or CmdListModel. Adding one means teaching every switch below about it —
 // TestWizardRendersEveryStepModel and its neighbours are what enforce that.
 type Step struct {
 	Name  string
@@ -397,10 +397,6 @@ func (m WizardModel) updateStep(step *Step, msg tea.Msg) (advanced bool, back bo
 		updated, c := child.Update(msg)
 		step.Model = updated
 		return updated.Done(), updated.Aborted(), c
-	case DecisionListModel:
-		updated, c := child.Update(msg)
-		step.Model = updated
-		return updated.Done(), updated.Aborted(), c
 	}
 	return false, false, nil
 }
@@ -765,10 +761,6 @@ func (m *WizardModel) propagateSize(stepIdx int) {
 		child.height = h
 		child.input.Width = max(domain.CmdListMinWidth, m.width-domain.CmdListWidthInset)
 		m.steps[stepIdx].Model = child
-	case DecisionListModel:
-		child.width = m.width
-		child.height = h
-		m.steps[stepIdx].Model = child
 	}
 }
 
@@ -878,8 +870,6 @@ func (m WizardModel) initStep(stepIdx int) tea.Cmd {
 		return child.Init()
 	case CmdListModel:
 		return child.Init()
-	case DecisionListModel:
-		return child.Init()
 	}
 	return nil
 }
@@ -919,8 +909,6 @@ func (m WizardModel) viewStep(stepIdx int) string {
 	case EnvValueListModel:
 		return child.View()
 	case CmdListModel:
-		return child.View()
-	case DecisionListModel:
 		return child.View()
 	}
 	return ""
@@ -1005,10 +993,6 @@ func (m *WizardModel) resetStep(stepIdx int) {
 		child.aborted = false
 		child.editing = false
 		m.steps[stepIdx].Model = child
-	case DecisionListModel:
-		child.done = false
-		child.aborted = false
-		m.steps[stepIdx].Model = child
 	}
 }
 
@@ -1058,8 +1042,6 @@ func (m WizardModel) stepDescription(step Step) string {
 		return child.desc
 	case CmdListModel:
 		return child.desc
-	case DecisionListModel:
-		return child.desc
 	}
 	return ""
 }
@@ -1101,8 +1083,6 @@ func (m WizardModel) stepTitle(step Step) string {
 	case EnvValueListModel:
 		return child.title
 	case CmdListModel:
-		return child.title
-	case DecisionListModel:
 		return child.title
 	}
 	return ""

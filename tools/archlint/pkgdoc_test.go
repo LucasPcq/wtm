@@ -4,12 +4,10 @@ import "testing"
 
 func TestEveryLowerPackageSaysItsResponsibility(t *testing.T) {
 	runTxtar(t, pkgdocAnalyzer, "pkgdoc",
-		internalPrefix+"service/gitwt",
+		internalPrefix+"service/hooks",
 		internalPrefix+"service/github",
-		internalPrefix+"infra/git",
+		internalPrefix+"infra/fs",
 		internalPrefix+"store",
 		internalPrefix+"rules",
-		internalPrefix+"command/create",
-		internalPrefix+"kernel",
 	)
 }

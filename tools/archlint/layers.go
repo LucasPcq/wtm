@@ -17,30 +17,6 @@ var layers = map[string]layer{
 		noIO:     true,
 		why:      "pure functions over the domain: stdlib and internal/domain only, no I/O",
 	},
-	"kernel": {
-		noIO: true,
-		why:  "the skeleton of the command engine: stdlib only, no business vocabulary, no I/O",
-	},
-	"command": {
-		internal: append([]string{"config", "domain", "infra/fs", "infra/git", "infra/proc", "kernel", "rules", "store"}, engineServicePaths()...),
-		why:      "a use case of the engine reaches the world through its ports — store/, infra/git, infra/fs, infra/proc and the engine's services — never through flow/, a surface, the git functions at the root of infra/ or the services of the commands on flow/",
-	},
-	"query": {
-		internal: append([]string{"config", "domain", "infra/fs", "infra/git", "infra/proc", "kernel", "rules", "store"}, engineServicePaths()...),
-		why:      "a read of the engine reaches the world through the ports a command does",
-	},
-	"registry": {
-		internal: append([]string{"command", "config", "dispatch", "domain", "infra", "kernel", "query", "rules", "store"}, engineServicePaths()...),
-		why:      "the composition root: every command and query with its real ports, handed to dispatch; the only importer of command/ and query/, imported by the production wiring of the surfaces only",
-	},
-	"flow/legacy": {
-		internal: []string{"dispatch", "domain", "flow", "kernel", "rules"},
-		why:      "the one-way bridge of the commands still on flow/ to the engine: it reaches a command through dispatch, never command/, and nothing on the engine imports it",
-	},
-	"dispatch": {
-		internal: []string{"domain", "infra", "kernel", "rules"},
-		why:      "the impure half of the engine runs on its own ports: a command's ports reach it as interfaces, never through service/ or a surface",
-	},
 	"infra": {
 		internal: []string{"domain", "rules"},
 		external: []string{"golang.org/x/sys/unix"},
@@ -65,9 +41,9 @@ var layers = map[string]layer{
 		why:      "the run of a command, surface-independent: never cobra, bubbletea, lipgloss, surface/ or config/ — and therefore never infra/, which needs a service/ wrapper instead",
 	},
 	"surface/cli/render": {
-		internal: []string{"domain", "flow", "kernel", "rules", "styles"},
+		internal: []string{"domain", "flow", "rules", "styles"},
 		external: []string{"golang.org/x/term"},
-		why:      "formats and prints, zero decision logic: it reads a command's results from the kernel, never runs one through dispatch",
+		why:      "formats and prints, zero decision logic",
 	},
 	"styles": {
 		internal: []string{"domain"},
@@ -79,23 +55,18 @@ var layers = map[string]layer{
 		external: []string{"github.com/charmbracelet/", "github.com/lrstanley/bubblezone", "golang.org/x/term"},
 		why:      "bubbletea models, rendering only",
 	},
-	"surface/tui/form": {
-		internal: []string{"dispatch", "domain", "kernel", "styles", "surface/tui"},
-		external: []string{"github.com/charmbracelet/"},
-		why:      "the form of a command on the engine, drawn with the wizard's components: it reaches the command through dispatch only, never flow/ or service/",
-	},
 	"surface/cli": {
-		internal: []string{"config", "dispatch", "domain", "flow", "flow/legacy", "infra", "kernel", "registry", "rules", "schemas", "service", "styles", "surface/cli/render", "surface/tui", "surface/tui/form"},
+		internal: []string{"config", "domain", "flow", "infra", "rules", "schemas", "service", "styles", "surface/cli/render", "surface/tui"},
 		external: []string{"github.com/charmbracelet/bubbletea", "github.com/spf13/cobra", "golang.org/x/term"},
-		why:      "the command line: the commands generated from the dispatch registry, and the flag wiring of the commands still on flow/",
+		why:      "the command line: flag wiring to flow/, zero business logic",
 	},
 	"schemas": {
 		why: "the embedded JSON Schema files",
 	},
 	"testutil": {
-		internal: []string{"command", "dispatch", "domain", "flow", "infra", "kernel", "rules", "schemas", "store"},
+		internal: []string{"domain", "flow", "infra", "rules", "schemas", "store"},
 		external: []string{"github.com/santhosh-tekuri/jsonschema/"},
-		why:      "test doubles for the flow seams, the dispatch bench, the commands and the ports of infra/ and store/, and the validator a contract test checks a bundled schema with",
+		why:      "test doubles for the flow seams and infra/, and the validator a contract test checks a bundled schema with",
 	},
 }
 
@@ -107,8 +78,6 @@ var serviceEdges = map[string][]string{
 	"runjobs":   {"process", "runconfig", "worktree"},
 	"worktree":  {"branch", "env", "github", "hooks", "process"},
 }
-
-var commandEdges = map[string][]string{}
 
 type layer struct {
 	internal []string
@@ -149,14 +118,6 @@ func admits(entries []string, target string) bool {
 func doesIO(stdPkg string) bool {
 	under := func(root string) bool { return stdPkg == root || strings.HasPrefix(stdPkg, root+"/") }
 	return slices.ContainsFunc(ioPackages, under) && !slices.Contains(pureNetwork, stdPkg)
-}
-
-func engineServicePaths() []string {
-	paths := make([]string, 0, len(engineServices))
-	for _, service := range engineServices {
-		paths = append(paths, string(service))
-	}
-	return paths
 }
 
 var layersAnalyzer = &analysis.Analyzer{

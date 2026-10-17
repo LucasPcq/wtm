@@ -1,16 +1,16 @@
--- github.com/LucasPcq/wtm/internal/service/gitwt/gitwt.go --
-// Package gitwt is a git worktree's lifecycle.
-package gitwt
--- github.com/LucasPcq/wtm/internal/service/gitwt/remove.go --
-package gitwt
+-- github.com/LucasPcq/wtm/internal/service/hooks/hooks.go --
+// Package hooks runs a worktree's lifecycle hooks.
+package hooks
+-- github.com/LucasPcq/wtm/internal/service/hooks/run.go --
+package hooks
 -- github.com/LucasPcq/wtm/internal/service/github/github.go --
 package github // want `package service/github has no package doc`
 -- github.com/LucasPcq/wtm/internal/service/github/pr.go --
 package github
--- github.com/LucasPcq/wtm/internal/infra/git/repo.go --
+-- github.com/LucasPcq/wtm/internal/infra/fs/update.go --
 // The comment of a file, not of the package.
 
-package git // want `package infra/git has no package doc`
+package fs // want `package infra/fs has no package doc`
 -- github.com/LucasPcq/wtm/internal/store/meta.go --
 /*
 Package store is the one owner of each state file.
@@ -18,8 +18,3 @@ Package store is the one owner of each state file.
 package store
 -- github.com/LucasPcq/wtm/internal/rules/rules.go --
 package rules
--- github.com/LucasPcq/wtm/internal/command/create/create.go --
-package create // want `package command/create has no package doc`
--- github.com/LucasPcq/wtm/internal/kernel/kernel.go --
-// Package kernel is the contract of the command engine.
-package kernel

@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/rules/envcopy"
 	"github.com/LucasPcq/wtm/internal/store"
 )
@@ -180,19 +179,6 @@ func TestACopySourceThatCannotBeStatedIsAnErrorNotASkip(t *testing.T) {
 	_, err := store.EnvDisk{}.Copy(t.Context(), envcopy.Request{Strategy: domain.EnvStrategyMain, Files: []domain.EnvFile{{Target: "apps/.env"}}, TargetDir: t.TempDir(), MainWorktreePath: main})
 
 	require.ErrorIs(t, err, os.ErrPermission)
-}
-
-func TestReadTakesAnAbsentFileForNoLines(t *testing.T) {
-	path := filepath.Join(t.TempDir(), ".env")
-
-	absent, err := store.EnvDisk{}.Read(path)
-	require.NoError(t, err)
-	assert.Nil(t, absent)
-
-	writeFile(t, path, "A=1\n")
-	lines, err := store.EnvDisk{}.Read(path)
-	require.NoError(t, err)
-	assert.Equal(t, "A=1\n", rules.RenderEnv(lines))
 }
 
 func TestTheTemplateIsThePinnedOneElseTheFirstCandidateOnDisk(t *testing.T) {

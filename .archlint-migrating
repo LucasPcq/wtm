@@ -6,43 +6,25 @@
 # THIS LIST MAY ONLY SHRINK. A new entry is a decision to take knowingly, and it
 # belongs in a ticket — not a way to get a commit past the linter.
 
-# Files written outside infra/fs by the commands not yet on the engine: the exec
-# log and the daemon's lock move with the run module (step 6 of LUC-283), the
-# directories relocate and extract leave behind with their commands (steps 4
-# and 5).
+# Files written outside infra/fs: the exec log, the daemon's lock and the
+# directories relocate and extract leave behind.
 statewrite internal/service/execsvc/execsvc\.go 1
 statewrite internal/service/process/daemonlock\.go 1
 statewrite internal/service/worktree/relocate\.go 1
 statewrite internal/service/worktree/extract\.go 2
 
 # State files written through fs.UpdateFile outside store/: run.toml,
-# pending-removals.toml and repos.json move into store/ with the run module
-# (step 6 of LUC-283), init's render, the global config, the schemas and the
-# compose patches with the inits (step 8), selfupdate's state.json by step 10.
+# pending-removals.toml, repos.json, init's render, the global config, the
+# schemas, the compose patches and selfupdate's state.json.
 stateowner internal/config/write\.go 4
 stateowner internal/config/pendingremovals\.go 1
 stateowner internal/infra/registry\.go 1
 stateowner internal/service/compose/patch\.go 1
 stateowner internal/service/selfupdate/state\.go 1
 
-# git run from the root of infra/, for the commands not yet on the engine (LUC-290): each
-# file leaves the list as its last caller moves to infra/git (steps 3 to 10 of
-# LUC-283).
-gitexec internal/infra/branch\.go 10
-gitexec internal/infra/git_paths\.go 3
-gitexec internal/infra/history\.go 3
-gitexec internal/infra/patch\.go 5
-gitexec internal/infra/rebase\.go 12
-gitexec internal/infra/status\.go 4
-gitexec internal/infra/tools\.go 1
-gitexec internal/infra/upstream\.go 4
-gitexec internal/infra/worktree_ops\.go 5
-gitexec internal/infra/worktree_query\.go 3
-
 # The roots of rules/ and domain/, frozen (LUC-293): one line per file, counting
-# the file and each exported symbol in it. A migration moves what its command
-# uses into the sub-package of its subject and lowers the count; step 10 of
-# LUC-283 moves the rest and deletes the roots.
+# the file and each exported symbol in it. Moving a symbol into the sub-package
+# of its subject lowers the count.
 rootfreeze internal/domain/agents\.go 7
 rootfreeze internal/domain/branch\.go 25
 rootfreeze internal/domain/compose\.go 19
@@ -55,7 +37,7 @@ rootfreeze internal/domain/envdiff\.go 24
 rootfreeze internal/domain/envports\.go 24
 rootfreeze internal/domain/envsync\.go 6
 rootfreeze internal/domain/errors\.go 92
-rootfreeze internal/domain/events\.go 42
+rootfreeze internal/domain/events\.go 37
 rootfreeze internal/domain/exec\.go 10
 rootfreeze internal/domain/extract\.go 10
 rootfreeze internal/domain/github\.go 11
@@ -215,11 +197,3 @@ rootfreeze internal/rules/validate\.go 15
 rootfreeze internal/rules/workspace\.go 5
 rootfreeze internal/rules/worktree\.go 20
 rootfreeze internal/rules/worktreestatus\.go 13
-
-# Real ports built outside internal/registry (LUC-300): the services of the
-# commands still on flow/ build store's ports on the state dir they are handed;
-# each site leaves as its command moves onto the engine and takes its ports
-# from the registry (steps 3 to 10 of LUC-283).
-portbuild internal/service/env/ 8
-portbuild internal/service/memory/ 1
-portbuild internal/service/worktree/ 11

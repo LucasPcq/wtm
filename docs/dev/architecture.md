@@ -1,6 +1,6 @@
 # Architecture — the layers and what they buy
 
-wtm is a Cobra CLI with interactive surfaces (an inline wizard, the form of a command on the engine, the `wtm ui` dashboard) over one set of git operations. The layering exists so that a command is written once and served by every surface. On the engine, a command is a `kernel.Command` in `command/`, assembled by `registry/` and reached through `dispatch/` ([commands.md](commands.md), [dispatch.md](dispatch.md)); no command is there yet, `create` is the first. Every other command is a *flow* in `flow/` — the order of its questions, its safety checks, its service calls — replayed by the wizard and the dashboard ([flow-layer.md](flow-layer.md)).
+wtm is a Cobra CLI with interactive surfaces (an inline wizard, the `wtm ui` dashboard) over one set of git operations. The layering exists so that a command is written once and served by every surface: each worktree-mutating command is a *flow* in `flow/` — the order of its questions, its safety checks, its service calls — replayed by the wizard and the dashboard ([flow-layer.md](flow-layer.md)).
 
 ## The map
 
@@ -12,37 +12,18 @@ internal/
   domain/                     ← types, errors, constants only (no methods, no functions); its root only shrinks,
                                 new code goes into the sub-package of its subject
     statefile/                ←   the schema version of each state file, and the error of a file a newer wtm wrote
-    operation/                ←   the holder file of an operation in progress, which dispatch writes and query/operations lists
   rules/                      ← pure functions (stdlib + domain only, no I/O); its root only shrinks, new code goes
                                 into the sub-package of its subject
     statefile/                ←   what a state file's schema allows: read, write, or refuse (exit 22)
     envcopy/                  ←   where each .env of a new worktree is copied from, and what could not be
-  kernel/                     ← the skeleton of the command engine (stdlib only, no business vocabulary): Command,
-                                fields, rules, errors, results, Each / Saga (commands.md)
-    text/                     ←   text.Messages and text.Catalog: a kernel.Code and its params into English, the
-                                kernel's messages and those each entry of the registry declares
-    kerneltest/               ←   the checks every command runs on itself (DependsOn, sagas)
-  dispatch/                   ← the impure half of the engine, the one way a surface reaches a command: registry,
-                                the form's calls, the run (locks → Observe → defaults → Validate → Plan →
-                                fingerprint → Apply), operation locks and holders, hook logs, operation events
-                                (dispatch.md)
-  command/                    ← the mutations on the engine, one package per command, run through dispatch only
-                                (none yet: create/ is written by its pilot; adding-a-mutation-command.md)
-  query/
-    operations/               ←   the operations in progress, read from their holder files
-  registry/                   ← the composition root: every command and query with its real ports (registry.Production),
-                                the only importer of command/ and query/, imported by surface/cli (dispatch.md)
   config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/, plus the global config (config.GlobalPath);
                                 every write puts the file's JSON schema (schemas/) beside it; ReviseProject is
                                 config.toml with a change applied, for store/ to write
   store/                      ← the one writer of each state file (store.md): Meta (meta.json: Load, Records,
                                 Update, Purge), ProjectConfig (config.toml: Remember, ConfigDisk.Update),
-                                EnvFiles (the .env files: Copy, Edit), each on disk and doubled in testutil/storetest
-  flow/                       ← the flow of each command not yet on the engine, surface-independent
+                                EnvFiles (the .env files: Copy, Edit)
+  flow/                       ← the flow of each command, surface-independent
                                 (flow-layer.md): the vocabulary (Step, Session, Prompter, Presenter, Publisher)
-    legacy/                   ←   the one-way bridge of the flows that use a command on the engine (extract's
-                                  create, the dashboard's), reached through interfaces they declare
-                                  (written by the create pilot)
     publish/                  ←   the event a flow publishes after a change to a worktree's
                                   identity, read back from git and meta.json (`wtm events`)
     ordinal/                  ←   allocating a worktree's ordinal from the flow that needs it,
@@ -104,16 +85,9 @@ internal/
                                     `Wizard` seam, not a flow.Session), write run.toml,
                                     compose and .env files
   service/                    ← impure orchestration only (git exec, I/O, hooks):
-    worktree/                 ←   git worktree operations (create, list, remove), for the commands on flow/
-    gitwt/                    ←   a git worktree's lifecycle for the engine (services.md): Add and Remove,
-                                  the Do and the Undo of a saga's worktree step
-    identity/                 ←   who a worktree is (services.md): one Snapshot (number, isolation, main,
-                                  derived names, where a branch is out) read once; Allocate the one mutator
-    runenv/                   ←   a worktree's run environment (services.md): JobEnv, ComposeProject, Env,
-                                  from the run.toml and the identity the caller read
+    worktree/                 ←   git worktree operations (create, list, remove)
     env/                      ←   .env provisioning (create) + drift reconciliation (`wtm env`, sync.go)
-    hooks/                    ←   on_create / on_clean hook execution (a /bin/sh line each): RunHooks for
-                                  flow/, Execute for the engine (each line to its caller, nothing printed)
+    hooks/                    ←   on_create / on_clean hook execution (a /bin/sh line each): RunHooks
     shell/                    ←   shell integration generation (zsh, bash, fish)
     integration/              ←   third-party adapters: handing a URL to the desktop's
                                   own opener (editor/agent detection lives in detect/)
@@ -138,24 +112,18 @@ internal/
     shellcmd/                 ←   checks that a config command is a valid /bin/sh line
     execsvc/                  ←   runs one shell line in several worktrees at once
     memory/                   ←   the answers the wizard remembers ([wizard.remembered] in config.toml), through store/
-  styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style), and what every surface draws alike: an intro, a recap, the rows of a plan (RenderPlan)
-  infra/                      ← the git functions of the commands still on flow/, and the state not yet
-                                  moved to a package of its own (repos.json)
-    git/                      ←   the one way the engine reaches git (git.md): Repo (a directory and its
-                                  remote, -C everywhere), Reader (Worktrees, MainWorktree, Branches,
-                                  RefExists, AheadBehind) and Writer (AddWorktree, RemoveWorktree,
-                                  DeleteBranch, Fetch, FetchRef, FastForwardRef, MergeFFOnly); no decision
+  styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style), and what every surface draws alike: an intro, a recap
+  infra/                      ← the git functions the services call, and the state not yet moved to a
+                                  package of its own (repos.json)
     fs/                       ←   the only writer of the files wtm keeps: UpdateFile (lock on <path>.lock, read,
                                   Mutate, temp file + fsync + rename), ReplaceFile for the daemon's index,
-                                  WithFileLock, GlobalDir; Lock.Held says when flock was unavailable;
-                                  TryLocks (a set, all or none, never waiting), HoldFile / HeldFiles
-                                  (a file held as long as its process runs), OpenLog
+                                  WithFileLock, GlobalDir, OpenLog; Lock.Held says when flock was
+                                  unavailable
     proc/                     ←   starting processes (Command, GroupCommand) and settling them on an
                                   interrupt (Shield, AwaitShields, KillCancelled)
   surface/                    ← the interfaces
     cli/                      ←   the command line (zero business logic, cli.md): the root, its signals,
-                                  --quiet and exit code; the commands generated from the dispatch
-                                  registry (cli.Bind); the flag wiring of the commands still on flow/
+                                  --quiet and exit code; the flag wiring of each command to its flow
       run/runctx/             ←     what every `run` command opens on: its directory, the config,
                                     run.toml, the opt-in guard and the prompt gate
       daemon/                 ←     the hidden `daemon` command and the macOS port-80 relay launchd runs
@@ -163,12 +131,8 @@ internal/
       events/                 ←     `wtm events`: the stream (text or JSON Lines) over service/events.Watch,
                                     or WatchAll outside any repository
       versioncmd/             ←     `wtm version`: the binary's version and each machine contract's (`events`)
-      render/                 ←     format and print results (zero decision logic); for a command on the
-                                    engine, the generic rendering of a kernel result and the v2 envelope
+      render/                 ←     format and print results (zero decision logic)
     tui/                      ←   Bubbletea models (zero business logic, rendering only)
-      form/                   ←     the interactive form of a command on the engine: a wizard drawn from
-                                    the command's schema, state and choices, its recap the plan of a dry
-                                    run, reached through dispatch only (form.md)
       flowui/                 ←     runs a flow.Session as a wizard (the only translator
                                     between flow.Step and components.Step)
       dashboard/              ←     `wtm ui`: the full-screen worktree dashboard, the second
@@ -183,36 +147,15 @@ internal/
 
 ```mermaid
 flowchart TD
-  cli["surface/cli/"] --> registry["registry/"]
-  cli --> dispatch["dispatch/"]
-  cli --> form["surface/tui/form/"]
-  cli --> output["surface/cli/render/"]
-  cli --> legacy["flow/legacy"]
+  cli["surface/cli/"] --> output["surface/cli/render/"]
   cli --> flow["flow/"]
   cli --> tui["surface/tui/"]
   cli --> config["config/"]
-  registry --> command["command/"]
-  registry --> query["query/"]
-  registry --> dispatch
-  form --> dispatch
-  form --> kernel
-  output --> kernel["kernel/"]
-  legacy --> dispatch
-  legacy --> flow
-  dispatch --> kernel
-  dispatch --> infra["infra/"]
-  command --> kernel
-  command --> engineservices["service/gitwt, identity, runenv, hooks"]
-  command --> store["store/"]
-  command --> git["infra/git"]
-  query --> kernel
-  engineservices --> store
-  engineservices --> git
   tui --> flow
   flow --> service["service/"]
   flow --> rules["rules/"]
-  service --> store
-  service --> infra
+  service --> store["store/"]
+  service --> infra["infra/"]
   service --> rules
   flow --> domain
   store --> config
@@ -229,30 +172,21 @@ Every arrow that is *missing* is the point:
 | `surface/cli/` has no business logic | A command is readable as flags in, one call out. Changing the flow never means editing flag parsing. |
 | `domain/` holds types, errors and constants only | Nothing can acquire a dependency by hiding behind a method on a shared type. |
 | `rules/` imports only stdlib + `domain/` | Decisions stay testable with no repo, no network, no temp dir. `rules.DecidePush` is a table test, not an integration test. |
-| `kernel/` imports only the stdlib | The skeleton carries no business vocabulary: a command composes `kernel` with `domain/`, never the reverse, so a change to the domain never reaches the contract every command, `dispatch` and surface share. I/O reaches it only as functions it is handed (`Observe`, `Apply`, the `Shield`). |
-| `command/` and `query/` never import `dispatch/` or `surface/`; `surface/` never imports them | A surface reaches a command through `dispatch` only, so the locks, the fingerprint and the events apply whatever the interface; a command never runs another inside its own locks. |
-| `registry/` alone imports `command/` and `query/`, and builds their real ports (`testutil/`'s doubles aside); only `surface/cli` imports it | One place says what the product serves and on which disk; `dispatch` stays a generic engine over its own ports, and a test runs a command on doubles without the registry. |
-| `flow/legacy` (written by the create pilot) imports `kernel/`, `dispatch/` and `flow/`, never `command/`; nothing on the engine imports it | Once `create` is on the engine, a flow that still uses it (`extract`, which calls `create.Embed` today) goes through `dispatch` like any surface, and the engine never learns the old model exists. |
 | `service/` never imports cobra, bubbletea or lipgloss | The git operations are callable from a test, a flow, a daemon — anything that is not a terminal. |
-| `surface/cli/render/` and `surface/tui/` hold no decision logic | Two surfaces can render the same run without disagreeing about what it means. `render` reads a command's results from `kernel`, never runs one through `dispatch`. The form asks `dispatch` what a field is (`State`, `Choices`) rather than deciding it. |
-| `surface/tui/form/` reaches a command through `dispatch` only, never `flow/` or `service/` | One form serves every command of the registry without knowing its types, and asks what any other surface would. |
+| `surface/cli/render/` and `surface/tui/` hold no decision logic | Two surfaces can render the same run without disagreeing about what it means. |
 | `styles/` is the only package instantiating `lipgloss.Style` | A theme change is one file. |
 | `flow/` imports only `service/`, `rules/`, `domain/` and the stdlib | The flow cannot grow a dependency on the surface that runs it. This is what makes a second surface possible at all — see below. |
 
 `flow/` cannot reach `infra/` either. When a flow needs something only `infra/` has, the fix is a thin `service/` wrapper, not an exception: `worktree.FindByBranch` and `worktree.ListAll` exist for exactly that reason.
 
-Two more edges are constrained beyond the diagram:
+More edges are constrained beyond the diagram:
 
-- `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`): today `detect→branch`, `events→{process,worktree}`, `process→proxy`, `runconfig→shellcmd`, `runjobs→{process,runconfig,worktree}`, `worktree→{branch,env,github,hooks,process}`. `command/x` imports `command/y` only along an edge of `commandEdges`, empty today.
-- `command/` and `query/` reach `domain/`, `rules/`, `kernel/`, `store/`, `config/`, `infra/git`, `infra/fs`, `infra/proc` and the engine's services only; an interface they declare is sealed, never a port (`ports`), they build no error from English text (`enginetext`), and they never build a real port: `store.MetaDisk`, `git.Repo` and the like are built by `registry/` alone (`portbuild`). `registry/` is the only package importing them (with `testutil/`, for the doubles), and `surface/cli` the only one importing `registry/` and `flow/legacy`, the bridge that reaches a command through `dispatch`. `kernel/` and `rules/` import no stdlib package that does I/O (`os`, `net`, `syscall`).
+- `rules/` imports no stdlib package that does I/O (`os`, `net`, `syscall`).
+- `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`): today `detect→branch`, `events→{process,worktree}`, `process→proxy`, `runconfig→shellcmd`, `runjobs→{process,runconfig,worktree}`, `worktree→{branch,env,github,hooks,process}`.
 - The daemon — `service/process` and `service/proxy`, which it serves — is blind to git: neither imports `service/worktree`, `service/branch`, `service/github`, `service/events` or `config`, and both call only allow-listed `infra/` functions (`fs.GlobalDir`, `fs.ReplaceFile`).
-- git is run by `infra/git` only (`gitexec`); the files at the root of `infra/` that still run it, for the commands on `flow/`, are tracked in `.archlint-migrating`.
-- The services a command on the engine reaches (`service/gitwt`, `identity`, `runenv`, `hooks.Execute`, [services.md](services.md)) import no other service, never `kernel/`, and publish nothing: a mutator returns what it changed, and `dispatch` publishes it.
-- `store/` imports `config/`, `domain/`, `infra/` and `rules/`; `service/` and `testutil/` reach it, `flow/` never does. An exported function of `service/worktree` that reaches a write of `store.Meta` is a mutator (`metawriter`).
+- `store/` imports `config/`, `domain/`, `infra/` and `rules/`; `service/` reaches it, `flow/` never does. An exported function of `service/worktree` that reaches a write of `store.Meta` is a mutator (`metawriter`).
 - A file is written through `infra/fs` only (`statewrite`): `os.WriteFile`, `os.Create`, `os.Rename`, `os.Remove`, `os.RemoveAll` and a writing `os.OpenFile` stay inside `infra/`, but for the permanent exceptions listed with their reason in `tools/archlint/statewrite.go`. A state file is written by its owner in `store/` only (`stateowner`): `fs.UpdateFile` and `fs.RemoveDir` are called from nowhere else.
-- A function that reaches a write sink is a mutator, inferred from the code (`writesink`): nothing in `query/` nor in a reader of a command (`Observe`, `Choices`, `Plan`…) reaches one, and a mutator of the engine's services is called from `command/` or another service only.
-- In the engine, `dispatch` alone publishes, through its `Publisher` (`publish`): `command/`, `query/` and the engine's services call no `Publish`.
-- Every package of `service/`, `infra/`, `store/` and of the engine (`kernel/`, `dispatch/`, `command/`, `query/`, `registry/`, `flow/legacy`) says its one responsibility in its package doc (`pkgdoc`).
+- Every package of `service/`, `infra/` and `store/` says its one responsibility in its package doc (`pkgdoc`).
 - The roots of `rules/` and `domain/` only shrink (`rootfreeze`): no new file or exported symbol there; new code goes into the sub-package of its subject, a presentation rule into the surface that uses it.
 - A service **mutator** (`worktree.Create`, `envsvc.ApplyEnvSync`, `runconfig.Save`, … — the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`, whatever the calling layer; a call inside the mutator's own package is its implementation.
 
@@ -269,8 +203,6 @@ Whatever answers, a resolved worktree is always **the worktree root as git spell
 ## A flow calls the service itself
 
 A TUI package may not import `service/`, and a wizard needs data only the service has: a branch's divergence, a worktree's safety check, a sync plan, the modified files of a source. On `flow/` the step declaration carries that work — `Skip`, `Build` and `Load` are the flow's own functions, which call the service — so the surface that draws the step runs nothing but the step. No command hands a TUI a closure into the service: what the dashboard and the wizard show of a step is what its `Build` or `Load` returned, computed once, on the flow's side of the boundary.
-
-On the engine the same boundary is `dispatch`: the form asks `State` and `Choices` ([form.md](form.md)), and the only I/O of a field is its `Choices`, run by the command.
 
 ## The run module — a flow that asks nothing
 
@@ -342,7 +274,7 @@ The ordinal is part of the identity, so the env readers never allocate it: `JobE
 
 ## Where each command runs
 
-A new worktree-mutating command is written on the engine, and each command below moves there in turn, `create` first — see [adding-a-mutation-command.md](adding-a-mutation-command.md). Today every one is still a flow; the surfaces each is wired into:
+Every worktree-mutating command is a flow — see [adding-a-mutation-command.md](adding-a-mutation-command.md); the surfaces each is wired into:
 
 | Command | Flow lives in | Surfaces |
 | -- | -- | -- |

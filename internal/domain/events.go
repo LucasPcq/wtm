@@ -20,9 +20,6 @@ const (
 	EventJobCrashed            EventType = "job.crashed"
 	EventJobExited             EventType = "job.exited"
 	EventJobStopped            EventType = "job.stopped"
-	EventOperationStarted      EventType = "operation.started"
-	EventUnitFinished          EventType = "unit.finished"
-	EventOperationFinished     EventType = "operation.finished"
 
 	// EventWorktreePrefix opens every type about one worktree's identity.
 	EventWorktreePrefix = "worktree."
@@ -46,9 +43,6 @@ var EventTypes = []EventType{
 	EventJobCrashed,
 	EventJobExited,
 	EventJobStopped,
-	EventOperationStarted,
-	EventUnitFinished,
-	EventOperationFinished,
 }
 
 // EventsSchemaVersion moves on a breaking change only.
@@ -116,23 +110,6 @@ type Event struct {
 	Job           *EventJob          `json:"job,omitempty"`
 	LastLines     []string           `json:"last_lines,omitempty"`
 	HeldBy        []WorktreeRef      `json:"held_by,omitempty"`
-	OpID          string             `json:"op_id,omitempty"`
-	Operation     *EventOperation    `json:"operation,omitempty"`
-	Unit          *EventUnit         `json:"unit,omitempty"`
-	Code          string             `json:"code,omitempty"`
-}
-
-// EventOperation is the command an operation runs and the surface it was
-// started from.
-type EventOperation struct {
-	Command string `json:"command"`
-	Surface string `json:"surface"`
-}
-
-// EventUnit is one item of an operation once its work is over.
-type EventUnit struct {
-	Subject string `json:"subject"`
-	Status  string `json:"status"`
 }
 
 type EventJob struct {

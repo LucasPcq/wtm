@@ -50,9 +50,6 @@ func parseDeadcodeIgnore(data string) []string {
 }
 
 var migratingCeiling = map[string]int{
-	`portbuild internal/service/env/`:                    8,
-	`portbuild internal/service/memory/`:                 1,
-	`portbuild internal/service/worktree/`:               11,
 	`statewrite internal/service/execsvc/execsvc\.go`:    1,
 	`statewrite internal/service/process/daemonlock\.go`: 1,
 	`statewrite internal/service/worktree/relocate\.go`:  1,
@@ -62,16 +59,6 @@ var migratingCeiling = map[string]int{
 	`stateowner internal/infra/registry\.go`:             1,
 	`stateowner internal/service/compose/patch\.go`:      1,
 	`stateowner internal/service/selfupdate/state\.go`:   1,
-	`gitexec internal/infra/branch\.go`:                  10,
-	`gitexec internal/infra/git_paths\.go`:               3,
-	`gitexec internal/infra/history\.go`:                 3,
-	`gitexec internal/infra/patch\.go`:                   5,
-	`gitexec internal/infra/rebase\.go`:                  12,
-	`gitexec internal/infra/status\.go`:                  4,
-	`gitexec internal/infra/tools\.go`:                   1,
-	`gitexec internal/infra/upstream\.go`:                4,
-	`gitexec internal/infra/worktree_ops\.go`:            5,
-	`gitexec internal/infra/worktree_query\.go`:          3,
 	`rootfreeze internal/domain/agents\.go`:              7,
 	`rootfreeze internal/domain/branch\.go`:              25,
 	`rootfreeze internal/domain/compose\.go`:             19,
@@ -84,7 +71,7 @@ var migratingCeiling = map[string]int{
 	`rootfreeze internal/domain/envports\.go`:            24,
 	`rootfreeze internal/domain/envsync\.go`:             6,
 	`rootfreeze internal/domain/errors\.go`:              92,
-	`rootfreeze internal/domain/events\.go`:              42,
+	`rootfreeze internal/domain/events\.go`:              37,
 	`rootfreeze internal/domain/exec\.go`:                10,
 	`rootfreeze internal/domain/extract\.go`:             10,
 	`rootfreeze internal/domain/github\.go`:              11,
@@ -249,23 +236,4 @@ var migratingCeiling = map[string]int{
 var deadcodeCeiling = []string{
 	`TextInputModel\.helpRowless`,
 	`TextListModel\.helpRowless`,
-	`^internal/surface/cli/bind\.go:.*unreachable func: Bind$`,
-}
-
-var commentCeiling = map[string]int{
-	`dispatch`:         13,
-	`domain/operation`: 1,
-	`infra/fs`:         40,
-	`infra/git`:        19,
-	`infra/proc`:       36,
-	`rules/envcopy`:    4,
-	`rules/runenv`:     2,
-	`rules/statefile`:  4,
-	`rules/worktree`:   6,
-	`service/gitwt`:    5,
-	`service/hooks`:    42,
-	`service/identity`: 9,
-	`service/runenv`:   11,
-	`store`:            20,
-	`surface/tui/form`: 9,
 }

@@ -2,6 +2,7 @@ package hooks_test
 
 import (
 	"context"
+	"io"
 	"testing"
 	"time"
 
@@ -16,7 +17,7 @@ func TestAStoppedHookIsNotAFailedOne(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(100*time.Millisecond, cancel)
 
-	err := hooks.Execute(ctx, hooks.ExecuteParams{Hooks: []domain.HookCommand{{Cmd: "sleep 30"}}, WorkDir: t.TempDir()})
+	err := hooks.RunHooks(ctx, hooks.RunHooksParams{Hooks: []domain.HookCommand{{Cmd: "sleep 30"}}, WorkDir: t.TempDir(), Output: io.Discard})
 
 	var failure hooks.Failure
 	require.ErrorAs(t, err, &failure)
@@ -25,7 +26,7 @@ func TestAStoppedHookIsNotAFailedOne(t *testing.T) {
 }
 
 func TestAFailedHookIsNotAStoppedOne(t *testing.T) {
-	err := hooks.Execute(t.Context(), hooks.ExecuteParams{Hooks: []domain.HookCommand{{Cmd: "exit 1"}}, WorkDir: t.TempDir()})
+	err := hooks.RunHooks(t.Context(), hooks.RunHooksParams{Hooks: []domain.HookCommand{{Cmd: "exit 1"}}, WorkDir: t.TempDir(), Output: io.Discard})
 
 	assert.ErrorIs(t, err, domain.ErrHookFailed)
 	assert.NotErrorIs(t, err, domain.ErrHookStopped)

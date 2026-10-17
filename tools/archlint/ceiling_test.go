@@ -7,7 +7,7 @@ import (
 )
 
 func TestANewMigratingEntryIsOverTheCeiling(t *testing.T) {
-	list, err := parseMigrating("statewrite internal/command/create/probe\\.go 1\n")
+	list, err := parseMigrating("statewrite internal/service/probe/probe\\.go 1\n")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,7 @@ func TestARaisedCountIsOverTheCeiling(t *testing.T) {
 }
 
 func TestAShrunkListNeedsNoEditOfTheCeiling(t *testing.T) {
-	list, err := parseMigrating("gitexec internal/infra/branch\\.go 3\n")
+	list, err := parseMigrating("stateowner internal/config/write\\.go 3\n")
 	if err != nil {
 		t.Fatal(err)
 	}

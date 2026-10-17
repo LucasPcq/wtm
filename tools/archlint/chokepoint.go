@@ -3,7 +3,6 @@ package main
 import (
 	"go/ast"
 	"go/types"
-	"slices"
 
 	"golang.org/x/tools/go/analysis"
 )
@@ -56,10 +55,6 @@ func runChokepoint(pass *analysis.Pass) (any, error) {
 			}
 			fn, ok := pass.TypesInfo.Uses[sel.Sel].(*types.Func)
 			if !ok || fn.Pkg() == pass.Pkg || !isMutator(fn) {
-				return true
-			}
-			if slices.ContainsFunc(useCases, func(d dir) bool { return d.holds(pass.Pkg.Path()) }) {
-				pass.Reportf(sel.Pos(), "%s.%s is called from %s/: a mutator of the commands on flow/ — a command on the engine changes a worktree through the engine's services, from its Apply (docs/dev/services.md)", qualifierOf(sel, fn), fn.Name(), caller)
 				return true
 			}
 			pass.Reportf(sel.Pos(), "%s.%s is called from %s/: a worktree-mutating command goes through internal/flow/<cmd>, "+

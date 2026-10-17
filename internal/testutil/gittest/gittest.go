@@ -1,4 +1,4 @@
-// Package gittest gives tests a git repository, real or in memory.
+// Package gittest gives tests a real git repository.
 package gittest
 
 import (

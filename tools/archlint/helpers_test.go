@@ -1,7 +1,6 @@
 package main
 
 import (
-	"go/ast"
 	"go/constant"
 	"go/token"
 	"go/types"
@@ -40,25 +39,6 @@ func extract(t *testing.T, root string, archive string) {
 	}
 }
 
-func exportedFuncs(pkg *types.Package) []*types.Func {
-	var funcs []*types.Func
-	for _, name := range pkg.Scope().Names() {
-		switch obj := pkg.Scope().Lookup(name).(type) {
-		case *types.Func:
-			if obj.Exported() {
-				funcs = append(funcs, obj)
-			}
-		case *types.TypeName:
-			for method := range types.NewMethodSet(types.NewPointer(obj.Type())).Methods() {
-				if fn, ok := method.Obj().(*types.Func); ok && fn.Exported() && fn.Pkg() == pkg {
-					funcs = append(funcs, fn)
-				}
-			}
-		}
-	}
-	return funcs
-}
-
 func eventTypesOf(domain *types.Package) map[string]bool {
 	declared := map[string]bool{}
 	for _, name := range domain.Scope().Names() {
@@ -76,13 +56,3 @@ func eventTypesOf(domain *types.Package) map[string]bool {
 }
 
 func at(file string) token.Position { return token.Position{Filename: file, Line: 1, Column: 1} }
-
-func loadedTests(pass *analysis.Pass) ([]*ast.File, error) {
-	var tests []*ast.File
-	for _, file := range pass.Files {
-		if isTestFile(pass, file) {
-			tests = append(tests, file)
-		}
-	}
-	return tests, nil
-}
