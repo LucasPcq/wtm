@@ -182,3 +182,12 @@ func TestTheWizardDrawsTheConflictStep(t *testing.T) {
 	d.keys("enter")
 	d.looksLike("on_conflict")
 }
+
+func TestABranchAWorktreeHoldsIsRefusedAsANewTarget(t *testing.T) {
+	d := open(t, wizardParams{App: newWorld(seed{}).usecase(), Request: extract.Request{Source: source, Files: []string{"old.txt"}}})
+
+	d.keys("enter", other, "enter")
+
+	assert.Equal(t, int(stepBranch), d.w.Current())
+	assert.Contains(t, d.screen(), "already has a worktree — pick it as the target worktree")
+}

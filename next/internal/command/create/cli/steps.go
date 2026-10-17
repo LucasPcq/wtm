@@ -25,11 +25,18 @@ const (
 	stepCount
 )
 
-// labels are the steps' names in the breadcrumb, the trail and the problems the wizard shows.
-var labels = [stepCount]string{"Branches", "Source branch", "Env strategy", "Isolation", "Source update", "If not exists", "Confirm"}
+// labels are the steps' names in the breadcrumb, the trail and the problems the wizard shows, and paths the field path each step answers, both read from create's form.
+var labels, paths = steps(schema)
 
-// paths are the field path each step answers.
-var paths = [stepCount]string{"branches", "from", "env_from", "isolation", "fast_forward", "if_not_exists", ""}
+// steps are the label and path of each field of form, a step per field in its order, then the recap.
+func steps(form domain.Form) (labels, paths [stepCount]string) {
+	for at, field := range form.Fields {
+		labels[at], paths[at] = field.Spec().Label, field.Spec().Path
+	}
+	labels[stepRecap] = "Confirm"
+
+	return labels, paths
+}
 
 // standing is where the answer of step s stands on the questions observed last, with the flag that set it, if one did.
 func (w *wizard) standing(s step) form.Standing {

@@ -212,3 +212,69 @@ func TestARecordedParentThatNoLongerExistsFallsBackToTheBaseBranch(t *testing.T)
 	require.NoError(t, err)
 	assert.Equal(t, "main", resolved.From)
 }
+
+func TestEachFieldOfTheFormAnswersTheRequestBack(t *testing.T) {
+	cases := map[string]extract.Request{
+		"to an existing worktree": {Source: source, Files: []string{"a.txt"}, To: other, Keep: new(true), OnConflict: extract.OnConflictResolve},
+		"to a new branch": {
+			Source:      source,
+			Files:       []string{"a.txt"},
+			To:          split,
+			From:        "main",
+			Isolation:   project.Verbatim,
+			FastForward: new(true),
+			Keep:        new(false),
+			OnConflict:  extract.OnConflictAbort,
+			Remember:    []string{"isolation", "fast_forward"},
+		},
+	}
+	for name, req := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t, seed{Behind: true, Run: jobsToml})
+			w.change(t, source, "a.txt", "a\n")
+
+			questions := w.questions(t, req)
+
+			require.Empty(t, questions.Errors)
+			assert.Equal(t, questions.Request(), answered(t, questions.Form()))
+		})
+	}
+}
+
+func TestTheFormExistsBeforeAnyRead(t *testing.T) {
+	form := extract.Questions{}.Form()
+
+	assert.Equal(t, map[string]string{"source": "<source>", "files": "--files", "to": "--to", "from": "--from", "isolation": "--isolation", "fast_forward": "--ff", "keep": "--keep", "on_conflict": "--on-conflict"}, form.Flags())
+	assert.Equal(t, []string{"isolation", "fast_forward"}, form.Rememberable())
+	assert.Len(t, form.Fields, 9, "a step per field: the target is asked as a worktree, then as a branch")
+}
+
+func TestABranchAWorktreeHoldsIsNoNewTarget(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+
+	questions := w.questions(t, extract.Request{Source: source})
+
+	require.Len(t, questions.NewTarget(other), 1)
+	assert.Equal(t, other+" already has a worktree — pick it as the target worktree", questions.NewTarget(other)[0].Message("Branch name"))
+	assert.Empty(t, questions.NewTarget(split))
+}
+
+func TestAnAnswerTheRequestCannotTakeIsRefused(t *testing.T) {
+	cases := map[string]struct {
+		path   string
+		values []string
+		code   string
+	}{
+		"an unknown field":       {"branches", []string{"a"}, domain.CodeUnknown},
+		"two values for one":     {"to", []string{other, split}, "one_value"},
+		"a confirmation unspelt": {"keep", []string{"copy"}, domain.CodeOneOf},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := extract.Request{}.Answer(c.path, c.values)
+
+			assert.Equal(t, map[string]string{c.path: c.code}, problems(err))
+		})
+	}
+}

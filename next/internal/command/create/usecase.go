@@ -35,18 +35,6 @@ type UseCase struct {
 	StateDir   string
 }
 
-// A Request is what the caller asks of create, as given: a field left empty takes its remembered answer, its configured value or its default when the request is resolved.
-type Request struct {
-	Branches    []string            `json:"branches"`
-	From        string              `json:"from"`
-	EnvFrom     project.EnvStrategy `json:"env_from"`
-	Isolation   project.Isolation   `json:"isolation"`
-	FastForward *bool               `json:"fast_forward"` // nil when not given, so a remembered answer can apply
-	IfNotExists bool                `json:"if_not_exists"`
-	Remember    []string            `json:"remember"` // the fields whose answer is remembered for the next runs
-	Ask         bool                `json:"-"`        // ignore the remembered answers for this run
-}
-
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, or a refusal before the apply).
 type Outcome struct {
 	Op          string
@@ -189,7 +177,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 		return Questions{}, err
 	}
 
-	return Form(facts, req), nil
+	return NewQuestions(facts, req), nil
 }
 
 // ----------------------------------------------------------------------------

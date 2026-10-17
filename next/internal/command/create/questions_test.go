@@ -319,5 +319,67 @@ func TestDecidingABranchWhoseFolderWasNeverLocatedIsAProgrammingError(t *testing
 	w := newWorld(t, seed{})
 	facts := w.facts(t)
 
-	assert.Panics(t, func() { create.Form(facts, create.Request{Branches: []string{branchName}}) })
+	assert.Panics(t, func() { create.NewQuestions(facts, create.Request{Branches: []string{branchName}}) })
+}
+
+func TestEachFieldOfTheFormAnswersTheRequestBack(t *testing.T) {
+	cases := map[string]create.Request{
+		"defaults": {Branches: []string{branchName}},
+		"every field given": {
+			Branches:    []string{branchName, "feat/two"},
+			From:        "main",
+			EnvFrom:     project.EnvMain,
+			Isolation:   project.Verbatim,
+			FastForward: new(true),
+			IfNotExists: true,
+			Remember:    []string{"env_from", "isolation", "fast_forward"},
+		},
+	}
+	for name, req := range cases {
+		t.Run(name, func(t *testing.T) {
+			questions := newWorld(t, seed{Run: jobsToml, Behind: true}).questions(t, req)
+
+			assert.Equal(t, questions.Request(), answered(t, questions.Form()))
+		})
+	}
+}
+
+func TestTheFormExistsBeforeAnyRead(t *testing.T) {
+	form := create.Questions{}.Form()
+
+	assert.Equal(t, map[string]string{"branches": "<branches>", "from": "--from", "env_from": "--env-from", "isolation": "--isolation", "fast_forward": "--ff", "if_not_exists": "--if-not-exists"}, form.Flags())
+	assert.Equal(t, []string{"env_from", "isolation", "fast_forward"}, form.Rememberable())
+}
+
+func TestTheFormCarriesEachFieldsProblems(t *testing.T) {
+	questions := newWorld(t, seed{}).questions(t, create.Request{Branches: []string{branchName, branchName}, EnvFrom: "copy"})
+
+	byPath := map[string][]string{}
+	for _, field := range questions.Form().Fields {
+		for _, problem := range field.Spec().Problems {
+			byPath[field.Spec().Path] = append(byPath[field.Spec().Path], problem.Path)
+		}
+	}
+
+	assert.Equal(t, map[string][]string{"branches": {"branches[1]"}, "env_from": {"env_from"}}, byPath)
+}
+
+func TestAnAnswerTheRequestCannotTakeIsRefused(t *testing.T) {
+	cases := map[string]struct {
+		path   string
+		values []string
+		code   string
+	}{
+		"an unknown field":       {"files", []string{"a"}, domain.CodeUnknown},
+		"two values for one":     {"from", []string{"main", "dev"}, "one_value"},
+		"a confirmation unspelt": {"fast_forward", []string{"yes"}, domain.CodeOneOf},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := create.Request{}.Answer(c.path, c.values)
+
+			require.Len(t, fieldsOf(t, err), 1)
+			assert.Equal(t, c.code, fieldsOf(t, err)[0].Code)
+		})
+	}
 }

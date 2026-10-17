@@ -46,10 +46,10 @@ Why a package per command, when the Go guides prefer a package per concept and B
 | The code… | Goes in |
 | -- | -- |
 | decides something from facts, no I/O, for one command | `command/<name>/rules.go` |
-| validates or defaults the request, builds the form model | `command/<name>/questions.go` |
+| validates or defaults the request, builds the form model and its schema (labels, help, flag names, option labels) | `command/<name>/questions.go` |
 | sequences the request, calls ports and services | `command/<name>/usecase.go` |
 | is an interface to the outside world one command needs | `command/<name>/port.go` |
-| parses flags, renders output, defines wizard steps for one command | `command/<name>/cli/` |
+| registers flags, renders output, draws the wizard steps of one command from its schema | `command/<name>/cli/` |
 | is a pure rule or a type two commands need | `domain/…` |
 | orchestrates I/O two commands need | `service/<name>` (with its own `port.go`) |
 | is presentation two commands need | `ui/…` |

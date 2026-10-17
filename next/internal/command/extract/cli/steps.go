@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
@@ -29,21 +28,17 @@ const (
 	stepCount
 )
 
-// stepLabels are the steps' names in the breadcrumb, the trail and the problems the wizard shows.
-var stepLabels = [stepCount]string{"Source worktree", "Files", "Target worktree", "Branch name", "Source branch", "Isolation", "Source update", "Mode", "On conflict", "Confirm"}
+// stepLabels are the steps' names in the breadcrumb, the trail and the problems the wizard shows, and stepPaths the field path each step answers (the branch of a created target is the target's), both read from extract's form.
+var stepLabels, stepPaths = steps(schema)
 
-// stepPaths are the field path each step answers; the branch of a created target is the target's.
-var stepPaths = [stepCount]string{"source", "files", "to", "to", "from", "isolation", "fast_forward", "keep", "on_conflict", ""}
+// steps are the label and path of each field of form, a step per field in its order, then the recap.
+func steps(form domain.Form) (labels, paths [stepCount]string) {
+	for at, field := range form.Fields {
+		labels[at], paths[at] = field.Spec().Label, field.Spec().Path
+	}
+	labels[stepRecap] = "Confirm"
 
-// stepDescriptions are the help of the steps whose help does not depend on the answers so far.
-var stepDescriptions = [stepCount]string{
-	stepSource:      "Which worktree to extract changes from",
-	stepFiles:       "Space to toggle, a to select all, / to filter, enter to confirm, esc to go back.",
-	stepTarget:      "Where to move the selected files",
-	stepBranch:      "Name for the new worktree branch",
-	stepFrom:        "Branch to base the new worktree on",
-	stepFastForward: "The branch the new worktree starts from is behind origin — fast-forward it before creating?",
-	stepMode:        "Move removes the files from the source; copy keeps them.",
+	return labels, paths
 }
 
 const (
@@ -52,42 +47,27 @@ const (
 	existingSkip = "the target worktree exists: nothing is created"
 	yes          = "yes"
 	no           = "no"
-	modeMove     = "move"
 	modeCopy     = "copy"
 	emptyFiles   = "select at least one file"
 )
 
-// description is the help of step s on the answers so far.
-func (w *wizard) description(s step) string {
-	switch {
-	case s == stepFiles && len(w.q.Files.Options) == 0:
-		return "No changes to extract in " + w.req.Source + " — press esc to pick another worktree."
-	case s == stepIsolation:
-		return descriptions["isolation"]
-	case s == stepOnConflict:
-		return w.conflictDescription()
+// field is the field step s answers, on the questions observed last; nil for the recap.
+func (w *wizard) field(s step) domain.Field {
+	fields := w.q.Form().Fields
+	if int(s) >= len(fields) {
+		return nil
 	}
 
-	return stepDescriptions[s]
+	return fields[s]
 }
 
-// conflictDescription names the files that conflict with the target and what each answer leaves behind.
-func (w *wizard) conflictDescription() string {
-	conflicts := w.q.OnConflict.Conflicts
-	files := make([]string, 0, len(conflicts))
-	for _, conflict := range conflicts {
-		files = append(files, conflict.Path)
+// description is the help of step s on the answers so far.
+func (w *wizard) description(s step) string {
+	if field := w.field(s); field != nil {
+		return field.Spec().Help
 	}
 
-	verb := " were"
-	if len(files) == 1 {
-		verb = " was"
-	}
-
-	target, source := `"`+w.req.To+`"`, `"`+w.req.Source+`"`
-	return strings.Join(files, ", ") + verb + " also changed in " + target + ".\n\n" +
-		"Resolving writes conflict markers there; nothing is removed from the source.\n" +
-		"Resolve them in " + target + ", then discard the same files in " + source + "; to undo, discard the applied files in " + target + "."
+	return ""
 }
 
 // standing is where the answer of step s stands on the questions observed last, with the flag that set it, if one did.
@@ -154,63 +134,75 @@ func (w *wizard) erred(path string) bool {
 
 // list offers the options of the select step s, starting on the answer so far.
 func (w *wizard) list(s step) *form.SelectList {
-	q, req := w.q, w.req
-	switch s {
-	case stepSource:
-		return form.NewSelectList(form.SelectParams{Options: optionsOf(q.Source.Options), Start: req.Source})
-	case stepTarget:
-		options := append([]form.Option{{Label: "+ Create a new worktree…", Value: createTarget}, {Separator: true}}, optionsOf(q.To.Options)...)
-		start := req.To
-		if w.creating() {
-			start = createTarget
-		}
-		return form.NewSelectList(form.SelectParams{Options: options, Start: start})
-	case stepFrom:
-		return w.fromList()
-	case stepIsolation:
-		options := make([]form.Option, 0, len(q.Isolation.Options))
-		for _, value := range domain.Names(q.Isolation.Options) {
-			options = append(options, form.Option{Label: value, Value: value})
-		}
-		return remembering(remembered{Options: options, Value: string(q.Isolation.Value), Remembered: string(q.Isolation.Remembered), Ticked: w.ticked(s)})
-	case stepFastForward:
-		options := []form.Option{{Label: "Fast-forward to origin", Value: yes}, {Separator: true}, {Label: "Keep it as-is", Value: no}}
-		ticked := w.ticked(s) || q.FastForward.Origin == domain.OriginRemembered
-		return form.NewSelectList(form.SelectParams{Options: options, Start: yesNo(q.FastForward.Value), Toggle: true, ToggleOn: ticked})
-	case stepMode:
-		options := []form.Option{{Label: "Move — remove the files from " + req.Source, Value: modeMove}, {Label: "Copy — keep the files in " + req.Source, Value: modeCopy}}
-		return form.NewSelectList(form.SelectParams{Options: options, Start: mode(q.Keep.Value)})
-	case stepOnConflict:
-		options := []form.Option{
-			{Label: "Abort — leave both worktrees untouched", Value: string(extract.OnConflictAbort)},
-			{Label: "Resolve — write conflict markers in " + req.To, Value: string(extract.OnConflictResolve)},
-		}
-		return form.NewSelectList(form.SelectParams{Options: options, Start: string(q.OnConflict.Value)})
-	case stepFiles, stepBranch, stepRecap, stepCount:
+	switch field := w.field(s).(type) {
+	case domain.SelectField:
+		return w.selectList(s, field)
+	case domain.ConfirmField:
+		return w.confirmList(s, field)
+	case domain.MultiSelectField, domain.TextField, domain.TextListField, nil:
 	}
 
 	return form.NewSelectList(form.SelectParams{})
 }
 
+// selectList offers the options of field; the target's first option, a worktree to create, is picked by the sentinel createTarget.
+func (w *wizard) selectList(s step, field domain.SelectField) *form.SelectList {
+	switch s {
+	case stepTarget:
+		created, worktrees := field.Options[0], field.Options[1:]
+		options := append([]form.Option{{Label: created.Label, Value: createTarget}, {Separator: true}}, optionsOf(worktrees)...)
+		start := w.req.To
+		if w.creating() {
+			start = createTarget
+		}
+		return form.NewSelectList(form.SelectParams{Options: options, Start: start})
+	case stepFrom:
+		return fromList(field)
+	case stepIsolation:
+		return remembering(remembered{Options: optionsOf(field.Options), Value: field.Value, Remembered: field.Remembered, Ticked: w.ticked(s)})
+	}
+
+	return form.NewSelectList(form.SelectParams{Options: optionsOf(field.Options), Start: field.Value})
+}
+
+// confirmList offers the two answers of field: the source update with its toggle, the mode move first.
+func (w *wizard) confirmList(s step, field domain.ConfirmField) *form.SelectList {
+	start := field.No.Value
+	if field.Value {
+		start = field.Yes.Value
+	}
+
+	if s == stepFastForward {
+		options := []form.Option{optionOf(field.Yes), {Separator: true}, optionOf(field.No)}
+		ticked := w.ticked(s) || field.Origin == domain.OriginRemembered
+		return form.NewSelectList(form.SelectParams{Options: options, Start: start, Toggle: true, ToggleOn: ticked})
+	}
+
+	return form.NewSelectList(form.SelectParams{Options: []form.Option{optionOf(field.No), optionOf(field.Yes)}, Start: start})
+}
+
 func optionsOf(found []domain.Option) []form.Option {
 	options := make([]form.Option, 0, len(found))
 	for _, o := range found {
-		options = append(options, form.Option{Label: o.Value, Value: o.Value, Badge: o.Badge})
+		options = append(options, optionOf(o))
 	}
 
 	return options
 }
 
+func optionOf(o domain.Option) form.Option {
+	return form.Option{Label: cmp.Or(o.Label, o.Value), Value: o.Value, Badge: o.Badge}
+}
+
 // fromList offers the source branches, the pinned one first, starting on the answer so far.
-func (w *wizard) fromList() *form.SelectList {
-	from := w.q.From
-	options := optionsOf(from.Options)
-	if at := slices.IndexFunc(options, func(o form.Option) bool { return o.Value == from.Pinned }); at > 0 {
+func fromList(field domain.SelectField) *form.SelectList {
+	options := optionsOf(field.Options)
+	if at := slices.IndexFunc(options, func(o form.Option) bool { return o.Value == field.Pinned }); at > 0 {
 		pinned := options[at]
 		options = append([]form.Option{pinned}, slices.Delete(options, at, at+1)...)
 	}
 
-	return form.NewSelectList(form.SelectParams{Options: options, Start: cmp.Or(from.Value, from.Pinned)})
+	return form.NewSelectList(form.SelectParams{Options: options, Start: cmp.Or(field.Value, field.Pinned)})
 }
 
 // remembered are the options of a choice, its answer so far, its remembered answer and whether its toggle is ticked.
@@ -262,8 +254,8 @@ func tone(status worktree.ChangeStatus) form.Tone {
 
 // branchProblem checks the branch typed for a created target against the repository, as the wizard shows it.
 func (w *wizard) branchProblem(branch string) error {
-	if slices.ContainsFunc(w.q.To.Options, func(o domain.Option) bool { return o.Value == branch }) {
-		return errors.New(branch + " already has a worktree — pick it as the target worktree")
+	if held := w.q.NewTarget(branch); len(held) > 0 {
+		return errors.New(held[0].Message(stepLabels[stepBranch]))
 	}
 
 	req := w.req

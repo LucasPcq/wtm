@@ -23,9 +23,10 @@ type Answer[T any] struct {
 	Origin Origin
 }
 
-// Option is one value a choice offers, with a badge the wizard shows beside it (`on origin`, a count of changes).
+// Option is one value a choice offers, how it reads (Label, empty when it reads as its value), and a badge the wizard shows beside it (`on origin`, a count of changes).
 type Option struct {
 	Value string
+	Label string
 	Badge string
 }
 
@@ -42,6 +43,9 @@ type Confirm struct {
 	Answer[bool]
 	Skip string
 }
+
+// IsolationHelp is the help of the isolation question, the same in every command that asks it.
+const IsolationHelp = "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated"
 
 // IsolationAnswer is the isolation a question the request leaves unanswered settles on: the remembered one (empty when none) while run.toml declares something a worktree isolates, else run.toml's, else isolated.
 func IsolationAnswer(remembered project.Isolation, run project.Run) Answer[project.Isolation] {
@@ -108,6 +112,16 @@ func Names[T ~string](values []T) []string {
 	found := make([]string, 0, len(values))
 	for _, value := range values {
 		found = append(found, string(value))
+	}
+
+	return found
+}
+
+// Options offers each of values as an option that reads as its value, in order.
+func Options[T ~string](values []T) []Option {
+	found := make([]Option, 0, len(values))
+	for _, value := range values {
+		found = append(found, Option{Value: string(value)})
 	}
 
 	return found
