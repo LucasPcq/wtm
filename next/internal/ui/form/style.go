@@ -25,6 +25,7 @@ type Styles struct {
 	*output.Styles
 	summary   lipgloss.Style
 	accent    lipgloss.Style
+	success   lipgloss.Style
 	tinted    lipgloss.Style
 	selected  lipgloss.Style
 	reverse   lipgloss.Style
@@ -37,6 +38,7 @@ func newStyles(base *output.Styles) *Styles {
 		Styles:    base,
 		summary:   base.NewStyle().Foreground(output.ColorMuted).Italic(true),
 		accent:    base.NewStyle().Foreground(output.ColorPrimary).Bold(true),
+		success:   base.NewStyle().Foreground(output.ColorSuccess),
 		tinted:    base.NewStyle().Background(colorRowTint).Foreground(colorSelectedFg),
 		selected:  base.NewStyle().Background(colorSelectedBg).Foreground(colorSelectedFg),
 		reverse:   base.NewStyle().Reverse(true),

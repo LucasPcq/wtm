@@ -302,3 +302,15 @@ func TestAReadThatFailsAfterAnAnswerEndsTheRun(t *testing.T) {
 	assert.Equal(t, 2, reads)
 	assert.Zero(t, f.applied)
 }
+
+func TestTheRecapNamesItsApplyAsTheScriptSays(t *testing.T) {
+	f := newFake()
+	script := f.script()
+	script.ApplyLabel = func() string { return "Yes, extract" }
+	d := open(t, Params{Script: script})
+
+	d.keys("enter", "enter")
+
+	assert.Contains(t, d.screen(), "Yes, extract")
+	assert.NotContains(t, d.screen(), "Yes, apply")
+}

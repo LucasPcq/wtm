@@ -18,9 +18,10 @@ const (
 // A Tone is the colour of a [Pick]'s tag.
 type Tone int
 
-// The tones of a tag: muted for a note, warning for a risk, danger for a loss.
+// The tones of a tag: muted for a note, success for an addition, warning for a risk, danger for a loss.
 const (
 	ToneMuted Tone = iota
+	ToneSuccess
 	ToneWarning
 	ToneDanger
 )
@@ -235,6 +236,8 @@ func (m *MultiSelect) row(p Pick, selected bool, width int, st *Styles) string {
 
 func toned(t Tone, st *Styles) lipgloss.Style {
 	switch t {
+	case ToneSuccess:
+		return st.success
 	case ToneWarning:
 		return st.Warning
 	case ToneDanger:

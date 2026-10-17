@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"time"
 
@@ -144,4 +145,40 @@ func (held) Release()                         {}
 
 func hookFails(context.Context, env.HookChain) error {
 	return errors.New("hook failed: exit status 3")
+}
+
+// previewing is a use case whose every preview has a fingerprint of its own and whose applies end on errs in turn; it records the fingerprint each apply was held to.
+type previewing struct {
+	useCase
+	previews int
+	errs     []error
+	held     []string
+}
+
+func (p *previewing) Run(ctx context.Context, req extract.Request, opts operation.Options) (extract.Outcome, error) {
+	if opts.DryRun {
+		p.previews++
+		outcome, err := p.useCase.Run(ctx, req, opts)
+		outcome.Fingerprint = fmt.Sprintf("preview-%d", p.previews)
+		return outcome, err
+	}
+
+	p.held = append(p.held, opts.ExpectFingerprint)
+	err := p.errs[0]
+	p.errs = p.errs[1:]
+	return extract.Outcome{}, err
+}
+
+// enters is a terminal on which the user keeps pressing enter.
+type enters struct{}
+
+func (enters) Read(p []byte) (int, error) {
+	time.Sleep(time.Millisecond)
+	p[0] = '\r'
+	return 1, nil
+}
+
+// settled asks to move two files from the source to the other worktree: every step but the mode is given.
+func settled() extract.Request {
+	return extract.Request{Source: source, Files: []string{"apps/api/a.txt", "apps/api/new.txt"}, To: other}
 }

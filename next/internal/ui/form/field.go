@@ -1,4 +1,4 @@
-// Package form holds what a command's interactive form is built of: the wizard that walks its steps to a recap, a select list, a multi-select, a text list, a confirm, their styles.
+// Package form holds what a command's interactive form is built of: the wizard that walks its steps to a recap, a select list, a multi-select, a text field, a text list, a confirm, their styles.
 package form
 
 import tea "github.com/charmbracelet/bubbletea"

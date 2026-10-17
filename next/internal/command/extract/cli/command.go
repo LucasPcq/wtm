@@ -1,4 +1,4 @@
-// Package cli is extract's command line: its flags, its dry run, its output and its JSON, over extract's use case.
+// Package cli is extract's command line: its flags, its form, its dry run, its output and its JSON, over extract's use case.
 package cli
 
 import (
@@ -20,9 +20,12 @@ const (
 	extractShort = "Move uncommitted changes to another worktree"
 	extractLong  = "Move a subset of a worktree's uncommitted changes to another worktree\n" +
 		"(new or existing) to split an oversized PR or isolate unrelated work.\n\n" +
-		"The source worktree is the first thing chosen: pass its branch as [source],\n" +
-		"or omit it to pick interactively from the worktrees that have changes. A source\n" +
-		"is required when there is no terminal or with --output json.\n\n" +
+		"On a terminal the wizard asks what the flags leave open: the source worktree,\n" +
+		"the files, the target (an existing worktree, or a new one: its branch, source\n" +
+		"branch and isolation), move or copy, and what to do when the files conflict\n" +
+		"with the target; its recap previews the plan, then applies exactly that plan.\n" +
+		"With --yes, --output json or no terminal nothing is asked: a source, --files\n" +
+		"and --to are then required.\n\n" +
 		"A --to branch that already exists locally is checked out as-is, keeping its\n" +
 		"commits. Its parent can't be inferred, so --from then names the branch recorded\n" +
 		"for `wtm sync` — asked in the wizard, required without it.\n\n" +
@@ -43,7 +46,7 @@ const (
   wtm extract feat/login --files apps/web/login.ts --to feat/login-web --from feat/login --keep --yes`
 
 	rememberUsage = "The answers to always use in this repository: isolation, fast_forward (repeatable)"
-	yesUsage      = "Skip all prompts; resolve every decision from flags and safe defaults (requires a source arg, --files and --to; --from is also required when --to already exists locally; errors if a selection is missing)"
+	yesUsage      = "Run unattended: no question, no confirmation; what is not given takes its default (a source, --files and --to are required, and --from when --to already exists locally)"
 
 	flagFF       = "ff"
 	flagKeep     = "keep"
@@ -70,9 +73,10 @@ type extractCommand struct {
 	dryRun     bool
 	expect     string
 	ask        bool
+	yes        bool
 }
 
-// New returns the extract command: its flags become an extract.Request, run unattended; it draws the outcome on streams, or the v2 JSON envelope with --output json.
+// New returns the extract command: its flags become an extract.Request, answered in the wizard when the user can see and answer it, else run unattended; it draws the outcome on streams, or the v2 JSON envelope with --output json.
 func New(streams *output.Streams, open func(ctx context.Context) (Project, error)) *cobra.Command {
 	// exits are the exit codes of extract's own codes, ahead of those of their kind.
 	exits := map[string]int{extract.CodeConfigNotFound: uicli.ExitConfigNotFound, extract.CodeConflict: exitConflict}
@@ -89,8 +93,7 @@ func New(streams *output.Streams, open func(ctx context.Context) (Project, error
 	flags.StringVar(&c.onConflict, "on-conflict", "", descriptions["on_conflict"])
 	flags.StringArrayVar(&c.remember, "remember", nil, rememberUsage)
 	flags.BoolVar(&c.ask, "ask", false, uicli.AskUsage)
-	// --yes is accepted so that command lines written for wtm keep working; with no wizard, extract always runs unattended.
-	flags.BoolP("yes", "y", false, yesUsage)
+	flags.BoolVarP(&c.yes, "yes", "y", false, yesUsage)
 	flags.StringVar(&c.io.Output, "output", uicli.OutputText, uicli.OutputUsage)
 	flags.BoolVarP(&c.dryRun, "dry-run", "n", false, uicli.DryRunUsage)
 	flags.StringVar(&c.expect, "expect-fingerprint", "", uicli.ExpectUsage)
@@ -115,10 +118,27 @@ func (c *extractCommand) run(cmd *cobra.Command, args []string) error {
 	}
 
 	progress := c.io.Progress(ctx)
-	outcome, err := project.UseCase.Run(ctx, req, operation.Options{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, Report: progress.Report})
+	ran, err := c.extract(cmd, project.UseCase, req, progress.Report)
 	progress.Close()
 
-	return c.conclude(cmd, concluded{Outcome: outcome, Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: req, Cwd: project.Cwd})
+	return c.conclude(cmd, concluded{Outcome: ran.Outcome, Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: ran.Request, Cwd: project.Cwd})
+}
+
+// extract runs the request in the wizard when the user can answer it, else unattended; it returns the request that ran, the wizard's answers included.
+func (c *extractCommand) extract(cmd *cobra.Command, useCase extract.UseCase, req extract.Request, report domain.Report) (ran, error) {
+	ctx := cmd.Context()
+
+	if c.interactive() {
+		return runForm(ctx, formParams{App: useCase, Request: req, DryRun: c.dryRun, Report: report, In: c.io.Streams.In, Out: c.io.Streams.Err})
+	}
+
+	outcome, err := useCase.Run(ctx, req, operation.Options{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, Report: report})
+	return ran{Outcome: outcome, Request: req}, err
+}
+
+// interactive reports whether the wizard runs: the user can see and answer it, the output is for a human, and neither --yes nor a previewed plan to apply asks for an unattended run.
+func (c *extractCommand) interactive() bool {
+	return c.io.Streams.CanPrompt() && c.expect == "" && c.io.Human() && !c.yes
 }
 
 func (c *extractCommand) request(cmd *cobra.Command, args []string) extract.Request {

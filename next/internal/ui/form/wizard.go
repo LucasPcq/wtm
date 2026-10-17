@@ -30,6 +30,8 @@ type Script struct {
 	Plan func(width int, st *output.Styles) string
 	// Label returns the label of the step that sets a request's field path, for the fields a failed preview refuses.
 	Label func(path string) string
+	// ApplyLabel names the recap's option that applies the plan Preview computed; nil offers "Yes, apply".
+	ApplyLabel func() string
 	// Apply carries out the request once the wizard has finished.
 	Apply func(ctx context.Context) error
 	// Stale reports whether err, an error of Apply, is a plan the facts changed under, which starts the wizard again.

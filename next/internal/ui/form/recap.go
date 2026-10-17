@@ -41,10 +41,17 @@ func (w *Wizard) previewed(m previewMsg) {
 		w.failure = failure
 	} else {
 		w.planned = true
-		options = append([]Option{{Label: applyLabel, Value: applyValue}, {Separator: true}}, options...)
+		options = append([]Option{{Label: w.applyLabel(), Value: applyValue}, {Separator: true}}, options...)
 	}
 
 	w.recap = NewSelectList(SelectParams{Options: options})
+}
+
+func (w *Wizard) applyLabel() string {
+	if w.script.ApplyLabel == nil {
+		return applyLabel
+	}
+	return w.script.ApplyLabel()
 }
 
 // confirmed ends the wizard on the recap's choice.

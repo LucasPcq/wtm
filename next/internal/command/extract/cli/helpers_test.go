@@ -3,13 +3,20 @@ package cli
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
+	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -88,4 +95,91 @@ func paths(changes []worktree.Change) []string {
 		found = append(found, change.Path)
 	}
 	return found
+}
+
+const settleWithin = 100 * time.Millisecond
+
+// A driver plays the wizard's event loop by hand: it sends a message, runs the command it returns, and feeds back the message that command produces.
+type driver struct {
+	t *testing.T
+	w *form.Wizard
+	c *wizard
+}
+
+func open(t *testing.T, params wizardParams) *driver {
+	t.Helper()
+	c := newWizard(t.Context(), params)
+	return start(t, c, form.New(t.Context(), c.form()))
+}
+
+func start(t *testing.T, c *wizard, w *form.Wizard) *driver {
+	t.Helper()
+	d := &driver{t: t, w: w, c: c}
+	d.send(tea.WindowSizeMsg{Width: 100, Height: 40})
+	d.run(w.Init())
+	return d
+}
+
+func (d *driver) send(msg tea.Msg) {
+	_, cmd := d.w.Update(msg)
+	d.run(cmd)
+}
+
+// run runs cmd and sends back its message; a command still running after settleWithin, a tick or a cursor blink is dropped, so the loop settles.
+func (d *driver) run(cmd tea.Cmd) {
+	if cmd == nil {
+		return
+	}
+	result := make(chan tea.Msg, 1)
+	go func() { result <- cmd() }()
+	var msg tea.Msg
+	select {
+	case msg = <-result:
+	case <-time.After(settleWithin):
+		return
+	}
+	switch m := msg.(type) {
+	case nil, tea.QuitMsg, spinner.TickMsg:
+	case tea.BatchMsg:
+		for _, inner := range m {
+			d.run(inner)
+		}
+	default:
+		if !strings.Contains(fmt.Sprintf("%T", m), "blink") {
+			d.send(m)
+		}
+	}
+}
+
+func (d *driver) keys(keys ...string) {
+	for _, key := range keys {
+		switch key {
+		case "enter":
+			d.send(tea.KeyMsg{Type: tea.KeyEnter})
+		case "esc":
+			d.send(tea.KeyMsg{Type: tea.KeyEsc})
+		case "up":
+			d.send(tea.KeyMsg{Type: tea.KeyUp})
+		case "down":
+			d.send(tea.KeyMsg{Type: tea.KeyDown})
+		case "space":
+			d.send(tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}})
+		default:
+			d.send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
+		}
+	}
+}
+
+func (d *driver) screen() string {
+	lines := strings.Split(ansi.Strip(d.w.View()), "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimRight(line, " ")
+	}
+	return strings.TrimRight(strings.Join(lines, "\n"), "\n")
+}
+
+// looksLike compares the screen with the frame testdata/frame_<name>.golden holds.
+func (d *driver) looksLike(name string) {
+	d.t.Helper()
+	golden(d.t, "frame_"+name, d.screen()+"\n")
 }

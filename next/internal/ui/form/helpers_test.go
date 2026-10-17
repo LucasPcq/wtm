@@ -115,6 +115,17 @@ func settled(l *TextList, cmd tea.Cmd) Verdict {
 	return verdict
 }
 
+// textSettled runs the check cmd starts on x and returns the verdict it ends on.
+func textSettled(x *Text, cmd tea.Cmd) Verdict {
+	verdict := Stay
+	for _, msg := range messages(cmd) {
+		if checked, ok := msg.(textChecked); ok {
+			verdict, _ = x.Update(checked)
+		}
+	}
+	return verdict
+}
+
 // messages returns what cmd returns, a batch flattened; nil when it does not return within settleWithin.
 func messages(cmd tea.Cmd) []tea.Msg {
 	if cmd == nil {

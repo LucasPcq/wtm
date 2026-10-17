@@ -95,3 +95,10 @@ func (enters) Read(p []byte) (int, error) {
 	p[0] = '\r'
 	return 1, nil
 }
+
+func refusingBad(value string) error {
+	if value == "bad" {
+		return errors.New("not a valid name")
+	}
+	return nil
+}
