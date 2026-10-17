@@ -254,3 +254,25 @@ func TestTheCommandOpensTheProjectDirAndRunsWithTheCorrelationID(t *testing.T) {
 	require.Len(t, w.seen.ops, 1)
 	assert.Equal(t, "corr-1", w.seen.ops[0].CorrelationID)
 }
+
+func TestTheEnvelopeOfEachEndingIsByteForByte(t *testing.T) {
+	for name, c := range map[string]struct {
+		Seed  seed
+		Words []string
+		Code  int
+	}{
+		"success":  {Words: []string{source, "--files", "apps/api/new.txt", "--to", other}, Code: uicli.ExitOK},
+		"dry_run":  {Words: []string{source, "--files", "old.txt", "--to", split, "--dry-run"}, Code: uicli.ExitOK},
+		"conflict": {Seed: seed{Conflicts: conflicting}, Words: []string{source, "--files", "apps/api", "--to", other}, Code: exitConflict},
+		"stale":    {Words: []string{source, "--files", "old.txt", "--to", other, "--expect-fingerprint", fingerprint}, Code: uicli.ExitPrecondition},
+		"invalid":  {Words: []string{source, "--to", other}, Code: uicli.ExitUsage},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := runExtract(t, newWorld(c.Seed), append(c.Words, "--output", "json")...)
+
+			assert.Equal(t, c.Code, got.Code, got.Stdout)
+			assert.Empty(t, got.Stderr)
+			golden(t, "envelope_"+name, got.Stdout)
+		})
+	}
+}

@@ -1,0 +1,32 @@
+{
+  "v": 2,
+  "command": "extract",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [
+    {
+      "argv": [
+        "wtm-next",
+        "extract",
+        "feat/login",
+        "--files",
+        "old.txt",
+        "--to",
+        "feat/other",
+        "--dry-run"
+      ],
+      "code": "plan.replan",
+      "message": "the plan the facts give now"
+    }
+  ],
+  "warnings": [],
+  "error": {
+    "kind": "precondition",
+    "code": "plan.stale",
+    "message": "the facts changed since the preview",
+    "params": {
+      "expected": "0123456789abcdef01234567",
+      "found": "6e0a3ca33d43628b2c3ed291"
+    }
+  }
+}

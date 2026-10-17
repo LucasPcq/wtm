@@ -95,7 +95,7 @@ func Execute(ctx context.Context, root *cobra.Command, args []string) int {
 	usage := domain.Invalid(nil)
 	usage.Cause = err
 	if asksJSON(args) {
-		if err := output.Envelope(root.OutOrStdout(), output.EnvelopeParams{Command: failing.Name(), Err: usage}); err != nil {
+		if err := output.Envelope(root.OutOrStdout(), domain.Envelope{Command: failing.Name(), Err: usage}, nil); err != nil {
 			return ExitError
 		}
 		return ExitUsage

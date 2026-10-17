@@ -13,10 +13,15 @@ type createLine struct {
 	Request create.Request
 }
 
-// String spells the command and its request, the flags in a fixed order and each only when given.
+// String is the command line of Argv, quoted for the shell.
 func (l createLine) String() string {
+	return output.Line(l.Argv())
+}
+
+// Argv spells the command and its request word by word, the flags in a fixed order and each only when given.
+func (l createLine) Argv() []string {
 	req := l.Request
-	words := append([]string{l.Command}, output.Quoted(req.Branches)...)
+	words := append(strings.Fields(l.Command), req.Branches...)
 	words = append(words, output.FlagWords(output.FlagValue{Name: "env-from", Value: string(req.EnvFrom)})...)
 	words = append(words, output.SwitchWords(flagFF, req.FastForward)...)
 	words = append(words, output.FlagWords(output.FlagValue{Name: "from", Value: req.From})...)
@@ -34,5 +39,5 @@ func (l createLine) String() string {
 		words = append(words, "--ask")
 	}
 
-	return strings.Join(words, " ")
+	return words
 }

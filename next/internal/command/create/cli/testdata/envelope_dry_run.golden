@@ -1,0 +1,20 @@
+{
+  "v": 2,
+  "command": "create",
+  "ok": true,
+  "op": "op-1",
+  "plan": {
+    "branches": [
+      {
+        "branch": "feat/x",
+        "path": "/repo/.trees/feat-x",
+        "action": "create"
+      }
+    ],
+    "from": "main",
+    "env_from": "example"
+  },
+  "fingerprint": "6f1d820770431ef1514b6bb5",
+  "follow_ups": [],
+  "warnings": []
+}

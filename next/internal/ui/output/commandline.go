@@ -21,12 +21,12 @@ type FlagValue struct {
 	Value string
 }
 
-// FlagWords returns the words that pass flag on a command line, its value quoted for the shell, or none when its value is empty.
+// FlagWords returns the words that pass flag on a command line, or none when its value is empty.
 func FlagWords(flag FlagValue) []string {
 	if flag.Value == "" {
 		return nil
 	}
-	return []string{"--" + flag.Name, Quote(flag.Value)}
+	return []string{"--" + flag.Name, flag.Value}
 }
 
 // SwitchWords returns the words that pass the boolean flag name as given, --name or --name=false, or none when it was not given.
@@ -57,9 +57,9 @@ func Quote(word string) string {
 	return "'" + strings.ReplaceAll(word, "'", `'\''`) + "'"
 }
 
-// FollowUpLine returns the command line of followUp, each word quoted for the shell.
-func FollowUpLine(followUp *domain.FollowUp) string {
-	return strings.Join(Quoted(followUp.Argv), " ")
+// Line returns the command line of argv, each word quoted for the shell.
+func Line(argv []string) string {
+	return strings.Join(Quoted(argv), " ")
 }
 
 // FollowUpSteps returns the next step that repairs what err left behind, its follow-up's command line and message; none when err is nil or has no follow-up.
@@ -67,7 +67,7 @@ func FollowUpSteps(err *domain.Error) []NextStep {
 	if err == nil || err.FollowUp == nil {
 		return nil
 	}
-	return []NextStep{{Command: FollowUpLine(err.FollowUp), Note: err.FollowUp.Message}}
+	return []NextStep{{Command: Line(err.FollowUp.Argv), Note: err.FollowUp.Message}}
 }
 
 // Shown is a path to show and the directory the command runs in.

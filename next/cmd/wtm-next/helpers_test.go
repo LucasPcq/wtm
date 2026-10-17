@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,4 +19,12 @@ func repository(t *testing.T) string {
 	require.NoError(t, os.MkdirAll(stateDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(stateDir, "config.toml"), []byte("[worktrees]\nbase_path = \"../.trees\"\n"), 0o644))
 	return main
+}
+
+// command returns the command of the catalogue called name.
+func command(t *testing.T, name string) api.Command {
+	t.Helper()
+	found, ok := catalogue().Find(name)
+	require.True(t, ok, name)
+	return found
 }

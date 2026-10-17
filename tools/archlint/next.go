@@ -27,6 +27,7 @@ const (
 	nextAdapter     nextLayer = "adapter"
 	nextCLI         nextLayer = "command/cli"
 	nextUI          nextLayer = "ui"
+	nextAPI         nextLayer = "api"
 	nextCmd         nextLayer = "cmd"
 )
 
@@ -50,6 +51,7 @@ var nextWhy = map[nextLayer]string{
 	nextCLI:         "a command's cli drives its own use case: command/<its name>, domain/*, ui/*, the stdlib and third parties, never another command, a service or an adapter",
 	nextAdapter:     "an adapter reaches domain/*, adapter/statefile, adapter/shell, the stdlib and third parties, never a service, a command or ui/*, nor another adapter",
 	nextUI:          "ui/ is the presentation kit every command's cli shares and knows no command: domain/*, ui/*, the stdlib and third parties, never a command, a service or an adapter",
+	nextAPI:         "the catalogue knows no command: domain/* and the stdlib only",
 	nextCmd:         "the composition root wires what is under next/",
 }
 
@@ -70,7 +72,7 @@ func runNext(pass *analysis.Pass, testsOf testFiles) (any, error) {
 	}
 	from, ok := nextPackageOf(rel)
 	if !ok {
-		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under domain/, service/, command/ (its cli/ beside it), adapter/, ui/ or cmd/ (next/README.md)", rel)
+		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under domain/, service/, command/ (its cli/ beside it), adapter/, ui/, api/ or cmd/ (next/README.md)", rel)
 		return nil, nil
 	}
 	sources := slices.DeleteFunc(slices.Clone(pass.Files), func(file *ast.File) bool { return isTestFile(pass, file) })
@@ -160,6 +162,8 @@ func nextPackageOf(rel string) (nextPackage, bool) {
 		return nextPackage{layer: nextCmd}, true
 	case parts[0] != "internal":
 		return nextPackage{}, false
+	case parts[1] == "api" && !nested:
+		return nextPackage{layer: nextAPI}, true
 	case parts[1] == "domain":
 		return nextPackage{layer: nextDomain}, true
 	case parts[1] == "service" && nested && strings.HasSuffix(unit, testSuffix):
@@ -214,7 +218,7 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 	switch from.layer {
 	case nextDomain:
 		return stdlib || in(nextDomain)
-	case nextService:
+	case nextService, nextAPI:
 		return stdlib || in(nextDomain)
 	case nextCommand:
 		return stdlib || in(nextDomain, nextService) || in(nextCommand) && to.pkg.unit == from.unit

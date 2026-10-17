@@ -1,0 +1,27 @@
+{
+  "v": 2,
+  "command": "extract",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/other",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-other",
+        "files": [
+          {
+            "path": "apps/api/new.txt",
+            "status": "untracked"
+          }
+        ],
+        "kept": false,
+        "conflicts": [],
+        "isolation": "isolated",
+        "existing_branch": false
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

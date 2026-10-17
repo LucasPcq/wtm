@@ -16,7 +16,7 @@ type FailureParams struct {
 
 // Failure writes the failure of params to w: its error, a line per field it refuses, then its next steps.
 func Failure(w io.Writer, params FailureParams) {
-	ErrorLine(w, ErrorText(params.Err))
+	ErrorLine(w, params.Err.Text())
 	for _, line := range fieldLines(params) {
 		Message(w, Indent+line)
 	}
@@ -31,9 +31,9 @@ func QuietFailure(w io.Writer, params FailureParams) {
 func failureLine(params FailureParams) string {
 	fields := fieldLines(params)
 	if len(fields) == 0 {
-		return ErrorText(params.Err)
+		return params.Err.Text()
 	}
-	return ErrorText(params.Err) + ": " + strings.Join(fields, "; ")
+	return params.Err.Text() + ": " + strings.Join(fields, "; ")
 }
 
 func fieldLines(params FailureParams) []string {
@@ -42,15 +42,6 @@ func fieldLines(params FailureParams) []string {
 		lines = append(lines, field.Message(params.Flags.Spell(field.Path)))
 	}
 	return lines
-}
-
-// ErrorText returns the text err is shown with: its message, followed by its cause only for an internal failure or for an invalid request that names no field, where the cause is all the reader has to go on.
-func ErrorText(err *domain.Error) string {
-	keepsCause := err.Kind == domain.KindInternal || err.Kind == domain.KindInvalid && len(err.Fields) == 0
-	if err.Cause == nil || !keepsCause {
-		return err.Message
-	}
-	return err.Message + ": " + err.Cause.Error()
 }
 
 var reasonLabels = map[domain.Reason]string{
@@ -84,7 +75,7 @@ func unfinishedWhy(item Unfinished) string {
 		return reasonLabels[item.Reason]
 	}
 
-	why := ErrorText(item.Err)
+	why := item.Err.Text()
 	if item.Reason != domain.ReasonIncomplete {
 		return why
 	}

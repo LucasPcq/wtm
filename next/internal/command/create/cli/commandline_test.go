@@ -28,3 +28,9 @@ func TestAnUnsetRequestIsTheBareCommand(t *testing.T) {
 	assert.Equal(t, "wtm-next create feat/a", createLine{Command: "wtm-next create", Request: create.Request{Branches: []string{"feat/a"}}}.String())
 	assert.Equal(t, "wtm-next create feat/a --ff=false", createLine{Command: "wtm-next create", Request: create.Request{Branches: []string{"feat/a"}, FastForward: new(false)}}.String())
 }
+
+func TestTheArgvKeepsEachWordAsTheRequestHasIt(t *testing.T) {
+	req := create.Request{Branches: []string{"it's"}, From: "two words"}
+
+	assert.Equal(t, []string{"wtm-next", "create", "it's", "--from", "two words"}, createLine{Command: "wtm-next create", Request: req}.Argv())
+}

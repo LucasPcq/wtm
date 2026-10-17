@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -81,4 +82,38 @@ func TestOneTakesASingleValueOfItsType(t *testing.T) {
 	failure, ok := errors.AsType[*Error](err)
 	require.True(t, ok)
 	assert.Equal(t, CodeOneValue, failure.Fields[0].Code)
+}
+
+func TestAFormIsEncodedWithTheKindOfEachField(t *testing.T) {
+	form := Form{
+		Fields: []Field{
+			TextListField{FieldSpec: FieldSpec{Path: "branches", Flag: "<branches>", Label: "Branches"}, Entries: []string{"feat/x"}},
+			ConfirmField{FieldSpec: FieldSpec{Path: "keep", Flag: "--keep", Label: "Keep", Skip: "not asked"}, Yes: Option{Value: "true", Label: "Copy"}, No: Option{Value: "false", Label: "Move"}},
+			SelectField{FieldSpec: FieldSpec{Path: "isolation", Flag: "--isolation", Label: "Isolation", Origin: OriginRemembered}, Value: "shared", Options: []Option{{Value: "shared", Label: "Shared", Badge: "remembered"}}, Remembered: "shared", Rememberable: true},
+			MultiSelectField{FieldSpec: FieldSpec{Path: "files", Flag: "--files", Label: "Files"}},
+			TextField{FieldSpec: FieldSpec{Path: "to", Flag: "--to", Label: "Target", Usage: "Target branch"}, Value: "feat/y"},
+		},
+		Problems: []FieldError{{Path: "branches[0]", Code: "required", Template: "{path} is required"}},
+	}
+
+	data, err := json.Marshal(form)
+
+	require.NoError(t, err)
+	assert.JSONEq(t, `{
+		"fields": [
+			{"kind": "text_list", "path": "branches", "flag": "<branches>", "label": "Branches", "help": "", "entries": ["feat/x"], "options": []},
+			{"kind": "confirm", "path": "keep", "flag": "--keep", "label": "Keep", "help": "", "skip": "not asked", "value": false, "yes": {"value": "true", "label": "Copy"}, "no": {"value": "false", "label": "Move"}, "rememberable": false, "remember": false},
+			{"kind": "select", "path": "isolation", "flag": "--isolation", "label": "Isolation", "help": "", "origin": "remembered", "value": "shared", "options": [{"value": "shared", "label": "Shared", "badge": "remembered"}], "remembered": "shared", "rememberable": true, "remember": false},
+			{"kind": "multi_select", "path": "files", "flag": "--files", "label": "Files", "help": "", "picked": [], "options": []},
+			{"kind": "text", "path": "to", "flag": "--to", "label": "Target", "help": "", "usage": "Target branch", "value": "feat/y"}
+		],
+		"problems": [{"path": "branches[0]", "code": "required", "flag": "branches[0]", "message": "branches[0] is required"}]
+	}`, string(data))
+}
+
+func TestAFormWithoutProblemsHasAnEmptyList(t *testing.T) {
+	data, err := json.Marshal(Form{})
+
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"fields": [], "problems": []}`, string(data))
 }

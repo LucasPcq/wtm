@@ -53,6 +53,24 @@ func (o Outcome) Failure() *domain.Error {
 	return o.Result.Failure()
 }
 
+// Envelope is how the run ended for every surface, err being Run's refusal if any: its items once applied, else the plan and its fingerprint unless refused.
+func (o Outcome) Envelope(err *domain.Error) domain.Envelope {
+	doc := domain.Envelope{Command: name, Op: o.Op, Err: err}
+
+	switch {
+	case o.Result != nil:
+		doc.Err = cmp.Or(doc.Err, o.Failure())
+		for _, item := range o.Result.Items {
+			doc.Items = append(doc.Items, item.envelopeItem())
+		}
+		doc.Warnings = o.Warnings
+	case doc.Err == nil:
+		doc.Plan, doc.Fingerprint, doc.Warnings = &o.Plan, o.Fingerprint, o.Warnings
+	}
+
+	return doc
+}
+
 // A Result is what the apply did: one Item per branch of the plan, in its order, and the warnings of the whole run.
 type Result struct {
 	Items    []Item
@@ -89,6 +107,10 @@ type Detail struct {
 	worktree.Standing
 	Ordinal  *int         `json:"ordinal,omitempty"`
 	EnvPorts env.Redacted `json:"env_ports,omitzero"`
+}
+
+func (i Item) envelopeItem() domain.Item {
+	return domain.Item{Subject: i.Subject, Status: i.Status, Reason: i.Reason, Err: i.Err, Warnings: i.Warnings, Detail: domain.DetailOf(i.Detail)}
 }
 
 // ----------------------------------------------------------------------------

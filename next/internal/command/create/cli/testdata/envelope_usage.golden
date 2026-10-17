@@ -1,0 +1,12 @@
+{
+  "v": 2,
+  "command": "create",
+  "ok": false,
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid: unknown flag: --nope"
+  }
+}

@@ -98,7 +98,7 @@ The numbered step comments are the one place a body carries a comment per paragr
 
 ## `cli/`: the driving adapter
 
-`cli/` turns the command line into a `Request` and `domain.RunOptions`, runs the wizard on a terminal or `UseCase.Run` otherwise, and draws the outcome with the `ui/` kit. Files: `command.go` (the cobra command, its run and conclusion), `flag.go` (its flags and usages, spelled from the schema), `commandline.go` (the apply and follow-up lines it prints), `output.go` (its plan rows, items, envelope mapping), and when it asks: `wizard.go`, `steps.go`, `recap.go`, `form.go` (its steps over the `ui/form` engine). CLI conventions: `cli.md`; TUI conventions: `tui.md`.
+`cli/` turns the command line into a `Request` and `domain.RunOptions`, runs the wizard on a terminal or `UseCase.Run` otherwise, and draws the outcome with the `ui/` kit. Files: `command.go` (the cobra command, its run and conclusion), `flag.go` (its flags and usages, spelled from the schema), `commandline.go` (the apply and follow-up lines it prints), `output.go` (its plan rows and items; the envelope is the use case's `Outcome.Envelope`), and when it asks: `wizard.go`, `steps.go`, `recap.go`, `form.go` (its steps over the `ui/form` engine). CLI conventions: `cli.md`; TUI conventions: `tui.md`.
 
 ## Sharing between commands
 
@@ -116,7 +116,7 @@ Extract on the second use, not before; until then a slice keeps its own code. A 
 
 ## A second step
 
-A command that offers a step after its outcome (sync's "push now?" once the result is read, clean's retry with sudo) gives it a second exported entry in its use case: its own request, operation, fingerprint and CLI spelling, run like the first. The first entry never runs it: it returns a `domain.FollowUp`, the argv of the line that triggers the second step, with its code, params and message. The CLI prints the argv word by word quoted for the shell (`output.FollowUpSteps`), the JSON envelope carries it as `error.follow_up{argv, code, message, params}`, and a caller runs it if it wants. Today a follow-up rides only on a failure (`error.follow_up`); the follow-ups of a success will go in the envelope's top-level `follow_ups`, whose shape LUC-313 decides. A follow-up that names another command gets its argv from `cmd/wtm-next`, so no service or `ui/` package knows that command.
+A command that offers a step after its outcome (sync's "push now?" once the result is read, clean's retry with sudo) gives it a second exported entry in its use case: its own request, operation, fingerprint and CLI spelling, run like the first. The first entry never runs it: it returns a `domain.FollowUp`, the argv of the line that triggers the second step, with its code, params and message. The CLI prints the argv word by word quoted for the shell (`output.FollowUpSteps`), the JSON envelope carries it as `error.follow_up{argv, code, message, params}`, and a caller runs it if it wants. A follow-up rides on a failure (`error.follow_up`) or in the envelope's top-level `follow_ups`, the same `{argv, code, message, params}`: a stale plan's `--dry-run` replay goes there (`uicli.Replan`), and so will the follow-ups of a success. A follow-up that names another command gets its argv from `cmd/wtm-next`, so no service or `ui/` package knows that command.
 
 ## Codes, messages and exit codes
 
@@ -137,7 +137,7 @@ A command that offers a step after its outcome (sync's "push now?" once the resu
 
 1. `command/<name>/port.go`: the ports it needs, method by method.
 2. `rules.go` and `questions.go`: facts, plan, request, form, validation — pure, tested first.
-3. `usecase.go`: `UseCase`, `Run` (the canonical shape above), `Plan`, `Apply`, `Questions`, `Observe`.
-4. `cli/`: the command, its flags, its output, its wizard steps if it asks; a refusal goes through `uicli.Run.Refuse`, which adds the `--dry-run` replay line to a stale plan.
-5. `cmd/wtm-next`: its adapters wired in `wire.go`, its cobra command registered in `main.go`.
+3. `usecase.go`: `UseCase`, `Run` (the canonical shape above), `Plan`, `Apply`, `Questions`, `Observe`, `Outcome.Envelope`.
+4. `cli/`: the command, its flags, its output, its wizard steps if it asks; a refusal goes through `uicli.Run.Refuse` with the request's argv, which adds the `--dry-run` replay to a stale plan (a next step, or `follow_ups` in JSON).
+5. `cmd/wtm-next`: its adapters wired in `wire.go`, its cobra command registered in `main.go`, its binding in `catalogue.go`.
 6. Anything it shares with an existing command moves to `domain/`, `service/` or `ui/` in the same change.

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"cmp"
+	"encoding/json"
 	"strconv"
 	"strings"
 )
@@ -10,6 +11,51 @@ import (
 type Form struct {
 	Fields   []Field
 	Problems []FieldError
+}
+
+// MarshalJSON is the form as a surface receives it: each field with its "kind" (select, multi_select, text, text_list, confirm) first, then what that kind carries, and the request's problems.
+func (f Form) MarshalJSON() ([]byte, error) {
+	fields := make([]json.RawMessage, 0, len(f.Fields))
+	for _, field := range f.Fields {
+		kind, listed := fieldKind(field)
+		raw, err := discriminated("kind", kind, listed)
+		if err != nil {
+			return nil, err
+		}
+		fields = append(fields, raw)
+	}
+
+	return encoded(struct {
+		Fields   []json.RawMessage `json:"fields"`
+		Problems []FieldError      `json:"problems"`
+	}{fields, orEmpty(f.Problems)})
+}
+
+// fieldKind returns the kind of field and the field with each of its lists an array, never null, so a surface iterates them as they are.
+func fieldKind(field Field) (string, Field) {
+	switch field := field.(type) {
+	case SelectField:
+		field.Options = orEmpty(field.Options)
+		return "select", field
+	case MultiSelectField:
+		field.Picked, field.Options = orEmpty(field.Picked), orEmpty(field.Options)
+		return "multi_select", field
+	case TextField:
+		return "text", field
+	case TextListField:
+		field.Entries, field.Options = orEmpty(field.Entries), orEmpty(field.Options)
+		return "text_list", field
+	case ConfirmField:
+		return "confirm", field
+	}
+	return "", field
+}
+
+func orEmpty[T any](list []T) []T {
+	if list == nil {
+		return []T{}
+	}
+	return list
 }
 
 // PathRemember is the path of the fields whose answer is remembered: the contract's --remember, accepting the paths of the form's rememberable fields.
@@ -28,13 +74,13 @@ type Field interface {
 
 // FieldSpec is what a field of every kind has.
 type FieldSpec struct {
-	Path   string // the request field it answers, as a field error names it
-	Flag   string // the argument or flag that sets it: <branches>, --from
-	Label  string // its name in a wizard's breadcrumb, trail and problems
-	Help   string // what its answer decides, as a wizard describes it
-	Usage  string // the usage of its flag, when it is not Help
-	Origin Origin // where its answer came from, empty when the field does not say
-	Skip   string // why it is not asked, empty when it is
+	Path   string `json:"path"`             // the request field it answers, as a field error names it
+	Flag   string `json:"flag"`             // the argument or flag that sets it: <branches>, --from
+	Label  string `json:"label"`            // its name in a wizard's breadcrumb, trail and problems
+	Help   string `json:"help"`             // what its answer decides, as a wizard describes it
+	Usage  string `json:"usage,omitempty"`  // the usage of its flag, when it is not Help
+	Origin Origin `json:"origin,omitempty"` // where its answer came from, empty when the field does not say
+	Skip   string `json:"skip,omitempty"`   // why it is not asked, empty when it is
 }
 
 // Spec is the spec itself, so each kind of field has it by embedding.
@@ -45,41 +91,42 @@ func (s FieldSpec) Spec() FieldSpec {
 // SelectField asks one of its options; Pinned is the option listed first, Remembered the answer remembered for it, Remember whether this run's answer is to be.
 type SelectField struct {
 	FieldSpec
-	Value        string
-	Options      []Option
-	Pinned       string
-	Remembered   string
-	Rememberable bool
-	Remember     bool
+	Value        string   `json:"value"`
+	Options      []Option `json:"options"`
+	Pinned       string   `json:"pinned,omitempty"`
+	Remembered   string   `json:"remembered,omitempty"`
+	Rememberable bool     `json:"rememberable"`
+	Remember     bool     `json:"remember"`
 }
 
 // MultiSelectField asks any of its options.
 type MultiSelectField struct {
 	FieldSpec
-	Picked  []string
-	Options []Option
+	Picked  []string `json:"picked"`
+	Options []Option `json:"options"`
 }
 
 // TextField asks one line of text.
 type TextField struct {
 	FieldSpec
-	Value string
+	Value string `json:"value"`
 }
 
 // TextListField asks a list of entries; Options are the values the repository knows, each with its badge.
 type TextListField struct {
 	FieldSpec
-	Entries []string
-	Options []Option
+	Entries []string `json:"entries"`
+	Options []Option `json:"options"`
 }
 
 // ConfirmField asks yes or no; Yes and No are its two options, valued true and false, with how each reads.
 type ConfirmField struct {
 	FieldSpec
-	Value        bool
-	Yes, No      Option
-	Rememberable bool
-	Remember     bool
+	Value        bool   `json:"value"`
+	Yes          Option `json:"yes"`
+	No           Option `json:"no"`
+	Rememberable bool   `json:"rememberable"`
+	Remember     bool   `json:"remember"`
 }
 
 // Answer is the option selected.

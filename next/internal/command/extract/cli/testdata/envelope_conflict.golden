@@ -1,0 +1,17 @@
+{
+  "v": 2,
+  "command": "extract",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "conflict",
+    "code": "extract.conflict",
+    "message": "cannot apply the selected changes: apps/api/a.txt was also modified in \"feat/other\" — resolve it there, extract to another worktree, or re-run with --on-conflict resolve",
+    "params": {
+      "files": "apps/api/a.txt",
+      "target": "feat/other"
+    }
+  }
+}

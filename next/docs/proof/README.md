@@ -20,10 +20,13 @@ The reference is the legacy `wtm create` of 0.30.1. Its output differs by design
   15. `--dry-run` with `--remember env_from` (next only)
   16. `--expect-fingerprint` with that fingerprint (next only)
   17. `--expect-fingerprint` with a stale fingerprint (next only)
+  18. `--output json --dry-run` of `--if-not-exists` on the worktree 9 made (next only)
+  19. `--output json --expect-fingerprint` with that fingerprint: applied, the worktree unchanged (next only)
+  20. `--output json --expect-fingerprint` with a stale fingerprint, its `follow_ups` the `--dry-run` that plans again (next only)
 - The states are identical for 1 to 15. The differences, all deliberate:
   - 3 is refused by both; next exits 2 (an invalid request, its field naming `--from`) where legacy exits 1. 12 likewise: next exits 2 where legacy exits 10.
   - 14 gives both the configured strategy, `main`.
-  - 15 to 17: legacy has no dry run, fingerprint nor `--remember`, and refuses the flag (exit 2). Next plans 15 without applying it, applies 16 (`feat/dry`, `env_from` remembered as `main`) and refuses 17 (exit 25).
+  - 15 to 20: legacy has no dry run, fingerprint nor `--remember`, and refuses the flag (exit 2). Next plans 15 and 18 without applying them, applies 16 (`feat/dry`, `env_from` remembered as `main`) and 19 (nothing to change), and refuses 17 and 20 (exit 25).
 - `tty.sh <side> <binary> tty/<side>`, after `create.sh`: tmux at 100×40 in that side's sandbox, `tty/legacy/` and `tty/next/` hold the screens.
   - The form under `--ask`: branches, then source, env strategy (the remembered answer ticked), isolation and the recap, then apply and the outcome. Next asks one step more (`If not exists`, shown settled) and draws its recap as the plan; legacy offers a "Use config default" row next has not.
   - One Ctrl+C during a hook: both exit 19, next saying `Cancelling — finishing on_create of feat/slow; Ctrl+C again to stop now`.

@@ -3,7 +3,6 @@ package output
 import (
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,8 +13,8 @@ func TestAWordIsQuotedOnlyWhenTheShellWouldReadItOtherwise(t *testing.T) {
 }
 
 func TestAFollowUpIsItsCommandLineEachWordQuotedForTheShell(t *testing.T) {
-	assert.Equal(t, "wtm clean feat/x --force", FollowUpLine(&domain.FollowUp{Argv: []string{"wtm", "clean", "feat/x", "--force"}}))
-	assert.Equal(t, `wtm clean 'it'\''s' 'a$b;c!' --force`, FollowUpLine(&domain.FollowUp{Argv: []string{"wtm", "clean", "it's", "a$b;c!", "--force"}}))
+	assert.Equal(t, "wtm clean feat/x --force", Line([]string{"wtm", "clean", "feat/x", "--force"}))
+	assert.Equal(t, `wtm clean 'it'\''s' 'a$b;c!' --force`, Line([]string{"wtm", "clean", "it's", "a$b;c!", "--force"}))
 }
 
 func TestAPathIsShownRelativeToWhereItRuns(t *testing.T) {

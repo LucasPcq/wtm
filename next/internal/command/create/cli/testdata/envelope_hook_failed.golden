@@ -1,0 +1,41 @@
+{
+  "v": 2,
+  "command": "create",
+  "ok": false,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/x",
+      "status": "failed",
+      "reason": "incomplete",
+      "error": {
+        "kind": "internal",
+        "code": "unit.phase_failed",
+        "message": "on_create failed: hook failed: exit status 3",
+        "params": {
+          "phase": "on_create"
+        }
+      },
+      "detail": {
+        "path": "/repo/.trees/feat-x",
+        "metadata": {
+          "source_branch": "main",
+          "created_at": "2026-10-16T12:00:00Z",
+          "env_strategy": "example",
+          "isolation": "isolated"
+        },
+        "existing_branch": false
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "internal",
+    "code": "unit.phase_failed",
+    "message": "on_create failed: hook failed: exit status 3",
+    "params": {
+      "phase": "on_create"
+    }
+  }
+}
