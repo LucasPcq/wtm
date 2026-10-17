@@ -11,7 +11,10 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/wtm/operation"
 )
 
-const commandCreate = "create"
+const (
+	commandCreate = "create"
+	CodePlanStale = "plan.stale"
+)
 
 type CreateParams struct {
 	Request           create.Request
@@ -26,6 +29,13 @@ type CreateOutcome struct {
 	Fingerprint string
 	Warnings    []wtm.Warning
 	Result      *create.Result
+}
+
+func (o CreateOutcome) Failure() *wtm.Error {
+	if o.Result == nil {
+		return nil
+	}
+	return o.Result.Failure()
 }
 
 func (a *App) CreateQuestions(ctx context.Context, req create.Request) (create.Questions, error) {
@@ -61,7 +71,7 @@ func (a *App) Create(ctx context.Context, params CreateParams) (CreateOutcome, e
 	if params.ExpectFingerprint != "" && params.ExpectFingerprint != outcome.Fingerprint {
 		return outcome, &wtm.Error{
 			Kind:    wtm.KindPrecondition,
-			Code:    "plan.stale",
+			Code:    CodePlanStale,
 			Message: "the facts changed since the preview",
 			Params:  wtm.Params{"expected": params.ExpectFingerprint, "found": outcome.Fingerprint},
 		}

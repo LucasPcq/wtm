@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 
+	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 )
 
@@ -20,11 +21,9 @@ const (
 	exitPrecondition     = 25
 )
 
-const codeNotARepository = "git.not_a_repository"
-
 var exitByCode = map[string]int{
-	"create.config_not_found": exitConfigNotFound,
-	codeNotARepository:        exitNotGitRepo,
+	create.CodeConfigNotFound: exitConfigNotFound,
+	wtm.CodeNotARepository:    exitNotGitRepo,
 }
 
 var exitByKind = map[wtm.Kind]int{
@@ -41,10 +40,7 @@ type exitParams struct {
 }
 
 func exitCode(params exitParams) int {
-	switch {
-	case params.Failure == nil:
-		return exitOK
-	case params.Signalled:
+	if params.Signalled {
 		return exitCancelled
 	}
 	if code, own := exitByCode[params.Failure.Code]; own {

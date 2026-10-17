@@ -12,6 +12,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
+const CodeConfigNotFound = "create.config_not_found"
+
 type Request struct {
 	Branches    []string            `json:"branches"`
 	From        string              `json:"from"`

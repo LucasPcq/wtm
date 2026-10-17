@@ -3,6 +3,7 @@ package cli
 import (
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,8 +24,8 @@ func TestEachKindExitsOnItsCode(t *testing.T) {
 }
 
 func TestACodeWithAnExitOfItsOwnExitsOnIt(t *testing.T) {
-	assert.Equal(t, exitConfigNotFound, exitCode(exitParams{Failure: &wtm.Error{Kind: wtm.KindPrecondition, Code: "create.config_not_found"}}))
-	assert.Equal(t, exitNotGitRepo, exitCode(exitParams{Failure: &wtm.Error{Kind: wtm.KindPrecondition, Code: codeNotARepository}}))
+	assert.Equal(t, exitConfigNotFound, exitCode(exitParams{Failure: &wtm.Error{Kind: wtm.KindPrecondition, Code: create.CodeConfigNotFound}}))
+	assert.Equal(t, exitNotGitRepo, exitCode(exitParams{Failure: &wtm.Error{Kind: wtm.KindPrecondition, Code: wtm.CodeNotARepository}}))
 }
 
 func TestAStateFileOfANewerSchemaExitsOnItsCodeWhereverItSurfaced(t *testing.T) {
@@ -35,5 +36,4 @@ func TestAStateFileOfANewerSchemaExitsOnItsCodeWhereverItSurfaced(t *testing.T) 
 
 func TestAFailureAfterAnInterruptIsTheInterrupt(t *testing.T) {
 	assert.Equal(t, exitCancelled, exitCode(exitParams{Failure: &wtm.Error{Kind: wtm.KindInternal}, Signalled: true}))
-	assert.Equal(t, exitOK, exitCode(exitParams{Signalled: true}))
 }

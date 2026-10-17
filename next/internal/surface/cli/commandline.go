@@ -2,9 +2,6 @@ package cli
 
 import (
 	"encoding/json"
-	"fmt"
-	"maps"
-	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/app/create"
@@ -43,36 +40,19 @@ func (l createLine) String() string {
 	return strings.Join(words, " ")
 }
 
-func followUpLine(followUp *wtm.FollowUp) (string, error) {
-	var request map[string]any
-	if len(followUp.Request) > 0 {
-		if err := json.Unmarshal(followUp.Request, &request); err != nil {
-			return "", fmt.Errorf("the follow-up %s has no request object: %w", followUp.Command, err)
-		}
+type cleanRequest struct {
+	Branches []string `json:"branches"`
+	Force    bool     `json:"force"`
+}
+
+func followUpLine(followUp *wtm.FollowUp) string {
+	var request cleanRequest
+	_ = json.Unmarshal(followUp.Request, &request)
+	words := append([]string{"wtm", followUp.Command}, quoted(request.Branches)...)
+	if request.Force {
+		words = append(words, "--force")
 	}
-	words := []string{"wtm", followUp.Command}
-	if branches, ok := request["branches"].([]any); ok {
-		words = append(words, quoted(texts(branches))...)
-	}
-	for _, key := range slices.Sorted(maps.Keys(request)) {
-		flag := strings.ReplaceAll(key, "_", "-")
-		switch value := request[key].(type) {
-		case bool:
-			if value {
-				words = append(words, "--"+flag)
-			}
-		case string:
-			words = appendFlag(words, flag, value)
-		case []any:
-			if key == "branches" {
-				continue
-			}
-			for _, item := range texts(value) {
-				words = appendFlag(words, flag, item)
-			}
-		}
-	}
-	return strings.Join(words, " "), nil
+	return strings.Join(words, " ")
 }
 
 func appendFlag(words []string, flag, value string) []string {
@@ -80,14 +60,6 @@ func appendFlag(words []string, flag, value string) []string {
 		return words
 	}
 	return append(words, "--"+flag, quote(value))
-}
-
-func texts(values []any) []string {
-	out := make([]string, 0, len(values))
-	for _, value := range values {
-		out = append(out, fmt.Sprint(value))
-	}
-	return out
 }
 
 func quoted(words []string) []string {

@@ -46,6 +46,18 @@ func TestAFolderOutsideAnyRepositoryIsRefused(t *testing.T) {
 
 	failure, ok := errors.AsType[*wtm.Error](err)
 	require.True(t, ok, "%v", err)
-	assert.Equal(t, "git.not_a_repository", failure.Code)
+	assert.Equal(t, wtm.CodeNotARepository, failure.Code)
 	assert.Equal(t, outside+" is not a git repository", failure.Message)
+}
+
+func TestANamedProjectDirOutsideAnyRepositoryIsRefused(t *testing.T) {
+	named := t.TempDir()
+	t.Setenv(projectDirEnv, named)
+
+	_, err := locate(t.Context(), t.TempDir())
+
+	failure, ok := errors.AsType[*wtm.Error](err)
+	require.True(t, ok, "%v", err)
+	assert.Equal(t, wtm.CodeNotARepository, failure.Code)
+	assert.Equal(t, gittest.Resolved(t, named)+" is not a git repository", failure.Message)
 }

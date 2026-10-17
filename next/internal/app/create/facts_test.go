@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
 	"github.com/LucasPcq/wtm/next/internal/wtm/run"
@@ -23,7 +24,7 @@ func TestARepositoryWithoutConfigIsAPrecondition(t *testing.T) {
 	failure, ok := errors.AsType[*wtm.Error](err)
 	require.True(t, ok, err)
 	assert.Equal(t, wtm.KindPrecondition, failure.Kind)
-	assert.Equal(t, "create.config_not_found", failure.Code)
+	assert.Equal(t, create.CodeConfigNotFound, failure.Code)
 	assert.Equal(t, "no wtm config found — run `wtm init` first", failure.Message)
 }
 

@@ -133,7 +133,7 @@ func TestAPreviewAppliesWhileItsPlanHoldsAndIsRefusedOnceItChanged(t *testing.T)
 
 	failure := refusal(t, staleErr)
 	assert.Equal(t, wtm.KindPrecondition, failure.Kind)
-	assert.Equal(t, "plan.stale", failure.Code)
+	assert.Equal(t, app.CodePlanStale, failure.Code)
 	assert.Equal(t, wtm.Params{"expected": preview.Fingerprint, "found": stale.Fingerprint}, failure.Params)
 	assert.NotEqual(t, preview.Fingerprint, stale.Fingerprint)
 	assert.NoDirExists(t, w.path(branchName))
@@ -237,4 +237,12 @@ func TestARunWithoutReportStillRuns(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, wtm.StatusDone, outcome.Result.Items[0].Status)
+}
+
+func TestAnOutcomeFailsOnItsFirstFailedItemAndAPreviewNever(t *testing.T) {
+	failure := &wtm.Error{Kind: wtm.KindInternal, Code: "unit.phase_failed"}
+	applied := app.CreateOutcome{Result: &create.Result{Items: []create.Item{{Subject: branchName, Status: wtm.StatusFailed, Err: failure}}}}
+
+	assert.Same(t, failure, applied.Failure())
+	assert.Nil(t, app.CreateOutcome{}.Failure())
 }

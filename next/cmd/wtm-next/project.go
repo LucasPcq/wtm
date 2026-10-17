@@ -36,17 +36,21 @@ func open(ctx context.Context) (cli.Project, error) {
 
 func locate(ctx context.Context, cwd string) (appParams, error) {
 	root, err := projectRoot(ctx, cwd)
-	if errors.Is(err, git.ErrNotRepository) {
-		return appParams{}, &wtm.Error{Kind: wtm.KindPrecondition, Code: "git.not_a_repository", Message: cwd + " is not a git repository", Cause: err}
-	}
 	if err != nil {
-		return appParams{}, err
+		return appParams{}, notARepository(cwd, err)
 	}
 	commonDir, err := git.Repo{Dir: root}.GitCommonDir(ctx)
 	if err != nil {
-		return appParams{}, err
+		return appParams{}, notARepository(root, err)
 	}
 	return appParams{MainPath: root, StateDir: cmp.Or(os.Getenv(stateDirEnv), filepath.Join(commonDir, stateDirName)), CommonDir: commonDir}, nil
+}
+
+func notARepository(dir string, err error) error {
+	if !errors.Is(err, git.ErrNotRepository) {
+		return err
+	}
+	return &wtm.Error{Kind: wtm.KindPrecondition, Code: wtm.CodeNotARepository, Message: dir + " is not a git repository", Cause: err}
 }
 
 func projectRoot(ctx context.Context, cwd string) (string, error) {

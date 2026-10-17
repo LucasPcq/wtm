@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"io"
 	"os"
@@ -107,12 +108,12 @@ func (c *createCommand) run(cmd *cobra.Command, args []string) error {
 	c.quiet, _ = cmd.Flags().GetBool(flagQuiet)
 	req := c.request(cmd, args)
 	if c.output != outputText && c.output != outputJSON {
-		refused := &wtm.Error{Kind: wtm.KindInvalid, Code: wtm.CodeInvalidRequest, Message: `invalid --output "` + c.output + `": expected one of text, json`}
+		refused := wtm.InvalidMessage(`invalid --output "` + c.output + `": expected one of text, json`)
 		c.output = outputText
 		return c.fail(cmd, refused, req)
 	}
 	if c.interactive(cmd) {
-		return c.fail(cmd, &wtm.Error{Kind: wtm.KindInvalid, Code: wtm.CodeInvalidRequest, Message: "the form is not yet available: pass --yes"}, req)
+		return c.fail(cmd, wtm.InvalidMessage("the form is not yet available: pass --yes"), req)
 	}
 	ctx := cmd.Context()
 	project, err := c.open(ctx)
@@ -168,17 +169,11 @@ type concluded struct {
 }
 
 func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
-	failure := done.Err
-	if failure == nil && done.Outcome.Result != nil {
-		failure = done.Outcome.Result.Failure()
+	failure := cmp.Or(done.Err, done.Outcome.Failure())
+	if !c.human() {
+		return c.envelope(cmd, envelopeOf{Outcome: done.Outcome, Err: done.Err, Failure: failure})
 	}
 	stdout, _ := c.streams(cmd)
-	if !c.human() {
-		if err := output.Envelope(stdout, output.EnvelopeParams{Outcome: done.Outcome, Err: done.Err}); err != nil {
-			return c.failed(wtm.AsError(wtm.AsErrorParams{Err: err}))
-		}
-		return c.failed(failure)
-	}
 	line := createLine{Command: cmd.CommandPath(), Request: done.Request}
 	switch {
 	case done.Err != nil:
@@ -188,10 +183,7 @@ func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
 		output.Frame(stdout, func(w io.Writer) { output.DryRun(w, output.DryRunParams{Outcome: done.Outcome, Apply: apply}) })
 		return nil
 	}
-	followUps, err := itemFollowUps(done.Outcome.Result.Items)
-	if err != nil {
-		return c.fail(cmd, wtm.AsError(wtm.AsErrorParams{Err: err}), done.Request)
-	}
+	followUps := itemFollowUps(done.Outcome.Result.Items)
 	output.Frame(stdout, func(w io.Writer) {
 		output.Outcome(w, output.OutcomeParams{Outcome: done.Outcome, FollowUps: followUps, Cwd: done.Cwd})
 	})
@@ -199,19 +191,29 @@ func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
 }
 
 func (c *createCommand) fail(cmd *cobra.Command, failure *wtm.Error, req create.Request) error {
-	stdout, stderr := c.streams(cmd)
 	if !c.human() {
-		if err := output.Envelope(stdout, output.EnvelopeParams{Err: failure}); err != nil {
-			return c.failed(wtm.AsError(wtm.AsErrorParams{Err: err}))
-		}
-		return c.failed(failure)
+		return c.envelope(cmd, envelopeOf{Err: failure, Failure: failure})
 	}
+	_, stderr := c.streams(cmd)
 	var next []output.NextStep
-	if failure.Code == "plan.stale" {
+	if failure.Code == app.CodePlanStale {
 		next = []output.NextStep{{Command: createLine{Command: cmd.CommandPath(), Request: req}.String() + " --dry-run", Note: replanNote}}
 	}
 	output.Frame(stderr, func(w io.Writer) { output.Failure(w, output.FailureParams{Err: failure, Next: next}) })
 	return c.failed(failure)
+}
+
+type envelopeOf struct {
+	Outcome app.CreateOutcome
+	Err     *wtm.Error
+	Failure *wtm.Error
+}
+
+func (c *createCommand) envelope(cmd *cobra.Command, doc envelopeOf) error {
+	if err := output.Envelope(cmd.OutOrStdout(), output.EnvelopeParams{Outcome: doc.Outcome, Err: doc.Err}); err != nil {
+		return c.failed(wtm.AsError(wtm.AsErrorParams{Err: err}))
+	}
+	return c.failed(doc.Failure)
 }
 
 func (c *createCommand) failed(failure *wtm.Error) error {
@@ -221,19 +223,15 @@ func (c *createCommand) failed(failure *wtm.Error) error {
 	return &failed{Err: failure, Quiet: c.quiet && c.human()}
 }
 
-func itemFollowUps(items []create.Item) ([]output.NextStep, error) {
+func itemFollowUps(items []create.Item) []output.NextStep {
 	var steps []output.NextStep
 	for _, item := range items {
 		if item.Err == nil || item.Err.FollowUp == nil {
 			continue
 		}
-		line, err := followUpLine(item.Err.FollowUp)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, output.NextStep{Command: line, Note: item.Err.FollowUp.Message})
+		steps = append(steps, output.NextStep{Command: followUpLine(item.Err.FollowUp), Note: item.Err.FollowUp.Message})
 	}
-	return steps, nil
+	return steps
 }
 
 func names[T ~string](values []T) []string {

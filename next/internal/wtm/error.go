@@ -25,6 +25,7 @@ const (
 	CodeInvalidRequest = "request.invalid"
 	CodeInterrupted    = "unit.interrupted"
 	CodeInternal       = "internal"
+	CodeNotARepository = "git.not_a_repository"
 )
 
 type Params map[string]string
@@ -86,6 +87,10 @@ func (e *Error) Unwrap() error {
 
 func Invalid(fields []FieldError) *Error {
 	return &Error{Kind: KindInvalid, Code: CodeInvalidRequest, Message: "the request is invalid", Fields: fields}
+}
+
+func InvalidMessage(message string) *Error {
+	return &Error{Kind: KindInvalid, Code: CodeInvalidRequest, Message: message}
 }
 
 type AsErrorParams struct {

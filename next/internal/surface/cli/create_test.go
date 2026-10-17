@@ -181,7 +181,7 @@ func TestAFailedHookExitsOneAndNamesTheBranch(t *testing.T) {
 }
 
 func TestTheProjectThatCannotBeOpenedIsTheFailure(t *testing.T) {
-	notARepo := &wtm.Error{Kind: wtm.KindPrecondition, Code: codeNotARepository, Message: "/tmp is not a git repository"}
+	notARepo := &wtm.Error{Kind: wtm.KindPrecondition, Code: wtm.CodeNotARepository, Message: "/tmp is not a git repository"}
 
 	got := runCreate(t, newWorld(seed{Open: notARepo}), branchName)
 

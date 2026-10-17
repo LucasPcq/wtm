@@ -71,7 +71,7 @@ func Envelope(w io.Writer, params EnvelopeParams) error {
 	doc := envelope{V: envelopeVersion, Command: commandName, Op: outcome.Op, FollowUps: []envelopeFollow{}}
 	switch {
 	case outcome.Result != nil:
-		failure = cmp.Or(failure, outcome.Result.Failure())
+		failure = cmp.Or(failure, outcome.Failure())
 		for _, item := range outcome.Result.Items {
 			doc.Items = append(doc.Items, itemOf(item))
 		}

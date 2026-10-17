@@ -9,7 +9,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 	"github.com/LucasPcq/wtm/next/internal/wtm/run"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestTheRequestIsSpelledWithItsFlagsSortedAndQuoted(t *testing.T) {
@@ -33,14 +32,7 @@ func TestAnUnsetRequestIsTheBareCommand(t *testing.T) {
 }
 
 func TestAFollowUpIsTheCommandItNamesWithItsBranchesFirst(t *testing.T) {
-	line, err := followUpLine(&wtm.FollowUp{Command: "clean", Request: json.RawMessage(`{"branches":["feat/x"],"force":true,"keep_branch":false,"note":""}`)})
+	line := followUpLine(&wtm.FollowUp{Command: "clean", Request: json.RawMessage(`{"branches":["feat/x"],"force":true}`)})
 
-	require.NoError(t, err)
 	assert.Equal(t, "wtm clean feat/x --force", line)
-}
-
-func TestAFollowUpWhoseRequestIsNoObjectIsAnError(t *testing.T) {
-	_, err := followUpLine(&wtm.FollowUp{Command: "clean", Request: json.RawMessage(`["feat/x"]`)})
-
-	assert.Error(t, err)
 }

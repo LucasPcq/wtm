@@ -32,7 +32,7 @@ type Facts struct {
 func (d Deps) Observe(ctx context.Context, branches []string) (Facts, error) {
 	config, global, err := d.LoadConfig()
 	if errors.Is(err, project.ErrConfigNotFound) {
-		return Facts{}, &wtm.Error{Kind: wtm.KindPrecondition, Code: "create.config_not_found", Message: "no wtm config found — run `wtm init` first", Cause: err}
+		return Facts{}, &wtm.Error{Kind: wtm.KindPrecondition, Code: CodeConfigNotFound, Message: "no wtm config found — run `wtm init` first", Cause: err}
 	}
 	if err != nil {
 		return Facts{}, err

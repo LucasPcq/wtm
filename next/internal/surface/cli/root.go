@@ -76,7 +76,7 @@ func Execute(ctx context.Context, root *cobra.Command) int {
 		}
 		return exitCode(exitParams{Failure: failure.Err, Signalled: ctx.Err() != nil})
 	}
-	usage := &wtm.Error{Kind: wtm.KindInvalid, Code: wtm.CodeInvalidRequest, Message: err.Error()}
+	usage := wtm.InvalidMessage(err.Error())
 	output.Frame(stderr, func(w io.Writer) { output.Failure(w, output.FailureParams{Err: usage}) })
 	return exitUsage
 }
