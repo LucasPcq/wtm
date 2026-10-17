@@ -39,53 +39,53 @@ func (s *Session[R, Q, O]) problems(answers ...domain.Answered) ([]domain.FieldE
 
 // fieldStep returns the step that asks field, at its place in the form, by its kind.
 func fieldStep(s sheet, at int, field domain.Field) Step {
-	base := asked{sheet: s, at: at}
+	base := Asked{sheet: s, at: at}
 	switch field := field.(type) {
 	case domain.SelectField:
 		if field.Refreshable {
-			return &refreshedSelectStep{selectStep{asked: base}}
+			return &refreshedSelectStep{selectStep{Asked: base}}
 		}
-		return &selectStep{asked: base}
+		return &selectStep{Asked: base}
 	case domain.ConfirmField:
-		return &confirmStep{asked: base}
+		return &confirmStep{Asked: base}
 	case domain.TextListField:
-		return &textListStep{asked: base}
+		return &textListStep{Asked: base}
 	case domain.TextField:
-		return &textStep{asked: base}
+		return &TextStep{Asked: base}
 	case domain.MultiSelectField:
-		return &multiSelectStep{asked: base}
+		return &MultiSelectStep{Asked: base}
 	}
 
 	return nil
 }
 
-// asked is a step's place in its session, which gives every step of a field kind its label, description, standing and reset.
-type asked struct {
+// Asked is a step's place in its session, which gives every step of a field kind, and a command's own steps that embed it, its label, description, standing and reset.
+type Asked struct {
 	sheet sheet
 	at    int
 }
 
 // Label is the field's label.
-func (a asked) Label() string {
+func (a Asked) Label() string {
 	return a.sheet.Field(a.at).Spec().Label
 }
 
 // Description is the field's help.
-func (a asked) Description() string {
+func (a Asked) Description() string {
 	return a.sheet.Field(a.at).Spec().Help
 }
 
 // Standing is where the field's answer stands.
-func (a asked) Standing() Standing {
+func (a Asked) Standing() Standing {
 	return a.sheet.Standing(a.at)
 }
 
 // Reset forgets the step's answer.
-func (a asked) Reset() {
+func (a Asked) Reset() {
 	a.sheet.Forget(a.at)
 }
 
-func (a asked) path() string {
+func (a Asked) path() string {
 	return a.sheet.Field(a.at).Spec().Path
 }
 
@@ -122,7 +122,7 @@ func shortOf(options []domain.Option, value string) string {
 
 // selectStep asks one of a field's options in a select list, the pinned one first, with the "always use this answer" toggle when the answer can be remembered.
 type selectStep struct {
-	asked
+	Asked
 	list *SelectList
 }
 
@@ -203,7 +203,7 @@ const (
 
 // confirmStep asks yes or no in a select list of the field's two options; one whose answer can be remembered sets them apart by a rule, above the "always use this answer" toggle.
 type confirmStep struct {
-	asked
+	Asked
 	list *SelectList
 }
 
@@ -262,7 +262,7 @@ func confirmed(field domain.ConfirmField, yes bool) string {
 
 // textListStep asks a list of entries, each checked against the repository as it is added, each badged with what the repository knows of it.
 type textListStep struct {
-	asked
+	Asked
 	list *TextList
 }
 
@@ -320,20 +320,26 @@ func (s *textListStep) Answer() string {
 // ----------------------------------------------------------------------------
 // A text
 
-// textStep asks one line of text, checked against the repository once typed.
-type textStep struct {
-	asked
-	text *Text
+// TextStep asks one line of text, checked against the repository once typed: by Check when a command's own step sets it, else by the problems the repository finds in it.
+type TextStep struct {
+	Asked
+	Check func(value string) error
+	text  *Text
 }
 
 // Open builds the text field on the answer so far and starts the cursor blinking.
-func (s *textStep) Open() tea.Cmd {
-	s.text = NewText(strings.Join(s.sheet.values(s.path()), ""), s.check)
+func (s *TextStep) Open() tea.Cmd {
+	check := s.check
+	if s.Check != nil {
+		check = s.Check
+	}
+
+	s.text = NewText(strings.Join(s.sheet.values(s.path()), ""), check)
 	return textinput.Blink
 }
 
 // check is the first problem of the value typed, as the step shows it.
-func (s *textStep) check(value string) error {
+func (s *TextStep) check(value string) error {
 	problems, err := s.sheet.problems(domain.Answered{Path: s.path(), Values: []string{value}})
 	if err != nil {
 		return Sentence(err)
@@ -347,12 +353,12 @@ func (s *textStep) check(value string) error {
 }
 
 // Field is the text field.
-func (s *textStep) Field() Field {
+func (s *TextStep) Field() Field {
 	return s.text
 }
 
 // Answer records the value typed.
-func (s *textStep) Answer() string {
+func (s *TextStep) Answer() string {
 	s.sheet.Answer(s.at, domain.Answered{Path: s.path(), Values: []string{s.text.Value()}})
 	return s.text.Value()
 }
@@ -360,19 +366,24 @@ func (s *textStep) Answer() string {
 // ----------------------------------------------------------------------------
 // A multi-select
 
-// multiSelectStep asks any of a field's options, those answered so far picked; none picked is refused with the field's Empty problem.
-type multiSelectStep struct {
-	asked
+// MultiSelectStep asks any of a field's options, those answered so far picked, each tag in the Tone a command's own step gives it (muted otherwise); none picked is refused with the field's Empty problem.
+type MultiSelectStep struct {
+	Asked
+	Tone  func(option domain.Option) Tone
 	picks *MultiSelect
 }
 
 // Open builds the multi-select.
-func (s *multiSelectStep) Open() tea.Cmd {
+func (s *MultiSelectStep) Open() tea.Cmd {
 	field, _ := s.sheet.Field(s.at).(domain.MultiSelectField)
 	picked := s.sheet.values(field.Path)
 	options := make([]Pick, 0, len(field.Options))
 	for _, o := range field.Options {
-		options = append(options, Pick{Label: cmp.Or(o.Label, o.Value), Value: o.Value, Tag: o.Badge, Picked: slices.Contains(picked, o.Value)})
+		pick := Pick{Label: cmp.Or(o.Label, o.Value), Value: o.Value, Tag: o.Badge, Picked: slices.Contains(picked, o.Value)}
+		if s.Tone != nil {
+			pick.Tone = s.Tone(o)
+		}
+		options = append(options, pick)
 	}
 
 	s.picks = NewMultiSelect(MultiSelectParams{Options: options, Empty: field.Empty})
@@ -380,12 +391,12 @@ func (s *multiSelectStep) Open() tea.Cmd {
 }
 
 // Field is the multi-select.
-func (s *multiSelectStep) Field() Field {
+func (s *MultiSelectStep) Field() Field {
 	return s.picks
 }
 
 // Answer records the options picked.
-func (s *multiSelectStep) Answer() string {
+func (s *MultiSelectStep) Answer() string {
 	s.sheet.Answer(s.at, domain.Answered{Path: s.path(), Values: s.picks.Values()})
 	return strings.Join(s.picks.Values(), ", ")
 }

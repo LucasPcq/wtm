@@ -19,7 +19,7 @@ What every mutating command of `next/` promises its callers — people at a term
 - A command's input is its `Request` (the command's own fields, JSON tags in snake_case) plus `domain.RunOptions` (`DryRun`, `ExpectFingerprint`, `Surface`, `CorrelationID`, `Report`), the same for every command. Everything an execution depends on travels with it, so one process can serve several callers and repositories: the correlation ID in the options (`operation.Service.Begin` records it on the operation and every event, and refuses an invalid one), the repository as the directory the use case is opened from (`open(ctx, dir)`, always resolved to its main worktree), `--ask` as the request's `ask` field. Only the CLI reads the environment, once (`uicli.ReadEnv`), except the process-wide `$WTM_STATE_DIR`, and it refuses an invalid `$WTM_CORRELATION_ID` before any repository lookup.
 - The subject is positional (`create [branch…]`, `extract [source]`); a worktree that is not the subject is a flag named after its role (`--to`, `--from`).
 - A flag whose absence means something (`--ff`, `--keep`) becomes a pointer in the request only when it was given.
-- Every field error names its path; the CLI turns the path into its flag (`flag.go`) so the message says `--files is required`, never `files is required`.
+- Every field error names its path; the CLI turns the path into its flag (`form.Command.Flags`, from the schema's `Form.Flags`) so the message says `--files is required`, never `files is required`.
 
 ## Interactive or unattended
 

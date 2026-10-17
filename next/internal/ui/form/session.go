@@ -95,6 +95,21 @@ func (s *Session[R, Q, O]) Questions() Q {
 	return s.q
 }
 
+// Asked is the place of step at in the session, for a command's own step to embed.
+func (s *Session[R, Q, O]) Asked(at int) Asked {
+	return Asked{sheet: s, at: at}
+}
+
+// TextStep is the step of the text field at, for a command's own step to embed.
+func (s *Session[R, Q, O]) TextStep(at int) *TextStep {
+	return &TextStep{Asked: s.Asked(at)}
+}
+
+// MultiSelectStep is the step of the multi-select field at, for a command's own step to embed.
+func (s *Session[R, Q, O]) MultiSelectStep(at int) *MultiSelectStep {
+	return &MultiSelectStep{Asked: s.Asked(at)}
+}
+
 // Step is the step at, among those built before it: a command's own step finds the one it pairs with.
 func (s *Session[R, Q, O]) Step(at int) Step {
 	return s.steps[at]

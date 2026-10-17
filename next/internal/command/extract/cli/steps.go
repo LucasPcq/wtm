@@ -7,7 +7,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -18,15 +17,19 @@ const createTarget = "\x00new-worktree"
 func special(s *session, at int, field domain.Field) form.Step {
 	switch field := field.(type) {
 	case domain.MultiSelectField:
-		return &filesStep{own: own{s: s, at: at}}
+		files := &filesStep{MultiSelectStep: s.MultiSelectStep(at), s: s}
+		files.Tone = files.tone
+		return files
 	case domain.SelectField:
 		if field.Path == "to" {
-			return &targetStep{own: own{s: s, at: at}}
+			return &targetStep{Asked: s.Asked(at), s: s, at: at}
 		}
 	case domain.TextField:
 		for before := range at {
 			if target, isTarget := s.Step(before).(*targetStep); isTarget {
-				return &branchStep{own: own{s: s, at: at}, target: target}
+				branch := &branchStep{TextStep: s.TextStep(at), s: s, at: at, target: target}
+				branch.Check = branch.check
+				return branch
 			}
 		}
 	case domain.ConfirmField, domain.TextListField:
@@ -35,39 +38,18 @@ func special(s *session, at int, field domain.Field) form.Step {
 	return nil
 }
 
-// An own is the place of one of extract's own steps in its session, which gives it its label, description and reset.
-type own struct {
-	s  *session
-	at int
-}
-
-// Label is the field's label.
-func (o own) Label() string {
-	return o.s.Field(o.at).Spec().Label
-}
-
-// Description is the field's help.
-func (o own) Description() string {
-	return o.s.Field(o.at).Spec().Help
-}
-
-// Reset forgets the step's answer.
-func (o own) Reset() {
-	o.s.Forget(o.at)
-}
-
 // ----------------------------------------------------------------------------
 // The files
 
-// filesStep asks the changes to extract in a multi-select, each tagged with its status in its tone.
+// filesStep asks the changes to extract, each tagged with its status in its tone, the trail counting the changes picked.
 type filesStep struct {
-	own
-	picks *form.MultiSelect
+	*form.MultiSelectStep
+	s *session
 }
 
 // Standing counts the changes the files answered stand for, a directory standing for every change under it.
 func (f *filesStep) Standing() form.Standing {
-	st := f.s.Standing(f.at)
+	st := f.MultiSelectStep.Standing()
 	st.Value = ""
 
 	files := f.s.Request().Files
@@ -85,23 +67,14 @@ func (f *filesStep) Standing() form.Standing {
 	return st
 }
 
-// Open builds the multi-select of the source's changes, those answered so far picked.
-func (f *filesStep) Open() tea.Cmd {
-	field, _ := f.s.Field(f.at).(domain.MultiSelectField)
-	files := f.s.Request().Files
-	changes := f.s.Questions().Files.Options
-	picks := make([]form.Pick, 0, len(changes))
-	for _, change := range changes {
-		picks = append(picks, form.Pick{Label: change.Label(), Value: change.Path, Tag: change.Status.Tag(), Tone: tone(change.Status), Picked: slices.Contains(files, change.Path)})
+// tone is the colour of a change's tag: an addition, a loss, a risk, or a rename that changes no content.
+func (f *filesStep) tone(option domain.Option) form.Tone {
+	at := slices.IndexFunc(f.s.Questions().Files.Options, func(c worktree.Change) bool { return c.Path == option.Value })
+	if at < 0 {
+		return form.ToneMuted
 	}
 
-	f.picks = form.NewMultiSelect(form.MultiSelectParams{Options: picks, Empty: field.Empty})
-	return nil
-}
-
-// tone is the colour of a change's tag: an addition, a loss, a risk, or a rename that changes no content.
-func tone(status worktree.ChangeStatus) form.Tone {
-	switch status {
+	switch f.s.Questions().Files.Options[at].Status {
 	case worktree.ChangeUntracked:
 		return form.ToneSuccess
 	case worktree.ChangeDeleted:
@@ -114,15 +87,10 @@ func tone(status worktree.ChangeStatus) form.Tone {
 	return form.ToneMuted
 }
 
-// Field is the multi-select.
-func (f *filesStep) Field() form.Field {
-	return f.picks
-}
-
-// Answer records the changes picked as the request's files.
+// Answer records the changes picked as the request's files, the trail counting them.
 func (f *filesStep) Answer() string {
-	f.s.Answer(f.at, domain.Answered{Path: "files", Values: f.picks.Values()})
-	return fileCount(len(f.picks.Values()))
+	f.MultiSelectStep.Answer()
+	return fileCount(len(f.s.Request().Files))
 }
 
 // ----------------------------------------------------------------------------
@@ -130,14 +98,16 @@ func (f *filesStep) Answer() string {
 
 // targetStep asks the target among the worktrees, or a worktree to create, whose branch the branch step asks next.
 type targetStep struct {
-	own
+	form.Asked
+	s         *session
+	at        int
 	list      *form.SelectList
 	newTarget bool // the user picked a worktree to create
 }
 
 // Standing is the target answered, "new worktree" for one to create; its problems are the branch step's once one is created.
 func (t *targetStep) Standing() form.Standing {
-	st := t.s.Standing(t.at)
+	st := t.Asked.Standing()
 	st.Erred = st.Erred && !t.creating()
 	if t.creating() {
 		st.Value = t.created()
@@ -201,7 +171,7 @@ func (t *targetStep) Answer() string {
 // Reset forgets the target picked.
 func (t *targetStep) Reset() {
 	t.newTarget = false
-	t.own.Reset()
+	t.Asked.Reset()
 }
 
 // creating reports whether the target is a worktree to create: picked as one, or a branch that no worktree other than the source holds.
@@ -214,16 +184,17 @@ func (t *targetStep) creating() bool {
 // ----------------------------------------------------------------------------
 // The branch of a created target
 
-// branchStep asks the branch of a created target, checked against the repository once typed.
+// branchStep asks the branch of a created target, refusing one a worktree already holds before the repository checks it.
 type branchStep struct {
-	own
+	*form.TextStep
+	s      *session
+	at     int
 	target *targetStep
-	text   *form.Text
 }
 
 // Standing is the branch answered; its flag and its problems are the target's own while an existing worktree is picked.
 func (b *branchStep) Standing() form.Standing {
-	st := b.s.Standing(b.at)
+	st := b.TextStep.Standing()
 	creating := b.target.creating()
 	st.Erred = st.Erred && creating
 	if !creating {
@@ -231,12 +202,6 @@ func (b *branchStep) Standing() form.Standing {
 	}
 
 	return st
-}
-
-// Open builds the text field on the branch answered so far and starts the cursor blinking.
-func (b *branchStep) Open() tea.Cmd {
-	b.text = form.NewText(b.s.Request().To, b.check)
-	return textinput.Blink
 }
 
 // check refuses a branch a worktree already holds, then checks it against the repository.
@@ -258,15 +223,4 @@ func (b *branchStep) check(branch string) error {
 	}
 
 	return nil
-}
-
-// Field is the text field.
-func (b *branchStep) Field() form.Field {
-	return b.text
-}
-
-// Answer records the branch typed as the request's target.
-func (b *branchStep) Answer() string {
-	b.s.Answer(b.at, domain.Answered{Path: "to", Values: []string{b.text.Value()}})
-	return b.text.Value()
 }
