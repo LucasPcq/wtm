@@ -60,6 +60,22 @@ func (o Outcome) Failure() *domain.Error {
 	return o.Result.Failure()
 }
 
+// Envelope is how the run ended for every surface, err being Run's refusal if any: its item once applied, else the plan and its fingerprint unless refused.
+func (o Outcome) Envelope(err *domain.Error) domain.Envelope {
+	doc := domain.Envelope{Command: name, Op: o.Op, Err: err}
+
+	switch {
+	case o.Result != nil:
+		doc.Err = cmp.Or(doc.Err, o.Failure())
+		doc.Items = []domain.Item{o.Result.Item.envelopeItem()}
+		doc.Warnings = o.Warnings
+	case doc.Err == nil:
+		doc.Plan, doc.Fingerprint, doc.Warnings = &o.Plan, o.Fingerprint, o.Warnings
+	}
+
+	return doc
+}
+
 // A Result is what the apply did: the Item of the target and the warnings of the whole run.
 type Result struct {
 	Item     Item
@@ -97,6 +113,17 @@ type Detail struct {
 	Isolation project.Isolation `json:"isolation,omitempty"`
 	EnvPorts  env.Redacted      `json:"env_ports,omitzero"`
 	worktree.Standing
+}
+
+func (i Item) envelopeItem() domain.Item {
+	doc := domain.Item{Subject: i.Subject, Status: i.Status, Reason: i.Reason, Err: i.Err, Warnings: i.Warnings}
+
+	// Set only when there is one: a nil *Detail would make the field a non-nil interface, encoded null instead of {}.
+	if i.Detail != nil {
+		doc.Detail = i.Detail
+	}
+
+	return doc
 }
 
 // ----------------------------------------------------------------------------

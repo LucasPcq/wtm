@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -213,9 +215,9 @@ func jsonOf(t *testing.T, value any) string {
 	return string(data)
 }
 
-func enveloped(t *testing.T, params envelopeParams) string {
+func enveloped(t *testing.T, outcome create.Outcome, err *domain.Error) string {
 	t.Helper()
 	var out bytes.Buffer
-	require.NoError(t, output.Envelope(&out, envelopeOf(params)))
+	require.NoError(t, output.Envelope(&out, outcome.Envelope(err), createFlags.Spell))
 	return out.String()
 }

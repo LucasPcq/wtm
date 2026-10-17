@@ -68,10 +68,10 @@ func (f FieldError) Message(path string) string {
 
 // FollowUp is the command line a failure suggests to repair what it left behind.
 type FollowUp struct {
-	Argv    []string // the command line to run next, word by word
-	Code    string
-	Message string
-	Params  Params
+	Argv    []string `json:"argv"` // the command line to run next, word by word
+	Code    string   `json:"code"`
+	Message string   `json:"message"`
+	Params  Params   `json:"params,omitempty"`
 }
 
 // Error returns the message, followed by the cause's when there is one.
@@ -83,6 +83,15 @@ func (e *Error) Error() string {
 		return e.Message
 	}
 
+	return e.Message + ": " + e.Cause.Error()
+}
+
+// Text returns the text the failure is shown with: its message, followed by its cause only for an internal failure or for an invalid request that names no field, where the cause is all the reader has to go on.
+func (e *Error) Text() string {
+	keepsCause := e.Kind == KindInternal || e.Kind == KindInvalid && len(e.Fields) == 0
+	if e.Cause == nil || !keepsCause {
+		return e.Message
+	}
 	return e.Message + ": " + e.Cause.Error()
 }
 

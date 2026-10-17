@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"cmp"
 	"io"
 	"strconv"
 
@@ -209,31 +208,4 @@ func drawUnfinished(w io.Writer, outcome extract.Outcome, cwd string) {
 
 	output.Blank(w)
 	output.NextSteps(w, next)
-}
-
-type envelopeParams struct {
-	Outcome extract.Outcome
-	Err     *domain.Error
-}
-
-// envelopeOf maps how the run ended onto the v2 envelope: its item once applied, else the plan and its fingerprint unless refused.
-func envelopeOf(params envelopeParams) output.EnvelopeParams {
-	outcome := params.Outcome
-	doc := output.EnvelopeParams{Command: commandName, Op: outcome.Op, Err: params.Err, Flags: extractFlags}
-
-	switch {
-	case outcome.Result != nil:
-		item := outcome.Result.Item
-		doc.Err = cmp.Or(doc.Err, outcome.Failure())
-		doc.Items = []output.Item{{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err, Warnings: item.Warnings}}
-		// Set only when there is one: a nil *Detail would make the field a non-nil interface, encoded null instead of {}.
-		if item.Detail != nil {
-			doc.Items[0].Detail = item.Detail
-		}
-		doc.Warnings = outcome.Warnings
-	case doc.Err == nil:
-		doc.Plan, doc.Fingerprint, doc.Warnings = &outcome.Plan, outcome.Fingerprint, outcome.Warnings
-	}
-
-	return doc
 }

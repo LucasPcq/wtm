@@ -76,14 +76,14 @@ func TestAnAppliedRunWritesEachItemWithItsDetail(t *testing.T) {
 		],
 		"follow_ups": [],
 		"warnings": [{"code": "locks.unavailable", "message": "ran without operation locks"}]
-	}`, enveloped(t, envelopeParams{Outcome: outcome}))
+	}`, enveloped(t, outcome, nil))
 }
 
 func TestAFailedRunIsNotOkAndNamesItsFirstFailure(t *testing.T) {
 	outcome := mixed("/trees")
 
 	var doc map[string]any
-	require.NoError(t, json.Unmarshal([]byte(enveloped(t, envelopeParams{Outcome: outcome})), &doc))
+	require.NoError(t, json.Unmarshal([]byte(enveloped(t, outcome, nil)), &doc))
 
 	assert.Equal(t, false, doc["ok"])
 	assert.Equal(t, map[string]any{"kind": "cancelled", "code": "unit.interrupted", "message": "interrupted", "params": map[string]any{"phase": "on_create"}}, doc["error"])
@@ -107,7 +107,7 @@ func TestADryRunWritesThePlanAndItsFingerprintInsteadOfItems(t *testing.T) {
 		"fingerprint": "0123456789abcdef01234567",
 		"follow_ups": [],
 		"warnings": [{"code": "create.env_parent_fallback", "message": "from main"}]
-	}`, enveloped(t, envelopeParams{Outcome: outcome}))
+	}`, enveloped(t, outcome, nil))
 }
 
 func TestAnInvalidRequestNamesEachFieldByItsPathAndItsFlag(t *testing.T) {
@@ -120,7 +120,7 @@ func TestAnInvalidRequestNamesEachFieldByItsPathAndItsFlag(t *testing.T) {
 			{"path": "env_from", "code": "one_of", "params": {"value": "copy"}, "accepted": ["example", "main", "parent"], "flag": "--env-from", "message": "--env-from must be one of example, main, parent, not copy"},
 			{"path": "from", "code": "required", "params": {"because": "create.parent_required"}, "flag": "--from", "message": "--from is required: a branch that already exists locally needs its parent named (it can't be inferred, and `+"`wtm sync`"+` needs it)"}
 		]}
-	}`, enveloped(t, envelopeParams{Outcome: create.Outcome{Op: "op-3"}, Err: invalid()}))
+	}`, enveloped(t, create.Outcome{Op: "op-3"}, invalid()))
 }
 
 func TestAFailureLeftBehindCarriesItsFollowUp(t *testing.T) {
@@ -135,11 +135,11 @@ func TestAFailureLeftBehindCarriesItsFollowUp(t *testing.T) {
 		"follow_ups": [], "warnings": [],
 		"error": {"kind": "internal", "code": "unit.undo_failed", "message": "could not remove the worktree, left behind: worktree: env failed: disk full", "params": {"left": "worktree"},
 			"follow_up": {"argv": ["wtm", "clean", "feat/x", "--force"], "code": "provision.left_behind", "message": "branch feat/x is left half-created", "params": {"branch": "feat/x", "path": "/p"}}}
-	}`, enveloped(t, envelopeParams{Err: stuck}))
+	}`, enveloped(t, create.Outcome{}, stuck))
 }
 
 func TestAnEnvelopeNeverEscapesItsHTMLAndNeverLeavesAPlaceholder(t *testing.T) {
-	doc := enveloped(t, envelopeParams{Err: invalid()})
+	doc := enveloped(t, create.Outcome{}, invalid())
 
 	assert.Contains(t, doc, "<branches>[1]")
 	assert.NotContains(t, doc, "{path}")
@@ -148,7 +148,7 @@ func TestAnEnvelopeNeverEscapesItsHTMLAndNeverLeavesAPlaceholder(t *testing.T) {
 func TestAFieldNamesTheOtherFieldsItIsCheckedWith(t *testing.T) {
 	selfParent := domain.Invalid([]domain.FieldError{{Path: "from", Code: "self_parent", Template: "{value} cannot be its own parent: pass another value to {path}", Params: domain.Params{"value": "feat/x"}, With: []string{"branches"}}})
 
-	assert.Contains(t, enveloped(t, envelopeParams{Err: selfParent}), `"with": [
+	assert.Contains(t, enveloped(t, create.Outcome{}, selfParent), `"with": [
           "branches"
         ],`)
 }

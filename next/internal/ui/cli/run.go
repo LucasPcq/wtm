@@ -60,7 +60,7 @@ func (r *Run) Progress(ctx context.Context) *output.Progress {
 // FailWith prints failure followed by next, or the envelope that carries it with --output json, and returns the failure that sets the exit code.
 func (r *Run) FailWith(failure *domain.Error, next []output.NextStep) error {
 	if !r.Human() {
-		return r.Envelope(output.EnvelopeParams{Command: r.Command, Err: failure, Flags: r.Flags})
+		return r.Envelope(domain.Envelope{Command: r.Command, Err: failure})
 	}
 
 	_, stderr := r.Writers()
@@ -81,9 +81,9 @@ func (r *Run) Refuse(failure *domain.Error, line string) error {
 	return r.FailWith(failure, next)
 }
 
-// Envelope writes the v2 JSON envelope doc on stdout and returns its failure; an envelope that cannot be written is the failure.
-func (r *Run) Envelope(doc output.EnvelopeParams) error {
-	if err := output.Envelope(r.Streams.Out, doc); err != nil {
+// Envelope writes the v2 JSON envelope doc on stdout, each field it refuses spelled as its flag, and returns its failure; an envelope that cannot be written is the failure.
+func (r *Run) Envelope(doc domain.Envelope) error {
+	if err := output.Envelope(r.Streams.Out, doc, r.Flags.Spell); err != nil {
 		return r.Failed(domain.AsError(domain.AsErrorParams{Err: err}))
 	}
 

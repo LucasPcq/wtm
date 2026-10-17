@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"cmp"
 	"fmt"
 	"io"
 	"slices"
@@ -204,39 +203,4 @@ func tallyKey(item create.Item) string {
 // planTextOf is the plan as the wizard's recap shows it, in width columns.
 func planTextOf(plan create.Plan, warnings []domain.Warning, width int, st *output.Styles) string {
 	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(plan), Warnings: output.Messages(warnings), Width: width, Styles: st}), "\n")
-}
-
-type envelopeParams struct {
-	Outcome create.Outcome
-	Err     *domain.Error
-}
-
-// envelopeOf maps how the run ended onto the v2 envelope: its items once applied, else the plan and its fingerprint unless refused.
-func envelopeOf(params envelopeParams) output.EnvelopeParams {
-	outcome := params.Outcome
-	doc := output.EnvelopeParams{Command: commandName, Op: outcome.Op, Err: params.Err, Flags: createFlags}
-
-	switch {
-	case outcome.Result != nil:
-		doc.Err = cmp.Or(doc.Err, outcome.Failure())
-		for _, item := range outcome.Result.Items {
-			doc.Items = append(doc.Items, envelopeItem(item))
-		}
-		doc.Warnings = outcome.Warnings
-	case doc.Err == nil:
-		doc.Plan, doc.Fingerprint, doc.Warnings = &outcome.Plan, outcome.Fingerprint, outcome.Warnings
-	}
-
-	return doc
-}
-
-func envelopeItem(item create.Item) output.Item {
-	doc := output.Item{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err, Warnings: item.Warnings}
-
-	// Set only when there is one: a nil *Detail would make the field a non-nil interface, encoded null instead of {}.
-	if item.Detail != nil {
-		doc.Detail = item.Detail
-	}
-
-	return doc
 }

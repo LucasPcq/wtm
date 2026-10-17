@@ -158,7 +158,7 @@ type concluded struct {
 // conclude prints how the run ended — the JSON envelope, a refusal, the dry run and the line that applies it, or the outcome — and returns the failure that sets the exit code.
 func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
 	if !c.io.Human() {
-		return c.io.Envelope(envelopeOf(envelopeParams{Outcome: done.Outcome, Err: done.Err}))
+		return c.io.Envelope(done.Outcome.Envelope(done.Err))
 	}
 
 	stdout, _ := c.io.Writers()
