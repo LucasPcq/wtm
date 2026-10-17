@@ -120,13 +120,16 @@ const (
 
 	SourceUpdateFastForward = "ff"
 	SourceUpdateKeep        = "keep"
+
+	// RememberEnvConfig is the remembered env strategy that follows env.strategy, as the legacy wizard writes its "Use config default" row.
+	RememberEnvConfig = "config"
 )
 
 // RememberableValues returns the values the question id may remember, and reports whether id is a question that remembers.
 func RememberableValues(id string) ([]string, bool) {
 	switch id {
 	case RememberEnvStrategy:
-		return []string{string(EnvExample), string(EnvMain), string(EnvParent)}, true
+		return []string{RememberEnvConfig, string(EnvExample), string(EnvMain), string(EnvParent)}, true
 	case RememberIsolation:
 		return []string{"isolated", "verbatim"}, true
 	case RememberSourceUpdate:
@@ -134,6 +137,15 @@ func RememberableValues(id string) ([]string, bool) {
 	}
 
 	return nil, false
+}
+
+// RememberedEnvStrategy returns the env strategy the remembered answer stands for: RememberEnvConfig stands for configured.
+func RememberedEnvStrategy(remembered string, configured EnvStrategy) EnvStrategy {
+	if remembered == RememberEnvConfig {
+		return configured
+	}
+
+	return EnvStrategy(remembered)
 }
 
 // RememberIDs returns the IDs of the questions whose answer the wizard can remember.

@@ -53,7 +53,7 @@ func TestTheListIsACopyACallerMayChange(t *testing.T) {
 
 func TestEachRememberedQuestionOffersItsAnswers(t *testing.T) {
 	cases := map[string][]string{
-		RememberEnvStrategy:  {"example", "main", "parent"},
+		RememberEnvStrategy:  {"config", "example", "main", "parent"},
 		RememberIsolation:    {"isolated", "verbatim"},
 		RememberSourceUpdate: {SourceUpdateFastForward, SourceUpdateKeep},
 	}

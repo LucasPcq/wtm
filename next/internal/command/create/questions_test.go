@@ -38,6 +38,16 @@ func TestARememberedAnswerIsTheDefaultUnlessAskedAgain(t *testing.T) {
 	assert.Equal(t, project.EnvExample, remembered.EnvFrom.Remembered)
 }
 
+func TestARememberedConfigDefaultFollowsTheConfiguredEnvStrategy(t *testing.T) {
+	w := newWorld(t, seed{Config: projectToml + "\n[wizard.remembered]\nenv_strategy = \"config\"\n"})
+
+	questions := w.questions(t, create.Request{Branches: []string{branchName}})
+
+	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: domain.OriginRemembered}, questions.EnvFrom.Answer)
+	assert.Equal(t, project.EnvMain, questions.EnvFrom.Remembered)
+	assert.Empty(t, questions.Errors)
+}
+
 func TestIfNotExistsIsSetByItsFlagOnly(t *testing.T) {
 	w := newWorld(t, seed{})
 

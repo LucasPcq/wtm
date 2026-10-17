@@ -58,7 +58,7 @@ func Form(f Facts, req Request) Questions {
 		Remember:    req.Remember,
 	}
 	// Even under --ask, the wizard shows what is remembered, so the user can keep or untick it.
-	questions.EnvFrom.Remembered = project.EnvStrategy(recalled[project.RememberEnvStrategy])
+	questions.EnvFrom.Remembered = project.RememberedEnvStrategy(recalled[project.RememberEnvStrategy], f.Config.Env.Strategy)
 	questions.Isolation.Remembered = project.Isolation(recalled[project.RememberIsolation])
 	questions.Errors = f.problems(questions)
 	return questions
@@ -116,12 +116,12 @@ func (f Facts) sourceOptions(creating []string) []domain.Option {
 
 func (f Facts) envFrom(given project.EnvStrategy) domain.Choice[project.EnvStrategy] {
 	question := domain.Choice[project.EnvStrategy]{Options: project.EnvStrategies()}
-	remembered, found := f.remembered(project.RememberEnvStrategy)
+	remembered := project.RememberedEnvStrategy(f.Config.Remembered[project.RememberEnvStrategy], f.Config.Env.Strategy)
 	switch {
 	case given != "":
 		question.Answer = domain.Answer[project.EnvStrategy]{Value: given, Origin: domain.OriginRequest}
-	case found:
-		question.Answer = domain.Answer[project.EnvStrategy]{Value: project.EnvStrategy(remembered), Origin: domain.OriginRemembered}
+	case remembered != "":
+		question.Answer = domain.Answer[project.EnvStrategy]{Value: remembered, Origin: domain.OriginRemembered}
 	case f.Config.Env.Strategy != "":
 		question.Answer = domain.Answer[project.EnvStrategy]{Value: f.Config.Env.Strategy, Origin: domain.OriginConfig}
 	}
@@ -159,11 +159,6 @@ func ifNotExists(given bool) domain.Confirm {
 	}
 
 	return question
-}
-
-func (f Facts) remembered(id string) (string, bool) {
-	value := f.Config.Remembered[id]
-	return value, value != ""
 }
 
 // ----------------------------------------------------------------------------
