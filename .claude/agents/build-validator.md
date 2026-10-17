@@ -37,16 +37,17 @@ go build ./...
 make lint
 ```
 
-This is six gates in one, and the output names which failed:
+This is seven gates in one, and the output names which failed:
 
 | Gate | Reports |
 | -- | -- |
 | `fmt` | files `gofmt` would change. It fails rather than rewrites — a formatting fix belongs in the commit that caused it |
 | `vet` | the stdlib's own diagnostics |
-| `arch` | `tools/archlint`, every rule listed in `docs/dev/lint.md`: the layer graph of CLAUDE.md §9 (`layers`: `rules/` stdlib and `domain` only; `flow/` on `service`, `rules`, `domain` only; `store/` never reached from `flow/`) and the declared `service→service` edges; `publish`, `statewrite`, `stateowner`, `metawriter`, `chokepoint`, `emits`, `pkgdoc`, `rootfreeze`, `domain`, `styles`, `typeassert`, `yesflag`, `daemonblind` and the output vocabulary rules. Each finding prints `file:line: [rule] why` |
+| `arch` | `tools/archlint`, every rule listed in `docs/dev/lint.md`: the layer graph of CLAUDE.md §9 (`layers`: `rules/` stdlib and `domain` only; `flow/` on `service`, `rules`, `domain` only; `store/` never reached from `flow/`) and the declared `service→service` edges; `publish`, `statewrite`, `stateowner`, `metawriter`, `chokepoint`, `emits`, `pkgdoc`, `rootfreeze`, `domain`, `styles`, `typeassert`, `yesflag`, `daemonblind`, the output vocabulary rules and `next` (the import table of `next/`; the rules written for `internal/` leave `next/` alone). Each finding prints `file:line: [rule] why` |
 | `dead` | `deadcode`: functions no path reaches, test paths included. Exceptions are listed with their reason in `.deadcode-ignore` |
 | `sumtype` | `go-sumtype`: a type switch over a sealed interface declared `//go-sumtype:decl` (`fs.Change`, `envcopy.Warning`) that misses a variant |
-| `staticcheck` | everything else |
+| `next-lint` | revive over `next/` with `next/revive.toml`: Go's doc-comment, naming and error-flow conventions |
+| `staticcheck` | everything else, every check on `next/` (`next/staticcheck.conf`) |
 
 Every one of these is a **BLOCKER**. Report each finding verbatim with its `file:line` — they are already worded to say which rule they break.
 

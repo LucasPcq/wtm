@@ -1,10 +1,14 @@
-BINARY   := wtm
-BUILD_DIR := bin
+BINARY      := wtm
+BINARY_NEXT := wtm-next
+BUILD_DIR   := bin
 
-.PHONY: build test vet fmt lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
+.PHONY: build next test vet fmt lint next-lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
+
+next:
+	go build -ldflags "-X main.version=$$(git describe --tags --always --dirty)" -o $(BUILD_DIR)/$(BINARY_NEXT) ./next/cmd/wtm-next
 
 test:
 	go test ./... -race -count=1
@@ -15,8 +19,8 @@ vet:
 # fmt fails rather than rewrites: a formatting fix belongs in the commit that
 # caused it, not in the one that ran the linter.
 fmt:
-	@test -z "$$(gofmt -l internal tools *.go)" || \
-		{ echo "gofmt needed:"; gofmt -l internal tools *.go; exit 1; }
+	@test -z "$$(gofmt -l internal next tools *.go)" || \
+		{ echo "gofmt needed:"; gofmt -l internal next tools *.go; exit 1; }
 
 # arch checks the rules of CLAUDE.md section 9 that no general-purpose linter
 # knows about: layers and service edges, the styles monopoly, comma-ok
@@ -45,16 +49,23 @@ dead-strict:
 sumtype:
 	go tool go-sumtype $$(go list ./...)
 
-lint: fmt vet arch dead sumtype
+lint: fmt vet arch dead sumtype next-lint
 	go tool staticcheck ./...
 
-# dupl reports token-level clones. It is not part of `lint`: a clone is a
-# judgement call — two parallel families over unrelated types read better
-# duplicated than behind a generic — so it informs a review rather than gating
-# one. Raise the threshold to see only the large ones.
+# next-lint holds next/ to Go's doc-comment and naming conventions with revive
+# (next/revive.toml); staticcheck already runs every check on next/ from
+# next/staticcheck.conf.
+next-lint:
+	go tool revive -config next/revive.toml -formatter plain ./next/...
+
+# dupl reports token-level clones in internal/ and next/. It is not part of
+# `lint`: a clone is a judgement call — two parallel families over unrelated
+# types (create and extract in next/) read better duplicated than behind a
+# generic — so it informs a review rather than gating one. Raise the threshold
+# to see only the large ones.
 DUPL_THRESHOLD ?= 75
 dupl:
-	@find internal -name '*.go' ! -name '*_test.go' > /tmp/wtm-dupl-files
+	@find internal next -name '*.go' ! -name '*_test.go' > /tmp/wtm-dupl-files
 	@go tool dupl -t $(DUPL_THRESHOLD) -files < /tmp/wtm-dupl-files
 
 tidy:

@@ -1,6 +1,6 @@
 # CLAUDE.md — Go CLI Development Principles
 
-Mandatory coding standards for `wtm`. For Go idioms and their sources, consult the `go-style` skill (`.claude/skills/go-style/SKILL.md`). Use the fff MCP tools for all file search operations instead of default tools.
+Mandatory coding standards for `wtm`. How Go is written follows the `go-style` skill (`.claude/skills/go-style/`: community conventions, every rule sourced); the architecture of `next/` follows the `go-architecture` skill (`.claude/skills/go-architecture/`). The rules below are this repository's own; where one departs from `go-style` (§2 Params structs, §8 comments), it governs `internal/` only, and `next/` follows `go-style`. Use the fff MCP tools for all file search operations instead of default tools.
 
 **Read on demand** — `docs/dev/` is the developer reference; open the page before working on its topic:
 
@@ -18,7 +18,7 @@ Mandatory coding standards for `wtm`. For Go idioms and their sources, consult t
 | [`docs/dev/changelog.md`](docs/dev/changelog.md) | writing a `CHANGELOG.md` entry |
 | [`docs/dev/run-addressing.md`](docs/dev/run-addressing.md), [`docs/dev/shared-services.md`](docs/dev/shared-services.md) | touching the run proxy / addressing, or `scope = "shared"` jobs |
 
-**Self-maintaining docs:** when a structural decision changes (new package, renamed layer, new dependency, new convention), update this file, the relevant `docs/dev/` page and/or the `build-validator` agent in the same session. Standards must reflect the actual codebase.
+**Self-maintaining docs:** when a structural decision changes (new package, renamed layer, new dependency, new convention), update this file, the relevant `docs/dev/` page and/or the skills (`go-style`, `go-architecture`) and the `build-validator` agent in the same session. Standards must reflect the actual codebase.
 
 ## Docs & README
 
@@ -157,7 +157,8 @@ Every commit message — subject and body — is in English, whatever language t
 ## 11. Validate before commit
 
 ```
-make lint          # fmt + vet + arch (tools/archlint) + dead (deadcode) + sumtype (go-sumtype) + staticcheck — all gating
+make lint          # fmt + vet + arch (tools/archlint) + dead (deadcode) + sumtype (go-sumtype) + next-lint (revive on next/) + staticcheck — all gating
+make next          # build bin/wtm-next, the next/ pilot
 make test          # go test ./... -race -count=1
 make docs          # regenerate docs/ from the Cobra tree
 make demos         # re-record the README GIFs and stills (needs vhs)
