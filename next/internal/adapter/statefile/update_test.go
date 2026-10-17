@@ -2,7 +2,6 @@ package statefile
 
 import (
 	"errors"
-	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -11,6 +10,8 @@ import (
 	"sync"
 	"syscall"
 	"testing"
+
+	"github.com/LucasPcq/wtm/next/internal/wtm"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

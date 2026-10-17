@@ -173,9 +173,9 @@ func TestALockTheDefaultsNameIsTakenThenTheFactsObservedAgain(t *testing.T) {
 
 type unprotected struct{}
 
-func (unprotected) Grow(operation.Operation) (bool, error) { return false, nil }
-func (unprotected) Protected() bool                        { return false }
-func (unprotected) Release()                               {}
+func (unprotected) Grow([]operation.Lock) (bool, error) { return false, nil }
+func (unprotected) Protected() bool                     { return false }
+func (unprotected) Release()                            {}
 
 func TestARunWithoutItsLocksSaysSoOnce(t *testing.T) {
 	w := newWorld(t, seed{})

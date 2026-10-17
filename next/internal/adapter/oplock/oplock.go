@@ -4,7 +4,6 @@ package oplock
 import (
 	"cmp"
 	"errors"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -27,8 +26,6 @@ const (
 	holderExt     = ".json"
 	unknown       = "unknown"
 )
-
-var errUnlockable = errors.New("lock unavailable")
 
 type Locks struct {
 	StateDir string
@@ -57,7 +54,7 @@ func (l Locks) Take(op operation.Operation) (*Held, error) {
 		taken.Release()
 		return nil, err
 	}
-	taken.files, taken.protected = files, protected && recorded.held
+	taken.files, taken.protected = files, protected
 	return taken, nil
 }
 
@@ -65,14 +62,14 @@ func (h *Held) Protected() bool {
 	return h.protected
 }
 
-func (h *Held) Grow(op operation.Operation) (bool, error) {
-	missing := slices.DeleteFunc(slices.Clone(op.Locks), func(lock operation.Lock) bool {
+func (h *Held) Grow(locks []operation.Lock) (bool, error) {
+	missing := slices.DeleteFunc(slices.Clone(locks), func(lock operation.Lock) bool {
 		return slices.ContainsFunc(h.operation.Locks, func(held operation.Lock) bool { return held.Key() == lock.Key() })
 	})
 	if len(missing) == 0 || !h.protected {
 		return false, nil
 	}
-	files, protected, err := h.locks.try(tried{Locks: missing, Asked: op})
+	files, protected, err := h.locks.try(tried{Locks: missing, Asked: h.operation})
 	if err != nil {
 		return false, err
 	}
@@ -84,10 +81,7 @@ func (h *Held) Grow(op operation.Operation) (bool, error) {
 }
 
 func (h *Held) Release() {
-	for _, file := range slices.Backward(h.files) {
-		_ = statefile.Flock(file, syscall.LOCK_UN)
-		_ = file.Close()
-	}
+	closeAll(h.files)
 	h.files = nil
 	h.holder.release()
 }
@@ -99,59 +93,20 @@ type tried struct {
 
 func (l Locks) try(t tried) ([]*os.File, bool, error) {
 	var files []*os.File
-	for _, lock := range merged(t.Locks) {
-		file, err := tryLock(tryParams{Path: l.lockPath(lock), Shared: lock.Mode == operation.Shared})
-		if errors.Is(err, errUnlockable) {
-			closeAll(files)
-			return nil, false, nil
-		}
+	for _, lock := range t.Locks {
+		file, err := statefile.TryLock(statefile.TryLockParams{Path: l.lockPath(lock), Shared: lock.Mode == operation.Shared})
 		if err != nil {
 			closeAll(files)
+		}
+		if errors.Is(err, statefile.ErrBusy) {
 			return nil, false, l.held(busy{Lock: lock, Asked: t.Asked})
+		}
+		if err != nil {
+			return nil, false, nil
 		}
 		files = append(files, file)
 	}
 	return files, true, nil
-}
-
-func merged(locks []operation.Lock) []operation.Lock {
-	byKey := map[string]operation.Lock{}
-	for _, lock := range locks {
-		if seen, found := byKey[lock.Key()]; found && seen.Mode == operation.Exclusive {
-			continue
-		}
-		byKey[lock.Key()] = lock
-	}
-	out := slices.Collect(maps.Values(byKey))
-	slices.SortFunc(out, func(a, b operation.Lock) int { return cmp.Compare(a.Key(), b.Key()) })
-	return out
-}
-
-type tryParams struct {
-	Path   string
-	Shared bool
-}
-
-var errBusy = errors.New("lock held")
-
-func tryLock(params tryParams) (*os.File, error) {
-	file, err := statefile.OpenLock(params.Path)
-	if err != nil {
-		return nil, errUnlockable
-	}
-	mode := syscall.LOCK_EX
-	if params.Shared {
-		mode = syscall.LOCK_SH
-	}
-	err = statefile.Flock(file, mode|syscall.LOCK_NB)
-	if err == nil {
-		return file, nil
-	}
-	file.Close()
-	if errors.Is(err, syscall.EWOULDBLOCK) {
-		return nil, errBusy
-	}
-	return nil, errUnlockable
 }
 
 func closeAll(files []*os.File) {

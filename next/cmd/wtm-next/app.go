@@ -63,8 +63,8 @@ func newApp(params appParams) *app.App {
 		TakeLocks: func(op operation.Operation) (app.Hold, error) {
 			return oplock.Locks{StateDir: params.StateDir}.Take(op)
 		},
-		Publisher: func(op operation.Operation) app.Publisher {
-			return events.NewPublisher(params.publisherParams(op))
+		Publisher: func(op operation.Operation) wtm.Report {
+			return events.NewPublisher(params.publisherParams(op)).Publish
 		},
 		NewOpID:       newOpID,
 		Now:           time.Now,

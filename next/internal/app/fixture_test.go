@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
@@ -33,30 +32,6 @@ const (
 
 var clock = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 
-type published struct {
-	mu     sync.Mutex
-	events []wtm.Event
-	ops    []string
-}
-
-func (p *published) all() []wtm.Event {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return append([]wtm.Event(nil), p.events...)
-}
-
-type publisher struct {
-	to *published
-	op string
-}
-
-func (p publisher) Publish(event wtm.Event) {
-	p.to.mu.Lock()
-	defer p.to.mu.Unlock()
-	p.to.events = append(p.to.events, event)
-	p.to.ops = append(p.to.ops, p.op)
-}
-
 type counted struct {
 	git.Repo
 	observed *int
@@ -72,7 +47,7 @@ type world struct {
 	main      string
 	stateDir  string
 	repo      git.Repo
-	published *published
+	published *recorder
 	deps      app.Deps
 }
 
@@ -97,7 +72,7 @@ func newWorld(t *testing.T, s seed) world {
 		writeFile(t, filepath.Join(stateDir, "run.toml"), s.Run)
 	}
 	writeFile(t, filepath.Join(main, ".env"), "PORT=3000\n")
-	events := &published{}
+	events := &recorder{}
 	ids := 0
 	meta := store.Meta{StateDir: stateDir}
 	return world{
@@ -129,7 +104,7 @@ func newWorld(t *testing.T, s seed) world {
 				StateDir: stateDir,
 			},
 			TakeLocks: func(op operation.Operation) (app.Hold, error) { return oplock.Locks{StateDir: stateDir}.Take(op) },
-			Publisher: func(op operation.Operation) app.Publisher { return publisher{to: events, op: op.ID} },
+			Publisher: func(operation.Operation) wtm.Report { return events.add },
 			NewOpID: func() string {
 				ids++
 				return "op-" + string(rune('0'+ids))

@@ -18,7 +18,6 @@ const heldTempPrefix = "."
 type holder struct {
 	path string
 	file *os.File
-	held bool
 }
 
 func hold(path string, op operation.Operation) (holder, error) {
@@ -35,14 +34,14 @@ func hold(path string, op operation.Operation) (holder, error) {
 	if err != nil {
 		return holder{}, err
 	}
-	held := statefile.Flock(file, syscall.LOCK_EX|syscall.LOCK_NB) == nil
+	_ = statefile.Flock(file, syscall.LOCK_EX|syscall.LOCK_NB)
 	if _, err := file.Write(data); err != nil {
 		return holder{}, discard(file, err)
 	}
 	if err := os.Rename(file.Name(), path); err != nil {
 		return holder{}, discard(file, err)
 	}
-	return holder{path: path, file: file, held: held}, nil
+	return holder{path: path, file: file}, nil
 }
 
 func (h holder) rehold(op operation.Operation) holder {
@@ -50,7 +49,7 @@ func (h holder) rehold(op operation.Operation) holder {
 	if err != nil {
 		return h
 	}
-	h.close()
+	closeAll([]*os.File{h.file})
 	return next
 }
 
@@ -59,12 +58,7 @@ func (h holder) release() {
 		return
 	}
 	_ = os.Remove(h.path)
-	h.close()
-}
-
-func (h holder) close() {
-	_ = statefile.Flock(h.file, syscall.LOCK_UN)
-	_ = h.file.Close()
+	closeAll([]*os.File{h.file})
 }
 
 func discard(file *os.File, cause error) error {
@@ -97,24 +91,9 @@ func readHeld(path string) ([]byte, bool) {
 		return nil, false
 	}
 	defer file.Close()
-	if statefile.Flock(file, syscall.LOCK_SH|syscall.LOCK_NB) != nil {
-		data, err := io.ReadAll(file)
-		return data, err == nil
+	if statefile.Flock(file, syscall.LOCK_SH|syscall.LOCK_NB) == nil {
+		return nil, false
 	}
-	removeIfSame(file, path)
-	_ = statefile.Flock(file, syscall.LOCK_UN)
-	return nil, false
-}
-
-func removeIfSame(file *os.File, path string) {
-	opened, err := file.Stat()
-	if err != nil {
-		return
-	}
-	current, err := os.Stat(path)
-	// A record renamed over the stale one since it was opened is not the stale one.
-	if err != nil || !os.SameFile(opened, current) {
-		return
-	}
-	_ = os.Remove(path)
+	data, err := io.ReadAll(file)
+	return data, err == nil
 }

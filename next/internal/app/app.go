@@ -10,19 +10,15 @@ import (
 )
 
 type Hold interface {
-	Grow(op operation.Operation) (bool, error)
+	Grow(locks []operation.Lock) (bool, error)
 	Protected() bool
 	Release()
-}
-
-type Publisher interface {
-	Publish(event wtm.Event)
 }
 
 type Deps struct {
 	Create        create.Deps
 	TakeLocks     func(op operation.Operation) (Hold, error)
-	Publisher     func(op operation.Operation) Publisher
+	Publisher     func(op operation.Operation) wtm.Report
 	NewOpID       func() string
 	Now           func() time.Time
 	Surface       string

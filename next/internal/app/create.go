@@ -50,7 +50,7 @@ func (a *App) Create(ctx context.Context, params CreateParams) (CreateOutcome, e
 		return CreateOutcome{Op: op.ID}, err
 	}
 	defer held.Release()
-	settled, err := a.settle(ctx, settling{Request: params.Request, Held: held, Operation: op})
+	settled, err := a.settle(ctx, settling{Request: params.Request, Held: held})
 	if err != nil {
 		return CreateOutcome{Op: op.ID}, err
 	}
@@ -66,7 +66,7 @@ func (a *App) Create(ctx context.Context, params CreateParams) (CreateOutcome, e
 			Params:  wtm.Params{"expected": params.ExpectFingerprint, "found": outcome.Fingerprint},
 		}
 	}
-	result := a.apply(ctx, applying{Operation: settled.Operation, Settled: settled, Plan: outcome.Plan, Report: params.Report})
+	result := a.apply(ctx, applying{Settled: settled, Plan: outcome.Plan, Report: a.report(op, params.Report)})
 	outcome.Result = &result
 	outcome.Warnings = append(outcome.Warnings, result.Warnings...)
 	if !held.Protected() {
@@ -89,15 +89,13 @@ func (a *App) operation(locks []operation.Lock) operation.Operation {
 }
 
 type settling struct {
-	Request   create.Request
-	Held      Hold
-	Operation operation.Operation
+	Request create.Request
+	Held    Hold
 }
 
 type settled struct {
-	Facts     create.Facts
-	Request   create.Request
-	Operation operation.Operation
+	Facts   create.Facts
+	Request create.Request
 }
 
 func (a *App) settle(ctx context.Context, s settling) (settled, error) {
@@ -110,19 +108,17 @@ func (a *App) settle(ctx context.Context, s settling) (settled, error) {
 		return settled{}, err
 	}
 	if s.Held == nil {
-		return settled{Facts: facts, Request: resolved, Operation: s.Operation}, nil
+		return settled{Facts: facts, Request: resolved}, nil
 	}
-	grown := s.Operation
-	grown.Locks = create.Locks(facts, resolved)
-	taken, err := s.Held.Grow(grown)
+	grown, err := s.Held.Grow(create.Locks(facts, resolved))
 	if err != nil {
 		return settled{}, err
 	}
-	if !taken {
-		return settled{Facts: facts, Request: resolved, Operation: s.Operation}, nil
+	if !grown {
+		return settled{Facts: facts, Request: resolved}, nil
 	}
 	// A lock the defaults named and the request did not is taken first, then the facts are observed again: what it guards may have changed meanwhile.
-	return a.settle(ctx, settling{Request: s.Request, Held: s.Held, Operation: grown})
+	return a.settle(ctx, s)
 }
 
 func (a *App) planned(op operation.Operation, s settled) (CreateOutcome, error) {
@@ -138,34 +134,36 @@ func (a *App) planned(op operation.Operation, s settled) (CreateOutcome, error) 
 }
 
 type applying struct {
-	Operation operation.Operation
-	Settled   settled
-	Plan      create.Planned
-	Report    wtm.Report
+	Settled settled
+	Plan    create.Planned
+	Report  wtm.Report
+}
+
+func (a *App) report(op operation.Operation, surface wtm.Report) wtm.Report {
+	publish := a.deps.Publisher(op)
+	return func(event wtm.Event) {
+		publish(event)
+		if surface != nil {
+			surface(event)
+		}
+	}
 }
 
 func (a *App) apply(ctx context.Context, run applying) create.Result {
-	publisher := a.deps.Publisher(run.Operation)
-	report := func(event wtm.Event) {
-		publisher.Publish(event)
-		if run.Report != nil {
-			run.Report(event)
-		}
-	}
-	report(wtm.OperationStarted{Command: commandCreate, Surface: a.deps.Surface})
+	run.Report(wtm.OperationStarted{Command: commandCreate, Surface: a.deps.Surface})
 	result := create.Apply(ctx, create.ApplyParams{
 		Deps:        a.deps.Create,
 		Facts:       run.Settled.Facts,
 		Plan:        run.Plan,
 		Isolation:   run.Settled.Request.Isolation,
 		FastForward: *run.Settled.Request.FastForward,
-		Report:      report,
+		Report:      run.Report,
 	})
 	finished := wtm.OperationFinished{Command: commandCreate, Surface: a.deps.Surface, OK: true}
 	if failure := result.Failure(); failure != nil {
 		finished.OK, finished.Code = false, failure.Code
 	}
-	report(finished)
+	run.Report(finished)
 	return result
 }
 

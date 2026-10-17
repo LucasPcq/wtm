@@ -1,11 +1,12 @@
 package statefile
 
 import (
-	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
+
+	"github.com/LucasPcq/wtm/next/internal/wtm"
 
 	"github.com/stretchr/testify/require"
 )

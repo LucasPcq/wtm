@@ -17,7 +17,10 @@ const (
 	scratchLockDir = "wtm-locks"
 )
 
-var errUnlockable = errors.New("lock unavailable")
+var (
+	ErrUnlockable = errors.New("lock unavailable")
+	ErrBusy       = errors.New("lock held")
+)
 
 type LockParams struct {
 	Path string
@@ -26,7 +29,7 @@ type LockParams struct {
 
 func WithLock(ctx context.Context, params LockParams) (bool, error) {
 	file, err := acquire(ctx, params.Path)
-	if errors.Is(err, errUnlockable) {
+	if errors.Is(err, ErrUnlockable) {
 		return false, params.Do()
 	}
 	if err != nil {
@@ -38,29 +41,45 @@ func WithLock(ctx context.Context, params LockParams) (bool, error) {
 }
 
 func acquire(ctx context.Context, path string) (*os.File, error) {
-	file, err := OpenLock(path)
-	if err != nil {
-		return nil, errUnlockable
-	}
 	for {
-		err := Flock(file, syscall.LOCK_EX|syscall.LOCK_NB)
-		if err == nil {
-			return file, nil
-		}
-		if !errors.Is(err, syscall.EWOULDBLOCK) {
-			file.Close()
-			return nil, errUnlockable
+		file, err := TryLock(TryLockParams{Path: path})
+		if !errors.Is(err, ErrBusy) {
+			return file, err
 		}
 		select {
 		case <-ctx.Done():
-			file.Close()
 			return nil, ctx.Err()
 		case <-time.After(lockRetryEvery):
 		}
 	}
 }
 
-func OpenLock(path string) (*os.File, error) {
+type TryLockParams struct {
+	Path   string
+	Shared bool
+}
+
+func TryLock(params TryLockParams) (*os.File, error) {
+	file, err := openLock(params.Path)
+	if err != nil {
+		return nil, ErrUnlockable
+	}
+	how := syscall.LOCK_EX
+	if params.Shared {
+		how = syscall.LOCK_SH
+	}
+	err = Flock(file, how|syscall.LOCK_NB)
+	if err == nil {
+		return file, nil
+	}
+	file.Close()
+	if errors.Is(err, syscall.EWOULDBLOCK) {
+		return nil, ErrBusy
+	}
+	return nil, ErrUnlockable
+}
+
+func openLock(path string) (*os.File, error) {
 	if path == "" {
 		return nil, fmt.Errorf("lock path required")
 	}

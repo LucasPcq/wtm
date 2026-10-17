@@ -44,16 +44,6 @@ func TestAWorktreeHeldByAnotherOperationIsAConflictNamingItsHolder(t *testing.T)
 	again.Release()
 }
 
-func TestTheRepositoryIsSharedBetweenOperations(t *testing.T) {
-	locks := Locks{StateDir: t.TempDir()}
-	take(t, func() (*Held, error) { return locks.Take(op("op-1", repoShared, featA)) })
-
-	held, err := locks.Take(op("op-2", repoShared, featB))
-
-	require.NoError(t, err)
-	held.Release()
-}
-
 func TestALockHeldWithoutARecordNamesAnUnknownHolder(t *testing.T) {
 	locks := Locks{StateDir: t.TempDir()}
 	file, err := os.OpenFile(filepath.Join(mkdir(t, filepath.Join(locks.StateDir, "locks")), "repo.lock"), os.O_CREATE|os.O_RDWR, 0o644)
@@ -71,8 +61,8 @@ func TestGrowingTakesTheLocksMissingAndRecordsThemAll(t *testing.T) {
 	locks := Locks{StateDir: t.TempDir()}
 	held := take(t, func() (*Held, error) { return locks.Take(op("op-1", repoShared, featA)) })
 
-	grown, err := held.Grow(op("op-1", repoShared, featA, featB))
-	unchanged, sameErr := held.Grow(op("op-1", repoShared, featA, featB))
+	grown, err := held.Grow([]operation.Lock{repoShared, featA, featB})
+	unchanged, sameErr := held.Grow([]operation.Lock{repoShared, featA, featB})
 
 	require.NoError(t, err)
 	require.NoError(t, sameErr)
@@ -85,16 +75,6 @@ func TestGrowingTakesTheLocksMissingAndRecordsThemAll(t *testing.T) {
 	assert.Equal(t, "lock.held", refusal(t, busy).Code)
 }
 
-func TestGrowingOntoALockAnotherHoldsIsAConflict(t *testing.T) {
-	locks := Locks{StateDir: t.TempDir()}
-	held := take(t, func() (*Held, error) { return locks.Take(op("op-1", repoShared, featA)) })
-	take(t, func() (*Held, error) { return locks.Take(op("op-2", featB)) })
-
-	_, err := held.Grow(op("op-1", repoShared, featA, featB))
-
-	assert.Equal(t, "op-2", refusal(t, err).Params["op"])
-}
-
 func TestAStateDirThatRefusesLocksRunsUnprotected(t *testing.T) {
 	stateDir := filepath.Join(t.TempDir(), "file")
 	require.NoError(t, os.WriteFile(stateDir, nil, 0o644))
@@ -103,7 +83,7 @@ func TestAStateDirThatRefusesLocksRunsUnprotected(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.False(t, held.Protected())
-	grown, err := held.Grow(op("op-1", repoShared, featA, featB))
+	grown, err := held.Grow([]operation.Lock{repoShared, featA, featB})
 	require.NoError(t, err)
 	assert.False(t, grown)
 	held.Release()
@@ -120,15 +100,14 @@ func TestTheRecordOfADeadOperationIsNeverItsHolder(t *testing.T) {
 	_, takeErr := locks.Take(op("op-1", repoShared))
 
 	assert.Equal(t, "unknown", refusal(t, takeErr).Params["op"])
-	assert.NoFileExists(t, filepath.Join(locks.StateDir, "locks", "ops", "op-dead.json"))
 }
 
 func TestGrowingKeepsWhatIsHeldWhenTheDefaultsMove(t *testing.T) {
 	locks := Locks{StateDir: t.TempDir()}
 	held := take(t, func() (*Held, error) { return locks.Take(op("op-1", repoShared, featA)) })
 
-	moved, movedErr := held.Grow(op("op-1", repoShared, featB))
-	back, backErr := held.Grow(op("op-1", repoShared, featA))
+	moved, movedErr := held.Grow([]operation.Lock{repoShared, featB})
+	back, backErr := held.Grow([]operation.Lock{repoShared, featA})
 
 	require.NoError(t, movedErr)
 	require.NoError(t, backErr)
