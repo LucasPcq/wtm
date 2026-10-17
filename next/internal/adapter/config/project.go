@@ -62,7 +62,7 @@ func (p Project) LoadRun() (project.Run, error) {
 }
 
 func (p Project) Remember(ctx context.Context, answers map[string]string) (domain.Written, error) {
-	return Remember(ctx, RememberParams{StateDir: p.StateDir, Answers: answers})
+	return Remember(ctx, p.StateDir, answers)
 }
 
 type LoadParams struct {
@@ -79,7 +79,7 @@ func Load(params LoadParams) (project.Config, project.Global, error) {
 	if err != nil {
 		return project.Config{}, project.Global{}, fmt.Errorf("project config: %w", err)
 	}
-	saved, err := parseProject(parseParams{Path: path, Data: data})
+	saved, err := parseProject(path, data)
 	if err != nil {
 		return project.Config{}, project.Global{}, fmt.Errorf("project config: %w", err)
 	}
@@ -97,14 +97,9 @@ func Load(params LoadParams) (project.Config, project.Global, error) {
 	return config, global.Global, nil
 }
 
-type parseParams struct {
-	Path string
-	Data []byte
-}
-
-func parseProject(params parseParams) (savedProject, error) {
+func parseProject(path string, data []byte) (savedProject, error) {
 	var file projectFile
-	if err := decodeStrict(strictParams{Source: params.Path, Data: params.Data, Out: &file, Ignore: hookTables}); err != nil {
+	if err := decodeStrict(strictParams{Source: path, Data: data, Out: &file, Ignore: hookTables}); err != nil {
 		return savedProject{}, err
 	}
 	onCreate, onClean, err := file.Hooks.decode()

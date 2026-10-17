@@ -156,24 +156,14 @@ func declaredComposeProject(files [][]dotenv.Line) string {
 	return ""
 }
 
-type HookEnvParams struct {
-	JobParams
-	ComposeEnv [][]dotenv.Line
-}
-
-func HookEnv(params HookEnvParams) map[string]string {
-	env := JobEnv(params.JobParams)
-	if name := declaredComposeProject(params.ComposeEnv); name != "" {
+func HookEnv(job JobParams, composeEnv [][]dotenv.Line) map[string]string {
+	env := JobEnv(job)
+	if name := declaredComposeProject(composeEnv); name != "" {
 		env[ComposeProjectKey] = name
 	}
 	return env
 }
 
-type HooksReadRunParams struct {
-	Run       project.Run
-	Isolation project.Isolation
-}
-
-func HooksReadRun(params HooksReadRunParams) bool {
-	return params.Isolation != "" && len(ComposeDirs(params.Run)) > 0
+func HooksReadRun(run project.Run, isolation project.Isolation) bool {
+	return isolation != "" && len(ComposeDirs(run)) > 0
 }

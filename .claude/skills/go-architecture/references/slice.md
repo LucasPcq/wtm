@@ -47,7 +47,7 @@ A reader opens `usecase.go` and reads the whole request from the top. Order its 
 // and applies it between the operation's started and finished events.
 func (u UseCase) Run(ctx context.Context, req Request, opts operation.Options) (Outcome, error) {
 	// 1. Take the operation's locks before reading anything, so the facts cannot change under the plan.
-	op, err := u.Operations.Begin(operation.BeginParams{Command: name, Locks: req.Locks(), Options: opts})
+	op, err := u.Operations.Begin(name, req.Locks(), opts)
 	if err != nil {
 		return Outcome{Op: op.ID}, err
 	}

@@ -111,16 +111,11 @@ type Clash struct {
 	Name   string
 }
 
-type ClashParams struct {
-	Branch string
-	Live   []string
-}
-
-func ClashWith(params ClashParams) (Clash, bool) {
-	slug := Slug(params.Branch)
+func ClashWith(branch string, others []string) (Clash, bool) {
+	slug := Slug(branch)
 	host := HostLabel(slug)
-	for _, live := range params.Live {
-		if live == "" || live == params.Branch {
+	for _, live := range others {
+		if live == "" || live == branch {
 			continue
 		}
 		other := Slug(live)

@@ -17,21 +17,21 @@ func TestEachKindExitsOnItsCode(t *testing.T) {
 		domain.KindInternal:     ExitError,
 	}
 	for kind, code := range cases {
-		assert.Equal(t, code, exitCode(exitParams{Failed: &Failed{Err: &domain.Error{Kind: kind, Code: "some.code"}}}), kind)
+		assert.Equal(t, code, exitCode(&Failed{Err: &domain.Error{Kind: kind, Code: "some.code"}}, false), kind)
 	}
 }
 
 func TestACodeWithAnExitOfItsOwnExitsOnIt(t *testing.T) {
-	assert.Equal(t, exitConfigNotFound, exitCode(exitParams{Failed: &Failed{Err: &domain.Error{Kind: domain.KindPrecondition, Code: codeConfigNotFound}, Exits: map[string]int{codeConfigNotFound: exitConfigNotFound}}}))
-	assert.Equal(t, ExitNotGitRepo, exitCode(exitParams{Failed: &Failed{Err: &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodeNotARepository}}}))
+	assert.Equal(t, exitConfigNotFound, exitCode(&Failed{Err: &domain.Error{Kind: domain.KindPrecondition, Code: codeConfigNotFound}, Exits: map[string]int{codeConfigNotFound: exitConfigNotFound}}, false))
+	assert.Equal(t, ExitNotGitRepo, exitCode(&Failed{Err: &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodeNotARepository}}, false))
 }
 
 func TestAStateFileOfANewerSchemaExitsOnItsCodeWhereverItSurfaced(t *testing.T) {
 	newer := &domain.Error{Kind: domain.KindInternal, Code: "unit.step_failed", Cause: &domain.SchemaNewer{Path: "meta.json", Found: 3, Supported: 2}}
 
-	assert.Equal(t, ExitStateSchemaNewer, exitCode(exitParams{Failed: &Failed{Err: newer}}))
+	assert.Equal(t, ExitStateSchemaNewer, exitCode(&Failed{Err: newer}, false))
 }
 
 func TestAFailureAfterAnInterruptIsTheInterrupt(t *testing.T) {
-	assert.Equal(t, ExitCancelled, exitCode(exitParams{Failed: &Failed{Err: &domain.Error{Kind: domain.KindInternal}}, Signalled: true}))
+	assert.Equal(t, ExitCancelled, exitCode(&Failed{Err: &domain.Error{Kind: domain.KindInternal}}, true))
 }

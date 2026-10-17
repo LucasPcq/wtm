@@ -12,9 +12,9 @@ import (
 func TestSourcesNameWhatTheyCouldNotFind(t *testing.T) {
 	present := map[string]bool{"/main/.env": true}
 
-	example, exampleWarnings := sources(t, SourcesParams{Request: CopyRequest{Strategy: project.EnvExample, Files: []project.EnvFile{{Target: ".env", Template: ".env.example"}}, TargetDir: "/wt", MainPath: "/main"}, Exists: existsIn(present)})
-	missing, missingWarnings := sources(t, SourcesParams{Request: CopyRequest{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env.local"}}, TargetDir: "/wt", MainPath: "/main"}, Exists: existsIn(present)})
-	fallback, fallbackWarnings := sources(t, SourcesParams{Request: CopyRequest{Strategy: project.EnvParent, Files: []project.EnvFile{{Target: ".env"}, {Target: ".env.local"}}, TargetDir: "/wt", MainPath: "/main", ParentPath: "/parent"}, Exists: existsIn(present)})
+	example, exampleWarnings := sources(t, CopyRequest{Strategy: project.EnvExample, Files: []project.EnvFile{{Target: ".env", Template: ".env.example"}}, TargetDir: "/wt", MainPath: "/main"}, existsIn(present))
+	missing, missingWarnings := sources(t, CopyRequest{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env.local"}}, TargetDir: "/wt", MainPath: "/main"}, existsIn(present))
+	fallback, fallbackWarnings := sources(t, CopyRequest{Strategy: project.EnvParent, Files: []project.EnvFile{{Target: ".env"}, {Target: ".env.local"}}, TargetDir: "/wt", MainPath: "/main", ParentPath: "/parent"}, existsIn(present))
 
 	assert.Empty(t, example)
 	assert.Equal(t, []CopyWarning{NoTemplate{Target: ".env"}}, exampleWarnings)
@@ -31,7 +31,7 @@ func TestSourcesNameWhatTheyCouldNotFind(t *testing.T) {
 func TestTheMainStrategyCopiesFromTheMainCheckout(t *testing.T) {
 	request := CopyRequest{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: "apps/api/.env"}}, TargetDir: "/wt", MainPath: "/main"}
 
-	found, warnings := sources(t, SourcesParams{Request: request, Exists: existsIn(map[string]bool{"/main/apps/api/.env": true})})
+	found, warnings := sources(t, request, existsIn(map[string]bool{"/main/apps/api/.env": true}))
 
 	assert.Equal(t, []Source{{From: "/main/apps/api/.env", To: "/wt/apps/api/.env"}}, found)
 	assert.Empty(t, warnings)
@@ -40,7 +40,7 @@ func TestTheMainStrategyCopiesFromTheMainCheckout(t *testing.T) {
 func TestTheParentStrategyCopiesFromTheParentWhenItHoldsTheFile(t *testing.T) {
 	request := CopyRequest{Strategy: project.EnvParent, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: "/wt", MainPath: "/main", ParentPath: "/parent"}
 
-	found, warnings := sources(t, SourcesParams{Request: request, Exists: existsIn(map[string]bool{"/parent/.env": true, "/main/.env": true})})
+	found, warnings := sources(t, request, existsIn(map[string]bool{"/parent/.env": true, "/main/.env": true}))
 
 	assert.Equal(t, []Source{{From: "/parent/.env", To: "/wt/.env"}}, found)
 	assert.Empty(t, warnings)
@@ -49,7 +49,7 @@ func TestTheParentStrategyCopiesFromTheParentWhenItHoldsTheFile(t *testing.T) {
 func TestTheParentStrategyWithoutAParentWorktreeCopiesFromMainSilently(t *testing.T) {
 	request := CopyRequest{Strategy: project.EnvParent, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: "/wt", MainPath: "/main"}
 
-	found, warnings := sources(t, SourcesParams{Request: request, Exists: existsIn(map[string]bool{"/main/.env": true})})
+	found, warnings := sources(t, request, existsIn(map[string]bool{"/main/.env": true}))
 
 	assert.Equal(t, []Source{{From: "/main/.env", To: "/wt/.env"}}, found)
 	assert.Empty(t, warnings)
@@ -73,7 +73,7 @@ func TestCandidatesAreEveryPathSourcesMayLookAt(t *testing.T) {
 func TestAnUnknownStrategyIsRefused(t *testing.T) {
 	request := CopyRequest{Strategy: "elsewhere", Files: []project.EnvFile{{Target: ".env"}}}
 
-	_, _, err := Sources(SourcesParams{Request: request})
+	_, _, err := Sources(request, nil)
 	assert.EqualError(t, err, "unknown env strategy: elsewhere")
 	_, err = candidates(request)
 	assert.EqualError(t, err, "unknown env strategy: elsewhere")
@@ -83,7 +83,7 @@ func TestAPathThatCannotBeCheckedStopsTheSources(t *testing.T) {
 	denied := errors.New("permission denied")
 	request := CopyRequest{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env"}}, TargetDir: "/wt", MainPath: "/main"}
 
-	_, _, err := Sources(SourcesParams{Request: request, Exists: func(string) (bool, error) { return false, denied }})
+	_, _, err := Sources(request, func(string) (bool, error) { return false, denied })
 
 	assert.ErrorIs(t, err, denied)
 }
@@ -93,8 +93,8 @@ func TestTheTemplateIsThePinnedOneElseTheFirstConventionalSpellingPresent(t *tes
 	pinned := CopyRequest{Strategy: project.EnvExample, Files: []project.EnvFile{{Target: ".env", Template: ".env.example"}}, TargetDir: "/wt", MainPath: "/main"}
 	present := map[string]bool{"/main/.env.sample": true, "/main/.env.tmpl": true}
 
-	found, _ := sources(t, SourcesParams{Request: guessed, Exists: existsIn(present)})
-	gone, warnings := sources(t, SourcesParams{Request: pinned, Exists: existsIn(present)})
+	found, _ := sources(t, guessed, existsIn(present))
+	gone, warnings := sources(t, pinned, existsIn(present))
 
 	assert.Equal(t, []Source{{From: "/main/.env.sample", To: "/wt/.env"}}, found)
 	assert.Empty(t, gone, "a pinned template that is gone is not replaced by a guess")

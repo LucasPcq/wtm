@@ -19,13 +19,13 @@ const (
 )
 
 func RunHooks(ctx context.Context, params env.HookChain) error {
-	sink := newLines(linesParams{Emit: params.Output, Log: params.Log})
+	sink := newLines(params.Output, params.Log)
 	defer sink.close()
 	for index, hook := range params.Hooks {
 		if ctx.Err() != nil {
 			return fmt.Errorf("%w: %d hook(s) not run", ctx.Err(), len(params.Hooks)-index)
 		}
-		err := runHook(ctx, hookRun{Hook: hook, Params: params, Sink: sink})
+		err := runHook(ctx, hook, params, sink)
 		sink.flush()
 		if err == nil || hook.ContinueOnError && ctx.Err() == nil {
 			continue
@@ -35,49 +35,43 @@ func RunHooks(ctx context.Context, params env.HookChain) error {
 	return nil
 }
 
-type hookRun struct {
-	Hook   project.Hook
-	Params env.HookChain
-	Sink   *lines
-}
-
-func runHook(ctx context.Context, run hookRun) error {
-	if strings.TrimSpace(run.Hook.Cmd) == "" {
+func runHook(ctx context.Context, hook project.Hook, chain env.HookChain, sink *lines) error {
+	if strings.TrimSpace(hook.Cmd) == "" {
 		return nil
 	}
-	run.Sink.openLog()
-	cmd := Command(ctx, shellBin, shellCommandFlag, run.Hook.Cmd)
-	cmd.Dir = hookDir(run)
-	cmd.Env = hookEnv(run.Params)
-	cmd.Stdout = run.Sink
-	cmd.Stderr = run.Sink
+	sink.openLog()
+	cmd := Command(ctx, shellBin, shellCommandFlag, hook.Cmd)
+	cmd.Dir = hookDir(hook, chain.WorkDir)
+	cmd.Env = hookEnv(chain)
+	cmd.Stdout = sink
+	cmd.Stderr = sink
 	err := cmd.Run()
 	switch {
 	case err == nil, errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState.Success():
 		return nil
 	case ctx.Err() != nil:
-		return &env.HookFailure{Cmd: run.Hook.Cmd, Err: fmt.Errorf("hook stopped: %w", ctx.Err())}
+		return &env.HookFailure{Cmd: hook.Cmd, Err: fmt.Errorf("hook stopped: %w", ctx.Err())}
 	}
-	failure := &env.HookFailure{Cmd: run.Hook.Cmd, Err: fmt.Errorf("hook failed: %w", err)}
+	failure := &env.HookFailure{Cmd: hook.Cmd, Err: fmt.Errorf("hook failed: %w", err)}
 	if code, exited := ExitCode(err); exited {
 		failure.ExitCode = &code
 	}
 	return failure
 }
 
-func hookDir(run hookRun) string {
-	if run.Hook.Cwd == "" {
-		return run.Params.WorkDir
+func hookDir(hook project.Hook, workDir string) string {
+	if hook.Cwd == "" {
+		return workDir
 	}
-	if filepath.IsAbs(run.Hook.Cwd) {
-		return run.Hook.Cwd
+	if filepath.IsAbs(hook.Cwd) {
+		return hook.Cwd
 	}
-	return filepath.Join(run.Params.WorkDir, run.Hook.Cwd)
+	return filepath.Join(workDir, hook.Cwd)
 }
 
 func hookEnv(params env.HookChain) []string {
 	if len(params.Env) == 0 {
 		return nil
 	}
-	return Environ(EnvironParams{Unset: params.Unset, Set: params.Env})
+	return Environ(params.Unset, params.Env)
 }

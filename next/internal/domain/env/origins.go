@@ -54,18 +54,12 @@ func (w settling) linkOrigin(link project.EnvPortLink) string {
 	return fmt.Sprintf("http://%s:%d", host, w.PublicPort)
 }
 
-type originEntryParams struct {
-	Entry Entry
-	Link  project.EnvPortLink
-}
-
-func (w settling) originEntry(params originEntryParams) (Entry, bool) {
-	entry := params.Entry
-	origin := w.linkOrigin(params.Link)
+func (w settling) originEntry(entry Entry, link project.EnvPortLink) (Entry, bool) {
+	origin := w.linkOrigin(link)
 	if !w.names() || origin == "" {
 		return entry, false
 	}
-	rewrite := rewriteOrigin(rewriteOriginParams{Value: entry.CurrentValue, Origin: origin, JobLabel: w.jobLabel(params.Link.Job), Project: w.Project, Base: entry.Base, Resolved: entry.Resolved})
+	rewrite := rewriteOrigin(rewriteOriginParams{Value: entry.CurrentValue, Origin: origin, JobLabel: w.jobLabel(link.Job), Project: w.Project, Base: entry.Base, Resolved: entry.Resolved})
 	if rewrite.Fallback {
 		return entry, false
 	}

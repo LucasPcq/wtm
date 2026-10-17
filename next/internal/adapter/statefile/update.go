@@ -41,10 +41,10 @@ func Update(ctx context.Context, params UpdateParams) (domain.Written, error) {
 	}
 	lockPath := cmp.Or(params.LockPath, params.Path+lockSuffix)
 	changed := false
-	held, err := WithLock(ctx, LockParams{Path: lockPath, Do: func() (err error) {
+	held, err := WithLock(ctx, lockPath, func() (err error) {
 		changed, err = update(params)
 		return err
-	}})
+	})
 	return domain.Written{Changed: changed, Unlocked: !held}, err
 }
 
@@ -64,7 +64,7 @@ func update(params UpdateParams) (bool, error) {
 		if info != nil && bytes.Equal(current, next.Data) {
 			return false, nil
 		}
-		return true, replace(replaceParams{Path: params.Path, Data: next.Data, Perm: permOf(info, params.Perm)})
+		return true, replace(params.Path, next.Data, permOf(info, params.Perm))
 	}
 	return false, errNoChange
 }

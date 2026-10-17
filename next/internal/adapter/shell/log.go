@@ -9,11 +9,6 @@ import (
 	"sync"
 )
 
-type linesParams struct {
-	Emit func(string)
-	Log  string
-}
-
 type lines struct {
 	mu      sync.Mutex
 	emit    func(string)
@@ -23,8 +18,8 @@ type lines struct {
 	buf     bytes.Buffer
 }
 
-func newLines(params linesParams) *lines {
-	return &lines{emit: params.Emit, logPath: params.Log}
+func newLines(emit func(string), log string) *lines {
+	return &lines{emit: emit, logPath: log}
 }
 
 func (l *lines) openLog() {

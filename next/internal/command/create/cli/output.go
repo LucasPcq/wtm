@@ -90,26 +90,20 @@ func anomaliesOf(item create.Item) []string {
 	return anomalies
 }
 
-type outcomeParams struct {
-	Outcome   create.Outcome
-	FollowUps []output.NextStep
-	Cwd       string
-}
-
-func drawOutcome(w io.Writer, params outcomeParams) {
-	items := params.Outcome.Result.Items
+func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextStep, cwd string) {
+	items := outcome.Result.Items
 	headline(w, items)
 	var rows []output.PlanRow
 	var anomalies []string
 	var next []output.NextStep
 	if len(items) > 0 {
-		rows = planRowsOf(params.Outcome.Plan)
+		rows = planRowsOf(outcome.Plan)
 	}
 	for _, item := range items {
 		if !stands(item) || item.Detail == nil {
 			continue
 		}
-		path := output.ShownPath(output.Shown{Cwd: params.Cwd, Path: item.Detail.Path})
+		path := output.ShownPath(output.Shown{Cwd: cwd, Path: item.Detail.Path})
 		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + itemNote(item)}})
 		anomalies = append(anomalies, anomaliesOf(item)...)
 		next = append(next, output.NextStep{Command: "wtm go " + item.Subject})
@@ -119,7 +113,7 @@ func drawOutcome(w io.Writer, params outcomeParams) {
 			anomalies = append(anomalies, item.Subject+"  "+warned.Message)
 		}
 	}
-	for _, warned := range params.Outcome.Warnings {
+	for _, warned := range outcome.Warnings {
 		anomalies = append(anomalies, warned.Message)
 	}
 	if len(rows) > 0 {
@@ -139,7 +133,7 @@ func drawOutcome(w io.Writer, params outcomeParams) {
 	for _, item := range unfinished {
 		output.UnfinishedLine(w, output.Unfinished{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err})
 	}
-	next = append(next, params.FollowUps...)
+	next = append(next, followUps...)
 	if len(next) > 0 {
 		output.Blank(w)
 		output.NextSteps(w, next)
@@ -185,30 +179,19 @@ func tallyKey(item create.Item) string {
 	return string(item.Status)
 }
 
-type dryRunParams struct {
-	Outcome create.Outcome
-	Apply   string
-}
-
-func drawDryRun(w io.Writer, params dryRunParams) {
+func drawDryRun(w io.Writer, outcome create.Outcome, apply string) {
 	output.SectionTitle(w, commandName+output.Dot+"dry run, nothing applied")
-	warnings := output.Messages(params.Outcome.Warnings)
-	output.DrawPlan(w, output.PlanParams{Rows: planRowsOf(params.Outcome.Plan), Warnings: warnings})
+	warnings := output.Messages(outcome.Warnings)
+	output.DrawPlan(w, output.PlanParams{Rows: planRowsOf(outcome.Plan), Warnings: warnings})
 	if len(warnings) > 0 {
 		output.Blank(w)
 	}
-	output.InfoLine(w, output.Info{Label: "fingerprint", Value: params.Outcome.Fingerprint})
-	output.NextSteps(w, []output.NextStep{{Command: params.Apply, Note: output.ApplyNote}})
+	output.InfoLine(w, output.Info{Label: "fingerprint", Value: outcome.Fingerprint})
+	output.NextSteps(w, []output.NextStep{{Command: apply, Note: output.ApplyNote}})
 }
 
-type planTextParams struct {
-	Plan     create.Plan
-	Warnings []domain.Warning
-	Width    int
-}
-
-func planTextOf(params planTextParams) string {
-	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(params.Plan), Warnings: output.Messages(params.Warnings), Width: params.Width}), "\n")
+func planTextOf(plan create.Plan, warnings []domain.Warning, width int) string {
+	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(plan), Warnings: output.Messages(warnings), Width: width}), "\n")
 }
 
 type envelopeParams struct {

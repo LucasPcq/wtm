@@ -14,7 +14,7 @@ func TestTargetsKeepTheLinksOfADeclaredEnvAndNameTheOthers(t *testing.T) {
 		EnvValues: []project.EnvValueLink{{File: ".env", Key: "REALM"}, {File: "api/.env", Key: "URL"}},
 	}
 
-	kept, ignored := Targets(TargetsParams{Run: config, Files: []project.EnvFile{{Target: ".env"}}})
+	kept, ignored := Targets(config, []project.EnvFile{{Target: ".env"}})
 
 	assert.Equal(t, []project.EnvPortLink{{File: ".env", Key: "PORT"}}, kept.EnvPorts)
 	assert.Equal(t, []project.EnvValueLink{{File: ".env", Key: "REALM"}}, kept.EnvValues)
@@ -27,7 +27,7 @@ func TestTargetsKeepTheLinksOfADeclaredEnvAndNameTheOthers(t *testing.T) {
 func TestTargetsOfARunWithNoLinkIgnoreNothing(t *testing.T) {
 	config := project.Run{Jobs: []project.Job{{Name: "web"}}}
 
-	kept, ignored := Targets(TargetsParams{Run: config})
+	kept, ignored := Targets(config, nil)
 
 	assert.Equal(t, config, kept)
 	assert.Empty(t, ignored)
@@ -39,31 +39,31 @@ func TestTheOwnedKeysGoToTheEnvOfTheComposeJobsOwnDirectory(t *testing.T) {
 		{Name: "web", Cmd: "pnpm run dev", Cwd: "apps/shop/web"},
 	}}
 
-	writes := ownedWrites(ownedWritesParams{
-		Run:            config,
-		Files:          []project.EnvFile{{Target: ".env", Template: ".env.example"}, {Target: "apps/shop/web/.env", Template: "apps/shop/web/.env.example"}},
-		ComposeProject: "repo-feat-x",
-	})
+	writes := ownedWrites(
+		config,
+		[]project.EnvFile{{Target: ".env", Template: ".env.example"}, {Target: "apps/shop/web/.env", Template: "apps/shop/web/.env.example"}},
+		"repo-feat-x",
+	)
 
 	assert.Equal(t, []OwnedEntry{{File: ".env", Key: "COMPOSE_PROJECT_NAME", Value: "repo-feat-x"}}, writes)
 }
 
 func TestAComposeDirectoryWithNoEnvTargetGetsNoOwnedKey(t *testing.T) {
-	writes := ownedWrites(ownedWritesParams{
-		Run:            project.Run{Jobs: []project.Job{{Name: "stack", Cmd: "docker compose up -d", Cwd: "infra"}}},
-		Files:          []project.EnvFile{{Target: ".env"}},
-		ComposeProject: "repo-feat-x",
-	})
+	writes := ownedWrites(
+		project.Run{Jobs: []project.Job{{Name: "stack", Cmd: "docker compose up -d", Cwd: "infra"}}},
+		[]project.EnvFile{{Target: ".env"}},
+		"repo-feat-x",
+	)
 
 	assert.Empty(t, writes)
 }
 
 func TestAnOwnedValueNobodyResolvedIsNotWritten(t *testing.T) {
-	writes := ownedWrites(ownedWritesParams{
-		Run:            project.Run{Jobs: []project.Job{{Name: "stack", Cmd: "docker compose up -d"}}},
-		Files:          []project.EnvFile{{Target: ".env"}},
-		ComposeProject: "",
-	})
+	writes := ownedWrites(
+		project.Run{Jobs: []project.Job{{Name: "stack", Cmd: "docker compose up -d"}}},
+		[]project.EnvFile{{Target: ".env"}},
+		"",
+	)
 
 	assert.Empty(t, writes)
 }
@@ -76,7 +76,7 @@ func TestTheOwnedTargetsAreTheEnvFilesAComposeStackReads(t *testing.T) {
 	}}
 	files := []project.EnvFile{{Target: ".env"}, {Target: "infra/.env"}, {Target: "apps/web/.env"}}
 
-	assert.Equal(t, []string{"infra/.env", ".env"}, OwnedTargets(OwnedTargetsParams{Run: config, Files: files}))
-	assert.Empty(t, OwnedTargets(OwnedTargetsParams{Run: config}))
-	assert.Empty(t, OwnedTargets(OwnedTargetsParams{Files: files}))
+	assert.Equal(t, []string{"infra/.env", ".env"}, OwnedTargets(config, files))
+	assert.Empty(t, OwnedTargets(config, nil))
+	assert.Empty(t, OwnedTargets(project.Run{}, files))
 }

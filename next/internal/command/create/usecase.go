@@ -57,7 +57,7 @@ func (o Outcome) Failure() *domain.Error {
 }
 
 func (u UseCase) Run(ctx context.Context, req Request, opts operation.Options) (Outcome, error) {
-	op, err := u.Operations.Begin(operation.BeginParams{Command: name, Locks: req.Locks(), Options: opts})
+	op, err := u.Operations.Begin(name, req.Locks(), opts)
 	if err != nil {
 		return Outcome{Op: op.ID}, err
 	}

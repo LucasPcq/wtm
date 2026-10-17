@@ -60,7 +60,7 @@ func (r Repo) gitWith(ctx context.Context, stdin []byte, args ...string) ([]byte
 	if stdin != nil {
 		cmd.Stdin = bytes.NewReader(stdin)
 	}
-	cmd.Env = shell.Environ(shell.EnvironParams{Unset: repoScopedEnv, Set: promptless()})
+	cmd.Env = shell.Environ(repoScopedEnv, promptless())
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()

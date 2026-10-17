@@ -175,7 +175,7 @@ func (m *MultiSelect) View(size Size) string {
 	m.offset = min(max(m.offset, m.cursor-rows+1), m.cursor)
 	end := min(m.offset+rows, len(m.shown))
 	for i := m.offset; i < end; i++ {
-		b.WriteString(m.row(pickRow{Pick: m.options[m.shown[i]], Selected: i == m.cursor, Width: size.Width}))
+		b.WriteString(m.row(m.options[m.shown[i]], i == m.cursor, size.Width))
 		if i < end-1 {
 			b.WriteString("\n")
 		}
@@ -200,21 +200,14 @@ func (m *MultiSelect) overhead() int {
 	return lines
 }
 
-type pickRow struct {
-	Pick     Pick
-	Selected bool
-	Width    int
-}
-
-func (m *MultiSelect) row(params pickRow) string {
-	p := params.Pick
+func (m *MultiSelect) row(p Pick, selected bool, width int) string {
 	check := checkOff
 	if p.Picked {
 		check = checkOn
 	}
 	label := check + " " + p.Label
-	fill := max(params.Width-rowPrefix-rowLead-lipgloss.Width(label)-lipgloss.Width(p.Tag)-rowTagGap, 1)
-	if params.Selected {
+	fill := max(width-rowPrefix-rowLead-lipgloss.Width(label)-lipgloss.Width(p.Tag)-rowTagGap, 1)
+	if selected {
 		block := " " + label + strings.Repeat(" ", fill) + p.Tag + strings.Repeat(" ", rowTagGap)
 		return Accent.Render("▌›") + tinted.Render(block)
 	}

@@ -18,7 +18,7 @@ func (w *wizard) previewPlan(ctx context.Context) error {
 }
 
 func (w *wizard) plan(width int) string {
-	return planTextOf(planTextParams{Plan: w.preview.Plan, Warnings: w.preview.Warnings, Width: width})
+	return planTextOf(w.preview.Plan, w.preview.Warnings, width)
 }
 
 func (w *wizard) apply(ctx context.Context) error {

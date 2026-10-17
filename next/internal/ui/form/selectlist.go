@@ -191,7 +191,7 @@ func (l *SelectList) View(size Size) string {
 	l.offset = min(max(l.offset, l.cursor-rows+1), l.cursor)
 	end := min(l.offset+rows, len(l.shown))
 	for i := l.offset; i < end; i++ {
-		b.WriteString(l.row(rowParams{Option: l.options[l.shown[i]], Selected: i == l.cursor, Width: size.Width}))
+		b.WriteString(l.row(l.options[l.shown[i]], i == l.cursor, size.Width))
 		if i < end-1 {
 			b.WriteString("\n")
 		}
@@ -220,19 +220,12 @@ func (l *SelectList) overhead() int {
 	return lines
 }
 
-type rowParams struct {
-	Option   Option
-	Selected bool
-	Width    int
-}
-
-func (l *SelectList) row(params rowParams) string {
-	o := params.Option
+func (l *SelectList) row(o Option, selected bool, width int) string {
 	if o.Separator {
-		return output.Muted.Render(output.Indent + strings.Repeat("─", max(params.Width-4, 4)))
+		return output.Muted.Render(output.Indent + strings.Repeat("─", max(width-4, 4)))
 	}
-	fill := max(params.Width-rowPrefix-rowLead-lipgloss.Width(o.Label)-lipgloss.Width(o.Badge)-rowTagGap, 1)
-	if params.Selected {
+	fill := max(width-rowPrefix-rowLead-lipgloss.Width(o.Label)-lipgloss.Width(o.Badge)-rowTagGap, 1)
+	if selected {
 		block := " " + o.Label + strings.Repeat(" ", fill) + o.Badge + strings.Repeat(" ", rowTagGap)
 		return Accent.Render("▌›") + tinted.Render(block)
 	}

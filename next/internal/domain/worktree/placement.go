@@ -53,7 +53,7 @@ func Place(params PlacementParams) Placement {
 	if params.Location.Exists {
 		return params.occupied()
 	}
-	if clash, found := ClashWith(ClashParams{Branch: params.Branch, Live: params.Live}); found {
+	if clash, found := ClashWith(params.Branch, params.Live); found {
 		return clash
 	}
 	switch {

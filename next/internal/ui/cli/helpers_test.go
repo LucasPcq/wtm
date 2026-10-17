@@ -15,7 +15,7 @@ type printed struct {
 
 func runIn(t *testing.T, args ...string) printed {
 	t.Helper()
-	root := NewRoot(RootParams{Version: "1.2.3", Commands: []*cobra.Command{probe()}})
+	root := NewRoot("1.2.3", []*cobra.Command{probe()})
 	var stdout, stderr bytes.Buffer
 	root.SetIn(&bytes.Buffer{})
 	root.SetOut(&stdout)

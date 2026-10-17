@@ -128,10 +128,10 @@ func TestOnlyALinkedWorktreesLinksNeedItsOrdinal(t *testing.T) {
 	ports := project.Run{EnvPorts: []project.EnvPortLink{{File: ".env", Key: "PORT"}}}
 	values := project.Run{EnvValues: []project.EnvValueLink{{File: ".env", Key: "REALM"}}}
 
-	assert.True(t, NeedsOrdinal(NeedsOrdinalParams{Run: ports}))
-	assert.True(t, NeedsOrdinal(NeedsOrdinalParams{Isolation: project.Isolated, Run: values}))
-	assert.False(t, NeedsOrdinal(NeedsOrdinalParams{Run: project.Run{}}))
-	assert.False(t, NeedsOrdinal(NeedsOrdinalParams{Isolation: project.Verbatim, Run: ports}))
+	assert.True(t, NeedsOrdinal("", ports))
+	assert.True(t, NeedsOrdinal(project.Isolated, values))
+	assert.False(t, NeedsOrdinal("", project.Run{}))
+	assert.False(t, NeedsOrdinal(project.Verbatim, ports))
 }
 
 func TestAProxyPortOutOfRangeIsRefusedOnlyWhenLinksNeedIt(t *testing.T) {

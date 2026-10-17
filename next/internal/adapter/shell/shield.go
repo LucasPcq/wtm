@@ -48,15 +48,10 @@ func KillCancelled() {
 	}
 }
 
-type stoppingParams struct {
-	Process *escalation
-	Kill    func()
-}
-
-func stopping(params stoppingParams) {
+func stopping(process *escalation, kill func()) {
 	inflight.Lock()
 	defer inflight.Unlock()
-	inflight.stopping[params.Process] = params.Kill
+	inflight.stopping[process] = kill
 }
 
 func stopped(process *escalation) {

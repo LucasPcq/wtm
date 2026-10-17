@@ -248,26 +248,21 @@ func refusedFor(target string, onConflict OnConflict, conflicts []worktree.Confl
 	if !binary && (len(conflicts) == 0 || onConflict == OnConflictResolve) {
 		return nil
 	}
-	return conflictRefusal(conflictRefusalParams{Conflicts: conflicts, Target: target})
+	return conflictRefusal(conflicts, target)
 }
 
-type conflictRefusalParams struct {
-	Conflicts []worktree.Conflict
-	Target    string
-}
-
-func conflictRefusal(params conflictRefusalParams) *domain.Error {
+func conflictRefusal(conflicts []worktree.Conflict, target string) *domain.Error {
 	byKind := map[worktree.ConflictKind][]string{}
 	var all []string
-	for _, conflict := range params.Conflicts {
+	for _, conflict := range conflicts {
 		byKind[conflict.Kind] = append(byKind[conflict.Kind], conflict.Path)
 		all = append(all, conflict.Path)
 	}
-	refusal := &domain.Error{Kind: domain.KindConflict, Code: CodeConflict, Params: domain.Params{"target": params.Target, "files": strings.Join(all, ", ")}}
+	refusal := &domain.Error{Kind: domain.KindConflict, Code: CodeConflict, Params: domain.Params{"target": target, "files": strings.Join(all, ", ")}}
 	if binary := byKind[worktree.ConflictBinary]; len(binary) > 0 {
 		refusal.Params["files"] = strings.Join(binary, ", ")
 		refusal.Message = fmt.Sprintf("cannot apply the selected changes: %s %s in %q and %s binary — conflict markers cannot be written, remove %s there or extract to another worktree",
-			strings.Join(binary, ", "), plural(len(binary), "already exists", "already exist"), params.Target, plural(len(binary), "is", "are"), plural(len(binary), "it", "them"))
+			strings.Join(binary, ", "), plural(len(binary), "already exists", "already exist"), target, plural(len(binary), "is", "are"), plural(len(binary), "it", "them"))
 		return refusal
 	}
 	var clauses []string
@@ -278,7 +273,7 @@ func conflictRefusal(params conflictRefusalParams) *domain.Error {
 		clauses = append(clauses, strings.Join(exists, ", ")+" "+plural(len(exists), "already exists", "already exist"))
 	}
 	refusal.Message = fmt.Sprintf("cannot apply the selected changes: %s in %q — resolve %s there, extract to another worktree, or re-run with --on-conflict resolve",
-		strings.Join(clauses, " and "), params.Target, plural(len(all), "it", "them"))
+		strings.Join(clauses, " and "), target, plural(len(all), "it", "them"))
 	return refusal
 }
 

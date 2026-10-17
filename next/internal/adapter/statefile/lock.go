@@ -22,22 +22,17 @@ var (
 	ErrBusy       = errors.New("lock held")
 )
 
-type LockParams struct {
-	Path string
-	Do   func() error
-}
-
-func WithLock(ctx context.Context, params LockParams) (bool, error) {
-	file, err := acquire(ctx, params.Path)
+func WithLock(ctx context.Context, path string, do func() error) (bool, error) {
+	file, err := acquire(ctx, path)
 	if errors.Is(err, ErrUnlockable) {
-		return false, params.Do()
+		return false, do()
 	}
 	if err != nil {
 		return false, err
 	}
 	defer file.Close()
 	defer Flock(file, syscall.LOCK_UN)
-	return true, params.Do()
+	return true, do()
 }
 
 func acquire(ctx context.Context, path string) (*os.File, error) {

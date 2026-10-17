@@ -31,17 +31,12 @@ var exitByKind = map[domain.Kind]int{
 	domain.KindPrecondition: ExitPrecondition,
 }
 
-type exitParams struct {
-	Failed    *Failed
-	Signalled bool
-}
-
-func exitCode(params exitParams) int {
-	if params.Signalled {
+func exitCode(failed *Failed, signalled bool) int {
+	if signalled {
 		return ExitCancelled
 	}
-	failure := params.Failed.Err
-	if code, own := params.Failed.Exits[failure.Code]; own {
+	failure := failed.Err
+	if code, own := failed.Exits[failure.Code]; own {
 		return code
 	}
 	if code, own := exitByCode[failure.Code]; own {

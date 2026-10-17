@@ -143,26 +143,26 @@ func TestTheComposeEnvPathsAreTheEnvOfEachComposeDirectoryElseTheRoot(t *testing
 }
 
 func TestAHookLearnsTheJobEnvironmentOfItsWorktree(t *testing.T) {
-	env := HookEnv(HookEnvParams{JobParams: shopParams("feat/a", 2, "")})
+	env := HookEnv(shopParams("feat/a", 2, ""), nil)
 
 	assert.Equal(t, "20", env["WTM_PORT_OFFSET"])
 	assert.Equal(t, shopProject+"-feat-a", env["COMPOSE_PROJECT_NAME"])
 }
 
 func TestAHookRunsUnderTheComposeProjectItsWorktreesEnvNames(t *testing.T) {
-	env := HookEnv(HookEnvParams{
-		JobParams:  shopParams("feat/a", 2, ""),
-		ComposeEnv: [][]dotenv.Line{dotenv.Parse([]byte("COMPOSE_PROJECT_NAME=renamed\n"))},
-	})
+	env := HookEnv(
+		shopParams("feat/a", 2, ""),
+		[][]dotenv.Line{dotenv.Parse([]byte("COMPOSE_PROJECT_NAME=renamed\n"))},
+	)
 
 	assert.Equal(t, "renamed", env["COMPOSE_PROJECT_NAME"])
 }
 
 func TestAHookKeepsTheDerivedComposeProjectWhenNoEnvNamesOne(t *testing.T) {
-	env := HookEnv(HookEnvParams{
-		JobParams:  shopParams("feat/a", 2, ""),
-		ComposeEnv: [][]dotenv.Line{dotenv.Parse([]byte("PORT=1\nCOMPOSE_PROJECT_NAME=\n"))},
-	})
+	env := HookEnv(
+		shopParams("feat/a", 2, ""),
+		[][]dotenv.Line{dotenv.Parse([]byte("PORT=1\nCOMPOSE_PROJECT_NAME=\n"))},
+	)
 
 	assert.Equal(t, shopProject+"-feat-a", env["COMPOSE_PROJECT_NAME"])
 }
@@ -171,19 +171,20 @@ func TestHooksReadTheRunEnvOnlyOfAWorktreeThatChoseAndAComposeStack(t *testing.T
 	compose := project.Run{Jobs: []project.Job{{Name: "db", Cmd: "docker compose up -d"}}}
 	script := project.Run{Jobs: []project.Job{{Name: "web", Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}}}
 	cases := []struct {
-		name   string
-		params HooksReadRunParams
-		want   bool
+		name      string
+		run       project.Run
+		isolation project.Isolation
+		want      bool
 	}{
-		{"isolated with a compose job", HooksReadRunParams{Run: compose, Isolation: project.Isolated}, true},
-		{"verbatim with a compose job", HooksReadRunParams{Run: compose, Isolation: project.Verbatim}, true},
-		{"never chose", HooksReadRunParams{Run: compose}, false},
-		{"no compose job", HooksReadRunParams{Run: script, Isolation: project.Isolated}, false},
-		{"no run config", HooksReadRunParams{Isolation: project.Isolated}, false},
+		{"isolated with a compose job", compose, project.Isolated, true},
+		{"verbatim with a compose job", compose, project.Verbatim, true},
+		{"never chose", compose, "", false},
+		{"no compose job", script, project.Isolated, false},
+		{"no run config", project.Run{}, project.Isolated, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, HooksReadRun(tc.params))
+			assert.Equal(t, tc.want, HooksReadRun(tc.run, tc.isolation))
 		})
 	}
 }

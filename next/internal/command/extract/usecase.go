@@ -51,7 +51,7 @@ func (o Outcome) Failure() *domain.Error {
 }
 
 func (u UseCase) Run(ctx context.Context, req Request, opts operation.Options) (Outcome, error) {
-	op, err := u.Operations.Begin(operation.BeginParams{Command: name, Locks: req.Locks(), Options: opts})
+	op, err := u.Operations.Begin(name, req.Locks(), opts)
 	if err != nil {
 		return Outcome{Op: op.ID}, err
 	}
@@ -325,7 +325,7 @@ func (u UseCase) move(ctx context.Context, plan Plan, item Item, report domain.R
 
 func (p Plan) failure(err error) *domain.Error {
 	if refused, ok := errors.AsType[*worktree.ConflictRefusal](err); ok {
-		return conflictRefusal(conflictRefusalParams{Conflicts: refused.Conflicts, Target: p.Target.Branch})
+		return conflictRefusal(refused.Conflicts, p.Target.Branch)
 	}
 	if half, ok := errors.AsType[*worktree.HalfMoved](err); ok {
 		return &domain.Error{

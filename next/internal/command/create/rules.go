@@ -116,17 +116,17 @@ func (f Facts) invalid(e entry) (refusal, bool) {
 	if at := slices.IndexFunc(e.earlier, func(earlier string) bool { return f.pathOf(earlier) == e.path }); at >= 0 {
 		return e.clashed(worktree.Clash{Branch: e.earlier[at], Name: filepath.Base(e.path)}), true
 	}
-	if clash, found := f.clash(worktree.ClashParams{Branch: e.name, Live: e.earlier}); found {
+	if clash, found := f.clash(e.name, e.earlier); found {
 		return e.clashed(clash), true
 	}
 	return refusal{}, false
 }
 
-func (f Facts) clash(params worktree.ClashParams) (worktree.Clash, bool) {
+func (f Facts) clash(branch string, live []string) (worktree.Clash, bool) {
 	if !f.namesWorktrees() {
 		return worktree.Clash{}, false
 	}
-	return worktree.ClashWith(params)
+	return worktree.ClashWith(branch, live)
 }
 
 func (e entry) placed(placement worktree.Placement) decision {

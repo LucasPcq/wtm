@@ -153,7 +153,7 @@ func Build(t testing.TB, params FakeParams) git.Repo {
 		Git(t, main, "update-ref", "refs/heads/"+name, commits.tip(params.Commits[worktree.LocalBranch{Name: name}]))
 	}
 	Git(t, main, "reset", "-q", "--hard")
-	buildRemote(t, buildRemoteParams{Main: main, Commits: commits, Seed: params})
+	buildRemote(t, main, commits, params)
 	for _, w := range params.Worktrees {
 		buildWorktree(t, buildWorktreeParams{Main: main, Root: commits.made[Root], Worktree: w, Seed: params})
 	}
@@ -202,28 +202,22 @@ func localBranches(params FakeParams) []string {
 	return slices.Compact(names)
 }
 
-type buildRemoteParams struct {
-	Main    string
-	Commits builder
-	Seed    FakeParams
-}
-
-func buildRemote(t testing.TB, params buildRemoteParams) {
+func buildRemote(t testing.TB, main string, built builder, seed FakeParams) {
 	t.Helper()
 	bare := t.TempDir()
-	Git(t, bare, "init", "-q", "--bare", "-b", params.Seed.Branch)
-	Git(t, params.Main, "remote", "add", origin, bare)
-	for _, name := range params.Seed.Remote {
-		Git(t, params.Main, "push", "-q", origin, params.Commits.tip(params.Seed.Commits[worktree.RemoteBranch{Name: name}])+":refs/heads/"+name)
+	Git(t, bare, "init", "-q", "--bare", "-b", seed.Branch)
+	Git(t, main, "remote", "add", origin, bare)
+	for _, name := range seed.Remote {
+		Git(t, main, "push", "-q", origin, built.tip(seed.Commits[worktree.RemoteBranch{Name: name}])+":refs/heads/"+name)
 	}
-	for name, commits := range params.Seed.Origin {
-		Git(t, params.Main, "push", "-q", "-f", origin, params.Commits.tip(commits)+":refs/heads/"+name)
+	for name, commits := range seed.Origin {
+		Git(t, main, "push", "-q", "-f", origin, built.tip(commits)+":refs/heads/"+name)
 	}
-	for name := range params.Seed.Origin {
-		Git(t, params.Main, "update-ref", "-d", remoteRef(name))
+	for name := range seed.Origin {
+		Git(t, main, "update-ref", "-d", remoteRef(name))
 	}
-	for _, name := range params.Seed.Remote {
-		Git(t, params.Main, "update-ref", remoteRef(name), params.Commits.tip(params.Seed.Commits[worktree.RemoteBranch{Name: name}]))
+	for _, name := range seed.Remote {
+		Git(t, main, "update-ref", remoteRef(name), built.tip(seed.Commits[worktree.RemoteBranch{Name: name}]))
 	}
 }
 

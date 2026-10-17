@@ -82,39 +82,29 @@ func mode(keep bool) string {
 	return "move"
 }
 
-type dryRunParams struct {
-	Outcome extract.Outcome
-	Apply   string
-}
-
-func drawDryRun(w io.Writer, params dryRunParams) {
+func drawDryRun(w io.Writer, outcome extract.Outcome, apply string) {
 	output.SectionTitle(w, commandName+output.Dot+"dry run, nothing applied")
-	warnings := output.Messages(params.Outcome.Warnings)
-	output.DrawPlan(w, output.PlanParams{Rows: planRowsOf(params.Outcome.Plan), Warnings: warnings})
+	warnings := output.Messages(outcome.Warnings)
+	output.DrawPlan(w, output.PlanParams{Rows: planRowsOf(outcome.Plan), Warnings: warnings})
 	if len(warnings) > 0 {
 		output.Blank(w)
 	}
-	output.InfoLine(w, output.Info{Label: "fingerprint", Value: params.Outcome.Fingerprint})
-	output.NextSteps(w, []output.NextStep{{Command: params.Apply, Note: output.ApplyNote}})
+	output.InfoLine(w, output.Info{Label: "fingerprint", Value: outcome.Fingerprint})
+	output.NextSteps(w, []output.NextStep{{Command: apply, Note: output.ApplyNote}})
 }
 
 func drawNothing(w io.Writer, plan extract.Plan) {
 	output.UnchangedLine(w, "No uncommitted changes to extract in "+plan.Source)
 }
 
-type outcomeParams struct {
-	Outcome extract.Outcome
-	Cwd     string
-}
-
-func drawOutcome(w io.Writer, params outcomeParams) {
-	item := params.Outcome.Result.Item
+func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
+	item := outcome.Result.Item
 	if item.Status != domain.StatusDone {
-		drawUnfinished(w, params)
+		drawUnfinished(w, outcome, cwd)
 		return
 	}
 	detail := item.Detail
-	source := params.Outcome.Plan.Source
+	source := outcome.Plan.Source
 	conflicted := len(detail.Conflicts) > 0
 	var rows []output.PlanRow
 	next := output.NextStep{Command: "wtm go " + item.Subject}
@@ -122,32 +112,27 @@ func drawOutcome(w io.Writer, params outcomeParams) {
 		drawConflicts(w, conflictsParams{Detail: detail, Target: item.Subject, Source: source})
 		next.Note = "resolve the conflicts, then discard the same files in " + source
 	} else {
-		drawApplied(w, appliedParams{Detail: detail, Target: item.Subject})
+		drawApplied(w, detail, item.Subject)
 		rows = append(rows, output.PlanRow{Label: "source", Values: []string{source + output.Dot + sourceNote(detail.Kept)}})
 	}
 	if note := output.SettlementNote(detail.EnvPorts); note != "" {
 		rows = append(rows, output.PlanRow{Label: "env", Values: []string{note}})
 	}
-	rows = append(rows, output.PlanRow{Label: "path", Values: []string{output.ShownPath(output.Shown{Cwd: params.Cwd, Path: detail.Path})}})
+	rows = append(rows, output.PlanRow{Label: "path", Values: []string{output.ShownPath(output.Shown{Cwd: cwd, Path: detail.Path})}})
 	output.Blank(w)
-	output.DrawPlan(w, output.PlanParams{Rows: rows, Warnings: anomaliesOf(params.Outcome)})
+	output.DrawPlan(w, output.PlanParams{Rows: rows, Warnings: anomaliesOf(outcome)})
 	output.Blank(w)
 	output.NextSteps(w, []output.NextStep{next})
 }
 
-type appliedParams struct {
-	Detail *extract.Detail
-	Target string
-}
-
-func drawApplied(w io.Writer, params appliedParams) {
+func drawApplied(w io.Writer, detail *extract.Detail, target string) {
 	verb := "Moved "
-	if params.Detail.Kept {
+	if detail.Kept {
 		verb = "Copied "
 	}
-	output.SuccessLine(w, verb+fileCount(len(params.Detail.Files))+" to "+params.Target)
+	output.SuccessLine(w, verb+fileCount(len(detail.Files))+" to "+target)
 	output.Blank(w)
-	for _, file := range params.Detail.Files {
+	for _, file := range detail.Files {
 		output.Message(w, output.Indent+file.Status.Tag()+"  "+file.Path)
 	}
 }
@@ -198,13 +183,13 @@ func anomaliesOf(outcome extract.Outcome) []string {
 	return anomalies
 }
 
-func drawUnfinished(w io.Writer, params outcomeParams) {
-	item := params.Outcome.Result.Item
+func drawUnfinished(w io.Writer, outcome extract.Outcome, cwd string) {
+	item := outcome.Result.Item
 	output.UnfinishedLine(w, output.Unfinished{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err})
 	if item.Detail != nil {
 		output.Blank(w)
-		path := output.ShownPath(output.Shown{Cwd: params.Cwd, Path: item.Detail.Path})
-		output.DrawPlan(w, output.PlanParams{Rows: []output.PlanRow{{Label: "path", Values: []string{path}}}, Warnings: anomaliesOf(params.Outcome)})
+		path := output.ShownPath(output.Shown{Cwd: cwd, Path: item.Detail.Path})
+		output.DrawPlan(w, output.PlanParams{Rows: []output.PlanRow{{Label: "path", Values: []string{path}}}, Warnings: anomaliesOf(outcome)})
 	}
 	if item.Err == nil || item.Err.FollowUp == nil {
 		return

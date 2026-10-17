@@ -96,7 +96,7 @@ func (r Repo) Move(ctx context.Context, move worktree.Move) (worktree.Moved, err
 		return worktree.Moved{}, err
 	}
 	written := journal{root: move.Target}
-	if err := target.write(ctx, writeParams{Move: move, Plan: plan, Journal: &written}); err != nil {
+	if err := target.write(ctx, move, plan, &written); err != nil {
 		return worktree.Moved{}, errors.Join(err, written.undo(ctx, target))
 	}
 	if len(plan.conflicts) > 0 {
@@ -299,14 +299,8 @@ func (p plan) refusal(move worktree.Move) error {
 	return nil
 }
 
-type writeParams struct {
-	Move    worktree.Move
-	Plan    plan
-	Journal *journal
-}
-
-func (r Repo) write(ctx context.Context, params writeParams) error {
-	patch, err := r.at(params.Move.Source).diff(ctx, params.Plan.patched)
+func (r Repo) write(ctx context.Context, move worktree.Move, p plan, written *journal) error {
+	patch, err := r.at(move.Source).diff(ctx, p.patched)
 	if err != nil {
 		return err
 	}
@@ -314,17 +308,17 @@ func (r Repo) write(ctx context.Context, params writeParams) error {
 		if _, err := r.gitWith(ctx, patch, "apply", "--whitespace=nowarn", "--3way"); err != nil {
 			return err
 		}
-		params.Journal.patch = patch
+		written.patch = patch
 	}
-	labels := []string{"-L", params.Move.TargetLabel, "-L", "base", "-L", "incoming (" + params.Move.SourceLabel + ")"}
-	for _, f := range append(params.Plan.merged, params.Plan.conflicting...) {
-		params.Journal.keep(f)
+	labels := []string{"-L", move.TargetLabel, "-L", "base", "-L", "incoming (" + move.SourceLabel + ")"}
+	for _, f := range append(p.merged, p.conflicting...) {
+		written.keep(f)
 		if err := r.mergeInPlace(ctx, f, labels); err != nil {
 			return fmt.Errorf("merge %s: %w", f.path, err)
 		}
 	}
-	for _, f := range params.Plan.copied {
-		params.Journal.keep(f)
+	for _, f := range p.copied {
+		written.keep(f)
 		if err := put(filepath.Join(r.Dir, f.path), f.theirs); err != nil {
 			return fmt.Errorf("copy %s: %w", f.path, err)
 		}

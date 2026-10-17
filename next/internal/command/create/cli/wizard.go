@@ -96,7 +96,7 @@ type branchesStep struct {
 }
 
 func (s *branchesStep) Open() tea.Cmd {
-	s.list = form.NewTextList(form.TextListParams{Entries: s.w.req.Branches, Check: s.w.branchProblem, Badge: s.w.branchBadge})
+	s.list = form.NewTextList(s.w.req.Branches, s.w.branchProblem, s.w.branchBadge)
 	return textinput.Blink
 }
 
@@ -153,7 +153,7 @@ func (s *choiceStep) Field() form.Field {
 }
 
 func (s *choiceStep) Answer() string {
-	return s.w.choose(chosen{Step: s.step, Value: s.list.Value(), Remember: s.list.Remember()})
+	return s.w.choose(s.step, s.list.Value(), s.list.Remember())
 }
 
 type fastForwardStep struct {
@@ -191,24 +191,18 @@ func (ifNotExistsStep) Answer() string {
 	return ""
 }
 
-type chosen struct {
-	Step     step
-	Value    string
-	Remember bool
-}
-
-func (w *wizard) choose(c chosen) string {
-	if c.Step == stepIsolation {
-		w.req.Isolation = project.Isolation(c.Value)
+func (w *wizard) choose(s step, value string, remember bool) string {
+	if s == stepIsolation {
+		w.req.Isolation = project.Isolation(value)
 	} else {
-		w.req.EnvFrom = project.EnvStrategy(c.Value)
+		w.req.EnvFrom = project.EnvStrategy(value)
 	}
-	path := paths[c.Step]
+	path := paths[s]
 	w.req.Remember = slices.DeleteFunc(slices.Clone(w.req.Remember), func(p string) bool { return p == path })
-	if c.Remember {
+	if remember {
 		w.req.Remember = append(w.req.Remember, path)
 	}
-	return c.Value
+	return value
 }
 
 func (w *wizard) reset(s step) {
@@ -218,9 +212,9 @@ func (w *wizard) reset(s step) {
 	case stepFrom:
 		w.req.From = w.given.From
 	case stepEnvFrom:
-		w.choose(chosen{Step: s, Value: string(w.given.EnvFrom), Remember: slices.Contains(w.given.Remember, paths[s])})
+		w.choose(s, string(w.given.EnvFrom), slices.Contains(w.given.Remember, paths[s]))
 	case stepIsolation:
-		w.choose(chosen{Step: s, Value: string(w.given.Isolation), Remember: slices.Contains(w.given.Remember, paths[s])})
+		w.choose(s, string(w.given.Isolation), slices.Contains(w.given.Remember, paths[s]))
 	case stepFastForward:
 		w.req.FastForward = w.given.FastForward
 	case stepRecap, stepIfNotExists, stepCount:

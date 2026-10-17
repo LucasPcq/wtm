@@ -28,7 +28,7 @@ type printed struct {
 
 func runExtract(t *testing.T, w world, words ...string) printed {
 	t.Helper()
-	root := uicli.NewRoot(uicli.RootParams{Version: "1.2.3", Commands: []*cobra.Command{New(w.open)}})
+	root := uicli.NewRoot("1.2.3", []*cobra.Command{New(w.open)})
 	var stdout, stderr bytes.Buffer
 	root.SetIn(&bytes.Buffer{})
 	root.SetOut(&stdout)

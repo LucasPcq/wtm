@@ -22,10 +22,10 @@ func (l extractLine) String() string {
 		words = append(words, output.FlagWords(output.FlagValue{Name: "files", Value: file})...)
 	}
 	words = append(words, output.FlagWords(output.FlagValue{Name: "to", Value: req.To})...)
-	words = append(words, switched(switchParams{Name: "ff", Value: req.FastForward})...)
+	words = append(words, switched("ff", req.FastForward)...)
 	words = append(words, output.FlagWords(output.FlagValue{Name: "from", Value: req.From})...)
 	words = append(words, output.FlagWords(output.FlagValue{Name: "isolation", Value: string(req.Isolation)})...)
-	words = append(words, switched(switchParams{Name: "keep", Value: req.Keep})...)
+	words = append(words, switched("keep", req.Keep)...)
 	words = append(words, output.FlagWords(output.FlagValue{Name: "on-conflict", Value: string(req.OnConflict)})...)
 	for _, answer := range req.Remember {
 		words = append(words, output.FlagWords(output.FlagValue{Name: "remember", Value: answer})...)
@@ -36,17 +36,12 @@ func (l extractLine) String() string {
 	return strings.Join(words, " ")
 }
 
-type switchParams struct {
-	Name  string
-	Value *bool
-}
-
-func switched(params switchParams) []string {
+func switched(name string, value *bool) []string {
 	switch {
-	case params.Value == nil:
+	case value == nil:
 		return nil
-	case *params.Value:
-		return []string{"--" + params.Name}
+	case *value:
+		return []string{"--" + name}
 	}
-	return []string{"--" + params.Name + "=false"}
+	return []string{"--" + name + "=false"}
 }

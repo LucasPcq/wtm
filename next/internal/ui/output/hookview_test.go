@@ -14,7 +14,7 @@ func TestAHookThatSucceedsLeavesOneResultLine(t *testing.T) {
 	view := newHookView(hookViewParams{W: &out, Label: "on_create · feat/x", LogPath: "/state/hooks/x.log"})
 
 	_, _ = view.Write([]byte("one\ntwo\n"))
-	view.finish(hookEnd{Label: "on_create · feat/x", Duration: 1200 * time.Millisecond})
+	view.finish("on_create · feat/x", 1200*time.Millisecond, false)
 
 	assert.Equal(t, []string{"  ✓ on_create · feat/x (1.2s)"}, finalScreen(out.String()))
 }
@@ -27,7 +27,7 @@ func TestAHookThatFailsKeepsItsTailAndPointsAtItsLog(t *testing.T) {
 		_, _ = view.Write([]byte("line " + strconv.Itoa(i) + "\n"))
 	}
 	_, _ = view.Write([]byte("progress 10%\rprogress 90%\rbroken"))
-	view.finish(hookEnd{Label: "on_create · feat/x", Duration: 300 * time.Millisecond, Failed: true})
+	view.finish("on_create · feat/x", 300*time.Millisecond, true)
 
 	assert.Equal(t, []string{
 		"  ✗ on_create · feat/x (300ms)",

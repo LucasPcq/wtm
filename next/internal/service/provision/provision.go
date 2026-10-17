@@ -56,9 +56,9 @@ type Outcome struct {
 func (s Service) Run(ctx context.Context, params Params) Outcome {
 	params.Worktree.Isolation = params.Worktree.Isolation.Effective()
 	p := &provisioning{Params: params, Service: s, hookLog: env.HookLogPath(env.HookLogPathParams{StateDir: params.Project.StateDir, Branch: params.Worktree.Branch})}
-	p.kept, p.ignored = env.Targets(env.TargetsParams{Run: params.Project.Run, Files: params.Project.EnvFiles})
+	p.kept, p.ignored = env.Targets(params.Project.Run, params.Project.EnvFiles)
 	if err := ctx.Err(); err != nil {
-		return p.outcome(Outcome{Status: domain.StatusCancelled, Reason: domain.ReasonInterrupted, Err: interrupted(interruption{Err: err})})
+		return p.outcome(Outcome{Status: domain.StatusCancelled, Reason: domain.ReasonInterrupted, Err: interrupted(err, nil)})
 	}
 	provisioned, failure := p.add(ctx)
 	if failure != nil {
@@ -108,7 +108,7 @@ func (p *provisioning) complete(ctx context.Context, provisioned Provisioned) Ou
 			err = p.do(ctx, next)
 		}
 		if err != nil {
-			return p.stopped(ctx, stop{Err: err, Phase: next.name, Provisioned: provisioned})
+			return p.stopped(ctx, err, next.name, provisioned)
 		}
 		if !numbered && provisioned.Ordinal != nil {
 			p.Report(domain.WorktreeNumbered{Worktree: p.identity(provisioned)})
@@ -124,29 +124,18 @@ func (p *provisioning) do(ctx context.Context, next phase) error {
 	return err
 }
 
-type stop struct {
-	Err         error
-	Phase       string
-	Provisioned Provisioned
-}
-
-func (p *provisioning) stopped(ctx context.Context, s stop) Outcome {
-	params := domain.Params{"phase": s.Phase}
-	failure := domain.AsError(domain.AsErrorParams{Err: s.Err, Code: "unit.phase_failed", Message: s.Phase + " failed", Params: params})
+func (p *provisioning) stopped(ctx context.Context, err error, phase string, provisioned Provisioned) Outcome {
+	params := domain.Params{"phase": phase}
+	failure := domain.AsError(domain.AsErrorParams{Err: err, Code: "unit.phase_failed", Message: phase + " failed", Params: params})
 	status := domain.StatusFailed
 	if ctx.Err() != nil {
-		failure, status = interrupted(interruption{Err: s.Err, Params: params}), domain.StatusCancelled
+		failure, status = interrupted(err, params), domain.StatusCancelled
 	}
-	return p.outcome(Outcome{Status: status, Reason: domain.ReasonIncomplete, Err: failure, Provisioned: s.Provisioned})
+	return p.outcome(Outcome{Status: status, Reason: domain.ReasonIncomplete, Err: failure, Provisioned: provisioned})
 }
 
-type interruption struct {
-	Err    error
-	Params domain.Params
-}
-
-func interrupted(i interruption) *domain.Error {
-	return &domain.Error{Kind: domain.KindCancelled, Code: domain.CodeInterrupted, Message: "interrupted", Params: i.Params, Cause: i.Err}
+func interrupted(err error, params domain.Params) *domain.Error {
+	return &domain.Error{Kind: domain.KindCancelled, Code: domain.CodeInterrupted, Message: "interrupted", Params: params, Cause: err}
 }
 
 func (p *provisioning) outcome(outcome Outcome) Outcome {

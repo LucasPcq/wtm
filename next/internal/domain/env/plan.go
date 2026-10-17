@@ -89,15 +89,10 @@ func portBases(cfg project.Run) map[portRef]int {
 	return bases
 }
 
-type planOfParams struct {
-	Links []project.EnvPortLink
-	Lines map[string][]dotenv.Line
-}
-
-func (w Writes) plan(params planOfParams) Plan {
+func (w Writes) plan(links []project.EnvPortLink, lines map[string][]dotenv.Line) Plan {
 	plan := Plan{Offset: w.worktree.Offset, Addressing: w.worktree.Addressing, PublicPort: w.worktree.PublicPort}
-	for _, group := range w.groups(params.Links) {
-		plan.Entries = append(plan.Entries, keyPlan{Writes: w, Group: group}.entry(params.Lines[group.File]))
+	for _, group := range w.groups(links) {
+		plan.Entries = append(plan.Entries, keyPlan{Writes: w, Group: group}.entry(lines[group.File]))
 	}
 	return plan
 }
@@ -140,15 +135,15 @@ type keyPlan struct {
 }
 
 func (k keyPlan) entry(lines []dotenv.Line) Entry {
-	merged := k.linkEntry(linkAt{Index: 0, Lines: lines})
-	merged.Moves = []Move{k.move(moveParams{Index: 0, Entry: merged})}
+	merged := k.linkEntry(0, lines)
+	merged.Moves = []Move{k.move(0, merged)}
 	for i := 1; i < len(k.Group.Links); i++ {
 		if merged.Status == StatusRewrite {
 			lines = applyPorts(lines, []Entry{merged})
 		}
-		next := k.linkEntry(linkAt{Index: i, Lines: lines})
+		next := k.linkEntry(i, lines)
 		merged = fold(merged, next)
-		merged.Moves = append(merged.Moves, k.move(moveParams{Index: i, Entry: next}))
+		merged.Moves = append(merged.Moves, k.move(i, next))
 	}
 	return merged
 }
@@ -157,15 +152,10 @@ func (k keyPlan) resolved(index int) int {
 	return ResolvedPort(ResolvedPortParams{Base: k.Group.Bases[index], Offset: k.worktree.Offset, Shared: k.worktree.Shared[k.Group.Links[index].Job]})
 }
 
-type moveParams struct {
-	Index int
-	Entry Entry
-}
-
-func (k keyPlan) move(params moveParams) Move {
-	link := k.Group.Links[params.Index]
-	move := Move{Port: link.Port, Job: link.Job, Base: k.Group.Bases[params.Index], Resolved: k.resolved(params.Index)}
-	if params.Entry.Addressing == project.AddressNames {
+func (k keyPlan) move(index int, entry Entry) Move {
+	link := k.Group.Links[index]
+	move := Move{Port: link.Port, Job: link.Job, Base: k.Group.Bases[index], Resolved: k.resolved(index)}
+	if entry.Addressing == project.AddressNames {
 		move.Origin = k.worktree.linkOrigin(link)
 	}
 	return move
@@ -186,21 +176,16 @@ func fold(into, next Entry) Entry {
 	return into
 }
 
-type linkAt struct {
-	Index int
-	Lines []dotenv.Line
-}
-
-func (k keyPlan) linkEntry(at linkAt) Entry {
-	link := k.Group.Links[at.Index]
-	entry := Entry{File: link.File, Key: link.Key, Port: link.Port, Base: k.Group.Bases[at.Index], Resolved: k.resolved(at.Index), Addressing: project.AddressPorts}
-	line, found := pairByKey(at.Lines, link.Key)
+func (k keyPlan) linkEntry(index int, lines []dotenv.Line) Entry {
+	link := k.Group.Links[index]
+	entry := Entry{File: link.File, Key: link.Key, Port: link.Port, Base: k.Group.Bases[index], Resolved: k.resolved(index), Addressing: project.AddressPorts}
+	line, found := pairByKey(lines, link.Key)
 	if !found {
 		entry.Status = StatusMissingKey
 		return entry
 	}
 	entry.CurrentValue = line.Value
-	if origin, planned := k.worktree.originEntry(originEntryParams{Entry: entry, Link: link}); planned {
+	if origin, planned := k.worktree.originEntry(entry, link); planned {
 		return origin
 	}
 	value := reducePortValue(reducePortParams{Value: line.Value, Base: entry.Base, Block: k.block, JobLabel: k.worktree.jobLabel(link.Job), Project: k.worktree.Project})

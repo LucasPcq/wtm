@@ -49,7 +49,7 @@ func (l Locks) Take(op domain.Operation) (*Held, error) {
 		return taken, nil
 	}
 	taken.holder = recorded
-	files, protected, err := l.try(tried{Locks: op.Locks, Asked: op})
+	files, protected, err := l.try(op.Locks, op)
 	if err != nil {
 		taken.Release()
 		return nil, err
@@ -69,7 +69,7 @@ func (h *Held) Grow(locks []domain.Lock) (bool, error) {
 	if len(missing) == 0 || !h.protected {
 		return false, nil
 	}
-	files, protected, err := h.locks.try(tried{Locks: missing, Asked: h.operation})
+	files, protected, err := h.locks.try(missing, h.operation)
 	if err != nil {
 		return false, err
 	}
@@ -86,20 +86,15 @@ func (h *Held) Release() {
 	h.holder.release()
 }
 
-type tried struct {
-	Locks []domain.Lock
-	Asked domain.Operation
-}
-
-func (l Locks) try(t tried) ([]*os.File, bool, error) {
+func (l Locks) try(locks []domain.Lock, asked domain.Operation) ([]*os.File, bool, error) {
 	var files []*os.File
-	for _, lock := range t.Locks {
+	for _, lock := range locks {
 		file, err := statefile.TryLock(statefile.TryLockParams{Path: l.lockPath(lock), Shared: lock.Mode == domain.LockShared})
 		if err != nil {
 			closeAll(files)
 		}
 		if errors.Is(err, statefile.ErrBusy) {
-			return nil, false, l.held(busy{Lock: lock, Asked: t.Asked})
+			return nil, false, l.held(lock, asked)
 		}
 		if err != nil {
 			return nil, false, nil
@@ -116,16 +111,11 @@ func closeAll(files []*os.File) {
 	}
 }
 
-type busy struct {
-	Lock  domain.Lock
-	Asked domain.Operation
-}
-
-func (l Locks) held(b busy) error {
-	key := b.Lock.Key()
+func (l Locks) held(lock domain.Lock, asked domain.Operation) error {
+	key := lock.Key()
 	params := domain.Params{"key": key, "op": unknown, "command": unknown, "pid": unknown}
 	for _, holder := range running(filepath.Join(l.StateDir, locksDir, operationsDir)) {
-		if holder.ID == b.Asked.ID || !slices.ContainsFunc(holder.Locks, func(lock domain.Lock) bool { return lock.Key() == key }) {
+		if holder.ID == asked.ID || !slices.ContainsFunc(holder.Locks, func(lock domain.Lock) bool { return lock.Key() == key }) {
 			continue
 		}
 		params = domain.Params{

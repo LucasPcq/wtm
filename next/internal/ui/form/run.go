@@ -8,14 +8,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type RunParams struct {
-	Params
-	In  io.Reader
-	Out io.Writer
-}
-
-func Run(ctx context.Context, params RunParams) error {
-	w := New(ctx, params.Params)
+func Run(ctx context.Context, params Params, in io.Reader, out io.Writer) error {
+	w := New(ctx, params)
 	script := params.Script
 	if params.DryRun {
 		if err := script.Observe(ctx); err != nil {
@@ -26,7 +20,7 @@ func Run(ctx context.Context, params RunParams) error {
 		}
 	}
 	for {
-		if err := ask(ctx, asked{Wizard: w, In: params.In, Out: params.Out}); err != nil {
+		if err := ask(ctx, w, in, out); err != nil {
 			return err
 		}
 		err := script.Apply(ctx)
@@ -37,14 +31,8 @@ func Run(ctx context.Context, params RunParams) error {
 	}
 }
 
-type asked struct {
-	Wizard *Wizard
-	In     io.Reader
-	Out    io.Writer
-}
-
-func ask(ctx context.Context, params asked) error {
-	final, err := tea.NewProgram(params.Wizard, tea.WithContext(ctx), tea.WithInput(params.In), tea.WithOutput(params.Out), tea.WithoutSignalHandler()).Run()
+func ask(ctx context.Context, wizard *Wizard, in io.Reader, out io.Writer) error {
+	final, err := tea.NewProgram(wizard, tea.WithContext(ctx), tea.WithInput(in), tea.WithOutput(out), tea.WithoutSignalHandler()).Run()
 	if err != nil {
 		return interrupted(err)
 	}

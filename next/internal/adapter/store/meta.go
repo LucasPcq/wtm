@@ -53,7 +53,7 @@ func (m Meta) Update(ctx context.Context, update worktree.MetaUpdate) (domain.Wr
 	return statefile.Update(ctx, statefile.UpdateParams{
 		Path: path,
 		Mutate: func(current []byte) (statefile.Change, error) {
-			stored, err := storedMeta(parseParams{Path: path, Current: current})
+			stored, err := storedMeta(path, current)
 			if err != nil {
 				return nil, err
 			}
@@ -71,20 +71,15 @@ func (m Meta) Update(ctx context.Context, update worktree.MetaUpdate) (domain.Wr
 }
 
 func (m Meta) LockOrdinals(ctx context.Context, do func() error) (bool, error) {
-	return statefile.WithLock(ctx, statefile.LockParams{Path: filepath.Join(m.StateDir, ordinalLock), Do: do})
+	return statefile.WithLock(ctx, filepath.Join(m.StateDir, ordinalLock), do)
 }
 
-type parseParams struct {
-	Path    string
-	Current []byte
-}
-
-func storedMeta(params parseParams) (worktree.Meta, error) {
-	stored, err := decodeMeta(params.Current)
-	if params.Current == nil || err != nil {
+func storedMeta(path string, current []byte) (worktree.Meta, error) {
+	stored, err := decodeMeta(current)
+	if current == nil || err != nil {
 		return worktree.Meta{}, nil
 	}
-	if err := statefile.Refusal(statefile.Schema{Path: params.Path, Found: stored.Schema, Supported: metaSchema}); err != nil {
+	if err := statefile.Refusal(statefile.Schema{Path: path, Found: stored.Schema, Supported: metaSchema}); err != nil {
 		return worktree.Meta{}, err
 	}
 	return stored, nil

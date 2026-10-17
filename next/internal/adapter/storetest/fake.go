@@ -230,7 +230,7 @@ func (f *Fake) Copy(_ context.Context, request env.CopyRequest) (env.Copied, err
 	if err := f.enter("Copy", request.TargetDir); err != nil {
 		return env.Copied{}, err
 	}
-	sources, warnings, err := env.Sources(env.SourcesParams{Request: request, Exists: f.exists})
+	sources, warnings, err := env.Sources(request, f.exists)
 	if err != nil {
 		return env.Copied{}, err
 	}

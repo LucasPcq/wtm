@@ -201,7 +201,7 @@ func (w *Wizard) decide(s int) mark {
 	if s == w.recapAt() {
 		return mark{asked: true}
 	}
-	return decided(settled{Standing: w.script.Steps[s].Standing(), Answered: w.answered[s]})
+	return decided(w.script.Steps[s].Standing(), w.answered[s])
 }
 
 func (w *Wizard) asks() bool {
@@ -248,7 +248,7 @@ func (w *Wizard) answer() tea.Cmd {
 	}
 	step := w.script.Steps[w.current]
 	answered := step.Answer()
-	w.marks[w.current].line = summarized(shown{Offered: step.Standing(), Shown: answered})
+	w.marks[w.current].line = summarized(step.Standing(), answered)
 	if err := w.script.Observe(w.ctx); err != nil {
 		w.err = err
 		return tea.Quit

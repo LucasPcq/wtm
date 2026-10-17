@@ -52,23 +52,17 @@ func (v *hookView) Write(p []byte) (int, error) {
 	}
 }
 
-type hookEnd struct {
-	Label    string
-	Duration time.Duration
-	Failed   bool
-}
-
-func (v *hookView) finish(end hookEnd) {
+func (v *hookView) finish(label string, took time.Duration, failed bool) {
 	v.flush()
-	failed := v.tail
+	tail := v.tail
 	v.clear()
-	result := fmt.Sprintf("%s (%s)", end.Label, duration(end.Duration))
-	if !end.Failed {
+	result := fmt.Sprintf("%s (%s)", label, duration(took))
+	if !failed {
 		SuccessLine(v.w, result)
 		return
 	}
 	ErrorLine(v.w, result)
-	for _, line := range failed {
+	for _, line := range tail {
 		Message(v.w, Indent+truncate(expandTabs(line), max(blockWidth(v.w)-len(Indent), hookMinWidth)))
 	}
 	if v.logPath != "" {

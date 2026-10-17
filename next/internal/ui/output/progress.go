@@ -140,7 +140,7 @@ func (p *Progress) phaseFinished(failed bool) {
 	if p.hook == nil {
 		return
 	}
-	p.hook.finish(hookEnd{Label: label, Duration: time.Since(p.started), Failed: failed})
+	p.hook.finish(label, time.Since(p.started), failed)
 	p.hook = nil
 	p.paint()
 }

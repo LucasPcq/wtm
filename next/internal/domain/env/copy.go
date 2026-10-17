@@ -25,11 +25,11 @@ func candidates(request CopyRequest) ([]string, error) {
 	for _, file := range request.Files {
 		switch request.Strategy {
 		case project.EnvExample:
-			paths = append(paths, templateCandidates(requestFile{Request: request, File: file})...)
+			paths = append(paths, templateCandidates(request, file)...)
 		case project.EnvMain:
 			paths = append(paths, filepath.Join(request.MainPath, file.Target))
 		case project.EnvParent:
-			paths = append(paths, parentCandidates(requestFile{Request: request, File: file})...)
+			paths = append(paths, parentCandidates(request, file)...)
 		default:
 			return nil, unknownStrategy(request.Strategy)
 		}
@@ -37,80 +37,59 @@ func candidates(request CopyRequest) ([]string, error) {
 	return paths, nil
 }
 
-type requestFile struct {
-	Request CopyRequest
-	File    project.EnvFile
-}
-
-func parentCandidates(params requestFile) []string {
-	main := filepath.Join(params.Request.MainPath, params.File.Target)
-	if params.Request.ParentPath == "" {
+func parentCandidates(request CopyRequest, file project.EnvFile) []string {
+	main := filepath.Join(request.MainPath, file.Target)
+	if request.ParentPath == "" {
 		return []string{main}
 	}
-	return []string{filepath.Join(params.Request.ParentPath, params.File.Target), main}
+	return []string{filepath.Join(request.ParentPath, file.Target), main}
 }
 
-type SourcesParams struct {
-	Request CopyRequest
-	Exists  func(path string) (bool, error)
-}
-
-func Sources(params SourcesParams) ([]Source, []CopyWarning, error) {
-	paths, err := candidates(params.Request)
+func Sources(request CopyRequest, exists func(path string) (bool, error)) ([]Source, []CopyWarning, error) {
+	paths, err := candidates(request)
 	if err != nil {
 		return nil, nil, err
 	}
 	present := map[string]bool{}
 	for _, path := range paths {
-		exists, err := params.Exists(path)
+		found, err := exists(path)
 		if err != nil {
 			return nil, nil, err
 		}
-		present[path] = exists
+		present[path] = found
 	}
-	return sourcesOf(presentParams{Request: params.Request, Present: present})
+	return sourcesOf(request, present)
 }
 
-type presentParams struct {
-	Request CopyRequest
-	Present map[string]bool
-}
-
-func sourcesOf(params presentParams) ([]Source, []CopyWarning, error) {
+func sourcesOf(request CopyRequest, present map[string]bool) ([]Source, []CopyWarning, error) {
 	var sources []Source
 	var warnings []CopyWarning
-	for _, file := range params.Request.Files {
-		from, fileWarnings, err := sourceOf(sourceOfParams{presentParams: params, File: file})
+	for _, file := range request.Files {
+		from, fileWarnings, err := sourceOf(request, present, file)
 		if err != nil {
 			return nil, nil, err
 		}
 		warnings = append(warnings, fileWarnings...)
 		if from != "" {
-			sources = append(sources, Source{From: from, To: filepath.Join(params.Request.TargetDir, file.Target)})
+			sources = append(sources, Source{From: from, To: filepath.Join(request.TargetDir, file.Target)})
 		}
 	}
 	return sources, warnings, nil
 }
 
-type sourceOfParams struct {
-	presentParams
-	File project.EnvFile
-}
-
-func sourceOf(params sourceOfParams) (string, []CopyWarning, error) {
-	request := params.Request
+func sourceOf(request CopyRequest, present map[string]bool, file project.EnvFile) (string, []CopyWarning, error) {
 	switch request.Strategy {
 	case project.EnvExample:
-		from := template(templateParams{Candidates: templateCandidates(requestFile{Request: request, File: params.File}), Present: params.Present})
+		from := template(templateCandidates(request, file), present)
 		if from == "" {
-			return "", []CopyWarning{NoTemplate{Target: params.File.Target}}, nil
+			return "", []CopyWarning{NoTemplate{Target: file.Target}}, nil
 		}
 		return from, nil, nil
 	case project.EnvMain:
-		from, warnings := inDir(inDirParams{Dir: request.MainPath, Target: params.File.Target, Present: params.Present})
+		from, warnings := inDir(inDirParams{Dir: request.MainPath, Target: file.Target, Present: present})
 		return from, warnings, nil
 	case project.EnvParent:
-		from, warnings := fromParent(params)
+		from, warnings := fromParent(request, present, file)
 		return from, warnings, nil
 	}
 	return "", nil, unknownStrategy(request.Strategy)
@@ -130,17 +109,17 @@ func inDir(params inDirParams) (string, []CopyWarning) {
 	return path, nil
 }
 
-func fromParent(params sourceOfParams) (string, []CopyWarning) {
-	main := inDirParams{Dir: params.Request.MainPath, Target: params.File.Target, Present: params.Present}
-	if params.Request.ParentPath == "" {
+func fromParent(request CopyRequest, present map[string]bool, file project.EnvFile) (string, []CopyWarning) {
+	main := inDirParams{Dir: request.MainPath, Target: file.Target, Present: present}
+	if request.ParentPath == "" {
 		return inDir(main)
 	}
-	path := filepath.Join(params.Request.ParentPath, params.File.Target)
-	if params.Present[path] {
+	path := filepath.Join(request.ParentPath, file.Target)
+	if present[path] {
 		return path, nil
 	}
 	fallback, warnings := inDir(main)
-	return fallback, append([]CopyWarning{ParentFallback{Target: params.File.Target}}, warnings...)
+	return fallback, append([]CopyWarning{ParentFallback{Target: file.Target}}, warnings...)
 }
 
 func unknownStrategy(strategy project.EnvStrategy) error {
@@ -155,8 +134,8 @@ type Copied struct {
 
 var templateSuffixes = [...]string{".example", ".dist", ".sample", ".template", ".tmpl"}
 
-func templateCandidates(params requestFile) []string {
-	dir, file := params.Request.MainPath, params.File
+func templateCandidates(request CopyRequest, file project.EnvFile) []string {
+	dir := request.MainPath
 	if file.Template != "" {
 		return []string{filepath.Join(dir, file.Template)}
 	}
@@ -167,14 +146,9 @@ func templateCandidates(params requestFile) []string {
 	return candidates
 }
 
-type templateParams struct {
-	Candidates []string
-	Present    map[string]bool
-}
-
-func template(params templateParams) string {
-	for _, candidate := range params.Candidates {
-		if params.Present[candidate] {
+func template(candidates []string, present map[string]bool) string {
+	for _, candidate := range candidates {
+		if present[candidate] {
 			return candidate
 		}
 	}

@@ -33,6 +33,6 @@ type ran struct {
 
 func runForm(ctx context.Context, params formParams) (ran, error) {
 	w := newWizard(ctx, wizardParams{App: params.App, Request: params.Request, DryRun: params.DryRun, Report: params.Report})
-	err := form.Run(ctx, form.RunParams{Params: w.form(), In: params.In, Out: params.Out})
+	err := form.Run(ctx, w.form(), params.In, params.Out)
 	return ran{Outcome: w.outcome, Request: w.req}, err
 }

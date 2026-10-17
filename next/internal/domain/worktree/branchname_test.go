@@ -124,7 +124,7 @@ func TestABranchClashesWithALiveOneSharingADerivedName(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			clash, found := ClashWith(ClashParams{Branch: tc.branch, Live: tc.live})
+			clash, found := ClashWith(tc.branch, tc.live)
 
 			assert.Equal(t, tc.found, found)
 			assert.Equal(t, tc.want, clash)

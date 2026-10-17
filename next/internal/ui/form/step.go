@@ -41,13 +41,7 @@ type mark struct {
 	line  string
 }
 
-type settled struct {
-	Standing Standing
-	Answered bool
-}
-
-func decided(s settled) mark {
-	st := s.Standing
+func decided(st Standing, answered bool) mark {
 	value := cmp.Or(st.Value, none)
 	switch {
 	case st.Skip != "":
@@ -56,7 +50,7 @@ func decided(s settled) mark {
 		return mark{asked: true}
 	case st.Flag != "":
 		return mark{line: value + trail + st.Flag}
-	case s.Answered:
+	case answered:
 		return mark{line: value}
 	case st.Origin == domain.OriginRemembered:
 		return mark{line: value + trail + string(domain.OriginRemembered)}
@@ -64,15 +58,10 @@ func decided(s settled) mark {
 	return mark{asked: true}
 }
 
-type shown struct {
-	Offered Standing
-	Shown   string
-}
-
-func summarized(s shown) string {
-	kept := s.Offered.Origin == domain.OriginConfig || s.Offered.Origin == domain.OriginDefault
-	if kept && s.Shown == s.Offered.Value {
-		return s.Shown + trail + string(s.Offered.Origin)
+func summarized(offered Standing, shown string) string {
+	kept := offered.Origin == domain.OriginConfig || offered.Origin == domain.OriginDefault
+	if kept && shown == offered.Value {
+		return shown + trail + string(offered.Origin)
 	}
-	return s.Shown
+	return shown
 }

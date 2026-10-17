@@ -29,7 +29,7 @@ func (EnvFiles) Read(path string) ([]dotenv.Line, error) {
 }
 
 func (EnvFiles) Copy(ctx context.Context, request env.CopyRequest) (env.Copied, error) {
-	sources, warnings, err := env.Sources(env.SourcesParams{Request: request, Exists: exists})
+	sources, warnings, err := env.Sources(request, exists)
 	if err != nil {
 		return env.Copied{}, err
 	}

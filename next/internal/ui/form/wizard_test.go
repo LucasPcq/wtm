@@ -160,7 +160,7 @@ func TestADryRunWithNothingToAskAppliesWithoutDrawing(t *testing.T) {
 	f.second.standing = Standing{Skip: "no"}
 	var out bytes.Buffer
 
-	err := Run(t.Context(), RunParams{Params: Params{Script: f.script(), DryRun: true}, In: &bytes.Buffer{}, Out: &out})
+	err := Run(t.Context(), Params{Script: f.script(), DryRun: true}, &bytes.Buffer{}, &out)
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, f.applied)
@@ -173,7 +173,7 @@ func TestAFailedObserveEndsTheRun(t *testing.T) {
 	script := f.script()
 	script.Observe = func(context.Context) error { return failed }
 
-	err := Run(t.Context(), RunParams{Params: Params{Script: script, DryRun: true}, In: &bytes.Buffer{}, Out: &bytes.Buffer{}})
+	err := Run(t.Context(), Params{Script: script, DryRun: true}, &bytes.Buffer{}, &bytes.Buffer{})
 
 	assert.ErrorIs(t, err, failed)
 	assert.Zero(t, f.applied)

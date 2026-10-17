@@ -97,7 +97,7 @@ func New(open func(ctx context.Context) (Project, error)) *cobra.Command {
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		invalid := domain.Invalid(nil)
 		invalid.Cause = err
-		return c.fail(cmd, refusal{Err: invalid})
+		return c.fail(cmd, invalid, extract.Request{})
 	})
 	return cmd
 }
@@ -108,12 +108,12 @@ func (c *extractCommand) run(cmd *cobra.Command, args []string) error {
 	if c.output != uicli.OutputText && c.output != uicli.OutputJSON {
 		refused := domain.InvalidMessage(`invalid --output "` + c.output + `": expected one of text, json`)
 		c.output = uicli.OutputText
-		return c.fail(cmd, refusal{Err: refused, Request: req})
+		return c.fail(cmd, refused, req)
 	}
 	ctx := cmd.Context()
 	project, err := c.open(ctx)
 	if err != nil {
-		return c.fail(cmd, refusal{Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: req})
+		return c.fail(cmd, domain.AsError(domain.AsErrorParams{Err: err}), req)
 	}
 	_, stderr := c.streams(cmd)
 	progress := output.NewProgress(ctx, output.ProgressParams{W: stderr, Human: c.human(), Live: output.IsTerminal(stderr)})
@@ -170,33 +170,27 @@ func (c *extractCommand) conclude(cmd *cobra.Command, done concluded) error {
 	outcome := done.Outcome
 	switch {
 	case done.Err != nil:
-		return c.fail(cmd, refusal{Err: done.Err, Request: done.Request})
+		return c.fail(cmd, done.Err, done.Request)
 	case outcome.Result == nil && outcome.Plan.Nothing():
 		output.Frame(stdout, func(w io.Writer) { drawNothing(w, outcome.Plan) })
 		return nil
 	case outcome.Result == nil:
 		apply := extractLine{Command: cmd.CommandPath(), Request: done.Request}.String() + " --expect-fingerprint " + outcome.Fingerprint
-		output.Frame(stdout, func(w io.Writer) { drawDryRun(w, dryRunParams{Outcome: outcome, Apply: apply}) })
+		output.Frame(stdout, func(w io.Writer) { drawDryRun(w, outcome, apply) })
 		return nil
 	}
-	output.Frame(stdout, func(w io.Writer) { drawOutcome(w, outcomeParams{Outcome: outcome, Cwd: done.Cwd}) })
+	output.Frame(stdout, func(w io.Writer) { drawOutcome(w, outcome, done.Cwd) })
 	return c.failed(outcome.Failure())
 }
 
-type refusal struct {
-	Err     *domain.Error
-	Request extract.Request
-}
-
-func (c *extractCommand) fail(cmd *cobra.Command, refused refusal) error {
-	failure := refused.Err
+func (c *extractCommand) fail(cmd *cobra.Command, failure *domain.Error, req extract.Request) error {
 	if !c.human() {
 		return c.envelope(cmd, envelopeParams{Err: failure})
 	}
 	_, stderr := c.streams(cmd)
 	var next []output.NextStep
 	if failure.Code == operation.CodePlanStale {
-		next = []output.NextStep{{Command: extractLine{Command: cmd.CommandPath(), Request: refused.Request}.String() + " --dry-run", Note: output.ReplanNote}}
+		next = []output.NextStep{{Command: extractLine{Command: cmd.CommandPath(), Request: req}.String() + " --dry-run", Note: output.ReplanNote}}
 	}
 	output.Frame(stderr, func(w io.Writer) {
 		output.Failure(w, output.FailureParams{Err: failure, Next: next, Flags: extractFlags})

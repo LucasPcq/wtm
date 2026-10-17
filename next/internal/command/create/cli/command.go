@@ -96,7 +96,7 @@ func New(open func(ctx context.Context) (Project, error)) *cobra.Command {
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		invalid := domain.Invalid(nil)
 		invalid.Cause = err
-		return c.fail(cmd, refusal{Err: invalid})
+		return c.fail(cmd, invalid, create.Request{})
 	})
 	return cmd
 }
@@ -107,33 +107,27 @@ func (c *createCommand) run(cmd *cobra.Command, args []string) error {
 	if c.output != uicli.OutputText && c.output != uicli.OutputJSON {
 		refused := domain.InvalidMessage(`invalid --output "` + c.output + `": expected one of text, json`)
 		c.output = uicli.OutputText
-		return c.fail(cmd, refusal{Err: refused, Request: req})
+		return c.fail(cmd, refused, req)
 	}
 	ctx := cmd.Context()
 	project, err := c.open(ctx)
 	if err != nil {
-		return c.fail(cmd, refusal{Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: req})
+		return c.fail(cmd, domain.AsError(domain.AsErrorParams{Err: err}), req)
 	}
 	_, stderr := c.streams(cmd)
 	progress := output.NewProgress(ctx, output.ProgressParams{W: stderr, Human: c.human(), Live: output.IsTerminal(stderr)})
-	ran, err := c.create(cmd, creating{UseCase: project.UseCase, Request: req, Report: progress.Report})
+	ran, err := c.create(cmd, project.UseCase, req, progress.Report)
 	progress.Close()
 	return c.conclude(cmd, concluded{Outcome: ran.Outcome, Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: ran.Request, Cwd: project.Cwd})
 }
 
-type creating struct {
-	UseCase create.UseCase
-	Request create.Request
-	Report  domain.Report
-}
-
-func (c *createCommand) create(cmd *cobra.Command, params creating) (ran, error) {
+func (c *createCommand) create(cmd *cobra.Command, useCase create.UseCase, req create.Request, report domain.Report) (ran, error) {
 	ctx := cmd.Context()
 	if c.interactive(cmd) {
-		return runForm(ctx, formParams{App: params.UseCase, Request: params.Request, DryRun: c.dryRun, Report: params.Report, In: cmd.InOrStdin(), Out: cmd.ErrOrStderr()})
+		return runForm(ctx, formParams{App: useCase, Request: req, DryRun: c.dryRun, Report: report, In: cmd.InOrStdin(), Out: cmd.ErrOrStderr()})
 	}
-	outcome, err := params.UseCase.Run(ctx, params.Request, operation.Options{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, Report: params.Report})
-	return ran{Outcome: outcome, Request: params.Request}, err
+	outcome, err := useCase.Run(ctx, req, operation.Options{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, Report: report})
+	return ran{Outcome: outcome, Request: req}, err
 }
 
 func (c *createCommand) request(cmd *cobra.Command, args []string) create.Request {
@@ -185,33 +179,27 @@ func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
 	line := createLine{Command: cmd.CommandPath(), Request: done.Request}
 	switch {
 	case done.Err != nil:
-		return c.fail(cmd, refusal{Err: done.Err, Request: done.Request})
+		return c.fail(cmd, done.Err, done.Request)
 	case done.Outcome.Result == nil:
 		apply := line.String() + " --expect-fingerprint " + done.Outcome.Fingerprint
-		output.Frame(stdout, func(w io.Writer) { drawDryRun(w, dryRunParams{Outcome: done.Outcome, Apply: apply}) })
+		output.Frame(stdout, func(w io.Writer) { drawDryRun(w, done.Outcome, apply) })
 		return nil
 	}
 	followUps := itemFollowUps(done.Outcome.Result.Items)
 	output.Frame(stdout, func(w io.Writer) {
-		drawOutcome(w, outcomeParams{Outcome: done.Outcome, FollowUps: followUps, Cwd: done.Cwd})
+		drawOutcome(w, done.Outcome, followUps, done.Cwd)
 	})
 	return c.failed(cmp.Or(done.Err, done.Outcome.Failure()))
 }
 
-type refusal struct {
-	Err     *domain.Error
-	Request create.Request
-}
-
-func (c *createCommand) fail(cmd *cobra.Command, refused refusal) error {
-	failure := refused.Err
+func (c *createCommand) fail(cmd *cobra.Command, failure *domain.Error, req create.Request) error {
 	if !c.human() {
-		return c.envelope(cmd, envelopeParams{Err: refused.Err})
+		return c.envelope(cmd, envelopeParams{Err: failure})
 	}
 	_, stderr := c.streams(cmd)
 	var next []output.NextStep
 	if failure.Code == operation.CodePlanStale {
-		next = []output.NextStep{{Command: createLine{Command: cmd.CommandPath(), Request: refused.Request}.String() + " --dry-run", Note: output.ReplanNote}}
+		next = []output.NextStep{{Command: createLine{Command: cmd.CommandPath(), Request: req}.String() + " --dry-run", Note: output.ReplanNote}}
 	}
 	output.Frame(stderr, func(w io.Writer) {
 		output.Failure(w, output.FailureParams{Err: failure, Next: next, Flags: createFlags})

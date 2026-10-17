@@ -18,38 +18,32 @@ func permOf(info os.FileInfo, perm os.FileMode) os.FileMode {
 	return perm
 }
 
-type replaceParams struct {
-	Path string
-	Data []byte
-	Perm os.FileMode
-}
-
-func replace(params replaceParams) error {
-	dir := filepath.Dir(params.Path)
-	tmp, err := os.CreateTemp(dir, "."+filepath.Base(params.Path)+".*")
+func replace(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".*")
 	if err != nil {
-		return fmt.Errorf("write %s: %w", params.Path, err)
+		return fmt.Errorf("write %s: %w", path, err)
 	}
 	defer os.Remove(tmp.Name())
-	if err := writeSynced(tmp, params); err != nil {
+	if err := writeSynced(tmp, data, perm); err != nil {
 		tmp.Close()
-		return fmt.Errorf("write %s: %w", params.Path, err)
+		return fmt.Errorf("write %s: %w", path, err)
 	}
 	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("write %s: %w", params.Path, err)
+		return fmt.Errorf("write %s: %w", path, err)
 	}
-	if err := os.Rename(tmp.Name(), params.Path); err != nil {
-		return fmt.Errorf("write %s: %w", params.Path, err)
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
 	}
 	syncDir(dir)
 	return nil
 }
 
-func writeSynced(tmp *os.File, params replaceParams) error {
-	if _, err := tmp.Write(params.Data); err != nil {
+func writeSynced(tmp *os.File, data []byte, perm os.FileMode) error {
+	if _, err := tmp.Write(data); err != nil {
 		return err
 	}
-	if err := tmp.Chmod(params.Perm); err != nil {
+	if err := tmp.Chmod(perm); err != nil {
 		return err
 	}
 	return tmp.Sync()

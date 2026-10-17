@@ -50,12 +50,12 @@ func (w settling) expand(link project.EnvValueLink) (string, error) {
 	if !found {
 		return "", fmt.Errorf("env %s in %s: no job named %q", link.Key, link.File, link.Job)
 	}
-	value, err := w.expandPorts(valueOf{Link: link, Job: job})
+	value, err := w.expandPorts(link, job)
 	if err != nil {
 		return "", err
 	}
 	if strings.Contains(value, tokenNamespace) {
-		namespace, err := w.linkNamespace(valueOf{Link: link, Job: job})
+		namespace, err := w.linkNamespace(link, job)
 		if err != nil {
 			return "", err
 		}
@@ -75,13 +75,8 @@ func (w settling) expand(link project.EnvValueLink) (string, error) {
 	return value, nil
 }
 
-type valueOf struct {
-	Link project.EnvValueLink
-	Job  project.Job
-}
-
-func (w settling) expandPorts(params valueOf) (string, error) {
-	value := params.Link.Value
+func (w settling) expandPorts(link project.EnvValueLink, job project.Job) (string, error) {
+	value := link.Value
 	for {
 		before, rest, found := strings.Cut(value, tokenPortPrefix)
 		if !found {
@@ -89,24 +84,24 @@ func (w settling) expandPorts(params valueOf) (string, error) {
 		}
 		name, after, closed := strings.Cut(rest, "}")
 		if !closed {
-			return "", fmt.Errorf("env %s in %s: a {port.…} placeholder is never closed", params.Link.Key, params.Link.File)
+			return "", fmt.Errorf("env %s in %s: a {port.…} placeholder is never closed", link.Key, link.File)
 		}
-		base, declared := params.Job.Ports[name]
+		base, declared := job.Ports[name]
 		if !declared {
-			return "", fmt.Errorf("env %s in %s: job %q declares no port named %q", params.Link.Key, params.Link.File, params.Job.Name, name)
+			return "", fmt.Errorf("env %s in %s: job %q declares no port named %q", link.Key, link.File, job.Name, name)
 		}
-		port := ResolvedPort(ResolvedPortParams{Base: base, Offset: w.Offset, Shared: params.Job.Scope == project.Shared})
+		port := ResolvedPort(ResolvedPortParams{Base: base, Offset: w.Offset, Shared: job.Scope == project.Shared})
 		value = before + strconv.Itoa(port) + after
 	}
 }
 
-func (w settling) linkNamespace(params valueOf) (string, error) {
-	if params.Job.Namespace == nil {
-		return "", fmt.Errorf("env %s in %s: job %q declares no [job.namespace], so {namespace} means nothing", params.Link.Key, params.Link.File, params.Job.Name)
+func (w settling) linkNamespace(link project.EnvValueLink, job project.Job) (string, error) {
+	if job.Namespace == nil {
+		return "", fmt.Errorf("env %s in %s: job %q declares no [job.namespace], so {namespace} means nothing", link.Key, link.File, job.Name)
 	}
-	name, err := w.namespace(*params.Job.Namespace)
+	name, err := w.namespace(*job.Namespace)
 	if err != nil {
-		return "", fmt.Errorf("env %s in %s: %v", params.Link.Key, params.Link.File, err)
+		return "", fmt.Errorf("env %s in %s: %v", link.Key, link.File, err)
 	}
 	return name, nil
 }

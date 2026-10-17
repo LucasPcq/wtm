@@ -12,16 +12,11 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
-type NeedsOrdinalParams struct {
-	Isolation project.Isolation
-	Run       project.Run
-}
-
-func NeedsOrdinal(params NeedsOrdinalParams) bool {
-	if params.Isolation.Effective() == project.Verbatim {
+func NeedsOrdinal(isolation project.Isolation, run project.Run) bool {
+	if isolation.Effective() == project.Verbatim {
 		return false
 	}
-	return len(params.Run.EnvPorts) > 0 || len(params.Run.EnvValues) > 0
+	return len(run.EnvPorts) > 0 || len(run.EnvValues) > 0
 }
 
 type ResolveParams struct {
@@ -43,8 +38,8 @@ func Resolve(params ResolveParams) (Writes, error) {
 	if params.Isolation.Effective() == project.Verbatim {
 		return Writes{}, nil
 	}
-	kept, _ := Targets(TargetsParams{Run: params.Run, Files: params.Files})
-	owned := ownedWrites(ownedWritesParams{Run: kept, Files: params.Files, ComposeProject: params.ComposeProject()})
+	kept, _ := Targets(params.Run, params.Files)
+	owned := ownedWrites(kept, params.Files, params.ComposeProject())
 	if len(kept.EnvPorts) == 0 && len(kept.EnvValues) == 0 {
 		return Writes{owned: owned}, nil
 	}
@@ -97,16 +92,11 @@ func (w Writes) Creates(file string) bool {
 	return slices.ContainsFunc(w.owned, func(entry OwnedEntry) bool { return entry.File == file })
 }
 
-type EditParams struct {
-	File  string
-	Lines []dotenv.Line
-}
-
-func (w Writes) Edit(params EditParams) []dotenv.Line {
-	plan := w.plan(planOfParams{Links: w.linksIn(params.File), Lines: map[string][]dotenv.Line{params.File: params.Lines}})
-	lines := applyPorts(params.Lines, plan.Entries)
+func (w Writes) Edit(file string, lines []dotenv.Line) []dotenv.Line {
+	plan := w.plan(w.linksIn(file), map[string][]dotenv.Line{file: lines})
+	lines = applyPorts(lines, plan.Entries)
 	for _, entry := range w.owned {
-		if entry.File == params.File {
+		if entry.File == file {
 			lines, _ = dotenv.Set(dotenv.SetParams{Lines: lines, Key: entry.Key, Value: entry.Value})
 		}
 	}
@@ -117,7 +107,7 @@ func (w Writes) Settled(read map[string][]dotenv.Line) Plan {
 	if w.Empty() {
 		return Plan{}
 	}
-	plan := w.plan(planOfParams{Links: w.links, Lines: read})
+	plan := w.plan(w.links, read)
 	plan.Owned = w.ownedOver(read)
 	plan.Applied = true
 	return plan

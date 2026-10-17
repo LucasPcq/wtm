@@ -20,20 +20,15 @@ const (
 //go:embed project.schema.json
 var projectSchemaJSON []byte
 
-type RememberParams struct {
-	StateDir string
-	Answers  map[string]string
-}
-
-func Remember(ctx context.Context, params RememberParams) (domain.Written, error) {
-	if len(params.Answers) == 0 {
+func Remember(ctx context.Context, stateDir string, answers map[string]string) (domain.Written, error) {
+	if len(answers) == 0 {
 		return domain.Written{}, nil
 	}
-	path := filepath.Join(params.StateDir, configFileName)
+	path := filepath.Join(stateDir, configFileName)
 	written, err := statefile.Update(ctx, statefile.UpdateParams{
 		Path: path,
 		Mutate: func(current []byte) (statefile.Change, error) {
-			next, err := remembered(rememberedParams{Path: path, Current: current, Answers: params.Answers})
+			next, err := remembered(path, current, answers)
 			if err != nil {
 				return nil, err
 			}
@@ -43,41 +38,35 @@ func Remember(ctx context.Context, params RememberParams) (domain.Written, error
 	if err != nil {
 		return domain.Written{}, err
 	}
-	return written, writeSchema(ctx, params.StateDir)
+	return written, writeSchema(ctx, stateDir)
 }
 
-type rememberedParams struct {
-	Path    string
-	Current []byte
-	Answers map[string]string
-}
-
-func remembered(params rememberedParams) ([]byte, error) {
-	if params.Current == nil {
+func remembered(path string, current []byte, answers map[string]string) ([]byte, error) {
+	if current == nil {
 		return nil, project.ErrConfigNotFound
 	}
-	if err := refuseNewer(parseParams{Path: params.Path, Data: params.Current}); err != nil {
+	if err := refuseNewer(path, current); err != nil {
 		return nil, err
 	}
-	saved, err := parseProject(parseParams{Path: params.Path, Data: params.Current})
+	saved, err := parseProject(path, current)
 	if err != nil {
 		return nil, err
 	}
-	answers := map[string]string{}
-	maps.Copy(answers, saved.Config.Remembered)
-	maps.Copy(answers, params.Answers)
-	saved.Config.Remembered = answers
+	merged := map[string]string{}
+	maps.Copy(merged, saved.Config.Remembered)
+	maps.Copy(merged, answers)
+	saved.Config.Remembered = merged
 	return render(saved)
 }
 
-func refuseNewer(params parseParams) error {
+func refuseNewer(path string, data []byte) error {
 	var file struct {
 		Schema int `toml:"schema"`
 	}
-	if _, err := toml.Decode(string(params.Data), &file); err != nil {
+	if _, err := toml.Decode(string(data), &file); err != nil {
 		return nil
 	}
-	return statefile.Refusal(statefile.Schema{Path: params.Path, Found: file.Schema, Supported: projectSchema})
+	return statefile.Refusal(statefile.Schema{Path: path, Found: file.Schema, Supported: projectSchema})
 }
 
 func writeSchema(ctx context.Context, stateDir string) error {

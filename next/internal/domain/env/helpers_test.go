@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func sources(t *testing.T, params SourcesParams) ([]Source, []CopyWarning) {
+func sources(t *testing.T, request CopyRequest, exists func(string) (bool, error)) ([]Source, []CopyWarning) {
 	t.Helper()
-	found, warnings, err := Sources(params)
+	found, warnings, err := Sources(request, exists)
 	require.NoError(t, err)
 	return found, warnings
 }
@@ -31,10 +31,10 @@ type planOneParams struct {
 
 func planOne(t *testing.T, params planOneParams) Entry {
 	t.Helper()
-	plan := Writes{bases: map[portRef]int{{Job: "svc", Name: "DB_PORT"}: params.Base}, block: 10, worktree: settling{Offset: params.Offset}}.plan(planOfParams{
-		Links: []project.EnvPortLink{{File: ".env", Key: "URL", Job: "svc", Port: "DB_PORT"}},
-		Lines: map[string][]dotenv.Line{".env": dotenv.Parse([]byte(params.Content))},
-	})
+	plan := Writes{bases: map[portRef]int{{Job: "svc", Name: "DB_PORT"}: params.Base}, block: 10, worktree: settling{Offset: params.Offset}}.plan(
+		[]project.EnvPortLink{{File: ".env", Key: "URL", Job: "svc", Port: "DB_PORT"}},
+		map[string][]dotenv.Line{".env": dotenv.Parse([]byte(params.Content))},
+	)
 	require.Len(t, plan.Entries, 1)
 	return plan.Entries[0]
 }
@@ -80,7 +80,7 @@ func applyWrites(writes Writes, files map[string]string) appliedWrites {
 			lines = dotenv.Parse([]byte(content))
 		}
 		read[file] = lines
-		written := string(dotenv.Render(writes.Edit(EditParams{File: file, Lines: lines})))
+		written := string(dotenv.Render(writes.Edit(file, lines)))
 		if present && written == content {
 			continue
 		}

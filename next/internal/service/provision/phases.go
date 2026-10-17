@@ -21,11 +21,11 @@ func (p *provisioning) needsOrdinal() bool {
 }
 
 func (p *provisioning) portsNeedOrdinal() bool {
-	return env.NeedsOrdinal(env.NeedsOrdinalParams{Isolation: p.Worktree.Isolation, Run: p.kept})
+	return env.NeedsOrdinal(p.Worktree.Isolation, p.kept)
 }
 
 func (p *provisioning) hooksReadRun() bool {
-	return len(p.Project.OnCreate) > 0 && env.HooksReadRun(env.HooksReadRunParams{Run: p.Project.Run, Isolation: p.Worktree.Isolation})
+	return len(p.Project.OnCreate) > 0 && env.HooksReadRun(p.Project.Run, p.Worktree.Isolation)
 }
 
 func (p *provisioning) number(ctx context.Context, provisioned *Provisioned) error {
@@ -94,7 +94,7 @@ func (p *provisioning) settlesPorts() bool {
 	case len(p.kept.EnvPorts) > 0 || len(p.kept.EnvValues) > 0:
 		return true
 	}
-	return len(env.OwnedTargets(env.OwnedTargetsParams{Run: p.kept, Files: p.Project.EnvFiles})) > 0
+	return len(env.OwnedTargets(p.kept, p.Project.EnvFiles)) > 0
 }
 
 func (p *provisioning) settle(ctx context.Context, provisioned *Provisioned) error {
@@ -150,7 +150,7 @@ func (p *provisioning) apply(ctx context.Context, writes env.Writes) (env.Plan, 
 			Create: writes.Creates(file),
 			Edit: func(lines []dotenv.Line) []dotenv.Line {
 				read[file] = lines
-				return writes.Edit(env.EditParams{File: file, Lines: lines})
+				return writes.Edit(file, lines)
 			},
 		})
 		if err != nil {
@@ -224,5 +224,5 @@ func (p *provisioning) hookEnv(ordinal *int) map[string]string {
 		}
 		compose = append(compose, lines)
 	}
-	return env.HookEnv(env.HookEnvParams{JobParams: p.jobParams(ordinal), ComposeEnv: compose})
+	return env.HookEnv(p.jobParams(ordinal), compose)
 }

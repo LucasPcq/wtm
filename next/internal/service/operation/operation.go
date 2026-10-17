@@ -34,12 +34,6 @@ type Options struct {
 	Report            domain.Report
 }
 
-type BeginParams struct {
-	Command string
-	Locks   []domain.Lock
-	Options Options
-}
-
 type Op struct {
 	ID      string
 	record  domain.Operation
@@ -49,22 +43,22 @@ type Op struct {
 	report  domain.Report
 }
 
-func (s Service) Begin(params BeginParams) (*Op, error) {
+func (s Service) Begin(command string, locks []domain.Lock, opts Options) (*Op, error) {
 	op := &Op{
 		record: domain.Operation{
 			ID:            s.NewOpID(),
 			PID:           os.Getpid(),
-			Command:       params.Command,
-			Surface:       params.Options.Surface,
+			Command:       command,
+			Surface:       opts.Surface,
 			CorrelationID: s.CorrelationID,
 			StartedAt:     s.Now().UTC(),
-			Locks:         params.Locks,
+			Locks:         locks,
 		},
 		service: s,
-		options: params.Options,
+		options: opts,
 	}
 	op.ID = op.record.ID
-	if params.Options.DryRun {
+	if opts.DryRun {
 		return op, nil
 	}
 	hold, err := s.Locker.Take(op.record)

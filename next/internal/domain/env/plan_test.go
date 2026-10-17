@@ -62,10 +62,10 @@ func TestABaseNeverMatchesInsideALongerNumber(t *testing.T) {
 }
 
 func TestALinkToAnUndeclaredPortIsLeftOutOfThePlan(t *testing.T) {
-	plan := Writes{bases: map[portRef]int{{Job: "svc", Name: "DB_PORT"}: 5432}, block: 10, worktree: settling{Offset: 10}}.plan(planOfParams{
-		Links: []project.EnvPortLink{{File: ".env", Key: "URL", Job: "svc", Port: "GONE"}},
-		Lines: map[string][]dotenv.Line{".env": dotenv.Parse([]byte("URL=5432\n"))},
-	})
+	plan := Writes{bases: map[portRef]int{{Job: "svc", Name: "DB_PORT"}: 5432}, block: 10, worktree: settling{Offset: 10}}.plan(
+		[]project.EnvPortLink{{File: ".env", Key: "URL", Job: "svc", Port: "GONE"}},
+		map[string][]dotenv.Line{".env": dotenv.Parse([]byte("URL=5432\n"))},
+	)
 
 	assert.Empty(t, plan.Entries)
 }
@@ -105,14 +105,14 @@ func TestApplyingThePlanKeepsEveryByteAroundTheValues(t *testing.T) {
 		{Job: "api", Name: "PORT"}:   4002,
 		{Job: "redis", Name: "PORT"}: 6379,
 		{Job: "minio", Name: "PORT"}: 9000,
-	}, block: 10, worktree: settling{Offset: 10}}.plan(planOfParams{
-		Links: []project.EnvPortLink{
+	}, block: 10, worktree: settling{Offset: 10}}.plan(
+		[]project.EnvPortLink{
 			{File: ".env", Key: "API_PORT", Job: "api", Port: "PORT"},
 			{File: ".env", Key: "REDIS_URL", Job: "redis", Port: "PORT"},
 			{File: ".env", Key: "MINIO_URL", Job: "minio", Port: "PORT"},
 		},
-		Lines: map[string][]dotenv.Line{".env": lines},
-	})
+		map[string][]dotenv.Line{".env": lines},
+	)
 
 	want := "export API_PORT=4012 # api\r\n" +
 		"REDIS_URL='redis://u:pa$w0rd@localhost:6389/0'\r\n" +
@@ -175,13 +175,13 @@ func TestAKeyFollowingTwoPortsMovesBoth(t *testing.T) {
 	plan := Writes{bases: map[portRef]int{
 		{Job: "web", Name: "VITE_PORT"}:   5173,
 		{Job: "admin", Name: "VITE_PORT"}: 5174,
-	}, block: 10, worktree: settling{Offset: 10}}.plan(planOfParams{
-		Links: []project.EnvPortLink{
+	}, block: 10, worktree: settling{Offset: 10}}.plan(
+		[]project.EnvPortLink{
 			{File: ".env", Key: "CORS_ORIGIN", Job: "web", Port: "VITE_PORT"},
 			{File: ".env", Key: "CORS_ORIGIN", Job: "admin", Port: "VITE_PORT"},
 		},
-		Lines: map[string][]dotenv.Line{".env": dotenv.Parse([]byte("CORS_ORIGIN=http://localhost:5173,http://localhost:5174\n"))},
-	})
+		map[string][]dotenv.Line{".env": dotenv.Parse([]byte("CORS_ORIGIN=http://localhost:5173,http://localhost:5174\n"))},
+	)
 
 	require.Len(t, plan.Entries, 1)
 	entry := plan.Entries[0]
@@ -191,10 +191,10 @@ func TestAKeyFollowingTwoPortsMovesBoth(t *testing.T) {
 }
 
 func TestAPortNoJobDeclaresIsLeftAlone(t *testing.T) {
-	plan := Writes{bases: map[portRef]int{{Job: "web", Name: "VITE_PORT"}: 5173}, block: 10, worktree: settling{Offset: 10}}.plan(planOfParams{
-		Links: []project.EnvPortLink{{File: ".env", Key: "CORS_ORIGIN", Job: "web", Port: "VITE_PORT"}},
-		Lines: map[string][]dotenv.Line{".env": dotenv.Parse([]byte("CORS_ORIGIN=http://localhost:5173,https://app.example.com:8443\n"))},
-	})
+	plan := Writes{bases: map[portRef]int{{Job: "web", Name: "VITE_PORT"}: 5173}, block: 10, worktree: settling{Offset: 10}}.plan(
+		[]project.EnvPortLink{{File: ".env", Key: "CORS_ORIGIN", Job: "web", Port: "VITE_PORT"}},
+		map[string][]dotenv.Line{".env": dotenv.Parse([]byte("CORS_ORIGIN=http://localhost:5173,https://app.example.com:8443\n"))},
+	)
 
 	require.Len(t, plan.Entries, 1)
 	assert.Equal(t, "http://localhost:5183,https://app.example.com:8443", plan.Entries[0].NewValue)

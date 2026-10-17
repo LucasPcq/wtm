@@ -70,7 +70,7 @@ func (e *escalation) arm(params armParams) {
 		return
 	}
 	e.pgid = params.Group
-	stopping(stoppingParams{Process: e, Kill: params.Kill})
+	stopping(e, params.Kill)
 	e.timers = append(e.timers, time.AfterFunc(interruptGrace, params.Terminate), time.AfterFunc(killDelay, params.Kill))
 }
 

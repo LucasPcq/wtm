@@ -15,13 +15,13 @@ import (
 
 func TestTwoBranchesCreatedAreCountedRowedAndPointedAt(t *testing.T) {
 
-	golden(t, "outcome_two_done", rendered(func(w *bytes.Buffer) { drawOutcome(w, outcomeParams{Outcome: twoCreated(trees), Cwd: cwd}) }))
+	golden(t, "outcome_two_done", rendered(func(w *bytes.Buffer) { drawOutcome(w, twoCreated(trees), nil, cwd) }))
 }
 
 func TestAMixedRunNamesEachAnomalyAndEachUnfinishedBranch(t *testing.T) {
 
 	golden(t, "outcome_mixed", rendered(func(w *bytes.Buffer) {
-		drawOutcome(w, outcomeParams{Outcome: mixed(trees), Cwd: cwd, FollowUps: []output.NextStep{{Command: "wtm clean feat/e --force", Note: "branch feat/e is left half-created at /trees/feat-e: remove it with `wtm clean feat/e --force`"}}})
+		drawOutcome(w, mixed(trees), []output.NextStep{{Command: "wtm clean feat/e --force", Note: "branch feat/e is left half-created at /trees/feat-e: remove it with `wtm clean feat/e --force`"}}, cwd)
 	}))
 }
 
@@ -32,12 +32,12 @@ func TestARunOfOnlyOpenBranchesIsUnchanged(t *testing.T) {
 		outcome.Plan.Branches[i].Action = create.ActionUnchanged
 	}
 
-	golden(t, "outcome_unchanged", rendered(func(w *bytes.Buffer) { drawOutcome(w, outcomeParams{Outcome: outcome, Cwd: cwd}) }))
+	golden(t, "outcome_unchanged", rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, nil, cwd) }))
 }
 
 func TestARunWithNothingToDoSaysSo(t *testing.T) {
 	golden(t, "outcome_nothing", rendered(func(w *bytes.Buffer) {
-		drawOutcome(w, outcomeParams{Outcome: create.Outcome{Result: &create.Result{}}})
+		drawOutcome(w, create.Outcome{Result: &create.Result{}}, nil, "")
 	}))
 }
 
@@ -49,14 +49,14 @@ func TestADryRunShowsThePlanItsWarningsItsFingerprintAndHowToApplyIt(t *testing.
 	outcome.Warnings = []domain.Warning{{Code: "create.env_parent_fallback", Message: `The "parent" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main.`}}
 
 	golden(t, "dryrun", rendered(func(w *bytes.Buffer) {
-		drawDryRun(w, dryRunParams{Outcome: outcome, Apply: "wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567"})
+		drawDryRun(w, outcome, "wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567")
 	}))
 }
 
 func TestAPlanReadsAsItsRowsThenItsWarnings(t *testing.T) {
 	plan := twoCreated(trees).Plan
 
-	text := planTextOf(planTextParams{Plan: plan, Warnings: []domain.Warning{{Code: "create.ff_failed", Message: "couldn't fast-forward main"}}})
+	text := planTextOf(plan, []domain.Warning{{Code: "create.ff_failed", Message: "couldn't fast-forward main"}}, 0)
 
 	assert.Equal(t, "Branches  feat/a, feat/b\nFrom      main\nEnv       example\n\n! couldn't fast-forward main", text)
 }

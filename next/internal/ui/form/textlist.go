@@ -21,17 +21,11 @@ type EntryCheck struct {
 	From    int
 }
 
-type TextListParams struct {
-	Entries []string
-	Check   func(check EntryCheck) error
-	Badge   func(entry string) string
-}
-
-func NewTextList(params TextListParams) *TextList {
+func NewTextList(entries []string, check func(check EntryCheck) error, badge func(entry string) string) *TextList {
 	input := textinput.New()
 	input.Prompt = Accent.Render("› ")
 	input.Focus()
-	return &TextList{input: input, entries: append([]string(nil), params.Entries...), check: params.Check, badge: params.Badge}
+	return &TextList{input: input, entries: append([]string(nil), entries...), check: check, badge: badge}
 }
 
 func (l *TextList) Entries() []string {

@@ -25,15 +25,10 @@ type Params struct {
 	AwaitShields  func()
 }
 
-type RootParams struct {
-	Version  string
-	Commands []*cobra.Command
-}
-
 func Main(params Params) int {
 	ctx, stop := interruptible(params)
 	defer stop()
-	root := NewRoot(RootParams{Version: params.Version, Commands: params.Commands})
+	root := NewRoot(params.Version, params.Commands)
 	root.SetArgs(params.Args)
 	code := Execute(ctx, root)
 	params.KillCancelled()
@@ -41,11 +36,11 @@ func Main(params Params) int {
 	return code
 }
 
-func NewRoot(params RootParams) *cobra.Command {
+func NewRoot(version string, commands []*cobra.Command) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "wtm-next",
 		Short:         "Git worktree manager, rebuilt as slices",
-		Version:       params.Version,
+		Version:       version,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
@@ -59,7 +54,7 @@ func NewRoot(params RootParams) *cobra.Command {
 		cmd.SetOut(out)
 		output.Help(out, text.String())
 	})
-	root.AddCommand(params.Commands...)
+	root.AddCommand(commands...)
 	return root
 }
 
@@ -75,7 +70,7 @@ func Execute(ctx context.Context, root *cobra.Command) int {
 				output.QuietFailure(w, output.FailureParams{Err: failure.Err, Flags: failure.Flags})
 			})
 		}
-		return exitCode(exitParams{Failed: failure, Signalled: ctx.Err() != nil})
+		return exitCode(failure, ctx.Err() != nil)
 	}
 	usage := domain.InvalidMessage(err.Error())
 	output.Frame(stderr, func(w io.Writer) { output.Failure(w, output.FailureParams{Err: usage}) })
