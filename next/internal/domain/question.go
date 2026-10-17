@@ -39,10 +39,11 @@ type Choice[T ~string] struct {
 	Remembered T
 }
 
-// Confirm is a yes-or-no question: its answer and the reason it is not asked (Skip, empty when it is).
+// Confirm is a yes-or-no question: its answer, the reason it is not asked (Skip, empty when it is), and the answer remembered for it (nil when none).
 type Confirm struct {
 	Answer[bool]
-	Skip string
+	Skip       string
+	Remembered *bool
 }
 
 // IsolationHelp is the help of the isolation question, the same in every command that asks it.
@@ -65,6 +66,15 @@ type FastForwardParams struct {
 	Given      *bool  // nil when the request does not say
 	Skip       string // why the question is not asked, empty when it is
 	Remembered string // project.SourceUpdateFastForward or project.SourceUpdateKeep, empty when none
+}
+
+// RememberedFastForward is the answer to the question whether to fast-forward the source first that a remembered source update gives, nil when none is.
+func RememberedFastForward(remembered string) *bool {
+	if remembered == "" {
+		return nil
+	}
+
+	return new(remembered == project.SourceUpdateFastForward)
 }
 
 // FastForwardAnswer is the question whether to fast-forward the source first: the request's answer, none while the question is skipped, else the remembered one, else no.

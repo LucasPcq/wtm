@@ -207,7 +207,7 @@ type confirmStep struct {
 	list *SelectList
 }
 
-// Open builds the list on the answer so far; a remembered answer ticks the toggle.
+// Open builds the list on the answer so far; a remembered answer starts the list on it, the toggle ticked.
 func (s *confirmStep) Open() tea.Cmd {
 	field, _ := s.sheet.Field(s.at).(domain.ConfirmField)
 	yes := Option{Label: cmp.Or(field.Yes.Label, yesLabel), Value: strconv.FormatBool(true)}
@@ -221,8 +221,12 @@ func (s *confirmStep) Open() tea.Cmd {
 		options = slices.Insert(options, 1, Option{Separator: true})
 	}
 
-	ticked := field.Remember || field.Origin == domain.OriginRemembered
-	s.list = NewSelectList(SelectParams{Options: options, Start: strconv.FormatBool(field.Value), Toggle: field.Rememberable, ToggleOn: ticked})
+	params := SelectParams{Options: options, Start: strconv.FormatBool(field.Value), Toggle: field.Rememberable, ToggleOn: field.Remember}
+	if field.Remembered != nil {
+		params.Start, params.ToggleOn = strconv.FormatBool(*field.Remembered), true
+	}
+
+	s.list = NewSelectList(params)
 	return nil
 }
 

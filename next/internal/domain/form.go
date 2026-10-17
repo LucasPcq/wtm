@@ -122,13 +122,14 @@ type TextListField struct {
 	Options []Option `json:"options"`
 }
 
-// ConfirmField asks yes or no; Yes and No are its two options, valued true and false, with how each reads (Yes and No when they say nothing), listed No first when NoFirst.
+// ConfirmField asks yes or no; Yes and No are its two options, valued true and false, with how each reads (Yes and No when they say nothing), listed No first when NoFirst; Remembered is the answer remembered for it, nil when none.
 type ConfirmField struct {
 	FieldSpec
 	Value        bool   `json:"value"`
 	Yes          Option `json:"yes"`
 	No           Option `json:"no"`
 	NoFirst      bool   `json:"no_first"`
+	Remembered   *bool  `json:"remembered,omitempty"`
 	Rememberable bool   `json:"rememberable"`
 	Remember     bool   `json:"remember"`
 }

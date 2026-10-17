@@ -186,6 +186,7 @@ func NewQuestions(f Facts, req Request) Questions {
 	}
 	// Even under --ask, the question carries what is remembered, so a form can show it to keep or untick.
 	questions.Isolation.Remembered = project.Isolation(recalled[project.RememberIsolation])
+	questions.FastForward.Remembered = domain.RememberedFastForward(recalled[project.RememberSourceUpdate])
 	questions.Errors = f.problems(req, questions)
 	return questions
 }
@@ -241,6 +242,7 @@ func (q Questions) Form() domain.Form {
 			Value:        q.FastForward.Value,
 			Yes:          domain.Option{Value: "true", Label: "Fast-forward to origin"},
 			No:           domain.Option{Value: "false", Label: "Keep it as-is"},
+			Remembered:   q.FastForward.Remembered,
 			Rememberable: true,
 			Remember:     q.remembers("fast_forward"),
 		},

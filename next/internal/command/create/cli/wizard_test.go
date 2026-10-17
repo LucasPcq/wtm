@@ -170,3 +170,12 @@ func TestIfNotExistsGivenByItsFlagStandsInTheTrail(t *testing.T) {
 	assert.Equal(t, stepRecap, d.w.Current())
 	assert.Contains(t, d.screen(), "✓ If not exists: yes · --if-not-exists")
 }
+
+func TestAskAsksARememberedSourceUpdateAgainStartingOnIt(t *testing.T) {
+	remembered := map[string]string{project.RememberSourceUpdate: project.SourceUpdateFastForward}
+	d := open(t, sessionParams{App: newApp(seed{Behind: true, Remembered: remembered}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample, Ask: true}})
+
+	require.Equal(t, stepFastForward, d.w.Current())
+	assert.Contains(t, d.screen(), "▌› Yes")
+	assert.Contains(t, d.screen(), "[x] Always use this answer in this repo")
+}

@@ -318,3 +318,13 @@ func TestEachAnswerReadsBackAsAnswerTakesIt(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, req, got)
 }
+
+func TestARememberedSourceUpdateIsShownEvenWhenAskedAgain(t *testing.T) {
+	w := newWorld(t, seed{Config: remembering, Behind: true})
+	w.change(t, source, "a.txt", "a\n")
+
+	asked := w.questions(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Ask: true}).FastForward
+
+	assert.Equal(t, new(true), asked.Remembered)
+	assert.Equal(t, domain.OriginDefault, asked.Origin)
+}

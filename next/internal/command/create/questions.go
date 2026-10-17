@@ -134,6 +134,7 @@ func NewQuestions(f Facts, req Request) Questions {
 	// Even under --ask, the wizard shows what is remembered, so the user can keep or untick it.
 	questions.EnvFrom.Remembered = project.RememberedEnvStrategy(recalled[project.RememberEnvStrategy], f.Config.Env.Strategy)
 	questions.Isolation.Remembered = project.Isolation(recalled[project.RememberIsolation])
+	questions.FastForward.Remembered = domain.RememberedFastForward(recalled[project.RememberSourceUpdate])
 	questions.Errors = f.problems(questions)
 	return questions
 }
@@ -172,6 +173,7 @@ func (q Questions) Form() domain.Form {
 		domain.ConfirmField{
 			FieldSpec:    domain.FieldSpec{Path: "fast_forward", Flag: "--ff", Label: "Source update", Help: "Fast-forward to origin first the branch each worktree starts from, when it is behind; one that has diverged or holds uncommitted changes starts as it is", Origin: q.FastForward.Origin, Skip: q.FastForward.Skip},
 			Value:        q.FastForward.Value,
+			Remembered:   q.FastForward.Remembered,
 			Rememberable: true,
 			Remember:     q.remembers("fast_forward"),
 		},
