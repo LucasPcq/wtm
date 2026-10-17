@@ -41,6 +41,7 @@ What every mutating command of `next/` promises its callers — people at a term
 
 - `--dry-run` (`-n`) plans without changing anything and prints the plan, its warnings, its fingerprint and the command line that applies exactly this plan (`… --expect-fingerprint <fp>`).
 - `--expect-fingerprint <fp>` applies only if the facts still give that fingerprint; otherwise it refuses with `plan.stale` (exit 25) and prints the dry-run line that shows the plan the facts give now.
+- The fingerprint covers what the plan does (which files, their status), not the files' bytes: a file edited between the preview and the apply is applied as it is then.
 - The wizard's recap is a dry run: it previews the plan, then applies it with its fingerprint; a stale preview asks again.
 
 ## Output

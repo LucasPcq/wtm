@@ -25,6 +25,9 @@ func TestRunKeepsTheOperationContract(t *testing.T) {
 			Stale: func(t *testing.T) {
 				writeFile(t, filepath.Join(w.stateDir, "config.toml"), withHook("touch hooked"))
 			},
+			Fail: func(t *testing.T) {
+				writeFile(t, filepath.Join(w.stateDir, "config.toml"), withHook("exit 3"))
+			},
 		}
 	})
 }

@@ -40,9 +40,8 @@ func TestTheSelectedChangesMoveToAnExistingWorktree(t *testing.T) {
 func TestANewTargetIsProvisionedUnderItsLocksThenReceivesTheChanges(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.change(t, source, "a.txt", "a\n")
-	report := &recorder{}
 
-	outcome, err := w.usecase.Run(t.Context(), extract.Request{Source: source, Files: []string{"a.txt"}, To: split}, domain.RunOptions{Surface: "cli", Report: report.add})
+	outcome, err := w.usecase.Run(t.Context(), extract.Request{Source: source, Files: []string{"a.txt"}, To: split}, domain.RunOptions{Surface: "cli"})
 
 	require.NoError(t, err)
 	require.NotNil(t, outcome.Result)
@@ -59,7 +58,6 @@ func TestANewTargetIsProvisionedUnderItsLocksThenReceivesTheChanges(t *testing.T
 	assert.True(t, containsKind[domain.WorktreeCreated](events))
 	assert.True(t, containsKind[domain.WorktreeProvisioned](events))
 	assert.Contains(t, events, domain.Event(domain.PhaseStarted{Subject: split, Phase: "move"}))
-	assert.Equal(t, events, report.all())
 	assert.NoFileExists(t, filepath.Join(w.stateDir, "locks", "ops", "op-1.json"))
 }
 
@@ -147,7 +145,6 @@ func TestADryRunMovesNothingAndFingerprintsThePlan(t *testing.T) {
 	assert.Nil(t, outcome.Result)
 	assert.NoDirExists(t, w.path(split))
 	assert.FileExists(t, filepath.Join(w.at(source), "a.txt"))
-	assert.Empty(t, w.published.all())
 }
 
 func TestAPreviewIsRefusedOnceTheChangesItSelectedChanged(t *testing.T) {

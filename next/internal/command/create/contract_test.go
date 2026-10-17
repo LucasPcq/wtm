@@ -24,6 +24,9 @@ func TestRunKeepsTheOperationContract(t *testing.T) {
 			Stale: func(t *testing.T) {
 				writeFile(t, filepath.Join(w.stateDir, "config.toml"), strings.Replace(projectToml, `strategy = "main"`, `strategy = "example"`, 1))
 			},
+			Fail: func(t *testing.T) {
+				writeFile(t, filepath.Join(w.stateDir, "config.toml"), withHook("exit 3"))
+			},
 		}
 	})
 }

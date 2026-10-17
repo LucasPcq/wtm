@@ -46,7 +46,7 @@ var nextWhy = map[nextLayer]string{
 	nextDomain:      "the domain is pure: the stdlib and domain/* only",
 	nextService:     "a service reaches the world through the ports it declares: domain/* and the stdlib, never another service, a command, an adapter or ui/*",
 	nextCommand:     "a use case orchestrates services and reaches the world through the ports it declares: domain/*, service/* and the stdlib, never another command, its own cli, an adapter or ui/*",
-	nextServiceTest: "a service's test kit checks what the service promises: service/<its name>, domain/*, the stdlib and third parties, never a command, an adapter or ui/*",
+	nextServiceTest: "a service's test kit checks what the service promises: service/<its name>, domain/*, the stdlib and third parties, never another service, a command, an adapter or ui/*",
 	nextCLI:         "a command's cli drives its own use case: command/<its name>, domain/*, ui/*, the stdlib and third parties, never another command, a service or an adapter",
 	nextAdapter:     "an adapter reaches domain/*, adapter/statefile, adapter/shell, the stdlib and third parties, never a service, a command or ui/*, nor another adapter",
 	nextUI:          "ui/ is the presentation kit every command's cli shares and knows no command: domain/*, ui/*, the stdlib and third parties, never a command, a service or an adapter",

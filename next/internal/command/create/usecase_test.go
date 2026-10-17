@@ -305,14 +305,13 @@ func TestASourceThatWillNotMoveIsNotLocked(t *testing.T) {
 	assert.NotContains(t, decided(t, w.facts(t, branchName), req).Locks(), domain.Lock{Scope: domain.ScopeWorktree, Name: "main", Mode: domain.LockExclusive})
 }
 
-func TestADryRunTakesNoLockWritesNothingAndPublishesNothing(t *testing.T) {
+func TestADryRunPlansDespiteAHeldLockAndWritesNothing(t *testing.T) {
 	w := newWorld(t, seed{})
 	held, err := oplock.Locks{StateDir: w.stateDir}.Take(domain.Operation{ID: "other", Locks: []domain.Lock{{Scope: domain.ScopeWorktree, Name: branchName, Mode: domain.LockExclusive}}})
 	require.NoError(t, err)
 	defer held.Release()
-	report := &recorder{}
 
-	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{DryRun: true, Report: report.add})
+	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{DryRun: true})
 
 	require.NoError(t, err)
 	assert.Equal(t, "op-1", outcome.Op)
@@ -321,15 +320,12 @@ func TestADryRunTakesNoLockWritesNothingAndPublishesNothing(t *testing.T) {
 	assert.Nil(t, outcome.Result)
 	assert.NoDirExists(t, w.path(branchName))
 	assert.NoDirExists(t, filepath.Join(w.stateDir, "worktrees"))
-	assert.Empty(t, report.all())
-	assert.Empty(t, w.published.all())
 }
 
 func TestAWorktreeIsCreatedUnderItsLocksAndAnnouncedFromStartToFinish(t *testing.T) {
 	w := newWorld(t, seed{Run: jobsToml})
-	report := &recorder{}
 
-	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{Surface: "tui", Report: report.add})
+	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{Surface: "tui"})
 
 	require.NoError(t, err)
 	require.NotNil(t, outcome.Result)
@@ -342,7 +338,6 @@ func TestAWorktreeIsCreatedUnderItsLocksAndAnnouncedFromStartToFinish(t *testing
 	assert.True(t, containsKind[domain.WorktreeCreated](events))
 	assert.True(t, containsKind[domain.WorktreeNumbered](events))
 	assert.True(t, containsKind[domain.WorktreeProvisioned](events))
-	assert.Equal(t, events, report.all())
 	assert.NoFileExists(t, filepath.Join(w.stateDir, "locks", "ops", "op-1.json"))
 }
 
@@ -397,24 +392,6 @@ func TestHelperProcess(t *testing.T) {
 	defer held.Release()
 	os.Stdout.WriteString(readyLine + "\n")
 	_, _ = io.Copy(io.Discard, os.Stdin)
-}
-
-func TestAPreviewAppliesWhileItsPlanHoldsAndIsRefusedOnceItChanged(t *testing.T) {
-	w := newWorld(t, seed{})
-	a := w.usecase
-	preview, err := a.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{DryRun: true, Report: (&recorder{}).add})
-	require.NoError(t, err)
-
-	writeFile(t, filepath.Join(w.stateDir, "config.toml"), strings.Replace(projectToml, `strategy = "main"`, `strategy = "example"`, 1))
-	stale, staleErr := a.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
-
-	failure := failureOf(t, staleErr)
-	assert.Equal(t, domain.KindPrecondition, failure.Kind)
-	assert.Equal(t, domain.CodePlanStale, failure.Code)
-	assert.Equal(t, domain.Params{"expected": preview.Fingerprint, "found": stale.Fingerprint}, failure.Params)
-	assert.NotEqual(t, preview.Fingerprint, stale.Fingerprint)
-	assert.NoDirExists(t, w.path(branchName))
-	assert.Empty(t, w.published.all())
 }
 
 func TestAPreviewStillHoldsWhenAnUnrelatedBranchMoved(t *testing.T) {

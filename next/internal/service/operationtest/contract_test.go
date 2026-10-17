@@ -16,7 +16,10 @@ func TestAUnitOrAPhaseStartedAndNotFinishedAfterIsUnfinished(t *testing.T) {
 		domain.PhaseFinished{Subject: "a", Phase: "hooks"},
 		domain.PhaseStarted{Subject: "a", Phase: "env"},
 		domain.UnitFinished{Subject: "a"},
+		domain.UnitStarted{Subject: "twice"},
+		domain.UnitStarted{Subject: "twice"},
+		domain.UnitFinished{Subject: "twice"},
 	}
 
-	assert.Equal(t, []string{"unit early", "phase env of a"}, unfinished(events))
+	assert.Equal(t, []string{"unit early", "phase env of a", "unit twice"}, unfinished(events))
 }
