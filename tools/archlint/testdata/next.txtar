@@ -181,3 +181,18 @@ package stray // want `next/internal/stray is in no row of next/'s import table`
 -- github.com/LucasPcq/wtm/next/doc.go --
 // Package next sits at the root.
 package next // want `next/ is in no row of next/'s import table`
+-- github.com/LucasPcq/wtm/next/internal/api/api.go --
+// Package api lists the commands.
+package api
+
+import (
+	"context"
+
+	_ "github.com/LucasPcq/wtm/next/internal/command/create" // want `next/internal/api must not import "github.com/LucasPcq/wtm/next/internal/command/create" — the catalogue knows no command`
+	_ "github.com/LucasPcq/wtm/next/internal/domain"
+	_ "github.com/LucasPcq/wtm/next/internal/service/operation" // want `next/internal/api must not import "github.com/LucasPcq/wtm/next/internal/service/operation" — the catalogue knows no command`
+	_ "github.com/LucasPcq/wtm/next/internal/ui/output" // want `next/internal/api must not import "github.com/LucasPcq/wtm/next/internal/ui/output" — the catalogue knows no command`
+	_ "github.com/spf13/cobra" // want `next/internal/api must not import "github.com/spf13/cobra" — the catalogue knows no command`
+)
+
+var _ context.Context
