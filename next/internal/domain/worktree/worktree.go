@@ -5,6 +5,7 @@ import (
 	"slices"
 )
 
+// Worktree is one worktree as git lists it: its path, whether it is the main one, and what it has checked out.
 type Worktree struct {
 	Path  string
 	Main  bool
@@ -13,14 +14,19 @@ type Worktree struct {
 
 //go-sumtype:decl State
 
+// State is what a worktree has checked out: OnBranch, Rebasing, Detached or Bare.
 type State interface{ state() }
 
+// OnBranch is a worktree on a branch.
 type OnBranch struct{ Branch string }
 
+// Rebasing is a worktree in the middle of a rebase of a branch.
 type Rebasing struct{ Branch string }
 
+// Detached is a worktree on a commit, on no branch.
 type Detached struct{}
 
+// Bare is the bare repository's entry, which has no working tree.
 type Bare struct{}
 
 func (OnBranch) state() {}
@@ -28,11 +34,13 @@ func (Rebasing) state() {}
 func (Detached) state() {}
 func (Bare) state()     {}
 
+// Merge asks to fast-forward the branch checked out in the worktree at Path onto Onto.
 type Merge struct {
 	Path string
 	Onto Ref
 }
 
+// Branch returns the branch the worktree is on or rebasing, "" when it is on none.
 func (w Worktree) Branch() string {
 	switch state := w.State.(type) {
 	case OnBranch:
@@ -41,9 +49,11 @@ func (w Worktree) Branch() string {
 		return state.Branch
 	case Detached, Bare:
 	}
+
 	return ""
 }
 
+// Location is a path resolved through its symbolic links, and whether something is there.
 type Location struct {
 	Path   string
 	Exists bool
@@ -51,21 +61,26 @@ type Location struct {
 
 //go-sumtype:decl Checkout
 
+// Checkout is the branch a new worktree checks out: a NewBranch, an ExistingBranch, or a TrackingBranch.
 type Checkout interface{ checkout() }
 
+// NewBranch is a branch created from From.
 type NewBranch struct {
 	Name string
 	From Ref
 }
 
+// ExistingBranch is a local branch that already exists.
 type ExistingBranch struct{ Name string }
 
+// TrackingBranch is a local branch created to track the branch of origin of the same name.
 type TrackingBranch struct{ Name string }
 
 func (NewBranch) checkout()      {}
 func (ExistingBranch) checkout() {}
 func (TrackingBranch) checkout() {}
 
+// CreatedBranch returns the branch checkout creates, and reports whether it creates one: an undo deletes it.
 func CreatedBranch(checkout Checkout) (string, bool) {
 	switch c := checkout.(type) {
 	case NewBranch:
@@ -74,9 +89,11 @@ func CreatedBranch(checkout Checkout) (string, bool) {
 		return c.Name, true
 	case ExistingBranch:
 	}
+
 	return "", false
 }
 
+// Addition asks to add a worktree at Path with Checkout.
 type Addition struct {
 	Path     string
 	Checkout Checkout
@@ -84,10 +101,12 @@ type Addition struct {
 
 const mainOrdinal = 0
 
+// FreeOrdinal returns the lowest worktree number not in taken; the main worktree's number, 0, is never free.
 func FreeOrdinal(taken []int) int {
 	candidate := mainOrdinal + 1
 	for slices.Contains(taken, candidate) {
 		candidate++
 	}
+
 	return candidate
 }

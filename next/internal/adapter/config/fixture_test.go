@@ -27,6 +27,8 @@ const minimalConfig = `
 
 const newerSchema = "schema = 99\n"
 
+// awkward holds every character a TOML string must escape, and awkwardConfig
+// writes it in every value config.toml holds, to prove a rewrite round-trips.
 const awkward = "say \"hi\" \\ C:\\tmp 'q'\nnext\ttab \x7f"
 
 const awkwardConfig = `

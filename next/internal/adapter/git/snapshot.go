@@ -6,7 +6,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-// Snapshot reads the worktrees and the branches, then counts ahead and behind each local branch whose origin tip differs.
+// Snapshot returns the repository's worktrees, its local and remote branches,
+// and how far ahead and behind its origin each local branch is when their tips
+// differ.
 func (r Repo) Snapshot(ctx context.Context) (worktree.Snapshot, error) {
 	worktrees, err := r.Worktrees(ctx)
 	if err != nil {

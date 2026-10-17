@@ -7,6 +7,8 @@ import (
 	"sync"
 )
 
+// inflight is the process-wide state of cancellation: how many shielded
+// sections are open, and how to kill each cancelled child still stopping.
 var inflight = struct {
 	sync.Mutex
 	cond     *sync.Cond
@@ -18,10 +20,14 @@ func init() {
 	inflight.cond = sync.NewCond(&inflight.Mutex)
 }
 
+// Shield opens a section that a first cancellation must let finish: it returns
+// ctx without its cancellation and the function that closes the section, safe
+// to call more than once.
 func Shield(ctx context.Context) (context.Context, func()) {
 	inflight.Lock()
 	inflight.open++
 	inflight.Unlock()
+
 	release := sync.OnceFunc(func() {
 		inflight.Lock()
 		inflight.open--
@@ -31,6 +37,7 @@ func Shield(ctx context.Context) (context.Context, func()) {
 	return context.WithoutCancel(ctx), release
 }
 
+// AwaitShields blocks until every section opened by Shield is released.
 func AwaitShields() {
 	inflight.Lock()
 	defer inflight.Unlock()
@@ -39,10 +46,13 @@ func AwaitShields() {
 	}
 }
 
+// KillCancelled sends SIGKILL now to the group of every cancelled child still
+// stopping, as a second Ctrl+C does.
 func KillCancelled() {
 	inflight.Lock()
 	kills := slices.Collect(maps.Values(inflight.stopping))
 	inflight.Unlock()
+
 	for _, kill := range kills {
 		kill()
 	}

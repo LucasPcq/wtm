@@ -17,41 +17,52 @@ var (
 	errNoCheckout = errors.New("no checkout given")
 )
 
+// Worktrees returns the repository's worktrees, the main one first. A detached
+// worktree in the middle of a rebase is reported as rebasing its branch.
 func (r Repo) Worktrees(ctx context.Context) ([]worktree.Worktree, error) {
 	out, err := r.git(ctx, "worktree", "list", "--porcelain", "-z")
 	if err != nil {
 		return nil, err
 	}
+
 	worktrees := parseWorktrees(string(out))
 	for i, w := range worktrees {
 		if _, detached := w.State.(worktree.Detached); !detached {
 			continue
 		}
+
 		state, err := detachedState(w.Path)
 		if err != nil {
 			return nil, err
 		}
 		worktrees[i].State = state
 	}
+
 	return worktrees, nil
 }
 
+// MainWorktree returns the repository's main worktree.
 func (r Repo) MainWorktree(ctx context.Context) (worktree.Worktree, error) {
 	worktrees, err := r.Worktrees(ctx)
 	if err != nil {
 		return worktree.Worktree{}, err
 	}
+
 	if len(worktrees) == 0 {
 		return worktree.Worktree{}, errNoWorktree
 	}
 	return worktrees[0], nil
 }
 
+// CommonDir returns the absolute path of the repository's common git
+// directory, shared by all its worktrees.
 func (r Repo) CommonDir(ctx context.Context) (string, error) {
 	out, err := r.git(ctx, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	return strings.TrimSpace(string(out)), err
 }
 
+// Locate resolves path, relative to r.Dir unless absolute, to its real path
+// and reports whether something already exists there.
 func (r Repo) Locate(_ context.Context, path string) (worktree.Location, error) {
 	absolute := path
 	if !filepath.IsAbs(path) {
@@ -61,10 +72,12 @@ func (r Repo) Locate(_ context.Context, path string) (worktree.Location, error) 
 		}
 		absolute = joined
 	}
+
 	resolved, err := RealPath(absolute)
 	if err != nil {
 		return worktree.Location{}, err
 	}
+
 	_, err = os.Lstat(resolved)
 	if errors.Is(err, fs.ErrNotExist) {
 		return worktree.Location{Path: resolved}, nil
@@ -75,6 +88,9 @@ func (r Repo) Locate(_ context.Context, path string) (worktree.Location, error) 
 	return worktree.Location{Path: resolved, Exists: true}, nil
 }
 
+// RealPath returns path with its symlinks resolved, as git spells a worktree's
+// path; a part that does not exist yet is kept as given under its resolved
+// parent.
 func RealPath(path string) (string, error) {
 	clean := filepath.Clean(path)
 	resolved, err := filepath.EvalSymlinks(clean)
@@ -84,10 +100,12 @@ func RealPath(path string) (string, error) {
 	if !errors.Is(err, fs.ErrNotExist) {
 		return "", err
 	}
+
 	parent := filepath.Dir(clean)
 	if parent == clean {
 		return clean, nil
 	}
+
 	resolvedParent, err := RealPath(parent)
 	if err != nil {
 		return "", err
@@ -95,15 +113,21 @@ func RealPath(path string) (string, error) {
 	return filepath.Join(resolvedParent, filepath.Base(clean)), nil
 }
 
+// AddWorktree adds a worktree at addition.Path with its checkout. A branch the
+// checkout creates is deleted again when the add fails, unless it existed
+// before. Checking out an existing branch with no local branch fails with
+// ErrNoLocalBranch.
 func (r Repo) AddWorktree(ctx context.Context, addition worktree.Addition) error {
 	created, creates := worktree.CreatedBranch(addition.Checkout)
 	if !creates {
 		return r.add(ctx, addition)
 	}
+
 	existed, err := r.refExists(ctx, worktree.LocalBranch{Name: created})
 	if err != nil {
 		return err
 	}
+
 	err = r.add(ctx, addition)
 	if err == nil || existed {
 		return err
@@ -111,6 +135,7 @@ func (r Repo) AddWorktree(ctx context.Context, addition worktree.Addition) error
 	return errors.Join(err, r.dropLeft(ctx, created))
 }
 
+// dropLeft deletes the branch name if a failed add left it behind.
 func (r Repo) dropLeft(ctx context.Context, name string) error {
 	left, err := r.refExists(ctx, worktree.LocalBranch{Name: name})
 	if err != nil || !left {
@@ -119,6 +144,7 @@ func (r Repo) dropLeft(ctx context.Context, name string) error {
 	return r.DeleteBranch(ctx, name)
 }
 
+// add runs git worktree add for each kind of checkout.
 func (r Repo) add(ctx context.Context, addition worktree.Addition) error {
 	switch checkout := addition.Checkout.(type) {
 	case worktree.NewBranch:
@@ -136,6 +162,7 @@ func (r Repo) add(ctx context.Context, addition worktree.Addition) error {
 		if !local {
 			return fmt.Errorf("%w: %s", ErrNoLocalBranch, checkout.Name)
 		}
+
 		_, err = r.git(ctx, "worktree", "add", "--", addition.Path, checkout.Name)
 		return err
 	case worktree.TrackingBranch:
@@ -145,11 +172,15 @@ func (r Repo) add(ctx context.Context, addition worktree.Addition) error {
 	return errNoCheckout
 }
 
+// RemoveWorktree removes the worktree at path, its changes included.
 func (r Repo) RemoveWorktree(ctx context.Context, path string) error {
 	_, err := r.git(ctx, "worktree", "remove", "--force", "--", path)
 	return err
 }
 
+// parseWorktrees reads git worktree list --porcelain -z; the first worktree is
+// the main one and each starts detached until a branch or bare line says
+// otherwise.
 func parseWorktrees(out string) []worktree.Worktree {
 	var worktrees []worktree.Worktree
 	var current *worktree.Worktree
@@ -168,9 +199,13 @@ func parseWorktrees(out string) []worktree.Worktree {
 			current = nil
 		}
 	}
+
 	return worktrees
 }
 
+// detachedState is what a detached worktree is doing: rebasing the branch its
+// rebase state names, or plainly detached. A worktree whose .git is gone reads
+// as detached.
 func detachedState(path string) (worktree.State, error) {
 	adminDir, err := adminDirOf(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -179,6 +214,7 @@ func detachedState(path string) (worktree.State, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	for _, rebase := range []string{"rebase-merge", "rebase-apply"} {
 		headName, err := os.ReadFile(filepath.Join(adminDir, rebase, "head-name"))
 		if errors.Is(err, fs.ErrNotExist) {
@@ -187,13 +223,17 @@ func detachedState(path string) (worktree.State, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		if name := strings.TrimPrefix(strings.TrimSpace(string(headName)), headsPrefix); name != "" {
 			return worktree.Rebasing{Branch: name}, nil
 		}
 	}
+
 	return worktree.Detached{}, nil
 }
 
+// adminDirOf returns the git directory of the worktree at path: its .git
+// directory, or the one its .git file points to.
 func adminDirOf(path string) (string, error) {
 	dotGit := filepath.Join(path, ".git")
 	info, err := os.Stat(dotGit)
@@ -203,14 +243,17 @@ func adminDirOf(path string) (string, error) {
 	if info.IsDir() {
 		return dotGit, nil
 	}
+
 	content, err := os.ReadFile(dotGit)
 	if err != nil {
 		return "", err
 	}
+
 	adminDir, ok := strings.CutPrefix(strings.TrimSpace(string(content)), "gitdir: ")
 	if !ok {
 		return "", errors.New("not a gitdir file: " + dotGit)
 	}
+
 	if filepath.IsAbs(adminDir) {
 		return adminDir, nil
 	}

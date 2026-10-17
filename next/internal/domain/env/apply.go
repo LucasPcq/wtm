@@ -7,8 +7,10 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 )
 
+// collisionHorizon is how many offset blocks above a base port a number may sit and still be read as that port shifted by an earlier worktree.
 const collisionHorizon = 20
 
+// applyPorts returns lines with the value of every key an entry rewrites replaced by its new value; lines no entry rewrites are returned as they are.
 func applyPorts(lines []dotenv.Line, entries []Entry) []dotenv.Line {
 	byKey := map[string]string{}
 	for _, entry := range entries {
@@ -19,6 +21,7 @@ func applyPorts(lines []dotenv.Line, entries []Entry) []dotenv.Line {
 	if len(byKey) == 0 {
 		return lines
 	}
+
 	out := make([]dotenv.Line, len(lines))
 	for i, line := range lines {
 		value, rewritten := byKey[line.Key]
@@ -38,11 +41,13 @@ type reducePortParams struct {
 	Project  string
 }
 
+// reducePortValue brings a value already settled for some worktree back to the base port, so it can be settled again for this one: a route of the job is rewound to its local origin, else the single number sitting a whole number of blocks above the base becomes the base. A value with no such number, or with several, is returned as it is.
 func reducePortValue(params reducePortParams) string {
 	value := reduceOriginValue(reduceOriginParams{Value: params.Value, JobLabel: params.JobLabel, Project: params.Project, Base: params.Base})
 	if value != params.Value {
 		return value
 	}
+
 	var at []number
 	for _, n := range numbers(params.Value) {
 		gap := n.value - params.Base
@@ -53,15 +58,18 @@ func reducePortValue(params reducePortParams) string {
 	if len(at) != 1 {
 		return params.Value
 	}
+
 	return replaceAt(replaceParams{Value: params.Value, At: at[0].at, Width: at[0].width, To: params.Base})
 }
 
+// A number is a run of digits found in a value: its byte offset, its width and what it reads as.
 type number struct {
 	at    int
 	width int
 	value int
 }
 
+// numbers returns every run of digits in value, in order.
 func numbers(value string) []number {
 	var found []number
 	for i := 0; i < len(value); {
@@ -69,6 +77,7 @@ func numbers(value string) []number {
 			i++
 			continue
 		}
+
 		end := i
 		for isDigitAt(value, end) {
 			end++
@@ -81,6 +90,7 @@ func numbers(value string) []number {
 	return found
 }
 
+// portOffsets returns the byte offsets at which port appears in value as a whole number, never as part of a longer one.
 func portOffsets(value string, port int) []int {
 	needle := strconv.Itoa(port)
 	var offsets []int
@@ -89,6 +99,7 @@ func portOffsets(value string, port int) []int {
 		if i < 0 {
 			return offsets
 		}
+
 		at := from + i
 		if !isDigitAt(value, at-1) && !isDigitAt(value, at+len(needle)) {
 			offsets = append(offsets, at)
@@ -97,6 +108,7 @@ func portOffsets(value string, port int) []int {
 	}
 }
 
+// isDigitAt reports whether value holds an ASCII digit at index i; an index out of range holds none.
 func isDigitAt(value string, i int) bool {
 	return i >= 0 && i < len(value) && value[i] >= '0' && value[i] <= '9'
 }
@@ -108,6 +120,7 @@ type replaceParams struct {
 	To    int
 }
 
+// replaceAt returns Value with the Width bytes at offset At replaced by the number To.
 func replaceAt(params replaceParams) string {
 	return params.Value[:params.At] + strconv.Itoa(params.To) + params.Value[params.At+params.Width:]
 }

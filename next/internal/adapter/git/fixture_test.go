@@ -12,6 +12,8 @@ import (
 
 const remote = "origin"
 
+// port is what both git.Repo and gittest.Fake implement, so one test runs
+// against each.
 type port interface {
 	Worktrees(ctx context.Context) ([]worktree.Worktree, error)
 	MainWorktree(ctx context.Context) (worktree.Worktree, error)
@@ -29,6 +31,8 @@ type port interface {
 	Snapshot(ctx context.Context) (worktree.Snapshot, error)
 }
 
+// implementation is one port under test: its root directory and at, which
+// returns the resolved path of a name under it.
 type implementation struct {
 	name string
 	port port
@@ -36,6 +40,7 @@ type implementation struct {
 	at   func(name string) string
 }
 
+// implementations returns the real repository and the fake, both seeded alike.
 func implementations(t *testing.T) []implementation {
 	t.Helper()
 	gitRoot, fakeRoot := gittest.Symlinked(t), gittest.Symlinked(t)
@@ -45,6 +50,9 @@ func implementations(t *testing.T) []implementation {
 	}
 }
 
+// seed is a repository under root with a worktree in every state git can
+// list, local branches ahead, behind and diverged from origin, and paths taken
+// or free for a new worktree.
 func seed(root string) gittest.FakeParams {
 	return gittest.FakeParams{
 		Main:   filepath.Join(root, "main"),
@@ -76,6 +84,8 @@ func seed(root string) gittest.FakeParams {
 	}
 }
 
+// under returns the function that joins a name to root with its symlinks
+// resolved.
 func under(t *testing.T, root string) func(name string) string {
 	resolved := gittest.Resolved(t, root)
 	return func(name string) string { return filepath.Join(resolved, name) }

@@ -19,6 +19,7 @@ func sources(t *testing.T, request CopyRequest, exists func(string) (bool, error
 	return found, warnings
 }
 
+// existsIn returns an exists function answering from present.
 func existsIn(present map[string]bool) func(string) (bool, error) {
 	return func(path string) (bool, error) { return present[path], nil }
 }
@@ -29,6 +30,7 @@ type planOneParams struct {
 	Offset  int
 }
 
+// planOne plans the single key URL of a .env holding Content, linked to a port with base Base, for a worktree at Offset.
 func planOne(t *testing.T, params planOneParams) Entry {
 	t.Helper()
 	plan := Writes{bases: map[portRef]int{{Job: "svc", Name: "DB_PORT"}: params.Base}, block: 10, worktree: settling{Offset: params.Offset}}.plan(
@@ -39,6 +41,7 @@ func planOne(t *testing.T, params planOneParams) Entry {
 	return plan.Entries[0]
 }
 
+// cookieParent returns the domain a cookie set by host would be scoped to: host without its first label.
 func cookieParent(host string) string {
 	if _, parent, found := strings.Cut(host, "."); found {
 		return parent
@@ -57,12 +60,14 @@ func resolvedWrites(t *testing.T, params ResolveParams) Writes {
 	return writes
 }
 
+// appliedWrites is what applying writes to a set of files did: the files after, the ones that changed, and the settled plan.
 type appliedWrites struct {
 	Files   map[string]string
 	Changed []string
 	Plan    Plan
 }
 
+// applyWrites applies writes to files, given as path to content, the way a store would: a missing file is written only when writes creates it, and a file left byte for byte as it was is not counted as changed.
 func applyWrites(writes Writes, files map[string]string) appliedWrites {
 	out := maps.Clone(files)
 	if out == nil {

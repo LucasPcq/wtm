@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// recorder records the events a run reports, safe across goroutines; on, when
+// set, is called with each one as it arrives.
 type recorder struct {
 	mu     sync.Mutex
 	events []domain.Event

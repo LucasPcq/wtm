@@ -9,8 +9,10 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 )
 
+// Status is what settling decided for one key of a .env file.
 type Status string
 
+// The statuses of an entry: a rewrite or no change, else an anomaly the user is told about — the key is missing, its value holds the base port nowhere or more than once, its url points at a host no job here serves, or it uses https on the job's own port.
 const (
 	StatusRewrite      Status = "rewrite"
 	StatusUnchanged    Status = "unchanged"
@@ -21,6 +23,7 @@ const (
 	StatusSecureScheme Status = "secure_scheme"
 )
 
+// A Move is one port a key links to and where it moves for the worktree: from Base to Resolved, or to Origin when the key is addressed by name.
 type Move struct {
 	Port     string `json:"port"`
 	Job      string `json:"job"`
@@ -29,6 +32,7 @@ type Move struct {
 	Origin   string `json:"origin,omitempty"`
 }
 
+// An Entry is one key of a .env file linked to one or more ports, and what settling decided for it. When several ports share a key, Port, Base and Resolved are the first one's and Moves lists them all.
 type Entry struct {
 	File         string             `json:"file"`
 	Key          string             `json:"key"`
@@ -43,6 +47,7 @@ type Entry struct {
 	ForeignHost  string             `json:"foreign_host,omitempty"`
 }
 
+// A Plan is what settling a worktree's .env files decides: the port offset, an entry per linked key, the values wtm owns, and whether it was applied.
 type Plan struct {
 	Offset     int                `json:"offset"`
 	Entries    []Entry            `json:"entries"`
@@ -52,6 +57,7 @@ type Plan struct {
 	Applied    bool               `json:"applied"`
 }
 
+// Rewrites returns the entries whose value is rewritten.
 func (p Plan) Rewrites() []Entry {
 	var out []Entry
 	for _, entry := range p.Entries {
@@ -62,6 +68,7 @@ func (p Plan) Rewrites() []Entry {
 	return out
 }
 
+// Anomalies returns the entries the user is told about: neither rewritten nor unchanged.
 func (p Plan) Anomalies() []Entry {
 	var out []Entry
 	for _, entry := range p.Entries {
@@ -74,11 +81,13 @@ func (p Plan) Anomalies() []Entry {
 	return out
 }
 
+// A portRef names a port by its job and its name.
 type portRef struct {
 	Job  string
 	Name string
 }
 
+// portBases returns the base of every port each job of cfg declares.
 func portBases(cfg project.Run) map[portRef]int {
 	bases := map[portRef]int{}
 	for _, job := range cfg.Jobs {
@@ -89,6 +98,7 @@ func portBases(cfg project.Run) map[portRef]int {
 	return bases
 }
 
+// plan decides an entry for each key the links name, over the lines read of each file.
 func (w Writes) plan(links []project.EnvPortLink, lines map[string][]dotenv.Line) Plan {
 	plan := Plan{Offset: w.worktree.Offset, Addressing: w.worktree.Addressing, PublicPort: w.worktree.PublicPort}
 	for _, group := range w.groups(links) {
@@ -97,6 +107,7 @@ func (w Writes) plan(links []project.EnvPortLink, lines map[string][]dotenv.Line
 	return plan
 }
 
+// A linkGroup is the links that name one key of one file, with the base of each one's port.
 type linkGroup struct {
 	File  string
 	Key   string
@@ -104,6 +115,7 @@ type linkGroup struct {
 	Bases []int
 }
 
+// groups gathers links by file and key, in the order each key first appears; a link to no job or to a port its job does not declare is left out.
 func (w Writes) groups(links []project.EnvPortLink) []linkGroup {
 	var order []string
 	byKey := map[string]*linkGroup{}
@@ -112,6 +124,7 @@ func (w Writes) groups(links []project.EnvPortLink) []linkGroup {
 		if link.Job == "" || !declared {
 			continue
 		}
+
 		id := link.File + "\x00" + link.Key
 		group, seen := byKey[id]
 		if !seen {
@@ -122,6 +135,7 @@ func (w Writes) groups(links []project.EnvPortLink) []linkGroup {
 		group.Links = append(group.Links, link)
 		group.Bases = append(group.Bases, base)
 	}
+
 	groups := make([]linkGroup, 0, len(order))
 	for _, id := range order {
 		groups = append(groups, *byKey[id])
@@ -129,11 +143,13 @@ func (w Writes) groups(links []project.EnvPortLink) []linkGroup {
 	return groups
 }
 
+// A keyPlan plans one key of a file from the links of its group.
 type keyPlan struct {
 	Writes
 	Group linkGroup
 }
 
+// entry plans each link of the key in turn, each over the value the previous ones rewrote, and folds them into one entry.
 func (k keyPlan) entry(lines []dotenv.Line) Entry {
 	merged := k.linkEntry(0, lines)
 	merged.Moves = []Move{k.move(0, merged)}
@@ -148,10 +164,12 @@ func (k keyPlan) entry(lines []dotenv.Line) Entry {
 	return merged
 }
 
+// resolved returns the port the link at index resolves to in the worktree.
 func (k keyPlan) resolved(index int) int {
 	return ResolvedPort(ResolvedPortParams{Base: k.Group.Bases[index], Offset: k.worktree.Offset, Shared: k.worktree.Shared[k.Group.Links[index].Job]})
 }
 
+// move returns where the link at index moves, entry being what was planned for it.
 func (k keyPlan) move(index int, entry Entry) Move {
 	link := k.Group.Links[index]
 	move := Move{Port: link.Port, Job: link.Job, Base: k.Group.Bases[index], Resolved: k.resolved(index)}
@@ -161,6 +179,7 @@ func (k keyPlan) move(index int, entry Entry) Move {
 	return move
 }
 
+// fold returns into updated with the entry of the next link of the same key: a rewrite carries its value forward, and an anomaly replaces a status that reported nothing to do.
 func fold(into, next Entry) Entry {
 	if next.Status == StatusRewrite {
 		into.NewValue = next.NewValue
@@ -170,12 +189,14 @@ func fold(into, next Entry) Entry {
 		}
 		return into
 	}
+
 	if into.Status == StatusUnchanged || into.Status == StatusNotFound {
 		into.Status = next.Status
 	}
 	return into
 }
 
+// linkEntry plans the link at index over lines: by its named origin when it can, else by finding its base port in the value, once reduced from any earlier settling, and moving it to the resolved port.
 func (k keyPlan) linkEntry(index int, lines []dotenv.Line) Entry {
 	link := k.Group.Links[index]
 	entry := Entry{File: link.File, Key: link.Key, Port: link.Port, Base: k.Group.Bases[index], Resolved: k.resolved(index), Addressing: project.AddressPorts}
@@ -184,10 +205,12 @@ func (k keyPlan) linkEntry(index int, lines []dotenv.Line) Entry {
 		entry.Status = StatusMissingKey
 		return entry
 	}
+
 	entry.CurrentValue = line.Value
 	if origin, planned := k.worktree.originEntry(entry, link); planned {
 		return origin
 	}
+
 	value := reducePortValue(reducePortParams{Value: line.Value, Base: entry.Base, Block: k.block, JobLabel: k.worktree.jobLabel(link.Job), Project: k.worktree.Project})
 	offsets := portOffsets(value, entry.Base)
 	switch {
@@ -205,6 +228,7 @@ func (k keyPlan) linkEntry(index int, lines []dotenv.Line) Entry {
 	return entry
 }
 
+// alreadyResolved returns the status of a value that holds the base port nowhere: unchanged when it holds the resolved port once, ambiguous when more than once, not found otherwise.
 func alreadyResolved(value string, entry Entry) Status {
 	if entry.Resolved == entry.Base {
 		return StatusNotFound
@@ -218,6 +242,7 @@ func alreadyResolved(value string, entry Entry) Status {
 	return StatusAmbiguous
 }
 
+// pairByKey returns the key=value line of key, and reports whether lines hold one.
 func pairByKey(lines []dotenv.Line, key string) (dotenv.Line, bool) {
 	for _, line := range lines {
 		if line.Kind == dotenv.Pair && line.Key == key {
@@ -227,8 +252,10 @@ func pairByKey(lines []dotenv.Line, key string) (dotenv.Line, bool) {
 	return dotenv.Line{}, false
 }
 
+// Redacted is a Plan with every value taken out of its entries, safe to print or send where a secret must not appear.
 type Redacted Plan
 
+// Redact returns plan without the current, new and foreign values of its entries; plan itself is left untouched.
 func Redact(plan Plan) Redacted {
 	entries := slices.Clone(plan.Entries)
 	for i := range entries {

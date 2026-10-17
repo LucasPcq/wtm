@@ -11,13 +11,16 @@ import (
 )
 
 const (
-	portMin          = 1
-	portMax          = 65535
+	portMin = 1
+	portMax = 65535
+	// collisionHorizon is how many worktrees apart a collision of two ports is
+	// still reported; further apart, no project reaches it.
 	collisionHorizon = 20
 )
 
 var envVarName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
+// declaration is one port a job of run.toml declares, with its base value.
 type declaration struct {
 	Job    string
 	Name   string
@@ -25,6 +28,8 @@ type declaration struct {
 	Shared bool
 }
 
+// portProblems lists every port that is not a valid environment variable name
+// or lies outside the port range, then every pair of ports that collide.
 func (f runFile) portProblems() []string {
 	var problems []string
 	for _, decl := range f.declarations() {
@@ -35,12 +40,17 @@ func (f runFile) portProblems() []string {
 			problems = append(problems, fmt.Sprintf("job %q: port %s is %d, outside %d-%d", decl.Job, decl.Name, decl.Base, portMin, portMax))
 		}
 	}
+
 	return append(problems, f.collisions()...)
 }
 
+// collisions lists the pairs of ports that would bind the same port in some
+// worktree: each worktree shifts a per-worktree port by a multiple of the
+// offset block, while a shared port never moves.
 func (f runFile) collisions() []string {
 	block := env.OffsetBlock(project.Run{PortOffsetBlock: f.PortOffsetBlock})
 	decls := f.declarations()
+
 	var problems []string
 	for i, a := range decls {
 		for _, b := range decls[i+1:] {
@@ -49,6 +59,7 @@ func (f runFile) collisions() []string {
 			if a.Shared && b.Shared {
 				meets = gap == 0
 			}
+
 			apart := gap / block
 			switch {
 			case !meets || apart > collisionHorizon:
@@ -62,6 +73,8 @@ func (f runFile) collisions() []string {
 	return problems
 }
 
+// declarations returns every port of every job, in job order and, within a
+// job, sorted by name so the problems read the same on every run.
 func (f runFile) declarations() []declaration {
 	var decls []declaration
 	for _, job := range f.Jobs {

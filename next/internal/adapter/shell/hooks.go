@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
-
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
@@ -18,13 +17,19 @@ const (
 	shellCommandFlag = "-c"
 )
 
+// RunHooks runs the hooks of params in order, each through /bin/sh -c, and
+// stops at the first that fails unless it continues on error. It returns that
+// failure as an *env.HookFailure; once ctx is cancelled, it stops the running
+// hook and returns ctx's error with the count of hooks not run.
 func RunHooks(ctx context.Context, params env.HookChain) error {
 	sink := newLines(params.Output, params.Log)
 	defer sink.close()
+
 	for index, hook := range params.Hooks {
 		if ctx.Err() != nil {
 			return fmt.Errorf("%w: %d hook(s) not run", ctx.Err(), len(params.Hooks)-index)
 		}
+
 		err := runHook(ctx, hook, params, sink)
 		sink.flush()
 		if err == nil || hook.ContinueOnError && ctx.Err() == nil {
@@ -35,10 +40,14 @@ func RunHooks(ctx context.Context, params env.HookChain) error {
 	return nil
 }
 
+// runHook runs one hook of chain, its output into sink. A blank command is
+// skipped; a failure is an *env.HookFailure, with the exit code when the hook
+// exited.
 func runHook(ctx context.Context, hook project.Hook, chain env.HookChain, sink *lines) error {
 	if strings.TrimSpace(hook.Cmd) == "" {
 		return nil
 	}
+
 	sink.openLog()
 	cmd := Command(ctx, shellBin, shellCommandFlag, hook.Cmd)
 	cmd.Dir = hookDir(hook, chain.WorkDir)
@@ -47,11 +56,13 @@ func runHook(ctx context.Context, hook project.Hook, chain env.HookChain, sink *
 	cmd.Stderr = sink
 	err := cmd.Run()
 	switch {
+	// A hook that exited 0 but left a child holding its output open still succeeded.
 	case err == nil, errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState.Success():
 		return nil
 	case ctx.Err() != nil:
 		return &env.HookFailure{Cmd: hook.Cmd, Err: fmt.Errorf("hook stopped: %w", ctx.Err())}
 	}
+
 	failure := &env.HookFailure{Cmd: hook.Cmd, Err: fmt.Errorf("hook failed: %w", err)}
 	if code, exited := ExitCode(err); exited {
 		failure.ExitCode = &code
@@ -59,6 +70,7 @@ func runHook(ctx context.Context, hook project.Hook, chain env.HookChain, sink *
 	return failure
 }
 
+// hookDir returns where hook runs: workDir, or its cwd resolved against it.
 func hookDir(hook project.Hook, workDir string) string {
 	if hook.Cwd == "" {
 		return workDir
@@ -69,6 +81,8 @@ func hookDir(hook project.Hook, workDir string) string {
 	return filepath.Join(workDir, hook.Cwd)
 }
 
+// hookEnv returns the environment of the chain's hooks, nil (this process's
+// own) when the chain sets none.
 func hookEnv(params env.HookChain) []string {
 	if len(params.Env) == 0 {
 		return nil

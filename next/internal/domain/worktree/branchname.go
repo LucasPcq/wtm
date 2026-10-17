@@ -8,18 +8,22 @@ import (
 	"strings"
 )
 
+// BranchProblem returns why git would refuse name as a branch name, or nil when it would accept it.
 func BranchProblem(name string) error {
 	reason := reason(name)
 	if reason == "" {
 		return nil
 	}
+
 	return fmt.Errorf("%q is not a valid branch name: %s", name, reason)
 }
 
+// BlankBranch reports whether name is empty or only white space.
 func BlankBranch(name string) bool {
 	return strings.TrimSpace(name) == ""
 }
 
+// reason returns why git would refuse name as a branch name (the rules of git check-ref-format), or "" when it would accept it.
 func reason(name string) string {
 	switch {
 	case name == "@", name == "HEAD":
@@ -37,6 +41,7 @@ func reason(name string) string {
 	case badComponent(name):
 		return "no part between slashes may start with . or end with .lock"
 	}
+
 	return ""
 }
 
@@ -55,14 +60,17 @@ const (
 	fallbackName    = "wtm"
 )
 
+// PathSegment returns name as one segment of a worktree's path: its slashes become dashes.
 func PathSegment(name string) string {
 	return strings.ReplaceAll(name, "/", "-")
 }
 
+// StateSegment returns name as one segment of a path in the state directory, escaped so that no branch name can reach another segment.
 func StateSegment(name string) string {
 	return url.PathEscape(name)
 }
 
+// Slug returns name as the identifier a worktree's environment knows it by: lowercase letters, digits, `_` and `-`, "wtm" when nothing is left.
 func Slug(name string) string {
 	mapped := strings.Map(func(r rune) rune {
 		switch {
@@ -72,9 +80,11 @@ func Slug(name string) string {
 			return '-'
 		}
 	}, strings.ToLower(name))
+
 	return cmp.Or(strings.TrimLeft(mapped, "-_"), fallbackName)
 }
 
+// HostLabel returns name as a DNS label: lowercase letters, digits and single dashes, at most 63 bytes, "wtm" when nothing is left.
 func HostLabel(name string) string {
 	mapped := strings.Map(func(r rune) rune {
 		switch {
@@ -86,10 +96,12 @@ func HostLabel(name string) string {
 			return '-'
 		}
 	}, name)
+
 	label := strings.Trim(collapseDashes(mapped), "-")
 	if len(label) > hostLabelMaxLen {
 		label = strings.Trim(label[:hostLabelMaxLen], "-")
 	}
+
 	return cmp.Or(label, fallbackName)
 }
 
@@ -103,17 +115,21 @@ func collapseDashes(s string) string {
 		b.WriteRune(r)
 		previous = r
 	}
+
 	return b.String()
 }
 
+// Clash is another live branch whose worktree would get the same name as Branch's: the slug or host label they share.
 type Clash struct {
 	Branch string
 	Name   string
 }
 
+// ClashWith returns the first branch of others whose slug or host label is the same as branch's, and reports whether there is one; others holds the branches of the live worktrees.
 func ClashWith(branch string, others []string) (Clash, bool) {
 	slug := Slug(branch)
 	host := HostLabel(slug)
+
 	for _, live := range others {
 		if live == "" || live == branch {
 			continue
@@ -126,5 +142,6 @@ func ClashWith(branch string, others []string) (Clash, bool) {
 			return Clash{Branch: live, Name: host}, true
 		}
 	}
+
 	return Clash{}, false
 }

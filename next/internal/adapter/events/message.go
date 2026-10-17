@@ -5,6 +5,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
+// repo, operation, unit and message are the shape of an event on the wire, as
+// wtm's daemon and wtm events read it (schema v1).
 type repo struct {
 	Root      string `json:"root"`
 	CommonDir string `json:"common_dir"`
@@ -37,6 +39,8 @@ type message struct {
 	Code          string             `json:"code,omitempty"`
 }
 
+// messageOf returns the wire message of event and reports whether wtm
+// publishes it at all; units started, phases and output stay in the process.
 func messageOf(event domain.Event) (message, bool) {
 	switch e := event.(type) {
 	case domain.WorktreeCreated:

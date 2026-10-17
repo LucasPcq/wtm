@@ -9,17 +9,20 @@ import (
 	"strings"
 )
 
+// Kind classifies a failure by what the caller can do about it; the command line maps each kind onto an exit code.
 type Kind string
 
+// The kinds of failure.
 const (
-	KindInvalid      Kind = "invalid"
-	KindConflict     Kind = "conflict"
-	KindPrecondition Kind = "precondition"
-	KindRefused      Kind = "refused"
-	KindCancelled    Kind = "cancelled"
-	KindInternal     Kind = "internal"
+	KindInvalid      Kind = "invalid"      // the request itself is wrong
+	KindConflict     Kind = "conflict"     // something already there, or held by another operation, collides with the request
+	KindPrecondition Kind = "precondition" // something the request needs is missing (no wtm config)
+	KindRefused      Kind = "refused"      // a safety check refused the request
+	KindCancelled    Kind = "cancelled"    // the operation was interrupted
+	KindInternal     Kind = "internal"     // something failed that the request could not prevent
 )
 
+// The codes shared by every command; a command declares its own beside the code that raises them.
 const (
 	CodeInvalidRequest = "request.invalid"
 	CodeInterrupted    = "unit.interrupted"
@@ -27,27 +30,31 @@ const (
 	CodeNotARepository = "git.not_a_repository"
 )
 
+// Params holds the named values a message or a code carries, for the JSON envelope and for templates.
 type Params map[string]string
 
+// Error is a failure as a use case reports it: its kind, its stable code, a human message, and what the caller can do next.
 type Error struct {
 	Kind     Kind
 	Code     string
 	Message  string
 	Params   Params
-	Fields   []FieldError
-	FollowUp *FollowUp
+	Fields   []FieldError // the request's problems, one per field, when Kind is KindInvalid
+	FollowUp *FollowUp    // a command that repairs what the failure left behind, if any
 	Cause    error
 }
 
+// FieldError is one problem with one field of a request.
 type FieldError struct {
-	Path     string
-	Code     string
-	Template string
+	Path     string // the field, as the request names it (`from`, `remember[0]`)
+	Code     string // the problem, stable across versions
+	Template string // the message, with {path}, {accepted} and each param as placeholders
 	Params   Params
-	Accepted []string
-	With     []string
+	Accepted []string // the values the field accepts, when they are a closed set
+	With     []string // the other fields the problem involves
 }
 
+// Message returns the field error's template with its placeholders filled; path is how the caller spells the field (a flag name on the command line), unless Params names a path itself.
 func (f FieldError) Message(path string) string {
 	pairs := []string{"{accepted}", strings.Join(f.Accepted, ", ")}
 	for key, value := range f.Params {
@@ -56,22 +63,26 @@ func (f FieldError) Message(path string) string {
 	if _, named := f.Params["path"]; !named {
 		pairs = append(pairs, "{path}", path)
 	}
+
 	return strings.NewReplacer(pairs...).Replace(f.Template)
 }
 
+// FollowUp is the command a failure suggests to repair what it left behind.
 type FollowUp struct {
-	Command string
-	Request json.RawMessage
+	Command string          // the command to run (`clean`)
+	Request json.RawMessage // its request, in the command's JSON shape
 	Code    string
 	Message string
 	Params  Params
 }
 
+// CleanRequest is the request of a `clean` follow-up, as FollowUp.Request carries it.
 type CleanRequest struct {
 	Branches []string `json:"branches"`
 	Force    bool     `json:"force"`
 }
 
+// Error returns the message, followed by the cause's when there is one.
 func (e *Error) Error() string {
 	if e == nil {
 		return "<nil *wtm.Error>"
@@ -79,24 +90,30 @@ func (e *Error) Error() string {
 	if e.Cause == nil {
 		return e.Message
 	}
+
 	return e.Message + ": " + e.Cause.Error()
 }
 
+// Unwrap returns the cause, so errors.Is and errors.As see through the failure.
 func (e *Error) Unwrap() error {
 	if e == nil {
 		return nil
 	}
+
 	return e.Cause
 }
 
+// Invalid returns the failure of a request whose fields have the given problems.
 func Invalid(fields []FieldError) *Error {
 	return &Error{Kind: KindInvalid, Code: CodeInvalidRequest, Message: "the request is invalid", Fields: fields}
 }
 
+// InvalidMessage returns the failure of a request that is wrong as a whole, described by message.
 func InvalidMessage(message string) *Error {
 	return &Error{Kind: KindInvalid, Code: CodeInvalidRequest, Message: message}
 }
 
+// AsErrorParams is what AsError turns into a failure: Err, and the code, message and params to give it when it is not one already.
 type AsErrorParams struct {
 	Err     error
 	Code    string
@@ -104,6 +121,7 @@ type AsErrorParams struct {
 	Params  Params
 }
 
+// AsError returns params.Err as a failure: the *Error it wraps if any, an interruption if it is a cancelled context, else an internal failure with params.Code and params.Message (or the generic internal code). It returns nil for a nil error.
 func AsError(params AsErrorParams) *Error {
 	if params.Err == nil {
 		return nil
@@ -117,15 +135,18 @@ func AsError(params AsErrorParams) *Error {
 	if params.Code != "" {
 		return &Error{Kind: KindInternal, Code: params.Code, Message: params.Message, Params: params.Params, Cause: params.Err}
 	}
+
 	return &Error{Kind: KindInternal, Code: CodeInternal, Message: "internal error", Params: params.Params, Cause: params.Err}
 }
 
+// SchemaNewer is the error of a state file written by a newer wtm, at a schema this one does not know: it refuses to change the file.
 type SchemaNewer struct {
 	Path      string
 	Found     int
 	Supported int
 }
 
+// Error names the file, its schema and the one this wtm writes, and asks for an upgrade.
 func (e *SchemaNewer) Error() string {
 	return fmt.Sprintf("%s is at schema %d, newer than the %d this wtm writes: upgrade wtm to change it", e.Path, e.Found, e.Supported)
 }

@@ -37,6 +37,8 @@ func head(t *testing.T, dir, ref string) string {
 	return gittest.Output(t, dir, "rev-parse", ref)
 }
 
+// advanceOnOrigin pushes a new commit to origin's branch name from a clone
+// and returns that commit.
 func advanceOnOrigin(t *testing.T, origin, name string) string {
 	t.Helper()
 	clone := filepath.Join(t.TempDir(), "clone")
@@ -49,6 +51,8 @@ func advanceOnOrigin(t *testing.T, origin, name string) string {
 	return head(t, clone, "HEAD")
 }
 
+// checkOutFeature checks feature out in the main worktree, or in a new linked
+// one, and returns where.
 func checkOutFeature(t *testing.T, dir string, linked bool) string {
 	t.Helper()
 	if !linked {
@@ -60,6 +64,7 @@ func checkOutFeature(t *testing.T, dir string, linked bool) string {
 	return where
 }
 
+// rebase starts a rebase onto main with backend, which must stop on a conflict.
 func rebase(t *testing.T, dir, backend string) {
 	t.Helper()
 	out, err := exec.Command("git", "-C", dir, "rebase", backend, "main").CombinedOutput()
@@ -125,6 +130,7 @@ func named(names ...string) []worktree.Branch {
 	return branches
 }
 
+// leaveAFile writes a .env inside the directory at path, if it exists.
 func leaveAFile(t *testing.T, path string) {
 	t.Helper()
 	if _, err := os.Stat(path); err != nil {
@@ -133,6 +139,8 @@ func leaveAFile(t *testing.T, path string) {
 	require.NoError(t, os.WriteFile(filepath.Join(path, ".env"), []byte("PORT=3000\n"), 0o644))
 }
 
+// fakeSSH puts an ssh on PATH that records its arguments and fails, with
+// GIT_SSH_COMMAND unset, and returns the file it records to.
 func fakeSSH(t *testing.T) string {
 	t.Helper()
 	bin := t.TempDir()
@@ -157,6 +165,8 @@ func lastLine(content string) string {
 	return lines[len(lines)-1]
 }
 
+// pair is a repository with two worktrees at the same commit: source, the main
+// one, and target, a linked one on branch split.
 type pair struct {
 	repo   git.Repo
 	source string
@@ -165,6 +175,8 @@ type pair struct {
 
 const numbered = "1\n2\n3\n4\n5\n6\n7\n8\n9\n"
 
+// sourceAndTarget builds a pair whose base commit holds a.txt, c.txt,
+// gone.txt, README.md and a .gitignore ignoring ignored.log.
 func sourceAndTarget(t *testing.T) pair {
 	t.Helper()
 	repo := newRepo(t)

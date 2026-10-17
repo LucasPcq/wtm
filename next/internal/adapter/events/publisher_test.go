@@ -129,10 +129,10 @@ func TestTheSocketIsTheOneWtmsDaemonListensOn(t *testing.T) {
 }
 
 func TestTheCommonDirIsResolvedThroughSymlinks(t *testing.T) {
-	real := t.TempDir()
+	target := t.TempDir()
 	link := filepath.Join(t.TempDir(), "link")
-	require.NoError(t, symlink(real, link))
-	resolved, err := filepath.EvalSymlinks(real)
+	require.NoError(t, symlink(target, link))
+	resolved, err := filepath.EvalSymlinks(target)
 	require.NoError(t, err)
 
 	publisher := NewPublisher(PublisherParams{Root: "/repo", CommonDir: link})

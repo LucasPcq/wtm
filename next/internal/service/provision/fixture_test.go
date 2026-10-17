@@ -28,11 +28,14 @@ const (
 
 var createdAt = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 
+// repo is the git a test provisions in, read back through Branches.
 type repo interface {
 	provision.Git
 	Branches(ctx context.Context) (worktree.Branches, error)
 }
 
+// world is a project with a main worktree on main and a local branch existing,
+// and a provision.Service over it.
 type world struct {
 	root     string
 	main     string
@@ -42,6 +45,7 @@ type world struct {
 	service  provision.Service
 }
 
+// onDisk builds the world in a real repository with the real meta and env stores.
 func onDisk(t *testing.T) world {
 	t.Helper()
 	root := gittest.TempDir(t)
@@ -53,12 +57,16 @@ func onDisk(t *testing.T) world {
 	return world{root: root, main: main, stateDir: stateDir, git: repo, meta: meta, service: service(repo, meta, store.EnvFiles{})}
 }
 
+// seeds is what an in-memory world starts with: git calls that fail, linked
+// worktrees and stored files.
 type seeds struct {
 	GitFail   map[string]error
 	Worktrees []worktree.Worktree
 	Store     storetest.FakeParams
 }
 
+// inMemory builds the world over the git and store fakes, the main .env
+// seeded, and returns the store fake to read back or fail.
 func inMemory(t *testing.T, seed seeds) (world, *storetest.Fake) {
 	t.Helper()
 	root := gittest.TempDir(t)
@@ -86,6 +94,8 @@ func service(git provision.Git, meta provision.Meta, env provision.EnvFiles) pro
 	}
 }
 
+// params provisions branchName as a new branch from main, its .env copied from
+// main, its events recorded by report.
 func (w world) params(report *recorder) provision.Params {
 	return provision.Params{
 		Project: provision.Project{MainPath: w.main, StateDir: w.stateDir, EnvFiles: []project.EnvFile{{Target: ".env"}}},
@@ -100,6 +110,7 @@ func (w world) params(report *recorder) provision.Params {
 	}
 }
 
+// existing provisions the existing local branch instead of a new one.
 func (w world) existing(report *recorder) provision.Params {
 	params := w.params(report)
 	params.Worktree.Branch = existing
@@ -112,6 +123,7 @@ func (w world) path(name string) string {
 	return filepath.Join(w.root, filepath.Base(name))
 }
 
+// portLinked adds a run.toml whose web job's port is linked into .env.
 func portLinked(params provision.Params) provision.Params {
 	params.Project.Run = project.Run{
 		Jobs:     []project.Job{{Name: "web", Kind: project.Service, Cmd: "npm start", Ports: map[string]int{"http": 3000}}},
@@ -120,6 +132,7 @@ func portLinked(params provision.Params) provision.Params {
 	return params
 }
 
+// composed adds a run.toml with a docker compose job and no env link.
 func composed(params provision.Params) provision.Params {
 	params.Project.Run = project.Run{
 		Jobs: []project.Job{{Name: "db", Kind: project.Service, Cmd: "docker compose up -d", Ports: map[string]int{"pg": 5432}}},
@@ -134,18 +147,21 @@ func hooked(params provision.Params, commands ...string) provision.Params {
 	return params
 }
 
+// unlocked is a meta store whose ordinals' lock is never held.
 type unlocked struct{ provision.Meta }
 
 func (unlocked) LockOrdinals(_ context.Context, do func() error) (bool, error) {
 	return false, do()
 }
 
+// unreadable is an env store whose files cannot be read.
 type unreadable struct{ provision.EnvFiles }
 
 func (unreadable) Read(string) ([]dotenv.Line, error) {
 	return nil, errors.New("read .env: permission denied")
 }
 
+// upstream is a repository whose branch existing is behind its origin.
 type upstream struct {
 	main    string
 	linked  string
@@ -157,6 +173,8 @@ type upstreamSeed struct {
 	Dirty  bool
 }
 
+// behindOrigin builds upstream, existing checked out in a linked worktree (dirty
+// or not) when seed asks.
 func behindOrigin(t *testing.T, seed upstreamSeed) upstream {
 	t.Helper()
 	root := gittest.TempDir(t)
