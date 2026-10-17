@@ -11,9 +11,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
-// surfaceTUI names the wizard as the surface of the operations it runs.
-const surfaceTUI = "tui"
-
 // useCase is what the wizard calls of extract's use case, so a test can stand in for it.
 type useCase interface {
 	Questions(ctx context.Context, req extract.Request) (extract.Questions, error)

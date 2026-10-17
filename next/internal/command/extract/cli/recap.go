@@ -2,18 +2,17 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
+	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
 // previewPlan dry-runs the request as answered, for the recap to show the plan its apply will be held to.
 func (w *wizard) previewPlan(ctx context.Context) (func(), error) {
-	outcome, err := w.app.Run(ctx, w.req, operation.Options{DryRun: true, Surface: surfaceTUI})
+	outcome, err := w.app.Run(ctx, w.req, operation.Options{DryRun: true, Surface: uicli.SurfaceTUI})
 	if err != nil {
 		return func() { w.preview = nil }, err
 	}
@@ -38,22 +37,16 @@ func (w *wizard) applyLabel() string {
 
 // apply runs the request as answered, held to the fingerprint of the plan previewed unless on a dry run; a stale plan leaves the outcome alone, since the wizard starts again.
 func (w *wizard) apply(ctx context.Context) error {
-	opts := operation.Options{DryRun: w.dryRun, Surface: surfaceTUI, Report: w.report}
+	opts := operation.Options{DryRun: w.dryRun, Surface: uicli.SurfaceTUI, Report: w.report}
 
 	if !w.dryRun {
 		opts.ExpectFingerprint = w.preview.Fingerprint
 	}
 
 	outcome, err := w.app.Run(ctx, w.req, opts)
-	if !stale(err) {
+	if !operation.Stale(err) {
 		w.outcome = outcome
 	}
 
 	return err
-}
-
-// stale reports whether err refuses a plan the facts changed under.
-func stale(err error) bool {
-	found, ok := errors.AsType[*domain.Error](err)
-	return ok && found.Code == operation.CodePlanStale
 }

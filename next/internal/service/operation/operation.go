@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"maps"
 	"os"
 	"slices"
@@ -136,6 +137,12 @@ func (o *Op) Expect(fingerprint string) error {
 		Message: "the facts changed since the preview",
 		Params:  domain.Params{"expected": expected, "found": fingerprint},
 	}
+}
+
+// Stale reports whether err is the refusal of a plan the facts changed under.
+func Stale(err error) bool {
+	found, ok := errors.AsType[*domain.Error](err)
+	return ok && found.Code == CodePlanStale
 }
 
 // Started publishes the operation's started event and returns the Report that

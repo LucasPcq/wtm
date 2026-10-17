@@ -58,13 +58,14 @@ lint: fmt vet arch dead sumtype next-lint
 next-lint:
 	go tool revive -config next/revive.toml -formatter plain ./next/...
 
-# dupl reports token-level clones. It is not part of `lint`: a clone is a
-# judgement call — two parallel families over unrelated types read better
-# duplicated than behind a generic — so it informs a review rather than gating
-# one. Raise the threshold to see only the large ones.
+# dupl reports token-level clones in internal/ and next/. It is not part of
+# `lint`: a clone is a judgement call — two parallel families over unrelated
+# types (create and extract in next/) read better duplicated than behind a
+# generic — so it informs a review rather than gating one. Raise the threshold
+# to see only the large ones.
 DUPL_THRESHOLD ?= 75
 dupl:
-	@find internal -name '*.go' ! -name '*_test.go' > /tmp/wtm-dupl-files
+	@find internal next -name '*.go' ! -name '*_test.go' > /tmp/wtm-dupl-files
 	@go tool dupl -t $(DUPL_THRESHOLD) -files < /tmp/wtm-dupl-files
 
 tidy:
