@@ -77,8 +77,9 @@ func (h *Held) Grow(op operation.Operation) (bool, error) {
 		return false, err
 	}
 	h.files, h.protected = append(h.files, files...), protected
-	h.operation = op
-	h.holder = h.holder.rehold(op)
+	h.operation.Locks = append(h.operation.Locks, missing...)
+	slices.SortFunc(h.operation.Locks, func(a, b operation.Lock) int { return cmp.Compare(a.Key(), b.Key()) })
+	h.holder = h.holder.rehold(h.operation)
 	return true, nil
 }
 

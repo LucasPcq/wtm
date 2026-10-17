@@ -34,6 +34,5 @@ type App struct {
 }
 
 func New(deps Deps) *App {
-	deps.Create.Provision.Now = deps.Now
 	return &App{deps: deps}
 }

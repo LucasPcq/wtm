@@ -122,3 +122,19 @@ func TestTheRecordOfADeadOperationIsNeverItsHolder(t *testing.T) {
 	assert.Equal(t, "unknown", refusal(t, takeErr).Params["op"])
 	assert.NoFileExists(t, filepath.Join(locks.StateDir, "locks", "ops", "op-dead.json"))
 }
+
+func TestGrowingKeepsWhatIsHeldWhenTheDefaultsMove(t *testing.T) {
+	locks := Locks{StateDir: t.TempDir()}
+	held := take(t, func() (*Held, error) { return locks.Take(op("op-1", repoShared, featA)) })
+
+	moved, movedErr := held.Grow(op("op-1", repoShared, featB))
+	back, backErr := held.Grow(op("op-1", repoShared, featA))
+
+	require.NoError(t, movedErr)
+	require.NoError(t, backErr)
+	assert.True(t, moved)
+	assert.False(t, back)
+	var recorded operation.Operation
+	require.NoError(t, json.Unmarshal(read(t, filepath.Join(locks.StateDir, "locks", "ops", "op-1.json")), &recorded))
+	assert.Equal(t, []operation.Lock{repoShared, featA, featB}, recorded.Locks)
+}

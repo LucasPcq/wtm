@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"os"
 	"os/exec"
@@ -214,4 +215,26 @@ func TestAnInvalidRequestIsRefusedBeforeAnythingIsLockedOrWritten(t *testing.T) 
 	assert.Equal(t, wtm.KindInvalid, refusal(t, err).Kind)
 	assert.NoFileExists(t, filepath.Join(w.stateDir, "locks", "ops", "op-1.json"))
 	assert.Empty(t, w.published.all())
+}
+
+func TestARunWithoutLocksThatRemembersSaysSoOnce(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.deps.TakeLocks = func(operation.Operation) (app.Hold, error) { return unprotected{}, nil }
+	w.deps.Create.Remember = func(context.Context, map[string]string) (wtm.Written, error) {
+		return wtm.Written{Changed: true, Unlocked: true}, nil
+	}
+
+	outcome, err := app.New(w.deps).Create(t.Context(), app.CreateParams{Request: create.Request{Branches: []string{branchName}, Remember: []string{"env_from"}}, Report: (&recorder{}).add})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"locks.unavailable"}, codesOf(outcome.Warnings))
+}
+
+func TestARunWithoutReportStillRuns(t *testing.T) {
+	w := newWorld(t, seed{})
+
+	outcome, err := app.New(w.deps).Create(t.Context(), app.CreateParams{Request: create.Request{Branches: []string{branchName}}})
+
+	require.NoError(t, err)
+	assert.Equal(t, wtm.StatusDone, outcome.Result.Items[0].Status)
 }

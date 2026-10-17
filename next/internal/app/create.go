@@ -68,10 +68,11 @@ func (a *App) Create(ctx context.Context, params CreateParams) (CreateOutcome, e
 	}
 	result := a.apply(ctx, applying{Operation: settled.Operation, Settled: settled, Plan: outcome.Plan, Report: params.Report})
 	outcome.Result = &result
-	outcome.Warnings = once(append(outcome.Warnings, result.Warnings...))
+	outcome.Warnings = append(outcome.Warnings, result.Warnings...)
 	if !held.Protected() {
 		outcome.Warnings = append(outcome.Warnings, wtm.Warning{Code: "locks.unavailable", Message: "ran without operation locks"})
 	}
+	outcome.Warnings = once(outcome.Warnings)
 	return outcome, nil
 }
 
@@ -112,7 +113,7 @@ func (a *App) settle(ctx context.Context, s settling) (settled, error) {
 		return settled{Facts: facts, Request: resolved, Operation: s.Operation}, nil
 	}
 	grown := s.Operation
-	grown.Locks = resolved.Locks()
+	grown.Locks = create.Locks(facts, resolved)
 	taken, err := s.Held.Grow(grown)
 	if err != nil {
 		return settled{}, err
@@ -147,7 +148,9 @@ func (a *App) apply(ctx context.Context, run applying) create.Result {
 	publisher := a.deps.Publisher(run.Operation)
 	report := func(event wtm.Event) {
 		publisher.Publish(event)
-		run.Report(event)
+		if run.Report != nil {
+			run.Report(event)
+		}
 	}
 	report(wtm.OperationStarted{Command: commandCreate, Surface: a.deps.Surface})
 	result := create.Apply(ctx, create.ApplyParams{

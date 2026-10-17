@@ -123,6 +123,7 @@ func newWorld(t *testing.T, s seed) world {
 					RunHooks:   shell.RunHooks,
 					PublicPort: func(context.Context, int) int { return 0 },
 					Shield:     shell.Shield,
+					Now:        func() time.Time { return clock },
 				},
 				MainPath: main,
 				StateDir: stateDir,

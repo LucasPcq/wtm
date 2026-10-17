@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
@@ -32,13 +31,13 @@ const (
 )
 
 type appParams struct {
-	MainPath string
-	StateDir string
+	MainPath  string
+	StateDir  string
+	CommonDir string
 }
 
 func newApp(params appParams) *app.App {
 	repo := git.Repo{Dir: params.MainPath, Remote: remote}
-	correlationID := os.Getenv(correlationIDEnv)
 	return app.New(app.Deps{
 		Create: create.Deps{
 			Git: repo,
@@ -56,6 +55,7 @@ func newApp(params appParams) *app.App {
 				RunHooks:   shell.RunHooks,
 				PublicPort: proxyport.Port{Plist: proxyport.PlistPath()}.Public,
 				Shield:     shell.Shield,
+				Now:        time.Now,
 			},
 			MainPath: params.MainPath,
 			StateDir: params.StateDir,
@@ -64,20 +64,24 @@ func newApp(params appParams) *app.App {
 			return oplock.Locks{StateDir: params.StateDir}.Take(op)
 		},
 		Publisher: func(op operation.Operation) app.Publisher {
-			return events.NewPublisher(events.PublisherParams{
-				Root:          params.MainPath,
-				CommonDir:     filepath.Dir(params.StateDir),
-				SocketPath:    events.SocketPath(),
-				OpID:          op.ID,
-				CorrelationID: correlationID,
-				Now:           time.Now,
-			})
+			return events.NewPublisher(params.publisherParams(op))
 		},
 		NewOpID:       newOpID,
 		Now:           time.Now,
 		Surface:       surface,
-		CorrelationID: correlationID,
+		CorrelationID: os.Getenv(correlationIDEnv),
 	})
+}
+
+func (p appParams) publisherParams(op operation.Operation) events.PublisherParams {
+	return events.PublisherParams{
+		Root:          p.MainPath,
+		CommonDir:     p.CommonDir,
+		SocketPath:    events.SocketPath(),
+		OpID:          op.ID,
+		CorrelationID: op.CorrelationID,
+		Now:           time.Now,
+	}
 }
 
 func newOpID() string {
