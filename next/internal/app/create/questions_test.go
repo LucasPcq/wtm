@@ -34,6 +34,17 @@ func TestARememberedAnswerIsTheDefaultUnlessAskedAgain(t *testing.T) {
 	assert.Equal(t, create.Answer[bool]{Value: true, Origin: create.OriginRemembered}, remembered.FastForward.Answer)
 	assert.Equal(t, create.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: create.OriginConfig}, asked.EnvFrom.Answer)
 	assert.Equal(t, create.Answer[bool]{Value: false, Origin: create.OriginDefault}, asked.FastForward.Answer)
+	assert.Equal(t, project.EnvExample, asked.EnvFrom.Remembered)
+	assert.Equal(t, run.Verbatim, asked.Isolation.Remembered)
+	assert.Equal(t, project.EnvExample, remembered.EnvFrom.Remembered)
+}
+
+func TestIfNotExistsIsSetByItsFlagOnly(t *testing.T) {
+	w := newWorld(t, seed{})
+
+	questions := w.questions(t, create.Request{Branches: []string{branchName}, IfNotExists: true})
+
+	assert.Equal(t, create.Confirm{Answer: create.Answer[bool]{Value: true, Origin: create.OriginRequest}, Skip: "set by its flag only"}, questions.IfNotExists)
 }
 
 func TestAnAnswerGivenWinsOverARememberedOne(t *testing.T) {

@@ -61,10 +61,8 @@ func (w *wizard) summaries() string {
 		switch {
 		case m.ruled != "":
 			lines = append(lines, muted.Render(indent+"· "+labels[s]+" — "+m.ruled))
-		case m.settled != "":
-			lines = append(lines, summary.Render(indent+"✓ "+labels[s]+": "+m.settled))
-		case m.asked:
-			lines = append(lines, summary.Render(indent+"✓ "+labels[s]+": "+m.summary))
+		default:
+			lines = append(lines, summary.Render(indent+"✓ "+labels[s]+": "+m.line))
 		}
 	}
 	return strings.Join(lines, "\n")

@@ -35,6 +35,15 @@ type Ran struct {
 
 func Run(ctx context.Context, params Params) (Ran, error) {
 	w := newWizard(ctx, wizardParams{App: params.App, Request: params.Request, DryRun: params.DryRun})
+	if params.DryRun {
+		if err := w.reobserve(); err != nil {
+			return Ran{Request: params.Request}, err
+		}
+		if !w.asks() {
+			outcome, err := params.App.Create(ctx, app.CreateParams{Request: params.Request, DryRun: true, Surface: surface})
+			return Ran{Outcome: outcome, Request: params.Request}, err
+		}
+	}
 	for {
 		answered, err := ask(ctx, askParams{Wizard: w, In: params.In, Out: params.Out})
 		if err != nil {

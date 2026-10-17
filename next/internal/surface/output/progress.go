@@ -165,7 +165,7 @@ func (p *Progress) erase() {
 	if !p.painted {
 		return
 	}
-	fmt.Fprintf(p.w, ansiPrevLine+ansiClearBelow, 1)
+	fmt.Fprintf(p.w, ansiPrevLine+ansiClearLine, 1)
 	p.painted = false
 }
 

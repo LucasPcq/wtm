@@ -80,10 +80,12 @@ func TestWhatAFlagOrARememberedAnswerSettledIsNotAsked(t *testing.T) {
 	assert.Contains(t, screen, "esc cancel")
 }
 
-func TestAskAsksARememberedAnswerAgain(t *testing.T) {
+func TestAskAsksARememberedAnswerAgainStartingOnIt(t *testing.T) {
 	d := open(t, wizardParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: "main"}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Ask: true}})
 
 	assert.Equal(t, stepEnvFrom, d.w.current)
+	assert.Equal(t, "main", d.w.envFrom.value())
+	assert.Contains(t, d.screen(), "[x] Always use this answer in this repo")
 }
 
 func TestASourceBehindOriginIsOfferedAFastForward(t *testing.T) {
@@ -109,20 +111,23 @@ func TestTheSourceListPinsTheBaseBranchAndRefreshes(t *testing.T) {
 	assert.Empty(t, d.w.loading)
 }
 
-func TestEscOnTheFirstQuestionCancels(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{})})
+func TestEachWayOutCancels(t *testing.T) {
+	settled := create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}
+	cases := map[string]struct {
+		Request create.Request
+		Keys    []string
+	}{
+		"esc on the first question": {Keys: []string{"esc"}},
+		"no, cancel":                {Request: settled, Keys: []string{"down", "enter"}},
+		"ctrl+c":                    {Keys: []string{"ctrl+c"}},
+	}
+	for name, c := range cases {
+		d := open(t, wizardParams{App: newApp(seed{}), Request: c.Request})
 
-	d.keys("esc")
+		d.keys(c.Keys...)
 
-	assert.True(t, d.w.aborted)
-}
-
-func TestNoCancelCancels(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}})
-
-	d.keys("down", "enter")
-
-	assert.True(t, d.w.aborted)
+		assert.True(t, d.w.aborted, name)
+	}
 }
 
 func TestAPlanThatCannotApplySaysWhyAndOffersOnlyToCancel(t *testing.T) {
@@ -156,12 +161,4 @@ func TestADryRunAsksTheQuestionsAndNoConfirmation(t *testing.T) {
 
 	assert.True(t, d.w.finished)
 	assert.Nil(t, d.w.preview)
-}
-
-func TestCtrlCCancels(t *testing.T) {
-	d := open(t, wizardParams{App: newApp(seed{})})
-
-	d.keys("ctrl+c")
-
-	assert.True(t, d.w.aborted)
 }

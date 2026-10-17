@@ -22,7 +22,7 @@ func finalScreen(raw string) []string {
 			n, _ := strconv.Atoi(count)
 			rows = append(rows, before)
 			rows = rows[:max(len(rows)-1-n, 0)]
-			line = strings.TrimPrefix(rest, "\x1b[J")
+			line = strings.TrimPrefix(strings.TrimPrefix(rest, "\x1b[J"), "\x1b[2K")
 		}
 		rows = append(rows, line)
 	}

@@ -1,16 +1,12 @@
 package form
 
 import (
-	"cmp"
 	"context"
-	"errors"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/app"
 	"github.com/LucasPcq/wtm/next/internal/app/create"
-	"github.com/LucasPcq/wtm/next/internal/surface/output"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 	"github.com/LucasPcq/wtm/next/internal/wtm/run"
@@ -18,23 +14,6 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
-
-type step int
-
-const (
-	stepBranches step = iota
-	stepFrom
-	stepEnvFrom
-	stepIsolation
-	stepFastForward
-	stepIfNotExists
-	stepRecap
-	stepCount
-)
-
-var labels = [stepCount]string{"Branches", "Source branch", "Env strategy", "Isolation", "Source update", "If not exists", "Confirm"}
-
-var paths = [stepCount]string{"branches", "from", "env_from", "isolation", "fast_forward", "if_not_exists", ""}
 
 const (
 	readingText  = "Reading the repository…"
@@ -46,7 +25,6 @@ const (
 	staleText    = "the facts changed since the preview"
 	applyValue   = "apply"
 	cancelValue  = "cancel"
-	ruledByFlag  = "set by its flag only"
 	none         = "none"
 	trail        = " · "
 	keyInterrupt = "ctrl+c"
@@ -78,21 +56,6 @@ type field interface {
 	update(msg tea.Msg) (verdict, tea.Cmd)
 	view(size size) string
 	help() help
-}
-
-type mark struct {
-	asked   bool
-	settled string
-	ruled   string
-	summary string
-	offered standing
-}
-
-type standing struct {
-	value   string
-	flagged bool
-	origin  create.Origin
-	skip    string
 }
 
 type wizard struct {
@@ -258,54 +221,7 @@ func (w *wizard) enter(from step) tea.Cmd {
 	return tea.Quit
 }
 
-func (w *wizard) standing(s step) standing {
-	q := w.q
-	switch s {
-	case stepBranches:
-		return standing{value: strings.Join(q.Branches.Given, ", "), flagged: len(w.given.Branches) > 0}
-	case stepFrom:
-		return standing{value: q.From.Value, flagged: w.given.From != "", origin: q.From.Origin}
-	case stepEnvFrom:
-		return standing{value: string(q.EnvFrom.Value), flagged: w.given.EnvFrom != "", origin: q.EnvFrom.Origin}
-	case stepIsolation:
-		return standing{value: string(q.Isolation.Value), flagged: w.given.Isolation != "", origin: q.Isolation.Origin, skip: q.Isolation.Skip}
-	case stepFastForward:
-		return standing{value: yesNo(q.FastForward.Value), flagged: w.given.FastForward != nil, origin: q.FastForward.Origin, skip: q.FastForward.Skip}
-	case stepIfNotExists:
-		return standing{skip: ruledByFlag}
-	case stepRecap, stepCount:
-	}
-	return standing{}
-}
-
-func (w *wizard) decide(s step) mark {
-	st := w.standing(s)
-	value := cmp.Or(st.value, none)
-	switch {
-	case s == stepRecap:
-		return mark{asked: true}
-	case st.skip != "":
-		return mark{ruled: st.skip}
-	case w.erred(paths[s]):
-		return mark{asked: true, offered: st}
-	case st.flagged:
-		return mark{settled: value + trail + output.Flag(paths[s])}
-	case w.answered[s]:
-		return mark{settled: value}
-	case st.origin == create.OriginRemembered:
-		return mark{settled: value + trail + string(create.OriginRemembered)}
-	}
-	return mark{asked: true, offered: st}
-}
-
-func (w *wizard) erred(path string) bool {
-	return slices.ContainsFunc(w.q.Errors, func(problem wtm.FieldError) bool {
-		return problem.Path == path || strings.HasPrefix(problem.Path, path+"[")
-	})
-}
-
 func (w *wizard) open(s step) tea.Cmd {
-	q := w.q
 	switch s {
 	case stepBranches:
 		w.branches = newTextList(textListParams{Entries: w.req.Branches, Check: w.branchProblem, Badge: w.branchBadge})
@@ -313,87 +229,16 @@ func (w *wizard) open(s step) tea.Cmd {
 	case stepFrom:
 		w.from = w.sourceList()
 	case stepEnvFrom:
-		w.envFrom = choiceList(choiceParams{Options: names(q.EnvFrom.Options), Value: string(q.EnvFrom.Value), Remembered: slices.Contains(w.req.Remember, paths[s])})
+		w.envFrom = choiceList(w.choices(s))
 	case stepIsolation:
-		w.isolate = choiceList(choiceParams{Options: names(q.Isolation.Options), Value: string(q.Isolation.Value), Remembered: slices.Contains(w.req.Remember, paths[s])})
+		w.isolate = choiceList(w.choices(s))
 	case stepFastForward:
-		w.ff = newConfirm(q.FastForward.Value)
+		w.ff = newConfirm(w.q.FastForward.Value)
 	case stepRecap:
 		return w.previewing()
 	case stepIfNotExists, stepCount:
 	}
 	return nil
-}
-
-func (w *wizard) sourceList() *selectList {
-	from := w.q.From
-	options := make([]option, 0, len(from.Options))
-	for _, o := range from.Options {
-		options = append(options, option{Label: o.Value, Value: o.Value, Badge: o.Badge})
-	}
-	if at := slices.IndexFunc(options, func(o option) bool { return o.Value == from.Pinned }); at > 0 {
-		pinned := options[at]
-		options = append([]option{pinned}, slices.Delete(options, at, at+1)...)
-	}
-	return newSelectList(selectParams{Options: options, Start: cmp.Or(from.Value, from.Pinned)})
-}
-
-type choiceParams struct {
-	Options    []string
-	Value      string
-	Remembered bool
-}
-
-func choiceList(params choiceParams) *selectList {
-	options := make([]option, 0, len(params.Options))
-	for _, value := range params.Options {
-		options = append(options, option{Label: value, Value: value})
-	}
-	return newSelectList(selectParams{Options: options, Start: params.Value, Toggle: true, ToggleOn: params.Remembered})
-}
-
-func (w *wizard) branchProblem(entries []string, from int) error {
-	req := w.req
-	req.Branches = entries
-	questions, err := w.app.CreateQuestions(w.ctx, req)
-	if err != nil {
-		return err
-	}
-	if len(entries) == 0 {
-		return problem(wtm.FieldError{Path: paths[stepBranches], Template: "{path} is required"})
-	}
-	for _, found := range questions.Errors {
-		index, entry := strings.CutPrefix(found.Path, paths[stepBranches]+"[")
-		at, err := strconv.Atoi(strings.TrimSuffix(index, "]"))
-		if entry && err == nil && at >= from {
-			return problem(found)
-		}
-	}
-	return nil
-}
-
-func problem(found wtm.FieldError) error {
-	return errors.New(found.Message(label(found.Path)))
-}
-
-func label(path string) string {
-	name, index, indexed := strings.Cut(path, "[")
-	at := slices.Index(paths[:], name)
-	if at < 0 {
-		return path
-	}
-	if indexed {
-		return labels[at] + "[" + index
-	}
-	return labels[at]
-}
-
-func (w *wizard) branchBadge(entry string) string {
-	at := slices.IndexFunc(w.q.Branches.Options, func(o create.Option) bool { return o.Value == entry })
-	if at < 0 {
-		return ""
-	}
-	return w.q.Branches.Options[at].Badge
 }
 
 func (w *wizard) field() field {
@@ -429,13 +274,9 @@ func (w *wizard) answer() tea.Cmd {
 		w.req.From = w.from.value()
 		shown = w.req.From
 	case stepEnvFrom:
-		w.req.EnvFrom = project.EnvStrategy(w.envFrom.value())
-		w.remember(rememberParams{Path: paths[s], On: w.envFrom.remember})
-		shown = string(w.req.EnvFrom)
+		shown = w.choose(chosen{Step: s, Value: w.envFrom.value(), Remember: w.envFrom.remember})
 	case stepIsolation:
-		w.req.Isolation = run.Isolation(w.isolate.value())
-		w.remember(rememberParams{Path: paths[s], On: w.isolate.remember})
-		shown = string(w.req.Isolation)
+		shown = w.choose(chosen{Step: s, Value: w.isolate.value(), Remember: w.isolate.remember})
 	case stepFastForward:
 		w.req.FastForward = new(w.ff.yes())
 		shown = yesNo(w.ff.yes())
@@ -443,17 +284,32 @@ func (w *wizard) answer() tea.Cmd {
 		return w.confirmed()
 	case stepIfNotExists, stepCount:
 	}
-	offered := w.marks[s].offered
-	kept := offered.origin == create.OriginConfig || offered.origin == create.OriginDefault
-	w.marks[s].summary = shown
-	if kept && shown == offered.value {
-		w.marks[s].summary = shown + trail + string(offered.origin)
-	}
+	w.marks[s].line = w.summarized(s, shown)
 	if err := w.reobserve(); err != nil {
 		w.err = err
 		return tea.Quit
 	}
 	return w.enter(s + 1)
+}
+
+type chosen struct {
+	Step     step
+	Value    string
+	Remember bool
+}
+
+func (w *wizard) choose(c chosen) string {
+	if c.Step == stepIsolation {
+		w.req.Isolation = run.Isolation(c.Value)
+	} else {
+		w.req.EnvFrom = project.EnvStrategy(c.Value)
+	}
+	path := paths[c.Step]
+	w.req.Remember = slices.DeleteFunc(slices.Clone(w.req.Remember), func(p string) bool { return p == path })
+	if c.Remember {
+		w.req.Remember = append(w.req.Remember, path)
+	}
+	return c.Value
 }
 
 func (w *wizard) confirmed() tea.Cmd {
@@ -469,18 +325,6 @@ func (w *wizard) reobserve() error {
 	questions, err := w.app.CreateQuestions(w.ctx, w.req)
 	w.q = questions
 	return err
-}
-
-type rememberParams struct {
-	Path string
-	On   bool
-}
-
-func (w *wizard) remember(params rememberParams) {
-	w.req.Remember = slices.DeleteFunc(slices.Clone(w.req.Remember), func(path string) bool { return path == params.Path })
-	if params.On {
-		w.req.Remember = append(w.req.Remember, params.Path)
-	}
 }
 
 func (w *wizard) back() tea.Cmd {
@@ -511,28 +355,11 @@ func (w *wizard) reset(s step) {
 	case stepFrom:
 		w.req.From = w.given.From
 	case stepEnvFrom:
-		w.req.EnvFrom = w.given.EnvFrom
-		w.remember(rememberParams{Path: paths[s], On: slices.Contains(w.given.Remember, paths[s])})
+		w.choose(chosen{Step: s, Value: string(w.given.EnvFrom), Remember: slices.Contains(w.given.Remember, paths[s])})
 	case stepIsolation:
-		w.req.Isolation = w.given.Isolation
-		w.remember(rememberParams{Path: paths[s], On: slices.Contains(w.given.Remember, paths[s])})
+		w.choose(chosen{Step: s, Value: string(w.given.Isolation), Remember: slices.Contains(w.given.Remember, paths[s])})
 	case stepFastForward:
 		w.req.FastForward = w.given.FastForward
 	case stepRecap, stepIfNotExists, stepCount:
 	}
-}
-
-func yesNo(yes bool) string {
-	if yes {
-		return "yes"
-	}
-	return "no"
-}
-
-func names[T ~string](values []T) []string {
-	out := make([]string, 0, len(values))
-	for _, value := range values {
-		out = append(out, string(value))
-	}
-	return out
 }

@@ -100,10 +100,10 @@ func engineScreen(t *testing.T, name string) string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("testdata", "engine_"+name+".txt"))
 	require.NoError(t, err)
-	return strings.TrimRight(fontSafe.Replace(string(data)), "\n")
+	return strings.TrimRight(engineGlyphsFontCovered.Replace(string(data)), "\n")
 }
 
-var fontSafe = strings.NewReplacer("▸", "›", "❯", "›", "⊘", "·")
+var engineGlyphsFontCovered = strings.NewReplacer("▸", "›", "❯", "›", "⊘", "·")
 
 func (d *driver) looksLike(name string) {
 	d.t.Helper()

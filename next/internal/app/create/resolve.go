@@ -43,7 +43,7 @@ func (q Questions) Request() Request {
 		EnvFrom:     q.EnvFrom.Value,
 		Isolation:   q.Isolation.Value,
 		FastForward: new(q.FastForward.Value),
-		IfNotExists: q.IfNotExists,
+		IfNotExists: q.IfNotExists.Value,
 		Remember:    slices.DeleteFunc(slices.Clone(q.Remember), q.skipped),
 	}
 }
@@ -73,7 +73,7 @@ func (f Facts) branchProblems(q Questions) []wtm.FieldError {
 		return []wtm.FieldError{{Path: "branches", Code: codeRequired, Template: "{path} is required"}}
 	}
 	var problems []wtm.FieldError
-	for index, d := range f.decisions(Request{Branches: branches, IfNotExists: q.IfNotExists}) {
+	for index, d := range f.decisions(Request{Branches: branches, IfNotExists: q.IfNotExists.Value}) {
 		if refused, isRefused := d.(refusal); isRefused {
 			problems = append(problems, refused.field(index))
 		}
@@ -84,7 +84,7 @@ func (f Facts) branchProblems(q Questions) []wtm.FieldError {
 func (f Facts) crossProblems(q Questions) []wtm.FieldError {
 	var problems []wtm.FieldError
 	branches, from := q.Branches.Given, q.From.Value
-	if from == "" && f.checksOut(Request{Branches: branches, IfNotExists: q.IfNotExists}) {
+	if from == "" && f.checksOut(Request{Branches: branches, IfNotExists: q.IfNotExists.Value}) {
 		problems = append(problems, wtm.FieldError{
 			Path:     "from",
 			Code:     codeRequired,

@@ -35,7 +35,7 @@ type Questions struct {
 	EnvFrom     Choice[project.EnvStrategy]
 	Isolation   Choice[run.Isolation]
 	FastForward Confirm
-	IfNotExists bool
+	IfNotExists Confirm
 	Remember    []string
 	Errors      []wtm.FieldError
 }
@@ -53,8 +53,9 @@ type From struct {
 
 type Choice[T ~string] struct {
 	Answer[T]
-	Options []T
-	Skip    string
+	Options    []T
+	Skip       string
+	Remembered T
 }
 
 type Confirm struct {
@@ -63,6 +64,7 @@ type Confirm struct {
 }
 
 func Form(f Facts, req Request) Questions {
+	recalled := f.Config.Remembered
 	if req.Ask {
 		f.Config.Remembered = nil
 	}
@@ -74,9 +76,11 @@ func Form(f Facts, req Request) Questions {
 		EnvFrom:     f.envFrom(req.EnvFrom),
 		Isolation:   f.isolation(req.Isolation),
 		FastForward: f.fastForward(req),
-		IfNotExists: req.IfNotExists,
+		IfNotExists: ifNotExists(req.IfNotExists),
 		Remember:    req.Remember,
 	}
+	questions.EnvFrom.Remembered = project.EnvStrategy(recalled[project.RememberEnvStrategy])
+	questions.Isolation.Remembered = run.Isolation(recalled[project.RememberIsolation])
 	questions.Errors = f.problems(questions)
 	return questions
 }
@@ -185,6 +189,14 @@ func (f Facts) fastForward(req Request) Confirm {
 		question.Answer = Answer[bool]{Value: remembered == project.SourceUpdateFastForward, Origin: OriginRemembered}
 	default:
 		question.Answer = Answer[bool]{Origin: OriginDefault}
+	}
+	return question
+}
+
+func ifNotExists(given bool) Confirm {
+	question := Confirm{Answer: Answer[bool]{Value: given, Origin: OriginDefault}, Skip: "set by its flag only"}
+	if given {
+		question.Origin = OriginRequest
 	}
 	return question
 }

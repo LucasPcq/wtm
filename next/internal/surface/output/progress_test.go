@@ -148,3 +148,15 @@ func TestALiveInterruptBetweenPhasesIsTheOnlyLine(t *testing.T) {
 
 	assert.Equal(t, []string{"  › Cancelling — finishing feat/x; Ctrl+C again to stop now"}, screen)
 }
+
+func TestALiveLineIsErasedAloneSoNoScreenIsClearedIntoTheScrollback(t *testing.T) {
+	var out bytes.Buffer
+	progress := NewProgress(t.Context(), ProgressParams{W: &out, Human: true, Live: true})
+
+	progress.Report(wtm.UnitStarted{Subject: "feat/x"})
+	progress.Report(wtm.UnitFinished{Subject: "feat/x", Status: wtm.StatusDone})
+	progress.Close()
+
+	assert.True(t, strings.HasSuffix(out.String(), "\x1b[1F\x1b[2K"), "%q", out.String())
+	assert.NotContains(t, out.String(), "\x1b[J")
+}

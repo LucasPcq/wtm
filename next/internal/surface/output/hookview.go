@@ -14,6 +14,7 @@ const (
 	hookLogLabel      = "full output:"
 	ansiPrevLine      = "\x1b[%dF"
 	ansiClearBelow    = "\x1b[J"
+	ansiClearLine     = "\x1b[2K"
 )
 
 type hookView struct {
