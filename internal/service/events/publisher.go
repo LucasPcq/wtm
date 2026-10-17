@@ -47,9 +47,7 @@ func (p *Publisher) Publish(ctx context.Context, event domain.Event) {
 	if p.repoErr != nil || p.socketPath == "" {
 		return
 	}
-	if event.CorrelationID == "" {
-		event.CorrelationID = p.correlationID
-	}
+	event.CorrelationID = p.correlationID
 	payload, err := json.Marshal(stamp(stampParams{Event: event, Repo: p.repo}))
 	if err != nil {
 		return
@@ -85,9 +83,7 @@ type stampParams struct {
 func stamp(params stampParams) domain.Event {
 	event := params.Event
 	event.V = domain.EventsSchemaVersion
-	if event.TS == "" {
-		event.TS = now()
-	}
+	event.TS = now()
 	repo := params.Repo
 	event.Repo = &repo
 	return event

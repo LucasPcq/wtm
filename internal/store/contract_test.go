@@ -15,7 +15,7 @@ import (
 	"github.com/LucasPcq/wtm/internal/store"
 )
 
-func TestTheFakeAndTheDiskAgreeOnTheRecords(t *testing.T) {
+func TestTheRecordsReadBackAsWritten(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {
 			ctx := t.Context()
@@ -45,7 +45,7 @@ func TestTheFakeAndTheDiskAgreeOnTheRecords(t *testing.T) {
 	}
 }
 
-func TestTheFakeAndTheDiskSayWhatAnUpdateChanged(t *testing.T) {
+func TestAnUpdateSaysWhatItChanged(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {
 			ordinal := func(n int) func(*domain.WorktreeMetadata) error {
@@ -76,7 +76,7 @@ func TestTheFakeAndTheDiskSayWhatAnUpdateChanged(t *testing.T) {
 	}
 }
 
-func TestTheFakeAndTheDiskOverwriteARecordThatDoesNotReadOnlyWhenCreating(t *testing.T) {
+func TestARecordThatDoesNotReadIsOverwrittenOnlyWhenCreating(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {
 			_, unreadable := impl.meta.Load("broken/d")
@@ -97,7 +97,7 @@ func TestTheFakeAndTheDiskOverwriteARecordThatDoesNotReadOnlyWhenCreating(t *tes
 	}
 }
 
-func TestTheFakeAndTheDiskAgreeOnTheMemory(t *testing.T) {
+func TestTheMemoryReadsBackAsRemembered(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {
 			require.NoError(t, errOf(impl.config.Remember(t.Context(), rules.RememberedChange{
@@ -110,7 +110,7 @@ func TestTheFakeAndTheDiskAgreeOnTheMemory(t *testing.T) {
 	}
 }
 
-func TestTheFakeAndTheDiskAgreeOnTheEnvFiles(t *testing.T) {
+func TestTheEnvFilesAreCopiedAndEdited(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {
 			ctx := t.Context()
@@ -133,16 +133,13 @@ func TestTheFakeAndTheDiskAgreeOnTheEnvFiles(t *testing.T) {
 			content, ok := impl.file(path)
 			require.True(t, ok)
 			assert.Equal(t, "# database\nDB_HOST=localhost\nWEB_PORT=3100 # the dev server\n\nexport API_KEY=secret\r\n", content)
-			lines, readErr := impl.env.Read(path)
-			require.NoError(t, readErr)
-			assert.Equal(t, rules.ParseEnv(content), lines)
 			_, exists := impl.file(filepath.Join(target, ".env.example"))
 			assert.False(t, exists)
 		})
 	}
 }
 
-func TestTheFakeAndTheDiskRefuseTheSameThings(t *testing.T) {
+func TestTheStoreRefusals(t *testing.T) {
 	refusals := []struct {
 		name string
 		call func(t *testing.T, impl implementation) error

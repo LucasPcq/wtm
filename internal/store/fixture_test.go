@@ -10,7 +10,6 @@ import (
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/store"
-	"github.com/LucasPcq/wtm/internal/testutil/storetest"
 )
 
 type implementation struct {
@@ -30,7 +29,7 @@ var (
 
 func implementations(t *testing.T) []implementation {
 	t.Helper()
-	return []implementation{onDisk(t), inMemory(t)}
+	return []implementation{onDisk(t)}
 }
 
 func onDisk(t *testing.T) implementation {
@@ -55,29 +54,6 @@ func onDisk(t *testing.T) implementation {
 			data, err := os.ReadFile(path)
 			return string(data), err == nil
 		},
-	}
-}
-
-func inMemory(t *testing.T) implementation {
-	main := t.TempDir()
-	fake := storetest.NewFake(storetest.FakeParams{
-		Meta:       map[string]domain.WorktreeMetadata{"feat/a": featA, "newer/b": newer},
-		Unreadable: []string{"broken/d"},
-		Config:     &domain.ProjectConfig{Worktrees: domain.WorktreesConfig{BasePath: "../.trees"}, Wizard: domain.WizardConfig{Remembered: map[string]string{domain.RememberIsolation: "verbatim"}}},
-		Files:      map[string]string{filepath.Join(main, ".env"): userEnv},
-	})
-	return implementation{
-		name:   "fake",
-		meta:   fake,
-		config: fake,
-		env:    fake,
-		main:   main,
-		remembered: func() map[string]string {
-			project, ok := fake.Config()
-			require.True(t, ok)
-			return project.Wizard.Remembered
-		},
-		file: fake.File,
 	}
 }
 

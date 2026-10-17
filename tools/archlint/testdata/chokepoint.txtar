@@ -69,11 +69,3 @@ import w "github.com/LucasPcq/wtm/internal/service/worktree"
 var create = w.Create // want `w\.Create is called from surface/tui/`
 
 func run() error { return w.Create() } // want `w\.Create is called from surface/tui/`
--- github.com/LucasPcq/wtm/internal/command/create/create.go --
-package create
-
-import "github.com/LucasPcq/wtm/internal/service/worktree"
-
-func Apply() error {
-	return worktree.SetIsolation() // want `worktree\.SetIsolation is called from command/: a mutator of the commands on flow/ — a command on the engine changes a worktree through the engine's services`
-}

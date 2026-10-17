@@ -75,13 +75,6 @@ type IntroParams struct {
 	InFrame bool
 }
 
-// RecapBodyWidth is how many columns the body of a recap has: what a plan
-// drawn in it wraps at.
-func RecapBodyWidth(params IntroParams) int {
-	box, inner := recapBox(params)
-	return inner - box.GetHorizontalPadding()
-}
-
 // recapBox is the box a recap is drawn in, and the width it is given. In a
 // frame it is a plain indent: the frame's own bar is the marker.
 func recapBox(params IntroParams) (lipgloss.Style, int) {

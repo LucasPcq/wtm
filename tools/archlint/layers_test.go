@@ -20,18 +20,6 @@ func TestTheDomainDeclaresNoFunction(t *testing.T) {
 	runTxtar(t, domainAnalyzer, "domain", internalPrefix+"domain")
 }
 
-func TestTheKernelImportsNothingButTheStdlib(t *testing.T) {
-	runTxtar(t, layersAnalyzer, "layers", internalPrefix+"kernel/text")
-}
-
-func TestDispatchRunsOnItsOwnPorts(t *testing.T) {
-	runTxtar(t, layersAnalyzer, "layers", internalPrefix+"dispatch")
-}
-
-func TestTheRegistryAssemblesTheEngine(t *testing.T) {
-	runTxtar(t, layersAnalyzer, "layers", internalPrefix+"registry")
-}
-
 func TestTheStoreWritesForTheServicesNeverForAFlow(t *testing.T) {
 	runTxtar(t, layersAnalyzer, "layers",
 		internalPrefix+"store",
@@ -39,30 +27,8 @@ func TestTheStoreWritesForTheServicesNeverForAFlow(t *testing.T) {
 	)
 }
 
-func TestACommandReachesTheWorldThroughItsPortsOnly(t *testing.T) {
-	runTxtar(t, layersAnalyzer, "layers",
-		internalPrefix+"command/create",
-		internalPrefix+"command/prune",
-		internalPrefix+"query/status",
-	)
-}
-
-func TestTheRegistryAndTheLegacyBridgeAreReachedFromTheCommandLineOnly(t *testing.T) {
-	runTxtar(t, layersAnalyzer, "layers",
-		internalPrefix+"registry",
-		internalPrefix+"flow/legacy",
-		internalPrefix+"flow/extract",
-		internalPrefix+"surface/cli/root",
-		internalPrefix+"surface/tui/dash",
-		internalPrefix+"testutil/commandtest",
-	)
-}
-
-func TestTheKernelAndTheRulesDoNoIO(t *testing.T) {
-	runTxtar(t, layersAnalyzer, "layers",
-		internalPrefix+"rules/pure",
-		internalPrefix+"kernel",
-	)
+func TestTheRulesDoNoIO(t *testing.T) {
+	runTxtar(t, layersAnalyzer, "layers", internalPrefix+"rules/pure")
 }
 
 func TestAPackageWithoutARowIsAFinding(t *testing.T) {

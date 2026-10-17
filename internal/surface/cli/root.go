@@ -270,5 +270,5 @@ func execute(ctx context.Context, params executeParams) int {
 		reportFailure(params.Stderr, err)
 		render.Blank(params.Stderr)
 	}
-	return exitCode(err)
+	return rules.ExitCode(err)
 }

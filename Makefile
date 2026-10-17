@@ -40,7 +40,7 @@ dead-strict:
 	@go tool deadcode ./... | grep -v -E -f .deadcode-ignore | grep -v -E '/(testutil|processtest)/' || true
 
 # sumtype checks that a type switch over a sealed interface declared with
-# //go-sumtype:decl (kernel.Error, kernel.Value) handles every variant. The
+# //go-sumtype:decl (fs.Change, envcopy.Warning) handles every variant. The
 # declaration is a standalone comment: gofmt rewrites it inside a doc comment.
 sumtype:
 	go tool go-sumtype $$(go list ./...)

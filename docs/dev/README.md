@@ -7,22 +7,17 @@ Reference documentation for people (and agents) working **on** wtm. It describes
 | Document | What it covers |
 | -- | -- |
 | [architecture.md](architecture.md) | The annotated package map, who may call whom and what each interdiction buys, how a command designates a worktree |
-| [commands.md](commands.md) | `internal/kernel/` — the engine's contract: commands, fields and forms, rules across fields, errors and their message catalogue, results, units of work (`Each`, sagas), the checks every command runs |
-| [dispatch.md](dispatch.md) | `internal/dispatch/` — how a command runs: the registry, the form's four calls, the order of a run, its errors, the operation locks and their holder, the fingerprint, progress, hook logs and events, ports, the test bench |
-| [git.md](git.md) | `internal/infra/git` — how the engine reaches a repository: `git.Repo` and its remote, the reads and the writes, a rebase in progress, errors, the double `gittest.Fake`, what `gitexec` holds |
-| [store.md](store.md) | `internal/store/` — the one writer of each state file: `meta.json` (`store.Meta`), the changes to `config.toml` and the remembered answers (`store.ProjectConfig`), the managed `.env` files (`store.EnvFiles`), the double `storetest.Fake`, what `stateowner` and `metawriter` hold |
-| [services.md](services.md) | `service/gitwt`, `identity`, `runenv`, `hooks.Execute` — the services a command on the engine reaches a worktree through: a worktree as a saga step, one identity snapshot and one allocation, the run environment from what the caller read, hook lines as progress; reader or mutator, publishing left to `dispatch` |
+| [store.md](store.md) | `internal/store/` — the one writer of each state file: `meta.json` (`store.Meta`), the changes to `config.toml` and the remembered answers (`store.ProjectConfig`), the managed `.env` files (`store.EnvFiles`), what `stateowner` and `metawriter` hold |
 | [state-files.md](state-files.md) | `internal/infra/fs` — how every file is written (`UpdateFile`, `fs.Change`, where the lock lives), the schema version of each state file and how to raise one, what `statewrite` holds |
-| [flow-layer.md](flow-layer.md) | `internal/flow/`, the model of the commands not yet on the engine — the three seams, the step model, unattended resolution, embedding, scheduling, events, testing a flow |
-| [adding-a-mutation-command.md](adding-a-mutation-command.md) | End-to-end recipe for a worktree-mutating command on the engine (`internal/command/`, the registry, `cli.Bind`, its tests and the lint that catches each mistake), the `flow/legacy` bridge, and the recipe of a command still on `flow/` |
-| [cli.md](cli.md) | `internal/surface/cli` — the command line: a command generated from the registry (`cli.Bind`, its flags), its run, the parity of the registry and the tree, the root (signals, `--quiet`, exit code) |
-| [form.md](form.md) | `internal/surface/tui/form` — the interactive form of a command on the engine: its loop over `dispatch`, which field it asks, a field per type, choices and refresh, remembering, the recap and the run, backing out |
-| [output.md](output.md) | What a command prints: the one question a block has to answer, the frame and the accent bar, the four levels, the two shapes of a conclusion, the glyph vocabulary, `--quiet`, a command on the engine (generic rendering, the v2 envelope, exit codes) |
+| [flow-layer.md](flow-layer.md) | `internal/flow/`, the model of every command — the three seams, the step model, unattended resolution, embedding, scheduling, events, testing a flow |
+| [adding-a-mutation-command.md](adding-a-mutation-command.md) | End-to-end recipe for a worktree-mutating command: vocabulary, rules, the flow package, its wiring, presenter, tests and docs |
+| [cli.md](cli.md) | `internal/surface/cli` — the root (signals, `--quiet`, usage errors, exit code) and how a command's flags reach its flow |
+| [output.md](output.md) | What a command prints: the one question a block has to answer, the frame and the accent bar, the four levels, the two shapes of a conclusion, the glyph vocabulary, `--quiet`, JSON |
 | [run-addressing.md](run-addressing.md) | Named URLs: proxy vs redirection vs public port, and what `addressing` writes into a `.env` |
 | [shared-services.md](shared-services.md) | `scope = "shared"`: one instance for the repository, one namespace per worktree, and why the job table is the reference count |
 | [lint.md](lint.md) | `make lint` and what each gate holds: the `archlint` rules, the exception files, the pre-commit hook, the rules considered and left out |
 | [changelog.md](changelog.md) | How to write `CHANGELOG.md`: the release template, the rules, and how a section becomes the GitHub release notes |
 
-For the coding standards themselves (immutability, struct params, constants, comments), see [`CLAUDE.md`](../../CLAUDE.md) and the `go-cli` skill in `.claude/skills/go-cli/SKILL.md`.
+For the coding standards themselves (immutability, struct params, constants, comments), see [`CLAUDE.md`](../../CLAUDE.md) and, for Go idioms with their sources, the `go-style` skill in `.claude/skills/go-style/SKILL.md`.
 
 To see a change working in the real binary — an isolated sandbox driven with tmux, or recorded with VHS, optionally before/after — use the `wtm-sandbox` skill (`.claude/skills/wtm-sandbox/`). To open a pull request (base branch from `wtm tree`, that terminal proof attached with `gh --attach`, body template), use the `open-pr` skill (`.claude/skills/open-pr/`).

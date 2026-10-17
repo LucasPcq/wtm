@@ -39,9 +39,9 @@ lock, err := fs.UpdateFile(ctx, fs.UpdateFileParams{
 
 A lock that cannot be taken (no `flock` on NFS or some WSL mounts, an unwritable directory) does not cancel the write: it runs unprotected and the returned `fs.Lock{Held: false}` says so. `store/` passes it on as `Written.Unlocked` ([store.md](store.md#what-a-write-says)), `identity.Allocate` as `Claim.Unlocked`, and the command reports it as the warning `locks.unavailable`.
 
-Whether a file is there is `fs.Exists(path) (bool, error)`: only a path that does not exist is absent, any other failure to stat it is an error. `fs.FileExists`, which takes any error for absence, is for the commands still on `flow/`. `fs.WithFileLock` is the same lock around any work (the ordinal allocation's `ordinal.lock`).
+Whether a file is there is `fs.Exists(path) (bool, error)`: only a path that does not exist is absent, any other failure to stat it is an error. `fs.FileExists` takes any error for absence. `fs.WithFileLock` is the same lock around any work (the ordinal allocation's `ordinal.lock`).
 
-These locks are short: one file, one write. The **operation locks** `dispatch` holds for a whole run (`<common>/wtm/locks/`) are another set, taken with `fs.TryLocks` (all or none, never waiting) beside a holder file written by `fs.HoldFile`: see [dispatch.md](dispatch.md#operation-locks).
+These locks are short: one file, one write.
 
 ## Schema versions
 
@@ -54,7 +54,7 @@ These locks are short: one file, one write. The **operation locks** `dispatch` h
 | `pending-removals.toml` | `PendingRemovalsSchema` | `config.LoadPendingRemovals` |
 
 - A file without `schema` is at 1. The key is written only from schema 2 on (`statefile.Written`): the TOML loaders of earlier releases reject an unknown key, so a file written at schema 1 stays readable by them.
-- Every writer of a versioned file checks first, inside `Mutate`: `statefile.Refusal(statefile.Schema{Path, Found, Supported})` returns a `*statefile.NewerError` when the file is newer than this binary. It carries the schema as data, for an interface to present, and unwraps to `statefile.ErrSchemaNewer`, which `rules.ExitCode` maps to `22`. `dispatch` presents it as `412 state.schema_newer`.
+- Every writer of a versioned file checks first, inside `Mutate`: `statefile.Refusal(statefile.Schema{Path, Found, Supported})` returns a `*statefile.NewerError` when the file is newer than this binary. It carries the schema as data, for an interface to present, and unwraps to `statefile.ErrSchemaNewer`, which `rules.ExitCode` maps to `22`.
 - Reading a newer file is not an error. The CLI warns on loading `config.toml` and `run.toml` (`shared.WarnSchemaNewer`, rendered by `render.SchemaNewer`); `meta.json` and `pending-removals.toml` are only refused on write.
 - `jobs.json` keeps its own `version` (`rules.ClassifyIndexVersion`): a newer index freezes the daemon's store.
 
@@ -62,8 +62,8 @@ These locks are short: one file, one write. The **operation locks** `dispatch` h
 
 ## What the lint holds
 
-`statewrite` (`tools/archlint/statewrite.go`) refuses `os.WriteFile`, `os.Create`, `os.Rename`, `os.Remove`, `os.RemoveAll` and an `os.OpenFile` that may write, as a call or a function value, outside `infra/`. Its permanent exceptions are in `stateWriteExempt`, each with its reason; a log is opened through `fs.OpenLog`, a directory wtm keeps is dropped by `fs.RemoveDir`, and what still writes by hand for the commands on `flow/` (the `exec` log, the daemon's lock, the directories `relocate` and `extract` remove) is tracked in `.archlint-migrating` until it moves (see [lint.md](lint.md)). `stateowner` keeps `fs.UpdateFile` and `fs.RemoveDir` to `store/`, the owner of each state file ([store.md](store.md#what-the-lint-holds)).
+`statewrite` (`tools/archlint/statewrite.go`) refuses `os.WriteFile`, `os.Create`, `os.Rename`, `os.Remove`, `os.RemoveAll` and an `os.OpenFile` that may write, as a call or a function value, outside `infra/`. Its permanent exceptions are in `stateWriteExempt`, each with its reason; a log is opened through `fs.OpenLog`, a directory wtm keeps is dropped by `fs.RemoveDir`, and what still writes by hand (the `exec` log, the daemon's lock, the directories `relocate` and `extract` remove) is tracked in `.archlint-migrating` (see [lint.md](lint.md)). `stateowner` keeps `fs.UpdateFile` and `fs.RemoveDir` to `store/`, the owner of each state file ([store.md](store.md#what-the-lint-holds)).
 
 ## Testing
 
-`internal/infra/fs` is tested like the kernel: testify, a test file per source file holding only `Test…` functions, the shared helpers in `helpers_test.go`. Concurrency is tested for real — goroutines, and processes started from the test binary (`TestHelperProcess`) — under `-race`. A writer built on `UpdateFile` tests its own refusal of a newer schema: the file at schema N+1 is read, the write returns `statefile.ErrSchemaNewer`, the file is byte for byte unchanged (`internal/config/statefile_test.go`, `internal/store/meta_test.go`, `internal/store/config_test.go`).
+`internal/infra/fs` is tested with testify: a test file per source file holding only `Test…` functions, the shared helpers in `helpers_test.go`. Concurrency is tested for real — goroutines, and processes started from the test binary (`TestHelperProcess`) — under `-race`. A writer built on `UpdateFile` tests its own refusal of a newer schema: the file at schema N+1 is read, the write returns `statefile.ErrSchemaNewer`, the file is byte for byte unchanged (`internal/config/statefile_test.go`, `internal/store/meta_test.go`, `internal/store/config_test.go`).

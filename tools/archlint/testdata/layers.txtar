@@ -17,19 +17,6 @@ var _ domain.Worktree
 package infra
 
 func GlobalDir() (string, error) { return "", nil }
--- github.com/LucasPcq/wtm/internal/kernel/kernel.go --
-package kernel
-
-type Code string
--- github.com/LucasPcq/wtm/internal/kernel/text/text.go --
-package text
-
-import (
-	"github.com/LucasPcq/wtm/internal/kernel"
-	_ "github.com/LucasPcq/wtm/internal/domain" // want `internal/kernel must not import "github.com/LucasPcq/wtm/internal/domain" — the skeleton`
-)
-
-var _ kernel.Code
 -- github.com/LucasPcq/wtm/internal/rules/bad/bad.go --
 package bad
 
@@ -47,10 +34,6 @@ var _ = in.GlobalDir
 package worktree
 
 func Create() error { return nil }
--- github.com/LucasPcq/wtm/internal/command/create/apply.go --
-package create
-
-func Apply() {}
 -- github.com/LucasPcq/wtm/internal/surface/cli/shared/shared.go --
 package shared
 
@@ -63,64 +46,12 @@ import (
 )
 
 func Message() bool { return shared.Interactive() }
--- github.com/LucasPcq/wtm/internal/surface/cli/render/engine.go --
-package render
-
-import (
-	"github.com/LucasPcq/wtm/internal/dispatch" // want `internal/surface/cli/render must not import "github.com/LucasPcq/wtm/internal/dispatch" — formats and prints`
-	"github.com/LucasPcq/wtm/internal/kernel"
-)
-
-var _ kernel.Code
-
-var _ = dispatch.Run
 -- github.com/LucasPcq/wtm/internal/surface/cli/wt/wt.go --
 package wt
 
 import "github.com/LucasPcq/wtm/internal/surface/cli/render"
 
 var _ = render.Message
--- github.com/LucasPcq/wtm/internal/dispatch/dispatch.go --
-package dispatch
-
-import (
-	"github.com/LucasPcq/wtm/internal/infra"
-	"github.com/LucasPcq/wtm/internal/kernel"
-	"github.com/LucasPcq/wtm/internal/query/operations" // want `internal/dispatch must not import "github.com/LucasPcq/wtm/internal/query/operations" — the impure half of the engine`
-	"github.com/LucasPcq/wtm/internal/service/worktree" // want `internal/dispatch must not import "github.com/LucasPcq/wtm/internal/service/worktree" — the impure half of the engine`
-)
-
-var _, _, _ = infra.GlobalDir, worktree.Create, operations.Query
-
-var _ kernel.Code
-
-func Run() {}
--- github.com/LucasPcq/wtm/internal/query/operations/operations.go --
-package operations
-
-func Query() {}
--- github.com/LucasPcq/wtm/internal/registry/registry.go --
-package registry
-
-import (
-	"github.com/LucasPcq/wtm/internal/dispatch"
-	"github.com/LucasPcq/wtm/internal/query/operations"
-	"github.com/LucasPcq/wtm/internal/service/worktree" // want `internal/registry must not import "github.com/LucasPcq/wtm/internal/service/worktree" — the composition root`
-)
-
-var _, _, _ = dispatch.Run, operations.Query, worktree.Create
--- github.com/LucasPcq/wtm/internal/surface/tui/form/form.go --
-package form
-
-import (
-	"github.com/LucasPcq/wtm/internal/dispatch"
-	"github.com/LucasPcq/wtm/internal/kernel"
-	"github.com/LucasPcq/wtm/internal/service/worktree" // want `internal/surface/tui/form must not import "github.com/LucasPcq/wtm/internal/service/worktree" — the form of a command on the engine`
-)
-
-var _, _ = dispatch.Run, worktree.Create
-
-var _ kernel.Code
 -- github.com/LucasPcq/wtm/internal/config/config.go --
 package config
 
@@ -142,125 +73,6 @@ package leaky
 import "github.com/LucasPcq/wtm/internal/store" // want `internal/flow must not import "github.com/LucasPcq/wtm/internal/store"`
 
 var _ = store.Remember
--- github.com/LucasPcq/wtm/internal/infra/git/git.go --
-package git
-
-type Repo struct{ Dir string }
--- github.com/LucasPcq/wtm/internal/service/gitwt/gitwt.go --
-package gitwt
-
-func Add() error { return nil }
--- github.com/LucasPcq/wtm/internal/flow/flow.go --
-package flow
-
-type Step struct{}
--- github.com/LucasPcq/wtm/internal/command/create/create.go --
-package create
-
-import (
-	"github.com/LucasPcq/wtm/internal/config"
-	"github.com/LucasPcq/wtm/internal/infra/git"
-	"github.com/LucasPcq/wtm/internal/kernel"
-	"github.com/LucasPcq/wtm/internal/service/gitwt"
-	"github.com/LucasPcq/wtm/internal/store"
-)
-
-var _, _, _ = config.Load, gitwt.Add, store.Remember
-
-var _ git.Repo
-
-var _ kernel.Code
--- github.com/LucasPcq/wtm/internal/command/create/leaky.go --
-package create
-
-import (
-	"github.com/LucasPcq/wtm/internal/flow"                  // want `internal/command must not import "github.com/LucasPcq/wtm/internal/flow" — a use case of the engine`
-	"github.com/LucasPcq/wtm/internal/infra"                 // want `internal/command must not import "github.com/LucasPcq/wtm/internal/infra" — a use case`
-	"github.com/LucasPcq/wtm/internal/service/worktree"      // want `internal/command must not import "github.com/LucasPcq/wtm/internal/service/worktree"`
-	"github.com/LucasPcq/wtm/internal/surface/cli/render"    // want `internal/command must not import "github.com/LucasPcq/wtm/internal/surface/cli/render"`
-)
-
-var _ flow.Step
-
-var _, _, _ = infra.GlobalDir, worktree.Create, render.Message
--- github.com/LucasPcq/wtm/internal/command/prune/prune.go --
-package prune
-
-import "github.com/LucasPcq/wtm/internal/flow/legacy" // want `internal/command must not import "github.com/LucasPcq/wtm/internal/flow/legacy"`
-
-var _ = legacy.Bridge
--- github.com/LucasPcq/wtm/internal/query/status/status.go --
-package status
-
-import (
-	"github.com/LucasPcq/wtm/internal/infra/git"
-	"github.com/LucasPcq/wtm/internal/service/worktree" // want `internal/query must not import "github.com/LucasPcq/wtm/internal/service/worktree" — a read of the engine`
-)
-
-var _ git.Repo
-
-var _ = worktree.Create
--- github.com/LucasPcq/wtm/internal/flow/legacy/legacy.go --
-package legacy
-
-import (
-	"github.com/LucasPcq/wtm/internal/command/create" // want `internal/flow/legacy must not import "github.com/LucasPcq/wtm/internal/command/create" — the one-way bridge`
-	"github.com/LucasPcq/wtm/internal/dispatch"
-	"github.com/LucasPcq/wtm/internal/flow"
-	"github.com/LucasPcq/wtm/internal/kernel"
-)
-
-var _ = dispatch.Run
-
-var _ flow.Step
-
-var _ kernel.Code
-
-var _ = create.Apply
-
-func Bridge() {}
--- github.com/LucasPcq/wtm/internal/flow/extract/extract.go --
-package extract
-
-import "github.com/LucasPcq/wtm/internal/flow/legacy" // want `internal/flow must not import "github.com/LucasPcq/wtm/internal/flow/legacy"`
-
-var _ = legacy.Bridge
--- github.com/LucasPcq/wtm/internal/registry/registry.go --
-package registry
-
-import (
-	"github.com/LucasPcq/wtm/internal/command/create"
-	"github.com/LucasPcq/wtm/internal/dispatch"
-	"github.com/LucasPcq/wtm/internal/infra/git"
-	"github.com/LucasPcq/wtm/internal/store"
-)
-
-var _, _, _ = create.Apply, dispatch.Run, store.Remember
-
-var _ git.Repo
-
-func Build() {}
--- github.com/LucasPcq/wtm/internal/surface/cli/root/root.go --
-package root
-
-import (
-	"github.com/LucasPcq/wtm/internal/flow/legacy"
-	"github.com/LucasPcq/wtm/internal/registry"
-)
-
-var _, _ = legacy.Bridge, registry.Build
--- github.com/LucasPcq/wtm/internal/surface/tui/dash/dash.go --
-package dash
-
-import "github.com/LucasPcq/wtm/internal/registry" // want `internal/surface/tui must not import "github.com/LucasPcq/wtm/internal/registry"`
-
-var _ = registry.Build
--- github.com/LucasPcq/wtm/internal/testutil/commandtest/commandtest.go --
-package commandtest
-
-import "github.com/LucasPcq/wtm/internal/command/create"
-
-var _ = create.Apply
 -- github.com/LucasPcq/wtm/internal/rules/pure/pure.go --
 package pure
 
@@ -274,14 +86,5 @@ import (
 var _ = url.Parse
 
 var _, _, _ = os.Getenv, exec.Command, strings.TrimSpace
--- github.com/LucasPcq/wtm/internal/kernel/io.go --
-package kernel
-
-import (
-	"net/http" // want `internal/kernel must not import "net/http" — the skeleton`
-	"syscall"  // want `internal/kernel must not import "syscall"`
-)
-
-var _, _ = http.Get, syscall.Getpid
 -- github.com/LucasPcq/wtm/internal/newlayer/newlayer.go --
 package newlayer // want `internal/newlayer has no row in the layers table`

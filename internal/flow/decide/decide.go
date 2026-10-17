@@ -110,21 +110,6 @@ func upstreamOf(params SourceUpdateParams) string {
 	return params.Target(params.Branch).Upstream
 }
 
-type FastForwardSubjectParams struct {
-	Target     domain.BranchTarget
-	FromBranch string
-	Branch     string
-}
-
-// FastForwardSubject names the branch a fast-forward updates: the source for a
-// branch git is about to create, the worktree's own branch when it already exists.
-func FastForwardSubject(params FastForwardSubjectParams) string {
-	if rules.SourceIsStartPoint(params.Target) {
-		return params.FromBranch
-	}
-	return params.Branch
-}
-
 type EnvFallbackParams struct {
 	ProjectDir  string
 	Source      string

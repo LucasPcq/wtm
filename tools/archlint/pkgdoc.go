@@ -7,11 +7,11 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-var documented = []dir{"service", "infra", "store", "kernel", "dispatch", "command", "query", "registry", "flow/legacy"}
+var documented = []dir{"service", "infra", "store"}
 
 var pkgdocAnalyzer = &analysis.Analyzer{
 	Name: "pkgdoc",
-	Doc:  "every package of service/, infra/, store/ and the engine has a package doc stating its one responsibility",
+	Doc:  "every package of service/, infra/ and store/ has a package doc stating its one responsibility",
 	Run:  runPkgdoc,
 }
 
