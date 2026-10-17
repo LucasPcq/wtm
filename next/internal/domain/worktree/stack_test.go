@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAStackHangsEachWorktreeUnderTheBranchItWasCreatedFrom(t *testing.T) {
@@ -42,13 +43,20 @@ func TestAStackHangsEachWorktreeUnderTheBranchItWasCreatedFrom(t *testing.T) {
 			children:  map[string][]string{"main": {"a"}},
 			parents:   map[string]string{"main": "", "a": "main"},
 		},
-		"the base branch is a root whatever its record says": {
+		"the base branch keeps its recorded parent": {
 			worktrees: live("develop", "feat"),
-			records:   map[string]Meta{"develop": at("main", "2026-01-01T00:00:00Z"), "feat": from("develop")},
+			records:   map[string]Meta{"develop": from("main"), "feat": from("develop")},
 			base:      "develop",
-			roots:     []string{"main", "develop"},
-			children:  map[string][]string{"main": nil, "develop": {"feat"}},
-			parents:   map[string]string{"develop": ""},
+			roots:     []string{"main"},
+			children:  map[string][]string{"main": {"develop"}, "develop": {"feat"}},
+			parents:   map[string]string{"develop": "main"},
+		},
+		"a main worktree on no branch is no node, its children under a virtual root": {
+			worktrees: []Worktree{{Path: "/repo", Main: true, State: Detached{}}, {Path: "/trees/a", State: OnBranch{Branch: "a"}}},
+			records:   map[string]Meta{"a": from("main")},
+			roots:     []string{"main"},
+			children:  map[string][]string{"main": {"a"}},
+			parents:   map[string]string{"a": "main"},
 		},
 		"a deleted parent is a virtual root holding its children": {
 			worktrees: live("a", "b"),
@@ -109,10 +117,10 @@ func TestAStackHangsEachWorktreeUnderTheBranchItWasCreatedFrom(t *testing.T) {
 
 func TestACascadeRebasesEachParentBeforeItsChildren(t *testing.T) {
 	stack := StackOf(StackOfParams{
-		Worktrees: live("develop", "a", "a1", "b", "d", "e", "x", "y"),
+		Worktrees: live("develop", "a", "a1", "b", "d", "e", "x", "y", "z"),
 		Records: map[string]Meta{
-			"a": at("main", "2026-01-01T00:00:00Z"), "a1": from("a"), "b": at("main", "2026-02-01T00:00:00Z"),
-			"d": from("develop"), "e": from("gone"), "x": from("y"), "y": from("x"),
+			"develop": from("main"), "a": at("main", "2026-01-01T00:00:00Z"), "a1": from("a"), "b": at("main", "2026-02-01T00:00:00Z"),
+			"d": from("develop"), "e": from("gone"), "x": from("y"), "y": from("x"), "z": from("x"),
 		},
 		Base: "develop",
 	})
@@ -120,13 +128,16 @@ func TestACascadeRebasesEachParentBeforeItsChildren(t *testing.T) {
 		roots []string
 		steps []string
 	}{
-		"level by level, main never a step":    {roots: []string{"main"}, steps: []string{"a", "b", "a1"}},
-		"the base branch never a step":         {roots: []string{"develop"}, steps: []string{"d"}},
-		"a root that is a worktree is a step":  {roots: []string{"a"}, steps: []string{"a", "a1"}},
-		"a virtual root never a step":          {roots: []string{"gone"}, steps: []string{"e"}},
-		"each branch once, the roots first":    {roots: []string{"main", "a", "a1"}, steps: []string{"a", "a1", "b"}},
-		"an unknown branch nothing":            {roots: []string{"nope"}},
-		"a cycle out of reach does not refuse": {roots: []string{"main", "develop", "gone"}, steps: []string{"a", "b", "d", "e", "a1"}},
+		"level by level, main never a step":          {roots: []string{"main"}, steps: []string{"a", "b", "d", "a1"}},
+		"the base branch never a step, its children": {roots: []string{"develop"}, steps: []string{"d"}},
+		"a root that is a worktree is a step":        {roots: []string{"a"}, steps: []string{"a", "a1"}},
+		"a virtual root never a step":                {roots: []string{"gone"}, steps: []string{"e"}},
+		"each branch once":                           {roots: []string{"main", "a", "a1"}, steps: []string{"a", "b", "d", "a1"}},
+		"a parent before a child given first":        {roots: []string{"a1", "a"}, steps: []string{"a", "a1"}},
+		"a child given beside its ancestor at depth": {roots: []string{"main", "a1"}, steps: []string{"a", "b", "d", "a1"}},
+		"an unknown branch nothing":                  {roots: []string{"nope"}},
+		"a branch under a cycle, without the cycle":  {roots: []string{"z"}, steps: []string{"z"}},
+		"a cycle out of reach does not refuse":       {roots: []string{"main", "develop", "gone"}, steps: []string{"a", "b", "e", "d", "a1"}},
 	}
 	for label, c := range cases {
 		t.Run(label, func(t *testing.T) {
@@ -146,6 +157,7 @@ func TestACascadeReachingACycleIsRefusedNamingIt(t *testing.T) {
 	}{
 		"two worktrees created from each other": {records: map[string]Meta{"a": from("b"), "b": from("a")}, roots: []string{"b"}, cycle: []string{"a", "b"}},
 		"a worktree created from itself":        {records: map[string]Meta{"a": from("a"), "b": from("main")}, roots: []string{"b", "a"}, cycle: []string{"a"}},
+		"a member above a branch under it":      {records: map[string]Meta{"a": from("b"), "b": from("a"), "c": from("a")}, roots: []string{"c", "a"}, cycle: []string{"a", "b"}},
 		"a longer loop":                         {records: map[string]Meta{"a": from("c"), "b": from("a"), "c": from("b")}, roots: []string{"main", "c"}, cycle: []string{"a", "b", "c"}},
 	}
 	for label, c := range cases {
@@ -153,7 +165,7 @@ func TestACascadeReachingACycleIsRefusedNamingIt(t *testing.T) {
 			steps, err := StackOf(StackOfParams{Worktrees: live("a", "b", "c"), Records: c.records}).Cascade(c.roots)
 
 			var cycle *CycleError
-			assert.ErrorAs(t, err, &cycle)
+			require.ErrorAs(t, err, &cycle)
 			assert.Equal(t, c.cycle, cycle.Branches)
 			assert.Nil(t, steps)
 		})
@@ -164,21 +176,4 @@ func TestACycleErrorNamesItsBranches(t *testing.T) {
 	err := &CycleError{Branches: []string{"a", "b"}}
 
 	assert.EqualError(t, err, "the parents of these worktrees form a cycle: a, b")
-}
-
-func live(branches ...string) []Worktree {
-	worktrees := []Worktree{{Path: "/repo", Main: true, State: OnBranch{Branch: "main"}}}
-	for _, branch := range branches {
-		worktrees = append(worktrees, Worktree{Path: "/trees/" + branch, State: OnBranch{Branch: branch}})
-	}
-
-	return worktrees
-}
-
-func from(source string) Meta {
-	return Meta{SourceBranch: source}
-}
-
-func at(source, createdAt string) Meta {
-	return Meta{SourceBranch: source, CreatedAt: createdAt}
 }

@@ -23,7 +23,7 @@ type StackOfParams struct {
 	Base      string
 }
 
-// StackOf builds the stack of the live worktrees from their records' source branches. It never fails: the main worktree and the base branch are roots whatever their record says, a worktree with no record or no source branch is a root, and the members of a cycle are promoted to roots, the cycle recorded for Cascade to refuse. Siblings, and the roots after the main one, are ordered by creation time, then by name; the virtual roots come last, by name.
+// StackOf builds the stack of the live worktrees from their records' source branches. It never fails: the main worktree is a root whatever its record says, and a main worktree on no branch is no node, its children then under a virtual root of the branch they name; the base branch keeps its recorded parent; a worktree with no record or no source branch is a root; and the members of a cycle are promoted to roots, the cycle recorded for Cascade to refuse. Siblings, and the roots after the main one, are ordered by creation time, then by name; the virtual roots come last, by name.
 func StackOf(params StackOfParams) Stack {
 	stack := Stack{parents: map[string]string{}, children: map[string][]string{}, steps: map[string]bool{}, cycles: map[string][]string{}}
 	created := map[string]time.Time{}
@@ -39,11 +39,8 @@ func StackOf(params StackOfParams) Stack {
 			main = branch
 			continue
 		}
-		if branch == params.Base {
-			continue
-		}
 
-		stack.steps[branch] = true
+		stack.steps[branch] = branch != params.Base
 		if source := params.Records[branch].SourceBranch; source != "" {
 			stack.parents[branch] = source
 		}
@@ -102,16 +99,18 @@ func (s Stack) Parent(branch string) (string, bool) {
 	return parent, ok
 }
 
-// Cascade returns the branches to rebase from roots down, each parent before its children, level by level: roots included, the main worktree, the base branch and virtual roots never. A cycle reachable from roots refuses the cascade with a *CycleError.
+// Cascade returns roots and the branches under them to rebase, each parent before its children, level by level from the stack's roots whatever the order roots are given in: the main worktree, the base branch and virtual roots are never a step. A member of a cycle among roots refuses the cascade with a *CycleError (a cycle's members being roots, roots is the only way to reach one); a cycle out of reach does not, where the legacy sync refuses any cycle: whether it should is sync's migration to decide.
 func (s Stack) Cascade(roots []string) ([]string, error) {
 	var steps []string
-	seen := map[string]bool{}
-	for queue := slices.Clone(roots); len(queue) > 0; queue = queue[1:] {
+	kept := map[string]bool{}
+	for queue := slices.Clone(s.roots); len(queue) > 0; queue = queue[1:] {
 		branch := queue[0]
-		if seen[branch] {
+		queue = append(queue, s.children[branch]...)
+		parent, hasParent := s.parents[branch]
+		if !slices.Contains(roots, branch) && !(hasParent && kept[parent]) {
 			continue
 		}
-		seen[branch] = true
+		kept[branch] = true
 
 		if members, loops := s.cycles[branch]; loops {
 			return nil, &CycleError{Branches: members}
@@ -119,7 +118,6 @@ func (s Stack) Cascade(roots []string) ([]string, error) {
 		if s.steps[branch] {
 			steps = append(steps, branch)
 		}
-		queue = append(queue, s.children[branch]...)
 	}
 
 	return steps, nil
