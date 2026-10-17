@@ -1,6 +1,7 @@
 package output
 
 import (
+	"cmp"
 	"io"
 	"strings"
 
@@ -26,16 +27,18 @@ type PlanParams struct {
 	Rows     []PlanRow
 	Warnings []string
 	Width    int
+	Styles   *Styles
 }
 
 func PlanLines(params PlanParams) []string {
-	lines := planRows(params)
+	st := cmp.Or(params.Styles, plainStyles)
+	lines := planRows(params, st)
 	if len(params.Warnings) > 0 {
 		lines = append(lines, "")
 	}
 	for _, text := range params.Warnings {
 		first, rest, _ := strings.Cut(text, "\n")
-		lines = append(lines, Warning.Render(GlyphAttention)+" "+first)
+		lines = append(lines, st.Warning.Render(GlyphAttention)+" "+first)
 		for line := range strings.SplitSeq(rest, "\n") {
 			if line != "" {
 				lines = append(lines, planContinuation+line)
@@ -45,9 +48,9 @@ func PlanLines(params PlanParams) []string {
 	return lines
 }
 
-func planRows(params PlanParams) []string {
+func planRows(params PlanParams, st *Styles) []string {
 	if len(params.Rows) == 0 {
-		return []string{Muted.Render(glyphUnchanged + " " + NothingToDo)}
+		return []string{st.Muted.Render(glyphUnchanged + " " + NothingToDo)}
 	}
 	labels := 0
 	for _, row := range params.Rows {
@@ -57,7 +60,7 @@ func planRows(params PlanParams) []string {
 	var lines []string
 	for _, row := range params.Rows {
 		values := planValues(row.Values, params.Width-column)
-		lines = append(lines, Muted.Render(row.Label)+strings.Repeat(" ", column-lipgloss.Width(row.Label))+values[0])
+		lines = append(lines, st.Muted.Render(row.Label)+strings.Repeat(" ", column-lipgloss.Width(row.Label))+values[0])
 		for _, value := range values[1:] {
 			lines = append(lines, strings.Repeat(" ", column)+value)
 		}
@@ -111,6 +114,7 @@ func Messages(warnings []domain.Warning) []string {
 
 func DrawPlan(w io.Writer, params PlanParams) {
 	params.Width = max(terminalWidth(w)-len(Indent), 0)
+	params.Styles = StylesOf(w)
 	for _, line := range PlanLines(params) {
 		if line == "" {
 			Blank(w)

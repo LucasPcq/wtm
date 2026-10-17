@@ -172,15 +172,15 @@ func (l *SelectList) move(step int) {
 	}
 }
 
-func (l *SelectList) View(size Size) string {
+func (l *SelectList) View(size Size, st *Styles) string {
 	if len(l.options) == 0 {
 		return ""
 	}
 	var b strings.Builder
 	if l.filtering || l.query != "" {
-		b.WriteString(output.Muted.Render("/ " + l.query))
+		b.WriteString(st.Muted.Render("/ " + l.query))
 		if l.filtering {
-			b.WriteString(reverse.Render(" "))
+			b.WriteString(st.reverse.Render(" "))
 		}
 		b.WriteString("\n\n")
 	}
@@ -191,20 +191,20 @@ func (l *SelectList) View(size Size) string {
 	l.offset = min(max(l.offset, l.cursor-rows+1), l.cursor)
 	end := min(l.offset+rows, len(l.shown))
 	for i := l.offset; i < end; i++ {
-		b.WriteString(l.row(l.options[l.shown[i]], i == l.cursor, size.Width))
+		b.WriteString(l.row(l.options[l.shown[i]], i == l.cursor, size.Width, st))
 		if i < end-1 {
 			b.WriteString("\n")
 		}
 	}
 	if len(l.shown) == 0 {
-		b.WriteString(output.Muted.Render(output.Indent + noMatches))
+		b.WriteString(st.Muted.Render(output.Indent + noMatches))
 	}
 	if l.toggle {
 		check := checkOff
 		if l.remember {
 			check = checkOn
 		}
-		b.WriteString("\n\n" + strings.Repeat(" ", rowPrefix+rowLead) + check + " " + output.Muted.Render(toggleLabel))
+		b.WriteString("\n\n" + strings.Repeat(" ", rowPrefix+rowLead) + check + " " + st.Muted.Render(toggleLabel))
 	}
 	return b.String()
 }
@@ -220,16 +220,16 @@ func (l *SelectList) overhead() int {
 	return lines
 }
 
-func (l *SelectList) row(o Option, selected bool, width int) string {
+func (l *SelectList) row(o Option, selected bool, width int, st *Styles) string {
 	if o.Separator {
-		return output.Muted.Render(output.Indent + strings.Repeat("─", max(width-4, 4)))
+		return st.Muted.Render(output.Indent + strings.Repeat("─", max(width-4, 4)))
 	}
 	fill := max(width-rowPrefix-rowLead-lipgloss.Width(o.Label)-lipgloss.Width(o.Badge)-rowTagGap, 1)
 	if selected {
 		block := " " + o.Label + strings.Repeat(" ", fill) + o.Badge + strings.Repeat(" ", rowTagGap)
-		return Accent.Render("▌›") + tinted.Render(block)
+		return st.accent.Render("▌›") + st.tinted.Render(block)
 	}
-	return strings.Repeat(" ", rowPrefix+rowLead) + o.Label + strings.Repeat(" ", fill) + output.Muted.Render(o.Badge) + strings.Repeat(" ", rowTagGap)
+	return strings.Repeat(" ", rowPrefix+rowLead) + o.Label + strings.Repeat(" ", fill) + st.Muted.Render(o.Badge) + strings.Repeat(" ", rowTagGap)
 }
 
 func (l *SelectList) Help() Help {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -58,12 +59,14 @@ func newFake() *fake {
 func (f *fake) script() Script {
 	return Script{
 		Steps:   []Step{f.first, f.second},
-		Observe: func(context.Context) error { f.observed++; return nil },
-		Preview: func(context.Context) error { return f.previewErr },
-		Plan:    func(int) string { return "plan: " + strings.Join([]string{f.first.answer, f.second.answer}, ", ") },
-		Label:   strings.ToUpper,
-		Apply:   func(context.Context) error { f.applied++; return f.applyErr },
-		Stale:   func(err error) bool { return errors.Is(err, errStale) },
+		Observe: func(context.Context) (func(), error) { return func() { f.observed++ }, nil },
+		Preview: func(context.Context) (func(), error) { return func() {}, f.previewErr },
+		Plan: func(int, *output.Styles) string {
+			return "plan: " + strings.Join([]string{f.first.answer, f.second.answer}, ", ")
+		},
+		Label: strings.ToUpper,
+		Apply: func(context.Context) error { f.applied++; return f.applyErr },
+		Stale: func(err error) bool { return errors.Is(err, errStale) },
 	}
 }
 

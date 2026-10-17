@@ -8,6 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
 const surfaceTUI = "tui"
@@ -23,7 +24,7 @@ type formParams struct {
 	DryRun  bool
 	Report  domain.Report
 	In      io.Reader
-	Out     io.Writer
+	Out     *output.Stream
 }
 
 type ran struct {

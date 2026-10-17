@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"cmp"
 	"errors"
+	"strings"
 	"testing"
 
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
@@ -9,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -198,4 +201,68 @@ func TestAWorktreeLeftHalfCreatedPointsAtTheCleanThatRemovesIt(t *testing.T) {
 
 	assert.Equal(t, uicli.ExitError, got.Code)
 	assert.Contains(t, got.Stdout, "→ wtm clean feat/x --force   branch feat/x is left half-created at /repo/.trees/feat-x: remove it with `wtm clean feat/x --force`")
+}
+
+func TestARunAsksOnlyWhenTheUserCanSeeTheQuestionsAndAnswerThem(t *testing.T) {
+	cases := map[string]struct {
+		In, Err, Dumb, Yes bool
+		Output, Expect     string
+		Asks               bool
+	}{
+		"stdin and stderr terminals": {In: true, Err: true, Asks: true},
+		"stdin piped":                {Err: true},
+		"stderr redirected":          {In: true},
+		"TERM=dumb":                  {In: true, Err: true, Dumb: true},
+		"--yes":                      {In: true, Err: true, Yes: true},
+		"--output json":              {In: true, Err: true, Output: uicli.OutputJSON},
+		"--expect-fingerprint":       {In: true, Err: true, Expect: fingerprint},
+	}
+	for name, c := range cases {
+		streams, _, _, _ := output.Test()
+		streams.SetStdinTerminal(c.In)
+		streams.Err.SetTerminal(c.Err)
+		streams.SetDumbTerminal(c.Dumb)
+		cmd := &createCommand{io: streams, output: cmp.Or(c.Output, uicli.OutputText), yes: c.Yes, expect: c.Expect}
+
+		assert.Equal(t, c.Asks, cmd.interactive(), name)
+	}
+}
+
+func TestTheProgressDrawsLiveOnlyOnAStderrTerminalOfAKnownKind(t *testing.T) {
+	cases := map[string]struct {
+		SetUp func(*output.Streams)
+		Live  bool
+	}{
+		"stderr a terminal":       {SetUp: func(s *output.Streams) { s.Err.SetTerminal(true) }, Live: true},
+		"stderr a dumb terminal":  {SetUp: func(s *output.Streams) { s.Err.SetTerminal(true); s.SetDumbTerminal(true) }},
+		"stderr redirected":       {SetUp: func(*output.Streams) {}},
+		"stdout alone a terminal": {SetUp: func(s *output.Streams) { s.Out.SetTerminal(true) }},
+	}
+	for name, c := range cases {
+		got := runOn(t, newWorld(seed{}), c.SetUp, "create", branchName)
+
+		require.Equal(t, uicli.ExitOK, got.Code, name)
+		assert.Equal(t, c.Live, strings.Contains(got.Stderr, "› feat/x"), name)
+	}
+}
+
+func TestAFlagErrorPointsAtTheHelp(t *testing.T) {
+	cases := map[string][]string{
+		"an unknown flag":     {"--bogus"},
+		"a bad value":         {branchName, "--ff=maybe"},
+		"an unknown --output": {branchName, "--output", "yaml"},
+	}
+	for name, words := range cases {
+		got := runCreate(t, newWorld(seed{}), words...)
+
+		assert.Equal(t, uicli.ExitUsage, got.Code, name)
+		assert.True(t, strings.HasSuffix(got.Stderr, "\n  → wtm-next create --help\n\n"), name+": "+got.Stderr)
+	}
+}
+
+func TestDashNIsTheDryRun(t *testing.T) {
+	got := runCreate(t, newWorld(seed{}), branchName, "-n")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	assert.Contains(t, got.Stdout, "create · dry run, nothing applied")
 }

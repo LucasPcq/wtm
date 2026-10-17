@@ -34,7 +34,7 @@
 
   Flags:
         --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
-        --dry-run                     Show the plan and its fingerprint, apply nothing
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
         --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
         --ff                          Fast-forward the parent branch to origin before creating the target (answers the wizard's question; skipped when it has diverged)
         --files strings               Files to extract, or a directory to take everything below it (skips interactive selection)

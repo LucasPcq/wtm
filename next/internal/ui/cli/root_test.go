@@ -17,7 +17,7 @@ func TestAnUnknownFlagOfTheRootIsAUsageError(t *testing.T) {
 	got := runIn(t, "--nope")
 
 	assert.Equal(t, ExitUsage, got.Code)
-	assert.Equal(t, "\n  ✗ unknown flag: --nope\n\n", got.Stderr)
+	assert.Equal(t, "\n  ✗ unknown flag: --nope\n  → wtm-next --help\n\n", got.Stderr)
 }
 
 func TestAnUnknownCommandIsAUsageError(t *testing.T) {
@@ -25,4 +25,5 @@ func TestAnUnknownCommandIsAUsageError(t *testing.T) {
 
 	assert.Equal(t, ExitUsage, got.Code)
 	assert.Contains(t, got.Stderr, `✗ unknown command "nope" for "wtm-next"`)
+	assert.Contains(t, got.Stderr, "→ wtm-next --help")
 }

@@ -56,7 +56,7 @@ func TestADryRunShowsThePlanItsWarningsItsFingerprintAndHowToApplyIt(t *testing.
 func TestAPlanReadsAsItsRowsThenItsWarnings(t *testing.T) {
 	plan := twoCreated(trees).Plan
 
-	text := planTextOf(plan, []domain.Warning{{Code: "create.ff_failed", Message: "couldn't fast-forward main"}}, 0)
+	text := planTextOf(plan, []domain.Warning{{Code: "create.ff_failed", Message: "couldn't fast-forward main"}}, 0, nil)
 
 	assert.Equal(t, "Branches  feat/a, feat/b\nFrom      main\nEnv       example\n\n! couldn't fast-forward main", text)
 }

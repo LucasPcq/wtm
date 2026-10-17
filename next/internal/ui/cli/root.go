@@ -19,6 +19,7 @@ const (
 
 type Params struct {
 	Version       string
+	Streams       *output.Streams
 	Args          []string
 	Commands      []*cobra.Command
 	KillCancelled func()
@@ -28,7 +29,7 @@ type Params struct {
 func Main(params Params) int {
 	ctx, stop := interruptible(params)
 	defer stop()
-	root := NewRoot(params.Version, params.Commands)
+	root := NewRoot(params.Version, params.Streams, params.Commands)
 	root.SetArgs(params.Args)
 	code := Execute(ctx, root)
 	params.KillCancelled()
@@ -36,7 +37,7 @@ func Main(params Params) int {
 	return code
 }
 
-func NewRoot(version string, commands []*cobra.Command) *cobra.Command {
+func NewRoot(version string, streams *output.Streams, commands []*cobra.Command) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "wtm-next",
 		Short:         "Git worktree manager, rebuilt as slices",
@@ -44,6 +45,9 @@ func NewRoot(version string, commands []*cobra.Command) *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
+	root.SetIn(streams.In)
+	root.SetOut(streams.Out)
+	root.SetErr(streams.Err)
 	root.PersistentFlags().BoolP(FlagQuiet, "q", false, quietUsage)
 	help := root.HelpFunc()
 	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
@@ -59,7 +63,7 @@ func NewRoot(version string, commands []*cobra.Command) *cobra.Command {
 }
 
 func Execute(ctx context.Context, root *cobra.Command) int {
-	_, err := root.ExecuteContextC(ctx)
+	failing, err := root.ExecuteContextC(ctx)
 	if err == nil {
 		return ExitOK
 	}
@@ -73,8 +77,14 @@ func Execute(ctx context.Context, root *cobra.Command) int {
 		return exitCode(failure, ctx.Err() != nil)
 	}
 	usage := domain.InvalidMessage(err.Error())
-	output.Frame(stderr, func(w io.Writer) { output.Failure(w, output.FailureParams{Err: usage}) })
+	output.Frame(stderr, func(w io.Writer) {
+		output.Failure(w, output.FailureParams{Err: usage, Next: []output.NextStep{HelpStep(failing)}})
+	})
 	return ExitUsage
+}
+
+func HelpStep(cmd *cobra.Command) output.NextStep {
+	return output.NextStep{Command: cmd.CommandPath() + " --help"}
 }
 
 type Failed struct {

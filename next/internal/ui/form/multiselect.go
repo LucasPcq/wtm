@@ -159,12 +159,12 @@ func (m *MultiSelect) move(step int) {
 	m.cursor = min(max(m.cursor+step, 0), max(len(m.shown)-1, 0))
 }
 
-func (m *MultiSelect) View(size Size) string {
+func (m *MultiSelect) View(size Size, st *Styles) string {
 	var b strings.Builder
 	if m.filtering || m.query != "" {
-		b.WriteString(output.Muted.Render("/ " + m.query))
+		b.WriteString(st.Muted.Render("/ " + m.query))
 		if m.filtering {
-			b.WriteString(reverse.Render(" "))
+			b.WriteString(st.reverse.Render(" "))
 		}
 		b.WriteString("\n\n")
 	}
@@ -175,16 +175,16 @@ func (m *MultiSelect) View(size Size) string {
 	m.offset = min(max(m.offset, m.cursor-rows+1), m.cursor)
 	end := min(m.offset+rows, len(m.shown))
 	for i := m.offset; i < end; i++ {
-		b.WriteString(m.row(m.options[m.shown[i]], i == m.cursor, size.Width))
+		b.WriteString(m.row(m.options[m.shown[i]], i == m.cursor, size.Width, st))
 		if i < end-1 {
 			b.WriteString("\n")
 		}
 	}
 	if len(m.shown) == 0 {
-		b.WriteString(output.Muted.Render(output.Indent + noMatches))
+		b.WriteString(st.Muted.Render(output.Indent + noMatches))
 	}
 	if m.err != nil {
-		b.WriteString("\n\n" + errorBanner(m.err.Error(), size.Width))
+		b.WriteString("\n\n" + errorBanner(m.err.Error(), size.Width, st))
 	}
 	return b.String()
 }
@@ -200,7 +200,7 @@ func (m *MultiSelect) overhead() int {
 	return lines
 }
 
-func (m *MultiSelect) row(p Pick, selected bool, width int) string {
+func (m *MultiSelect) row(p Pick, selected bool, width int, st *Styles) string {
 	check := checkOff
 	if p.Picked {
 		check = checkOn
@@ -209,20 +209,20 @@ func (m *MultiSelect) row(p Pick, selected bool, width int) string {
 	fill := max(width-rowPrefix-rowLead-lipgloss.Width(label)-lipgloss.Width(p.Tag)-rowTagGap, 1)
 	if selected {
 		block := " " + label + strings.Repeat(" ", fill) + p.Tag + strings.Repeat(" ", rowTagGap)
-		return Accent.Render("▌›") + tinted.Render(block)
+		return st.accent.Render("▌›") + st.tinted.Render(block)
 	}
-	return strings.Repeat(" ", rowPrefix+rowLead) + label + strings.Repeat(" ", fill) + toned(p.Tone).Render(p.Tag) + strings.Repeat(" ", rowTagGap)
+	return strings.Repeat(" ", rowPrefix+rowLead) + label + strings.Repeat(" ", fill) + toned(p.Tone, st).Render(p.Tag) + strings.Repeat(" ", rowTagGap)
 }
 
-func toned(t Tone) lipgloss.Style {
+func toned(t Tone, st *Styles) lipgloss.Style {
 	switch t {
 	case ToneWarning:
-		return output.Warning
+		return st.Warning
 	case ToneDanger:
-		return output.Danger
+		return st.Danger
 	case ToneMuted:
 	}
-	return output.Muted
+	return st.Muted
 }
 
 func (m *MultiSelect) Help() Help {

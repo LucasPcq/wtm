@@ -19,11 +19,11 @@ func (w *Wizard) View() string {
 	if w.size.Height > 0 {
 		body.Height = max(minListRows, w.size.Height-strings.Count(head+tail, "\n"))
 	}
-	return head + w.field().View(body) + tail
+	return head + w.field().View(body, w.styles) + tail
 }
 
 func (w *Wizard) status() string {
-	return StatusBox.Render(w.spinner.View() + " " + output.Muted.Render(w.loading))
+	return w.styles.statusBox.Render(w.spinner.View() + " " + w.styles.Muted.Render(w.loading))
 }
 
 func (w *Wizard) head() string {
@@ -41,7 +41,7 @@ func (w *Wizard) head() string {
 	if w.atRecap() {
 		return b.String() + w.review() + "\n\n"
 	}
-	b.WriteString(output.Muted.Render(Indented(Wrap(w.script.Steps[w.current].Description(), w.size.Width-len(output.Indent)-1))) + "\n\n")
+	b.WriteString(w.styles.Muted.Render(Indented(Wrap(w.script.Steps[w.current].Description(), w.size.Width-len(output.Indent)-1))) + "\n\n")
 	return b.String()
 }
 
@@ -50,7 +50,8 @@ func (w *Wizard) breadcrumb() string {
 	if !w.atRecap() {
 		title = w.script.Steps[w.current].Label()
 	}
-	return output.Muted.Render(fmt.Sprintf("%sStep %d/%d", output.Indent, w.current+1, w.last())) + output.Muted.Render(HelpSeparator) + Accent.Render(title)
+	muted := w.styles.Muted
+	return muted.Render(fmt.Sprintf("%sStep %d/%d", output.Indent, w.current+1, w.last())) + muted.Render(HelpSeparator) + w.styles.accent.Render(title)
 }
 
 func (w *Wizard) summaries() string {
@@ -60,16 +61,16 @@ func (w *Wizard) summaries() string {
 		label := w.script.Steps[s].Label()
 		switch {
 		case m.ruled != "":
-			lines = append(lines, output.Muted.Render(output.Indent+"· "+label+" — "+m.ruled))
+			lines = append(lines, w.styles.Muted.Render(output.Indent+"· "+label+" — "+m.ruled))
 		default:
-			lines = append(lines, Summary.Render(output.Indent+"✓ "+label+": "+m.line))
+			lines = append(lines, w.styles.summary.Render(output.Indent+"✓ "+label+": "+m.line))
 		}
 	}
 	return strings.Join(lines, "\n")
 }
 
 func (w *Wizard) tail() string {
-	return "\n\n" + output.Muted.Render(w.helpLine()) + "\n"
+	return "\n\n" + w.styles.Muted.Render(w.helpLine()) + "\n"
 }
 
 func (w *Wizard) helpLine() string {

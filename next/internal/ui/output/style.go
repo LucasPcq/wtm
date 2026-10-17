@@ -1,6 +1,10 @@
 package output
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"io"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 var (
 	ColorPrimary = lipgloss.AdaptiveColor{Light: "#5B4BE0", Dark: "#9B8CFF"}
@@ -8,11 +12,32 @@ var (
 	ColorSuccess = lipgloss.AdaptiveColor{Light: "#158A4A", Dark: "#4ADE80"}
 	ColorWarning = lipgloss.AdaptiveColor{Light: "#B07800", Dark: "#F0C000"}
 	ColorDanger  = lipgloss.AdaptiveColor{Light: "#C21E28", Dark: "#FA6E76"}
-
-	bold    = lipgloss.NewStyle().Bold(true)
-	Muted   = lipgloss.NewStyle().Foreground(ColorMuted)
-	success = lipgloss.NewStyle().Foreground(ColorSuccess)
-	Warning = lipgloss.NewStyle().Foreground(ColorWarning)
-	primary = lipgloss.NewStyle().Foreground(ColorPrimary)
-	Danger  = lipgloss.NewStyle().Foreground(ColorDanger)
 )
+
+type Styles struct {
+	renderer *lipgloss.Renderer
+	bold     lipgloss.Style
+	Muted    lipgloss.Style
+	success  lipgloss.Style
+	Warning  lipgloss.Style
+	primary  lipgloss.Style
+	Danger   lipgloss.Style
+}
+
+var plainStyles = newStyles(lipgloss.NewRenderer(io.Discard))
+
+func newStyles(r *lipgloss.Renderer) *Styles {
+	return &Styles{
+		renderer: r,
+		bold:     r.NewStyle().Bold(true),
+		Muted:    r.NewStyle().Foreground(ColorMuted),
+		success:  r.NewStyle().Foreground(ColorSuccess),
+		Warning:  r.NewStyle().Foreground(ColorWarning),
+		primary:  r.NewStyle().Foreground(ColorPrimary),
+		Danger:   r.NewStyle().Foreground(ColorDanger),
+	}
+}
+
+func (s *Styles) NewStyle() lipgloss.Style {
+	return s.renderer.NewStyle()
+}

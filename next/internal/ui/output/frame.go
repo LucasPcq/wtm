@@ -41,7 +41,7 @@ func (b *barWriter) Write(p []byte) (int, error) {
 		}
 		b.afterCR = false
 		if b.atLineStart {
-			out.WriteString(primary.Render(accentBar))
+			out.WriteString(StylesOf(b.w).primary.Render(accentBar))
 			b.atLineStart = false
 		}
 		out.WriteByte(c)
@@ -57,5 +57,3 @@ func (b *barWriter) Write(p []byte) (int, error) {
 	}
 	return len(p), nil
 }
-
-func (b *barWriter) Unwrap() io.Writer { return b.w }

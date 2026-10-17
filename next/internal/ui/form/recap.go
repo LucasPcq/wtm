@@ -25,12 +25,14 @@ func (w *Wizard) previewing() tea.Cmd {
 	w.planned, w.failure = false, nil
 	w.recap = NewSelectList(SelectParams{})
 	return tea.Batch(w.load(planText), func() tea.Msg {
-		return previewMsg{err: w.script.Preview(w.ctx)}
+		apply, err := w.script.Preview(w.ctx)
+		return previewMsg{apply: apply, err: err}
 	})
 }
 
 func (w *Wizard) previewed(m previewMsg) {
 	w.loading = ""
+	m.apply()
 	options := []Option{{Label: cancelLabel, Value: cancelValue}}
 	if failure := domain.AsError(domain.AsErrorParams{Err: m.err}); failure != nil {
 		w.failure = failure
@@ -64,11 +66,11 @@ func (w *Wizard) recapBody() string {
 	case !w.planned:
 		return planText
 	}
-	plan := w.script.Plan(w.recapWidth() - RecapBox.GetHorizontalPadding())
+	plan := w.script.Plan(w.recapWidth()-w.styles.recapBox.GetHorizontalPadding(), w.styles.Styles)
 	if !w.stale {
 		return plan
 	}
-	return output.Warning.Render(output.GlyphAttention) + " " + staleText + "\n\n" + plan
+	return w.styles.Warning.Render(output.GlyphAttention) + " " + staleText + "\n\n" + plan
 }
 
 func (w *Wizard) failureText() string {
@@ -76,7 +78,7 @@ func (w *Wizard) failureText() string {
 	if len(w.failure.Fields) > 0 {
 		first = w.failure.Message
 	}
-	lines := []string{output.Danger.Render(output.GlyphFailure) + " " + first}
+	lines := []string{w.styles.Danger.Render(output.GlyphFailure) + " " + first}
 	for _, found := range w.failure.Fields {
 		lines = append(lines, detailHang+found.Message(w.script.Label(found.Path)))
 	}
@@ -88,5 +90,5 @@ func (w *Wizard) recapWidth() int {
 }
 
 func (w *Wizard) review() string {
-	return RecapBox.Width(w.recapWidth()).Render(Accent.Render(reviewTitle) + "\n\n" + w.recapBody())
+	return w.styles.recapBox.Width(w.recapWidth()).Render(w.styles.accent.Render(reviewTitle) + "\n\n" + w.recapBody())
 }

@@ -5,7 +5,6 @@ import (
 	"cmp"
 	"context"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
@@ -16,7 +15,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 const (
@@ -61,6 +59,7 @@ type Project struct {
 }
 
 type createCommand struct {
+	io          *output.Streams
 	open        func(ctx context.Context) (Project, error)
 	from        string
 	envFrom     string
@@ -76,8 +75,8 @@ type createCommand struct {
 	quiet       bool
 }
 
-func New(open func(ctx context.Context) (Project, error)) *cobra.Command {
-	c := &createCommand{open: open}
+func New(streams *output.Streams, open func(ctx context.Context) (Project, error)) *cobra.Command {
+	c := &createCommand{io: streams, open: open}
 	cmd := &cobra.Command{Use: "create [branch...]", Short: createShort, Long: createLong, Example: createExample, Args: cobra.ArbitraryArgs, RunE: c.run}
 	flags := cmd.Flags()
 	flags.StringVar(&c.from, "from", "", descriptions["from"])
@@ -88,7 +87,7 @@ func New(open func(ctx context.Context) (Project, error)) *cobra.Command {
 	flags.StringArrayVar(&c.remember, "remember", nil, rememberUsage)
 	flags.BoolVarP(&c.yes, "yes", "y", false, yesUsage)
 	flags.StringVar(&c.output, "output", uicli.OutputText, uicli.OutputUsage)
-	flags.BoolVar(&c.dryRun, "dry-run", false, uicli.DryRunUsage)
+	flags.BoolVarP(&c.dryRun, "dry-run", "n", false, uicli.DryRunUsage)
 	flags.StringVar(&c.expect, "expect-fingerprint", "", uicli.ExpectUsage)
 	flags.BoolVar(&c.ask, "ask", false, uicli.AskUsage)
 	_ = cmd.RegisterFlagCompletionFunc("env-from", cobra.FixedCompletions(create.Names(project.EnvStrategies()), cobra.ShellCompDirectiveNoFileComp))
@@ -96,7 +95,7 @@ func New(open func(ctx context.Context) (Project, error)) *cobra.Command {
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		invalid := domain.Invalid(nil)
 		invalid.Cause = err
-		return c.fail(cmd, invalid, create.Request{})
+		return c.misused(cmd, invalid)
 	})
 	return cmd
 }
@@ -107,15 +106,15 @@ func (c *createCommand) run(cmd *cobra.Command, args []string) error {
 	if c.output != uicli.OutputText && c.output != uicli.OutputJSON {
 		refused := domain.InvalidMessage(`invalid --output "` + c.output + `": expected one of text, json`)
 		c.output = uicli.OutputText
-		return c.fail(cmd, refused, req)
+		return c.misused(cmd, refused)
 	}
 	ctx := cmd.Context()
 	project, err := c.open(ctx)
 	if err != nil {
 		return c.fail(cmd, domain.AsError(domain.AsErrorParams{Err: err}), req)
 	}
-	_, stderr := c.streams(cmd)
-	progress := output.NewProgress(ctx, output.ProgressParams{W: stderr, Human: c.human(), Live: output.IsTerminal(stderr)})
+	_, stderr := c.streams()
+	progress := output.NewProgress(ctx, output.ProgressParams{W: stderr, Human: c.human(), Live: !c.quiet && c.io.CanAnimate()})
 	ran, err := c.create(cmd, project.UseCase, req, progress.Report)
 	progress.Close()
 	return c.conclude(cmd, concluded{Outcome: ran.Outcome, Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: ran.Request, Cwd: project.Cwd})
@@ -123,8 +122,8 @@ func (c *createCommand) run(cmd *cobra.Command, args []string) error {
 
 func (c *createCommand) create(cmd *cobra.Command, useCase create.UseCase, req create.Request, report domain.Report) (ran, error) {
 	ctx := cmd.Context()
-	if c.interactive(cmd) {
-		return runForm(ctx, formParams{App: useCase, Request: req, DryRun: c.dryRun, Report: report, In: cmd.InOrStdin(), Out: cmd.ErrOrStderr()})
+	if c.interactive() {
+		return runForm(ctx, formParams{App: useCase, Request: req, DryRun: c.dryRun, Report: report, In: c.io.In, Out: c.io.Err})
 	}
 	outcome, err := useCase.Run(ctx, req, operation.Options{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, Report: report})
 	return ran{Outcome: outcome, Request: req}, err
@@ -152,16 +151,15 @@ func (c *createCommand) human() bool {
 	return c.output == uicli.OutputText
 }
 
-func (c *createCommand) interactive(cmd *cobra.Command) bool {
-	stdin, ok := cmd.InOrStdin().(*os.File)
-	return ok && term.IsTerminal(int(stdin.Fd())) && c.expect == "" && c.human() && !c.yes
+func (c *createCommand) interactive() bool {
+	return c.io.CanPrompt() && c.expect == "" && c.human() && !c.yes
 }
 
-func (c *createCommand) streams(cmd *cobra.Command) (io.Writer, io.Writer) {
+func (c *createCommand) streams() (io.Writer, io.Writer) {
 	if c.quiet && c.human() {
 		return io.Discard, io.Discard
 	}
-	return cmd.OutOrStdout(), cmd.ErrOrStderr()
+	return c.io.Out, c.io.Err
 }
 
 type concluded struct {
@@ -173,9 +171,9 @@ type concluded struct {
 
 func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
 	if !c.human() {
-		return c.envelope(cmd, envelopeParams{Outcome: done.Outcome, Err: done.Err})
+		return c.envelope(envelopeParams{Outcome: done.Outcome, Err: done.Err})
 	}
-	stdout, _ := c.streams(cmd)
+	stdout, _ := c.streams()
 	line := createLine{Command: cmd.CommandPath(), Request: done.Request}
 	switch {
 	case done.Err != nil:
@@ -193,23 +191,31 @@ func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
 }
 
 func (c *createCommand) fail(cmd *cobra.Command, failure *domain.Error, req create.Request) error {
-	if !c.human() {
-		return c.envelope(cmd, envelopeParams{Err: failure})
-	}
-	_, stderr := c.streams(cmd)
 	var next []output.NextStep
 	if failure.Code == operation.CodePlanStale {
 		next = []output.NextStep{{Command: createLine{Command: cmd.CommandPath(), Request: req}.String() + " --dry-run", Note: output.ReplanNote}}
 	}
+	return c.failWith(failure, next)
+}
+
+func (c *createCommand) misused(cmd *cobra.Command, failure *domain.Error) error {
+	return c.failWith(failure, []output.NextStep{uicli.HelpStep(cmd)})
+}
+
+func (c *createCommand) failWith(failure *domain.Error, next []output.NextStep) error {
+	if !c.human() {
+		return c.envelope(envelopeParams{Err: failure})
+	}
+	_, stderr := c.streams()
 	output.Frame(stderr, func(w io.Writer) {
 		output.Failure(w, output.FailureParams{Err: failure, Next: next, Flags: createFlags})
 	})
 	return c.failed(failure)
 }
 
-func (c *createCommand) envelope(cmd *cobra.Command, params envelopeParams) error {
+func (c *createCommand) envelope(params envelopeParams) error {
 	doc := envelopeOf(params)
-	if err := output.Envelope(cmd.OutOrStdout(), doc); err != nil {
+	if err := output.Envelope(c.io.Out, doc); err != nil {
 		return c.failed(domain.AsError(domain.AsErrorParams{Err: err}))
 	}
 	return c.failed(doc.Err)

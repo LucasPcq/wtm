@@ -35,11 +35,14 @@ type printed struct {
 
 func runIn(t *testing.T, w world, args ...string) printed {
 	t.Helper()
-	root := uicli.NewRoot("1.2.3", []*cobra.Command{New(w.open)})
-	var stdout, stderr bytes.Buffer
-	root.SetIn(&bytes.Buffer{})
-	root.SetOut(&stdout)
-	root.SetErr(&stderr)
+	return runOn(t, w, func(*output.Streams) {}, args...)
+}
+
+func runOn(t *testing.T, w world, setUp func(*output.Streams), args ...string) printed {
+	t.Helper()
+	streams, _, stdout, stderr := output.Test()
+	setUp(streams)
+	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.open)})
 	root.SetArgs(args)
 	code := uicli.Execute(t.Context(), root)
 	return printed{Stdout: stdout.String(), Stderr: stderr.String(), Code: code}

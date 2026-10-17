@@ -171,3 +171,10 @@ func TestQuietSilencesASuccess(t *testing.T) {
 	assert.Empty(t, got.Stdout)
 	assert.Empty(t, got.Stderr)
 }
+
+func TestAFlagErrorPointsAtTheHelp(t *testing.T) {
+	got := runExtract(t, newWorld(seed{}), "--bogus")
+
+	assert.Equal(t, uicli.ExitUsage, got.Code)
+	assert.Equal(t, "\n  ✗ the request is invalid: unknown flag: --bogus\n  → wtm-next extract --help\n\n", got.Stderr)
+}

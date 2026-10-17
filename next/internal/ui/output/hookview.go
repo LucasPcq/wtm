@@ -35,7 +35,7 @@ type hookViewParams struct {
 }
 
 func newHookView(params hookViewParams) *hookView {
-	view := &hookView{w: params.W, logPath: params.LogPath, header: Muted.Render(glyphNext + " " + params.Label)}
+	view := &hookView{w: params.W, logPath: params.LogPath, header: StylesOf(params.W).Muted.Render(glyphNext + " " + params.Label)}
 	view.repaint()
 	return view
 }
@@ -112,7 +112,7 @@ func (v *hookView) repaint() {
 	}
 	for _, line := range v.tail {
 		body := truncate(expandTabs(line), max(width-len(Indent), hookMinWidth))
-		fmt.Fprintf(v.w, "%s%s%s\n", Indent, Indent, Muted.Render(body))
+		fmt.Fprintf(v.w, "%s%s%s\n", Indent, Indent, StylesOf(v.w).Muted.Render(body))
 		v.painted++
 	}
 }

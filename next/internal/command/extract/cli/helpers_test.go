@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"os"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,11 +28,8 @@ type printed struct {
 
 func runExtract(t *testing.T, w world, words ...string) printed {
 	t.Helper()
-	root := uicli.NewRoot("1.2.3", []*cobra.Command{New(w.open)})
-	var stdout, stderr bytes.Buffer
-	root.SetIn(&bytes.Buffer{})
-	root.SetOut(&stdout)
-	root.SetErr(&stderr)
+	streams, _, stdout, stderr := output.Test()
+	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.open)})
 	root.SetArgs(append([]string{"extract"}, words...))
 	code := uicli.Execute(t.Context(), root)
 	return printed{Stdout: stdout.String(), Stderr: stderr.String(), Code: code}

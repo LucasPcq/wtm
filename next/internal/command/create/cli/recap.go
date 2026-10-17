@@ -6,19 +6,19 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
-func (w *wizard) previewPlan(ctx context.Context) error {
-	w.preview = nil
+func (w *wizard) previewPlan(ctx context.Context) (func(), error) {
 	outcome, err := w.app.Run(ctx, w.req, operation.Options{DryRun: true, Surface: surfaceTUI})
-	if err == nil {
-		w.preview = &outcome
+	if err != nil {
+		return func() { w.preview = nil }, err
 	}
-	return err
+	return func() { w.preview = &outcome }, nil
 }
 
-func (w *wizard) plan(width int) string {
-	return planTextOf(w.preview.Plan, w.preview.Warnings, width)
+func (w *wizard) plan(width int, st *output.Styles) string {
+	return planTextOf(w.preview.Plan, w.preview.Warnings, width, st)
 }
 
 func (w *wizard) apply(ctx context.Context) error {

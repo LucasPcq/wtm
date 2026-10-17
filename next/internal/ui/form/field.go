@@ -24,6 +24,6 @@ type Help struct {
 
 type Field interface {
 	Update(msg tea.Msg) (Verdict, tea.Cmd)
-	View(size Size) string
+	View(size Size, st *Styles) string
 	Help() Help
 }

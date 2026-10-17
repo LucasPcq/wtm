@@ -2,6 +2,7 @@ package form
 
 import (
 	"context"
+	"io"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -20,9 +21,9 @@ const (
 
 type Script struct {
 	Steps   []Step
-	Observe func(ctx context.Context) error
-	Preview func(ctx context.Context) error
-	Plan    func(width int) string
+	Observe func(ctx context.Context) (func(), error)
+	Preview func(ctx context.Context) (func(), error)
+	Plan    func(width int, st *output.Styles) string
 	Label   func(path string) string
 	Apply   func(ctx context.Context) error
 	Stale   func(err error) bool
@@ -49,7 +50,10 @@ type Wizard struct {
 	planned  bool
 	failure  *domain.Error
 	loading  string
+	reading  bool
+	queued   []tea.KeyMsg
 	spinner  spinner.Model
+	styles   *Styles
 	size     Size
 	ending   Ending
 	err      error
@@ -62,14 +66,22 @@ type Params struct {
 
 func New(ctx context.Context, params Params) *Wizard {
 	s := spinner.New()
-	s.Spinner, s.Style = spinner.MiniDot, output.Muted
+	s.Spinner = spinner.MiniDot
 	count := len(params.Script.Steps) + 1
-	return &Wizard{ctx: ctx, script: params.Script, dryRun: params.DryRun, answered: make([]bool, count), marks: make([]mark, count), spinner: s, size: Size{Width: defaultWidth}}
+	w := &Wizard{ctx: ctx, script: params.Script, dryRun: params.DryRun, answered: make([]bool, count), marks: make([]mark, count), spinner: s, size: Size{Width: defaultWidth}}
+	w.style(output.StylesOf(io.Discard))
+	return w
+}
+
+func (w *Wizard) style(base *output.Styles) {
+	w.styles = newStyles(base)
+	w.spinner.Style = base.Muted
 }
 
 func (w *Wizard) Again() *Wizard {
 	next := New(w.ctx, Params{Script: w.script, DryRun: w.dryRun})
 	next.stale = true
+	next.style(w.styles.Styles)
 	for s, m := range w.marks {
 		next.answered[s] = m.asked
 	}
@@ -84,17 +96,28 @@ func (w *Wizard) Current() int {
 	return w.current
 }
 
+type then int
+
+const (
+	thenEnter then = iota
+	thenRefresh
+	thenNext
+	thenStay
+)
+
 type observedMsg struct {
-	err     error
-	refresh bool
+	apply func()
+	err   error
+	then  then
 }
 
 type previewMsg struct {
-	err error
+	apply func()
+	err   error
 }
 
 func (w *Wizard) Init() tea.Cmd {
-	return tea.Batch(w.load(readingText), w.observe(false))
+	return tea.Batch(w.load(readingText), w.observe(thenEnter))
 }
 
 func (w *Wizard) load(text string) tea.Cmd {
@@ -102,9 +125,11 @@ func (w *Wizard) load(text string) tea.Cmd {
 	return w.spinner.Tick
 }
 
-func (w *Wizard) observe(refresh bool) tea.Cmd {
+func (w *Wizard) observe(after then) tea.Cmd {
+	w.reading = true
 	return func() tea.Msg {
-		return observedMsg{err: w.script.Observe(w.ctx), refresh: refresh}
+		apply, err := w.script.Observe(w.ctx)
+		return observedMsg{apply: apply, err: err, then: after}
 	}
 }
 
@@ -129,8 +154,7 @@ func (w *Wizard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return w, nil
 	}
 	if field := w.field(); field != nil {
-		_, cmd := field.Update(msg)
-		return w, cmd
+		return w, w.settle(field.Update(msg))
 	}
 	return w, nil
 }
@@ -140,14 +164,21 @@ func (w *Wizard) key(m tea.KeyMsg) tea.Cmd {
 		w.ending = Cancelled
 		return tea.Quit
 	}
+	if w.reading {
+		w.queued = append(w.queued, m)
+		return nil
+	}
 	field := w.field()
 	if field == nil || w.loading != "" {
 		return nil
 	}
 	if r, ok := w.refresher(); ok && m.String() == keyRefresh && r.Refreshable() {
-		return tea.Batch(w.load(refreshText), w.observe(true))
+		return tea.Batch(w.load(refreshText), w.observe(thenRefresh))
 	}
-	verdict, cmd := field.Update(m)
+	return w.settle(field.Update(m))
+}
+
+func (w *Wizard) settle(verdict Verdict, cmd tea.Cmd) tea.Cmd {
 	switch verdict {
 	case Done:
 		return w.answer()
@@ -167,19 +198,36 @@ func (w *Wizard) refresher() (Refresher, bool) {
 }
 
 func (w *Wizard) observed(m observedMsg) tea.Cmd {
-	w.loading = ""
+	w.loading, w.reading = "", false
+	m.apply()
 	if m.err != nil {
 		w.err = m.err
 		return tea.Quit
 	}
-	if !m.refresh {
+	var cmd tea.Cmd
+	switch m.then {
+	case thenEnter:
 		w.loaded = true
-		return w.enter(0)
+		cmd = w.enter(0)
+	case thenNext:
+		cmd = w.enter(w.current + 1)
+	case thenRefresh:
+		if r, ok := w.refresher(); ok {
+			r.Refreshed()
+		}
+	case thenStay:
 	}
-	if r, ok := w.refresher(); ok {
-		r.Refreshed()
+	return tea.Batch(cmd, w.replay())
+}
+
+func (w *Wizard) replay() tea.Cmd {
+	var cmds []tea.Cmd
+	for len(w.queued) > 0 && !w.reading && w.ending == Asking {
+		typed := w.queued[0]
+		w.queued = w.queued[1:]
+		cmds = append(cmds, w.key(typed))
 	}
-	return nil
+	return tea.Batch(cmds...)
 }
 
 func (w *Wizard) recapAt() int {
@@ -249,11 +297,7 @@ func (w *Wizard) answer() tea.Cmd {
 	step := w.script.Steps[w.current]
 	answered := step.Answer()
 	w.marks[w.current].line = summarized(step.Standing(), answered)
-	if err := w.script.Observe(w.ctx); err != nil {
-		w.err = err
-		return tea.Quit
-	}
-	return w.enter(w.current + 1)
+	return tea.Batch(w.load(readingText), w.observe(thenNext))
 }
 
 func (w *Wizard) back() tea.Cmd {
@@ -272,9 +316,5 @@ func (w *Wizard) back() tea.Cmd {
 		}
 	}
 	w.current = to
-	if err := w.script.Observe(w.ctx); err != nil {
-		w.err = err
-		return tea.Quit
-	}
-	return nil
+	return tea.Batch(w.load(readingText), w.observe(thenStay))
 }

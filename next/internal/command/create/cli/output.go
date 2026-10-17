@@ -63,7 +63,7 @@ func sourceLabel(branches []create.BranchPlan) string {
 	return "Parent"
 }
 
-func itemNote(item create.Item) string {
+func itemNote(item create.Item, st *output.Styles) string {
 	note := output.SettlementNote(item.Detail.EnvPorts)
 	if item.Reason == domain.ReasonUnchanged {
 		note = "already open"
@@ -71,7 +71,7 @@ func itemNote(item create.Item) string {
 	if note == "" {
 		return ""
 	}
-	return output.Muted.Render(output.Dot + note)
+	return st.Muted.Render(output.Dot + note)
 }
 
 func anomaliesOf(item create.Item) []string {
@@ -104,7 +104,7 @@ func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextSte
 			continue
 		}
 		path := output.ShownPath(output.Shown{Cwd: cwd, Path: item.Detail.Path})
-		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + itemNote(item)}})
+		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + itemNote(item, output.StylesOf(w))}})
 		anomalies = append(anomalies, anomaliesOf(item)...)
 		next = append(next, output.NextStep{Command: "wtm go " + item.Subject})
 	}
@@ -190,8 +190,8 @@ func drawDryRun(w io.Writer, outcome create.Outcome, apply string) {
 	output.NextSteps(w, []output.NextStep{{Command: apply, Note: output.ApplyNote}})
 }
 
-func planTextOf(plan create.Plan, warnings []domain.Warning, width int) string {
-	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(plan), Warnings: output.Messages(warnings), Width: width}), "\n")
+func planTextOf(plan create.Plan, warnings []domain.Warning, width int, st *output.Styles) string {
+	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(plan), Warnings: output.Messages(warnings), Width: width, Styles: st}), "\n")
 }
 
 type envelopeParams struct {

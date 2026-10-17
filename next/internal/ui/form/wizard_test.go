@@ -1,12 +1,12 @@
 package form
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -158,9 +158,9 @@ func TestADryRunWithNothingToAskAppliesWithoutDrawing(t *testing.T) {
 	f := newFake()
 	f.first.standing = Standing{Skip: "no"}
 	f.second.standing = Standing{Skip: "no"}
-	var out bytes.Buffer
+	ios, _, _, out := output.Test()
 
-	err := Run(t.Context(), Params{Script: f.script(), DryRun: true}, &bytes.Buffer{}, &out)
+	err := Run(t.Context(), Params{Script: f.script(), DryRun: true}, ios.In, ios.Err)
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, f.applied)
@@ -171,9 +171,10 @@ func TestAFailedObserveEndsTheRun(t *testing.T) {
 	f := newFake()
 	failed := errors.New("no repository")
 	script := f.script()
-	script.Observe = func(context.Context) error { return failed }
+	script.Observe = func(context.Context) (func(), error) { return func() {}, failed }
+	ios, _, _, _ := output.Test()
 
-	err := Run(t.Context(), Params{Script: script, DryRun: true}, &bytes.Buffer{}, &bytes.Buffer{})
+	err := Run(t.Context(), Params{Script: script, DryRun: true}, ios.In, ios.Err)
 
 	assert.ErrorIs(t, err, failed)
 	assert.Zero(t, f.applied)
@@ -193,4 +194,40 @@ func TestAStepThatRefreshesIsReobservedOnItsKey(t *testing.T) {
 	assert.Equal(t, 2, f.observed)
 	assert.Equal(t, 1, refreshing.refreshed)
 	assert.Equal(t, 0, d.w.Current())
+}
+
+func TestAnAnswerAndABackAreObservedOffTheLoopWhileTheStepSaysItIsReading(t *testing.T) {
+	f := newFake()
+	d := open(t, Params{Script: f.script()})
+
+	_, cmd := d.w.Update(keyOf("enter"))
+	assert.Equal(t, 1, f.observed)
+	assert.Equal(t, 0, d.w.Current())
+	assert.Contains(t, d.screen(), "Reading the repository…")
+	d.run(cmd)
+	assert.Equal(t, 2, f.observed)
+	assert.Equal(t, 1, d.w.Current())
+	assert.NotContains(t, d.screen(), "Reading the repository…")
+
+	_, cmd = d.w.Update(keyOf("esc"))
+	assert.Equal(t, 2, f.observed)
+	assert.Contains(t, d.screen(), "Reading the repository…")
+	d.run(cmd)
+	assert.Equal(t, 3, f.observed)
+	assert.Equal(t, 0, d.w.Current())
+	assert.NotContains(t, d.screen(), "Reading the repository…")
+}
+
+func TestKeysTypedWhileTheRepositoryIsReadAreReplayedInOrder(t *testing.T) {
+	f := newFake()
+	d := open(t, Params{Script: f.script()})
+
+	_, cmd := d.w.Update(keyOf("enter"))
+	d.w.Update(keyOf("down"))
+	d.w.Update(keyOf("enter"))
+	d.run(cmd)
+
+	assert.Equal(t, 2, d.w.Current())
+	assert.Equal(t, "no", f.second.answer)
+	assert.Equal(t, 3, f.observed)
 }

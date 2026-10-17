@@ -22,7 +22,7 @@ What every mutating command of `next/` promises its callers — people at a term
 
 ## Interactive or unattended
 
-- A run is interactive only when stdin is a terminal, the output is human, `--yes` is not given and no `--expect-fingerprint` is passed; then the wizard asks what the request leaves open.
+- A run is interactive only when stdin and stderr (where the wizard draws) are terminals, `TERM` is not `dumb`, the output is human, `--yes` is not given and no `--expect-fingerprint` is passed; then the wizard asks what the request leaves open. Live progress follows the same terminal rule on stderr alone.
 - Otherwise it is unattended: a field with a default takes it, a required field without one is a refusal naming its flag. Never fall back to a picker.
 - `--output json` is unattended by nature; `--yes` is accepted with it and changes nothing.
 
@@ -39,13 +39,14 @@ What every mutating command of `next/` promises its callers — people at a term
 
 ## Dry run and fingerprint
 
-- `--dry-run` plans without changing anything and prints the plan, its warnings, its fingerprint and the command line that applies exactly this plan (`… --expect-fingerprint <fp>`).
+- `--dry-run` (`-n`) plans without changing anything and prints the plan, its warnings, its fingerprint and the command line that applies exactly this plan (`… --expect-fingerprint <fp>`).
 - `--expect-fingerprint <fp>` applies only if the facts still give that fingerprint; otherwise it refuses with `plan.stale` (exit 25) and prints the dry-run line that shows the plan the facts give now.
 - The wizard's recap is a dry run: it previews the plan, then applies it with its fingerprint; a stale preview asks again.
 
 ## Output
 
-- Human output is framed once (`ui/output.Frame`) on stdout; progress, hook output and warnings that come while it runs go to stderr; refusals are framed on stderr.
+- Human output is framed once (`ui/output.Frame`) on stdout; progress, hook output and warnings that come while it runs go to stderr; refusals are framed on stderr. Colour is decided per stream (`NO_COLOR`, `TERM=dumb`, not a terminal), so `2>log` gets no escape codes.
+- A flag error (unknown flag, bad value) prints the failure, then one line pointing at the help (`→ wtm-next create --help`), never the usage dump.
 - `--output json` prints one v2 envelope on stdout, never framed, nothing else on stdout: `{v: 2, command, ok, op, items[{subject, status, reason, error, warnings, detail}], plan, fingerprint, follow_ups, warnings, error{kind, code, message, params, follow_up, fields[{path, code, flag, message…}]}}`.
 - `-q`/`--quiet` silences human output; errors and the exit code are unchanged, and JSON still prints its document.
 - Success contracts to a count; anomalies are named one by one; every outcome ends with the next step (`→ wtm go <branch>`).

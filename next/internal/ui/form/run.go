@@ -5,14 +5,18 @@ import (
 	"io"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func Run(ctx context.Context, params Params, in io.Reader, out io.Writer) error {
+func Run(ctx context.Context, params Params, in io.Reader, out *output.Stream) error {
 	w := New(ctx, params)
+	w.style(output.StylesOf(out))
 	script := params.Script
 	if params.DryRun {
-		if err := script.Observe(ctx); err != nil {
+		apply, err := script.Observe(ctx)
+		apply()
+		if err != nil {
 			return err
 		}
 		if !w.asks() {
@@ -31,8 +35,8 @@ func Run(ctx context.Context, params Params, in io.Reader, out io.Writer) error 
 	}
 }
 
-func ask(ctx context.Context, wizard *Wizard, in io.Reader, out io.Writer) error {
-	final, err := tea.NewProgram(wizard, tea.WithContext(ctx), tea.WithInput(in), tea.WithOutput(out), tea.WithoutSignalHandler()).Run()
+func ask(ctx context.Context, wizard *Wizard, in io.Reader, out *output.Stream) error {
+	final, err := tea.NewProgram(wizard, tea.WithContext(ctx), tea.WithInput(in), tea.WithOutput(out.Writer), tea.WithoutSignalHandler()).Run()
 	if err != nil {
 		return interrupted(err)
 	}

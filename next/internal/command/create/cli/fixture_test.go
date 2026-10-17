@@ -17,6 +17,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/spf13/cobra"
 )
 
@@ -70,7 +71,8 @@ func newWorld(s seed) world {
 }
 
 func (w world) params(args []string) uicli.Params {
-	return uicli.Params{Version: "1.2.3", Args: args, Commands: []*cobra.Command{New(w.open)}, KillCancelled: shell.KillCancelled, AwaitShields: shell.AwaitShields}
+	streams := output.System()
+	return uicli.Params{Version: "1.2.3", Streams: streams, Args: args, Commands: []*cobra.Command{New(streams, w.open)}, KillCancelled: shell.KillCancelled, AwaitShields: shell.AwaitShields}
 }
 
 func (w world) open(context.Context) (Project, error) {

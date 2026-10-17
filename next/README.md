@@ -26,7 +26,7 @@ internal/
     <name>test/        a stateful fake of an adapter, for tests
   ui/                  the presentation kit every command's cli shares, knowing no command
     cli/               the root: version, --quiet, help, signals, the exit code a command's failure sets
-    output/            frames and blocks, progress, failures, plans, the hook view, the v2 envelope writer
+    output/            the streams (stdin, stdout, stderr, whether each is a terminal, a colour renderer each), frames and blocks, progress, failures, plans, the hook view, the v2 envelope writer
     form/              a command's form: the wizard that walks its steps to a recap and applies, select list, multi-select, text list, confirm, their styles
 ```
 No file format lives in `domain/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `domain/project`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
@@ -55,8 +55,8 @@ A use case or a service declares the interfaces it needs in its `port.go`; an ad
 
 `wtm-next create feat/x --from main`, hop by hop:
 
-1. `cmd/wtm-next/main.go → main`: `ui/cli.Main` runs the root with `command/create/cli.New(openCreate)` registered on it; `ui/cli/root.go → Execute` maps the failure a command returns onto its exit code.
-2. `command/create/cli/command.go → createCommand.run`: the flags become a `create.Request`, `openCreate` (`cmd/wtm-next/project.go`) finds the repository and wires the use case (`cmd/wtm-next/wire.go → wire`), then `createCommand.create` runs the wizard on a terminal (`form.go → runForm`), else `create.UseCase.Run` with its `operation.Options`.
+1. `cmd/wtm-next/main.go → main`: `ui/output.System()` reads the process's streams, and `ui/cli.Main` runs the root with `command/create/cli.New(streams, openCreate)` registered on it; `ui/cli/root.go → Execute` maps the failure a command returns onto its exit code.
+2. `command/create/cli/command.go → createCommand.run`: the flags become a `create.Request`, `openCreate` (`cmd/wtm-next/project.go`) finds the repository and wires the use case (`cmd/wtm-next/wire.go → wire`), then `createCommand.create` runs the wizard when the user can see and answer it (stdin and stderr terminals, `TERM` not `dumb`, human output, no `--yes` nor `--expect-fingerprint`: `output.Streams.CanPrompt`, `form.go → runForm`), else `create.UseCase.Run` with its `operation.Options`.
 3. `command/create/usecase.go → UseCase.Run`: `operation.Service.Begin` takes the operation's locks (`service/operation/operation.go`), `operation.PlanUnderLocks` plans under them, `operation.Fingerprint` fingerprints the plan, a dry run stops there, `Op.Expect` refuses a stale plan, then `Apply` runs between the started and finished events.
 4. `command/create/usecase.go → UseCase.Plan`: `Observe` reads the repository through the ports of `port.go` (git, config), `Resolve` (`questions.go`) settles the request on those facts, `Decide` (`rules.go`) turns them into the plan.
 5. `command/create/usecase.go → UseCase.Apply`: an optional fast-forward of the source (`provision.Service.FastForward`, `service/provision/fastforward.go`), then `provision.Service.Run` (`service/provision/provision.go`) per branch: the worktree, its env, its meta record, its hooks.

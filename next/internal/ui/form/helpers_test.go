@@ -1,10 +1,12 @@
 package form
 
 import (
+	"io"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
@@ -68,6 +70,8 @@ func keyOf(key string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyEnter}
 	case "esc":
 		return tea.KeyMsg{Type: tea.KeyEsc}
+	case "tab":
+		return tea.KeyMsg{Type: tea.KeyTab}
 	case "up":
 		return tea.KeyMsg{Type: tea.KeyUp}
 	case "down":
@@ -92,6 +96,46 @@ func plain(view string) string {
 		lines[i] = strings.TrimRight(line, " ")
 	}
 	return strings.TrimRight(strings.Join(lines, "\n"), "\n")
+}
+
+func settled(l *TextList, cmd tea.Cmd) Verdict {
+	verdict := Stay
+	for _, msg := range messages(cmd) {
+		if checked, ok := msg.(entryChecked); ok {
+			var next tea.Cmd
+			verdict, next = l.Update(checked)
+			if verdict == Stay {
+				verdict = settled(l, next)
+			}
+		}
+	}
+	return verdict
+}
+
+func messages(cmd tea.Cmd) []tea.Msg {
+	if cmd == nil {
+		return nil
+	}
+	result := make(chan tea.Msg, 1)
+	go func() { result <- cmd() }()
+	select {
+	case msg := <-result:
+		batch, ok := msg.(tea.BatchMsg)
+		if !ok {
+			return []tea.Msg{msg}
+		}
+		var all []tea.Msg
+		for _, inner := range batch {
+			all = append(all, messages(inner)...)
+		}
+		return all
+	case <-time.After(settleWithin):
+		return nil
+	}
+}
+
+func plainStyles() *Styles {
+	return newStyles(output.StylesOf(io.Discard))
 }
 
 func pressed(m *MultiSelect, keys ...string) Verdict {

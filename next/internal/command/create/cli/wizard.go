@@ -63,10 +63,9 @@ func (w *wizard) form() form.Params {
 	}
 }
 
-func (w *wizard) observe(ctx context.Context) error {
+func (w *wizard) observe(ctx context.Context) (func(), error) {
 	questions, err := w.app.Questions(ctx, w.req)
-	w.q = questions
-	return err
+	return func() { w.q = questions }, err
 }
 
 type at struct {

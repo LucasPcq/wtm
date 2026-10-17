@@ -40,7 +40,7 @@ func (c *Confirm) Update(msg tea.Msg) (Verdict, tea.Cmd) {
 	return Stay, nil
 }
 
-func (c *Confirm) View(size Size) string {
+func (c *Confirm) View(size Size, st *Styles) string {
 	lines := make([]string, 0, 2)
 	for i, answer := range []string{"Yes", "No"} {
 		if i != c.cursor {
@@ -48,7 +48,7 @@ func (c *Confirm) View(size Size) string {
 			continue
 		}
 		line := "› " + answer
-		lines = append(lines, selected.Render(line+strings.Repeat(" ", max(size.Width-len(line)-1, 0))))
+		lines = append(lines, st.selected.Render(line+strings.Repeat(" ", max(size.Width-len(line)-1, 0))))
 	}
 	return strings.Join(lines, "\n")
 }
