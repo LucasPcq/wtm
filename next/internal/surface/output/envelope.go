@@ -23,7 +23,7 @@ type envelope struct {
 	OK          bool             `json:"ok"`
 	Op          string           `json:"op,omitempty"`
 	Items       []envelopeItem   `json:"items,omitempty"`
-	Plan        *create.Planned  `json:"plan,omitempty"`
+	Plan        *create.Plan     `json:"plan,omitempty"`
 	Fingerprint string           `json:"fingerprint,omitempty"`
 	FollowUps   []envelopeFollow `json:"follow_ups"`
 	Warnings    []wtm.Warning    `json:"warnings"`

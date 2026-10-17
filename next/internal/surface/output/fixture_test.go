@@ -24,7 +24,7 @@ const (
 func twoCreated(trees string) app.CreateOutcome {
 	return app.CreateOutcome{
 		Op: "op-1",
-		Plan: create.Planned{
+		Plan: create.Plan{
 			Branches: []create.BranchPlan{
 				{Branch: "feat/a", Path: filepath.Join(trees, "feat-a"), Action: create.ActionCreate},
 				{Branch: "feat/b", Path: filepath.Join(trees, "feat-b"), Action: create.ActionCreate},
@@ -44,7 +44,7 @@ func mixed(trees string) app.CreateOutcome {
 	hook := &wtm.Error{Kind: wtm.KindInternal, Code: "unit.phase_failed", Message: "on_create failed", Params: wtm.Params{"phase": "on_create"}, Cause: errors.New("hook failed: exit status 3")}
 	return app.CreateOutcome{
 		Op: "op-2",
-		Plan: create.Planned{
+		Plan: create.Plan{
 			Branches: []create.BranchPlan{
 				{Branch: "feature", Path: filepath.Join(trees, "feature"), Action: create.ActionCheckOut},
 				{Branch: "linked", Path: "/repo/main/elsewhere/linked", Action: create.ActionUnchanged},

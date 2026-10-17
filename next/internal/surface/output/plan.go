@@ -103,7 +103,7 @@ func wrapped(value string, width int) []string {
 }
 
 type PlanTextParams struct {
-	Plan     create.Planned
+	Plan     create.Plan
 	Warnings []wtm.Warning
 	Width    int
 }

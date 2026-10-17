@@ -13,8 +13,8 @@ internal/
     dotenv/            .env files parsed and rendered byte for byte
     env/               a worktree's environment: where its .env files come from, what wtm writes into them, what its jobs and hooks run with, its hook chain
                        (env imports worktree, project and dotenv; worktree imports project; wtm imports worktree)
-  app/                 the API every surface calls: locks, fingerprint, events around each use case
-    <slice>/           one use case (create); provision/ is the one shared by several (a new worktree made whole)
+  app/                 the API every surface calls: runs any use case under its locks, fingerprint and events, written once (run.go)
+    <slice>/           one use case in one package whose create.go tells it: Plan, Apply, Questions when it asks; provision/ is the one shared by several (a new worktree made whole)
   adapter/             what the app reaches out to: git, statefile, store, config, shell, oplock, events, proxyport
     <name>test/        a stateful fake of an adapter, for tests
   surface/             what calls the app: cli, output (what wtm-next prints), form

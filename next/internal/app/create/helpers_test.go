@@ -49,14 +49,22 @@ func (w world) questions(t *testing.T, req create.Request) create.Questions {
 	return create.Form(w.facts(t, req.Branches...), req)
 }
 
-func (w world) plan(t *testing.T, req create.Request) (create.Planned, []wtm.Warning) {
+func (w world) plan(t *testing.T, req create.Request) (create.Plan, []wtm.Warning) {
 	t.Helper()
-	facts := w.facts(t, req.Branches...)
-	resolved, err := create.Resolve(facts, req)
-	require.NoError(t, err)
-	planned, warnings, err := create.Plan(facts, resolved)
+	planned, warnings, err := w.deps.Plan(t.Context(), req)
 	require.NoError(t, err)
 	return planned, warnings
+}
+
+func decided(t *testing.T, facts create.Facts, req create.Request) create.Plan {
+	t.Helper()
+	planned, _, err := create.Decide(facts, req)
+	require.NoError(t, err)
+	return planned
+}
+
+func shown(planned create.Plan) create.Plan {
+	return create.Plan{Branches: planned.Branches, From: planned.From, EnvFrom: planned.EnvFrom, Isolation: planned.Isolation, FastForward: planned.FastForward, Remember: planned.Remember}
 }
 
 func (w world) apply(t *testing.T, req create.Request) (create.Result, *recorder) {
@@ -66,13 +74,10 @@ func (w world) apply(t *testing.T, req create.Request) (create.Result, *recorder
 
 func (w world) applyIn(ctx context.Context, t *testing.T, req create.Request) (create.Result, *recorder) {
 	t.Helper()
-	facts := w.facts(t, req.Branches...)
-	resolved, err := create.Resolve(facts, req)
-	require.NoError(t, err)
-	planned, _, err := create.Plan(facts, resolved)
+	planned, _, err := w.deps.Plan(t.Context(), req)
 	require.NoError(t, err)
 	report := &recorder{}
-	return create.Apply(ctx, create.ApplyParams{Deps: w.deps, Facts: facts, Plan: planned, Isolation: resolved.Isolation, FastForward: *resolved.FastForward, Report: report.add}), report
+	return w.deps.Apply(ctx, planned, report.add), report
 }
 
 func problems(err error) map[string]string {

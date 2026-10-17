@@ -30,6 +30,8 @@ const (
 	jobsToml    = "[[job]]\nname = \"web\"\nkind = \"service\"\ncmd = \"npm start\"\nports = { PORT = 3000 }\n\n[[env_port]]\nfile = \".env\"\nkey = \"PORT\"\njob = \"web\"\nport = \"PORT\"\n"
 )
 
+const remembering = projectToml + "\n[wizard.remembered]\nenv_strategy = \"example\"\nisolation = \"verbatim\"\nsource_update = \"ff\"\n"
+
 var createdAt = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 
 type seed struct {

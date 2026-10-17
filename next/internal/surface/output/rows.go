@@ -15,7 +15,7 @@ const (
 	anomaliesTitle = "Env ports left alone"
 )
 
-func planRowsOf(plan create.Planned) []planRow {
+func planRowsOf(plan create.Plan) []planRow {
 	rows := []planRow{
 		{Label: "Branches", Values: plannedBranches(plan.Branches)},
 		{Label: sourceLabel(plan.Branches), Values: []string{plan.From}},

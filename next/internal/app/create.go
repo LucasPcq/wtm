@@ -2,17 +2,9 @@ package app
 
 import (
 	"context"
-	"maps"
-	"os"
-	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
-)
-
-const (
-	commandCreate = "create"
-	CodePlanStale = "plan.stale"
 )
 
 type CreateParams struct {
@@ -23,170 +15,19 @@ type CreateParams struct {
 	Report            wtm.Report
 }
 
-type CreateOutcome struct {
-	Op          string
-	Plan        create.Planned
-	Fingerprint string
-	Warnings    []wtm.Warning
-	Result      *create.Result
-}
+type CreateOutcome = Outcome[create.Plan, create.Result]
 
-func (o CreateOutcome) Failure() *wtm.Error {
-	if o.Result == nil {
-		return nil
-	}
-	return o.Result.Failure()
+func (a *App) Create(ctx context.Context, params CreateParams) (CreateOutcome, error) {
+	return run(ctx, a, steps[create.Plan, create.Result]{
+		Command: "create",
+		Locks:   params.Request.Locks(),
+		Plan: func(ctx context.Context) (create.Plan, []wtm.Warning, error) {
+			return a.deps.Create.Plan(ctx, params.Request)
+		},
+		Apply: a.deps.Create.Apply,
+	}, Params{DryRun: params.DryRun, ExpectFingerprint: params.ExpectFingerprint, Surface: params.Surface, Report: params.Report})
 }
 
 func (a *App) CreateQuestions(ctx context.Context, req create.Request) (create.Questions, error) {
-	facts, err := a.deps.Create.Observe(ctx, req.Branches)
-	if err != nil {
-		return create.Questions{}, err
-	}
-	return create.Form(facts, req), nil
-}
-
-func (a *App) Create(ctx context.Context, params CreateParams) (CreateOutcome, error) {
-	op := a.operation(params)
-	if params.DryRun {
-		settled, err := a.settle(ctx, settling{Request: params.Request})
-		if err != nil {
-			return CreateOutcome{Op: op.ID}, err
-		}
-		return a.planned(op, settled)
-	}
-	held, err := a.deps.TakeLocks(op)
-	if err != nil {
-		return CreateOutcome{Op: op.ID}, err
-	}
-	defer held.Release()
-	settled, err := a.settle(ctx, settling{Request: params.Request, Held: held})
-	if err != nil {
-		return CreateOutcome{Op: op.ID}, err
-	}
-	outcome, err := a.planned(op, settled)
-	if err != nil {
-		return outcome, err
-	}
-	if params.ExpectFingerprint != "" && params.ExpectFingerprint != outcome.Fingerprint {
-		return outcome, &wtm.Error{
-			Kind:    wtm.KindPrecondition,
-			Code:    CodePlanStale,
-			Message: "the facts changed since the preview",
-			Params:  wtm.Params{"expected": params.ExpectFingerprint, "found": outcome.Fingerprint},
-		}
-	}
-	result := a.apply(ctx, applying{Op: op, Settled: settled, Plan: outcome.Plan, Report: a.report(op, params.Report)})
-	outcome.Result = &result
-	outcome.Warnings = append(outcome.Warnings, result.Warnings...)
-	if !held.Protected() {
-		outcome.Warnings = append(outcome.Warnings, wtm.LocksUnavailable)
-	}
-	outcome.Warnings = once(outcome.Warnings)
-	return outcome, nil
-}
-
-func (a *App) operation(params CreateParams) wtm.Operation {
-	return wtm.Operation{
-		ID:            a.deps.NewOpID(),
-		PID:           os.Getpid(),
-		Command:       commandCreate,
-		Surface:       params.Surface,
-		CorrelationID: a.deps.CorrelationID,
-		StartedAt:     a.deps.Now().UTC(),
-		Locks:         params.Request.Locks(),
-	}
-}
-
-type settling struct {
-	Request create.Request
-	Held    Hold
-}
-
-type settled struct {
-	Facts   create.Facts
-	Request create.Request
-}
-
-func (a *App) settle(ctx context.Context, s settling) (settled, error) {
-	facts, err := a.deps.Create.Observe(ctx, s.Request.Branches)
-	if err != nil {
-		return settled{}, err
-	}
-	resolved, err := create.Resolve(facts, s.Request)
-	if err != nil {
-		return settled{}, err
-	}
-	if s.Held == nil {
-		return settled{Facts: facts, Request: resolved}, nil
-	}
-	grown, err := s.Held.Grow(create.Locks(facts, resolved))
-	if err != nil {
-		return settled{}, err
-	}
-	if !grown {
-		return settled{Facts: facts, Request: resolved}, nil
-	}
-	// A lock the defaults named and the request did not is taken first, then the facts are observed again: what it guards may have changed meanwhile.
-	return a.settle(ctx, s)
-}
-
-func (a *App) planned(op wtm.Operation, s settled) (CreateOutcome, error) {
-	plan, warnings, err := create.Plan(s.Facts, s.Request)
-	if err != nil {
-		return CreateOutcome{Op: op.ID}, err
-	}
-	fingerprint, err := fingerprintOf(fingerprinted{Plan: plan, Isolation: s.Request.Isolation})
-	if err != nil {
-		return CreateOutcome{Op: op.ID}, err
-	}
-	return CreateOutcome{Op: op.ID, Plan: plan, Fingerprint: fingerprint, Warnings: warnings}, nil
-}
-
-type applying struct {
-	Op      wtm.Operation
-	Settled settled
-	Plan    create.Planned
-	Report  wtm.Report
-}
-
-func (a *App) report(op wtm.Operation, surface wtm.Report) wtm.Report {
-	publish := a.deps.Publisher(op)
-	return func(event wtm.Event) {
-		publish(event)
-		if surface != nil {
-			surface(event)
-		}
-	}
-}
-
-func (a *App) apply(ctx context.Context, run applying) create.Result {
-	run.Report(wtm.OperationStarted{Command: commandCreate, Surface: run.Op.Surface})
-	result := create.Apply(ctx, create.ApplyParams{
-		Deps:        a.deps.Create,
-		Facts:       run.Settled.Facts,
-		Plan:        run.Plan,
-		Isolation:   run.Settled.Request.Isolation,
-		FastForward: *run.Settled.Request.FastForward,
-		Report:      run.Report,
-	})
-	finished := wtm.OperationFinished{Command: commandCreate, Surface: run.Op.Surface, OK: true}
-	if failure := result.Failure(); failure != nil {
-		finished.OK, finished.Code = false, failure.Code
-	}
-	run.Report(finished)
-	return result
-}
-
-func once(warnings []wtm.Warning) []wtm.Warning {
-	var kept []wtm.Warning
-	for _, warning := range warnings {
-		seen := slices.ContainsFunc(kept, func(k wtm.Warning) bool {
-			return k.Code == warning.Code && k.Message == warning.Message && maps.Equal(k.Params, warning.Params)
-		})
-		if !seen {
-			kept = append(kept, warning)
-		}
-	}
-	return kept
+	return a.deps.Create.Questions(ctx, req)
 }
