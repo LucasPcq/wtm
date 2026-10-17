@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,7 +50,7 @@ func TestADryRunShowsThePlanItsWarningsItsFingerprintAndHowToApplyIt(t *testing.
 	outcome.Warnings = []domain.Warning{{Code: "create.env_parent_fallback", Message: `The "parent" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main.`}}
 
 	golden(t, "dryrun", rendered(func(w *bytes.Buffer) {
-		drawDryRun(w, outcome, "wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567")
+		output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(outcome.Plan), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: "wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567"})
 	}))
 }
 
@@ -63,7 +64,7 @@ func TestAPlanReadsAsItsRowsThenItsWarnings(t *testing.T) {
 
 func TestAnAppliedRunWritesEachItemWithItsDetail(t *testing.T) {
 	outcome := twoCreated("/trees")
-	outcome.Result.Items[1].Detail.Standing = create.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2}
+	outcome.Result.Items[1].Detail.Standing = worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2}
 	outcome.Result.Items[1].Detail.Ordinal = new(2)
 	outcome.Warnings = []domain.Warning{{Code: "locks.unavailable", Message: "ran without operation locks"}}
 

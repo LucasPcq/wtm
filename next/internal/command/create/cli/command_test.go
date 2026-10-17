@@ -131,7 +131,7 @@ func TestWithoutConfigCreateExitsOnItsOwnCode(t *testing.T) {
 
 	got := runCreate(t, w, branchName)
 
-	assert.Equal(t, exitConfigNotFound, got.Code)
+	assert.Equal(t, uicli.ExitConfigNotFound, got.Code)
 	assert.Contains(t, got.Stderr, "run `wtm init` first")
 }
 
@@ -222,7 +222,7 @@ func TestARunAsksOnlyWhenTheUserCanSeeTheQuestionsAndAnswerThem(t *testing.T) {
 		streams.SetStdinTerminal(c.In)
 		streams.Err.SetTerminal(c.Err)
 		streams.SetDumbTerminal(c.Dumb)
-		cmd := &createCommand{io: streams, output: cmp.Or(c.Output, uicli.OutputText), yes: c.Yes, expect: c.Expect}
+		cmd := &createCommand{io: uicli.Run{Streams: streams, Output: cmp.Or(c.Output, uicli.OutputText)}, yes: c.Yes, expect: c.Expect}
 
 		assert.Equal(t, c.Asks, cmd.interactive(), name)
 	}

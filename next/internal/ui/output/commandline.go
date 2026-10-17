@@ -30,6 +30,17 @@ func FlagWords(flag FlagValue) []string {
 	return []string{"--" + flag.Name, Quote(flag.Value)}
 }
 
+// SwitchWords returns the words that pass the boolean flag name as given, --name or --name=false, or none when it was not given.
+func SwitchWords(name string, value *bool) []string {
+	switch {
+	case value == nil:
+		return nil
+	case *value:
+		return []string{"--" + name}
+	}
+	return []string{"--" + name + "=false"}
+}
+
 // Quoted returns each of words quoted for the shell.
 func Quoted(words []string) []string {
 	out := make([]string, 0, len(words))
@@ -57,6 +68,14 @@ func FollowUpLine(followUp *domain.FollowUp) string {
 		words = append(words, "--force")
 	}
 	return strings.Join(words, " ")
+}
+
+// FollowUpSteps returns the next step that repairs what err left behind, its follow-up's command line and message; none when err is nil or has no follow-up.
+func FollowUpSteps(err *domain.Error) []NextStep {
+	if err == nil || err.FollowUp == nil {
+		return nil
+	}
+	return []NextStep{{Command: FollowUpLine(err.FollowUp), Note: err.FollowUp.Message}}
 }
 
 // Shown is a path to show and the directory the command runs in.

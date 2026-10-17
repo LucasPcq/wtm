@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"io"
 	"strconv"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -12,10 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
-const (
-	commandName    = "extract"
-	anomaliesTitle = "Env ports left alone"
-)
+const commandName = "extract"
 
 // planRowsOf are the rows of the plan the dry run shows.
 func planRowsOf(plan extract.Plan) []output.PlanRow {
@@ -89,19 +85,6 @@ func mode(keep bool) string {
 	}
 
 	return "move"
-}
-
-// drawDryRun draws the plan and its fingerprint, and apply, the line that applies exactly that plan.
-func drawDryRun(w io.Writer, outcome extract.Outcome, apply string) {
-	output.SectionTitle(w, commandName+output.Dot+"dry run, nothing applied")
-	warnings := output.Messages(outcome.Warnings)
-	output.DrawPlan(w, output.PlanParams{Rows: planRowsOf(outcome.Plan), Warnings: warnings})
-	if len(warnings) > 0 {
-		output.Blank(w)
-	}
-
-	output.InfoLine(w, output.Info{Label: "fingerprint", Value: outcome.Fingerprint})
-	output.NextSteps(w, []output.NextStep{{Command: apply, Note: output.ApplyNote}})
 }
 
 func drawNothing(w io.Writer, plan extract.Plan) {
@@ -205,11 +188,7 @@ func anomaliesOf(outcome extract.Outcome) []string {
 		return anomalies
 	}
 
-	if lines := output.AnomalyLines(item.Detail.EnvPorts); len(lines) > 0 {
-		anomalies = append(anomalies, anomaliesTitle+"\n"+strings.Join(lines, "\n"))
-	}
-
-	return anomalies
+	return append(anomalies, output.PortAnomalies(item.Detail.EnvPorts)...)
 }
 
 // drawUnfinished draws a target that failed, was skipped or was cancelled: why, where its worktree stands if it does, and the command that repairs what it left behind.
@@ -223,12 +202,13 @@ func drawUnfinished(w io.Writer, outcome extract.Outcome, cwd string) {
 		output.DrawPlan(w, output.PlanParams{Rows: []output.PlanRow{{Label: "path", Values: []string{path}}}, Warnings: anomaliesOf(outcome)})
 	}
 
-	if item.Err == nil || item.Err.FollowUp == nil {
+	next := output.FollowUpSteps(item.Err)
+	if len(next) == 0 {
 		return
 	}
 
 	output.Blank(w)
-	output.NextSteps(w, []output.NextStep{{Command: output.FollowUpLine(item.Err.FollowUp), Note: item.Err.FollowUp.Message}})
+	output.NextSteps(w, next)
 }
 
 type envelopeParams struct {

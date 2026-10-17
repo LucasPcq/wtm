@@ -198,7 +198,7 @@ func mixed(trees string) create.Outcome {
 		Result: &create.Result{Items: []create.Item{
 			{Subject: "feature", Status: domain.StatusDone, Detail: &create.Detail{
 				Path: filepath.Join(trees, "feature"), Metadata: meta,
-				Standing: create.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2},
+				Standing: worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2},
 				EnvPorts: env.Redacted{Offset: 10, Applied: true, Entries: []env.Entry{
 					{File: ".env", Key: "PORT", Port: "http", Base: 3000, Resolved: 3010, Status: env.StatusRewrite},
 					{File: ".env", Key: "DB", Port: "pg", Base: 5432, Status: env.StatusMissingKey},

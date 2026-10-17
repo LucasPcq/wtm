@@ -22,7 +22,7 @@ func TestEachKindExitsOnItsCode(t *testing.T) {
 }
 
 func TestACodeWithAnExitOfItsOwnExitsOnIt(t *testing.T) {
-	assert.Equal(t, exitConfigNotFound, exitCode(&Failed{Err: &domain.Error{Kind: domain.KindPrecondition, Code: codeConfigNotFound}, Exits: map[string]int{codeConfigNotFound: exitConfigNotFound}}, false))
+	assert.Equal(t, ExitConfigNotFound, exitCode(&Failed{Err: &domain.Error{Kind: domain.KindPrecondition, Code: codeConfigNotFound}, Exits: map[string]int{codeConfigNotFound: ExitConfigNotFound}}, false))
 	assert.Equal(t, ExitNotGitRepo, exitCode(&Failed{Err: &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodeNotARepository}}, false))
 }
 

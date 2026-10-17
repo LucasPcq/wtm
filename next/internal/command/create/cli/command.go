@@ -47,12 +47,8 @@ const (
 	rememberUsage = "The answers to always use in this repository: env_from, isolation, fast_forward (repeatable)"
 	yesUsage      = "Run unattended: no question, no confirmation; what is not given takes its default"
 
-	flagFF             = "ff"
-	exitConfigNotFound = 12
+	flagFF = "ff"
 )
-
-// exits are the exit codes of create's own codes, ahead of those of their kind.
-var exits = map[string]int{create.CodeConfigNotFound: exitConfigNotFound}
 
 // A Project is what the command runs against, found by New's open once the flags are valid: the use case wired to the repository, and the directory the command runs in, from which paths are shown.
 type Project struct {
@@ -61,7 +57,7 @@ type Project struct {
 }
 
 type createCommand struct {
-	io          *output.Streams
+	io          uicli.Run
 	open        func(ctx context.Context) (Project, error)
 	from        string
 	envFrom     string
@@ -70,16 +66,16 @@ type createCommand struct {
 	ifNotExists bool
 	remember    []string
 	yes         bool
-	output      string
 	dryRun      bool
 	expect      string
 	ask         bool
-	quiet       bool
 }
 
 // New returns the create command: its flags become a create.Request, answered in the wizard when the user can see and answer it, else run unattended; it draws the outcome on streams, or the v2 JSON envelope with --output json.
 func New(streams *output.Streams, open func(ctx context.Context) (Project, error)) *cobra.Command {
-	c := &createCommand{io: streams, open: open}
+	// exits are the exit codes of create's own codes, ahead of those of their kind.
+	exits := map[string]int{create.CodeConfigNotFound: uicli.ExitConfigNotFound}
+	c := &createCommand{io: uicli.Run{Command: commandName, Streams: streams, Flags: createFlags, Exits: exits}, open: open}
 	cmd := &cobra.Command{Use: "create [branch...]", Short: createShort, Long: createLong, Example: createExample, Args: cobra.ArbitraryArgs, RunE: c.run}
 
 	flags := cmd.Flags()
@@ -90,27 +86,23 @@ func New(streams *output.Streams, open func(ctx context.Context) (Project, error
 	flags.BoolVar(&c.ifNotExists, "if-not-exists", false, descriptions["if_not_exists"])
 	flags.StringArrayVar(&c.remember, "remember", nil, rememberUsage)
 	flags.BoolVarP(&c.yes, "yes", "y", false, yesUsage)
-	flags.StringVar(&c.output, "output", uicli.OutputText, uicli.OutputUsage)
+	flags.StringVar(&c.io.Output, "output", uicli.OutputText, uicli.OutputUsage)
 	flags.BoolVarP(&c.dryRun, "dry-run", "n", false, uicli.DryRunUsage)
 	flags.StringVar(&c.expect, "expect-fingerprint", "", uicli.ExpectUsage)
 	flags.BoolVar(&c.ask, "ask", false, uicli.AskUsage)
 
-	_ = cmd.RegisterFlagCompletionFunc("env-from", cobra.FixedCompletions(create.Names(project.EnvStrategies()), cobra.ShellCompDirectiveNoFileComp))
-	_ = cmd.RegisterFlagCompletionFunc("isolation", cobra.FixedCompletions(create.Names(project.Isolations()), cobra.ShellCompDirectiveNoFileComp))
+	_ = cmd.RegisterFlagCompletionFunc("env-from", cobra.FixedCompletions(domain.Names(project.EnvStrategies()), cobra.ShellCompDirectiveNoFileComp))
+	_ = cmd.RegisterFlagCompletionFunc("isolation", cobra.FixedCompletions(domain.Names(project.Isolations()), cobra.ShellCompDirectiveNoFileComp))
 
 	return cmd
 }
 
 func (c *createCommand) run(cmd *cobra.Command, args []string) error {
-	c.quiet, _ = cmd.Flags().GetBool(uicli.FlagQuiet)
-	req := c.request(cmd, args)
-
-	if c.output != uicli.OutputText && c.output != uicli.OutputJSON {
-		refused := domain.InvalidMessage(`invalid --output "` + c.output + `": expected one of text, json`)
-		// The refusal of an unknown format is printed as text, the one format sure to be understood.
-		c.output = uicli.OutputText
-		return c.misused(cmd, refused)
+	if err := c.io.Begin(cmd); err != nil {
+		return err
 	}
+
+	req := c.request(cmd, args)
 
 	ctx := cmd.Context()
 	project, err := c.open(ctx)
@@ -118,8 +110,7 @@ func (c *createCommand) run(cmd *cobra.Command, args []string) error {
 		return c.fail(cmd, domain.AsError(domain.AsErrorParams{Err: err}), req)
 	}
 
-	_, stderr := c.streams()
-	progress := output.NewProgress(ctx, output.ProgressParams{W: stderr, Human: c.human(), Live: !c.quiet && c.io.CanAnimate()})
+	progress := c.io.Progress(ctx)
 	ran, err := c.create(cmd, project.UseCase, req, progress.Report)
 	progress.Close()
 
@@ -131,7 +122,7 @@ func (c *createCommand) create(cmd *cobra.Command, useCase create.UseCase, req c
 	ctx := cmd.Context()
 
 	if c.interactive() {
-		return runForm(ctx, formParams{App: useCase, Request: req, DryRun: c.dryRun, Report: report, In: c.io.In, Out: c.io.Err})
+		return runForm(ctx, formParams{App: useCase, Request: req, DryRun: c.dryRun, Report: report, In: c.io.Streams.In, Out: c.io.Streams.Err})
 	}
 
 	outcome, err := useCase.Run(ctx, req, operation.Options{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, Report: report})
@@ -159,22 +150,9 @@ func (c *createCommand) request(cmd *cobra.Command, args []string) create.Reques
 	return req
 }
 
-func (c *createCommand) human() bool {
-	return c.output == uicli.OutputText
-}
-
 // interactive reports whether the wizard runs: the user can see and answer it, the output is for a human, and neither --yes nor a previewed plan to apply asks for an unattended run.
 func (c *createCommand) interactive() bool {
-	return c.io.CanPrompt() && c.expect == "" && c.human() && !c.yes
-}
-
-// streams are stdout and stderr, both silenced by --quiet in human output.
-func (c *createCommand) streams() (io.Writer, io.Writer) {
-	if c.quiet && c.human() {
-		return io.Discard, io.Discard
-	}
-
-	return c.io.Out, c.io.Err
+	return c.io.Streams.CanPrompt() && c.expect == "" && c.io.Human() && !c.yes
 }
 
 // concluded is how a run ended, for conclude: its outcome, its refusal, the request that ran and where.
@@ -187,18 +165,20 @@ type concluded struct {
 
 // conclude prints how the run ended — the JSON envelope, a refusal, the dry run and the line that applies it, or the outcome — and returns the failure that sets the exit code.
 func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
-	if !c.human() {
-		return c.envelope(envelopeParams{Outcome: done.Outcome, Err: done.Err})
+	if !c.io.Human() {
+		return c.io.Envelope(envelopeOf(envelopeParams{Outcome: done.Outcome, Err: done.Err}))
 	}
 
-	stdout, _ := c.streams()
+	stdout, _ := c.io.Writers()
 	line := createLine{Command: cmd.CommandPath(), Request: done.Request}
 	switch {
 	case done.Err != nil:
 		return c.fail(cmd, done.Err, done.Request)
 	case done.Outcome.Result == nil:
 		apply := line.String() + " --expect-fingerprint " + done.Outcome.Fingerprint
-		output.Frame(stdout, func(w io.Writer) { drawDryRun(w, done.Outcome, apply) })
+		output.Frame(stdout, func(w io.Writer) {
+			output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(done.Outcome.Plan), Warnings: done.Outcome.Warnings, Fingerprint: done.Outcome.Fingerprint, Apply: apply})
+		})
 		return nil
 	}
 
@@ -207,7 +187,7 @@ func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
 		drawOutcome(w, done.Outcome, followUps, done.Cwd)
 	})
 
-	return c.failed(cmp.Or(done.Err, done.Outcome.Failure()))
+	return c.io.Failed(cmp.Or(done.Err, done.Outcome.Failure()))
 }
 
 // fail prints a refusal; a stale plan is followed by the line that previews it again.
@@ -217,54 +197,14 @@ func (c *createCommand) fail(cmd *cobra.Command, failure *domain.Error, req crea
 		next = []output.NextStep{{Command: createLine{Command: cmd.CommandPath(), Request: req}.String() + " --dry-run", Note: output.ReplanNote}}
 	}
 
-	return c.failWith(failure, next)
-}
-
-// misused prints a misuse of the command line, followed by the way to its help.
-func (c *createCommand) misused(cmd *cobra.Command, failure *domain.Error) error {
-	return c.failWith(failure, []output.NextStep{uicli.HelpStep(cmd)})
-}
-
-func (c *createCommand) failWith(failure *domain.Error, next []output.NextStep) error {
-	if !c.human() {
-		return c.envelope(envelopeParams{Err: failure})
-	}
-
-	_, stderr := c.streams()
-	output.Frame(stderr, func(w io.Writer) {
-		output.Failure(w, output.FailureParams{Err: failure, Next: next, Flags: createFlags})
-	})
-
-	return c.failed(failure)
-}
-
-// envelope writes the v2 JSON envelope on stdout and returns its failure; an envelope that cannot be written is the failure.
-func (c *createCommand) envelope(params envelopeParams) error {
-	doc := envelopeOf(params)
-	if err := output.Envelope(c.io.Out, doc); err != nil {
-		return c.failed(domain.AsError(domain.AsErrorParams{Err: err}))
-	}
-
-	return c.failed(doc.Err)
-}
-
-// failed is the error the root reads the exit code and the --quiet line from, nil for no failure.
-func (c *createCommand) failed(failure *domain.Error) error {
-	if failure == nil {
-		return nil
-	}
-
-	return &uicli.Failed{Err: failure, Quiet: c.quiet && c.human(), Flags: createFlags, Exits: exits}
+	return c.io.FailWith(failure, next)
 }
 
 // itemFollowUps are the commands the failed branches suggest, to repair what they left behind.
 func itemFollowUps(items []create.Item) []output.NextStep {
 	var steps []output.NextStep
 	for _, item := range items {
-		if item.Err == nil || item.Err.FollowUp == nil {
-			continue
-		}
-		steps = append(steps, output.NextStep{Command: output.FollowUpLine(item.Err.FollowUp), Note: item.Err.FollowUp.Message})
+		steps = append(steps, output.FollowUpSteps(item.Err)...)
 	}
 
 	return steps

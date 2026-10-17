@@ -12,6 +12,7 @@ const (
 	ExitOK               = 0
 	ExitError            = 1  // a failure no other code names
 	ExitUsage            = 2  // a flag or an argument the command refuses
+	ExitConfigNotFound   = 12 // a command's own code for a missing config file, set in its Exits
 	ExitCancelled        = 19 // interrupted by a signal or by the user leaving the form
 	ExitNotGitRepo       = 21
 	ExitStateSchemaNewer = 22 // a state file written by a newer wtm

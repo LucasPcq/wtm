@@ -128,7 +128,7 @@ func TestADryRunInJSONIsThePlanAndItsFingerprint(t *testing.T) {
 func TestWithoutConfigExtractExitsOnItsOwnCode(t *testing.T) {
 	got := runExtract(t, newWorld(seed{NoConfig: true}), source, "--files", "old.txt", "--to", other)
 
-	assert.Equal(t, exitConfigNotFound, got.Code)
+	assert.Equal(t, uicli.ExitConfigNotFound, got.Code)
 	assert.Contains(t, got.Stderr, "run `wtm init` first")
 }
 

@@ -14,10 +14,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
-const (
-	commandName    = "create"
-	anomaliesTitle = "Env ports left alone"
-)
+const commandName = "create"
 
 // planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome.
 func planRowsOf(plan create.Plan) []output.PlanRow {
@@ -96,11 +93,7 @@ func anomaliesOf(item create.Item) []string {
 	case worktree.NoOrigin, worktree.UpToDate, worktree.Ahead:
 	}
 
-	if lines := output.AnomalyLines(item.Detail.EnvPorts); len(lines) > 0 {
-		anomalies = append(anomalies, anomaliesTitle+"\n"+strings.Join(lines, "\n"))
-	}
-
-	return anomalies
+	return append(anomalies, output.PortAnomalies(item.Detail.EnvPorts)...)
 }
 
 // drawOutcome draws what the apply did: the tally, the plan with each worktree that stands and the anomalies, the branches left unfinished, and the next steps.
@@ -206,19 +199,6 @@ func tallyKey(item create.Item) string {
 	}
 
 	return string(item.Status)
-}
-
-// drawDryRun draws the plan and its fingerprint, and apply, the line that applies exactly that plan.
-func drawDryRun(w io.Writer, outcome create.Outcome, apply string) {
-	output.SectionTitle(w, commandName+output.Dot+"dry run, nothing applied")
-	warnings := output.Messages(outcome.Warnings)
-	output.DrawPlan(w, output.PlanParams{Rows: planRowsOf(outcome.Plan), Warnings: warnings})
-	if len(warnings) > 0 {
-		output.Blank(w)
-	}
-
-	output.InfoLine(w, output.Info{Label: "fingerprint", Value: outcome.Fingerprint})
-	output.NextSteps(w, []output.NextStep{{Command: apply, Note: output.ApplyNote}})
 }
 
 // planTextOf is the plan as the wizard's recap shows it, in width columns.

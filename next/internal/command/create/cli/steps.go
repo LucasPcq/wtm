@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 )
@@ -115,11 +114,11 @@ func (w *wizard) choices(s step) choiceParams {
 
 	if s == stepIsolation {
 		q := w.q.Isolation
-		return choiceParams{Options: create.Names(q.Options), Value: string(q.Value), Remembered: string(q.Remembered), Ticked: ticked}
+		return choiceParams{Options: domain.Names(q.Options), Value: string(q.Value), Remembered: string(q.Remembered), Ticked: ticked}
 	}
 
 	q := w.q.EnvFrom
-	return choiceParams{Options: create.Names(q.Options), Value: string(q.Value), Remembered: string(q.Remembered), Ticked: ticked}
+	return choiceParams{Options: domain.Names(q.Options), Value: string(q.Value), Remembered: string(q.Remembered), Ticked: ticked}
 }
 
 // branchProblem checks the branches typed against the repository: the first problem of the list itself or of an entry from check.From on, as the wizard shows it.

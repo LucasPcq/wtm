@@ -57,6 +57,16 @@ func AnomalyLines(plan env.Redacted) []string {
 	return lines
 }
 
+// PortAnomalies returns the ports plan could not shift as one anomaly, its lines under the title "Env ports left alone"; nil when there are none.
+func PortAnomalies(plan env.Redacted) []string {
+	lines := AnomalyLines(plan)
+	if len(lines) == 0 {
+		return nil
+	}
+
+	return []string{"Env ports left alone\n" + strings.Join(lines, "\n")}
+}
+
 func anomalyReason(entry env.Entry) string {
 	switch entry.Status {
 	case env.StatusMissingKey:

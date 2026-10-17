@@ -26,10 +26,10 @@ func (l extractLine) String() string {
 	}
 
 	words = append(words, output.FlagWords(output.FlagValue{Name: "to", Value: req.To})...)
-	words = append(words, switched("ff", req.FastForward)...)
+	words = append(words, output.SwitchWords(flagFF, req.FastForward)...)
 	words = append(words, output.FlagWords(output.FlagValue{Name: "from", Value: req.From})...)
 	words = append(words, output.FlagWords(output.FlagValue{Name: "isolation", Value: string(req.Isolation)})...)
-	words = append(words, switched("keep", req.Keep)...)
+	words = append(words, output.SwitchWords(flagKeep, req.Keep)...)
 	words = append(words, output.FlagWords(output.FlagValue{Name: "on-conflict", Value: string(req.OnConflict)})...)
 
 	for _, answer := range req.Remember {
@@ -41,15 +41,4 @@ func (l extractLine) String() string {
 	}
 
 	return strings.Join(words, " ")
-}
-
-// switched spells a boolean flag as given, --name or --name=false, and nothing when it was not.
-func switched(name string, value *bool) []string {
-	switch {
-	case value == nil:
-		return nil
-	case *value:
-		return []string{"--" + name}
-	}
-	return []string{"--" + name + "=false"}
 }

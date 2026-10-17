@@ -18,15 +18,7 @@ func (l createLine) String() string {
 	req := l.Request
 	words := append([]string{l.Command}, output.Quoted(req.Branches)...)
 	words = append(words, output.FlagWords(output.FlagValue{Name: "env-from", Value: string(req.EnvFrom)})...)
-
-	switch {
-	case req.FastForward == nil:
-	case *req.FastForward:
-		words = append(words, "--ff")
-	default:
-		words = append(words, "--ff=false")
-	}
-
+	words = append(words, output.SwitchWords(flagFF, req.FastForward)...)
 	words = append(words, output.FlagWords(output.FlagValue{Name: "from", Value: req.From})...)
 	if req.IfNotExists {
 		words = append(words, "--if-not-exists")
