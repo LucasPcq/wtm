@@ -2,7 +2,7 @@ BINARY      := wtm
 BINARY_NEXT := wtm-next
 BUILD_DIR   := bin
 
-.PHONY: build next test vet fmt lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
+.PHONY: build next test vet fmt lint next-lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
@@ -51,6 +51,12 @@ sumtype:
 
 lint: fmt vet arch dead sumtype
 	go tool staticcheck ./...
+
+# next-lint holds next/ to Go's doc-comment and naming conventions with revive
+# (next/revive.toml); staticcheck already runs every check on next/ from
+# next/staticcheck.conf. Not part of lint until next/'s exported names are documented.
+next-lint:
+	go tool revive -config next/revive.toml -formatter plain ./next/...
 
 # dupl reports token-level clones. It is not part of `lint`: a clone is a
 # judgement call — two parallel families over unrelated types read better

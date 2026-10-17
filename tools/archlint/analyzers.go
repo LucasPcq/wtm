@@ -33,7 +33,6 @@ var analyzers = append(internalOnly(
 	typeassertAnalyzer,
 	fontcoverAnalyzer,
 	nextAnalyzer,
-	nextCommentsAnalyzer,
 )
 
 func internalOnly(written ...*analysis.Analyzer) []*analysis.Analyzer {

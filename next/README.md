@@ -67,7 +67,7 @@ A second command is its own `command/<name>/` (use case, ports, rules, questions
 
 ## Comments
 
-Close to zero. Each package has a one-line package doc; every other comment line counts, godoc and tests included, except a directive (`//go:…`, `//go-sumtype:…`) and a `//nolint:<linters>` with nothing after it. A line earns its place only as a why the code cannot show. `.next-comments` holds each package's count (absent = 0); `make lint` (rule `nextcomments`) refuses a package above it (delete, or raise the count in review) or below it (lower the count).
+Go's doc-comment conventions, as the `go-style` skill states them ([`comments.md`](../.claude/skills/go-style/references/comments.md)): every package has a package comment and every exported name a doc comment that starts with its name; a comment in a body says why, never what. `staticcheck` checks their shape in `make lint` (`staticcheck.conf`); `make next-lint` runs revive (`revive.toml`), which requires them.
 
 ## Cancellation
 

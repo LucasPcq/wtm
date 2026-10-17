@@ -1,15 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"go/ast"
-	"os"
-	"path/filepath"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 
 	"golang.org/x/tools/go/analysis"
 )
@@ -203,129 +198,4 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 func admitsAdapter(imp nextImport, to nextPackage) bool {
 	from := imp.From
 	return to.unit == from.unit || slices.Contains(sharedAdapters, to.unit) || from.unit == to.unit+"test"
-}
-
-type nextCommentsParams struct {
-	Tests    testFiles
-	Ceilings func() (map[string]int, error)
-}
-
-var nextCommentsAnalyzer = newNextCommentsAnalyzer(nextCommentsParams{Tests: testFilesOnDisk, Ceilings: sync.OnceValues(ceilingsOnDisk)})
-
-func newNextCommentsAnalyzer(params nextCommentsParams) *analysis.Analyzer {
-	return &analysis.Analyzer{
-		Name: "nextcomments",
-		Doc:  "a package of next/ has a one-line package doc and, beside it and the bare directives, exactly the comment lines its ceiling in .next-comments allows, godoc included",
-		Run:  func(pass *analysis.Pass) (any, error) { return runNextComments(pass, params) },
-	}
-}
-
-func runNextComments(pass *analysis.Pass, params nextCommentsParams) (any, error) {
-	rel, ok := nextRel(pass)
-	if !ok {
-		return nil, nil
-	}
-	ceilings, err := params.Ceilings()
-	if err != nil {
-		return nil, err
-	}
-	tests, err := params.Tests(pass)
-	if err != nil {
-		return nil, err
-	}
-	sources := slices.DeleteFunc(slices.Clone(pass.Files), func(file *ast.File) bool { return isTestFile(pass, file) })
-	checkNextPackageDoc(pass, rel, sources)
-	for _, file := range tests {
-		checkTestHeader(pass, file)
-		checkBanners(pass, file)
-	}
-	lines := 0
-	for _, file := range append(sources, tests...) {
-		lines += commentLines(pass.Fset, file, nextDirective)
-	}
-	ceiling := ceilings[rel]
-	switch {
-	case lines > ceiling:
-		pass.Reportf(firstFile(pass).Package, "next/%s has %d comment lines, above its ceiling of %d in .next-comments: delete the comments that restate the code; one that earns its place raises the ceiling, in review", rel, lines, ceiling)
-	case lines < ceiling:
-		pass.Reportf(firstFile(pass).Package, "next/%s has %d comment lines, under its ceiling of %d in .next-comments: lower it, a ceiling only goes down", rel, lines, ceiling)
-	}
-	return nil, nil
-}
-
-func checkNextPackageDoc(pass *analysis.Pass, rel string, sources []*ast.File) {
-	documented := slices.DeleteFunc(slices.Clone(sources), func(file *ast.File) bool { return file.Doc == nil })
-	if len(documented) == 0 {
-		pass.Reportf(firstFile(pass).Package, "next/%s has no package doc: say its one responsibility in one line", rel)
-		return
-	}
-	for _, file := range documented {
-		if span := lineSpan(pass.Fset, file.Doc); span > 1 {
-			pass.Reportf(file.Doc.Pos(), "next/%s has a package doc of %d lines: say its one responsibility in one line, the rest goes to next/README.md", rel, span)
-		}
-	}
-}
-
-var bareNolint = regexp.MustCompile(`^//nolint:[\w,-]+$`)
-
-func nextDirective(comment *ast.Comment) bool {
-	return directive(comment) && (!strings.HasPrefix(comment.Text, "//nolint") || bareNolint.MatchString(comment.Text))
-}
-
-func ceilingsOnDisk() (map[string]int, error) {
-	data, err := os.ReadFile(".next-comments")
-	if os.IsNotExist(err) {
-		return map[string]int{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	ceilings, err := parseNextCeilings(string(data))
-	if err != nil {
-		return nil, err
-	}
-	if stale := staleCeilings(staleCeilingsParams{Root: "next", Ceilings: ceilings}); len(stale) > 0 {
-		return nil, fmt.Errorf(".next-comments: no package under next/ for %s — remove its line", strings.Join(stale, ", "))
-	}
-	return ceilings, nil
-}
-
-func parseNextCeilings(data string) (map[string]int, error) {
-	ceilings := map[string]int{}
-	for _, raw := range strings.Split(data, "\n") {
-		line := strings.TrimSpace(raw)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) != 2 {
-			return nil, fmt.Errorf(".next-comments: %q is not `<package under next/> <comment lines>`", line)
-		}
-		count, err := strconv.Atoi(fields[1])
-		if err != nil || count < 0 {
-			return nil, fmt.Errorf(".next-comments: %q: the count must be a number of lines", line)
-		}
-		if _, seen := ceilings[fields[0]]; seen {
-			return nil, fmt.Errorf(".next-comments: %s has two lines", fields[0])
-		}
-		ceilings[fields[0]] = count
-	}
-	return ceilings, nil
-}
-
-type staleCeilingsParams struct {
-	Root     string
-	Ceilings map[string]int
-}
-
-func staleCeilings(params staleCeilingsParams) []string {
-	var stale []string
-	for pkg := range params.Ceilings {
-		matches, err := filepath.Glob(filepath.Join(params.Root, filepath.FromSlash(pkg), "*.go"))
-		if err != nil || len(matches) == 0 {
-			stale = append(stale, pkg)
-		}
-	}
-	slices.Sort(stale)
-	return stale
 }
