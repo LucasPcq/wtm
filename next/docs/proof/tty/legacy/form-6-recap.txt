@@ -1,0 +1,23 @@
+$ wtmx create --ask; echo EXIT=$?
+
+  Step 6/6 • Confirm & create
+
+  ✓ Branches: feat/form, topic
+  ✓ Source branch: main
+  ✓ Env strategy: config default
+  ✓ Isolation: isolated
+  ⊘ Source update — source already up to date
+
+  ┃  Review & confirm
+  ┃
+  ┃  Branches:  feat/form, topic (existing)
+  ┃  Source:    main
+  ┃  Env:       config default · will be remembered
+  ┃  Isolation: isolated
+
+▌▸ Yes, create 2 worktrees
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

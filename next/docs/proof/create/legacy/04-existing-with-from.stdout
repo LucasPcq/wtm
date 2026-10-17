@@ -1,0 +1,11 @@
+
+  ✓ Created worktree feature on existing branch
+
+  parent  main
+  env     example · 3 ports settled (offset +50)
+  path    ../acme.trees/feature
+
+  Reused your existing local branch feature.
+
+  → wtm go feature
+

@@ -1,4 +1,4 @@
-$ wtmx create; echo EXIT=$?
+$ wtmx create --ask; echo EXIT=$?
   ✓ on_create · feat/form (<DUR>)
   ✓ on_create · topic (<DUR>)
 
@@ -8,13 +8,13 @@ $ wtmx create; echo EXIT=$?
 ┃  From       main
 ┃  Env        main
 ┃  Isolation  isolated
-┃  feat/form  ../acme.trees/feat-form · 3 ports settled (offset +120)
-┃  topic      ../acme.trees/topic · 3 ports settled (offset +130)
+┃  Remember   env_from
+┃  feat/form  ../acme.trees/feat-form · 3 ports settled (offset +140)
+┃  topic      ../acme.trees/topic · 3 ports settled (offset +150)
 ┃
 ┃  → wtm go feat/form
 ┃  → wtm go topic
 
 EXIT=0
-$
 $
 

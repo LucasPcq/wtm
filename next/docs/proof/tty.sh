@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Usage: tty.sh <side> <binary> <out dir>
-# Drives the binary in tmux in the sandbox /tmp/wtmcmp-<first letter of side> (made by compare.sh):
-# the form to its recap then applied, and Ctrl+C twice during a hook.
+# Usage: tty.sh <side> <binary> <out dir>, side legacy or next
+# Drives the binary in tmux in the sandbox /tmp/wtmcmp-<first letter of side> (made by create.sh):
+# the form to its recap then applied (--ask, the sandbox remembering the env answer), and Ctrl+C
+# once then twice during a hook.
 set -euo pipefail
 side=$1 bin=$2 out=$3
 root=/tmp/wtmcmp-${side:0:1}
@@ -18,7 +19,7 @@ start() {
   tmux send-keys -t "$session" "wtmx $*; echo EXIT=\$?" Enter
 }
 
-start create
+start create --ask
 capture form-1-branches 1.5
 tmux send-keys -t "$session" "feat/form" Tab "topic" Tab
 capture form-2-entries 0.8

@@ -1,0 +1,9 @@
+
+  → case feat/bad-json in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) echo set up feat/bad-json;; esac
+
+failing
+
+  ✗ case feat/bad-json in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) echo set up feat/bad-json;; esac (<DUR>)
+
+  ✗ on_create: case feat/bad-json in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) echo set up feat/bad-json;; esac: hook failed: exit status 3
+

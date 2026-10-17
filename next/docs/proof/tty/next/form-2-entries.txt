@@ -1,4 +1,4 @@
-$ wtmx create; echo EXIT=$?
+$ wtmx create --ask; echo EXIT=$?
 
   Step 1/7 • Branches
 

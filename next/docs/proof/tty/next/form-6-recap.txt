@@ -1,19 +1,25 @@
-$ wtmx create; echo EXIT=$?
-  ✓ on_create · feat/form (<DUR>)
-  ✓ on_create · topic (<DUR>)
+$ wtmx create --ask; echo EXIT=$?
 
-┃  ✓ create: 2 done
-┃
-┃  Branches   feat/form, topic (existing)
-┃  From       main
-┃  Env        main
-┃  Isolation  isolated
-┃  feat/form  ../acme.trees/feat-form · 3 ports settled (offset +120)
-┃  topic      ../acme.trees/topic · 3 ports settled (offset +130)
-┃
-┃  → wtm go feat/form
-┃  → wtm go topic
+  Step 7/7 • Apply this plan?
 
-EXIT=0
-$
+  ✓ Branches: feat/form, topic
+  ✓ Source branch: main
+  ✓ Env strategy: main · config
+  ✓ Isolation: isolated · default
+  · Source update — nothing to fast-forward: no branch it starts from is behind origin
+  · If not exists — set by its flag only
+
+  ┃  Review & confirm
+  ┃
+  ┃  Branches   feat/form, topic (existing)
+  ┃  From       main
+  ┃  Env        main
+  ┃  Isolation  isolated
+  ┃  Remember   env_from
+
+▌› Yes, apply
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
 

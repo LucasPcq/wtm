@@ -1,4 +1,4 @@
-$ wtmx create; echo EXIT=$?
+$ wtmx create --ask; echo EXIT=$?
 
   Step 2/7 • Source branch
 
@@ -13,10 +13,12 @@ $ wtmx create; echo EXIT=$?
    feat/bad-json
    feat/c
    feat/dry
+   feat/env
    feat/ff
    feat/idem
    feat/json
    feat/one
+   feat/remembered
    feature
    remote-only
 

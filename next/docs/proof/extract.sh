@@ -99,7 +99,7 @@ run_side next "$next"
   for state in "$out"/legacy/*.state; do
     name=$(basename "$state" .state)
     echo "=== $name: exit legacy $(cat "$out/legacy/$name.exit"), next $(cat "$out/next/$name.exit")"
-    diff -u "$state" "$out/next/$name.state" || true
+    diff -u --label "legacy/$name" --label "next/$name" "$state" "$out/next/$name.state" || true
   done
 } >"$out/states.diff"
 echo "$out/states.diff"

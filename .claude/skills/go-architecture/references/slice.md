@@ -123,7 +123,7 @@ Extract on the second use, not before; until then a slice keeps its own code. A 
 - `usecase_test.go`: the use case over the stateful fakes of the adapters (`adapter/gittest`, `adapter/storetest`), checking what it changed, the events, the locks.
 - `cli/`: golden files in `cli/testdata/` for help, dry run, outcomes, refusals, the JSON envelope; the wizard through its frames.
 - The adapters are tested against the real thing (real git in a temp repo); one end-to-end test per command in `cmd/wtm-next` wires the real adapters.
-- Behaviour against the legacy `wtm`: the scripts of `next/docs/proof/` (`compare.sh`, `tty.sh`, `extract.sh`).
+- Behaviour against the legacy `wtm`: the scripts of `next/docs/proof/` (`create.sh`, `tty.sh`, `extract.sh`).
 
 ## Adding a command
 

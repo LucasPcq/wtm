@@ -1,0 +1,11 @@
+
+  ✓ create: 1 done
+
+  Branches         feat/remembered
+  From             main
+  Env              main
+  Isolation        isolated
+  feat/remembered  ../acme.trees/feat-remembered · 3 ports settled (offset +120)
+
+  → wtm go feat/remembered
+

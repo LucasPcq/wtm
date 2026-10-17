@@ -1,0 +1,9 @@
+
+  ✓ Created worktree feat/env
+
+  from  main
+  env   main · 3 ports settled (offset +80)
+  path  ../acme.trees/feat-env
+
+  → wtm go feat/env
+

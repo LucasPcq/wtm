@@ -1,19 +1,19 @@
-$ wtmx create; echo EXIT=$?
+$ wtmx create --ask; echo EXIT=$?
 
-  Step 4/7 • Isolation
+  Step 3/7 • Env strategy
 
   ✓ Branches: feat/form, topic
   ✓ Source branch: main
-  ✓ Env strategy: main · remembered
 
-  How the new worktree stands against its source: isolated (its own ports, compose project and
-  namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as
-  copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated
+  How the .env files of the new worktrees are provisioned: example (from its template), main
+  (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's
+  strategy
 
-▌› isolated
-   verbatim
+   example
+▌› main
+   parent
 
-   [ ] Always use this answer in this repo
+   [x] Always use this answer in this repo
 
   ↑↓ navigate • tab always use • / filter • enter confirm • esc back
 

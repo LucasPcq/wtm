@@ -1,7 +1,0 @@
-$ wtmx create feat/slow2 --yes; echo EXIT=$?
-  › feat/slow2 · Cancelling…
-^C
-$ echo EXIT=$?
-EXIT=130
-$
-

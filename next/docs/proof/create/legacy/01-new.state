@@ -1,0 +1,61 @@
+## branches
+feat/one 
+feature 
+main 
+topic 
+## worktrees
+worktree <SB>/acme
+branch refs/heads/main
+worktree <SB>/acme.trees/feat-one
+branch refs/heads/feat/one
+## .git/wtm/worktrees/feat%2Fone/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 1,
+  "isolation": "isolated"
+}
+## ../acme.trees/feat-one/apps/api/.env
+PORT=24111
+## ../acme.trees/feat-one/apps/web/.env
+PORT=24110
+API_URL=http://api.feat-one.acme.localhost:24102
+## config.toml
+#:schema ./schemas/project.schema.json
+
+# wtm — Worktree Manager configuration
+# Docs: https://github.com/LucasPcq/wtm
+
+[worktrees]
+# Directory where worktrees are created (relative to repo root)
+base_path = "../acme.trees"
+
+# Branch used as the default base for new worktrees
+base_branch = "main"
+
+[env]
+# Strategy for provisioning .env files in new worktrees:
+#   example — copy .env.example and rename to .env
+#   main    — copy .env from the main checkout
+#   parent  — copy .env from the source worktree
+strategy = "example"
+
+# Each value file to provision, with its committed template (if any).
+
+[[env.file]]
+target = "apps/api/.env"
+template = "apps/api/.env.example"
+
+[[env.file]]
+target = "apps/web/.env"
+template = "apps/web/.env.example"
+
+[hooks]
+# Commands run after creating a new worktree
+on_create = [{ cmd = "case {{branch}} in feat/bad*) echo failing; exit 3;; feat/slow*) trap \"sleep 2\" INT; sleep 30;; *) echo set up {{branch}};; esac" }]
+
+# Commands run right before removing a worktree (e.g. tear down external
+# resources like Docker). A non-zero exit aborts the removal unless the entry
+# sets continue_on_error.
+on_clean = [
+]

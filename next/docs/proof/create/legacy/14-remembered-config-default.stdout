@@ -1,0 +1,9 @@
+
+  ✓ Created worktree feat/remembered
+
+  from  main
+  env   main · 3 ports settled (offset +120)
+  path  ../acme.trees/feat-remembered
+
+  → wtm go feat/remembered
+

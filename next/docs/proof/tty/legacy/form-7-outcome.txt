@@ -1,0 +1,24 @@
+$ wtmx create --ask; echo EXIT=$?
+
+┃  › feat/form (1/2)
+┃
+┃  Hooks · On Create
+┃  ✓ case feat/form in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;;
+*) echo set up feat/form;; esac (<DUR>)
+┃
+┃  › topic (2/2)
+┃
+┃  Hooks · On Create
+┃  ✓ case topic in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) e
+cho set up topic;; esac (<DUR>)
+
+┃  ✓ feat/form
+┃    ../acme.trees/feat-form
+┃  ✓ topic
+┃    ../acme.trees/topic
+┃
+┃  2 created
+
+EXIT=0
+$
+

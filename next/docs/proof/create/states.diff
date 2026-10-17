@@ -1,0 +1,147 @@
+=== 01-new: exit legacy 0, next 0
+=== 02-three-one-failing: exit legacy 1, next 1
+=== 03-existing-without-from: exit legacy 1, next 2
+=== 04-existing-with-from: exit legacy 0, next 0
+=== 05-remote-only: exit legacy 0, next 0
+=== 06-if-not-exists-1: exit legacy 0, next 0
+=== 07-if-not-exists-2: exit legacy 0, next 0
+=== 08-env-from-main: exit legacy 0, next 0
+=== 09-json-success: exit legacy 0, next 0
+=== 10-json-invalid: exit legacy 2, next 2
+=== 11-json-failure: exit legacy 1, next 1
+=== 12-quiet-failure: exit legacy 10, next 2
+=== 13-ff-behind: exit legacy 0, next 0
+=== 14-remembered-config-default: exit legacy 0, next 0
+=== 15-dry-run: exit legacy 2, next 0
+=== 16-expect-fingerprint: exit legacy 2, next 0
+--- legacy/16-expect-fingerprint
++++ next/16-expect-fingerprint
+@@ -3,6 +3,7 @@
+ feat/bad 
+ feat/bad-json 
+ feat/c 
++feat/dry 
+ feat/env 
+ feat/ff 
+ feat/idem 
+@@ -24,6 +25,8 @@
+ branch refs/heads/feat/bad-json
+ worktree <SB>/acme.trees/feat-c
+ branch refs/heads/feat/c
++worktree <SB>/acme.trees/feat-dry
++branch refs/heads/feat/dry
+ worktree <SB>/acme.trees/feat-env
+ branch refs/heads/feat/env
+ worktree <SB>/acme.trees/feat-ff
+@@ -68,6 +71,13 @@
+   "ordinal": 4,
+   "isolation": "isolated"
+ }
++## .git/wtm/worktrees/feat%2Fdry/meta.json
++{
++  "source_branch": "main",
++  "env_strategy": "main",
++  "ordinal": 13,
++  "isolation": "isolated"
++}
+ ## .git/wtm/worktrees/feat%2Fenv/meta.json
+ {
+   "source_branch": "main",
+@@ -144,6 +154,11 @@
+ ## ../acme.trees/feat-c/apps/web/.env
+ PORT=24140
+ API_URL=http://api.feat-c.acme.localhost:24102
++## ../acme.trees/feat-dry/apps/api/.env
++PORT=24231
++## ../acme.trees/feat-dry/apps/web/.env
++PORT=24230
++API_URL=http://api.feat-dry.acme.localhost:24102
+ ## ../acme.trees/feat-env/apps/api/.env
+ PORT=24181
+ ## ../acme.trees/feat-env/apps/web/.env
+@@ -216,7 +231,9 @@
+ 
+ [hooks]
+ # Commands run after creating a new worktree
+-on_create = [{ cmd = "case {{branch}} in feat/bad*) echo failing; exit 3;; feat/slow*) trap \"sleep 2\" INT; sleep 30;; *) echo set up {{branch}};; esac" }]
++on_create = [
++  "case {{branch}} in feat/bad*) echo failing; exit 3;; feat/slow*) trap \"sleep 2\" INT; sleep 30;; *) echo set up {{branch}};; esac",
++]
+ 
+ # Commands run right before removing a worktree (e.g. tear down external
+ # resources like Docker). A non-zero exit aborts the removal unless the entry
+@@ -224,5 +241,7 @@
+ on_clean = [
+ ]
+ 
++# Answers the wizard no longer asks, kept by "Always use this answer".
++# --ask asks them again; deleting a line forgets it.
+ [wizard.remembered]
+-env_strategy = "config"
++env_strategy = "main"
+=== 17-stale-fingerprint: exit legacy 2, next 25
+--- legacy/17-stale-fingerprint
++++ next/17-stale-fingerprint
+@@ -3,6 +3,7 @@
+ feat/bad 
+ feat/bad-json 
+ feat/c 
++feat/dry 
+ feat/env 
+ feat/ff 
+ feat/idem 
+@@ -24,6 +25,8 @@
+ branch refs/heads/feat/bad-json
+ worktree <SB>/acme.trees/feat-c
+ branch refs/heads/feat/c
++worktree <SB>/acme.trees/feat-dry
++branch refs/heads/feat/dry
+ worktree <SB>/acme.trees/feat-env
+ branch refs/heads/feat/env
+ worktree <SB>/acme.trees/feat-ff
+@@ -68,6 +71,13 @@
+   "ordinal": 4,
+   "isolation": "isolated"
+ }
++## .git/wtm/worktrees/feat%2Fdry/meta.json
++{
++  "source_branch": "main",
++  "env_strategy": "main",
++  "ordinal": 13,
++  "isolation": "isolated"
++}
+ ## .git/wtm/worktrees/feat%2Fenv/meta.json
+ {
+   "source_branch": "main",
+@@ -144,6 +154,11 @@
+ ## ../acme.trees/feat-c/apps/web/.env
+ PORT=24140
+ API_URL=http://api.feat-c.acme.localhost:24102
++## ../acme.trees/feat-dry/apps/api/.env
++PORT=24231
++## ../acme.trees/feat-dry/apps/web/.env
++PORT=24230
++API_URL=http://api.feat-dry.acme.localhost:24102
+ ## ../acme.trees/feat-env/apps/api/.env
+ PORT=24181
+ ## ../acme.trees/feat-env/apps/web/.env
+@@ -216,7 +231,9 @@
+ 
+ [hooks]
+ # Commands run after creating a new worktree
+-on_create = [{ cmd = "case {{branch}} in feat/bad*) echo failing; exit 3;; feat/slow*) trap \"sleep 2\" INT; sleep 30;; *) echo set up {{branch}};; esac" }]
++on_create = [
++  "case {{branch}} in feat/bad*) echo failing; exit 3;; feat/slow*) trap \"sleep 2\" INT; sleep 30;; *) echo set up {{branch}};; esac",
++]
+ 
+ # Commands run right before removing a worktree (e.g. tear down external
+ # resources like Docker). A non-zero exit aborts the removal unless the entry
+@@ -224,5 +241,7 @@
+ on_clean = [
+ ]
+ 
++# Answers the wizard no longer asks, kept by "Always use this answer".
++# --ask asks them again; deleting a line forgets it.
+ [wizard.remembered]
+-env_strategy = "config"
++env_strategy = "main"
