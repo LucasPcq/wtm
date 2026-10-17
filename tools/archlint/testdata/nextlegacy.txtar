@@ -1,0 +1,56 @@
+-- github.com/charmbracelet/lipgloss/lipgloss.go --
+package lipgloss
+
+type Style struct{}
+
+func NewStyle() Style { return Style{} }
+-- github.com/LucasPcq/wtm/next/internal/adapter/shell/command.go --
+// Package shell starts child processes.
+package shell
+
+import (
+	"context"
+	"os/exec"
+)
+
+func Command(ctx context.Context, name string, args ...string) *exec.Cmd {
+	return exec.CommandContext(ctx, name, args...)
+}
+-- github.com/LucasPcq/wtm/next/internal/adapter/git/repo.go --
+// Package git runs git.
+package git
+
+import (
+	"context"
+	"os"
+	"os/exec"
+
+	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
+)
+
+func Add(ctx context.Context, dir string) error {
+	if err := exec.Command("git", "-C", dir, "worktree", "add").Run(); err != nil {
+		return err
+	}
+	if err := shell.Command(ctx, "git", "status").Run(); err != nil {
+		return err
+	}
+	if err := os.WriteFile(dir+"/meta.json.tmp", nil, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(dir+"/meta.json.tmp", dir+"/meta.json")
+}
+-- github.com/LucasPcq/wtm/next/internal/surface/output/style.go --
+// Package output prints results.
+package output
+
+import "github.com/charmbracelet/lipgloss"
+
+var Accent = lipgloss.NewStyle()
+-- github.com/LucasPcq/wtm/next/internal/wtm/assert/assert.go --
+// Package assert holds an unguarded assertion.
+package assert
+
+func Name(v any) string {
+	return v.(string) // want `type assertion without the comma-ok form`
+}

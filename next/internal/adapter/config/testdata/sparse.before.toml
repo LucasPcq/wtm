@@ -1,0 +1,5 @@
+[worktrees]
+base_path = "../.trees"
+
+[[env.file]]
+target = ".env"

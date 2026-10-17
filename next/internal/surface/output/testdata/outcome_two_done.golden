@@ -1,0 +1,10 @@
+  ✓ create: 2 done
+
+  Branches  feat/a, feat/b
+  From      main
+  Env       example
+  feat/a    .trees/feat-a
+  feat/b    .trees/feat-b
+
+  → wtm go feat/a
+  → wtm go feat/b

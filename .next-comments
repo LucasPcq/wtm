@@ -1,0 +1,7 @@
+# The comment lines each package of next/ holds beside its one-line package doc and its bare directives, godoc and tests included:
+# `<package under next/> <lines>`, absent = 0. archlint (nextcomments) refuses a count above or below its line,
+# so a ceiling only goes down by itself and goes up in review.
+internal/adapter/statefile 2
+internal/adapter/oplock 1
+internal/app 1
+internal/surface/output 2

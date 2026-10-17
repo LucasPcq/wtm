@@ -1,10 +1,14 @@
-BINARY   := wtm
-BUILD_DIR := bin
+BINARY      := wtm
+BINARY_NEXT := wtm-next
+BUILD_DIR   := bin
 
-.PHONY: build test vet fmt lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
+.PHONY: build next test vet fmt lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
+
+next:
+	go build -ldflags "-X main.version=$$(git describe --tags --always --dirty)" -o $(BUILD_DIR)/$(BINARY_NEXT) ./next/cmd/wtm-next
 
 test:
 	go test ./... -race -count=1
@@ -15,8 +19,8 @@ vet:
 # fmt fails rather than rewrites: a formatting fix belongs in the commit that
 # caused it, not in the one that ran the linter.
 fmt:
-	@test -z "$$(gofmt -l internal tools *.go)" || \
-		{ echo "gofmt needed:"; gofmt -l internal tools *.go; exit 1; }
+	@test -z "$$(gofmt -l internal next tools *.go)" || \
+		{ echo "gofmt needed:"; gofmt -l internal next tools *.go; exit 1; }
 
 # arch checks the rules of CLAUDE.md section 9 that no general-purpose linter
 # knows about: layers and service edges, the styles monopoly, comma-ok
