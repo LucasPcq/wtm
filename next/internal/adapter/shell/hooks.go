@@ -82,9 +82,9 @@ func hookDir(hook project.Hook, workDir string) string {
 }
 
 // hookEnv returns the environment of the chain's hooks, nil (this process's
-// own) when the chain sets none.
+// own) when the chain neither sets nor unsets any.
 func hookEnv(params env.HookChain) []string {
-	if len(params.Env) == 0 {
+	if len(params.Env) == 0 && len(params.Unset) == 0 {
 		return nil
 	}
 	return Environ(params.Unset, params.Env)

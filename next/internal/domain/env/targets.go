@@ -57,16 +57,16 @@ type OwnedEntry struct {
 	Changed bool   `json:"changed"`
 }
 
-// OwnedTargets returns the declared .env files that sit in a directory where a job runs docker compose, which wtm gives a COMPOSE_PROJECT_NAME.
+// OwnedTargets returns the declared .env files docker compose reads, the .env of a directory where a job runs it, which wtm gives a COMPOSE_PROJECT_NAME.
 func OwnedTargets(run project.Run, files []project.EnvFile) []string {
-	byDir := make(map[string]string, len(files))
+	declared := make(map[string]string, len(files))
 	for _, file := range files {
-		byDir[path.Dir(file.Target)] = file.Target
+		declared[path.Clean(file.Target)] = file.Target
 	}
 
 	var targets []string
 	for _, dir := range ComposeDirs(run) {
-		if target, declared := byDir[dir]; declared {
+		if target, ok := declared[path.Join(dir, ".env")]; ok {
 			targets = append(targets, target)
 		}
 	}

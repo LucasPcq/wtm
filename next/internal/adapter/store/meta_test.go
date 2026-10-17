@@ -245,3 +245,18 @@ func TestNumberingWhereTheLockCannotBeTakenRunsUnlocked(t *testing.T) {
 	assert.False(t, held)
 	assert.True(t, ran)
 }
+
+func TestTheRecordsListedAreTheBranchesTheyBelongTo(t *testing.T) {
+	stateDir := t.TempDir()
+	meta := Meta{StateDir: stateDir}
+	empty, err := meta.List()
+	require.NoError(t, err)
+	writeMeta(t, stateDir, "feat/a", realRecord)
+	writeMeta(t, stateDir, "main", realRecord)
+
+	listed, err := meta.List()
+
+	require.NoError(t, err)
+	assert.Empty(t, empty)
+	assert.ElementsMatch(t, []string{"feat/a", "main"}, listed)
+}

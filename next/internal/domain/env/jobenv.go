@@ -2,6 +2,7 @@ package env
 
 import (
 	"cmp"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -138,7 +139,7 @@ func ComposeDirs(cfg project.Run) []string {
 	var dirs []string
 	seen := map[string]bool{}
 	for _, job := range cfg.Jobs {
-		dir := cmp.Or(job.Cwd, ".")
+		dir := path.Clean(cmp.Or(job.Cwd, "."))
 		if !job.RunsCompose() || seen[dir] {
 			continue
 		}

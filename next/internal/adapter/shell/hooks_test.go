@@ -166,6 +166,22 @@ func TestTheEnvGivenWinsAndNoInheritedWorktreeVariableFillsOneLeftUnset(t *testi
 	assert.Equal(t, []string{"[20][]"}, out.all())
 }
 
+func TestAVariableToUnsetIsUnsetEvenWhenNoEnvIsGiven(t *testing.T) {
+	t.Setenv("COMPOSE_PROJECT_NAME", "launched-from-another-worktree")
+	t.Setenv("WTM_PORT_OFFSET", "90")
+	out := &collected{}
+
+	err := RunHooks(t.Context(), env.HookChain{
+		Hooks:   []project.Hook{{Cmd: `echo "[$WTM_PORT_OFFSET][$COMPOSE_PROJECT_NAME]"`}},
+		WorkDir: t.TempDir(),
+		Unset:   []string{"WTM_PORT_OFFSET", "COMPOSE_PROJECT_NAME"},
+		Output:  out.add,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"[][]"}, out.all())
+}
+
 func TestWithoutEnvAHookInheritsTheProcessEnvironment(t *testing.T) {
 	t.Setenv("COMPOSE_PROJECT_NAME", "inherited")
 	out := &collected{}

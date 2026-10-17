@@ -2,6 +2,7 @@ package provision
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
@@ -13,15 +14,19 @@ type FastForwardParams struct {
 }
 
 // FastForwarded is what FastForward did: Dirty when the branch's worktree had
-// changes and was left alone, Err when git failed.
+// changes and was left alone, Busy when it was stopped in a rebase or a bisect
+// and was left alone, Err when git failed.
 type FastForwarded struct {
 	Dirty bool
+	Busy  bool
 	Err   error
 }
 
 // FastForward brings params.Subject up to its origin branch, never merging:
 // the ref alone when no worktree has it checked out, else a fast-forward merge
-// in that worktree, which it skips when the worktree is dirty.
+// in that worktree, which it skips when the worktree is not plainly on the
+// branch (mid-rebase or bisect: the merge would move its detached HEAD, not
+// the branch) or is dirty.
 func (s Service) FastForward(ctx context.Context, params FastForwardParams) FastForwarded {
 	if params.CheckedOutAt == "" {
 		return FastForwarded{Err: s.Git.FastForwardRef(ctx, params.Subject)}
@@ -31,10 +36,32 @@ func (s Service) FastForward(ctx context.Context, params FastForwardParams) Fast
 		return FastForwarded{Err: err}
 	}
 
+	busy, err := s.busy(ctx, params.CheckedOutAt)
+	if err != nil || busy {
+		return FastForwarded{Busy: busy, Err: err}
+	}
+
 	dirty, err := s.Git.Dirty(ctx, params.CheckedOutAt)
 	if err != nil || dirty {
 		return FastForwarded{Dirty: dirty, Err: err}
 	}
 
 	return FastForwarded{Err: s.Git.MergeFFOnly(ctx, worktree.Merge{Path: params.CheckedOutAt, Onto: worktree.RemoteBranch{Name: params.Subject}})}
+}
+
+// busy reports whether the worktree at path has its branch in an operation
+// rather than checked out: any state but OnBranch.
+func (s Service) busy(ctx context.Context, path string) (bool, error) {
+	worktrees, err := s.Git.Worktrees(ctx)
+	if err != nil {
+		return false, fmt.Errorf("list worktrees: %w", err)
+	}
+
+	for _, listed := range worktrees {
+		if listed.Path == path {
+			_, onBranch := listed.State.(worktree.OnBranch)
+			return !onBranch, nil
+		}
+	}
+	return false, nil
 }

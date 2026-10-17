@@ -41,6 +41,17 @@ func TestASourceWithUncommittedChangesIsLeftWhereItIs(t *testing.T) {
 	assert.Equal(t, before, gittest.Output(t, u.linked, "rev-parse", "HEAD"))
 }
 
+func TestASourceWorktreeStoppedInARebaseIsLeftWhereItIs(t *testing.T) {
+	u := behindOrigin(t, upstreamSeed{Linked: true, Rebasing: true})
+	head, branch := gittest.Output(t, u.linked, "rev-parse", "HEAD"), gittest.Output(t, u.main, "rev-parse", existing)
+
+	forwarded := u.service.FastForward(t.Context(), provision.FastForwardParams{Subject: existing, CheckedOutAt: u.linked})
+
+	assert.Equal(t, provision.FastForwarded{Busy: true}, forwarded)
+	assert.Equal(t, head, gittest.Output(t, u.linked, "rev-parse", "HEAD"))
+	assert.Equal(t, branch, gittest.Output(t, u.main, "rev-parse", existing))
+}
+
 func TestAFastForwardThatFailsCarriesItsCause(t *testing.T) {
 	for name, seed := range map[string]upstreamSeed{"without worktree": {}, "in its worktree": {Linked: true}} {
 		t.Run(name, func(t *testing.T) {

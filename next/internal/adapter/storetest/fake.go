@@ -140,6 +140,25 @@ func (f *Fake) Load(branch string) (worktree.Meta, error) {
 	return meta, nil
 }
 
+// List returns the branches that hold a record, readable or not, sorted, as
+// store.Meta.List does.
+func (f *Fake) List() ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("List", ""); err != nil {
+		return nil, err
+	}
+
+	branches := slices.Collect(maps.Keys(f.meta))
+	for branch := range f.unreadable {
+		if _, ok := f.meta[branch]; !ok {
+			branches = append(branches, branch)
+		}
+	}
+	slices.Sort(branches)
+	return branches, nil
+}
+
 // Update applies update.Change to the record of update.Branch as
 // store.Meta.Update does: from an empty record when there is none or it does
 // not read, refusing a newer schema, and reporting no change when the record

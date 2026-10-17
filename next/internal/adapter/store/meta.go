@@ -4,7 +4,10 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -52,6 +55,34 @@ func (m Meta) Load(branch string) (worktree.Meta, error) {
 	}
 
 	return decodeMeta(data)
+}
+
+// List returns the branches that have a record directory, none when the state
+// directory holds no record yet.
+func (m Meta) List() ([]string, error) {
+	// MetaDir names the directory every record sits in; any branch locates it.
+	dir, ok := worktree.MetaDir(worktree.MetaDirParams{StateDir: m.StateDir, Branch: "_"})
+	if !ok {
+		return nil, nil
+	}
+
+	entries, err := os.ReadDir(filepath.Dir(dir))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("list records: %w", err)
+	}
+
+	var branches []string
+	for _, entry := range entries {
+		branch, err := url.PathUnescape(entry.Name())
+		if err != nil || !entry.IsDir() || worktree.StateSegment(branch) != entry.Name() {
+			continue
+		}
+		branches = append(branches, branch)
+	}
+	return branches, nil
 }
 
 // Update applies update.Change to the record of update.Branch under its lock,

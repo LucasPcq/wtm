@@ -38,6 +38,18 @@ func TestAWorktreeGetsTheSmallestOrdinalNoLiveWorktreeHolds(t *testing.T) {
 	assert.Equal(t, "main", recorded.SourceBranch)
 }
 
+func TestTheOrdinalOfADetachedWorktreeIsNeverGivenAgain(t *testing.T) {
+	w, _ := inMemory(t, seeds{
+		Worktrees: []worktree.Worktree{{Path: "/trees/a", State: worktree.Detached{}}},
+		Store:     storetest.FakeParams{Meta: map[string]worktree.Meta{"feat/a": {Ordinal: 1}}},
+	})
+
+	outcome := w.service.Run(t.Context(), portLinked(w.params(&recorder{})))
+
+	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
+	assert.Equal(t, new(2), outcome.Provisioned.Ordinal)
+}
+
 func TestANumberIsGivenUnderTheOrdinalLock(t *testing.T) {
 	w, files := inMemory(t, seeds{})
 
@@ -81,15 +93,45 @@ func TestANumberThatCannotBeGivenLeavesThePortsAsCopiedAndSaysWhy(t *testing.T) 
 	assert.Len(t, report.worktreeEvents(), 2)
 }
 
-func TestANumberOnlyHooksNeededFailsSilently(t *testing.T) {
-	w, _ := inMemory(t, seeds{GitFail: map[string]error{"Worktrees": errors.New("exit status 128")}})
+func TestANumberOnlyHooksNeededStillGivesTheComposeNameAndSaysThePortsAreMissing(t *testing.T) {
+	t.Setenv("COMPOSE_PROJECT_NAME", "app-a")
+	t.Setenv("WTM_PORT_OFFSET", "90")
+	w, files := inMemory(t, seeds{GitFail: map[string]error{"Worktrees": errors.New("exit status 128")}})
 	require.NoError(t, os.MkdirAll(w.path(branchName), 0o755))
+	report := &recorder{}
 
-	outcome := w.service.Run(t.Context(), hooked(composed(w.params(&recorder{})), "true"))
+	outcome := w.service.Run(t.Context(), hooked(composed(w.params(report)), "echo offset=$WTM_PORT_OFFSET project=$COMPOSE_PROJECT_NAME"))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Nil(t, outcome.Provisioned.Ordinal)
-	assert.Empty(t, outcome.Warnings)
+	assert.Equal(t, []string{"provision.hook_env_unnumbered"}, codes(outcome.Warnings))
+	assert.Equal(t, []string{"offset= project=main-feat-x"}, report.lines())
+	written, _ := files.File(filepath.Join(w.path(branchName), ".env"))
+	assert.Equal(t, mainEnv+"COMPOSE_PROJECT_NAME=main-feat-x\n", written)
+}
+
+func TestAComposeStackWhosePortsCannotBeSettledStillGetsItsProjectName(t *testing.T) {
+	for name, seed := range map[string]seeds{
+		"no ordinal":         {GitFail: map[string]error{"Worktrees": errors.New("exit status 128")}},
+		"a value unresolved": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w, files := inMemory(t, seed)
+			params := composed(w.params(&recorder{}))
+			params.Project.Run.Jobs = append(params.Project.Run.Jobs, project.Job{Name: "web", Kind: project.Service, Cmd: "npm start", Ports: map[string]int{"http": 3000}})
+			params.Project.Run.EnvPorts = []project.EnvPortLink{{File: ".env", Key: "PORT", Job: "web", Port: "http"}}
+			if name == "a value unresolved" {
+				params.Project.Run.EnvValues = []project.EnvValueLink{{File: ".env", Key: "API", Job: "ghost", Value: "x"}}
+			}
+
+			outcome := w.service.Run(t.Context(), params)
+
+			require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
+			assert.Len(t, outcome.Warnings, 1)
+			written, _ := files.File(filepath.Join(w.path(branchName), ".env"))
+			assert.Equal(t, mainEnv+"COMPOSE_PROJECT_NAME=main-feat-x\n", written)
+		})
+	}
 }
 
 func TestAPortLinkedWorktreeIsNumberedAndItsEnvMovedOntoItsPorts(t *testing.T) {
@@ -308,7 +350,7 @@ func TestAHookReadsTheRunEnvironmentOnlyWhenTheRunReachesHooks(t *testing.T) {
 
 	assert.Equal(t, []string{"worktree", "env", "meta", "on_create"}, plain.phases())
 	assert.Equal(t, []string{"worktree", "env", "meta", "ordinal", "ports", "on_create"}, composedReport.phases())
-	assert.Equal(t, []string{"offset=90 project="}, plain.lines())
+	assert.Equal(t, []string{"offset= project="}, plain.lines())
 	require.Len(t, composedReport.lines(), 1)
 	assert.True(t, strings.HasPrefix(composedReport.lines()[0], "offset=10 project=main-feat-x"), composedReport.lines())
 }

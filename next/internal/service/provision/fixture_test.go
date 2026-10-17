@@ -169,12 +169,13 @@ type upstream struct {
 }
 
 type upstreamSeed struct {
-	Linked bool
-	Dirty  bool
+	Linked   bool
+	Dirty    bool
+	Rebasing bool
 }
 
 // behindOrigin builds upstream, existing checked out in a linked worktree (dirty
-// or not) when seed asks.
+// or mid-rebase) when seed asks.
 func behindOrigin(t *testing.T, seed upstreamSeed) upstream {
 	t.Helper()
 	root := gittest.TempDir(t)
@@ -189,6 +190,9 @@ func behindOrigin(t *testing.T, seed upstreamSeed) upstream {
 	if seed.Linked {
 		linked = filepath.Join(root, existing)
 		params.Worktrees = []worktree.Worktree{{Path: linked, State: worktree.OnBranch{Branch: existing}}}
+	}
+	if seed.Rebasing {
+		params.Worktrees[0].State = worktree.Rebasing{Branch: existing}
 	}
 	if seed.Dirty {
 		params.Dirty = []string{linked}

@@ -25,6 +25,7 @@ type Git interface {
 // Meta is the store of each worktree's meta.json record.
 type Meta interface {
 	Load(branch string) (worktree.Meta, error)
+	List() ([]string, error)
 	Update(ctx context.Context, update worktree.MetaUpdate) (domain.Written, error)
 	// LockOrdinals runs do under the lock that serialises ordinal allocation and
 	// reports whether the lock was held; do runs unlocked when it could not be.

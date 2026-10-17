@@ -87,13 +87,13 @@ func (p *provisioning) taken(ctx context.Context) ([]int, error) {
 		return nil, fmt.Errorf("list worktrees: %w", err)
 	}
 
-	var taken []int
-	for _, listed := range worktrees {
-		branch := listed.Branch()
-		if listed.Main || branch == "" || branch == p.Worktree.Branch {
-			continue
-		}
+	holders, err := p.holders(worktrees)
+	if err != nil {
+		return nil, err
+	}
 
+	var taken []int
+	for _, branch := range holders {
 		meta, err := p.Service.Meta.Load(branch)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
@@ -104,6 +104,40 @@ func (p *provisioning) taken(ctx context.Context) ([]int, error) {
 		taken = append(taken, meta.Ordinal)
 	}
 	return taken, nil
+}
+
+// holders returns the branches whose record may hold another worktree's
+// ordinal: those of the linked worktrees, and, when one of them is detached
+// and so names no branch, every recorded branch no worktree lists, since its
+// record may be the detached one's.
+func (p *provisioning) holders(worktrees []worktree.Worktree) ([]string, error) {
+	var holders []string
+	listed := map[string]bool{p.Worktree.Branch: true}
+	detached := false
+	for _, w := range worktrees {
+		branch := w.Branch()
+		_, isDetached := w.State.(worktree.Detached)
+		detached = detached || !w.Main && isDetached
+		if w.Main || branch == "" || listed[branch] {
+			continue
+		}
+		listed[branch] = true
+		holders = append(holders, branch)
+	}
+	if !detached {
+		return holders, nil
+	}
+
+	recorded, err := p.Service.Meta.List()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errOrdinalUnreadable, err)
+	}
+	for _, branch := range recorded {
+		if !listed[branch] {
+			holders = append(holders, branch)
+		}
+	}
+	return holders, nil
 }
 
 // settlesPorts reports whether the ports phase runs: run.toml links values into
@@ -133,19 +167,21 @@ func (p *provisioning) settle(ctx context.Context, provisioned *Provisioned) err
 		p.warn(ignoredWarning(link))
 	}
 
-	if p.Worktree.Isolation == project.Verbatim || p.portsNeedOrdinal() && provisioned.Ordinal == nil {
+	if p.Worktree.Isolation == project.Verbatim {
 		return nil
 	}
 
-	writes, err := env.Resolve(env.ResolveParams{
-		JobParams:  p.jobParams(provisioned.Ordinal),
-		Files:      p.Project.EnvFiles,
-		Proxy:      p.Project.Global.Proxy,
-		PublicPort: p.Service.PublicPort(ctx, p.Project.Global.ProxyPort()),
-	})
-	if _, inRunToml := errors.AsType[*env.ValueError](err); inRunToml {
-		p.warn(p.notSettled(notSettled{Cause: err, InRunToml: true}))
-		return nil
+	// The compose project name never depends on the ordinal nor on the links:
+	// it is written even when the ports cannot be.
+	run := p.Project.Run
+	if p.portsNeedOrdinal() && provisioned.Ordinal == nil {
+		run = ownedOnly(run)
+	}
+	writes, err := p.resolve(ctx, run, provisioned.Ordinal)
+	if err != nil {
+		_, inRunToml := errors.AsType[*env.ValueError](err)
+		p.warn(p.notSettled(notSettled{Cause: err, InRunToml: inRunToml}))
+		writes, err = p.resolve(ctx, ownedOnly(run), provisioned.Ordinal)
 	}
 	if err != nil {
 		p.warn(p.notSettled(notSettled{Cause: err}))
@@ -163,6 +199,25 @@ func (p *provisioning) settle(ctx context.Context, provisioned *Provisioned) err
 
 	provisioned.EnvPorts = env.Redact(plan)
 	return nil
+}
+
+// resolve returns the writes run links into the worktree's env files.
+func (p *provisioning) resolve(ctx context.Context, run project.Run, ordinal *int) (env.Writes, error) {
+	job := p.jobParams(ordinal)
+	job.Run = run
+	return env.Resolve(env.ResolveParams{
+		JobParams:  job,
+		Files:      p.Project.EnvFiles,
+		Proxy:      p.Project.Global.Proxy,
+		PublicPort: p.Service.PublicPort(ctx, p.Project.Global.ProxyPort()),
+	})
+}
+
+// ownedOnly returns run without its links, which leaves only the values wtm
+// owns to write.
+func ownedOnly(run project.Run) project.Run {
+	run.EnvPorts, run.EnvValues = nil, nil
+	return run
 }
 
 // jobParams is what the worktree's job environment derives from; a nil ordinal
@@ -257,9 +312,10 @@ func (p *provisioning) runHooks(ctx context.Context, provisioned Provisioned) er
 
 // hookEnv is the run environment the hooks get, read from the worktree's
 // compose env files; nil when they read none, or with a warning when a file
-// cannot be read.
+// cannot be read. An unnumbered worktree's hooks get only its compose project
+// name, with a warning: its ports and offset would be main's.
 func (p *provisioning) hookEnv(ordinal *int) map[string]string {
-	if !p.hooksReadRun() || ordinal == nil {
+	if !p.hooksReadRun() {
 		return nil
 	}
 
@@ -277,5 +333,18 @@ func (p *provisioning) hookEnv(ordinal *int) map[string]string {
 		compose = append(compose, lines)
 	}
 
-	return env.HookEnv(p.jobParams(ordinal), compose)
+	hookEnv := env.HookEnv(p.jobParams(ordinal), compose)
+	if ordinal != nil {
+		return hookEnv
+	}
+
+	p.warn(domain.Warning{
+		Code:    "provision.hook_env_unnumbered",
+		Message: "no ordinal for " + p.Worktree.Branch + " — on_create hooks run without its ports",
+		Params:  domain.Params{"branch": p.Worktree.Branch},
+	})
+	if name := hookEnv[env.ComposeProjectKey]; name != "" {
+		return map[string]string{env.ComposeProjectKey: name}
+	}
+	return nil
 }

@@ -80,3 +80,14 @@ func TestTheOwnedTargetsAreTheEnvFilesAComposeStackReads(t *testing.T) {
 	assert.Empty(t, OwnedTargets(config, nil))
 	assert.Empty(t, OwnedTargets(project.Run{}, files))
 }
+
+func TestTheOwnedTargetIsTheDotEnvComposeReadsNotTheLastFileOfItsDirectory(t *testing.T) {
+	config := project.Run{Jobs: []project.Job{
+		{Name: "root", Cmd: "docker compose up -d", Cwd: "."},
+		{Name: "infra", Cmd: "docker compose up -d", Cwd: "./infra"},
+	}}
+	files := []project.EnvFile{{Target: ".env"}, {Target: ".env.local"}, {Target: "infra/.env"}}
+
+	assert.Equal(t, []string{".env", "infra/.env"}, OwnedTargets(config, files))
+	assert.Equal(t, []string{".env", "infra/.env"}, ComposeEnvPaths(config))
+}
