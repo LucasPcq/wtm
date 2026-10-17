@@ -6,6 +6,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+	"github.com/LucasPcq/wtm/next/internal/wtm/run"
 	"github.com/LucasPcq/wtm/next/internal/wtm/settle"
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
@@ -14,6 +15,7 @@ type ApplyParams struct {
 	Deps        Deps
 	Facts       Facts
 	Plan        Planned
+	Isolation   run.Isolation
 	FastForward bool
 	Report      wtm.Report
 }
@@ -105,7 +107,7 @@ func (p ApplyParams) provisionParams(planned BranchPlan) provision.Params {
 			Source:     p.Plan.From,
 			ParentPath: f.checkedOutAt(p.Plan.From),
 			Strategy:   p.Plan.EnvFrom,
-			Isolation:  p.Plan.Isolation,
+			Isolation:  p.Isolation,
 		},
 		Report: p.Report,
 	}

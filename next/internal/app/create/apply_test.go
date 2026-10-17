@@ -116,3 +116,25 @@ func TestAnInterruptedRunSkipsTheBranchesItNeverReached(t *testing.T) {
 	assert.Equal(t, create.Item{Subject: other, Status: wtm.StatusSkipped, Reason: wtm.ReasonInterrupted}, result.Items[1])
 	assert.NoDirExists(t, w.path(other))
 }
+
+func TestTheRecordKeepsTheRunIsolationEvenWhereNothingIsIsolated(t *testing.T) {
+	w := newWorld(t, seed{Run: "isolation = \"verbatim\"\n", Config: remembering})
+
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}})
+
+	require.Equal(t, wtm.StatusDone, result.Items[0].Status, result.Items[0].Err)
+	recorded, err := w.meta.Load(branchName)
+	require.NoError(t, err)
+	assert.Equal(t, run.Verbatim, recorded.Isolation)
+}
+
+func TestAnIsolationNothingAppliesToIgnoresTheRememberedOne(t *testing.T) {
+	w := newWorld(t, seed{Config: remembering})
+
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}})
+
+	require.Equal(t, wtm.StatusDone, result.Items[0].Status, result.Items[0].Err)
+	recorded, err := w.meta.Load(branchName)
+	require.NoError(t, err)
+	assert.Equal(t, run.Isolated, recorded.Isolation)
+}

@@ -161,7 +161,7 @@ func (f Facts) isolation(given run.Isolation) Choice[run.Isolation] {
 	switch {
 	case given != "":
 		question.Answer = Answer[run.Isolation]{Value: given, Origin: OriginRequest}
-	case found:
+	case found && question.Skip == "":
 		question.Answer = Answer[run.Isolation]{Value: run.Isolation(remembered), Origin: OriginRemembered}
 	case f.Run.Isolation != "":
 		question.Answer = Answer[run.Isolation]{Value: f.Run.Isolation.Effective(), Origin: OriginConfig}
