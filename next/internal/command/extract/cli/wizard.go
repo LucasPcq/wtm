@@ -20,8 +20,7 @@ type wizard struct {
 	given     extract.Request // as the flags gave it: a step given a flag is not asked, and a step gone back before returns to it
 	req       extract.Request
 	newTarget bool
-	dryRun    bool
-	report    domain.Report
+	opts      domain.RunOptions
 	q         extract.Questions
 	preview   *extract.Outcome
 	outcome   extract.Outcome
@@ -31,13 +30,12 @@ type wizard struct {
 type wizardParams struct {
 	App     useCase
 	Request extract.Request
-	DryRun  bool
-	Report  domain.Report
+	Options domain.RunOptions
 }
 
 // newWizard builds the wizard of params.Request, each step knowing its place in it.
 func newWizard(ctx context.Context, params wizardParams) *wizard {
-	w := &wizard{ctx: ctx, app: params.App, given: params.Request, req: params.Request, dryRun: params.DryRun, report: params.Report}
+	w := &wizard{ctx: ctx, app: params.App, given: params.Request, req: params.Request, opts: params.Options}
 
 	w.steps = []form.Step{
 		&selectStep{at: at{w: w, step: stepSource}},
@@ -67,7 +65,7 @@ func (w *wizard) form() form.Params {
 			Apply:      w.apply,
 			Stale:      domain.PlanStale,
 		},
-		DryRun: w.dryRun,
+		DryRun: w.opts.DryRun,
 	}
 }
 

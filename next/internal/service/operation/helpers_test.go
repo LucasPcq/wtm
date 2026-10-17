@@ -9,11 +9,10 @@ import (
 
 func service(l *locker, p *publisher) Service {
 	return Service{
-		Locker:        l,
-		Publisher:     p,
-		NewOpID:       func() string { return "op-1" },
-		Now:           func() time.Time { return startedAt },
-		CorrelationID: "corr-1",
+		Locker:    l,
+		Publisher: p,
+		NewOpID:   func() string { return "op-1" },
+		Now:       func() time.Time { return startedAt },
 	}
 }
 

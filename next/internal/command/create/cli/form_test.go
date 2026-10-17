@@ -17,7 +17,7 @@ func TestADryRunWithNothingToAskDrawsNothing(t *testing.T) {
 	streams, _, _, out := output.Test()
 	req := create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}
 
-	ran, err := runForm(t.Context(), formParams{App: newApp(seed{}), Request: req, DryRun: true, In: streams.In, Out: streams.Err})
+	ran, err := runForm(t.Context(), formParams{App: newApp(seed{}), Request: req, Options: domain.RunOptions{DryRun: true}, In: streams.In, Out: streams.Err})
 
 	require.NoError(t, err)
 	assert.Equal(t, req, ran.Request)
@@ -47,4 +47,15 @@ func TestAFailedApplyEndsTheFormWithoutAskingAgain(t *testing.T) {
 
 	assert.ErrorIs(t, err, failed)
 	assert.Equal(t, []string{"preview-1"}, app.held)
+}
+
+func TestTheFormRunsThePreviewAndTheApplyWithTheCorrelationID(t *testing.T) {
+	app := &previewing{useCase: newApp(seed{}), errs: []error{nil}}
+	streams, _, _, _ := output.Test()
+	req := create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}
+
+	_, err := runForm(t.Context(), formParams{App: app, Request: req, Options: domain.RunOptions{CorrelationID: "corr-1"}, In: enters{}, Out: streams.Err})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"corr-1", "corr-1"}, app.ids)
 }

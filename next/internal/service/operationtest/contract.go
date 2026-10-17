@@ -1,8 +1,9 @@
-// Package operationtest is the contract every mutating use case's Run keeps with its operation: a dry run takes no lock and publishes nothing, a stale plan is refused before any event, and the events of an apply arrive in order, each unit started finished.
+// Package operationtest is the contract every mutating use case's Run keeps with its operation: a dry run takes no lock and publishes nothing, a stale plan is refused before any event, the events of an apply arrive in order, each unit started finished, and the operation records the correlation ID of its own options.
 package operationtest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"testing"
@@ -16,12 +17,18 @@ import (
 
 // A Subject is one command's Run over a repository made for one check of the contract.
 type Subject struct {
-	// Run runs a request that applies a change with events, returning the fingerprint of its plan.
-	Run func(ctx context.Context, opts domain.RunOptions) (fingerprint string, err error)
+	// Run runs a request that applies a change with events, returning the operation it ran under and the fingerprint of its plan.
+	Run func(ctx context.Context, opts domain.RunOptions) (Ran, error)
 	// Stale changes the facts the request's plan depends on, so that a preview made before no longer holds.
 	Stale func(t *testing.T)
 	// Fail makes the apply of the request fail once it started, as a failing hook does.
 	Fail func(t *testing.T)
+}
+
+// Ran is what Run returns of the outcome: its operation's id and its plan's fingerprint.
+type Ran struct {
+	Op          string
+	Fingerprint string
 }
 
 // Contract checks the contract on the Subject that subject returns, a new one for each check, wired to the operations service it is given.
@@ -31,10 +38,10 @@ func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Su
 		run := subject(t, rec.service()).Run
 		reported := &events{}
 
-		fingerprint, err := run(t.Context(), domain.RunOptions{DryRun: true, Report: reported.add})
+		ran, err := run(t.Context(), domain.RunOptions{DryRun: true, Report: reported.add})
 
 		require.NoError(t, err)
-		assert.NotEmpty(t, fingerprint)
+		assert.NotEmpty(t, ran.Fingerprint)
 		assert.Empty(t, rec.holds)
 		assert.Empty(t, rec.published.list)
 		assert.Empty(t, reported.list)
@@ -48,7 +55,7 @@ func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Su
 		s.Stale(t)
 		reported := &events{}
 
-		_, err = s.Run(t.Context(), domain.RunOptions{ExpectFingerprint: preview, Report: reported.add})
+		_, err = s.Run(t.Context(), domain.RunOptions{ExpectFingerprint: preview.Fingerprint, Report: reported.add})
 
 		assert.True(t, domain.PlanStale(err), "Run with a stale fingerprint = %v, want %s", err, domain.CodePlanStale)
 		assert.Empty(t, rec.published.list)
@@ -65,6 +72,36 @@ func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Su
 
 		require.NoError(t, err)
 		inOrder(t, inOrderParams{Recorder: rec, Reported: reported.list, OK: true})
+	})
+
+	t.Run("the correlation ID of the options reaches the record and every event", func(t *testing.T) {
+		rec := &recorder{}
+		run := subject(t, rec.service()).Run
+
+		_, err := run(t.Context(), domain.RunOptions{CorrelationID: "corr-1"})
+
+		require.NoError(t, err)
+		require.NotEmpty(t, rec.taken, "the run took no lock")
+		require.NotEmpty(t, rec.opened, "the run published no event")
+		for _, op := range append(rec.taken, rec.opened...) {
+			assert.Equal(t, "corr-1", op.CorrelationID, "operation %s", op.ID)
+		}
+	})
+
+	t.Run("an invalid correlation ID is refused before any lock or event", func(t *testing.T) {
+		rec := &recorder{}
+		run := subject(t, rec.service()).Run
+		reported := &events{}
+
+		ran, err := run(t.Context(), domain.RunOptions{CorrelationID: "bad\x01id", Report: reported.add})
+
+		refused, ok := errors.AsType[*domain.Error](err)
+		require.True(t, ok, "Run with an invalid correlation ID = %v, want a *domain.Error", err)
+		assert.Equal(t, domain.KindInvalid, refused.Kind)
+		assert.NotEmpty(t, ran.Op, "the refusal still names its operation")
+		assert.Empty(t, rec.taken)
+		assert.Empty(t, rec.published.list)
+		assert.Empty(t, reported.list)
 	})
 
 	t.Run("a failed apply still finishes every unit it started", func(t *testing.T) {
@@ -131,8 +168,10 @@ func finish(open []string, name string) []string {
 // ----------------------------------------------------------------------------
 // Fakes
 
-// recorder is the Locker and the Publisher of an operations service, recording the holds it gave and what was published.
+// recorder is the Locker and the Publisher of an operations service, recording the operations it locked and published for, the holds it gave and what was published.
 type recorder struct {
+	taken     []domain.Operation
+	opened    []domain.Operation
 	holds     []*hold
 	published events
 }
@@ -147,12 +186,15 @@ func (r *recorder) service() operation.Service {
 }
 
 func (r *recorder) Take(op domain.Operation) (operation.Hold, error) {
+	r.taken = append(r.taken, op)
 	h := &hold{}
 	r.holds = append(r.holds, h)
 	return h, nil
 }
 
-func (r *recorder) Open(domain.Operation) domain.Report {
+// Open publishes every event of op through the one report it returns: the record op carries is what stamps each of them.
+func (r *recorder) Open(op domain.Operation) domain.Report {
+	r.opened = append(r.opened, op)
 	return r.published.add
 }
 

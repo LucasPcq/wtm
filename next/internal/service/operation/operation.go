@@ -22,11 +22,10 @@ const (
 // Service begins the operations of the mutating use cases. Its fields are the
 // adapters and clocks it records an operation with; the zero value is not usable.
 type Service struct {
-	Locker        Locker
-	Publisher     Publisher
-	NewOpID       func() string
-	Now           func() time.Time
-	CorrelationID string
+	Locker    Locker
+	Publisher Publisher
+	NewOpID   func() string
+	Now       func() time.Time
 }
 
 // An Op is one running operation: its record, the locks it holds and where its
@@ -41,8 +40,9 @@ type Op struct {
 }
 
 // Begin records an operation of command and takes locks, unless opts is a dry
-// run, which takes none. When another operation holds one of the locks it
-// returns the Op, whose ID still names the attempt, with the Locker's error.
+// run, which takes none. When opts carry an invalid correlation ID, or another
+// operation holds one of the locks, it returns the Op, whose ID still names the
+// attempt, with the refusal.
 // The caller ends the returned Op with End.
 func (s Service) Begin(command string, locks []domain.Lock, opts domain.RunOptions) (*Op, error) {
 	op := &Op{
@@ -51,7 +51,7 @@ func (s Service) Begin(command string, locks []domain.Lock, opts domain.RunOptio
 			PID:           os.Getpid(),
 			Command:       command,
 			Surface:       opts.Surface,
-			CorrelationID: s.CorrelationID,
+			CorrelationID: opts.CorrelationID,
 			StartedAt:     s.Now().UTC(),
 			Locks:         locks,
 		},
@@ -59,6 +59,10 @@ func (s Service) Begin(command string, locks []domain.Lock, opts domain.RunOptio
 		options: opts,
 	}
 	op.ID = op.record.ID
+
+	if err := domain.CorrelationProblem(opts.CorrelationID); err != nil {
+		return op, domain.InvalidMessage("the correlation id " + err.Error())
+	}
 
 	if opts.DryRun {
 		return op, nil

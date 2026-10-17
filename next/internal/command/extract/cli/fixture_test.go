@@ -17,6 +17,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
+	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
 
 const (
@@ -40,6 +41,7 @@ var changed = []worktree.Change{
 }
 
 type seed struct {
+	Env        uicli.Env // zero runs in the main worktree
 	Clean      bool
 	Behind     bool // origin's main is ahead of main
 	Isolates   bool // run.toml declares a port, so the isolation is asked
@@ -55,6 +57,20 @@ type world struct {
 	git   *gittest.Fake
 	store *storetest.Fake
 	seed  seed
+	seen  *seen
+}
+
+// seen is what the use case was given: the directory it was opened from and the operations it locked.
+type seen struct {
+	dirs []string
+	ops  []domain.Operation
+}
+
+func (w world) env() uicli.Env {
+	if w.seed.Env != (uicli.Env{}) {
+		return w.seed.Env
+	}
+	return uicli.Env{Cwd: mainPath, ProjectDir: mainPath}
 }
 
 func newWorld(s seed) world {
@@ -90,11 +106,13 @@ func newWorld(s seed) world {
 		}),
 		store: storetest.NewFake(storetest.FakeParams{Config: config, Fail: s.StoreFails}),
 		seed:  s,
+		seen:  &seen{},
 	}
 }
 
-func (w world) open(context.Context) (Project, error) {
-	return Project{UseCase: w.usecase(), Cwd: mainPath}, nil
+func (w world) open(_ context.Context, dir string) (extract.UseCase, error) {
+	w.seen.dirs = append(w.seen.dirs, dir)
+	return w.usecase(), nil
 }
 
 func (w world) usecase() extract.UseCase {
@@ -109,7 +127,7 @@ func (w world) usecase() extract.UseCase {
 		Meta:    w.store,
 		Shield:  shell.Shield,
 		Operations: operation.Service{
-			Locker:    locker{},
+			Locker:    locker{seen: w.seen},
 			Publisher: locker{},
 			NewOpID:   func() string { return "op-1" },
 			Now:       func() time.Time { return createdAt },
@@ -149,10 +167,16 @@ func (s stored) LoadRun() (project.Run, error) {
 	return project.Run{}, nil
 }
 
-type locker struct{}
+type locker struct{ seen *seen }
 
-func (locker) Take(domain.Operation) (operation.Hold, error) { return held{}, nil }
-func (locker) Open(domain.Operation) domain.Report           { return func(domain.Event) {} }
+func (l locker) Take(op domain.Operation) (operation.Hold, error) {
+	if l.seen != nil {
+		l.seen.ops = append(l.seen.ops, op)
+	}
+	return held{}, nil
+}
+
+func (locker) Open(domain.Operation) domain.Report { return func(domain.Event) {} }
 
 type held struct{}
 
@@ -170,9 +194,11 @@ type previewing struct {
 	previews int
 	errs     []error
 	held     []string
+	ids      []string // the correlation ID of each run, previews included
 }
 
 func (p *previewing) Run(ctx context.Context, req extract.Request, opts domain.RunOptions) (extract.Outcome, error) {
+	p.ids = append(p.ids, opts.CorrelationID)
 	if opts.DryRun {
 		p.previews++
 		outcome, err := p.useCase.Run(ctx, req, opts)

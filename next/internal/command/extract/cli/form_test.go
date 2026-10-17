@@ -28,10 +28,22 @@ func TestADryRunWithNothingToAskDrawsNothing(t *testing.T) {
 	req := settled()
 	req.Keep = new(false)
 
-	ran, err := runForm(t.Context(), formParams{App: newWorld(seed{}).usecase(), Request: req, DryRun: true, In: streams.In, Out: streams.Err})
+	ran, err := runForm(t.Context(), formParams{App: newWorld(seed{}).usecase(), Request: req, Options: domain.RunOptions{DryRun: true}, In: streams.In, Out: streams.Err})
 
 	require.NoError(t, err)
 	assert.Equal(t, req, ran.Request)
 	assert.NotEmpty(t, ran.Outcome.Fingerprint)
 	assert.Empty(t, out.String())
+}
+
+func TestTheRecapRunsThePreviewAndTheApplyWithTheCorrelationID(t *testing.T) {
+	app := &previewing{useCase: newWorld(seed{}).usecase(), errs: []error{nil}}
+	streams, _, _, _ := output.Test()
+	req := settled()
+	req.Keep = new(false)
+
+	_, err := runForm(t.Context(), formParams{App: app, Request: req, Options: domain.RunOptions{CorrelationID: "corr-1"}, In: enters{}, Out: streams.Err})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"corr-1", "corr-1"}, app.ids)
 }

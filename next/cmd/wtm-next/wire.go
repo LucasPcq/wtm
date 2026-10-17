@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"os"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
@@ -21,9 +20,8 @@ import (
 )
 
 const (
-	remote           = "origin"
-	correlationIDEnv = "WTM_CORRELATION_ID" // ties an operation's events to the caller's own run
-	opIDBytes        = 8
+	remote    = "origin"
+	opIDBytes = 8
 )
 
 // wireParams is where the repository a command runs on keeps its files; it also publishes the events of the operations on it.
@@ -45,11 +43,10 @@ func wire(params wireParams) app {
 	projectConfig := config.Project{StateDir: params.StateDir, GlobalPath: config.GlobalPath()}
 
 	operations := operation.Service{
-		Locker:        locker{oplock.Locks{StateDir: params.StateDir}},
-		Publisher:     params,
-		NewOpID:       newOpID,
-		Now:           time.Now,
-		CorrelationID: os.Getenv(correlationIDEnv),
+		Locker:    locker{oplock.Locks{StateDir: params.StateDir}},
+		Publisher: params,
+		NewOpID:   newOpID,
+		Now:       time.Now,
 	}
 
 	provisions := provision.Service{
