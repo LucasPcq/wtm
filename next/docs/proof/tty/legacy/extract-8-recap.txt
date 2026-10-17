@@ -1,0 +1,27 @@
+$ wtmx extract; echo EXIT=$?
+
+  Step 9/9 • Confirm
+
+  ✓ Source worktree: feat/form
+  ✓ Files: 1 file
+  ✓ Target worktree: new worktree
+  ✓ Branch name: feat/moved
+  ✓ Source branch: main
+  ✓ Isolation: isolated
+  ⊘ Source update — source already up to date
+  ✓ Mode: move
+
+  ┃  Review & confirm
+  ┃
+  ┃  Source:    feat/form
+  ┃  Files:     README.md
+  ┃  Target:    new worktree feat/moved from main
+  ┃  Isolation: isolated
+  ┃  Mode:      move
+
+▌▸ Yes, create & extract
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

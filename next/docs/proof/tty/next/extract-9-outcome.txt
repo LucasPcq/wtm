@@ -1,0 +1,16 @@
+$ wtmx extract; echo EXIT=$?
+  ✓ on_create · feat/moved (<DUR>)
+
+┃  ✓ Moved 1 file to feat/moved
+┃
+┃    mod  README.md
+┃
+┃  source  feat/form · files removed
+┃  env     3 ports settled (offset +180)
+┃  path    ../acme.trees/feat-moved
+┃
+┃  → wtm go feat/moved
+
+EXIT=0
+$
+

@@ -1,0 +1,19 @@
+$ wtmx extract; echo EXIT=$?
+
+┃  Hooks · On Create
+┃  ✓ case feat/moved in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;;
+ *) echo set up feat/moved;; esac (<DUR>)
+
+┃  ✓ Moved 1 file to feat/moved
+┃
+┃    mod  README.md
+┃
+┃  source  feat/form · files removed
+┃  env     3 ports settled (offset +170)
+┃  path    ../acme.trees/feat-moved
+┃
+┃  → wtm go feat/moved
+
+EXIT=0
+$
+

@@ -41,6 +41,8 @@ var changed = []worktree.Change{
 
 type seed struct {
 	Clean      bool
+	Behind     bool // origin's main is ahead of main
+	Isolates   bool // run.toml declares a port, so the isolation is asked
 	Conflicts  map[string]worktree.ConflictKind
 	NoConfig   bool
 	OnCreate   []project.Hook
@@ -68,6 +70,10 @@ func newWorld(s seed) world {
 	if s.NoConfig {
 		config = nil
 	}
+	commits := map[worktree.Ref][]string{}
+	if s.Behind {
+		commits[worktree.RemoteBranch{Name: "main"}] = []string{"upstream main"}
+	}
 	return world{
 		git: gittest.NewFake(gittest.FakeParams{
 			Main:   mainPath,
@@ -77,6 +83,7 @@ func newWorld(s seed) world {
 				{Path: sourcePath, State: worktree.OnBranch{Branch: source}},
 				{Path: otherPath, State: worktree.OnBranch{Branch: other}},
 			},
+			Commits:   commits,
 			Changes:   changes,
 			Conflicts: s.Conflicts,
 			Fail:      s.GitFails,
@@ -97,7 +104,7 @@ func (w world) usecase() extract.UseCase {
 	}
 	return extract.UseCase{
 		Git:     w.git,
-		Config:  stored{w.store},
+		Config:  stored{Fake: w.store, isolates: w.seed.Isolates},
 		Answers: w.store,
 		Meta:    w.store,
 		Shield:  shell.Shield,
@@ -124,6 +131,7 @@ func (w world) usecase() extract.UseCase {
 
 type stored struct {
 	*storetest.Fake
+	isolates bool
 }
 
 func (s stored) Load() (project.Config, project.Global, error) {
@@ -134,7 +142,12 @@ func (s stored) Load() (project.Config, project.Global, error) {
 	return config, project.Global{}, nil
 }
 
-func (stored) LoadRun() (project.Run, error) { return project.Run{}, nil }
+func (s stored) LoadRun() (project.Run, error) {
+	if s.isolates {
+		return project.Run{EnvPorts: []project.EnvPortLink{{}}}, nil
+	}
+	return project.Run{}, nil
+}
 
 type locker struct{}
 

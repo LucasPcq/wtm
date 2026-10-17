@@ -1,0 +1,12 @@
+$ wtmx extract; echo EXIT=$?
+
+  Step 2/9 • Select files to extract
+
+  ✓ Source worktree: feat/form
+
+  Space to toggle, a to select all, / to filter, enter to confirm, esc to cancel.
+
+▌ [ ] mod README.md
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc back
+

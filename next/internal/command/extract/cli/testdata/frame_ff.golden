@@ -1,0 +1,19 @@
+
+  Step 7/10 • Source update
+
+  ✓ Source worktree: feat/login · <source>
+  ✓ Files: 1 file · --files
+  ✓ Target worktree: new worktree
+  ✓ Branch name: feat/split
+  ✓ Source branch: main · config
+  ✓ Isolation: isolated · default
+
+  The branch the new worktree starts from is behind origin — fast-forward it before creating?
+
+   Fast-forward to origin
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+▌› Keep it as-is
+
+   [ ] Always use this answer in this repo
+
+  ↑↓ navigate • tab always use • / filter • enter confirm • esc back

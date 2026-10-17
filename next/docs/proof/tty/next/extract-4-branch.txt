@@ -1,0 +1,14 @@
+$ wtmx extract; echo EXIT=$?
+
+  Step 4/10 • Branch name
+
+  ✓ Source worktree: feat/form
+  ✓ Files: 1 file
+  ✓ Target worktree: new worktree
+
+  Name for the new worktree branch
+
+›
+
+  enter confirm • esc back
+

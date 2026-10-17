@@ -155,3 +155,30 @@ func TestEachWayOutCancels(t *testing.T) {
 		assert.Equal(t, form.Cancelled, d.w.Ending(), name)
 	}
 }
+
+func TestTheWizardDrawsEachStepOfANewTarget(t *testing.T) {
+	d := open(t, wizardParams{App: newWorld(seed{Behind: true, Isolates: true}).usecase(), Request: extract.Request{Source: source, Files: []string{"old.txt"}}})
+
+	d.keys("enter")
+	d.looksLike("branch")
+
+	d.keys("feat/split", "enter")
+	d.looksLike("from")
+
+	d.keys("enter")
+	d.looksLike("isolation")
+
+	d.keys("enter")
+	d.looksLike("ff")
+
+	d.keys("enter")
+	d.looksLike("mode")
+}
+
+func TestTheWizardDrawsTheConflictStep(t *testing.T) {
+	conflicts := map[string]worktree.ConflictKind{"apps/api/a.txt": worktree.ConflictModified}
+	d := open(t, wizardParams{App: newWorld(seed{Conflicts: conflicts}).usecase(), Request: settled()})
+
+	d.keys("enter")
+	d.looksLike("on_conflict")
+}

@@ -28,6 +28,8 @@ The reference is the legacy `wtm create` of 0.30.1. Its output differs by design
   - The form under `--ask`: branches, then source, env strategy (the remembered answer ticked), isolation and the recap, then apply and the outcome. Next asks one step more (`If not exists`, shown settled) and draws its recap as the plan; legacy offers a "Use config default" row next has not.
   - One Ctrl+C during a hook: both exit 19, next saying `Cancelling — finishing on_create of feat/slow; Ctrl+C again to stop now`.
   - Two Ctrl+C: the run dies by SIGINT, exit 130 for both.
+  - The extract form (`extract-*`), on a change made in `feat/form`: source, files, a new target `feat/moved`, its source branch, isolation, mode and the recap, then apply and the outcome. Both skip the source update (main is not behind) and next shows the conflict question settled; legacy's target list is sorted, since it follows git's order, which varies between runs.
+  - Each screen is captured once it shows what it waits for and holds still. Run the three scripts in one go under `lockf -t 1800 /tmp/wtm-proof.lock`: the sandboxes and tmux sessions are fixed, so two runs at once spoil each other.
 - `form.gif`, `form-recap.png` and `apply-hooks.gif` are recorded from `form.tape` and `hooks.tape` in the next sandbox: the form through its recap and apply, and three branches whose hooks run, one failing.
 
 # Proof: `wtm extract` (legacy `flow/`) vs `wtm-next extract`
