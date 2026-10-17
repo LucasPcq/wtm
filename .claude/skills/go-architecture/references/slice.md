@@ -104,10 +104,10 @@ A command never imports another command (archlint refuses it). Two commands shar
 
 | What both need | Where | Example |
 | -- | -- | -- |
-| a pure rule or a vocabulary | `domain/…` | `worktree.Place` (where a branch lands), `worktree.SelectChanges`, `domain.Choice` |
-| a reading of the repository | a port method returning a domain value | `worktree.Snapshot` from the git port |
-| an orchestration with I/O | `service/<name>` (concrete, its own ports) | `provision.Service.Run`, `provision.Service.FastForward`, `operation.Service` |
-| presentation | `ui/…` | the wizard engine, the envelope writer, `output.FollowUpLine` |
+| a pure rule or a vocabulary | `domain/…` | `worktree.Place` (where a branch lands), `worktree.Repository` (the facts every command decides from: main path, config, run.toml, snapshot), `worktree.SelectChanges`, `domain.WorktreeLocks`, `domain.IsolationAnswer`, `domain.Choice` |
+| a reading of the repository | a port method returning a domain value, or a service reading through its ports | `worktree.Snapshot` from the git port, `provision.Observe` (config, snapshot, run.toml) |
+| an orchestration with I/O | `service/<name>` (concrete, its own ports) | `provision.Service.Run`, `provision.Service.FastForwardEach` (typed outcomes each command words as its warnings), `operation.Service` |
+| presentation | `ui/…` | `uicli.Run` (a command's run plumbing: streams, output format, quiet, failures, envelope), the wizard engine, `output.DryRun`, `output.FollowUpSteps` |
 
 Extract on the second use, not before; until then a slice keeps its own code. A shared piece speaks the domain's language; each command maps it onto its own codes and messages (`worktree.Place` returns a sealed `Placement`, create and extract each turn it into their refusals).
 
