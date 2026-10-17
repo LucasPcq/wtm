@@ -5,7 +5,7 @@ $ wtmx extract; echo EXIT=$?
   ✓ Source worktree: feat/form
   ✓ Files: 1 file
 
-  Where to move the selected files
+  Target worktree branch; created if it does not exist
 
 ▌› + Create a new worktree…
   ────────────────────────────────────────────────────────────────────────────────────────────────

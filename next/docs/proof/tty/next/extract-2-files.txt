@@ -4,7 +4,7 @@ $ wtmx extract; echo EXIT=$?
 
   ✓ Source worktree: feat/form
 
-  Space to toggle, a to select all, / to filter, enter to confirm, esc to go back.
+  Files to extract, or a directory to take everything below it
 
 ▌› [ ] README.md                                                                               mod
 
