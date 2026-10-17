@@ -8,7 +8,7 @@
 cmd/wtm-next/          the composition root: builds each adapter once (wire.go), opens the project on demand, registers each command's cobra command on the root
 internal/
   domain/              the contract every use case speaks: errors, warnings, events and their stream, outcomes, operations and their locks, the vocabulary of a question — pure, stdlib only
-    worktree/          branches and worktrees as git lists them: names, refs, where a branch stands against origin, where a branch asked for a new worktree lands, a checkout, meta.json, identity
+    worktree/          branches and worktrees as git lists them: names, refs, where a branch stands against origin, where a branch asked for a new worktree lands, a checkout, meta.json, identity, the stack of worktrees by the branch each was created from
     project/           what a use case reads of config.toml, run.toml (isolation included) and the global settings
     dotenv/            .env files parsed and rendered byte for byte
     env/               a worktree's environment: where its .env files come from, what wtm writes into them, what its jobs and hooks run with, its hook chain
@@ -23,6 +23,7 @@ internal/
     operation/         the operation every mutating use case goes through: its record, its locks, its plan under them and fingerprinted, its events
     operationtest/     the contract every mutating use case's Run passes (no lock nor event on a dry run, a stale plan refused before any event, events in order), for tests
     provision/         a new worktree made whole and a source fast-forwarded, shared by the commands that create one
+    repository/        the facts of the repository a command decides from: config, run.toml, snapshot
   adapter/             what the ports reach out to: git, statefile, store, config, shell, oplock, events, proxyport
     <name>test/        a stateful fake of an adapter, for tests
   ui/                  the presentation kit every command's cli shares, knowing no command
@@ -60,7 +61,7 @@ A use case or a service declares the interfaces it needs in its `port.go`; an ad
 1. `cmd/wtm-next/main.go → main`: `ui/output.System()` reads the process's streams, and `ui/cli.Main` runs the root with `command/create/cli.New(streams, openCreate)` registered on it; `ui/cli/root.go → Execute` maps the failure a command returns onto its exit code.
 2. `command/create/cli/command.go → createCommand.run`: the flags become a `create.Request`, `openCreate` (`cmd/wtm-next/project.go`) finds the repository and wires the use case (`cmd/wtm-next/wire.go → wire`), then `createCommand.create` runs the wizard when the user can see and answer it (stdin and stderr terminals, `TERM` not `dumb`, human output, no `--yes` nor `--expect-fingerprint`: `output.Streams.CanPrompt`, `form.go → runForm`), else `create.UseCase.Run` with its `domain.RunOptions`.
 3. `command/create/usecase.go → UseCase.Run`: `operation.Service.Begin` takes the operation's locks (`service/operation/operation.go`), `operation.PlanUnderLocks` plans under them, `operation.Fingerprint` fingerprints the plan, a dry run stops there, `Op.Expect` refuses a stale plan, then `Apply` runs between the started and finished events.
-4. `command/create/usecase.go → UseCase.Plan`: `Observe` reads the repository (`provision.Observe`: config, snapshot, run.toml, through the ports of `port.go`), `Resolve` (`questions.go`) settles the request on those facts, `Decide` (`rules.go`) turns them into the plan.
+4. `command/create/usecase.go → UseCase.Plan`: `Observe` reads the repository (`repository.Observe`: config, snapshot, run.toml, through the ports of `port.go`), `Resolve` (`questions.go`) settles the request on those facts, `Decide` (`rules.go`) turns them into the plan.
 5. `command/create/usecase.go → UseCase.Apply`: an optional fast-forward of the source (`provision.Service.FastForwardEach`, `service/provision/fastforward.go`, each outcome worded as create's own warning), then `provision.Service.Run` (`service/provision/provision.go`) per branch: the worktree, its env, its meta record, its hooks.
 6. `adapter/git/worktree.go → Repo.AddWorktree`: the port's implementation runs `git worktree add`.
 7. Back in `command/create/cli/command.go → createCommand.conclude`: `output.go` draws the outcome (or the dry run, or the v2 envelope with `--output json`) with the kit of `ui/output`.

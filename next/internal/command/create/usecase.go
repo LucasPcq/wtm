@@ -13,6 +13,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
 // ----------------------------------------------------------------------------
@@ -196,7 +197,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 
 // Observe reads what create decides from: the project's config, the repository's snapshot and what lies at the path each of branches would take. A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, branches []string) (Facts, error) {
-	repo, err := provision.Observe(ctx, provision.ObserveParams{Config: u.Config, Git: u.Git, MainPath: u.MainPath})
+	repo, err := repository.Observe(ctx, repository.ObserveParams{Config: u.Config, Git: u.Git, MainPath: u.MainPath})
 	if errors.Is(err, project.ErrConfigNotFound) {
 		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeConfigNotFound, Message: "no wtm config found — run `wtm init` first", Cause: err}
 	}

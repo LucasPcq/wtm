@@ -6,7 +6,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
-// Repository is what a command that creates a worktree reads before deciding: the path of the main checkout, the project's config and global settings, its run.toml, and the repository's snapshot.
+// Repository is what a command reads before deciding: the path of the main checkout, the project's config and global settings, its run.toml, and the repository's snapshot.
 type Repository struct {
 	MainPath string
 	Config   project.Config

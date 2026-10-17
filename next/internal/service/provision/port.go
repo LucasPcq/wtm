@@ -7,7 +7,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
-	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
@@ -38,17 +37,6 @@ type EnvFiles interface {
 	Read(path string) ([]dotenv.Line, error)
 	Copy(ctx context.Context, request env.CopyRequest) (env.Copied, error)
 	Edit(ctx context.Context, edit dotenv.Edit) (domain.Written, error)
-}
-
-// Config loads the project's config.toml with the global settings, and its run.toml; Load fails with project.ErrConfigNotFound when the repository has no wtm config.
-type Config interface {
-	Load() (project.Config, project.Global, error)
-	LoadRun() (project.Run, error)
-}
-
-// Snapshotter reads the repository's snapshot.
-type Snapshotter interface {
-	Snapshot(ctx context.Context) (worktree.Snapshot, error)
 }
 
 // Service provisions new worktrees and fast-forwards their sources for the

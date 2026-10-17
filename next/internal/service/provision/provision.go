@@ -1,4 +1,4 @@
-// Package provision makes a new worktree whole: added with its env and its record, then numbered, its ports settled and its hooks run; fast-forwards the source it starts from; and reads the repository a command creating one decides from.
+// Package provision makes a new worktree whole: added with its env and its record, then numbered, its ports settled and its hooks run; and fast-forwards the source it starts from.
 package provision
 
 import (
@@ -24,6 +24,19 @@ type Project struct {
 	Run      project.Run
 	RunErr   error // why run.toml could not be read; its ports are then left unsettled with a warning
 	Global   project.Global
+}
+
+// ProjectOf is what Run needs of the project, as repo holds it, with the path of wtm's state.
+func ProjectOf(repo worktree.Repository, stateDir string) Project {
+	return Project{
+		MainPath: repo.MainPath,
+		StateDir: stateDir,
+		EnvFiles: repo.Config.Env.Files,
+		OnCreate: repo.Config.OnCreate,
+		Run:      repo.Run,
+		RunErr:   repo.RunErr,
+		Global:   repo.Global,
+	}
 }
 
 // Worktree is the worktree Run adds: its branch, where it goes, what it checks

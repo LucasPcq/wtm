@@ -304,3 +304,24 @@ func TestACheckOutNeverDeletesTheBranchOnUndo(t *testing.T) {
 	assert.Equal(t, "unit.step_failed", outcome.Err.Code)
 	assert.Contains(t, gitStateNames(t, w), existing)
 }
+
+func TestTheProjectProvisionedIsTheOneObserved(t *testing.T) {
+	runErr := errors.New("bad run.toml")
+	repo := worktree.Repository{
+		MainPath: "/repo/main",
+		Config:   project.Config{Env: project.Env{Files: []project.EnvFile{{Target: ".env"}}}, OnCreate: []project.Hook{{Cmd: "make"}}},
+		Global:   project.Global{Proxy: project.Proxy{Port: 8080}},
+		Run:      project.Run{Isolation: project.Verbatim},
+		RunErr:   runErr,
+	}
+
+	assert.Equal(t, provision.Project{
+		MainPath: "/repo/main",
+		StateDir: "/state",
+		EnvFiles: []project.EnvFile{{Target: ".env"}},
+		OnCreate: []project.Hook{{Cmd: "make"}},
+		Run:      project.Run{Isolation: project.Verbatim},
+		RunErr:   runErr,
+		Global:   project.Global{Proxy: project.Proxy{Port: 8080}},
+	}, provision.ProjectOf(repo, "/state"))
+}

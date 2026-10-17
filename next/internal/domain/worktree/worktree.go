@@ -1,4 +1,4 @@
-// Package worktree is branches and worktrees as git lists them: names, refs, where a branch stands against origin, a worktree's checkout, its meta.json record and its identity.
+// Package worktree is branches and worktrees as git lists them: names, refs, where a branch stands against origin, a worktree's checkout, its meta.json record, its identity, and the stack of worktrees by the branch each was created from.
 package worktree
 
 import (
