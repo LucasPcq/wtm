@@ -200,13 +200,13 @@ func (q Questions) Form() domain.Form {
 			Options:   q.Source.Options,
 		},
 		domain.MultiSelectField{
-			FieldSpec: domain.FieldSpec{Path: "files", Flag: "--files", Label: "Files", Help: q.filesHelp(), Usage: "Files to extract, or a directory to take everything below it (skips interactive selection)"},
+			FieldSpec: domain.FieldSpec{Path: "files", Flag: "--files", Label: "Files", Help: q.filesHelp()},
 			Picked:    q.Files.Given,
 			Options:   q.fileOptions(),
 			Empty:     "Select at least one file",
 		},
 		domain.SelectField{
-			FieldSpec: domain.FieldSpec{Path: "to", Flag: "--to", Label: "Target worktree", Help: "Where to move the selected files", Usage: "Target worktree branch; created if it does not exist"},
+			FieldSpec: domain.FieldSpec{Path: "to", Flag: "--to", Label: "Target worktree", Help: "Target worktree branch; created if it does not exist"},
 			Value:     to,
 			Options:   append([]domain.Option{{Label: "+ Create a new worktree…", Short: "new worktree"}}, q.To.Options...),
 		},
@@ -215,7 +215,7 @@ func (q Questions) Form() domain.Form {
 			Value:     to,
 		},
 		domain.SelectField{
-			FieldSpec:   domain.FieldSpec{Path: "from", Flag: "--from", Label: "Source branch", Help: "Branch to base the new worktree on", Usage: "Parent branch when creating the target worktree", Origin: q.From.Origin, Skip: q.From.Skip},
+			FieldSpec:   domain.FieldSpec{Path: "from", Flag: "--from", Label: "Source branch", Help: "Parent branch when creating the target worktree", Origin: q.From.Origin, Skip: q.From.Skip},
 			Value:       q.From.Value,
 			Options:     q.From.Options,
 			Pinned:      q.From.Pinned,
@@ -234,8 +234,7 @@ func (q Questions) Form() domain.Form {
 				Path:   "fast_forward",
 				Flag:   "--ff",
 				Label:  "Source update",
-				Help:   "The branch the new worktree starts from is behind origin — fast-forward it before creating?",
-				Usage:  "Fast-forward the parent branch to origin before creating the target (answers the wizard's question; skipped when it has diverged)",
+				Help:   "Fast-forward the parent branch to origin before creating the target; skipped when it has diverged",
 				Origin: q.FastForward.Origin,
 				Skip:   q.FastForward.Skip,
 			},
@@ -246,14 +245,14 @@ func (q Questions) Form() domain.Form {
 			Remember:     q.remembers("fast_forward"),
 		},
 		domain.ConfirmField{
-			FieldSpec: domain.FieldSpec{Path: "keep", Flag: "--keep", Label: "Mode", Help: "Move removes the files from the source; copy keeps them.", Usage: "Copy instead of move (keep the changes in the source)", Origin: q.Keep.Origin},
+			FieldSpec: domain.FieldSpec{Path: "keep", Flag: "--keep", Label: "Mode", Help: "Copy instead of move (keep the changes in the source)", Origin: q.Keep.Origin},
 			Value:     q.Keep.Value,
 			Yes:       domain.Option{Value: "true", Label: "Copy — keep the files in " + source, Short: "copy"},
 			No:        domain.Option{Value: "false", Label: "Move — remove the files from " + source, Short: "move"},
 			NoFirst:   true,
 		},
 		domain.SelectField{
-			FieldSpec: domain.FieldSpec{Path: "on_conflict", Flag: "--on-conflict", Label: "On conflict", Help: q.conflictHelp(), Usage: "On conflict: abort (default) or resolve (write conflict markers in the target)", Origin: q.OnConflict.Origin, Skip: q.OnConflict.Skip},
+			FieldSpec: domain.FieldSpec{Path: "on_conflict", Flag: "--on-conflict", Label: "On conflict", Help: q.conflictHelp(), Origin: q.OnConflict.Origin, Skip: q.OnConflict.Skip},
 			Value:     string(q.OnConflict.Value),
 			Options: []domain.Option{
 				{Value: string(OnConflictAbort), Label: "Abort — leave both worktrees untouched"},
@@ -268,7 +267,7 @@ func (q Questions) filesHelp() string {
 		return "No changes to extract in " + q.Source.Given + " — press esc to pick another worktree."
 	}
 
-	return "Space to toggle, a to select all, / to filter, enter to confirm, esc to go back."
+	return "Files to extract, or a directory to take everything below it"
 }
 
 func (q Questions) fileOptions() []domain.Option {
@@ -289,11 +288,11 @@ func (q Questions) branchSkip() string {
 	return ""
 }
 
-// conflictHelp names the files that conflict with the target and what each answer leaves behind; it is empty while nothing conflicts.
+// conflictHelp names the files that conflict with the target and what each answer leaves behind; while nothing conflicts, it says what each answer does.
 func (q Questions) conflictHelp() string {
 	conflicts := q.OnConflict.Conflicts
 	if len(conflicts) == 0 {
-		return ""
+		return "On conflict: abort (default) or resolve (write conflict markers in the target)"
 	}
 
 	files := make([]string, 0, len(conflicts))

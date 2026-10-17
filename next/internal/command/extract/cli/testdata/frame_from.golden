@@ -6,7 +6,7 @@
   ✓ Target worktree: new worktree
   ✓ Branch name: feat/split
 
-  Branch to base the new worktree on
+  Parent branch when creating the target worktree
 
 ▌› main                                                                                   1 behind
    feat/login

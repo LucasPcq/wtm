@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"cmp"
 	"encoding/json"
 	"strconv"
 	"strings"
@@ -80,8 +79,7 @@ type FieldSpec struct {
 	Path   string `json:"path"`             // the request field it answers, as a field error names it
 	Flag   string `json:"flag"`             // the argument or flag that sets it: <branches>, --from
 	Label  string `json:"label"`            // its name in a wizard's breadcrumb, trail and problems
-	Help   string `json:"help"`             // what its answer decides, as a wizard describes it
-	Usage  string `json:"usage,omitempty"`  // the usage of its flag, when it is not Help
+	Help   string `json:"help"`             // what its answer decides: a wizard's description and its flag's usage
 	Origin Origin `json:"origin,omitempty"` // where its answer came from, empty when the field does not say
 	Skip   string `json:"skip,omitempty"`   // why it is not asked, empty when it is
 }
@@ -156,13 +154,13 @@ func (TextField) field()        {}
 func (TextListField) field()    {}
 func (ConfirmField) field()     {}
 
-// Flags spells each field path as the argument or flag that sets it, with the usage of that flag (its Usage, else its Help); the first field answering a path gives both. A form with a rememberable field also has --remember.
+// Flags spells each field path as the argument or flag that sets it, with the usage of that flag, its Help; the first field answering a path gives both. A form with a rememberable field also has --remember.
 func (f Form) Flags() (flags, usages map[string]string) {
 	flags, usages = map[string]string{}, map[string]string{}
 	for _, field := range f.Fields {
 		spec := field.Spec()
 		if _, seen := flags[spec.Path]; !seen {
-			flags[spec.Path], usages[spec.Path] = spec.Flag, cmp.Or(spec.Usage, spec.Help)
+			flags[spec.Path], usages[spec.Path] = spec.Flag, spec.Help
 		}
 	}
 

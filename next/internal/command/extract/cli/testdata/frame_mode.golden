@@ -9,7 +9,7 @@
   ✓ Isolation: isolated · default
   ✓ Source update: no · default
 
-  Move removes the files from the source; copy keeps them.
+  Copy instead of move (keep the changes in the source)
 
 ▌› Move — remove the files from feat/login
    Copy — keep the files in feat/login
