@@ -4,13 +4,13 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
-	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestADryRunWithNothingToAskDrawsNothing(t *testing.T) {
@@ -26,7 +26,7 @@ func TestADryRunWithNothingToAskDrawsNothing(t *testing.T) {
 }
 
 func TestTheFormAppliesThePlanItPreviewedAndPreviewsAgainWhenItTurnedStale(t *testing.T) {
-	stale := &domain.Error{Kind: domain.KindPrecondition, Code: operation.CodePlanStale}
+	stale := &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodePlanStale}
 	app := &previewing{useCase: newApp(seed{}), errs: []error{stale, nil}}
 	streams, _, _, _ := output.Test()
 	req := create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}

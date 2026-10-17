@@ -13,15 +13,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/oplock"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
-	"github.com/LucasPcq/wtm/next/internal/service/operation"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestEachBranchGetsItsWorktreeEnvAndRecord(t *testing.T) {
@@ -312,7 +312,7 @@ func TestADryRunTakesNoLockWritesNothingAndPublishesNothing(t *testing.T) {
 	defer held.Release()
 	report := &recorder{}
 
-	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{DryRun: true, Report: report.add})
+	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{DryRun: true, Report: report.add})
 
 	require.NoError(t, err)
 	assert.Equal(t, "op-1", outcome.Op)
@@ -329,7 +329,7 @@ func TestAWorktreeIsCreatedUnderItsLocksAndAnnouncedFromStartToFinish(t *testing
 	w := newWorld(t, seed{Run: jobsToml})
 	report := &recorder{}
 
-	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{Surface: "tui", Report: report.add})
+	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{Surface: "tui", Report: report.add})
 
 	require.NoError(t, err)
 	require.NotNil(t, outcome.Result)
@@ -349,7 +349,7 @@ func TestAWorktreeIsCreatedUnderItsLocksAndAnnouncedFromStartToFinish(t *testing
 func TestARunWhoseBranchFailsFinishesNotOkWithItsCode(t *testing.T) {
 	w := newWorld(t, seed{Config: withHook("exit 3")})
 
-	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{Surface: "cli", Report: (&recorder{}).add})
+	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{Surface: "cli", Report: (&recorder{}).add})
 
 	require.NoError(t, err)
 	assert.Equal(t, domain.StatusFailed, outcome.Result.Items[0].Status)
@@ -371,7 +371,7 @@ func TestARepositoryHeldByAnotherProcessRefusesTheRunAndChangesNothing(t *testin
 	require.NoError(t, err)
 	require.Equal(t, readyLine+"\n", line)
 
-	_, refused := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{Report: (&recorder{}).add})
+	_, refused := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{Report: (&recorder{}).add})
 
 	failure := failureOf(t, refused)
 	assert.Equal(t, domain.KindConflict, failure.Kind)
@@ -383,7 +383,7 @@ func TestARepositoryHeldByAnotherProcessRefusesTheRunAndChangesNothing(t *testin
 
 	require.NoError(t, child.Process.Kill())
 	_ = child.Wait()
-	_, err = w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{Report: (&recorder{}).add})
+	_, err = w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{Report: (&recorder{}).add})
 	assert.NoError(t, err, "a dead process still held the repository")
 }
 
@@ -402,15 +402,15 @@ func TestHelperProcess(t *testing.T) {
 func TestAPreviewAppliesWhileItsPlanHoldsAndIsRefusedOnceItChanged(t *testing.T) {
 	w := newWorld(t, seed{})
 	a := w.usecase
-	preview, err := a.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{DryRun: true, Report: (&recorder{}).add})
+	preview, err := a.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{DryRun: true, Report: (&recorder{}).add})
 	require.NoError(t, err)
 
 	writeFile(t, filepath.Join(w.stateDir, "config.toml"), strings.Replace(projectToml, `strategy = "main"`, `strategy = "example"`, 1))
-	stale, staleErr := a.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
+	stale, staleErr := a.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
 
 	failure := failureOf(t, staleErr)
 	assert.Equal(t, domain.KindPrecondition, failure.Kind)
-	assert.Equal(t, operation.CodePlanStale, failure.Code)
+	assert.Equal(t, domain.CodePlanStale, failure.Code)
 	assert.Equal(t, domain.Params{"expected": preview.Fingerprint, "found": stale.Fingerprint}, failure.Params)
 	assert.NotEqual(t, preview.Fingerprint, stale.Fingerprint)
 	assert.NoDirExists(t, w.path(branchName))
@@ -420,11 +420,11 @@ func TestAPreviewAppliesWhileItsPlanHoldsAndIsRefusedOnceItChanged(t *testing.T)
 func TestAPreviewStillHoldsWhenAnUnrelatedBranchMoved(t *testing.T) {
 	w := newWorld(t, seed{})
 	a := w.usecase
-	preview, err := a.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{DryRun: true, Report: (&recorder{}).add})
+	preview, err := a.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{DryRun: true, Report: (&recorder{}).add})
 	require.NoError(t, err)
 	gittest.CreateBranch(t, w.main, "unrelated")
 
-	outcome, err := a.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
+	outcome, err := a.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
 
 	require.NoError(t, err)
 	assert.Equal(t, domain.StatusDone, outcome.Result.Items[0].Status)
@@ -437,10 +437,10 @@ func TestALockTheDefaultsNameIsTakenThenTheFactsObservedAgain(t *testing.T) {
 	held, err := oplock.Locks{StateDir: w.stateDir}.Take(domain.Operation{ID: "other", Command: "sync", PID: 7, Locks: []domain.Lock{{Scope: domain.ScopeWorktree, Name: "main", Mode: domain.LockExclusive}}})
 	require.NoError(t, err)
 
-	_, refused := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{Report: (&recorder{}).add})
+	_, refused := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{Report: (&recorder{}).add})
 	held.Release()
 	observed = 0
-	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{Report: (&recorder{}).add})
+	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{Report: (&recorder{}).add})
 
 	assert.Equal(t, "wt:main", failureOf(t, refused).Params["key"])
 	require.NoError(t, err)
@@ -452,7 +452,7 @@ func TestARunWithoutItsLocksSaysSoOnce(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.usecase.Operations.Locker = unprotected{}
 
-	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{Report: (&recorder{}).add})
+	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{Report: (&recorder{}).add})
 
 	require.NoError(t, err)
 	assert.Equal(t, []domain.Warning{{Code: "locks.unavailable", Message: "ran without operation locks"}}, outcome.Warnings)
@@ -461,7 +461,7 @@ func TestARunWithoutItsLocksSaysSoOnce(t *testing.T) {
 func TestTheWarningsOfThePlanComeWithThoseOfTheRun(t *testing.T) {
 	w := newWorld(t, seed{})
 
-	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}, From: "feature", EnvFrom: project.EnvParent}, operation.Options{Report: (&recorder{}).add})
+	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}, From: "feature", EnvFrom: project.EnvParent}, domain.RunOptions{Report: (&recorder{}).add})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"create.env_parent_fallback"}, codes(outcome.Warnings))
@@ -481,7 +481,7 @@ func TestTheQuestionsAreAskedOfTheBranchesOfTheRequest(t *testing.T) {
 func TestAnInvalidRequestIsRefusedBeforeAnythingIsLockedOrWritten(t *testing.T) {
 	w := newWorld(t, seed{})
 
-	_, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{"bad..name"}}, operation.Options{Report: (&recorder{}).add})
+	_, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{"bad..name"}}, domain.RunOptions{Report: (&recorder{}).add})
 
 	assert.Equal(t, domain.KindInvalid, failureOf(t, err).Kind)
 	assert.NoFileExists(t, filepath.Join(w.stateDir, "locks", "ops", "op-1.json"))
@@ -493,7 +493,7 @@ func TestARunWithoutLocksThatRemembersSaysSoOnce(t *testing.T) {
 	w.usecase.Operations.Locker = unprotected{}
 	w.usecase.Answers = answering{written: domain.Written{Changed: true, Unlocked: true}}
 
-	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}, Remember: []string{"env_from"}}, operation.Options{Report: (&recorder{}).add})
+	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}, Remember: []string{"env_from"}}, domain.RunOptions{Report: (&recorder{}).add})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"locks.unavailable"}, codes(outcome.Warnings))
@@ -502,7 +502,7 @@ func TestARunWithoutLocksThatRemembersSaysSoOnce(t *testing.T) {
 func TestARunWithoutReportStillRuns(t *testing.T) {
 	w := newWorld(t, seed{})
 
-	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{})
+	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{})
 
 	require.NoError(t, err)
 	assert.Equal(t, domain.StatusDone, outcome.Result.Items[0].Status)
@@ -519,14 +519,14 @@ func TestAnOutcomeFailsOnItsFirstFailedItemAndAPreviewNever(t *testing.T) {
 func TestAPreviewIsStaleOnceTheIsolationItWouldRecordChanged(t *testing.T) {
 	w := newWorld(t, seed{Run: "isolation = \"verbatim\"\n"})
 	a := w.usecase
-	preview, err := a.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{DryRun: true})
+	preview, err := a.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{DryRun: true})
 	require.NoError(t, err)
 	require.Empty(t, preview.Plan.Isolation)
 
 	writeFile(t, filepath.Join(w.stateDir, "run.toml"), "isolation = \"isolated\"\n")
-	_, staleErr := a.Run(t.Context(), create.Request{Branches: []string{branchName}}, operation.Options{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
+	_, staleErr := a.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
 
-	assert.Equal(t, operation.CodePlanStale, failureOf(t, staleErr).Code)
+	assert.Equal(t, domain.CodePlanStale, failureOf(t, staleErr).Code)
 	assert.NoDirExists(t, w.path(branchName))
 }
 
@@ -552,13 +552,13 @@ func TestAChangeToWhatTheApplyRunsMakesThePreviewStale(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			w := newWorld(t, seed{Run: jobsToml})
 			req := create.Request{Branches: []string{branchName}}
-			preview, err := w.usecase.Run(t.Context(), req, operation.Options{DryRun: true, Report: (&recorder{}).add})
+			preview, err := w.usecase.Run(t.Context(), req, domain.RunOptions{DryRun: true, Report: (&recorder{}).add})
 			require.NoError(t, err)
 			change(w)
 
-			_, err = w.usecase.Run(t.Context(), req, operation.Options{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
+			_, err = w.usecase.Run(t.Context(), req, domain.RunOptions{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
 
-			assert.Equal(t, operation.CodePlanStale, failureOf(t, err).Code)
+			assert.Equal(t, domain.CodePlanStale, failureOf(t, err).Code)
 			assert.NoDirExists(t, w.path(branchName))
 		})
 	}

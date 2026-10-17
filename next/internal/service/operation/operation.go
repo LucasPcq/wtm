@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"maps"
 	"os"
 	"slices"
@@ -16,10 +15,6 @@ import (
 )
 
 const (
-	// CodePlanStale is the code of the refusal Op.Expect returns when the plan
-	// no longer matches the fingerprint of its preview.
-	CodePlanStale = "plan.stale"
-
 	// fingerprintBytes is how many bytes of the plan's SHA-256 a fingerprint keeps.
 	fingerprintBytes = 12
 )
@@ -34,21 +29,13 @@ type Service struct {
 	CorrelationID string
 }
 
-// Options are how a surface runs an operation.
-type Options struct {
-	DryRun            bool          // plan without taking locks, stop after the fingerprint
-	ExpectFingerprint string        // refuse to apply a plan whose fingerprint differs; empty accepts any
-	Surface           string        // the surface that started the operation (cli, ui…), recorded in its events
-	Report            domain.Report // receives each event as it is published; may be nil
-}
-
 // An Op is one running operation: its record, the locks it holds and where its
 // events go. It is used by one goroutine, from Begin to End.
 type Op struct {
 	ID      string
 	record  domain.Operation
 	service Service
-	options Options
+	options domain.RunOptions
 	hold    Hold
 	report  domain.Report
 }
@@ -57,7 +44,7 @@ type Op struct {
 // run, which takes none. When another operation holds one of the locks it
 // returns the Op, whose ID still names the attempt, with the Locker's error.
 // The caller ends the returned Op with End.
-func (s Service) Begin(command string, locks []domain.Lock, opts Options) (*Op, error) {
+func (s Service) Begin(command string, locks []domain.Lock, opts domain.RunOptions) (*Op, error) {
 	op := &Op{
 		record: domain.Operation{
 			ID:            s.NewOpID(),
@@ -123,7 +110,7 @@ func Fingerprint(v any) (string, error) {
 }
 
 // Expect refuses a plan whose fingerprint differs from the one the options
-// expect, with a precondition error coded CodePlanStale. With no expected
+// expect, with a precondition error coded domain.CodePlanStale. With no expected
 // fingerprint it accepts any plan.
 func (o *Op) Expect(fingerprint string) error {
 	expected := o.options.ExpectFingerprint
@@ -133,16 +120,10 @@ func (o *Op) Expect(fingerprint string) error {
 
 	return &domain.Error{
 		Kind:    domain.KindPrecondition,
-		Code:    CodePlanStale,
+		Code:    domain.CodePlanStale,
 		Message: "the facts changed since the preview",
 		Params:  domain.Params{"expected": expected, "found": fingerprint},
 	}
-}
-
-// Stale reports whether err is the refusal of a plan the facts changed under.
-func Stale(err error) bool {
-	found, ok := errors.AsType[*domain.Error](err)
-	return ok && found.Code == CodePlanStale
 }
 
 // Started publishes the operation's started event and returns the Report that

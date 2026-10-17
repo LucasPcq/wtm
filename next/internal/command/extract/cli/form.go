@@ -6,7 +6,6 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
@@ -14,7 +13,7 @@ import (
 // useCase is what the wizard calls of extract's use case, so a test can stand in for it.
 type useCase interface {
 	Questions(ctx context.Context, req extract.Request) (extract.Questions, error)
-	Run(ctx context.Context, req extract.Request, opts operation.Options) (extract.Outcome, error)
+	Run(ctx context.Context, req extract.Request, opts domain.RunOptions) (extract.Outcome, error)
 }
 
 type formParams struct {

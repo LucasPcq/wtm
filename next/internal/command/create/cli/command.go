@@ -10,7 +10,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
-	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
@@ -107,7 +106,7 @@ func (c *createCommand) run(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	project, err := c.open(ctx)
 	if err != nil {
-		return c.fail(cmd, domain.AsError(domain.AsErrorParams{Err: err}), req)
+		return c.io.Refuse(domain.AsError(domain.AsErrorParams{Err: err}), createLine{Command: cmd.CommandPath(), Request: req}.String())
 	}
 
 	progress := c.io.Progress(ctx)
@@ -125,7 +124,7 @@ func (c *createCommand) create(cmd *cobra.Command, useCase create.UseCase, req c
 		return runForm(ctx, formParams{App: useCase, Request: req, DryRun: c.dryRun, Report: report, In: c.io.Streams.In, Out: c.io.Streams.Err})
 	}
 
-	outcome, err := useCase.Run(ctx, req, operation.Options{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, Report: report})
+	outcome, err := useCase.Run(ctx, req, domain.RunOptions{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, Report: report})
 	return ran{Outcome: outcome, Request: req}, err
 }
 
@@ -173,7 +172,7 @@ func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
 	line := createLine{Command: cmd.CommandPath(), Request: done.Request}
 	switch {
 	case done.Err != nil:
-		return c.fail(cmd, done.Err, done.Request)
+		return c.io.Refuse(done.Err, line.String())
 	case done.Outcome.Result == nil:
 		apply := line.String() + " --expect-fingerprint " + done.Outcome.Fingerprint
 		output.Frame(stdout, func(w io.Writer) {
@@ -188,16 +187,6 @@ func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
 	})
 
 	return c.io.Failed(cmp.Or(done.Err, done.Outcome.Failure()))
-}
-
-// fail prints a refusal; a stale plan is followed by the line that previews it again.
-func (c *createCommand) fail(cmd *cobra.Command, failure *domain.Error, req create.Request) error {
-	var next []output.NextStep
-	if failure.Code == operation.CodePlanStale {
-		next = []output.NextStep{{Command: createLine{Command: cmd.CommandPath(), Request: req}.String() + " --dry-run", Note: output.ReplanNote}}
-	}
-
-	return c.io.FailWith(failure, next)
 }
 
 // itemFollowUps are the commands the failed branches suggest, to repair what they left behind.

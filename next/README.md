@@ -21,6 +21,7 @@ internal/
     cli/               its driving adapter: the cobra command, its wizard, its human output and its JSON
   service/             what the use cases call
     operation/         the operation every mutating use case goes through: its record, its locks, its plan under them and fingerprinted, its events
+    operationtest/     the contract every mutating use case's Run passes (no lock nor event on a dry run, a stale plan refused before any event, events in order), for tests
     provision/         a new worktree made whole and a source fast-forwarded, shared by the commands that create one
   adapter/             what the ports reach out to: git, statefile, store, config, shell, oplock, events, proxyport
     <name>test/        a stateful fake of an adapter, for tests
@@ -42,7 +43,8 @@ A use case reads in one place. `command/<name>/usecase.go` tells the whole reque
 | `domain`, `domain/*` | stdlib, `domain/*` |
 | `service/<name>` | `domain/*`, stdlib — never another service, `command/*`, `adapter/*`, `ui/*` |
 | `command/<name>` | `domain/*`, `service/*`, stdlib — never another command, its own `cli`, `adapter/*`, `ui/*` |
-| `command/<name>/cli` | `command/<name>`, `service/operation`, `domain/*`, `ui/*`, stdlib, third party — never another command nor its `cli`, `adapter/*`, another service |
+| `service/<name>test` | what `service/<name>` may, third party, and `service/<name>`; imported from a `_test.go` only |
+| `command/<name>/cli` | `command/<name>`, `domain/*`, `ui/*`, stdlib, third party — never another command nor its `cli`, `service/*`, `adapter/*` |
 | `adapter/<name>` | `domain/*`, `adapter/statefile`, `adapter/shell` (the one way to start a child), stdlib, third party — never `service/*`, `command/*`, `ui/*`, another adapter |
 | `adapter/<name>test` | what `adapter/<name>` may, and `adapter/<name>`; imported from a `_test.go` only |
 | `ui/*` | `domain/*`, `ui/*`, stdlib, third party — never `command/*`, `service/*`, `adapter/*` |
@@ -56,7 +58,7 @@ A use case or a service declares the interfaces it needs in its `port.go`; an ad
 `wtm-next create feat/x --from main`, hop by hop:
 
 1. `cmd/wtm-next/main.go → main`: `ui/output.System()` reads the process's streams, and `ui/cli.Main` runs the root with `command/create/cli.New(streams, openCreate)` registered on it; `ui/cli/root.go → Execute` maps the failure a command returns onto its exit code.
-2. `command/create/cli/command.go → createCommand.run`: the flags become a `create.Request`, `openCreate` (`cmd/wtm-next/project.go`) finds the repository and wires the use case (`cmd/wtm-next/wire.go → wire`), then `createCommand.create` runs the wizard when the user can see and answer it (stdin and stderr terminals, `TERM` not `dumb`, human output, no `--yes` nor `--expect-fingerprint`: `output.Streams.CanPrompt`, `form.go → runForm`), else `create.UseCase.Run` with its `operation.Options`.
+2. `command/create/cli/command.go → createCommand.run`: the flags become a `create.Request`, `openCreate` (`cmd/wtm-next/project.go`) finds the repository and wires the use case (`cmd/wtm-next/wire.go → wire`), then `createCommand.create` runs the wizard when the user can see and answer it (stdin and stderr terminals, `TERM` not `dumb`, human output, no `--yes` nor `--expect-fingerprint`: `output.Streams.CanPrompt`, `form.go → runForm`), else `create.UseCase.Run` with its `domain.RunOptions`.
 3. `command/create/usecase.go → UseCase.Run`: `operation.Service.Begin` takes the operation's locks (`service/operation/operation.go`), `operation.PlanUnderLocks` plans under them, `operation.Fingerprint` fingerprints the plan, a dry run stops there, `Op.Expect` refuses a stale plan, then `Apply` runs between the started and finished events.
 4. `command/create/usecase.go → UseCase.Plan`: `Observe` reads the repository (`provision.Observe`: config, snapshot, run.toml, through the ports of `port.go`), `Resolve` (`questions.go`) settles the request on those facts, `Decide` (`rules.go`) turns them into the plan.
 5. `command/create/usecase.go → UseCase.Apply`: an optional fast-forward of the source (`provision.Service.FastForwardEach`, `service/provision/fastforward.go`, each outcome worded as create's own warning), then `provision.Service.Run` (`service/provision/provision.go`) per branch: the worktree, its env, its meta record, its hooks.

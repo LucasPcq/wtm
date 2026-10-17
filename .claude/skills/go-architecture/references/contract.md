@@ -15,7 +15,7 @@ What every mutating command of `next/` promises its callers — people at a term
 
 ## Inputs: request and options
 
-- A command's input is its `Request` (the command's own fields, JSON tags in snake_case) plus `operation.Options` (`DryRun`, `ExpectFingerprint`, `Surface`, `Report`), the same for every command.
+- A command's input is its `Request` (the command's own fields, JSON tags in snake_case) plus `domain.RunOptions` (`DryRun`, `ExpectFingerprint`, `Surface`, `Report`), the same for every command.
 - The subject is positional (`create [branch…]`, `extract [source]`); a worktree that is not the subject is a flag named after its role (`--to`, `--from`).
 - A flag whose absence means something (`--ff`, `--keep`) becomes a pointer in the request only when it was given.
 - Every field error names its path; the CLI turns the path into its flag (`flag.go`) so the message says `--files is required`, never `files is required`.

@@ -9,7 +9,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
-	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
@@ -114,7 +113,7 @@ func (c *extractCommand) run(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	project, err := c.open(ctx)
 	if err != nil {
-		return c.fail(cmd, domain.AsError(domain.AsErrorParams{Err: err}), req)
+		return c.io.Refuse(domain.AsError(domain.AsErrorParams{Err: err}), extractLine{Command: cmd.CommandPath(), Request: req}.String())
 	}
 
 	progress := c.io.Progress(ctx)
@@ -132,7 +131,7 @@ func (c *extractCommand) extract(cmd *cobra.Command, useCase extract.UseCase, re
 		return runForm(ctx, formParams{App: useCase, Request: req, DryRun: c.dryRun, Report: report, In: c.io.Streams.In, Out: c.io.Streams.Err})
 	}
 
-	outcome, err := useCase.Run(ctx, req, operation.Options{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, Report: report})
+	outcome, err := useCase.Run(ctx, req, domain.RunOptions{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, Report: report})
 	return ran{Outcome: outcome, Request: req}, err
 }
 
@@ -182,14 +181,15 @@ func (c *extractCommand) conclude(cmd *cobra.Command, done concluded) error {
 
 	stdout, _ := c.io.Writers()
 	outcome := done.Outcome
+	line := extractLine{Command: cmd.CommandPath(), Request: done.Request}
 	switch {
 	case done.Err != nil:
-		return c.fail(cmd, done.Err, done.Request)
+		return c.io.Refuse(done.Err, line.String())
 	case outcome.Result == nil && outcome.Plan.Nothing():
 		output.Frame(stdout, func(w io.Writer) { drawNothing(w, outcome.Plan) })
 		return nil
 	case outcome.Result == nil:
-		apply := extractLine{Command: cmd.CommandPath(), Request: done.Request}.String() + " --expect-fingerprint " + outcome.Fingerprint
+		apply := line.String() + " --expect-fingerprint " + outcome.Fingerprint
 		output.Frame(stdout, func(w io.Writer) {
 			output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(outcome.Plan), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: apply})
 		})
@@ -198,14 +198,4 @@ func (c *extractCommand) conclude(cmd *cobra.Command, done concluded) error {
 
 	output.Frame(stdout, func(w io.Writer) { drawOutcome(w, outcome, done.Cwd) })
 	return c.io.Failed(outcome.Failure())
-}
-
-// fail prints a refusal; a stale plan is followed by the line that previews it again.
-func (c *extractCommand) fail(cmd *cobra.Command, failure *domain.Error, req extract.Request) error {
-	var next []output.NextStep
-	if failure.Code == operation.CodePlanStale {
-		next = []output.NextStep{{Command: extractLine{Command: cmd.CommandPath(), Request: req}.String() + " --dry-run", Note: output.ReplanNote}}
-	}
-
-	return c.io.FailWith(failure, next)
 }

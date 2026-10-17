@@ -7,15 +7,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/oplock"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
-	"github.com/LucasPcq/wtm/next/internal/service/operation"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestTheSelectedChangesMoveToAnExistingWorktree(t *testing.T) {
@@ -42,7 +42,7 @@ func TestANewTargetIsProvisionedUnderItsLocksThenReceivesTheChanges(t *testing.T
 	w.change(t, source, "a.txt", "a\n")
 	report := &recorder{}
 
-	outcome, err := w.usecase.Run(t.Context(), extract.Request{Source: source, Files: []string{"a.txt"}, To: split}, operation.Options{Surface: "cli", Report: report.add})
+	outcome, err := w.usecase.Run(t.Context(), extract.Request{Source: source, Files: []string{"a.txt"}, To: split}, domain.RunOptions{Surface: "cli", Report: report.add})
 
 	require.NoError(t, err)
 	require.NotNil(t, outcome.Result)
@@ -70,7 +70,7 @@ func TestATargetHeldByAnotherOperationRefusesTheRunAndChangesNothing(t *testing.
 	require.NoError(t, err)
 	defer held.Release()
 
-	_, err = w.usecase.Run(t.Context(), extract.Request{Source: source, Files: []string{"a.txt"}, To: split}, operation.Options{Report: (&recorder{}).add})
+	_, err = w.usecase.Run(t.Context(), extract.Request{Source: source, Files: []string{"a.txt"}, To: split}, domain.RunOptions{Report: (&recorder{}).add})
 
 	require.Error(t, err)
 	assert.NoDirExists(t, w.path(split))
@@ -113,7 +113,7 @@ func TestAConflictUnderAbortIsRefusedAtPlanTimeAndNothingIsCreatedOrMoved(t *tes
 	gittest.Git(t, w.main, "commit", "-q", "-m", "a on main")
 	w.change(t, source, "a.txt", "source\n")
 
-	_, err := w.usecase.Run(t.Context(), extract.Request{Source: source, Files: []string{"a.txt"}, To: split}, operation.Options{Report: (&recorder{}).add})
+	_, err := w.usecase.Run(t.Context(), extract.Request{Source: source, Files: []string{"a.txt"}, To: split}, domain.RunOptions{Report: (&recorder{}).add})
 
 	failure := failureOf(t, err)
 	assert.Equal(t, domain.KindConflict, failure.Kind)
@@ -127,7 +127,7 @@ func TestAConflictUnderAbortIsRefusedAtPlanTimeAndNothingIsCreatedOrMoved(t *tes
 func TestASourceWithNothingToExtractIsAPlanWithNoFilesAndNoRun(t *testing.T) {
 	w := newWorld(t, seed{})
 
-	outcome, err := w.usecase.Run(t.Context(), extract.Request{Source: source}, operation.Options{Report: (&recorder{}).add})
+	outcome, err := w.usecase.Run(t.Context(), extract.Request{Source: source}, domain.RunOptions{Report: (&recorder{}).add})
 
 	require.NoError(t, err)
 	assert.True(t, outcome.Plan.Nothing())
@@ -140,7 +140,7 @@ func TestADryRunMovesNothingAndFingerprintsThePlan(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.change(t, source, "a.txt", "a\n")
 
-	outcome, err := w.usecase.Run(t.Context(), extract.Request{Source: source, Files: []string{"a.txt"}, To: split}, operation.Options{DryRun: true, Report: (&recorder{}).add})
+	outcome, err := w.usecase.Run(t.Context(), extract.Request{Source: source, Files: []string{"a.txt"}, To: split}, domain.RunOptions{DryRun: true, Report: (&recorder{}).add})
 
 	require.NoError(t, err)
 	assert.Regexp(t, regexp.MustCompile(`^[0-9a-f]{24}$`), outcome.Fingerprint)
@@ -154,13 +154,13 @@ func TestAPreviewIsRefusedOnceTheChangesItSelectedChanged(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.change(t, source, "dir/a.txt", "a\n")
 	req := extract.Request{Source: source, Files: []string{"dir"}, To: other}
-	preview, err := w.usecase.Run(t.Context(), req, operation.Options{DryRun: true, Report: (&recorder{}).add})
+	preview, err := w.usecase.Run(t.Context(), req, domain.RunOptions{DryRun: true, Report: (&recorder{}).add})
 	require.NoError(t, err)
 	w.change(t, source, "dir/b.txt", "b\n")
 
-	_, err = w.usecase.Run(t.Context(), req, operation.Options{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
+	_, err = w.usecase.Run(t.Context(), req, domain.RunOptions{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
 
-	assert.Equal(t, operation.CodePlanStale, failureOf(t, err).Code)
+	assert.Equal(t, domain.CodePlanStale, failureOf(t, err).Code)
 	assert.NoFileExists(t, filepath.Join(w.at(other), "dir", "a.txt"))
 }
 
@@ -292,13 +292,13 @@ func TestAChangeToWhatTheApplyRunsMakesThePreviewStale(t *testing.T) {
 			w := newWorld(t, seed{Run: jobsToml})
 			w.change(t, source, "a.txt", "a\n")
 			req := extract.Request{Source: source, Files: []string{"a.txt"}, To: split}
-			preview, err := w.usecase.Run(t.Context(), req, operation.Options{DryRun: true, Report: (&recorder{}).add})
+			preview, err := w.usecase.Run(t.Context(), req, domain.RunOptions{DryRun: true, Report: (&recorder{}).add})
 			require.NoError(t, err)
 			change(w)
 
-			_, err = w.usecase.Run(t.Context(), req, operation.Options{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
+			_, err = w.usecase.Run(t.Context(), req, domain.RunOptions{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
 
-			assert.Equal(t, operation.CodePlanStale, failureOf(t, err).Code)
+			assert.Equal(t, domain.CodePlanStale, failureOf(t, err).Code)
 			assert.NoDirExists(t, w.path(split))
 		})
 	}
@@ -308,14 +308,14 @@ func TestAPreviewOfChangesCommittedSinceIsStaleRatherThanNothingToExtract(t *tes
 	w := newWorld(t, seed{})
 	w.change(t, source, "a.txt", "a\n")
 	req := moving("a.txt")
-	preview, err := w.usecase.Run(t.Context(), req, operation.Options{DryRun: true, Report: (&recorder{}).add})
+	preview, err := w.usecase.Run(t.Context(), req, domain.RunOptions{DryRun: true, Report: (&recorder{}).add})
 	require.NoError(t, err)
 	gittest.Git(t, w.at(source), "add", "a.txt")
 	gittest.Git(t, w.at(source), "commit", "-q", "-m", "a")
 
-	_, err = w.usecase.Run(t.Context(), req, operation.Options{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
+	_, err = w.usecase.Run(t.Context(), req, domain.RunOptions{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
 
-	assert.Equal(t, operation.CodePlanStale, failureOf(t, err).Code)
+	assert.Equal(t, domain.CodePlanStale, failureOf(t, err).Code)
 }
 
 func TestAMoveThatLeavesTheChangesInBothWorktreesIsHalfMoved(t *testing.T) {

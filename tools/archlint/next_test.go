@@ -7,6 +7,7 @@ func TestANextPackageImportsOnlyWhatItsRowAllows(t *testing.T) {
 		nextModule,
 		nextPrefix+"internal/domain/branch",
 		nextPrefix+"internal/service/provision",
+		nextPrefix+"internal/service/operationtest",
 		nextPrefix+"internal/command/create",
 		nextPrefix+"internal/adapter/git",
 		nextPrefix+"internal/adapter/gittest",

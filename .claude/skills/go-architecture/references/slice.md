@@ -46,7 +46,7 @@ A reader opens `usecase.go` and reads the whole request from the top. Order its 
 // Run carries out the request under its operation: it takes the locks, plans
 // under them, fingerprints the plan, stops on a dry run, refuses a stale plan
 // and applies it between the operation's started and finished events.
-func (u UseCase) Run(ctx context.Context, req Request, opts operation.Options) (Outcome, error) {
+func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (Outcome, error) {
 	// 1. Take the operation's locks before reading anything, so the facts cannot change under the plan.
 	op, err := u.Operations.Begin(name, req.Locks(), opts)
 	if err != nil {
@@ -97,7 +97,7 @@ The numbered step comments are the one place a body carries a comment per paragr
 
 ## `cli/`: the driving adapter
 
-`cli/` turns the command line into a `Request` and `operation.Options`, runs the wizard on a terminal or `UseCase.Run` otherwise, and draws the outcome with the `ui/` kit. Files: `command.go` (the cobra command, its run and conclusion), `flag.go` (its flag table), `commandline.go` (the apply and follow-up lines it prints), `output.go` (its plan rows, items, envelope mapping), and when it asks: `wizard.go`, `steps.go`, `recap.go`, `form.go` (its steps over the `ui/form` engine). CLI conventions: `cli.md`; TUI conventions: `tui.md`.
+`cli/` turns the command line into a `Request` and `domain.RunOptions`, runs the wizard on a terminal or `UseCase.Run` otherwise, and draws the outcome with the `ui/` kit. Files: `command.go` (the cobra command, its run and conclusion), `flag.go` (its flag table), `commandline.go` (the apply and follow-up lines it prints), `output.go` (its plan rows, items, envelope mapping), and when it asks: `wizard.go`, `steps.go`, `recap.go`, `form.go` (its steps over the `ui/form` engine). CLI conventions: `cli.md`; TUI conventions: `tui.md`.
 
 ## Sharing between commands
 
@@ -127,6 +127,7 @@ A command that offers a step after its outcome (sync's "push now?" once the resu
 
 - `rules_test.go`, `questions_test.go`: pure, table-driven, from facts built in `fixture_test.go`.
 - `usecase_test.go`: the use case over the stateful fakes of the adapters (`adapter/gittest`, `adapter/storetest`), checking what it changed, the events, the locks.
+- `contract_test.go`: `operationtest.Contract` over `Run`, with a request that applies a change, so its events are there to check: a dry run takes no lock and publishes nothing, a stale plan is refused before any event, the events arrive in order and each unit started finishes.
 - `cli/`: golden files in `cli/testdata/` for help, dry run, outcomes, refusals, the JSON envelope; the wizard through its frames.
 - The adapters are tested against the real thing (real git in a temp repo); one end-to-end test per command in `cmd/wtm-next` wires the real adapters.
 - Behaviour against the legacy `wtm`: the scripts of `next/docs/proof/` (`create.sh`, `tty.sh`, `extract.sh`).
@@ -136,6 +137,6 @@ A command that offers a step after its outcome (sync's "push now?" once the resu
 1. `command/<name>/port.go`: the ports it needs, method by method.
 2. `rules.go` and `questions.go`: facts, plan, request, form, validation — pure, tested first.
 3. `usecase.go`: `UseCase`, `Run` (the canonical shape above), `Plan`, `Apply`, `Questions`, `Observe`.
-4. `cli/`: the command, its flags, its output, its wizard steps if it asks.
+4. `cli/`: the command, its flags, its output, its wizard steps if it asks; a refusal goes through `uicli.Run.Refuse`, which adds the `--dry-run` replay line to a stale plan.
 5. `cmd/wtm-next`: its adapters wired in `wire.go`, its cobra command registered in `main.go`.
 6. Anything it shares with an existing command moves to `domain/`, `service/` or `ui/` in the same change.

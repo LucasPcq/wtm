@@ -9,7 +9,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/service/operation"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +23,7 @@ func TestTheAppIsWiredOntoTheRealAdapters(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(stateDir, "config.toml"), []byte("[worktrees]\nbase_path = \"../.trees\"\n"), 0o644))
 	t.Setenv("HOME", t.TempDir())
 
-	outcome, err := wire(wireParams{MainPath: main, StateDir: stateDir, CommonDir: filepath.Join(main, ".git")}).Create.Run(t.Context(), create.Request{Branches: []string{"feat/x"}}, operation.Options{Report: func(domain.Event) {}})
+	outcome, err := wire(wireParams{MainPath: main, StateDir: stateDir, CommonDir: filepath.Join(main, ".git")}).Create.Run(t.Context(), create.Request{Branches: []string{"feat/x"}}, domain.RunOptions{Report: func(domain.Event) {}})
 
 	require.NoError(t, err)
 	require.NotNil(t, outcome.Result)
@@ -44,7 +43,7 @@ func TestExtractIsWiredOntoTheRealAdapters(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(main, "notes.txt"), []byte("notes\n"), 0o644))
 	t.Setenv("HOME", t.TempDir())
 
-	outcome, err := wire(wireParams{MainPath: main, StateDir: stateDir, CommonDir: filepath.Join(main, ".git")}).Extract.Run(t.Context(), extract.Request{Source: "main", Files: []string{"notes.txt"}, To: "feat/notes"}, operation.Options{Report: func(domain.Event) {}})
+	outcome, err := wire(wireParams{MainPath: main, StateDir: stateDir, CommonDir: filepath.Join(main, ".git")}).Extract.Run(t.Context(), extract.Request{Source: "main", Files: []string{"notes.txt"}, To: "feat/notes"}, domain.RunOptions{Report: func(domain.Event) {}})
 
 	require.NoError(t, err)
 	require.NotNil(t, outcome.Result)

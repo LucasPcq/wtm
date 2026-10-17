@@ -7,7 +7,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
-	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -66,7 +65,7 @@ func (w *wizard) form() form.Params {
 			Label:      label,
 			ApplyLabel: w.applyLabel,
 			Apply:      w.apply,
-			Stale:      operation.Stale,
+			Stale:      domain.PlanStale,
 		},
 		DryRun: w.dryRun,
 	}

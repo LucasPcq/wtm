@@ -28,6 +28,17 @@ var _ = strings.TrimSpace
 package operation
 
 import _ "github.com/LucasPcq/wtm/next/internal/domain"
+-- github.com/LucasPcq/wtm/next/internal/service/operationtest/contract.go --
+// Package operationtest is the contract of an operation.
+package operationtest
+
+import (
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/service/operationtest must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — a service's test kit`
+	_ "github.com/LucasPcq/wtm/next/internal/domain"
+	_ "github.com/LucasPcq/wtm/next/internal/service/operation"
+	_ "github.com/LucasPcq/wtm/next/internal/service/provision" // want `next/internal/service/operationtest must not import "github.com/LucasPcq/wtm/next/internal/service/provision" — a service's test kit`
+	_ "github.com/spf13/cobra"
+)
 -- github.com/LucasPcq/wtm/next/internal/service/provision/provision.go --
 // Package provision makes a new worktree whole.
 package provision
@@ -54,6 +65,7 @@ import (
 	_ "github.com/LucasPcq/wtm/next/internal/command/clean" // want `next/internal/command/create must not import "github.com/LucasPcq/wtm/next/internal/command/clean" — a use case`
 	_ "github.com/LucasPcq/wtm/next/internal/domain/branch"
 	_ "github.com/LucasPcq/wtm/next/internal/service/operation"
+	_ "github.com/LucasPcq/wtm/next/internal/service/operationtest" // want `next/internal/command/create must not import "github.com/LucasPcq/wtm/next/internal/service/operationtest" — a fake`
 	_ "github.com/LucasPcq/wtm/next/internal/service/provision"
 	_ "github.com/LucasPcq/wtm/next/internal/ui/output" // want `next/internal/command/create must not import "github.com/LucasPcq/wtm/next/internal/ui/output" — a use case`
 )
@@ -67,6 +79,7 @@ import (
 
 	_ "github.com/LucasPcq/wtm/internal/domain" // want `a test of next/internal/command/create must not import "github.com/LucasPcq/wtm/internal/domain"`
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	_ "github.com/LucasPcq/wtm/next/internal/service/operationtest"
 )
 
 func TestCreate(t *testing.T) {}
@@ -135,7 +148,7 @@ import (
 	_ "github.com/LucasPcq/wtm/next/internal/command/clean/cli" // want `next/internal/command/create/cli must not import "github.com/LucasPcq/wtm/next/internal/command/clean/cli" — a command's cli`
 	_ "github.com/LucasPcq/wtm/next/internal/command/create"
 	_ "github.com/LucasPcq/wtm/next/internal/domain"
-	_ "github.com/LucasPcq/wtm/next/internal/service/operation"
+	_ "github.com/LucasPcq/wtm/next/internal/service/operation" // want `next/internal/command/create/cli must not import "github.com/LucasPcq/wtm/next/internal/service/operation" — a command's cli`
 	_ "github.com/LucasPcq/wtm/next/internal/service/provision" // want `next/internal/command/create/cli must not import "github.com/LucasPcq/wtm/next/internal/service/provision" — a command's cli`
 	_ "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	_ "github.com/LucasPcq/wtm/next/internal/ui/output"
