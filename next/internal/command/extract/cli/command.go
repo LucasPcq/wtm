@@ -51,8 +51,10 @@ const (
 	exitConflict       = 15
 )
 
+// exits are the exit codes of extract's own codes, ahead of those of their kind.
 var exits = map[string]int{extract.CodeConfigNotFound: exitConfigNotFound, extract.CodeConflict: exitConflict}
 
+// A Project is what the command runs against, found by New's open once the flags are valid: the use case wired to the repository, and the directory the command runs in, from which paths are shown.
 type Project struct {
 	UseCase extract.UseCase
 	Cwd     string
@@ -76,9 +78,11 @@ type extractCommand struct {
 	quiet      bool
 }
 
+// New returns the extract command: its flags become an extract.Request, run unattended; it draws the outcome on streams, or the v2 JSON envelope with --output json.
 func New(streams *output.Streams, open func(ctx context.Context) (Project, error)) *cobra.Command {
 	c := &extractCommand{io: streams, open: open}
 	cmd := &cobra.Command{Use: "extract [source]", Short: extractShort, Long: extractLong, Example: extractExample, Args: cobra.MaximumNArgs(1), RunE: c.run}
+
 	flags := cmd.Flags()
 	flags.StringSliceVar(&c.files, "files", nil, descriptions["files"])
 	flags.StringVar(&c.to, "to", "", descriptions["to"])
@@ -89,37 +93,47 @@ func New(streams *output.Streams, open func(ctx context.Context) (Project, error
 	flags.StringVar(&c.onConflict, "on-conflict", "", descriptions["on_conflict"])
 	flags.StringArrayVar(&c.remember, "remember", nil, rememberUsage)
 	flags.BoolVar(&c.ask, "ask", false, uicli.AskUsage)
+	// --yes is accepted so that command lines written for wtm keep working; with no wizard, extract always runs unattended.
 	flags.BoolP("yes", "y", false, yesUsage)
 	flags.StringVar(&c.output, "output", uicli.OutputText, uicli.OutputUsage)
 	flags.BoolVarP(&c.dryRun, "dry-run", "n", false, uicli.DryRunUsage)
 	flags.StringVar(&c.expect, "expect-fingerprint", "", uicli.ExpectUsage)
+
 	_ = cmd.RegisterFlagCompletionFunc("isolation", cobra.FixedCompletions(extract.Names(project.Isolations()), cobra.ShellCompDirectiveNoFileComp))
 	_ = cmd.RegisterFlagCompletionFunc("on-conflict", cobra.FixedCompletions(extract.Names(extract.OnConflicts()), cobra.ShellCompDirectiveNoFileComp))
+
+	// A flag cobra cannot parse is refused as any invalid request is: framed, or in the envelope.
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		invalid := domain.Invalid(nil)
 		invalid.Cause = err
 		return c.misused(cmd, invalid)
 	})
+
 	return cmd
 }
 
 func (c *extractCommand) run(cmd *cobra.Command, args []string) error {
 	c.quiet, _ = cmd.Flags().GetBool(uicli.FlagQuiet)
 	req := c.request(cmd, args)
+
 	if c.output != uicli.OutputText && c.output != uicli.OutputJSON {
 		refused := domain.InvalidMessage(`invalid --output "` + c.output + `": expected one of text, json`)
+		// The refusal of an unknown format is printed as text, the one format sure to be understood.
 		c.output = uicli.OutputText
 		return c.misused(cmd, refused)
 	}
+
 	ctx := cmd.Context()
 	project, err := c.open(ctx)
 	if err != nil {
 		return c.fail(cmd, domain.AsError(domain.AsErrorParams{Err: err}), req)
 	}
+
 	_, stderr := c.streams()
 	progress := output.NewProgress(ctx, output.ProgressParams{W: stderr, Human: c.human(), Live: !c.quiet && c.io.CanAnimate()})
 	outcome, err := project.UseCase.Run(ctx, req, operation.Options{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, Report: progress.Report})
 	progress.Close()
+
 	return c.conclude(cmd, concluded{Outcome: outcome, Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: req, Cwd: project.Cwd})
 }
 
@@ -133,15 +147,18 @@ func (c *extractCommand) request(cmd *cobra.Command, args []string) extract.Requ
 		Remember:   c.remember,
 		Ask:        c.ask,
 	}
+
 	if len(args) > 0 {
 		req.Source = strings.TrimSpace(args[0])
 	}
+
 	if cmd.Flags().Changed(flagFF) {
 		req.FastForward = new(c.ff)
 	}
 	if cmd.Flags().Changed(flagKeep) {
 		req.Keep = new(c.keep)
 	}
+
 	return req
 }
 
@@ -149,13 +166,16 @@ func (c *extractCommand) human() bool {
 	return c.output == uicli.OutputText
 }
 
+// streams are stdout and stderr, both silenced by --quiet in human output.
 func (c *extractCommand) streams() (io.Writer, io.Writer) {
 	if c.quiet && c.human() {
 		return io.Discard, io.Discard
 	}
+
 	return c.io.Out, c.io.Err
 }
 
+// concluded is how a run ended, for conclude: its outcome, its refusal, the request that ran and where.
 type concluded struct {
 	Outcome extract.Outcome
 	Err     *domain.Error
@@ -163,10 +183,12 @@ type concluded struct {
 	Cwd     string
 }
 
+// conclude prints how the run ended — the JSON envelope, a refusal, nothing to extract, the dry run and the line that applies it, or the outcome — and returns the failure that sets the exit code.
 func (c *extractCommand) conclude(cmd *cobra.Command, done concluded) error {
 	if !c.human() {
 		return c.envelope(envelopeParams{Outcome: done.Outcome, Err: done.Err})
 	}
+
 	stdout, _ := c.streams()
 	outcome := done.Outcome
 	switch {
@@ -180,18 +202,22 @@ func (c *extractCommand) conclude(cmd *cobra.Command, done concluded) error {
 		output.Frame(stdout, func(w io.Writer) { drawDryRun(w, outcome, apply) })
 		return nil
 	}
+
 	output.Frame(stdout, func(w io.Writer) { drawOutcome(w, outcome, done.Cwd) })
 	return c.failed(outcome.Failure())
 }
 
+// fail prints a refusal; a stale plan is followed by the line that previews it again.
 func (c *extractCommand) fail(cmd *cobra.Command, failure *domain.Error, req extract.Request) error {
 	var next []output.NextStep
 	if failure.Code == operation.CodePlanStale {
 		next = []output.NextStep{{Command: extractLine{Command: cmd.CommandPath(), Request: req}.String() + " --dry-run", Note: output.ReplanNote}}
 	}
+
 	return c.failWith(failure, next)
 }
 
+// misused prints a misuse of the command line, followed by the way to its help.
 func (c *extractCommand) misused(cmd *cobra.Command, failure *domain.Error) error {
 	return c.failWith(failure, []output.NextStep{uicli.HelpStep(cmd)})
 }
@@ -200,24 +226,30 @@ func (c *extractCommand) failWith(failure *domain.Error, next []output.NextStep)
 	if !c.human() {
 		return c.envelope(envelopeParams{Err: failure})
 	}
+
 	_, stderr := c.streams()
 	output.Frame(stderr, func(w io.Writer) {
 		output.Failure(w, output.FailureParams{Err: failure, Next: next, Flags: extractFlags})
 	})
+
 	return c.failed(failure)
 }
 
+// envelope writes the v2 JSON envelope on stdout and returns its failure; an envelope that cannot be written is the failure.
 func (c *extractCommand) envelope(params envelopeParams) error {
 	doc := envelopeOf(params)
 	if err := output.Envelope(c.io.Out, doc); err != nil {
 		return c.failed(domain.AsError(domain.AsErrorParams{Err: err}))
 	}
+
 	return c.failed(doc.Err)
 }
 
+// failed is the error the root reads the exit code and the --quiet line from, nil for no failure.
 func (c *extractCommand) failed(failure *domain.Error) error {
 	if failure == nil {
 		return nil
 	}
+
 	return &uicli.Failed{Err: failure, Quiet: c.quiet && c.human(), Flags: extractFlags, Exits: exits}
 }

@@ -138,6 +138,7 @@ func (l locker) Take(domain.Operation) (operation.Hold, error) {
 
 func (locker) Open(domain.Operation) domain.Report { return func(domain.Event) {} }
 
+// held stands in for both the locker and the event publisher: every lock is held, and nothing is published.
 type held struct{}
 
 func (held) Grow([]domain.Lock) (bool, error) { return false, nil }
@@ -155,6 +156,7 @@ const (
 	trees = "/repo/main/.trees"
 )
 
+// twoCreated is the outcome of two branches created cleanly from main, their worktrees under trees.
 func twoCreated(trees string) create.Outcome {
 	return create.Outcome{
 		Op: "op-1",
@@ -174,6 +176,7 @@ func twoCreated(trees string) create.Outcome {
 	}
 }
 
+// mixed is an outcome with a branch of every kind: checked out behind origin with its env ports, already open, failed in its hook, cancelled, and skipped.
 func mixed(trees string) create.Outcome {
 	hook := &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed", Params: domain.Params{"phase": "on_create"}, Cause: errors.New("hook failed: exit status 3")}
 	return create.Outcome{
@@ -273,6 +276,7 @@ func (loaded) LoadRun() (project.Run, error) { return project.Run{}, nil }
 func (held) Take(domain.Operation) (operation.Hold, error) { return held{}, nil }
 func (held) Open(domain.Operation) domain.Report           { return func(domain.Event) {} }
 
+// refusing is a use case whose run is refused with err.
 type refusing struct {
 	useCase
 	err error

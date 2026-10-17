@@ -19,12 +19,14 @@ const (
 	anomaliesTitle = "Env ports left alone"
 )
 
+// planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome.
 func planRowsOf(plan create.Plan) []output.PlanRow {
 	rows := []output.PlanRow{
 		{Label: "Branches", Values: plannedBranches(plan.Branches)},
 		{Label: sourceLabel(plan.Branches), Values: []string{plan.From}},
 		{Label: "Env", Values: []string{string(plan.EnvFrom)}},
 	}
+
 	if plan.Isolation != "" {
 		rows = append(rows, output.PlanRow{Label: "Isolation", Values: []string{string(plan.Isolation)}})
 	}
@@ -34,9 +36,11 @@ func planRowsOf(plan create.Plan) []output.PlanRow {
 	if len(plan.Remember) > 0 {
 		rows = append(rows, output.PlanRow{Label: "Remember", Values: plan.Remember})
 	}
+
 	return rows
 }
 
+// plannedBranches spells each planned branch, how it gets its worktree in parentheses unless it is created.
 func plannedBranches(branches []create.BranchPlan) []string {
 	values := make([]string, 0, len(branches))
 	for _, planned := range branches {
@@ -51,29 +55,36 @@ func plannedBranches(branches []create.BranchPlan) []string {
 			values = append(values, planned.Branch)
 		}
 	}
+
 	return values
 }
 
+// sourceLabel names the source row: From when a branch is created from it, else Parent, the branch recorded for wtm sync.
 func sourceLabel(branches []create.BranchPlan) string {
 	for _, planned := range branches {
 		if planned.Action == create.ActionCreate {
 			return "From"
 		}
 	}
+
 	return "Parent"
 }
 
+// itemNote is the muted note after an item's path: already open, else how its env ports were settled, if worth saying.
 func itemNote(item create.Item, st *output.Styles) string {
 	note := output.SettlementNote(item.Detail.EnvPorts)
 	if item.Reason == domain.ReasonUnchanged {
 		note = "already open"
 	}
+
 	if note == "" {
 		return ""
 	}
+
 	return st.Muted.Render(output.Dot + note)
 }
 
+// anomaliesOf are what the reader of an item should act on: a branch checked out behind or diverged from origin, the env ports left alone.
 func anomaliesOf(item create.Item) []string {
 	var anomalies []string
 	standing := item.Detail.Standing
@@ -84,21 +95,26 @@ func anomaliesOf(item create.Item) []string {
 		anomalies = append(anomalies, fmt.Sprintf("%s has diverged from origin (%d ahead, %d behind) — the worktree starts from your local branch, missing commits that are on origin.", item.Subject, standing.OriginAhead, standing.OriginBehind))
 	case worktree.NoOrigin, worktree.UpToDate, worktree.Ahead:
 	}
+
 	if lines := output.AnomalyLines(item.Detail.EnvPorts); len(lines) > 0 {
 		anomalies = append(anomalies, anomaliesTitle+"\n"+strings.Join(lines, "\n"))
 	}
+
 	return anomalies
 }
 
+// drawOutcome draws what the apply did: the tally, the plan with each worktree that stands and the anomalies, the branches left unfinished, and the next steps.
 func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextStep, cwd string) {
 	items := outcome.Result.Items
 	headline(w, items)
+
 	var rows []output.PlanRow
 	var anomalies []string
 	var next []output.NextStep
 	if len(items) > 0 {
 		rows = planRowsOf(outcome.Plan)
 	}
+
 	for _, item := range items {
 		if !stands(item) || item.Detail == nil {
 			continue
@@ -108,24 +124,29 @@ func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextSte
 		anomalies = append(anomalies, anomaliesOf(item)...)
 		next = append(next, output.NextStep{Command: "wtm go " + item.Subject})
 	}
+
 	for _, item := range items {
 		for _, warned := range item.Warnings {
 			anomalies = append(anomalies, item.Subject+"  "+warned.Message)
 		}
 	}
+
 	for _, warned := range outcome.Warnings {
 		anomalies = append(anomalies, warned.Message)
 	}
+
 	if len(rows) > 0 {
 		output.Blank(w)
 		output.DrawPlan(w, output.PlanParams{Rows: rows, Warnings: anomalies})
 	}
+
 	if len(rows) == 0 && len(anomalies) > 0 {
 		output.Blank(w)
 		for _, text := range anomalies {
 			output.WarningLine(w, text)
 		}
 	}
+
 	unfinished := slices.DeleteFunc(slices.Clone(items), func(item create.Item) bool { return item.Status == domain.StatusDone })
 	if len(unfinished) > 0 {
 		output.Blank(w)
@@ -133,6 +154,7 @@ func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextSte
 	for _, item := range unfinished {
 		output.UnfinishedLine(w, output.Unfinished{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err})
 	}
+
 	next = append(next, followUps...)
 	if len(next) > 0 {
 		output.Blank(w)
@@ -140,25 +162,30 @@ func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextSte
 	}
 }
 
+// stands reports whether the item's worktree stands: created, or left incomplete by a later step of its provisioning.
 func stands(item create.Item) bool {
 	return item.Status == domain.StatusDone || item.Reason == domain.ReasonIncomplete
 }
 
+// headline is the tally of the items by status, in the colour of the worst.
 func headline(w io.Writer, items []create.Item) {
 	if len(items) == 0 {
 		output.UnchangedLine(w, commandName+": "+output.NothingToDo)
 		return
 	}
+
 	count := map[string]int{}
 	for _, item := range items {
 		count[tallyKey(item)]++
 	}
+
 	var parts []string
 	for _, key := range []string{"done", "unchanged", "failed", "skipped", "cancelled"} {
 		if count[key] > 0 {
 			parts = append(parts, strconv.Itoa(count[key])+" "+key)
 		}
 	}
+
 	line := commandName + ": " + strings.Join(parts, output.Dot)
 	switch {
 	case count["failed"] > 0:
@@ -172,13 +199,16 @@ func headline(w io.Writer, items []create.Item) {
 	}
 }
 
+// tallyKey is the column of the tally an item counts in: a worktree already open counts as unchanged, not done.
 func tallyKey(item create.Item) string {
 	if item.Status == domain.StatusDone && item.Reason == domain.ReasonUnchanged {
 		return "unchanged"
 	}
+
 	return string(item.Status)
 }
 
+// drawDryRun draws the plan and its fingerprint, and apply, the line that applies exactly that plan.
 func drawDryRun(w io.Writer, outcome create.Outcome, apply string) {
 	output.SectionTitle(w, commandName+output.Dot+"dry run, nothing applied")
 	warnings := output.Messages(outcome.Warnings)
@@ -186,10 +216,12 @@ func drawDryRun(w io.Writer, outcome create.Outcome, apply string) {
 	if len(warnings) > 0 {
 		output.Blank(w)
 	}
+
 	output.InfoLine(w, output.Info{Label: "fingerprint", Value: outcome.Fingerprint})
 	output.NextSteps(w, []output.NextStep{{Command: apply, Note: output.ApplyNote}})
 }
 
+// planTextOf is the plan as the wizard's recap shows it, in width columns.
 func planTextOf(plan create.Plan, warnings []domain.Warning, width int, st *output.Styles) string {
 	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(plan), Warnings: output.Messages(warnings), Width: width, Styles: st}), "\n")
 }
@@ -199,9 +231,11 @@ type envelopeParams struct {
 	Err     *domain.Error
 }
 
+// envelopeOf maps how the run ended onto the v2 envelope: its items once applied, else the plan and its fingerprint unless refused.
 func envelopeOf(params envelopeParams) output.EnvelopeParams {
 	outcome := params.Outcome
 	doc := output.EnvelopeParams{Command: commandName, Op: outcome.Op, Err: params.Err, Flags: createFlags}
+
 	switch {
 	case outcome.Result != nil:
 		doc.Err = cmp.Or(doc.Err, outcome.Failure())
@@ -212,13 +246,17 @@ func envelopeOf(params envelopeParams) output.EnvelopeParams {
 	case doc.Err == nil:
 		doc.Plan, doc.Fingerprint, doc.Warnings = &outcome.Plan, outcome.Fingerprint, outcome.Warnings
 	}
+
 	return doc
 }
 
 func envelopeItem(item create.Item) output.Item {
 	doc := output.Item{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err, Warnings: item.Warnings}
+
+	// Set only when there is one: a nil *Detail would make the field a non-nil interface, encoded null instead of {}.
 	if item.Detail != nil {
 		doc.Detail = item.Detail
 	}
+
 	return doc
 }

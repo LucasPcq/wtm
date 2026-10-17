@@ -7,35 +7,43 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
+// An extractLine is the command line that runs a request again: the apply line after a dry run, the preview line after a stale plan.
 type extractLine struct {
 	Command string
 	Request extract.Request
 }
 
+// String spells the command and its request, the flags each only when given.
 func (l extractLine) String() string {
 	req := l.Request
 	words := []string{l.Command}
 	if req.Source != "" {
 		words = append(words, output.Quote(req.Source))
 	}
+
 	for _, file := range req.Files {
 		words = append(words, output.FlagWords(output.FlagValue{Name: "files", Value: file})...)
 	}
+
 	words = append(words, output.FlagWords(output.FlagValue{Name: "to", Value: req.To})...)
 	words = append(words, switched("ff", req.FastForward)...)
 	words = append(words, output.FlagWords(output.FlagValue{Name: "from", Value: req.From})...)
 	words = append(words, output.FlagWords(output.FlagValue{Name: "isolation", Value: string(req.Isolation)})...)
 	words = append(words, switched("keep", req.Keep)...)
 	words = append(words, output.FlagWords(output.FlagValue{Name: "on-conflict", Value: string(req.OnConflict)})...)
+
 	for _, answer := range req.Remember {
 		words = append(words, output.FlagWords(output.FlagValue{Name: "remember", Value: answer})...)
 	}
+
 	if req.Ask {
 		words = append(words, "--ask")
 	}
+
 	return strings.Join(words, " ")
 }
 
+// switched spells a boolean flag as given, --name or --name=false, and nothing when it was not.
 func switched(name string, value *bool) []string {
 	switch {
 	case value == nil:

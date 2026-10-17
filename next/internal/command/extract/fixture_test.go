@@ -138,6 +138,7 @@ func (l locks) Take(op domain.Operation) (operation.Hold, error) {
 	return l.Locks.Take(op)
 }
 
+// interrupting cancels the operation as the move starts, recording what the move's context saw of it.
 type interrupting struct {
 	git.Repo
 	cancel context.CancelFunc

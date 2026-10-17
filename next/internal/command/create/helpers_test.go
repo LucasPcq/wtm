@@ -67,6 +67,7 @@ func decided(t *testing.T, facts create.Facts, req create.Request) create.Plan {
 	return planned
 }
 
+// shown is the plan as its JSON shows it, without the facts and resolved answers it carries unexported.
 func shown(planned create.Plan) create.Plan {
 	return create.Plan{Branches: planned.Branches, From: planned.From, EnvFrom: planned.EnvFrom, Isolation: planned.Isolation, FastForward: planned.FastForward, Remember: planned.Remember}
 }
@@ -137,6 +138,7 @@ func withHook(command string) string {
 	return strings.Replace(projectToml, "on_create = []", "on_create = [{ cmd = "+strconv.Quote(command)+" }]", 1)
 }
 
+// appears is closed once a file exists at path, polled every 10ms.
 func appears(path string) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
@@ -163,6 +165,7 @@ func problemsOf(questions create.Questions) map[string]string {
 	return found
 }
 
+// behindOrigin puts origin's copy of the branch name one commit ahead of the local branch.
 func behindOrigin(t *testing.T, w world, name string) {
 	t.Helper()
 	ahead := gittest.Output(t, w.main, "commit-tree", name+"^{tree}", "-p", name, "-m", "upstream "+name)

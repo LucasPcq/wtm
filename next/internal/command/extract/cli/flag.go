@@ -2,6 +2,7 @@ package cli
 
 import "github.com/LucasPcq/wtm/next/internal/ui/output"
 
+// extractFlags spells each field path of the request as the argument or flag that sets it, for the failures.
 var extractFlags = output.Flags{
 	"source":       "<source>",
 	"files":        "--files",
@@ -14,6 +15,7 @@ var extractFlags = output.Flags{
 	"remember":     "--remember",
 }
 
+// descriptions are the help of each field, by its path: the usage of its flag.
 var descriptions = map[string]string{
 	"files":        "Files to extract, or a directory to take everything below it (skips interactive selection)",
 	"to":           "Target worktree branch; created if it does not exist",

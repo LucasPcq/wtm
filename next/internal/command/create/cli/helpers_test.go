@@ -103,6 +103,7 @@ func golden(t *testing.T, name string, got string) {
 
 const settleWithin = 100 * time.Millisecond
 
+// A driver plays the wizard's event loop by hand: it sends a message, runs the command it returns, and feeds back the message that command produces.
 type driver struct {
 	t *testing.T
 	w *form.Wizard
@@ -128,6 +129,7 @@ func (d *driver) send(msg tea.Msg) {
 	d.run(cmd)
 }
 
+// run runs cmd and sends back its message; a command still running after settleWithin, a tick or a cursor blink is dropped, so the loop settles.
 func (d *driver) run(cmd tea.Cmd) {
 	if cmd == nil {
 		return
@@ -184,6 +186,7 @@ func (d *driver) screen() string {
 	return strings.TrimRight(strings.Join(lines, "\n"), "\n")
 }
 
+// engineScreen is the frame the engine's form (refactor/create-pilot-engine) drew at that point, from testdata, its glyphs mapped to those this wizard draws.
 func engineScreen(t *testing.T, name string) string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("testdata", "engine_"+name+".txt"))

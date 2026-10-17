@@ -114,6 +114,7 @@ func newWorld(t *testing.T, s seed) world {
 	}
 }
 
+// linkedUnder are worktrees of branches, each at its linkedPath under root, outside the base path.
 func linkedUnder(root string, branches []string) []worktree.Worktree {
 	worktrees := make([]worktree.Worktree, 0, len(branches))
 	for _, name := range branches {
@@ -133,6 +134,7 @@ func configOf(s seed) string {
 	return projectToml
 }
 
+// commitsOf are the commits each ref carries beyond main for the seed: origin's main ahead when Behind, and local main too when Diverged.
 func commitsOf(s seed) map[worktree.Ref][]string {
 	commits := map[worktree.Ref][]string{
 		worktree.LocalBranch{Name: existing}:  {"feature work"},
@@ -166,6 +168,7 @@ func (l locks) Take(op domain.Operation) (operation.Hold, error) {
 	return l.Locks.Take(op)
 }
 
+// counted counts the snapshots a use case reads, to see how many times it plans.
 type counted struct {
 	git.Repo
 	observed *int
@@ -176,6 +179,7 @@ func (c counted) Snapshot(ctx context.Context) (worktree.Snapshot, error) {
 	return c.Repo.Snapshot(ctx)
 }
 
+// unprotected is a locker whose hold protects nothing, as when the lock files cannot be taken.
 type unprotected struct{}
 
 func (unprotected) Take(domain.Operation) (operation.Hold, error) { return unprotected{}, nil }

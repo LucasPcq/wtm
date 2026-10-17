@@ -12,14 +12,18 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
+// ----------------------------------------------------------------------------
+// Facts
+
+// Facts are what create decides from, as Observe read them: the project's config, its run.toml, the repository's snapshot and what lies at the path each branch asked would take.
 type Facts struct {
 	MainPath string
 	Config   project.Config
 	Global   project.Global
 	Run      project.Run
-	RunErr   error
+	RunErr   error // why run.toml could not be loaded, nil when it was
 	worktree.Snapshot
-	Folders map[string]worktree.Location
+	Folders map[string]worktree.Location // keyed by the path a new worktree would take
 }
 
 func (f Facts) pathsOf(branches []string) []string {
@@ -29,13 +33,16 @@ func (f Facts) pathsOf(branches []string) []string {
 			paths = append(paths, f.pathOf(name))
 		}
 	}
+
 	return paths
 }
 
+// pathOf is where the worktree of the branch name would be created.
 func (f Facts) pathOf(name string) string {
 	return filepath.Join(f.MainPath, f.Config.Worktrees.BasePath, worktree.PathSegment(name))
 }
 
+// namesWorktrees reports whether run.toml gives each worktree a name derived from its branch, so two branches deriving the same name clash; a run.toml that failed to load is assumed to.
 func (f Facts) namesWorktrees() bool {
 	return f.RunErr != nil || len(f.Run.Jobs) > 0 || len(f.Run.Profiles) > 0
 }
@@ -44,10 +51,15 @@ func aheadAndBehind(counts worktree.AheadBehind) string {
 	return strconv.Itoa(counts.Ahead) + " ahead, " + strconv.Itoa(counts.Behind) + " behind"
 }
 
+// ----------------------------------------------------------------------------
+// Each branch's decision
+
 //go-sumtype:decl decision
 
+// A decision is what becomes of one branch asked: its BranchPlan, or the refusal that stops it.
 type decision interface{ decision() }
 
+// A refusal is why one branch is refused; KindInvalid makes it a field error of that branch, any other kind refuses the whole request.
 type refusal struct {
 	Kind     domain.Kind
 	Code     string
@@ -62,10 +74,11 @@ func (r refusal) field(index int) domain.FieldError {
 	return domain.FieldError{Path: branchPath(index), Code: r.Code, Template: r.Template, Params: r.Params}
 }
 
+// An entry is one branch asked, with what deciding it needs of the rest of the request.
 type entry struct {
 	name        string
 	path        string
-	earlier     []string
+	earlier     []string // the branches asked before it, against which it must be distinct
 	ifNotExists bool
 }
 
@@ -74,22 +87,27 @@ func (f Facts) decisions(req Request) []decision {
 	for index, name := range req.Branches {
 		decisions = append(decisions, f.decide(entry{name: name, path: f.pathOf(name), earlier: req.Branches[:index], ifNotExists: req.IfNotExists}))
 	}
+
 	return decisions
 }
 
+// decide places one branch; it panics when Observe was not given that branch, a bug of the caller.
 func (f Facts) decide(e entry) decision {
 	if refused, found := f.invalid(e); found {
 		return refused
 	}
+
 	at := f.CheckedOutAt(e.name)
 	location, located := f.Folders[e.path]
 	if !located && at == "" {
 		panic(fmt.Sprintf("create: the folder of %s was never located: observe with the branches of the request", e.name))
 	}
+
 	var live []string
 	if f.namesWorktrees() {
 		live = f.Live()
 	}
+
 	return e.placed(worktree.Place(worktree.PlacementParams{
 		Branch:       e.name,
 		Path:         e.path,
@@ -103,22 +121,28 @@ func (f Facts) decide(e entry) decision {
 	}))
 }
 
+// invalid is the refusal of a branch that the request itself rules out, whatever the repository holds: blank, given twice, not a valid branch name, or sharing its path or derived name with a branch asked before it.
 func (f Facts) invalid(e entry) (refusal, bool) {
 	if worktree.BlankBranch(e.name) {
 		return refusal{Kind: domain.KindInvalid, Code: codeRequired, Template: "{path} is required"}, true
 	}
+
 	if slices.Contains(e.earlier, e.name) {
 		return refusal{Kind: domain.KindInvalid, Code: "distinct", Template: "{path}: {value} is given twice", Params: domain.Params{"value": e.name}}, true
 	}
+
 	if err := worktree.BranchProblem(e.name); err != nil {
 		return refusal{Kind: domain.KindInvalid, Code: "create.branch_name_invalid", Template: "{problem}", Params: domain.Params{"problem": err.Error()}}, true
 	}
+
 	if at := slices.IndexFunc(e.earlier, func(earlier string) bool { return f.pathOf(earlier) == e.path }); at >= 0 {
 		return e.clashed(worktree.Clash{Branch: e.earlier[at], Name: filepath.Base(e.path)}), true
 	}
+
 	if clash, found := f.clash(e.name, e.earlier); found {
 		return e.clashed(clash), true
 	}
+
 	return refusal{}, false
 }
 
@@ -126,9 +150,11 @@ func (f Facts) clash(branch string, live []string) (worktree.Clash, bool) {
 	if !f.namesWorktrees() {
 		return worktree.Clash{}, false
 	}
+
 	return worktree.ClashWith(branch, live)
 }
 
+// placed turns where the domain places the branch into create's decision and refusals.
 func (e entry) placed(placement worktree.Placement) decision {
 	switch p := placement.(type) {
 	case worktree.Unchanged:
@@ -147,6 +173,7 @@ func (e entry) placed(placement worktree.Placement) decision {
 	case worktree.Placed:
 		return BranchPlan{Branch: e.name, Path: e.path, Action: Action(p.Start), Upstream: p.Upstream}
 	}
+
 	return nil
 }
 
@@ -164,6 +191,7 @@ func (r refusal) as(kind domain.Kind) refusal {
 	return r
 }
 
+// checksOut reports whether the request checks out a branch that already exists locally, whose parent then cannot be inferred.
 func (f Facts) checksOut(req Request) bool {
 	return slices.ContainsFunc(f.decisions(req), func(d decision) bool {
 		planned, isPlanned := d.(BranchPlan)
@@ -171,6 +199,7 @@ func (f Facts) checksOut(req Request) bool {
 	})
 }
 
+// subjectsAt is each local branch a planned worktree starts from — the existing branch it checks out, or the source of a new branch — whose standing against origin is standing, each once.
 func (f Facts) subjectsAt(req Request, standing worktree.Divergence) []string {
 	var subjects []string
 	for _, d := range f.decisions(req) {
@@ -183,13 +212,19 @@ func (f Facts) subjectsAt(req Request, standing worktree.Divergence) []string {
 		case planned.Action == ActionCreate && f.Local(req.From):
 			subject = req.From
 		}
+
 		if subject != "" && f.Standing(subject) == standing && !slices.Contains(subjects, subject) {
 			subjects = append(subjects, subject)
 		}
 	}
+
 	return subjects
 }
 
+// ----------------------------------------------------------------------------
+// Decide
+
+// Decide turns the facts and the resolved request into the plan and its warnings. A branch the request rules out is a field error, all of them returned together by domain.Invalid; a branch the repository refuses (checked out elsewhere, its path taken, its name clashing with a live worktree) refuses the whole request with its code.
 func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	branches := make([]BranchPlan, 0, len(req.Branches))
 	var invalid []domain.FieldError
@@ -204,9 +239,11 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 			branches = append(branches, decided)
 		}
 	}
+
 	if len(invalid) > 0 {
 		return Plan{}, nil, domain.Invalid(invalid)
 	}
+
 	planned := Plan{
 		Branches:    branches,
 		From:        req.From,
@@ -221,10 +258,12 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	return planned, append(f.divergedWarnings(req), f.fallbackWarnings(planned)...), nil
 }
 
+// plannedIsolation is the isolation the plan shows: none when run.toml declares nothing a worktree isolates.
 func (f Facts) plannedIsolation(given project.Isolation) project.Isolation {
 	if !f.Run.IsolationApplies() {
 		return ""
 	}
+
 	return given
 }
 
@@ -232,6 +271,7 @@ func (f Facts) fastForwarded(req Request) []string {
 	if req.FastForward == nil || !*req.FastForward {
 		return nil
 	}
+
 	return f.subjectsAt(req, worktree.Behind)
 }
 
@@ -245,6 +285,7 @@ func (f Facts) divergedWarnings(req Request) []domain.Warning {
 			Params:  domain.Params{"branch": subject, "ahead": strconv.Itoa(counts.Ahead), "behind": strconv.Itoa(counts.Behind)},
 		})
 	}
+
 	return warnings
 }
 
@@ -258,18 +299,25 @@ func (f Facts) fallbackWarnings(planned Plan) []domain.Warning {
 	if !creates || !fallsBack {
 		return nil
 	}
+
 	return []domain.Warning{{Code: "create.env_parent_fallback", Message: `The "parent" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main.`}}
 }
 
+// ----------------------------------------------------------------------------
+// The plan
+
+// An Action is how a branch gets its worktree.
 type Action string
 
+// The actions of a branch's plan.
 const (
-	ActionCreate    Action = "create"
-	ActionCheckOut  Action = "check_out"
-	ActionResume    Action = "resume"
-	ActionUnchanged Action = "unchanged"
+	ActionCreate    Action = "create"    // a new branch, from the plan's source
+	ActionCheckOut  Action = "check_out" // a branch that exists locally, as it is
+	ActionResume    Action = "resume"    // a branch only origin has, tracking it
+	ActionUnchanged Action = "unchanged" // its worktree is already open (--if-not-exists)
 )
 
+// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: each branch's worktree, the source, the env strategy, the isolation, the sources to fast-forward first and the answers to remember.
 type Plan struct {
 	Branches    []BranchPlan        `json:"branches"`
 	From        string              `json:"from,omitempty"`
@@ -278,10 +326,11 @@ type Plan struct {
 	FastForward []string            `json:"fast_forward,omitempty"`
 	Remember    []string            `json:"remember,omitempty"`
 	facts       Facts
-	isolation   project.Isolation
-	fastForward bool
+	isolation   project.Isolation // as resolved, handed to provisioning even where the plan shows none
+	fastForward bool              // as answered, even with nothing to fast-forward, for the remembered answer
 }
 
+// A BranchPlan is what becomes of one branch: the path of its worktree, how it gets there, and the remote branch it resumes.
 type BranchPlan struct {
 	Branch   string `json:"branch"`
 	Path     string `json:"path"`
@@ -289,14 +338,17 @@ type BranchPlan struct {
 	Upstream string `json:"upstream,omitempty"`
 }
 
+// Locks are the locks the plan needs: the repository shared, and each worktree it makes or fast-forwards exclusive.
 func (p Plan) Locks() []domain.Lock {
 	names := make([]string, 0, len(p.Branches)+len(p.FastForward))
 	for _, planned := range p.Branches {
 		names = append(names, planned.Branch)
 	}
+
 	return locksOf(append(names, p.FastForward...))
 }
 
+// Fingerprinted is what the plan's fingerprint covers: the plan, and the isolation as resolved.
 func (p Plan) Fingerprinted() any {
 	return struct {
 		Plan      Plan              `json:"plan"`
@@ -304,16 +356,19 @@ func (p Plan) Fingerprinted() any {
 	}{Plan: p, Isolation: p.isolation}
 }
 
+// Locks are the locks taken before planning: the repository shared, and each branch asked exclusive.
 func (r Request) Locks() []domain.Lock {
 	return locksOf(slices.DeleteFunc(slices.Clone(r.Branches), func(name string) bool { return name == "" }))
 }
 
+// locksOf sorts the worktrees so that two operations always take their locks in the same order.
 func locksOf(worktrees []string) []domain.Lock {
 	locks := []domain.Lock{{Scope: domain.ScopeRepo, Mode: domain.LockShared}}
 	slices.Sort(worktrees)
 	for _, name := range slices.Compact(worktrees) {
 		locks = append(locks, domain.Lock{Scope: domain.ScopeWorktree, Name: name, Mode: domain.LockExclusive})
 	}
+
 	return locks
 }
 
@@ -325,6 +380,7 @@ func (p Plan) checkout(planned BranchPlan) worktree.Checkout {
 		return worktree.TrackingBranch{Name: planned.Branch}
 	case ActionCreate, ActionUnchanged:
 	}
+
 	return worktree.NewBranch{Name: planned.Branch, From: p.facts.Ref(p.From)}
 }
 
@@ -337,14 +393,17 @@ func (f Facts) standingOf(planned BranchPlan) Standing {
 		return Standing{Upstream: planned.Upstream}
 	case ActionCreate, ActionUnchanged:
 	}
+
 	return Standing{}
 }
 
+// answers are the answers to remember, keyed by their id in config.toml.
 func (p Plan) answers() map[string]string {
 	sourceUpdate := project.SourceUpdateKeep
 	if p.fastForward {
 		sourceUpdate = project.SourceUpdateFastForward
 	}
+
 	values := map[string]string{"env_from": string(p.EnvFrom), "isolation": string(p.Isolation), "fast_forward": sourceUpdate}
 	answers := map[string]string{}
 	for _, r := range remembered {
@@ -352,5 +411,6 @@ func (p Plan) answers() map[string]string {
 			answers[r.id] = value
 		}
 	}
+
 	return answers
 }

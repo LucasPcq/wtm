@@ -37,6 +37,7 @@ func (r *recorder) all() []domain.Event {
 	return slices.Clone(r.events)
 }
 
+// at is where the seeded worktree of name lives; path is where a new one would be created.
 func (w world) at(name string) string {
 	return linkedPath(w.root, name)
 }
@@ -90,6 +91,7 @@ func (w world) applyIn(ctx context.Context, t *testing.T, req extract.Request) (
 	return w.usecase.Apply(ctx, planned, report.add), report
 }
 
+// moving asks to move files from the source worktree to the other one.
 func moving(files ...string) extract.Request {
 	return extract.Request{Source: source, Files: files, To: other}
 }
