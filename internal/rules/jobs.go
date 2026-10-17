@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -294,6 +295,17 @@ func JobUpIn(params JobUpInParams) bool {
 	return false
 }
 
+// JobCrashedIn says the daemon still holds this job in this worktree as it
+// died: nothing to stop, a record for `run down` to settle.
+func JobCrashedIn(params JobUpInParams) bool {
+	for _, job := range params.Jobs {
+		if job.Name == params.Name && job.WorkDir == params.WorkDir && job.Status == domain.JobStatusCrashed {
+			return true
+		}
+	}
+	return false
+}
+
 type WorkDirsWithJobsUpParams struct {
 	Jobs   []domain.JobInfo
 	Within []string
@@ -302,6 +314,25 @@ type WorkDirsWithJobsUpParams struct {
 // WorkDirsWithJobsUp names, once each and in the daemon's order, the work dirs
 // among Within that hold a job up.
 func WorkDirsWithJobsUp(params WorkDirsWithJobsUpParams) []string {
+	return workDirsHolding(workDirsHoldingParams{WorkDirsWithJobsUpParams: params, Holds: IsJobUp})
+}
+
+// WorkDirsWithOnlyCrashedJobs names the work dirs among Within whose every job
+// crashed, which an emptying of the worktrees with jobs up never reaches.
+func WorkDirsWithOnlyCrashedJobs(params WorkDirsWithJobsUpParams) []string {
+	up := WorkDirsWithJobsUp(params)
+	crashed := workDirsHolding(workDirsHoldingParams{WorkDirsWithJobsUpParams: params, Holds: func(status domain.JobStatus) bool {
+		return status == domain.JobStatusCrashed
+	}})
+	return slices.DeleteFunc(crashed, func(dir string) bool { return slices.Contains(up, dir) })
+}
+
+type workDirsHoldingParams struct {
+	WorkDirsWithJobsUpParams
+	Holds func(domain.JobStatus) bool
+}
+
+func workDirsHolding(params workDirsHoldingParams) []string {
 	within := make(map[string]bool, len(params.Within))
 	for _, dir := range params.Within {
 		within[filepath.Clean(dir)] = true
@@ -310,7 +341,7 @@ func WorkDirsWithJobsUp(params WorkDirsWithJobsUpParams) []string {
 	var dirs []string
 	for _, job := range params.Jobs {
 		dir := filepath.Clean(job.WorkDir)
-		if !IsJobUp(job.Status) || !within[dir] || seen[dir] {
+		if !params.Holds(job.Status) || !within[dir] || seen[dir] {
 			continue
 		}
 		seen[dir] = true

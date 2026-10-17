@@ -18,7 +18,7 @@ func TestMainCheckoutFoundFromALinkedWorktree(t *testing.T) {
 	linked := filepath.Join(t.TempDir(), "feat-x")
 	gittest.Git(t, repo, "worktree", "add", "-b", "feat-x", linked)
 
-	got, err := worktree.MainCheckout(worktree.MainCheckoutParams{ProjectDir: linked})
+	got, err := worktree.MainCheckout(t.Context(), worktree.MainCheckoutParams{ProjectDir: linked})
 	if err != nil {
 		t.Fatalf("MainCheckout: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestMainCheckoutFoundFromALinkedWorktree(t *testing.T) {
 
 func TestMainCheckoutFoundFromTheMainCheckoutItself(t *testing.T) {
 	repo := gittest.InitRepo(t)
-	got, err := worktree.MainCheckout(worktree.MainCheckoutParams{ProjectDir: repo})
+	got, err := worktree.MainCheckout(t.Context(), worktree.MainCheckoutParams{ProjectDir: repo})
 	if err != nil {
 		t.Fatalf("MainCheckout: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestMainCheckoutFoundFromTheMainCheckoutItself(t *testing.T) {
 }
 
 func TestMainCheckoutErrorsOutsideARepository(t *testing.T) {
-	_, err := worktree.MainCheckout(worktree.MainCheckoutParams{ProjectDir: t.TempDir()})
+	_, err := worktree.MainCheckout(t.Context(), worktree.MainCheckoutParams{ProjectDir: t.TempDir()})
 	if err == nil {
 		t.Fatal("MainCheckout outside a repository = nil error")
 	}
@@ -78,7 +78,7 @@ func TestRecordNamespacesIsAdditiveAndIdempotent(t *testing.T) {
 
 	record := func(jobs ...string) {
 		t.Helper()
-		if err := worktree.RecordNamespaces(worktree.RecordNamespacesParams{
+		if err := worktree.RecordNamespaces(t.Context(), worktree.RecordNamespacesParams{
 			StateDir: stateDir, Branch: "feat-x", Jobs: jobs,
 		}); err != nil {
 			t.Fatalf("RecordNamespaces: %v", err)
@@ -102,7 +102,7 @@ func TestRecordNamespacesIsAdditiveAndIdempotent(t *testing.T) {
 // The main checkout has no meta.json, and recording must not create one.
 func TestRecordNamespacesCreatesNoMetadata(t *testing.T) {
 	stateDir := t.TempDir()
-	if err := worktree.RecordNamespaces(worktree.RecordNamespacesParams{
+	if err := worktree.RecordNamespaces(t.Context(), worktree.RecordNamespacesParams{
 		StateDir: stateDir, Branch: "main", Jobs: []string{"db"},
 	}); err != nil {
 		t.Fatalf("RecordNamespaces: %v", err)

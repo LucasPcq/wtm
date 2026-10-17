@@ -62,7 +62,7 @@ Pick the **smallest view that makes the point** — one or two visuals, each pla
 - **Runtime flow** — a call tree, as a `diff` when the shape already existed:
 
   ```diff
-   commands/clean.go  runClean
+   surface/cli/clean.go  runClean
      flow/clean.Run
        worktree.Remove
   +    events.Publish(WorktreeRemoved)

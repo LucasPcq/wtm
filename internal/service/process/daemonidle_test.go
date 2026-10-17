@@ -1,6 +1,7 @@
 package process
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,7 +60,7 @@ func (d testDaemon) answer(t *testing.T, req Request) Response {
 	}
 	answered := make(chan outcome, 1)
 	go func() {
-		resp, err := NewClient(d.socket).Send(req)
+		resp, err := NewClient(d.socket).Send(context.Background(), req)
 		answered <- outcome{resp: resp, err: err}
 	}()
 

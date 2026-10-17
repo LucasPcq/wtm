@@ -1,0 +1,36 @@
+-- github.com/LucasPcq/wtm/internal/infra/fs/fs.go --
+package fs
+
+func UpdateFile(path string) error { return nil }
+
+func RemoveDir(path string) error { return nil }
+
+func ReplaceFile(path string) error { return UpdateFile(path) }
+-- github.com/LucasPcq/wtm/internal/store/meta.go --
+package store
+
+import "github.com/LucasPcq/wtm/internal/infra/fs"
+
+func Update(path string) error { return fs.UpdateFile(path) }
+
+func Purge(dir string) error { return fs.RemoveDir(dir) }
+-- github.com/LucasPcq/wtm/internal/config/write.go --
+package config
+
+import files "github.com/LucasPcq/wtm/internal/infra/fs"
+
+func WriteRun(path string) error {
+	return files.UpdateFile(path) // want `fs\.UpdateFile outside store/: a state file is written by its owner in store/`
+}
+
+var drop = files.RemoveDir // want `fs\.RemoveDir outside store/`
+
+func Replace(path string) error { return files.ReplaceFile(path) }
+-- github.com/LucasPcq/wtm/internal/infra/registry.go --
+package infra
+
+import "github.com/LucasPcq/wtm/internal/infra/fs"
+
+func Register(path string) error {
+	return fs.UpdateFile(path) // want `fs\.UpdateFile outside store/`
+}

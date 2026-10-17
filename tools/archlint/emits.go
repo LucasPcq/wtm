@@ -13,9 +13,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// emitters are the functions through which a flow publishes each event. A flow
-// that calls a mutator and none of these has changed a worktree no consumer
-// will hear about.
 var emitters = map[string][]objectRef{
 	"worktree.created":       {{Path: internalPrefix + "flow/publish", Name: "Created"}},
 	"worktree.provisioned":   {{Path: internalPrefix + "flow/publish", Name: "Provisioned"}},
@@ -99,8 +96,7 @@ func publishedEvents(pass *analysis.Pass) map[string]bool {
 	return published
 }
 
-// recordsPublications reads the package's test files from disk: archlint loads
-// the packages without their tests, and the rule is about whether one exists.
+// archlint loads the packages without their tests, so they are read from disk.
 func recordsPublications(pass *analysis.Pass) bool {
 	dirPath := filepath.Dir(pass.Fset.File(pass.Files[0].Pos()).Name())
 	entries, err := os.ReadDir(dirPath)

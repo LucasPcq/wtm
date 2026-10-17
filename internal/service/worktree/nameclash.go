@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/config"
@@ -18,11 +19,11 @@ type NameCheckParams struct {
 // CheckNameFree refuses a branch whose derived name a live worktree carries.
 // The names only exist for the run module, so a project declaring no job is
 // never refused: the core creates what it always created.
-func CheckNameFree(params NameCheckParams) error {
+func CheckNameFree(ctx context.Context, params NameCheckParams) error {
 	if !DerivedNamesMatter(params.StateDir) {
 		return nil
 	}
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return err
 	}

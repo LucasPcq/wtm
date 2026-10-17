@@ -90,14 +90,14 @@ func TestAnOlderDaemonCanBeListedAndStopped(t *testing.T) {
 	old := serveOld(t, socket, []domain.JobInfo{{Name: "web", Status: domain.JobStatusRunning, WorkDir: "/w"}})
 	client := NewClient(socket)
 
-	resp, err := client.Send(Request{Action: ActionList})
+	resp, err := client.Send(t.Context(), Request{Action: ActionList})
 	if err != nil || len(resp.Jobs) != 1 {
 		t.Fatalf("list = %+v, %v; want the older daemon's job", resp.Jobs, err)
 	}
-	if _, err := client.Send(Request{Action: ActionStop, Name: "web", WorkDir: "/w"}); err != nil {
+	if _, err := client.Send(t.Context(), Request{Action: ActionStop, Name: "web", WorkDir: "/w"}); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
-	if _, err := client.Send(Request{Action: ActionStopAll}); err != nil {
+	if _, err := client.Send(t.Context(), Request{Action: ActionStopAll}); err != nil {
 		t.Fatalf("stop all: %v", err)
 	}
 	if !old.received(ActionStop) || !old.received(ActionStopAll) {
@@ -110,7 +110,7 @@ func TestAnOlderDaemonIsStillRefusedAStart(t *testing.T) {
 	serveOld(t, socket, nil)
 	job := domain.JobConfig{Name: "web", Kind: domain.JobKindService, Cmd: "true"}
 
-	_, err := NewClient(socket).Send(Request{Action: ActionStart, Job: &job})
+	_, err := NewClient(socket).Send(t.Context(), Request{Action: ActionStart, Job: &job})
 	if !errors.Is(err, domain.ErrDaemonVersionMismatch) {
 		t.Fatalf("error = %v, want a version mismatch", err)
 	}
@@ -160,7 +160,7 @@ func TestShutdownSignalsADaemonThatPredatesTheRequest(t *testing.T) {
 	}
 	t.Cleanup(func() { terminate = previous })
 
-	if err := Shutdown(socket); err != nil {
+	if err := Shutdown(t.Context(), socket); err != nil {
 		t.Fatalf("shutdown: %v", err)
 	}
 	if len(signalled) != 1 || signalled[0] != os.Getpid() {
@@ -173,7 +173,7 @@ func TestEnsureCurrentDaemonReplacesAnIdleOlderDaemon(t *testing.T) {
 	old := serveOld(t, socket, nil)
 	signalled := replaceOnTerminate(t, old, socket)
 
-	if err := EnsureCurrentDaemon(DaemonParams{SocketPath: socket}); err != nil {
+	if err := EnsureCurrentDaemon(t.Context(), DaemonParams{SocketPath: socket}); err != nil {
 		t.Fatalf("ensure: %v", err)
 	}
 	if len(*signalled) != 1 {
@@ -189,7 +189,7 @@ func TestEnsureCurrentDaemonRefusesAnOlderDaemonHoldingJobs(t *testing.T) {
 	})
 	signalled := replaceOnTerminate(t, old, socket)
 
-	err := EnsureCurrentDaemon(DaemonParams{SocketPath: socket})
+	err := EnsureCurrentDaemon(t.Context(), DaemonParams{SocketPath: socket})
 	if !errors.Is(err, domain.ErrDaemonVersionMismatch) {
 		t.Fatalf("error = %v, want a version mismatch", err)
 	}
@@ -207,7 +207,7 @@ func TestAClaimFromADaemonBeforeTheRenameReadsAsJoined(t *testing.T) {
 	socket := skewSocket(t)
 	serveOld(t, socket, []domain.JobInfo{{Name: "postgres", WorkDir: "/w/feat", Status: domain.JobStatusLegacyAttached}})
 
-	resp, err := NewClient(socket).Send(Request{Action: ActionList})
+	resp, err := NewClient(socket).Send(t.Context(), Request{Action: ActionList})
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}

@@ -1,6 +1,7 @@
 package process
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"sync/atomic"
@@ -16,7 +17,7 @@ import (
 func TestASecondDaemonLeavesTheFirstOneServing(t *testing.T) {
 	daemon := idleDaemon(t, time.Minute, time.Second)
 	t.Cleanup(func() {
-		_ = Shutdown(daemon.socket)
+		_ = Shutdown(context.Background(), daemon.socket)
 		<-daemon.exited
 	})
 
@@ -63,13 +64,13 @@ func TestEnsureDaemonWaitsForAStoppingDaemonToExit(t *testing.T) {
 	}
 	t.Cleanup(func() { spawnDaemon = previous })
 
-	if err := EnsureDaemon(DaemonParams{SocketPath: socket}); err != nil {
+	if err := EnsureDaemon(t.Context(), DaemonParams{SocketPath: socket}); err != nil {
 		t.Fatalf("ensure: %v", err)
 	}
 	if spawnedEarly.Load() {
 		t.Error("a daemon was spawned while the previous one had not exited")
 	}
-	if err := Shutdown(socket); err != nil {
+	if err := Shutdown(t.Context(), socket); err != nil {
 		t.Fatalf("shutdown: %v", err)
 	}
 }

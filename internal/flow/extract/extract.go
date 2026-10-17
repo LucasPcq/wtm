@@ -2,6 +2,7 @@
 package extract
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -26,6 +27,8 @@ type Request struct {
 	// OnConflict is --on-conflict, empty when it was not given.
 	OnConflict string
 	Isolation  domain.Isolation
+	// Ask asks the remembered questions again (--ask).
+	Ask bool
 }
 
 // Outcome is Nothing when there was nothing to extract — no worktree with
@@ -48,8 +51,9 @@ type Params struct {
 	Presenter Presenter
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &extractFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -61,6 +65,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type extractFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -110,32 +115,34 @@ func (f *extractFlow) run() (Outcome, error) {
 	}
 
 	if f.request.To != "" {
-		_, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: f.request.To})
+		_, err := worktree.FindByBranch(f.runCtx, worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: f.request.To})
 		f.creates = err != nil
 	}
 	if f.creates && f.request.From == f.request.To {
 		return Outcome{}, fmt.Errorf(domain.BranchOwnParentFmt, f.request.To, domain.FlagFrom)
 	}
-	f.create = f.embed()
+	f.create = f.embed(f.runCtx)
 	if err := f.create.CheckBranch(); err != nil {
 		return Outcome{}, err
 	}
 
-	answers, err := f.prompter.Ask(f.session())
+	session := f.session(f.runCtx)
+	answers, err := f.prompter.Ask(session)
 	if errors.Is(err, domain.ErrUserAborted) {
 		return f.abort()
 	}
 	if err != nil {
 		return Outcome{}, err
 	}
+	decide.Remember(f.runCtx, decide.RememberParams{Context: f.ctx, Session: session, Answers: answers, Presenter: f.presenter})
 	return f.extract(answers)
 }
 
 func (f *extractFlow) listWorktrees() error {
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.ExtractScanLoading,
-		Work: func() error {
-			statuses, err := worktree.List(domain.ListParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Config: f.ctx.Config})
+		Work: func(ctx context.Context) error {
+			statuses, err := worktree.List(ctx, domain.ListParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Config: f.ctx.Config})
 			if err != nil {
 				return fmt.Errorf("list worktrees: %w", err)
 			}
@@ -158,17 +165,17 @@ func (f *extractFlow) dirty() []domain.WorktreeStatus {
 
 // sourceChanges resolves a source given by name, as --to is: an exact branch.
 func (f *extractFlow) sourceChanges(branch string) ([]domain.ExtractFile, error) {
-	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branch})
+	wt, err := worktree.FindByBranch(f.runCtx, worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branch})
 	if err != nil {
 		return nil, fmt.Errorf(domain.ExtractSourceNotFoundFmt, branch, err)
 	}
 	f.paths[branch] = wt.Path
 	var files []domain.ExtractFile
-	err = f.presenter.Stage(flow.StageParams{
+	err = f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.ExtractScanLoading,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var listErr error
-			files, listErr = worktree.ListChanges(worktree.ListChangesParams{WorktreePath: wt.Path})
+			files, listErr = worktree.ListChanges(ctx, worktree.ListChangesParams{WorktreePath: wt.Path})
 			return listErr
 		},
 	})
@@ -188,7 +195,7 @@ func (f *extractFlow) pickedChanges(branch string) ([]domain.ExtractFile, error)
 	if path == "" {
 		return nil, nil
 	}
-	files, err := worktree.ListChanges(worktree.ListChangesParams{WorktreePath: path})
+	files, err := worktree.ListChanges(f.runCtx, worktree.ListChangesParams{WorktreePath: path})
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +227,7 @@ type target struct {
 	branch   string
 	envPorts domain.EnvPortPlan
 	warnings []string
+	origins  map[string]domain.AnswerOrigin
 }
 
 func (f *extractFlow) extract(answers flow.Answers) (Outcome, error) {
@@ -246,7 +254,7 @@ func (f *extractFlow) extract(answers flow.Answers) (Outcome, error) {
 		return f.abort()
 	}
 
-	result, err := worktree.Extract(domain.ExtractParams{
+	result, err := worktree.Extract(f.runCtx, domain.ExtractParams{
 		SourcePath:   f.paths[source],
 		SourceBranch: source,
 		TargetPath:   dest.path,
@@ -260,6 +268,7 @@ func (f *extractFlow) extract(answers flow.Answers) (Outcome, error) {
 	}
 	result.Warnings = dest.warnings
 	result.EnvPorts = dest.envPorts
+	result.Origins = dest.origins
 	result.Isolation = worktree.IsolationOf(worktree.WorktreeRef{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: dest.branch})
 	return f.conclude(Outcome{Result: result})
 }
@@ -274,13 +283,13 @@ func (f *extractFlow) resolveTarget(answers flow.Answers) (target, bool, error) 
 	if err != nil || !proceed {
 		return target{}, proceed, err
 	}
-	return target{path: created.Path, branch: created.Branch, envPorts: created.EnvPorts, warnings: created.Warnings}, true, nil
+	return target{path: created.Path, branch: created.Branch, envPorts: created.EnvPorts, warnings: created.Warnings, origins: created.Origins}, true, nil
 }
 
 // existingTarget is a worktree the extraction did not create, so --isolation had
 // nothing to answer; saying so is all that is left to do with it.
 func (f *extractFlow) existingTarget(branch string) (target, bool, error) {
-	wt, err := worktree.FindByBranch(worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branch})
+	wt, err := worktree.FindByBranch(f.runCtx, worktree.FindByBranchParams{ProjectDir: f.ctx.ProjectDir, Branch: branch})
 	if err != nil {
 		return target{}, false, err
 	}
@@ -322,7 +331,7 @@ type conflictModeParams struct {
 // selection and on the disk, a target created a moment ago included. proceed is
 // false when the user declined to write conflict markers.
 func (f *extractFlow) conflictMode(params conflictModeParams) (mode string, proceed bool) {
-	conflicts := worktree.ConflictingFiles(domain.ConflictCheckParams{
+	conflicts := worktree.ConflictingFiles(f.runCtx, domain.ConflictCheckParams{
 		SourcePath: params.SourcePath,
 		TargetPath: params.Target.path,
 		Files:      params.Selected,

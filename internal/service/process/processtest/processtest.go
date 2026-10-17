@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
 )
 
@@ -115,7 +116,7 @@ func (d *Daemon) respond(req process.Request) process.Response {
 func (d *Daemon) in(workDir string) []domain.JobInfo {
 	var jobs []domain.JobInfo
 	for _, job := range d.jobs {
-		if job.WorkDir == workDir {
+		if job.WorkDir == workDir && rules.IsJobUp(job.Status) {
 			jobs = append(jobs, job)
 		}
 	}

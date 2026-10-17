@@ -1,7 +1,7 @@
 BINARY   := wtm
 BUILD_DIR := bin
 
-.PHONY: build test vet fmt lint arch dead dead-strict dupl tidy docs site site-dev demos release release-notes install clean
+.PHONY: build test vet fmt lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
@@ -15,8 +15,8 @@ vet:
 # fmt fails rather than rewrites: a formatting fix belongs in the commit that
 # caused it, not in the one that ran the linter.
 fmt:
-	@test -z "$$(gofmt -l cmd internal tools *.go)" || \
-		{ echo "gofmt needed:"; gofmt -l cmd internal tools *.go; exit 1; }
+	@test -z "$$(gofmt -l internal tools *.go)" || \
+		{ echo "gofmt needed:"; gofmt -l internal tools *.go; exit 1; }
 
 # arch checks the rules of CLAUDE.md section 9 that no general-purpose linter
 # knows about: layers and service edges, the styles monopoly, comma-ok
@@ -39,7 +39,13 @@ dead:
 dead-strict:
 	@go tool deadcode ./... | grep -v -E -f .deadcode-ignore | grep -v -E '/(testutil|processtest)/' || true
 
-lint: fmt vet arch dead
+# sumtype checks that a type switch over a sealed interface declared with
+# //go-sumtype:decl (fs.Change, envcopy.Warning) handles every variant. The
+# declaration is a standalone comment: gofmt rewrites it inside a doc comment.
+sumtype:
+	go tool go-sumtype $$(go list ./...)
+
+lint: fmt vet arch dead sumtype
 	go tool staticcheck ./...
 
 # dupl reports token-level clones. It is not part of `lint`: a clone is a
@@ -48,7 +54,7 @@ lint: fmt vet arch dead
 # one. Raise the threshold to see only the large ones.
 DUPL_THRESHOLD ?= 75
 dupl:
-	@find cmd internal -name '*.go' ! -name '*_test.go' > /tmp/wtm-dupl-files
+	@find internal -name '*.go' ! -name '*_test.go' > /tmp/wtm-dupl-files
 	@go tool dupl -t $(DUPL_THRESHOLD) -files < /tmp/wtm-dupl-files
 
 tidy:

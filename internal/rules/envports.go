@@ -2,6 +2,7 @@ package rules
 
 import (
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -106,6 +107,51 @@ func PlanEnvPorts(params PlanEnvPortsParams) domain.EnvPortPlan {
 	return plan
 }
 
+type SettleEnvResolvedValuesParams struct {
+	Files []domain.EnvFileResult
+	// Ports plans the worktree's links; its Lines are ignored.
+	Ports PlanEnvPortsParams
+}
+
+// SettleEnvResolvedValues spells each source value a link follows the way the
+// port pass leaves it: a value taken from the source is shifted onto this
+// worktree's port right after it is written, so previewing the source's
+// spelling shows a port the file never gets. It returns a copy.
+func SettleEnvResolvedValues(params SettleEnvResolvedValuesParams) []domain.EnvFileResult {
+	files := slices.Clone(params.Files)
+	for i, file := range files {
+		entries := slices.Clone(file.Diff.Entries)
+		for j, entry := range entries {
+			entries[j].ResolvedValue = settledEnvValue(settledEnvValueParams{Ports: params.Ports, File: file.Target, Entry: entry})
+		}
+		files[i].Diff.Entries = entries
+	}
+	return files
+}
+
+type settledEnvValueParams struct {
+	Ports PlanEnvPortsParams
+	File  string
+	Entry domain.EnvKeyDiff
+}
+
+func settledEnvValue(params settledEnvValueParams) string {
+	value := params.Entry.ResolvedValue
+	ports := params.Ports
+	ports.Links = slices.DeleteFunc(slices.Clone(ports.Links), func(link domain.EnvPortLink) bool {
+		return link.File != params.File || link.Key != params.Entry.Key
+	})
+	if value == "" || len(ports.Links) == 0 {
+		return value
+	}
+	ports.Lines = map[string][]domain.EnvLine{params.File: {{Kind: domain.EnvLinePair, Key: params.Entry.Key, Value: value}}}
+	plan := PlanEnvPorts(ports)
+	if len(plan.Entries) != 1 || plan.Entries[0].Status != domain.EnvPortStatusRewrite {
+		return value
+	}
+	return plan.Entries[0].NewValue
+}
+
 // linkGroup is every link one .env key follows, in declaration order.
 type linkGroup struct {
 	File  string
@@ -161,7 +207,7 @@ func planEnvPortKey(params planEnvPortKeyParams) domain.EnvPortEntry {
 		Lines:    params.Lines,
 		Origins:  params.Origins,
 	})
-	merged.Moves = []domain.EnvPortMove{moveOf(params.Group.Links[0], params.Group.Bases[0], resolvedPort(params, 0))}
+	merged.Moves = []domain.EnvPortMove{moveOf(moveOfParams{Key: params, Index: 0, Entry: merged})}
 	if len(params.Group.Links) == 1 {
 		return merged
 	}
@@ -182,7 +228,7 @@ func planEnvPortKey(params planEnvPortKeyParams) domain.EnvPortEntry {
 			Origins:  params.Origins,
 		})
 		merged = foldEnvPortEntry(merged, next)
-		merged.Moves = append(merged.Moves, moveOf(params.Group.Links[i], params.Group.Bases[i], resolvedPort(params, i)))
+		merged.Moves = append(merged.Moves, moveOf(moveOfParams{Key: params, Index: i, Entry: next}))
 	}
 	return merged
 }
@@ -220,8 +266,20 @@ func ResolvedPort(params ResolvedPortParams) int {
 	return params.Base + params.Offset
 }
 
-func moveOf(link domain.EnvPortLink, base, resolved int) domain.EnvPortMove {
-	return domain.EnvPortMove{Port: link.Port, Job: link.Job, Base: base, Resolved: resolved}
+type moveOfParams struct {
+	Key   planEnvPortKeyParams
+	Index int
+	// Entry is the link's own reading, which says whether it took an address.
+	Entry domain.EnvPortEntry
+}
+
+func moveOf(params moveOfParams) domain.EnvPortMove {
+	link := params.Key.Group.Links[params.Index]
+	move := domain.EnvPortMove{Port: link.Port, Job: link.Job, Base: params.Key.Group.Bases[params.Index], Resolved: resolvedPort(params.Key, params.Index)}
+	if params.Entry.Addressing == domain.AddressingNames {
+		move.Origin = linkOrigin(linkOriginParams{Link: link, Origins: params.Key.Origins})
+	}
+	return move
 }
 
 // foldEnvPortEntry keeps what the run has done so far and what the next link
@@ -321,13 +379,7 @@ func planOriginEntry(entry domain.EnvPortEntry, value string, params planEnvPort
 		return entry, false
 	}
 
-	origin := LinkOrigin(LinkOriginParams{
-		Job:        params.Origins.Jobs[params.Link.Job],
-		PortName:   params.Link.Port,
-		Worktree:   params.Origins.Worktree,
-		Project:    params.Origins.Project,
-		PublicPort: params.Origins.PublicPort,
-	})
+	origin := linkOrigin(linkOriginParams{Link: params.Link, Origins: params.Origins})
 	if origin == "" {
 		return entry, false
 	}
@@ -349,6 +401,21 @@ func planOriginEntry(entry domain.EnvPortEntry, value string, params planEnvPort
 	entry.NewValue = rewrite.Value
 	entry.ForeignHost = rewrite.ForeignHost
 	return entry, true
+}
+
+type linkOriginParams struct {
+	Link    domain.EnvPortLink
+	Origins OriginContext
+}
+
+func linkOrigin(params linkOriginParams) string {
+	return LinkOrigin(LinkOriginParams{
+		Job:        params.Origins.Jobs[params.Link.Job],
+		PortName:   params.Link.Port,
+		Worktree:   params.Origins.Worktree,
+		Project:    params.Origins.Project,
+		PublicPort: params.Origins.PublicPort,
+	})
 }
 
 // alreadyResolvedStatus classifies a value the base does not appear in. Finding
@@ -546,30 +613,24 @@ func envPairByKey(lines []domain.EnvLine, key string) (domain.EnvLine, bool) {
 	return domain.EnvLine{}, false
 }
 
-type ElideEnvValueParams struct {
-	Value string
-	// Width is the room the value has. Zero is a surface that could not measure
-	// itself — a pipe, a test — and falls back to the default.
+type envPortBecomesParams struct {
+	Entry domain.EnvPortEntry
+	// Width is the room the column has. Zero is a surface that could not
+	// measure itself — a pipe, a test — and falls back to the default.
 	Width int
 }
 
-// ElideEnvValue shortens a value for display. Cutting at the credentials
-// separator is not only about width: a DATABASE_URL printed whole puts a
-// password on screen, and the part worth reading is the host and the port.
-//
-// The width is an input because a named origin is long by nature —
-// `http://admin.feat-x.monorepo.localhost:11080` is past fifty characters — and
-// a value cut to a fixed budget on a wide terminal is unreadable for no reason.
-func ElideEnvValue(params ElideEnvValueParams) string {
+// envPortBecomes is where a link's ports land, built from the plan alone: the
+// value is the user's, a password among it, and no part of it is printed.
+func envPortBecomes(params envPortBecomesParams) string {
 	width := params.Width
 	if width <= 0 {
 		width = domain.EnvValueDisplayWidth
 	}
-
-	value := params.Value
-	if at := strings.LastIndex(value, domain.EnvCredentialsSeparator); at >= 0 {
-		value = domain.Ellipsis + value[at:]
+	if len(params.Entry.Moves) == 0 {
+		return domain.Ellipsis
 	}
+	value := EnvPortMovesTo(params.Entry.Moves)
 	if len(value) <= width {
 		return value
 	}

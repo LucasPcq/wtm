@@ -1,4 +1,4 @@
--- github.com/LucasPcq/wtm/internal/commands/wt/wt.go --
+-- github.com/LucasPcq/wtm/internal/surface/cli/wt/wt.go --
 package wt
 
 import (
@@ -8,10 +8,10 @@ import (
 
 func run() error {
 	_ = worktree.List()
-	if err := worktree.SetIsolation(); err != nil { // want `worktree\.SetIsolation is called from commands/: a worktree-mutating command goes through internal/flow/<cmd>`
+	if err := worktree.SetIsolation(); err != nil { // want `worktree\.SetIsolation is called from surface/cli/: a worktree-mutating command goes through internal/flow/<cmd>`
 		return err
 	}
-	return envsvc.ApplyEnvSync() // want `envsvc\.ApplyEnvSync is called from commands/`
+	return envsvc.ApplyEnvSync() // want `envsvc\.ApplyEnvSync is called from surface/cli/`
 }
 -- github.com/LucasPcq/wtm/internal/flow/create/create.go --
 package create
@@ -61,11 +61,11 @@ func EnsureOrdinal() (int, error) { return 0, nil }
 func List() error { return nil }
 
 func BranchEnv() (int, error) { return EnsureOrdinal() }
--- github.com/LucasPcq/wtm/internal/tui/dash/dash.go --
+-- github.com/LucasPcq/wtm/internal/surface/tui/dash/dash.go --
 package dash
 
 import w "github.com/LucasPcq/wtm/internal/service/worktree"
 
-var create = w.Create // want `w\.Create is called from tui/`
+var create = w.Create // want `w\.Create is called from surface/tui/`
 
-func run() error { return w.Create() } // want `w\.Create is called from tui/`
+func run() error { return w.Create() } // want `w\.Create is called from surface/tui/`

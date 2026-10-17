@@ -140,7 +140,7 @@ type DetailSection struct {
 	Key   string
 	Title string
 	// TitleRight is a summary of the section, rendered flush right on its
-	// heading row (mirrors panelParams.TitleRight in tui/dashboard/render.go)
+	// heading row (mirrors panelParams.TitleRight in surface/tui/dashboard/render.go)
 	// and dropped whole, never truncated, when the panel is too narrow for it.
 	TitleRight string
 	Lines      []string

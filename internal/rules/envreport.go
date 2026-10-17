@@ -32,9 +32,8 @@ func EnvReportFields(result domain.EnvSyncResult) []domain.RecapField {
 type EnvKeyRowsParams struct {
 	File  domain.EnvFileResult
 	Check bool
-	// Managed are the keys whose values a row may print (EnvManagedKeys);
-	// ShowValues prints them all.
-	Managed    map[string]bool
+	// ShowValues prints a conflict's two values, withheld otherwise: both are
+	// read from the files, so both are the user's.
 	ShowValues bool
 }
 
@@ -100,7 +99,7 @@ type envConflictDetailParams struct {
 func envConflictDetail(params envConflictDetailParams) string {
 	e, rows := params.Entry, params.Rows
 	source := EnvSourceName(e.Source, rows.File.ParentBranch)
-	if !rows.ShowValues && !rows.Managed[e.Key] {
+	if !rows.ShowValues {
 		if rows.Check {
 			return fmt.Sprintf(domain.EnvDetailConflictRedactedFmt, source)
 		}
@@ -110,11 +109,7 @@ func envConflictDetail(params envConflictDetailParams) string {
 	if !rows.Check {
 		conflictFmt = domain.EnvDetailConflictKeptFmt
 	}
-	current, resolved := e.CurrentValue, e.ResolvedValue
-	if !rows.ShowValues {
-		current, resolved = MaskURLPassword(current), MaskURLPassword(resolved)
-	}
-	return fmt.Sprintf(conflictFmt, EnvQuote(current), source, EnvQuote(resolved))
+	return fmt.Sprintf(conflictFmt, EnvQuote(e.CurrentValue), source, EnvQuote(e.ResolvedValue))
 }
 
 // EnvFileTally counts what an apply did to a file's keys — "2 added · 1

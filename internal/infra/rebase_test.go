@@ -33,7 +33,7 @@ func writeCommit(t *testing.T, dir, name, content string) {
 func TestConflictedFiles_ReportsUnmergedPaths(t *testing.T) {
 	dir := gittest.InitRepo(t)
 
-	if got := ConflictedFiles(dir); got != nil {
+	if got := ConflictedFiles(t.Context(), dir); got != nil {
 		t.Fatalf("clean tree: ConflictedFiles = %v, want nil", got)
 	}
 
@@ -48,7 +48,7 @@ func TestConflictedFiles_ReportsUnmergedPaths(t *testing.T) {
 	// A conflicting merge stops with a.txt unmerged (non-zero exit expected).
 	exec.Command("git", "-C", dir, "merge", "feature").Run()
 
-	files := ConflictedFiles(dir)
+	files := ConflictedFiles(t.Context(), dir)
 	if len(files) != 1 || files[0] != "a.txt" {
 		t.Fatalf("ConflictedFiles = %v, want [a.txt]", files)
 	}

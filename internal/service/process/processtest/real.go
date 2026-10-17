@@ -1,6 +1,7 @@
 package processtest
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -30,7 +31,8 @@ func RealDaemon(t *testing.T, socket string) (stop func()) {
 			return
 		}
 		stopped = true
-		_, _ = process.NewClient(socket).SendUnchecked(process.Request{Action: process.ActionShutdown})
+		// A cleanup runs this after t.Context() is already done.
+		_, _ = process.NewClient(socket).SendUnchecked(context.Background(), process.Request{Action: process.ActionShutdown})
 		select {
 		case <-exited:
 		case <-time.After(3 * time.Second):

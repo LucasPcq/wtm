@@ -15,7 +15,7 @@ import (
 func TestWorktreeStepIsNotAskedInASingleWorktreeRepository(t *testing.T) {
 	repo := gittest.InitRepo(t)
 
-	step := target.WorktreeStep(target.WorktreeParams{ProjectDir: repo, Current: repo})
+	step := target.WorktreeStep(t.Context(), target.WorktreeParams{ProjectDir: repo, Current: repo})
 
 	skip, reason := step.Skip(flow.Answers{})
 	if !skip {
@@ -32,7 +32,7 @@ func TestWorktreeStepIsNotAskedInASingleWorktreeRepository(t *testing.T) {
 func TestWorktreeStepResolvesToTheCurrentWorktree(t *testing.T) {
 	repo := gittest.InitRepo(t)
 
-	step := target.WorktreeStep(target.WorktreeParams{ProjectDir: repo, Current: repo})
+	step := target.WorktreeStep(t.Context(), target.WorktreeParams{ProjectDir: repo, Current: repo})
 
 	answer, err := step.Resolve(flow.Answers{})
 	if err != nil {
@@ -40,15 +40,15 @@ func TestWorktreeStepResolvesToTheCurrentWorktree(t *testing.T) {
 	}
 	// Spelled the way git spells it, whatever the caller passed: the answer is
 	// the daemon's key for every job the run touches.
-	if answer.Value != target.Root(repo) {
-		t.Errorf("Resolve = %q, want the current worktree %q", answer.Value, target.Root(repo))
+	if answer.Value != target.Root(t.Context(), repo) {
+		t.Errorf("Resolve = %q, want the current worktree %q", answer.Value, target.Root(t.Context(), repo))
 	}
 }
 
 func TestWorktreeStepOffersEveryWorktreeWithItsRunningJobs(t *testing.T) {
 	repo, second := repoWithSecondWorktree(t)
 
-	step := target.WorktreeStep(target.WorktreeParams{
+	step := target.WorktreeStep(t.Context(), target.WorktreeParams{
 		ProjectDir: repo,
 		Current:    repo,
 		Running:    map[string]int{second: 2},
@@ -62,8 +62,8 @@ func TestWorktreeStepOffersEveryWorktreeWithItsRunningJobs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
-	if content.Start != target.Root(repo) {
-		t.Errorf("Start = %q, want the current worktree %q", content.Start, target.Root(repo))
+	if content.Start != target.Root(t.Context(), repo) {
+		t.Errorf("Start = %q, want the current worktree %q", content.Start, target.Root(t.Context(), repo))
 	}
 	if len(content.Options) != 2 {
 		t.Fatalf("options = %d, want 2", len(content.Options))
@@ -73,7 +73,7 @@ func TestWorktreeStepOffersEveryWorktreeWithItsRunningJobs(t *testing.T) {
 	if got := badges[second]; got != "2 running" {
 		t.Errorf("second worktree badges = %q, want its running count", got)
 	}
-	if got := badges[target.Root(repo)]; got != domain.RunWorktreeCurrent {
+	if got := badges[target.Root(t.Context(), repo)]; got != domain.RunWorktreeCurrent {
 		t.Errorf("current worktree badges = %q, want %q", got, domain.RunWorktreeCurrent)
 	}
 }
@@ -83,7 +83,7 @@ func TestWorktreeStepOffersEveryWorktreeWithItsRunningJobs(t *testing.T) {
 func TestWorktreeStepSummarizesAPathAsItsBranch(t *testing.T) {
 	repo, second := repoWithSecondWorktree(t)
 
-	step := target.WorktreeStep(target.WorktreeParams{ProjectDir: repo, Current: repo})
+	step := target.WorktreeStep(t.Context(), target.WorktreeParams{ProjectDir: repo, Current: repo})
 
 	if got := step.Summarize(flow.Answer{Value: second}); got != "feature" {
 		t.Errorf("Summarize = %q, want the branch name", got)
@@ -211,7 +211,7 @@ func repoWithSecondWorktree(t *testing.T) (repo, second string) {
 	repo = gittest.InitRepo(t)
 	second = filepath.Join(t.TempDir(), "feature")
 	gittest.Git(t, repo, "worktree", "add", "-b", "feature", second)
-	return repo, target.Root(second)
+	return repo, target.Root(t.Context(), second)
 }
 
 func badgesByValue(options []flow.Option) map[string]string {
@@ -229,13 +229,13 @@ func badgesByValue(options []flow.Option) map[string]string {
 func TestWorktreesStepResolvesToTheCurrentWorktreeAsASetOfOne(t *testing.T) {
 	repo := gittest.InitRepo(t)
 
-	step := target.WorktreesStep(target.WorktreesParams{ProjectDir: repo, Current: repo})
+	step := target.WorktreesStep(t.Context(), target.WorktreesParams{ProjectDir: repo, Current: repo})
 
 	answer, err := step.Resolve(flow.Answers{})
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
-	if len(answer.Values) != 1 || answer.Values[0] != target.Root(repo) {
+	if len(answer.Values) != 1 || answer.Values[0] != target.Root(t.Context(), repo) {
 		t.Errorf("Resolve = %v, want the current worktree alone", answer.Values)
 	}
 }
@@ -245,14 +245,14 @@ func TestWorktreesStepResolvesToTheCurrentWorktreeAsASetOfOne(t *testing.T) {
 func TestWorktreesStepPrechecksWhatTheRunWouldActOnAnyway(t *testing.T) {
 	repo, second := repoWithSecondWorktree(t)
 
-	step := target.WorktreesStep(target.WorktreesParams{ProjectDir: repo, Current: repo})
+	step := target.WorktreesStep(t.Context(), target.WorktreesParams{ProjectDir: repo, Current: repo})
 
 	content, err := step.Build(flow.Answers{})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 	for _, option := range content.Options {
-		want := option.Value == target.Root(repo)
+		want := option.Value == target.Root(t.Context(), repo)
 		if option.Selected != want {
 			t.Errorf("%q selected = %v, want %v", option.Value, option.Selected, want)
 		}
@@ -265,7 +265,7 @@ func TestWorktreesStepPrechecksWhatTheRunWouldActOnAnyway(t *testing.T) {
 func TestWorktreesStepPrechecksThePositionalsInstead(t *testing.T) {
 	repo, second := repoWithSecondWorktree(t)
 
-	step := target.WorktreesStep(target.WorktreesParams{
+	step := target.WorktreesStep(t.Context(), target.WorktreesParams{
 		ProjectDir: repo,
 		Current:    repo,
 		Selected:   []string{second},
@@ -287,7 +287,7 @@ func TestWorktreesStepPrechecksThePositionalsInstead(t *testing.T) {
 func TestWorktreesStepRefusesAnEmptySelection(t *testing.T) {
 	repo := gittest.InitRepo(t)
 
-	step := target.WorktreesStep(target.WorktreesParams{ProjectDir: repo, Current: repo})
+	step := target.WorktreesStep(t.Context(), target.WorktreesParams{ProjectDir: repo, Current: repo})
 
 	if err := step.ValidateSet(nil); err == nil {
 		t.Fatal("an empty selection was accepted")
@@ -300,9 +300,9 @@ func TestWorktreesStepRefusesAnEmptySelection(t *testing.T) {
 func TestWorktreesStepSummarizesPathsAsBranches(t *testing.T) {
 	repo, second := repoWithSecondWorktree(t)
 
-	step := target.WorktreesStep(target.WorktreesParams{ProjectDir: repo, Current: repo})
+	step := target.WorktreesStep(t.Context(), target.WorktreesParams{ProjectDir: repo, Current: repo})
 
-	got := step.Summarize(flow.Answer{Values: []string{target.Root(repo), second}})
+	got := step.Summarize(flow.Answer{Values: []string{target.Root(t.Context(), repo), second}})
 	if !strings.Contains(got, "feature") {
 		t.Errorf("Summarize = %q, want the branch names", got)
 	}
@@ -311,7 +311,7 @@ func TestWorktreesStepSummarizesPathsAsBranches(t *testing.T) {
 func TestWorkDirsPrefersTheAnswerThenThePositionalsThenTheCwd(t *testing.T) {
 	repo := gittest.InitRepo(t)
 
-	answered := target.WorkDirs(target.WorkDirsParams{
+	answered := target.WorkDirs(t.Context(), target.WorkDirsParams{
 		Answers: flow.Answers{}.WithValues(target.KeyWorktree, []string{"/a", "/b"}),
 		Named:   []target.Resolved{{Dir: "/named"}},
 		Cwd:     repo,
@@ -320,7 +320,7 @@ func TestWorkDirsPrefersTheAnswerThenThePositionalsThenTheCwd(t *testing.T) {
 		t.Errorf("WorkDirs = %v, want what the step answered", answered)
 	}
 
-	named := target.WorkDirs(target.WorkDirsParams{
+	named := target.WorkDirs(t.Context(), target.WorkDirsParams{
 		Named: []target.Resolved{{Dir: "/named"}, {Dir: "/other"}},
 		Cwd:   repo,
 	})
@@ -328,8 +328,8 @@ func TestWorkDirsPrefersTheAnswerThenThePositionalsThenTheCwd(t *testing.T) {
 		t.Errorf("WorkDirs = %v, want the positionals", named)
 	}
 
-	fallback := target.WorkDirs(target.WorkDirsParams{Cwd: repo})
-	if len(fallback) != 1 || fallback[0] != target.Root(repo) {
+	fallback := target.WorkDirs(t.Context(), target.WorkDirsParams{Cwd: repo})
+	if len(fallback) != 1 || fallback[0] != target.Root(t.Context(), repo) {
 		t.Errorf("WorkDirs = %v, want the current worktree alone", fallback)
 	}
 }
@@ -337,7 +337,7 @@ func TestWorkDirsPrefersTheAnswerThenThePositionalsThenTheCwd(t *testing.T) {
 // A branch and a path can name the same worktree. Running it twice would race
 // two identical sequences, the second failing on the jobs the first started.
 func TestWorkDirsKeepsOneMentionOfEachWorktree(t *testing.T) {
-	dirs := target.WorkDirs(target.WorkDirsParams{
+	dirs := target.WorkDirs(t.Context(), target.WorkDirsParams{
 		Named: []target.Resolved{{Dir: "/a"}, {Dir: "/b"}, {Dir: "/a"}},
 		Cwd:   "/cwd",
 	})
@@ -351,7 +351,7 @@ func TestWorkDirsKeepsOneMentionOfEachWorktree(t *testing.T) {
 // The picker refuses at the tick rather than after the recap.
 func TestWorktreesStepRefusesASecondTickForASingleWorktreeRun(t *testing.T) {
 	repo := gittest.InitRepo(t)
-	step := target.WorktreesStep(target.WorktreesParams{ProjectDir: repo, Current: repo, Single: true})
+	step := target.WorktreesStep(t.Context(), target.WorktreesParams{ProjectDir: repo, Current: repo, Single: true})
 
 	if err := step.ValidateSet([]string{"/a"}); err != nil {
 		t.Errorf("ValidateSet: %v", err)
@@ -367,7 +367,7 @@ func TestWorktreesStepRefusesASecondTickForASingleWorktreeRun(t *testing.T) {
 func TestWorktreesStepOpensOnWhatTheSurfacePrechecked(t *testing.T) {
 	repo, second := repoWithSecondWorktree(t)
 
-	step := target.WorktreesStep(target.WorktreesParams{
+	step := target.WorktreesStep(t.Context(), target.WorktreesParams{
 		ProjectDir: repo,
 		Current:    repo,
 		Selected:   target.Preselected(target.PreselectedParams{Precheck: []string{second}}),

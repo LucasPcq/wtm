@@ -17,6 +17,9 @@ func Validate(cfg domain.Config) error {
 	if err := ValidateEnvFiles(cfg.Project.Env.Files); err != nil {
 		return err
 	}
+	if err := ValidateRemembered(cfg.Project.Wizard.Remembered); err != nil {
+		return err
+	}
 	if err := ValidateShellType(cfg.Global.Shell); err != nil {
 		return err
 	}

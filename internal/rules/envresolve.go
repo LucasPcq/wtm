@@ -152,7 +152,7 @@ func EnvRestoreRecapLines(entries []domain.EnvRestoredEntry) []string {
 	}
 	for _, file := range files {
 		lines = append(lines, file)
-		for _, row := range EnvRestoredRows(entries, file) {
+		for _, row := range EnvRestoredRows(EnvRestoredRowsParams{Entries: entries, File: file}) {
 			lines = append(lines, domain.RecapRowIndent+row)
 		}
 	}

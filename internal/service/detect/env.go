@@ -1,6 +1,7 @@
 package detect
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sort"
@@ -68,6 +69,6 @@ func DockerComposeFiles(projectDir string) []string {
 }
 
 // DockerComposeCommand returns the docker-compose invocation available on the host.
-func DockerComposeCommand() string {
-	return infra.DockerComposeCommand()
+func DockerComposeCommand(ctx context.Context) string {
+	return infra.DockerComposeCommand(ctx)
 }

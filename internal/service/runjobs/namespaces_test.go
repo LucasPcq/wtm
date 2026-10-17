@@ -27,7 +27,7 @@ func TestDetachWorktreeRunsTheCommandWithTheNamespaceName(t *testing.T) {
 	dir := t.TempDir()
 	witness := filepath.Join(dir, "witness")
 
-	got := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+	got := runjobs.RemoveWorktreeNamespaces(t.Context(), runjobs.RemoveNamespacesParams{
 		Config:  namespaceConfig("printf '%s\\n' \"$WTM_NAMESPACE\" >> " + witness),
 		Env:     worktreeEnv(),
 		WorkDir: dir,
@@ -54,7 +54,7 @@ func TestDetachWorktreeDefersWhenTheServiceIsDown(t *testing.T) {
 	dir := t.TempDir()
 	witness := filepath.Join(dir, "witness")
 
-	got := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+	got := runjobs.RemoveWorktreeNamespaces(t.Context(), runjobs.RemoveNamespacesParams{
 		Config:  namespaceConfig("printf 'ran\\n' >> " + witness),
 		Env:     worktreeEnv(),
 		WorkDir: dir,
@@ -76,7 +76,7 @@ func TestDetachWorktreeDefersWhenTheServiceIsDown(t *testing.T) {
 }
 
 func TestDetachWorktreeDefersAFailedCommand(t *testing.T) {
-	got := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+	got := runjobs.RemoveWorktreeNamespaces(t.Context(), runjobs.RemoveNamespacesParams{
 		Config:  namespaceConfig("exit 3"),
 		Env:     worktreeEnv(),
 		WorkDir: t.TempDir(),
@@ -97,7 +97,7 @@ func TestDetachWorktreeDefersAFailedCommand(t *testing.T) {
 // A drop blocked on a lock nobody releases must not hold the clean for ever.
 func TestRemoveGivesUpOnACommandThatNeverReturns(t *testing.T) {
 	started := time.Now()
-	got := runjobs.RemoveWorktreeNamespaces(runjobs.RemoveNamespacesParams{
+	got := runjobs.RemoveWorktreeNamespaces(t.Context(), runjobs.RemoveNamespacesParams{
 		Config:  namespaceConfig("sleep 600; true"),
 		Env:     worktreeEnv(),
 		WorkDir: t.TempDir(),
@@ -120,7 +120,7 @@ func TestPendingDetachQueueRoundTrips(t *testing.T) {
 	stateDir := t.TempDir()
 	ref := domain.NamespaceRef{Job: "db", Worktree: "feat_a", Ordinal: 2}
 
-	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: stateDir, Refs: []domain.NamespaceRef{ref}}); err != nil {
+	if err := runjobs.QueueRemovals(t.Context(), runjobs.QueueRemovalsParams{StateDir: stateDir, Refs: []domain.NamespaceRef{ref}}); err != nil {
 		t.Fatalf("queue: %v", err)
 	}
 	if got := runjobs.LoadPendingRemovals(stateDir); len(got) != 1 || got[0] != ref {
@@ -128,14 +128,14 @@ func TestPendingDetachQueueRoundTrips(t *testing.T) {
 	}
 
 	// The same worktree cleaned twice owes one namespace, not two.
-	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: stateDir, Refs: []domain.NamespaceRef{ref}}); err != nil {
+	if err := runjobs.QueueRemovals(t.Context(), runjobs.QueueRemovalsParams{StateDir: stateDir, Refs: []domain.NamespaceRef{ref}}); err != nil {
 		t.Fatalf("queue again: %v", err)
 	}
 	if got := runjobs.LoadPendingRemovals(stateDir); len(got) != 1 {
 		t.Errorf("loaded = %v, want one entry", got)
 	}
 
-	if err := runjobs.SettleRemovals(runjobs.SettleRemovalsParams{StateDir: stateDir, Refs: []domain.NamespaceRef{ref}}); err != nil {
+	if err := runjobs.SettleRemovals(t.Context(), runjobs.SettleRemovalsParams{StateDir: stateDir, Refs: []domain.NamespaceRef{ref}}); err != nil {
 		t.Fatalf("settle: %v", err)
 	}
 	if got := runjobs.LoadPendingRemovals(stateDir); len(got) != 0 {

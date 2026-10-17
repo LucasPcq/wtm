@@ -4,6 +4,7 @@
 package urls
 
 import (
+	"context"
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -28,10 +29,10 @@ type Reader struct {
 	proxyPort int
 }
 
-func Open(params Params) Reader {
+func Open(ctx context.Context, params Params) Reader {
 	proxyPort := 0
 	if !params.Raw {
-		proxyPort = process.PublicProxyPort(rules.RunProxyPort(rules.RunProxyPortParams{Run: params.Config, Global: params.Context.Config.Global}))
+		proxyPort = process.PublicProxyPort(ctx, rules.RunProxyPort(rules.RunProxyPortParams{Run: params.Config, Global: params.Context.Config.Global}))
 	}
 	return Reader{ctx: params.Context, config: params.Config, proxyPort: proxyPort}
 }
@@ -42,11 +43,17 @@ func (r Reader) Serving() bool { return r.proxyPort > 0 }
 
 // In lists the jobs reachable in one worktree. The worktree is what makes the
 // addresses differ: its ordinal decides every port.
-func (r Reader) In(dir string) ([]domain.JobURLEntry, error) {
-	env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: r.ctx.ProjectDir, StateDir: r.ctx.StateDir, WorkDir: dir, Publisher: r.ctx.Publisher})
+func (r Reader) In(ctx context.Context, dir string) ([]domain.JobURLEntry, error) {
+	env, err := seam.JobEnv(ctx, seam.JobEnvParams{ProjectDir: r.ctx.ProjectDir, StateDir: r.ctx.StateDir, WorkDir: dir, Publisher: r.ctx.Publisher})
 	if err != nil {
 		return nil, err
 	}
+	return r.At(env), nil
+}
+
+// At lists the jobs reachable under an environment already resolved, for a
+// reader that must not number the worktree to ask.
+func (r Reader) At(env map[string]string) []domain.JobURLEntry {
 	addresses := rules.WorktreeJobAddresses(rules.WorktreeJobAddressesParams{
 		Config:     r.config,
 		PortOffset: rules.PortOffsetFromEnv(env),
@@ -63,5 +70,5 @@ func (r Reader) In(dir string) ([]domain.JobURLEntry, error) {
 		}
 		entries = append(entries, domain.JobURLEntry{Job: job.Name, URL: url})
 	}
-	return entries, nil
+	return entries
 }

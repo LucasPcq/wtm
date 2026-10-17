@@ -26,10 +26,10 @@ func newContext(t *testing.T) (flow.Context, *flowtest.Recorder) {
 func TestEnsurePublishesTheAllocationOnlyOnce(t *testing.T) {
 	ctx, rec := newContext(t)
 
-	if err := ordinal.Ensure(ctx, "feat/a"); err != nil {
+	if err := ordinal.Ensure(t.Context(), ctx, "feat/a"); err != nil {
 		t.Fatal(err)
 	}
-	if err := ordinal.Ensure(ctx, "feat/a"); err != nil {
+	if err := ordinal.Ensure(t.Context(), ctx, "feat/a"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -46,7 +46,7 @@ func TestRetryAllocatesWhenTheServiceAsksForANumber(t *testing.T) {
 	ctx, rec := newContext(t)
 	calls := 0
 
-	err := ordinal.Retry(ordinal.RetryParams{Context: ctx, Branch: func() string { return "feat/a" }, Do: func() error {
+	err := ordinal.Retry(t.Context(), ordinal.RetryParams{Context: ctx, Branch: func() string { return "feat/a" }, Do: func() error {
 		calls++
 		if calls == 1 {
 			return domain.ErrOrdinalUnallocated
@@ -64,7 +64,7 @@ func TestRetryLeavesAnyOtherErrorAlone(t *testing.T) {
 	boom := errors.New("boom")
 	calls := 0
 
-	err := ordinal.Retry(ordinal.RetryParams{Context: ctx, Branch: func() string { return "feat/a" }, Do: func() error {
+	err := ordinal.Retry(t.Context(), ordinal.RetryParams{Context: ctx, Branch: func() string { return "feat/a" }, Do: func() error {
 		calls++
 		return boom
 	}})
@@ -78,7 +78,7 @@ func TestRetryReadsTheBranchOnlyToAllocate(t *testing.T) {
 	ctx, _ := newContext(t)
 	asked := 0
 
-	err := ordinal.Retry(ordinal.RetryParams{
+	err := ordinal.Retry(t.Context(), ordinal.RetryParams{
 		Context: ctx,
 		Branch:  func() string { asked++; return "feat/a" },
 		Do:      func() error { return nil },
@@ -92,7 +92,7 @@ func TestRetryReadsTheBranchOnlyToAllocate(t *testing.T) {
 func TestBeforeHooksAllocatesNothingTheHooksWillNotRead(t *testing.T) {
 	ctx, rec := newContext(t)
 
-	ordinal.BeforeHooks(ctx, "feat/a")
+	ordinal.BeforeHooks(t.Context(), ctx, "feat/a")
 
 	if len(rec.Published) != 0 {
 		t.Fatalf("published %v for hooks that read no run variables", rec.PublishedTypes())
@@ -109,11 +109,11 @@ func TestBeforeHooksNumbersAWorktreeWhoseHooksReadTheRunEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	ref := worktree.WorktreeRef{ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir, Branch: "feat/a"}
-	if err := worktree.SetIsolation(worktree.SetIsolationParams{Ref: ref, Isolation: domain.IsolationIsolated}); err != nil {
+	if err := worktree.SetIsolation(t.Context(), worktree.SetIsolationParams{Ref: ref, Isolation: domain.IsolationIsolated}); err != nil {
 		t.Fatal(err)
 	}
 
-	ordinal.BeforeHooks(ctx, "feat/a")
+	ordinal.BeforeHooks(t.Context(), ctx, "feat/a")
 
 	if !slices.Equal(rec.PublishedTypes(), []domain.EventType{domain.EventWorktreeUpdated}) {
 		t.Fatalf("published %v, want the ordinal update", rec.PublishedTypes())

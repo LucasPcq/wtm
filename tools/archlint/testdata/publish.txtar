@@ -39,7 +39,7 @@ import (
 )
 
 func Run(ctx flow.Context) { ctx.Publish(domain.Event{}) }
--- github.com/LucasPcq/wtm/internal/tui/dash/dash.go --
+-- github.com/LucasPcq/wtm/internal/surface/tui/dash/dash.go --
 package dash
 
 import (
@@ -48,6 +48,6 @@ import (
 )
 
 func Run(ctx flow.Context, p flow.Publisher) {
-	ctx.Publish(domain.Event{})   // want `flow\.Context\.Publish is called from tui/: only internal/flow publishes`
-	p.Publish(domain.Event{})     // want `flow\.Publisher\.Publish is called from tui/: only internal/flow publishes`
+	ctx.Publish(domain.Event{})   // want `flow\.Context\.Publish is called from surface/tui/: only internal/flow publishes`
+	p.Publish(domain.Event{})     // want `flow\.Publisher\.Publish is called from surface/tui/: only internal/flow publishes`
 }

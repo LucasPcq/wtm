@@ -47,7 +47,7 @@ func runner() domain.JobConfig {
 func TestAddWithoutACommandIsRefusedNamingTheFlag(t *testing.T) {
 	presenter := &recorder{}
 
-	_, err := jobflow.Add(jobflow.AddParams{
+	_, err := jobflow.Add(t.Context(), jobflow.AddParams{
 		Context:   context(t),
 		Request:   jobflow.AddRequest{Initial: domain.JobConfig{Name: "api"}},
 		Prompter:  flow.Unattended{},
@@ -64,7 +64,7 @@ func TestAddResolvesEveryFieldFromWhatTheFlagsGave(t *testing.T) {
 	ctx := context(t)
 	presenter := &recorder{}
 
-	outcome, err := jobflow.Add(jobflow.AddParams{
+	outcome, err := jobflow.Add(t.Context(), jobflow.AddParams{
 		Context: ctx,
 		Request: jobflow.AddRequest{Initial: domain.JobConfig{
 			Name:  "api",
@@ -99,7 +99,7 @@ func TestEditKeepsWhatTheFormDoesNotAskAbout(t *testing.T) {
 	}}
 	presenter := &recorder{}
 
-	_, err := jobflow.Edit(jobflow.EditParams{
+	_, err := jobflow.Edit(t.Context(), jobflow.EditParams{
 		Context: ctx,
 		Request: jobflow.EditRequest{Name: "dev", Config: cfg},
 		Prompter: &flowtest.ScriptedPrompter{
@@ -150,7 +150,7 @@ func TestEditKeepsASharedServicesScopeAndNamespace(t *testing.T) {
 		{"pg", "docker compose up -d --wait pg", string(domain.JobKindService), nil},
 		{"reset", "pnpm db:reset", string(domain.JobKindTask), []string{"pg"}},
 	} {
-		if _, err := jobflow.Edit(jobflow.EditParams{
+		if _, err := jobflow.Edit(t.Context(), jobflow.EditParams{
 			Context: ctx,
 			Request: jobflow.EditRequest{Name: edit.name, Config: cfg},
 			Prompter: &flowtest.ScriptedPrompter{
@@ -184,7 +184,7 @@ func TestEditKeepsASharedServicesScopeAndNamespace(t *testing.T) {
 func TestEditWithNothingToChangeIsRefused(t *testing.T) {
 	presenter := &recorder{}
 
-	_, err := jobflow.Edit(jobflow.EditParams{
+	_, err := jobflow.Edit(t.Context(), jobflow.EditParams{
 		Context:   context(t),
 		Request:   jobflow.EditRequest{Name: "dev", Config: domain.RunConfig{Jobs: []domain.JobConfig{runner()}}},
 		Prompter:  flow.Unattended{},
@@ -204,7 +204,7 @@ func TestRemoveRefusesAReferencedJobWithoutForce(t *testing.T) {
 	}
 	presenter := &recorder{}
 
-	_, err := jobflow.Remove(jobflow.RemoveParams{
+	_, err := jobflow.Remove(t.Context(), jobflow.RemoveParams{
 		Context:   context(t),
 		Request:   jobflow.RemoveRequest{Name: "api", Config: cfg},
 		Prompter:  flow.Unattended{},
@@ -235,7 +235,7 @@ func TestRemoveLiftsTheReferenceRefusalByAsking(t *testing.T) {
 	}
 
 	prompter := &flowtest.ScriptedPrompter{Confirmed: true}
-	outcome, err := jobflow.Remove(jobflow.RemoveParams{
+	outcome, err := jobflow.Remove(t.Context(), jobflow.RemoveParams{
 		Context:   ctx,
 		Request:   jobflow.RemoveRequest{Name: "api", Config: cfg},
 		Prompter:  prompter,
@@ -263,7 +263,7 @@ func TestRemoveKeepsTheJobWhenTheRefusalStands(t *testing.T) {
 		Profiles: []domain.ProfileConfig{{Name: "dev", Jobs: []string{"api"}}},
 	}
 
-	outcome, err := jobflow.Remove(jobflow.RemoveParams{
+	outcome, err := jobflow.Remove(t.Context(), jobflow.RemoveParams{
 		Context:   ctx,
 		Request:   jobflow.RemoveRequest{Name: "api", Config: cfg},
 		Prompter:  &flowtest.ScriptedPrompter{Confirmed: false},
@@ -288,7 +288,7 @@ func TestRemoveNamesTheRunnersInItsRefusal(t *testing.T) {
 		{Name: "api", Kind: domain.JobKindService, Cmd: "true"},
 	}}
 
-	_, err := jobflow.Remove(jobflow.RemoveParams{
+	_, err := jobflow.Remove(t.Context(), jobflow.RemoveParams{
 		Context:   flow.Context{StateDir: t.TempDir()},
 		Request:   jobflow.RemoveRequest{Name: "api", Config: cfg},
 		Prompter:  flow.Unattended{},

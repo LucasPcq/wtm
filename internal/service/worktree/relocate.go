@@ -1,18 +1,17 @@
 package worktree
 
 import (
-	"errors"
+	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/process"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 type PlanRelocateParams struct {
@@ -23,8 +22,8 @@ type PlanRelocateParams struct {
 	Force          bool
 }
 
-func PlanRelocate(params PlanRelocateParams) (domain.RelocatePlan, error) {
-	candidates, err := collectRelocateCandidates(params)
+func PlanRelocate(ctx context.Context, params PlanRelocateParams) (domain.RelocatePlan, error) {
+	candidates, err := collectRelocateCandidates(ctx, params)
 	if err != nil {
 		return domain.RelocatePlan{}, err
 	}
@@ -44,11 +43,11 @@ type MoveParams struct {
 	Force      bool
 }
 
-func Move(params MoveParams) error {
+func Move(ctx context.Context, params MoveParams) error {
 	if err := os.MkdirAll(filepath.Dir(params.To), 0o755); err != nil {
 		return fmt.Errorf("create target dir: %w", err)
 	}
-	return infra.MoveWorktree(infra.MoveWorktreeParams{
+	return infra.MoveWorktree(ctx, infra.MoveWorktreeParams{
 		ProjectDir: params.ProjectDir,
 		From:       params.From,
 		To:         params.To,
@@ -66,41 +65,41 @@ type AdoptParams struct {
 // already ran jobs holds its ordinal, its isolation and the namespaces clean
 // has to give back. The ordinal is left for the run module to allocate on
 // first use, as for a created worktree.
-func Adopt(params AdoptParams) error {
-	metadata, err := loadMetadata(params.StateDir, params.Branch)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("read metadata for %s: %w", params.Branch, err)
-	}
-	metadata.SourceBranch = params.Parent
-	metadata.CreatedAt = time.Now().UTC().Format(time.RFC3339)
-	return writeMetadata(rules.WorktreeMetaDir(params.StateDir, params.Branch), metadata)
+func Adopt(ctx context.Context, params AdoptParams) error {
+	_, err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
+		Branch:  params.Branch,
+		Missing: store.MissingCreate,
+		Change: func(metadata *domain.WorktreeMetadata) error {
+			metadata.SourceBranch = params.Parent
+			metadata.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+			return nil
+		},
+	})
+	return err
 }
 
 type SetBasePathParams struct {
-	ProjectDir string
-	StateDir   string
-	Project    domain.ProjectConfig
-	BasePath   string
+	ProjectDir       string
+	StateDir         string
+	PreviousBasePath string
+	BasePath         string
 }
 
 // SetBasePath also retires the previous base_path directory once the moves
 // have emptied it. os.Remove leaves a directory that still holds anything —
 // a worktree a refusal kept there, or files that are not wtm's.
-func SetBasePath(params SetBasePathParams) error {
-	updated := params.Project
-	updated.Worktrees.BasePath = params.BasePath
-	if err := config.WriteProjectConfig(config.WriteProjectConfigParams{
-		StateDir: params.StateDir,
-		Config:   updated,
+func SetBasePath(ctx context.Context, params SetBasePathParams) error {
+	if _, err := (store.ConfigDisk{StateDir: params.StateDir}).Update(ctx, func(project *domain.ProjectConfig) {
+		project.Worktrees.BasePath = params.BasePath
 	}); err != nil {
 		return fmt.Errorf("update config base_path: %w", err)
 	}
-	_ = os.Remove(filepath.Join(params.ProjectDir, params.Project.Worktrees.BasePath))
+	_ = os.Remove(filepath.Join(params.ProjectDir, params.PreviousBasePath))
 	return nil
 }
 
-func collectRelocateCandidates(params PlanRelocateParams) ([]rules.RelocateCandidate, error) {
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
+func collectRelocateCandidates(ctx context.Context, params PlanRelocateParams) ([]rules.RelocateCandidate, error) {
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +116,7 @@ func collectRelocateCandidates(params PlanRelocateParams) ([]rules.RelocateCandi
 			continue
 		}
 
-		dirty, dirtyErr := infra.IsDirty(infra.IsDirtyParams{WorktreePath: w.Path})
+		dirty, dirtyErr := infra.IsDirty(ctx, infra.IsDirtyParams{WorktreePath: w.Path})
 		to := rules.DesiredWorktreePath(rules.DesiredWorktreePathParams{
 			ProjectDir: params.ProjectDir,
 			BasePath:   params.TargetBasePath,
@@ -134,7 +133,7 @@ func collectRelocateCandidates(params PlanRelocateParams) ([]rules.RelocateCandi
 			InspectErr:   dirtyErr != nil,
 			IsLocked:     w.Locked,
 			DestOccupied: !samePath(w.Path, to) && pathExists(to),
-			HasJobs:      !samePath(w.Path, to) && process.WorktreeHasJobs(w.Path),
+			HasJobs:      !samePath(w.Path, to) && process.WorktreeHasJobs(ctx, w.Path),
 		})
 	}
 

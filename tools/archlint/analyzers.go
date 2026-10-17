@@ -18,4 +18,8 @@ var analyzers = []*analysis.Analyzer{
 	metawriterAnalyzer,
 	emitsAnalyzer,
 	publishAnalyzer,
+	statewriteAnalyzer,
+	stateownerAnalyzer,
+	pkgdocAnalyzer,
+	rootfreezeAnalyzer,
 }

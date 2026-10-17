@@ -1,6 +1,7 @@
 package env
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -54,7 +55,7 @@ func testContext(t *testing.T) flow.Context {
 func withPorts(t *testing.T, ctx flow.Context) {
 	t.Helper()
 	write(t, filepath.Join(ctx.ProjectDir, ".env"), "SHARED=main\nWEB_PORT=3000\n")
-	if err := config.WriteRun(config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
 		Jobs:     []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}},
 		EnvPorts: []domain.EnvPortLink{{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"}},
 	}}); err != nil {
@@ -82,7 +83,7 @@ func read(t *testing.T, path string) string {
 // before the choice existed.
 func makeWorktree(t *testing.T, ctx flow.Context, branch string) string {
 	t.Helper()
-	result, err := worktree.Create(domain.CreateParams{
+	result, err := worktree.Create(t.Context(), domain.CreateParams{
 		ProjectDir:   ctx.ProjectDir,
 		StateDir:     ctx.StateDir,
 		Branch:       branch,
@@ -113,7 +114,7 @@ func run(ctx flow.Context, request Request, prompter flow.Prompter) (Outcome, *r
 		request.OnConflict = domain.EnvDecisionKeep
 	}
 	presenter := &recorder{}
-	outcome, err := Run(Params{Context: ctx, Request: request, Prompter: prompter, Presenter: presenter})
+	outcome, err := Run(context.Background(), Params{Context: ctx, Request: request, Prompter: prompter, Presenter: presenter})
 	return outcome, presenter, err
 }
 
@@ -352,7 +353,7 @@ func TestAnIsolationChangeIsPublishedAndAnUnchangedOneIsNot(t *testing.T) {
 func TestRunSettlesTheConfiguredEnvDespiteAnOrphanLink(t *testing.T) {
 	ctx := testContext(t)
 	write(t, filepath.Join(ctx.ProjectDir, ".env"), "SHARED=main\nWEB_PORT=3000\n")
-	if err := config.WriteRun(config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
 		Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}},
 		EnvPorts: []domain.EnvPortLink{
 			{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"},
@@ -403,7 +404,7 @@ func withNamedAPI(t *testing.T, ctx flow.Context, addressing domain.Addressing) 
 func setIsolation(t *testing.T, ctx flow.Context, branch string, isolation domain.Isolation) {
 	t.Helper()
 	ref := worktree.WorktreeRef{ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir, Branch: branch}
-	if err := worktree.SetIsolation(worktree.SetIsolationParams{Ref: ref, Isolation: isolation}); err != nil {
+	if err := worktree.SetIsolation(t.Context(), worktree.SetIsolationParams{Ref: ref, Isolation: isolation}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -613,5 +614,157 @@ func TestWithNoWorktreeGivenThePickerIsAskedFirst(t *testing.T) {
 	}
 	if len(prompter.Asked) == 0 || prompter.Asked[0] != KeyWorktree {
 		t.Errorf("asked = %s, want the worktree picker first", prompter.AskedKeys())
+	}
+}
+
+// LUC-274: overwriting a port-linked conflict takes the source's value and the
+// port pass then shifts it onto this worktree's port, but the resolver and the
+// recap previewed the source's port — a value the file never gets.
+func TestTheResolverPreviewsALinkedOverwriteOnTheWorktreesPort(t *testing.T) {
+	ctx := testContext(t)
+	write(t, filepath.Join(ctx.ProjectDir, ".env"), "SHARED=main\nDB_URL=postgres://app:main@localhost:3000/db\n")
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
+		Jobs:     []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}},
+		EnvPorts: []domain.EnvPortLink{{File: ".env", Key: "DB_URL", Job: "web", Port: "PORT"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	path := makeWorktree(t, ctx, "feat/a")
+	if _, _, err := run(ctx, Request{Worktree: "feat/a"}, flow.Unattended{}); err != nil {
+		t.Fatalf("settle: %v", err)
+	}
+	settled := read(t, filepath.Join(path, ".env"))
+	if strings.Contains(settled, "localhost:3000") {
+		t.Fatalf("setup: .env = %q, want its own port", settled)
+	}
+	write(t, filepath.Join(path, ".env"), strings.Replace(settled, "app:main@", "app:mine@", 1))
+
+	prompter := &flowtest.ScriptedPrompter{
+		Answers: map[string]string{KeyWorktree: "feat/a", KeyIsolation: domain.EnvKeepValue, KeyRecap: domain.EnvApplyValue},
+		EnvDecisions: map[string][]domain.EnvFileDecision{KeyResolve: {{
+			Target:    ".env",
+			Decisions: map[string]domain.EnvConflictDecision{"DB_URL": domain.EnvDecisionOverwrite},
+		}}},
+	}
+	if _, _, err := run(ctx, Request{Mode: domain.EnvModeRefresh}, prompter); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	written := read(t, filepath.Join(path, ".env"))
+	want := ""
+	for _, line := range strings.Split(written, "\n") {
+		if value, ok := strings.CutPrefix(line, "DB_URL="); ok {
+			want = value
+		}
+	}
+	if !strings.Contains(want, "app:main@") || strings.Contains(want, "localhost:3000") {
+		t.Fatalf(".env = %q, want the source's value on the worktree's port", written)
+	}
+	var preview string
+	for _, file := range prompter.Content[KeyResolve].EnvFiles {
+		for _, entry := range file.Diff.Entries {
+			if entry.Key == "DB_URL" {
+				preview = entry.ResolvedValue
+			}
+		}
+	}
+	if preview != want {
+		t.Errorf("resolver previews %q, want %q — what the overwrite writes", preview, want)
+	}
+	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, want) {
+		t.Errorf("recap lacks %q:\n%s", want, recap)
+	}
+}
+
+const dsnEnv = "WEB_PORT=3000\n" +
+	"DSN_BARE=host=localhost port=3000 password=s3cret dbname=app\n" +
+	"DSN_DQ=\"host=localhost port=3000 password=s3cret dbname=app\"\n" +
+	"DSN_SQ='host=localhost port=3000 password=s3cret dbname=app'\n"
+
+// LUC-280: a bare value with spaces whose port moved came back double-quoted,
+// so the worktree's .env differed from its source beyond the port.
+func TestSettlingAPortKeepsEachValuesQuoting(t *testing.T) {
+	ctx := testContext(t)
+	write(t, filepath.Join(ctx.ProjectDir, ".env"), dsnEnv)
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: ctx.StateDir, Force: true, Config: domain.RunConfig{
+		Jobs: []domain.JobConfig{{Name: "web", Kind: domain.JobKindService, Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}},
+		EnvPorts: []domain.EnvPortLink{
+			{File: ".env", Key: "WEB_PORT", Job: "web", Port: "PORT"},
+			{File: ".env", Key: "DSN_BARE", Job: "web", Port: "PORT"},
+			{File: ".env", Key: "DSN_DQ", Job: "web", Port: "PORT"},
+			{File: ".env", Key: "DSN_SQ", Job: "web", Port: "PORT"},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	path := makeWorktree(t, ctx, "feat/a")
+	write(t, filepath.Join(path, ".env"), dsnEnv)
+
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{
+		KeyWorktree:   "feat/a",
+		KeyIsolation:  domain.EnvKeepValue,
+		KeyAddressing: domain.EnvKeepValue,
+		KeyRecap:      domain.EnvApplyValue,
+	}}
+	if _, _, err := run(ctx, Request{}, prompter); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	got := read(t, filepath.Join(path, ".env"))
+	port, _, _ := strings.Cut(strings.TrimPrefix(got, "WEB_PORT="), "\n")
+	if port == "3000" || strings.ReplaceAll(got, port, "3000") != dsnEnv {
+		t.Errorf(".env =\n%s\nwant the source with only its port moved:\n%s", got, dsnEnv)
+	}
+}
+
+// LUC-276 (b): with the worktree's .env deleted, --check reported each linked
+// key as missing from the file, while the apply rebuilt it and settled them.
+func TestACheckOfADeletedEnvPlansThePortsTheApplySettles(t *testing.T) {
+	ctx := testContext(t)
+	withPorts(t, ctx)
+	path := makeWorktree(t, ctx, "feat/a")
+	if err := os.Remove(filepath.Join(path, ".env")); err != nil {
+		t.Fatal(err)
+	}
+
+	checked, _, err := run(ctx, Request{Worktree: "feat/a", Check: true}, flow.Unattended{})
+	if !errors.Is(err, domain.ErrEnvDrift) {
+		t.Fatalf("check err = %v, want the drift of a file to rebuild", err)
+	}
+	applied, _, err := run(ctx, Request{Worktree: "feat/a"}, flow.Unattended{})
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+
+	statuses := func(plan domain.EnvPortPlan) []domain.EnvPortStatus {
+		var out []domain.EnvPortStatus
+		for _, entry := range plan.Entries {
+			out = append(out, entry.Status)
+		}
+		return out
+	}
+	got, want := statuses(checked.Result.Ports), statuses(applied.Result.Ports)
+	if !slices.Equal(got, want) || slices.Contains(got, domain.EnvPortStatusMissingKey) {
+		t.Errorf("check plans %v, the apply %v", got, want)
+	}
+}
+
+// LUC-276 (c): under strategy main, a file the main checkout lacks left the
+// report saying its keys need a value without naming the file missing.
+func TestAMissingMainCopyIsNamedAsTheSource(t *testing.T) {
+	ctx := testContext(t)
+	ctx.Config.Project.Env.Files = []domain.EnvFile{{Target: ".env", Template: ".env.example"}}
+	path := makeWorktree(t, ctx, "feat/a")
+	if err := os.Remove(filepath.Join(ctx.ProjectDir, ".env")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(path, ".env.example"), "API_KEY=\n")
+
+	outcome, _, err := run(ctx, Request{Worktree: "feat/a", Check: true}, flow.Unattended{})
+	if !errors.Is(err, domain.ErrEnvDrift) {
+		t.Fatalf("err = %v, want the key needing a value reported as drift", err)
+	}
+	if got, want := outcome.Result.Files[0].Source, "template (no .env in the main checkout)"; got != want {
+		t.Errorf("source = %q, want %q", got, want)
 	}
 }

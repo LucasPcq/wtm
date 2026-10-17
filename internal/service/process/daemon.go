@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/proxy"
 )
@@ -567,7 +567,7 @@ func (w responseStreamWriter) Write(p []byte) (int, error) {
 // has no user-config directory at all — there is nowhere to put a socket, and
 // every caller reads that as "no daemon".
 func SocketPath() string {
-	dir, err := infra.GlobalDir()
+	dir, err := fs.GlobalDir()
 	if err != nil {
 		return ""
 	}

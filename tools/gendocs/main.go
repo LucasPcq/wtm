@@ -12,8 +12,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 
-	"github.com/LucasPcq/wtm/cmd"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/surface/cli"
 )
 
 const outputDir = "docs"
@@ -26,7 +26,7 @@ func main() {
 }
 
 func run() error {
-	root := cmd.Root()
+	root := cli.Root()
 	disableAutoGenTag(root)
 
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {

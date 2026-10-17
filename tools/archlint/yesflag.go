@@ -10,13 +10,11 @@ import (
 
 var (
 	cobraCommand    = objectRef{Path: "github.com/spf13/cobra", Name: "Command"}
-	interactiveGate = objectRef{Path: internalPrefix + "commands/shared", Name: "Interactive"}
-	yesFlag         = objectRef{Path: internalPrefix + "commands/shared", Name: "AddYesFlag"}
+	interactiveGate = objectRef{Path: internalPrefix + "surface/cli/shared", Name: "Interactive"}
+	yesFlag         = objectRef{Path: internalPrefix + "surface/cli/shared", Name: "AddYesFlag"}
 )
 
-// yesflagAnalyzer enforces the confirmation axis: a file that builds a command
-// and reads the prompt-capability gate registers --yes on it. A helper that
-// merely takes a command has no flags of its own to register.
+// A helper that merely takes a command has no flags of its own to register.
 var yesflagAnalyzer = &analysis.Analyzer{
 	Name: "yesflag",
 	Doc:  "a command reading the interactive gate registers --yes",
@@ -24,7 +22,7 @@ var yesflagAnalyzer = &analysis.Analyzer{
 }
 
 func runYesFlag(pass *analysis.Pass) (any, error) {
-	if layerOfPackage(pass.Pkg.Path()) != "commands" {
+	if layerOfPackage(pass.Pkg.Path()) != "surface/cli" {
 		return nil, nil
 	}
 	for _, file := range pass.Files {

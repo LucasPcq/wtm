@@ -5,6 +5,7 @@
 package job
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -55,7 +56,7 @@ type AddParams struct {
 	Presenter Presenter
 }
 
-func Add(params AddParams) (Outcome, error) {
+func Add(ctx context.Context, params AddParams) (Outcome, error) {
 	answers, err := params.Prompter.Ask(flow.Session{
 		ErrLabel: domain.CmdAdd,
 		Steps: formSteps(formParams{
@@ -77,7 +78,7 @@ func Add(params AddParams) (Outcome, error) {
 
 	cfg := params.Request.Config
 	cfg.Jobs = append(cfg.Jobs, job)
-	if err := save(params.Context, cfg); err != nil {
+	if err := save(ctx, params.Context, cfg); err != nil {
 		return Outcome{}, err
 	}
 	return conclude(params.Presenter, Outcome{Name: job.Name, Status: domain.JobActionAdded})
@@ -99,7 +100,7 @@ type EditParams struct {
 	Presenter Presenter
 }
 
-func Edit(params EditParams) (Outcome, error) {
+func Edit(ctx context.Context, params EditParams) (Outcome, error) {
 	name, err := target.PickOne(target.PickOneParams{
 		Prompter: params.Prompter,
 		Step:     pickStep(params.Request.Config, domain.RunJobPickerTitleEdit),
@@ -113,10 +114,10 @@ func Edit(params EditParams) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	return editNamed(params, name)
+	return editNamed(ctx, params, name)
 }
 
-func editNamed(params EditParams, name string) (Outcome, error) {
+func editNamed(ctx context.Context, params EditParams, name string) (Outcome, error) {
 	current, exists := rules.FindJob(params.Request.Config, name)
 	if !exists {
 		return Outcome{}, fmt.Errorf(domain.RunJobNotFoundFmt, domain.ErrJobNotFound, name)
@@ -145,7 +146,7 @@ func editNamed(params EditParams, name string) (Outcome, error) {
 			break
 		}
 	}
-	if err := save(params.Context, cfg); err != nil {
+	if err := save(ctx, params.Context, cfg); err != nil {
 		return Outcome{}, err
 	}
 	if renamed && publishedUnderName(current) && publishedUnderName(updated) {
@@ -215,7 +216,7 @@ type RemoveParams struct {
 	Presenter Presenter
 }
 
-func Remove(params RemoveParams) (Outcome, error) {
+func Remove(ctx context.Context, params RemoveParams) (Outcome, error) {
 	name, err := target.PickOne(target.PickOneParams{
 		Prompter: params.Prompter,
 		Step:     pickStep(params.Request.Config, domain.RunJobPickerTitleRemove),
@@ -229,10 +230,10 @@ func Remove(params RemoveParams) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	return removeNamed(params, name)
+	return removeNamed(ctx, params, name)
 }
 
-func removeNamed(params RemoveParams, name string) (Outcome, error) {
+func removeNamed(ctx context.Context, params RemoveParams, name string) (Outcome, error) {
 	if _, exists := rules.FindJob(params.Request.Config, name); !exists {
 		return Outcome{}, fmt.Errorf(domain.RunJobNotFoundFmt, domain.ErrJobNotFound, name)
 	}
@@ -248,7 +249,7 @@ func removeNamed(params RemoveParams, name string) (Outcome, error) {
 			return aborted(params.Presenter)
 		}
 	}
-	if err := save(params.Context, cfg); err != nil {
+	if err := save(ctx, params.Context, cfg); err != nil {
 		return Outcome{}, err
 	}
 	if len(held) > 0 {
@@ -302,7 +303,7 @@ type ListParams struct {
 // List is the listing that acts: a job, then what to do to it. The chosen action
 // runs here rather than in the surface, so the picker and the commands it stands
 // for cannot drift apart.
-func List(params ListParams) (Outcome, error) {
+func List(ctx context.Context, params ListParams) (Outcome, error) {
 	answers, err := params.Prompter.Ask(flow.Session{
 		ErrLabel: domain.CmdList,
 		Steps: []flow.Step{
@@ -320,14 +321,14 @@ func List(params ListParams) (Outcome, error) {
 	name := answers.Value(target.KeyJob)
 	switch answers.Value(KeyAction) {
 	case domain.RunCRUDActionEditValue:
-		return editNamed(EditParams{
+		return editNamed(ctx, EditParams{
 			Context:   params.Context,
 			Request:   EditRequest{Name: name, Config: params.Request.Config},
 			Prompter:  params.Prompter,
 			Presenter: params.Presenter,
 		}, name)
 	case domain.RunCRUDActionRmValue:
-		return removeNamed(RemoveParams{
+		return removeNamed(ctx, RemoveParams{
 			Context:   params.Context,
 			Request:   RemoveRequest{Name: name, Config: params.Request.Config},
 			Prompter:  params.Prompter,
@@ -341,8 +342,8 @@ func pickStep(cfg domain.RunConfig, title string) flow.Step {
 	return target.JobStep(target.JobParams{Jobs: cfg.Jobs, Title: title, Detail: true})
 }
 
-func save(ctx flow.Context, cfg domain.RunConfig) error {
-	return runconfig.Save(runconfig.SaveParams{StateDir: ctx.StateDir, Config: cfg})
+func save(ctx context.Context, project flow.Context, cfg domain.RunConfig) error {
+	return runconfig.Save(ctx, runconfig.SaveParams{StateDir: project.StateDir, Config: cfg})
 }
 
 func conclude(presenter Presenter, outcome Outcome) (Outcome, error) {

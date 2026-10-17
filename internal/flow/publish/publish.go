@@ -5,6 +5,7 @@
 package publish
 
 import (
+	"context"
 	"errors"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -13,8 +14,8 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
-func Created(ctx flow.Context, branch string) {
-	emit(emitParams{Context: ctx, Branch: branch, Event: domain.Event{Type: domain.EventWorktreeCreated}})
+func Created(ctx context.Context, project flow.Context, branch string) {
+	emit(ctx, emitParams{Context: project, Branch: branch, Event: domain.Event{Type: domain.EventWorktreeCreated}})
 }
 
 type UpdatedParams struct {
@@ -23,8 +24,8 @@ type UpdatedParams struct {
 	Changed []domain.IdentityField
 }
 
-func Updated(params UpdatedParams) {
-	emit(emitParams{Context: params.Context, Branch: params.Branch, Event: domain.Event{Type: domain.EventWorktreeUpdated, Changed: params.Changed}})
+func Updated(ctx context.Context, params UpdatedParams) {
+	emit(ctx, emitParams{Context: params.Context, Branch: params.Branch, Event: domain.Event{Type: domain.EventWorktreeUpdated, Changed: params.Changed}})
 }
 
 type RelocatedParams struct {
@@ -33,8 +34,8 @@ type RelocatedParams struct {
 	FromPath string
 }
 
-func Relocated(params RelocatedParams) {
-	emit(emitParams{Context: params.Context, Branch: params.Branch, Event: domain.Event{Type: domain.EventWorktreeRelocated, FromPath: params.FromPath}})
+func Relocated(ctx context.Context, params RelocatedParams) {
+	emit(ctx, emitParams{Context: params.Context, Branch: params.Branch, Event: domain.Event{Type: domain.EventWorktreeRelocated, FromPath: params.FromPath}})
 }
 
 type ReparentedParams struct {
@@ -43,31 +44,31 @@ type ReparentedParams struct {
 	FromParent string
 }
 
-func Reparented(params ReparentedParams) {
-	emit(emitParams{Context: params.Context, Branch: params.Branch, Event: domain.Event{Type: domain.EventWorktreeReparented, FromParent: params.FromParent}})
+func Reparented(ctx context.Context, params ReparentedParams) {
+	emit(ctx, emitParams{Context: params.Context, Branch: params.Branch, Event: domain.Event{Type: domain.EventWorktreeReparented, FromParent: params.FromParent}})
 }
 
 // ReparentedAll reports each move that was written, including the ones a
 // failing batch got through before it stopped: they are not rolled back.
-func ReparentedAll(ctx flow.Context, results []domain.ReparentResult) {
+func ReparentedAll(ctx context.Context, project flow.Context, results []domain.ReparentResult) {
 	for _, result := range results {
-		Reparented(ReparentedParams{Context: ctx, Branch: result.Branch, FromParent: result.OldParent})
+		Reparented(ctx, ReparentedParams{Context: project, Branch: result.Branch, FromParent: result.OldParent})
 	}
 }
 
 // Capture reads the identity a removal is about to erase: removed carries the
 // last state a consumer saw, and once git forgot the worktree there is nothing
 // left to read.
-func Capture(ctx flow.Context, branch string) (domain.WorktreeIdentity, bool) {
-	if !ctx.Listening() {
+func Capture(ctx context.Context, project flow.Context, branch string) (domain.WorktreeIdentity, bool) {
+	if !project.Listening() {
 		return domain.WorktreeIdentity{}, false
 	}
-	identity, err := worktree.Identity(ref(ctx, branch))
+	identity, err := worktree.Identity(ctx, ref(project, branch))
 	return identity, err == nil
 }
 
-func Removed(ctx flow.Context, last domain.WorktreeIdentity) {
-	ctx.Publish(domain.Event{Type: domain.EventWorktreeRemoved, Worktree: &last})
+func Removed(ctx context.Context, project flow.Context, last domain.WorktreeIdentity) {
+	project.Publish(ctx, domain.Event{Type: domain.EventWorktreeRemoved, Worktree: &last})
 }
 
 type ProvisionedParams struct {
@@ -77,8 +78,8 @@ type ProvisionedParams struct {
 	Err error
 }
 
-func Provisioned(params ProvisionedParams) {
-	emit(emitParams{Context: params.Context, Branch: params.Branch, Event: outcome(domain.EventWorktreeProvisioned, params.Err)})
+func Provisioned(ctx context.Context, params ProvisionedParams) {
+	emit(ctx, emitParams{Context: params.Context, Branch: params.Branch, Event: outcome(domain.EventWorktreeProvisioned, params.Err)})
 }
 
 type DeprovisionedParams struct {
@@ -88,8 +89,8 @@ type DeprovisionedParams struct {
 	Err error
 }
 
-func Deprovisioned(params DeprovisionedParams) {
-	emit(emitParams{Context: params.Context, Branch: params.Branch, Event: outcome(domain.EventWorktreeDeprovisioned, params.Err)})
+func Deprovisioned(ctx context.Context, params DeprovisionedParams) {
+	emit(ctx, emitParams{Context: params.Context, Branch: params.Branch, Event: outcome(domain.EventWorktreeDeprovisioned, params.Err)})
 }
 
 func outcome(typ domain.EventType, err error) domain.Event {
@@ -109,17 +110,17 @@ type emitParams struct {
 	Event   domain.Event
 }
 
-func emit(params emitParams) {
+func emit(ctx context.Context, params emitParams) {
 	if !params.Context.Listening() {
 		return
 	}
-	identity, err := worktree.Identity(ref(params.Context, params.Branch))
+	identity, err := worktree.Identity(ctx, ref(params.Context, params.Branch))
 	if err != nil {
 		return
 	}
 	event := params.Event
 	event.Worktree = &identity
-	params.Context.Publish(event)
+	params.Context.Publish(ctx, event)
 }
 
 func ref(ctx flow.Context, branch string) worktree.WorktreeRef {

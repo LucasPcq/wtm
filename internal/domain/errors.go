@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
 	// ErrWorktreeNotFound is returned when a worktree cannot be located.
@@ -16,6 +19,9 @@ var (
 	// run, a caller that declined one — the runner wraps it in HookFailedNamedFmt
 	// instead, because then the error is the only thing there is to read.
 	ErrHookFailed = errors.New("hook failed")
+	// ErrHookStopped is a hook wtm stopped itself, on an interrupt: the status
+	// its shell exited with then says nothing about the hook.
+	ErrHookStopped = errors.New("hook stopped")
 
 	// ErrConfigNotFound is returned when no configuration file is found.
 	ErrConfigNotFound = errors.New("config file not found")
@@ -154,9 +160,14 @@ var (
 	ErrRunNotInitialized = errors.New("no run.toml — run `wtm run init`")
 
 	// ErrCancelled is a run the user backed out of — Esc, Ctrl-C, "No, cancel",
-	// a declined confirmation. It always travels with ErrAborted: the `=` line
-	// saying so is already on screen.
+	// a declined confirmation — or interrupted (SIGINT, SIGTERM). A backed-out
+	// run carries ErrAborted too: the `=` line saying so is already on screen.
 	ErrCancelled = errors.New("cancelled")
+
+	// ErrLeftBehind is an interrupt that left something the reader has to
+	// know about — a worktree created but not set up: its message is printed
+	// whole, where a bare interrupt reads "Aborted.".
+	ErrLeftBehind = fmt.Errorf("%w", ErrCancelled)
 
 	// ErrExtractConflict is returned when the selected changes do not apply
 	// cleanly onto the target worktree. The extraction is aborted and the source
@@ -331,4 +342,12 @@ var (
 	// ErrDaemonNoSubscribe is a daemon built before the event bus: it is the one
 	// daemon a watcher replaces, and only while it holds no job.
 	ErrDaemonNoSubscribe = errors.New("the run daemon predates wtm events")
+
+	// ErrStatusDetached refuses `wtm status` on a detached HEAD: a worktree's
+	// state is keyed on its branch.
+	ErrStatusDetached = errors.New("worktree is on a detached HEAD: wtm status needs a branch")
+
+	// ErrDaemonForkInTest refuses to fork the daemon from a test binary, which
+	// would run the test suite again rather than serve anything.
+	ErrDaemonForkInTest = errors.New("refusing to fork the run daemon from a test binary")
 )

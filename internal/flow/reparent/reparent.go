@@ -2,6 +2,7 @@
 package reparent
 
 import (
+	"context"
 	"errors"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -41,8 +42,9 @@ func Operation() flow.Operation {
 	return flow.Operation{Kind: domain.OpKindReparent, Mode: flow.ModeBlocking}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &reparentFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -52,6 +54,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type reparentFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -62,7 +65,7 @@ type reparentFlow struct {
 }
 
 func (f *reparentFlow) run() (Outcome, error) {
-	nodes, err := worktree.Nodes(worktree.NodesParams{
+	nodes, err := worktree.Nodes(f.runCtx, worktree.NodesParams{
 		ProjectDir: f.ctx.ProjectDir,
 		StateDir:   f.ctx.StateDir,
 	})
@@ -70,7 +73,7 @@ func (f *reparentFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 	f.nodes = nodes
-	f.candidates = decide.BranchCandidates(f.ctx.ProjectDir)
+	f.candidates = decide.BranchCandidates(f.runCtx, f.ctx.ProjectDir)
 
 	answers, err := f.prompter.Ask(f.session())
 	if errors.Is(err, domain.ErrUserAborted) {
@@ -82,11 +85,11 @@ func (f *reparentFlow) run() (Outcome, error) {
 	}
 
 	var results []domain.ReparentResult
-	err = f.presenter.Stage(flow.StageParams{
+	err = f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.ReparentStageMessage,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var batchErr error
-			results, batchErr = worktree.ReparentBatch(domain.ReparentBatchParams{
+			results, batchErr = worktree.ReparentBatch(ctx, domain.ReparentBatchParams{
 				ProjectDir: f.ctx.ProjectDir,
 				StateDir:   f.ctx.StateDir,
 				Branches:   answers.Values(KeyBranches),
@@ -96,7 +99,7 @@ func (f *reparentFlow) run() (Outcome, error) {
 			return batchErr
 		},
 	})
-	publish.ReparentedAll(f.ctx, results)
+	publish.ReparentedAll(f.runCtx, f.ctx, results)
 	if err != nil {
 		return Outcome{}, err
 	}

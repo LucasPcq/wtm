@@ -1,10 +1,4 @@
-// Command archlint checks the architecture rules of CLAUDE.md that no
-// general-purpose linter knows about: the mechanical half of section 9.
-//
-// Usage: go run ./tools/archlint [-warn rule,rule] [dir]
-//
-// Each rule is a go/analysis Analyzer and reports `file:line:col: [rule] message`;
-// a non-empty report exits 1. A rule named in -warn reports without failing.
+// Command archlint checks the architecture rules of CLAUDE.md that no general-purpose linter knows about.
 package main
 
 import (
@@ -20,19 +14,17 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// targetSystems are loaded in turn because go/packages keeps only the files a
-// build would compile: peerpid_linux.go and the proxy's *_other.go would drop
-// out on a Mac, and peerpid_other.go (!darwin && !linux) on both, which the
-// parse-everything walk this replaced never let happen. A test checks that
-// together they compile every file of the tree.
+// go/packages keeps only the files a build would compile: peerpid_linux.go and
+// the proxy's *_other.go drop out on a Mac, peerpid_other.go on both.
 var targetSystems = []string{"darwin", "linux", "freebsd"}
 
 const loadMode = packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
 	packages.NeedImports | packages.NeedTypes | packages.NeedTypesSizes |
-	packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedModule
+	packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedModule | packages.NeedDeps
 
 func main() {
 	warn := flag.String("warn", "", "comma-separated rules that report without failing")
+	tracked := flag.Bool("tracked", false, "print each site .archlint-migrating covers")
 	flag.Parse()
 
 	root := "internal"
@@ -53,21 +45,34 @@ func main() {
 		os.Exit(2)
 	}
 
+	deadcode, err := loadDeadcodeIgnore()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "archlint:", err)
+		os.Exit(2)
+	}
+	over := overCeiling(migrating, deadcode)
+
 	findings, err := analyze(analyzeParams{Root: root, Systems: targetSystems})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "archlint:", err)
 		os.Exit(2)
 	}
 
-	verdict := judge(judgeParams{Findings: findings, Migrating: migrating, Warned: warned})
+	verdict := judge(judgeParams{Findings: findings, Migrating: migrating, Warned: warned, Tracked: *tracked})
 	for _, line := range verdict.lines {
 		fmt.Println(line)
 	}
 	for _, note := range verdict.notes {
 		fmt.Println("archlint: note:", note)
 	}
-	if verdict.failed {
-		fmt.Fprintf(os.Stderr, "\narchlint: %d finding(s) — see CLAUDE.md section 9\n", len(findings))
+	if verdict.tracked > 0 && !*tracked {
+		fmt.Printf("archlint: %d site(s) tracked in .archlint-migrating (-tracked lists them)\n", verdict.tracked)
+	}
+	for _, line := range over {
+		fmt.Println("archlint:", line)
+	}
+	if verdict.failed || len(over) > 0 {
+		fmt.Fprintf(os.Stderr, "\narchlint: %d finding(s) — see CLAUDE.md section 9\n", verdict.failures+len(over))
 		os.Exit(1)
 	}
 	fmt.Printf("archlint: %s clean\n", root)

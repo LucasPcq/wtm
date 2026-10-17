@@ -48,7 +48,7 @@ func run(t *testing.T, repo string, request stop.Request) (stop.Outcome, *record
 	if request.Config.Jobs == nil && !request.ByName {
 		request.Config = declared
 	}
-	outcome, err := stop.Run(stop.Params{
+	outcome, err := stop.Run(t.Context(), stop.Params{
 		Context:   flow.Context{ProjectDir: repo},
 		Request:   request,
 		Prompter:  flow.Unattended{},
@@ -219,7 +219,7 @@ func TestStopBackedOutOfSaysAborted(t *testing.T) {
 	processtest.Serve(t, nil)
 	presenter := &recorder{Recorder: &flowtest.Recorder{}}
 
-	outcome, err := stop.Run(stop.Params{
+	outcome, err := stop.Run(t.Context(), stop.Params{
 		Context:   flow.Context{ProjectDir: repo},
 		Request:   stop.Request{Cwd: repo, Config: declared},
 		Prompter:  &flowtest.ScriptedPrompter{Abort: true},

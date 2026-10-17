@@ -1,6 +1,7 @@
 package checkout
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -27,12 +28,16 @@ const (
 
 const confirmCheckout = "checkout"
 
-func (f *checkoutFlow) session() flow.Session {
+func (f *checkoutFlow) session(ctx context.Context) flow.Session {
+	return flow.Recall(flow.RecallParams{Session: f.steps(ctx), Remembered: f.ctx.Config.Project.Wizard.Remembered, Ask: f.request.Ask})
+}
+
+func (f *checkoutFlow) steps(ctx context.Context) flow.Session {
 	return flow.Session{
 		ErrLabel: domain.WizardErrLabel,
 		Presets:  flow.NewAnswers(f.presets()),
 		Steps: []flow.Step{
-			f.prStep(),
+			f.prStep(ctx),
 			f.parentStep(),
 			f.envStep(),
 			f.isolationStep(),
@@ -62,7 +67,7 @@ func (f *checkoutFlow) pr(answers flow.Answers) (domain.PRInfo, bool) {
 	return f.findPR(number)
 }
 
-func (f *checkoutFlow) prStep() flow.Step {
+func (f *checkoutFlow) prStep(ctx context.Context) flow.Step {
 	return flow.Step{
 		Kind:           flow.StepSelect,
 		Key:            KeyPR,
@@ -70,7 +75,7 @@ func (f *checkoutFlow) prStep() flow.Step {
 		Title:          domain.CheckoutPRTitle,
 		Description:    domain.CheckoutPRDescription,
 		LoadingMessage: domain.LoadingPRsText,
-		Load:           func(flow.Answers) (flow.StepContent, error) { return f.loadPRs(), nil },
+		Load:           func(flow.Answers) (flow.StepContent, error) { return f.loadPRs(ctx), nil },
 		Resolve: func(flow.Answers) (flow.Answer, error) {
 			return flow.Answer{}, errors.New(domain.CheckoutPRRequired)
 		},
@@ -86,12 +91,12 @@ func (f *checkoutFlow) prStep() flow.Step {
 
 // loadPRs disables the pull requests that cannot be checked out here: one whose
 // branch a worktree already holds, and one from a fork.
-func (f *checkoutFlow) loadPRs() flow.StepContent {
-	prs, conn := ghservice.ListOpenPRsWithConnection(ghservice.ListPRsParams{ProjectDir: f.ctx.ProjectDir, Filter: f.request.Filter})
+func (f *checkoutFlow) loadPRs(ctx context.Context) flow.StepContent {
+	prs, conn := ghservice.ListOpenPRsWithConnection(ctx, ghservice.ListPRsParams{ProjectDir: f.ctx.ProjectDir, Filter: f.request.Filter})
 	f.setPRs(prs)
 
 	linked := map[string]bool{}
-	if worktrees, err := worktree.ListAll(worktree.ListAllParams{ProjectDir: f.ctx.ProjectDir}); err == nil {
+	if worktrees, err := worktree.ListAll(f.runCtx, worktree.ListAllParams{ProjectDir: f.ctx.ProjectDir}); err == nil {
 		for _, wt := range worktrees {
 			linked[wt.Branch] = true
 		}
@@ -134,7 +139,7 @@ func (f *checkoutFlow) parentStep() flow.Step {
 		PinnedSuffix: domain.PinnedSuffixBase,
 		PinAbsent:    true,
 		Refresh: func() []domain.BranchCandidate {
-			return branch.Refresh(branch.ListParams{ProjectDir: f.ctx.ProjectDir})
+			return branch.Refresh(f.runCtx, branch.ListParams{ProjectDir: f.ctx.ProjectDir})
 		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
 			return flow.StepContent{Pinned: f.base(answers)}, nil
@@ -157,6 +162,7 @@ func (f *checkoutFlow) envStep() flow.Step {
 		Resolve:     func(flow.Answers) (flow.Answer, error) { return flow.Answer{Value: ""}, nil },
 		Summarize:   envSummary,
 		Flag:        domain.FlagEnvFrom,
+		Memory:      flow.Memory{ID: domain.RememberEnvStrategy},
 	}
 }
 
@@ -185,6 +191,7 @@ func (f *checkoutFlow) isolationStep() flow.Step {
 		Resolve:   func(flow.Answers) (flow.Answer, error) { return flow.Answer{Value: string(fallback)}, nil },
 		Summarize: func(answer flow.Answer) string { return rules.IsolationSummary(domain.Isolation(answer.Value)) },
 		Flag:      domain.FlagIsolation,
+		Memory:    flow.Memory{ID: domain.RememberIsolation},
 	}
 }
 
@@ -203,7 +210,7 @@ func (f *checkoutFlow) sourceUpdate(answers flow.Answers) decide.SourceUpdatePro
 	if !found || f.target(pr.Branch).State != domain.BranchTargetExisting {
 		return decide.SourceUpdatePrompt{SkipReason: domain.CheckoutSourceUpdateSkipNew}
 	}
-	return decide.SourceUpdate(decide.SourceUpdateParams{
+	return decide.SourceUpdate(f.runCtx, decide.SourceUpdateParams{
 		ProjectDir: f.ctx.ProjectDir,
 		Target:     f.target,
 		Branch:     pr.Branch,
@@ -244,19 +251,21 @@ func (f *checkoutFlow) recap(answers flow.Answers) string {
 		lines = append(lines, domain.RecapFieldParent+source)
 	}
 	env := answers.Value(KeyEnv)
-	lines = append(lines, domain.RecapFieldEnv+envSummary(flow.Answer{Value: env}))
+	lines = append(lines, domain.RecapFieldEnv+envSummary(flow.Answer{Value: env})+flow.RememberedMark(answers, KeyEnv))
 	if rules.IsolationRecapShown(rules.IsolationRecapShownParams{Applies: f.applies, Override: f.request.Isolation}) {
-		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(f.isolation(answers)))
+		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(f.isolation(answers))+flow.RememberedMark(answers, KeyIsolation))
 	}
 	if answers.Value(KeySourceUpdate) == decide.UpdateFastForward {
-		lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, pr.Branch))
+		lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, pr.Branch)+flow.RememberedMark(answers, KeySourceUpdate))
 	}
+	lines = append(lines, decide.KeptSourceLines(answers, KeySourceUpdate)...)
+	lines = append(lines, flow.RememberedHint(answers, KeyEnv, KeyIsolation, KeySourceUpdate)...)
 
 	var warnings []string
 	if prompt := f.sourceUpdate(answers); prompt.Show && prompt.AbortOnDecline && prompt.Warning != "" {
 		warnings = append(warnings, domain.WarningPrefix+prompt.Warning)
 	}
-	if show, warning := decide.EnvParentFallback(decide.EnvFallbackParams{
+	if show, warning := decide.EnvParentFallback(f.runCtx, decide.EnvFallbackParams{
 		ProjectDir:  f.ctx.ProjectDir,
 		Source:      source,
 		Config:      f.ctx.Config,

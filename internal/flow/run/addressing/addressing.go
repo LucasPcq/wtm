@@ -5,6 +5,8 @@
 package addressing
 
 import (
+	"context"
+
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/ordinal"
@@ -32,8 +34,8 @@ type State struct {
 }
 
 // Read resolves both in one pass over the worktrees' .env files.
-func Read(params Params) State {
-	found := drifts(params)
+func Read(ctx context.Context, params Params) State {
+	found := drifts(ctx, params)
 	lines := make([]rules.AddressingDriftParams, 0, len(found))
 	for _, drift := range found {
 		lines = append(lines, drift.AddressingDriftParams)
@@ -54,8 +56,8 @@ func Read(params Params) State {
 // Lines are the warning as a surface that draws its own band takes it: the run
 // view shows them while it holds the terminal, where a notice printed after it
 // reaches a reader who has already followed the URL.
-func Lines(params Params) []string {
-	return Read(params).Warnings
+func Lines(ctx context.Context, params Params) []string {
+	return Read(ctx, params).Warnings
 }
 
 // Notice is what a surface shows, and false when every worktree of the run is
@@ -63,8 +65,8 @@ func Lines(params Params) []string {
 // run.toml, a link naming a file .wtm.toml does not configure, an unreadable
 // .env — yields no warning rather than an error: this is about an address, the
 // run is about processes.
-func Notice(params Params) (flow.Notice, bool) {
-	lines := Lines(params)
+func Notice(ctx context.Context, params Params) (flow.Notice, bool) {
+	lines := Lines(ctx, params)
 	if len(lines) == 0 {
 		return flow.Notice{}, false
 	}
@@ -82,14 +84,14 @@ type drift struct {
 	WorkDir string
 }
 
-func drifts(params Params) []drift {
+func drifts(ctx context.Context, params Params) []drift {
 	drifts := make([]drift, 0, len(params.WorkDirs))
 	for _, dir := range params.WorkDirs {
-		branch := target.BranchOf(dir)
+		branch := target.BranchOf(ctx, dir)
 		if branch == "" {
 			continue
 		}
-		plan, err := planOf(planOfParams{Context: params.Context, Branch: branch, Path: dir})
+		plan, err := planOf(ctx, planOfParams{Context: params.Context, Branch: branch, Path: dir})
 		if err != nil {
 			continue
 		}
@@ -110,13 +112,13 @@ type planOfParams struct {
 
 // planOf numbers the worktree the first time its ports are planned, as reading
 // them always did, so the allocation is published.
-func planOf(params planOfParams) (domain.EnvPortPlan, error) {
+func planOf(ctx context.Context, params planOfParams) (domain.EnvPortPlan, error) {
 	var plan domain.EnvPortPlan
-	err := ordinal.Retry(ordinal.RetryParams{
+	err := ordinal.Retry(ctx, ordinal.RetryParams{
 		Context: params.Context,
 		Branch:  func() string { return params.Branch },
 		Do: func() error {
-			resolved, planErr := worktree.EnvPortPlanFor(worktree.ResolveEnvPortsParams{
+			resolved, planErr := worktree.EnvPortPlanFor(ctx, worktree.ResolveEnvPortsParams{
 				ProjectDir:   params.Context.ProjectDir,
 				StateDir:     params.Context.StateDir,
 				Branch:       params.Branch,

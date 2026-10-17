@@ -26,13 +26,13 @@ func fixture(t *testing.T) (flow.Context, string) {
 	gittest.Git(t, repo, "worktree", "add", "-b", "feat-live", filepath.Join(t.TempDir(), "feat-live"))
 	witness := filepath.Join(t.TempDir(), "witness")
 
-	if err := config.WriteRun(config.WriteRunParams{StateDir: stateDir, Force: true, Config: domain.RunConfig{Jobs: []domain.JobConfig{{
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: stateDir, Force: true, Config: domain.RunConfig{Jobs: []domain.JobConfig{{
 		Name: "postgres", Kind: domain.JobKindService, Cmd: "true", Scope: domain.JobScopeShared,
 		Namespace: &domain.JobNamespaceConfig{Name: "app_{worktree}", Create: "true", Remove: "echo $WTM_NAMESPACE >> " + witness},
 	}}}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := runjobs.QueueRemovals(runjobs.QueueRemovalsParams{StateDir: stateDir, Refs: []domain.NamespaceRef{
+	if err := runjobs.QueueRemovals(t.Context(), runjobs.QueueRemovalsParams{StateDir: stateDir, Refs: []domain.NamespaceRef{
 		{Job: "postgres", Worktree: "feat-live", Ordinal: 1},
 		{Job: "postgres", Worktree: "gone", Ordinal: 2},
 	}}); err != nil {
@@ -47,7 +47,7 @@ func TestSettleWithdrawsADebtWhoseWorktreeExistsAgain(t *testing.T) {
 	ctx, witness := fixture(t)
 	presenter := &flowtest.Recorder{}
 
-	result := Settle(Params{Context: ctx, Presenter: presenter})
+	result := Settle(t.Context(), Params{Context: ctx, Presenter: presenter})
 
 	if body, _ := os.ReadFile(witness); len(body) != 0 {
 		t.Errorf("remove ran with %q, want nothing dropped", body)
@@ -68,8 +68,8 @@ func TestSettleWithdrawsADebtWhoseWorktreeExistsAgain(t *testing.T) {
 func TestSettleLeavesADebtOwedWhileItsServiceIsDown(t *testing.T) {
 	ctx, _ := fixture(t)
 
-	Settle(Params{Context: ctx, Presenter: &flowtest.Recorder{}})
-	result := Settle(Params{Context: ctx, Presenter: &flowtest.Recorder{}})
+	Settle(t.Context(), Params{Context: ctx, Presenter: &flowtest.Recorder{}})
+	result := Settle(t.Context(), Params{Context: ctx, Presenter: &flowtest.Recorder{}})
 
 	if len(result.Settled) != 0 || result.Owed["postgres"] != 1 {
 		t.Errorf("result = %+v, want nothing paid and one still owed", result)

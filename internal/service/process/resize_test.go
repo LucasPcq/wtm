@@ -202,7 +202,7 @@ func TestClientResize_TravelsOnItsOwnConnection(t *testing.T) {
 	go serveVersionedOK(listener, requests, Response{Status: StatusOK, Version: domain.Version})
 
 	client := NewClient(socket)
-	if err := client.Resize(ResizeParams{Name: "dev", WorkDir: "/work/feat", Cols: 80, Rows: 20}); err != nil {
+	if err := client.Resize(t.Context(), ResizeParams{Name: "dev", WorkDir: "/work/feat", Cols: 80, Rows: 20}); err != nil {
 		t.Fatalf("resize: %v", err)
 	}
 
@@ -229,7 +229,7 @@ func TestClientResize_SurfacesTheDaemonError(t *testing.T) {
 
 	go serveVersionedOK(listener, nil, Response{Status: StatusError, Version: domain.Version, Message: "job dev not found"})
 
-	err = NewClient(socket).Resize(ResizeParams{Name: "dev", Cols: 80, Rows: 20})
+	err = NewClient(socket).Resize(t.Context(), ResizeParams{Name: "dev", Cols: 80, Rows: 20})
 	if err == nil {
 		t.Fatal("expected an error")
 	}

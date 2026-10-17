@@ -32,10 +32,9 @@ type EnvPortTableParams struct {
 // pushes them out of alignment with the header naming their columns. A rule
 // separates the groups without spending indentation to do it.
 //
-// Only the port shows a before and an after: it is the only thing that changes,
-// and printing both whole values would double the width for nothing. The value is
-// elided, which is not only about width — a DATABASE_URL printed whole puts a
-// password on screen.
+// Only the port shows a before and an after: it is the only thing that changes.
+// The last column is where the value's origins land, never the value: the rest
+// of it is the user's, a password among it.
 func EnvPortTableLines(params EnvPortTableParams) []string {
 	entries := EnvPortRewrites(params.Plan)
 	if len(entries) == 0 {
@@ -59,7 +58,7 @@ func EnvPortTableLines(params EnvPortTableParams) []string {
 	)}
 	for _, e := range entries {
 		rows = append(rows, row(e.Key, e.Port, envPortMove(e),
-			ElideEnvValue(ElideEnvValueParams{Value: e.NewValue, Width: valueWidth})))
+			envPortBecomes(envPortBecomesParams{Entry: e, Width: valueWidth})))
 	}
 
 	return withFileRules(withFileRulesParams{Entries: entries, Rows: rows, Width: widestLine(rows)})
@@ -146,7 +145,9 @@ func envPortAnomalyReason(e domain.EnvPortEntry) string {
 	case domain.EnvPortStatusAmbiguous:
 		return fmt.Sprintf(domain.EnvPortReasonAmbiguousFmt, e.Base)
 	case domain.EnvPortStatusForeignHost:
-		return fmt.Sprintf(domain.EnvPortReasonForeignHostFmt, e.ForeignHost)
+		// The host is the user's text, not wtm's: naming it is what let a
+		// password through when parsers disagreed on where userinfo ends.
+		return domain.EnvPortReasonForeignHost
 	case domain.EnvPortStatusSecureScheme:
 		return domain.EnvPortReasonSecureScheme
 	default:

@@ -56,6 +56,10 @@ type BranchTarget struct {
 	// DivergenceUnknown when the branch is new or has no origin counterpart.
 	Origin      DivergenceState
 	AheadBehind AheadBehind
+	// Upstream is origin/<branch> when a new branch exists only on origin: git
+	// creates it from there and tracks it, and the source branch is then only
+	// the sync parent recorded in metadata.
+	Upstream string
 }
 
 // BranchCandidate is a branch offered in a picker as a worktree start-point or
@@ -81,6 +85,8 @@ const (
 	FFDiverged
 	FFNoUpstream
 	FFFailed
+	// FFCancelled is a branch an interrupt reached first: left where it was.
+	FFCancelled
 )
 
 // FastForwardCheck is one branch's state against origin, gathered in a single

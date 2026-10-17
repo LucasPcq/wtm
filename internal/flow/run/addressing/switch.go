@@ -1,6 +1,7 @@
 package addressing
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -56,7 +57,7 @@ type SwitchOutcome struct {
 // Switch sets run.toml's addressing, then settles every worktree whose .env
 // spells the other one. The second half runs even when the mode did not change:
 // a worktree left out of step by an earlier switch is the same debt.
-func Switch(params SwitchParams) (SwitchOutcome, error) {
+func Switch(ctx context.Context, params SwitchParams) (SwitchOutcome, error) {
 	if err := validMode(params.Request.Mode); err != nil {
 		return SwitchOutcome{}, err
 	}
@@ -65,7 +66,7 @@ func Switch(params SwitchParams) (SwitchOutcome, error) {
 	pending := pendingByMode{ctx: params.Context, cache: map[string]outOfStep{}}
 	answers, err := params.Prompter.Ask(flow.Session{
 		ErrLabel: domain.CmdAddressing,
-		Steps:    []flow.Step{modeStep(previous), settleStep(&pending)},
+		Steps:    []flow.Step{modeStep(previous), settleStep(ctx, &pending)},
 		Presets:  presets(params.Request),
 	})
 	if errors.Is(err, domain.ErrUserAborted) {
@@ -80,19 +81,19 @@ func Switch(params SwitchParams) (SwitchOutcome, error) {
 	if outcome.Current != previous {
 		cfg := params.Request.Config
 		cfg.Addressing = outcome.Current
-		if err := runconfig.Save(runconfig.SaveParams{StateDir: params.Context.StateDir, Config: cfg}); err != nil {
+		if err := runconfig.Save(ctx, runconfig.SaveParams{StateDir: params.Context.StateDir, Config: cfg}); err != nil {
 			return SwitchOutcome{}, err
 		}
 		outcome.Changed = true
 	}
 
-	found := pending.of(string(outcome.Current))
+	found := pending.of(ctx, string(outcome.Current))
 	outcome.MainLeft = found.MainLeft
 	if answers.Value(stepSettle) != settleYes {
 		outcome.Pending = refsOf(found.Settle)
 		return outcome, params.Presenter.Switched(outcome)
 	}
-	outcome = settle(params, outcome, found.Settle)
+	outcome = settle(ctx, params, outcome, found.Settle)
 	return outcome, params.Presenter.Switched(outcome)
 }
 
@@ -135,20 +136,20 @@ func modeStep(current domain.Addressing) flow.Step {
 // settleStep resolves to yes when nobody can be asked, as the port pass of a
 // create does: the values rewritten are only the ones wtm links to an address,
 // and switching back rewrites them again.
-func settleStep(pending *pendingByMode) flow.Step {
+func settleStep(ctx context.Context, pending *pendingByMode) flow.Step {
 	return flow.Step{
 		Kind:  flow.StepSelect,
 		Key:   stepSettle,
 		Label: domain.AddressingSettleStepName,
 		Flag:  domain.FlagKeepEnv,
 		Skip: func(answers flow.Answers) (bool, string) {
-			if len(pending.of(answers.Value(stepMode)).Settle) == 0 {
+			if len(pending.of(ctx, answers.Value(stepMode)).Settle) == 0 {
 				return true, domain.AddressingSettleNothing
 			}
 			return false, ""
 		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
-			found := pending.of(answers.Value(stepMode))
+			found := pending.of(ctx, answers.Value(stepMode))
 			count := rules.WorktreeCountLabel(len(found.Settle))
 			description := fmt.Sprintf(domain.AddressingSettleDescFmt, count, strings.Join(branchesOf(found.Settle), ", "))
 			if found.MainLeft != nil {
@@ -170,10 +171,10 @@ func settleStep(pending *pendingByMode) flow.Step {
 	}
 }
 
-func settle(params SwitchParams, outcome SwitchOutcome, worktrees []domain.GitWorktree) SwitchOutcome {
+func settle(ctx context.Context, params SwitchParams, outcome SwitchOutcome, worktrees []domain.GitWorktree) SwitchOutcome {
 	once := &statusOnce{SwitchPresenter: params.Presenter, seen: map[string]bool{}}
 	for _, wt := range worktrees {
-		_, err := envports.Settle(envports.Params{
+		_, err := envports.Settle(ctx, envports.Params{
 			Context:      params.Context,
 			Branch:       wt.Branch,
 			WorktreePath: wt.Path,
@@ -224,19 +225,19 @@ type outOfStep struct {
 	MainLeft *domain.WorktreeRef
 }
 
-func (p *pendingByMode) of(mode string) outOfStep {
+func (p *pendingByMode) of(ctx context.Context, mode string) outOfStep {
 	if cached, ok := p.cache[mode]; ok {
 		return cached
 	}
-	found := readOutOfStep(p.ctx, domain.Addressing(mode))
+	found := readOutOfStep(ctx, p.ctx, domain.Addressing(mode))
 	p.cache[mode] = found
 	return found
 }
 
 // readOutOfStep reads each worktree's plan under the mode given rather than the
 // one run.toml holds: the question is asked before anything is written.
-func readOutOfStep(ctx flow.Context, mode domain.Addressing) outOfStep {
-	all, err := worktree.ListAll(worktree.ListAllParams{ProjectDir: ctx.ProjectDir})
+func readOutOfStep(ctx context.Context, project flow.Context, mode domain.Addressing) outOfStep {
+	all, err := worktree.ListAll(ctx, worktree.ListAllParams{ProjectDir: project.ProjectDir})
 	if err != nil {
 		return outOfStep{}
 	}
@@ -245,7 +246,7 @@ func readOutOfStep(ctx flow.Context, mode domain.Addressing) outOfStep {
 		if wt.Branch == "" {
 			continue
 		}
-		plan, planErr := planOf(planOfParams{Context: ctx, Branch: wt.Branch, Path: wt.Path, Addressing: mode})
+		plan, planErr := planOf(ctx, planOfParams{Context: project, Branch: wt.Branch, Path: wt.Path, Addressing: mode})
 		if planErr != nil || len(rules.EnvPortRewrites(plan)) == 0 {
 			continue
 		}

@@ -35,3 +35,10 @@ type ExecCounts struct {
 	Interrupted int
 	NotStarted  int
 }
+
+// ProcessLink is one row of the process table: a process, its parent, its group.
+type ProcessLink struct {
+	PID  int
+	PPID int
+	PGID int
+}

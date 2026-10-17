@@ -11,8 +11,8 @@ parent); --from overrides it for one run. When run.toml declares ports, the
 values wtm owns are then settled on the worktree's isolation.
 
 Pass a worktree, or omit it to pick one. --check reports and writes nothing.
-A report prints only the values wtm writes (ports, owned values); the others,
-secrets included, are withheld unless --show-values.
+A report prints only what wtm writes (the host:port it moves, owned values);
+every other part of a value, secrets included, is withheld unless --show-values.
 Unattended (--yes, no terminal, --output json) it applies safe additions only:
 conflicts need --on-conflict, orphans --prune.
 
@@ -56,7 +56,7 @@ wtm env [worktree] [flags]
       --on-conflict string   Conflict resolution with --mode refresh: keep (default) or overwrite
       --output string        Output format: text or json (default "text")
       --prune                Remove orphan keys (present in the .env but in no source)
-      --show-values          Print the values of keys wtm does not write (secrets included); withheld by default
+      --show-values          Print every value whole, secrets included; by default a report shows only what wtm writes
   -y, --yes                  Skip all prompts; resolve every decision from flags and safe defaults (additions only)
 ```
 

@@ -1,12 +1,13 @@
 package env
 
 import (
+	"context"
 	"path/filepath"
 	"strconv"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/infra"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 type WritePortKeysParams struct {
@@ -21,12 +22,12 @@ type WritePortKeysParams struct {
 // The template is only ever amended, never created: adding a committed file
 // nobody asked for is not this pass's business. The value file is created,
 // because provisioning creates it anyway.
-func WritePortKeys(params WritePortKeysParams) ([]domain.PortKeyWrite, error) {
+func WritePortKeys(ctx context.Context, params WritePortKeysParams) ([]domain.PortKeyWrite, error) {
 	applied := make([]domain.PortKeyWrite, 0, len(params.Writes))
 	for _, write := range params.Writes {
 		value := strconv.Itoa(write.Base)
 
-		changed, err := upsertEnvKey(upsertEnvKeyParams{
+		changed, err := upsertEnvKey(ctx, upsertEnvKeyParams{
 			Path: filepath.Join(params.ProjectDir, write.File), Key: write.Port, Value: value, Create: true,
 		})
 		if err != nil {
@@ -34,7 +35,7 @@ func WritePortKeys(params WritePortKeysParams) ([]domain.PortKeyWrite, error) {
 		}
 
 		if write.Template != "" {
-			templateChanged, templateErr := upsertEnvKey(upsertEnvKeyParams{
+			templateChanged, templateErr := upsertEnvKey(ctx, upsertEnvKeyParams{
 				Path: filepath.Join(params.ProjectDir, write.Template), Key: write.Port, Value: value,
 			})
 			if templateErr != nil {
@@ -59,19 +60,14 @@ type upsertEnvKeyParams struct {
 	Create bool
 }
 
-func upsertEnvKey(params upsertEnvKeyParams) (bool, error) {
-	if !params.Create && !infra.FileExists(params.Path) {
-		return false, nil
-	}
-
-	lines, err := readEnvFile(params.Path)
-	if err != nil {
-		return false, err
-	}
-
-	updated, changed := rules.UpsertEnvPair(rules.UpsertEnvPairParams{Lines: lines, Key: params.Key, Value: params.Value})
-	if !changed {
-		return false, nil
-	}
-	return true, writeEnvFile(params.Path, rules.RenderEnv(updated))
+func upsertEnvKey(ctx context.Context, params upsertEnvKeyParams) (bool, error) {
+	written, err := store.EnvDisk{}.Edit(ctx, store.EnvEdit{
+		Path:   params.Path,
+		Create: params.Create,
+		Edit: func(lines []domain.EnvLine) []domain.EnvLine {
+			updated, _ := rules.UpsertEnvPair(rules.UpsertEnvPairParams{Lines: lines, Key: params.Key, Value: params.Value})
+			return updated
+		},
+	})
+	return written.Changed, err
 }

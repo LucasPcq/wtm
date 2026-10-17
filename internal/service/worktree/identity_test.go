@@ -28,7 +28,7 @@ func assertSamePath(t *testing.T, got, want string) {
 func TestTheMainCheckoutIsOrdinalZeroWithNoParent(t *testing.T) {
 	repo := newOrdinalRepo(t)
 
-	identity, err := Identity(WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "main"})
+	identity, err := Identity(t.Context(), WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "main"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestAWorktreeNobodyNumberedHasANullOrdinal(t *testing.T) {
 	}
 	ref := WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/a"}
 
-	identity, err := Identity(ref)
+	identity, err := Identity(t.Context(), ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,12 +55,12 @@ func TestAWorktreeNobodyNumberedHasANullOrdinal(t *testing.T) {
 	}
 	assertSamePath(t, identity.Path, path)
 
-	if _, err := Ordinal(ref); !errors.Is(err, domain.ErrOrdinalUnallocated) {
+	if _, err := Ordinal(t.Context(), ref); !errors.Is(err, domain.ErrOrdinalUnallocated) {
 		t.Fatalf("Ordinal = %v, want ErrOrdinalUnallocated", err)
 	}
 
 	repo.ensure(t, "feat/a")
-	identity, err = Identity(ref)
+	identity, err = Identity(t.Context(), ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestIdentitiesListsMainFirstAndSkipsADetachedWorktree(t *testing.T) {
 	repo.addWorktree(t, "feat/a")
 	git(t, repo.dir, "worktree", "add", "--detach", filepath.Join(t.TempDir(), "detached"))
 
-	identities, err := Identities(IdentitiesParams{ProjectDir: repo.dir, StateDir: repo.stateDir})
+	identities, err := Identities(t.Context(), IdentitiesParams{ProjectDir: repo.dir, StateDir: repo.stateDir})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,14 +85,14 @@ func TestIdentitiesListsMainFirstAndSkipsADetachedWorktree(t *testing.T) {
 
 func TestTheIdentityOfAnUnknownBranchIsAnError(t *testing.T) {
 	repo := newOrdinalRepo(t)
-	if _, err := Identity(WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "nope"}); err == nil {
+	if _, err := Identity(t.Context(), WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "nope"}); err == nil {
 		t.Fatal("expected an error")
 	}
 }
 
 func TestARepoIsKeyedByItsCommonDir(t *testing.T) {
 	repo := newOrdinalRepo(t)
-	got, err := RepoOf(RepoOfParams{ProjectDir: repo.dir})
+	got, err := RepoOf(t.Context(), RepoOfParams{ProjectDir: repo.dir})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,11 +111,11 @@ func TestARepoHasOneKeyWhateverPathReachesIt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	direct, err := RepoOf(RepoOfParams{ProjectDir: repo.dir})
+	direct, err := RepoOf(t.Context(), RepoOfParams{ProjectDir: repo.dir})
 	if err != nil {
 		t.Fatal(err)
 	}
-	linked, err := RepoOf(RepoOfParams{ProjectDir: link})
+	linked, err := RepoOf(t.Context(), RepoOfParams{ProjectDir: link})
 	if err != nil {
 		t.Fatal(err)
 	}

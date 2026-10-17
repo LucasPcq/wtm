@@ -32,7 +32,7 @@ func TestEveryEventOfARunCarriesTheCallersCorrelationID(t *testing.T) {
 			received := watchAfterReady(t, watchParams{ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir, Socket: socket})
 			ctx.Publisher = events.NewPublisher(events.PublisherParams{ProjectDir: ctx.ProjectDir, SocketPath: socket, CorrelationID: tc.ID})
 
-			if _, err := Run(Params{
+			if _, err := Run(t.Context(), Params{
 				Context:   ctx,
 				Request:   Request{Branches: []string{"top"}, BaseBranch: "main", ReparentChildren: true},
 				Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyDelete: deleteYes}},

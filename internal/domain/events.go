@@ -73,10 +73,7 @@ type RegisteredRepo struct {
 	AddedAt   string `json:"added_at"`
 }
 
-const (
-	RegistryFileName = "repos.json"
-	RegistryLockName = "repos.json.lock"
-)
+const RegistryFileName = "repos.json"
 
 type EventRepo struct {
 	Root      string `json:"root"`

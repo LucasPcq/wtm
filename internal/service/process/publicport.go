@@ -1,6 +1,8 @@
 package process
 
 import (
+	"context"
+
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/proxy"
 )
@@ -12,14 +14,14 @@ import (
 // state is all there is.
 //
 // Configured is the bind port the config asks for, zero when the proxy is off.
-func PublicProxyPort(configured int) int {
+func PublicProxyPort(ctx context.Context, configured int) int {
 	if configured == 0 {
 		return 0
 	}
 
 	socketPath := SocketPath()
 	if IsDaemonRunning(socketPath) {
-		resp, err := NewClient(socketPath).Send(Request{Action: ActionList})
+		resp, err := NewClient(socketPath).Send(ctx, Request{Action: ActionList})
 		if err == nil && resp.Status != StatusError {
 			return resp.ProxyPublicPort
 		}

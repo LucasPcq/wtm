@@ -95,7 +95,7 @@ func (f *relocateFlow) candidates(needed bool) []domain.BranchCandidate {
 	if !needed || !f.prompter.Interactive() {
 		return nil
 	}
-	return decide.BranchCandidates(f.ctx.ProjectDir)
+	return decide.BranchCandidates(f.runCtx, f.ctx.ProjectDir)
 }
 
 type parentStepParams struct {
@@ -130,7 +130,7 @@ func (f *relocateFlow) parentStep(params parentStepParams) flow.Step {
 	}
 	if params.Refresh {
 		step.Refresh = func() []domain.BranchCandidate {
-			return branch.Refresh(branch.ListParams{ProjectDir: f.ctx.ProjectDir})
+			return branch.Refresh(f.runCtx, branch.ListParams{ProjectDir: f.ctx.ProjectDir})
 		}
 	}
 	return step

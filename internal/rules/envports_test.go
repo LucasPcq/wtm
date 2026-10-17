@@ -184,16 +184,24 @@ func TestReduceEnvPortValueKeepsRealConflictsVisible(t *testing.T) {
 	}
 }
 
-func TestElideEnvValueHidesCredentials(t *testing.T) {
-	got := ElideEnvValue(ElideEnvValueParams{Value: "postgres://user:supersecret@localhost:5442/app"})
-	if got != "…@localhost:5442/app" {
-		t.Fatalf("ElideEnvValue() = %q, want the credentials elided", got)
+func TestEnvPortBecomesIsBuiltFromThePlan(t *testing.T) {
+	got := envPortBecomes(envPortBecomesParams{Entry: domain.EnvPortEntry{
+		CurrentValue: "postgres://user:supersecret@localhost:5432/app",
+		NewValue:     "postgres://user:supersecret@localhost:5442/app",
+		Moves:        []domain.EnvPortMove{{Base: 5432, Resolved: 5442}},
+	}})
+	if got != ":5442" {
+		t.Fatalf("envPortBecomes() = %q, want the port it lands on", got)
 	}
 }
 
-func TestElideEnvValueKeepsShortValues(t *testing.T) {
-	if got := ElideEnvValue(ElideEnvValueParams{Value: "http://localhost:3010"}); got != "http://localhost:3010" {
-		t.Errorf("ElideEnvValue() = %q, want it unchanged", got)
+func TestEnvPortBecomesListsEveryMove(t *testing.T) {
+	got := envPortBecomes(envPortBecomesParams{Entry: domain.EnvPortEntry{Moves: []domain.EnvPortMove{
+		{Base: 3000, Resolved: 3010},
+		{Base: 3001, Origin: "http://admin.feat-x.app.localhost:1355"},
+	}}, Width: 200})
+	if got != ":3010, http://admin.feat-x.app.localhost:1355" {
+		t.Errorf("envPortBecomes() = %q, want each move's landing", got)
 	}
 }
 
@@ -348,5 +356,30 @@ func TestPlanEnvPortsLeavesAnUndeclaredPortAlone(t *testing.T) {
 	}
 	if !strings.Contains(plan.Entries[0].NewValue, "app.example.com:8443") {
 		t.Errorf("value = %q, want the external origin untouched", plan.Entries[0].NewValue)
+	}
+}
+
+// LUC-274: a source value a link follows is previewed on this worktree's port;
+// a key no link follows, and the input, are left alone.
+func TestSettleEnvResolvedValuesShiftsOnlyALinkedValue(t *testing.T) {
+	files := []domain.EnvFileResult{{Target: ".env", Diff: domain.EnvDiff{Entries: []domain.EnvKeyDiff{
+		{Key: "DB_URL", Status: domain.EnvKeyConflict, ResolvedValue: "postgres://app:pw@localhost:5432/db"},
+		{Key: "OTHER", Status: domain.EnvKeyConflict, ResolvedValue: "localhost:5432"},
+	}}}}
+
+	settled := SettleEnvResolvedValues(SettleEnvResolvedValuesParams{Files: files, Ports: PlanEnvPortsParams{
+		Links:  []domain.EnvPortLink{{File: ".env", Key: "DB_URL", Job: "db", Port: "PG"}},
+		Bases:  map[domain.PortRef]int{{Job: "db", Name: "PG"}: 5432},
+		Offset: 10,
+	}})
+
+	if got := settled[0].Diff.Entries[0].ResolvedValue; got != "postgres://app:pw@localhost:5442/db" {
+		t.Errorf("DB_URL = %q, want it on the worktree's port", got)
+	}
+	if got := settled[0].Diff.Entries[1].ResolvedValue; got != "localhost:5432" {
+		t.Errorf("OTHER = %q, want it untouched", got)
+	}
+	if got := files[0].Diff.Entries[0].ResolvedValue; got != "postgres://app:pw@localhost:5432/db" {
+		t.Errorf("input = %q, want it untouched", got)
 	}
 }

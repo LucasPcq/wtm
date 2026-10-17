@@ -12,7 +12,7 @@ import (
 func TestTargetNewBranch(t *testing.T) {
 	dir := gittest.InitRepo(t)
 
-	got := Target(BranchParams{ProjectDir: dir, Branch: "feat/absent"})
+	got := Target(t.Context(), BranchParams{ProjectDir: dir, Branch: "feat/absent"})
 	if got.State != domain.BranchTargetNew {
 		t.Errorf("State = %v, want BranchTargetNew", got.State)
 	}
@@ -28,7 +28,7 @@ func TestTargetExistingBranchWithoutWorktree(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	gittest.CreateBranch(t, dir, "feat/existing")
 
-	got := Target(BranchParams{ProjectDir: dir, Branch: "feat/existing"})
+	got := Target(t.Context(), BranchParams{ProjectDir: dir, Branch: "feat/existing"})
 	if got.State != domain.BranchTargetExisting {
 		t.Errorf("State = %v, want BranchTargetExisting", got.State)
 	}
@@ -43,7 +43,7 @@ func TestTargetBranchCheckedOutInAnotherWorktree(t *testing.T) {
 	wtPath := filepath.Join(t.TempDir(), "taken")
 	addWorktree(t, dir, wtPath, "feat/taken")
 
-	got := Target(BranchParams{ProjectDir: dir, Branch: "feat/taken"})
+	got := Target(t.Context(), BranchParams{ProjectDir: dir, Branch: "feat/taken"})
 	if got.State != domain.BranchTargetCheckedOut {
 		t.Fatalf("State = %v, want BranchTargetCheckedOut", got.State)
 	}
@@ -57,7 +57,7 @@ func TestTargetBranchCheckedOutInAnotherWorktree(t *testing.T) {
 func TestTargetBranchCheckedOutInMainWorktree(t *testing.T) {
 	dir := gittest.InitRepo(t)
 
-	got := Target(BranchParams{ProjectDir: dir, Branch: "main"})
+	got := Target(t.Context(), BranchParams{ProjectDir: dir, Branch: "main"})
 	if got.State != domain.BranchTargetCheckedOut {
 		t.Errorf("State = %v, want BranchTargetCheckedOut for the checked-out main branch", got.State)
 	}

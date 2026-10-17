@@ -20,7 +20,7 @@ func TestPickerOffersAWorktreeWhosePRIsOlderThanTheHundredNewest(t *testing.T) {
 	ghtest.Stub(t, ghtest.StubParams{PRs: append(prs, ghtest.PR{Number: 1, Branch: "old-merged", State: domain.PRStateMerged})})
 	prompter := &flowtest.ScriptedPrompter{Sets: map[string][]string{KeySelection: {}}, Answers: map[string]string{KeyConfirm: confirmYes}}
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   fixture.ctx,
 		Request:   Request{Merged: true, Closed: true, Gone: true, NoFetch: true, BaseBranch: "main"},
 		Prompter:  prompter,

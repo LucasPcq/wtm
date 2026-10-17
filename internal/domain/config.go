@@ -11,10 +11,23 @@ const (
 
 // ProjectConfig maps to .wtm.toml (project-level configuration).
 type ProjectConfig struct {
+	// Schema is the version read from the file, zero when it carries none.
+	Schema    int             `toml:"-" json:"-"`
 	Worktrees WorktreesConfig `toml:"worktrees" json:"worktrees"`
 	Env       EnvConfig       `toml:"env" json:"env"`
 	Hooks     HooksConfig     `toml:"hooks" json:"hooks"`
+	Wizard    WizardConfig    `toml:"wizard" json:"wizard"`
 }
+
+// WizardConfig.Remembered holds the answers this repository chose never to be
+// asked again, keyed by a question's memory id (domain.Remember*).
+type WizardConfig struct {
+	Remembered map[string]string `toml:"remembered" json:"remembered,omitempty"`
+}
+
+// AnswerOrigin says what settled a rememberable answer, for a reader that has to
+// know whether a remembered one stood in for a flag it did not pass.
+type AnswerOrigin string
 
 // WorktreesConfig controls worktree creation defaults.
 type WorktreesConfig struct {
@@ -48,6 +61,7 @@ type HooksConfig struct {
 
 // GlobalConfig maps to the global wtm config (user-level configuration).
 type GlobalConfig struct {
+	Schema int          `toml:"schema" json:"-"`
 	Shell  ShellType    `toml:"shell"`
 	UI     UIConfig     `toml:"ui"`
 	Proxy  ProxyConfig  `toml:"proxy"`

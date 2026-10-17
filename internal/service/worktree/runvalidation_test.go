@@ -13,7 +13,7 @@ import (
 func resolveErr(t *testing.T, repo ordinalRepo, global domain.GlobalConfig) error {
 	t.Helper()
 	globaldir.Isolate(t)
-	_, err := ResolveEnvPorts(ResolveEnvPortsParams{
+	_, err := ResolveEnvPorts(t.Context(), ResolveEnvPortsParams{
 		ProjectDir:   repo.dir,
 		StateDir:     repo.stateDir,
 		Branch:       "main",
@@ -49,7 +49,7 @@ value = "{worktree}"
 `)
 	path := repo.addWorktree(t, "feat/a")
 	repo.ensure(t, "feat/a")
-	resolved, err := ResolveEnvPorts(ResolveEnvPortsParams{
+	resolved, err := ResolveEnvPorts(t.Context(), ResolveEnvPortsParams{
 		ProjectDir:   repo.dir,
 		StateDir:     repo.stateDir,
 		Branch:       "feat/a",
@@ -95,7 +95,7 @@ value = "acme-{worktree}"
 
 func resolveMain(t *testing.T, repo ordinalRepo) envsvc.EnvPortsParams {
 	t.Helper()
-	resolved, err := ResolveEnvPorts(ResolveEnvPortsParams{
+	resolved, err := ResolveEnvPorts(t.Context(), ResolveEnvPortsParams{
 		ProjectDir:   repo.dir,
 		StateDir:     repo.stateDir,
 		Branch:       "main",

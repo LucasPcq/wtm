@@ -1,6 +1,7 @@
 package process
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -18,19 +19,19 @@ type WorktreeJobsParams struct {
 // Its claims on shared services stay standing: releasing the last one stops the
 // service, which could then not take the worktree's namespace back.
 // ReleaseWorktreeJobs lets them go once it has.
-func StopWorktreeJobs(params WorktreeJobsParams) (stopped []string, err error) {
-	client, reachable, err := daemonFor(params)
+func StopWorktreeJobs(ctx context.Context, params WorktreeJobsParams) (stopped []string, err error) {
+	client, reachable, err := daemonFor(ctx, params)
 	if err != nil || !reachable {
 		return nil, err
 	}
-	own, err := ownJobsUp(client, params.WorkDir)
+	own, err := ownJobsUp(ctx, client, params.WorkDir)
 	if err != nil || len(own) == 0 {
 		return nil, err
 	}
 
 	var errs []error
 	for _, name := range own {
-		resp, sendErr := client.Send(Request{Action: ActionStop, Name: name, WorkDir: params.WorkDir})
+		resp, sendErr := client.Send(ctx, Request{Action: ActionStop, Name: name, WorkDir: params.WorkDir})
 		if sendErr != nil {
 			errs = append(errs, sendErr)
 			continue
@@ -43,7 +44,7 @@ func StopWorktreeJobs(params WorktreeJobsParams) (stopped []string, err error) {
 		return nil, errors.Join(errs...)
 	}
 
-	survivors, err := ownJobsUp(client, params.WorkDir)
+	survivors, err := ownJobsUp(ctx, client, params.WorkDir)
 	if err != nil {
 		return nil, err
 	}
@@ -56,12 +57,12 @@ func StopWorktreeJobs(params WorktreeJobsParams) (stopped []string, err error) {
 
 // ReleaseWorktreeJobs lets go of everything workDir still holds — its claims on
 // shared services, and whatever a forced removal left running.
-func ReleaseWorktreeJobs(params WorktreeJobsParams) error {
-	client, reachable, err := daemonFor(params)
+func ReleaseWorktreeJobs(ctx context.Context, params WorktreeJobsParams) error {
+	client, reachable, err := daemonFor(ctx, params)
 	if err != nil || !reachable {
 		return err
 	}
-	resp, err := client.Send(Request{Action: ActionStopAll, WorkDir: params.WorkDir})
+	resp, err := client.Send(ctx, Request{Action: ActionStopAll, WorkDir: params.WorkDir})
 	if err != nil {
 		return err
 	}
@@ -74,20 +75,20 @@ func ReleaseWorktreeJobs(params WorktreeJobsParams) error {
 // daemonFor reaches the daemon holding workDir's jobs. None listening and none
 // indexed means there is nothing to stop, and no daemon is started to learn it;
 // a detached stack outliving its daemon does need one to run its stop command.
-func daemonFor(params WorktreeJobsParams) (*Client, bool, error) {
+func daemonFor(ctx context.Context, params WorktreeJobsParams) (*Client, bool, error) {
 	if !IsDaemonRunning(params.SocketPath) {
 		if !HasIndexedJobs(params.WorkDir) {
 			return nil, false, nil
 		}
-		if err := EnsureDaemon(DaemonParams{SocketPath: params.SocketPath}); err != nil {
+		if err := EnsureDaemon(ctx, DaemonParams{SocketPath: params.SocketPath}); err != nil {
 			return nil, false, err
 		}
 	}
 	return NewClient(params.SocketPath), true, nil
 }
 
-func ownJobsUp(client *Client, workDir string) ([]string, error) {
-	resp, err := client.Send(Request{Action: ActionList})
+func ownJobsUp(ctx context.Context, client *Client, workDir string) ([]string, error) {
+	resp, err := client.Send(ctx, Request{Action: ActionList})
 	if err != nil {
 		return nil, err
 	}

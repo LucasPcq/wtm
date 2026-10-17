@@ -150,7 +150,7 @@ func TestCancelKillsACommandThatIgnoresSIGINT(t *testing.T) {
 	if results[0].Status != domain.ExecStatusInterrupted {
 		t.Errorf("status = %s", results[0].Status)
 	}
-	if elapsed := time.Since(begin); elapsed > domain.ExecInterruptGrace+3*time.Second {
+	if elapsed := time.Since(begin); elapsed > 2*domain.SubprocessInterruptGrace+3*time.Second {
 		t.Fatalf("took %s: SIGINT was ignored and nothing escalated", elapsed)
 	}
 }

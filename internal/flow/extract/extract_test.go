@@ -114,7 +114,7 @@ func TestAPickedRunAsksEveryQuestionInOrder(t *testing.T) {
 	}
 	presenter := newRecorder()
 
-	if _, err := Run(Params{Context: r.ctx, Prompter: prompter, Presenter: presenter}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: r.ctx, Prompter: prompter, Presenter: presenter}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if got, want := prompter.AskedKeys(), "extract.source,extract.files,extract.target,extract.mode,extract.recap"; got != want {
@@ -134,7 +134,7 @@ func TestThePickedSourceListsItsChangesAsTheFilesStepLoads(t *testing.T) {
 		Answers: map[string]string{KeySource: "src", KeyTarget: "dst", KeyMode: modeKeep, KeyRecap: confirmExtract},
 		Sets:    map[string][]string{KeyFiles: {"a.txt"}},
 	}
-	if _, err := Run(Params{Context: r.ctx, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: r.ctx, Prompter: prompter, Presenter: newRecorder()}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	files := prompter.Content[KeyFiles]
@@ -159,7 +159,7 @@ func TestFlagsLeaveOnlyTheRecapToAsk(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: confirmExtract}}
 
 	request := Request{Source: "src", Files: []string{"a.txt"}, To: "dst", Keep: true, KeepSet: true}
-	if _, err := Run(Params{Context: r.ctx, Request: request, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: r.ctx, Request: request, Prompter: prompter, Presenter: newRecorder()}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if got := prompter.AskedKeys(); got != KeyRecap {
@@ -190,7 +190,7 @@ func TestANewTargetAsksCreatesQuestionsThenCreatesIt(t *testing.T) {
 	}
 	presenter := newRecorder()
 
-	if _, err := Run(Params{Context: r.ctx, Request: Request{Source: "src"}, Prompter: prompter, Presenter: presenter}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: r.ctx, Request: Request{Source: "src"}, Prompter: prompter, Presenter: presenter}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if got, want := prompter.AskedKeys(), "extract.files,extract.target,create.branch,create.source,extract.mode,extract.recap"; got != want {
@@ -202,6 +202,36 @@ func TestANewTargetAsksCreatesQuestionsThenCreatesIt(t *testing.T) {
 	result := presenter.extracted.Result
 	if result.TargetBranch != "feat/split" || read(t, filepath.Join(result.TargetPath, "a.txt")) != "a\n" {
 		t.Errorf("result = %+v, want a.txt in a new feat/split worktree", result)
+	}
+}
+
+// LUC-281: --ff only answered unattended runs, so the wizard still offered the
+// fast-forward of a new target's source the flag had already accepted.
+func TestFastForwardFlagIsNeverAsked(t *testing.T) {
+	r := newRepo(t)
+	gittest.AddOrigin(t, r.ctx.ProjectDir)
+	gittest.Git(t, r.ctx.ProjectDir, "commit", "--allow-empty", "-m", "on origin only")
+	gittest.Git(t, r.ctx.ProjectDir, "push", "origin", "main")
+	gittest.Git(t, r.ctx.ProjectDir, "reset", "--hard", "HEAD~1")
+	prompter := &flowtest.ScriptedPrompter{
+		Answers: map[string]string{
+			KeyTarget:        targetCreate,
+			create.KeyBranch: "feat/split",
+			create.KeySource: "main",
+			KeyMode:          modeMove,
+			KeyRecap:         confirmExtract,
+		},
+		Sets: map[string][]string{KeyFiles: {"a.txt"}},
+	}
+
+	if _, err := Run(t.Context(), Params{Context: r.ctx, Request: Request{Source: "src", FastForward: true}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got, want := prompter.AskedKeys(), "extract.files,extract.target,create.branch,create.source,extract.mode,extract.recap"; got != want {
+		t.Errorf("asked %s, want %s: --ff answers the source update", got, want)
+	}
+	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, "fast-forward") {
+		t.Errorf("recap = %q, want the fast-forward the flag accepted", recap)
 	}
 }
 
@@ -223,14 +253,14 @@ func TestTheNewTargetsParentIsTheSourcesOwn(t *testing.T) {
 		},
 		Sets: map[string][]string{KeyFiles: {"a.txt"}},
 	}
-	if _, err := Run(Params{Context: r.ctx, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: r.ctx, Prompter: prompter, Presenter: newRecorder()}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if got := prompter.Content[create.KeySource].Pinned; got != "stack-base" {
 		t.Errorf("the parent offered first = %q, want the picked source's recorded parent", got)
 	}
 
-	unattended := &extractFlow{ctx: r.ctx}
+	unattended := &extractFlow{runCtx: t.Context(), ctx: r.ctx}
 	if got := unattended.defaultParent(flow.NewAnswers(map[string]string{KeySource: "dst"})); got != "" {
 		t.Errorf("a source with no recorded parent = %q, want create's base branch to stand in", got)
 	}
@@ -246,7 +276,7 @@ func TestAConflictIsAskedAfterTheRecap(t *testing.T) {
 	}
 
 	request := Request{Source: "src", Files: []string{"a.txt"}, To: "dst"}
-	if _, err := Run(Params{Context: r.ctx, Request: request, Prompter: prompter, Presenter: presenter}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: r.ctx, Request: request, Prompter: prompter, Presenter: presenter}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if got := strings.Join(*presenter.order, ","); got != "ask,confirm,extracted" {
@@ -267,7 +297,7 @@ func TestADeclinedConflictChangesNothing(t *testing.T) {
 	presenter := newRecorder()
 
 	request := Request{Source: "src", Files: []string{"a.txt"}, To: "dst"}
-	outcome, err := Run(Params{Context: r.ctx, Request: request, Prompter: prompter, Presenter: presenter})
+	outcome, err := Run(t.Context(), Params{Context: r.ctx, Request: request, Prompter: prompter, Presenter: presenter})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -282,7 +312,7 @@ func TestADeclinedConflictChangesNothing(t *testing.T) {
 func TestAnAbortedWizardSaysSoAndChangesNothing(t *testing.T) {
 	r := newRepo(t)
 	presenter := newRecorder()
-	outcome, err := Run(Params{Context: r.ctx, Prompter: &flowtest.ScriptedPrompter{Abort: true}, Presenter: presenter})
+	outcome, err := Run(t.Context(), Params{Context: r.ctx, Prompter: &flowtest.ScriptedPrompter{Abort: true}, Presenter: presenter})
 	if err != nil || !outcome.Aborted || presenter.extracted != nil {
 		t.Errorf("outcome %+v, err %v: want an abort with no conclusion", outcome, err)
 	}
@@ -301,7 +331,7 @@ func TestUnattendedRefusesWhatOnlyAPickerCouldAnswer(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := Run(Params{Context: r.ctx, Request: c.request, Prompter: flow.Unattended{}, Presenter: newRecorder()})
+			_, err := Run(t.Context(), Params{Context: r.ctx, Request: c.request, Prompter: flow.Unattended{}, Presenter: newRecorder()})
 			if !errors.Is(err, c.want) {
 				t.Errorf("err = %v, want %v", err, c.want)
 			}
@@ -315,7 +345,7 @@ func TestNoWorktreeWithChangesIsNothingToDo(t *testing.T) {
 		t.Fatal(err)
 	}
 	presenter := newRecorder()
-	if _, err := Run(Params{Context: r.ctx, Prompter: &flowtest.ScriptedPrompter{}, Presenter: presenter}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: r.ctx, Prompter: &flowtest.ScriptedPrompter{}, Presenter: presenter}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if presenter.extracted == nil || !errors.Is(presenter.extracted.Nothing, domain.ErrNoDirtyWorktrees) {
@@ -327,9 +357,9 @@ func TestNoWorktreeWithChangesIsNothingToDo(t *testing.T) {
 // breadcrumb counts only what can still be asked.
 func TestAnExistingTargetLeavesCreatesStepsOut(t *testing.T) {
 	r := newRepo(t)
-	f := &extractFlow{ctx: r.ctx, request: Request{Source: "src", To: "dst"}, changes: map[string][]domain.ExtractFile{}, paths: map[string]string{}}
-	f.create = f.embed()
-	for _, step := range f.session().Steps {
+	f := &extractFlow{runCtx: t.Context(), ctx: r.ctx, request: Request{Source: "src", To: "dst"}, changes: map[string][]domain.ExtractFile{}, paths: map[string]string{}}
+	f.create = f.embed(t.Context())
+	for _, step := range f.session(t.Context()).Steps {
 		if strings.HasPrefix(step.Key, "create.") {
 			t.Errorf("step %s is in a session whose target exists", step.Key)
 		}
@@ -343,7 +373,7 @@ func TestANewTargetIsNotOfferedAsItsOwnParent(t *testing.T) {
 		Sets:    map[string][]string{KeyFiles: {"a.txt"}},
 	}
 	gittest.CreateBranch(t, r.ctx.ProjectDir, "old-br")
-	if _, err := Run(Params{Context: r.ctx, Request: Request{To: "old-br"}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: r.ctx, Request: Request{To: "old-br"}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	excluded := prompter.Content[create.KeySource].ExcludeBranches
@@ -355,7 +385,7 @@ func TestANewTargetIsNotOfferedAsItsOwnParent(t *testing.T) {
 func TestAFromNamingTheTargetIsRefused(t *testing.T) {
 	r := newRepo(t)
 	request := Request{Source: "src", Files: []string{"a.txt"}, To: "feat/x", From: "feat/x"}
-	_, err := Run(Params{Context: r.ctx, Request: request, Prompter: flow.Unattended{}, Presenter: newRecorder()})
+	_, err := Run(t.Context(), Params{Context: r.ctx, Request: request, Prompter: flow.Unattended{}, Presenter: newRecorder()})
 	if err == nil || !strings.Contains(err.Error(), "own parent") {
 		t.Errorf("err = %v, want the own-parent refusal", err)
 	}
@@ -364,7 +394,7 @@ func TestAFromNamingTheTargetIsRefused(t *testing.T) {
 func TestFilesMatchingNoChangeAreRefusedBeforeTheRecap(t *testing.T) {
 	r := newRepo(t)
 	prompter := &flowtest.ScriptedPrompter{}
-	_, err := Run(Params{Context: r.ctx, Request: Request{Source: "src", Files: []string{"zzz.txt"}, To: "dst"}, Prompter: prompter, Presenter: newRecorder()})
+	_, err := Run(t.Context(), Params{Context: r.ctx, Request: Request{Source: "src", Files: []string{"zzz.txt"}, To: "dst"}, Prompter: prompter, Presenter: newRecorder()})
 	if err == nil || len(prompter.Asked) != 0 {
 		t.Errorf("err = %v, asked %v: want a refusal before any question", err, prompter.Asked)
 	}
@@ -376,7 +406,7 @@ func TestTheRecapNamesTheFilesADirectoryStandsFor(t *testing.T) {
 	write(t, filepath.Join(r.src, "dir", "y.txt"), "y\n")
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyMode: modeMove, KeyRecap: confirmExtract}}
 	request := Request{Source: "src", Files: []string{"dir/"}, To: "dst"}
-	if _, err := Run(Params{Context: r.ctx, Request: request, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: r.ctx, Request: request, Prompter: prompter, Presenter: newRecorder()}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, "Files:     dir/x.txt, dir/y.txt") {
@@ -387,7 +417,7 @@ func TestTheRecapNamesTheFilesADirectoryStandsFor(t *testing.T) {
 func TestATargetGitWouldRefuseIsRefusedFirst(t *testing.T) {
 	r := newRepo(t)
 	request := Request{Source: "src", Files: []string{"a.txt"}, To: "bad..name"}
-	_, err := Run(Params{Context: r.ctx, Request: request, Prompter: flow.Unattended{}, Presenter: newRecorder()})
+	_, err := Run(t.Context(), Params{Context: r.ctx, Request: request, Prompter: flow.Unattended{}, Presenter: newRecorder()})
 	if !errors.Is(err, domain.ErrUsage) {
 		t.Errorf("err = %v, want the branch name refused as a usage error", err)
 	}
@@ -397,7 +427,7 @@ func TestCreationFlagsOnAnExistingTargetAreSaidToBeIgnored(t *testing.T) {
 	r := newRepo(t)
 	presenter := newRecorder()
 	request := Request{Source: "src", Files: []string{"a.txt"}, To: "dst", From: "main", FastForward: true}
-	if _, err := Run(Params{Context: r.ctx, Request: request, Prompter: flow.Unattended{}, Presenter: presenter}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: r.ctx, Request: request, Prompter: flow.Unattended{}, Presenter: presenter}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	warnings := presenter.extracted.Result.Warnings
@@ -424,7 +454,7 @@ func TestOnlyANewTargetIsPublished(t *testing.T) {
 			r.ctx.Publisher = presenter.Recorder
 			prompter := &flowtest.ScriptedPrompter{Answers: tc.answers, Sets: map[string][]string{KeyFiles: {"a.txt"}}}
 
-			if _, err := Run(Params{Context: r.ctx, Request: Request{Source: "src"}, Prompter: prompter, Presenter: presenter}); err != nil {
+			if _, err := Run(t.Context(), Params{Context: r.ctx, Request: Request{Source: "src"}, Prompter: prompter, Presenter: presenter}); err != nil {
 				t.Fatalf("Run: %v", err)
 			}
 

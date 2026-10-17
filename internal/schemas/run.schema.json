@@ -6,6 +6,11 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "schema": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Version of this file's format. Absent means 1; wtm writes it from 2 on, and a wtm that knows an older version reads the file but refuses to write it."
+    },
     "port_offset_block": {
       "type": "integer",
       "minimum": 1,

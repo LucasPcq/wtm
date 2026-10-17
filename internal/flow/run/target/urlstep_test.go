@@ -22,7 +22,7 @@ var (
 // A single published address is the answer, not a question — which is what keeps
 // `run open` a one-keystroke gesture in the repositories that publish one job.
 func TestURLStepIsNotAskedWhenOneJobPublishes(t *testing.T) {
-	step := target.URLStep(target.URLParams{Published: publishing(apiURL), Cwd: t.TempDir()})
+	step := target.URLStep(t.Context(), target.URLParams{Published: publishing(apiURL), Cwd: t.TempDir()})
 
 	skip, reason := step.Skip(flow.Answers{})
 	if !skip {
@@ -34,7 +34,7 @@ func TestURLStepIsNotAskedWhenOneJobPublishes(t *testing.T) {
 }
 
 func TestURLStepIsAskedWhenSeveralJobsPublish(t *testing.T) {
-	step := target.URLStep(target.URLParams{Published: publishing(apiURL, webURL), Cwd: t.TempDir()})
+	step := target.URLStep(t.Context(), target.URLParams{Published: publishing(apiURL, webURL), Cwd: t.TempDir()})
 
 	if skip, _ := step.Skip(flow.Answers{}); skip {
 		t.Fatal("the step was skipped although two jobs publish a url")
@@ -56,7 +56,7 @@ func TestURLStepIsAskedWhenSeveralJobsPublish(t *testing.T) {
 // The refusal names the jobs it could have meant. The generic "pass --job" would
 // be true and useless: the caller does not know what to pass it.
 func TestURLStepRefusesAnAmbiguityByNamingTheJobs(t *testing.T) {
-	step := target.URLStep(target.URLParams{Published: publishing(apiURL, webURL), Cwd: t.TempDir()})
+	step := target.URLStep(t.Context(), target.URLParams{Published: publishing(apiURL, webURL), Cwd: t.TempDir()})
 
 	_, err := step.Resolve(flow.Answers{})
 	if !errors.Is(err, domain.ErrJobAmbiguous) {
@@ -72,7 +72,7 @@ func TestURLStepRefusesAnAmbiguityByNamingTheJobs(t *testing.T) {
 // launched.
 func TestURLStepReadsTheWorktreeAnsweredBefore(t *testing.T) {
 	var asked string
-	step := target.URLStep(target.URLParams{
+	step := target.URLStep(t.Context(), target.URLParams{
 		Published: func(workDir string) []domain.JobURLEntry {
 			asked = workDir
 			return []domain.JobURLEntry{apiURL, webURL}

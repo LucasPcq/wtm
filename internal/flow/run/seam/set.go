@@ -40,10 +40,10 @@ type Set struct {
 	seams []Seam
 }
 
-func OpenSet(params SetParams) Set {
+func OpenSet(ctx context.Context, params SetParams) Set {
 	seams := make([]Seam, 0, len(params.WorkDirs))
 	for _, workDir := range params.WorkDirs {
-		seams = append(seams, Open(Params{
+		seams = append(seams, Open(ctx, Params{
 			ProjectDir:  params.ProjectDir,
 			StateDir:    params.StateDir,
 			WorkDir:     workDir,

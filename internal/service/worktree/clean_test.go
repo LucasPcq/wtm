@@ -38,7 +38,7 @@ func TestCleanRunsOnCleanHooksBeforeRemoval(t *testing.T) {
 		Config:     cleanConfig([]domain.HookCommand{{Cmd: "touch " + marker}}),
 	}
 
-	if err := Clean(params); err != nil {
+	if err := Clean(t.Context(), params); err != nil {
 		t.Fatalf("Clean: %v", err)
 	}
 
@@ -67,7 +67,7 @@ func TestCleanOnCleanHookFailureAbortsRemoval(t *testing.T) {
 		Config:     cleanConfig([]domain.HookCommand{{Cmd: "false"}}),
 	}
 
-	err := Clean(params)
+	err := Clean(t.Context(), params)
 	if err == nil {
 		t.Fatal("expected Clean to fail when an on_clean hook fails")
 	}
@@ -95,7 +95,7 @@ func TestCleanOnCleanHookContinueOnError(t *testing.T) {
 		}),
 	}
 
-	if err := Clean(params); err != nil {
+	if err := Clean(t.Context(), params); err != nil {
 		t.Fatalf("Clean should proceed past a continue_on_error hook: %v", err)
 	}
 	if _, err := os.Stat(featPath); !errors.Is(err, os.ErrNotExist) {
@@ -117,11 +117,11 @@ func TestPruneWorktreesClearsStaleMetadata(t *testing.T) {
 		t.Fatalf("remove worktree dir: %v", err)
 	}
 
-	if err := infra.PruneWorktrees(source); err != nil {
+	if err := infra.PruneWorktrees(t.Context(), source); err != nil {
 		t.Fatalf("PruneWorktrees: %v", err)
 	}
 
-	if _, err := infra.FindWorktreeByBranch(infra.FindWorktreeByBranchParams{
+	if _, err := infra.FindWorktreeByBranch(t.Context(), infra.FindWorktreeByBranchParams{
 		ProjectDir: source,
 		Branch:     "feat",
 	}); !errors.Is(err, domain.ErrWorktreeNotFound) {
@@ -136,7 +136,7 @@ func TestCleanPurgesWorktreeState(t *testing.T) {
 	featPath := filepath.Join(t.TempDir(), "feat")
 	gitRun(t, source, "worktree", "add", "-q", "-b", "feat/x", featPath, "HEAD")
 
-	ordinal, err := EnsureOrdinal(WorktreeRef{ProjectDir: source, StateDir: stateDir, Branch: "feat/x"})
+	ordinal, err := EnsureOrdinal(t.Context(), WorktreeRef{ProjectDir: source, StateDir: stateDir, Branch: "feat/x"})
 	if err != nil {
 		t.Fatalf("EnsureOrdinal: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestCleanPurgesWorktreeState(t *testing.T) {
 		t.Fatalf("fixture has no meta dir: %v", statErr)
 	}
 
-	if err := Clean(domain.CleanParams{
+	if err := Clean(t.Context(), domain.CleanParams{
 		ProjectDir: source,
 		StateDir:   stateDir,
 		Branch:     "feat/x",
@@ -167,7 +167,7 @@ func TestCheckAllChecksEachBranchOnItsOwn(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entries := CheckAll(CheckAllParams{ProjectDir: source, Branches: []string{"feat/dirty", "feat/ghost", "main"}})
+	entries := CheckAll(t.Context(), CheckAllParams{ProjectDir: source, Branches: []string{"feat/dirty", "feat/ghost", "main"}})
 
 	if entry := entries["feat/dirty"]; entry.Err != nil || !entry.Check.IsDirty || entry.Check.Branch != "feat/dirty" {
 		t.Errorf("feat/dirty = %+v, want a dirty worktree", entry)
@@ -186,7 +186,7 @@ func TestCheckAllReportsALockedWorktree(t *testing.T) {
 	gitRun(t, source, "worktree", "add", "-q", "-b", "feat/locked", lockedPath, "HEAD")
 	gitRun(t, source, "worktree", "lock", lockedPath)
 
-	entry := CheckAll(CheckAllParams{ProjectDir: source, Branches: []string{"feat/locked"}})["feat/locked"]
+	entry := CheckAll(t.Context(), CheckAllParams{ProjectDir: source, Branches: []string{"feat/locked"}})["feat/locked"]
 	if entry.Err != nil || !entry.Check.IsLocked {
 		t.Errorf("feat/locked = %+v, want a locked worktree", entry)
 	}
@@ -198,7 +198,7 @@ func TestListMarksALockedWorktree(t *testing.T) {
 	gitRun(t, source, "worktree", "add", "-q", "-b", "feat/locked", lockedPath, "HEAD")
 	gitRun(t, source, "worktree", "lock", lockedPath)
 
-	statuses, err := List(domain.ListParams{ProjectDir: source, StateDir: t.TempDir()})
+	statuses, err := List(t.Context(), domain.ListParams{ProjectDir: source, StateDir: t.TempDir()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestCleanForcedRemovesALockedWorktree(t *testing.T) {
 	gitRun(t, source, "worktree", "add", "-q", "-b", "feat/locked", lockedPath, "HEAD")
 	gitRun(t, source, "worktree", "lock", lockedPath)
 
-	if err := Clean(domain.CleanParams{ProjectDir: source, StateDir: t.TempDir(), Branch: "feat/locked", Force: true}); err != nil {
+	if err := Clean(t.Context(), domain.CleanParams{ProjectDir: source, StateDir: t.TempDir(), Branch: "feat/locked", Force: true}); err != nil {
 		t.Fatalf("Clean --force: %v", err)
 	}
 	if _, err := os.Stat(lockedPath); !errors.Is(err, os.ErrNotExist) {
@@ -244,7 +244,7 @@ func TestCheckAllAsksEachBranchWhenThePRListIsTruncated(t *testing.T) {
 			}
 			ghtest.Stub(t, ghtest.StubParams{PRs: prs})
 
-			entry := CheckAll(CheckAllParams{ProjectDir: source, Branches: []string{"feat/x"}})["feat/x"]
+			entry := CheckAll(t.Context(), CheckAllParams{ProjectDir: source, Branches: []string{"feat/x"}})["feat/x"]
 
 			if entry.Err != nil || entry.Check.HasOpenPR != c.wantOpenPR {
 				t.Errorf("entry = %+v, want HasOpenPR %v", entry, c.wantOpenPR)

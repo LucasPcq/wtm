@@ -29,7 +29,7 @@ func repoContext(t *testing.T) flow.Context {
 
 func makeTarget(t *testing.T, ctx flow.Context, branch string) teardown.Target {
 	t.Helper()
-	result, err := worktree.Create(domain.CreateParams{
+	result, err := worktree.Create(t.Context(), domain.CreateParams{
 		ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir, Branch: branch,
 		FromBranch: "main", SourceBranch: "main", Config: ctx.Config, SkipHooks: true,
 	})
@@ -49,7 +49,7 @@ func TestBatchKeepsGoingPastAFailureUnlessAskedToStop(t *testing.T) {
 			gittest.JamWorktree(t, targets[1].Path)
 			var started, done int
 
-			removals := teardown.Batch(teardown.BatchParams{
+			removals := teardown.Batch(t.Context(), teardown.BatchParams{
 				Context:       ctx,
 				Presenter:     &flowtest.Recorder{},
 				Targets:       targets,
@@ -84,14 +84,14 @@ func TestBatchTitlesEachHookPhaseByWorktreeOnlyWhenSeveral(t *testing.T) {
 	targets := []teardown.Target{makeTarget(t, ctx, "feat/a"), makeTarget(t, ctx, "feat/b")}
 	presenter := &flowtest.Recorder{}
 
-	teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: presenter, Targets: targets, ForceRemoval: true})
+	teardown.Batch(t.Context(), teardown.BatchParams{Context: ctx, Presenter: presenter, Targets: targets, ForceRemoval: true})
 
 	if len(presenter.Hooks) != 2 || !strings.Contains(presenter.Hooks[1], "feat/b") {
 		t.Errorf("hook titles = %v, want each naming its worktree", presenter.Hooks)
 	}
 
 	single := &flowtest.Recorder{}
-	teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: single, Targets: []teardown.Target{makeTarget(t, ctx, "feat/c")}, ForceRemoval: true})
+	teardown.Batch(t.Context(), teardown.BatchParams{Context: ctx, Presenter: single, Targets: []teardown.Target{makeTarget(t, ctx, "feat/c")}, ForceRemoval: true})
 	if len(single.Hooks) != 1 || single.Hooks[0] != domain.HooksTitleOnClean {
 		t.Errorf("hook titles = %v, want the plain title for one worktree", single.Hooks)
 	}
@@ -104,7 +104,7 @@ func TestBatchNamesEveryHookPhaseWhenAskedTo(t *testing.T) {
 	ctx.Config.Project.Hooks.OnClean = []domain.HookCommand{{Cmd: "true"}}
 	presenter := &flowtest.Recorder{}
 
-	teardown.Batch(teardown.BatchParams{
+	teardown.Batch(t.Context(), teardown.BatchParams{
 		Context:        ctx,
 		Presenter:      presenter,
 		Targets:        []teardown.Target{makeTarget(t, ctx, "feat/only")},
@@ -125,7 +125,7 @@ func TestEveryRemovalIsPublishedWithItsLastState(t *testing.T) {
 	recorder := &flowtest.Recorder{}
 	ctx.Publisher = recorder
 
-	teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: targets, ForceRemoval: true})
+	teardown.Batch(t.Context(), teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: targets, ForceRemoval: true})
 
 	want := []domain.EventType{domain.EventWorktreeDeprovisioned, domain.EventWorktreeRemoved, domain.EventWorktreeDeprovisioned, domain.EventWorktreeRemoved}
 	if got := recorder.PublishedTypes(); !slices.Equal(got, want) {
@@ -157,7 +157,7 @@ func TestAHalfRemovedWorktreeIsPublishedOnce(t *testing.T) {
 	recorder := &flowtest.Recorder{}
 	ctx.Publisher = recorder
 
-	removals := teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{target}, ForceRemoval: true})
+	removals := teardown.Batch(t.Context(), teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{target}, ForceRemoval: true})
 
 	if removals[0].Err != nil {
 		t.Fatalf("removal: %v", removals[0].Err)
@@ -183,12 +183,12 @@ func TestAWorktreeGoneIsPublishedEvenWhenItsBranchStays(t *testing.T) {
 	recorder := &flowtest.Recorder{}
 	ctx.Publisher = recorder
 
-	removals := teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{target}})
+	removals := teardown.Batch(t.Context(), teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{target}})
 
 	if removals[0].Err == nil {
 		t.Fatal("the unmerged branch was expected to fail the removal")
 	}
-	if worktree.StillTracked(worktree.FindByBranchParams{ProjectDir: ctx.ProjectDir, Branch: "feat/a"}) {
+	if worktree.StillTracked(t.Context(), worktree.FindByBranchParams{ProjectDir: ctx.ProjectDir, Branch: "feat/a"}) {
 		t.Fatal("fixture: git still tracks the worktree")
 	}
 	if got := recorder.PublishedTypes(); !slices.Equal(got, deprovisionedThenRemoved) {
@@ -205,7 +205,7 @@ func TestARemovalWithoutHooksIsDeprovisionedThenRemoved(t *testing.T) {
 	recorder := &flowtest.Recorder{}
 	ctx.Publisher = recorder
 
-	teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{makeTarget(t, ctx, "feat/a")}, ForceRemoval: true})
+	teardown.Batch(t.Context(), teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{makeTarget(t, ctx, "feat/a")}, ForceRemoval: true})
 
 	if got := recorder.PublishedTypes(); !slices.Equal(got, deprovisionedThenRemoved) {
 		t.Fatalf("published %v, want %v", got, deprovisionedThenRemoved)
@@ -224,7 +224,7 @@ func TestAFailingOnCleanHookStopsAtDeprovisioned(t *testing.T) {
 	recorder := &flowtest.Recorder{}
 	ctx.Publisher = recorder
 
-	removals := teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{target}, ForceRemoval: true})
+	removals := teardown.Batch(t.Context(), teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{target}, ForceRemoval: true})
 
 	if removals[0].Err == nil {
 		t.Fatal("want the hook's error")
@@ -264,7 +264,7 @@ func TestAWorktreeWhoseDirectoryIsGone(t *testing.T) {
 			recorder := &flowtest.Recorder{}
 			ctx.Publisher = recorder
 
-			teardown.Batch(teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{target}, ForceRemoval: true})
+			teardown.Batch(t.Context(), teardown.BatchParams{Context: ctx, Presenter: recorder, Targets: []teardown.Target{target}, ForceRemoval: true})
 
 			if got := recorder.PublishedTypes(); !slices.Equal(got, tc.want) || *recorder.Published[0].OK != tc.ok {
 				t.Fatalf("published %+v, want %v with ok=%v", recorder.Published, tc.want, tc.ok)

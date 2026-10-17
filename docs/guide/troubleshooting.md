@@ -115,7 +115,7 @@ Without the port: on macOS, `wtm run proxy install` serves the names on port 80,
 
 ## A `.env` is out of date
 
-**Symptom.** A worktree's `.env` misses a key the template gained, still carries a value from before, or points at the wrong port after `run.toml` changed.
+**Symptom.** A worktree's `.env` misses a key the template gained, still carries a value from before, points at the wrong port after `run.toml` changed, or is gone altogether (`wtm status` reports `env_missing`).
 
 **Fix.** Compare it with its source, then reconcile:
 
@@ -126,6 +126,6 @@ wtm env feat/login --mode refresh --on-conflict overwrite --yes   # also overwri
 wtm env feat/login --prune --yes                             # drop keys no source has any more
 ```
 
-The values come from the strategy the worktree was created with (`example`, `main` or `parent`); `--from` overrides it for one run. The ports and addresses `run.toml` links are settled on the worktree's own at the same time. `wtm env main` does the same for the main checkout, keeping the addressing its `.env` spells unless `--addressing` says otherwise.
+The values come from the strategy the worktree was created with (`example`, `main` or `parent`); `--from` overrides it for one run. A file missing from the worktree is rebuilt the way `wtm create` provisions it — the template under `example`, the parent's or main's copy otherwise. The ports and addresses `run.toml` links are settled on the worktree's own at the same time. `wtm env main` does the same for the main checkout, keeping the addressing its `.env` spells unless `--addressing` says otherwise.
 
-The report prints only the values wtm writes itself: the linked ports and addresses (with a URL's password masked), `COMPOSE_PROJECT_NAME` and the `[[env]]` values. Every other value, secrets included, is withheld, so the report and its `--output json` are safe to paste into a log or an agent's context; a conflict reads "local value differs from main". `--show-values` prints them all.
+The report prints no text read from a value. What it shows is built by wtm: `COMPOSE_PROJECT_NAME` and the `[[env]]` values it renders, whole, and for a linked value the ports it moves (`5432 → 5442`, landing on `:5442`) or the address it writes under named addressing. Host, scheme, user, password, database, path and query never appear, whatever format the value is written in, and a value pointing at a host the proxy does not serve reads "points at another host". Every value read from a file is withheld, so the report and its `--output json` are safe to paste into a log or an agent's context; a conflict reads "local value differs from main", and a value `--isolation verbatim` restores names the port run.toml declares for it (`back to the source's :5432`). The one text taken from a file is a missing key's placeholder, read from the committed template. `--show-values` prints every value whole. A `--check` names each `[[env]]` key it would rewrite, and the wizard previews a linked value it would overwrite on the worktree's own port.

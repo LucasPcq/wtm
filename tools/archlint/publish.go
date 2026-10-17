@@ -9,10 +9,7 @@ import (
 
 var (
 	processPublish = objectRef{Path: internalPrefix + "service/process", Name: "Publish"}
-	// busSeams are the flow types whose Publish only a flow may call: an event
-	// published from anywhere else reports a change no flow made, which no other
-	// surface could replay.
-	busSeams = map[string]bool{"Publisher": true, "Context": true}
+	busSeams       = map[string]bool{"Publisher": true, "Context": true}
 )
 
 var publishAnalyzer = &analysis.Analyzer{
@@ -42,8 +39,6 @@ func runPublish(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-// flowSeamOf names the flow type a Publish call goes through, empty when it is
-// not one of the bus seams.
 func flowSeamOf(pass *analysis.Pass, sel *ast.SelectorExpr) string {
 	selection, ok := pass.TypesInfo.Selections[sel]
 	if !ok || selection.Obj().Name() != "Publish" {

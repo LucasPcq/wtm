@@ -1,9 +1,11 @@
 package env
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/rules"
 	envsvc "github.com/LucasPcq/wtm/internal/service/env"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
@@ -12,7 +14,10 @@ import (
 // written: its drift, the port pass that rides along with the apply, and what
 // a switch to verbatim puts back.
 type branchScan struct {
-	files   []domain.EnvFileResult
+	files []domain.EnvFileResult
+	// preview is files with each linked source value on this worktree's port,
+	// as an overwrite or an addition ends up once the port pass ran.
+	preview []domain.EnvFileResult
 	ports   domain.EnvPortPlan
 	restore []domain.EnvRestoredEntry
 }
@@ -36,8 +41,8 @@ func (f *envFlow) pickerKey(branch string) scanKey {
 
 // scan runs once, before the first screen, over every worktree the picker may
 // offer — the list badges each one with its drift.
-func (f *envFlow) scan() error {
-	statuses, err := worktree.List(domain.ListParams{
+func (f *envFlow) scan(ctx context.Context) error {
+	statuses, err := worktree.List(ctx, domain.ListParams{
 		ProjectDir: f.ctx.ProjectDir,
 		StateDir:   f.ctx.StateDir,
 		Config:     f.ctx.Config,
@@ -99,8 +104,8 @@ func (f *envFlow) scanBranch(key scanKey) (branchScan, error) {
 	if err != nil {
 		return branchScan{}, err
 	}
-	ctx := f.envContext(key.branch)
-	preview, err := f.planSwitch(planSwitchParams{Target: t, Ctx: ctx, Isolation: key.isolation})
+	env := f.envContext(key.branch)
+	preview, err := f.planSwitch(planSwitchParams{Target: t, Ctx: env, Isolation: key.isolation})
 	if err != nil {
 		return branchScan{}, err
 	}
@@ -110,7 +115,7 @@ func (f *envFlow) scanBranch(key scanKey) (branchScan, error) {
 	// ordinal, and whether it gets one is what the run is deciding.
 	var ports envsvc.EnvPortsParams
 	if !state.adoption.Pending && !state.movesOntoIsolation(key.isolation) {
-		ports, _ = f.resolvePorts(resolvePortsParams{Target: t, Isolation: key.isolation, Addressing: addressing})
+		ports, _ = f.resolvePorts(f.runCtx, resolvePortsParams{Target: t, Isolation: key.isolation, Addressing: addressing})
 	}
 
 	reserved := preview.keys()
@@ -121,10 +126,10 @@ func (f *envFlow) scanBranch(key scanKey) (branchScan, error) {
 		Branch:             key.branch,
 		MainPath:           f.ctx.ProjectDir,
 		WorktreePath:       t.path,
-		ParentWorktreePath: ctx.parentPath,
-		ParentBranch:       ctx.parentBranch,
+		ParentWorktreePath: env.ParentPath,
+		ParentBranch:       env.ParentBranch,
 		Files:              f.ctx.Config.Project.Env.Files,
-		Strategy:           ctx.strategy,
+		Strategy:           env.Strategy,
 		Mode:               f.request.Mode,
 		Ports:              ports,
 		Reserved:           reserved,
@@ -133,7 +138,11 @@ func (f *envFlow) scanBranch(key scanKey) (branchScan, error) {
 		return branchScan{}, err
 	}
 
-	scan := branchScan{files: files, restore: preview.planned}
+	scan := branchScan{
+		files:   files,
+		preview: rules.SettleEnvResolvedValues(rules.SettleEnvResolvedValuesParams{Files: files, Ports: ports.PlanParams()}),
+		restore: preview.planned,
+	}
 	if !ports.Empty() {
 		if scan.ports, err = envsvc.ComputeEnvPorts(ports); err != nil {
 			return branchScan{}, err

@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -11,8 +12,8 @@ import (
 // Ordinal reads the worktree's number without ever allocating one. A recorded
 // number another worktree also claims is not settled, and reads as unallocated:
 // the flow that next needs it reallocates it.
-func Ordinal(ref WorktreeRef) (int, error) {
-	claim, err := readClaim(ref)
+func Ordinal(ctx context.Context, ref WorktreeRef) (int, error) {
+	claim, err := readClaim(ctx, ref)
 	if err != nil {
 		return 0, err
 	}
@@ -24,8 +25,8 @@ func Ordinal(ref WorktreeRef) (int, error) {
 
 // Identity is what `wtm events` reports about one worktree: read from git and
 // meta.json only, never from the network.
-func Identity(ref WorktreeRef) (domain.WorktreeIdentity, error) {
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: ref.ProjectDir})
+func Identity(ctx context.Context, ref WorktreeRef) (domain.WorktreeIdentity, error) {
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: ref.ProjectDir})
 	if err != nil {
 		return domain.WorktreeIdentity{}, fmt.Errorf("list worktrees: %w", err)
 	}
@@ -44,8 +45,8 @@ type IdentitiesParams struct {
 
 // Identities leaves out a detached worktree: a consumer keys on the branch, and
 // it has none.
-func Identities(params IdentitiesParams) ([]domain.WorktreeIdentity, error) {
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
+func Identities(ctx context.Context, params IdentitiesParams) ([]domain.WorktreeIdentity, error) {
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: params.ProjectDir})
 	if err != nil {
 		return nil, fmt.Errorf("list worktrees: %w", err)
 	}
@@ -95,8 +96,8 @@ type RepoOfParams struct {
 // The key is resolved through symlinks: git spells a relative common dir from
 // the path it was given, and a publisher and a subscriber reaching the repo by
 // two spellings (macOS's /var and /private/var) would never meet.
-func RepoOf(params RepoOfParams) (domain.EventRepo, error) {
-	commonDir, err := infra.GitCommonDir(infra.GitCommonDirParams{Dir: params.ProjectDir})
+func RepoOf(ctx context.Context, params RepoOfParams) (domain.EventRepo, error) {
+	commonDir, err := infra.GitCommonDir(ctx, infra.GitCommonDirParams{Dir: params.ProjectDir})
 	if err != nil {
 		return domain.EventRepo{}, err
 	}

@@ -1,40 +1,56 @@
 package main
 
 import (
-	"go/token"
 	"strings"
 	"testing"
 )
 
-func at(file string) token.Position { return token.Position{Filename: file, Line: 1, Column: 1} }
-
 func TestAMigratingEntryWithoutItsCountIsRefused(t *testing.T) {
-	if _, err := parseMigrating("mutation internal/commands/wt/env\\.go\n"); err == nil {
+	if _, err := parseMigrating("mutation internal/surface/cli/wt/env\\.go\n"); err == nil {
 		t.Error("an entry with no site count was accepted: the list could grow without anyone noticing")
 	}
 }
 
 func TestAMigratingEntryFailsTheSiteBeyondItsCount(t *testing.T) {
-	list, err := parseMigrating("# comment\nmutation internal/commands/wt/env\\.go 1\n")
+	list, err := parseMigrating("# comment\nmutation internal/surface/cli/wt/env\\.go 1\n")
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := judge(judgeParams{Migrating: list, Findings: []finding{
-		{pos: at("internal/commands/wt/env.go"), rule: "mutation", msg: "a"},
-		{pos: at("internal/commands/wt/env.go"), rule: "mutation", msg: "b"},
+		{pos: at("internal/surface/cli/wt/env.go"), rule: "mutation", msg: "a"},
+		{pos: at("internal/surface/cli/wt/env.go"), rule: "mutation", msg: "b"},
 	}})
 	if !got.failed {
 		t.Errorf("two sites under a count of one passed:\n%s", strings.Join(got.lines, "\n"))
 	}
 }
 
+func TestATrackedSiteIsCountedAndListedOnlyOnRequest(t *testing.T) {
+	list, err := parseMigrating("mutation internal/surface/cli/wt/env\\.go 2\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	findings := []finding{
+		{pos: at("internal/surface/cli/wt/env.go"), rule: "mutation", msg: "a"},
+		{pos: at("internal/surface/cli/wt/env.go"), rule: "mutation", msg: "b"},
+	}
+	quiet := judge(judgeParams{Migrating: list, Findings: findings})
+	if quiet.failed || quiet.tracked != 2 || len(quiet.lines) != 0 {
+		t.Errorf("quiet run: failed %v, tracked %d, lines %q; want 2 sites counted and none printed", quiet.failed, quiet.tracked, quiet.lines)
+	}
+	listed := judge(judgeParams{Migrating: list, Findings: findings, Tracked: true})
+	if len(listed.lines) != 2 || !strings.Contains(listed.lines[0], tagMigrating) {
+		t.Errorf("tracked run: lines %q, want both sites tagged migrating", listed.lines)
+	}
+}
+
 func TestAMigratingEntryCoveringFewerSitesSaysItCanShrink(t *testing.T) {
-	list, err := parseMigrating("mutation internal/commands/wt/env\\.go 3\nmutation internal/commands/checkout/ 1\n")
+	list, err := parseMigrating("mutation internal/surface/cli/wt/env\\.go 3\nmutation internal/surface/cli/checkout/ 1\n")
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := judge(judgeParams{Migrating: list, Findings: []finding{
-		{pos: at("internal/commands/wt/env.go"), rule: "mutation", msg: "a"},
+		{pos: at("internal/surface/cli/wt/env.go"), rule: "mutation", msg: "a"},
 	}})
 	if got.failed {
 		t.Errorf("a site within its count failed:\n%s", strings.Join(got.lines, "\n"))
@@ -65,5 +81,28 @@ func TestALegacyRuneUnderItsCountSaysItCanShrink(t *testing.T) {
 	all := strings.Join(append(got.lines, got.notes...), "\n")
 	if !strings.Contains(all, "lower it to 1") || !strings.Contains(all, `"⚠" has no site left`) {
 		t.Errorf("report = %q, want ▸ lowered to 1 and ⚠ named as gone", all)
+	}
+}
+
+// The site past an entry's count is the one sorted last, not the new one: the
+// report lists every site of the entry, so the new symbol is always in it.
+func TestAnEntryOverItsCountListsEverySiteItCovers(t *testing.T) {
+	list, err := parseMigrating("rootfreeze internal/rules/plural\\.go 1\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := judge(judgeParams{Migrating: list, Findings: []finding{
+		{pos: at("internal/rules/plural.go"), rule: "rootfreeze", msg: "rules.NewRule"},
+		{pos: at("internal/rules/plural.go"), rule: "rootfreeze", msg: "rules.Plural"},
+	}})
+	lines := strings.Join(got.lines, "\n")
+	if !got.failed || got.failures != 1 {
+		t.Errorf("failed %v with %d failure(s), want one failure", got.failed, got.failures)
+	}
+	if !strings.Contains(lines, "rules.NewRule") || !strings.Contains(lines, "rules.Plural") {
+		t.Errorf("lines = %q, want both sites of the entry listed", lines)
+	}
+	if !strings.Contains(strings.Join(got.notes, "\n"), "the new one is among the sites listed above") {
+		t.Errorf("notes = %q, want the overflow named", got.notes)
 	}
 }

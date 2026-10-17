@@ -1,28 +1,29 @@
 # Architecture — the layers and what they buy
 
-wtm is a Cobra CLI with two interactive surfaces (an inline wizard and the `wtm ui` dashboard) over one set of git operations. The layering exists so that a command's *flow* — the order of its questions, its safety checks, its service calls — is written once and can be replayed by either surface.
+wtm is a Cobra CLI with interactive surfaces (an inline wizard, the `wtm ui` dashboard) over one set of git operations. The layering exists so that a command is written once and served by every surface: each worktree-mutating command is a *flow* in `flow/` — the order of its questions, its safety checks, its service calls — replayed by the wizard and the dashboard ([flow-layer.md](flow-layer.md)).
 
 ## The map
 
 One line per package: what it owns. The import rules between them are the next section.
 
 ```
-cmd/                          ← entry points, cobra setup only
+main.go                       ← the entry point: cli.Execute
 internal/
-  commands/                   ← flag wiring, delegates to flow/service (zero business logic)
-    run/runctx/               ←   what every `run` command opens on: its directory, the config,
-                                  run.toml, the opt-in guard and the prompt gate
-    daemon/                   ←   the hidden `daemon` command and the macOS port-80 relay launchd runs
-    ui/                       ←   `wtm ui`: refuses JSON and a missing TTY, then hands off to tui/dashboard
-    events/                   ←   `wtm events`: the stream (text or JSON Lines) over service/events.Watch,
-                                  or WatchAll outside any repository
-    versioncmd/               ←   `wtm version`: the binary's version and each machine contract's (`events`)
-  domain/                     ← types, errors, constants only (no methods, no functions)
-  rules/                      ← pure functions (stdlib + domain only, no I/O)
+  domain/                     ← types, errors, constants only (no methods, no functions); its root only shrinks,
+                                new code goes into the sub-package of its subject
+    statefile/                ←   the schema version of each state file, and the error of a file a newer wtm wrote
+  rules/                      ← pure functions (stdlib + domain only, no I/O); its root only shrinks, new code goes
+                                into the sub-package of its subject
+    statefile/                ←   what a state file's schema allows: read, write, or refuse (exit 22)
+    envcopy/                  ←   where each .env of a new worktree is copied from, and what could not be
   config/                     ← load & validate config.toml + run.toml from <git-common-dir>/wtm/, plus the global config (config.GlobalPath);
-                                every write puts the file's JSON schema (schemas/) beside it
-  flow/                       ← the flow of each command, surface-independent (see below):
-                                the vocabulary (Step, Session, Prompter, Presenter, Publisher)
+                                every write puts the file's JSON schema (schemas/) beside it; ReviseProject is
+                                config.toml with a change applied, for store/ to write
+  store/                      ← the one writer of each state file (store.md): Meta (meta.json: Load, Records,
+                                Update, Purge), ProjectConfig (config.toml: Remember, ConfigDisk.Update),
+                                EnvFiles (the .env files: Copy, Edit)
+  flow/                       ← the flow of each command, surface-independent
+                                (flow-layer.md): the vocabulary (Step, Session, Prompter, Presenter, Publisher)
     publish/                  ←   the event a flow publishes after a change to a worktree's
                                   identity, read back from git and meta.json (`wtm events`)
     ordinal/                  ←   allocating a worktree's ordinal from the flow that needs it,
@@ -57,6 +58,8 @@ internal/
     sync/                     ←   `wtm sync`: the run (sync.go) + its questions (steps.go)
     fastforward/              ←   `wtm fast-forward`: the run + its questions
     exec/                     ←   `wtm exec`: the run + its questions
+    status/                   ←   `wtm status`: a worktree's state read without asking,
+                                  numbering or waking anything (no Prompter, no Presenter)
     runlogs/                  ←   the jobs a surface shows (`Board`), their live streams,
                                   and the profile start sequence (reports events, not steps)
     run/                      ←   the `run` module's flows, mirroring its command tree:
@@ -84,7 +87,7 @@ internal/
   service/                    ← impure orchestration only (git exec, I/O, hooks):
     worktree/                 ←   git worktree operations (create, list, remove)
     env/                      ←   .env provisioning (create) + drift reconciliation (`wtm env`, sync.go)
-    hooks/                    ←   on_create / on_clean hook execution (a /bin/sh line each)
+    hooks/                    ←   on_create / on_clean hook execution (a /bin/sh line each): RunHooks
     shell/                    ←   shell integration generation (zsh, bash, fish)
     integration/              ←   third-party adapters: handing a URL to the desktop's
                                   own opener (editor/agent detection lives in detect/)
@@ -102,40 +105,62 @@ internal/
                                   registry of repositories wtm was used in (`repos.json`, through
                                   `infra/registry.go`) and WatchAll, which follows all of them
     runconfig/                ←   load + validate + write run.toml (and its schema)
-    runjobs/                  ←   the daemon's jobs as a surface reads them (the dashboard too)
+    runjobs/                  ←   the daemon's jobs as a surface reads them (the dashboard too);
+                                  `Current` reads the index itself when no daemon listens
     compose/                  ←   a compose file's `ports:` and absolute names, read and rewritten
     portprobe/                ←   is anything listening on a port
     shellcmd/                 ←   checks that a config command is a valid /bin/sh line
     execsvc/                  ←   runs one shell line in several worktrees at once
-  output/                     ← format and print results (zero decision logic)
-  styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style)
-  tui/                        ← Bubbletea models (zero business logic, rendering only)
-    flowui/                   ←   runs a flow.Session as a wizard (the only translator
-                                  between flow.Step and components.Step)
-    dashboard/                ←   `wtm ui`: the full-screen worktree dashboard, the second
-                                  surface over flow/ (its own Prompter/Presenter, mouse
-                                  zones via bubblezone). It also hands the terminal to
-                                  runview (`handoff.go`) for the run flows that draw
-    runview/                  ←   a job's raw PTY output replayed through a terminal
-                                  emulator (`github.com/charmbracelet/x/vt`)
-  infra/                      ← I/O, git exec, filesystem wrappers
+    memory/                   ←   the answers the wizard remembers ([wizard.remembered] in config.toml), through store/
+  styles/                     ← all Lipgloss styles (only package allowed to instantiate lipgloss.Style), and what every surface draws alike: an intro, a recap
+  infra/                      ← the git functions the services call, and the state not yet moved to a
+                                  package of its own (repos.json)
+    fs/                       ←   the only writer of the files wtm keeps: UpdateFile (lock on <path>.lock, read,
+                                  Mutate, temp file + fsync + rename), ReplaceFile for the daemon's index,
+                                  WithFileLock, GlobalDir, OpenLog; Lock.Held says when flock was
+                                  unavailable
+    proc/                     ←   starting processes (Command, GroupCommand) and settling them on an
+                                  interrupt (Shield, AwaitShields, KillCancelled)
+  surface/                    ← the interfaces
+    cli/                      ←   the command line (zero business logic, cli.md): the root, its signals,
+                                  --quiet and exit code; the flag wiring of each command to its flow
+      run/runctx/             ←     what every `run` command opens on: its directory, the config,
+                                    run.toml, the opt-in guard and the prompt gate
+      daemon/                 ←     the hidden `daemon` command and the macOS port-80 relay launchd runs
+      ui/                     ←     `wtm ui`: refuses JSON and a missing TTY, then hands off to tui/dashboard
+      events/                 ←     `wtm events`: the stream (text or JSON Lines) over service/events.Watch,
+                                    or WatchAll outside any repository
+      versioncmd/             ←     `wtm version`: the binary's version and each machine contract's (`events`)
+      render/                 ←     format and print results (zero decision logic)
+    tui/                      ←   Bubbletea models (zero business logic, rendering only)
+      flowui/                 ←     runs a flow.Session as a wizard (the only translator
+                                    between flow.Step and components.Step)
+      dashboard/              ←     `wtm ui`: the full-screen worktree dashboard, the second
+                                    surface over flow/ (its own Prompter/Presenter, mouse
+                                    zones via bubblezone). It also hands the terminal to
+                                    runview (`handoff.go`) for the run flows that draw
+      runview/                ←     a job's raw PTY output replayed through a terminal
+                                    emulator (`github.com/charmbracelet/x/vt`)
 ```
 
 ## Who may call whom
 
 ```mermaid
 flowchart TD
-  commands["commands/"] --> flow["flow/"]
-  commands --> output["output/"]
-  commands --> tui["tui/"]
-  commands --> config["config/"]
+  cli["surface/cli/"] --> output["surface/cli/render/"]
+  cli --> flow["flow/"]
+  cli --> tui["surface/tui/"]
+  cli --> config["config/"]
   tui --> flow
   flow --> service["service/"]
   flow --> rules["rules/"]
+  service --> store["store/"]
   service --> infra["infra/"]
   service --> rules
-  rules --> domain["domain/"]
   flow --> domain
+  store --> config
+  store --> infra
+  rules --> domain["domain/"]
   output --> styles["styles/"]
   tui --> styles
 ```
@@ -144,20 +169,25 @@ Every arrow that is *missing* is the point:
 
 | Interdiction | What it buys |
 | -- | -- |
-| `commands/` has no business logic | A command is readable as flags in, one call out. Changing the flow never means editing flag parsing. |
+| `surface/cli/` has no business logic | A command is readable as flags in, one call out. Changing the flow never means editing flag parsing. |
 | `domain/` holds types, errors and constants only | Nothing can acquire a dependency by hiding behind a method on a shared type. |
 | `rules/` imports only stdlib + `domain/` | Decisions stay testable with no repo, no network, no temp dir. `rules.DecidePush` is a table test, not an integration test. |
 | `service/` never imports cobra, bubbletea or lipgloss | The git operations are callable from a test, a flow, a daemon — anything that is not a terminal. |
-| `output/` and `tui/` hold no decision logic | Two surfaces can render the same run without disagreeing about what it means. |
+| `surface/cli/render/` and `surface/tui/` hold no decision logic | Two surfaces can render the same run without disagreeing about what it means. |
 | `styles/` is the only package instantiating `lipgloss.Style` | A theme change is one file. |
 | `flow/` imports only `service/`, `rules/`, `domain/` and the stdlib | The flow cannot grow a dependency on the surface that runs it. This is what makes a second surface possible at all — see below. |
 
 `flow/` cannot reach `infra/` either. When a flow needs something only `infra/` has, the fix is a thin `service/` wrapper, not an exception: `worktree.FindByBranch` and `worktree.ListAll` exist for exactly that reason.
 
-Two more edges are constrained beyond the diagram:
+More edges are constrained beyond the diagram:
 
+- `rules/` imports no stdlib package that does I/O (`os`, `net`, `syscall`).
 - `service/x` imports `service/y` only along an edge declared in `tools/archlint` (`serviceEdges`): today `detect→branch`, `events→{process,worktree}`, `process→proxy`, `runconfig→shellcmd`, `runjobs→{process,runconfig,worktree}`, `worktree→{branch,env,github,hooks,process}`.
-- The daemon — `service/process` and `service/proxy`, which it serves — is blind to git: neither imports `service/worktree`, `service/branch`, `service/github`, `service/events` or `config`, and both call only allow-listed `infra/` functions (`GlobalDir`).
+- The daemon — `service/process` and `service/proxy`, which it serves — is blind to git: neither imports `service/worktree`, `service/branch`, `service/github`, `service/events` or `config`, and both call only allow-listed `infra/` functions (`fs.GlobalDir`, `fs.ReplaceFile`).
+- `store/` imports `config/`, `domain/`, `infra/` and `rules/`; `service/` reaches it, `flow/` never does. An exported function of `service/worktree` that reaches a write of `store.Meta` is a mutator (`metawriter`).
+- A file is written through `infra/fs` only (`statewrite`): `os.WriteFile`, `os.Create`, `os.Rename`, `os.Remove`, `os.RemoveAll` and a writing `os.OpenFile` stay inside `infra/`, but for the permanent exceptions listed with their reason in `tools/archlint/statewrite.go`. A state file is written by its owner in `store/` only (`stateowner`): `fs.UpdateFile` and `fs.RemoveDir` are called from nowhere else.
+- Every package of `service/`, `infra/` and `store/` says its one responsibility in its package doc (`pkgdoc`).
+- The roots of `rules/` and `domain/` only shrink (`rootfreeze`): no new file or exported symbol there; new code goes into the sub-package of its subject, a presentation rule into the surface that uses it.
 - A service **mutator** (`worktree.Create`, `envsvc.ApplyEnvSync`, `runconfig.Save`, … — the table in `tools/archlint/chokepoint.go`) is called only from `internal/flow/`, whatever the calling layer; a call inside the mutator's own package is its implementation.
 
 None of this is left to review: `make lint` runs `tools/archlint`, and each rule above is one of its analyzers. The full list, and how to add one, is in [lint.md](lint.md).
@@ -170,25 +200,9 @@ Omitting the positional resolves in one of two ways, and which one is not a matt
 
 Whatever answers, a resolved worktree is always **the worktree root as git spells it** (`infra.Toplevel`), never a raw `os.Getwd()`. The daemon keys a job on `name + WorkDir` by string equality *and* runs it there, resolving `run.toml`'s `cwd` against it: a subdirectory, or macOS's `/var` where git says `/private/var`, splits one worktree into two keys and mis-resolves every relative `cwd`.
 
-## The founding observation: seven closures
+## A flow calls the service itself
 
-Before this layering existed, `internal/commands/wt/*.go` did three things at once: read the flags, run the flow itself, **and** hand the TUI closures that called back into the service. The TUI is forbidden from importing `service/`, so the command passed it functions instead:
-
-| Closure injected into the TUI | Command | What it called back into |
-| -- | -- | -- |
-| `SourceUpdate` | `create`, `extract` | `branch.Divergence` |
-| `Target` | `create`, `extract` | `branch.Target` |
-| `EnvFallback` | `create`, `extract` | `shared.EnvParentFallbackApplies` |
-| `Check` | `clean` | `worktree.Check` |
-| `ReparentPreview` | `clean` | `worktree.PlanCleanReparent` |
-| `PlanPreview` | `sync` | `worktree.PlanSync` + `output.SprintSyncPlan` |
-| `LoadFiles` | `extract` | `infra.ListModifiedFiles` |
-
-The rule was respected and the architecture was still defeated: the service call happened on the TUI's goroutine, at the TUI's whim, with the command as a courier. Worse, the flow lived on both sides of that boundary — the dashboard could not replay it without duplicating it.
-
-`flow/` **is allowed** to call the service. Those closures become hooks carried by the step declaration itself (`Skip`, `Build`, `Load`) and the courier disappears. That is the gain that justifies the refactor independently of the dashboard: `create` and `clean` inject nothing today.
-
-The closures went with their command's migration: `checkout`'s `EnvFallback` and `Target` are now read by its recap step directly. `prune`'s `ReparentPreview` and `sync`'s `PlanPreview` both went with their migration — a flow calls `rules.FinalizePrunePlan` and `rules.SprintSyncPlan` directly, and `internal/tui/syncpicker` (the package `PlanPreview` was injected into) no longer exists. `extract`'s three went with its migration, along with `LoadFiles`: its files step loads them itself, and the create sub-flow it embedded in Bubbletea terms is now create's own steps, through `create.Embed`.
+A TUI package may not import `service/`, and a wizard needs data only the service has: a branch's divergence, a worktree's safety check, a sync plan, the modified files of a source. On `flow/` the step declaration carries that work — `Skip`, `Build` and `Load` are the flow's own functions, which call the service — so the surface that draws the step runs nothing but the step. No command hands a TUI a closure into the service: what the dashboard and the wizard show of a step is what its `Build` or `Load` returned, computed once, on the flow's side of the boundary.
 
 ## The run module — a flow that asks nothing
 
@@ -202,13 +216,13 @@ Three surfaces consume it, chosen by one pure rule (`rules.DecideRunSurface`, wh
 
 | Surface | Who | What it does with the seam |
 | -- | -- | -- |
-| `internal/tui/runview` | a terminal | full screen, one VT-emulated pane per job, tmux-style focus; returns its recap for the command to frame |
-| `output.RunPrinter` | `-d`, a pipe, CI | renders each `Event` as a line on stdout/stderr |
-| `output.WriteRunOutcomeJSON` | `--output json` | the array of job results, with the failing job's `output` and `exit_code` |
+| `internal/surface/tui/runview` | a terminal | full screen, one VT-emulated pane per job, tmux-style focus; returns its recap for the command to frame |
+| `render.RunPrinter` | `-d`, a pipe, CI | renders each `Event` as a line on stdout/stderr |
+| `render.WriteRunOutcomeJSON` | `--output json` | the array of job results, with the failing job's `output` and `exit_code` |
 
 Everything a job needs to know about *which* worktree it belongs to is resolved by the client and travels down the seam beside `WorkDir` and `LogDir`: `RunParams.Env` → `StartRequest.Env` → `process.Request.Env` → `cmd.Env`. It cannot be inherited — the daemon is global, outlives the command that forked it, and its own environment belongs to whichever worktree happened to start it. `service/worktree.EnsureOrdinal` is what gives the worktree the stable number those variables derive from, and `service/worktree.JobEnv`/`BranchEnv` assemble them; the daemon keeps the resolved map on the `ManagedJob` so the job's stop command runs in the same environment its start did.
 
-`internal/commands/run/surface.go` is the whole wiring: open the seam, build the starter, switch on the rule. The one thing left in the command is `handleConcurrentJobs` — the question `run up` asks about another worktree's jobs. It is a `flow.Prompter` question in everything but name, and `runlogs` has no Prompter; it stays put until the `--exclusive`/`--parallel` axis is reopened, which worktree isolation may remove entirely.
+`internal/surface/cli/run/surface.go` is the whole wiring: open the seam, build the starter, switch on the rule. The one thing left in the command is `handleConcurrentJobs` — the question `run up` asks about another worktree's jobs. It is a `flow.Prompter` question in everything but name, and `runlogs` has no Prompter; it stays put until the `--exclusive`/`--parallel` axis is reopened, which worktree isolation may remove entirely.
 
 ## Worktree ports and the `.env` — a terminal transformation, not a source
 
@@ -244,7 +258,7 @@ The cross-file check has to live outside `config.LoadRun`: that loader only ever
 | `service/worktree.BranchEnv` — every job and hook | `WTM_PORT_OFFSET = ordinal × block`, `COMPOSE_PROJECT_NAME` derived (the main's without its branch) | offset 0, `COMPOSE_PROJECT_NAME` left to the `.env`, `WTM_ISOLATION=verbatim` |
 | `service/process.runNamespace` — the daemon | carves the worktree's namespace | carves nothing (read from `WTM_ISOLATION`: the daemon never reads metadata) |
 
-They used to be separate: a "keep the ports" answer left the `.env` on its source's ports while the daemon still shifted the jobs, so a front read one port and its back bound another, and the worktree quietly talked to its source. Anything in between the two columns is incoherent by construction, which is why there is no third answer and no `Rewrite` flag any more. The cost of verbatim is that it shares its source's ports; `flow/run/up` measures that (`rules.PortClashes`) and turns the concurrency question into stop-the-other-or-don't-start rather than letting a bind fail. `wtm env --isolation` switches an existing worktree, and the interactive run asks the same question as a step that keeps the current isolation first, rather than skipping the port pass once.
+Splitting them would be incoherent: a `.env` left on its source's ports while the daemon still shifted the jobs would have a front read one port while its back bound another, and the worktree quietly talk to its source. Anything in between the two columns is incoherent by construction, which is why there is no third answer and no flag to rewrite the ports alone. The cost of verbatim is that it shares its source's ports; `flow/run/up` measures that (`rules.PortClashes`) and turns the concurrency question into stop-the-other-or-don't-start rather than letting a bind fail. `wtm env --isolation` switches an existing worktree, and the interactive run asks the same question as a step that keeps the current isolation first, rather than skipping the port pass once.
 
 ## The event bus — the daemon relays, the flows speak, the jobs report
 
@@ -256,11 +270,11 @@ They used to be separate: a "keep the ports" answer left the `.env` on its sourc
 - **Job events are the one kind the daemon writes**, since only it sees a job end. `Manager` reports each transition (`JobTransition`: started, crashed, exited, stopped) to `ManagerParams.OnTransition`, and `daemonServer.publishJob` marshals a `domain.JobEvent` into the hub. It stays blind to git: the repository and correlation id come from the client in `Request.Origin` (built by `flow.Context.Origin()` from the publisher), the branch from the job's `WTM_BRANCH`, and the origin is persisted in `jobs.json` so an adopted job can still publish its stop. A job started without an origin publishes nothing. A stop sets `ManagedJob.stopping` before it signals, so the reaper does not read the exit as a crash.
 - **`service/events.Watch`** subscribes **before** it reads the snapshot (`worktree.Identities`, plus the daemon's job list mapped by `rules.WorktreeJobs`), so a change made meanwhile waits in the subscription and arrives after `ready`. On EOF it backs off and starts over with a fresh snapshot.
 
-The ordinal is part of the identity, which is why `worktree.EnsureOrdinal` left the env readers: `JobEnv`, `BranchEnv`, `ResolveEnvPorts` and the hook environment now read the ordinal and answer `ErrOrdinalUnallocated` when there is none, and `internal/flow/ordinal` allocates — `Retry` around a read that asked for it, `BeforeHooks` before a hook phase that would read it — and publishes `worktree.updated`. A reader outside any flow (the dashboard's addresses) simply shows nothing for a worktree no run has numbered yet.
+The ordinal is part of the identity, so the env readers never allocate it: `JobEnv`, `BranchEnv`, `ResolveEnvPorts` and the hook environment read the ordinal and answer `ErrOrdinalUnallocated` when there is none, and `internal/flow/ordinal` allocates — `Retry` around a read that asked for it, `BeforeHooks` before a hook phase that would read it — and publishes `worktree.updated`. A reader outside any flow (the dashboard's addresses) simply shows nothing for a worktree no run has numbered yet.
 
-## Where each flow runs
+## Where each command runs
 
-Every worktree-mutating command goes through `flow/`; a new one does too — see [adding-a-mutation-command.md](adding-a-mutation-command.md). The surfaces each one is wired into:
+Every worktree-mutating command is a flow — see [adding-a-mutation-command.md](adding-a-mutation-command.md); the surfaces each is wired into:
 
 | Command | Flow lives in | Surfaces |
 | -- | -- | -- |

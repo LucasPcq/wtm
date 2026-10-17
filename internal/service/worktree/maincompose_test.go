@@ -74,7 +74,7 @@ func TestResolveEnvPortsWritesTheMainsStableComposeProject(t *testing.T) {
 	writeRunConfig(t, repo.stateDir, composeRunConfig)
 	git(t, repo.dir, "checkout", "-b", "chore/dev-multi-worktree")
 
-	resolved, err := ResolveEnvPorts(ResolveEnvPortsParams{
+	resolved, err := ResolveEnvPorts(t.Context(), ResolveEnvPortsParams{
 		ProjectDir:   repo.dir,
 		StateDir:     repo.stateDir,
 		Branch:       "chore/dev-multi-worktree",

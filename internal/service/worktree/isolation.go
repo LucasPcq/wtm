@@ -1,10 +1,12 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/config"
+	"github.com/LucasPcq/wtm/internal/store"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/infra"
@@ -38,8 +40,8 @@ type SetIsolationParams struct {
 
 // SetIsolation records a new choice for an existing worktree. It writes the
 // record only: bringing the .env in line with it is the caller's next step.
-func SetIsolation(params SetIsolationParams) error {
-	isMain, err := isMainBranch(params.Ref)
+func SetIsolation(ctx context.Context, params SetIsolationParams) error {
+	isMain, err := isMainBranch(ctx, params.Ref)
 	if err != nil {
 		return err
 	}
@@ -47,18 +49,21 @@ func SetIsolation(params SetIsolationParams) error {
 		return mainIsolation(params.Isolation)
 	}
 
-	meta, err := loadMetadata(params.Ref.StateDir, params.Ref.Branch)
-	if err != nil {
-		meta = domain.WorktreeMetadata{}
-	}
-	meta.Isolation = rules.EffectiveIsolation(params.Isolation)
-	return writeMetadata(rules.WorktreeMetaDir(params.Ref.StateDir, params.Ref.Branch), meta)
+	_, err = (store.MetaDisk{StateDir: params.Ref.StateDir}).Update(ctx, store.MetaUpdate{
+		Branch:  params.Ref.Branch,
+		Missing: store.MissingCreate,
+		Change: func(meta *domain.WorktreeMetadata) error {
+			meta.Isolation = rules.EffectiveIsolation(params.Isolation)
+			return nil
+		},
+	})
+	return err
 }
 
 // CheckIsolation refuses a choice SetIsolation would refuse, before anything is
 // written for it.
-func CheckIsolation(params SetIsolationParams) error {
-	isMain, err := isMainBranch(params.Ref)
+func CheckIsolation(ctx context.Context, params SetIsolationParams) error {
+	isMain, err := isMainBranch(ctx, params.Ref)
 	if err != nil || !isMain {
 		return err
 	}
@@ -73,12 +78,12 @@ func mainIsolation(isolation domain.Isolation) error {
 }
 
 // IsMain says whether the branch is the one the main checkout has out.
-func IsMain(ref WorktreeRef) (bool, error) {
-	return isMainBranch(ref)
+func IsMain(ctx context.Context, ref WorktreeRef) (bool, error) {
+	return isMainBranch(ctx, ref)
 }
 
-func isMainBranch(ref WorktreeRef) (bool, error) {
-	worktrees, err := infra.ListWorktrees(infra.ListWorktreesParams{ProjectDir: ref.ProjectDir})
+func isMainBranch(ctx context.Context, ref WorktreeRef) (bool, error) {
+	worktrees, err := infra.ListWorktrees(ctx, infra.ListWorktreesParams{ProjectDir: ref.ProjectDir})
 	if err != nil {
 		return false, fmt.Errorf("list worktrees: %w", err)
 	}
@@ -100,12 +105,12 @@ type IsolationAdoptionParams struct {
 // answer is asked before the worktree is touched. A run.toml that cannot be
 // read leaves nothing to adopt — the port pass is skipped for that reason, and
 // says so itself.
-func IsolationAdoptionFor(params IsolationAdoptionParams) (domain.IsolationAdoptionPlan, error) {
+func IsolationAdoptionFor(ctx context.Context, params IsolationAdoptionParams) (domain.IsolationAdoptionPlan, error) {
 	cfg, err := config.LoadRun(params.Ref.StateDir)
 	if err != nil {
 		return domain.IsolationAdoptionPlan{}, nil
 	}
-	isMain, err := isMainBranch(params.Ref)
+	isMain, err := isMainBranch(ctx, params.Ref)
 	if err != nil {
 		return domain.IsolationAdoptionPlan{}, err
 	}

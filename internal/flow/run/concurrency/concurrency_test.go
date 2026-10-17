@@ -1,6 +1,7 @@
 package concurrency
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -54,7 +55,7 @@ func questionFor(params questionParams) *Question {
 		Config:    cfg,
 		Running:   params.Running,
 		WorkDirs: func(answers flow.Answers) []string {
-			return target.WorkDirs(target.WorkDirsParams{Answers: answers, Cwd: here})
+			return target.WorkDirs(context.Background(), target.WorkDirsParams{Answers: answers, Cwd: here})
 		},
 		Starting: func(flow.Answers) []domain.JobConfig { return rules.JobsWithEffectivePorts(cfg, cfg.Jobs) },
 	})
@@ -63,7 +64,7 @@ func questionFor(params questionParams) *Question {
 func TestConcurrencyIsNotAskedWhenNothingRunsElsewhere(t *testing.T) {
 	f := questionWith(request{}, running(here))
 
-	skip, reason := f.Step().Skip(flow.Answers{})
+	skip, reason := f.Step(t.Context()).Skip(flow.Answers{})
 	if !skip || reason != domain.RunConcurrencySkipAlone {
 		t.Errorf("Skip = (%v, %q), want the step skipped for want of a neighbour", skip, reason)
 	}
@@ -75,19 +76,19 @@ func TestConcurrencyMeasuresAgainstTheTargetNotTheCurrentDirectory(t *testing.T)
 	f := questionWith(request{}, running("/wt/other"))
 	answers := flow.NewAnswers(map[string]string{"run.worktree": "/wt/other"})
 
-	if skip, _ := f.Step().Skip(answers); !skip {
+	if skip, _ := f.Step(t.Context()).Skip(answers); !skip {
 		t.Error("the step was asked about the very worktree the run targets")
 	}
 }
 
 func TestConcurrencyIsAskedOnceThenNeverAgain(t *testing.T) {
 	asked := questionWith(request{}, running(here, "/wt/other"))
-	if skip, _ := asked.Step().Skip(flow.Answers{}); skip {
+	if skip, _ := asked.Step(t.Context()).Skip(flow.Answers{}); skip {
 		t.Fatal("the step was skipped although another worktree is running jobs")
 	}
 
 	settled := questionWith(request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}}, running(here, "/wt/other"))
-	skip, reason := settled.Step().Skip(flow.Answers{})
+	skip, reason := settled.Step(t.Context()).Skip(flow.Answers{})
 	if !skip || reason != domain.RunConcurrencySkipSettled {
 		t.Errorf("Skip = (%v, %q), want the config to have settled it", skip, reason)
 	}
@@ -104,7 +105,7 @@ func TestConcurrencyFlagsAnswerWithoutAsking(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := questionWith(tc.request, running(here, "/wt/other"))
-			step := f.Step()
+			step := f.Step(t.Context())
 
 			if skip, _ := step.Skip(flow.Answers{}); !skip {
 				t.Error("the step was asked although a flag answered it")
@@ -125,7 +126,7 @@ func TestConcurrencyFlagsAnswerWithoutAsking(t *testing.T) {
 func TestConcurrencyResolvesToLeavingTheOthersAlone(t *testing.T) {
 	f := questionWith(request{}, running(here, "/wt/other"))
 
-	answer, err := f.Step().Resolve(flow.Answers{})
+	answer, err := f.Step(t.Context()).Resolve(flow.Answers{})
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
@@ -137,7 +138,7 @@ func TestConcurrencyResolvesToLeavingTheOthersAlone(t *testing.T) {
 func TestConcurrencyOffersFourAnswersAndNamesTheNeighbours(t *testing.T) {
 	f := questionWith(request{}, running(here, "/wt/other"))
 
-	content, err := f.Step().Build(flow.Answers{})
+	content, err := f.Step(t.Context()).Build(flow.Answers{})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -168,7 +169,7 @@ func TestRememberWritesTheAnswerToRunTomlAndSaysSo(t *testing.T) {
 	})
 
 	answers := flow.NewAnswers(map[string]string{Key: answerExclusiveAlways})
-	if _, err := f.remember(answers); err != nil {
+	if _, err := f.remember(t.Context(), answers); err != nil {
 		t.Fatalf("remember: %v", err)
 	}
 
@@ -189,7 +190,7 @@ func TestAOneOffAnswerIsNotRemembered(t *testing.T) {
 	stateDir := t.TempDir()
 	f := questionFor(questionParams{StateDir: stateDir, Presenter: &flowtest.Recorder{}})
 
-	if _, err := f.remember(flow.NewAnswers(map[string]string{Key: answerExclusive})); err != nil {
+	if _, err := f.remember(t.Context(), flow.NewAnswers(map[string]string{Key: answerExclusive})); err != nil {
 		t.Fatalf("remember: %v", err)
 	}
 
@@ -225,7 +226,7 @@ func TestASettledConcurrencyIsStillActedOn(t *testing.T) {
 
 			// What an unattended run produces: Skip wins, and the step is recorded
 			// as skipped with no value.
-			answers, err := flow.Unattended{}.Ask(flow.Session{Steps: []flow.Step{f.Step()}})
+			answers, err := flow.Unattended{}.Ask(flow.Session{Steps: []flow.Step{f.Step(t.Context())}})
 			if err != nil {
 				t.Fatalf("Ask: %v", err)
 			}
@@ -233,7 +234,7 @@ func TestASettledConcurrencyIsStillActedOn(t *testing.T) {
 				t.Fatal("the step was answered, so this test no longer covers the skipped path")
 			}
 
-			if got := f.Decided(answers); got != tc.want {
+			if got := f.Decided(t.Context(), answers); got != tc.want {
 				t.Errorf("concurrency = %q, want %q", got, tc.want)
 			}
 		})
@@ -245,7 +246,7 @@ func TestAnAnsweredConcurrencyOutranksTheFallback(t *testing.T) {
 	f := questionWith(request{Parallel: true}, running(here, "/wt/other"))
 	answers := flow.Answers{}.With(Key, flow.Answer{Value: answerExclusiveAlways, Asked: true})
 
-	if got := f.Decided(answers); got != domain.ConcurrencyExclusive {
+	if got := f.Decided(t.Context(), answers); got != domain.ConcurrencyExclusive {
 		t.Errorf("concurrency = %q, want the answer that was actually given", got)
 	}
 }
@@ -256,7 +257,7 @@ func TestASettledExclusiveIsPutBackToTheUserOnAMultiWorktreeRun(t *testing.T) {
 	f := questionWith(request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}}, nil)
 	answers := flow.Answers{}.WithValues("run.worktree", []string{here, "/wt/other"})
 
-	step := f.Step()
+	step := f.Step(t.Context())
 	if skip, reason := step.Skip(answers); skip {
 		t.Fatalf("the step was skipped (%q) although the run contradicts the setting", reason)
 	}
@@ -284,10 +285,10 @@ func TestASettledExclusiveStandsOnASingleWorktreeRun(t *testing.T) {
 	f := questionWith(request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}}, running(here, "/wt/other"))
 	answers := flow.Answers{}.WithValues("run.worktree", []string{here})
 
-	if skip, reason := f.Step().Skip(answers); !skip || reason != domain.RunConcurrencySkipSettled {
+	if skip, reason := f.Step(t.Context()).Skip(answers); !skip || reason != domain.RunConcurrencySkipSettled {
 		t.Errorf("Skip = (%v, %q), want the settled answer to stand", skip, reason)
 	}
-	if got := f.Decided(answers); got != domain.ConcurrencyExclusive {
+	if got := f.Decided(t.Context(), answers); got != domain.ConcurrencyExclusive {
 		t.Errorf("concurrency = %q, want the setting applied", got)
 	}
 }
@@ -297,7 +298,7 @@ func TestAnUnattendedContradictionStopsNothing(t *testing.T) {
 	f := questionWith(request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyExclusive}}, running("/wt/other"))
 	answers := flow.Answers{}.WithValues("run.worktree", []string{here, "/wt/second"})
 
-	answer, err := f.Step().Resolve(answers)
+	answer, err := f.Step(t.Context()).Resolve(answers)
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
@@ -325,7 +326,7 @@ func TestTheUnattendedContradictionIsAnnounced(t *testing.T) {
 	})
 	answers := flow.Answers{}.WithValues("run.worktree", []string{here, "/wt/second"})
 
-	f.noticeOverridden(answers)
+	f.noticeOverridden(t.Context(), answers)
 
 	if len(recorder.Statuses) != 1 {
 		t.Fatalf("statuses = %v, want the setting's suspension announced once", recorder.Statuses)
@@ -346,7 +347,7 @@ func TestAnAnsweredContradictionIsNotAnnounced(t *testing.T) {
 		WithValues("run.worktree", []string{here, "/wt/second"}).
 		With(Key, flow.Answer{Value: answerParallel, Asked: true})
 
-	f.noticeOverridden(answers)
+	f.noticeOverridden(t.Context(), answers)
 
 	if len(recorder.Statuses) != 0 {
 		t.Errorf("statuses = %v, want nothing said over an answer someone gave", recorder.Statuses)
@@ -370,7 +371,7 @@ func clashFlow(req request, otherOffset int) *Question {
 // settled as its preference.
 func TestAPortClashOverridesAParallelPreference(t *testing.T) {
 	f := clashFlow(request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyParallel}}, 0)
-	step := f.Step()
+	step := f.Step(t.Context())
 
 	if skip, reason := step.Skip(flow.Answers{}); skip {
 		t.Fatalf("skipped (%s), want the clash put to the user", reason)
@@ -390,14 +391,14 @@ func TestAPortClashOverridesAParallelPreference(t *testing.T) {
 // Nobody to ask: stopping another worktree is not a default to take silently,
 // and running both is not possible — the run refuses, naming the way out.
 func TestAPortClashRefusesAnUnattendedRun(t *testing.T) {
-	_, err := clashFlow(request{}, 0).Step().Resolve(flow.Answers{})
+	_, err := clashFlow(request{}, 0).Step(t.Context()).Resolve(flow.Answers{})
 	if err == nil || !strings.Contains(err.Error(), "--"+domain.FlagExclusive) {
 		t.Errorf("err = %v, want a refusal naming --%s", err, domain.FlagExclusive)
 	}
 }
 
 func TestAPortClashIsSettledByExclusive(t *testing.T) {
-	step := clashFlow(request{Exclusive: true}, 0).Step()
+	step := clashFlow(request{Exclusive: true}, 0).Step(t.Context())
 	if skip, _ := step.Skip(flow.Answers{}); !skip {
 		t.Error("--exclusive answers the clash, want the step skipped")
 	}
@@ -410,10 +411,10 @@ func TestAPortClashIsSettledByExclusive(t *testing.T) {
 // Isolated worktrees sit a block apart: the same job up next door is not a clash.
 func TestIsolatedWorktreesDoNotClash(t *testing.T) {
 	f := clashFlow(request{Config: domain.RunConfig{Concurrency: domain.ConcurrencyParallel}}, 10)
-	if clashes := f.clashes(flow.Answers{}); len(clashes) != 0 {
+	if clashes := f.clashes(t.Context(), flow.Answers{}); len(clashes) != 0 {
 		t.Errorf("clashes = %+v, want none a block apart", clashes)
 	}
-	if skip, _ := f.Step().Skip(flow.Answers{}); !skip {
+	if skip, _ := f.Step(t.Context()).Skip(flow.Answers{}); !skip {
 		t.Error("the settled preference applies when nothing clashes")
 	}
 }
@@ -425,7 +426,7 @@ func TestAPortClashNamesEveryWorktreeItsAnswerStops(t *testing.T) {
 	f.params.Running = append(f.params.Running, domain.JobInfo{Name: "db", WorkDir: "/wt/bystander", Status: domain.JobStatusRunning})
 	f.offsets["/wt/bystander"] = 20
 
-	content, err := f.Step().Build(flow.Answers{})
+	content, err := f.Step(t.Context()).Build(flow.Answers{})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}

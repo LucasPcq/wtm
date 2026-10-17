@@ -25,7 +25,7 @@ func TestDashboardHeaderHeightDegradesBelowTheThreshold(t *testing.T) {
 
 // TestComputeDashboardLayoutMarksTheTallHeader pins that the layout, not the
 // renderer, decides whether the tall header shows — a magic-threshold
-// comparison re-derived in tui/ is exactly the decision logic that belongs
+// comparison re-derived in surface/tui/ is exactly the decision logic that belongs
 // here instead.
 func TestComputeDashboardLayoutMarksTheTallHeader(t *testing.T) {
 	tall := ComputeDashboardLayout(DashboardLayoutParams{Width: 120, Height: 40})

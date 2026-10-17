@@ -1,6 +1,7 @@
 package env
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"maps"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 // envPaths are the resolved locations + strategy shared by the compute and apply
@@ -59,6 +61,9 @@ type computedFile struct {
 	// fresh project has no source either, but it does have a template — this is
 	// a config.toml entry pointing at nothing.
 	unresolvable bool
+	// created says the worktree lacked the file and child is its scaffold: it
+	// is written even when the reconciliation changes nothing in it.
+	created bool
 }
 
 // ComputeEnvParams holds the inputs to compute a worktree's env drift, without any
@@ -125,7 +130,7 @@ type ApplyEnvSyncParams struct {
 // ApplyEnvSync recomputes each file's drift and writes the reconciled content,
 // applying the matching resolution. Files whose reconciled content is unchanged are
 // left untouched. Returns the full result.
-func ApplyEnvSync(params ApplyEnvSyncParams) (domain.EnvSyncResult, error) {
+func ApplyEnvSync(ctx context.Context, params ApplyEnvSyncParams) (domain.EnvSyncResult, error) {
 	if len(params.Files) == 0 {
 		return domain.EnvSyncResult{}, domain.ErrEnvNoFiles
 	}
@@ -146,14 +151,14 @@ func ApplyEnvSync(params ApplyEnvSyncParams) (domain.EnvSyncResult, error) {
 		if err != nil {
 			return domain.EnvSyncResult{}, err
 		}
-		applied, err := applyFile(paths, &c, params.Resolutions[f.Target])
+		applied, err := applyFile(ctx, paths, &c, params.Resolutions[f.Target])
 		if err != nil {
 			return domain.EnvSyncResult{}, err
 		}
 		files = append(files, fileResult(paths, c, applied))
 	}
 
-	ports, err := settleEnvPorts(settleEnvPortsParams{Ports: params.Ports, Write: true, Owned: true})
+	ports, err := settleEnvPorts(ctx, settleEnvPortsParams{Ports: params.Ports, Write: true, Owned: true})
 	if err != nil {
 		return domain.EnvSyncResult{}, err
 	}
@@ -191,7 +196,7 @@ type SyncEnvParams struct {
 // SyncEnv reconciles a worktree's env files non-interactively: it applies safe
 // additions plus any flag-driven decisions (OnConflict, Prune), writing changed
 // files. With Check set it computes and returns the drift without writing anything.
-func SyncEnv(params SyncEnvParams) (domain.EnvSyncResult, error) {
+func SyncEnv(ctx context.Context, params SyncEnvParams) (domain.EnvSyncResult, error) {
 	if len(params.Files) == 0 {
 		return domain.EnvSyncResult{}, domain.ErrEnvNoFiles
 	}
@@ -207,17 +212,23 @@ func SyncEnv(params SyncEnvParams) (domain.EnvSyncResult, error) {
 	}
 
 	files := make([]domain.EnvFileResult, 0, len(params.Files))
+	// A --check plans the ports on what the apply would write, not on the disk:
+	// a file the apply rebuilds holds the keys the port pass then settles.
+	reconciled := map[string][]domain.EnvLine{}
 	for _, f := range params.Files {
 		c, err := computeFile(paths, f)
 		if err != nil {
 			return domain.EnvSyncResult{}, err
 		}
-		applied := false
-		if !params.Check {
-			applied, err = applyFile(paths, &c, flagResolution(params, c.diff))
-			if err != nil {
-				return domain.EnvSyncResult{}, err
-			}
+		resolution := flagResolution(params, c.diff)
+		if params.Check {
+			reconciled[f.Target] = rules.ApplyEnvDiff(applyDiffParams(c, resolution))
+			files = append(files, fileResult(paths, c, false))
+			continue
+		}
+		applied, err := applyFile(ctx, paths, &c, resolution)
+		if err != nil {
+			return domain.EnvSyncResult{}, err
 		}
 		files = append(files, fileResult(paths, c, applied))
 	}
@@ -225,7 +236,7 @@ func SyncEnv(params SyncEnvParams) (domain.EnvSyncResult, error) {
 	// The ports come last, on files that are now reconciled: the value sources
 	// carry another worktree's port, so applying the offset before the merge
 	// would only see it overwritten.
-	ports, err := settleEnvPorts(settleEnvPortsParams{Ports: params.Ports, Write: !params.Check, Owned: !params.Check})
+	ports, err := settleEnvPorts(ctx, settleEnvPortsParams{Ports: params.Ports, Write: !params.Check, Owned: !params.Check, Reconciled: reconciled})
 	if err != nil {
 		return domain.EnvSyncResult{}, err
 	}
@@ -247,24 +258,27 @@ type settleEnvPortsParams struct {
 	// Both are false on a --check run, which writes nothing at all.
 	Write bool
 	Owned bool
+	// Reconciled is each file as a --check run would have written it, read in
+	// place of the disk.
+	Reconciled map[string][]domain.EnvLine
 }
 
 // settleEnvPorts applies the worktree's offset to the linked values, or merely
 // resolves what it would do when the caller is reporting rather than writing —
 // a --check run, or one where the user declined the pass. Either way the links
 // still feed the diff's comparison, which is why they are never simply dropped.
-func settleEnvPorts(params settleEnvPortsParams) (domain.EnvPortPlan, error) {
+func settleEnvPorts(ctx context.Context, params settleEnvPortsParams) (domain.EnvPortPlan, error) {
 	if params.Ports.Empty() {
 		return domain.EnvPortPlan{}, nil
 	}
 	if !params.Write {
-		plan, err := ComputeEnvPorts(params.Ports)
+		plan, err := computeEnvPorts(computeEnvPortsParams{Ports: params.Ports, Reconciled: params.Reconciled})
 		if err != nil || !params.Owned {
 			return plan, err
 		}
-		return plan, ApplyOwnedEnv(params.Ports)
+		return plan, ApplyOwnedEnv(ctx, params.Ports)
 	}
-	plan, err := ApplyEnvPorts(params.Ports)
+	plan, err := ApplyEnvPorts(ctx, params.Ports)
 	plan.Applied = err == nil
 	return plan, err
 }
@@ -284,13 +298,15 @@ func fileResult(paths envPaths, c computedFile, applied bool) domain.EnvFileResu
 		ParentBranch:   parentBranch,
 		ParentFallback: c.parentFallback,
 		Unresolvable:   c.unresolvable,
+		Created:        c.created,
 	}
 }
 
 // computeFile reads the four documents for one env file according to the strategy
 // and computes its diff.
 func computeFile(paths envPaths, f domain.EnvFile) (computedFile, error) {
-	child, err := readEnvFile(filepath.Join(paths.WorktreePath, f.Target))
+	childPath := filepath.Join(paths.WorktreePath, f.Target)
+	child, err := readEnvFile(childPath)
 	if err != nil {
 		return computedFile{}, err
 	}
@@ -302,6 +318,13 @@ func computeFile(paths envPaths, f domain.EnvFile) (computedFile, error) {
 	parent, main, source, fallback, err := valueSources(paths, f)
 	if err != nil {
 		return computedFile{}, err
+	}
+	unresolvable := child == nil && template == nil && parent == nil && main == nil
+
+	created := false
+	if !fileExists(childPath) {
+		child = scaffoldOf(scaffoldParams{Strategy: paths.Strategy, Template: template, Parent: parent, Main: main})
+		created = child != nil
 	}
 
 	diff := rules.DiffEnv(rules.EnvDiffParams{
@@ -321,8 +344,30 @@ func computeFile(paths envPaths, f domain.EnvFile) (computedFile, error) {
 		parentFallback: fallback,
 		child:          child,
 		diff:           diff,
-		unresolvable:   child == nil && template == nil && parent == nil && main == nil,
+		unresolvable:   unresolvable,
+		created:        created,
 	}, nil
+}
+
+type scaffoldParams struct {
+	Strategy domain.EnvStrategy
+	Template []domain.EnvLine
+	Parent   []domain.EnvLine
+	Main     []domain.EnvLine
+}
+
+// scaffoldOf is what a missing file starts from, the copy create would have
+// made: the template under example, the strategy's source otherwise. Without it
+// a file whose keys are all placeholders is never written, nobody being there
+// to fill them.
+func scaffoldOf(params scaffoldParams) []domain.EnvLine {
+	if params.Strategy == domain.EnvStrategyExample {
+		return params.Template
+	}
+	if params.Parent != nil {
+		return params.Parent
+	}
+	return params.Main
 }
 
 // ownedKeys are the keys the reconciliation leaves to others in one file: what
@@ -357,7 +402,7 @@ func valueSources(paths envPaths, f domain.EnvFile) (parent, main []domain.EnvLi
 			return nil, nil, "", false, err
 		}
 		if main == nil {
-			return nil, nil, domain.EnvSourceLabelNone, false, nil
+			return nil, nil, fmt.Sprintf(domain.EnvSourceLabelNoMainFmt, f.Target), false, nil
 		}
 		return nil, main, domain.EnvSourceLabelMain, false, nil
 
@@ -391,7 +436,7 @@ func parentFallback(paths envPaths, f domain.EnvFile, fallbackLabel string) (par
 		return nil, nil, "", false, err
 	}
 	if main == nil {
-		return nil, nil, domain.EnvSourceLabelNone, false, nil
+		return nil, nil, fmt.Sprintf(domain.EnvSourceLabelNoMainFmt, f.Target), false, nil
 	}
 	return nil, main, fallbackLabel, true, nil
 }
@@ -439,8 +484,32 @@ func flagResolution(params SyncEnvParams, diff domain.EnvDiff) EnvResolution {
 // applyFile reconciles one file and writes it back when the result differs from the
 // current content, recording on c's diff what it did to each key. Returns
 // whether it wrote.
-func applyFile(paths envPaths, c *computedFile, res EnvResolution) (bool, error) {
-	diff := rules.ApplyEnvDiffParams{
+func applyFile(ctx context.Context, paths envPaths, c *computedFile, res EnvResolution) (bool, error) {
+	diff := applyDiffParams(*c, res)
+	reconciled := rules.ApplyEnvDiff(diff)
+	c.diff = rules.EnvDiffActions(diff)
+
+	if rules.RenderEnv(reconciled) == rules.RenderEnv(c.child) && !c.created {
+		return false, nil
+	}
+
+	written, err := store.EnvDisk{}.Edit(ctx, store.EnvEdit{
+		Path:   filepath.Join(paths.WorktreePath, c.file.Target),
+		Create: c.created,
+		Edit: func(current []domain.EnvLine) []domain.EnvLine {
+			if current == nil {
+				return reconciled
+			}
+			onDisk := diff
+			onDisk.Child = current
+			return rules.ApplyEnvDiff(onDisk)
+		},
+	})
+	return written.Changed, err
+}
+
+func applyDiffParams(c computedFile, res EnvResolution) rules.ApplyEnvDiffParams {
+	return rules.ApplyEnvDiffParams{
 		Child:        c.child,
 		Diff:         c.diff,
 		Decisions:    res.Decisions,
@@ -449,28 +518,15 @@ func applyFile(paths envPaths, c *computedFile, res EnvResolution) (bool, error)
 		PruneKeys:    res.PruneKeys,
 		SkipKeys:     res.SkipKeys,
 	}
-	reconciled := rules.ApplyEnvDiff(diff)
-	c.diff = rules.EnvDiffActions(diff)
-
-	rendered := rules.RenderEnv(reconciled)
-	if rendered == rules.RenderEnv(c.child) {
-		return false, nil
-	}
-
-	if err := writeEnvFile(filepath.Join(paths.WorktreePath, c.file.Target), rendered); err != nil {
-		return false, err
-	}
-	return true, nil
 }
 
 // templateLines reads the committed template (the schema) for a file from the
 // target worktree itself — each worktree's branch declares its own expected keys —
-// returning nil when no template exists. resolveTemplateSrc is shared with the
-// creation-time provisioning in env.go.
+// returning nil when no template exists.
 func templateLines(worktreePath string, f domain.EnvFile) ([]domain.EnvLine, error) {
-	src := resolveTemplateSrc(worktreePath, f)
-	if src == "" {
-		return nil, nil
+	src, err := store.EnvDisk{}.Template(worktreePath, f)
+	if src == "" || err != nil {
+		return nil, err
 	}
 	return readEnvFile(src)
 }
@@ -486,15 +542,4 @@ func readEnvFile(path string) ([]domain.EnvLine, error) {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 	return rules.ParseEnv(string(data)), nil
-}
-
-// writeEnvFile renders and writes reconciled content, creating parent dirs.
-func writeEnvFile(path, content string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create directory for %s: %w", path, err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	return nil
 }

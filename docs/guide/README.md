@@ -15,6 +15,7 @@ How wtm works beyond `--help`. Every flag of every command is in `wtm <command> 
 - **[Stacked branches](stacked-branches.md)**: each worktree's parent, the tree and its badges, syncing a stack parents first, fast-forward, reparent, merged parents and orphans.
 - **[Removing worktrees](removing-worktrees.md)**: `clean` and `prune`, the safety refusals, `--force` and `--yes`, orphaned children, the branch and the data.
 - **[Configuration](configuration.md)**: `config.toml`, how `.env` files are provisioned, `on_create` / `on_clean` hooks, the environment of `wtm exec`, moving worktrees, the global config.
+- **[A worktree's state](status.md)**: `wtm status`, what a worktree runs, what it lacks, and the command that fixes each problem.
 - **[Where wtm keeps its state](state.md)**: the files under `<git-common-dir>/wtm/` and beside the global config.
 
 ## Dev stacks with `wtm run`

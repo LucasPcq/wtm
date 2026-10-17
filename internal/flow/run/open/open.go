@@ -2,6 +2,7 @@
 package open
 
 import (
+	"context"
 	"errors"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -42,26 +43,28 @@ type Params struct {
 	Open func(url string) error
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	if err := target.RequireDeclared(target.DeclaredParams{Config: params.Request.Config, Job: params.Request.Job}); err != nil {
 		return Outcome{}, err
 	}
 	f := &openFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
 		presenter: params.Presenter,
 		open:      params.Open,
-		reader: urls.Open(urls.Params{
+		reader: urls.Open(ctx, urls.Params{
 			Context: params.Context,
 			Config:  params.Request.Config,
 			Raw:     params.Request.Raw,
 		}),
 	}
-	return f.run()
+	return f.run(ctx)
 }
 
 type openFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -72,14 +75,14 @@ type openFlow struct {
 	named *target.Resolved
 }
 
-func (f *openFlow) run() (Outcome, error) {
-	named, err := target.Named(target.ResolveParams{ProjectDir: f.ctx.ProjectDir, Query: f.request.Worktree})
+func (f *openFlow) run(ctx context.Context) (Outcome, error) {
+	named, err := target.Named(f.runCtx, target.ResolveParams{ProjectDir: f.ctx.ProjectDir, Query: f.request.Worktree})
 	if err != nil {
 		return Outcome{}, err
 	}
 	f.named = named
 
-	answers, err := f.prompter.Ask(f.session())
+	answers, err := f.prompter.Ask(f.session(ctx))
 	if errors.Is(err, domain.ErrUserAborted) {
 		f.presenter.Notice(flow.AbortedNotice)
 		return Outcome{Aborted: true}, nil
@@ -88,8 +91,8 @@ func (f *openFlow) run() (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	workDir := target.WorkDir(target.WorkDirParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
-	published, err := f.reader.In(workDir)
+	workDir := target.WorkDir(f.runCtx, target.WorkDirParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
+	published, err := f.reader.In(f.runCtx, workDir)
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -102,7 +105,7 @@ func (f *openFlow) run() (Outcome, error) {
 	// is meaningless under --raw, which asked for the port, and equally so with
 	// no proxy: there is no name for the .env to disagree with.
 	if !f.request.Raw && f.reader.Serving() {
-		if notice, drifting := addressing.Notice(addressing.Params{Context: f.ctx, WorkDirs: []string{workDir}}); drifting {
+		if notice, drifting := addressing.Notice(f.runCtx, addressing.Params{Context: f.ctx, WorkDirs: []string{workDir}}); drifting {
 			f.presenter.Status(notice)
 		}
 	}
@@ -115,24 +118,24 @@ func (f *openFlow) run() (Outcome, error) {
 // published feeds the picker. A worktree whose addresses cannot be resolved
 // offers none, and the run then refuses it by name.
 func (f *openFlow) published(workDir string) []domain.JobURLEntry {
-	entries, _ := f.reader.In(workDir)
+	entries, _ := f.reader.In(f.runCtx, workDir)
 	return entries
 }
 
-func (f *openFlow) session() flow.Session {
+func (f *openFlow) session(ctx context.Context) flow.Session {
 	return flow.Session{
 		ErrLabel: domain.CmdOpen,
 		Presets:  target.Presets(target.PresetParams{Named: f.named, Job: f.request.Job}),
 		Steps: []flow.Step{
-			target.WorktreeStep(target.WorktreeParams{
+			target.WorktreeStep(f.runCtx, target.WorktreeParams{
 				ProjectDir: f.ctx.ProjectDir,
 				Current:    f.request.Cwd,
 				// What each worktree already has up, which is half of deciding
 				// which one to open. A daemon that cannot answer leaves the
 				// badges off rather than refusing the run.
-				Running: rules.RunningJobsByWorktree(runjobs.Load()),
+				Running: rules.RunningJobsByWorktree(runjobs.Load(ctx)),
 			}),
-			target.URLStep(target.URLParams{
+			target.URLStep(f.runCtx, target.URLParams{
 				Published: f.published,
 				Named:     f.named,
 				Cwd:       f.request.Cwd,

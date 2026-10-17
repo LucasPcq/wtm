@@ -223,6 +223,8 @@ type ProfileConfig struct {
 // [[profile]] block declares one entry; the Go field names are kept plural
 // because they hold the slices of all entries.
 type RunConfig struct {
+	// Schema is the version read from the file, zero when it carries none.
+	Schema int `toml:"schema,omitempty" json:"-"`
 	// PortOffsetBlock spaces two worktrees' declared ports apart. Zero means the
 	// default: a project only sets it to make room for base ports that would
 	// otherwise land a multiple of the block apart.
@@ -454,7 +456,7 @@ type DaemonState struct {
 }
 
 // JobInfo is the JSON representation of a managed job, shared across the daemon
-// protocol and the output/tui layers that render it.
+// protocol and the render/ and surface/tui/ layers that render it.
 type JobInfo struct {
 	Name    string    `json:"name"`
 	Kind    JobKind   `json:"kind"`
@@ -533,8 +535,11 @@ type WorktreeRunResult struct {
 	Profile string `json:"profile,omitempty"`
 	// Aborted says this worktree stopped short. The others carry on regardless,
 	// so it is read per worktree and never for the run as a whole.
-	Aborted bool              `json:"aborted"`
-	Jobs    []JobActionResult `json:"jobs"`
+	Aborted bool `json:"aborted"`
+	// Interrupted says an interrupt stopped this worktree's start; the jobs it
+	// had started keep running.
+	Interrupted bool              `json:"interrupted,omitempty"`
+	Jobs        []JobActionResult `json:"jobs"`
 }
 
 // WorktreeJobResults is one worktree's part of `run down` and `run stop`.
@@ -643,8 +648,11 @@ type DaemonStatus struct {
 	SocketPath    string `json:"socket_path"`
 	StatePath     string `json:"state_path"`
 	ProxyPort     int    `json:"proxy_port,omitempty"`
-	Foreground    int    `json:"foreground_jobs"`
-	Detached      int    `json:"detached_jobs"`
+	// Foreground counts the jobs the daemon supervises, which die with it;
+	// Detached the stacks that outlive it. A claim on a shared service is in
+	// neither.
+	Foreground int `json:"foreground_jobs"`
+	Detached   int `json:"detached_jobs"`
 	// IndexFrozen says a newer wtm owns the index, so this build records nothing
 	// it starts. It is read from the file rather than asked of the daemon: the
 	// two versions are all it takes to know, and the warning has to work when no

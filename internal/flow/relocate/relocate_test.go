@@ -33,6 +33,9 @@ func testContext(t *testing.T) flow.Context {
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(stateDir, domain.ConfigFileName), []byte("[worktrees]\nbase_path = \"../.trees\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	config := domain.Config{}
 	config.Project.Worktrees.BasePath = "../.trees"
 	config.Project.Worktrees.BaseBranch = "main"
@@ -54,7 +57,7 @@ func run(t *testing.T, ctx flow.Context, request Request, prompter flow.Prompter
 		request.BaseBranch = "main"
 	}
 	presenter := &recorder{}
-	outcome, err := Run(Params{Context: ctx, Request: request, Prompter: prompter, Presenter: presenter})
+	outcome, err := Run(t.Context(), Params{Context: ctx, Request: request, Prompter: prompter, Presenter: presenter})
 	return outcome, presenter, err
 }
 

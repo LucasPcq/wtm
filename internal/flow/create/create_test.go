@@ -27,7 +27,7 @@ func newFlow(t *testing.T, request Request, target func(string) domain.BranchTar
 	if target == nil {
 		target = func(string) domain.BranchTarget { return domain.BranchTarget{} }
 	}
-	return &createFlow{
+	return &createFlow{runCtx: t.Context(),
 		ctx:      flow.Context{ProjectDir: t.TempDir(), Config: config},
 		request:  request,
 		prompter: flow.Unattended{},
@@ -160,22 +160,60 @@ func TestSourceStepRefusesAGuessedParent(t *testing.T) {
 	}
 }
 
-// --ff accepts the offer unattended; its absence keeps the branch where it is.
-func TestSourceUpdateResolvesFromTheFlagOnly(t *testing.T) {
-	answer, err := newFlow(t, Request{FastForward: true}, nil).sourceUpdateStep().Resolve(flow.Answers{})
-	if err != nil {
-		t.Fatalf("Resolve: %v", err)
-	}
-	if answer.Value != updateFastForward {
-		t.Errorf("answer = %q, want the fast-forward accepted", answer.Value)
+// --ff answers the offer once it stands; its absence keeps the branch where it is.
+func TestSourceUpdateIsGivenByTheFlagOnly(t *testing.T) {
+	if given := newFlow(t, Request{FastForward: true}, nil).sourceUpdateStep().Given; given != updateFastForward {
+		t.Errorf("given = %q, want --ff to accept the fast-forward", given)
 	}
 
-	answer, err = newFlow(t, Request{}, nil).sourceUpdateStep().Resolve(flow.Answers{})
+	step := newFlow(t, Request{}, nil).sourceUpdateStep()
+	if step.Given != "" {
+		t.Errorf("given = %q, want no answer without --ff", step.Given)
+	}
+	answer, err := step.Resolve(flow.Answers{})
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
 	if answer.Value != updateKeep {
-		t.Errorf("answer = %q, want the branch left as-is", answer.Value)
+		t.Errorf("answer = %q, want the branch kept as it is", answer.Value)
+	}
+}
+
+// LUC-281: --ff only answered unattended runs, so the wizard still offered the
+// fast-forward the flag had already accepted.
+func TestFastForwardFlagIsNeverAsked(t *testing.T) {
+	ctx := testContext(t)
+	gittest.AddOrigin(t, ctx.ProjectDir)
+	gittest.Git(t, ctx.ProjectDir, "commit", "--allow-empty", "-m", "on origin only")
+	gittest.Git(t, ctx.ProjectDir, "push", "origin", "main")
+	gittest.Git(t, ctx.ProjectDir, "reset", "--hard", "HEAD~1")
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{
+		KeyBranch: "feat/w", KeySource: "main", KeyEnv: "", KeyRecap: confirmCreate,
+	}}
+
+	if _, err := Run(t.Context(), Params{Context: ctx, Request: Request{FastForward: true}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if _, asked := prompter.Content[KeySourceUpdate]; asked {
+		t.Errorf("--ff answers the source update, yet asked %q", prompter.AskedKeys())
+	}
+	if recap := prompter.Content[KeyRecap].Description; !strings.Contains(recap, "fast-forward") {
+		t.Errorf("recap = %q, want the fast-forward the flag accepted", recap)
+	}
+}
+
+// Nothing to reconcile, nothing to announce: --ff answers a question the run
+// puts, never one its Skip removed.
+func TestFastForwardFlagAnnouncesNothingWhenTheSourceIsUpToDate(t *testing.T) {
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{
+		KeyBranch: "feat/w", KeySource: "main", KeyEnv: "", KeyRecap: confirmCreate,
+	}}
+
+	if _, err := Run(t.Context(), Params{Context: testContext(t), Request: Request{FastForward: true}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if recap := prompter.Content[KeyRecap].Description; strings.Contains(recap, "fast-forward") {
+		t.Errorf("recap = %q, want no fast-forward announced for an up-to-date source", recap)
 	}
 }
 
@@ -225,7 +263,7 @@ func TestRunAsksEveryQuestionThenCreates(t *testing.T) {
 	}}
 	presenter := newRecorder()
 
-	outcome, err := Run(Params{Context: testContext(t), Prompter: prompter, Presenter: presenter})
+	outcome, err := Run(t.Context(), Params{Context: testContext(t), Prompter: prompter, Presenter: presenter})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -261,7 +299,7 @@ func TestRunAsksEveryQuestionThenCreates(t *testing.T) {
 func TestRunSkipsTheQuestionsTheRequestAnswers(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: confirmCreate}}
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Branches: []string{"feat/flagged"}, From: "main", EnvFrom: "example"},
 		Prompter:  prompter,
@@ -284,7 +322,7 @@ func TestRunSkipsTheQuestionsTheRequestAnswers(t *testing.T) {
 func TestRunAbortedCreatesNothing(t *testing.T) {
 	presenter := newRecorder()
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Branches: []string{"feat/nope"}, From: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Abort: true},
@@ -309,7 +347,7 @@ func TestRunRunsHooksAsTheirOwnPhase(t *testing.T) {
 	ctx.Config.Project.Hooks.OnCreate = []domain.HookCommand{{Cmd: "echo hooked"}}
 	presenter := newRecorder()
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context: ctx,
 		Request: Request{Branches: []string{"feat/hooked"}, From: "main"},
 		Prompter: &flowtest.ScriptedPrompter{Answers: map[string]string{
@@ -332,7 +370,7 @@ func TestRunRefusesABranchHeldElsewhereBeforeAsking(t *testing.T) {
 	gittest.Git(t, ctx.ProjectDir, "worktree", "add", filepath.Join(t.TempDir(), "taken"), "feat/taken")
 
 	prompter := &flowtest.ScriptedPrompter{}
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/taken"}, From: "main"},
 		Prompter:  prompter,
@@ -346,21 +384,11 @@ func TestRunRefusesABranchHeldElsewhereBeforeAsking(t *testing.T) {
 	}
 }
 
-func TestFastForwardSubjectIsSharedWithTheOtherFlows(t *testing.T) {
-	if got := decide.FastForwardSubject(decide.FastForwardSubjectParams{
-		Target:     domain.BranchTarget{State: domain.BranchTargetExisting},
-		FromBranch: "main",
-		Branch:     "feat/x",
-	}); got != "feat/x" {
-		t.Errorf("subject = %q, want the reused branch", got)
-	}
-}
-
 // withRunConfig gives the flow a state dir holding this run.toml.
 func withRunConfig(t *testing.T, f *createFlow, cfg domain.RunConfig) *createFlow {
 	t.Helper()
 	stateDir := t.TempDir()
-	if err := config.WriteRun(config.WriteRunParams{StateDir: stateDir, Force: true, Config: cfg}); err != nil {
+	if err := config.WriteRun(t.Context(), config.WriteRunParams{StateDir: stateDir, Force: true, Config: cfg}); err != nil {
 		t.Fatalf("write run config: %v", err)
 	}
 	f.ctx.StateDir = stateDir
@@ -473,7 +501,7 @@ func multiRun(t *testing.T, request Request, sets []string) (Outcome, *flowtest.
 		Answers: map[string]string{KeySource: "main", KeyEnv: "", KeyRecap: confirmCreate},
 		Sets:    map[string][]string{KeyBranch: sets},
 	}
-	outcome, err := Run(Params{Context: testContext(t), Request: request, Prompter: prompter, Presenter: newRecorder()})
+	outcome, err := Run(t.Context(), Params{Context: testContext(t), Request: request, Prompter: prompter, Presenter: newRecorder()})
 	return outcome, prompter, err
 }
 
@@ -521,7 +549,7 @@ func TestMultiWithOneArgumentSkipsTheListStep(t *testing.T) {
 }
 
 func TestMultiUnattendedTakesTheArguments(t *testing.T) {
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Branches: []string{"feat/a", "feat/b"}},
 		Prompter:  flow.Unattended{},
@@ -537,7 +565,7 @@ func TestMultiUnattendedTakesTheArguments(t *testing.T) {
 
 func TestRunRefusesADuplicateArgument(t *testing.T) {
 	presenter := newRecorder()
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Branches: []string{"feat/a", "feat/a"}},
 		Prompter:  flow.Unattended{},
@@ -556,7 +584,7 @@ func TestRunRefusesAClashInsideTheListBeforeCreatingAnything(t *testing.T) {
 	linkedRunConfig(t, ctx, ".env")
 	presenter := newRecorder()
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/x", "feat.x"}},
 		Prompter:  flow.Unattended{},
@@ -574,7 +602,7 @@ func TestMixedListWithoutFromIsRefusedUnattended(t *testing.T) {
 	ctx := testContext(t)
 	gittest.CreateBranch(t, ctx.ProjectDir, "feat/old")
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/new", "feat/old"}},
 		Prompter:  flow.Unattended{},
@@ -623,7 +651,7 @@ func TestAFailureInTheMiddleDoesNotStopTheRest(t *testing.T) {
 	occupy(t, ctx, "feat/b")
 	presenter := &batchRecorder{recorder: newRecorder()}
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/a", "feat/b", "feat/c"}, From: "main"},
 		Prompter:  flow.Unattended{},
@@ -661,7 +689,7 @@ func TestASingleBranchFailsAsBefore(t *testing.T) {
 	occupy(t, ctx, "feat/b")
 	presenter := &batchRecorder{recorder: newRecorder()}
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/b"}, From: "main"},
 		Prompter:  flow.Unattended{},
@@ -684,7 +712,7 @@ func TestFastForwardReachesAnExistingBranchWhenTheSourceIsUpToDate(t *testing.T)
 	gittest.Git(t, ctx.ProjectDir, "checkout", "main")
 	gittest.Git(t, ctx.ProjectDir, "branch", "-f", "feat/old", "main")
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/new", "feat/old"}, From: "main", FastForward: true},
 		Prompter:  flow.Unattended{},
@@ -700,7 +728,7 @@ func TestFastForwardReachesAnExistingBranchWhenTheSourceIsUpToDate(t *testing.T)
 }
 
 func TestADuplicateArgumentIsAUsageError(t *testing.T) {
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Branches: []string{"feat/a", "feat/a"}},
 		Prompter:  flow.Unattended{},
@@ -731,7 +759,7 @@ func TestRecapConfirmNamesHowManyWorktrees(t *testing.T) {
 }
 
 func TestPositionalArgumentsAreTrimmed(t *testing.T) {
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Branches: []string{" feat/a ", "feat/b"}},
 		Prompter:  flow.Unattended{},
@@ -747,7 +775,7 @@ func TestPositionalArgumentsAreTrimmed(t *testing.T) {
 
 func TestABlankArgumentIsAUsageError(t *testing.T) {
 	presenter := newRecorder()
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Branches: []string{"feat/a", "  "}},
 		Prompter:  flow.Unattended{},
@@ -762,7 +790,7 @@ func TestABlankArgumentIsAUsageError(t *testing.T) {
 }
 
 func TestARepeatedArgumentIsWordedForTheCommandLine(t *testing.T) {
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Branches: []string{"feat/a", "feat/a"}},
 		Prompter:  flow.Unattended{},
@@ -785,7 +813,7 @@ func TestTheWizardSpeaksInThePluralForSeveralBranches(t *testing.T) {
 		Answers: map[string]string{KeySource: "main", KeyEnv: "", KeyIsolation: string(domain.IsolationIsolated), KeySourceUpdate: updateKeep, KeyRecap: confirmCreate},
 		Sets:    map[string][]string{KeyBranch: {"feat/a", "feat/b"}},
 	}
-	if _, err := Run(Params{Context: ctx, Request: Request{}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
+	if _, err := Run(t.Context(), Params{Context: ctx, Request: Request{}, Prompter: prompter, Presenter: newRecorder()}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -832,7 +860,7 @@ func TestUnattendedRunWarnsTheParentFallback(t *testing.T) {
 	}
 	presenter := newRecorder()
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat/fallback"}, From: "develop", EnvFrom: string(domain.EnvStrategyParent)},
 		Prompter:  flow.Unattended{},
@@ -850,7 +878,7 @@ func TestUnattendedRunWarnsTheParentFallback(t *testing.T) {
 }
 
 func TestAFromNamingTheBranchItselfIsRefused(t *testing.T) {
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   testContext(t),
 		Request:   Request{Branches: []string{"feat/x"}, From: "feat/x"},
 		Prompter:  flow.Unattended{},
@@ -867,7 +895,7 @@ func TestRunPublishesTheNewWorktreeOnceAndAReusedOneNever(t *testing.T) {
 	ctx.Publisher = presenter.Recorder
 	run := func() {
 		t.Helper()
-		if _, err := Run(Params{
+		if _, err := Run(t.Context(), Params{
 			Context:   ctx,
 			Request:   Request{Branches: []string{"feat/pub"}, From: "main", IfNotExists: true},
 			Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyEnv: "", KeyRecap: confirmCreate}},
@@ -891,7 +919,7 @@ func TestRunPublishesTheNewWorktreeOnceAndAReusedOneNever(t *testing.T) {
 
 func runCreate(t *testing.T, ctx flow.Context, presenter Presenter, branches ...string) error {
 	t.Helper()
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: branches, From: "main"},
 		Prompter:  flow.Unattended{},
@@ -955,5 +983,109 @@ func TestABatchPublishesOneProvisionedPerBranch(t *testing.T) {
 	got := provisioned(presenter.Published)
 	if len(got) != 2 || got[0].Worktree.Branch != "feat/a" || !*got[0].OK || got[1].Worktree.Branch != "feat/b" || *got[1].OK {
 		t.Fatalf("provisioned = %+v, want feat/a ok then feat/b not ok", got)
+	}
+}
+
+// The branch typed into the wizard folds to the folder of a worktree another
+// branch holds: an idempotent create must refuse it rather than return it.
+func TestAWizardBranchSharingAnotherWorktreeFolderIsRefused(t *testing.T) {
+	ctx := testContext(t)
+	if _, err := Run(t.Context(), Params{Context: ctx, Request: Request{Branches: []string{"feat-x"}, From: "main"}, Prompter: flow.Unattended{}, Presenter: newRecorder()}); err != nil {
+		t.Fatal(err)
+	}
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyBranch: "feat/x", KeySource: "main", KeyEnv: "", KeyRecap: confirmCreate}}
+
+	outcome, err := Run(t.Context(), Params{Context: ctx, Request: Request{IfNotExists: true}, Prompter: prompter, Presenter: newRecorder()})
+
+	if !errors.Is(err, domain.ErrWorktreeNameTaken) {
+		t.Fatalf("err = %v, want ErrWorktreeNameTaken", err)
+	}
+	if len(outcome.Results) != 0 || len(outcome.Failed) != 1 || outcome.Failed[0].ExitCode != domain.ExitCodeWorktreeExists {
+		t.Errorf("outcome = %+v, want feat/x failed with exit %d and nothing returned", outcome, domain.ExitCodeWorktreeExists)
+	}
+}
+
+// pushedOnly leaves name on origin alone, one commit past main, with no local
+// branch: the state a branch someone else pushed is in after a fetch.
+func pushedOnly(t *testing.T, ctx flow.Context, name string) string {
+	t.Helper()
+	gittest.AddOrigin(t, ctx.ProjectDir)
+	gittest.Git(t, ctx.ProjectDir, "checkout", "-b", name)
+	gittest.Git(t, ctx.ProjectDir, "commit", "--allow-empty", "-m", "pushed work")
+	gittest.PushBranch(t, ctx.ProjectDir, name)
+	gittest.Git(t, ctx.ProjectDir, "checkout", "main")
+	gittest.Git(t, ctx.ProjectDir, "branch", "-D", name)
+	return revParse(t, ctx.ProjectDir, domain.RemoteBranchPrefix+name)
+}
+
+func upstreamOf(t *testing.T, dir, branchName string) string {
+	t.Helper()
+	out, err := exec.Command("git", "-C", dir, "rev-parse", "--abbrev-ref", branchName+"@{upstream}").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func assertResumed(t *testing.T, result domain.CreateResult, tip string) {
+	t.Helper()
+	if head := revParse(t, result.Path, "HEAD"); head != tip {
+		t.Errorf("worktree HEAD = %s, want origin's tip %s", head, tip)
+	}
+	if got, want := upstreamOf(t, result.Path, result.Branch), domain.RemoteBranchPrefix+result.Branch; got != want {
+		t.Errorf("upstream = %q, want %q", got, want)
+	}
+	if result.Upstream != domain.RemoteBranchPrefix+result.Branch {
+		t.Errorf("result upstream = %q, want it reported", result.Upstream)
+	}
+	if result.Metadata.SourceBranch != "main" {
+		t.Errorf("source_branch = %q, want the base branch recorded as the sync parent", result.Metadata.SourceBranch)
+	}
+}
+
+// LUC-305: a branch only on origin was created from main, without upstream.
+func TestARemoteOnlyBranchStartsFromOriginAndTracksIt(t *testing.T) {
+	ctx := testContext(t)
+	tip := pushedOnly(t, ctx, "feat/remote")
+
+	outcome, err := Run(t.Context(), Params{Context: ctx, Request: Request{Branches: []string{"feat/remote"}}, Prompter: flow.Unattended{}, Presenter: newRecorder()})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	assertResumed(t, outcome.Results[0], tip)
+}
+
+func TestTheWizardResumesARemoteOnlyBranch(t *testing.T) {
+	ctx := testContext(t)
+	tip := pushedOnly(t, ctx, "feat/remote")
+	if prompt := newFlow(t, Request{}, decide.MemoizedTarget(t.Context(), ctx.ProjectDir)).sourceUpdate(answers(map[string]string{KeyBranch: "feat/remote", KeySource: "main"})); prompt.SkipReason != domain.CheckoutSourceUpdateSkipNew {
+		t.Errorf("skip reason = %q, want the branch named as starting from origin", prompt.SkipReason)
+	}
+	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{
+		KeyBranch: "feat/remote", KeySource: "main", KeyEnv: "", KeyRecap: confirmCreate,
+	}}
+
+	outcome, err := Run(t.Context(), Params{Context: ctx, Prompter: prompter, Presenter: newRecorder()})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	assertResumed(t, outcome.Results[0], tip)
+	recap := prompter.Content[KeyRecap].Description
+	for _, want := range []string{"Branch:    feat/remote (resumes origin/feat/remote)", "Parent:    main"} {
+		if !strings.Contains(recap, want) {
+			t.Errorf("recap %q should contain %q", recap, want)
+		}
+	}
+	if _, asked := prompter.Content[KeySourceUpdate]; asked {
+		t.Error("a branch resumed from origin has nothing to fast-forward")
+	}
+}
+
+func TestEntryBadgeNamesARemoteBranch(t *testing.T) {
+	f := newFlow(t, Request{}, func(string) domain.BranchTarget {
+		return domain.BranchTarget{State: domain.BranchTargetNew, Upstream: "origin/feat/remote"}
+	})
+	if got := f.entryBadge("feat/remote").Text; got != badgeRemote {
+		t.Errorf("badge = %q, want %q", got, badgeRemote)
 	}
 }

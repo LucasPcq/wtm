@@ -62,12 +62,11 @@ func ShouldOfferFastForward(state domain.DivergenceState) bool {
 }
 
 // SourceIsStartPoint reports whether the source branch is the git start-point of
-// the worktree's branch. It is only when the branch does not exist yet: an
-// existing local branch is checked out as-is, and the source then merely records
-// the sync parent in metadata. Callers use it to decide whether a source is
-// required at all.
-func SourceIsStartPoint(state domain.BranchTargetState) bool {
-	return state == domain.BranchTargetNew
+// the worktree's branch. It is only when the branch exists nowhere yet: an
+// existing local branch is checked out as-is, one only on origin starts from
+// origin, and the source then merely records the sync parent in metadata.
+func SourceIsStartPoint(target domain.BranchTarget) bool {
+	return target.State == domain.BranchTargetNew && target.Upstream == ""
 }
 
 // ParentMustBeExplicit reports whether the sync parent has to be named by the
@@ -139,7 +138,7 @@ func FastForwardSplit(results []domain.FastForwardResult) (moved, notable, faile
 		switch result.Status {
 		case domain.FFAdvanced:
 			moved = append(moved, result)
-		case domain.FFDiverged, domain.FFNoUpstream:
+		case domain.FFDiverged, domain.FFNoUpstream, domain.FFCancelled:
 			notable = append(notable, result)
 		case domain.FFFailed:
 			failed = append(failed, result)

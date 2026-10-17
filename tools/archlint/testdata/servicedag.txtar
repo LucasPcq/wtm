@@ -20,7 +20,7 @@ var _ = branch.List
 -- github.com/LucasPcq/wtm/internal/service/fresh/fresh.go --
 package fresh
 
-import "github.com/LucasPcq/wtm/internal/service/branch" // want `internal/service/fresh must not import .* undeclared service edge`
+import "github.com/LucasPcq/wtm/internal/service/branch" // want `internal/service/fresh must not import .* undeclared edge`
 
 var _ = branch.List
 -- github.com/LucasPcq/wtm/internal/service/process/process.go --
@@ -28,7 +28,7 @@ package process
 
 import (
 	"github.com/LucasPcq/wtm/internal/service/proxy"
-	"github.com/LucasPcq/wtm/internal/service/worktree" // want `internal/service/process must not import "github.com/LucasPcq/wtm/internal/service/worktree" — undeclared service edge`
+	"github.com/LucasPcq/wtm/internal/service/worktree" // want `internal/service/process must not import "github.com/LucasPcq/wtm/internal/service/worktree" — undeclared edge`
 )
 
 var Placeholder = 0

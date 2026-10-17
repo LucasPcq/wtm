@@ -14,7 +14,7 @@ func TestCreateWorktreeNewBranch(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	wtPath := filepath.Join(t.TempDir(), "my-worktree")
 
-	err := CreateWorktree(CreateWorktreeParams{
+	err := CreateWorktree(t.Context(), CreateWorktreeParams{
 		ProjectDir: dir,
 		Path:       wtPath,
 		Branch:     "feat-new",
@@ -34,7 +34,7 @@ func TestCreateWorktreeExistingBranch(t *testing.T) {
 	gittest.CreateBranch(t, dir, "existing-branch")
 	wtPath := filepath.Join(t.TempDir(), "existing-wt")
 
-	err := CreateWorktree(CreateWorktreeParams{
+	err := CreateWorktree(t.Context(), CreateWorktreeParams{
 		ProjectDir:  dir,
 		Path:        wtPath,
 		Branch:      "existing-branch",
@@ -53,14 +53,14 @@ func TestRemoveWorktree(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	wtPath := filepath.Join(t.TempDir(), "wt-remove")
 
-	_ = CreateWorktree(CreateWorktreeParams{
+	_ = CreateWorktree(t.Context(), CreateWorktreeParams{
 		ProjectDir: dir,
 		Path:       wtPath,
 		Branch:     "feat-remove",
 		FromBranch: "HEAD",
 	})
 
-	err := RemoveWorktree(RemoveWorktreeParams{
+	err := RemoveWorktree(t.Context(), RemoveWorktreeParams{
 		ProjectDir: dir,
 		Path:       wtPath,
 		Force:      false,
@@ -77,7 +77,7 @@ func TestRemoveWorktree(t *testing.T) {
 func TestRemoveWorktreeLiftsALockOnlyWhenTold(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	wtPath := filepath.Join(t.TempDir(), "wt-locked")
-	if err := CreateWorktree(CreateWorktreeParams{ProjectDir: dir, Path: wtPath, Branch: "feat-locked", FromBranch: "HEAD"}); err != nil {
+	if err := CreateWorktree(t.Context(), CreateWorktreeParams{ProjectDir: dir, Path: wtPath, Branch: "feat-locked", FromBranch: "HEAD"}); err != nil {
 		t.Fatal(err)
 	}
 	lock := exec.Command("git", "worktree", "lock", wtPath)
@@ -86,10 +86,10 @@ func TestRemoveWorktreeLiftsALockOnlyWhenTold(t *testing.T) {
 		t.Fatalf("git worktree lock: %s", out)
 	}
 
-	if err := RemoveWorktree(RemoveWorktreeParams{ProjectDir: dir, Path: wtPath, Force: true}); err == nil {
+	if err := RemoveWorktree(t.Context(), RemoveWorktreeParams{ProjectDir: dir, Path: wtPath, Force: true}); err == nil {
 		t.Fatal("a single --force must not remove a locked worktree")
 	}
-	if err := RemoveWorktree(RemoveWorktreeParams{ProjectDir: dir, Path: wtPath, Force: true, Locked: true}); err != nil {
+	if err := RemoveWorktree(t.Context(), RemoveWorktreeParams{ProjectDir: dir, Path: wtPath, Force: true, Locked: true}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if _, statErr := os.Stat(wtPath); !os.IsNotExist(statErr) {
@@ -123,7 +123,7 @@ func TestCreateWorktreeFromRemoteBranchDoesNotTrackParent(t *testing.T) {
 	// Pin git's default so the assertion does not depend on the ambient config.
 	gittest.Git(t, dir, "config", "branch.autoSetupMerge", "true")
 
-	err := CreateWorktree(CreateWorktreeParams{
+	err := CreateWorktree(t.Context(), CreateWorktreeParams{
 		ProjectDir: dir,
 		Path:       filepath.Join(t.TempDir(), "child"),
 		Branch:     "child",

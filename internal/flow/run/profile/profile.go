@@ -3,6 +3,7 @@
 package profile
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -42,7 +43,7 @@ type AddParams struct {
 	Presenter Presenter
 }
 
-func Add(params AddParams) (Outcome, error) {
+func Add(ctx context.Context, params AddParams) (Outcome, error) {
 	answers, err := params.Prompter.Ask(flow.Session{
 		ErrLabel: domain.CmdAdd,
 		Steps: formSteps(formParams{
@@ -64,7 +65,7 @@ func Add(params AddParams) (Outcome, error) {
 	if added.Default {
 		cfg = rules.ApplyDefaultOverride(cfg, added.Name)
 	}
-	if err := save(params.Context, cfg); err != nil {
+	if err := save(ctx, params.Context, cfg); err != nil {
 		return Outcome{}, err
 	}
 	sayDefaultReplaced(defaultReplacedParams{Presenter: params.Presenter, Previous: previous, Current: defaultName(added)})
@@ -84,7 +85,7 @@ type EditParams struct {
 	Presenter Presenter
 }
 
-func Edit(params EditParams) (Outcome, error) {
+func Edit(ctx context.Context, params EditParams) (Outcome, error) {
 	name, err := target.PickOne(target.PickOneParams{
 		Prompter: params.Prompter,
 		Step:     pickStep(params.Request.Config, domain.RunProfilePickerTitleEdit),
@@ -98,10 +99,10 @@ func Edit(params EditParams) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	return editNamed(params, name)
+	return editNamed(ctx, params, name)
 }
 
-func editNamed(params EditParams, name string) (Outcome, error) {
+func editNamed(ctx context.Context, params EditParams, name string) (Outcome, error) {
 	current, exists := rules.FindProfile(params.Request.Config, name)
 	if !exists {
 		return Outcome{}, fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, name)
@@ -129,7 +130,7 @@ func editNamed(params EditParams, name string) (Outcome, error) {
 	if updated.Default {
 		cfg = rules.ApplyDefaultOverride(cfg, updated.Name)
 	}
-	if err := save(params.Context, cfg); err != nil {
+	if err := save(ctx, params.Context, cfg); err != nil {
 		return Outcome{}, err
 	}
 	sayDefaultReplaced(defaultReplacedParams{Presenter: params.Presenter, Previous: previous, Current: defaultName(updated)})
@@ -171,7 +172,7 @@ type RemoveParams struct {
 	Presenter Presenter
 }
 
-func Remove(params RemoveParams) (Outcome, error) {
+func Remove(ctx context.Context, params RemoveParams) (Outcome, error) {
 	name, err := target.PickOne(target.PickOneParams{
 		Prompter: params.Prompter,
 		Step:     pickStep(params.Request.Config, domain.RunProfilePickerTitleRemove),
@@ -185,12 +186,12 @@ func Remove(params RemoveParams) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	return removeNamed(params, name)
+	return removeNamed(ctx, params, name)
 }
 
 // removeNamed leaves the jobs the profile started untouched: a profile is a way
 // of naming them together, not what they belong to.
-func removeNamed(params RemoveParams, name string) (Outcome, error) {
+func removeNamed(ctx context.Context, params RemoveParams, name string) (Outcome, error) {
 	removed, exists := rules.FindProfile(params.Request.Config, name)
 	if !exists {
 		return Outcome{}, fmt.Errorf(domain.RunProfileNotFoundFmt, domain.ErrProfileNotFound, name)
@@ -198,7 +199,7 @@ func removeNamed(params RemoveParams, name string) (Outcome, error) {
 
 	cfg := params.Request.Config
 	cfg.Profiles = slices.DeleteFunc(cfg.Profiles, func(p domain.ProfileConfig) bool { return p.Name == name })
-	if err := save(params.Context, cfg); err != nil {
+	if err := save(ctx, params.Context, cfg); err != nil {
 		return Outcome{}, err
 	}
 	sayDefaultRemoved(defaultRemovedParams{Presenter: params.Presenter, Removed: removed, Config: cfg})
@@ -216,7 +217,7 @@ type ListParams struct {
 	Presenter Presenter
 }
 
-func List(params ListParams) (Outcome, error) {
+func List(ctx context.Context, params ListParams) (Outcome, error) {
 	answers, err := params.Prompter.Ask(flow.Session{
 		ErrLabel: domain.CmdList,
 		Steps: []flow.Step{
@@ -234,14 +235,14 @@ func List(params ListParams) (Outcome, error) {
 	name := answers.Value(target.KeyProfile)
 	switch answers.Value(KeyAction) {
 	case domain.RunCRUDActionEditValue:
-		return editNamed(EditParams{
+		return editNamed(ctx, EditParams{
 			Context:   params.Context,
 			Request:   EditRequest{Name: name, Config: params.Request.Config},
 			Prompter:  params.Prompter,
 			Presenter: params.Presenter,
 		}, name)
 	case domain.RunCRUDActionRmValue:
-		return removeNamed(RemoveParams{
+		return removeNamed(ctx, RemoveParams{
 			Context:   params.Context,
 			Request:   RemoveRequest{Name: name, Config: params.Request.Config},
 			Prompter:  params.Prompter,
@@ -295,8 +296,8 @@ func pickStep(cfg domain.RunConfig, title string) flow.Step {
 	return target.ProfilePickStep(target.ProfilePickParams{Profiles: cfg.Profiles, Title: title})
 }
 
-func save(ctx flow.Context, cfg domain.RunConfig) error {
-	return runconfig.Save(runconfig.SaveParams{StateDir: ctx.StateDir, Config: cfg})
+func save(ctx context.Context, project flow.Context, cfg domain.RunConfig) error {
+	return runconfig.Save(ctx, runconfig.SaveParams{StateDir: project.StateDir, Config: cfg})
 }
 
 func conclude(presenter Presenter, outcome Outcome) (Outcome, error) {

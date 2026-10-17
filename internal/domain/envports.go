@@ -45,6 +45,13 @@ type EnvKeyRef struct {
 	Key  string
 }
 
+// EnvOwnedKeys are the keys wtm writes into an isolated worktree, and the base
+// ports run.toml declares for the port-linked ones among them.
+type EnvOwnedKeys struct {
+	Refs      []EnvKeyRef
+	PortBases map[EnvKeyRef][]int
+}
+
 // EnvValueField is one candidate row of the [[env]] step: a .env key that could
 // follow a shared service's namespace. wtm cannot detect which key is a realm or a
 // database name — the value is opaque, with none of the three signs that make a
@@ -124,6 +131,9 @@ type EnvPortMove struct {
 	Job      string `json:"job"`
 	Base     int    `json:"base"`
 	Resolved int    `json:"resolved"`
+	// Origin is the address wtm writes for this port under AddressingNames,
+	// built from the job and the worktree, never read back from the value.
+	Origin string `json:"origin,omitempty"`
 }
 
 // EnvPortEntry is one link resolved against the worktree's offset and the value

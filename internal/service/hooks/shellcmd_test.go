@@ -17,7 +17,7 @@ func TestRunHooksRunsCmdThroughTheShell(t *testing.T) {
 	marker := filepath.Join(dir, "chained")
 
 	var out bytes.Buffer
-	if err := RunHooks(RunHooksParams{
+	if err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: "echo first > " + marker + " && echo second >> " + marker}},
 		WorkDir: dir,
 		Output:  &out,
@@ -38,7 +38,7 @@ func TestRunHooksRunsCmdThroughTheShell(t *testing.T) {
 
 func TestRunHooksSkipsBlankCmd(t *testing.T) {
 	var out bytes.Buffer
-	err := RunHooks(RunHooksParams{
+	err := RunHooks(t.Context(), RunHooksParams{
 		Hooks:   []domain.HookCommand{{Cmd: "   "}},
 		WorkDir: t.TempDir(),
 		Output:  &out,

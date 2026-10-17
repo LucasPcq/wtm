@@ -2,6 +2,7 @@
 package up
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -77,17 +78,19 @@ func Operation() flow.Operation {
 	}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &upFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
 		presenter: params.Presenter,
 	}
-	return f.run()
+	return f.run(ctx)
 }
 
 type upFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -103,11 +106,11 @@ type upFlow struct {
 	concurrency *concurrency.Question
 }
 
-func (f *upFlow) run() (Outcome, error) {
+func (f *upFlow) run(ctx context.Context) (Outcome, error) {
 	if err := target.RequireDeclared(target.DeclaredParams{Config: f.request.Config, Profile: f.request.Profile}); err != nil {
 		return Outcome{}, err
 	}
-	named, err := target.NamedAll(target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
+	named, err := target.NamedAll(f.runCtx, target.ResolveAllParams{ProjectDir: f.ctx.ProjectDir, Queries: f.request.Worktrees})
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -127,7 +130,7 @@ func (f *upFlow) run() (Outcome, error) {
 	}
 	f.concurrency = f.question()
 
-	answers, err := f.prompter.Ask(f.session())
+	answers, err := f.prompter.Ask(f.session(f.runCtx))
 	if errors.Is(err, domain.ErrUserAborted) {
 		f.presenter.Notice(flow.AbortedNotice)
 		return Outcome{Aborted: true}, nil
@@ -139,12 +142,12 @@ func (f *upFlow) run() (Outcome, error) {
 		f.presenter.Notice(flow.AbortedNotice)
 		return Outcome{Aborted: true}, nil
 	}
-	if err := seam.RequireEnv(seam.RequireEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDirs: f.workDirs(answers), Publisher: f.ctx.Publisher}); err != nil {
+	if err := seam.RequireEnv(f.runCtx, seam.RequireEnvParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, WorkDirs: f.workDirs(answers), Publisher: f.ctx.Publisher}); err != nil {
 		return Outcome{}, err
 	}
 	// Before anything is stopped: a selection that is its own conflict must not
 	// cost the other worktrees their jobs first.
-	if clashes := rules.SelfPortClashes(f.concurrency.StartingClaims(answers)); len(clashes) > 0 {
+	if clashes := rules.SelfPortClashes(f.concurrency.StartingClaims(f.runCtx, answers)); len(clashes) > 0 {
 		return Outcome{}, fmt.Errorf(domain.RunSelfPortClashFmt, strings.Join(rules.PortClashLines(clashes), "\n"))
 	}
 	if proceed, err := f.allowForeignData(answers); err != nil || !proceed {
@@ -154,13 +157,13 @@ func (f *upFlow) run() (Outcome, error) {
 		return Outcome{Aborted: err == nil}, err
 	}
 
-	cfg, err := f.concurrency.Apply(answers)
+	cfg, err := f.concurrency.Apply(f.runCtx, answers)
 	f.request.Config = cfg
 	if err != nil {
 		return Outcome{}, err
 	}
 
-	return f.start(answers)
+	return f.start(ctx, answers)
 }
 
 // allowForeignData stops before a job rewrites data the worktree does not own —
@@ -170,7 +173,7 @@ func (f *upFlow) allowForeignData(answers flow.Answers) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return foreigndata.Allow(foreigndata.Params{
+	return foreigndata.Allow(f.runCtx, foreigndata.Params{
 		Context:  f.ctx,
 		Config:   f.request.Config,
 		Jobs:     profile.Jobs,
@@ -184,16 +187,16 @@ func (f *upFlow) allowForeignData(answers flow.Answers) (bool, error) {
 // and the concurrency question are about what is already running, so neither
 // can be built before this.
 func (f *upFlow) connect() error {
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.RunDaemonConnecting,
-		Work: func() error {
-			if err := process.EnsureCurrentDaemon(process.DaemonParams{
+		Work: func(ctx context.Context) error {
+			if err := process.EnsureCurrentDaemon(ctx, process.DaemonParams{
 				SocketPath: process.SocketPath(),
 				ProxyPort:  rules.ProxyPort(f.ctx.Config.Global),
 			}); err != nil {
 				return fmt.Errorf("ensure daemon: %w", err)
 			}
-			f.service = runlogs.NewService(runlogs.ServiceParams{SocketPath: process.SocketPath()})
+			f.service = runlogs.NewService(f.runCtx, runlogs.ServiceParams{SocketPath: process.SocketPath()})
 			// A daemon that cannot list is not a reason to refuse the run: the
 			// counts decorate a picker and the question defaults to stopping
 			// nothing.
@@ -204,7 +207,7 @@ func (f *upFlow) connect() error {
 	})
 }
 
-func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
+func (f *upFlow) start(ctx context.Context, answers flow.Answers) (Outcome, error) {
 	workDirs := f.workDirs(answers)
 	profile, err := f.resolveProfile(answers)
 	if err != nil {
@@ -221,9 +224,9 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 		return Outcome{}, fmt.Errorf("%s:\n%s", domain.JobConflictTitle, strings.Join(rules.JobConflictLines(conflicts), "\n"))
 	}
 
-	warnings := addressing.Lines(addressing.Params{Context: f.ctx, WorkDirs: workDirs})
-	proxy := seam.ProxyPortsFor(seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
-	set := seam.OpenSet(seam.SetParams{
+	warnings := addressing.Lines(f.runCtx, addressing.Params{Context: f.ctx, WorkDirs: workDirs})
+	proxy := seam.ProxyPortsFor(ctx, seam.ProxyPortsParams{Global: f.ctx.Config.Global, Run: f.request.Config})
+	set := seam.OpenSet(f.runCtx, seam.SetParams{
 		ProjectDir:  f.ctx.ProjectDir,
 		StateDir:    f.ctx.StateDir,
 		WorkDirs:    workDirs,
@@ -253,7 +256,7 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 		return Outcome{}, err
 	}
 
-	cfg, err := probes.OfferToSilence(probes.Params{
+	cfg, err := probes.OfferToSilence(ctx, probes.Params{
 		Context:   f.ctx,
 		Prompter:  f.prompter,
 		Presenter: f.presenter,
@@ -266,7 +269,7 @@ func (f *upFlow) start(answers flow.Answers) (Outcome, error) {
 	}
 	// A shared service this run brought up is the moment to pay what a clean
 	// owed it while it was down.
-	owed.Settle(owed.Params{Context: f.ctx, Presenter: f.presenter})
+	owed.Settle(f.runCtx, owed.Params{Context: f.ctx, Presenter: f.presenter})
 
 	return Outcome{
 		WorkDirs: workDirs,

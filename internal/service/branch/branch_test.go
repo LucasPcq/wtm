@@ -54,7 +54,7 @@ func TestFastForwardToOriginAdvancesBehindBranch(t *testing.T) {
 	git(t, work, "commit", "--allow-empty", "-m", "server-commit")
 	git(t, work, "push", "origin", "main:feat")
 
-	if err := FastForwardToOrigin(BranchParams{ProjectDir: work, Branch: "feat"}); err != nil {
+	if err := FastForwardToOrigin(t.Context(), BranchParams{ProjectDir: work, Branch: "feat"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -79,7 +79,7 @@ func TestFastForwardToOriginRefusesDiverged(t *testing.T) {
 	git(t, work, "commit", "--allow-empty", "-m", "server-commit")
 	git(t, work, "push", "origin", "main:feat")
 
-	err := FastForwardToOrigin(BranchParams{ProjectDir: work, Branch: "feat"})
+	err := FastForwardToOrigin(t.Context(), BranchParams{ProjectDir: work, Branch: "feat"})
 	if err == nil {
 		t.Fatal("expected a diverged error, got nil")
 	}
@@ -95,7 +95,7 @@ func TestCheckReportsBehindBranch(t *testing.T) {
 	git(t, work, "commit", "--allow-empty", "-m", "server-commit")
 	git(t, work, "push", "origin", "main:feat")
 
-	check, err := Check(BranchParams{ProjectDir: work, Branch: "feat"})
+	check, err := Check(t.Context(), BranchParams{ProjectDir: work, Branch: "feat"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestCheckReportsNoUpstream(t *testing.T) {
 	work := repoWithRemote(t)
 	git(t, work, "branch", "local-only")
 
-	check, err := Check(BranchParams{ProjectDir: work, Branch: "local-only"})
+	check, err := Check(t.Context(), BranchParams{ProjectDir: work, Branch: "local-only"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestFastForwardAdvancesBranchWithNoWorktree(t *testing.T) {
 	git(t, work, "commit", "--allow-empty", "-m", "server-commit")
 	git(t, work, "push", "origin", "main:feat")
 
-	result := FastForward(FastForwardParams{ProjectDir: work, Branch: "feat"})
+	result := FastForward(t.Context(), FastForwardParams{ProjectDir: work, Branch: "feat"})
 	if result.Status != domain.FFAdvanced {
 		t.Fatalf("status = %v (%s), want FFAdvanced", result.Status, result.Detail)
 	}
@@ -153,7 +153,7 @@ func TestFastForwardIsANoOpWhenUpToDate(t *testing.T) {
 	git(t, work, "branch", "feat")
 	git(t, work, "push", "origin", "feat")
 
-	result := FastForward(FastForwardParams{ProjectDir: work, Branch: "feat"})
+	result := FastForward(t.Context(), FastForwardParams{ProjectDir: work, Branch: "feat"})
 	if result.Status != domain.FFUpToDate {
 		t.Fatalf("status = %v (%s), want FFUpToDate", result.Status, result.Detail)
 	}
@@ -172,7 +172,7 @@ func TestFastForwardRefusesDivergedEvenWithForce(t *testing.T) {
 	git(t, work, "commit", "--allow-empty", "-m", "local-commit")
 	localTip := revParse(t, work, "feat")
 
-	result := FastForward(FastForwardParams{ProjectDir: work, Branch: "feat", Force: true})
+	result := FastForward(t.Context(), FastForwardParams{ProjectDir: work, Branch: "feat", Force: true})
 	if result.Status != domain.FFDiverged {
 		t.Fatalf("status = %v (%s), want FFDiverged", result.Status, result.Detail)
 	}
@@ -185,7 +185,7 @@ func TestFastForwardRefusesNoUpstream(t *testing.T) {
 	work := repoWithRemote(t)
 	git(t, work, "branch", "local-only")
 
-	result := FastForward(FastForwardParams{ProjectDir: work, Branch: "local-only"})
+	result := FastForward(t.Context(), FastForwardParams{ProjectDir: work, Branch: "local-only"})
 	if result.Status != domain.FFNoUpstream {
 		t.Fatalf("status = %v (%s), want FFNoUpstream", result.Status, result.Detail)
 	}

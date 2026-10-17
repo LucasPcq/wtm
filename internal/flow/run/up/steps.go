@@ -1,6 +1,8 @@
 package up
 
 import (
+	"context"
+
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/run/concurrency"
@@ -8,12 +10,12 @@ import (
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
-func (f *upFlow) session() flow.Session {
+func (f *upFlow) session(ctx context.Context) flow.Session {
 	return flow.Session{
 		ErrLabel: domain.CmdUp,
 		Presets:  target.Presets(target.PresetParams{Worktrees: target.Dirs(f.named), Profile: f.request.Profile}),
 		Steps: []flow.Step{
-			target.WorktreesStep(target.WorktreesParams{
+			target.WorktreesStep(ctx, target.WorktreesParams{
 				ProjectDir: f.ctx.ProjectDir,
 				Current:    f.request.Cwd,
 				Selected:   target.Preselected(target.PreselectedParams{Named: f.named, Precheck: f.request.Precheck}),
@@ -23,7 +25,7 @@ func (f *upFlow) session() flow.Session {
 				Single: f.request.Exclusive,
 			}),
 			target.ProfileStep(target.ProfileParams{Profiles: f.request.Config.Profiles}),
-			f.concurrency.Step(),
+			f.concurrency.Step(ctx),
 		},
 	}
 }
@@ -54,5 +56,5 @@ func (f *upFlow) startingJobs(answers flow.Answers) []domain.JobConfig {
 // workDirs are the worktrees this run acts on, as git spells them — the
 // daemon's keys for every job it is about to start.
 func (f *upFlow) workDirs(answers flow.Answers) []string {
-	return target.WorkDirs(target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
+	return target.WorkDirs(f.runCtx, target.WorkDirsParams{Answers: answers, Named: f.named, Cwd: f.request.Cwd})
 }

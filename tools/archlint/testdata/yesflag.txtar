@@ -1,19 +1,19 @@
--- github.com/LucasPcq/wtm/internal/commands/aliased/cmd.go --
+-- github.com/LucasPcq/wtm/internal/surface/cli/aliased/cmd.go --
 package aliased // want `cmd.go reads the interactive gate but registers no --yes`
 
 import (
-	sh "github.com/LucasPcq/wtm/internal/commands/shared"
+	sh "github.com/LucasPcq/wtm/internal/surface/cli/shared"
 	cb "github.com/spf13/cobra"
 )
 
 func newCmd() *cb.Command { return &cb.Command{} }
 
 func run() bool { return sh.Interactive() }
--- github.com/LucasPcq/wtm/internal/commands/field/cmd.go --
+-- github.com/LucasPcq/wtm/internal/surface/cli/field/cmd.go --
 package field
 
 import (
-	"github.com/LucasPcq/wtm/internal/commands/shared"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 	"github.com/spf13/cobra"
 )
 
@@ -22,28 +22,28 @@ func newCmd() *cobra.Command { return &cobra.Command{} }
 func run(interactive bool) bool {
 	return shared.Prompter(shared.PrompterParams{Interactive: interactive})
 }
--- github.com/LucasPcq/wtm/internal/commands/helper/helper.go --
+-- github.com/LucasPcq/wtm/internal/surface/cli/helper/helper.go --
 package helper
 
-import "github.com/LucasPcq/wtm/internal/commands/shared"
+import "github.com/LucasPcq/wtm/internal/surface/cli/shared"
 
 func Ask() bool { return shared.Interactive() }
--- github.com/LucasPcq/wtm/internal/commands/missing/cmd.go --
+-- github.com/LucasPcq/wtm/internal/surface/cli/missing/cmd.go --
 package missing // want `cmd.go reads the interactive gate but registers no --yes`
 
 import (
-	"github.com/LucasPcq/wtm/internal/commands/shared"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 	"github.com/spf13/cobra"
 )
 
 func newCmd() *cobra.Command { return &cobra.Command{} }
 
 func run() bool { return shared.Interactive() }
--- github.com/LucasPcq/wtm/internal/commands/registered/cmd.go --
+-- github.com/LucasPcq/wtm/internal/surface/cli/registered/cmd.go --
 package registered
 
 import (
-	"github.com/LucasPcq/wtm/internal/commands/shared"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 	"github.com/spf13/cobra"
 )
 
@@ -54,11 +54,11 @@ func newCmd() *cobra.Command {
 }
 
 func run() bool { return shared.Interactive() }
--- github.com/LucasPcq/wtm/internal/commands/retired/cmd.go --
+-- github.com/LucasPcq/wtm/internal/surface/cli/retired/cmd.go --
 package retired // want `cmd.go reads the interactive gate but registers no --yes`
 
 import (
-	"github.com/LucasPcq/wtm/internal/commands/shared"
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared"
 	"github.com/spf13/cobra"
 )
 
@@ -69,7 +69,7 @@ func newCmd() *cobra.Command {
 }
 
 func run() bool { return shared.Interactive() }
--- github.com/LucasPcq/wtm/internal/commands/shared/shared.go --
+-- github.com/LucasPcq/wtm/internal/surface/cli/shared/shared.go --
 package shared
 
 import "github.com/spf13/cobra"

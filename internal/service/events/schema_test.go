@@ -1,6 +1,7 @@
 package events
 
 import (
+	"context"
 	"encoding/json"
 	"path/filepath"
 	"strings"
@@ -19,17 +20,17 @@ func TestEveryEventTypeMatchesTheSchema(t *testing.T) {
 	dir := gittest.InitRepo(t)
 	gittest.Git(t, dir, "worktree", "add", "-b", "feat/a", filepath.Join(t.TempDir(), "feat-a"))
 	stateDir := filepath.Join(dir, ".git", "wtm")
-	repo, err := worktree.RepoOf(worktree.RepoOfParams{ProjectDir: dir})
+	repo, err := worktree.RepoOf(t.Context(), worktree.RepoOfParams{ProjectDir: dir})
 	if err != nil {
 		t.Fatal(err)
 	}
-	identity, err := worktree.Identity(worktree.WorktreeRef{ProjectDir: dir, StateDir: stateDir, Branch: "feat/a"})
+	identity, err := worktree.Identity(t.Context(), worktree.WorktreeRef{ProjectDir: dir, StateDir: stateDir, Branch: "feat/a"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	previous := listJobs
 	crashed := 1
-	listJobs = func(string) ([]domain.JobInfo, error) {
+	listJobs = func(context.Context, string) ([]domain.JobInfo, error) {
 		return []domain.JobInfo{
 			{Name: "web", Kind: domain.JobKindService, Status: domain.JobStatusRunning, State: domain.JobStateRunning, WorkDir: identity.Path, URL: "http://web.feat-a.app.localhost"},
 			{Name: "api", Kind: domain.JobKindService, Status: domain.JobStatusCrashed, WorkDir: identity.Path, ExitCode: &crashed},
@@ -38,7 +39,7 @@ func TestEveryEventTypeMatchesTheSchema(t *testing.T) {
 		}, nil
 	}
 	t.Cleanup(func() { listJobs = previous })
-	snapshot, err := snapshotOf(snapshotParams{ProjectDir: dir, StateDir: stateDir, Repo: repo, Socket: "daemon.sock"})
+	snapshot, err := snapshotOf(t.Context(), snapshotParams{ProjectDir: dir, StateDir: stateDir, Repo: repo, Socket: "daemon.sock"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 package prune
 
 import (
+	"context"
 	"sort"
 	"strings"
 	"testing"
@@ -21,7 +22,7 @@ func flowWith(plan domain.PrunePlan, request Request) *pruneFlow {
 	if request.BaseBranch == "" {
 		request.BaseBranch = "main"
 	}
-	return &pruneFlow{request: request, plan: plan}
+	return &pruneFlow{runCtx: context.Background(), request: request, plan: plan}
 }
 
 func candidate(branch, reason, unsafe, parent string) domain.PruneCandidate {

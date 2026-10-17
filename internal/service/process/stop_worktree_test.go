@@ -95,7 +95,7 @@ func TestStopWorktreeJobsStopsItsOwnJobsAndKeepsItsClaims(t *testing.T) {
 	daemon := &fakeDaemon{version: domain.Version, jobs: worktreeJobs()}
 	socket := serveFake(t, daemon)
 
-	stopped, err := StopWorktreeJobs(WorktreeJobsParams{SocketPath: socket, WorkDir: "/w/feat"})
+	stopped, err := StopWorktreeJobs(t.Context(), WorktreeJobsParams{SocketPath: socket, WorkDir: "/w/feat"})
 	if err != nil {
 		t.Fatalf("stop: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestStopWorktreeJobsWithNothingUpSendsNoStop(t *testing.T) {
 	}}
 	socket := serveFake(t, daemon)
 
-	stopped, err := StopWorktreeJobs(WorktreeJobsParams{SocketPath: socket, WorkDir: "/w/feat"})
+	stopped, err := StopWorktreeJobs(t.Context(), WorktreeJobsParams{SocketPath: socket, WorkDir: "/w/feat"})
 	if err != nil || len(stopped) != 0 {
 		t.Errorf("stopped = %v, %v — want nothing to do", stopped, err)
 	}
@@ -129,7 +129,7 @@ func TestStopWorktreeJobsReportsAListingItCouldNotGet(t *testing.T) {
 	daemon := &fakeDaemon{version: domain.Version, jobs: worktreeJobs(), listErr: "unknown action: list"}
 	socket := serveFake(t, daemon)
 
-	_, err := StopWorktreeJobs(WorktreeJobsParams{SocketPath: socket, WorkDir: "/w/feat"})
+	_, err := StopWorktreeJobs(t.Context(), WorktreeJobsParams{SocketPath: socket, WorkDir: "/w/feat"})
 	if err == nil || !strings.Contains(err.Error(), "unknown action: list") {
 		t.Fatalf("err = %v, want the daemon's refusal", err)
 	}
@@ -142,7 +142,7 @@ func TestStopWorktreeJobsReportsAStopTheDaemonRefused(t *testing.T) {
 	daemon := &fakeDaemon{version: domain.Version, jobs: worktreeJobs(), stopErr: "compose down: exit status 1"}
 	socket := serveFake(t, daemon)
 
-	_, err := StopWorktreeJobs(WorktreeJobsParams{SocketPath: socket, WorkDir: "/w/feat"})
+	_, err := StopWorktreeJobs(t.Context(), WorktreeJobsParams{SocketPath: socket, WorkDir: "/w/feat"})
 	if err == nil || !strings.Contains(err.Error(), "compose down: exit status 1") {
 		t.Errorf("err = %v, want the daemon's answer", err)
 	}
@@ -153,7 +153,7 @@ func TestStopWorktreeJobsNamesTheJobsStillUpAfterTheStop(t *testing.T) {
 	daemon := &fakeDaemon{version: domain.Version, jobs: worktreeJobs(), survive: true}
 	socket := serveFake(t, daemon)
 
-	_, err := StopWorktreeJobs(WorktreeJobsParams{SocketPath: socket, WorkDir: "/w/feat"})
+	_, err := StopWorktreeJobs(t.Context(), WorktreeJobsParams{SocketPath: socket, WorkDir: "/w/feat"})
 	if !errors.Is(err, domain.ErrWorktreeJobsRunning) || !strings.Contains(err.Error(), "api, stack") {
 		t.Errorf("err = %v, want the survivors named", err)
 	}
@@ -162,7 +162,7 @@ func TestStopWorktreeJobsNamesTheJobsStillUpAfterTheStop(t *testing.T) {
 func TestStopWorktreeJobsWithoutADaemonOrAnIndexHasNothingToDo(t *testing.T) {
 	globaldir.Isolate(t)
 
-	stopped, err := StopWorktreeJobs(WorktreeJobsParams{SocketPath: socktest.Path(t), WorkDir: "/w/feat"})
+	stopped, err := StopWorktreeJobs(t.Context(), WorktreeJobsParams{SocketPath: socktest.Path(t), WorkDir: "/w/feat"})
 	if err != nil || len(stopped) != 0 {
 		t.Errorf("stopped = %v, %v — want nothing, and no daemon started for it", stopped, err)
 	}
@@ -172,7 +172,7 @@ func TestReleaseWorktreeJobsLetsGoOfEverythingLeft(t *testing.T) {
 	daemon := &fakeDaemon{version: domain.Version, jobs: worktreeJobs()}
 	socket := serveFake(t, daemon)
 
-	if err := ReleaseWorktreeJobs(WorktreeJobsParams{SocketPath: socket, WorkDir: "/w/feat"}); err != nil {
+	if err := ReleaseWorktreeJobs(t.Context(), WorktreeJobsParams{SocketPath: socket, WorkDir: "/w/feat"}); err != nil {
 		t.Fatalf("release: %v", err)
 	}
 	if got := strings.Join(daemon.actions(), " "); got != "stop_all:" {
@@ -184,7 +184,7 @@ func TestReleaseWorktreeJobsReportsARefusal(t *testing.T) {
 	daemon := &fakeDaemon{version: domain.Version, jobs: worktreeJobs(), stopErr: "boom"}
 	socket := serveFake(t, daemon)
 
-	if err := ReleaseWorktreeJobs(WorktreeJobsParams{SocketPath: socket, WorkDir: "/w/feat"}); err == nil || !strings.Contains(err.Error(), "boom") {
+	if err := ReleaseWorktreeJobs(t.Context(), WorktreeJobsParams{SocketPath: socket, WorkDir: "/w/feat"}); err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Errorf("err = %v, want the refusal", err)
 	}
 }

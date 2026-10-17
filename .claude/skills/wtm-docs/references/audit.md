@@ -19,7 +19,7 @@ Read the index (`docs/guide/README.md`), then every page's title and lede only, 
 - **Overlap.** Is a concept explained in two places? Keep the fuller one as the home; the other links to it. Typical pairs: `how-run-works` and `jobs-and-profiles`, `configuration` and `state`, `integrations` and `events`.
 - **Placement.** Is the page in the section a reader would look in? Is something in the guide that belongs in `--help` (one flag's behaviour), in `docs/dev/` (how it is built), or in the changelog (what changed)?
 - **Order.** Within a page: common case, then variations, then edge cases. Within a section: concept before reference.
-- **Examples.** Do they still match what wtm prints? Spot-check the ones on pages whose commands changed recently (`git log --since=… -- internal/commands/`) by running them in the `wtm-sandbox`. Repository and branch names consistent (`acme`, `feat/login`)?
+- **Examples.** Do they still match what wtm prints? Spot-check the ones on pages whose commands changed recently (`git log --since=… -- internal/surface/cli/ internal/flow/`) by running them in the `wtm-sandbox`. Repository and branch names consistent (`acme`, `feat/login`)?
 - **Voice.** Against `docs/dev/identity.md` "Voice": superlatives, marketing words, "we", "simply", "just", history ("since 0.28", "previously") in a concept page.
 - **Links.** Concepts mentioned without a link to their home; links to a page where an anchor would land the reader on the right section.
 - **Balance.** A section with one page, or one page carrying most of a section, hints that the sections no longer match the content.

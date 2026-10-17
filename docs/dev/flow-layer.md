@@ -1,6 +1,6 @@
 # `internal/flow/` — how a command runs
 
-A *flow* is everything a command does between "the flags are parsed" and "the result is printed": the questions it asks and in what order, which ones it may skip, the safety checks, the service calls, the phases it reports, the events it publishes. It is written once, in `internal/flow/<command>/`, and three surfaces run it: the CLI wizard, the unattended CLI, and the dashboard. Which command runs on which surface is the table in [architecture.md](architecture.md#where-each-flow-runs); the recipe for a new one is [adding-a-mutation-command.md](adding-a-mutation-command.md).
+A *flow* is everything a command does between "the flags are parsed" and "the result is printed": the questions it asks and in what order, which ones it may skip, the safety checks, the service calls, the phases it reports, the events it publishes. It is written once, in `internal/flow/<command>/`, and three surfaces run it: the CLI wizard, the unattended CLI, and the dashboard.
 
 - [The shape of a flow](#the-shape-of-a-flow)
 - [The three seams](#the-three-seams)
@@ -10,6 +10,7 @@ A *flow* is everything a command does between "the flags are parsed" and "the re
 - [Surfaces and scheduling](#surfaces-and-scheduling)
 - [Hook output](#hook-output)
 - [Publishing what a flow changed](#publishing-what-a-flow-changed)
+- [Cancellation](#cancellation)
 - [Testing a flow](#testing-a-flow)
 - [Settled decisions](#settled-decisions)
 - [Known gaps](#known-gaps)
@@ -24,7 +25,7 @@ internal/flow/create/
   steps.go    the session: the flow.Step declarations and the recap
 ```
 
-The entry point is always the same shape — one struct parameter, one outcome, one error:
+The entry point is always the same shape — the run's context, one struct parameter, one outcome, one error:
 
 ```go
 type Params struct {
@@ -34,10 +35,10 @@ type Params struct {
 	Presenter Presenter     // where the phases go
 }
 
-func Run(params Params) (Outcome, error)
+func Run(ctx context.Context, params Params) (Outcome, error)
 ```
 
-`Run` is a package-level function; behind it an unexported `createFlow` / `cleanFlow` struct holds the params so the step declarations can close over them.
+`Run` is a package-level function; behind it an unexported `createFlow` / `cleanFlow` struct holds the params (and the context, as `runCtx`) so the step declarations can close over them. The context is a carrier, like an `io.Writer`: it is never a `Params` field.
 
 **Errors are returned, never presented.** There is no `Presenter.Error`: on the CLI Cobra prints the error and `rules.ExitCode` sets the status; on the dashboard the caller puts it in the output panel. A user abort is not an error: the flow emits `flow.AbortedNotice` and returns `Outcome{Aborted: true}` with a `nil` error.
 
@@ -65,9 +66,9 @@ type Session struct {
 
 | Implementation | Where | `Ask` | `Confirm` | `Interactive()` |
 | -- | -- | -- | -- | -- |
-| `flowui.Prompter` | `internal/tui/flowui` | `components.RunWizard` | `components.RunStandaloneConfirm` | `true` |
+| `flowui.Prompter` | `internal/surface/tui/flowui` | `components.RunWizard` | `components.RunStandaloneConfirm` | `true` |
 | `flow.Unattended` | `internal/flow/unattended.go` | resolves with no interaction | `false, nil` | `false` |
-| `dashboard.prompter` | `internal/tui/dashboard/prompter.go` | a modal, over a reply channel | a one-question modal | `true` |
+| `dashboard.prompter` | `internal/surface/tui/dashboard/prompter.go` | a modal, over a reply channel | a one-question modal | `true` |
 
 `Unattended` lives in `flow/` because it is the only implementation with no surface dependency, and it carries the bypass taxonomy, which must exist once.
 
@@ -75,7 +76,7 @@ type Session struct {
 
 ```go
 type Presenter interface {
-	Stage(StageParams) error         // one unit of work under a progress indicator
+	Stage(context.Context, StageParams) error // one unit of work under a progress indicator; Work gets the context
 	HookPhase(HookPhaseParams) error // a titled hook phase and the sink it streams into
 	Notice(Notice)                   // concludes the run
 	Status(Notice)                   // one line inside an ongoing phase
@@ -145,6 +146,8 @@ type Step struct {
 	Summarize func(Answer) string
 	Flag      string // what an unattended run should pass instead
 	Arg       bool   // ...or that it is a positional
+
+	Memory Memory // the answer this repository may remember (ID, Value, Reask)
 }
 ```
 
@@ -159,7 +162,7 @@ type Step struct {
 | `StepEnvResolve` | a decision per drifting `.env` key (`StepContent.EnvFiles`) | `EnvDecisions` |
 | `StepRecap` | confirmation of the whole session | `Value` |
 
-`flowui` renders every kind; the dashboard's modal renders all but `StepEnvResolve` and refuses an unknown kind (`domain.DashboardUnsupportedStepFmt`) rather than guessing. **A kind that is drawn must be read back**: a kind rendered but not read answers empty, and the flow writes that absence as if it were the answer. `TestEveryDrawableKindIsReadBack` (`internal/tui/flowui`) pins it. Adding a kind means teaching every surface that runs a flow using it.
+`flowui` renders every kind; the dashboard's modal renders all but `StepEnvResolve` and refuses an unknown kind (`domain.DashboardUnsupportedStepFmt`) rather than guessing. **A kind that is drawn must be read back**: a kind rendered but not read answers empty, and the flow writes that absence as if it were the answer. `TestEveryDrawableKindIsReadBack` (`internal/surface/tui/flowui`) pins it. Adding a kind means teaching every surface that runs a flow using it.
 
 **`StepContent`** is what may depend on earlier answers (`Title`, `Options`, `Default`, `Start`, `ExcludeBranches`, `Pinned`, `Banner`, `Blockers`, …). `flow.MergeContent` lays it over the step's static fields, and both surfaces read it through there. A `Load` runs while the step is on screen, so a slow source (`gh`, a worktree's changes) never blocks the wizard. A `Build` runs twice: once before the session's first question, with only the presets known, then again when its step is reached. **A `Build` that reads an earlier answer returns empty content while that answer is missing, never an error**: an error from that first pass aborts the whole session before anything is drawn. `ScriptedPrompter` makes the same first pass, so a flow test catches it.
 
@@ -175,12 +178,16 @@ type Answer struct {
 	Skipped      bool
 	SkipReason   string
 	Asked        bool // false for a preset, a Resolve fallback, or a skip
+	Recalled     bool // settled from a remembered answer, not asked
+	Remember     bool // the user ticked "Always use this answer"
 }
 ```
 
 `Answers.With` returns a copy; `Values` reads a single value as a set of one.
 
 **`Presets` keep a flag from erasing a recap line.** A preset step is not asked, but the recap builder still reads it back, so `wtm create feat/x --from main` shows the same lines as the fully interactive run. A preset is never validated by its step: a flow that presets from flags validates them up front (create's `acceptRequested`, `Embedded.CheckBranch`). `Answered` is the converse — it says whether a human actually saw the question.
+
+**A flag answers its step; it never only preselects.** Reordering a step's options or pre-checking a row on a flag leaves the question on screen, which is the bug LUC-281 fixed. A step its `Skip` can rule out — the conflict policy when nothing is rebased, a fast-forward when the source is not behind — takes the flag through **`Step.Given`** rather than as a preset. A preset bypasses `Skip`, so the recap would announce what never happens. `flow.Settle` reads `Given` after `Skip` and before the memory (`Answer.Given`), so on every host the flag answers only a question the run actually puts, and `flowui` reads it back as `· --<flag>`.
 
 ## Unattended resolution and the two axes
 
@@ -192,11 +199,9 @@ for _, step := range session.Steps {
 	if _, known := answers.Get(step.Key); known {
 		continue // a flag or a positional already answered it
 	}
-	if step.Skip != nil {
-		if skip, reason := step.Skip(answers); skip {
-			answers = answers.With(step.Key, Answer{Skipped: true, SkipReason: reason})
-			continue
-		}
+	if answer, settled := Settle(step, answers); settled {
+		answers = answers.With(step.Key, answer) // skipped, or remembered
+		continue
 	}
 	if step.Resolve == nil {
 		return Answers{}, requiredErr(step) // refuse, naming step.Flag or the positional
@@ -219,6 +224,14 @@ for _, step := range session.Steps {
 
 The default a `Resolve` returns is **never destructive**: `clean --yes` leaves children orphaned unless `--reparent-children`, `sync --yes` does not push, `extract --yes` aborts on conflict.
 
+### Remembered answers
+
+The precedence of a decision is **flag > remembered answer > `Resolve`'s default**, on every surface. A `StepSelect` opts in with `Step.Memory{ID: domain.Remember…}`; the flow lays what `config.toml`'s `[wizard.remembered]` holds on its steps with `flow.Recall` (`Ask` is `--ask`, which asks them again), and every host settles a step through **`flow.Settle`**: its `Skip` first — a remembered fast-forward never fires for a source that is not behind — then the flag's `Given`, then the remembered value. `flowui` keeps every step nobody is asked — a preset, a remembered answer — in its place in the wizard as a `components.Step.Settled` step: never entered, counted in "Step n/N", read in the trail as `✓ <Label>: <summary> · --<flag>` or `· remembered`. A remembered step behind a condition is settled on entry (`SettledSummary`), against the answers given before it, and reads `⊘` when its condition rules it out. The dashboard has no trail; it honours the memory but offers no toggle.
+
+- **What can be remembered** is one table, `rules.RememberableValues`: an ID and the values its question offers, nothing destructive. `flow.Rememberable` also refuses a recap, any kind but `StepSelect`, an option the step no longer offers and a `Danger` one, so a stale value is asked again, never guessed. `config` refuses an unknown ID or value at load.
+- **Writing it**: `flowui` draws "Always use this answer in this repo" under an opted-in step (`tab`), read back as `Answer.Remember`. After a confirmed `Ask`, `decide.Remember` writes `flow.Remembering(session, answers)` through `service/memory`: a ticked answer is kept, a remembered question asked again under `--ask` and left unticked is forgotten. An aborted session writes nothing.
+- **Reading it back**: every host hands an asked answer through `flow.Asked`, which drops a tick on a value no memory holds and marks a remembered question left unticked as `Forget`; the recap marks the line (`flow.RememberedMark`: remembered, will be remembered, clears the remembered answer) and closes with `flow.RememberedHint`; a remembered "keep" adds its own line (`decide.KeptSourceLines`), since a kept source otherwise has none. The JSON of `create`, `checkout` and `extract` carries `origins` (`decide.Origins`): `flag`, `remembered`, `config`, `default`.
+
 **`--force` never travels this path.** It is a `Request` field, the safety axis. `--force` alone does not imply `--yes` — the session still runs and asks to confirm, the refusals already lifted. `--yes` alone does not lift a refusal: `clean --yes` on a dirty worktree fails naming `--force` (`resolveDelete` in `internal/flow/clean/steps.go` runs the safety check while answering the step). Where the recap offers a dangerous option, the flag and the answer converge on one value: `request.Force || answers.Value(KeyDelete) == deleteForce`.
 
 The command's only job on this axis is choosing the Prompter:
@@ -238,7 +251,7 @@ The write-side counterpart of "a flag never erases a recap line": a re-init step
 - The pre-fill reads the **existing config**, not detection, wherever the config has an opinion (`rules.ProposedScriptKind`, `rules.URLCandidatesFor`).
 - A step that **removes** may only remove what it proposed: `rules.DeselectedJobs` never reaches a job written by `run job add`. Removal goes through `rules.RemoveJob`, which also strips profile entries, `[[env_port]]` and `[[env]]` links, `runs` and `touches`; a rename goes through `rules.RenameJobRefs`, which follows the same five.
 
-`run init`'s services wizard edits structured rows no `StepKind` renders, so it is its own seam, `initrun.Wizard` (`internal/tui/inittui`, or `rules.AutoServicesAnswers` unattended).
+`run init`'s services wizard edits structured rows no `StepKind` renders, so it is its own seam, `initrun.Wizard` (`internal/surface/tui/inittui`, or `rules.AutoServicesAnswers` unattended).
 
 ## A flow that embeds another
 
@@ -282,17 +295,17 @@ type Operation struct {
 }
 ```
 
-What a flow declares about how it is scheduled on a surface that runs several at once. `ModeBlocking` (`clean`) keeps the surface until the run ends; `ModeBackground` (`create`, whose hooks can run long) gives it back and locks its target instead. The target is known only once its step is answered, so the dashboard prompter posts `opTargetMsg` as soon as the session returns; run sessions answer with worktree **paths**, translated once to branches on receipt (`rules.BranchesForPaths`). An operation holds a stage per worktree, so each locked row shows its own progress. The CLI ignores all of it; `internal/tui/dashboard/ops.go` enforces it once.
+What a flow declares about how it is scheduled on a surface that runs several at once. `ModeBlocking` (`clean`) keeps the surface until the run ends; `ModeBackground` (`create`, whose hooks can run long) gives it back and locks its target instead. The target is known only once its step is answered, so the dashboard prompter posts `opTargetMsg` as soon as the session returns; run sessions answer with worktree **paths**, translated once to branches on receipt (`rules.BranchesForPaths`). An operation holds a stage per worktree, so each locked row shows its own progress. The CLI ignores all of it; `internal/surface/tui/dashboard/ops.go` enforces it once.
 
 ### Handing the terminal over
 
-A flow whose surface is a second full-screen program — `run up` and `run logs` in the dashboard — goes through `tea.Exec` with a `tea.ExecCommand` that runs `runview` **in this process**, so its result comes back typed. Bubbletea restores the terminal around it but not the mouse tracking: a mouse-driven surface asks for it again (`internal/tui/dashboard/handoff.go`).
+A flow whose surface is a second full-screen program — `run up` and `run logs` in the dashboard — goes through `tea.Exec` with a `tea.ExecCommand` that runs `runview` **in this process**, so its result comes back typed. Bubbletea restores the terminal around it but not the mouse tracking: a mouse-driven surface asks for it again (`internal/surface/tui/dashboard/handoff.go`).
 
 ## Hook output
 
 A hook phase reports through `flow.HookSink`: `Output`, the raw stream, and `OnHook`, the `domain.HookBeat` of each hook starting and finishing. The flow asks the Presenter for a phase and hands the sink to the service; it never writes itself. `service/hooks` sends both stdout and stderr into `Output` (stderr is also kept for the failure beat) and renders the beats itself only when no `OnHook` was installed.
 
-- **CLI**: `shared.DrawHookPhase`, the only place a hook phase is drawn, tees the stream into the phase's log (`HookPhaseParams.LogPath`) on every path; a terminal gets `output.HookView` (a bounded tail replaced by one result line per hook), anything else the raw stream. See [output.md](output.md).
+- **CLI**: `shared.DrawHookPhase`, the only place a hook phase is drawn, tees the stream into the phase's log (`HookPhaseParams.LogPath`) on every path; a terminal gets `render.HookView` (a bounded tail replaced by one result line per hook), anything else the raw stream. See [output.md](output.md).
 - **Dashboard**: `Output` is a `flow.LineWriter`, which emits one `OutputLineMsg` per `\n` (`Flush` for the trailing fragment); each beat is one more line. It need not be concurrency-safe: `RunHooks` serializes a hook's stdout and stderr copiers before the sink.
 
 ## Publishing what a flow changed
@@ -309,6 +322,18 @@ Every change to a worktree's identity is published from the flow that made it, n
 
 `tools/archlint` holds it: `chokepoint`'s table names each mutator's event, `emits` reports a flow package that calls a mutator without publishing its event or without a test recording what it publishes, and `metawriter` reports a `service/worktree` metadata writer the table does not list.
 
+## Cancellation
+
+The first SIGINT or SIGTERM cancels the root context (`surface/cli/signal.go`) and gives the next signal back to the default handler, so a second Ctrl-C kills a run that is slow to unwind. A run that fails after the signal is read as cancelled (`rules.Interrupted`) and exits on `ExitCodeCancelled` (19); one that ends cleanly anyway, as `wtm events` does, keeps its 0.
+
+The context travels down every layer as the first argument: `cmd.Context()` in the runner, `Run(ctx, Params)` in the flow, `Stage(ctx, StageParams)` whose `Work(ctx)` must use the context it is handed (a surface may narrow it to cancel that one stage), then every service and infra function that reaches a subprocess or the daemon. The dashboard runs its flows under its program's context.
+
+- **Subprocesses** start through `proc.Command`: on cancel, SIGINT, SIGTERM `SubprocessInterruptGrace` later, the kill once `WaitDelay` runs out. git stays in wtm's process group, so the terminal's own Ctrl-C reaches it and a credential prompt can still read `/dev/tty`. Hooks and `wtm exec` start through `proc.GroupCommand`, in their own process group, and every signal goes to the whole group.
+- **The daemon is never signalled.** A request in flight closes its own socket (`Client.SendStream`), and a wait on the daemon starting or stopping selects on `ctx.Done()`. The daemon's own children (jobs, the namespaces it creates, its probes) live by the daemon, not by a client's context.
+- **What must not stop half-way is shielded** (`proc.Shield`, `worktree.Shield` for a flow): a context no cancellation reaches, a child started under it in its own process group (out of reach of the terminal's Ctrl-C), and the process held open until it is released (`proc.AwaitShields`, called by `cli.Execute` before every exit and on a second signal). Shielded today: `git worktree add` with what makes the worktree readable (`worktree.Create`), a removal with its branch, event, data reclaim and claim release (`teardown`), `git rebase --abort` (`infra.RebaseOnto`). A `Stage` given a shielded context shows "Cancelling…" but is never abandoned by a second Ctrl-C (`domain.ShieldedFrom` keys the context it came from). What is cut short is reported, not hidden: a loop checks the context at its head and names what it never reached (`teardown.Removal.NotReached`, `domain.SyncStatusCancelled`, `domain.FFCancelled`), `flow.Interrupted` reads a failure the interrupt caused as `ErrCancelled`, and the run exits 19.
+- **Hooks stop on an interrupt**: the hook running is stopped, the next ones never start (`continue_on_error` does not go past it). **Jobs do not**: a `run up` interrupted mid-start leaves what the daemon accepted running, and counts it among `Started`.
+- **Grandchildren**: on cancel, `proc.Command` signals what its child started too (a `ps` snapshot, re-read at each step), but only the processes still in the child's process group: a daemon git started to outlive it (credential cache, fsmonitor, ssh `ControlPersist`) has left it and is never touched. A second signal SIGKILLs everything a cancellation is still waiting on (`proc.KillCancelled`), so a child that ignores SIGINT does not outlive wtm.
+
 ## Testing a flow
 
 A flow is tested without a terminal, with the two doubles in `internal/testutil/flowtest`:
@@ -323,7 +348,7 @@ recorder := &flowtest.Recorder{}
 ```
 
 - **`ScriptedPrompter`** walks the session as a real host does — presets, `Skip`, `Build`/`Load`, `Validate`/`ValidateSet`/`ValidateEntry` — and answers from `Answers`, `Sets` (set kinds) or `EnvDecisions`. It records `Asked` (`AskedKeys()` for a one-line assertion) and the `Content` each step produced, so a test can assert on what the user would have seen. A step with nothing scripted is an error, so a new question cannot slip in unnoticed. Like `flowui`, it first builds every step from the presets alone and fails on a `Build` that errors there. `Abort` makes `Ask` return `ErrUserAborted`; `Confirmed` answers every `Confirm`.
-- **`Recorder`** implements `flow.Presenter`, collecting `Stages`, `Hooks`, `Beats`, `Notices` and `Statuses`, and runs `Work()` and `Run(sink)` for real. It is also a `flow.Publisher`: set it as the `Context`'s `Publisher` and `Published` / `PublishedTypes()` hold every event (`Unheard` simulates nobody listening). The `emits` rule requires such a test in every package that calls a mutator.
+- **`Recorder`** implements `flow.Presenter`, collecting `Stages`, `Hooks`, `Beats`, `Notices` and `Statuses`, and runs `Work(ctx)` and `Run(sink)` for real. It is also a `flow.Publisher`: set it as the `Context`'s `Publisher` and `Published` / `PublishedTypes()` hold every event (`Unheard` simulates nobody listening). The `emits` rule requires such a test in every package that calls a mutator.
 
 The typed conclusion is not part of `Recorder`; a test embeds it and adds the command's methods:
 
@@ -336,7 +361,7 @@ type recorder struct {
 func (r *recorder) Created(o Outcome) error { r.outcome = o; return nil }
 ```
 
-For the unattended path, `flow.Unattended{}` **is** the double (`internal/flow/unattended_test.go`). The CLI-level tests in `internal/commands/wt` (`create_noninteractive_test.go`, `integration_test.go`, `prune_test.go`) pin what a user observes: do not edit one to make a refactor pass.
+For the unattended path, `flow.Unattended{}` **is** the double (`internal/flow/unattended_test.go`). The CLI-level tests in `internal/surface/cli/wt` (`create_noninteractive_test.go`, `integration_test.go`, `prune_test.go`) pin what a user observes: do not edit one to make a refactor pass.
 
 ## Settled decisions
 
@@ -350,6 +375,9 @@ For the unattended path, `flow.Unattended{}` **is** the double (`internal/flow/u
 ## Known gaps
 
 Deliberately open, not to be fixed opportunistically:
+
+- Ctrl-C under a spinner (`components.RunLoading`), `runview` or a picker does not cancel the run: a Bubbletea program holds the terminal in raw mode, so the key never becomes a signal. Only SIGTERM, or a run with no spinner (`--output json`, no TTY), reaches the root context there.
+- A cancellation stops a mutation wherever its next subprocess starts: a `clean` can be left with the worktree gone and the branch still there. There are no safe checkpoints yet.
 
 - `clean --force` without a TTY resolves the delete step without any safety check (`resolveDelete` returns early on `Force`) and without a confirmation.
 - `flow.Context` duplicates `shared.ConfigResult`, which imports cobra and so cannot be reused as is.

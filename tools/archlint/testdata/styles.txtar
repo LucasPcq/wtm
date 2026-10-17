@@ -4,7 +4,7 @@ package styles
 import "github.com/charmbracelet/lipgloss"
 
 var Muted = lipgloss.NewStyle()
--- github.com/LucasPcq/wtm/internal/tui/bad/bad.go --
+-- github.com/LucasPcq/wtm/internal/surface/tui/bad/bad.go --
 package bad
 
 import lg "github.com/charmbracelet/lipgloss"

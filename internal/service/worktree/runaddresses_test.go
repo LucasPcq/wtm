@@ -19,7 +19,7 @@ func TestRunAddressesForAnswersPerBranch(t *testing.T) {
 	repo.ensure(t, "feat/a")
 	repo.ensure(t, "feat/b")
 
-	answer := RunAddressesFor(RunAddressesForParams{
+	answer := RunAddressesFor(t.Context(), RunAddressesForParams{
 		ProjectDir: repo.dir,
 		StateDir:   repo.stateDir,
 		RunConfig:  runAddressConfig(),
@@ -43,7 +43,7 @@ func TestRunAddressesForSkipsABranchItCannotRead(t *testing.T) {
 	repo.addWorktree(t, "feat/a")
 	repo.ensure(t, "feat/a")
 
-	answer := RunAddressesFor(RunAddressesForParams{
+	answer := RunAddressesFor(t.Context(), RunAddressesForParams{
 		ProjectDir: repo.dir,
 		StateDir:   repo.stateDir,
 		RunConfig:  runAddressConfig(),
@@ -62,7 +62,7 @@ func TestRunAddressesForIsEmptyWithoutJobs(t *testing.T) {
 	repo := newOrdinalRepo(t)
 	repo.addWorktree(t, "feat/a")
 
-	if got := RunAddressesFor(RunAddressesForParams{
+	if got := RunAddressesFor(t.Context(), RunAddressesForParams{
 		ProjectDir: repo.dir, StateDir: repo.stateDir, Branches: []string{"feat/a"},
 	}); len(got.ByBranch) != 0 {
 		t.Errorf("addresses = %v, want none: a project with no run module computes none", got)
@@ -75,7 +75,7 @@ func TestRunAddressesForLeavesAnUnnumberedWorktreeOutAndUnnumbered(t *testing.T)
 	repo := newOrdinalRepo(t)
 	repo.addWorktree(t, "feat/a")
 
-	answer := RunAddressesFor(RunAddressesForParams{
+	answer := RunAddressesFor(t.Context(), RunAddressesForParams{
 		ProjectDir: repo.dir,
 		StateDir:   repo.stateDir,
 		RunConfig:  runAddressConfig(),
@@ -85,7 +85,7 @@ func TestRunAddressesForLeavesAnUnnumberedWorktreeOutAndUnnumbered(t *testing.T)
 	if _, present := answer.ByBranch["feat/a"]; present {
 		t.Error("an unnumbered worktree got addresses")
 	}
-	if _, err := Ordinal(WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/a"}); err == nil {
+	if _, err := Ordinal(t.Context(), WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: "feat/a"}); err == nil {
 		t.Error("reading addresses numbered the worktree")
 	}
 }

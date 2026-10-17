@@ -33,7 +33,7 @@ func TestStartCheckSuppressedReturnsNilAndNoticeIsNilSafe(t *testing.T) {
 	hermeticEnv(t)
 	t.Setenv(domain.EnvNoUpdateCheck, "1")
 
-	check := selfupdate.StartCheck(selfupdate.StartCheckParams{
+	check := selfupdate.StartCheck(t.Context(), selfupdate.StartCheckParams{
 		Version:     "0.1.0",
 		Format:      domain.OutputText,
 		Command:     domain.CmdList,
@@ -43,7 +43,7 @@ func TestStartCheckSuppressedReturnsNilAndNoticeIsNilSafe(t *testing.T) {
 		t.Fatalf("StartCheck = %v, want nil when the opt-out env var is set", check)
 	}
 
-	if _, _, _, ok := check.Notice(time.Millisecond); ok {
+	if _, _, _, ok := check.Notice(t.Context(), time.Millisecond); ok {
 		t.Fatal("Notice on a nil Check must report ok=false, not panic")
 	}
 }
@@ -53,14 +53,14 @@ func TestNoticeServesTheCachedVersionWithoutNetwork(t *testing.T) {
 
 	// A recent check with a newer version cached: no refresh is due, so the
 	// notice must come straight from state with no network call.
-	if err := selfupdate.SaveState(domain.UpdateState{
+	if err := selfupdate.SaveState(t.Context(), domain.UpdateState{
 		CheckedAt:     time.Now(),
 		LatestVersion: "9.9.9",
 	}); err != nil {
 		t.Fatalf("SaveState: %v", err)
 	}
 
-	check := selfupdate.StartCheck(selfupdate.StartCheckParams{
+	check := selfupdate.StartCheck(t.Context(), selfupdate.StartCheckParams{
 		Version:     "0.1.0",
 		Format:      domain.OutputText,
 		Command:     domain.CmdList,
@@ -70,7 +70,7 @@ func TestNoticeServesTheCachedVersionWithoutNetwork(t *testing.T) {
 		t.Fatal("StartCheck = nil; a TTY run with a newer cached version must arm a notice")
 	}
 
-	current, latest, _, ok := check.Notice(time.Millisecond)
+	current, latest, _, ok := check.Notice(t.Context(), time.Millisecond)
 	if !ok {
 		t.Fatal("Notice reported nothing; a cached newer version must produce a notice")
 	}
@@ -82,14 +82,14 @@ func TestNoticeServesTheCachedVersionWithoutNetwork(t *testing.T) {
 func TestNoticeSilentWhenCachedVersionIsNotNewer(t *testing.T) {
 	hermeticEnv(t)
 
-	if err := selfupdate.SaveState(domain.UpdateState{
+	if err := selfupdate.SaveState(t.Context(), domain.UpdateState{
 		CheckedAt:     time.Now(),
 		LatestVersion: "0.1.0",
 	}); err != nil {
 		t.Fatalf("SaveState: %v", err)
 	}
 
-	check := selfupdate.StartCheck(selfupdate.StartCheckParams{
+	check := selfupdate.StartCheck(t.Context(), selfupdate.StartCheckParams{
 		Version:     "0.1.0",
 		Format:      domain.OutputText,
 		Command:     domain.CmdList,
@@ -99,7 +99,7 @@ func TestNoticeSilentWhenCachedVersionIsNotNewer(t *testing.T) {
 		t.Fatal("StartCheck = nil; the display gate must allow a TTY run")
 	}
 
-	if _, _, _, ok := check.Notice(time.Millisecond); ok {
+	if _, _, _, ok := check.Notice(t.Context(), time.Millisecond); ok {
 		t.Fatal("Notice fired for an identical version")
 	}
 }
@@ -116,14 +116,14 @@ func TestNoticePrefersTheRefreshedVersionOverTheCache(t *testing.T) {
 
 	// Stale enough that a refresh is due, with an older version cached: the
 	// notice must report what the refresh found, not what was on disk.
-	if err := selfupdate.SaveState(domain.UpdateState{
+	if err := selfupdate.SaveState(t.Context(), domain.UpdateState{
 		CheckedAt:     time.Now().Add(-domain.UpdateCheckTTL - time.Hour),
 		LatestVersion: "0.5.0",
 	}); err != nil {
 		t.Fatalf("SaveState: %v", err)
 	}
 
-	check := selfupdate.StartCheck(selfupdate.StartCheckParams{
+	check := selfupdate.StartCheck(t.Context(), selfupdate.StartCheckParams{
 		Version:     "0.1.0",
 		Format:      domain.OutputText,
 		Command:     domain.CmdList,
@@ -134,7 +134,7 @@ func TestNoticePrefersTheRefreshedVersionOverTheCache(t *testing.T) {
 		t.Fatal("StartCheck = nil; a stale cache on a TTY run must trigger a refresh")
 	}
 
-	_, latest, _, ok := check.Notice(5 * time.Second)
+	_, latest, _, ok := check.Notice(t.Context(), 5*time.Second)
 	if !ok {
 		t.Fatal("Notice reported nothing")
 	}
@@ -161,14 +161,14 @@ func TestNoticeFallsBackToTheCacheWhenTheRefreshIsTooSlow(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := selfupdate.SaveState(domain.UpdateState{
+	if err := selfupdate.SaveState(t.Context(), domain.UpdateState{
 		CheckedAt:     time.Now().Add(-domain.UpdateCheckTTL - time.Hour),
 		LatestVersion: "0.5.0",
 	}); err != nil {
 		t.Fatalf("SaveState: %v", err)
 	}
 
-	check := selfupdate.StartCheck(selfupdate.StartCheckParams{
+	check := selfupdate.StartCheck(t.Context(), selfupdate.StartCheckParams{
 		Version:     "0.1.0",
 		Format:      domain.OutputText,
 		Command:     domain.CmdList,
@@ -179,7 +179,7 @@ func TestNoticeFallsBackToTheCacheWhenTheRefreshIsTooSlow(t *testing.T) {
 		t.Fatal("StartCheck = nil")
 	}
 
-	_, latest, _, ok := check.Notice(50 * time.Millisecond)
+	_, latest, _, ok := check.Notice(t.Context(), 50*time.Millisecond)
 	if !ok {
 		t.Fatal("Notice went silent; a slow refresh must still serve the cached version")
 	}
@@ -192,7 +192,7 @@ func TestNoticeFallsBackToTheCacheWhenTheRefreshIsTooSlow(t *testing.T) {
 	// environment the moment this function returns — a goroutine still in flight
 	// would write the test's fixture into the user's own state file.
 	close(release)
-	check.Notice(5 * time.Second)
+	check.Notice(t.Context(), 5*time.Second)
 }
 
 func TestStartCheckDoesNotReachTheNetworkInsideTheTTL(t *testing.T) {
@@ -204,14 +204,14 @@ func TestStartCheckDoesNotReachTheNetworkInsideTheTTL(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := selfupdate.SaveState(domain.UpdateState{
+	if err := selfupdate.SaveState(t.Context(), domain.UpdateState{
 		CheckedAt:     time.Now(),
 		LatestVersion: "9.9.9",
 	}); err != nil {
 		t.Fatalf("SaveState: %v", err)
 	}
 
-	check := selfupdate.StartCheck(selfupdate.StartCheckParams{
+	check := selfupdate.StartCheck(t.Context(), selfupdate.StartCheckParams{
 		Version:     "0.1.0",
 		Format:      domain.OutputText,
 		Command:     domain.CmdList,
@@ -222,7 +222,7 @@ func TestStartCheckDoesNotReachTheNetworkInsideTheTTL(t *testing.T) {
 		t.Fatal("StartCheck = nil; a fresh cache must still serve a notice")
 	}
 
-	if _, latest, _, ok := check.Notice(time.Second); !ok || latest != "9.9.9" {
+	if _, latest, _, ok := check.Notice(t.Context(), time.Second); !ok || latest != "9.9.9" {
 		t.Fatalf("Notice = (%q, %v), want (9.9.9, true) from cache", latest, ok)
 	}
 	if got := atomic.LoadInt32(&hits); got != 0 {

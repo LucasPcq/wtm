@@ -4,6 +4,38 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-10-17
+
+Wizards stop asking what you already answered, an interrupt never leaves a worktree or a state file half done, and `wtm status` reads a worktree's whole state at once.
+
+### Highlights
+
+- **"Always use this answer"** in the wizards of `create`, `checkout` and `extract`: tick it with `tab` and the env strategy, the isolation or the source fast-forward is no longer asked in that repository; `--ask` asks again. → [Remembered answers](docs/guide/configuration.md#remembered-answers)
+- **Interrupting wtm** (Ctrl+C, SIGTERM) stops the git, hook or `wtm exec` process it waits on, never leaves a worktree half created or half removed, names what it did not reach, and exits `19`; a second interrupt quits at once. → [Interrupting a run](docs/guide/integrations.md#interrupting-a-run)
+
+### Breaking
+
+- **`env_ports` and `env --output json`** no longer carry linked values (`current_value`, `new_value`, `foreign_host`, restored `from` / `to`): read `moves` and restored `ports`, or pass `wtm env --show-values`. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
+- **Backing out** of a question, a picker or a confirmation (Esc, Ctrl-C, "No, cancel", a declined import) exits `19` in every command instead of `1` or `0`: a script branching on those should read `19`. → [Exit codes](docs/guide/integrations.md#the-contract---yes-and---output-json)
+
+### Added
+
+- **`wtm status [worktree]`** reads a worktree's isolation, missing `.env` files and jobs in one document, each problem with the command that fixes it; `--all` reads every worktree. → [A worktree's state](docs/guide/status.md)
+- **Exit code `22`**: a state file written by a newer wtm is read but never rewritten; upgrade wtm to change it. → [State files](docs/guide/state.md#versions)
+
+### Fixed
+
+- **Two wtm commands at once** keep each other's changes to `meta.json`, the remembered answers and the `.env` keys wtm manages, and a crash never leaves a state file, a `.env` or a compose file half written. → [State files](docs/guide/state.md#how-these-files-are-written)
+- **Ctrl+C** stops wtm behind a spinner, a picker, the run view or `wtm ui`: the first press cancels and shows "Cancelling…", a second one quits at once, and no git, hook or ssh process is left behind.
+- **Interrupting `sync`** aborts the rebase in progress and pushes nothing; **interrupting `run up`** lists the jobs left running. → [Interrupting a run](docs/guide/integrations.md#interrupting-a-run)
+- **A flag answers its wizard question** instead of only preselecting it: `wtm sync --keep-conflict` no longer asks "On conflict", `--ff` no longer offers the fast-forward, and the trail reads the flag. → [Stacked pull requests](docs/guide/recipes.md#stacked-pull-requests)
+- **`wtm env`** prints only the ports and addresses it writes and its `[[env]]` values, so no password reaches its text or JSON, and rebuilds a declared `.env` missing from the worktree. → [A .env is out of date](docs/guide/troubleshooting.md#a-env-is-out-of-date)
+- **`wtm create`** starts a branch that exists only on origin from `origin/<branch>` and tracks it, like **`wtm checkout`**; `--if-not-exists` refuses with exit `10` instead of returning the worktree of another branch sharing the folder name.
+- **`wtm init`** writes every value into `config.toml` exactly as given: a quote or a backslash no longer breaks the file.
+- **`wtm relocate`** and **`wtm run init`** change only their key in `config.toml`, keeping the remembered answers. → [Remembered answers](docs/guide/configuration.md#remembered-answers)
+- **`wtm run down`** settles a crashed job, and **`wtm run daemon status`** no longer counts a claim on a shared service as a job.
+- **`wtm env` and `wtm create`**: a port moves in an unquoted value with spaces without new quotes, an unreadable `.env` source is named instead of skipped, and `--check` plans what the apply settles.
+
 ## [0.29.2] - 2026-10-06
 
 For scripts and agents: `wtm events` follows every repository and reports job crashes, `wtm env` stops printing secrets, `wtm prune` stays fast on repositories with many branches, and usage errors exit `2`.
@@ -732,7 +764,8 @@ Initial release.
 - **Detection** of the base branch, env files, package manager, Docker Compose and pnpm workspaces.
 - **Install** with Homebrew (`brew install LucasPcq/tap/wtm`), release binaries or `go install`.
 
-[Unreleased]: https://github.com/LucasPcq/wtm/compare/v0.29.2...HEAD
+[Unreleased]: https://github.com/LucasPcq/wtm/compare/v0.30.0...HEAD
+[0.30.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.30.0
 [0.29.2]: https://github.com/LucasPcq/wtm/releases/tag/v0.29.2
 [0.29.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.29.1
 [0.29.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.29.0

@@ -61,7 +61,7 @@ func (r repo) withFeature(t *testing.T) string {
 // onto names.
 func (r repo) alignMain(t *testing.T) {
 	t.Helper()
-	if _, err := envports.Settle(envports.Params{
+	if _, err := envports.Settle(t.Context(), envports.Params{
 		Context:      r.params().Context,
 		Branch:       "main",
 		WorktreePath: r.dir,
@@ -102,7 +102,7 @@ func TestSwitchToNamesSettlesTheWorktreesButNotMain(t *testing.T) {
 	feature := r.withFeature(t)
 	params, presenter := r.switchParams(SwitchRequest{Mode: domain.AddressingNames}, flow.Unattended{})
 
-	outcome, err := Switch(params)
+	outcome, err := Switch(t.Context(), params)
 	if err != nil {
 		t.Fatalf("Switch: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestSwitchToNamesSettlesTheWorktreesButNotMain(t *testing.T) {
 func TestSwitchLeavesAVerbatimWorktreeAsCopied(t *testing.T) {
 	r := newRepo(t, portsConfig, portsEnv)
 	feature := r.withFeature(t)
-	if err := worktree.SetIsolation(worktree.SetIsolationParams{
+	if err := worktree.SetIsolation(t.Context(), worktree.SetIsolationParams{
 		Ref:       worktree.WorktreeRef{ProjectDir: r.dir, StateDir: r.stateDir, Branch: "feature"},
 		Isolation: domain.IsolationVerbatim,
 	}); err != nil {
@@ -137,7 +137,7 @@ func TestSwitchLeavesAVerbatimWorktreeAsCopied(t *testing.T) {
 	}
 	params, _ := r.switchParams(SwitchRequest{Mode: domain.AddressingNames}, flow.Unattended{})
 
-	outcome, err := Switch(params)
+	outcome, err := Switch(t.Context(), params)
 	if err != nil {
 		t.Fatalf("Switch: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestSwitchToPortsBringsMainBack(t *testing.T) {
 	r.alignMain(t)
 	params, _ := r.switchParams(SwitchRequest{Mode: domain.AddressingPorts}, flow.Unattended{})
 
-	outcome, err := Switch(params)
+	outcome, err := Switch(t.Context(), params)
 	if err != nil {
 		t.Fatalf("Switch: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestSwitchKeepEnvLeavesTheFilesOutOfStep(t *testing.T) {
 	feature := r.withFeature(t)
 	params, _ := r.switchParams(SwitchRequest{Mode: domain.AddressingNames, KeepEnv: true}, flow.Unattended{})
 
-	outcome, err := Switch(params)
+	outcome, err := Switch(t.Context(), params)
 	if err != nil {
 		t.Fatalf("Switch: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestSwitchToTheCurrentModeStillSettlesTheDrift(t *testing.T) {
 	r.withFeature(t)
 	params, _ := r.switchParams(SwitchRequest{Mode: domain.AddressingNames}, flow.Unattended{})
 
-	outcome, err := Switch(params)
+	outcome, err := Switch(t.Context(), params)
 	if err != nil {
 		t.Fatalf("Switch: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestSwitchDeclinedLeavesTheFilesPending(t *testing.T) {
 	}}
 	params, _ := r.switchParams(SwitchRequest{}, prompter)
 
-	outcome, err := Switch(params)
+	outcome, err := Switch(t.Context(), params)
 	if err != nil {
 		t.Fatalf("Switch: %v", err)
 	}
@@ -243,7 +243,7 @@ func TestSwitchUnattendedNeedsTheMode(t *testing.T) {
 	r := newRepo(t, portsConfig, portsEnv)
 	params, _ := r.switchParams(SwitchRequest{}, flow.Unattended{})
 
-	_, err := Switch(params)
+	_, err := Switch(t.Context(), params)
 	if err == nil || !strings.Contains(err.Error(), "argument") {
 		t.Fatalf("err = %v, want the refusal naming the argument", err)
 	}
@@ -256,7 +256,7 @@ func TestSwitchRefusesAnUnknownMode(t *testing.T) {
 	r := newRepo(t, portsConfig, portsEnv)
 	params, _ := r.switchParams(SwitchRequest{Mode: "hosts"}, flow.Unattended{})
 
-	if _, err := Switch(params); err == nil || !strings.Contains(err.Error(), `"hosts"`) {
+	if _, err := Switch(t.Context(), params); err == nil || !strings.Contains(err.Error(), `"hosts"`) {
 		t.Fatalf("err = %v, want the unknown mode named", err)
 	}
 }
@@ -268,7 +268,7 @@ func TestSwitchSkipsTheSettleStepWhenOnlyMainIsOutOfStep(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{stepMode: string(domain.AddressingNames)}}
 	params, _ := r.switchParams(SwitchRequest{}, prompter)
 
-	outcome, err := Switch(params)
+	outcome, err := Switch(t.Context(), params)
 	if err != nil {
 		t.Fatalf("Switch: %v", err)
 	}

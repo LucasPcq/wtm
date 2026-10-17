@@ -61,7 +61,7 @@ func TestRegisterIsIdempotent(t *testing.T) {
 	dir := initializedRepo(t)
 
 	for range 2 {
-		if err := Register(RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
+		if err := Register(t.Context(), RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -90,7 +90,7 @@ func TestConcurrentRegistrationsKeepEveryRepo(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for _, dir := range dirs {
-		wg.Go(func() { _ = Register(RegisterParams{Root: dir, StateDir: stateOf(dir)}) })
+		wg.Go(func() { _ = Register(t.Context(), RegisterParams{Root: dir, StateDir: stateOf(dir)}) })
 	}
 	wg.Wait()
 
@@ -107,7 +107,7 @@ func TestRegisterPublishesRepoAddedOnce(t *testing.T) {
 	dir := initializedRepo(t)
 
 	for range 2 {
-		if err := Register(RegisterParams{Root: dir, StateDir: stateOf(dir), SocketPath: socket, CorrelationID: "c"}); err != nil {
+		if err := Register(t.Context(), RegisterParams{Root: dir, StateDir: stateOf(dir), SocketPath: socket, CorrelationID: "c"}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -129,7 +129,7 @@ func TestPruneDropsARepoThatIsGoneAndPublishesIt(t *testing.T) {
 	processtest.RealDaemon(t, socket)
 	kept, gone := initializedRepo(t), initializedRepo(t)
 	for _, dir := range []string{kept, gone} {
-		if err := Register(RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
+		if err := Register(t.Context(), RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -138,7 +138,7 @@ func TestPruneDropsARepoThatIsGoneAndPublishesIt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	repos, err := Prune(PruneParams{SocketPath: socket})
+	repos, err := Prune(t.Context(), PruneParams{SocketPath: socket})
 
 	if err != nil || len(repos) != 1 || repos[0].Root != kept {
 		t.Fatalf("repos = %+v, err = %v", repos, err)
@@ -151,12 +151,12 @@ func TestPruneDropsARepoThatIsGoneAndPublishesIt(t *testing.T) {
 func TestPruneDropsARepoNoLongerInitialized(t *testing.T) {
 	processtest.Home(t)
 	dir := initializedRepo(t)
-	if err := Register(RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
+	if err := Register(t.Context(), RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
 		t.Fatal(err)
 	}
 	removeConfig(t, dir)
 
-	if repos, err := Prune(PruneParams{}); err != nil || len(repos) != 0 {
+	if repos, err := Prune(t.Context(), PruneParams{}); err != nil || len(repos) != 0 {
 		t.Fatalf("repos = %+v, err = %v", repos, err)
 	}
 }
@@ -188,10 +188,10 @@ func TestACorruptRegistryIsRebuilt(t *testing.T) {
 	}
 	dir := initializedRepo(t)
 
-	if err := Register(RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
+	if err := Register(t.Context(), RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
-	if repos, err := Prune(PruneParams{}); err != nil || len(repos) != 1 {
+	if repos, err := Prune(t.Context(), PruneParams{}); err != nil || len(repos) != 1 {
 		t.Fatalf("repos = %+v, err = %v", repos, err)
 	}
 }
@@ -201,7 +201,7 @@ func TestACorruptRegistryIsRebuilt(t *testing.T) {
 func TestPruneWithNothingToDropDoesNotRewrite(t *testing.T) {
 	processtest.Home(t)
 	dir := initializedRepo(t)
-	if err := Register(RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
+	if err := Register(t.Context(), RegisterParams{Root: dir, StateDir: stateOf(dir)}); err != nil {
 		t.Fatal(err)
 	}
 	path, err := infra.RegistryPath()
@@ -214,7 +214,7 @@ func TestPruneWithNothingToDropDoesNotRewrite(t *testing.T) {
 	}
 	time.Sleep(20 * time.Millisecond)
 
-	if _, err := Prune(PruneParams{}); err != nil {
+	if _, err := Prune(t.Context(), PruneParams{}); err != nil {
 		t.Fatal(err)
 	}
 

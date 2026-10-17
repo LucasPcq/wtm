@@ -3,6 +3,7 @@
 package flow
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -25,27 +26,27 @@ type Context struct {
 // Listening is asked before an event is built: reading the identity it
 // carries costs a git call, which a run nobody watches should not pay.
 type Publisher interface {
-	Publish(event domain.Event)
+	Publish(ctx context.Context, event domain.Event)
 	Listening() bool
 	// Origin is what the daemon stamps on the job events a request causes;
 	// false when the repository cannot be named.
-	Origin() (domain.EventOrigin, bool)
+	Origin(ctx context.Context) (domain.EventOrigin, bool)
 }
 
-func (c Context) Publish(event domain.Event) {
+func (c Context) Publish(ctx context.Context, event domain.Event) {
 	if c.Publisher == nil {
 		return
 	}
-	c.Publisher.Publish(event)
+	c.Publisher.Publish(ctx, event)
 }
 
 // Origin is nil without a publisher, or a repository to name: the daemon then
 // publishes nothing about the jobs the request starts.
-func (c Context) Origin() *domain.EventOrigin {
+func (c Context) Origin(ctx context.Context) *domain.EventOrigin {
 	if c.Publisher == nil {
 		return nil
 	}
-	origin, ok := c.Publisher.Origin()
+	origin, ok := c.Publisher.Origin(ctx)
 	if !ok {
 		return nil
 	}
@@ -193,6 +194,14 @@ type Step struct {
 	// thing for a step answered by a positional, which has no flag to name.
 	Flag string
 	Arg  bool
+	// PresetFlag names the flag a preset came from, for a step two flags answer
+	// (--ff-parents, --no-ff-parents) where Flag alone would name the wrong one.
+	PresetFlag func(Answer) string
+	// Given is the answer a flag gives a conditional step, settled only once its
+	// Skip lets the step stand: a preset would answer a step the run rules out.
+	Given string
+
+	Memory Memory
 }
 
 // Mode is how long a flow holds the surface that runs it. A background flow gives
@@ -229,6 +238,14 @@ type Answer struct {
 	Skipped      bool
 	SkipReason   string
 	Asked        bool
+	// Recalled is an answer the repository remembered, not asked; Remember is
+	// one the user asked never to be asked again.
+	Recalled bool
+	// Given is an answer the step's flag settled (Step.Given).
+	Given    bool
+	Remember bool
+	// Forget is a remembered question asked again and left unticked.
+	Forget bool
 }
 
 type Answers struct {
@@ -325,9 +342,11 @@ type Prompter interface {
 	Interactive() bool
 }
 
+// StageParams.Work is handed the context to run under: the one Stage was given,
+// or one the surface derived from it to cancel this unit of work on its own.
 type StageParams struct {
 	Message string
-	Work    func() error
+	Work    func(context.Context) error
 }
 
 // HookSink is where a hook phase reports: the raw output as it is produced, and
@@ -369,7 +388,7 @@ type Notice struct {
 }
 
 type Presenter interface {
-	Stage(StageParams) error
+	Stage(context.Context, StageParams) error
 	HookPhase(HookPhaseParams) error
 	// Notice concludes the run; Status is one line inside an ongoing phase.
 	Notice(Notice)
@@ -483,6 +502,9 @@ func PinnedSuffix(step Step) string {
 // large selection does not overflow the line.
 func SummarizeSet(answer Answer) string {
 	values := answer.Values
+	if len(values) == 0 && answer.Value != "" {
+		values = []string{answer.Value}
+	}
 	if len(values) == 0 {
 		return domain.SummaryNone
 	}

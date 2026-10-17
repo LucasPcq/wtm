@@ -58,7 +58,7 @@ func flowFor(t *testing.T, in recapInput) *checkoutFlow {
 	if !in.Picked {
 		request.Number = in.PR.Number
 	}
-	f := &checkoutFlow{
+	f := &checkoutFlow{runCtx: t.Context(),
 		ctx:      flow.Context{ProjectDir: gittest.InitRepo(t), StateDir: t.TempDir(), Config: config},
 		request:  request,
 		prompter: flow.Unattended{},

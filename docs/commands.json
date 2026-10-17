@@ -50,6 +50,11 @@
           "short": "Move worktrees to align with base_path and adopt external ones"
         },
         {
+          "path": "wtm status",
+          "file": "wtm_status.md",
+          "short": "Show a worktree's whole state: isolation, env files, jobs and what to fix"
+        },
+        {
           "path": "wtm tree",
           "file": "wtm_tree.md",
           "short": "Show the worktree forest (parent → child)"

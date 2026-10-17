@@ -28,7 +28,7 @@ func verbatimWorktree(t *testing.T) (flow.Context, string) {
 	stateDir := filepath.Join(repo, ".git", "wtm")
 	path := filepath.Join(t.TempDir(), "feature")
 	gittest.Git(t, repo, "worktree", "add", "-b", "feature", path)
-	if err := worktree.SetIsolation(worktree.SetIsolationParams{
+	if err := worktree.SetIsolation(t.Context(), worktree.SetIsolationParams{
 		Ref:       worktree.WorktreeRef{ProjectDir: repo, StateDir: stateDir, Branch: "feature"},
 		Isolation: domain.IsolationVerbatim,
 	}); err != nil {
@@ -44,7 +44,7 @@ func params(ctx flow.Context, dir string, prompter flow.Prompter) foreigndata.Pa
 func TestAResetOnTheSourcesDataIsRefusedWithNobodyToAsk(t *testing.T) {
 	ctx, dir := verbatimWorktree(t)
 
-	proceed, err := foreigndata.Allow(params(ctx, dir, flow.Unattended{}))
+	proceed, err := foreigndata.Allow(t.Context(), params(ctx, dir, flow.Unattended{}))
 	if proceed || err == nil {
 		t.Fatalf("Allow = (%v, %v), want a refusal", proceed, err)
 	}
@@ -59,11 +59,11 @@ func TestAResetOnTheSourcesDataIsAskedOnATerminal(t *testing.T) {
 	ctx, dir := verbatimWorktree(t)
 
 	declined := &flowtest.ScriptedPrompter{}
-	if proceed, err := foreigndata.Allow(params(ctx, dir, declined)); proceed || err != nil || declined.Confirms != 1 {
+	if proceed, err := foreigndata.Allow(t.Context(), params(ctx, dir, declined)); proceed || err != nil || declined.Confirms != 1 {
 		t.Errorf("declined: Allow = (%v, %v) after %d confirm(s), want one question answered no", proceed, err, declined.Confirms)
 	}
 	accepted := &flowtest.ScriptedPrompter{Confirmed: true}
-	if proceed, err := foreigndata.Allow(params(ctx, dir, accepted)); !proceed || err != nil {
+	if proceed, err := foreigndata.Allow(t.Context(), params(ctx, dir, accepted)); !proceed || err != nil {
 		t.Errorf("accepted: Allow = (%v, %v), want the run to go on", proceed, err)
 	}
 }
@@ -74,7 +74,7 @@ func TestForceLiftsTheRefusal(t *testing.T) {
 	forced := params(ctx, dir, flow.Unattended{})
 	forced.Force = true
 
-	if proceed, err := foreigndata.Allow(forced); !proceed || err != nil {
+	if proceed, err := foreigndata.Allow(t.Context(), forced); !proceed || err != nil {
 		t.Errorf("Allow = (%v, %v), want --force to let the run through", proceed, err)
 	}
 }
@@ -82,7 +82,7 @@ func TestForceLiftsTheRefusal(t *testing.T) {
 // Main owns its data: a reset there is its own business.
 func TestMainIsNeverStopped(t *testing.T) {
 	ctx, _ := verbatimWorktree(t)
-	if proceed, err := foreigndata.Allow(params(ctx, ctx.ProjectDir, flow.Unattended{})); !proceed || err != nil {
+	if proceed, err := foreigndata.Allow(t.Context(), params(ctx, ctx.ProjectDir, flow.Unattended{})); !proceed || err != nil {
 		t.Errorf("Allow = (%v, %v), want main let through", proceed, err)
 	}
 }

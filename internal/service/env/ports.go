@@ -1,10 +1,12 @@
 package env
 
 import (
+	"context"
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 // EnvPortsParams locates the .env files a set of links names and the offset the
@@ -38,24 +40,40 @@ type EnvPortsParams struct {
 // case and means every caller can skip the whole reconciliation.
 func (p EnvPortsParams) Empty() bool { return len(p.Links) == 0 && len(p.Owned) == 0 }
 
+// PlanParams is the port plan of these links over no .env yet.
+func (p EnvPortsParams) PlanParams() rules.PlanEnvPortsParams {
+	return rules.PlanEnvPortsParams{
+		Links:   p.Links,
+		Bases:   p.Bases,
+		Offset:  p.Offset,
+		Block:   p.Block,
+		Origins: p.Origins,
+		Shared:  p.Shared,
+	}
+}
+
 // ComputeEnvPorts resolves every link against the worktree's current .env files,
 // writing nothing. A file that does not exist yields missing keys rather than
 // silence — a link the user declared must stay visible in the report.
 func ComputeEnvPorts(params EnvPortsParams) (domain.EnvPortPlan, error) {
+	return computeEnvPorts(computeEnvPortsParams{Ports: params})
+}
+
+type computeEnvPortsParams struct {
+	Ports EnvPortsParams
+	// Reconciled holds files as they would be written, read in place of the disk.
+	Reconciled map[string][]domain.EnvLine
+}
+
+func computeEnvPorts(params computeEnvPortsParams) (domain.EnvPortPlan, error) {
 	lines, err := readLinkedFiles(params)
 	if err != nil {
 		return domain.EnvPortPlan{}, err
 	}
 
-	plan := rules.PlanEnvPorts(rules.PlanEnvPortsParams{
-		Links:   params.Links,
-		Bases:   params.Bases,
-		Offset:  params.Offset,
-		Block:   params.Block,
-		Lines:   lines,
-		Origins: params.Origins,
-		Shared:  params.Shared,
-	})
+	planParams := params.Ports.PlanParams()
+	planParams.Lines = lines
+	plan := rules.PlanEnvPorts(planParams)
 	owned, err := planOwned(params)
 	if err != nil {
 		return domain.EnvPortPlan{}, err
@@ -66,17 +84,17 @@ func ComputeEnvPorts(params EnvPortsParams) (domain.EnvPortPlan, error) {
 
 // planOwned reads each file an owned key lands in and says whether it already
 // holds that value, so a report never announces a write that changed nothing.
-func planOwned(params EnvPortsParams) ([]domain.EnvOwnedEntry, error) {
-	if len(params.Owned) == 0 {
+func planOwned(params computeEnvPortsParams) ([]domain.EnvOwnedEntry, error) {
+	if len(params.Ports.Owned) == 0 {
 		return nil, nil
 	}
 
 	byFile := map[string][]domain.EnvLine{}
-	out := make([]domain.EnvOwnedEntry, 0, len(params.Owned))
-	for _, entry := range params.Owned {
+	out := make([]domain.EnvOwnedEntry, 0, len(params.Ports.Owned))
+	for _, entry := range params.Ports.Owned {
 		lines, read := byFile[entry.File]
 		if !read {
-			parsed, err := readEnvFile(filepath.Join(params.WorktreePath, entry.File))
+			parsed, err := params.read(entry.File)
 			if err != nil {
 				return nil, err
 			}
@@ -94,29 +112,23 @@ func planOwned(params EnvPortsParams) ([]domain.EnvOwnedEntry, error) {
 // ApplyEnvPorts recomputes the plan and writes the rewrites it holds, one file at
 // a time. It returns the plan it acted on, so a caller reports what happened
 // rather than what it intended.
-func ApplyEnvPorts(params EnvPortsParams) (domain.EnvPortPlan, error) {
+func ApplyEnvPorts(ctx context.Context, params EnvPortsParams) (domain.EnvPortPlan, error) {
 	plan, err := ComputeEnvPorts(params)
 	if err != nil {
 		return domain.EnvPortPlan{}, err
 	}
 
 	for _, file := range rewrittenFiles(plan) {
-		path := filepath.Join(params.WorktreePath, file)
-		lines, readErr := readEnvFile(path)
-		if readErr != nil {
-			return domain.EnvPortPlan{}, readErr
-		}
-
-		rendered := rules.RenderEnv(rules.ApplyEnvPorts(lines, entriesForFile(plan, file)))
-		if rendered == rules.RenderEnv(lines) {
-			continue
-		}
-		if writeErr := writeEnvFile(path, rendered); writeErr != nil {
-			return domain.EnvPortPlan{}, writeErr
+		entries := entriesForFile(plan, file)
+		if _, err := (store.EnvDisk{}).Edit(ctx, store.EnvEdit{
+			Path: filepath.Join(params.WorktreePath, file),
+			Edit: func(lines []domain.EnvLine) []domain.EnvLine { return rules.ApplyEnvPorts(lines, entries) },
+		}); err != nil {
+			return domain.EnvPortPlan{}, err
 		}
 	}
 
-	if err := applyOwned(params, plan); err != nil {
+	if err := applyOwned(ctx, params, plan); err != nil {
 		return domain.EnvPortPlan{}, err
 	}
 
@@ -126,7 +138,7 @@ func ApplyEnvPorts(params EnvPortsParams) (domain.EnvPortPlan, error) {
 // ApplyOwnedEnv writes the worktree identity alone. The port pass is a question
 // the user may answer no to; which worktree this is, is not one of the things
 // being asked.
-func ApplyOwnedEnv(params EnvPortsParams) error {
+func ApplyOwnedEnv(ctx context.Context, params EnvPortsParams) error {
 	if len(params.Owned) == 0 {
 		return nil
 	}
@@ -134,37 +146,32 @@ func ApplyOwnedEnv(params EnvPortsParams) error {
 	if err != nil {
 		return err
 	}
-	return applyOwned(params, plan)
+	return applyOwned(ctx, params, plan)
 }
 
 // applyOwned writes the owned keys one file at a time, after the port rewrites:
 // both touch the same documents, and reading the file back is what keeps the
 // second write from dropping the first.
-func applyOwned(params EnvPortsParams, plan domain.EnvPortPlan) error {
+func applyOwned(ctx context.Context, params EnvPortsParams, plan domain.EnvPortPlan) error {
 	for _, file := range ownedFiles(plan) {
-		path := filepath.Join(params.WorktreePath, file)
-		lines, err := readEnvFile(path)
-		if err != nil {
-			return err
-		}
-
-		changed := false
-		for _, entry := range plan.Owned {
-			if entry.File != file {
-				continue
-			}
-			updated, wrote := rules.UpsertEnvPair(rules.UpsertEnvPairParams{Lines: lines, Key: entry.Key, Value: entry.Value})
-			lines = updated
-			changed = changed || wrote
-		}
-		if !changed {
-			continue
-		}
-		if err := writeEnvFile(path, rules.RenderEnv(lines)); err != nil {
+		if _, err := (store.EnvDisk{}).Edit(ctx, store.EnvEdit{
+			Path:   filepath.Join(params.WorktreePath, file),
+			Create: true,
+			Edit:   func(lines []domain.EnvLine) []domain.EnvLine { return upsertOwned(lines, plan.Owned, file) },
+		}); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func upsertOwned(lines []domain.EnvLine, owned []domain.EnvOwnedEntry, file string) []domain.EnvLine {
+	for _, entry := range owned {
+		if entry.File == file {
+			lines, _ = rules.UpsertEnvPair(rules.UpsertEnvPairParams{Lines: lines, Key: entry.Key, Value: entry.Value})
+		}
+	}
+	return lines
 }
 
 func ownedFiles(plan domain.EnvPortPlan) []string {
@@ -186,13 +193,20 @@ func EnvValueRefsFor(params EnvPortsParams, target string) map[string]rules.EnvV
 	return rules.EnvValueRefsByKey(linksForFile(params.Links, target), params.Bases, params.Origins)
 }
 
-func readLinkedFiles(params EnvPortsParams) (map[string][]domain.EnvLine, error) {
+func (p computeEnvPortsParams) read(file string) ([]domain.EnvLine, error) {
+	if lines, ok := p.Reconciled[file]; ok {
+		return lines, nil
+	}
+	return readEnvFile(filepath.Join(p.Ports.WorktreePath, file))
+}
+
+func readLinkedFiles(params computeEnvPortsParams) (map[string][]domain.EnvLine, error) {
 	lines := map[string][]domain.EnvLine{}
-	for _, link := range params.Links {
+	for _, link := range params.Ports.Links {
 		if _, read := lines[link.File]; read {
 			continue
 		}
-		parsed, err := readEnvFile(filepath.Join(params.WorktreePath, link.File))
+		parsed, err := params.read(link.File)
 		if err != nil {
 			return nil, err
 		}

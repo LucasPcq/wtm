@@ -3,6 +3,7 @@ package down_test
 import (
 	"errors"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -59,7 +60,7 @@ func run(t *testing.T, repo string, request down.Request) (down.Outcome, *record
 	presenter := &recorder{Recorder: &flowtest.Recorder{}}
 	request.Cwd = repo
 	request.Config = declared
-	outcome, err := down.Run(down.Params{
+	outcome, err := down.Run(t.Context(), down.Params{
 		Context:   flow.Context{ProjectDir: repo},
 		Request:   request,
 		Prompter:  flow.Unattended{},
@@ -219,7 +220,7 @@ func TestDownBackedOutOfSaysAborted(t *testing.T) {
 	processtest.Serve(t, nil)
 	presenter := &recorder{Recorder: &flowtest.Recorder{}}
 
-	outcome, err := down.Run(down.Params{
+	outcome, err := down.Run(t.Context(), down.Params{
 		Context:   flow.Context{ProjectDir: repo},
 		Request:   down.Request{Cwd: repo, Config: declared},
 		Prompter:  &flowtest.ScriptedPrompter{Abort: true},
@@ -231,5 +232,68 @@ func TestDownBackedOutOfSaysAborted(t *testing.T) {
 	}
 	if presenter.downed != nil {
 		t.Error("an abort reached the presenter as a conclusion")
+	}
+}
+
+// LUC-276 (a): a crashed job is settled by every shape of `run down`, and never
+// reported as stopped: it was not running.
+func TestDownSettlesACrashedJobWithoutReportingIt(t *testing.T) {
+	repo := project(t)
+	daemon := processtest.Serve(t, []domain.JobInfo{
+		{Name: "api", Status: domain.JobStatusRunning, WorkDir: repo},
+		{Name: "web", Status: domain.JobStatusCrashed, WorkDir: repo},
+	})
+
+	outcome, _, err := run(t, repo, down.Request{})
+
+	if err != nil {
+		t.Fatalf("down: %v", err)
+	}
+	if got := statuses(outcome.Results[0].Jobs); got != "api=stopped" {
+		t.Errorf("jobs = %s, want api alone", got)
+	}
+	if want := "stop_all:@" + repo; strings.Join(daemon.Actions(), " ") != want {
+		t.Errorf("requests = %v, want %s", daemon.Actions(), want)
+	}
+}
+
+func TestDownProfileSettlesItsCrashedJob(t *testing.T) {
+	repo := project(t)
+	daemon := processtest.Serve(t, []domain.JobInfo{
+		{Name: "api", Status: domain.JobStatusRunning, WorkDir: repo},
+		{Name: "web", Status: domain.JobStatusCrashed, WorkDir: repo},
+	})
+
+	outcome, _, err := run(t, repo, down.Request{Profile: "dev"})
+
+	if err != nil {
+		t.Fatalf("down: %v", err)
+	}
+	if got := statuses(outcome.Results[0].Jobs); got != "api=stopped web=not_running" {
+		t.Errorf("jobs = %s, want api stopped and web not_running", got)
+	}
+	if !slices.Contains(daemon.Actions(), "stop:web@"+repo) {
+		t.Errorf("requests = %v, want the crashed web settled", daemon.Actions())
+	}
+}
+
+func TestDownAllSettlesAWorktreeWhoseJobsAllCrashed(t *testing.T) {
+	repo := project(t)
+	feature := addWorktree(t, repo, "feature")
+	daemon := processtest.Serve(t, []domain.JobInfo{
+		{Name: "api", Status: domain.JobStatusRunning, WorkDir: repo},
+		{Name: "web", Status: domain.JobStatusCrashed, WorkDir: feature},
+	})
+
+	outcome, _, err := run(t, repo, down.Request{All: true})
+
+	if err != nil {
+		t.Fatalf("down --all: %v", err)
+	}
+	if len(outcome.Results) != 1 || outcome.Results[0].Branch != "main" {
+		t.Errorf("results = %+v, want main alone: feature stopped nothing", outcome.Results)
+	}
+	if !slices.Contains(daemon.Actions(), "stop_all:@"+feature) {
+		t.Errorf("requests = %v, want feature's crash settled", daemon.Actions())
 	}
 }

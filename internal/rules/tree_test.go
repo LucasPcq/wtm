@@ -152,7 +152,7 @@ func TestBuildForestStatusPreserved(t *testing.T) {
 	}
 }
 
-// flattenSample mirrors the forest output/tree_test.go renders, so the shape the
+// flattenSample mirrors the forest surface/cli/render/tree_test.go renders, so the shape the
 // two surfaces share is pinned where it is now decided.
 func flattenSample() domain.Forest {
 	return domain.Forest{

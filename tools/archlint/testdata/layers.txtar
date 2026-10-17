@@ -34,3 +34,57 @@ var _ = in.GlobalDir
 package worktree
 
 func Create() error { return nil }
+-- github.com/LucasPcq/wtm/internal/surface/cli/shared/shared.go --
+package shared
+
+func Interactive() bool { return false }
+-- github.com/LucasPcq/wtm/internal/surface/cli/render/render.go --
+package render
+
+import (
+	"github.com/LucasPcq/wtm/internal/surface/cli/shared" // want `internal/surface/cli/render must not import "github.com/LucasPcq/wtm/internal/surface/cli/shared" — formats and prints`
+)
+
+func Message() bool { return shared.Interactive() }
+-- github.com/LucasPcq/wtm/internal/surface/cli/wt/wt.go --
+package wt
+
+import "github.com/LucasPcq/wtm/internal/surface/cli/render"
+
+var _ = render.Message
+-- github.com/LucasPcq/wtm/internal/config/config.go --
+package config
+
+func Load() {}
+-- github.com/LucasPcq/wtm/internal/store/store.go --
+package store
+
+import (
+	"github.com/LucasPcq/wtm/internal/config"
+	"github.com/LucasPcq/wtm/internal/service/worktree" // want `internal/store must not import "github.com/LucasPcq/wtm/internal/service/worktree" — the one writer of each state file`
+)
+
+var _, _ = config.Load, worktree.Create
+
+func Remember() {}
+-- github.com/LucasPcq/wtm/internal/flow/leaky/leaky.go --
+package leaky
+
+import "github.com/LucasPcq/wtm/internal/store" // want `internal/flow must not import "github.com/LucasPcq/wtm/internal/store"`
+
+var _ = store.Remember
+-- github.com/LucasPcq/wtm/internal/rules/pure/pure.go --
+package pure
+
+import (
+	"net/url"
+	"os" // want `internal/rules must not import "os" — pure functions`
+	"os/exec" // want `internal/rules must not import "os/exec"`
+	"strings"
+)
+
+var _ = url.Parse
+
+var _, _, _ = os.Getenv, exec.Command, strings.TrimSpace
+-- github.com/LucasPcq/wtm/internal/newlayer/newlayer.go --
+package newlayer // want `internal/newlayer has no row in the layers table`

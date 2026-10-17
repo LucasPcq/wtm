@@ -54,7 +54,7 @@ func (f *fixture) run(t *testing.T, params runParams) (open.Outcome, *flowtest.R
 		}
 	}
 	presenter := &flowtest.Recorder{}
-	outcome, err := open.Run(open.Params{
+	outcome, err := open.Run(t.Context(), open.Params{
 		Context:   flow.Context{ProjectDir: f.repo, StateDir: filepath.Join(f.repo, ".git", "wtm")},
 		Request:   params.Request,
 		Prompter:  params.Prompter,

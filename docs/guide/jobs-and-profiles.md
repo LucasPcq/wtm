@@ -60,7 +60,7 @@ The runner carries its children's ports and named URLs, and wtm will not start a
 
 ## The run view, or `-d`
 
-`run up`, `run start` on a service and `run logs` open the **run view**: a full-screen view with one pane per job. Leaving it (`q`, or Ctrl+C outside focus mode) **detaches** (the jobs keep running in the background daemon), and `wtm run logs` reopens it.
+`run up`, `run start` on a service and `run logs` open the **run view**: a full-screen view with one pane per job. Leaving it (`q`) **detaches** (the jobs keep running in the background daemon), and `wtm run logs` reopens it. Ctrl+C outside focus mode detaches too once every job has started; while `run up` or `run start` is still starting them, it cancels the start instead: the view shows "Cancelling…" until the start has stopped, then exits with code 19, and a second Ctrl+C quits at once. The jobs already started, the one being started included, keep running: the recap lists them, and `wtm run down` stops them.
 
 - `-d` starts the jobs and gives the prompt back instead. A task always runs inline, with or without `-d`.
 - No view opens unless both stdin and stdout are a terminal (`wtm run up > run.log` included), nor under `--output json`: the run reports itself as lines, which is what a script or an agent gets.
@@ -87,7 +87,7 @@ Worktrees that share their ports (a [verbatim](isolation.md) worktree and its so
 | `detached` | a service whose launcher exited, leaving the work to something wtm does not own (a compose stack); nothing about it is verified, and it survives the daemon |
 | `joined` | this worktree's hold on a [shared service](shared-services.md) running in the main checkout; it owns no process |
 | `stopped` | stopped on request |
-| `crashed` | a service that exited without being asked to (`exit_code` in the JSON says how) |
+| `crashed` | a service that exited without being asked to (`exit_code` in the JSON says how); `run down` settles it to `stopped` |
 | `reaped` | a service that outlived the daemon which owned it, taken down by the next one |
 
 The results of `run up`, `run down` and `run stop` use their own vocabulary: `started`, `joined`, `done` (a task that ran to the end), `stopped`, `released` (a shared service this worktree let go of, still up for others), `already_running`, `not_running` (nothing was up under that name) and `error`.

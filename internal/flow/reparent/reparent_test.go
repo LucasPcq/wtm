@@ -36,7 +36,7 @@ func testContext(t *testing.T) flow.Context {
 func stack(t *testing.T, ctx flow.Context) {
 	t.Helper()
 	for _, step := range []struct{ branch, from string }{{"feat", "main"}, {"dev-a", "feat"}} {
-		if _, err := worktree.Create(domain.CreateParams{
+		if _, err := worktree.Create(t.Context(), domain.CreateParams{
 			ProjectDir:   ctx.ProjectDir,
 			StateDir:     ctx.StateDir,
 			Branch:       step.branch,
@@ -57,7 +57,7 @@ func TestRunAsksOnlyWhatTheRequestDoesNotCarry(t *testing.T) {
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: confirmReparent}}
 	presenter := &recorder{}
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"dev-a"}, To: "main"},
 		Prompter:  prompter,
@@ -84,7 +84,7 @@ func TestRecapNamesEveryMoveEvenWhenFlagsAnsweredThem(t *testing.T) {
 	stack(t, ctx)
 
 	prompter := &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: confirmReparent}}
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"dev-a"}, To: "main"},
 		Prompter:  prompter,
@@ -110,7 +110,7 @@ func TestRunAsksTheParentWhenTheRequestHasNone(t *testing.T) {
 		KeyRecap:  confirmReparent,
 	}}
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"dev-a"}},
 		Prompter:  prompter,
@@ -135,7 +135,7 @@ func TestRunAsksTheWorktreesWhenTheRequestHasNone(t *testing.T) {
 		Answers: map[string]string{KeyParent: "main", KeyRecap: confirmReparent},
 	}
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{},
 		Prompter:  prompter,
@@ -163,7 +163,7 @@ func TestRunAbortsWithoutTouchingAnything(t *testing.T) {
 	stack(t, ctx)
 
 	presenter := &recorder{}
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"dev-a"}, To: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Abort: true},
@@ -185,7 +185,7 @@ func TestRunAbortsWithoutTouchingAnything(t *testing.T) {
 
 func parentOf(t *testing.T, ctx flow.Context, branchName string) string {
 	t.Helper()
-	nodes, err := worktree.Nodes(worktree.NodesParams{ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir})
+	nodes, err := worktree.Nodes(t.Context(), worktree.NodesParams{ProjectDir: ctx.ProjectDir, StateDir: ctx.StateDir})
 	if err != nil {
 		t.Fatalf("nodes: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestUnattendedRefusesWithoutWorktrees(t *testing.T) {
 	ctx := testContext(t)
 	stack(t, ctx)
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{To: "main"},
 		Prompter:  flow.Unattended{},
@@ -219,7 +219,7 @@ func TestUnattendedRefusesWithoutParent(t *testing.T) {
 	ctx := testContext(t)
 	stack(t, ctx)
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"dev-a"}},
 		Prompter:  flow.Unattended{},
@@ -238,7 +238,7 @@ func TestUnattendedProceedsWhenBothAreGiven(t *testing.T) {
 	stack(t, ctx)
 
 	presenter := &recorder{}
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"dev-a"}, To: "main"},
 		Prompter:  flow.Unattended{},
@@ -260,7 +260,7 @@ func TestRunCollapsesRepeatedBranches(t *testing.T) {
 	ctx := testContext(t)
 	stack(t, ctx)
 
-	outcome, err := Run(Params{
+	outcome, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"dev-a", "dev-a"}, To: "main"},
 		Prompter:  flow.Unattended{},
@@ -300,7 +300,7 @@ func TestParentStepExcludesASelectionMadeInThePicker(t *testing.T) {
 		Answers: map[string]string{KeyParent: "main", KeyRecap: confirmReparent},
 	}
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{},
 		Prompter:  prompter,
@@ -324,7 +324,7 @@ func TestParentStepExcludesAPresetSelection(t *testing.T) {
 		Answers: map[string]string{KeyParent: "main", KeyRecap: confirmReparent},
 	}
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"feat"}},
 		Prompter:  prompter,
@@ -349,7 +349,7 @@ func TestTheWorktreeStepRefusesAnEmptySelection(t *testing.T) {
 	ctx := testContext(t)
 	stack(t, ctx)
 
-	_, err := Run(Params{
+	_, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{},
 		Prompter:  &flowtest.ScriptedPrompter{Sets: map[string][]string{KeyBranches: {}}},
@@ -369,7 +369,7 @@ func TestEachMovedWorktreeIsPublished(t *testing.T) {
 	presenter := &recorder{}
 	ctx.Publisher = &presenter.Recorder
 
-	if _, err := Run(Params{
+	if _, err := Run(t.Context(), Params{
 		Context:   ctx,
 		Request:   Request{Branches: []string{"dev-a"}, To: "main"},
 		Prompter:  &flowtest.ScriptedPrompter{Answers: map[string]string{KeyRecap: confirmReparent}},

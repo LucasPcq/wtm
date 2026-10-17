@@ -1,6 +1,7 @@
 package infra
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -8,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra/proc"
 )
 
 // GitCommonDirParams holds inputs for resolving the git common dir.
@@ -18,8 +20,8 @@ type GitCommonDirParams struct {
 // GitCommonDir runs `git rev-parse --git-common-dir` and resolves the result
 // to an absolute path. The common dir is shared across all worktrees of a
 // clone, so the returned path is stable from any worktree.
-func GitCommonDir(params GitCommonDirParams) (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--git-common-dir")
+func GitCommonDir(ctx context.Context, params GitCommonDirParams) (string, error) {
+	cmd := proc.Command(ctx, "git", "rev-parse", "--git-common-dir")
 	cmd.Dir = params.Dir
 	out, err := cmd.Output()
 	if err != nil {
@@ -40,8 +42,8 @@ func GitCommonDir(params GitCommonDirParams) (string, error) {
 
 // Toplevel runs `git rev-parse --show-toplevel` and returns the root directory
 // of the worktree containing dir.
-func Toplevel(dir string) (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+func Toplevel(ctx context.Context, dir string) (string, error) {
+	cmd := proc.Command(ctx, "git", "rev-parse", "--show-toplevel")
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
@@ -52,8 +54,8 @@ func Toplevel(dir string) (string, error) {
 
 // InsideGitRepo reads git's own verdict rather than any failure of rev-parse:
 // a missing git binary or an unreadable directory is an error, not an answer.
-func InsideGitRepo(dir string) (bool, error) {
-	cmd := exec.Command("git", "rev-parse", "--git-dir")
+func InsideGitRepo(ctx context.Context, dir string) (bool, error) {
+	cmd := proc.Command(ctx, "git", "rev-parse", "--git-dir")
 	cmd.Dir = dir
 	var stderr strings.Builder
 	cmd.Stderr = &stderr

@@ -1,6 +1,7 @@
 package rules_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -326,9 +327,29 @@ func TestReduceOriginValueCanonicalizes(t *testing.T) {
 	}
 }
 
-func TestRewriteOriginNamesAForeignHostWithoutItsCredentials(t *testing.T) {
-	got := rules.RewriteOrigin(rewriteParams("https://u:pw@api.staging.example.com/v1"))
+func TestRewriteOriginNamesAForeignHost(t *testing.T) {
+	got := rules.RewriteOrigin(rewriteParams("https://api.staging.example.com/v1"))
 	if got.Status != domain.EnvPortStatusForeignHost || got.ForeignHost != "api.staging.example.com" {
 		t.Fatalf("got %+v, want foreign host api.staging.example.com", got)
+	}
+}
+
+// LUC-279: the host a refusal found is the user's text — read up to a "#"
+// before the "@", it was a password — so no report names it.
+func TestEnvPortReportNamesNoForeignHost(t *testing.T) {
+	for _, value := range []string{
+		"https://u:pw@api.staging.example.com/v1",
+		"http://user:hunter2#x@api.staging.example.com/v1",
+		"http://user:hunter2?x@api.staging.example.com/v1",
+	} {
+		got := rules.RewriteOrigin(rewriteParams(value))
+		plan := domain.EnvPortPlan{Entries: []domain.EnvPortEntry{{File: ".env", Key: "API", Port: "P", Status: got.Status, ForeignHost: got.ForeignHost}}}
+		lines := strings.Join(rules.EnvPortAnomalyLines(plan), "\n")
+		if got.Status != domain.EnvPortStatusForeignHost || strings.Contains(lines, got.ForeignHost) {
+			t.Errorf("%q: status %s, anomaly %q", value, got.Status, lines)
+		}
+		if redacted := rules.RedactEnvPortPlan(plan); redacted.Entries[0].ForeignHost != "" {
+			t.Errorf("%q: redacted foreign_host = %q", value, redacted.Entries[0].ForeignHost)
+		}
 	}
 }

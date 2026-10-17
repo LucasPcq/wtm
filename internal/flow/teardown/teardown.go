@@ -6,6 +6,7 @@
 package teardown
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -37,16 +38,16 @@ type StopParams struct {
 // Stop stops the worktree's own jobs and checks they are gone. A job still up
 // refuses the removal: an API connected to its database is what a drop cannot
 // go through, and a process left in a deleted directory is nobody's to stop.
-func Stop(params StopParams) error {
+func Stop(ctx context.Context, params StopParams) error {
 	if params.Target.Path == "" {
 		return nil
 	}
 	var stopped []string
-	err := params.Presenter.Stage(flow.StageParams{
+	err := params.Presenter.Stage(ctx, flow.StageParams{
 		Message: fmt.Sprintf(domain.CleanStoppingServicesFmt, params.Target.Branch),
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var stopErr error
-			stopped, stopErr = process.StopWorktreeJobs(process.WorktreeJobsParams{
+			stopped, stopErr = process.StopWorktreeJobs(ctx, process.WorktreeJobsParams{
 				SocketPath: process.SocketPath(),
 				WorkDir:    params.Target.Path,
 			})
@@ -75,12 +76,12 @@ type HooksParams struct {
 
 // Hooks runs on_clean as its own phase, so the hooks do not fight the removal's
 // progress for the terminal.
-func Hooks(params HooksParams) error {
+func Hooks(ctx context.Context, params HooksParams) error {
 	hooks := params.Context.Config.Project.Hooks.OnClean
 	if len(hooks) == 0 || params.Target.Path == "" {
 		return nil
 	}
-	ordinal.BeforeHooks(params.Context, params.Target.Branch)
+	ordinal.BeforeHooks(ctx, params.Context, params.Target.Branch)
 	return params.Presenter.HookPhase(flow.HookPhaseParams{
 		Title: params.Title,
 		LogPath: rules.HooksLogPath(rules.HooksLogPathParams{
@@ -89,7 +90,7 @@ func Hooks(params HooksParams) error {
 			Branch:   params.Target.Branch,
 		}),
 		Run: func(sink flow.HookSink) error {
-			return worktree.RunCleanHooks(domain.CleanHooksParams{
+			return worktree.RunCleanHooks(ctx, domain.CleanHooksParams{
 				ProjectDir:   params.Context.ProjectDir,
 				StateDir:     params.Context.StateDir,
 				WorktreePath: params.Target.Path,
@@ -120,14 +121,14 @@ type SalvageParams struct {
 // has already dropped its entry, so the branch and the state go too and the
 // leftover directory is named, rather than stranding a worktree git no longer
 // knows beside a branch and a namespace nothing would ever reclaim.
-func Salvage(params SalvageParams) error {
-	if worktree.StillTracked(worktree.FindByBranchParams{ProjectDir: params.Clean.ProjectDir, Branch: params.Clean.Branch}) {
+func Salvage(ctx context.Context, params SalvageParams) error {
+	if worktree.StillTracked(ctx, worktree.FindByBranchParams{ProjectDir: params.Clean.ProjectDir, Branch: params.Clean.Branch}) {
 		return params.Cause
 	}
-	if err := worktree.FinishRemoval(params.Clean); err != nil {
+	if err := worktree.FinishRemoval(ctx, params.Clean); err != nil {
 		return err
 	}
-	PublishRemoved(params)
+	PublishRemoved(ctx, params)
 	params.Presenter.Status(flow.Notice{
 		Kind: flow.NoticeWarning,
 		Text: fmt.Sprintf(domain.CleanLeftOnDiskFmt, params.Clean.Branch, params.Path, params.Cause, params.Path),
@@ -144,8 +145,8 @@ type ReclaimParams struct {
 // Reclaim is what follows a removal: the data the worktree held, and its job
 // logs. The logs are best effort — leftover files are not worth failing a
 // removal that already happened.
-func Reclaim(params ReclaimParams) []domain.NamespaceOutcome {
-	outcomes := params.Dropper.Drop(params.Target.Branch)
+func Reclaim(ctx context.Context, params ReclaimParams) []domain.NamespaceOutcome {
+	outcomes := params.Dropper.Drop(ctx, params.Target.Branch)
 	_ = process.PurgeWorktreeLogs(rules.WorktreeLogDir(rules.WorktreeLogDirParams{
 		StateDir: params.Context.StateDir,
 		Branch:   params.Target.Branch,
@@ -160,11 +161,11 @@ type ReleaseParams struct {
 
 // Release lets go of the worktree's claims on the shared services, last: the
 // last claim released stops a service, which then takes no namespace back.
-func Release(params ReleaseParams) {
+func Release(ctx context.Context, params ReleaseParams) {
 	if params.Target.Path == "" {
 		return
 	}
-	if err := process.ReleaseWorktreeJobs(process.WorktreeJobsParams{
+	if err := process.ReleaseWorktreeJobs(ctx, process.WorktreeJobsParams{
 		SocketPath: process.SocketPath(),
 		WorkDir:    params.Target.Path,
 	}); err != nil {
@@ -176,8 +177,12 @@ type Removal struct {
 	Target     Target
 	Absent     bool
 	Namespaces []domain.NamespaceOutcome
+	// NotReached is a target an interrupt stopped the batch before: untouched.
+	NotReached bool
 	Err        error
 }
+
+func (r Removal) Removed() bool { return r.Err == nil && !r.NotReached }
 
 type BatchParams struct {
 	Context   flow.Context
@@ -199,7 +204,7 @@ type BatchParams struct {
 	// on the command line.
 	NameHookPhases bool
 	// Recover settles a removal git reported as failed; nil settles it as Salvage does.
-	Recover func(SalvageParams) error
+	Recover func(context.Context, SalvageParams) error
 	OnStart func(flow.Progress)
 	OnDone  func(Removal)
 }
@@ -208,34 +213,45 @@ type BatchParams struct {
 // before the first removal, while every environment still exists, and their
 // claims are released after the last, together: the claim one removal lets go
 // of may be what keeps a service up for the next one's drop.
-func Batch(params BatchParams) []Removal {
+func Batch(ctx context.Context, params BatchParams) []Removal {
 	inside := insideTarget(params.Targets)
-	dropper := owed.NewDropper(owed.DropperParams{
+	dropper := owed.NewDropper(ctx, owed.DropperParams{
 		Context:   params.Context,
 		Presenter: params.Presenter,
-		Snapshot:  owed.Read(owed.ReadParams{Context: params.Context, Branches: branchesOf(params.Targets)}),
+		Snapshot:  owed.Read(ctx, owed.ReadParams{Context: params.Context, Branches: branchesOf(params.Targets)}),
 		StartDown: params.StartDown,
 		KeepData:  params.KeepData,
 	})
 
 	removals := make([]Removal, 0, len(params.Targets))
 	for index, target := range params.Targets {
+		if ctx.Err() != nil {
+			removals = append(removals, notReached(params.Targets[index:])...)
+			break
+		}
 		if params.OnStart != nil {
 			params.OnStart(flow.Progress{Branch: target.Branch, Position: index + 1, Total: len(params.Targets)})
 		}
-		removal := removeOne(removeOneParams{Batch: params, Target: target, Dropper: dropper})
+		removal := removeOne(ctx, removeOneParams{Batch: params, Target: target, Dropper: dropper})
 		removals = append(removals, removal)
 		if params.OnDone != nil {
 			params.OnDone(removal)
+		}
+		if removal.Err != nil && params.StopOnFailure && ctx.Err() != nil {
+			removals = append(removals, notReached(params.Targets[index+1:])...)
 		}
 		if removal.Err != nil && params.StopOnFailure {
 			break
 		}
 	}
 
+	// The claims of what went are let go of, interrupted or not: nothing would
+	// release them later.
+	shielded, release := worktree.Shield(ctx)
+	defer release()
 	for _, removal := range removals {
-		if removal.Err == nil {
-			Release(ReleaseParams{Presenter: params.Presenter, Target: removal.Target})
+		if removal.Removed() {
+			Release(shielded, ReleaseParams{Presenter: params.Presenter, Target: removal.Target})
 		}
 	}
 	dropper.Close()
@@ -252,25 +268,58 @@ type removeOneParams struct {
 	Dropper *owed.Dropper
 }
 
-func removeOne(params removeOneParams) Removal {
+func removeOne(ctx context.Context, params removeOneParams) Removal {
+	removal := prepare(ctx, params)
+	if removal.Err != nil {
+		removal.Err = flow.Interrupted(ctx, removal.Err)
+		return removal
+	}
+	// From here the worktree goes all the way — removal, branch, event, data —
+	// or not at all: an interrupt half-way would strand a branch, a namespace
+	// and an event nobody publishes.
+	shielded, release := worktree.Shield(ctx)
+	defer release()
+	removal = remove(shielded, removeParams{removeOneParams: params, Interrupted: ctx.Err})
+	removal.Err = flow.Interrupted(ctx, removal.Err)
+	return removal
+}
+
+// prepare is what may be interrupted before a removal: the jobs stopping, the
+// on_clean hooks. Either refuses the removal and leaves the worktree whole.
+func prepare(ctx context.Context, params removeOneParams) Removal {
 	batch, target := params.Batch, params.Target
 	removal := Removal{Target: target}
-	if err := Stop(StopParams{Context: batch.Context, Presenter: batch.Presenter, Target: target, Force: batch.Force}); err != nil {
+	if err := Stop(ctx, StopParams{Context: batch.Context, Presenter: batch.Presenter, Target: target, Force: batch.Force}); err != nil {
 		removal.Err = err
 		return removal
 	}
-	hookErr := Hooks(HooksParams{
+	hookErr := Hooks(ctx, HooksParams{
 		Context:   batch.Context,
 		Presenter: batch.Presenter,
 		Target:    target,
 		Title:     hooksTitle(hooksTitleParams{Target: target, Named: batch.NameHookPhases || len(batch.Targets) > 1}),
 	})
-	publish.Deprovisioned(publish.DeprovisionedParams{Context: batch.Context, Branch: target.Branch, Err: hookErr})
+	publish.Deprovisioned(context.WithoutCancel(ctx), publish.DeprovisionedParams{Context: batch.Context, Branch: target.Branch, Err: hookErr})
 	if hookErr != nil {
 		removal.Err = hookErr
 		return removal
 	}
+	if ctx.Err() != nil {
+		removal.Err = domain.ErrCancelled
+	}
+	return removal
+}
 
+type removeParams struct {
+	removeOneParams
+	// Interrupted reports an interrupt the shielded removal goes on through: it
+	// then asks nobody anything.
+	Interrupted func() error
+}
+
+func remove(ctx context.Context, params removeParams) Removal {
+	batch, target := params.Batch, params.Target
+	removal := Removal{Target: target}
 	clean := domain.CleanParams{
 		ProjectDir: batch.Context.ProjectDir,
 		StateDir:   batch.Context.StateDir,
@@ -281,21 +330,21 @@ func removeOne(params removeOneParams) Removal {
 		SkipHooks:  true,
 	}
 	salvage := SalvageParams{Context: batch.Context, Presenter: batch.Presenter, Clean: clean, Path: target.Path}
-	if last, captured := publish.Capture(batch.Context, target.Branch); captured {
+	if last, captured := publish.Capture(ctx, batch.Context, target.Branch); captured {
 		salvage.Last = &last
 	}
-	err := batch.Presenter.Stage(flow.StageParams{
+	err := batch.Presenter.Stage(ctx, flow.StageParams{
 		Message: fmt.Sprintf(domain.CleanLoadingFmt, target.Branch),
-		Work:    func() error { return worktree.Clean(clean) },
+		Work:    func(ctx context.Context) error { return worktree.Clean(ctx, clean) },
 	})
 	// A branch git refused to delete fails the run after the worktree went:
 	// the worktree is gone all the same, and that is what consumers track.
-	if err == nil || (!errors.Is(err, domain.ErrWorktreeRemoveFailed) && !worktree.StillTracked(worktree.FindByBranchParams{ProjectDir: clean.ProjectDir, Branch: clean.Branch})) {
-		PublishRemoved(salvage)
+	if err == nil || (!errors.Is(err, domain.ErrWorktreeRemoveFailed) && !worktree.StillTracked(ctx, worktree.FindByBranchParams{ProjectDir: clean.ProjectDir, Branch: clean.Branch})) {
+		PublishRemoved(ctx, salvage)
 	}
 	if errors.Is(err, domain.ErrWorktreeRemoveFailed) {
 		salvage.Cause = err
-		err = recoverer(batch)(salvage)
+		err = recoverer(recovererParams{Batch: batch, Interrupted: params.Interrupted() != nil})(ctx, salvage)
 	}
 	// Already gone is a removal that happened earlier, which keeps a re-run idempotent.
 	if errors.Is(err, domain.ErrWorktreeNotFound) {
@@ -305,22 +354,37 @@ func removeOne(params removeOneParams) Removal {
 		removal.Err = err
 		return removal
 	}
-	removal.Namespaces = Reclaim(ReclaimParams{Context: batch.Context, Target: target, Dropper: params.Dropper})
+	removal.Namespaces = Reclaim(ctx, ReclaimParams{Context: batch.Context, Target: target, Dropper: params.Dropper})
 	return removal
+}
+
+func notReached(targets []Target) []Removal {
+	removals := make([]Removal, 0, len(targets))
+	for _, target := range targets {
+		removals = append(removals, Removal{Target: target, NotReached: true})
+	}
+	return removals
 }
 
 // PublishRemoved reports a removal that went through, whichever of the three
 // removals settled it.
-func PublishRemoved(params SalvageParams) {
+func PublishRemoved(ctx context.Context, params SalvageParams) {
 	if params.Last == nil {
 		return
 	}
-	publish.Removed(params.Context, *params.Last)
+	publish.Removed(ctx, params.Context, *params.Last)
 }
 
-func recoverer(batch BatchParams) func(SalvageParams) error {
-	if batch.Recover != nil {
-		return batch.Recover
+type recovererParams struct {
+	Batch       BatchParams
+	Interrupted bool
+}
+
+// recoverer is the batch's own unless the run was interrupted: a recovery
+// may ask for sudo, and an interrupted run asks nothing.
+func recoverer(params recovererParams) func(context.Context, SalvageParams) error {
+	if params.Batch.Recover != nil && !params.Interrupted {
+		return params.Batch.Recover
 	}
 	return Salvage
 }

@@ -2,10 +2,13 @@
 package fastforward
 
 import (
+	"context"
 	"errors"
+	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/branch"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
@@ -47,8 +50,9 @@ func Operation() flow.Operation {
 	return flow.Operation{Kind: domain.OpKindFastForward, Mode: flow.ModeBlocking}
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &fastForwardFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -59,6 +63,7 @@ func Run(params Params) (Outcome, error) {
 }
 
 type fastForwardFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -104,6 +109,9 @@ func (f *fastForwardFlow) run() (Outcome, error) {
 	if err != nil {
 		return outcome, err
 	}
+	if rules.FastForwardInterrupted(results) {
+		return outcome, fmt.Errorf("%w: %w", domain.ErrAborted, domain.ErrCancelled)
+	}
 	if hasFailure(results) {
 		return outcome, domain.ErrAborted
 	}
@@ -111,7 +119,7 @@ func (f *fastForwardFlow) run() (Outcome, error) {
 }
 
 func (f *fastForwardFlow) load() error {
-	statuses, err := worktree.List(domain.ListParams{
+	statuses, err := worktree.List(f.runCtx, domain.ListParams{
 		ProjectDir: f.ctx.ProjectDir,
 		StateDir:   f.ctx.StateDir,
 		Config:     f.ctx.Config,
@@ -124,7 +132,7 @@ func (f *fastForwardFlow) load() error {
 	if len(f.request.Branches) == 0 {
 		return nil
 	}
-	selection, err := worktree.ResolveSyncBranches(worktree.ResolveSyncBranchesParams{
+	selection, err := worktree.ResolveSyncBranches(f.runCtx, worktree.ResolveSyncBranchesParams{
 		ProjectDir: f.ctx.ProjectDir,
 		Queries:    f.request.Branches,
 	})
@@ -142,12 +150,16 @@ type advanceParams struct {
 
 func (f *fastForwardFlow) advance(params advanceParams) ([]domain.FastForwardResult, error) {
 	var results []domain.FastForwardResult
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.FastForwardStage,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			for _, name := range params.Branches {
+				if ctx.Err() != nil {
+					results = append(results, branch.FastForward(ctx, branch.FastForwardParams{ProjectDir: f.ctx.ProjectDir, Branch: name}))
+					continue
+				}
 				check := f.check(name)
-				results = append(results, branch.FastForward(branch.FastForwardParams{
+				results = append(results, branch.FastForward(ctx, branch.FastForwardParams{
 					ProjectDir: f.ctx.ProjectDir,
 					Branch:     name,
 					Force:      params.Force,
@@ -166,7 +178,7 @@ func (f *fastForwardFlow) check(name string) domain.FastForwardCheck {
 	if cached, ok := f.checks[name]; ok {
 		return cached
 	}
-	result, err := branch.Check(branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: name})
+	result, err := branch.Check(f.runCtx, branch.BranchParams{ProjectDir: f.ctx.ProjectDir, Branch: name})
 	if err != nil {
 		result = domain.FastForwardCheck{Branch: name, State: domain.DivergenceUnknown}
 	}

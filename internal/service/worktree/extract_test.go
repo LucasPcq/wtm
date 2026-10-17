@@ -38,7 +38,7 @@ func TestExtractMovesModifiedFile(t *testing.T) {
 	env := setupExtract(t)
 	writeFile(t, env.source, "a.txt", "line1\nCHANGED\nline3\n")
 
-	result, err := Extract(domain.ExtractParams{
+	result, err := Extract(t.Context(), domain.ExtractParams{
 		SourcePath: env.source,
 		TargetPath: env.target,
 		Files:      []domain.ExtractFile{{Path: "a.txt", Status: domain.ExtractStatusModified}},
@@ -65,7 +65,7 @@ func TestExtractMovesUntrackedFile(t *testing.T) {
 	env := setupExtract(t)
 	writeFile(t, env.source, "c.txt", "brand new\n")
 
-	_, err := Extract(domain.ExtractParams{
+	_, err := Extract(t.Context(), domain.ExtractParams{
 		SourcePath: env.source,
 		TargetPath: env.target,
 		Files:      []domain.ExtractFile{{Path: "c.txt", Status: domain.ExtractStatusUntracked}},
@@ -88,7 +88,7 @@ func TestExtractMovesDeletedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := Extract(domain.ExtractParams{
+	_, err := Extract(t.Context(), domain.ExtractParams{
 		SourcePath: env.source,
 		TargetPath: env.target,
 		Files:      []domain.ExtractFile{{Path: "b.txt", Status: domain.ExtractStatusDeleted}},
@@ -109,7 +109,7 @@ func TestExtractKeepLeavesSource(t *testing.T) {
 	env := setupExtract(t)
 	writeFile(t, env.source, "a.txt", "line1\nKEEP\nline3\n")
 
-	_, err := Extract(domain.ExtractParams{
+	_, err := Extract(t.Context(), domain.ExtractParams{
 		SourcePath: env.source,
 		TargetPath: env.target,
 		Keep:       true,
@@ -132,7 +132,7 @@ func TestExtractConflictAbortsAndLeavesSourceIntact(t *testing.T) {
 	writeFile(t, env.source, "a.txt", "line1\nSRC\nline3\n")
 	writeFile(t, env.target, "a.txt", "line1\nTGT\nline3\n")
 
-	_, err := Extract(domain.ExtractParams{
+	_, err := Extract(t.Context(), domain.ExtractParams{
 		SourcePath: env.source,
 		TargetPath: env.target,
 		Files:      []domain.ExtractFile{{Path: "a.txt", Status: domain.ExtractStatusModified}},
@@ -154,7 +154,7 @@ func TestExtractUntrackedCollisionAborts(t *testing.T) {
 	writeFile(t, env.source, "c.txt", "from source\n")
 	writeFile(t, env.target, "c.txt", "already here\n")
 
-	_, err := Extract(domain.ExtractParams{
+	_, err := Extract(t.Context(), domain.ExtractParams{
 		SourcePath: env.source,
 		TargetPath: env.target,
 		Files:      []domain.ExtractFile{{Path: "c.txt", Status: domain.ExtractStatusUntracked}},
@@ -172,7 +172,7 @@ func TestExtractResolveWritesMarkersAndKeepsSource(t *testing.T) {
 	writeFile(t, env.source, "a.txt", "line1\nSRC\nline3\n")
 	writeFile(t, env.target, "a.txt", "line1\nTGT\nline3\n")
 
-	result, err := Extract(domain.ExtractParams{
+	result, err := Extract(t.Context(), domain.ExtractParams{
 		SourcePath:   env.source,
 		SourceBranch: "main",
 		TargetPath:   env.target,
@@ -202,7 +202,7 @@ func TestExtractResolveAppliesCleanFilesAlongsideConflicts(t *testing.T) {
 	writeFile(t, env.target, "a.txt", "line1\nTGT\nline3\n")
 	writeFile(t, env.source, "b.txt", "base\nappended\n")
 
-	result, err := Extract(domain.ExtractParams{
+	result, err := Extract(t.Context(), domain.ExtractParams{
 		SourcePath:   env.source,
 		SourceBranch: "main",
 		TargetPath:   env.target,
@@ -232,12 +232,12 @@ func TestExtractResolveAppliesCleanFilesAlongsideConflicts(t *testing.T) {
 func TestExtractGuards(t *testing.T) {
 	env := setupExtract(t)
 
-	_, err := Extract(domain.ExtractParams{SourcePath: env.source, TargetPath: env.source})
+	_, err := Extract(t.Context(), domain.ExtractParams{SourcePath: env.source, TargetPath: env.source})
 	if !errors.Is(err, domain.ErrSameWorktree) {
 		t.Errorf("same worktree: err = %v", err)
 	}
 
-	_, err = Extract(domain.ExtractParams{SourcePath: env.source, TargetPath: env.target})
+	_, err = Extract(t.Context(), domain.ExtractParams{SourcePath: env.source, TargetPath: env.target})
 	if !errors.Is(err, domain.ErrNoFilesSelected) {
 		t.Errorf("no files: err = %v", err)
 	}
@@ -248,7 +248,7 @@ func TestExtractResolveMergesUntrackedCollision(t *testing.T) {
 	writeFile(t, env.source, "c.txt", "from source\n")
 	writeFile(t, env.target, "c.txt", "already here\n")
 
-	result, err := Extract(domain.ExtractParams{
+	result, err := Extract(t.Context(), domain.ExtractParams{
 		SourcePath:   env.source,
 		SourceBranch: "main",
 		TargetPath:   env.target,
@@ -280,7 +280,7 @@ func TestExtractUntrackedIdenticalContentIsNotAConflict(t *testing.T) {
 	writeFile(t, env.source, "c.txt", "same bytes\n")
 	writeFile(t, env.target, "c.txt", "same bytes\n")
 
-	result, err := Extract(domain.ExtractParams{
+	result, err := Extract(t.Context(), domain.ExtractParams{
 		SourcePath: env.source,
 		TargetPath: env.target,
 		Files:      []domain.ExtractFile{{Path: "c.txt", Status: domain.ExtractStatusUntracked}},
@@ -305,7 +305,7 @@ func TestExtractUntrackedBinaryCollisionAbortsEvenInResolveMode(t *testing.T) {
 	writeFile(t, env.source, "blob.bin", "sourc\x00e bytes")
 	writeFile(t, env.target, "blob.bin", "targe\x00t bytes")
 
-	_, err := Extract(domain.ExtractParams{
+	_, err := Extract(t.Context(), domain.ExtractParams{
 		SourcePath:   env.source,
 		TargetPath:   env.target,
 		TargetBranch: "feat",
@@ -325,7 +325,7 @@ func TestExtractMovesSingleFileOutOfNewDirectory(t *testing.T) {
 	writeFile(t, env.source, "newmod/x.go", "package newmod\n")
 	writeFile(t, env.source, "newmod/sub/y.go", "package sub\n")
 
-	_, err := Extract(domain.ExtractParams{
+	_, err := Extract(t.Context(), domain.ExtractParams{
 		SourcePath: env.source,
 		TargetPath: env.target,
 		Files:      []domain.ExtractFile{{Path: "newmod/sub/y.go", Status: domain.ExtractStatusUntracked}},
@@ -355,7 +355,7 @@ func TestExtractMovesUntrackedPathWithSpaces(t *testing.T) {
 	env := setupExtract(t)
 	writeFile(t, env.source, "a b.txt", "spaced\n")
 
-	_, err := Extract(domain.ExtractParams{
+	_, err := Extract(t.Context(), domain.ExtractParams{
 		SourcePath: env.source,
 		TargetPath: env.target,
 		Files:      []domain.ExtractFile{{Path: "a b.txt", Status: domain.ExtractStatusUntracked}},
@@ -376,7 +376,7 @@ func TestExtractMovesRenamedFile(t *testing.T) {
 	env := setupExtract(t)
 	gitRun(t, env.source, "mv", "a.txt", "renamed.txt")
 
-	_, err := Extract(domain.ExtractParams{
+	_, err := Extract(t.Context(), domain.ExtractParams{
 		SourcePath: env.source,
 		TargetPath: env.target,
 		Files: []domain.ExtractFile{

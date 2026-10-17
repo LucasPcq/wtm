@@ -2,22 +2,25 @@
 package decide
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
+	"github.com/LucasPcq/wtm/internal/flow/envports"
 	"github.com/LucasPcq/wtm/internal/rules"
 	"github.com/LucasPcq/wtm/internal/service/branch"
+	"github.com/LucasPcq/wtm/internal/service/memory"
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
-func BranchCandidates(projectDir string) []domain.BranchCandidate {
-	return branch.Candidates(branch.ListParams{ProjectDir: projectDir})
+func BranchCandidates(ctx context.Context, projectDir string) []domain.BranchCandidate {
+	return branch.Candidates(ctx, branch.ListParams{ProjectDir: projectDir})
 }
 
 // MemoizedTarget caches branch classification for one run: it costs ~3 git
 // subprocesses, and a step, a recap and a warning all classify the same name.
-func MemoizedTarget(projectDir string) func(string) domain.BranchTarget {
+func MemoizedTarget(ctx context.Context, projectDir string) func(string) domain.BranchTarget {
 	cache := make(map[string]domain.BranchTarget)
 	return func(name string) domain.BranchTarget {
 		if name == "" {
@@ -26,7 +29,7 @@ func MemoizedTarget(projectDir string) func(string) domain.BranchTarget {
 		if target, ok := cache[name]; ok {
 			return target
 		}
-		target := branch.Target(branch.BranchParams{ProjectDir: projectDir, Branch: name})
+		target := branch.Target(ctx, branch.BranchParams{ProjectDir: projectDir, Branch: name})
 		cache[name] = target
 		return target
 	}
@@ -54,13 +57,13 @@ type SourceUpdateParams struct {
 
 // SourceUpdate classifies the divergence from origin of whichever branch the
 // worktree starts from: the target branch when it already exists locally (its
-// commits are what gets checked out), the source branch otherwise.
-func SourceUpdate(params SourceUpdateParams) SourceUpdatePrompt {
-	subject := params.Source
-	if params.Target != nil && params.Branch != "" &&
-		params.Target(params.Branch).State == domain.BranchTargetExisting {
-		subject = params.Branch
+// commits are what gets checked out), its origin counterpart when it exists only
+// there, the source branch otherwise.
+func SourceUpdate(ctx context.Context, params SourceUpdateParams) SourceUpdatePrompt {
+	if upstream := upstreamOf(params); upstream != "" {
+		return SourceUpdatePrompt{Branch: upstream, SkipReason: domain.CheckoutSourceUpdateSkipNew}
 	}
+	subject := startOf(params)
 	if subject == "" {
 		return SourceUpdatePrompt{SkipReason: domain.SourceUpdateSkipNoSource}
 	}
@@ -68,7 +71,7 @@ func SourceUpdate(params SourceUpdateParams) SourceUpdatePrompt {
 		return SourceUpdatePrompt{Branch: subject, SkipReason: domain.SourceUpdateSkipRemote}
 	}
 
-	state, ab := branch.Divergence(branch.BranchParams{ProjectDir: params.ProjectDir, Branch: subject})
+	state, ab := branch.Divergence(ctx, branch.BranchParams{ProjectDir: params.ProjectDir, Branch: subject})
 	if rules.ShouldOfferFastForward(state) {
 		return SourceUpdatePrompt{
 			Branch:      subject,
@@ -90,19 +93,21 @@ func SourceUpdate(params SourceUpdateParams) SourceUpdatePrompt {
 	return SourceUpdatePrompt{Branch: subject, SkipReason: domain.SourceUpdateSkipUpToDate}
 }
 
-type FastForwardSubjectParams struct {
-	Target     domain.BranchTarget
-	FromBranch string
-	Branch     string
+func startOf(params SourceUpdateParams) string {
+	if params.Target == nil || params.Branch == "" {
+		return params.Source
+	}
+	if params.Target(params.Branch).State == domain.BranchTargetExisting {
+		return params.Branch
+	}
+	return params.Source
 }
 
-// FastForwardSubject names the branch a fast-forward updates: the source for a
-// branch git is about to create, the worktree's own branch when it already exists.
-func FastForwardSubject(params FastForwardSubjectParams) string {
-	if rules.SourceIsStartPoint(params.Target.State) {
-		return params.FromBranch
+func upstreamOf(params SourceUpdateParams) string {
+	if params.Target == nil || params.Branch == "" {
+		return ""
 	}
-	return params.Branch
+	return params.Target(params.Branch).Upstream
 }
 
 type EnvFallbackParams struct {
@@ -114,11 +119,11 @@ type EnvFallbackParams struct {
 
 // EnvParentFallback: the "parent" strategy silently sources .env from the main
 // worktree when the source branch has no local one.
-func EnvParentFallback(params EnvFallbackParams) (bool, string) {
+func EnvParentFallback(ctx context.Context, params EnvFallbackParams) (bool, string) {
 	if params.Source == "" {
 		return false, ""
 	}
-	applies := worktree.EnvParentFallsBackToMain(worktree.EnvFallbackParams{
+	applies := worktree.EnvParentFallsBackToMain(ctx, worktree.EnvFallbackParams{
 		ProjectDir:  params.ProjectDir,
 		Source:      params.Source,
 		Config:      params.Config,
@@ -174,8 +179,8 @@ func IsolationOptions(params IsolationOptionsParams) []flow.Option {
 
 // UpdateFastForward and UpdateKeep answer a source-update step.
 const (
-	UpdateFastForward = "ff"
-	UpdateKeep        = "keep"
+	UpdateFastForward = domain.SourceUpdateFastForward
+	UpdateKeep        = domain.SourceUpdateKeep
 )
 
 type SourceUpdateStepParams struct {
@@ -187,10 +192,15 @@ type SourceUpdateStepParams struct {
 // SourceUpdateStep applies only to a behind-only branch; a diverged one is not a
 // gate here, it becomes a ⚠ line in the recap.
 func SourceUpdateStep(params SourceUpdateStepParams) flow.Step {
+	given := ""
+	if params.FastForward {
+		given = UpdateFastForward
+	}
 	return flow.Step{
-		Kind:  flow.StepSelect,
-		Key:   params.Key,
-		Label: domain.SourceUpdateLabel,
+		Memory: flow.Memory{ID: domain.RememberSourceUpdate},
+		Kind:   flow.StepSelect,
+		Key:    params.Key,
+		Label:  domain.SourceUpdateLabel,
 		Skip: func(answers flow.Answers) (bool, string) {
 			prompt := params.Prompt(answers)
 			if prompt.Show && !prompt.AbortOnDecline {
@@ -210,9 +220,6 @@ func SourceUpdateStep(params SourceUpdateStepParams) flow.Step {
 			}, nil
 		},
 		Resolve: func(flow.Answers) (flow.Answer, error) {
-			if params.FastForward {
-				return flow.Answer{Value: UpdateFastForward}, nil
-			}
 			return flow.Answer{Value: UpdateKeep}, nil
 		},
 		Summarize: func(answer flow.Answer) string {
@@ -221,7 +228,8 @@ func SourceUpdateStep(params SourceUpdateStepParams) flow.Step {
 			}
 			return domain.SourceUpdateSummaryKeep
 		},
-		Flag: domain.FlagFF,
+		Flag:  domain.FlagFF,
+		Given: given,
 	}
 }
 
@@ -237,22 +245,22 @@ type ApplyFastForwardParams struct {
 // effort: a branch that cannot be cleanly fast-forwarded is left as-is and the
 // run proceeds from it. Interactively a failure asks whether to go on from the
 // stale branch; proceed is false when that is declined.
-func ApplyFastForward(params ApplyFastForwardParams) (proceed bool) {
+func ApplyFastForward(ctx context.Context, params ApplyFastForwardParams) (proceed bool) {
 	branchParams := branch.BranchParams{ProjectDir: params.ProjectDir, Branch: params.Subject}
 	if !params.Prompter.Interactive() {
-		_ = branch.FastForwardIfBehind(branchParams)
+		_ = branch.FastForwardIfBehind(ctx, branchParams)
 		return true
 	}
 
-	ffErr := params.Presenter.Stage(flow.StageParams{
+	ffErr := params.Presenter.Stage(ctx, flow.StageParams{
 		Message: fmt.Sprintf(domain.SourceFastForwardLoadingFmt, params.Subject),
-		Work:    func() error { return branch.FastForwardToOrigin(branchParams) },
+		Work:    func(ctx context.Context) error { return branch.FastForwardToOrigin(ctx, branchParams) },
 	})
 	if ffErr == nil {
 		return true
 	}
 
-	_, ab := branch.Divergence(branchParams)
+	_, ab := branch.Divergence(ctx, branchParams)
 	proceed, err := params.Prompter.Confirm(flow.ConfirmParams{
 		Title:      fmt.Sprintf(Pick(PickParams{Many: params.Many, One: domain.SourceProceedStalePrompt, Several: domain.SourceProceedStalePromptMany}), params.Subject, ab.Behind),
 		Warning:    fmt.Sprintf(domain.SourceProceedStaleWarning, ffErr),
@@ -270,14 +278,92 @@ type UnseenFallbackParams struct {
 // WarnUnseenFallback says after the fact what a recap warns an interactive run
 // about: an unattended one never saw it, and its .env came from main rather
 // than from the parent it named.
-func WarnUnseenFallback(params UnseenFallbackParams) []string {
+func WarnUnseenFallback(ctx context.Context, params UnseenFallbackParams) []string {
 	if params.Prompter.Interactive() {
 		return nil
 	}
-	show, warning := EnvParentFallback(params.Fallback)
+	show, warning := EnvParentFallback(ctx, params.Fallback)
 	if !show {
 		return nil
 	}
 	params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: warning})
 	return []string{warning}
+}
+
+type RememberParams struct {
+	Context   flow.Context
+	Session   flow.Session
+	Answers   flow.Answers
+	Presenter flow.Presenter
+}
+
+// Remember keeps what a confirmed session ticked. Failing to write it costs the
+// next run a question, never this run its worktree.
+func Remember(ctx context.Context, params RememberParams) {
+	err := memory.Remember(ctx, memory.RememberParams{
+		StateDir: params.Context.StateDir,
+		Change:   flow.Remembering(params.Session, params.Answers),
+	})
+	if err != nil {
+		params.Presenter.Status(flow.Notice{Kind: flow.NoticeWarning, Text: fmt.Sprintf(domain.RememberWriteFailedFmt, err)})
+	}
+}
+
+// OriginsParams names the steps of a session creating a worktree, and the flags
+// its request carried; an empty key is a question the session does not ask.
+type OriginsParams struct {
+	Context         flow.Context
+	Answers         flow.Answers
+	EnvKey          string
+	IsolationKey    string
+	SourceUpdateKey string
+	EnvFlag         bool
+	IsolationFlag   bool
+	FastForward     bool
+}
+
+// Origins says, per memory id, what settled each answer a step could have
+// remembered, for the JSON a script reads to know whether a remembered answer
+// stood in for a flag it did not pass.
+func Origins(params OriginsParams) map[string]domain.AnswerOrigin {
+	questions := []struct {
+		id       string
+		key      string
+		flag     bool
+		fallback domain.AnswerOrigin
+	}{
+		{domain.RememberEnvStrategy, params.EnvKey, params.EnvFlag, domain.AnswerOriginConfig},
+		{domain.RememberIsolation, params.IsolationKey, params.IsolationFlag, envports.IsolationOrigin(params.Context)},
+		{domain.RememberSourceUpdate, params.SourceUpdateKey, params.FastForward, domain.AnswerOriginDefault},
+	}
+	origins := map[string]domain.AnswerOrigin{}
+	for _, question := range questions {
+		if question.key == "" {
+			continue
+		}
+		origin, settled := flow.OriginOf(flow.OriginParams{
+			Answers:  params.Answers,
+			Key:      question.key,
+			Flag:     question.flag,
+			Fallback: question.fallback,
+		})
+		if settled {
+			origins[question.id] = origin
+		}
+	}
+	if len(origins) == 0 {
+		return nil
+	}
+	return origins
+}
+
+// KeptSourceLines names a source left behind origin by a remembered or
+// to-be-remembered "keep": asked, it is a visible choice; settled from memory,
+// it would otherwise leave no trace in the recap.
+func KeptSourceLines(answers flow.Answers, key string) []string {
+	mark := flow.RememberedMark(answers, key)
+	if mark == "" || answers.Value(key) != UpdateKeep {
+		return nil
+	}
+	return []string{domain.RecapFieldSourceUpdate + domain.SourceUpdateSummaryKeep + mark}
 }

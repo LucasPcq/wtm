@@ -27,7 +27,7 @@ func TestRunHooksPassesPlaceholderPathsVerbatim(t *testing.T) {
 				"printf %s '{{worktree}}' > '{{root}}/single'",
 			} {
 				var out bytes.Buffer
-				if err := RunHooks(RunHooksParams{
+				if err := RunHooks(t.Context(), RunHooksParams{
 					Hooks:   []domain.HookCommand{{Cmd: cmd}},
 					WorkDir: worktree,
 					Vars:    rules.TemplateVars{Worktree: worktree, Root: root},

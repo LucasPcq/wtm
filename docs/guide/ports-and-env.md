@@ -108,6 +108,7 @@ wtm finds the **declared base** inside the value and shifts only that number; cr
 - The rewrite happens when an **isolated** worktree is created (never a verbatim one) and whenever `wtm env` reconciles; its isolation step can switch the worktree to verbatim instead, and `--check` counts a pending shift as drift.
 - `wtm env --mode refresh` compares linked values **modulo the offset**: `5442` in a worktree against `5432` in `main` is not a conflict.
 - wtm reports rather than guesses when the key is missing, the base appears more than once, or neither the base nor any offset of it is there.
+- The rest of the line stays as written: its quotes or their absence (a libpq `host=… port=5432 dbname=app` stays unquoted), its inline comment, `export` and line ending; quotes are added only when the new value would not read back without them.
 
 When the value is a URL and the linked job publishes a [named URL](addressing.md), the link writes the job's whole named origin instead of a shifted port, under `addressing = "names"` (the default): see [Addressing](addressing.md#addressing-what-a-env-value-holds).
 

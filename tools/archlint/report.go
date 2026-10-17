@@ -15,19 +15,13 @@ type finding struct {
 	pos  token.Position
 	rule string
 	msg  string
-	// legacy marks what predates its rule and is tracked in the code rather than
-	// in .archlint-migrating, keyed so its sites collapse to one line.
-	legacy string
-	// overBudget is a legacy key with more sites than its recorded count.
+	// legacy keys a site tracked in the code (fontLegacy) rather than in
+	// .archlint-migrating, so its sites collapse to one line.
+	legacy     string
 	overBudget bool
-	// note reports without being a site: a count that can be lowered.
-	note bool
+	note       bool
 }
 
-// migrating is what predates a rule and is tracked out rather than fixed on the
-// spot. It reports without failing, and the list may only ever shrink: each
-// entry records how many sites it covers, a site beyond that count fails, and a
-// count higher than needed is reported to be lowered.
 type migratingList struct {
 	entries []migratingEntry
 }
@@ -87,17 +81,20 @@ type judgeParams struct {
 	Findings  []finding
 	Migrating migratingList
 	Warned    map[string]bool
+	Tracked   bool
 }
 
 type verdict struct {
-	lines  []string
-	notes  []string
-	failed bool
+	lines    []string
+	notes    []string
+	tracked  int
+	failures int
+	failed   bool
 }
 
 func judge(params judgeParams) verdict {
 	var result verdict
-	used := make([]int, len(params.Migrating.entries))
+	used := sitesPerEntry(params)
 	for _, f := range params.Findings {
 		if f.note {
 			result.notes = append(result.notes, fmt.Sprintf("[%s] %s", f.rule, f.msg))
@@ -106,6 +103,16 @@ func judge(params judgeParams) verdict {
 		tag := tagOf(tagParams{Finding: f, Migrating: params.Migrating, Used: used, Warned: params.Warned})
 		if tag == "" || tag == tagOverBudget {
 			result.failed = true
+			result.failures++
+		}
+		if tag == tagOverEntry {
+			result.tracked++
+		}
+		if tag == tagMigrating && f.legacy == "" {
+			result.tracked++
+			if !params.Tracked {
+				continue
+			}
 		}
 		result.lines = append(result.lines, fmt.Sprintf("%s:%d:%d: [%s]%s %s", f.pos.Filename, f.pos.Line, f.pos.Column, f.rule, tag, f.msg))
 	}
@@ -115,15 +122,33 @@ func judge(params judgeParams) verdict {
 			result.notes = append(result.notes, fmt.Sprintf(".archlint-migrating: %q covers nothing any more — remove it", entry.line))
 		case used[index] < entry.budget:
 			result.notes = append(result.notes, fmt.Sprintf(".archlint-migrating: %q covers %d site(s) — lower it to %d", entry.line, used[index], used[index]))
+		case used[index] > entry.budget:
+			result.failed = true
+			result.failures += used[index] - entry.budget
+			result.notes = append(result.notes, fmt.Sprintf(".archlint-migrating: %q covers %d sites, %d more than its count: the new one is among the sites listed above — the list may only shrink", entry.line, used[index], used[index]-entry.budget))
 		}
 	}
 	return result
+}
+
+func sitesPerEntry(params judgeParams) []int {
+	used := make([]int, len(params.Migrating.entries))
+	for _, f := range params.Findings {
+		if f.note || f.legacy != "" || params.Warned[f.rule] {
+			continue
+		}
+		if index := params.Migrating.match(f); index >= 0 {
+			used[index]++
+		}
+	}
+	return used
 }
 
 const (
 	tagWarning    = " (warning)"
 	tagMigrating  = " (migrating)"
 	tagOverBudget = " (over its recorded count — the list may only shrink)"
+	tagOverEntry  = " (migrating, its entry over its count)"
 )
 
 type tagParams struct {
@@ -148,21 +173,18 @@ func tagOf(params tagParams) string {
 	if index < 0 {
 		return ""
 	}
-	params.Used[index]++
 	if params.Used[index] > params.Migrating.entries[index].budget {
-		return tagOverBudget
+		return tagOverEntry
 	}
 	return tagMigrating
 }
 
 type collapseLegacyParams struct {
 	Findings []finding
-	// Budgets is the recorded site count of each legacy key.
-	Budgets map[string]int
+	Budgets  map[string]int
 }
 
-// collapseLegacy keeps the first site of each legacy key and counts the rest,
-// so a tracked debt is one line of the report rather than a page of it.
+// A tracked debt is one line of the report rather than a page of it.
 func collapseLegacy(params collapseLegacyParams) []finding {
 	findings := params.Findings
 	sort.SliceStable(findings, func(i, j int) bool {

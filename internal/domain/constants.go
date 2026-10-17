@@ -95,11 +95,11 @@ const (
 	EnvSourceLabelTemplate = "template"
 	EnvSourceLabelMain     = "main"
 	EnvSourceLabelParent   = "parent worktree"
-	// EnvSourceLabelNone is shown when the strategy's value source has no .env file at
-	// all (and no fallback either) — nothing to sync from, so keys come from the
-	// template as placeholders. Typical on a fresh project before any .env is created.
-	EnvPortLinkTwiceFmt = "env_port %s in %s follows %s twice — a key may follow several ports, never the same one"
-	EnvSourceLabelNone  = "template (no .env to sync from)"
+	// EnvSourceLabelNoMainFmt names the file the main checkout lacks when the
+	// strategy reads it (and no fallback either): nothing to sync from, so keys
+	// come from the template as placeholders.
+	EnvPortLinkTwiceFmt     = "env_port %s in %s follows %s twice — a key may follow several ports, never the same one"
+	EnvSourceLabelNoMainFmt = "template (no %s in the main checkout)"
 	// EnvFileUnresolvableFmt names a configured file the repository does not
 	// have anywhere. Nothing can fill it, so the fix is in config.toml.
 	EnvUnresolvableSummaryFmt = "%d configured .env file(s) exist nowhere — fix [env] in config.toml."
@@ -115,11 +115,13 @@ const (
 	// EnvInterpolation is what a dotenv reader expands outside single quotes.
 	EnvInterpolation = "$"
 
-	// EnvCredentialsSeparator ends the userinfo part of a URL. A value is elided
-	// there before display: what precedes it is a password, what follows is the
-	// host and the port the reader is actually looking for.
+	// EnvCredentialsSeparator ends the userinfo part of a URL.
 	EnvCredentialsSeparator = "@"
-	// EnvValueDisplayWidth caps an elided .env value in the port table, for a
+	// EnvOriginJoin separates the ports or addresses a report lists for one value.
+	EnvOriginJoin = ", "
+	// EnvPortSideFmt is a port a report names, rendered from the plan's number.
+	EnvPortSideFmt = ":%d"
+	// EnvValueDisplayWidth caps the origins of a value in the port table, for a
 	// surface that could not measure itself. EnvValueMinWidth is the floor a
 	// measured one never goes under: below it the value is unrecognisable, and
 	// a wrapped line says more than an elided one that says nothing.
@@ -193,6 +195,13 @@ const (
 	// glyph filed off.
 	SyncPlanEmpty     = "No worktrees to sync."
 	SyncNothingToPush = "Everything is in sync with origin — nothing to push."
+	// SyncInterruptedSummary closes a run an interrupt stopped: nothing was
+	// pushed, and the rest is what a second run picks up.
+	SyncInterruptedSummary  = "Interrupted — nothing pushed; run `wtm sync` again to finish."
+	SyncCancelledDetail     = "interrupted before its rebase finished; branch unchanged"
+	SyncNotReachedDetail    = "interrupted before it was reached; branch unchanged"
+	SyncCancelledLineFmt    = "%s not synced — interrupted, branch unchanged"
+	SyncBaseInterruptedNote = "(not refreshed — interrupted)"
 	// HookLogTailLabel labels the path a collapsed phase kept its output at. A
 	// label is chrome, so it is muted and the path is not.
 	HookLogTailLabel = "full output:"
@@ -610,8 +619,6 @@ const (
 	OriginSchemeHTTP      = "http"
 	OriginSchemeHTTPS     = "https"
 	OriginSchemeSeparator = "://"
-	// MaskedURLPassword stands for the password of a URL a report prints.
-	MaskedURLPassword = "***"
 	// OriginListSeparator is what an app splits a multi-origin setting on.
 	OriginListSeparator = ","
 	// The loopback spellings a .env value reaches a local job by, beside the TLD.
@@ -680,7 +687,7 @@ const (
 	// What `wtm run proxy status` prints, and the callout it raises when the
 	// redirection is declared but does not reach the proxy that is running.
 	ProxyStatusTitle = "Run proxy"
-	// The readout's fields. Labels only: the alignment is output.Announce's, and
+	// The readout's fields. Labels only: the alignment is render.Announce's, and
 	// hand-spacing it inside the wording is how two sibling readouts ended up
 	// aligned two different ways.
 	ProxyStatusBindLabel    = "Bind port"
@@ -1097,8 +1104,8 @@ const (
 	EnvPortReasonNotFoundFmt  = "no %d to shift in the value"
 	// The two refusals an origin rewrite adds. Both name what wtm saw rather
 	// than what it wanted, since the value is the thing the reader must fix.
-	EnvPortReasonForeignHostFmt = "points at %s, which no job here serves"
-	EnvPortReasonSecureScheme   = "https — the run proxy serves plain HTTP"
+	EnvPortReasonForeignHost  = "points at another host, which no job here serves"
+	EnvPortReasonSecureScheme = "https — the run proxy serves plain HTTP"
 
 	// The trailing verdict of `wtm env`.
 	EnvCheckDriftMessage        = "Read-only check — run `wtm env %s` to reconcile."
@@ -1112,7 +1119,7 @@ const (
 	EnvDetailConflictFmt = "conflict — local %s vs %s %s"
 	// EnvDetailConflictKeptFmt is a conflict an apply left as it was.
 	EnvDetailConflictKeptFmt = "conflict kept — local %s vs %s %s"
-	// The same two rows for a key whose values the report withholds.
+	// The same two rows without --show-values.
 	EnvDetailConflictRedactedFmt     = "conflict — local value differs from %s"
 	EnvDetailConflictKeptRedactedFmt = "conflict kept — local value differs from %s"
 	EnvTallyAdded                    = "added"
@@ -1227,7 +1234,13 @@ const (
 	EnvRestoredFmt         = "%d value(s) wtm owns back to the source's."
 	// EnvDetailRestored* are the file-block rows of those values.
 	EnvDetailRestoredFmt        = "back to the source's %s (was %s)"
+	EnvDetailRestoredValue      = "back to the source's value"
+	EnvDetailRestoredPortsFmt   = "back to the source's %s"
+	EnvDetailRestoredRemoved    = "removed — the source has none"
 	EnvDetailRestoredRemovedFmt = "removed — the source has none (was %s)"
+	// EnvDetailOwnedWouldSetFmt is a check's row for a key wtm writes in full
+	// and would rewrite.
+	EnvDetailOwnedWouldSetFmt = "would be set to wtm's value %s"
 	// EnvRestoreRecapTitle heads the wizard recap's preview of what the switch
 	// to verbatim puts back.
 	EnvRestoreRecapTitle       = "Back to the source's values"
@@ -1373,6 +1386,7 @@ const (
 	IsolationUnknownFmt = "unknown isolation %q (expected %q or %q)"
 
 	// Flag names.
+	FlagAsk        = "ask"
 	FlagFrom       = "from"
 	FlagFF         = "ff"
 	FlagEnvFrom    = "env-from"
@@ -1563,6 +1577,9 @@ const (
 	PruneSkipDirty    = "dirty"
 	PruneSkipUnpushed = "unpushed"
 	PruneSkipOpenPR   = "open_pr"
+	// PruneSkipInterrupted is a worktree an interrupt stopped the batch before
+	// (clean and prune): untouched, safe to run again.
+	PruneSkipInterrupted = "interrupted"
 
 	// The wizard step settling the kind of a script checked outside the dev ones.
 	// The description spells both kinds out: arriving here having checked
@@ -2003,8 +2020,10 @@ const (
 	HookViewMinWidth = 8
 	// TabWidth is what a tab is expanded to before a line is measured.
 	TabWidth = 8
-	// The cursor moves a surface makes to redraw a block it already printed.
-	AnsiCursorUpFmt = "\x1b[%dA"
+	// The cursor moves a surface makes to redraw a block it already printed. The
+	// move lands in column zero: a ^C the terminal echoed leaves the cursor
+	// mid-row, and an erase from there keeps the start of the row it is redrawing.
+	AnsiPrevLineFmt = "\x1b[%dF"
 	AnsiClearBelow  = "\x1b[J"
 	AnsiReset       = "\x1b[0m"
 	// Hook phase titles: a bold section header above the phase, so create and
@@ -2302,6 +2321,11 @@ const (
 	// <state-dir>/worktrees/<branch>/.
 	MetaFileName = "meta.json"
 
+	// The .env files create could not provision as their strategy asked, on stderr.
+	EnvNoTemplateWarningFmt     = "warning: no template found for %s, skipping\n"
+	EnvSourceMissingWarningFmt  = "warning: %s not found in %s, skipping\n"
+	EnvParentFallbackWarningFmt = "warning: %s not found in parent worktree, falling back to main\n"
+
 	// Cobra group IDs — one per section of the root --help output.
 	CmdGroupWorktrees = "worktrees"
 	CmdGroupNavigate  = "navigate"
@@ -2449,7 +2473,7 @@ const (
 	DaemonStatusUpFmt      = "Daemon running (pid %d)"
 	DaemonStatusVersLabel  = "Version"
 	DaemonStatusJobsLabel  = "Jobs"
-	DaemonStatusJobsFmt    = "%d foreground · %d detached"
+	DaemonStatusJobsFmt    = "%d supervised · %d detached stack(s)"
 	DaemonStatusSocketLbl  = "Socket"
 	DaemonStatusIndexLabel = "Index"
 	DaemonStatusProxyLabel = "Proxy"
@@ -2986,7 +3010,7 @@ const (
 	RunAbortRunningLabel    = "Left running:"
 	RunAbortNotStartedLabel = "Not started: "
 	// The abort's way out reads like every other hint in the tree: one command
-	// per line, through output.NextStep. It used to be one prose string under the
+	// per line, through render.NextStep. It used to be one prose string under the
 	// ephemeral `›`, in a block that stays in the scrollback.
 	RunAbortRetryHint = "wtm run up"
 	RunAbortRetryNote = "re-run once fixed"
@@ -3093,7 +3117,8 @@ const (
 	SyncNothingToSync         = "No worktrees to sync."
 	SyncUpToDateSuffix        = "already up to date"
 	SyncRebasedLineFmt        = "%s rebased onto %s   %s%s"
-	SyncCommitsReplayedFmt    = "%d commits"
+	SyncCommitOne             = "commit"
+	SyncCommitMany            = "commits"
 	FastForwardStateFmt       = "%s — %s"
 	// SyncNoRebaseStep and SyncNoStaleParent are why a decision was never put to
 	// the user: nothing is rebased, or no parent is behind its remote.
@@ -3123,6 +3148,7 @@ const (
 	SyncLabelConflict         = "conflict"
 	SyncLabelUnknownParent    = "skipped — no recorded parent"
 	SyncLabelError            = "failed"
+	SyncLabelCancelled        = "interrupted, unchanged"
 	// SyncLabelConflictKept, SyncLabelConflictAborted and SyncLabelErrorFmt say what
 	// the bare status cannot: which of the two conflict modes ran — and so whether
 	// there is anything left to clean up — and why a step failed (cause).
@@ -3163,11 +3189,12 @@ const (
 	FastForwardForceHintFmt = "%s has %s Use --%s to fast-forward anyway"
 	// FastForwardLabel* say in a few words what became of one branch
 	// (rules.FastForwardStatusLabel).
-	FastForwardLabelUpToDate = "already up to date"
-	FastForwardLabelAdvanced = "fast-forwarded from origin"
-	FastForwardLabelDiverged = "diverged"
-	FastForwardLabelNoRemote = "no origin counterpart"
-	FastForwardLabelFailed   = "failed"
+	FastForwardLabelUpToDate  = "already up to date"
+	FastForwardLabelAdvanced  = "fast-forwarded from origin"
+	FastForwardLabelDiverged  = "diverged"
+	FastForwardLabelNoRemote  = "no origin counterpart"
+	FastForwardLabelFailed    = "failed"
+	FastForwardLabelCancelled = "interrupted, unchanged"
 	// FastForwardDivergedHintFmt names the gesture that does handle a divergence:
 	// this one never rewrites a branch carrying local commits. Verbs: branch,
 	// ahead, behind, branch.
@@ -3357,6 +3384,7 @@ const (
 	RecapFieldFiles        = "Files:     "
 	RecapFieldTarget       = "Target:    "
 	RecapFieldMode         = "Mode:      "
+	RecapFieldSourceUpdate = "Update:    "
 	RecapFastForwardSuffix = " (fast-forward to origin)"
 	WarningPrefix          = "⚠ "
 	WizardErrLabel         = "wizard"
@@ -3479,19 +3507,28 @@ const (
 
 	// PruneLabel* are the short phrases a reason or a skip reads as, shared by
 	// every surface that shows one.
-	PruneLabelPRMerged  = "PR merged"
-	PruneLabelPRClosed  = "PR closed"
-	PruneLabelGone      = "remote branch gone"
-	PruneLabelBase      = "base branch"
-	PruneLabelMain      = "main checkout"
-	PruneLabelLocked    = "locked — pass --force"
-	PruneLabelDirty     = "dirty — pass --force"
-	PruneLabelUnpushed  = "unpushed commits — pass --force"
-	PruneLabelOpenPR    = "open PR — pass --force"
-	PruneSkippedFmt     = "Skipped %s (%s)"
-	PruneWizardErrLabel = "prune wizard"
-	PruneSelectionTitle = "Select worktrees to prune"
-	PruneConfirmTitle   = "Confirm"
+	PruneLabelPRMerged    = "PR merged"
+	PruneLabelPRClosed    = "PR closed"
+	PruneLabelGone        = "remote branch gone"
+	PruneLabelBase        = "base branch"
+	PruneLabelMain        = "main checkout"
+	PruneLabelLocked      = "locked — pass --force"
+	PruneLabelDirty       = "dirty — pass --force"
+	PruneLabelUnpushed    = "unpushed commits — pass --force"
+	PruneLabelOpenPR      = "open PR — pass --force"
+	PruneLabelInterrupted = "interrupted before it was reached"
+	// HooksInterruptedFmt wraps ErrCancelled with the count of hooks never started.
+	HooksInterruptedFmt = "%w: %d hook(s) not run"
+	// CreateSetupInterruptedFmt is a worktree created whole whose setup — ports,
+	// on_create hooks — an interrupt stopped before it began.
+	CreateSetupInterruptedFmt = "%w: %s was created but not set up (ports, on_create hooks)"
+	// CreateHooksInterruptedFmt is the same worktree when the interrupt came
+	// while its on_create hooks ran.
+	CreateHooksInterruptedFmt = "%w: %s was created but its on_create hooks did not finish"
+	PruneSkippedFmt           = "Skipped %s (%s)"
+	PruneWizardErrLabel       = "prune wizard"
+	PruneSelectionTitle       = "Select worktrees to prune"
+	PruneConfirmTitle         = "Confirm"
 	// PruneScanning and PruneFetchAndScanning distinguish the two costs of the
 	// planning phase: the second one also hits the network (gh, and the fetch
 	// gone-detection runs first).
@@ -4029,6 +4066,9 @@ const (
 	// DashboardOperationLabel names a failed run in the output panel when the
 	// failure is the run itself rather than one of its phases.
 	DashboardOperationLabel = "operation"
+	// DashboardCancellingNotice is what the output panel says once a quit has
+	// cancelled the runs in flight and waits for them to stop.
+	DashboardCancellingNotice = "Cancelling… — ctrl+c again to quit at once"
 	// DashboardOpenPRLabel names a failed browser launch for the REVIEW
 	// section's PR line, in the same "✗ <label>: <err>" form.
 	DashboardOpenPRLabel = "open PR"
@@ -4240,6 +4280,9 @@ const (
 	// KeyInterrupt cancels a wizard wherever it stands, as Esc does on its
 	// first step: a terminal user reaches for it first.
 	KeyInterrupt = "ctrl+c"
+	// CancellingMessage replaces a wait's message once the first Ctrl-C has
+	// cancelled the work under it; a second one stops waiting.
+	CancellingMessage = "Cancelling…"
 
 	// EscapePrefix is the leading escape a terminal sends for an alt-modified
 	// key, and KeyCtrlPrefix how a control combination is named.
@@ -4561,8 +4604,8 @@ const (
 	// ExitCodeEnvDrift is a `wtm env --check` that found drift, so a CI step can
 	// fail on it without parsing the report.
 	ExitCodeEnvDrift = 18
-	// ExitCodeCancelled is a run the user backed out of interactively, so that
-	// `wtm create x && wtm go x` stops there.
+	// ExitCodeCancelled is a run the user backed out of interactively or
+	// interrupted, so that `wtm create x && wtm go x` stops there.
 	ExitCodeCancelled = 19
 	// ExitCodeEventsSchemaNewer is a `wtm events` that received an event of a
 	// schema newer than its own: the consumer has to upgrade wtm.
@@ -4571,6 +4614,9 @@ const (
 	// is not in a git repository. 13 is skipped: it once meant a pull request
 	// already existed, and a script reading it that way must not misread it.
 	ExitCodeNotGitRepo = 21
+	// ExitCodeStateSchemaNewer is a write refused because the file it would
+	// change was written by a newer wtm (statefile.ErrSchemaNewer).
+	ExitCodeStateSchemaNewer = 22
 
 	// FlagValueInvalidFmt is every flag value that does not parse.
 	FlagValueInvalidFmt = "invalid --%s value %q: use %s"
@@ -4599,7 +4645,9 @@ const (
 	// ExecPartialLineCap bounds a line that never ends (binary output, a
 	// progress bar without \r) so the tail cannot grow without limit.
 	ExecPartialLineCap = 4096
-	ExecInterruptGrace = 5 * time.Second
+	// SubprocessInterruptGrace is how long a cancelled subprocess has between
+	// SIGINT and SIGTERM; the kill follows one ExecPipeGrace later.
+	SubprocessInterruptGrace = time.Second
 	// ExecPipeGrace bounds the wait for a process that exited while something it
 	// started (a backgrounded job, a daemon) still holds its output pipe.
 	ExecPipeGrace = time.Second
@@ -4718,4 +4766,106 @@ const (
 	NotGitRepoFmt = "%s is %w"
 	// GitNotARepoStderr is how git says it found no repository.
 	GitNotARepoStderr = "not a git repository"
+)
+
+// The memory ids a question remembers its answer under, in [wizard.remembered].
+// One id is shared by every command asking the same question.
+const (
+	RememberEnvStrategy  = "env_strategy"
+	RememberIsolation    = "isolation"
+	RememberSourceUpdate = "source_update"
+)
+
+// SourceUpdateFastForward and SourceUpdateKeep answer a source-update question.
+const (
+	SourceUpdateFastForward = "ff"
+	SourceUpdateKeep        = "keep"
+)
+
+const (
+	AnswerOriginFlag       AnswerOrigin = "flag"
+	AnswerOriginRemembered AnswerOrigin = "remembered"
+	AnswerOriginPrompt     AnswerOrigin = "prompt"
+	AnswerOriginConfig     AnswerOrigin = "config"
+	AnswerOriginDefault    AnswerOrigin = "default"
+)
+
+const (
+	RememberToggleLabel     = "Always use this answer in this repo"
+	HelpRemember            = "tab always use"
+	RecapRememberedSuffix   = " · remembered"
+	RecapWillRememberSuffix = " · will be remembered"
+	RecapWillForgetSuffix   = " · clears the remembered answer"
+	TrailFlagSuffixFmt      = " · --%s"
+	RecapRememberedHint     = "Remembered answers are not asked: --ask asks them again."
+	FlagAskUsage            = "Ask again the questions this repository remembers an answer to, to change or forget it"
+	RememberedUnknownFmt    = "unknown remembered answer %q in [wizard.remembered] (expected one of %s)"
+	RememberedInvalidFmt    = "invalid remembered %s %q in [wizard.remembered] (expected one of %s)"
+	RememberWriteFailedFmt  = "could not remember the answer: %v"
+)
+
+const (
+	// StatusFix*Fmt are the commands that clear each problem `wtm status`
+	// reports, spelled unattended so an agent can run them as given.
+	StatusFixEnvMissingFmt       = "wtm env %s --yes"
+	StatusFixEnvFromTemplateFmt  = "wtm env %s --from example --yes"
+	StatusFixEnvNowhere          = "wtm config edit"
+	StatusFixJobCrashedFmt       = "wtm run start %s --job %s -d --yes"
+	StatusFixIsolationPendingFmt = "wtm env %s --isolation isolated --yes"
+
+	StatusProblemEnvMissingFmt           = "%s is missing"
+	StatusProblemEnvNowhereFmt           = "%s is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand"
+	StatusProblemJobKilledFmt            = "%s crashed (killed by a signal)"
+	StatusProblemJobCrashedFmt           = "%s crashed"
+	StatusProblemJobCrashedCodeFmt       = "%s crashed (exit %d)"
+	StatusProblemIsolationPendingMessage = "predates the isolation choice: run up and run start refuse it"
+
+	// PluralFmt is a count beside its agreed noun (rules.Plural).
+	PluralFmt = "%d %s"
+
+	StatusHeadlineCleanFmt    = "%s — nothing to fix"
+	StatusHeadlineProblemsFmt = "%s — %s"
+	StatusAllCleanFmt         = "%s — nothing to fix"
+	StatusAllProblemsFmt      = "%s · %d %s"
+	StatusNeedsAttention      = "needs attention"
+	StatusNeedAttention       = "need attention"
+	StatusNounWorktree        = "worktree"
+	StatusNounWorktrees       = "worktrees"
+	StatusNounProblem         = "problem"
+	StatusNounProblems        = "problems"
+	StatusNounFile            = "file"
+	StatusNounFiles           = "files"
+	StatusFieldPath           = "path"
+	StatusFieldIsolation      = "isolation"
+	StatusFieldAddressing     = "addressing"
+	StatusFieldPorts          = "ports"
+	StatusFieldEnv            = "env"
+	StatusFieldRun            = "run"
+	StatusMainSuffix          = " (main)"
+	StatusIsolationNotChosen  = "not chosen"
+	// StatusPorts* say which ports a worktree binds: its offset from the main
+	// checkout's, the main's own, or its source's for a verbatim one.
+	StatusPortsOffsetFmt   = "+%d"
+	StatusPortsBase        = "base"
+	StatusPortsSource      = "source's"
+	StatusPortsUnallocated = "not numbered"
+	StatusCellNone         = "—"
+	StatusRunConfigAbsent  = "no run.toml"
+	StatusEnvMissingFmt    = "%d missing"
+	StatusJobsTitle        = "JOBS"
+	StatusJobsEmpty        = "no job declared"
+	StatusJobOwnerFmt      = "held from %s"
+	StatusColWorktree      = "WORKTREE"
+	StatusColIsolation     = "ISOLATION"
+	StatusColPorts         = "PORTS"
+	StatusColJobs          = "JOBS"
+	StatusColEnv           = "ENV"
+
+	// EnvFileCreatedFmt and EnvFileWouldCreateFmt are a .env the worktree
+	// lacked, rebuilt by `wtm env` from the copy create would have made.
+	EnvFileCreatedFmt        = "created from %s"
+	EnvFileWouldCreateFmt    = "missing: wtm env creates it from %s"
+	EnvRecapCreatedFmt       = "%s: create from %s"
+	StatusLoading            = "Reading the worktree's state…"
+	StatusAllWithWorktreeMsg = "--all reads every worktree: drop the [worktree] argument"
 )

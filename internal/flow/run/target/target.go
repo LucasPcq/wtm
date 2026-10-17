@@ -5,6 +5,7 @@
 package target
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -38,8 +39,8 @@ type Resolved struct {
 // Resolve turns the positional into a worktree, and refuses a name matching
 // none or several. It is the flow's job rather than the runner's: naming a
 // worktree is a business input, and the two surfaces must refuse the same names.
-func Resolve(params ResolveParams) (Resolved, error) {
-	result, err := worktree.Resolve(domain.ResolveParams{ProjectDir: params.ProjectDir, Query: params.Query})
+func Resolve(ctx context.Context, params ResolveParams) (Resolved, error) {
+	result, err := worktree.Resolve(ctx, domain.ResolveParams{ProjectDir: params.ProjectDir, Query: params.Query})
 	if err != nil {
 		return Resolved{}, fmt.Errorf("worktree %q: %w", params.Query, err)
 	}
@@ -52,8 +53,8 @@ func Resolve(params ResolveParams) (Resolved, error) {
 // Root is the worktree containing dir as git spells it, and dir itself when git
 // cannot say — a path outside any repository is refused later, by the command
 // that needed a worktree, rather than here.
-func Root(dir string) string {
-	root, err := worktree.Root(dir)
+func Root(ctx context.Context, dir string) string {
+	root, err := worktree.Root(ctx, dir)
 	if err != nil {
 		return dir
 	}
@@ -63,8 +64,8 @@ func Root(dir string) string {
 // BranchOf names a worktree the way a reader recognises it, and answers empty
 // for one git cannot name — which is what makes such a worktree persist nothing
 // rather than share another's log directory.
-func BranchOf(dir string) string {
-	branch, err := worktree.CurrentBranch(worktree.CurrentBranchParams{Dir: dir})
+func BranchOf(ctx context.Context, dir string) string {
+	branch, err := worktree.CurrentBranch(ctx, worktree.CurrentBranchParams{Dir: dir})
 	if err != nil {
 		return ""
 	}
@@ -78,19 +79,19 @@ type NamedBranchParams struct {
 
 // NamedBranch is the branch the positional named at dir, else the one git
 // reports there.
-func NamedBranch(params NamedBranchParams) string {
+func NamedBranch(ctx context.Context, params NamedBranchParams) string {
 	for _, named := range params.Named {
 		if named.Dir == params.Dir && named.Branch != "" {
 			return named.Branch
 		}
 	}
-	return BranchOf(params.Dir)
+	return BranchOf(ctx, params.Dir)
 }
 
 // ProjectOf names the repository a worktree belongs to — its main checkout's
 // directory, as every run name spells the project — empty when git cannot say.
-func ProjectOf(dir string) string {
-	main, err := worktree.MainCheckout(worktree.MainCheckoutParams{ProjectDir: dir})
+func ProjectOf(ctx context.Context, dir string) string {
+	main, err := worktree.MainCheckout(ctx, worktree.MainCheckoutParams{ProjectDir: dir})
 	if err != nil {
 		return ""
 	}
@@ -163,22 +164,22 @@ type worktreeList struct {
 	err        error
 }
 
-func (l *worktreeList) get() ([]domain.GitWorktree, error) {
+func (l *worktreeList) get(ctx context.Context) ([]domain.GitWorktree, error) {
 	l.once.Do(func() {
-		l.worktrees, l.err = worktree.ListAll(worktree.ListAllParams{ProjectDir: l.projectDir})
+		l.worktrees, l.err = worktree.ListAll(ctx, worktree.ListAllParams{ProjectDir: l.projectDir})
 	})
 	return l.worktrees, l.err
 }
 
 // branchesOf names a set of worktrees the way a recap shows them, capped so a
 // wide selection does not overflow the line.
-func (l *worktreeList) branchesOf(paths []string) string {
+func (l *worktreeList) branchesOf(ctx context.Context, paths []string) string {
 	if len(paths) == 0 {
 		return domain.SummaryNone
 	}
 	names := make([]string, 0, len(paths))
 	for _, path := range paths {
-		names = append(names, l.branchOf(path))
+		names = append(names, l.branchOf(ctx, path))
 	}
 	const maxNames = 5
 	if len(names) <= maxNames {
@@ -187,8 +188,8 @@ func (l *worktreeList) branchesOf(paths []string) string {
 	return strings.Join(names[:maxNames], domain.RunURLListSep) + fmt.Sprintf(" +%d", len(names)-maxNames)
 }
 
-func (l *worktreeList) branchOf(path string) string {
-	worktrees, err := l.get()
+func (l *worktreeList) branchOf(ctx context.Context, path string) string {
+	worktrees, err := l.get(ctx)
 	if err != nil {
 		return path
 	}
@@ -202,11 +203,11 @@ func (l *worktreeList) branchOf(path string) string {
 
 // Named resolves the positional, and reports nil when there was none — which is
 // the difference between "this worktree" and "no worktree named yet".
-func Named(params ResolveParams) (*Resolved, error) {
+func Named(ctx context.Context, params ResolveParams) (*Resolved, error) {
 	if params.Query == "" {
 		return nil, nil
 	}
-	resolved, err := Resolve(params)
+	resolved, err := Resolve(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -222,13 +223,13 @@ type ResolveAllParams struct {
 // NamedAll resolves every positional, and reports nil when there was none. A
 // query matching nothing or several worktrees refuses the whole run: acting on
 // part of what was asked for would be worse than not acting.
-func NamedAll(params ResolveAllParams) ([]Resolved, error) {
+func NamedAll(ctx context.Context, params ResolveAllParams) ([]Resolved, error) {
 	if len(params.Queries) == 0 {
 		return nil, nil
 	}
 	resolved := make([]Resolved, 0, len(params.Queries))
 	for _, query := range params.Queries {
-		one, err := Resolve(ResolveParams{ProjectDir: params.ProjectDir, Query: query})
+		one, err := Resolve(ctx, ResolveParams{ProjectDir: params.ProjectDir, Query: query})
 		if err != nil {
 			return nil, err
 		}
@@ -272,14 +273,14 @@ type WorkDirsParams struct {
 // WorkDirs is the set of worktrees a run acts on: what the step answered, else
 // the positionals, else where the command was launched. It is WorkDir's
 // cumulative form, and answers a set of one wherever that one is all there is.
-func WorkDirs(params WorkDirsParams) []string {
+func WorkDirs(ctx context.Context, params WorkDirsParams) []string {
 	if answered := params.Answers.Values(KeyWorktree); len(answered) > 0 {
 		return dedupe(answered)
 	}
 	if len(params.Named) > 0 {
 		return dedupe(Dirs(params.Named))
 	}
-	return []string{Root(params.Cwd)}
+	return []string{Root(ctx, params.Cwd)}
 }
 
 // dedupe keeps the first mention of each worktree. A branch and a path can name
@@ -306,14 +307,14 @@ type WorkDirParams struct {
 
 // WorkDir is the worktree a run acts on, as git spells it: what the step
 // answered, else the positional, else where the command was launched.
-func WorkDir(params WorkDirParams) string {
+func WorkDir(ctx context.Context, params WorkDirParams) string {
 	if answered := params.Answers.Value(KeyWorktree); answered != "" {
 		return answered
 	}
 	if params.Named != nil {
 		return params.Named.Dir
 	}
-	return Root(params.Cwd)
+	return Root(ctx, params.Cwd)
 }
 
 type PickOneParams struct {

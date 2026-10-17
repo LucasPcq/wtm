@@ -36,7 +36,7 @@ func run(t *testing.T, repo string, request url.Request) (url.Outcome, error) {
 	t.Helper()
 	request.Cwd = repo
 	request.Config = published
-	return url.Run(url.Params{
+	return url.Run(t.Context(), url.Params{
 		Context: flow.Context{ProjectDir: repo, StateDir: filepath.Join(repo, ".git", "wtm")},
 		Request: request,
 	})

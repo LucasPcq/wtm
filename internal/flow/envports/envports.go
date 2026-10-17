@@ -3,6 +3,8 @@
 package envports
 
 import (
+	"context"
+
 	"github.com/LucasPcq/wtm/internal/domain"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/flow/ordinal"
@@ -41,6 +43,16 @@ func DefaultIsolation(ctx flow.Context) domain.Isolation {
 	return rules.EffectiveIsolation(cfg.Isolation)
 }
 
+// IsolationOrigin is what DefaultIsolation answers from: run.toml when it says,
+// else the built-in default.
+func IsolationOrigin(ctx flow.Context) domain.AnswerOrigin {
+	cfg, err := runconfig.Load(ctx.StateDir)
+	if err != nil || cfg.Isolation == "" {
+		return domain.AnswerOriginDefault
+	}
+	return domain.AnswerOriginConfig
+}
+
 // Settle moves the host ports a freshly provisioned .env holds onto the ones
 // this worktree binds. The values were just copied from main or from a parent,
 // so they carry that worktree's ports and nothing else would fix them. A
@@ -49,13 +61,13 @@ func DefaultIsolation(ctx flow.Context) domain.Isolation {
 // It never asks: the question belongs to the run that creates the worktree,
 // where it is one confirmation among the others rather than a second one, put
 // after the point of no return. What is left here is a report of what happened.
-func Settle(params Params) (domain.EnvPortPlan, error) {
+func Settle(ctx context.Context, params Params) (domain.EnvPortPlan, error) {
 	ignored, err := runconfig.Check(runconfig.CheckParams{StateDir: params.Context.StateDir, EnvFiles: params.Context.Config.Project.Env.Files})
 	if err != nil {
 		return domain.EnvPortPlan{}, err
 	}
 	reportIgnored(params.Presenter, ignored)
-	return settle(settleParams{Params: params, Notices: rules.EnvPortNotices})
+	return settle(ctx, settleParams{Params: params, Notices: rules.EnvPortNotices})
 }
 
 type settleParams struct {
@@ -63,13 +75,13 @@ type settleParams struct {
 	Notices func(domain.EnvPortPlan) []rules.EnvPortNotice
 }
 
-func settle(params settleParams) (domain.EnvPortPlan, error) {
+func settle(ctx context.Context, params settleParams) (domain.EnvPortPlan, error) {
 	var resolved envsvc.EnvPortsParams
-	err := ordinal.Retry(ordinal.RetryParams{
+	err := ordinal.Retry(ctx, ordinal.RetryParams{
 		Context: params.Context,
 		Branch:  func() string { return params.Branch },
 		Do: func() error {
-			ports, resolveErr := worktree.ResolveEnvPorts(worktree.ResolveEnvPortsParams{
+			ports, resolveErr := worktree.ResolveEnvPorts(ctx, worktree.ResolveEnvPortsParams{
 				ProjectDir:   params.Context.ProjectDir,
 				StateDir:     params.Context.StateDir,
 				Branch:       params.Branch,
@@ -97,9 +109,9 @@ func settle(params settleParams) (domain.EnvPortPlan, error) {
 	}
 
 	if len(rules.EnvPortRewrites(plan)) == 0 {
-		err = envsvc.ApplyOwnedEnv(resolved)
+		err = envsvc.ApplyOwnedEnv(ctx, resolved)
 	} else {
-		_, err = envsvc.ApplyEnvPorts(resolved)
+		_, err = envsvc.ApplyEnvPorts(ctx, resolved)
 	}
 	if err != nil {
 		return domain.EnvPortPlan{}, err
@@ -130,12 +142,16 @@ type FreshParams struct {
 // SettleFresh is Settle for a worktree a core command has just created, which
 // the run module must never fail: whatever stands in the way is a warning,
 // returned for the command's JSON, and the .env stays as it was copied.
-func SettleFresh(params FreshParams) (domain.EnvPortPlan, []string) {
+func SettleFresh(ctx context.Context, params FreshParams) (domain.EnvPortPlan, []string) {
 	if params.Preflight.Err != nil {
 		return domain.EnvPortPlan{}, notSettled(notSettledParams{Params: params.Params, Cause: params.Preflight.Err, RunConfig: true})
 	}
 	warnings := reportIgnored(params.Presenter, params.Preflight.Ignored)
-	plan, err := settle(settleParams{Params: params.Params, Notices: rules.EnvPortNoticesOnCreate})
+	plan, err := settle(ctx, settleParams{Params: params.Params, Notices: rules.EnvPortNoticesOnCreate})
+	// An interrupt is the caller's to report, as a worktree left unset.
+	if err != nil && ctx.Err() != nil {
+		return domain.EnvPortPlan{}, warnings
+	}
 	if err != nil {
 		return domain.EnvPortPlan{}, append(warnings, notSettled(notSettledParams{Params: params.Params, Cause: err})...)
 	}

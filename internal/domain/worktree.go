@@ -15,6 +15,8 @@ type Worktree struct {
 // WorktreeMetadata is written to <state-dir>/worktrees/<branch>/meta.json
 // for every worktree managed by wtm.
 type WorktreeMetadata struct {
+	// Schema is omitted while the file is at schema 1.
+	Schema       int         `json:"schema,omitempty"`
 	SourceBranch string      `json:"source_branch"`
 	CreatedAt    string      `json:"created_at"`
 	EnvStrategy  EnvStrategy `json:"env_strategy"`
@@ -179,6 +181,9 @@ type CreateResult struct {
 	// created (OriginState empty) or up to date.
 	OriginAhead  int `json:"origin_ahead,omitempty"`
 	OriginBehind int `json:"origin_behind,omitempty"`
+	// Upstream is the remote branch a branch only on origin was created from and
+	// now tracks. Empty when the branch was new or reused.
+	Upstream string `json:"upstream,omitempty"`
 	// Isolation is the worktree's, recorded or, for one that predates the
 	// choice, what it reads as.
 	Isolation Isolation `json:"isolation,omitempty"`
@@ -189,6 +194,9 @@ type CreateResult struct {
 	// Warnings are what the run module could not do for the worktree, which
 	// never fails its creation (a port pass left undone, and why).
 	Warnings []string `json:"warnings,omitempty"`
+	// Origins says, per memory id, what settled each answer the wizard could
+	// have remembered: a flag, a remembered answer, the config or the default.
+	Origins map[string]AnswerOrigin `json:"origins,omitempty"`
 }
 
 // Path is set when the worktree exists but its hooks failed.
@@ -205,6 +213,8 @@ type BatchFailure struct {
 type CreateBatchResult struct {
 	Results []CreateResult `json:"results"`
 	Failed  []BatchFailure `json:"failed"`
+	// Skipped are the branches an interrupt stopped the run before: nothing created.
+	Skipped []PruneSkip `json:"skipped,omitempty"`
 }
 
 // CleanParams holds inputs for cleaning a worktree.

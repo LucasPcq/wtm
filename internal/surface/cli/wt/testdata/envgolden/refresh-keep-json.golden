@@ -1,0 +1,96 @@
+args: feat/a --yes --mode refresh --output json
+err: 
+exit: 0
+--- stdout ---
+{
+  "branch": "feat/a",
+  "path": "<trees>/feat-a",
+  "mode": "refresh",
+  "check": false,
+  "files": [
+    {
+      "target": ".env",
+      "strategy": "main",
+      "source": "main",
+      "diff": {
+        "mode": "refresh",
+        "entries": [
+          {
+            "key": "WEB_PORT",
+            "status": "resolved",
+            "redacted": true
+          },
+          {
+            "key": "REALM",
+            "status": "resolved",
+            "redacted": true
+          },
+          {
+            "key": "SHARED",
+            "status": "conflict",
+            "source": "main",
+            "action": "kept",
+            "redacted": true
+          },
+          {
+            "key": "ORPHAN",
+            "status": "orphan",
+            "action": "kept",
+            "redacted": true
+          },
+          {
+            "key": "NEW_KEY",
+            "status": "resolved",
+            "source": "main",
+            "action": "added",
+            "redacted": true
+          }
+        ]
+      },
+      "applied": true
+    }
+  ],
+  "ports": {
+    "offset": 10,
+    "entries": [
+      {
+        "file": ".env",
+        "key": "WEB_PORT",
+        "port": "PORT",
+        "base": 3000,
+        "resolved": 3010,
+        "moves": [
+          {
+            "port": "PORT",
+            "job": "web",
+            "base": 3000,
+            "resolved": 3010
+          }
+        ],
+        "addressing": "ports",
+        "status": "unchanged"
+      }
+    ],
+    "addressing": "names",
+    "public_port": 11080,
+    "owned": [
+      {
+        "file": ".env",
+        "key": "REALM",
+        "value": "app-feat-a",
+        "changed": false
+      }
+    ],
+    "applied": true
+  },
+  "isolation": "isolated"
+}
+--- stderr ---
+--- .env ---
+WEB_PORT=3010
+REALM=app-feat-a
+SHARED=from-worktree
+ORPHAN=1
+NEW_KEY=1
+--- isolation ---
+isolated

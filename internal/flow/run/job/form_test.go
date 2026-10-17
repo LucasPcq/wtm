@@ -43,7 +43,7 @@ func TestAddAsksRunsTouchesAndScope(t *testing.T) {
 		Sets: map[string][]string{jobflow.KeyRuns: {"seed"}, jobflow.KeyTouches: {"db"}},
 	}
 
-	if _, err := jobflow.Add(jobflow.AddParams{
+	if _, err := jobflow.Add(t.Context(), jobflow.AddParams{
 		Context: ctx, Request: jobflow.AddRequest{Config: dataConfig()}, Prompter: prompter, Presenter: &recorder{},
 	}); err != nil {
 		t.Fatalf("Add: %v", err)
@@ -71,7 +71,7 @@ func TestTouchesOffersTheDeclaredServices(t *testing.T) {
 		Answers: formAnswers(map[string]string{jobflow.KeyName: "reset", jobflow.KeyCmd: "x", jobflow.KeyKind: string(domain.JobKindTask)}),
 		Sets:    map[string][]string{jobflow.KeyRuns: nil, jobflow.KeyTouches: nil},
 	}
-	if _, err := jobflow.Add(jobflow.AddParams{
+	if _, err := jobflow.Add(t.Context(), jobflow.AddParams{
 		Context: context(t), Request: jobflow.AddRequest{Config: dataConfig()}, Prompter: prompter, Presenter: &recorder{},
 	}); err != nil {
 		t.Fatalf("Add: %v", err)
@@ -100,7 +100,7 @@ func TestAddSharedServiceAsksItsNamespace(t *testing.T) {
 		}),
 		Sets: map[string][]string{jobflow.KeyRuns: nil, jobflow.KeyTouches: nil},
 	}
-	if _, err := jobflow.Add(jobflow.AddParams{
+	if _, err := jobflow.Add(t.Context(), jobflow.AddParams{
 		Context: ctx, Request: jobflow.AddRequest{Config: dataConfig()}, Prompter: prompter, Presenter: &recorder{},
 	}); err != nil {
 		t.Fatalf("Add: %v", err)
@@ -126,7 +126,7 @@ func TestSharedServiceWithoutANamespaceSkipsItsCommands(t *testing.T) {
 		}),
 		Sets: map[string][]string{jobflow.KeyRuns: nil, jobflow.KeyTouches: nil},
 	}
-	if _, err := jobflow.Add(jobflow.AddParams{
+	if _, err := jobflow.Add(t.Context(), jobflow.AddParams{
 		Context: ctx, Request: jobflow.AddRequest{Config: dataConfig()}, Prompter: prompter, Presenter: &recorder{},
 	}); err != nil {
 		t.Fatalf("Add: %v", err)
@@ -152,7 +152,7 @@ func TestEditPreFillsEveryFieldFromTheFile(t *testing.T) {
 			jobflow.KeyNamespaceName: "app_{worktree}", jobflow.KeyNamespaceCreate: "./add.sh"}),
 		Sets: map[string][]string{jobflow.KeyRuns: nil, jobflow.KeyTouches: nil},
 	}
-	if _, err := jobflow.Edit(jobflow.EditParams{
+	if _, err := jobflow.Edit(t.Context(), jobflow.EditParams{
 		Context: context(t), Request: jobflow.EditRequest{Name: "db", Config: cfg}, Prompter: prompter, Presenter: &recorder{},
 	}); err != nil {
 		t.Fatalf("Edit: %v", err)
@@ -180,7 +180,7 @@ func TestEditPreFillsEveryFieldFromTheFile(t *testing.T) {
 
 	seed := &flowtest.ScriptedPrompter{Answers: formAnswers(map[string]string{jobflow.KeyName: "seed", jobflow.KeyCmd: "x", jobflow.KeyKind: string(domain.JobKindTask)}),
 		Sets: map[string][]string{jobflow.KeyRuns: nil, jobflow.KeyTouches: {"db"}}}
-	if _, err := jobflow.Edit(jobflow.EditParams{
+	if _, err := jobflow.Edit(t.Context(), jobflow.EditParams{
 		Context: context(t), Request: jobflow.EditRequest{Name: "seed", Config: cfg}, Prompter: seed, Presenter: &recorder{},
 	}); err != nil {
 		t.Fatalf("Edit seed: %v", err)
@@ -199,7 +199,7 @@ func TestEditUntickingEveryRowWithdrawsTheList(t *testing.T) {
 	cfg := dataConfig()
 	cfg.Jobs[2].Touches = []string{"db"}
 
-	if _, err := jobflow.Edit(jobflow.EditParams{
+	if _, err := jobflow.Edit(t.Context(), jobflow.EditParams{
 		Context: ctx, Request: jobflow.EditRequest{Name: "seed", Config: cfg},
 		Prompter: &flowtest.ScriptedPrompter{
 			Answers: formAnswers(map[string]string{jobflow.KeyName: "seed", jobflow.KeyCmd: "x", jobflow.KeyKind: string(domain.JobKindTask)}),
@@ -223,7 +223,7 @@ func TestEditUnsharingDropsTheNamespace(t *testing.T) {
 	cfg.Jobs[0].Scope = domain.JobScopeShared
 	cfg.Jobs[0].Namespace = &domain.JobNamespaceConfig{Name: "app_{worktree}", Create: "./add.sh"}
 
-	if _, err := jobflow.Edit(jobflow.EditParams{
+	if _, err := jobflow.Edit(t.Context(), jobflow.EditParams{
 		Context: ctx, Request: jobflow.EditRequest{Name: "db", Config: cfg},
 		Prompter: &flowtest.ScriptedPrompter{
 			Answers: formAnswers(map[string]string{jobflow.KeyName: "db", jobflow.KeyCmd: "x"}),
@@ -242,7 +242,7 @@ func TestEditUnsharingDropsTheNamespace(t *testing.T) {
 // the run is refused naming the flag rather than writing a block the loader
 // refuses.
 func TestAddUnattendedNamespaceWithoutCreateNamesTheFlag(t *testing.T) {
-	_, err := jobflow.Add(jobflow.AddParams{
+	_, err := jobflow.Add(t.Context(), jobflow.AddParams{
 		Context: context(t),
 		Request: jobflow.AddRequest{Config: dataConfig(), Initial: domain.JobConfig{
 			Name: "pg", Cmd: "docker compose up -d pg", Scope: domain.JobScopeShared,
@@ -263,7 +263,7 @@ func TestAddUnattendedKeepsWhatTheFlagsDeclared(t *testing.T) {
 		Runs: []string{"api"}, Scope: domain.JobScopeShared,
 		Namespace: &domain.JobNamespaceConfig{Name: "app_{worktree}", Create: "./add.sh", Env: map[string]string{"A": "1"}},
 	}
-	if _, err := jobflow.Add(jobflow.AddParams{
+	if _, err := jobflow.Add(t.Context(), jobflow.AddParams{
 		Context: ctx, Request: jobflow.AddRequest{Config: dataConfig(), Initial: initial},
 		Prompter: flow.Unattended{}, Presenter: &recorder{},
 	}); err != nil {
@@ -288,7 +288,7 @@ func TestEditAnsweringEveryPreFillIsUnchanged(t *testing.T) {
 	}
 	presenter := &recorder{}
 
-	if _, err := jobflow.Edit(jobflow.EditParams{
+	if _, err := jobflow.Edit(t.Context(), jobflow.EditParams{
 		Context: context(t), Request: jobflow.EditRequest{Name: "api", Config: cfg}, Prompter: prompter, Presenter: presenter,
 	}); err != nil {
 		t.Fatalf("Edit: %v", err)

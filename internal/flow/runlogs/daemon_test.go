@@ -228,7 +228,7 @@ func TestServiceStartKeepsWhatTheDaemonAnswered(t *testing.T) {
 	)
 
 	var streamed []byte
-	result, err := NewService(ServiceParams{SocketPath: socket}).Start(t.Context(), StartRequest{
+	result, err := NewService(t.Context(), ServiceParams{SocketPath: socket}).Start(t.Context(), StartRequest{
 		Job:      domain.JobConfig{Name: "migrate", Kind: domain.JobKindTask, Cmd: "pnpm migrate"},
 		WorkDir:  "/work/api",
 		OnOutput: func(chunk []byte) { streamed = append(streamed, chunk...) },
@@ -251,7 +251,7 @@ func TestServiceStartKeepsWhatTheDaemonAnswered(t *testing.T) {
 func TestServiceStartGivesUpOnTheDaemonWhenTheRunDetaches(t *testing.T) {
 	socket := scriptedDaemon(t, process.Response{Status: process.StatusOutput, Data: []byte("applying 001\n")})
 	ctx, detach := context.WithCancel(t.Context())
-	service := NewService(ServiceParams{SocketPath: socket})
+	service := NewService(t.Context(), ServiceParams{SocketPath: socket})
 
 	streamed := make(chan struct{}, 1)
 	answered := make(chan error, 1)

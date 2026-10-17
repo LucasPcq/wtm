@@ -22,10 +22,8 @@ func runTypeAssert(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-// unguardedAssertions is every `x.(T)` a wrong type would panic on. The two
-// checked forms are subtracted rather than special-cased on the way down: a
-// type switch owns its assertion, and a comma-ok one is only recognisable from
-// the assignment above it.
+// The checked forms are subtracted rather than special-cased on the way down:
+// a comma-ok assertion is only recognisable from the assignment above it.
 func unguardedAssertions(file *ast.File) []token.Pos {
 	guarded := map[token.Pos]bool{}
 	ast.Inspect(file, func(node ast.Node) bool {
@@ -59,8 +57,7 @@ func unguardedAssertions(file *ast.File) []token.Pos {
 	var unguarded []token.Pos
 	ast.Inspect(file, func(node ast.Node) bool {
 		assert, ok := node.(*ast.TypeAssertExpr)
-		// A nil Type is the `x.(type)` of a type switch, which has no wrong-type
-		// case to guard.
+		// A nil Type is the `x.(type)` of a type switch.
 		if ok && assert.Type != nil && !guarded[assert.Pos()] {
 			unguarded = append(unguarded, assert.Pos())
 		}

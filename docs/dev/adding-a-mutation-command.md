@@ -1,8 +1,8 @@
 # Adding a worktree-mutating command
 
-A *mutation command* is one that changes worktree state: it creates, removes, moves or rewrites something, and therefore has questions to ask, safety refusals to honor, and two bypass axes to expose. Every new one goes through `internal/flow/` — the model in [flow-layer.md](flow-layer.md).
+A *mutation command* changes worktree state: it creates, removes, moves or rewrites something, so it has steps to ask, safety refusals to honor and two bypass axes to expose. It is a flow in `internal/flow/<name>/`, wired by `internal/surface/cli`. The model is [flow-layer.md](flow-layer.md).
 
-A read-only command (`list`, `tree`, `resolve`) needs none of this: parse flags, call the service, hand the result to `output/`.
+A read-only command (`list`, `tree`, `resolve`) needs none of this: parse flags, call the service, hand the result to `surface/cli/render/`.
 
 ## 1. Declare the vocabulary in `domain/`
 
@@ -15,7 +15,7 @@ Constants first, so nothing downstream invents a string:
 
 ## 2. Put the decisions in `rules/`
 
-Anything that is a *decision over data* — is this safe, which of these applies, what is the default here — is a pure function in `internal/rules/`, taking domain types and returning domain types. No I/O, no writing. It is then testable as a table and callable from the flow, the service and any surface.
+Anything that is a *decision over data* — is this safe, which of these applies, what is the default here — is a pure function in the sub-package of its subject under `internal/rules/`, taking domain types and returning domain types. No I/O, no writing. It is then testable as a table and callable from the flow, the service and any surface.
 
 ## 3. Write the flow package
 
@@ -46,8 +46,8 @@ type Params struct {
 	Presenter Presenter
 }
 
-func Run(params Params) (Outcome, error) {
-	f := &splitFlow{ctx: params.Context, request: params.Request,
+func Run(ctx context.Context, params Params) (Outcome, error) {
+	f := &splitFlow{runCtx: ctx, ctx: params.Context, request: params.Request,
 		prompter: params.Prompter, presenter: params.Presenter}
 	return f.run()
 }
@@ -55,8 +55,9 @@ func Run(params Params) (Outcome, error) {
 
 Rules that are not negotiable:
 
-- The package imports **only** `internal/service`, `internal/rules`, `internal/domain` and the stdlib. Never cobra, bubbletea, lipgloss, `internal/output`, `internal/tui`, `internal/config` or `internal/commands`. If you need something only `infra/` has, add a thin wrapper in `service/` — as `worktree.FindByBranch` does.
+- The package imports **only** `internal/service`, `internal/rules`, `internal/domain` and the stdlib. Never cobra, bubbletea, lipgloss, `internal/surface/cli/render`, `internal/surface/tui`, `internal/config` or `internal/surface/cli`. If you need something only `infra/` has, add a thin wrapper in `service/` — as `worktree.FindByBranch` does.
 - `Request` carries **no `--yes` and no `--output`**. `--force` does belong there.
+- The run's `context.Context` is the first argument, never a `Params` field. Every service call that may reach a subprocess or the daemon takes it, and a `Stage`'s work uses the one `Work` is handed (see [flow-layer.md](flow-layer.md#cancellation)).
 - Errors are returned. A user abort is `presenter.Notice(flow.AbortedNotice)` followed by `Outcome{Aborted: true}, nil`.
 - Long work goes through `presenter.Stage`; hook output through `presenter.HookPhase`; a line inside an ongoing phase through `presenter.Status`. The flow never prints.
 
@@ -108,7 +109,7 @@ func Operation() flow.Operation {
 
 ## 4. Wire the command
 
-`internal/commands/wt/split.go` holds flag wiring and nothing else:
+`internal/surface/cli/wt/split.go` holds flag wiring and nothing else:
 
 ```go
 func runSplit(cmd *cobra.Command, args []string) error {
@@ -131,13 +132,13 @@ func runSplit(cmd *cobra.Command, args []string) error {
 	}
 
 	// The one place --yes is read: which Prompter gets installed.
-	interactive := rules.IsHumanFormat(format) && !yes && term.IsTerminal(int(os.Stdin.Fd()))
+	interactive := rules.IsHumanFormat(format) && !yes && shared.StdinIsTerminal()
 
-	_, err = splitflow.Run(splitflow.Params{
-		Context:   flowContext(config),
+	_, err = splitflow.Run(cmd.Context(), splitflow.Params{
+		Context:   shared.FlowContext(config),
 		Request:   splitflow.Request{Branch: branchName, Into: into, Force: force},
-		Prompter:  flowPrompter(flowPrompterParams{Interactive: interactive}),
-		Presenter: splitPresenter{cliPresenter: newPresenter(cmd, format)},
+		Prompter:  shared.FlowPrompter(cmd.Context(), shared.FlowPrompterParams{Interactive: interactive}),
+		Presenter: splitPresenter{CLIPresenter: shared.NewPresenter(cmd, format)},
 	})
 	return err
 }
@@ -152,23 +153,23 @@ Register the command in its parent group and give it a `GroupID` (`domain.CmdGro
 
 ## 5. Add the CLI presenter
 
-In `internal/commands/wt/presenter.go`, next to `createPresenter` and `cleanPresenter`:
+In `internal/surface/cli/wt/presenter.go`, next to `createPresenter` and `cleanPresenter`:
 
 ```go
-type splitPresenter struct{ cliPresenter }
+type splitPresenter struct{ shared.CLIPresenter }
 
 func (p splitPresenter) Split(outcome splitflow.Outcome) error {
-	if p.format == domain.OutputJSON {
-		return output.WriteSplitJSON(p.cmd.OutOrStdout(), outcome.Result)
+	if p.Format == domain.OutputJSON {
+		return render.WriteSplitJSON(p.Cmd.OutOrStdout(), outcome.Result)
 	}
-	output.Frame(p.cmd.OutOrStdout(), func() {
-		output.FormatSplitResult(p.cmd.OutOrStdout(), /* … */)
+	render.Frame(p.Cmd.OutOrStdout(), func() {
+		render.FormatSplitResult(p.Cmd.OutOrStdout(), /* … */)
 	})
 	return nil
 }
 ```
 
-`cliPresenter` already implements `Stage`, `HookPhase`, `Notice` and `Status` — embed it and add only the typed conclusion. The frame is applied **exactly once**, here; JSON and machine output are never framed.
+`shared.CLIPresenter` (`internal/surface/cli/shared/presenter.go`) already implements `Stage`, `HookPhase`, `Notice` and `Status` — embed it and add only the typed conclusion. The frame is applied **exactly once**, here; JSON and machine output are never framed.
 
 ## 6. Test it
 
@@ -179,9 +180,9 @@ func (p splitPresenter) Split(outcome splitflow.Outcome) error {
 ## 7. Documentation
 
 1. `make docs` — regenerates `docs/`, never hand-edited, and the command reference on the docs site with it. The README has no command table.
-2. Update the agent skill (`internal/commands/agents/assets/using-wtm/`, the reference file of the command's topic) if the agent-facing surface changed (a new command, a new flag, a changed JSON shape, changed failure/abort semantics).
+2. Update the agent skill (`internal/surface/cli/agents/assets/using-wtm/`, the reference file of the command's topic) if the agent-facing surface changed (a new command, a new flag, a changed JSON shape, changed failure/abort semantics).
 3. Run the `build-validator` subagent. Step 6 fails the run if `internal/flow/` gained a forbidden import.
 
-## Optional: make it work in the dashboard
+## In the dashboard
 
-Nothing in the flow changes. In `internal/tui/dashboard/actions.go`, add a `startSplit` that checks `busyReason`, calls `beginOp(splitflow.Operation())`, and launches `splitflow.Run` in a `tea.Cmd` with the dashboard's `prompter` and a presenter embedding `dashboard.presenter` plus the typed conclusion. If the flow uses a step kind the dashboard's modal cannot render, that is the only work left — and `flowui` will refuse an unknown kind rather than guess, so you will hear about it immediately.
+Nothing in the flow changes. In `internal/surface/tui/dashboard/actions.go`, add a `startSplit` that checks `busyReason`, calls `beginOp(beginParams{Operation: splitflow.Operation()})`, and launches `splitflow.Run` in a `tea.Cmd` with the dashboard's `prompter` and a presenter embedding `dashboard.presenter` plus the typed conclusion. If the flow uses a step kind the dashboard's modal cannot render, that is the only work left — and `flowui` will refuse an unknown kind rather than guess, so you will hear about it immediately.

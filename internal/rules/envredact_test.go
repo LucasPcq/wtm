@@ -16,6 +16,7 @@ func redactFixture() domain.EnvSyncResult {
 			Target: ".env",
 			Diff: domain.EnvDiff{Mode: domain.EnvModeRefresh, Entries: []domain.EnvKeyDiff{
 				{Key: "WEB_PORT", Status: domain.EnvKeyResolved, CurrentValue: "3010"},
+				{Key: "DATABASE_URL", Status: domain.EnvKeyConflict, CurrentValue: "postgres://app:" + fakeSecret + "@localhost:5442/db", ResolvedValue: "postgres://app:" + fakeSecret + "@localhost:5432/db", Source: domain.EnvSourceMain},
 				{Key: "REALM", Status: domain.EnvKeyResolved, CurrentValue: "app-feat-a"},
 				{Key: domain.EnvComposeProjectName, Status: domain.EnvKeyResolved, CurrentValue: "app-feat-a"},
 				{Key: "CLIENT_SECRET", Status: domain.EnvKeyConflict, CurrentValue: fakeSecret, ResolvedValue: fakeSecret + "-main", Source: domain.EnvSourceMain},
@@ -26,8 +27,12 @@ func redactFixture() domain.EnvSyncResult {
 			}},
 		}},
 		Ports: domain.EnvPortPlan{
-			Entries: []domain.EnvPortEntry{{File: ".env", Key: "WEB_PORT", Status: domain.EnvPortStatusUnchanged, CurrentValue: "3010"}},
-			Owned:   []domain.EnvOwnedEntry{{File: ".env", Key: "REALM", Value: "app-feat-a"}},
+			Entries: []domain.EnvPortEntry{
+				{File: ".env", Key: "WEB_PORT", Status: domain.EnvPortStatusUnchanged, CurrentValue: "3010"},
+				{File: ".env", Key: "DATABASE_URL", Status: domain.EnvPortStatusRewrite,
+					CurrentValue: "postgres://app:" + fakeSecret + "@localhost:5432/db", NewValue: "postgres://app:" + fakeSecret + "@localhost:5442/db"},
+			},
+			Owned: []domain.EnvOwnedEntry{{File: ".env", Key: "REALM", Value: "app-feat-a"}},
 		},
 	}
 }
@@ -55,7 +60,7 @@ func TestRedactEnvResultWithholdsTheValuesWtmDoesNotWrite(t *testing.T) {
 	if strings.Contains(string(body), fakeSecret) {
 		t.Errorf("redacted JSON still carries a secret: %s", body)
 	}
-	for _, key := range []string{"CLIENT_SECRET", "NEW_SECRET", "OLD_SECRET"} {
+	for _, key := range []string{"CLIENT_SECRET", "NEW_SECRET", "OLD_SECRET", "DATABASE_URL"} {
 		e := entryOf(t, redacted, key)
 		if !e.Redacted || e.CurrentValue != "" || e.ResolvedValue != "" {
 			t.Errorf("%s = %+v, want its values withheld and redacted set", key, e)
@@ -66,13 +71,21 @@ func TestRedactEnvResultWithholdsTheValuesWtmDoesNotWrite(t *testing.T) {
 	}
 }
 
-func TestRedactEnvResultKeepsTheValuesWtmWrites(t *testing.T) {
+// LUC-279: what wtm writes reaches the report through the port plan — an owned
+// value whole, a link's origins — never through the values the reconciliation
+// read from the files, which are the user's.
+func TestRedactEnvResultKeepsWhatWtmWrites(t *testing.T) {
 	redacted := RedactEnvResult(redactFixture())
 
-	for key, want := range map[string]string{"WEB_PORT": "3010", "REALM": "app-feat-a", domain.EnvComposeProjectName: "app-feat-a"} {
-		e := entryOf(t, redacted, key)
-		if e.Redacted || e.CurrentValue != want {
-			t.Errorf("%s = %+v, want its value %q shown", key, e, want)
+	if got := redacted.Ports.Owned[0].Value; got != "app-feat-a" {
+		t.Errorf("owned value = %q, want wtm's value whole", got)
+	}
+	if link := redacted.Ports.Entries[1]; link.CurrentValue != "" || link.NewValue != "" {
+		t.Errorf("link = %+v, want no value", link)
+	}
+	for _, key := range []string{"WEB_PORT", "REALM", domain.EnvComposeProjectName} {
+		if e := entryOf(t, redacted, key); !e.Redacted || e.CurrentValue != "" {
+			t.Errorf("%s = %+v, want its value withheld: the file's value is not wtm's", key, e)
 		}
 	}
 }
@@ -98,20 +111,25 @@ func TestRedactEnvResultLeavesItsInputIntact(t *testing.T) {
 	if e := entryOf(t, result, "CLIENT_SECRET"); e.CurrentValue != fakeSecret {
 		t.Errorf("input entry = %+v, want it untouched — the report classifies on it", e)
 	}
+	if got := result.Ports.Entries[1].NewValue; !strings.Contains(got, fakeSecret) {
+		t.Errorf("input plan = %q, want it untouched", got)
+	}
 }
 
-func TestEnvKeyRowsWithholdAConflictValueWtmDoesNotWrite(t *testing.T) {
+func TestEnvKeyRowsWithholdEveryConflictValue(t *testing.T) {
 	result := redactFixture()
 
-	rows := EnvKeyRows(EnvKeyRowsParams{File: result.Files[0], Check: true, Managed: EnvManagedKeys(EnvManagedKeysParams{Plan: result.Ports, Target: ".env"})})
+	rows := EnvKeyRows(EnvKeyRowsParams{File: result.Files[0], Check: true})
 
 	for _, row := range rows {
 		if strings.Contains(row.Text, fakeSecret) {
 			t.Errorf("row %q prints a secret", row.Text)
 		}
 	}
-	if !strings.Contains(rowText(rows, "CLIENT_SECRET"), "differs from main") {
-		t.Errorf("conflict row = %q, want it to say the values differ", rowText(rows, "CLIENT_SECRET"))
+	for _, key := range []string{"CLIENT_SECRET", "DATABASE_URL"} {
+		if !strings.Contains(rowText(rows, key), "differs from main") {
+			t.Errorf("conflict row = %q, want it to say the values differ", rowText(rows, key))
+		}
 	}
 }
 
@@ -132,71 +150,4 @@ func rowText(rows []domain.EnvKeyRow, key string) string {
 		}
 	}
 	return ""
-}
-
-func TestMaskURLPasswordMasksOnlyAURLPassword(t *testing.T) {
-	cases := map[string]string{
-		"postgres://app:hunter2@localhost:5432/db": "postgres://app:***@localhost:5432/db",
-		"redis://:hunter2@127.0.0.1:6379":          "redis://:***@127.0.0.1:6379",
-		"amqp://u:p%40ss@localhost:5672/vhost?x=1": "amqp://u:***@localhost:5672/vhost?x=1",
-		"3010":           "3010",
-		"localhost:3010": "localhost:3010",
-		"http://localhost:3010/callback?next=/a@b":   "http://localhost:3010/callback?next=/a@b",
-		"postgres://app@localhost:5432/db":           "postgres://app@localhost:5432/db",
-		"postgres://app:@localhost:5432/db":          "postgres://app:***@localhost:5432/db",
-		"http://[::1:3010":                           "http://[::1:3010",
-		"not a url: user:pass@host":                  "not a url: user:pass@host",
-		"":                                           "",
-		"http://localhost:3010,http://a:b@localhost": "http://localhost:3010,http://a:b@localhost",
-	}
-	for in, want := range cases {
-		if got := MaskURLPassword(in); got != want {
-			t.Errorf("MaskURLPassword(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-func TestRedactEnvResultMasksThePasswordOfAPortLinkedURL(t *testing.T) {
-	result := domain.EnvSyncResult{
-		Files: []domain.EnvFileResult{{Target: ".env", Diff: domain.EnvDiff{Entries: []domain.EnvKeyDiff{
-			{Key: "DATABASE_URL", Status: domain.EnvKeyResolved, CurrentValue: "postgres://app:" + fakeSecret + "@localhost:5442/db"},
-		}}}},
-		Ports: domain.EnvPortPlan{Entries: []domain.EnvPortEntry{{
-			File: ".env", Key: "DATABASE_URL", Status: domain.EnvPortStatusRewrite,
-			CurrentValue: "postgres://app:" + fakeSecret + "@localhost:5432/db",
-			NewValue:     "postgres://app:" + fakeSecret + "@localhost:5442/db",
-		}}},
-	}
-
-	redacted := RedactEnvResult(result)
-
-	body, _ := json.Marshal(redacted)
-	if strings.Contains(string(body), fakeSecret) {
-		t.Errorf("redacted JSON carries the password: %s", body)
-	}
-	if got := redacted.Ports.Entries[0].NewValue; got != "postgres://app:***@localhost:5442/db" {
-		t.Errorf("new_value = %q, want only the password masked", got)
-	}
-	if got := entryOf(t, redacted, "DATABASE_URL"); got.Redacted || got.CurrentValue != "postgres://app:***@localhost:5442/db" {
-		t.Errorf("entry = %+v, want its value shown with the password masked", got)
-	}
-	if result.Ports.Entries[0].NewValue == redacted.Ports.Entries[0].NewValue {
-		t.Error("the input plan was masked in place")
-	}
-}
-
-func TestEnvKeyRowsMaskThePasswordOfAManagedConflict(t *testing.T) {
-	file := fileWith(domain.EnvKeyDiff{Key: "DATABASE_URL", Status: domain.EnvKeyConflict, Source: domain.EnvSourceMain,
-		CurrentValue: "postgres://app:" + fakeSecret + "@localhost:5442/db", ResolvedValue: "postgres://app:other@localhost:5442/db"})
-	managed := map[string]bool{"DATABASE_URL": true}
-
-	masked := EnvKeyRows(EnvKeyRowsParams{File: file, Check: true, Managed: managed})
-	shown := EnvKeyRows(EnvKeyRowsParams{File: file, Check: true, Managed: managed, ShowValues: true})
-
-	if strings.Contains(masked[0].Text, fakeSecret) || !strings.Contains(masked[0].Text, "app:***@") {
-		t.Errorf("row = %q, want the password masked", masked[0].Text)
-	}
-	if !strings.Contains(shown[0].Text, fakeSecret) {
-		t.Errorf("row = %q, want the full value with --show-values", shown[0].Text)
-	}
 }

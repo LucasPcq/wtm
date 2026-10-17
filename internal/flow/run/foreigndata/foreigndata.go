@@ -3,6 +3,7 @@
 package foreigndata
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -24,11 +25,11 @@ type Params struct {
 
 // Allow says whether the run may go on. A terminal is asked; nobody to ask is
 // a refusal naming --force, never a silent reset of someone else's database.
-func Allow(params Params) (bool, error) {
+func Allow(ctx context.Context, params Params) (bool, error) {
 	if params.Force {
 		return true, nil
 	}
-	risks, err := Risks(params)
+	risks, err := Risks(ctx, params)
 	if err != nil {
 		return false, err
 	}
@@ -53,13 +54,13 @@ func Allow(params Params) (bool, error) {
 
 // Risks reads each worktree's isolation from the environment its jobs would
 // get, which is the same answer the daemon acts on.
-func Risks(params Params) ([]domain.DataRisk, error) {
+func Risks(ctx context.Context, params Params) ([]domain.DataRisk, error) {
 	if !rules.DeclaresTouches(params.Config, params.Jobs) {
 		return nil, nil
 	}
 	var risks []domain.DataRisk
 	for _, dir := range params.WorkDirs {
-		env, err := seam.JobEnv(seam.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, WorkDir: dir, Publisher: params.Context.Publisher})
+		env, err := seam.JobEnv(ctx, seam.JobEnvParams{ProjectDir: params.Context.ProjectDir, StateDir: params.Context.StateDir, WorkDir: dir, Publisher: params.Context.Publisher})
 		if err != nil {
 			return nil, err
 		}

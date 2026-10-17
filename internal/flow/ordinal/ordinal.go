@@ -3,6 +3,7 @@
 package ordinal
 
 import (
+	"context"
 	"errors"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -11,13 +12,13 @@ import (
 	"github.com/LucasPcq/wtm/internal/service/worktree"
 )
 
-func Ensure(ctx flow.Context, branch string) error {
-	claim, err := worktree.EnsureOrdinal(ref(ctx, branch))
+func Ensure(ctx context.Context, project flow.Context, branch string) error {
+	claim, err := worktree.EnsureOrdinal(ctx, ref(project, branch))
 	if err != nil {
 		return err
 	}
 	if claim.Allocated {
-		publish.Updated(publish.UpdatedParams{Context: ctx, Branch: branch, Changed: []domain.IdentityField{domain.IdentityOrdinal}})
+		publish.Updated(ctx, publish.UpdatedParams{Context: project, Branch: branch, Changed: []domain.IdentityField{domain.IdentityOrdinal}})
 	}
 	return nil
 }
@@ -33,12 +34,12 @@ type RetryParams struct {
 // Retry allocates exactly when the service would once have done it lazily: the
 // service answers ErrOrdinalUnallocated only when it needed the number, so the
 // flow never has to know which reads do.
-func Retry(params RetryParams) error {
+func Retry(ctx context.Context, params RetryParams) error {
 	err := params.Do()
 	if !errors.Is(err, domain.ErrOrdinalUnallocated) {
 		return err
 	}
-	if err := Ensure(params.Context, params.Branch()); err != nil {
+	if err := Ensure(ctx, params.Context, params.Branch()); err != nil {
 		return err
 	}
 	return params.Do()
@@ -46,11 +47,11 @@ func Retry(params RetryParams) error {
 
 // BeforeHooks is best effort, as the hooks' environment always was: a number
 // that cannot be allocated leaves the hooks their own environment.
-func BeforeHooks(ctx flow.Context, branch string) {
-	if !worktree.HookEnvPending(ref(ctx, branch)) {
+func BeforeHooks(ctx context.Context, project flow.Context, branch string) {
+	if !worktree.HookEnvPending(ctx, ref(project, branch)) {
 		return
 	}
-	_ = Ensure(ctx, branch)
+	_ = Ensure(ctx, project, branch)
 }
 
 func ref(ctx flow.Context, branch string) worktree.WorktreeRef {

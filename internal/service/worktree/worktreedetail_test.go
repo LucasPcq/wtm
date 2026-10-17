@@ -21,7 +21,7 @@ func TestDetailReadsCommitsAndChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := Detail(DetailParams{
+	got := Detail(t.Context(), DetailParams{
 		ProjectDir: dir,
 		Status:     domain.WorktreeStatus{Branch: "main", Path: dir, IsDirty: true},
 		Children:   []string{"feat/enfant"},
@@ -53,7 +53,7 @@ func TestDetailBlockersFromMemoryNotFromGH(t *testing.T) {
 	gittest.Git(t, dir, "add", ".")
 	gittest.Git(t, dir, "commit", "-m", "seed")
 
-	got := Detail(DetailParams{
+	got := Detail(t.Context(), DetailParams{
 		ProjectDir: dir,
 		Status:     domain.WorktreeStatus{Branch: "feat/x", Path: dir, IsDirty: true, IsLocked: true},
 		PRs:        []domain.PRInfo{{Branch: "feat/x", Number: 7, URL: "https://example/7"}},
@@ -76,7 +76,7 @@ func TestDetailBlockersFromMemoryNotFromGH(t *testing.T) {
 }
 
 func TestDetailRecordsFailurePerFamily(t *testing.T) {
-	got := Detail(DetailParams{
+	got := Detail(t.Context(), DetailParams{
 		ProjectDir: t.TempDir(),
 		Status:     domain.WorktreeStatus{Branch: "orpheline", Path: filepath.Join(t.TempDir(), "absent")},
 		Commits:    domain.DashboardDetailCommits,
@@ -121,7 +121,7 @@ func TestDetailEnvDriftUsesParentPathNotMain(t *testing.T) {
 		Files: []domain.EnvFile{{Target: ".env", Template: ".env.example"}},
 	}}}
 
-	got := Detail(DetailParams{
+	got := Detail(t.Context(), DetailParams{
 		ProjectDir: mainDir,
 		StateDir:   stateDir,
 		Config:     cfg,
@@ -156,7 +156,7 @@ func TestDetailReadsBranchDiffAgainstBase(t *testing.T) {
 
 	cfg := domain.Config{Project: domain.ProjectConfig{Worktrees: domain.WorktreesConfig{BaseBranch: "main"}}}
 
-	got := Detail(DetailParams{
+	got := Detail(t.Context(), DetailParams{
 		ProjectDir: dir,
 		Config:     cfg,
 		Status:     domain.WorktreeStatus{Branch: "feat/x", Path: dir},
@@ -179,7 +179,7 @@ func TestDetailReadsBranchDiffAgainstBase(t *testing.T) {
 // using a path that would otherwise fail the call and asserting no failure
 // is recorded for it.
 func TestDetailSkipsBranchDiffForParent(t *testing.T) {
-	got := Detail(DetailParams{
+	got := Detail(t.Context(), DetailParams{
 		ProjectDir: t.TempDir(),
 		Status:     domain.WorktreeStatus{Branch: "main", Path: filepath.Join(t.TempDir(), "absent"), IsParent: true},
 		Commits:    domain.DashboardDetailCommits,

@@ -27,7 +27,7 @@ func TestApplyReparentsMovesEachToItsParent(t *testing.T) {
 	seedMeta(t, stateDir, "dev/b", domain.WorktreeMetadata{SourceBranch: "dev/a", CreatedAt: "x"})
 	seedMeta(t, stateDir, "dev/c", domain.WorktreeMetadata{SourceBranch: "dev/x", CreatedAt: "x"})
 
-	applied, err := ApplyReparents(ApplyReparentsParams{
+	applied, err := ApplyReparents(t.Context(), ApplyReparentsParams{
 		StateDir: stateDir,
 		Reparents: []domain.ReparentResult{
 			{Branch: "dev/b", OldParent: "dev/a", NewParent: "main"},
@@ -73,7 +73,7 @@ func TestPlanPruneGHBased(t *testing.T) {
 	}
 	prs := []domain.PRInfo{{Branch: "feat-merged", State: domain.PRStateMerged}}
 
-	plan, err := PlanPrune(PlanPruneParams{Prune: params, PRs: func() []domain.PRInfo { return prs }})
+	plan, err := PlanPrune(t.Context(), PlanPruneParams{Prune: params, PRs: func() []domain.PRInfo { return prs }})
 	if err != nil {
 		t.Fatalf("PlanPrune: %v", err)
 	}

@@ -1,6 +1,10 @@
 package proxy
 
-import "github.com/LucasPcq/wtm/internal/domain"
+import (
+	"context"
+
+	"github.com/LucasPcq/wtm/internal/domain"
+)
 
 type RedirectorParams struct {
 	// Root is what every path is joined onto, "/" in production. It exists so
@@ -17,7 +21,7 @@ type Plan struct {
 
 type Redirector interface {
 	Plan() (Plan, error)
-	Apply() error
-	Remove() error
+	Apply(ctx context.Context) error
+	Remove(ctx context.Context) error
 	Inspect() domain.ProxyStatus
 }

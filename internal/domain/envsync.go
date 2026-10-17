@@ -22,6 +22,9 @@ type EnvFileResult struct {
 	// entry naming a path the repository does not have, and no amount of
 	// syncing will ever fill it.
 	Unresolvable bool `json:"unresolvable,omitempty"`
+	// Created says the worktree lacked the file: an apply wrote it from the
+	// copy create would have made, a --check reports that it would.
+	Created bool `json:"created,omitempty"`
 }
 
 // EnvSyncResult is the full outcome of `wtm env` on one worktree across all its
@@ -55,11 +58,14 @@ type EnvSyncResult struct {
 // EnvRestoredEntry is one value wtm owns put back to its source's. Removed is
 // a key the source does not have, so its line was dropped.
 type EnvRestoredEntry struct {
-	File    string `json:"file"`
-	Key     string `json:"key"`
-	From    string `json:"from"`
-	To      string `json:"to,omitempty"`
-	Removed bool   `json:"removed,omitempty"`
+	File string `json:"file"`
+	Key  string `json:"key"`
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
+	// Ports are the base ports run.toml declares for the key, the ones its
+	// value goes back to: a report names them rather than read the value.
+	Ports   []int `json:"ports,omitempty"`
+	Removed bool  `json:"removed,omitempty"`
 }
 
 // EnvFileDecision is what a reader decided for one file's drift. A key absent

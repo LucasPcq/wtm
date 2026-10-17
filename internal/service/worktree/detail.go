@@ -1,14 +1,11 @@
 package worktree
 
 import (
-	"encoding/json"
-	"errors"
-	"io/fs"
-	"os"
-	"path/filepath"
+	"context"
+	"slices"
 
 	"github.com/LucasPcq/wtm/internal/domain"
-	"github.com/LucasPcq/wtm/internal/rules"
+	"github.com/LucasPcq/wtm/internal/store"
 )
 
 // ParentBranchParams holds inputs for resolving a worktree's parent branch.
@@ -42,19 +39,8 @@ func loadSourceBranch(stateDir, branch string) string {
 	return meta.SourceBranch
 }
 
-// loadMetadata reads the full meta.json for a worktree, so callers can update one
-// field while preserving the rest (CreatedAt, EnvStrategy).
 func loadMetadata(stateDir, branch string) (domain.WorktreeMetadata, error) {
-	metaPath := filepath.Join(rules.WorktreeMetaDir(stateDir, branch), domain.MetaFileName)
-	data, err := os.ReadFile(metaPath)
-	if err != nil {
-		return domain.WorktreeMetadata{}, err
-	}
-	var meta domain.WorktreeMetadata
-	if err := json.Unmarshal(data, &meta); err != nil {
-		return domain.WorktreeMetadata{}, err
-	}
-	return meta, nil
+	return (store.MetaDisk{StateDir: stateDir}).Load(branch)
 }
 
 type RecordNamespacesParams struct {
@@ -69,35 +55,23 @@ type RecordNamespacesParams struct {
 // no metadata — the main checkout — records nothing rather than creating some.
 // Any other failure is returned: a namespace nobody recorded is one no clean
 // will ever drop.
-func RecordNamespaces(params RecordNamespacesParams) error {
+func RecordNamespaces(ctx context.Context, params RecordNamespacesParams) error {
 	if len(params.Jobs) == 0 {
 		return nil
 	}
-	meta, err := loadMetadata(params.StateDir, params.Branch)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	held := make(map[string]bool, len(meta.Namespaces))
-	for _, job := range meta.Namespaces {
-		held[job] = true
-	}
-	changed := false
-	for _, job := range params.Jobs {
-		if held[job] {
-			continue
-		}
-		held[job] = true
-		meta.Namespaces = append(meta.Namespaces, job)
-		changed = true
-	}
-	if !changed {
-		return nil
-	}
-	return writeMetadata(rules.WorktreeMetaDir(params.StateDir, params.Branch), meta)
+	_, err := (store.MetaDisk{StateDir: params.StateDir}).Update(ctx, store.MetaUpdate{
+		Branch:  params.Branch,
+		Missing: store.MissingSkip,
+		Change: func(meta *domain.WorktreeMetadata) error {
+			for _, job := range params.Jobs {
+				if !slices.Contains(meta.Namespaces, job) {
+					meta.Namespaces = append(meta.Namespaces, job)
+				}
+			}
+			return nil
+		},
+	})
+	return err
 }
 
 // NamespacesOf is what this worktree has to give back when it goes.

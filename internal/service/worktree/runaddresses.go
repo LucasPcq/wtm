@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"path/filepath"
 	"strconv"
 
@@ -33,11 +34,11 @@ type planForParams struct {
 // planFor is the worktree's [[env_port]] pass, computed and not applied. Empty
 // when it cannot be read, which reads as settled: an address is a poor place to
 // report that a config could not be loaded.
-func planFor(params planForParams) domain.EnvPortPlan {
+func planFor(ctx context.Context, params planForParams) domain.EnvPortPlan {
 	if params.Path == "" {
 		return domain.EnvPortPlan{}
 	}
-	plan, err := EnvPortPlanFor(ResolveEnvPortsParams{
+	plan, err := EnvPortPlanFor(ctx, ResolveEnvPortsParams{
 		ProjectDir:   params.Addresses.ProjectDir,
 		StateDir:     params.Addresses.StateDir,
 		Branch:       params.Branch,
@@ -53,8 +54,8 @@ func planFor(params planForParams) domain.EnvPortPlan {
 
 // pathsByBranch lists the worktrees once rather than per branch: resolving each
 // path on its own turned one address refresh into a git call per worktree.
-func pathsByBranch(projectDir string) map[string]string {
-	worktrees, err := ListAll(ListAllParams{ProjectDir: projectDir})
+func pathsByBranch(ctx context.Context, projectDir string) map[string]string {
+	worktrees, err := ListAll(ctx, ListAllParams{ProjectDir: projectDir})
 	if err != nil {
 		return nil
 	}
@@ -68,18 +69,18 @@ func pathsByBranch(projectDir string) map[string]string {
 // RunAddressesFor is where every declared job answers, in each worktree asked
 // for. A branch whose environment cannot be read is left out rather than given
 // a guess: a wrong port reads as a truth.
-func RunAddressesFor(params RunAddressesForParams) domain.RunAddresses {
+func RunAddressesFor(ctx context.Context, params RunAddressesForParams) domain.RunAddresses {
 	if len(params.RunConfig.Jobs) == 0 {
 		return domain.RunAddresses{}
 	}
 
-	paths := pathsByBranch(params.ProjectDir)
+	paths := pathsByBranch(ctx, params.ProjectDir)
 	answer := domain.RunAddresses{
 		ByBranch: make(map[string]map[string]domain.JobAddress, len(params.Branches)),
 		Notes:    map[string]string{},
 	}
 	for _, branch := range params.Branches {
-		env, err := BranchEnv(WorktreeRef{
+		env, err := BranchEnv(ctx, WorktreeRef{
 			ProjectDir: params.ProjectDir,
 			StateDir:   params.StateDir,
 			Branch:     branch,
@@ -91,7 +92,7 @@ func RunAddressesFor(params RunAddressesForParams) domain.RunAddresses {
 		if err != nil {
 			continue
 		}
-		plan := planFor(planForParams{Addresses: params, Branch: branch, Path: paths[branch]})
+		plan := planFor(ctx, planForParams{Addresses: params, Branch: branch, Path: paths[branch]})
 		if note := rules.AddressingDriftLine(rules.AddressingDriftParams{Worktree: branch, Plan: plan}); note != "" {
 			answer.Notes[branch] = note
 		}

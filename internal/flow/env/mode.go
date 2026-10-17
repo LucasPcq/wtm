@@ -66,7 +66,7 @@ func (f *envFlow) answeredState(answers flow.Answers) (modeState, error) {
 
 func (f *envFlow) readMode(t target) (modeState, error) {
 	ref := f.ref(t.branch)
-	isMain, err := worktree.IsMain(ref)
+	isMain, err := worktree.IsMain(f.runCtx, ref)
 	if err != nil {
 		return modeState{}, err
 	}
@@ -105,11 +105,11 @@ type planUnderParams struct {
 
 func (f *envFlow) planUnder(params planUnderParams) (domain.EnvPortPlan, error) {
 	var plan domain.EnvPortPlan
-	err := ordinal.Retry(ordinal.RetryParams{
+	err := ordinal.Retry(f.runCtx, ordinal.RetryParams{
 		Context: f.ctx,
 		Branch:  func() string { return params.Target.branch },
 		Do: func() error {
-			resolved, planErr := worktree.EnvPortPlanFor(worktree.ResolveEnvPortsParams{
+			resolved, planErr := worktree.EnvPortPlanFor(f.runCtx, worktree.ResolveEnvPortsParams{
 				ProjectDir:   f.ctx.ProjectDir,
 				StateDir:     f.ctx.StateDir,
 				Branch:       params.Target.branch,

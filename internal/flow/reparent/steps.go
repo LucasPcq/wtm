@@ -93,7 +93,7 @@ func (f *reparentFlow) parentStep() flow.Step {
 		Pinned:   f.baseBranch(),
 		Branches: f.candidates,
 		Refresh: func() []domain.BranchCandidate {
-			return branch.Refresh(branch.ListParams{ProjectDir: f.ctx.ProjectDir})
+			return branch.Refresh(f.runCtx, branch.ListParams{ProjectDir: f.ctx.ProjectDir})
 		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
 			selected := answers.Values(KeyBranches)

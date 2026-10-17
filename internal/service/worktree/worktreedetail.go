@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"time"
 
 	"github.com/LucasPcq/wtm/internal/domain"
@@ -28,7 +29,7 @@ type DetailParams struct {
 // Detail gathers what the detail panel displays beyond the status. It never
 // returns an error: each family fails on its own, into Failures, so the rest of
 // the panel stays readable.
-func Detail(params DetailParams) domain.WorktreeDetail {
+func Detail(ctx context.Context, params DetailParams) domain.WorktreeDetail {
 	detail := domain.WorktreeDetail{
 		Branch:   params.Status.Branch,
 		Children: params.Children,
@@ -36,7 +37,7 @@ func Detail(params DetailParams) domain.WorktreeDetail {
 		Failures: map[domain.DetailFamily]error{},
 	}
 
-	commits, err := infra.RecentCommits(infra.RecentCommitsParams{
+	commits, err := infra.RecentCommits(ctx, infra.RecentCommitsParams{
 		WorktreePath: params.Status.Path,
 		Limit:        params.Commits,
 	})
@@ -45,13 +46,13 @@ func Detail(params DetailParams) domain.WorktreeDetail {
 	}
 	detail.Commits = commits
 
-	detail.Changes, err = readChanges(params.Status.Path)
+	detail.Changes, err = readChanges(ctx, params.Status.Path)
 	if err != nil {
 		detail.Failures[domain.DetailFamilyChanges] = err
 	}
 
 	if !params.Status.IsParent {
-		detail.BranchDiff, err = infra.BranchDiffShortstat(infra.BranchDiffShortstatParams{
+		detail.BranchDiff, err = infra.BranchDiffShortstat(ctx, infra.BranchDiffShortstatParams{
 			WorktreePath: params.Status.Path,
 			Base:         params.Config.Project.Worktrees.BaseBranch,
 			Branch:       params.Status.Branch,
@@ -67,7 +68,7 @@ func Detail(params DetailParams) domain.WorktreeDetail {
 		IsDirty:         params.Status.IsDirty,
 		IsLocked:        params.Status.IsLocked,
 		IsParent:        params.Status.IsParent,
-		UnpushedCommits: unpushed(params),
+		UnpushedCommits: unpushed(ctx, params),
 		HasOpenPR:       openPR(params) != nil,
 		PRUrl:           openPRURL(params),
 	})
@@ -80,14 +81,14 @@ func Detail(params DetailParams) domain.WorktreeDetail {
 	return detail
 }
 
-func readChanges(worktreePath string) (domain.WorkingChanges, error) {
-	entries, err := infra.ListModifiedFiles(infra.ListModifiedFilesParams{WorktreePath: worktreePath})
+func readChanges(ctx context.Context, worktreePath string) (domain.WorkingChanges, error) {
+	entries, err := infra.ListModifiedFiles(ctx, infra.ListModifiedFilesParams{WorktreePath: worktreePath})
 	if err != nil {
 		return domain.WorkingChanges{}, err
 	}
 
 	changes := rules.CountChanges(entries)
-	stat, err := infra.DiffShortstat(infra.DiffShortstatParams{WorktreePath: worktreePath})
+	stat, err := infra.DiffShortstat(ctx, infra.DiffShortstatParams{WorktreePath: worktreePath})
 	if err != nil {
 		return changes, err
 	}
@@ -96,8 +97,8 @@ func readChanges(worktreePath string) (domain.WorkingChanges, error) {
 }
 
 // unpushed treats a branch with no remote as nothing to push, not a failure.
-func unpushed(params DetailParams) int {
-	count, err := infra.UnpushedCommits(infra.UnpushedCommitsParams{
+func unpushed(ctx context.Context, params DetailParams) int {
+	count, err := infra.UnpushedCommits(ctx, infra.UnpushedCommitsParams{
 		ProjectDir: params.ProjectDir,
 		Branch:     params.Status.Branch,
 	})

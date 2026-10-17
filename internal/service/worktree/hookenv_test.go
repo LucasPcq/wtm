@@ -21,12 +21,12 @@ ports = { DB_PORT = 5432 }
 
 func hookSaw(t *testing.T, repo ordinalRepo, branch, path string) map[string]string {
 	t.Helper()
-	if HookEnvPending(WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: branch}) {
+	if HookEnvPending(t.Context(), WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: branch}) {
 		repo.ensure(t, branch)
 	}
 	marker := filepath.Join(t.TempDir(), "env")
 	var out bytes.Buffer
-	if err := RunCleanHooks(domain.CleanHooksParams{
+	if err := RunCleanHooks(t.Context(), domain.CleanHooksParams{
 		ProjectDir:   repo.dir,
 		StateDir:     repo.stateDir,
 		WorktreePath: path,
@@ -61,7 +61,7 @@ func unsetComposeProject(t *testing.T) {
 func recordIsolation(t *testing.T, repo ordinalRepo, branch string, isolation domain.Isolation) {
 	t.Helper()
 	ref := WorktreeRef{ProjectDir: repo.dir, StateDir: repo.stateDir, Branch: branch}
-	if err := SetIsolation(SetIsolationParams{Ref: ref, Isolation: isolation}); err != nil {
+	if err := SetIsolation(t.Context(), SetIsolationParams{Ref: ref, Isolation: isolation}); err != nil {
 		t.Fatalf("SetIsolation: %v", err)
 	}
 }
@@ -168,7 +168,7 @@ func TestCreateRecordsIsolationBeforeItsHooksRun(t *testing.T) {
 	var cfg domain.Config
 	cfg.Project.Worktrees.BasePath = t.TempDir()
 
-	if _, err := Create(domain.CreateParams{
+	if _, err := Create(t.Context(), domain.CreateParams{
 		ProjectDir: repo.dir,
 		StateDir:   repo.stateDir,
 		Branch:     "feat/x",

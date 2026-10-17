@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -22,12 +23,12 @@ type JobEnvParams struct {
 // JobEnv resolves what a worktree's jobs and hooks learn about it. Only a
 // client can build this: it takes git to name the branch, and the daemon must
 // never run git.
-func JobEnv(params JobEnvParams) (map[string]string, error) {
-	branch, err := CurrentBranch(CurrentBranchParams{Dir: params.Dir})
+func JobEnv(ctx context.Context, params JobEnvParams) (map[string]string, error) {
+	branch, err := CurrentBranch(ctx, CurrentBranchParams{Dir: params.Dir})
 	if err != nil {
 		return nil, err
 	}
-	return BranchEnv(WorktreeRef{
+	return BranchEnv(ctx, WorktreeRef{
 		ProjectDir: params.ProjectDir,
 		StateDir:   params.StateDir,
 		Branch:     branch,
@@ -37,14 +38,14 @@ func JobEnv(params JobEnvParams) (map[string]string, error) {
 // BranchEnv is JobEnv for a caller that already knows the branch — the
 // lifecycle hooks, which are handed one rather than a directory to ask git
 // about.
-func BranchEnv(params WorktreeRef) (map[string]string, error) {
-	return branchEnvAs(params, IsolationOf(params))
+func BranchEnv(ctx context.Context, params WorktreeRef) (map[string]string, error) {
+	return branchEnvAs(ctx, params, IsolationOf(params))
 }
 
 // branchEnvAs resolves the environment under a given isolation: `wtm env
 // --isolation` settles the .env for the choice before recording it.
-func branchEnvAs(params WorktreeRef, isolation domain.Isolation) (map[string]string, error) {
-	ordinal, err := Ordinal(params)
+func branchEnvAs(ctx context.Context, params WorktreeRef, isolation domain.Isolation) (map[string]string, error) {
+	ordinal, err := Ordinal(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -145,12 +146,12 @@ type hookEnvParams struct {
 // COMPOSE_PROJECT_NAME the worktree's own .env sets wins: it is the stack a
 // `docker compose` typed there reaches. Resolving nothing degrades to the
 // hook's own environment rather than to another worktree's values.
-func hookEnv(params hookEnvParams) map[string]string {
+func hookEnv(ctx context.Context, params hookEnvParams) map[string]string {
 	cfg := runConfig(params.Ref.StateDir)
 	if !rules.RunEnvReachesHooks(rules.RunEnvReachesHooksParams{Config: cfg, Recorded: RecordedIsolation(params.Ref)}) {
 		return nil
 	}
-	env, err := BranchEnv(params.Ref)
+	env, err := BranchEnv(ctx, params.Ref)
 	if err != nil {
 		return nil
 	}
@@ -163,11 +164,11 @@ func hookEnv(params hookEnvParams) map[string]string {
 // HookEnvPending says whether this worktree's hooks would read its run
 // environment while it has no number yet: the flow allocates one first, so the
 // allocation is published like any other change to the worktree.
-func HookEnvPending(ref WorktreeRef) bool {
+func HookEnvPending(ctx context.Context, ref WorktreeRef) bool {
 	cfg := runConfig(ref.StateDir)
 	if !rules.RunEnvReachesHooks(rules.RunEnvReachesHooksParams{Config: cfg, Recorded: RecordedIsolation(ref)}) {
 		return false
 	}
-	_, err := Ordinal(ref)
+	_, err := Ordinal(ctx, ref)
 	return errors.Is(err, domain.ErrOrdinalUnallocated)
 }

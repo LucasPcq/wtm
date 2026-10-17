@@ -57,7 +57,7 @@ func runFlow(t *testing.T, dir, confirm string) (Outcome, error) {
 		Answers: map[string]string{KeyConfirm: confirm},
 	}
 	presenter := &recorder{Recorder: &flowtest.Recorder{}}
-	return Run(Params{
+	return Run(t.Context(), Params{
 		Context:   flow.Context{ProjectDir: dir, StateDir: filepath.Join(t.TempDir(), "state")},
 		Request:   Request{Branches: []string{"main"}},
 		Prompter:  prompter,

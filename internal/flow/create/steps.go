@@ -35,7 +35,18 @@ const (
 	labelRecap  = "Confirm & create"
 )
 
+const (
+	badgeRemote         = "on origin"
+	resumedSuffixFmt    = " (resumes %s)"
+	resumedListSuffix   = " (on origin)"
+	parentForResumedFmt = "Parent recorded for `wtm sync` — the branch starts from %s and tracks it"
+)
+
 func (f *createFlow) session() flow.Session {
+	return flow.Recall(flow.RecallParams{Session: f.steps(), Remembered: f.ctx.Config.Project.Wizard.Remembered, Ask: f.request.Ask})
+}
+
+func (f *createFlow) steps() flow.Session {
 	return flow.Session{
 		ErrLabel: domain.WizardErrLabel,
 		Presets:  f.presetAnswers(),
@@ -109,7 +120,7 @@ func (f *createFlow) validateEntry(check flow.EntryCheck) error {
 	if !f.derivedNames {
 		return nil
 	}
-	return worktree.CheckNameFree(worktree.NameCheckParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: check.Entry})
+	return worktree.CheckNameFree(f.runCtx, worktree.NameCheckParams{ProjectDir: f.ctx.ProjectDir, StateDir: f.ctx.StateDir, Branch: check.Entry})
 }
 
 func (f *createFlow) entryBadge(entry string) flow.Badge {
@@ -119,6 +130,9 @@ func (f *createFlow) entryBadge(entry string) flow.Badge {
 	case domain.BranchTargetCheckedOut:
 		return flow.Badge{Text: domain.BranchEntryWorktreeExists, Tone: domain.ToneNeutral}
 	}
+	if f.target(entry).Upstream != "" {
+		return flow.Badge{Text: badgeRemote, Tone: domain.ToneNeutral}
+	}
 	return flow.Badge{Text: domain.BranchEntryNew, Tone: domain.ToneSuccess}
 }
 
@@ -126,10 +140,12 @@ func (f *createFlow) branches(answers flow.Answers) []string { return answers.Va
 
 func (f *createFlow) many(answers flow.Answers) bool { return len(f.branches(answers)) > 1 }
 
-func (f *createFlow) existingBranches(answers flow.Answers) []string {
+// startingElsewhere are the branches the source does not start: an existing
+// local one, or one only on origin.
+func (f *createFlow) startingElsewhere(answers flow.Answers) []string {
 	var found []string
 	for _, name := range f.branches(answers) {
-		if f.target(name).State == domain.BranchTargetExisting {
+		if !rules.SourceIsStartPoint(f.target(name)) {
 			found = append(found, name)
 		}
 	}
@@ -146,16 +162,19 @@ func (f *createFlow) sourceStep() flow.Step {
 		Branches:    f.candidates,
 		Pinned:      f.pinnedParent(flow.Answers{}),
 		Refresh: func() []domain.BranchCandidate {
-			return branch.Refresh(branch.ListParams{ProjectDir: f.ctx.ProjectDir})
+			return branch.Refresh(f.runCtx, branch.ListParams{ProjectDir: f.ctx.ProjectDir})
 		},
 		Build: func(answers flow.Answers) (flow.StepContent, error) {
 			description := domain.CreateSourceStepDescription
 			if f.many(answers) {
 				description = domain.CreateSourceStepDescriptionMany
 			}
+			names := f.branches(answers)
 			switch {
-			case f.reusesBranch(answers) && len(f.branches(answers)) > 1:
+			case f.reusesBranch(answers) && len(names) > 1:
 				description = domain.RecapParentRecordedForExisting
+			case f.reusesBranch(answers) && f.target(names[0]).Upstream != "":
+				description = fmt.Sprintf(parentForResumedFmt, f.target(names[0]).Upstream)
 			case f.reusesBranch(answers):
 				description = domain.RecapParentRecordedForSync
 			}
@@ -208,6 +227,7 @@ func (f *createFlow) envStep() flow.Step {
 		Resolve:   func(flow.Answers) (flow.Answer, error) { return flow.Answer{Value: ""}, nil },
 		Summarize: envSummary,
 		Flag:      domain.FlagEnvFrom,
+		Memory:    flow.Memory{ID: domain.RememberEnvStrategy},
 	}
 }
 
@@ -253,6 +273,7 @@ func (f *createFlow) isolationStep() flow.Step {
 		},
 		Summarize: func(answer flow.Answer) string { return rules.IsolationSummary(domain.Isolation(answer.Value)) },
 		Flag:      domain.FlagIsolation,
+		Memory:    flow.Memory{ID: domain.RememberIsolation},
 	}
 }
 
@@ -300,7 +321,7 @@ func (f *createFlow) sourceUpdate(answers flow.Answers) decide.SourceUpdatePromp
 	if names := f.branches(answers); len(names) == 1 {
 		single = names[0]
 	}
-	return decide.SourceUpdate(decide.SourceUpdateParams{
+	return decide.SourceUpdate(f.runCtx, decide.SourceUpdateParams{
 		ProjectDir: f.ctx.ProjectDir,
 		Target:     f.target,
 		Branch:     single,
@@ -310,32 +331,47 @@ func (f *createFlow) sourceUpdate(answers flow.Answers) decide.SourceUpdatePromp
 }
 
 func (f *createFlow) reusesBranch(answers flow.Answers) bool {
-	return len(f.existingBranches(answers)) > 0
+	return len(f.startingElsewhere(answers)) > 0
 }
 
 func (f *createFlow) allReused(answers flow.Answers) bool {
 	names := f.branches(answers)
-	return len(names) > 0 && len(f.existingBranches(answers)) == len(names)
+	return len(names) > 0 && len(f.startingElsewhere(answers)) == len(names)
 }
 
 func (f *createFlow) branchLine(answers flow.Answers) string {
 	names := f.branches(answers)
 	switch {
 	case len(names) == 1:
-		label := names[0]
-		if f.reusesBranch(answers) {
-			label += domain.BranchReusedSuffix
-		}
-		return domain.RecapFieldBranch + label
+		return domain.RecapFieldBranch + names[0] + f.singleSuffix(names[0])
 	case len(names) > 1:
 		labels := make([]string, 0, len(names))
 		for _, name := range names {
-			if f.target(name).State == domain.BranchTargetExisting {
-				name += domain.BranchListExistingSuffix
-			}
-			labels = append(labels, name)
+			labels = append(labels, name+f.listSuffix(name))
 		}
 		return domain.RecapFieldBranches + strings.Join(labels, ", ")
+	}
+	return ""
+}
+
+func (f *createFlow) singleSuffix(name string) string {
+	target := f.target(name)
+	switch {
+	case target.State == domain.BranchTargetExisting:
+		return domain.BranchReusedSuffix
+	case target.Upstream != "":
+		return fmt.Sprintf(resumedSuffixFmt, target.Upstream)
+	}
+	return ""
+}
+
+func (f *createFlow) listSuffix(name string) string {
+	target := f.target(name)
+	switch {
+	case target.State == domain.BranchTargetExisting:
+		return domain.BranchListExistingSuffix
+	case target.Upstream != "":
+		return resumedListSuffix
 	}
 	return ""
 }
@@ -357,22 +393,25 @@ func (f *createFlow) recap(answers flow.Answers) string {
 	if answers.Value(KeySourceUpdate) == updateFastForward {
 		ffBranch = f.sourceUpdate(answers).Branch
 	}
+	updateMark := flow.RememberedMark(answers, KeySourceUpdate)
 	sourceLabel := source
 	if ffBranch != "" && ffBranch == source {
-		sourceLabel += domain.RecapFastForwardSuffix
+		sourceLabel += domain.RecapFastForwardSuffix + updateMark
 	}
 
 	var lines []string
 	if line := f.branchLine(answers); line != "" {
 		lines = append(lines, line)
 	}
-	lines = append(lines, sourceField+sourceLabel, domain.RecapFieldEnv+envLabel)
+	lines = append(lines, sourceField+sourceLabel, domain.RecapFieldEnv+envLabel+flow.RememberedMark(answers, KeyEnv))
 	if isolation := answers.Value(KeyIsolation); isolation != "" {
-		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(domain.Isolation(isolation)))
+		lines = append(lines, domain.RecapFieldIsolation+rules.IsolationSummary(domain.Isolation(isolation))+flow.RememberedMark(answers, KeyIsolation))
 	}
 	if ffBranch != "" && ffBranch != source {
-		lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, ffBranch))
+		lines = append(lines, fmt.Sprintf(domain.RecapUpdateFastForward, ffBranch)+updateMark)
 	}
+	lines = append(lines, decide.KeptSourceLines(answers, KeySourceUpdate)...)
+	lines = append(lines, flow.RememberedHint(answers, KeyEnv, KeyIsolation, KeySourceUpdate)...)
 
 	if warnings := f.warnings(answers); len(warnings) > 0 {
 		lines = append(lines, "")
@@ -388,7 +427,7 @@ func (f *createFlow) warnings(answers flow.Answers) []string {
 	if prompt := f.sourceUpdate(answers); prompt.Show && prompt.AbortOnDecline && prompt.Warning != "" {
 		warnings = append(warnings, domain.WarningPrefix+prompt.Warning)
 	}
-	if show, warning := decide.EnvParentFallback(decide.EnvFallbackParams{
+	if show, warning := decide.EnvParentFallback(f.runCtx, decide.EnvFallbackParams{
 		ProjectDir:  f.ctx.ProjectDir,
 		Source:      answers.Value(KeySource),
 		Config:      f.ctx.Config,

@@ -1139,6 +1139,10 @@ func (m *Manager) stopAllMatching(keep func(*ManagedJob) bool) error {
 	m.mu.Lock()
 	var own, shared []string
 	for key, job := range m.jobs {
+		if job.Status == domain.JobStatusCrashed && keep(job) {
+			own = append(own, key)
+			continue
+		}
 		if !rules.IsJobUp(job.Status) || !keep(job) {
 			continue
 		}
@@ -1177,12 +1181,17 @@ func (m *Manager) stopByKey(key string) error {
 	m.mu.Lock()
 	job, ok := m.jobs[key]
 	isRunning := ok && job.Status == domain.JobStatusRunning
+	crashed := ok && job.Status == domain.JobStatusCrashed
 	m.mu.Unlock()
 
 	if !ok {
 		// Idempotent: a job that isn't tracked is already stopped, so stopping
 		// it again is a no-op success. Whether the job name is actually declared
 		// is validated at the command layer (which has the run.toml config).
+		return nil
+	}
+	if crashed {
+		m.settleCrashed(job)
 		return nil
 	}
 
@@ -1414,6 +1423,16 @@ func (m *Manager) markStopped(job *ManagedJob) {
 
 	m.persist()
 	m.notify(notifyParams{Job: job, Type: domain.EventJobStopped})
+}
+
+// settleCrashed puts down a job that died on its own: nothing is left to stop,
+// and the job.crashed already sent stays its last event — a stream reads one
+// sequence per job.
+func (m *Manager) settleCrashed(job *ManagedJob) {
+	m.mu.Lock()
+	job.Status = domain.JobStatusStopped
+	m.mu.Unlock()
+	m.persist()
 }
 
 func (m *Manager) stopWithCommand(job *ManagedJob) error {

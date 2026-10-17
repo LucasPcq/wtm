@@ -17,7 +17,7 @@ Most drift comes from a fact written in the wrong place, then duplicated elsewhe
 | -- | -- | -- |
 | what one flag or command does | the Cobra `Short`/`Long`/flag help | `make docs` regenerates `docs/wtm_*.md`; never hand-edit those |
 | a concept spanning several commands, a setup, a model the user needs | `docs/guide/<page>.md` | this skill, §2–4 |
-| something an agent driving wtm must know (command surface, `--output json`, exit codes, abort semantics) | `internal/commands/agents/assets/using-wtm/references/<topic>.md` | `SKILL.md` there only when every task needs it |
+| something an agent driving wtm must know (command surface, `--output json`, exit codes, abort semantics) | `internal/surface/cli/agents/assets/using-wtm/references/<topic>.md` | `SKILL.md` there only when every task needs it |
 | a complete setup to copy | a section of `docs/guide/recipes.md` | one `##` per recipe, its final `run.toml` and the commands |
 | a symptom and its fix | a section of `docs/guide/troubleshooting.md` | **Symptom.** / cause / the command that fixes it |
 | what changed in a release | `CHANGELOG.md` | rules in [`docs/dev/changelog.md`](../../../docs/dev/changelog.md) |
@@ -86,7 +86,7 @@ When a page is renamed or removed, `grep` for its file name across `docs/`, `REA
 cd site && npm test && npm run build    # sync + build; internal links and anchors are validated
 ```
 
-Go tests also read the docs: `internal/commands/agents/events_doc_test.go` requires every final `wtm events` exit code to be named in `docs/guide/events.md`, `docs/guide/recipes.md` and the `using-wtm` skill. A fact a test pins to several pages stays on each of them; run `go test ./internal/commands/agents/` (or `make test`) after editing those pages.
+Go tests also read the docs: `internal/surface/cli/agents/events_doc_test.go` requires every final `wtm events` exit code to be named in `docs/guide/events.md`, `docs/guide/recipes.md` and the `using-wtm` skill. A fact a test pins to several pages stays on each of them; run `go test ./internal/surface/cli/agents/` (or `make test`) after editing those pages.
 
 A broken anchor fails the build: renaming a heading breaks every `#anchor` pointing at it, so `grep` the old slug first. Then look at the page in `make site-dev` (sidebar placement, lede, how code and tables render). When the change also touched the landing or the theme, take screenshots with the `wtm-site` skill.
 

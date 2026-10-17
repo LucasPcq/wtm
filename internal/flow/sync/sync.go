@@ -2,6 +2,7 @@
 package sync
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -63,6 +64,7 @@ func Operation() flow.Operation {
 }
 
 type syncFlow struct {
+	runCtx    context.Context
 	ctx       flow.Context
 	request   Request
 	prompter  flow.Prompter
@@ -78,8 +80,9 @@ type syncFlow struct {
 	selection []string
 }
 
-func Run(params Params) (Outcome, error) {
+func Run(ctx context.Context, params Params) (Outcome, error) {
 	f := &syncFlow{
+		runCtx:    ctx,
 		ctx:       params.Context,
 		request:   params.Request,
 		prompter:  params.Prompter,
@@ -114,7 +117,7 @@ func (f *syncFlow) run() (Outcome, error) {
 
 	// Rebuilt for the answered selection: what the recap memoized served the
 	// preview, and the answers may have narrowed it since.
-	plan, err := worktree.PlanSync(syncParams)
+	plan, err := worktree.PlanSync(f.runCtx, syncParams)
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -140,7 +143,8 @@ func (f *syncFlow) run() (Outcome, error) {
 	}
 	f.presenter.Rebased(result)
 
-	if !f.request.DryRun && f.shouldPush(result) {
+	// An interrupted run pushes nothing, and offers nothing to push.
+	if !f.request.DryRun && f.runCtx.Err() == nil && f.shouldPush(result) {
 		pushed, pushErr := f.push(result)
 		if pushErr != nil {
 			return Outcome{}, pushErr
@@ -152,6 +156,9 @@ func (f *syncFlow) run() (Outcome, error) {
 	if err != nil {
 		return outcome, err
 	}
+	if rules.SyncInterrupted(result.Steps) || f.runCtx.Err() != nil {
+		return outcome, fmt.Errorf("%w: %w", domain.ErrAborted, domain.ErrCancelled)
+	}
 	if !f.request.DryRun && rules.HasSyncFailure(result.Steps) {
 		return outcome, domain.ErrAborted
 	}
@@ -162,7 +169,7 @@ func (f *syncFlow) run() (Outcome, error) {
 // is I/O, so only the run that could actually ask pays for it; every other
 // outcome is settled by the flags alone.
 func (f *syncFlow) load() error {
-	statuses, err := worktree.List(domain.ListParams{
+	statuses, err := worktree.List(f.runCtx, domain.ListParams{
 		ProjectDir: f.ctx.ProjectDir,
 		StateDir:   f.ctx.StateDir,
 		Config:     f.ctx.Config,
@@ -188,17 +195,17 @@ func (f *syncFlow) resolvedBranches() ([]string, error) {
 	if len(f.request.Branches) == 0 {
 		return nil, nil
 	}
-	return worktree.ResolveSyncBranches(worktree.ResolveSyncBranchesParams{
+	return worktree.ResolveSyncBranches(f.runCtx, worktree.ResolveSyncBranchesParams{
 		ProjectDir: f.ctx.ProjectDir,
 		Queries:    f.request.Branches,
 	})
 }
 
 func (f *syncFlow) scanParents() error {
-	return f.presenter.Stage(flow.StageParams{
+	return f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.SyncParentScanning,
-		Work: func() error {
-			classified, err := worktree.ClassifyParents(worktree.ClassifyParentsParams{
+		Work: func(ctx context.Context) error {
+			classified, err := worktree.ClassifyParents(ctx, worktree.ClassifyParentsParams{
 				ProjectDir: f.ctx.ProjectDir,
 				StateDir:   f.ctx.StateDir,
 				BaseBranch: f.request.BaseBranch,
@@ -211,11 +218,11 @@ func (f *syncFlow) scanParents() error {
 
 func (f *syncFlow) rebase(params worktree.SyncParams) (domain.SyncResult, error) {
 	var result domain.SyncResult
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.SyncRebasing,
-		Work: func() error {
+		Work: func(ctx context.Context) error {
 			var syncErr error
-			result, syncErr = worktree.Sync(params)
+			result, syncErr = worktree.Sync(ctx, params)
 			return syncErr
 		},
 	})
@@ -224,10 +231,10 @@ func (f *syncFlow) rebase(params worktree.SyncParams) (domain.SyncResult, error)
 
 func (f *syncFlow) push(result domain.SyncResult) (domain.SyncResult, error) {
 	pushed := result
-	err := f.presenter.Stage(flow.StageParams{
+	err := f.presenter.Stage(f.runCtx, flow.StageParams{
 		Message: domain.SyncPushing,
-		Work: func() error {
-			pushed = worktree.PushSynced(worktree.PushSyncedParams{
+		Work: func(ctx context.Context) error {
+			pushed = worktree.PushSynced(ctx, worktree.PushSyncedParams{
 				ProjectDir: f.ctx.ProjectDir,
 				Result:     result,
 			})

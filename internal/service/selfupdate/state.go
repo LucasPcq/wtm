@@ -1,11 +1,13 @@
 package selfupdate
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/infra/fs"
 )
 
 func StatePath() (string, error) {
@@ -38,47 +40,20 @@ func LoadState() domain.UpdateState {
 	return state
 }
 
-func SaveState(state domain.UpdateState) error {
+// SaveState writes atomically: the refresh goroutine dies with the process by
+// design, and a partial file would cost an extra network call to recover from.
+func SaveState(ctx context.Context, state domain.UpdateState) error {
 	path, err := StatePath()
 	if err != nil {
 		return err
 	}
-
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-
 	data, err := json.Marshal(state)
 	if err != nil {
 		return err
 	}
-
-	// Written through a temp file: os.WriteFile truncates in place, so a process
-	// exiting mid-write — which the refresh goroutine does by design — would
-	// leave a partial file that costs an extra network call to recover from.
-	tmp, err := os.CreateTemp(filepath.Dir(path), "."+domain.GlobalStateFile+"-*")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	if err := os.Chmod(tmpPath, 0o644); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-
-	return nil
+	_, err = fs.UpdateFile(ctx, fs.UpdateFileParams{
+		Path:   path,
+		Mutate: func([]byte) (fs.Change, error) { return fs.Write{Data: data}, nil },
+	})
+	return err
 }
