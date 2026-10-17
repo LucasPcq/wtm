@@ -15,7 +15,6 @@ func TestEachKindExitsOnItsCode(t *testing.T) {
 		wtm.KindRefused:      exitRefused,
 		wtm.KindConflict:     exitConflict,
 		wtm.KindPrecondition: exitPrecondition,
-		wtm.KindNotFound:     exitError,
 		wtm.KindInternal:     exitError,
 	}
 	for kind, code := range cases {

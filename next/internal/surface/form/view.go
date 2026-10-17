@@ -24,7 +24,7 @@ func (w *wizard) View() string {
 }
 
 func (w *wizard) status() string {
-	return statusBox.Render(w.spinner.View() + " " + muted.Render(w.loading))
+	return statusBox.Render(w.spinner.View() + " " + output.Muted.Render(w.loading))
 }
 
 func (w *wizard) head() string {
@@ -42,7 +42,7 @@ func (w *wizard) head() string {
 	if w.current == stepRecap {
 		return b.String() + w.review() + "\n\n"
 	}
-	b.WriteString(muted.Render(indented(wrap(output.Describe(paths[w.current]), w.size.Width-len(indent)-1))) + "\n\n")
+	b.WriteString(output.Muted.Render(indented(wrap(output.Describe(paths[w.current]), w.size.Width-len(output.Indent)-1))) + "\n\n")
 	return b.String()
 }
 
@@ -51,7 +51,7 @@ func (w *wizard) breadcrumb() string {
 	if w.current == stepRecap {
 		title = w.recapTitle()
 	}
-	return muted.Render(fmt.Sprintf("%sStep %d/%d", indent, w.current+1, w.last())) + muted.Render(helpSeparator) + accent.Render(title)
+	return output.Muted.Render(fmt.Sprintf("%sStep %d/%d", output.Indent, w.current+1, w.last())) + output.Muted.Render(helpSeparator) + accent.Render(title)
 }
 
 func (w *wizard) summaries() string {
@@ -60,16 +60,16 @@ func (w *wizard) summaries() string {
 		m := w.marks[s]
 		switch {
 		case m.ruled != "":
-			lines = append(lines, muted.Render(indent+"· "+labels[s]+" — "+m.ruled))
+			lines = append(lines, output.Muted.Render(output.Indent+"· "+labels[s]+" — "+m.ruled))
 		default:
-			lines = append(lines, summary.Render(indent+"✓ "+labels[s]+": "+m.line))
+			lines = append(lines, summary.Render(output.Indent+"✓ "+labels[s]+": "+m.line))
 		}
 	}
 	return strings.Join(lines, "\n")
 }
 
 func (w *wizard) tail() string {
-	return "\n\n" + muted.Render(w.helpLine()) + "\n"
+	return "\n\n" + output.Muted.Render(w.helpLine()) + "\n"
 }
 
 func (w *wizard) helpLine() string {
@@ -91,7 +91,7 @@ func (w *wizard) helpLine() string {
 	} else {
 		parts = append(parts, "esc cancel")
 	}
-	return indent + strings.Join(parts, helpSeparator)
+	return output.Indent + strings.Join(parts, helpSeparator)
 }
 
 func (w *wizard) canGoBack() bool {

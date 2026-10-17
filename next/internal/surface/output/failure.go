@@ -15,7 +15,7 @@ type FailureParams struct {
 func Failure(w io.Writer, params FailureParams) {
 	errorLine(w, errorText(params.Err))
 	for _, line := range fieldLines(params.Err) {
-		message(w, indent+line)
+		message(w, Indent+line)
 	}
 	nextSteps(w, params.Next)
 }

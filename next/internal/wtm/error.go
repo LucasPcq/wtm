@@ -13,7 +13,6 @@ type Kind string
 
 const (
 	KindInvalid      Kind = "invalid"
-	KindNotFound     Kind = "not_found"
 	KindConflict     Kind = "conflict"
 	KindPrecondition Kind = "precondition"
 	KindRefused      Kind = "refused"

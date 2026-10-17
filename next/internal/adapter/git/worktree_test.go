@@ -133,7 +133,7 @@ func TestTheCommonDirIsTheMainRepositorysEvenFromInsideALinkedWorktree(t *testin
 	inside := filepath.Join(linked, "sub")
 	require.NoError(t, os.Mkdir(inside, 0o755))
 
-	common, err := git.Repo{Dir: inside, Remote: remote}.GitCommonDir(t.Context())
+	common, err := git.Repo{Dir: inside, Remote: remote}.CommonDir(t.Context())
 
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(repo.Dir, ".git"), common)
@@ -218,7 +218,7 @@ func TestTheFakeAndGitReadTheSameRepository(t *testing.T) {
 			at := impl.at
 
 			main, mainErr := impl.port.MainWorktree(t.Context())
-			common, commonErr := impl.port.GitCommonDir(t.Context())
+			common, commonErr := impl.port.CommonDir(t.Context())
 
 			require.NoError(t, mainErr)
 			assert.Equal(t, at("main"), main.Path)

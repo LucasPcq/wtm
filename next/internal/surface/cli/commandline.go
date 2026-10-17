@@ -19,7 +19,7 @@ type createLine struct {
 func (l createLine) String() string {
 	req := l.Request
 	words := append([]string{l.Command}, quoted(req.Branches)...)
-	words = appendFlag(words, "env-from", string(req.EnvFrom))
+	words = append(words, flagWords(flagValue{Name: "env-from", Value: string(req.EnvFrom)})...)
 	switch {
 	case req.FastForward == nil:
 	case *req.FastForward:
@@ -27,13 +27,13 @@ func (l createLine) String() string {
 	default:
 		words = append(words, "--ff=false")
 	}
-	words = appendFlag(words, "from", req.From)
+	words = append(words, flagWords(flagValue{Name: "from", Value: req.From})...)
 	if req.IfNotExists {
 		words = append(words, "--if-not-exists")
 	}
-	words = appendFlag(words, "isolation", string(req.Isolation))
+	words = append(words, flagWords(flagValue{Name: "isolation", Value: string(req.Isolation)})...)
 	for _, answer := range req.Remember {
-		words = appendFlag(words, "remember", answer)
+		words = append(words, flagWords(flagValue{Name: "remember", Value: answer})...)
 	}
 	if req.Ask {
 		words = append(words, "--ask")
@@ -51,11 +51,16 @@ func followUpLine(followUp *wtm.FollowUp) string {
 	return strings.Join(words, " ")
 }
 
-func appendFlag(words []string, flag, value string) []string {
-	if value == "" {
-		return words
+type flagValue struct {
+	Name  string
+	Value string
+}
+
+func flagWords(flag flagValue) []string {
+	if flag.Value == "" {
+		return nil
 	}
-	return append(words, "--"+flag, quote(value))
+	return []string{"--" + flag.Name, quote(flag.Value)}
 }
 
 func quoted(words []string) []string {

@@ -15,7 +15,7 @@ const remote = "origin"
 type port interface {
 	Worktrees(ctx context.Context) ([]worktree.Worktree, error)
 	MainWorktree(ctx context.Context) (worktree.Worktree, error)
-	GitCommonDir(ctx context.Context) (string, error)
+	CommonDir(ctx context.Context) (string, error)
 	Locate(ctx context.Context, path string) (worktree.Location, error)
 	Branches(ctx context.Context) (branch.Branches, error)
 	AheadBehind(ctx context.Context, name string) (branch.AheadBehind, error)

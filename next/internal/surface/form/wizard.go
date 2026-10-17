@@ -7,6 +7,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/app"
 	"github.com/LucasPcq/wtm/next/internal/app/create"
+	"github.com/LucasPcq/wtm/next/internal/surface/output"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 	"github.com/LucasPcq/wtm/next/internal/wtm/run"
@@ -94,7 +95,7 @@ type wizardParams struct {
 
 func newWizard(ctx context.Context, params wizardParams) *wizard {
 	s := spinner.New()
-	s.Spinner, s.Style = spinner.MiniDot, muted
+	s.Spinner, s.Style = spinner.MiniDot, output.Muted
 	return &wizard{ctx: ctx, app: params.App, given: params.Request, req: params.Request, dryRun: params.DryRun, spinner: s, size: size{Width: defaultWidth}}
 }
 
@@ -284,7 +285,7 @@ func (w *wizard) answer() tea.Cmd {
 		return w.confirmed()
 	case stepIfNotExists, stepCount:
 	}
-	w.marks[s].line = w.summarized(s, shown)
+	w.marks[s].line = w.summarized(answer{Step: s, Shown: shown})
 	if err := w.reobserve(); err != nil {
 		w.err = err
 		return tea.Quit

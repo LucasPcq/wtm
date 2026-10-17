@@ -3,31 +3,11 @@ package output
 import (
 	"bytes"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
-
-func finalScreen(raw string) []string {
-	var rows []string
-	for line := range strings.SplitSeq(raw, "\n") {
-		for {
-			before, after, found := strings.Cut(line, "\x1b[")
-			if !found {
-				break
-			}
-			count, rest, _ := strings.Cut(after, "F")
-			n, _ := strconv.Atoi(count)
-			rows = append(rows, before)
-			rows = rows[:max(len(rows)-1-n, 0)]
-			line = strings.TrimPrefix(strings.TrimPrefix(rest, "\x1b[J"), "\x1b[2K")
-		}
-		rows = append(rows, line)
-	}
-	return rows[:len(rows)-1]
-}
 
 func TestAHookThatSucceedsLeavesOneResultLine(t *testing.T) {
 	var out bytes.Buffer

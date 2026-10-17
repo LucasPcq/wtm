@@ -31,7 +31,7 @@ type Params struct {
 	Run        run.Config
 }
 
-func JobEnv(params Params) map[string]string {
+func Env(params Params) map[string]string {
 	env := map[string]string{
 		worktreeKey:   branch.Slug(params.Branch),
 		branchKey:     params.Branch,

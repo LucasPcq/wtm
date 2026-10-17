@@ -6,9 +6,12 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,3 +49,41 @@ const (
 	time2s = 2 * time.Second
 	tick   = 10 * time.Millisecond
 )
+
+func hookRun(progress *Progress, lines ...string) {
+	progress.Report(wtm.UnitStarted{Subject: "feat/x"})
+	progress.Report(wtm.PhaseStarted{Subject: "feat/x", Phase: "worktree"})
+	progress.Report(wtm.PhaseFinished{Subject: "feat/x", Phase: "worktree"})
+	progress.Report(wtm.PhaseStarted{Subject: "feat/x", Phase: "on_create", Log: "/state/hooks/on_create-feat%2Fx.log"})
+	for _, line := range lines {
+		progress.Report(wtm.Output{Subject: "feat/x", Line: line})
+	}
+	progress.Report(wtm.PhaseFinished{Subject: "feat/x", Phase: "on_create"})
+	progress.Report(wtm.UnitFinished{Subject: "feat/x", Status: wtm.StatusDone})
+}
+
+func finalScreen(raw string) []string {
+	var rows []string
+	for line := range strings.SplitSeq(raw, "\n") {
+		for {
+			before, after, found := strings.Cut(line, "\x1b[")
+			if !found {
+				break
+			}
+			count, rest, _ := strings.Cut(after, "F")
+			n, _ := strconv.Atoi(count)
+			rows = append(rows, before)
+			rows = rows[:max(len(rows)-1-n, 0)]
+			line = strings.TrimPrefix(strings.TrimPrefix(rest, "\x1b[J"), "\x1b[2K")
+		}
+		rows = append(rows, line)
+	}
+	return rows[:len(rows)-1]
+}
+
+func envelopeOf(t *testing.T, params EnvelopeParams) string {
+	t.Helper()
+	var out bytes.Buffer
+	require.NoError(t, Envelope(&out, params))
+	return out.String()
+}

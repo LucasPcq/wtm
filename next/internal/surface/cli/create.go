@@ -91,12 +91,12 @@ func newCreate(open func(ctx context.Context) (Project, error)) *cobra.Command {
 	flags.BoolVar(&c.dryRun, "dry-run", false, dryRunUsage)
 	flags.StringVar(&c.expect, "expect-fingerprint", "", expectUsage)
 	flags.BoolVar(&c.ask, "ask", false, askUsage)
-	_ = cmd.RegisterFlagCompletionFunc("env-from", cobra.FixedCompletions(names(project.EnvStrategies()), cobra.ShellCompDirectiveNoFileComp))
-	_ = cmd.RegisterFlagCompletionFunc("isolation", cobra.FixedCompletions(names(run.Isolations()), cobra.ShellCompDirectiveNoFileComp))
+	_ = cmd.RegisterFlagCompletionFunc("env-from", cobra.FixedCompletions(create.Names(project.EnvStrategies()), cobra.ShellCompDirectiveNoFileComp))
+	_ = cmd.RegisterFlagCompletionFunc("isolation", cobra.FixedCompletions(create.Names(run.Isolations()), cobra.ShellCompDirectiveNoFileComp))
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		invalid := wtm.Invalid(nil)
 		invalid.Cause = err
-		return c.fail(cmd, invalid, create.Request{})
+		return c.fail(cmd, refusal{Err: invalid})
 	})
 	return cmd
 }
@@ -107,12 +107,12 @@ func (c *createCommand) run(cmd *cobra.Command, args []string) error {
 	if c.output != outputText && c.output != outputJSON {
 		refused := wtm.InvalidMessage(`invalid --output "` + c.output + `": expected one of text, json`)
 		c.output = outputText
-		return c.fail(cmd, refused, req)
+		return c.fail(cmd, refusal{Err: refused, Request: req})
 	}
 	ctx := cmd.Context()
 	project, err := c.open(ctx)
 	if err != nil {
-		return c.fail(cmd, wtm.AsError(wtm.AsErrorParams{Err: err}), req)
+		return c.fail(cmd, refusal{Err: wtm.AsError(wtm.AsErrorParams{Err: err}), Request: req})
 	}
 	_, stderr := c.streams(cmd)
 	progress := output.NewProgress(ctx, output.ProgressParams{W: stderr, Human: c.human(), Live: output.IsTerminal(stderr)})
@@ -178,15 +178,14 @@ type concluded struct {
 }
 
 func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
-	failure := cmp.Or(done.Err, done.Outcome.Failure())
 	if !c.human() {
-		return c.envelope(cmd, envelopeOf{Outcome: done.Outcome, Err: done.Err, Failure: failure})
+		return c.envelope(cmd, output.EnvelopeParams{Outcome: done.Outcome, Err: done.Err})
 	}
 	stdout, _ := c.streams(cmd)
 	line := createLine{Command: cmd.CommandPath(), Request: done.Request}
 	switch {
 	case done.Err != nil:
-		return c.fail(cmd, done.Err, done.Request)
+		return c.fail(cmd, refusal{Err: done.Err, Request: done.Request})
 	case done.Outcome.Result == nil:
 		apply := line.String() + " --expect-fingerprint " + done.Outcome.Fingerprint
 		output.Frame(stdout, func(w io.Writer) { output.DryRun(w, output.DryRunParams{Outcome: done.Outcome, Apply: apply}) })
@@ -196,33 +195,33 @@ func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
 	output.Frame(stdout, func(w io.Writer) {
 		output.Outcome(w, output.OutcomeParams{Outcome: done.Outcome, FollowUps: followUps, Cwd: done.Cwd})
 	})
-	return c.failed(failure)
+	return c.failed(cmp.Or(done.Err, done.Outcome.Failure()))
 }
 
-func (c *createCommand) fail(cmd *cobra.Command, failure *wtm.Error, req create.Request) error {
+type refusal struct {
+	Err     *wtm.Error
+	Request create.Request
+}
+
+func (c *createCommand) fail(cmd *cobra.Command, refused refusal) error {
+	failure := refused.Err
 	if !c.human() {
-		return c.envelope(cmd, envelopeOf{Err: failure, Failure: failure})
+		return c.envelope(cmd, output.EnvelopeParams{Err: refused.Err})
 	}
 	_, stderr := c.streams(cmd)
 	var next []output.NextStep
 	if failure.Code == app.CodePlanStale {
-		next = []output.NextStep{{Command: createLine{Command: cmd.CommandPath(), Request: req}.String() + " --dry-run", Note: replanNote}}
+		next = []output.NextStep{{Command: createLine{Command: cmd.CommandPath(), Request: refused.Request}.String() + " --dry-run", Note: replanNote}}
 	}
 	output.Frame(stderr, func(w io.Writer) { output.Failure(w, output.FailureParams{Err: failure, Next: next}) })
 	return c.failed(failure)
 }
 
-type envelopeOf struct {
-	Outcome app.CreateOutcome
-	Err     *wtm.Error
-	Failure *wtm.Error
-}
-
-func (c *createCommand) envelope(cmd *cobra.Command, doc envelopeOf) error {
-	if err := output.Envelope(cmd.OutOrStdout(), output.EnvelopeParams{Outcome: doc.Outcome, Err: doc.Err}); err != nil {
+func (c *createCommand) envelope(cmd *cobra.Command, doc output.EnvelopeParams) error {
+	if err := output.Envelope(cmd.OutOrStdout(), doc); err != nil {
 		return c.failed(wtm.AsError(wtm.AsErrorParams{Err: err}))
 	}
-	return c.failed(doc.Failure)
+	return c.failed(cmp.Or(doc.Err, doc.Outcome.Failure()))
 }
 
 func (c *createCommand) failed(failure *wtm.Error) error {
@@ -241,12 +240,4 @@ func itemFollowUps(items []create.Item) []output.NextStep {
 		steps = append(steps, output.NextStep{Command: followUpLine(item.Err.FollowUp), Note: item.Err.FollowUp.Message})
 	}
 	return steps
-}
-
-func names[T ~string](values []T) []string {
-	out := make([]string, 0, len(values))
-	for _, value := range values {
-		out = append(out, string(value))
-	}
-	return out
 }

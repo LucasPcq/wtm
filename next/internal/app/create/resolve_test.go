@@ -1,7 +1,6 @@
 package create_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/app/create"
@@ -11,29 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func resolve(t *testing.T, w world, req create.Request) (create.Request, error) {
-	t.Helper()
-	return create.Resolve(w.facts(t, req.Branches...), req)
-}
-
-func fieldsOf(t *testing.T, err error) []wtm.FieldError {
-	t.Helper()
-	invalid, ok := errors.AsType[*wtm.Error](err)
-	require.True(t, ok, err)
-	assert.Equal(t, wtm.KindInvalid, invalid.Kind)
-	assert.Equal(t, "request.invalid", invalid.Code)
-	return invalid.Fields
-}
-
-func messages(t *testing.T, err error) map[string]string {
-	t.Helper()
-	found := map[string]string{}
-	for _, field := range fieldsOf(t, err) {
-		found[field.Path] = field.Message("<" + field.Path + ">")
-	}
-	return found
-}
 
 func TestANewBranchStartsFromTheBaseBranchAndTheConfiguredEnv(t *testing.T) {
 	w := newWorld(t, seed{})

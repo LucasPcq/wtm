@@ -11,7 +11,7 @@ type HookEnvParams struct {
 }
 
 func HookEnv(params HookEnvParams) map[string]string {
-	env := JobEnv(params.Params)
+	env := Env(params.Params)
 	if name := declaredComposeProject(params.ComposeEnv); name != "" {
 		env[ComposeProjectKey] = name
 	}

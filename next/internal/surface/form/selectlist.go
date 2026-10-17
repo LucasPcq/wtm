@@ -3,6 +3,7 @@ package form
 import (
 	"strings"
 
+	"github.com/LucasPcq/wtm/next/internal/surface/output"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -169,7 +170,7 @@ func (l *selectList) view(size size) string {
 	}
 	var b strings.Builder
 	if l.filtering || l.query != "" {
-		b.WriteString(muted.Render("/ " + l.query))
+		b.WriteString(output.Muted.Render("/ " + l.query))
 		if l.filtering {
 			b.WriteString(reverse.Render(" "))
 		}
@@ -188,14 +189,14 @@ func (l *selectList) view(size size) string {
 		}
 	}
 	if len(l.shown) == 0 {
-		b.WriteString(muted.Render(indent + noMatches))
+		b.WriteString(output.Muted.Render(output.Indent + noMatches))
 	}
 	if l.toggle {
 		check := checkOff
 		if l.remember {
 			check = checkOn
 		}
-		b.WriteString("\n\n" + strings.Repeat(" ", rowPrefix+rowLead) + check + " " + muted.Render(toggleLabel))
+		b.WriteString("\n\n" + strings.Repeat(" ", rowPrefix+rowLead) + check + " " + output.Muted.Render(toggleLabel))
 	}
 	return b.String()
 }
@@ -220,14 +221,14 @@ type rowParams struct {
 func (l *selectList) row(params rowParams) string {
 	o := params.Option
 	if o.Separator {
-		return muted.Render(indent + strings.Repeat("─", max(params.Width-4, 4)))
+		return output.Muted.Render(output.Indent + strings.Repeat("─", max(params.Width-4, 4)))
 	}
 	fill := max(params.Width-rowPrefix-rowLead-lipgloss.Width(o.Label)-lipgloss.Width(o.Badge)-rowTagGap, 1)
 	if params.Selected {
 		block := " " + o.Label + strings.Repeat(" ", fill) + o.Badge + strings.Repeat(" ", rowTagGap)
 		return accent.Render("▌›") + tinted.Render(block)
 	}
-	return strings.Repeat(" ", rowPrefix+rowLead) + o.Label + strings.Repeat(" ", fill) + muted.Render(o.Badge) + strings.Repeat(" ", rowTagGap)
+	return strings.Repeat(" ", rowPrefix+rowLead) + o.Label + strings.Repeat(" ", fill) + output.Muted.Render(o.Badge) + strings.Repeat(" ", rowTagGap)
 }
 
 func (l *selectList) help() help {

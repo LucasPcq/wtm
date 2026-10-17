@@ -12,8 +12,3 @@ func TestABranchStandsAgainstOriginByItsCountsOnBothSides(t *testing.T) {
 	assert.Equal(t, Ahead, AheadBehind{Ahead: 1}.Divergence())
 	assert.Equal(t, Diverged, AheadBehind{Ahead: 1, Behind: 2}.Divergence())
 }
-
-func TestARemoteBranchIsNamedAfterOrigin(t *testing.T) {
-	assert.True(t, IsRemote("origin/feat/x"))
-	assert.False(t, IsRemote("feat/origin"))
-}

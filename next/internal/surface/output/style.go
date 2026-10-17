@@ -10,9 +10,9 @@ var (
 	ColorDanger  = lipgloss.AdaptiveColor{Light: "#C21E28", Dark: "#FA6E76"}
 
 	bold    = lipgloss.NewStyle().Bold(true)
-	muted   = lipgloss.NewStyle().Foreground(ColorMuted)
+	Muted   = lipgloss.NewStyle().Foreground(ColorMuted)
 	success = lipgloss.NewStyle().Foreground(ColorSuccess)
-	warning = lipgloss.NewStyle().Foreground(ColorWarning)
+	Warning = lipgloss.NewStyle().Foreground(ColorWarning)
 	primary = lipgloss.NewStyle().Foreground(ColorPrimary)
-	danger  = lipgloss.NewStyle().Foreground(ColorDanger)
+	Danger  = lipgloss.NewStyle().Foreground(ColorDanger)
 )

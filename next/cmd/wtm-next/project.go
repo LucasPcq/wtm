@@ -43,7 +43,7 @@ func locate(ctx context.Context, cwd string) (appParams, error) {
 	if err != nil {
 		return appParams{}, notARepository(cwd, err)
 	}
-	commonDir, err := git.Repo{Dir: root}.GitCommonDir(ctx)
+	commonDir, err := git.Repo{Dir: root}.CommonDir(ctx)
 	if err != nil {
 		return appParams{}, notARepository(root, err)
 	}

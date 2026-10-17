@@ -57,9 +57,9 @@ func (f Facts) problems(q Questions) []wtm.FieldError {
 	if from := q.From.Value; from != "" && !f.candidate(from) {
 		problems = append(problems, wtm.FieldError{Path: "from", Code: "not_found", Template: "{path}: {value} not found", Params: wtm.Params{"value": from}})
 	}
-	problems = append(problems, oneOf(choice{Path: "env_from", Value: string(q.EnvFrom.Value), Accepted: names(project.EnvStrategies())})...)
+	problems = append(problems, oneOf(choice{Path: "env_from", Value: string(q.EnvFrom.Value), Accepted: Names(project.EnvStrategies())})...)
 	if q.Isolation.Origin == OriginRequest {
-		problems = append(problems, oneOf(choice{Path: "isolation", Value: string(q.Isolation.Value), Accepted: names(run.Isolations())})...)
+		problems = append(problems, oneOf(choice{Path: "isolation", Value: string(q.Isolation.Value), Accepted: Names(run.Isolations())})...)
 	}
 	for index, id := range q.Remember {
 		problems = append(problems, oneOf(choice{Path: "remember[" + strconv.Itoa(index) + "]", Value: id, Accepted: rememberable()})...)
@@ -117,7 +117,7 @@ func oneOf(c choice) []wtm.FieldError {
 	}}
 }
 
-func names[T ~string](values []T) []string {
+func Names[T ~string](values []T) []string {
 	found := make([]string, 0, len(values))
 	for _, value := range values {
 		found = append(found, string(value))

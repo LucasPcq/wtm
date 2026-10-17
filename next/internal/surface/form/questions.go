@@ -86,13 +86,18 @@ func (w *wizard) asks() bool {
 	return slices.ContainsFunc([]step{stepBranches, stepFrom, stepEnvFrom, stepIsolation, stepFastForward, stepIfNotExists}, func(s step) bool { return w.decide(s).asked })
 }
 
-func (w *wizard) summarized(s step, shown string) string {
-	offered := w.standing(s)
+type answer struct {
+	Step  step
+	Shown string
+}
+
+func (w *wizard) summarized(a answer) string {
+	offered := w.standing(a.Step)
 	kept := offered.origin == create.OriginConfig || offered.origin == create.OriginDefault
-	if kept && shown == offered.value {
-		return shown + trail + string(offered.origin)
+	if kept && a.Shown == offered.value {
+		return a.Shown + trail + string(offered.origin)
 	}
-	return shown
+	return a.Shown
 }
 
 func (w *wizard) erred(path string) bool {
@@ -136,15 +141,15 @@ func (w *wizard) choices(s step) choiceParams {
 	ticked := slices.Contains(w.req.Remember, paths[s])
 	if s == stepIsolation {
 		q := w.q.Isolation
-		return choiceParams{Options: names(q.Options), Value: string(q.Value), Remembered: string(q.Remembered), Ticked: ticked}
+		return choiceParams{Options: create.Names(q.Options), Value: string(q.Value), Remembered: string(q.Remembered), Ticked: ticked}
 	}
 	q := w.q.EnvFrom
-	return choiceParams{Options: names(q.Options), Value: string(q.Value), Remembered: string(q.Remembered), Ticked: ticked}
+	return choiceParams{Options: create.Names(q.Options), Value: string(q.Value), Remembered: string(q.Remembered), Ticked: ticked}
 }
 
-func (w *wizard) branchProblem(entries []string, from int) error {
+func (w *wizard) branchProblem(check entryCheck) error {
 	req := w.req
-	req.Branches = entries
+	req.Branches = check.Entries
 	questions, err := w.app.CreateQuestions(w.ctx, req)
 	if err != nil {
 		return err
@@ -155,7 +160,7 @@ func (w *wizard) branchProblem(entries []string, from int) error {
 		}
 		index, entry := strings.CutPrefix(found.Path, paths[stepBranches]+"[")
 		at, err := strconv.Atoi(strings.TrimSuffix(index, "]"))
-		if entry && err == nil && at >= from {
+		if entry && err == nil && at >= check.From {
 			return problem(found)
 		}
 	}
@@ -191,12 +196,4 @@ func yesNo(yes bool) string {
 		return "yes"
 	}
 	return "no"
-}
-
-func names[T ~string](values []T) []string {
-	out := make([]string, 0, len(values))
-	for _, value := range values {
-		out = append(out, string(value))
-	}
-	return out
 }

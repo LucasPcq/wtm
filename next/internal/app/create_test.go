@@ -23,11 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	envHelperState = "WTM_NEXT_TEST_LOCK_STATE"
-	readyLine      = "holding"
-)
-
 func TestADryRunTakesNoLockWritesNothingAndPublishesNothing(t *testing.T) {
 	w := newWorld(t, seed{})
 	held, err := oplock.Locks{StateDir: w.stateDir}.Take(operation.Operation{ID: "other", Locks: []operation.Lock{{Scope: operation.ScopeWorktree, Name: branchName, Mode: operation.Exclusive}}})
@@ -170,12 +165,6 @@ func TestALockTheDefaultsNameIsTakenThenTheFactsObservedAgain(t *testing.T) {
 	assert.Equal(t, []string{"main"}, outcome.Plan.FastForward)
 	assert.Equal(t, 2, observed)
 }
-
-type unprotected struct{}
-
-func (unprotected) Grow([]operation.Lock) (bool, error) { return false, nil }
-func (unprotected) Protected() bool                     { return false }
-func (unprotected) Release()                            {}
 
 func TestARunWithoutItsLocksSaysSoOnce(t *testing.T) {
 	w := newWorld(t, seed{})

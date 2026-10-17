@@ -35,7 +35,7 @@ type hookViewParams struct {
 }
 
 func newHookView(params hookViewParams) *hookView {
-	view := &hookView{w: params.W, logPath: params.LogPath, header: muted.Render(glyphNext + " " + params.Label)}
+	view := &hookView{w: params.W, logPath: params.LogPath, header: Muted.Render(glyphNext + " " + params.Label)}
 	view.repaint()
 	return view
 }
@@ -69,10 +69,10 @@ func (v *hookView) finish(end hookEnd) {
 	}
 	errorLine(v.w, result)
 	for _, line := range failed {
-		message(v.w, indent+truncate(expandTabs(line), max(blockWidth(v.w)-len(indent), hookMinWidth)))
+		message(v.w, Indent+truncate(expandTabs(line), max(blockWidth(v.w)-len(Indent), hookMinWidth)))
 	}
 	if v.logPath != "" {
-		infoLine(v.w, hookLogLabel, v.logPath)
+		infoLine(v.w, info{Label: hookLogLabel, Value: v.logPath})
 	}
 }
 
@@ -110,15 +110,15 @@ func (v *hookView) flush() {
 func (v *hookView) repaint() {
 	v.clear()
 	width := blockWidth(v.w)
-	fmt.Fprintf(v.w, "%s%s\n", indent, truncate(v.header, width))
+	fmt.Fprintf(v.w, "%s%s\n", Indent, truncate(v.header, width))
 	v.painted++
 	if v.notice != "" {
 		message(v.w, truncate(v.notice, width))
 		v.painted++
 	}
 	for _, line := range v.tail {
-		body := truncate(expandTabs(line), max(width-len(indent), hookMinWidth))
-		fmt.Fprintf(v.w, "%s%s%s\n", indent, indent, muted.Render(body))
+		body := truncate(expandTabs(line), max(width-len(Indent), hookMinWidth))
+		fmt.Fprintf(v.w, "%s%s%s\n", Indent, Indent, Muted.Render(body))
 		v.painted++
 	}
 }

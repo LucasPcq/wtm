@@ -66,19 +66,18 @@ func itemNote(item create.Item) string {
 	if note == "" {
 		return ""
 	}
-	return muted.Render(dot + note)
+	return Muted.Render(dot + note)
 }
 
 func anomaliesOf(item create.Item) []string {
 	var anomalies []string
 	standing := item.Detail.Standing
-	counts := branch.AheadBehind{Ahead: standing.OriginAhead, Behind: standing.OriginBehind}
-	switch {
-	case !standing.ExistingBranch:
-	case counts.Divergence() == branch.Behind:
-		anomalies = append(anomalies, fmt.Sprintf("%s is %d commit(s) behind origin — the worktree starts from your local branch.", item.Subject, counts.Behind))
-	case counts.Divergence() == branch.Diverged:
-		anomalies = append(anomalies, fmt.Sprintf("%s has diverged from origin (%d ahead, %d behind) — the worktree starts from your local branch, missing commits that are on origin.", item.Subject, counts.Ahead, counts.Behind))
+	switch standing.OriginState {
+	case branch.Behind:
+		anomalies = append(anomalies, fmt.Sprintf("%s is %d commit(s) behind origin — the worktree starts from your local branch.", item.Subject, standing.OriginBehind))
+	case branch.Diverged:
+		anomalies = append(anomalies, fmt.Sprintf("%s has diverged from origin (%d ahead, %d behind) — the worktree starts from your local branch, missing commits that are on origin.", item.Subject, standing.OriginAhead, standing.OriginBehind))
+	case branch.NoOrigin, branch.UpToDate, branch.Ahead:
 	}
 	if lines := anomalyLines(item.Detail.EnvPorts); len(lines) > 0 {
 		anomalies = append(anomalies, anomaliesTitle+"\n"+strings.Join(lines, "\n"))

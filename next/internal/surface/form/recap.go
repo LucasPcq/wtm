@@ -54,7 +54,7 @@ func (w *wizard) recapBody() string {
 	if !w.stale {
 		return plan
 	}
-	return warning.Render(glyphAttention) + " " + staleText + "\n\n" + plan
+	return output.Warning.Render(output.GlyphAttention) + " " + staleText + "\n\n" + plan
 }
 
 func (w *wizard) failureText() string {
@@ -62,7 +62,7 @@ func (w *wizard) failureText() string {
 	if len(w.failure.Fields) > 0 {
 		first = w.failure.Message
 	}
-	lines := []string{danger.Render(glyphFailure) + " " + first}
+	lines := []string{output.Danger.Render(output.GlyphFailure) + " " + first}
 	for _, found := range w.failure.Fields {
 		lines = append(lines, detailHang+found.Message(label(found.Path)))
 	}

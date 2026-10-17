@@ -3,6 +3,7 @@ package form
 import (
 	"strings"
 
+	"github.com/LucasPcq/wtm/next/internal/surface/output"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -10,14 +11,19 @@ import (
 type textList struct {
 	input   textinput.Model
 	entries []string
-	check   func(entries []string, from int) error
+	check   func(check entryCheck) error
 	badge   func(entry string) string
 	err     error
 }
 
+type entryCheck struct {
+	Entries []string
+	From    int
+}
+
 type textListParams struct {
 	Entries []string
-	Check   func(entries []string, from int) error
+	Check   func(check entryCheck) error
 	Badge   func(entry string) string
 }
 
@@ -61,7 +67,7 @@ func (l *textList) add() bool {
 		return true
 	}
 	entries := append(append([]string(nil), l.entries...), typed)
-	if l.err = l.check(entries, len(l.entries)); l.err != nil {
+	if l.err = l.check(entryCheck{Entries: entries, From: len(l.entries)}); l.err != nil {
 		return false
 	}
 	l.entries = entries
@@ -73,7 +79,7 @@ func (l *textList) confirm() verdict {
 	if !l.add() {
 		return stay
 	}
-	if l.err = l.check(l.entries, 0); l.err != nil {
+	if l.err = l.check(entryCheck{Entries: l.entries}); l.err != nil {
 		return stay
 	}
 	return done
@@ -84,9 +90,9 @@ func (l *textList) view(size size) string {
 	var b strings.Builder
 	b.WriteString(l.input.View())
 	for _, entry := range l.entries {
-		b.WriteString("\n" + indent + entry)
+		b.WriteString("\n" + output.Indent + entry)
 		if badge := l.badge(entry); badge != "" {
-			b.WriteString("  " + muted.Render(badge))
+			b.WriteString("  " + output.Muted.Render(badge))
 		}
 	}
 	if l.err != nil {

@@ -18,6 +18,6 @@ func DryRun(w io.Writer, params DryRunParams) {
 	if len(warnings) > 0 {
 		blank(w)
 	}
-	infoLine(w, "fingerprint", params.Outcome.Fingerprint)
+	infoLine(w, info{Label: "fingerprint", Value: params.Outcome.Fingerprint})
 	nextSteps(w, []NextStep{{Command: params.Apply, Note: "apply this plan"}})
 }

@@ -1,7 +1,6 @@
 package output
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -12,13 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func envelopeOf(t *testing.T, params EnvelopeParams) string {
-	t.Helper()
-	var out bytes.Buffer
-	require.NoError(t, Envelope(&out, params))
-	return out.String()
-}
 
 func TestAnAppliedRunWritesEachItemWithItsDetail(t *testing.T) {
 	outcome := twoCreated("/trees")

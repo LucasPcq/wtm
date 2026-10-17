@@ -36,7 +36,7 @@ func renderPlan(params planParams) []string {
 	}
 	for _, text := range params.Warnings {
 		first, rest, _ := strings.Cut(text, "\n")
-		lines = append(lines, warning.Render(glyphAttention)+" "+first)
+		lines = append(lines, Warning.Render(GlyphAttention)+" "+first)
 		for line := range strings.SplitSeq(rest, "\n") {
 			if line != "" {
 				lines = append(lines, planContinuation+line)
@@ -48,7 +48,7 @@ func renderPlan(params planParams) []string {
 
 func planRows(params planParams) []string {
 	if len(params.Rows) == 0 {
-		return []string{muted.Render(glyphUnchanged + " " + nothingToDo)}
+		return []string{Muted.Render(glyphUnchanged + " " + nothingToDo)}
 	}
 	labels := 0
 	for _, row := range params.Rows {
@@ -58,7 +58,7 @@ func planRows(params planParams) []string {
 	var lines []string
 	for _, row := range params.Rows {
 		values := planValues(row.Values, params.Width-column)
-		lines = append(lines, muted.Render(row.Label)+strings.Repeat(" ", column-lipgloss.Width(row.Label))+values[0])
+		lines = append(lines, Muted.Render(row.Label)+strings.Repeat(" ", column-lipgloss.Width(row.Label))+values[0])
 		for _, value := range values[1:] {
 			lines = append(lines, strings.Repeat(" ", column)+value)
 		}
@@ -121,7 +121,7 @@ func messages(warnings []wtm.Warning) []string {
 }
 
 func drawPlan(w io.Writer, params planParams) {
-	params.Width = max(terminalWidth(w)-len(indent), 0)
+	params.Width = max(terminalWidth(w)-len(Indent), 0)
 	for _, line := range renderPlan(params) {
 		if line == "" {
 			blank(w)

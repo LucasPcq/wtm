@@ -2,7 +2,7 @@
 
 Two identical sandboxes (the `docs/demos` "acme" project with the same ports, a bare `origin`, a local `feature` and `topic`, and an `on_create` hook that fails on `feat/bad*` and sleeps on `feat/slow*`) are driven by each binary in turn. Paths, timestamps, op ids, fingerprints and durations are normalised, and `wtm-next create` is read as `wtm create`.
 
-- `compare.sh <engine> <next> cli`: 15 command-line scenarios, then the state (branches, worktrees, every `meta.json`, every `.env`, `config.toml`). `cli/diff.txt` is empty: stdout, stderr, exit codes and state are byte-identical.
+- `compare.sh <engine> <next> cli`: 15 command-line scenarios, then the state (branches, worktrees, every `meta.json`, every `.env`, `config.toml`). `cli/diff.txt` is empty: stdout, stderr, exit codes and state are byte-identical. `cli/engine/` keeps the captures; the next side, identical, is rebuilt by the script.
   1. a new branch
   2. three branches with one failing hook
   3. an existing local branch without `--from`

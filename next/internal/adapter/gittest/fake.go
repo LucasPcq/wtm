@@ -106,10 +106,10 @@ func (f *Fake) MainWorktree(context.Context) (worktree.Worktree, error) {
 	return f.worktrees[0], nil
 }
 
-func (f *Fake) GitCommonDir(context.Context) (string, error) {
+func (f *Fake) CommonDir(context.Context) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if err := f.enter("GitCommonDir", ""); err != nil {
+	if err := f.enter("CommonDir", ""); err != nil {
 		return "", err
 	}
 	return filepath.Join(f.worktrees[0].Path, ".git"), nil

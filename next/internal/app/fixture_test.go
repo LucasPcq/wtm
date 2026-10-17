@@ -117,3 +117,14 @@ func newWorld(t *testing.T, s seed) world {
 func (w world) path(name string) string {
 	return filepath.Join(w.root, ".trees", branch.PathSegment(name))
 }
+
+const (
+	envHelperState = "WTM_NEXT_TEST_LOCK_STATE"
+	readyLine      = "holding"
+)
+
+type unprotected struct{}
+
+func (unprotected) Grow([]operation.Lock) (bool, error) { return false, nil }
+func (unprotected) Protected() bool                     { return false }
+func (unprotected) Release()                            {}

@@ -11,18 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func hookRun(progress *Progress, lines ...string) {
-	progress.Report(wtm.UnitStarted{Subject: "feat/x"})
-	progress.Report(wtm.PhaseStarted{Subject: "feat/x", Phase: "worktree"})
-	progress.Report(wtm.PhaseFinished{Subject: "feat/x", Phase: "worktree"})
-	progress.Report(wtm.PhaseStarted{Subject: "feat/x", Phase: "on_create", Log: "/state/hooks/on_create-feat%2Fx.log"})
-	for _, line := range lines {
-		progress.Report(wtm.Output{Subject: "feat/x", Line: line})
-	}
-	progress.Report(wtm.PhaseFinished{Subject: "feat/x", Phase: "on_create"})
-	progress.Report(wtm.UnitFinished{Subject: "feat/x", Status: wtm.StatusDone})
-}
-
 func TestOffATerminalAHookPhaseIsTitledBeforeItsFirstLine(t *testing.T) {
 	var out bytes.Buffer
 	progress := NewProgress(t.Context(), ProgressParams{W: &out, Human: true})

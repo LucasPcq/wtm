@@ -1,9 +1,5 @@
 package branch
 
-import "strings"
-
-const remotePrefix = "origin/"
-
 func (ab AheadBehind) Divergence() Divergence {
 	switch {
 	case ab.Ahead > 0 && ab.Behind > 0:
@@ -14,8 +10,4 @@ func (ab AheadBehind) Divergence() Divergence {
 		return Ahead
 	}
 	return UpToDate
-}
-
-func IsRemote(name string) bool {
-	return strings.HasPrefix(name, remotePrefix)
 }

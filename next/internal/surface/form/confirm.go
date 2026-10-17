@@ -3,6 +3,7 @@ package form
 import (
 	"strings"
 
+	"github.com/LucasPcq/wtm/next/internal/surface/output"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -43,7 +44,7 @@ func (c *confirm) view(size size) string {
 	lines := make([]string, 0, 2)
 	for i, answer := range []string{"Yes", "No"} {
 		if i != c.cursor {
-			lines = append(lines, indent+answer)
+			lines = append(lines, output.Indent+answer)
 			continue
 		}
 		line := "› " + answer

@@ -10,10 +10,7 @@ import (
 )
 
 const (
-	indent         = "  "
-	glyphFailure   = "✗"
-	glyphAttention = "!"
-	helpSeparator  = " • "
+	helpSeparator = " • "
 )
 
 var (
@@ -21,11 +18,8 @@ var (
 	colorSelectedBg = lipgloss.AdaptiveColor{Light: "#DCD7FB", Dark: "#3B2FA8"}
 	colorSelectedFg = lipgloss.AdaptiveColor{Light: "#1A1150", Dark: "#FFFFFF"}
 
-	muted     = lipgloss.NewStyle().Foreground(output.ColorMuted)
 	summary   = lipgloss.NewStyle().Foreground(output.ColorMuted).Italic(true)
 	accent    = lipgloss.NewStyle().Foreground(output.ColorPrimary).Bold(true)
-	danger    = lipgloss.NewStyle().Foreground(output.ColorDanger)
-	warning   = lipgloss.NewStyle().Foreground(output.ColorWarning)
 	tinted    = lipgloss.NewStyle().Background(colorRowTint).Foreground(colorSelectedFg)
 	selected  = lipgloss.NewStyle().Background(colorSelectedBg).Foreground(colorSelectedFg)
 	reverse   = lipgloss.NewStyle().Reverse(true)
@@ -43,18 +37,18 @@ func wrap(value string, width int) string {
 func indented(text string) string {
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
-		lines[i] = indent + line
+		lines[i] = output.Indent + line
 	}
 	return strings.Join(lines, "\n")
 }
 
 func errorBanner(message string, width int) string {
-	hang := indent + "  "
+	hang := output.Indent + "  "
 	lines := strings.Split(wrap(capitalized(message), width-len(hang)-1), "\n")
 	for i := 1; i < len(lines); i++ {
-		lines[i] = hang + danger.Render(lines[i])
+		lines[i] = hang + output.Danger.Render(lines[i])
 	}
-	lines[0] = indent + danger.Render(glyphFailure) + " " + danger.Render(lines[0])
+	lines[0] = output.Indent + output.Danger.Render(output.GlyphFailure) + " " + output.Danger.Render(lines[0])
 	return strings.Join(lines, "\n")
 }
 

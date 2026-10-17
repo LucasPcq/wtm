@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	indent         = "  "
+	Indent         = "  "
 	dot            = " · "
 	glyphSuccess   = "✓"
-	glyphAttention = "!"
-	glyphFailure   = "✗"
+	GlyphAttention = "!"
+	GlyphFailure   = "✗"
 	glyphUnchanged = "="
 	glyphProgress  = "›"
 	glyphNext      = "→"
@@ -25,39 +25,44 @@ const (
 )
 
 func successLine(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", indent, success.Render(glyphSuccess), msg)
+	fmt.Fprintf(w, "%s%s %s\n", Indent, success.Render(glyphSuccess), msg)
 }
 
 func warningLine(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", indent, warning.Render(glyphAttention), msg)
+	fmt.Fprintf(w, "%s%s %s\n", Indent, Warning.Render(GlyphAttention), msg)
 }
 
 func unchangedLine(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", indent, muted.Render(glyphUnchanged), muted.Render(msg))
+	fmt.Fprintf(w, "%s%s %s\n", Indent, Muted.Render(glyphUnchanged), Muted.Render(msg))
 }
 
 func errorLine(w io.Writer, msg string) {
 	lines := strings.Split(strings.TrimRight(msg, "\n"), "\n")
-	fmt.Fprintf(w, "%s%s %s\n", indent, danger.Render(glyphFailure), lines[0])
+	fmt.Fprintf(w, "%s%s %s\n", Indent, Danger.Render(GlyphFailure), lines[0])
 	for _, line := range lines[1:] {
-		fmt.Fprintf(w, "%s  %s\n", indent, line)
+		fmt.Fprintf(w, "%s  %s\n", Indent, line)
 	}
 }
 
 func loadingLine(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", indent, muted.Render(glyphProgress), muted.Render(msg))
+	fmt.Fprintf(w, "%s%s %s\n", Indent, Muted.Render(glyphProgress), Muted.Render(msg))
 }
 
-func infoLine(w io.Writer, label, value string) {
-	fmt.Fprintf(w, "%s%s  %s\n", indent, muted.Render(label), value)
+type info struct {
+	Label string
+	Value string
+}
+
+func infoLine(w io.Writer, line info) {
+	fmt.Fprintf(w, "%s%s  %s\n", Indent, Muted.Render(line.Label), line.Value)
 }
 
 func sectionTitle(w io.Writer, title string) {
-	fmt.Fprintf(w, "%s%s\n", indent, bold.Render(title))
+	fmt.Fprintf(w, "%s%s\n", Indent, bold.Render(title))
 }
 
 func message(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s\n", indent, msg)
+	fmt.Fprintf(w, "%s%s\n", Indent, msg)
 }
 
 func blank(w io.Writer) {
@@ -77,9 +82,9 @@ func nextSteps(w io.Writer, steps []NextStep) {
 	for _, step := range steps {
 		line := bold.Render(step.Command)
 		if step.Note != "" {
-			line = bold.Render(fmt.Sprintf("%-*s", width, step.Command)) + muted.Render(noteSeparator+step.Note)
+			line = bold.Render(fmt.Sprintf("%-*s", width, step.Command)) + Muted.Render(noteSeparator+step.Note)
 		}
-		fmt.Fprintf(w, "%s%s %s\n", indent, primary.Render(glyphNext), line)
+		fmt.Fprintf(w, "%s%s %s\n", Indent, primary.Render(glyphNext), line)
 	}
 }
 
@@ -88,7 +93,7 @@ func blockWidth(w io.Writer) int {
 	if cols <= 0 {
 		return hookFallbackWidth
 	}
-	return max(cols-2*len(indent), hookMinWidth)
+	return max(cols-2*len(Indent), hookMinWidth)
 }
 
 func truncate(value string, width int) string {

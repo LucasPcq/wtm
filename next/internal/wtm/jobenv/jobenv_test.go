@@ -43,7 +43,7 @@ func TestAWorktreeLearnsItsIdentityItsOffsetAndItsComposeProject(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, JobEnv(tc.params))
+			assert.Equal(t, tc.want, Env(tc.params))
 		})
 	}
 }
@@ -51,7 +51,7 @@ func TestAWorktreeLearnsItsIdentityItsOffsetAndItsComposeProject(t *testing.T) {
 func TestALinkedWorktreesJobsRunOffsetByItsNumber(t *testing.T) {
 	t.Setenv("COMPOSE_PROJECT_NAME", "launched-from-another-worktree")
 
-	env := JobEnv(shopParams("feat/a", 2, ""))
+	env := Env(shopParams("feat/a", 2, ""))
 
 	assert.Equal(t, "20", env["WTM_PORT_OFFSET"])
 	assert.Equal(t, shopProject+"-feat-a", env["COMPOSE_PROJECT_NAME"])
@@ -59,11 +59,11 @@ func TestALinkedWorktreesJobsRunOffsetByItsNumber(t *testing.T) {
 }
 
 func TestAVerbatimWorktreesJobsRunOnTheBasePorts(t *testing.T) {
-	assert.Equal(t, "3000", JobEnv(shopParams("feat/a", 2, run.Verbatim))["http"])
+	assert.Equal(t, "3000", Env(shopParams("feat/a", 2, run.Verbatim))["http"])
 }
 
 func TestTheKeysAreEveryKeyAJobEnvironmentHoldsBesideItsPorts(t *testing.T) {
-	env := JobEnv(Params{Branch: "feat/x", ProjectDir: "/src/app"})
+	env := Env(Params{Branch: "feat/x", ProjectDir: "/src/app"})
 
 	assert.ElementsMatch(t, Keys(), slices.Collect(maps.Keys(env)))
 }

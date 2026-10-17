@@ -48,7 +48,7 @@ func (r Repo) MainWorktree(ctx context.Context) (worktree.Worktree, error) {
 	return worktrees[0], nil
 }
 
-func (r Repo) GitCommonDir(ctx context.Context) (string, error) {
+func (r Repo) CommonDir(ctx context.Context) (string, error) {
 	out, err := r.git(ctx, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	return strings.TrimSpace(string(out)), err
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/app/create"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -164,4 +165,27 @@ func jsonOf(t *testing.T, value any) string {
 	data, err := json.Marshal(value)
 	require.NoError(t, err)
 	return string(data)
+}
+
+func resolve(t *testing.T, w world, req create.Request) (create.Request, error) {
+	t.Helper()
+	return create.Resolve(w.facts(t, req.Branches...), req)
+}
+
+func fieldsOf(t *testing.T, err error) []wtm.FieldError {
+	t.Helper()
+	invalid, ok := errors.AsType[*wtm.Error](err)
+	require.True(t, ok, err)
+	assert.Equal(t, wtm.KindInvalid, invalid.Kind)
+	assert.Equal(t, "request.invalid", invalid.Code)
+	return invalid.Fields
+}
+
+func messages(t *testing.T, err error) map[string]string {
+	t.Helper()
+	found := map[string]string{}
+	for _, field := range fieldsOf(t, err) {
+		found[field.Path] = field.Message("<" + field.Path + ">")
+	}
+	return found
 }
