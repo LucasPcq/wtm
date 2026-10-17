@@ -6,6 +6,7 @@ import (
 
 	"github.com/LucasPcq/wtm/internal/config"
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/domain/remember"
 	"github.com/LucasPcq/wtm/internal/flow"
 	"github.com/LucasPcq/wtm/internal/testutil/flowtest"
 )
@@ -230,9 +231,7 @@ func TestFastForwardFlagWinsOverARememberedKeep(t *testing.T) {
 	}
 }
 
-// The config-default row answers "", which no memory holds: ticking it must not
-// promise in the recap what the run then does the opposite of.
-func TestTickingTheConfigDefaultSaysItForgetsInsteadOfRemembering(t *testing.T) {
+func TestTickingTheConfigDefaultRemembersIt(t *testing.T) {
 	ctx := rememberingContext(t, map[string]string{domain.RememberEnvStrategy: string(domain.EnvStrategyParent)})
 	prompter := &flowtest.ScriptedPrompter{
 		Answers:  map[string]string{KeyEnv: "", KeyIsolation: string(domain.IsolationIsolated), KeyRecap: confirmCreate},
@@ -249,13 +248,10 @@ func TestTickingTheConfigDefaultSaysItForgetsInsteadOfRemembering(t *testing.T) 
 	}
 
 	recap := prompter.Content[KeyRecap].Description
-	if !strings.Contains(recap, "Env:       "+domain.EnvSummaryConfigDefault+domain.RecapWillForgetSuffix) {
-		t.Errorf("recap %q should say the env strategy will be forgotten", recap)
+	if !strings.Contains(recap, "Env:       "+domain.EnvSummaryConfigDefault+domain.RecapWillRememberSuffix) {
+		t.Errorf("recap %q should say the config default will be remembered", recap)
 	}
-	if strings.Contains(recap, domain.RecapWillRememberSuffix) {
-		t.Errorf("recap %q promises to remember an answer no memory can hold", recap)
-	}
-	if remembered := rememberedOnDisk(t, ctx); len(remembered) != 0 {
-		t.Errorf("remembered = %v, want the env strategy forgotten", remembered)
+	if remembered := rememberedOnDisk(t, ctx); remembered[domain.RememberEnvStrategy] != remember.ConfigDefault {
+		t.Errorf("remembered = %v, want env_strategy=config", remembered)
 	}
 }

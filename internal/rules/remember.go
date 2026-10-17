@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/domain/remember"
 )
 
 // RememberableValues is every answer a memory id may hold. A destructive option
@@ -14,7 +15,7 @@ import (
 func RememberableValues(id string) ([]string, bool) {
 	switch id {
 	case domain.RememberEnvStrategy:
-		return []string{string(domain.EnvStrategyExample), string(domain.EnvStrategyMain), string(domain.EnvStrategyParent)}, true
+		return []string{remember.ConfigDefault, string(domain.EnvStrategyExample), string(domain.EnvStrategyMain), string(domain.EnvStrategyParent)}, true
 	case domain.RememberIsolation:
 		return []string{string(domain.IsolationIsolated), string(domain.IsolationVerbatim)}, true
 	case domain.RememberSourceUpdate:

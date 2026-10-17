@@ -59,7 +59,7 @@ A branch that exists only on origin (fetched, no local branch) is resumed, not r
 
 ## Remembered answers
 
-In the interactive wizard of `create`, `checkout` and `extract`, the user can tick "Always use this answer in this repo" on three questions: the env strategy, the isolation and whether to fast-forward a source behind origin. The answer lands in `config.toml` under `[wizard.remembered]` (`env_strategy`, `isolation`, `source_update`), and **it applies under `--yes` and `--output json` too**: it stands in for the flag you did not pass, ahead of the config default.
+In the interactive wizard of `create`, `checkout` and `extract`, the user can tick "Always use this answer in this repo" on three questions: the env strategy, the isolation and whether to fast-forward a source behind origin. The answer lands in `config.toml` under `[wizard.remembered]` (`env_strategy`, `isolation`, `source_update`; `env_strategy = "config"` follows `env.strategy`), and **it applies under `--yes` and `--output json` too**: it stands in for the flag you did not pass, ahead of the config default.
 
 - **For a guaranteed result, pass the flag**: `--env-from`, `--isolation`, `--ff`. A flag always wins over a remembered answer.
 - The JSON says what settled each of these answers: `origins` (see `json.md`). `"remembered"` means the user's memory chose, not your command.

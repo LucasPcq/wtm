@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/domain/remember"
 )
 
 func envStep() Step {
@@ -119,6 +120,21 @@ func TestRememberingKeepsWhatWasTickedAndForgetsWhatWasUnticked(t *testing.T) {
 	}
 	if !slices.Equal(change.Forget, []string{domain.RememberIsolation}) {
 		t.Errorf("forget = %v, want the isolation asked again and left unticked", change.Forget)
+	}
+}
+
+func TestTheConfigDefaultIsRememberedAndRecalled(t *testing.T) {
+	step := envStep()
+	step.Options = append([]Option{{Value: ""}}, step.Options...)
+	answers := NewAnswers(nil).With("env", Answer{Value: "", Asked: true, Remember: true})
+
+	change := Remembering(Session{Steps: []Step{step}}, answers)
+	if change.Remember[domain.RememberEnvStrategy] != remember.ConfigDefault {
+		t.Errorf("remember = %v, want env_strategy=config", change.Remember)
+	}
+	answer, settled := Settle(recalled(step, remember.ConfigDefault, false), Answers{})
+	if !settled || !answer.Recalled || answer.Value != "" {
+		t.Errorf("answer = %+v, want the config default recalled", answer)
 	}
 }
 

@@ -12,6 +12,7 @@ internal/
   domain/                     ← types, errors, constants only (no methods, no functions); its root only shrinks,
                                 new code goes into the sub-package of its subject
     statefile/                ←   the schema version of each state file, and the error of a file a newer wtm wrote
+    remember/                 ←   how [wizard.remembered] spells an answer ("config" for the config default)
   rules/                      ← pure functions (stdlib + domain only, no I/O); its root only shrinks, new code goes
                                 into the sub-package of its subject
     statefile/                ←   what a state file's schema allows: read, write, or refuse (exit 22)
