@@ -7,7 +7,7 @@
 ```
 cmd/wtm-next/          the composition root: builds each adapter once (wire.go), opens the project on demand, registers each command's cobra command on the root
 internal/
-  domain/              the contract every use case speaks: errors, warnings, events and their stream, outcomes, operations and their locks, the vocabulary of a question and a form's schema — pure, stdlib only
+  domain/              the contract every use case speaks: errors, warnings, events and their stream, outcomes and the envelope that reports them, operations and their locks, the vocabulary of a question and a form's schema, and the JSON of each a surface receives — pure, stdlib only
     worktree/          branches and worktrees as git lists them: names, refs, where a branch stands against origin, where a branch asked for a new worktree lands, a checkout, meta.json, identity, the stack of worktrees by the branch each was created from
     project/           what a use case reads of config.toml, run.toml (isolation included) and the global settings
     dotenv/            .env files parsed and rendered byte for byte
@@ -29,6 +29,7 @@ internal/
   ui/                  the presentation kit every command's cli shares, knowing no command
     cli/               the root: version, --quiet, help, signals, the exit code a command's failure sets
     output/            the streams (stdin, stdout, stderr, whether each is a terminal, a colour renderer each), frames and blocks, progress, failures, plans, the hook view, the v2 envelope writer
+  api/                 the catalogue of the commands, knowing none of them: each one's name, its schema (domain.Form) and its execution, a JSON request in and a domain.Envelope out with the status of its kind, for a surface other than the command line
     form/              a command's form: the wizard that walks its steps to a recap and applies, select list, multi-select, text field, text list, confirm, their styles
 ```
 No file format lives in `domain/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `domain/project`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
@@ -49,6 +50,7 @@ A use case reads in one place. `command/<name>/usecase.go` tells the whole reque
 | `adapter/<name>` | `domain/*`, `adapter/statefile`, `adapter/shell` (the one way to start a child), stdlib, third party — never `service/*`, `command/*`, `ui/*`, another adapter |
 | `adapter/<name>test` | what `adapter/<name>` may, and `adapter/<name>`; imported from a `_test.go` only |
 | `ui/*` | `domain/*`, `ui/*`, stdlib, third party — never `command/*`, `service/*`, `adapter/*` |
+| `api` | `domain/*`, stdlib — never `command/*`, `service/*`, `adapter/*`, `ui/*`, third party |
 | any test | never `github.com/LucasPcq/wtm/internal/…` |
 | `cmd/wtm-next` | anything under `next/` |
 
@@ -64,9 +66,9 @@ A use case or a service declares the interfaces it needs in its `port.go`; an ad
 4. `command/create/usecase.go → UseCase.Plan`: `Observe` reads the repository (`repository.Observe`: config, snapshot, run.toml, through the ports of `port.go`), `Resolve` (`questions.go`) settles the request on those facts, `Decide` (`rules.go`) turns them into the plan.
 5. `command/create/usecase.go → UseCase.Apply`: an optional fast-forward of the source (`provision.Service.FastForwardEach`, `service/provision/fastforward.go`, each outcome worded as create's own warning), then `provision.Service.Run` (`service/provision/provision.go`) per branch: the worktree, its env, its meta record, its hooks.
 6. `adapter/git/worktree.go → Repo.AddWorktree`: the port's implementation runs `git worktree add`.
-7. Back in `command/create/cli/command.go → createCommand.conclude`: `output.go` draws the outcome (or the dry run, or the v2 envelope with `--output json`) with the kit of `ui/output`.
+7. Back in `command/create/cli/command.go → createCommand.conclude`: `output.go` draws the outcome or the dry run with the kit of `ui/output`; with `--output json`, `create.Outcome.Envelope` reports the run as a `domain.Envelope`, which `ui/output.Envelope` writes with each field spelled as its flag.
 
-A second command is its own `command/<name>/` (use case, ports, rules, questions, `cli/`) and one line in `cmd/wtm-next`: its constructor in `main.go`'s `Commands`, its adapters wired in `wire.go`.
+A second command is its own `command/<name>/` (use case, ports, rules, questions, `cli/`) and one line in each list of `cmd/wtm-next`: its constructor in `main.go`'s `Commands`, its binding in `catalogue.go` (`api.Bind(name, Questions{}.Form(), open, UseCase.Run)`), its adapters wired in `wire.go`.
 
 ## Comments
 

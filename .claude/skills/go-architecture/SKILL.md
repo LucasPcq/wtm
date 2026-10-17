@@ -23,6 +23,7 @@ next/
     domain/             the model, pure: errors, events, operations and their run options, question vocabulary; worktree/ (with the stack graph), project/, env/, dotenv/
     adapter/<name>/     driven adapters implementing the ports (git, store, config, shell, oplock, events…) + <name>test fakes
     ui/                 the presentation kit, knowing no command: cli (root, exit codes, signals), output (frames, envelope), form (wizard engine, components)
+    api/                the catalogue of the commands for a surface other than the CLI: name, schema, execution (JSON request → domain.Envelope + status); domain and stdlib only
 ```
 
 Dependencies point inward, checked by `make lint` (archlint `next`): `domain` imports nothing of next/; a `service` imports `domain`; a `command` imports `domain` and `service`; its `cli/` imports its command, `domain` and `ui`, never a service; an `adapter` imports `domain`; `ui` imports `domain`; only `cmd/wtm-next` sees everything. A command never imports another command.
@@ -39,7 +40,7 @@ Why a package per command, when the Go guides prefer a package per concept and B
 4. `Plan`: `Observe` reads the repository through the ports of `port.go`; `Resolve` (`questions.go`) settles the request; `Decide` (`rules.go`) makes the plan.
 5. `Apply`: its steps, calling `service/provision` for each new worktree.
 6. `adapter/git`: the port's implementation runs git.
-7. Back in `cli/command.go`: `output.go` draws the outcome with the `ui/` kit, or the JSON envelope.
+7. Back in `cli/command.go`: `output.go` draws the outcome with the `ui/` kit, or `Outcome.Envelope` reports it as the JSON envelope.
 
 ## Where does this code go?
 
