@@ -42,6 +42,7 @@ const (
 	tick   = 10 * time.Millisecond
 )
 
+// hookRun reports to progress a unit whose worktree phase prints nothing and whose on_create hook prints lines.
 func hookRun(progress *Progress, lines ...string) {
 	progress.Report(domain.UnitStarted{Subject: "feat/x"})
 	progress.Report(domain.PhaseStarted{Subject: "feat/x", Phase: "worktree"})
@@ -54,6 +55,7 @@ func hookRun(progress *Progress, lines ...string) {
 	progress.Report(domain.UnitFinished{Subject: "feat/x", Status: domain.StatusDone})
 }
 
+// finalScreen returns the rows a terminal shows once it has played raw, applying the cursor-up-and-clear sequences a live progress redraws with.
 func finalScreen(raw string) []string {
 	var rows []string
 	for line := range strings.SplitSeq(raw, "\n") {

@@ -49,12 +49,12 @@ dead-strict:
 sumtype:
 	go tool go-sumtype $$(go list ./...)
 
-lint: fmt vet arch dead sumtype
+lint: fmt vet arch dead sumtype next-lint
 	go tool staticcheck ./...
 
 # next-lint holds next/ to Go's doc-comment and naming conventions with revive
 # (next/revive.toml); staticcheck already runs every check on next/ from
-# next/staticcheck.conf. Not part of lint until next/'s exported names are documented.
+# next/staticcheck.conf.
 next-lint:
 	go tool revive -config next/revive.toml -formatter plain ./next/...
 

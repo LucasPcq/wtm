@@ -14,6 +14,7 @@ import (
 
 const settleWithin = 100 * time.Millisecond
 
+// A driver plays a wizard's event loop in the test's goroutine, the way Bubble Tea would.
 type driver struct {
 	w *Wizard
 }
@@ -35,6 +36,7 @@ func (d *driver) send(msg tea.Msg) {
 	d.run(cmd)
 }
 
+// run runs cmd and sends the wizard the message it returns, a batch's one by one; a command that does not return within settleWithin, such as a tick, is dropped.
 func (d *driver) run(cmd tea.Cmd) {
 	if cmd == nil {
 		return
@@ -98,6 +100,7 @@ func plain(view string) string {
 	return strings.TrimRight(strings.Join(lines, "\n"), "\n")
 }
 
+// settled runs the checks cmd starts on l, and those their verdicts start in turn, and returns the verdict they end on.
 func settled(l *TextList, cmd tea.Cmd) Verdict {
 	verdict := Stay
 	for _, msg := range messages(cmd) {
@@ -112,6 +115,7 @@ func settled(l *TextList, cmd tea.Cmd) Verdict {
 	return verdict
 }
 
+// messages returns what cmd returns, a batch flattened; nil when it does not return within settleWithin.
 func messages(cmd tea.Cmd) []tea.Msg {
 	if cmd == nil {
 		return nil

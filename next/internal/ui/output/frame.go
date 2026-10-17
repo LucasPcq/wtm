@@ -11,6 +11,8 @@ const (
 	accentBarWidth = 1
 )
 
+// Frame writes a command's human output to w: a blank line, what body writes, a blank line.
+// On a terminal each line body writes starts with the accent bar; elsewhere body writes to w as is.
 func Frame(w io.Writer, body func(io.Writer)) {
 	Blank(w)
 	body(barred(w))
@@ -24,12 +26,14 @@ func barred(w io.Writer) io.Writer {
 	return &barWriter{w: w, atLineStart: true}
 }
 
+// A barWriter draws the accent bar at the start of each line it writes, a line a carriage return rewrites included.
 type barWriter struct {
 	w           io.Writer
 	atLineStart bool
 	afterCR     bool
 }
 
+// Write writes p to the writer under b with the bar before each line p starts, and reports p's whole length as written.
 func (b *barWriter) Write(p []byte) (int, error) {
 	var out bytes.Buffer
 	for _, c := range p {
@@ -40,10 +44,12 @@ func (b *barWriter) Write(p []byte) (int, error) {
 			continue
 		}
 		b.afterCR = false
+
 		if b.atLineStart {
 			out.WriteString(StylesOf(b.w).primary.Render(accentBar))
 			b.atLineStart = false
 		}
+
 		out.WriteByte(c)
 		switch c {
 		case '\n':
@@ -52,6 +58,7 @@ func (b *barWriter) Write(p []byte) (int, error) {
 			b.atLineStart, b.afterCR = true, true
 		}
 	}
+
 	if _, err := b.w.Write(out.Bytes()); err != nil {
 		return 0, err
 	}

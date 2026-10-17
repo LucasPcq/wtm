@@ -7,13 +7,14 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
+// The exit codes of wtm-next, shared with wtm: a script branches on them, so a value never changes meaning.
 const (
 	ExitOK               = 0
-	ExitError            = 1
-	ExitUsage            = 2
-	ExitCancelled        = 19
+	ExitError            = 1  // a failure no other code names
+	ExitUsage            = 2  // a flag or an argument the command refuses
+	ExitCancelled        = 19 // interrupted by a signal or by the user leaving the form
 	ExitNotGitRepo       = 21
-	ExitStateSchemaNewer = 22
+	ExitStateSchemaNewer = 22 // a state file written by a newer wtm
 	ExitRefused          = 23
 	ExitConflict         = 24
 	ExitPrecondition     = 25
@@ -31,10 +32,12 @@ var exitByKind = map[domain.Kind]int{
 	domain.KindPrecondition: ExitPrecondition,
 }
 
+// exitCode returns the exit code of a command's failure, from the most specific source to the least: a signal, the command's own code, a code every command shares, a newer state file, then the failure's kind.
 func exitCode(failed *Failed, signalled bool) int {
 	if signalled {
 		return ExitCancelled
 	}
+
 	failure := failed.Err
 	if code, own := failed.Exits[failure.Code]; own {
 		return code
@@ -45,5 +48,6 @@ func exitCode(failed *Failed, signalled bool) int {
 	if _, newer := errors.AsType[*domain.SchemaNewer](failure); newer {
 		return ExitStateSchemaNewer
 	}
+
 	return cmp.Or(exitByKind[failure.Kind], ExitError)
 }

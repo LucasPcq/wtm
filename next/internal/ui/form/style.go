@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+// HelpSeparator joins the parts of the breadcrumb and of the help line.
 const (
 	HelpSeparator = " • "
 )
@@ -19,6 +20,7 @@ var (
 	colorSelectedFg = lipgloss.AdaptiveColor{Light: "#1A1150", Dark: "#FFFFFF"}
 )
 
+// Styles are the styles of a form: those of the stream it draws on, and its own, rendered with that stream's colour profile.
 type Styles struct {
 	*output.Styles
 	summary   lipgloss.Style
@@ -43,6 +45,7 @@ func newStyles(base *output.Styles) *Styles {
 	}
 }
 
+// Wrap returns value wrapped to width columns, escape codes aside, or value as it is when width is under 1.
 func Wrap(value string, width int) string {
 	if width < 1 {
 		return value
@@ -50,6 +53,7 @@ func Wrap(value string, width int) string {
 	return ansi.Wrap(value, width, "")
 }
 
+// Indented returns text with each of its lines indented like the rest of wtm's output.
 func Indented(text string) string {
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
@@ -58,9 +62,11 @@ func Indented(text string) string {
 	return strings.Join(lines, "\n")
 }
 
+// errorBanner draws message as a field's error, wrapped to width under the failure glyph.
 func errorBanner(message string, width int, st *Styles) string {
 	hang := output.Indent + "  "
 	lines := strings.Split(Wrap(capitalized(message), width-len(hang)-1), "\n")
+
 	for i := 1; i < len(lines); i++ {
 		lines[i] = hang + st.Danger.Render(lines[i])
 	}

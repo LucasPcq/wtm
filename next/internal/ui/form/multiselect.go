@@ -15,22 +15,26 @@ const (
 	helpPickAll    = "a all"
 )
 
+// A Tone is the colour of a [Pick]'s tag.
 type Tone int
 
+// The tones of a tag: muted for a note, warning for a risk, danger for a loss.
 const (
 	ToneMuted Tone = iota
 	ToneWarning
 	ToneDanger
 )
 
+// A Pick is a row of a [MultiSelect].
 type Pick struct {
 	Label  string
 	Value  string
-	Tag    string
+	Tag    string // a note drawn at the row's right end, in Tone
 	Tone   Tone
-	Picked bool
+	Picked bool // the row starts picked
 }
 
+// A MultiSelect is a [Field] that picks one or more options, filtered by typing after /; it refuses to be confirmed with none picked.
 type MultiSelect struct {
 	options   []Pick
 	shown     []int
@@ -42,17 +46,20 @@ type MultiSelect struct {
 	err       error
 }
 
+// MultiSelectParams is what a [MultiSelect] offers.
 type MultiSelectParams struct {
 	Options []Pick
-	Empty   string
+	Empty   string // the error shown when enter confirms with nothing picked
 }
 
+// NewMultiSelect returns a multi-select over a copy of params.Options.
 func NewMultiSelect(params MultiSelectParams) *MultiSelect {
 	m := &MultiSelect{options: append([]Pick(nil), params.Options...), empty: params.Empty}
 	m.refilter()
 	return m
 }
 
+// Values returns the values of the options picked, in their order.
 func (m *MultiSelect) Values() []string {
 	var values []string
 	for _, o := range m.options {
@@ -63,14 +70,17 @@ func (m *MultiSelect) Values() []string {
 	return values
 }
 
+// Update handles a key: ↑↓ (or k j) move, space picks or unpicks, a picks every option shown, enter confirms, / starts the filter, esc clears it or goes back.
 func (m *MultiSelect) Update(msg tea.Msg) (Verdict, tea.Cmd) {
 	key, ok := msg.(tea.KeyMsg)
 	if !ok {
 		return Stay, nil
 	}
+
 	if m.filtering {
 		return m.filter(key), nil
 	}
+
 	switch key.String() {
 	case "up", "k":
 		m.move(-1)
@@ -94,6 +104,7 @@ func (m *MultiSelect) Update(msg tea.Msg) (Verdict, tea.Cmd) {
 	return Stay, nil
 }
 
+// filter handles a key while the filter takes typed text: a printable key narrows the options, space still picks, backspace widens them, esc leaves the filter as typed.
 func (m *MultiSelect) filter(key tea.KeyMsg) Verdict {
 	switch typed := key.String(); typed {
 	case "esc":
@@ -136,6 +147,7 @@ func (m *MultiSelect) pickAll() {
 	m.err = nil
 }
 
+// confirm answers the field, or stays with its Empty error when nothing is picked.
 func (m *MultiSelect) confirm() Verdict {
 	if len(m.Values()) == 0 {
 		m.err = errors.New(m.empty)
@@ -159,6 +171,7 @@ func (m *MultiSelect) move(step int) {
 	m.cursor = min(max(m.cursor+step, 0), max(len(m.shown)-1, 0))
 }
 
+// View draws the filter, the rows that fit size.Height scrolled to the cursor, then the error of a refused confirm.
 func (m *MultiSelect) View(size Size, st *Styles) string {
 	var b strings.Builder
 	if m.filtering || m.query != "" {
@@ -168,6 +181,7 @@ func (m *MultiSelect) View(size Size, st *Styles) string {
 		}
 		b.WriteString("\n\n")
 	}
+
 	rows := len(m.shown)
 	if size.Height > 0 {
 		rows = max(1, size.Height-m.overhead())
@@ -183,12 +197,15 @@ func (m *MultiSelect) View(size Size, st *Styles) string {
 	if len(m.shown) == 0 {
 		b.WriteString(st.Muted.Render(output.Indent + noMatches))
 	}
+
 	if m.err != nil {
 		b.WriteString("\n\n" + errorBanner(m.err.Error(), size.Width, st))
 	}
+
 	return b.String()
 }
 
+// overhead returns the lines View draws besides the rows.
 func (m *MultiSelect) overhead() int {
 	lines := 0
 	if m.filtering || m.query != "" {
@@ -200,11 +217,13 @@ func (m *MultiSelect) overhead() int {
 	return lines
 }
 
+// row draws p with its box across width, its tag at the right end, tinted when selected.
 func (m *MultiSelect) row(p Pick, selected bool, width int, st *Styles) string {
 	check := checkOff
 	if p.Picked {
 		check = checkOn
 	}
+
 	label := check + " " + p.Label
 	fill := max(width-rowPrefix-rowLead-lipgloss.Width(label)-lipgloss.Width(p.Tag)-rowTagGap, 1)
 	if selected {
@@ -225,6 +244,7 @@ func toned(t Tone, st *Styles) lipgloss.Style {
 	return st.Muted
 }
 
+// Help returns the filter's own line while it takes typed text, else the keys that pick and filter.
 func (m *MultiSelect) Help() Help {
 	if m.filtering {
 		return Help{Modal: pickFilterHelp}

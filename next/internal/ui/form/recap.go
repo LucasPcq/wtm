@@ -21,6 +21,7 @@ const (
 	detailHang  = "    "
 )
 
+// previewing computes the plan off the event loop, the recap offering no choice until it lands.
 func (w *Wizard) previewing() tea.Cmd {
 	w.planned, w.failure = false, nil
 	w.recap = NewSelectList(SelectParams{})
@@ -30,9 +31,11 @@ func (w *Wizard) previewing() tea.Cmd {
 	})
 }
 
+// previewed installs the plan a preview computed and offers to apply it, or, when the preview failed, keeps its failure and offers only to cancel.
 func (w *Wizard) previewed(m previewMsg) {
 	w.loading = ""
 	m.apply()
+
 	options := []Option{{Label: cancelLabel, Value: cancelValue}}
 	if failure := domain.AsError(domain.AsErrorParams{Err: m.err}); failure != nil {
 		w.failure = failure
@@ -40,9 +43,11 @@ func (w *Wizard) previewed(m previewMsg) {
 		w.planned = true
 		options = append([]Option{{Label: applyLabel, Value: applyValue}, {Separator: true}}, options...)
 	}
+
 	w.recap = NewSelectList(SelectParams{Options: options})
 }
 
+// confirmed ends the wizard on the recap's choice.
 func (w *Wizard) confirmed() tea.Cmd {
 	if w.recap.Value() == applyValue {
 		w.ending = Finished
@@ -59,6 +64,7 @@ func (w *Wizard) recapTitle() string {
 	return recapTitle
 }
 
+// recapBody draws the plan, warned stale when it changed since the plan the user confirmed, or the preview's failure.
 func (w *Wizard) recapBody() string {
 	switch {
 	case w.failure != nil:
@@ -66,6 +72,7 @@ func (w *Wizard) recapBody() string {
 	case !w.planned:
 		return planText
 	}
+
 	plan := w.script.Plan(w.recapWidth()-w.styles.recapBox.GetHorizontalPadding(), w.styles.Styles)
 	if !w.stale {
 		return plan
@@ -73,11 +80,13 @@ func (w *Wizard) recapBody() string {
 	return w.styles.Warning.Render(output.GlyphAttention) + " " + staleText + "\n\n" + plan
 }
 
+// failureText draws the preview's failure: its message, then each field it refuses under the label of the step that sets it.
 func (w *Wizard) failureText() string {
 	first := w.failure.Error()
 	if len(w.failure.Fields) > 0 {
 		first = w.failure.Message
 	}
+
 	lines := []string{w.styles.Danger.Render(output.GlyphFailure) + " " + first}
 	for _, found := range w.failure.Fields {
 		lines = append(lines, detailHang+found.Message(w.script.Label(found.Path)))
@@ -89,6 +98,7 @@ func (w *Wizard) recapWidth() int {
 	return max(w.size.Width-8, 24)
 }
 
+// review draws the recap's box: its title and its body.
 func (w *Wizard) review() string {
 	return w.styles.recapBox.Width(w.recapWidth()).Render(w.styles.accent.Render(reviewTitle) + "\n\n" + w.recapBody())
 }

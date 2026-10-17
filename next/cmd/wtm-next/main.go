@@ -1,4 +1,6 @@
-// Command wtm-next is wtm rebuilt as use-case slices over a light hexagon.
+// Command wtm-next manages the git worktrees of a repository: it is wtm rebuilt as use-case slices over a light hexagon, working on the same repositories and state files.
+//
+// main.go registers each command's command line on the root; wire.go builds each adapter once and injects it; project.go finds the repository a command runs on.
 package main
 
 import (
@@ -12,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// version is set at build time with -ldflags "-X main.version=…".
 var version = "dev"
 
 func main() {

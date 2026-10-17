@@ -9,26 +9,29 @@ import (
 
 const envelopeVersion = 2
 
+// EnvelopeParams is what a command's v2 envelope reports: its operation, its items, its plan and fingerprint on a dry run, its warnings and its failure.
 type EnvelopeParams struct {
 	Command     string
-	Op          string
+	Op          string // the operation's id
 	Items       []Item
-	Plan        any
+	Plan        any // the plan a dry run shows, encoded as it is
 	Fingerprint string
 	Warnings    []domain.Warning
-	Err         *domain.Error
-	Flags       Flags
+	Err         *domain.Error // nil when the command succeeded
+	Flags       Flags         // spells the path of each field Err refuses
 }
 
+// An Item is the outcome of one subject of an operation, a worktree for instance.
 type Item struct {
 	Subject  string
 	Status   domain.Status
 	Reason   domain.Reason
 	Err      *domain.Error
 	Warnings []domain.Warning
-	Detail   any
+	Detail   any // what the command reports of the subject, encoded as {} when nil
 }
 
+// envelope is the v2 JSON document; its field names and their presence are a contract scripts rely on.
 type envelope struct {
 	V           int              `json:"v"`
 	Command     string           `json:"command"`
@@ -77,6 +80,7 @@ type envelopeField struct {
 	Message  string        `json:"message"`
 }
 
+// Envelope writes the v2 JSON envelope params describes to w, indented, with follow_ups and warnings always arrays; it returns the error of the write.
 func Envelope(w io.Writer, params EnvelopeParams) error {
 	doc := envelope{V: envelopeVersion, Command: params.Command, OK: params.Err == nil, Op: params.Op, Plan: params.Plan, Fingerprint: params.Fingerprint, FollowUps: []envelopeFollow{}, Warnings: params.Warnings, Error: errorOf(FailureParams{Err: params.Err, Flags: params.Flags})}
 	for _, item := range params.Items {
@@ -85,6 +89,7 @@ func Envelope(w io.Writer, params EnvelopeParams) error {
 	if doc.Warnings == nil {
 		doc.Warnings = []domain.Warning{}
 	}
+
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	encoder.SetEscapeHTML(false)
@@ -96,21 +101,26 @@ func itemOf(item Item, flags Flags) envelopeItem {
 	if detail == nil {
 		detail = struct{}{}
 	}
+
 	return envelopeItem{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Error: errorOf(FailureParams{Err: item.Err, Flags: flags}), Warnings: item.Warnings, Detail: detail}
 }
 
+// errorOf returns the error of the envelope for params' error, each field it refuses with the flag that sets it; nil when there is none.
 func errorOf(params FailureParams) *envelopeError {
 	err := params.Err
 	if err == nil {
 		return nil
 	}
+
 	doc := &envelopeError{Kind: err.Kind, Code: err.Code, Message: ErrorText(err), Params: err.Params}
 	if follow := err.FollowUp; follow != nil {
 		doc.FollowUp = &envelopeFollow{Command: follow.Command, Request: follow.Request, Code: follow.Code, Params: follow.Params}
 	}
+
 	for _, field := range err.Fields {
 		flag := params.Flags.Spell(field.Path)
 		doc.Fields = append(doc.Fields, envelopeField{Path: field.Path, Code: field.Code, Params: field.Params, Accepted: field.Accepted, With: field.With, Flag: flag, Message: field.Message(flag)})
 	}
+
 	return doc
 }

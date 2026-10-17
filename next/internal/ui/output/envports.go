@@ -8,6 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 )
 
+// SettlementNote returns what plan writes into a worktree's .env files in one line, how many ports it shifts and how many owned values it writes, or "" when it writes neither.
 func SettlementNote(plan env.Redacted) string {
 	var parts []string
 	if shifted := len(env.Plan(plan).Rewrites()); shifted > 0 {
@@ -16,25 +17,30 @@ func SettlementNote(plan env.Redacted) string {
 	if written := changedOwned(plan.Owned); written > 0 {
 		parts = append(parts, fmt.Sprintf("%d owned %s written", written, noun(written, "value")))
 	}
+
 	return strings.Join(parts, Dot)
 }
 
+// AnomalyLines returns the ports plan could not shift, as a table per .env file: each key, its port and why; nil when there are none.
 func AnomalyLines(plan env.Redacted) []string {
 	entries := env.Plan(plan).Anomalies()
 	if len(entries) == 0 {
 		return nil
 	}
+
 	keyWidth, portWidth := 0, 0
 	for _, entry := range entries {
 		keyWidth = max(keyWidth, len(entry.Key))
 		portWidth = max(portWidth, len(entry.Port))
 	}
+
 	rows := make([]string, len(entries))
 	widest := 0
 	for i, entry := range entries {
 		rows[i] = strings.TrimRight(fmt.Sprintf("%s  %s  %s", pad(entry.Key, keyWidth), pad(entry.Port, portWidth), anomalyReason(entry)), " ")
 		widest = max(widest, len([]rune(rows[i])))
 	}
+
 	var lines []string
 	for i, file := range filesOf(entries) {
 		if i > 0 {
