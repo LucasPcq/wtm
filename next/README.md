@@ -14,12 +14,14 @@ internal/
     env/               a worktree's environment: where its .env files come from, what wtm writes into them, what its jobs and hooks run with, its hook chain
                        (env imports worktree, project and dotenv; worktree imports project; wtm imports worktree)
   app/                 the API every surface calls: runs any use case under its locks, fingerprint and events, written once (run.go)
-    <slice>/           one use case in one package whose create.go tells it: Plan, Apply, Questions when it asks; provision/ is the one shared by several (a new worktree made whole)
+    <slice>/           one use case in one package whose <slice>.go tells it: Plan, Apply, Questions when it asks; provision/ is the one shared by several (a new worktree made whole)
   adapter/             what the app reaches out to: git, statefile, store, config, shell, oplock, events, proxyport
     <name>test/        a stateful fake of an adapter, for tests
   surface/             what calls the app: cli, output (what wtm-next prints), form
 ```
 No file format lives in `wtm/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `wtm/project`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
+
+A use case reads in one place. `<slice>.go` holds its request, its ports and its story first: `Plan` (observe what the repository holds, settle the request on it, decide), `Apply`, and `Questions` when it asks; then its plan and result types. `facts.go` holds what it observes and decides from, `questions.go` its form and validation. `app/<slice>.go` only hands `Plan` and `Apply` to the pipeline in `app/run.go`. A file is a topic, not a declaration; a package is split only when it passes about 1,000 lines and a seam is natural.
 
 ## Import rules
 
