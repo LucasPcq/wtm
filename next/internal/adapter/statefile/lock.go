@@ -33,17 +33,17 @@ func WithLock(ctx context.Context, params LockParams) (bool, error) {
 		return false, err
 	}
 	defer file.Close()
-	defer flock(file, syscall.LOCK_UN)
+	defer Flock(file, syscall.LOCK_UN)
 	return true, params.Do()
 }
 
 func acquire(ctx context.Context, path string) (*os.File, error) {
-	file, err := openLockFile(path)
+	file, err := OpenLock(path)
 	if err != nil {
 		return nil, errUnlockable
 	}
 	for {
-		err := flock(file, syscall.LOCK_EX|syscall.LOCK_NB)
+		err := Flock(file, syscall.LOCK_EX|syscall.LOCK_NB)
 		if err == nil {
 			return file, nil
 		}
@@ -60,7 +60,7 @@ func acquire(ctx context.Context, path string) (*os.File, error) {
 	}
 }
 
-func openLockFile(path string) (*os.File, error) {
+func OpenLock(path string) (*os.File, error) {
 	if path == "" {
 		return nil, fmt.Errorf("lock path required")
 	}
@@ -70,7 +70,7 @@ func openLockFile(path string) (*os.File, error) {
 	return os.OpenFile(path, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0o644)
 }
 
-func flock(file *os.File, how int) error {
+func Flock(file *os.File, how int) error {
 	for {
 		// The runtime's preemption signals interrupt the call, and an interrupted try says nothing about the lock.
 		if err := syscall.Flock(int(file.Fd()), how); !errors.Is(err, syscall.EINTR) {

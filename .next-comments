@@ -2,3 +2,5 @@
 # `<package under next/> <lines>`, absent = 0. archlint (nextcomments) refuses a count above or below its line,
 # so a ceiling only goes down by itself and goes up in review.
 internal/adapter/statefile 2
+internal/adapter/oplock 2
+internal/app 1

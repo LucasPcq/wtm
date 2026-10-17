@@ -1,7 +1,9 @@
 package create
 
 import (
+	"cmp"
 	"context"
+	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
@@ -23,6 +25,20 @@ type ApplyParams struct {
 type Result struct {
 	Items    []Item
 	Warnings []wtm.Warning
+}
+
+func (r Result) Failure() *wtm.Error {
+	if at := slices.IndexFunc(r.Items, interrupted); at >= 0 {
+		return cmp.Or(r.Items[at].Err, &wtm.Error{Kind: wtm.KindCancelled, Code: wtm.CodeInterrupted, Message: "interrupted"})
+	}
+	if at := slices.IndexFunc(r.Items, func(item Item) bool { return item.Status == wtm.StatusFailed }); at >= 0 {
+		return r.Items[at].Err
+	}
+	return nil
+}
+
+func interrupted(item Item) bool {
+	return item.Status == wtm.StatusCancelled || item.Reason == wtm.ReasonInterrupted
 }
 
 type Item struct {

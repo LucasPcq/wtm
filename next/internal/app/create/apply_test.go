@@ -138,3 +138,15 @@ func TestAnIsolationNothingAppliesToIgnoresTheRememberedOne(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, run.Isolated, recorded.Isolation)
 }
+
+func TestTheFailureOfARunIsItsFirstInterruptElseItsFirstFailure(t *testing.T) {
+	hook := &wtm.Error{Code: "unit.phase_failed"}
+	stopped := &wtm.Error{Code: "unit.interrupted"}
+	failed := create.Item{Subject: "a", Status: wtm.StatusFailed, Err: hook}
+
+	assert.Nil(t, create.Result{Items: []create.Item{{Status: wtm.StatusDone}}}.Failure())
+	assert.Same(t, hook, create.Result{Items: []create.Item{failed}}.Failure())
+	assert.Same(t, stopped, create.Result{Items: []create.Item{failed, {Status: wtm.StatusCancelled, Err: stopped}}}.Failure())
+	skipped := create.Result{Items: []create.Item{failed, {Status: wtm.StatusSkipped, Reason: wtm.ReasonInterrupted}}}.Failure()
+	assert.Equal(t, &wtm.Error{Kind: wtm.KindCancelled, Code: "unit.interrupted", Message: "interrupted"}, skipped)
+}

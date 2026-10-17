@@ -18,6 +18,7 @@ internal/
     settle/            what wtm writes into a new worktree's .env files (imports jobenv)
     hookvars/          the template variables of a hook command
     hook/              a chain of hook commands as a worktree runs it: its log and how it fails
+    operation/         an operation in progress as its holder file records it, and the locks it holds
                        (worktree may import branch, project and run, which import nothing else of the domain)
   app/                 the API every surface calls: locks, fingerprint, events around each use case
     <slice>/           one use case (create); provision/ is the one shared by several (a new worktree made whole)
