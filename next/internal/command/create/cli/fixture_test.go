@@ -95,7 +95,7 @@ func (w world) usecase() create.UseCase {
 			NewOpID:   func() string { return "op-1" },
 			Now:       func() time.Time { return createdAt },
 		},
-		Provision: provision.Deps{
+		Provision: provision.Service{
 			Git:        w.git,
 			Meta:       w.store,
 			EnvFiles:   w.store,
@@ -245,7 +245,7 @@ func newApp(s seed) create.UseCase {
 			NewOpID:   func() string { return "op-1" },
 			Now:       func() time.Time { return createdAt },
 		},
-		Provision: provision.Deps{
+		Provision: provision.Service{
 			Git:        git,
 			Meta:       store,
 			EnvFiles:   store,

@@ -112,7 +112,7 @@ func codes(warnings []domain.Warning) []string {
 	return found
 }
 
-func values(options []create.Option) []string {
+func values(options []domain.Option) []string {
 	found := make([]string, 0, len(options))
 	for _, option := range options {
 		found = append(found, option.Value)

@@ -14,7 +14,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
-	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +29,7 @@ func TestAWorktreeGetsTheSmallestOrdinalNoLiveWorktreeHolds(t *testing.T) {
 		Store: storetest.FakeParams{Meta: map[string]worktree.Meta{"feat/a": {Ordinal: 1}, "feat/b": {Ordinal: 3}}},
 	})
 
-	outcome := provision.Run(t.Context(), portLinked(w.params(&recorder{})))
+	outcome := w.service.Run(t.Context(), portLinked(w.params(&recorder{})))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, new(2), outcome.Provisioned.Ordinal)
@@ -42,7 +41,7 @@ func TestAWorktreeGetsTheSmallestOrdinalNoLiveWorktreeHolds(t *testing.T) {
 func TestANumberIsGivenUnderTheOrdinalLock(t *testing.T) {
 	w, files := inMemory(t, seeds{})
 
-	provision.Run(t.Context(), portLinked(w.params(&recorder{})))
+	w.service.Run(t.Context(), portLinked(w.params(&recorder{})))
 
 	calls := files.Calls()
 	locked := slices.Index(calls, "LockOrdinals ")
@@ -56,7 +55,7 @@ func TestANumberIsNeverGivenPastANeighbourWhoseRecordDoesNotRead(t *testing.T) {
 		Store:     storetest.FakeParams{Unreadable: []string{"feat/a"}},
 	})
 
-	outcome := provision.Run(t.Context(), portLinked(w.params(&recorder{})))
+	outcome := w.service.Run(t.Context(), portLinked(w.params(&recorder{})))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Nil(t, outcome.Provisioned.Ordinal)
@@ -70,7 +69,7 @@ func TestANumberThatCannotBeGivenLeavesThePortsAsCopiedAndSaysWhy(t *testing.T) 
 	w, _ := inMemory(t, seeds{GitFail: map[string]error{"Worktrees": errors.New("git worktree list: exit status 128")}})
 	report := &recorder{}
 
-	outcome := provision.Run(t.Context(), portLinked(w.params(report)))
+	outcome := w.service.Run(t.Context(), portLinked(w.params(report)))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Nil(t, outcome.Provisioned.Ordinal)
@@ -86,7 +85,7 @@ func TestANumberOnlyHooksNeededFailsSilently(t *testing.T) {
 	w, _ := inMemory(t, seeds{GitFail: map[string]error{"Worktrees": errors.New("exit status 128")}})
 	require.NoError(t, os.MkdirAll(w.path(branchName), 0o755))
 
-	outcome := provision.Run(t.Context(), hooked(composed(w.params(&recorder{})), "true"))
+	outcome := w.service.Run(t.Context(), hooked(composed(w.params(&recorder{})), "true"))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Nil(t, outcome.Provisioned.Ordinal)
@@ -97,7 +96,7 @@ func TestAPortLinkedWorktreeIsNumberedAndItsEnvMovedOntoItsPorts(t *testing.T) {
 	w := onDisk(t)
 	report := &recorder{}
 
-	outcome := provision.Run(t.Context(), portLinked(w.params(report)))
+	outcome := w.service.Run(t.Context(), portLinked(w.params(report)))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{"worktree", "env", "meta", "ordinal", "ports"}, report.phases())
@@ -120,7 +119,7 @@ func TestARunConfigThatDoesNotLoadLeavesTheEnvAsCopiedAndSaysWhy(t *testing.T) {
 	params := portLinked(w.params(report))
 	params.Project.RunErr = errors.New("run.toml: line 3")
 
-	outcome := provision.Run(t.Context(), params)
+	outcome := w.service.Run(t.Context(), params)
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{"worktree", "env", "meta", "ports"}, report.phases())
@@ -139,7 +138,7 @@ func TestAVerbatimWorktreeKeepsItsEnvAsCopiedAndHasNoNumber(t *testing.T) {
 	params := portLinked(w.params(report))
 	params.Worktree.Isolation = project.Verbatim
 
-	outcome := provision.Run(t.Context(), params)
+	outcome := w.service.Run(t.Context(), params)
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{"worktree", "env", "meta"}, report.phases())
@@ -152,7 +151,7 @@ func TestAnEnvValueThatCannotBeExpandedIsSaidAsARunTomlToFix(t *testing.T) {
 	params := portLinked(w.params(&recorder{}))
 	params.Project.Run.EnvValues = []project.EnvValueLink{{File: ".env", Key: "API", Job: "ghost", Value: "x"}}
 
-	outcome := provision.Run(t.Context(), params)
+	outcome := w.service.Run(t.Context(), params)
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{"provision.ports_not_settled_run"}, codes(outcome.Warnings))
@@ -164,7 +163,7 @@ func TestAProxyPortOutOfRangeIsSaidAsAConfigToFix(t *testing.T) {
 	params := portLinked(w.params(&recorder{}))
 	params.Project.Global.Proxy.Port = 70000
 
-	outcome := provision.Run(t.Context(), params)
+	outcome := w.service.Run(t.Context(), params)
 
 	assert.Equal(t, []string{"provision.ports_not_settled"}, codes(outcome.Warnings))
 }
@@ -175,7 +174,7 @@ func TestALinkToAnEnvConfigTomlDoesNotDeclareIsNamedAndLeftOut(t *testing.T) {
 	params.Project.Run.EnvPorts = append(params.Project.Run.EnvPorts, project.EnvPortLink{File: "web/.env", Key: "WEB_PORT", Job: "web", Port: "http"})
 	params.Project.Run.EnvValues = []project.EnvValueLink{{File: "api/.env", Key: "API", Job: "web", Value: "x"}}
 
-	outcome := provision.Run(t.Context(), params)
+	outcome := w.service.Run(t.Context(), params)
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []domain.Warning{
@@ -200,7 +199,7 @@ func TestAnOriginWithoutTheRunProxyIsAProxyToFixNotARunToml(t *testing.T) {
 	params.Project.Run.Jobs[0].URL = &project.URL{Port: "http"}
 	params.Project.Run.EnvValues = []project.EnvValueLink{{File: ".env", Key: "API", Job: "web", Value: "{origin}"}}
 
-	outcome := provision.Run(t.Context(), params)
+	outcome := w.service.Run(t.Context(), params)
 
 	require.Equal(t, []string{"provision.ports_not_settled"}, codes(outcome.Warnings))
 	assert.Equal(t, "env API in .env: {origin} of job \"web\" is served by the run proxy, which serves no port: enable the proxy, or write the host yourself — ports not settled — run `wtm env feat/x` once this is fixed", outcome.Warnings[0].Message)
@@ -209,7 +208,7 @@ func TestAnOriginWithoutTheRunProxyIsAProxyToFixNotARunToml(t *testing.T) {
 func TestAPortPassThatFailsNeverFailsTheWorktree(t *testing.T) {
 	w, _ := inMemory(t, seeds{Store: storetest.FakeParams{Fail: map[string]error{"Edit": errors.New("read-only file system")}}})
 
-	outcome := provision.Run(t.Context(), portLinked(w.params(&recorder{})))
+	outcome := w.service.Run(t.Context(), portLinked(w.params(&recorder{})))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{"provision.ports_not_settled"}, codes(outcome.Warnings))
@@ -220,7 +219,7 @@ func TestAPortPassThatFailsNeverFailsTheWorktree(t *testing.T) {
 func TestAComposeStackGetsItsProjectNameWithoutAnyPortLink(t *testing.T) {
 	w := onDisk(t)
 
-	outcome := provision.Run(t.Context(), composed(w.params(&recorder{})))
+	outcome := w.service.Run(t.Context(), composed(w.params(&recorder{})))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, mainEnv+"COMPOSE_PROJECT_NAME=main-feat-x\n", readFile(t, filepath.Join(w.path(branchName), ".env")))
@@ -230,7 +229,7 @@ func TestOnCreateRunsInTheNewWorktreeAndKeepsItsLog(t *testing.T) {
 	w := onDisk(t)
 	report := &recorder{}
 
-	outcome := provision.Run(t.Context(), hooked(w.params(report), "pwd", "echo from {{from_branch}} on {{branch}}"))
+	outcome := w.service.Run(t.Context(), hooked(w.params(report), "pwd", "echo from {{from_branch}} on {{branch}}"))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{w.path(branchName), "from main on feat/x"}, report.lines())
@@ -242,7 +241,7 @@ func TestAHookThatFailsLeavesTheWorktreeIncomplete(t *testing.T) {
 	w := onDisk(t)
 	report := &recorder{}
 
-	outcome := provision.Run(t.Context(), hooked(w.params(report), "exit 3"))
+	outcome := w.service.Run(t.Context(), hooked(w.params(report), "exit 3"))
 
 	assert.Equal(t, domain.StatusFailed, outcome.Status)
 	assert.Equal(t, domain.ReasonIncomplete, outcome.Reason)
@@ -267,7 +266,7 @@ func TestAHookInterruptedLeavesTheWorktreeCancelledAndIncomplete(t *testing.T) {
 		}
 	}}
 
-	outcome := provision.Run(ctx, hooked(w.params(report), "echo started; sleep 5", "echo never"))
+	outcome := w.service.Run(ctx, hooked(w.params(report), "echo started; sleep 5", "echo never"))
 
 	assert.Equal(t, domain.StatusCancelled, outcome.Status)
 	assert.Equal(t, domain.ReasonIncomplete, outcome.Reason)
@@ -284,9 +283,9 @@ func TestAComposeEnvThatCannotBeReadIsSaidAndTheHooksRunWithoutIt(t *testing.T) 
 	w := onDisk(t)
 	report := &recorder{}
 	params := hooked(composed(w.params(report)), "echo project=$COMPOSE_PROJECT_NAME")
-	params.Deps.EnvFiles = unreadable{EnvFiles: params.Deps.EnvFiles}
+	w.service.EnvFiles = unreadable{EnvFiles: w.service.EnvFiles}
 
-	outcome := provision.Run(t.Context(), params)
+	outcome := w.service.Run(t.Context(), params)
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{"project="}, report.lines())
@@ -302,8 +301,10 @@ func TestAHookReadsTheRunEnvironmentOnlyWhenTheRunReachesHooks(t *testing.T) {
 	echo := "echo offset=$WTM_PORT_OFFSET project=$COMPOSE_PROJECT_NAME"
 	plain, composedReport := &recorder{}, &recorder{}
 
-	provision.Run(t.Context(), hooked(onDisk(t).params(plain), echo))
-	provision.Run(t.Context(), hooked(composed(onDisk(t).params(composedReport)), echo))
+	plainWorld, composedWorld := onDisk(t), onDisk(t)
+
+	plainWorld.service.Run(t.Context(), hooked(plainWorld.params(plain), echo))
+	composedWorld.service.Run(t.Context(), hooked(composed(composedWorld.params(composedReport)), echo))
 
 	assert.Equal(t, []string{"worktree", "env", "meta", "on_create"}, plain.phases())
 	assert.Equal(t, []string{"worktree", "env", "meta", "ordinal", "ports", "on_create"}, composedReport.phases())

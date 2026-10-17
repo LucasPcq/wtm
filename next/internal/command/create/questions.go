@@ -9,57 +9,26 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-type Origin string
-
-const (
-	OriginRequest    Origin = "request"
-	OriginRemembered Origin = "remembered"
-	OriginConfig     Origin = "config"
-	OriginDefault    Origin = "default"
-)
-
-type Answer[T any] struct {
-	Value  T
-	Origin Origin
-}
-
-type Option struct {
-	Value string
-	Badge string
-}
-
 type Questions struct {
 	Branches    Branches
 	From        From
-	EnvFrom     Choice[project.EnvStrategy]
-	Isolation   Choice[project.Isolation]
-	FastForward Confirm
-	IfNotExists Confirm
+	EnvFrom     domain.Choice[project.EnvStrategy]
+	Isolation   domain.Choice[project.Isolation]
+	FastForward domain.Confirm
+	IfNotExists domain.Confirm
 	Remember    []string
 	Errors      []domain.FieldError
 }
 
 type Branches struct {
 	Given   []string
-	Options []Option
+	Options []domain.Option
 }
 
 type From struct {
-	Answer[string]
-	Options []Option
+	domain.Answer[string]
+	Options []domain.Option
 	Pinned  string
-}
-
-type Choice[T ~string] struct {
-	Answer[T]
-	Options    []T
-	Skip       string
-	Remembered T
-}
-
-type Confirm struct {
-	Answer[bool]
-	Skip string
 }
 
 func Form(f Facts, req Request) Questions {
@@ -84,18 +53,18 @@ func Form(f Facts, req Request) Questions {
 	return questions
 }
 
-func (f Facts) branchOptions() []Option {
-	options := make([]Option, 0, len(f.Branches.Local)+len(f.Branches.Remote))
+func (f Facts) branchOptions() []domain.Option {
+	options := make([]domain.Option, 0, len(f.Branches.Local)+len(f.Branches.Remote))
 	for _, local := range f.Branches.Local {
 		badge := "existing"
 		if f.checkedOutAt(local.Name) != "" {
 			badge = "worktree exists"
 		}
-		options = append(options, Option{Value: local.Name, Badge: badge})
+		options = append(options, domain.Option{Value: local.Name, Badge: badge})
 	}
 	for _, remote := range f.Branches.Remote {
 		if !f.local(remote.Name) {
-			options = append(options, Option{Value: remote.Name, Badge: "on origin"})
+			options = append(options, domain.Option{Value: remote.Name, Badge: "on origin"})
 		}
 	}
 	return options
@@ -105,23 +74,23 @@ func (f Facts) from(req Request) From {
 	question := From{Options: f.sourceOptions(req.Branches), Pinned: f.Config.Worktrees.BaseBranch}
 	switch base := f.Config.Worktrees.BaseBranch; {
 	case req.From != "":
-		question.Answer = Answer[string]{Value: req.From, Origin: OriginRequest}
+		question.Answer = domain.Answer[string]{Value: req.From, Origin: domain.OriginRequest}
 	case base != "" && !f.checksOut(req):
-		question.Answer = Answer[string]{Value: base, Origin: OriginConfig}
+		question.Answer = domain.Answer[string]{Value: base, Origin: domain.OriginConfig}
 	}
 	return question
 }
 
-func (f Facts) sourceOptions(creating []string) []Option {
-	options := make([]Option, 0, len(f.Branches.Local)+len(f.Branches.Remote))
+func (f Facts) sourceOptions(creating []string) []domain.Option {
+	options := make([]domain.Option, 0, len(f.Branches.Local)+len(f.Branches.Remote))
 	for _, local := range f.Branches.Local {
 		if !slices.Contains(creating, local.Name) {
-			options = append(options, Option{Value: local.Name, Badge: f.badge(local.Name)})
+			options = append(options, domain.Option{Value: local.Name, Badge: f.badge(local.Name)})
 		}
 	}
 	for _, remote := range f.Branches.Remote {
 		if !f.local(remote.Name) && !slices.Contains(creating, remote.Name) {
-			options = append(options, Option{Value: remotePrefix + remote.Name})
+			options = append(options, domain.Option{Value: remotePrefix + remote.Name})
 		}
 	}
 	return options
@@ -141,61 +110,61 @@ func (f Facts) badge(name string) string {
 	return ""
 }
 
-func (f Facts) envFrom(given project.EnvStrategy) Choice[project.EnvStrategy] {
-	question := Choice[project.EnvStrategy]{Options: project.EnvStrategies()}
+func (f Facts) envFrom(given project.EnvStrategy) domain.Choice[project.EnvStrategy] {
+	question := domain.Choice[project.EnvStrategy]{Options: project.EnvStrategies()}
 	remembered, found := f.remembered(project.RememberEnvStrategy)
 	switch {
 	case given != "":
-		question.Answer = Answer[project.EnvStrategy]{Value: given, Origin: OriginRequest}
+		question.Answer = domain.Answer[project.EnvStrategy]{Value: given, Origin: domain.OriginRequest}
 	case found:
-		question.Answer = Answer[project.EnvStrategy]{Value: project.EnvStrategy(remembered), Origin: OriginRemembered}
+		question.Answer = domain.Answer[project.EnvStrategy]{Value: project.EnvStrategy(remembered), Origin: domain.OriginRemembered}
 	case f.Config.Env.Strategy != "":
-		question.Answer = Answer[project.EnvStrategy]{Value: f.Config.Env.Strategy, Origin: OriginConfig}
+		question.Answer = domain.Answer[project.EnvStrategy]{Value: f.Config.Env.Strategy, Origin: domain.OriginConfig}
 	}
 	return question
 }
 
-func (f Facts) isolation(given project.Isolation) Choice[project.Isolation] {
-	question := Choice[project.Isolation]{Options: project.Isolations()}
+func (f Facts) isolation(given project.Isolation) domain.Choice[project.Isolation] {
+	question := domain.Choice[project.Isolation]{Options: project.Isolations()}
 	if !f.Run.IsolationApplies() {
 		question.Skip = "run.toml declares nothing a worktree isolates"
 	}
 	remembered, found := f.remembered(project.RememberIsolation)
 	switch {
 	case given != "":
-		question.Answer = Answer[project.Isolation]{Value: given, Origin: OriginRequest}
+		question.Answer = domain.Answer[project.Isolation]{Value: given, Origin: domain.OriginRequest}
 	case found && question.Skip == "":
-		question.Answer = Answer[project.Isolation]{Value: project.Isolation(remembered), Origin: OriginRemembered}
+		question.Answer = domain.Answer[project.Isolation]{Value: project.Isolation(remembered), Origin: domain.OriginRemembered}
 	case f.Run.Isolation != "":
-		question.Answer = Answer[project.Isolation]{Value: f.Run.Isolation.Effective(), Origin: OriginConfig}
+		question.Answer = domain.Answer[project.Isolation]{Value: f.Run.Isolation.Effective(), Origin: domain.OriginConfig}
 	default:
-		question.Answer = Answer[project.Isolation]{Value: project.Isolated, Origin: OriginDefault}
+		question.Answer = domain.Answer[project.Isolation]{Value: project.Isolated, Origin: domain.OriginDefault}
 	}
 	return question
 }
 
-func (f Facts) fastForward(req Request) Confirm {
-	question := Confirm{}
+func (f Facts) fastForward(req Request) domain.Confirm {
+	question := domain.Confirm{}
 	if len(f.subjectsAt(req, worktree.Behind)) == 0 {
 		question.Skip = "nothing to fast-forward: no branch it starts from is behind origin"
 	}
 	remembered, found := f.remembered(project.RememberSourceUpdate)
 	switch {
 	case req.FastForward != nil:
-		question.Answer = Answer[bool]{Value: *req.FastForward, Origin: OriginRequest}
+		question.Answer = domain.Answer[bool]{Value: *req.FastForward, Origin: domain.OriginRequest}
 	case question.Skip != "":
 	case found:
-		question.Answer = Answer[bool]{Value: remembered == project.SourceUpdateFastForward, Origin: OriginRemembered}
+		question.Answer = domain.Answer[bool]{Value: remembered == project.SourceUpdateFastForward, Origin: domain.OriginRemembered}
 	default:
-		question.Answer = Answer[bool]{Origin: OriginDefault}
+		question.Answer = domain.Answer[bool]{Origin: domain.OriginDefault}
 	}
 	return question
 }
 
-func ifNotExists(given bool) Confirm {
-	question := Confirm{Answer: Answer[bool]{Value: given, Origin: OriginDefault}, Skip: "set by its flag only"}
+func ifNotExists(given bool) domain.Confirm {
+	question := domain.Confirm{Answer: domain.Answer[bool]{Value: given, Origin: domain.OriginDefault}, Skip: "set by its flag only"}
 	if given {
-		question.Origin = OriginRequest
+		question.Origin = domain.OriginRequest
 	}
 	return question
 }
@@ -254,7 +223,7 @@ func (f Facts) problems(q Questions) []domain.FieldError {
 		problems = append(problems, domain.FieldError{Path: "from", Code: "not_found", Template: "{path}: {value} not found", Params: domain.Params{"value": from}})
 	}
 	problems = append(problems, oneOf(choice{Path: "env_from", Value: string(q.EnvFrom.Value), Accepted: Names(project.EnvStrategies())})...)
-	if q.Isolation.Origin == OriginRequest {
+	if q.Isolation.Origin == domain.OriginRequest {
 		problems = append(problems, oneOf(choice{Path: "isolation", Value: string(q.Isolation.Value), Accepted: Names(project.Isolations())})...)
 	}
 	for index, id := range q.Remember {

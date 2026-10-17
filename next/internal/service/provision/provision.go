@@ -1,4 +1,4 @@
-// Package provision makes a new worktree whole: added with its env and its record, then numbered, its ports settled and its hooks run.
+// Package provision makes a new worktree whole: added with its env and its record, then numbered, its ports settled and its hooks run; and fast-forwards the source it starts from.
 package provision
 
 import (
@@ -34,7 +34,6 @@ type Worktree struct {
 }
 
 type Params struct {
-	Deps     Deps
 	Project  Project
 	Worktree Worktree
 	Report   domain.Report
@@ -54,9 +53,9 @@ type Outcome struct {
 	Warnings    []domain.Warning
 }
 
-func Run(ctx context.Context, params Params) Outcome {
+func (s Service) Run(ctx context.Context, params Params) Outcome {
 	params.Worktree.Isolation = params.Worktree.Isolation.Effective()
-	p := &provisioning{Params: params, hookLog: env.HookLogPath(env.HookLogPathParams{StateDir: params.Project.StateDir, Branch: params.Worktree.Branch})}
+	p := &provisioning{Params: params, Service: s, hookLog: env.HookLogPath(env.HookLogPathParams{StateDir: params.Project.StateDir, Branch: params.Worktree.Branch})}
 	p.kept, p.ignored = env.Targets(env.TargetsParams{Run: params.Project.Run, Files: params.Project.EnvFiles})
 	if err := ctx.Err(); err != nil {
 		return p.outcome(Outcome{Status: domain.StatusCancelled, Reason: domain.ReasonInterrupted, Err: interrupted(interruption{Err: err})})
@@ -73,6 +72,7 @@ func Run(ctx context.Context, params Params) Outcome {
 
 type provisioning struct {
 	Params
+	Service  Service
 	kept     project.Run
 	ignored  []env.Ignored
 	hookLog  string
@@ -181,7 +181,7 @@ func (p *provisioning) provisionedEvent(outcome Outcome) domain.WorktreeProvisio
 }
 
 func (p *provisioning) add(ctx context.Context) (Provisioned, *domain.Error) {
-	shielded, release := p.Deps.Shield(ctx)
+	shielded, release := p.Service.Shield(ctx)
 	defer release()
 	if err := p.do(shielded, phase{name: "worktree", run: p.addWorktree}); err != nil {
 		return Provisioned{}, stepFailed("worktree", err)
@@ -201,13 +201,13 @@ func stepFailed(step string, err error) *domain.Error {
 }
 
 func (p *provisioning) addWorktree(ctx context.Context) error {
-	return p.Deps.Git.AddWorktree(ctx, worktree.Addition{Path: p.Worktree.Path, Checkout: p.Worktree.Checkout})
+	return p.Service.Git.AddWorktree(ctx, worktree.Addition{Path: p.Worktree.Path, Checkout: p.Worktree.Checkout})
 }
 
 func (p *provisioning) meta() worktree.Meta {
 	return worktree.Meta{
 		SourceBranch: p.Worktree.Source,
-		CreatedAt:    p.Deps.Now().UTC().Format(time.RFC3339),
+		CreatedAt:    p.Service.Now().UTC().Format(time.RFC3339),
 		EnvStrategy:  p.Worktree.Strategy,
 		Isolation:    p.Worktree.Isolation,
 	}
@@ -217,7 +217,7 @@ func (p *provisioning) copyEnv(ctx context.Context) error {
 	if len(p.Project.EnvFiles) == 0 {
 		return nil
 	}
-	copied, err := p.Deps.EnvFiles.Copy(ctx, env.CopyRequest{
+	copied, err := p.Service.EnvFiles.Copy(ctx, env.CopyRequest{
 		Strategy:   p.Worktree.Strategy,
 		Files:      p.Project.EnvFiles,
 		TargetDir:  p.Worktree.Path,
@@ -247,7 +247,7 @@ func copyWarning(warning env.CopyWarning) domain.Warning {
 }
 
 func (p *provisioning) record(ctx context.Context, meta worktree.Meta) error {
-	written, err := p.Deps.Meta.Update(ctx, worktree.MetaUpdate{
+	written, err := p.Service.Meta.Update(ctx, worktree.MetaUpdate{
 		Branch: p.Worktree.Branch,
 		Change: func(stored *worktree.Meta) error {
 			*stored = meta
@@ -259,14 +259,14 @@ func (p *provisioning) record(ctx context.Context, meta worktree.Meta) error {
 }
 
 func (p *provisioning) undo(ctx context.Context, failure *domain.Error) *domain.Error {
-	if err := p.Deps.Git.RemoveWorktree(ctx, p.Worktree.Path); err != nil {
+	if err := p.Service.Git.RemoveWorktree(ctx, p.Worktree.Path); err != nil {
 		return p.leftBehind(leftBehind{Failure: failure, Err: err, Worktree: true})
 	}
 	name, created := worktree.CreatedBranch(p.Worktree.Checkout)
 	if !created {
 		return failure
 	}
-	if err := p.Deps.Git.DeleteBranch(ctx, name); err != nil {
+	if err := p.Service.Git.DeleteBranch(ctx, name); err != nil {
 		return p.leftBehind(leftBehind{Failure: failure, Err: err})
 	}
 	return failure

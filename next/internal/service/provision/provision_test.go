@@ -22,7 +22,7 @@ func TestAProjectWithoutRunConfigOrHooksStopsAtItsRecord(t *testing.T) {
 	w, _ := inMemory(t, seeds{})
 	report := &recorder{}
 
-	outcome := provision.Run(t.Context(), w.params(report))
+	outcome := w.service.Run(t.Context(), w.params(report))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{"worktree", "env", "meta"}, report.phases())
@@ -32,7 +32,7 @@ func TestAWorktreeIsCreatedNumberedThenProvisionedInThatOrder(t *testing.T) {
 	w := onDisk(t)
 	report := &recorder{}
 
-	outcome := provision.Run(t.Context(), portLinked(w.params(report)))
+	outcome := w.service.Run(t.Context(), portLinked(w.params(report)))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	created := worktree.Identity{Branch: branchName, Path: w.path(branchName), Parent: "main", Isolation: project.Isolated, CreatedAt: "2026-10-16T12:00:00Z"}
@@ -49,7 +49,7 @@ func TestEachPhaseIsReportedUnderItsBranch(t *testing.T) {
 	w, _ := inMemory(t, seeds{})
 	report := &recorder{}
 
-	provision.Run(t.Context(), w.params(report))
+	w.service.Run(t.Context(), w.params(report))
 
 	assert.Equal(t, []domain.Event{
 		domain.PhaseStarted{Subject: branchName, Phase: "worktree"},
@@ -67,7 +67,7 @@ func TestAnInterruptBeforeTheStartCreatesNothing(t *testing.T) {
 	cancel()
 	report := &recorder{}
 
-	outcome := provision.Run(ctx, w.params(report))
+	outcome := w.service.Run(ctx, w.params(report))
 
 	assert.Equal(t, domain.StatusCancelled, outcome.Status)
 	assert.Equal(t, domain.ReasonInterrupted, outcome.Reason)
@@ -81,7 +81,7 @@ func TestADeadlinePassedBeforeTheStartIsAnInterrupt(t *testing.T) {
 	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
 	defer cancel()
 
-	outcome := provision.Run(ctx, w.params(&recorder{}))
+	outcome := w.service.Run(ctx, w.params(&recorder{}))
 
 	assert.Equal(t, domain.StatusCancelled, outcome.Status)
 	assert.Equal(t, domain.KindCancelled, outcome.Err.Kind)
@@ -94,7 +94,7 @@ func TestTheNumberIsAnnouncedOnceItsPhaseHasFinished(t *testing.T) {
 	w, _ := inMemory(t, seeds{})
 	report := &recorder{}
 
-	provision.Run(t.Context(), portLinked(w.params(report)))
+	w.service.Run(t.Context(), portLinked(w.params(report)))
 
 	events := report.all()
 	finished := slices.Index(events, domain.Event(domain.PhaseFinished{Subject: branchName, Phase: "ordinal"}))
@@ -113,7 +113,7 @@ func TestAnInterruptDuringTheAddFinishesItsEnvAndRecordThenStops(t *testing.T) {
 		}
 	}}
 
-	outcome := provision.Run(ctx, hooked(portLinked(w.params(report)), "echo never"))
+	outcome := w.service.Run(ctx, hooked(portLinked(w.params(report)), "echo never"))
 
 	assert.Equal(t, domain.StatusCancelled, outcome.Status)
 	assert.Equal(t, domain.ReasonIncomplete, outcome.Reason)
@@ -131,7 +131,7 @@ func TestAnInterruptDuringTheAddFinishesItsEnvAndRecordThenStops(t *testing.T) {
 func TestAWorktreeIsAddedWithItsEnvAndItsRecord(t *testing.T) {
 	w := onDisk(t)
 
-	outcome := provision.Run(t.Context(), w.params(&recorder{}))
+	outcome := w.service.Run(t.Context(), w.params(&recorder{}))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	meta := worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Isolation: project.Isolated}
@@ -147,7 +147,7 @@ func TestEachEnvThatCouldNotBeCopiedIsAWarning(t *testing.T) {
 	w := onDisk(t)
 	require.NoError(t, os.Remove(filepath.Join(w.main, ".env")))
 
-	outcome := provision.Run(t.Context(), w.params(&recorder{}))
+	outcome := w.service.Run(t.Context(), w.params(&recorder{}))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []domain.Warning{{
@@ -168,8 +168,8 @@ func TestATemplateOrAParentThatIsMissingIsNamed(t *testing.T) {
 	parent.Worktree.Strategy = project.EnvParent
 	parent.Worktree.ParentPath = w.path("elsewhere")
 
-	fromTemplate := provision.Run(t.Context(), example)
-	fromParent := provision.Run(t.Context(), parent)
+	fromTemplate := w.service.Run(t.Context(), example)
+	fromParent := w.service.Run(t.Context(), parent)
 
 	assert.Equal(t, []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for web/.env, skipping", Params: domain.Params{"target": "web/.env"}}}, fromTemplate.Warnings)
 	assert.Equal(t, []domain.Warning{{Code: "provision.env_parent_fallback", Message: "file .env not found in the parent worktree, copied from main", Params: domain.Params{"target": ".env"}}}, fromParent.Warnings)
@@ -180,7 +180,7 @@ func TestAProjectWithoutEnvFilesCopiesNothing(t *testing.T) {
 	params := w.params(&recorder{})
 	params.Project.EnvFiles = nil
 
-	outcome := provision.Run(t.Context(), params)
+	outcome := w.service.Run(t.Context(), params)
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.NotContains(t, files.Calls(), "Copy "+w.path(branchName))
@@ -189,9 +189,9 @@ func TestAProjectWithoutEnvFilesCopiesNothing(t *testing.T) {
 func TestAWriteWithoutItsLockIsSaidOnce(t *testing.T) {
 	w := onDisk(t)
 	params := portLinked(w.params(&recorder{}))
-	params.Deps.Meta = unlocked{w.meta}
+	w.service.Meta = unlocked{w.meta}
 
-	outcome := provision.Run(t.Context(), params)
+	outcome := w.service.Run(t.Context(), params)
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []domain.Warning{{Code: "locks.unavailable", Message: "ran without operation locks"}}, outcome.Warnings)
@@ -211,7 +211,7 @@ func TestAnEnvThatCannotBeCopiedLeavesNothingBehind(t *testing.T) {
 			report := &recorder{}
 			p := params(w, report)
 
-			outcome := provision.Run(t.Context(), p)
+			outcome := w.service.Run(t.Context(), p)
 
 			assert.Equal(t, domain.StatusFailed, outcome.Status)
 			assert.Empty(t, outcome.Reason)
@@ -233,7 +233,7 @@ func TestARecordThatCannotBeWrittenLeavesNothingBehind(t *testing.T) {
 	w, files := inMemory(t, seeds{Store: storetest.FakeParams{Fail: map[string]error{"Update": errors.New("disk full")}}})
 	before := gitState(t, w)
 
-	outcome := provision.Run(t.Context(), w.params(&recorder{}))
+	outcome := w.service.Run(t.Context(), w.params(&recorder{}))
 
 	assert.Equal(t, domain.StatusFailed, outcome.Status)
 	assert.Equal(t, "unit.step_failed", outcome.Err.Code)
@@ -246,7 +246,7 @@ func TestARecordThatCannotBeWrittenLeavesNothingBehind(t *testing.T) {
 func TestAWorktreeThatCannotBeAddedHasNothingToUndo(t *testing.T) {
 	w, files := inMemory(t, seeds{GitFail: map[string]error{"AddWorktree": errors.New("path exists")}})
 
-	outcome := provision.Run(t.Context(), w.params(&recorder{}))
+	outcome := w.service.Run(t.Context(), w.params(&recorder{}))
 
 	assert.Equal(t, domain.StatusFailed, outcome.Status)
 	assert.Equal(t, "worktree failed: path exists", outcome.Err.Error())
@@ -259,7 +259,7 @@ func TestAnUndoThatFailsNamesWhatIsLeftAndTheWayOut(t *testing.T) {
 		Store:   storetest.FakeParams{Fail: map[string]error{"Update": errors.New("disk full")}},
 	})
 
-	outcome := provision.Run(t.Context(), w.params(&recorder{}))
+	outcome := w.service.Run(t.Context(), w.params(&recorder{}))
 
 	require.Equal(t, domain.StatusFailed, outcome.Status)
 	assert.Equal(t, "unit.undo_failed", outcome.Err.Code)
@@ -283,7 +283,7 @@ func TestABranchThatCannotBeDeletedIsLeftBehindToo(t *testing.T) {
 		Store:   storetest.FakeParams{Fail: map[string]error{"Update": errors.New("disk full")}},
 	})
 
-	outcome := provision.Run(t.Context(), w.params(&recorder{}))
+	outcome := w.service.Run(t.Context(), w.params(&recorder{}))
 
 	assert.Equal(t, "unit.undo_failed", outcome.Err.Code)
 	assert.Equal(t, "could not delete the branch, left behind: branch", outcome.Err.Message)
@@ -301,7 +301,7 @@ func TestABranchThatCannotBeDeletedIsLeftBehindToo(t *testing.T) {
 func TestACheckOutNeverDeletesTheBranchOnUndo(t *testing.T) {
 	w, _ := inMemory(t, seeds{Store: storetest.FakeParams{Fail: map[string]error{"Update": errors.New("disk full")}}})
 
-	outcome := provision.Run(t.Context(), w.existing(&recorder{}))
+	outcome := w.service.Run(t.Context(), w.existing(&recorder{}))
 
 	assert.Equal(t, "unit.step_failed", outcome.Err.Code)
 	assert.Contains(t, gitStateNames(t, w), existing)

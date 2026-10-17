@@ -41,7 +41,7 @@ func wire(params wireParams) create.UseCase {
 		Now:           time.Now,
 		CorrelationID: os.Getenv(correlationIDEnv),
 	}
-	provisions := provision.Deps{
+	provisions := provision.Service{
 		Git:        repo,
 		Meta:       store.Meta{StateDir: params.StateDir},
 		EnvFiles:   store.EnvFiles{},

@@ -38,7 +38,7 @@ type mark struct {
 type standing struct {
 	value   string
 	flagged bool
-	origin  create.Origin
+	origin  domain.Origin
 	skip    string
 }
 
@@ -76,8 +76,8 @@ func (w *wizard) decide(s step) mark {
 		return mark{line: value + trail + createFlags.Spell(paths[s])}
 	case w.answered[s]:
 		return mark{line: value}
-	case st.origin == create.OriginRemembered:
-		return mark{line: value + trail + string(create.OriginRemembered)}
+	case st.origin == domain.OriginRemembered:
+		return mark{line: value + trail + string(domain.OriginRemembered)}
 	}
 	return mark{asked: true}
 }
@@ -93,7 +93,7 @@ type answer struct {
 
 func (w *wizard) summarized(a answer) string {
 	offered := w.standing(a.Step)
-	kept := offered.origin == create.OriginConfig || offered.origin == create.OriginDefault
+	kept := offered.origin == domain.OriginConfig || offered.origin == domain.OriginDefault
 	if kept && a.Shown == offered.value {
 		return a.Shown + trail + string(offered.origin)
 	}
@@ -184,7 +184,7 @@ func label(path string) string {
 }
 
 func (w *wizard) branchBadge(entry string) string {
-	at := slices.IndexFunc(w.q.Branches.Options, func(o create.Option) bool { return o.Value == entry })
+	at := slices.IndexFunc(w.q.Branches.Options, func(o domain.Option) bool { return o.Value == entry })
 	if at < 0 {
 		return ""
 	}

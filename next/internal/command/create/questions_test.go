@@ -15,10 +15,10 @@ func TestEachDefaultSaysWhereItComesFrom(t *testing.T) {
 
 	questions := w.questions(t, create.Request{Branches: []string{branchName}})
 
-	assert.Equal(t, create.Answer[string]{Value: "main", Origin: create.OriginConfig}, questions.From.Answer)
-	assert.Equal(t, create.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: create.OriginConfig}, questions.EnvFrom.Answer)
-	assert.Equal(t, create.Answer[project.Isolation]{Value: project.Isolated, Origin: create.OriginDefault}, questions.Isolation.Answer)
-	assert.Equal(t, create.Answer[bool]{Value: false, Origin: create.OriginDefault}, questions.FastForward.Answer)
+	assert.Equal(t, domain.Answer[string]{Value: "main", Origin: domain.OriginConfig}, questions.From.Answer)
+	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: domain.OriginConfig}, questions.EnvFrom.Answer)
+	assert.Equal(t, domain.Answer[project.Isolation]{Value: project.Isolated, Origin: domain.OriginDefault}, questions.Isolation.Answer)
+	assert.Equal(t, domain.Answer[bool]{Value: false, Origin: domain.OriginDefault}, questions.FastForward.Answer)
 	assert.Empty(t, questions.Errors)
 }
 
@@ -28,11 +28,11 @@ func TestARememberedAnswerIsTheDefaultUnlessAskedAgain(t *testing.T) {
 	remembered := w.questions(t, create.Request{Branches: []string{branchName}})
 	asked := w.questions(t, create.Request{Branches: []string{branchName}, Ask: true})
 
-	assert.Equal(t, create.Answer[project.EnvStrategy]{Value: project.EnvExample, Origin: create.OriginRemembered}, remembered.EnvFrom.Answer)
-	assert.Equal(t, create.Answer[project.Isolation]{Value: project.Verbatim, Origin: create.OriginRemembered}, remembered.Isolation.Answer)
-	assert.Equal(t, create.Answer[bool]{Value: true, Origin: create.OriginRemembered}, remembered.FastForward.Answer)
-	assert.Equal(t, create.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: create.OriginConfig}, asked.EnvFrom.Answer)
-	assert.Equal(t, create.Answer[bool]{Value: false, Origin: create.OriginDefault}, asked.FastForward.Answer)
+	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: project.EnvExample, Origin: domain.OriginRemembered}, remembered.EnvFrom.Answer)
+	assert.Equal(t, domain.Answer[project.Isolation]{Value: project.Verbatim, Origin: domain.OriginRemembered}, remembered.Isolation.Answer)
+	assert.Equal(t, domain.Answer[bool]{Value: true, Origin: domain.OriginRemembered}, remembered.FastForward.Answer)
+	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: domain.OriginConfig}, asked.EnvFrom.Answer)
+	assert.Equal(t, domain.Answer[bool]{Value: false, Origin: domain.OriginDefault}, asked.FastForward.Answer)
 	assert.Equal(t, project.EnvExample, asked.EnvFrom.Remembered)
 	assert.Equal(t, project.Verbatim, asked.Isolation.Remembered)
 	assert.Equal(t, project.EnvExample, remembered.EnvFrom.Remembered)
@@ -43,7 +43,7 @@ func TestIfNotExistsIsSetByItsFlagOnly(t *testing.T) {
 
 	questions := w.questions(t, create.Request{Branches: []string{branchName}, IfNotExists: true})
 
-	assert.Equal(t, create.Confirm{Answer: create.Answer[bool]{Value: true, Origin: create.OriginRequest}, Skip: "set by its flag only"}, questions.IfNotExists)
+	assert.Equal(t, domain.Confirm{Answer: domain.Answer[bool]{Value: true, Origin: domain.OriginRequest}, Skip: "set by its flag only"}, questions.IfNotExists)
 }
 
 func TestAnAnswerGivenWinsOverARememberedOne(t *testing.T) {
@@ -51,9 +51,9 @@ func TestAnAnswerGivenWinsOverARememberedOne(t *testing.T) {
 
 	questions := w.questions(t, create.Request{Branches: []string{branchName}, EnvFrom: project.EnvParent, Isolation: project.Isolated, FastForward: new(false)})
 
-	assert.Equal(t, create.Answer[project.EnvStrategy]{Value: project.EnvParent, Origin: create.OriginRequest}, questions.EnvFrom.Answer)
-	assert.Equal(t, create.Answer[project.Isolation]{Value: project.Isolated, Origin: create.OriginRequest}, questions.Isolation.Answer)
-	assert.Equal(t, create.Answer[bool]{Value: false, Origin: create.OriginRequest}, questions.FastForward.Answer)
+	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: project.EnvParent, Origin: domain.OriginRequest}, questions.EnvFrom.Answer)
+	assert.Equal(t, domain.Answer[project.Isolation]{Value: project.Isolated, Origin: domain.OriginRequest}, questions.Isolation.Answer)
+	assert.Equal(t, domain.Answer[bool]{Value: false, Origin: domain.OriginRequest}, questions.FastForward.Answer)
 }
 
 func TestTheRunIsolationIsTheDefaultBeforeIsolated(t *testing.T) {
@@ -61,7 +61,7 @@ func TestTheRunIsolationIsTheDefaultBeforeIsolated(t *testing.T) {
 
 	questions := w.questions(t, create.Request{Branches: []string{branchName}})
 
-	assert.Equal(t, create.Answer[project.Isolation]{Value: project.Verbatim, Origin: create.OriginConfig}, questions.Isolation.Answer)
+	assert.Equal(t, domain.Answer[project.Isolation]{Value: project.Verbatim, Origin: domain.OriginConfig}, questions.Isolation.Answer)
 }
 
 func TestIsolationIsAskedOnlyWhenTheRunHasSomethingToIsolate(t *testing.T) {
@@ -72,7 +72,7 @@ func TestIsolationIsAskedOnlyWhenTheRunHasSomethingToIsolate(t *testing.T) {
 	asked := isolating.questions(t, create.Request{Branches: []string{branchName}})
 
 	assert.Equal(t, "run.toml declares nothing a worktree isolates", skipped.Isolation.Skip)
-	assert.Equal(t, create.Answer[project.Isolation]{Value: project.Isolated, Origin: create.OriginDefault}, skipped.Isolation.Answer)
+	assert.Equal(t, domain.Answer[project.Isolation]{Value: project.Isolated, Origin: domain.OriginDefault}, skipped.Isolation.Answer)
 	assert.Empty(t, asked.Isolation.Skip)
 	assert.Equal(t, []project.Isolation{project.Isolated, project.Verbatim}, asked.Isolation.Options)
 }
@@ -96,7 +96,7 @@ func TestTheBranchOptionsSayWhichAlreadyExist(t *testing.T) {
 
 	questions := w.questions(t, create.Request{})
 
-	assert.Equal(t, []create.Option{
+	assert.Equal(t, []domain.Option{
 		{Value: existing, Badge: "existing"},
 		{Value: "linked", Badge: "worktree exists"},
 		{Value: "main", Badge: "worktree exists"},
@@ -117,7 +117,7 @@ func TestTheSourcePickerListsEveryBranchButThoseBeingCreated(t *testing.T) {
 func TestTheSourceBadgesSayWhereABranchStandsAgainstOrigin(t *testing.T) {
 	behind := newWorld(t, seed{Behind: true})
 
-	assert.Equal(t, create.Option{Value: "main", Badge: "1 behind"}, behind.questions(t, create.Request{Branches: []string{branchName}}).From.Options[1])
+	assert.Equal(t, domain.Option{Value: "main", Badge: "1 behind"}, behind.questions(t, create.Request{Branches: []string{branchName}}).From.Options[1])
 }
 
 func TestTheQuestionsCarryTheProblemsOfTheRequest(t *testing.T) {

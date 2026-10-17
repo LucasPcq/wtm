@@ -15,6 +15,10 @@ type Git interface {
 	AddWorktree(ctx context.Context, addition worktree.Addition) error
 	RemoveWorktree(ctx context.Context, path string) error
 	DeleteBranch(ctx context.Context, name string) error
+	FetchRef(ctx context.Context, name string) error
+	FastForwardRef(ctx context.Context, name string) error
+	MergeFFOnly(ctx context.Context, merge worktree.Merge) error
+	Dirty(ctx context.Context, path string) (bool, error)
 }
 
 type Meta interface {
@@ -29,7 +33,7 @@ type EnvFiles interface {
 	Edit(ctx context.Context, edit dotenv.Edit) (domain.Written, error)
 }
 
-type Deps struct {
+type Service struct {
 	Git        Git
 	Meta       Meta
 	EnvFiles   EnvFiles

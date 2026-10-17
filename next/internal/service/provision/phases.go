@@ -45,13 +45,13 @@ func (p *provisioning) number(ctx context.Context, provisioned *Provisioned) err
 
 func (p *provisioning) allocate(ctx context.Context) (int, error) {
 	var ordinal int
-	held, err := p.Deps.Meta.LockOrdinals(ctx, func() error {
+	held, err := p.Service.Meta.LockOrdinals(ctx, func() error {
 		taken, err := p.taken(ctx)
 		if err != nil {
 			return err
 		}
 		ordinal = worktree.FreeOrdinal(taken)
-		written, err := p.Deps.Meta.Update(ctx, worktree.MetaUpdate{Branch: p.Worktree.Branch, Change: func(meta *worktree.Meta) error {
+		written, err := p.Service.Meta.Update(ctx, worktree.MetaUpdate{Branch: p.Worktree.Branch, Change: func(meta *worktree.Meta) error {
 			meta.Ordinal = ordinal
 			return nil
 		}})
@@ -63,7 +63,7 @@ func (p *provisioning) allocate(ctx context.Context) (int, error) {
 }
 
 func (p *provisioning) taken(ctx context.Context) ([]int, error) {
-	worktrees, err := p.Deps.Git.Worktrees(ctx)
+	worktrees, err := p.Service.Git.Worktrees(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list worktrees: %w", err)
 	}
@@ -73,7 +73,7 @@ func (p *provisioning) taken(ctx context.Context) ([]int, error) {
 		if listed.Main || branch == "" || branch == p.Worktree.Branch {
 			continue
 		}
-		meta, err := p.Deps.Meta.Load(branch)
+		meta, err := p.Service.Meta.Load(branch)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
@@ -112,7 +112,7 @@ func (p *provisioning) settle(ctx context.Context, provisioned *Provisioned) err
 		JobParams:  p.jobParams(provisioned.Ordinal),
 		Files:      p.Project.EnvFiles,
 		Proxy:      p.Project.Global.Proxy,
-		PublicPort: p.Deps.PublicPort(ctx, p.Project.Global.ProxyPort()),
+		PublicPort: p.Service.PublicPort(ctx, p.Project.Global.ProxyPort()),
 	})
 	if _, inRunToml := errors.AsType[*env.ValueError](err); inRunToml {
 		p.warn(p.notSettled(notSettled{Cause: err, InRunToml: true}))
@@ -145,7 +145,7 @@ func (p *provisioning) jobParams(ordinal *int) env.JobParams {
 func (p *provisioning) apply(ctx context.Context, writes env.Writes) (env.Plan, error) {
 	read := map[string][]dotenv.Line{}
 	for _, file := range writes.Files() {
-		written, err := p.Deps.EnvFiles.Edit(ctx, dotenv.Edit{
+		written, err := p.Service.EnvFiles.Edit(ctx, dotenv.Edit{
 			Path:   filepath.Join(p.Worktree.Path, file),
 			Create: writes.Creates(file),
 			Edit: func(lines []dotenv.Line) []dotenv.Line {
@@ -197,7 +197,7 @@ func (p *provisioning) runHooks(ctx context.Context, provisioned Provisioned) er
 	for _, configured := range p.Project.OnCreate {
 		hooks = append(hooks, vars.Hook(configured))
 	}
-	return p.Deps.RunHooks(ctx, env.HookChain{
+	return p.Service.RunHooks(ctx, env.HookChain{
 		Hooks:   hooks,
 		WorkDir: p.Worktree.Path,
 		Env:     p.hookEnv(provisioned.Ordinal),
@@ -213,7 +213,7 @@ func (p *provisioning) hookEnv(ordinal *int) map[string]string {
 	}
 	var compose [][]dotenv.Line
 	for _, path := range env.ComposeEnvPaths(p.Project.Run) {
-		lines, err := p.Deps.EnvFiles.Read(filepath.Join(p.Worktree.Path, path))
+		lines, err := p.Service.EnvFiles.Read(filepath.Join(p.Worktree.Path, path))
 		if err != nil {
 			p.warn(domain.Warning{
 				Code:    "provision.hook_env_unavailable",

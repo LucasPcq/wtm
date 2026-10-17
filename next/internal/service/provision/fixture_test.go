@@ -39,7 +39,7 @@ type world struct {
 	stateDir string
 	git      repo
 	meta     provision.Meta
-	deps     provision.Deps
+	service  provision.Service
 }
 
 func onDisk(t *testing.T) world {
@@ -50,7 +50,7 @@ func onDisk(t *testing.T) world {
 	writeFile(t, filepath.Join(main, ".env"), mainEnv)
 	stateDir := filepath.Join(main, ".git", "wtm")
 	meta := store.Meta{StateDir: stateDir}
-	return world{root: root, main: main, stateDir: stateDir, git: repo, meta: meta, deps: deps(repo, meta, store.EnvFiles{})}
+	return world{root: root, main: main, stateDir: stateDir, git: repo, meta: meta, service: service(repo, meta, store.EnvFiles{})}
 }
 
 type seeds struct {
@@ -71,11 +71,11 @@ func inMemory(t *testing.T, seed seeds) (world, *storetest.Fake) {
 	}
 	seeded.Files[filepath.Join(main, ".env")] = mainEnv
 	files := storetest.NewFake(seeded)
-	return world{root: root, main: main, stateDir: filepath.Join(main, ".git", "wtm"), git: repo, meta: files, deps: deps(repo, files, files)}, files
+	return world{root: root, main: main, stateDir: filepath.Join(main, ".git", "wtm"), git: repo, meta: files, service: service(repo, files, files)}, files
 }
 
-func deps(git provision.Git, meta provision.Meta, env provision.EnvFiles) provision.Deps {
-	return provision.Deps{
+func service(git provision.Git, meta provision.Meta, env provision.EnvFiles) provision.Service {
+	return provision.Service{
 		Git:        git,
 		Meta:       meta,
 		EnvFiles:   env,
@@ -88,7 +88,6 @@ func deps(git provision.Git, meta provision.Meta, env provision.EnvFiles) provis
 
 func (w world) params(report *recorder) provision.Params {
 	return provision.Params{
-		Deps:    w.deps,
 		Project: provision.Project{MainPath: w.main, StateDir: w.stateDir, EnvFiles: []project.EnvFile{{Target: ".env"}}},
 		Worktree: provision.Worktree{
 			Branch:   branchName,
@@ -145,4 +144,36 @@ type unreadable struct{ provision.EnvFiles }
 
 func (unreadable) Read(string) ([]dotenv.Line, error) {
 	return nil, errors.New("read .env: permission denied")
+}
+
+type upstream struct {
+	main    string
+	linked  string
+	service provision.Service
+}
+
+type upstreamSeed struct {
+	Linked bool
+	Dirty  bool
+}
+
+func behindOrigin(t *testing.T, seed upstreamSeed) upstream {
+	t.Helper()
+	root := gittest.TempDir(t)
+	params := gittest.FakeParams{
+		Main:   filepath.Join(root, "main"),
+		Branch: "main",
+		Local:  []string{existing},
+		Remote: []string{existing},
+		Origin: map[string][]string{existing: {"upstream " + existing}},
+	}
+	linked := ""
+	if seed.Linked {
+		linked = filepath.Join(root, existing)
+		params.Worktrees = []worktree.Worktree{{Path: linked, State: worktree.OnBranch{Branch: existing}}}
+	}
+	if seed.Dirty {
+		params.Dirty = []string{linked}
+	}
+	return upstream{main: params.Main, linked: linked, service: provision.Service{Git: gittest.Build(t, params)}}
 }

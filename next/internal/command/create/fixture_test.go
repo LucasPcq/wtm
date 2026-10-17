@@ -99,7 +99,7 @@ func newWorld(t *testing.T, s seed) world {
 				},
 				Now: func() time.Time { return createdAt },
 			},
-			Provision: provision.Deps{
+			Provision: provision.Service{
 				Git:        repo,
 				Meta:       meta,
 				EnvFiles:   store.EnvFiles{},

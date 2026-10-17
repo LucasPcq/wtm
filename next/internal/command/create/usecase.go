@@ -25,7 +25,7 @@ type UseCase struct {
 	Config     Config
 	Answers    Answers
 	Operations operation.Service
-	Provision  provision.Deps
+	Provision  provision.Service
 	MainPath   string
 	StateDir   string
 }
@@ -232,25 +232,15 @@ func (u UseCase) fastForward(ctx context.Context, plan Plan, report domain.Repor
 }
 
 func (u UseCase) advance(ctx context.Context, plan Plan, subject string) (domain.Warning, bool) {
-	at := plan.facts.checkedOutAt(subject)
-	if at == "" {
-		return notAdvanced(subject, u.Git.FastForwardRef(ctx, subject))
-	}
-	if err := u.Git.FetchRef(ctx, subject); err != nil {
-		return notAdvanced(subject, err)
-	}
-	dirty, err := u.Git.Dirty(ctx, at)
-	if err != nil {
-		return notAdvanced(subject, err)
-	}
-	if dirty {
+	forwarded := u.Provision.FastForward(ctx, provision.FastForwardParams{Subject: subject, CheckedOutAt: plan.facts.checkedOutAt(subject)})
+	if forwarded.Dirty {
 		return domain.Warning{
 			Code:    "create.ff_dirty",
 			Message: "couldn't fast-forward " + subject + ": its worktree has uncommitted changes — it starts from your local branch",
 			Params:  domain.Params{"branch": subject},
 		}, true
 	}
-	return notAdvanced(subject, u.Git.MergeFFOnly(ctx, worktree.Merge{Path: at, Onto: worktree.RemoteBranch{Name: subject}}))
+	return notAdvanced(subject, forwarded.Err)
 }
 
 func notAdvanced(subject string, err error) (domain.Warning, bool) {
@@ -272,7 +262,7 @@ func (u UseCase) item(ctx context.Context, plan Plan, planned BranchPlan, report
 		return Item{Subject: planned.Branch, Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted}
 	}
 	report(domain.UnitStarted{Subject: planned.Branch})
-	outcome := provision.Run(ctx, u.provisionParams(plan, planned, report))
+	outcome := u.Provision.Run(ctx, u.provisionParams(plan, planned, report))
 	item := Item{Subject: planned.Branch, Status: outcome.Status, Reason: outcome.Reason, Err: outcome.Err, Warnings: outcome.Warnings}
 	if outcome.Provisioned.Meta.CreatedAt != "" {
 		item.Detail = &Detail{
@@ -295,7 +285,6 @@ func (u UseCase) unchanged(planned BranchPlan) Item {
 func (u UseCase) provisionParams(plan Plan, planned BranchPlan, report domain.Report) provision.Params {
 	f := plan.facts
 	return provision.Params{
-		Deps: u.Provision,
 		Project: provision.Project{
 			MainPath: f.MainPath,
 			StateDir: u.StateDir,

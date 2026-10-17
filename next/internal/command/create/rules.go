@@ -134,26 +134,26 @@ func (f Facts) decide(e entry) decision {
 	if refused, found := f.invalid(e); found {
 		return refused
 	}
-	if at := f.checkedOutAt(e.name); at != "" {
-		return e.open(at)
-	}
+	at := f.checkedOutAt(e.name)
 	location, located := f.Folders[e.path]
-	if !located {
+	if !located && at == "" {
 		panic(fmt.Sprintf("create: the folder of %s was never located: observe with the branches of the request", e.name))
 	}
-	if location.Exists {
-		return e.occupied(f.occupant(location))
+	var live []string
+	if f.namesWorktrees() {
+		live = f.live()
 	}
-	if clash, found := f.clash(worktree.ClashParams{Branch: e.name, Live: f.live()}); found {
-		return e.clashed(clash).as(domain.KindConflict)
-	}
-	switch {
-	case f.local(e.name):
-		return BranchPlan{Branch: e.name, Path: e.path, Action: ActionCheckOut}
-	case f.remote(e.name):
-		return BranchPlan{Branch: e.name, Path: e.path, Action: ActionResume, Upstream: remotePrefix + e.name}
-	}
-	return BranchPlan{Branch: e.name, Path: e.path, Action: ActionCreate}
+	return e.placed(worktree.Place(worktree.PlacementParams{
+		Branch:       e.name,
+		Path:         e.path,
+		CheckedOutAt: at,
+		Location:     location,
+		Occupant:     f.occupant(location),
+		Local:        f.local(e.name),
+		Remote:       f.remote(e.name),
+		Live:         live,
+		IfNotExists:  e.ifNotExists,
+	}))
 }
 
 func (f Facts) invalid(e entry) (refusal, bool) {
@@ -182,26 +182,25 @@ func (f Facts) clash(params worktree.ClashParams) (worktree.Clash, bool) {
 	return worktree.ClashWith(params)
 }
 
-func (e entry) open(at string) decision {
-	if e.ifNotExists {
-		return BranchPlan{Branch: e.name, Path: at, Action: ActionUnchanged}
-	}
-	return refusal{
-		Kind:     domain.KindConflict,
-		Code:     "create.checked_out_elsewhere",
-		Template: "branch {branch} is checked out at {path} — run `wtm go {branch}` to jump in",
-		Params:   domain.Params{"branch": e.name, "path": at},
-	}
-}
-
-func (e entry) occupied(occupant string) decision {
-	switch {
-	case e.ifNotExists && occupant == e.name:
-		return BranchPlan{Branch: e.name, Path: e.path, Action: ActionUnchanged}
-	case occupant == "" || occupant == e.name:
+func (e entry) placed(placement worktree.Placement) decision {
+	switch p := placement.(type) {
+	case worktree.Unchanged:
+		return BranchPlan{Branch: e.name, Path: p.Path, Action: ActionUnchanged}
+	case worktree.CheckedOutElsewhere:
+		return refusal{
+			Kind:     domain.KindConflict,
+			Code:     "create.checked_out_elsewhere",
+			Template: "branch {branch} is checked out at {path} — run `wtm go {branch}` to jump in",
+			Params:   domain.Params{"branch": e.name, "path": p.Path},
+		}
+	case worktree.PathTaken:
 		return refusal{Kind: domain.KindConflict, Code: "create.path_exists", Template: "worktree path already exists: {path}", Params: domain.Params{"path": e.path}}
+	case worktree.Clash:
+		return e.clashed(p).as(domain.KindConflict)
+	case worktree.Placed:
+		return BranchPlan{Branch: e.name, Path: e.path, Action: Action(p.Start), Upstream: p.Upstream}
 	}
-	return e.clashed(worktree.Clash{Branch: occupant, Name: filepath.Base(e.path)}).as(domain.KindConflict)
+	return nil
 }
 
 func (e entry) clashed(clash worktree.Clash) refusal {

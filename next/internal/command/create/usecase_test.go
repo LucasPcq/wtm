@@ -189,17 +189,6 @@ func TestASourceWithUncommittedChangesIsLeftWhereItIsAndSaysSo(t *testing.T) {
 	assert.NotEqual(t, gittest.Output(t, w.main, "rev-parse", "origin/main"), gittest.Output(t, w.path(branchName), "rev-parse", "HEAD"))
 }
 
-func TestASourceWithoutWorktreeIsMovedWithoutCheckingItOut(t *testing.T) {
-	w := newWorld(t, seed{})
-	gittest.Git(t, w.main, "push", "-q", "origin", gittest.Output(t, w.main, "commit-tree", existing+"^{tree}", "-p", existing, "-m", "upstream")+":refs/heads/"+existing)
-	gittest.Git(t, w.main, "fetch", "-q", "origin")
-
-	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, From: existing, FastForward: new(true)})
-
-	assert.Empty(t, result.Warnings)
-	assert.Equal(t, gittest.Output(t, w.main, "rev-parse", "origin/"+existing), gittest.Output(t, w.main, "rev-parse", existing))
-}
-
 func TestAFastForwardThatFailsIsAWarningAndTheBranchStillStarts(t *testing.T) {
 	w := newWorld(t, seed{})
 	behindOrigin(t, w, existing)
@@ -487,7 +476,7 @@ func TestTheQuestionsAreAskedOfTheBranchesOfTheRequest(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "create.path_exists", questions.Errors[0].Code)
-	assert.Equal(t, create.Answer[string]{Value: "main", Origin: create.OriginConfig}, questions.From.Answer)
+	assert.Equal(t, domain.Answer[string]{Value: "main", Origin: domain.OriginConfig}, questions.From.Answer)
 }
 
 func TestAnInvalidRequestIsRefusedBeforeAnythingIsLockedOrWritten(t *testing.T) {
