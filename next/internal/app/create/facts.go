@@ -1,0 +1,155 @@
+package create
+
+import (
+	"context"
+	"errors"
+	"path/filepath"
+	"slices"
+	"strings"
+
+	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
+	"github.com/LucasPcq/wtm/next/internal/wtm/project"
+	"github.com/LucasPcq/wtm/next/internal/wtm/run"
+	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
+)
+
+const remotePrefix = "origin/"
+
+type Facts struct {
+	MainPath   string
+	Config     project.Config
+	Global     project.Global
+	Run        run.Config
+	RunErr     error
+	Worktrees  []worktree.Worktree
+	Branches   branch.Branches
+	Divergence map[string]branch.AheadBehind
+	Taken      map[string]worktree.Location
+}
+
+func (d Deps) Observe(ctx context.Context, branches []string) (Facts, error) {
+	config, global, err := d.LoadConfig()
+	if errors.Is(err, project.ErrConfigNotFound) {
+		return Facts{}, &wtm.Error{Kind: wtm.KindPrecondition, Code: "create.config_not_found", Message: "no wtm config found — run `wtm init` first", Cause: err}
+	}
+	if err != nil {
+		return Facts{}, err
+	}
+	worktrees, err := d.Git.Worktrees(ctx)
+	if err != nil {
+		return Facts{}, err
+	}
+	refs, err := d.Git.Branches(ctx)
+	if err != nil {
+		return Facts{}, err
+	}
+	divergence, err := d.divergence(ctx, refs)
+	if err != nil {
+		return Facts{}, err
+	}
+	facts := Facts{MainPath: d.MainPath, Config: config, Global: global, Worktrees: worktrees, Branches: refs, Divergence: divergence}
+	taken, err := d.taken(ctx, facts.pathsOf(branches))
+	if err != nil {
+		return Facts{}, err
+	}
+	facts.Taken = taken
+	facts.Run, facts.RunErr = d.LoadRun()
+	return facts, nil
+}
+
+func (d Deps) divergence(ctx context.Context, refs branch.Branches) (map[string]branch.AheadBehind, error) {
+	found := map[string]branch.AheadBehind{}
+	for _, local := range refs.Local {
+		at := slices.IndexFunc(refs.Remote, func(remote branch.Branch) bool { return remote.Name == local.Name })
+		if at < 0 || refs.Remote[at].Tip == local.Tip {
+			continue
+		}
+		counts, err := d.Git.AheadBehind(ctx, local.Name)
+		if err != nil {
+			return nil, err
+		}
+		found[local.Name] = counts
+	}
+	return found, nil
+}
+
+func (d Deps) taken(ctx context.Context, paths []string) (map[string]worktree.Location, error) {
+	taken := map[string]worktree.Location{}
+	for _, path := range paths {
+		location, err := d.Git.Locate(ctx, path)
+		if err != nil {
+			return nil, err
+		}
+		if location.Exists {
+			taken[path] = location
+		}
+	}
+	return taken, nil
+}
+
+func (f Facts) pathsOf(branches []string) []string {
+	var paths []string
+	for _, name := range branches {
+		if !branch.Blank(name) {
+			paths = append(paths, f.pathOf(strings.TrimSpace(name)))
+		}
+	}
+	return paths
+}
+
+func (f Facts) pathOf(name string) string {
+	return filepath.Join(f.MainPath, f.Config.Worktrees.BasePath, branch.PathSegment(name))
+}
+
+func (f Facts) local(name string) bool {
+	return slices.ContainsFunc(f.Branches.Local, func(b branch.Branch) bool { return b.Name == name })
+}
+
+func (f Facts) remote(name string) bool {
+	return slices.ContainsFunc(f.Branches.Remote, func(b branch.Branch) bool { return b.Name == name })
+}
+
+func (f Facts) candidate(name string) bool {
+	remote, onOrigin := strings.CutPrefix(name, remotePrefix)
+	return f.local(name) || onOrigin && f.remote(remote)
+}
+
+func (f Facts) existing(name string) bool {
+	return f.local(name) && f.checkedOutAt(name) == ""
+}
+
+func (f Facts) checkedOutAt(name string) string {
+	at := slices.IndexFunc(f.Worktrees, func(w worktree.Worktree) bool { return w.Branch() == name })
+	if at < 0 {
+		return ""
+	}
+	return f.Worktrees[at].Path
+}
+
+func (f Facts) occupant(location worktree.Location) string {
+	at := slices.IndexFunc(f.Worktrees, func(w worktree.Worktree) bool { return w.Path == location.Path })
+	if at < 0 {
+		return ""
+	}
+	return f.Worktrees[at].Branch()
+}
+
+func (f Facts) standing(name string) branch.Divergence {
+	if !f.remote(name) {
+		return branch.NoOrigin
+	}
+	return f.Divergence[name].Divergence()
+}
+
+func (f Facts) namesWorktrees() bool {
+	return f.RunErr != nil || len(f.Run.Jobs) > 0 || len(f.Run.Profiles) > 0
+}
+
+func (f Facts) live() []string {
+	names := make([]string, 0, len(f.Worktrees))
+	for _, w := range f.Worktrees {
+		names = append(names, w.Branch())
+	}
+	return names
+}
