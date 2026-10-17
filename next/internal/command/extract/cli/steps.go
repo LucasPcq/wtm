@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"errors"
 	"slices"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -44,10 +43,6 @@ func steps(form domain.Form) (labels, paths [stepCount]string) {
 const (
 	createTarget = "\x00new-worktree"
 	newWorktree  = "new worktree"
-	existingSkip = "the target worktree exists: nothing is created"
-	yes          = "yes"
-	no           = "no"
-	modeCopy     = "copy"
 	emptyFiles   = "select at least one file"
 )
 
@@ -89,20 +84,20 @@ func (w *wizard) standing(s step) form.Standing {
 	case stepFrom:
 		st, flagged = form.Standing{Value: q.From.Value, Origin: q.From.Origin}, given.From != ""
 	case stepIsolation:
-		st, flagged = form.Standing{Value: string(q.Isolation.Value), Origin: q.Isolation.Origin, Skip: q.Isolation.Skip}, given.Isolation != ""
+		st, flagged = form.Standing{Value: string(q.Isolation.Value), Origin: q.Isolation.Origin}, given.Isolation != ""
 	case stepFastForward:
-		st, flagged = form.Standing{Value: yesNo(q.FastForward.Value), Origin: q.FastForward.Origin, Skip: q.FastForward.Skip}, given.FastForward != nil
+		st, flagged = form.Standing{Value: yesNo(q.FastForward.Value), Origin: q.FastForward.Origin}, given.FastForward != nil
 	case stepMode:
 		st, flagged = form.Standing{Value: mode(q.Keep.Value), Origin: q.Keep.Origin}, given.Keep != nil
 	case stepOnConflict:
-		st, flagged = form.Standing{Value: string(q.OnConflict.Value), Origin: q.OnConflict.Origin, Skip: q.OnConflict.Skip}, given.OnConflict != ""
+		st, flagged = form.Standing{Value: string(q.OnConflict.Value), Origin: q.OnConflict.Origin}, given.OnConflict != ""
 	case stepRecap, stepCount:
 	}
 
 	// The branch is the target's: its problems are the target step's while an existing worktree is picked, the branch step's once one is created.
 	st.Erred = w.erred(stepPaths[s]) && (stepPaths[s] != "to" || (s == stepBranch) == creating)
-	if (s == stepBranch || s == stepFrom) && !creating {
-		st.Skip = existingSkip
+	if field := w.field(s); field != nil {
+		st.Skip = field.Spec().Skip
 	}
 	if flagged {
 		st.Flag = extractFlags.Spell(stepPaths[s])
@@ -127,9 +122,7 @@ func (w *wizard) fileSummary() string {
 
 // erred reports whether a problem names the field at path or one of its entries.
 func (w *wizard) erred(path string) bool {
-	return slices.ContainsFunc(w.q.Errors, func(problem domain.FieldError) bool {
-		return problem.Path == path || strings.HasPrefix(problem.Path, path+"[")
-	})
+	return len(domain.ProblemsOf(w.q.Errors, path)) > 0
 }
 
 // list offers the options of the select step s, starting on the answer so far.
@@ -145,12 +138,15 @@ func (w *wizard) list(s step) *form.SelectList {
 	return form.NewSelectList(form.SelectParams{})
 }
 
-// selectList offers the options of field; the target's first option, a worktree to create, is picked by the sentinel createTarget.
+// selectList offers the options of field; the target's option with no value, a worktree to create, is picked by the sentinel createTarget.
 func (w *wizard) selectList(s step, field domain.SelectField) *form.SelectList {
 	switch s {
 	case stepTarget:
-		created, worktrees := field.Options[0], field.Options[1:]
-		options := append([]form.Option{{Label: created.Label, Value: createTarget}, {Separator: true}}, optionsOf(worktrees)...)
+		options := optionsOf(field.Options)
+		if at := slices.IndexFunc(field.Options, func(o domain.Option) bool { return o.Value == "" }); at >= 0 {
+			options[at].Value = createTarget
+			options = slices.Insert(options, at+1, form.Option{Separator: true})
+		}
 		start := w.req.To
 		if w.creating() {
 			start = createTarget
@@ -286,8 +282,8 @@ func label(path string) string {
 
 func yesNo(value bool) string {
 	if value {
-		return yes
+		return "yes"
 	}
 
-	return no
+	return "no"
 }

@@ -213,3 +213,20 @@ func answered(t *testing.T, form domain.Form) extract.Request {
 	require.NoError(t, err)
 	return req
 }
+
+func isolationOptions(form domain.Form) []string {
+	for _, field := range form.Fields {
+		if isolation, isSelect := field.(domain.SelectField); isSelect && isolation.Path == "isolation" {
+			return valuesOf(isolation.Options)
+		}
+	}
+	return nil
+}
+
+// answeredTrue is the confirmation at path the request holds.
+func answeredTrue(t *testing.T, req extract.Request, path string) bool {
+	t.Helper()
+	answers := map[string]*bool{"fast_forward": req.FastForward, "keep": req.Keep}
+	require.NotNil(t, answers[path], path)
+	return *answers[path]
+}

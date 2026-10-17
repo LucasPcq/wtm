@@ -10,7 +10,7 @@ root=/tmp/wtmcmp-${side:0:1}
 mkdir -p "$out"
 session=wtmcmp-$side
 screen() { tmux capture-pane -p -t "$session" | cat -s; }
-# settle <text>: waits until the screen shows text and is the same twice in a row.
+# settle <text>: waits until the screen shows text and is the same twice in a row, else fails the run.
 settle() {
   local now last="" tries=0
   while ((tries < 100)); do
@@ -20,6 +20,7 @@ settle() {
     sleep 0.3
   done
   echo "tty.sh: the screen never settled on \"$1\"" >&2
+  return 1
 }
 capture() {
   settle "$2"

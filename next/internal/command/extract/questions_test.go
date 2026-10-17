@@ -225,7 +225,7 @@ func TestEachFieldOfTheFormAnswersTheRequestBack(t *testing.T) {
 			FastForward: new(true),
 			Keep:        new(false),
 			OnConflict:  extract.OnConflictAbort,
-			Remember:    []string{"isolation", "fast_forward"},
+			Remember:    []string{"fast_forward", "isolation", "fast_forward"},
 		},
 	}
 	for name, req := range cases {
@@ -244,7 +244,10 @@ func TestEachFieldOfTheFormAnswersTheRequestBack(t *testing.T) {
 func TestTheFormExistsBeforeAnyRead(t *testing.T) {
 	form := extract.Questions{}.Form()
 
-	assert.Equal(t, map[string]string{"source": "<source>", "files": "--files", "to": "--to", "from": "--from", "isolation": "--isolation", "fast_forward": "--ff", "keep": "--keep", "on_conflict": "--on-conflict"}, form.Flags())
+	flags, usages := form.Flags()
+	assert.Equal(t, map[string]string{"source": "<source>", "files": "--files", "to": "--to", "from": "--from", "isolation": "--isolation", "fast_forward": "--ff", "keep": "--keep", "on_conflict": "--on-conflict", "remember": "--remember"}, flags)
+	assert.Equal(t, "The answers to always use in this repository: isolation, fast_forward (repeatable)", usages["remember"])
+	assert.Equal(t, []string{"isolated", "verbatim"}, isolationOptions(form))
 	assert.Equal(t, []string{"isolation", "fast_forward"}, form.Rememberable())
 	assert.Len(t, form.Fields, 9, "a step per field: the target is asked as a worktree, then as a branch")
 }
@@ -260,21 +263,41 @@ func TestABranchAWorktreeHoldsIsNoNewTarget(t *testing.T) {
 	assert.Empty(t, questions.NewTarget(split))
 }
 
-func TestAnAnswerTheRequestCannotTakeIsRefused(t *testing.T) {
+func TestAnAnswerTheRequestCannotTakeIsRefusedAndChangesNothing(t *testing.T) {
 	cases := map[string]struct {
 		path   string
 		values []string
 		code   string
 	}{
-		"an unknown field":       {"branches", []string{"a"}, domain.CodeUnknown},
-		"two values for one":     {"to", []string{other, split}, "one_value"},
-		"a confirmation unspelt": {"keep", []string{"copy"}, domain.CodeOneOf},
+		"an unknown field":             {"branches", []string{"a"}, domain.CodeUnknown},
+		"an unknown field, two values": {"typo", []string{"a", "b"}, domain.CodeUnknown},
+		"two values for one":           {"to", []string{other, split}, domain.CodeOneValue},
+		"a confirmation unspelt":       {"keep", []string{"copy"}, domain.CodeOneOf},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, err := extract.Request{}.Answer(c.path, c.values)
+			req := extract.Request{To: other, Keep: new(true)}
+
+			got, err := req.Answer(c.path, c.values)
 
 			assert.Equal(t, map[string]string{c.path: c.code}, problems(err))
+			assert.Equal(t, req, got)
 		})
+	}
+}
+
+func TestAConfirmationsOptionsAreItsAnswers(t *testing.T) {
+	form := extract.Questions{}.Form()
+	for _, field := range form.Fields {
+		confirm, isConfirm := field.(domain.ConfirmField)
+		if !isConfirm {
+			continue
+		}
+
+		for want, option := range map[bool]domain.Option{true: confirm.Yes, false: confirm.No} {
+			req, err := extract.Request{}.Answer(confirm.Path, []string{option.Value})
+			require.NoError(t, err, confirm.Path)
+			assert.Equal(t, want, answeredTrue(t, req, confirm.Path), confirm.Path)
+		}
 	}
 }

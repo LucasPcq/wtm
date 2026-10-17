@@ -15,8 +15,22 @@ func TestTheFirstFieldAnsweringAPathSpellsItsFlagAndUsage(t *testing.T) {
 		ConfirmField{FieldSpec: FieldSpec{Path: "keep", Flag: "--keep", Help: "Copy rather than move"}},
 	}}
 
-	assert.Equal(t, map[string]string{"to": "--to", "keep": "--keep"}, form.Flags())
-	assert.Equal(t, map[string]string{"to": "Target branch", "keep": "Copy rather than move"}, form.Usages())
+	flags, usages := form.Flags()
+
+	assert.Equal(t, map[string]string{"to": "--to", "keep": "--keep"}, flags)
+	assert.Equal(t, map[string]string{"to": "Target branch", "keep": "Copy rather than move"}, usages)
+}
+
+func TestAFormWithARememberableFieldHasRemember(t *testing.T) {
+	form := Form{Fields: []Field{
+		SelectField{FieldSpec: FieldSpec{Path: "isolation", Flag: "--isolation"}, Rememberable: true},
+		ConfirmField{FieldSpec: FieldSpec{Path: "fast_forward", Flag: "--ff"}, Rememberable: true},
+	}}
+
+	flags, usages := form.Flags()
+
+	assert.Equal(t, "--remember", flags[PathRemember])
+	assert.Equal(t, "The answers to always use in this repository: isolation, fast_forward (repeatable)", usages[PathRemember])
 }
 
 func TestOnlyASelectOrAConfirmationIsRemembered(t *testing.T) {
@@ -56,4 +70,15 @@ func TestAConfirmationTakesTrueOrFalseOnly(t *testing.T) {
 		require.True(t, ok, values)
 		assert.Equal(t, "keep", failure.Fields[0].Path, values)
 	}
+}
+
+func TestOneTakesASingleValueOfItsType(t *testing.T) {
+	value, err := One[Origin](AnswerParams{Path: "origin", Values: []string{"config"}})
+	require.NoError(t, err)
+	assert.Equal(t, OriginConfig, value)
+
+	_, err = One[string](AnswerParams{Path: "from", Values: []string{"a", "b"}})
+	failure, ok := errors.AsType[*Error](err)
+	require.True(t, ok)
+	assert.Equal(t, CodeOneValue, failure.Fields[0].Code)
 }

@@ -201,10 +201,13 @@ func (w *wizard) pick(s step, value string, remember bool) string {
 		w.req.Isolation = project.Isolation(value)
 		w.remember(stepPaths[s], remember)
 	case stepFastForward:
-		w.req.FastForward = new(value == yes)
+		// The options are the field's own, true and false, which Answer always takes.
+		w.req, _ = w.req.Answer(stepPaths[s], []string{value})
 		w.remember(stepPaths[s], remember)
+		return yesNo(w.req.FastForward != nil && *w.req.FastForward)
 	case stepMode:
-		w.req.Keep = new(value == modeCopy)
+		w.req, _ = w.req.Answer(stepPaths[s], []string{value})
+		return mode(w.req.Keep != nil && *w.req.Keep)
 	case stepOnConflict:
 		w.req.OnConflict = extract.OnConflict(value)
 	case stepFiles, stepBranch, stepRecap, stepCount:

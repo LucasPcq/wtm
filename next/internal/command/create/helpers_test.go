@@ -237,3 +237,11 @@ func answered(t *testing.T, form domain.Form) create.Request {
 	require.NoError(t, err)
 	return req
 }
+
+func paths(problems []domain.FieldError) []string {
+	found := make([]string, 0, len(problems))
+	for _, problem := range problems {
+		found = append(found, problem.Path)
+	}
+	return found
+}

@@ -6,10 +6,14 @@ import (
 	"strings"
 )
 
-// Form is a command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, the request's flags and its --help spelled from them.
+// Form is a command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, the request's flags and its --help spelled from them, and the request's problems, each naming a field, an entry of one, or a field the form does not list (remember[0]).
 type Form struct {
-	Fields []Field
+	Fields   []Field
+	Problems []FieldError
 }
+
+// PathRemember is the path of the fields whose answer is remembered: the contract's --remember, accepting the paths of the form's rememberable fields.
+const PathRemember = "remember"
 
 //go-sumtype:decl Field
 
@@ -24,14 +28,13 @@ type Field interface {
 
 // FieldSpec is what a field of every kind has.
 type FieldSpec struct {
-	Path     string // the request field it answers, as a field error names it
-	Flag     string // the argument or flag that sets it: <branches>, --from
-	Label    string // its name in a wizard's breadcrumb, trail and problems
-	Help     string // what its answer decides, as a wizard describes it
-	Usage    string // the usage of its flag, when it is not Help
-	Origin   Origin // where its answer came from, empty when the field does not say
-	Skip     string // why it is not asked, empty when it is
-	Problems []FieldError
+	Path   string // the request field it answers, as a field error names it
+	Flag   string // the argument or flag that sets it: <branches>, --from
+	Label  string // its name in a wizard's breadcrumb, trail and problems
+	Help   string // what its answer decides, as a wizard describes it
+	Usage  string // the usage of its flag, when it is not Help
+	Origin Origin // where its answer came from, empty when the field does not say
+	Skip   string // why it is not asked, empty when it is
 }
 
 // Spec is the spec itself, so each kind of field has it by embedding.
@@ -70,7 +73,7 @@ type TextListField struct {
 	Options []Option
 }
 
-// ConfirmField asks yes or no; Yes and No are how each answer reads, when a field words them.
+// ConfirmField asks yes or no; Yes and No are its two options, valued true and false, with how each reads.
 type ConfirmField struct {
 	FieldSpec
 	Value        bool
@@ -100,30 +103,22 @@ func (TextField) field()        {}
 func (TextListField) field()    {}
 func (ConfirmField) field()     {}
 
-// Flags spells each field path as the argument or flag that sets it; the first field answering a path gives it.
-func (f Form) Flags() map[string]string {
-	flags := map[string]string{}
+// Flags spells each field path as the argument or flag that sets it, with the usage of that flag (its Usage, else its Help); the first field answering a path gives both. A form with a rememberable field also has --remember.
+func (f Form) Flags() (flags, usages map[string]string) {
+	flags, usages = map[string]string{}, map[string]string{}
 	for _, field := range f.Fields {
 		spec := field.Spec()
 		if _, seen := flags[spec.Path]; !seen {
-			flags[spec.Path] = spec.Flag
+			flags[spec.Path], usages[spec.Path] = spec.Flag, cmp.Or(spec.Usage, spec.Help)
 		}
 	}
 
-	return flags
-}
-
-// Usages are the usage of each field's flag, by path: its Usage, else its Help; the first field answering a path gives it.
-func (f Form) Usages() map[string]string {
-	usages := map[string]string{}
-	for _, field := range f.Fields {
-		spec := field.Spec()
-		if _, seen := usages[spec.Path]; !seen {
-			usages[spec.Path] = cmp.Or(spec.Usage, spec.Help)
-		}
+	if rememberable := f.Rememberable(); len(rememberable) > 0 {
+		flags[PathRemember] = "--" + PathRemember
+		usages[PathRemember] = "The answers to always use in this repository: " + strings.Join(rememberable, ", ") + " (repeatable)"
 	}
 
-	return usages
+	return flags, usages
 }
 
 // Rememberable are the paths of the fields whose answer can be remembered, in order.
@@ -191,18 +186,21 @@ type AnswerParams struct {
 	Values []string
 }
 
+// CodeOneValue is the field-error code of a field given a count of values other than one.
+const CodeOneValue = "one_value"
+
 // One is the single value given to a field, else the problem of a count other than one.
-func One(params AnswerParams) (string, error) {
+func One[T ~string](params AnswerParams) (T, error) {
 	if len(params.Values) != 1 {
-		return "", Invalid([]FieldError{{Path: params.Path, Code: "one_value", Template: "{path} takes one value, not {count}", Params: Params{"count": strconv.Itoa(len(params.Values))}}})
+		return "", Invalid([]FieldError{{Path: params.Path, Code: CodeOneValue, Template: "{path} takes one value, not {count}", Params: Params{"count": strconv.Itoa(len(params.Values))}}})
 	}
 
-	return params.Values[0], nil
+	return T(params.Values[0]), nil
 }
 
-// Yes is the answer given to a ConfirmField, spelled as its Answer spells it: true or false.
+// Yes is the answer given to a ConfirmField, spelled as its Answer and its options spell it: true or false.
 func Yes(params AnswerParams) (bool, error) {
-	value, err := One(params)
+	value, err := One[string](params)
 	if err != nil {
 		return false, err
 	}
