@@ -10,6 +10,54 @@ import (
 )
 
 // ----------------------------------------------------------------------------
+// The request
+
+// A Request is what the caller asks of create, as given: a field left empty takes its remembered answer, its configured value or its default when the request is resolved.
+type Request struct {
+	Branches    []string            `json:"branches"`
+	From        string              `json:"from"`
+	EnvFrom     project.EnvStrategy `json:"env_from"`
+	Isolation   project.Isolation   `json:"isolation"`
+	FastForward *bool               `json:"fast_forward"` // nil when not given, so a remembered answer can apply
+	IfNotExists bool                `json:"if_not_exists"`
+	Remember    []string            `json:"remember"` // the fields whose answer is remembered for the next runs
+	Ask         bool                `json:"-"`        // ignore the remembered answers for this run
+}
+
+// Answer is the request with the field at path answered by values, spelled as the field's Answer spells them; the path "remember" answers the fields whose answer is remembered. A value the field cannot take leaves the request as it was.
+func (r Request) Answer(path string, values []string) (Request, error) {
+	answer := domain.AnswerParams{Path: path, Values: values}
+	next := r
+	var err error
+	switch path {
+	case "branches":
+		next.Branches = values
+	case domain.PathRemember:
+		next.Remember = values
+	case "from":
+		next.From, err = domain.One[string](answer)
+	case "env_from":
+		next.EnvFrom, err = domain.One[project.EnvStrategy](answer)
+	case "isolation":
+		next.Isolation, err = domain.One[project.Isolation](answer)
+	case "fast_forward":
+		var yes bool
+		yes, err = domain.Yes(answer)
+		next.FastForward = &yes
+	case "if_not_exists":
+		next.IfNotExists, err = domain.Yes(answer)
+	default:
+		err = domain.Unknown(path)
+	}
+
+	if err != nil {
+		return r, err
+	}
+
+	return next, nil
+}
+
+// ----------------------------------------------------------------------------
 // The form
 
 // Questions is the request as a form: each question with its options, its answer so far and where that answer comes from, the fields whose answer is to be remembered, and the request's problems as field errors.
@@ -37,8 +85,8 @@ type From struct {
 	Pinned  string
 }
 
-// Form builds the questions for the request on the facts: a field given keeps its value, an empty one takes its remembered answer (unless the request asks again), its configured value or its default.
-func Form(f Facts, req Request) Questions {
+// NewQuestions builds the questions for the request on the facts: a field given keeps its value, an empty one takes its remembered answer (unless the request asks again), its configured value or its default.
+func NewQuestions(f Facts, req Request) Questions {
 	recalled := f.Config.Remembered
 	if req.Ask {
 		f.Config.Remembered = nil
@@ -62,6 +110,49 @@ func Form(f Facts, req Request) Questions {
 	questions.Isolation.Remembered = project.Isolation(recalled[project.RememberIsolation])
 	questions.Errors = f.problems(questions)
 	return questions
+}
+
+// Form is the questions as the schema a surface renders: the fields in the order the wizard asks them, each with its flag, label, help and answer so far. A zero Questions gives the schema the flags and --help are spelled from.
+func (q Questions) Form() domain.Form {
+	return domain.Form{Problems: q.Errors, Fields: []domain.Field{
+		domain.TextListField{
+			FieldSpec: domain.FieldSpec{Path: "branches", Flag: "<branches>", Label: "Branches", Help: "The branches to create a worktree for; one that already exists is checked out as it is"},
+			Entries:   q.Branches.Given,
+			Options:   q.Branches.Options,
+		},
+		domain.SelectField{
+			FieldSpec: domain.FieldSpec{Path: "from", Flag: "--from", Label: "Source branch", Help: "The branch a new branch starts from, or the parent recorded for wtm sync of one that already exists", Origin: q.From.Origin},
+			Value:     q.From.Value,
+			Options:   q.From.Options,
+			Pinned:    q.From.Pinned,
+		},
+		domain.SelectField{
+			FieldSpec:    domain.FieldSpec{Path: "env_from", Flag: "--env-from", Label: "Env strategy", Help: "How the .env files of the new worktrees are provisioned: example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy", Origin: q.EnvFrom.Origin},
+			Value:        string(q.EnvFrom.Value),
+			Options:      domain.Options(project.EnvStrategies()),
+			Remembered:   string(q.EnvFrom.Remembered),
+			Rememberable: true,
+			Remember:     q.remembers("env_from"),
+		},
+		domain.SelectField{
+			FieldSpec:    domain.FieldSpec{Path: "isolation", Flag: "--isolation", Label: "Isolation", Help: domain.IsolationHelp, Origin: q.Isolation.Origin, Skip: q.Isolation.Skip},
+			Value:        string(q.Isolation.Value),
+			Options:      domain.Options(project.Isolations()),
+			Remembered:   string(q.Isolation.Remembered),
+			Rememberable: true,
+			Remember:     q.remembers("isolation"),
+		},
+		domain.ConfirmField{
+			FieldSpec:    domain.FieldSpec{Path: "fast_forward", Flag: "--ff", Label: "Source update", Help: "Fast-forward to origin first the branch each worktree starts from, when it is behind; one that has diverged or holds uncommitted changes starts as it is", Origin: q.FastForward.Origin, Skip: q.FastForward.Skip},
+			Value:        q.FastForward.Value,
+			Rememberable: true,
+			Remember:     q.remembers("fast_forward"),
+		},
+		domain.ConfirmField{
+			FieldSpec: domain.FieldSpec{Path: "if_not_exists", Flag: "--if-not-exists", Label: "If not exists", Help: "Succeed without a change when the worktree already exists (idempotent)", Origin: q.IfNotExists.Origin, Skip: q.IfNotExists.Skip},
+			Value:     q.IfNotExists.Value,
+		},
+	}}
 }
 
 func (f Facts) branchOptions() []domain.Option {
@@ -169,12 +260,12 @@ const codeRequired = "required"
 
 // rememberable are the fields whose answer can be remembered.
 func rememberable() []string {
-	return []string{"env_from", "isolation", "fast_forward"}
+	return Questions{}.Form().Rememberable()
 }
 
-// Resolve settles the request on the facts, every field answered as Form answers it; a request with problems is refused with all of them, by domain.Invalid.
+// Resolve settles the request on the facts, every field answered as NewQuestions answers it; a request with problems is refused with all of them, by domain.Invalid.
 func Resolve(f Facts, req Request) (Request, error) {
-	questions := Form(f, req)
+	questions := NewQuestions(f, req)
 	if len(questions.Errors) > 0 {
 		return Request{}, domain.Invalid(questions.Errors)
 	}
@@ -182,7 +273,7 @@ func Resolve(f Facts, req Request) (Request, error) {
 	return questions.Request(), nil
 }
 
-// Request is the request the questions answer; a field whose question is skipped is not remembered.
+// Request is the request the questions answer.
 func (q Questions) Request() Request {
 	return Request{
 		Branches:    q.Branches.Given,
@@ -191,8 +282,24 @@ func (q Questions) Request() Request {
 		Isolation:   q.Isolation.Value,
 		FastForward: new(q.FastForward.Value),
 		IfNotExists: q.IfNotExists.Value,
-		Remember:    slices.DeleteFunc(slices.Clone(q.Remember), q.skipped),
+		Remember:    q.remembered(),
 	}
+}
+
+// remembered are the fields whose answer is to be remembered, in the order of the form and each once; a field whose question is skipped is not.
+func (q Questions) remembered() []string {
+	var remembered []string
+	for _, field := range rememberable() {
+		if q.remembers(field) {
+			remembered = append(remembered, field)
+		}
+	}
+
+	return remembered
+}
+
+func (q Questions) remembers(field string) bool {
+	return slices.Contains(q.Remember, field) && !q.skipped(field)
 }
 
 func (q Questions) skipped(field string) bool {

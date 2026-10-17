@@ -1,0 +1,31 @@
+$ wtmx extract; echo EXIT=$?
+
+  Step 3/10 • Target worktree
+
+  ✓ Source worktree: feat/form
+  ✓ Files: 1 file
+
+  Where to move the selected files
+
+▌› + Create a new worktree…
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   main
+   feat/a
+   feat/bad
+   feat/bad-json
+   feat/c
+   feat/dry
+   feat/env
+   feat/ff
+   feat/idem
+   feat/json
+   feat/one
+   feat/remembered
+   feat/slow
+   feat/slow2
+   feature
+   remote-only
+   topic
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

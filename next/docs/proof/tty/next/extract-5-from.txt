@@ -1,0 +1,32 @@
+$ wtmx extract; echo EXIT=$?
+
+  Step 5/10 • Source branch
+
+  ✓ Source worktree: feat/form
+  ✓ Files: 1 file
+  ✓ Target worktree: new worktree
+  ✓ Branch name: feat/moved
+
+  Branch to base the new worktree on
+
+▌› main
+   feat/a
+   feat/bad
+   feat/bad-json
+   feat/c
+   feat/dry
+   feat/env
+   feat/ff
+   feat/form
+   feat/idem
+   feat/json
+   feat/one
+   feat/remembered
+   feat/slow
+   feat/slow2
+   feature
+   remote-only
+   topic
+
+  ↑↓ navigate • / filter • r refresh • enter confirm • esc back
+

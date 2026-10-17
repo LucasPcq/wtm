@@ -71,7 +71,7 @@ func (w world) facts(t *testing.T, req extract.Request) extract.Facts {
 
 func (w world) questions(t *testing.T, req extract.Request) extract.Questions {
 	t.Helper()
-	return extract.Form(w.facts(t, req), req)
+	return extract.NewQuestions(w.facts(t, req), req)
 }
 
 func (w world) plan(t *testing.T, req extract.Request) (extract.Plan, []domain.Warning) {
@@ -197,4 +197,36 @@ func rebasing(t *testing.T, w world, name string) {
 	path := filepath.Join(w.root, "wt-rebasing")
 	gittest.Git(t, w.main, "worktree", "add", "-q", "--detach", path, name)
 	writeFile(t, filepath.Join(gittest.Output(t, path, "rev-parse", "--absolute-git-dir"), "rebase-merge", "head-name"), "refs/heads/"+name+"\n")
+}
+
+// answered is the request the fields of form answer, built by Request.Answer from an empty one, the fields it remembers included.
+func answered(t *testing.T, form domain.Form) extract.Request {
+	t.Helper()
+	var req extract.Request
+	for _, field := range form.Fields {
+		var err error
+		req, err = req.Answer(field.Spec().Path, field.Answer())
+		require.NoError(t, err, field.Spec().Path)
+	}
+
+	req, err := req.Answer("remember", form.Remembering())
+	require.NoError(t, err)
+	return req
+}
+
+func isolationOptions(form domain.Form) []string {
+	for _, field := range form.Fields {
+		if isolation, isSelect := field.(domain.SelectField); isSelect && isolation.Path == "isolation" {
+			return valuesOf(isolation.Options)
+		}
+	}
+	return nil
+}
+
+// answeredTrue is the confirmation at path the request holds.
+func answeredTrue(t *testing.T, req extract.Request, path string) bool {
+	t.Helper()
+	answers := map[string]*bool{"fast_forward": req.FastForward, "keep": req.Keep}
+	require.NotNil(t, answers[path], path)
+	return *answers[path]
 }

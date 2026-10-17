@@ -319,5 +319,70 @@ func TestDecidingABranchWhoseFolderWasNeverLocatedIsAProgrammingError(t *testing
 	w := newWorld(t, seed{})
 	facts := w.facts(t)
 
-	assert.Panics(t, func() { create.Form(facts, create.Request{Branches: []string{branchName}}) })
+	assert.Panics(t, func() { create.NewQuestions(facts, create.Request{Branches: []string{branchName}}) })
+}
+
+func TestEachFieldOfTheFormAnswersTheRequestBack(t *testing.T) {
+	cases := map[string]create.Request{
+		"defaults": {Branches: []string{branchName}},
+		"every field given": {
+			Branches:    []string{branchName, "feat/two"},
+			From:        "main",
+			EnvFrom:     project.EnvMain,
+			Isolation:   project.Verbatim,
+			FastForward: new(true),
+			IfNotExists: true,
+			Remember:    []string{"isolation", "env_from", "isolation", "fast_forward"},
+		},
+	}
+	for name, req := range cases {
+		t.Run(name, func(t *testing.T) {
+			questions := newWorld(t, seed{Run: jobsToml, Behind: true}).questions(t, req)
+
+			assert.Equal(t, questions.Request(), answered(t, questions.Form()))
+		})
+	}
+}
+
+func TestTheFormExistsBeforeAnyRead(t *testing.T) {
+	form := create.Questions{}.Form()
+
+	flags, usages := form.Flags()
+	assert.Equal(t, map[string]string{"branches": "<branches>", "from": "--from", "env_from": "--env-from", "isolation": "--isolation", "fast_forward": "--ff", "if_not_exists": "--if-not-exists", "remember": "--remember"}, flags)
+	assert.Equal(t, "The answers to always use in this repository: env_from, isolation, fast_forward (repeatable)", usages["remember"])
+	assert.Equal(t, []string{"env_from", "isolation", "fast_forward"}, form.Rememberable())
+}
+
+func TestTheFormCarriesTheRequestsProblems(t *testing.T) {
+	questions := newWorld(t, seed{}).questions(t, create.Request{Branches: []string{branchName, branchName}, EnvFrom: "copy", Remember: []string{"from"}})
+
+	form := questions.Form()
+
+	assert.Equal(t, questions.Errors, form.Problems)
+	assert.Equal(t, []string{"branches[1]"}, paths(domain.ProblemsOf(form.Problems, "branches")))
+	assert.Equal(t, []string{"remember[0]"}, paths(domain.ProblemsOf(form.Problems, domain.PathRemember)))
+}
+
+func TestAnAnswerTheRequestCannotTakeIsRefusedAndChangesNothing(t *testing.T) {
+	cases := map[string]struct {
+		path   string
+		values []string
+		code   string
+	}{
+		"an unknown field":             {"files", []string{"a"}, domain.CodeUnknown},
+		"an unknown field, two values": {"typo", []string{"a", "b"}, domain.CodeUnknown},
+		"two values for one":           {"from", []string{"main", "dev"}, domain.CodeOneValue},
+		"a confirmation unspelt":       {"fast_forward", []string{"yes"}, domain.CodeOneOf},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			req := create.Request{From: "feature", FastForward: new(true)}
+
+			got, err := req.Answer(c.path, c.values)
+
+			require.Len(t, fieldsOf(t, err), 1)
+			assert.Equal(t, c.code, fieldsOf(t, err)[0].Code)
+			assert.Equal(t, req, got)
+		})
+	}
 }

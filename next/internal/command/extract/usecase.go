@@ -204,7 +204,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 		return Questions{}, err
 	}
 
-	questions := Form(facts, req)
+	questions := NewQuestions(facts, req)
 	if len(questions.Errors) > 0 {
 		return questions, nil
 	}

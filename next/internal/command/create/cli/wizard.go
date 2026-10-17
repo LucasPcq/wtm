@@ -87,7 +87,11 @@ func (a at) Label() string {
 
 // Description is the help of the field the step answers.
 func (a at) Description() string {
-	return descriptions[paths[a.step]]
+	if field := a.w.field(a.step); field != nil {
+		return field.Spec().Help
+	}
+
+	return ""
 }
 
 // Standing is where the step's answer stands on the questions observed last.
@@ -166,7 +170,7 @@ type choiceStep struct {
 
 // Open builds the list of the choice.
 func (s *choiceStep) Open() tea.Cmd {
-	s.list = choiceList(s.w.choices(s.step))
+	s.list = s.w.choiceList(s.step)
 	return nil
 }
 

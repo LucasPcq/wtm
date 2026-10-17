@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -39,6 +40,45 @@ type Request struct {
 	OnConflict  OnConflict        `json:"on_conflict"`
 	Remember    []string          `json:"remember"` // the fields whose answer is remembered for the next runs
 	Ask         bool              `json:"-"`        // ignore the remembered answers for this run
+}
+
+// Answer is the request with the field at path answered by values, spelled as the field's Answer spells them; the path "remember" answers the fields whose answer is remembered. A value the field cannot take leaves the request as it was.
+func (r Request) Answer(path string, values []string) (Request, error) {
+	answer := domain.AnswerParams{Path: path, Values: values}
+	next := r
+	var err error
+	switch path {
+	case "files":
+		next.Files = values
+	case domain.PathRemember:
+		next.Remember = values
+	case "source":
+		next.Source, err = domain.One[string](answer)
+	case "to":
+		next.To, err = domain.One[string](answer)
+	case "from":
+		next.From, err = domain.One[string](answer)
+	case "isolation":
+		next.Isolation, err = domain.One[project.Isolation](answer)
+	case "on_conflict":
+		next.OnConflict, err = domain.One[OnConflict](answer)
+	case "fast_forward":
+		var yes bool
+		yes, err = domain.Yes(answer)
+		next.FastForward = &yes
+	case "keep":
+		var yes bool
+		yes, err = domain.Yes(answer)
+		next.Keep = &yes
+	default:
+		err = domain.Unknown(path)
+	}
+
+	if err != nil {
+		return r, err
+	}
+
+	return next, nil
 }
 
 // ----------------------------------------------------------------------------
@@ -92,8 +132,8 @@ type Conflicting struct {
 
 const existingSkip = "the target worktree exists: nothing is created"
 
-// Form builds the questions for the request on the facts: a field given keeps its value, an empty one takes its remembered answer (unless the request asks again), its recorded or configured value or its default. Its conflict question has no conflicts yet: they are read once the request has no problem (UseCase.Questions).
-func Form(f Facts, req Request) Questions {
+// NewQuestions builds the questions for the request on the facts: a field given keeps its value, an empty one takes its remembered answer (unless the request asks again), its recorded or configured value or its default. Its conflict question has no conflicts yet: they are read once the request has no problem (UseCase.Questions).
+func NewQuestions(f Facts, req Request) Questions {
 	recalled := f.Config.Remembered
 	if req.Ask {
 		f.Config.Remembered = nil
@@ -118,6 +158,139 @@ func Form(f Facts, req Request) Questions {
 	questions.Isolation.Remembered = project.Isolation(recalled[project.RememberIsolation])
 	questions.Errors = f.problems(req, questions)
 	return questions
+}
+
+// Form is the questions as the schema a surface renders: the fields in the order the wizard asks them, each with its flag, label, help and answer so far. The target is asked twice: as a worktree to pick, then, for one to create, as its branch. A zero Questions gives the schema the flags and --help are spelled from.
+func (q Questions) Form() domain.Form {
+	source, to := q.Source.Given, q.To.Given
+	return domain.Form{Problems: q.Errors, Fields: []domain.Field{
+		domain.SelectField{
+			FieldSpec: domain.FieldSpec{Path: "source", Flag: "<source>", Label: "Source worktree", Help: "Which worktree to extract changes from"},
+			Value:     source,
+			Options:   q.Source.Options,
+		},
+		domain.MultiSelectField{
+			FieldSpec: domain.FieldSpec{Path: "files", Flag: "--files", Label: "Files", Help: q.filesHelp(), Usage: "Files to extract, or a directory to take everything below it (skips interactive selection)"},
+			Picked:    q.Files.Given,
+			Options:   q.fileOptions(),
+		},
+		domain.SelectField{
+			FieldSpec: domain.FieldSpec{Path: "to", Flag: "--to", Label: "Target worktree", Help: "Where to move the selected files", Usage: "Target worktree branch; created if it does not exist"},
+			Value:     to,
+			Options:   append([]domain.Option{{Label: "+ Create a new worktree…"}}, q.To.Options...),
+		},
+		domain.TextField{
+			FieldSpec: domain.FieldSpec{Path: "to", Flag: "--to", Label: "Branch name", Help: "Name for the new worktree branch", Skip: q.branchSkip()},
+			Value:     to,
+		},
+		domain.SelectField{
+			FieldSpec: domain.FieldSpec{Path: "from", Flag: "--from", Label: "Source branch", Help: "Branch to base the new worktree on", Usage: "Parent branch when creating the target worktree", Origin: q.From.Origin, Skip: q.From.Skip},
+			Value:     q.From.Value,
+			Options:   q.From.Options,
+			Pinned:    q.From.Pinned,
+		},
+		domain.SelectField{
+			FieldSpec:    domain.FieldSpec{Path: "isolation", Flag: "--isolation", Label: "Isolation", Help: domain.IsolationHelp, Origin: q.Isolation.Origin, Skip: q.Isolation.Skip},
+			Value:        string(q.Isolation.Value),
+			Options:      domain.Options(project.Isolations()),
+			Remembered:   string(q.Isolation.Remembered),
+			Rememberable: true,
+			Remember:     q.remembers("isolation"),
+		},
+		domain.ConfirmField{
+			FieldSpec: domain.FieldSpec{
+				Path:   "fast_forward",
+				Flag:   "--ff",
+				Label:  "Source update",
+				Help:   "The branch the new worktree starts from is behind origin — fast-forward it before creating?",
+				Usage:  "Fast-forward the parent branch to origin before creating the target (answers the wizard's question; skipped when it has diverged)",
+				Origin: q.FastForward.Origin,
+				Skip:   q.FastForward.Skip,
+			},
+			Value:        q.FastForward.Value,
+			Yes:          domain.Option{Value: "true", Label: "Fast-forward to origin"},
+			No:           domain.Option{Value: "false", Label: "Keep it as-is"},
+			Rememberable: true,
+			Remember:     q.remembers("fast_forward"),
+		},
+		domain.ConfirmField{
+			FieldSpec: domain.FieldSpec{Path: "keep", Flag: "--keep", Label: "Mode", Help: "Move removes the files from the source; copy keeps them.", Usage: "Copy instead of move (keep the changes in the source)", Origin: q.Keep.Origin},
+			Value:     q.Keep.Value,
+			Yes:       domain.Option{Value: "true", Label: "Copy — keep the files in " + source},
+			No:        domain.Option{Value: "false", Label: "Move — remove the files from " + source},
+		},
+		domain.SelectField{
+			FieldSpec: domain.FieldSpec{Path: "on_conflict", Flag: "--on-conflict", Label: "On conflict", Help: q.conflictHelp(), Usage: "On conflict: abort (default) or resolve (write conflict markers in the target)", Origin: q.OnConflict.Origin, Skip: q.OnConflict.Skip},
+			Value:     string(q.OnConflict.Value),
+			Options: []domain.Option{
+				{Value: string(OnConflictAbort), Label: "Abort — leave both worktrees untouched"},
+				{Value: string(OnConflictResolve), Label: "Resolve — write conflict markers in " + to},
+			},
+		},
+	}}
+}
+
+func (q Questions) filesHelp() string {
+	if q.Source.Given != "" && len(q.Files.Options) == 0 {
+		return "No changes to extract in " + q.Source.Given + " — press esc to pick another worktree."
+	}
+
+	return "Space to toggle, a to select all, / to filter, enter to confirm, esc to go back."
+}
+
+func (q Questions) fileOptions() []domain.Option {
+	options := make([]domain.Option, 0, len(q.Files.Options))
+	for _, change := range q.Files.Options {
+		options = append(options, domain.Option{Value: change.Path, Label: change.Label(), Badge: change.Status.Tag()})
+	}
+
+	return options
+}
+
+// branchSkip skips the branch of the target while the target is a worktree that exists: the source, or another one.
+func (q Questions) branchSkip() string {
+	if to := q.To.Given; to != "" && (to == q.Source.Given || q.held(to)) {
+		return existingSkip
+	}
+
+	return ""
+}
+
+// conflictHelp names the files that conflict with the target and what each answer leaves behind; it is empty while nothing conflicts.
+func (q Questions) conflictHelp() string {
+	conflicts := q.OnConflict.Conflicts
+	if len(conflicts) == 0 {
+		return ""
+	}
+
+	files := make([]string, 0, len(conflicts))
+	for _, conflict := range conflicts {
+		files = append(files, conflict.Path)
+	}
+
+	verb := " were"
+	if len(files) == 1 {
+		verb = " was"
+	}
+
+	target, source := `"`+q.To.Given+`"`, `"`+q.Source.Given+`"`
+	return strings.Join(files, ", ") + verb + " also changed in " + target + ".\n\n" +
+		"Resolving writes conflict markers there; nothing is removed from the source.\n" +
+		"Resolve them in " + target + ", then discard the same files in " + source + "; to undo, discard the applied files in " + target + "."
+}
+
+// NewTarget is the problem of branch typed as the branch of a target to create, as a field error of the target: a worktree already holds it.
+func (q Questions) NewTarget(branch string) []domain.FieldError {
+	if !q.held(branch) {
+		return nil
+	}
+
+	return []domain.FieldError{{Path: "to", Code: "extract.has_worktree", Template: "{value} already has a worktree — pick it as the target worktree", Params: domain.Params{"value": branch}}}
+}
+
+// held reports whether a worktree other than the source holds branch.
+func (q Questions) held(branch string) bool {
+	return slices.ContainsFunc(q.To.Options, func(o domain.Option) bool { return o.Value == branch })
 }
 
 func (f Facts) sourceOptions() []domain.Option {
@@ -265,12 +438,12 @@ const (
 
 // rememberable are the fields whose answer can be remembered.
 func rememberable() []string {
-	return []string{"isolation", "fast_forward"}
+	return Questions{}.Form().Rememberable()
 }
 
-// Resolve settles the request on the facts, every field answered as Form answers it; a request with problems is refused with all of them, by domain.Invalid.
+// Resolve settles the request on the facts, every field answered as NewQuestions answers it; a request with problems is refused with all of them, by domain.Invalid.
 func Resolve(f Facts, req Request) (Request, error) {
-	questions := Form(f, req)
+	questions := NewQuestions(f, req)
 	if len(questions.Errors) > 0 {
 		return Request{}, domain.Invalid(questions.Errors)
 	}
@@ -278,7 +451,7 @@ func Resolve(f Facts, req Request) (Request, error) {
 	return questions.Request(), nil
 }
 
-// Request is the request the questions answer; a field whose question is skipped is not remembered.
+// Request is the request the questions answer.
 func (q Questions) Request() Request {
 	return Request{
 		Source:      q.Source.Given,
@@ -289,8 +462,24 @@ func (q Questions) Request() Request {
 		Isolation:   q.Isolation.Value,
 		Keep:        new(q.Keep.Value),
 		OnConflict:  q.OnConflict.Value,
-		Remember:    slices.DeleteFunc(slices.Clone(q.Remember), q.skipped),
+		Remember:    q.remembered(),
 	}
+}
+
+// remembered are the fields whose answer is to be remembered, in the order of the form and each once; a field whose question is skipped is not.
+func (q Questions) remembered() []string {
+	var remembered []string
+	for _, field := range rememberable() {
+		if q.remembers(field) {
+			remembered = append(remembered, field)
+		}
+	}
+
+	return remembered
+}
+
+func (q Questions) remembers(field string) bool {
+	return slices.Contains(q.Remember, field) && !q.skipped(field)
 }
 
 func (q Questions) skipped(field string) bool {

@@ -43,8 +43,7 @@ const (
   # For a script or an agent: idempotent, with the v2 JSON envelope
   wtm create feat/login --if-not-exists --output json`
 
-	rememberUsage = "The answers to always use in this repository: env_from, isolation, fast_forward (repeatable)"
-	yesUsage      = "Run unattended: no question, no confirmation; what is not given takes its default"
+	yesUsage = "Run unattended: no question, no confirmation; what is not given takes its default"
 
 	flagFF = "ff"
 )
@@ -83,7 +82,7 @@ func New(streams *output.Streams, open func(ctx context.Context) (Project, error
 	flags.StringVar(&c.isolation, "isolation", "", descriptions["isolation"])
 	flags.BoolVar(&c.ff, flagFF, false, descriptions["fast_forward"])
 	flags.BoolVar(&c.ifNotExists, "if-not-exists", false, descriptions["if_not_exists"])
-	flags.StringArrayVar(&c.remember, "remember", nil, rememberUsage)
+	flags.StringArrayVar(&c.remember, "remember", nil, descriptions["remember"])
 	flags.BoolVarP(&c.yes, "yes", "y", false, yesUsage)
 	flags.StringVar(&c.io.Output, "output", uicli.OutputText, uicli.OutputUsage)
 	flags.BoolVarP(&c.dryRun, "dry-run", "n", false, uicli.DryRunUsage)

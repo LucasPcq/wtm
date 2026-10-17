@@ -1,0 +1,19 @@
+$ wtmx extract; echo EXIT=$?
+
+  Step 8/9 • Mode
+
+  ✓ Source worktree: feat/form
+  ✓ Files: 1 file
+  ✓ Target worktree: new worktree
+  ✓ Branch name: feat/moved
+  ✓ Source branch: main
+  ✓ Isolation: isolated
+  ⊘ Source update — source already up to date
+
+  Move removes the files from the source; copy keeps them.
+
+▌▸ Move — remove the files from feat/form
+   Copy — keep the files in feat/form
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

@@ -1,0 +1,10 @@
+$ wtmx extract; echo EXIT=$?
+
+  Step 1/9 • Source worktree
+
+  Which worktree to extract changes from
+
+▌▸ feat/form
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

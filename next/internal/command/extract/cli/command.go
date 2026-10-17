@@ -44,8 +44,7 @@ const (
   # Copy one file instead, onto a branch stacked on the source
   wtm extract feat/login --files apps/web/login.ts --to feat/login-web --from feat/login --keep --yes`
 
-	rememberUsage = "The answers to always use in this repository: isolation, fast_forward (repeatable)"
-	yesUsage      = "Run unattended: no question, no confirmation; what is not given takes its default (a source, --files and --to are required, and --from when --to already exists locally)"
+	yesUsage = "Run unattended: no question, no confirmation; what is not given takes its default (a source, --files and --to are required, and --from when --to already exists locally)"
 
 	flagFF       = "ff"
 	flagKeep     = "keep"
@@ -90,7 +89,7 @@ func New(streams *output.Streams, open func(ctx context.Context) (Project, error
 	flags.BoolVar(&c.ff, flagFF, false, descriptions["fast_forward"])
 	flags.BoolVar(&c.keep, flagKeep, false, descriptions["keep"])
 	flags.StringVar(&c.onConflict, "on-conflict", "", descriptions["on_conflict"])
-	flags.StringArrayVar(&c.remember, "remember", nil, rememberUsage)
+	flags.StringArrayVar(&c.remember, "remember", nil, descriptions["remember"])
 	flags.BoolVar(&c.ask, "ask", false, uicli.AskUsage)
 	flags.BoolVarP(&c.yes, "yes", "y", false, yesUsage)
 	flags.StringVar(&c.io.Output, "output", uicli.OutputText, uicli.OutputUsage)

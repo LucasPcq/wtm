@@ -1,0 +1,21 @@
+$ wtmx extract; echo EXIT=$?
+
+  Step 6/10 • Isolation
+
+  ✓ Source worktree: feat/form
+  ✓ Files: 1 file
+  ✓ Target worktree: new worktree
+  ✓ Branch name: feat/moved
+  ✓ Source branch: main · default
+
+  How the new worktree stands against its source: isolated (its own ports, compose project and
+  namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as
+  copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated
+
+▌› isolated
+   verbatim
+
+   [ ] Always use this answer in this repo
+
+  ↑↓ navigate • tab always use • / filter • enter confirm • esc back
+

@@ -1,0 +1,17 @@
+
+  Step 8/10 • Mode
+
+  ✓ Source worktree: feat/login · <source>
+  ✓ Files: 1 file · --files
+  ✓ Target worktree: new worktree
+  ✓ Branch name: feat/split
+  ✓ Source branch: main · config
+  ✓ Isolation: isolated · default
+  ✓ Source update: no · default
+
+  Move removes the files from the source; copy keeps them.
+
+▌› Move — remove the files from feat/login
+   Copy — keep the files in feat/login
+
+  ↑↓ navigate • / filter • enter confirm • esc back

@@ -7,7 +7,7 @@
 ```
 cmd/wtm-next/          the composition root: builds each adapter once (wire.go), opens the project on demand, registers each command's cobra command on the root
 internal/
-  domain/              the contract every use case speaks: errors, warnings, events and their stream, outcomes, operations and their locks, the vocabulary of a question — pure, stdlib only
+  domain/              the contract every use case speaks: errors, warnings, events and their stream, outcomes, operations and their locks, the vocabulary of a question and a form's schema — pure, stdlib only
     worktree/          branches and worktrees as git lists them: names, refs, where a branch stands against origin, where a branch asked for a new worktree lands, a checkout, meta.json, identity, the stack of worktrees by the branch each was created from
     project/           what a use case reads of config.toml, run.toml (isolation included) and the global settings
     dotenv/            .env files parsed and rendered byte for byte
@@ -17,7 +17,7 @@ internal/
     usecase.go         the story: Run (operation, plan, fingerprint, apply), Plan, Apply, Observe, Questions
     port.go            the driven ports it reaches the world through
     rules.go           pure: facts → plan
-    questions.go       its form model and its validation
+    questions.go       its form model, its schema (Questions.Form, Request.Answer: what the flags, --help and wizard read) and its validation
     cli/               its driving adapter: the cobra command, its wizard, its human output and its JSON
   service/             what the use cases call
     operation/         the operation every mutating use case goes through: its record, its locks, its plan under them and fingerprinted, its events
@@ -33,7 +33,7 @@ internal/
 ```
 No file format lives in `domain/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `domain/project`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
 
-A use case reads in one place. `command/<name>/usecase.go` tells the whole request top to bottom in `Run`: begin the operation (`service/operation`), plan under its locks, fingerprint, stop on a dry run, refuse a stale plan, apply between the started and finished events; then `Plan` (observe what the repository holds, settle the request on it, decide), `Apply` and `Questions` when it asks. `rules.go` holds what it observes and decides from, pure; `questions.go` its form and validation; `port.go` the interfaces it reaches the world through. A service is concrete and called directly; a port is an interface, for the outside world only. A package is split only when it passes about 1,000 lines and a seam is natural.
+A use case reads in one place. `command/<name>/usecase.go` tells the whole request top to bottom in `Run`: begin the operation (`service/operation`), plan under its locks, fingerprint, stop on a dry run, refuse a stale plan, apply between the started and finished events; then `Plan` (observe what the repository holds, settle the request on it, decide), `Apply` and `Questions` when it asks. `rules.go` holds what it observes and decides from, pure; `questions.go` its form, the schema of its fields (labels, help, flags, options) and validation; `port.go` the interfaces it reaches the world through. A service is concrete and called directly; a port is an interface, for the outside world only. A package is split only when it passes about 1,000 lines and a seam is natural.
 
 ## Import rules
 

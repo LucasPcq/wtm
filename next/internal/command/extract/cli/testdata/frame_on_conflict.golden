@@ -1,0 +1,22 @@
+
+  Step 9/10 • On conflict
+
+  ✓ Source worktree: feat/login · <source>
+  ✓ Files: 2 files · --files
+  ✓ Target worktree: feat/other · --to
+  · Branch name — the target worktree exists: nothing is created
+  · Source branch — the target worktree exists: nothing is created
+  · Isolation — the target worktree exists: nothing is created
+  · Source update — the target worktree exists: nothing is created
+  ✓ Mode: move · default
+
+  apps/api/a.txt was also changed in "feat/other".
+
+  Resolving writes conflict markers there; nothing is removed from the source.
+  Resolve them in "feat/other", then discard the same files in "feat/login"; to undo, discard the
+  applied files in "feat/other".
+
+▌› Abort — leave both worktrees untouched
+   Resolve — write conflict markers in feat/other
+
+  ↑↓ navigate • / filter • enter confirm • esc back
