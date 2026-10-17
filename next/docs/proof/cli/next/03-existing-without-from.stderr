@@ -1,0 +1,4 @@
+
+  ✗ the request is invalid
+    --from is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)
+

@@ -1,0 +1,7 @@
+$ wtmx create feat/slow2 --yes; echo EXIT=$?
+  › Cancelling — finishing on_create of feat/slow2; Ctrl+C again to stop now
+^C
+$ echo EXIT=$?
+EXIT=130
+$
+

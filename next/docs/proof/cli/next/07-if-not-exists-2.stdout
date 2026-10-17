@@ -1,0 +1,11 @@
+
+  = create: 1 unchanged
+
+  Branches   feat/idem (already open)
+  Parent     main
+  Env        example
+  Isolation  isolated
+  feat/idem  ../acme.trees/feat-idem · already open
+
+  → wtm go feat/idem
+
