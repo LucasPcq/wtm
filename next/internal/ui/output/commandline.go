@@ -1,7 +1,6 @@
 package output
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"strings"
 
@@ -58,16 +57,9 @@ func Quote(word string) string {
 	return "'" + strings.ReplaceAll(word, "'", `'\''`) + "'"
 }
 
-// FollowUpLine returns the wtm command line that carries out followUp, a clean of the branches its request names.
+// FollowUpLine returns the command line of followUp, each word quoted for the shell.
 func FollowUpLine(followUp *domain.FollowUp) string {
-	var request domain.CleanRequest
-	_ = json.Unmarshal(followUp.Request, &request)
-
-	words := append([]string{"wtm", followUp.Command}, Quoted(request.Branches)...)
-	if request.Force {
-		words = append(words, "--force")
-	}
-	return strings.Join(words, " ")
+	return strings.Join(Quoted(followUp.Argv), " ")
 }
 
 // FollowUpSteps returns the next step that repairs what err left behind, its follow-up's command line and message; none when err is nil or has no follow-up.

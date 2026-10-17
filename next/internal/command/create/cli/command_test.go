@@ -183,6 +183,7 @@ func TestAFailedHookExitsOneAndNamesTheBranch(t *testing.T) {
 	assert.Equal(t, uicli.ExitError, got.Code)
 	assert.Contains(t, got.Stdout, "✗ create: 1 failed")
 	assert.Contains(t, got.Stdout, "feat/x  on_create failed")
+	assert.NotContains(t, got.Stdout, "wtm clean")
 }
 
 func TestTheProjectThatCannotBeOpenedIsTheFailure(t *testing.T) {
@@ -200,7 +201,7 @@ func TestAWorktreeLeftHalfCreatedPointsAtTheCleanThatRemovesIt(t *testing.T) {
 	got := runCreate(t, w, branchName)
 
 	assert.Equal(t, uicli.ExitError, got.Code)
-	assert.Contains(t, got.Stdout, "→ wtm clean feat/x --force   branch feat/x is left half-created at /repo/.trees/feat-x: remove it with `wtm clean feat/x --force`")
+	assert.Contains(t, got.Stdout, "→ wtm clean feat/x --force   branch feat/x is left half-created at /repo/.trees/feat-x")
 }
 
 func TestARunAsksOnlyWhenTheUserCanSeeTheQuestionsAndAnswerThem(t *testing.T) {

@@ -107,6 +107,7 @@ func newWorld(t *testing.T, s seed) world {
 				PublicPort: func(context.Context, int) int { return 0 },
 				Shield:     shell.Shield,
 				Now:        func() time.Time { return createdAt },
+				LeftBehind: cleanLine,
 			},
 			MainPath: main,
 			StateDir: stateDir,
@@ -195,3 +196,5 @@ type answering struct {
 func (a answering) Remember(context.Context, map[string]string) (domain.Written, error) {
 	return a.written, a.err
 }
+
+func cleanLine(branch string) []string { return []string{"wtm", "clean", branch, "--force"} }

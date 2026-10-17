@@ -106,6 +106,7 @@ func (w world) usecase() create.UseCase {
 			PublicPort: func(context.Context, int) int { return 0 },
 			Shield:     shell.Shield,
 			Now:        func() time.Time { return createdAt },
+			LeftBehind: cleanLine,
 		},
 		MainPath: mainPath,
 		StateDir: stateDir,
@@ -259,6 +260,7 @@ func newApp(s seed) create.UseCase {
 			PublicPort: func(context.Context, int) int { return 0 },
 			Shield:     shell.Shield,
 			Now:        func() time.Time { return createdAt },
+			LeftBehind: cleanLine,
 		},
 		MainPath: mainPath,
 		StateDir: mainPath + "/.git/wtm",
@@ -317,3 +319,5 @@ func (enters) Read(p []byte) (int, error) {
 	p[0] = '\r'
 	return 1, nil
 }
+
+func cleanLine(branch string) []string { return []string{"wtm", "clean", branch, "--force"} }

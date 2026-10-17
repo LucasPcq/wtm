@@ -62,4 +62,5 @@ type Service struct {
 	PublicPort func(ctx context.Context, configured int) int        // the port a named URL announces, given the proxy's configured one; 0 with no proxy
 	Shield     func(ctx context.Context) (context.Context, func())  // a context the first cancel does not reach, and its release
 	Now        func() time.Time
+	LeftBehind func(branch string) []string // the command line that removes a branch an undo left behind, and its worktree
 }

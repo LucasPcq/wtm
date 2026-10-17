@@ -40,11 +40,13 @@ var changed = []worktree.Change{
 }
 
 type seed struct {
-	Clean     bool
-	Conflicts map[string]worktree.ConflictKind
-	NoConfig  bool
-	OnCreate  []project.Hook
-	RunHooks  func(ctx context.Context, chain env.HookChain) error
+	Clean      bool
+	Conflicts  map[string]worktree.ConflictKind
+	NoConfig   bool
+	OnCreate   []project.Hook
+	RunHooks   func(ctx context.Context, chain env.HookChain) error
+	GitFails   map[string]error
+	StoreFails map[string]error
 }
 
 type world struct {
@@ -77,8 +79,9 @@ func newWorld(s seed) world {
 			},
 			Changes:   changes,
 			Conflicts: s.Conflicts,
+			Fail:      s.GitFails,
 		}),
-		store: storetest.NewFake(storetest.FakeParams{Config: config}),
+		store: storetest.NewFake(storetest.FakeParams{Config: config, Fail: s.StoreFails}),
 		seed:  s,
 	}
 }
@@ -112,6 +115,7 @@ func (w world) usecase() extract.UseCase {
 			PublicPort: func(context.Context, int) int { return 0 },
 			Shield:     shell.Shield,
 			Now:        func() time.Time { return createdAt },
+			LeftBehind: cleanLine,
 		},
 		MainPath: mainPath,
 		StateDir: stateDir,
@@ -182,3 +186,5 @@ func (enters) Read(p []byte) (int, error) {
 func settled() extract.Request {
 	return extract.Request{Source: source, Files: []string{"apps/api/a.txt", "apps/api/new.txt"}, To: other}
 }
+
+func cleanLine(branch string) []string { return []string{"wtm", "clean", branch, "--force"} }

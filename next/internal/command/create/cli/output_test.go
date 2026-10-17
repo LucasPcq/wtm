@@ -22,7 +22,7 @@ func TestTwoBranchesCreatedAreCountedRowedAndPointedAt(t *testing.T) {
 func TestAMixedRunNamesEachAnomalyAndEachUnfinishedBranch(t *testing.T) {
 
 	golden(t, "outcome_mixed", rendered(func(w *bytes.Buffer) {
-		drawOutcome(w, mixed(trees), []output.NextStep{{Command: "wtm clean feat/e --force", Note: "branch feat/e is left half-created at /trees/feat-e: remove it with `wtm clean feat/e --force`"}}, cwd)
+		drawOutcome(w, mixed(trees), []output.NextStep{{Command: "wtm clean feat/e --force", Note: "branch feat/e is left half-created at /trees/feat-e"}}, cwd)
 	}))
 }
 
@@ -126,7 +126,7 @@ func TestAnInvalidRequestNamesEachFieldByItsPathAndItsFlag(t *testing.T) {
 func TestAFailureLeftBehindCarriesItsFollowUp(t *testing.T) {
 	stuck := &domain.Error{
 		Kind: domain.KindInternal, Code: "unit.undo_failed", Message: "could not remove the worktree, left behind: worktree", Params: domain.Params{"left": "worktree"},
-		FollowUp: &domain.FollowUp{Command: "clean", Request: json.RawMessage(`{"branches":["feat/x"],"force":true}`), Code: "provision.left_behind", Message: "branch feat/x is left half-created", Params: domain.Params{"branch": "feat/x", "path": "/p"}},
+		FollowUp: &domain.FollowUp{Argv: []string{"wtm", "clean", "feat/x", "--force"}, Code: "provision.left_behind", Message: "branch feat/x is left half-created", Params: domain.Params{"branch": "feat/x", "path": "/p"}},
 		Cause:    errors.New("env failed: disk full"),
 	}
 
@@ -134,7 +134,7 @@ func TestAFailureLeftBehindCarriesItsFollowUp(t *testing.T) {
 		"v": 2, "command": "create", "ok": false,
 		"follow_ups": [], "warnings": [],
 		"error": {"kind": "internal", "code": "unit.undo_failed", "message": "could not remove the worktree, left behind: worktree: env failed: disk full", "params": {"left": "worktree"},
-			"follow_up": {"command": "clean", "request": {"branches": ["feat/x"], "force": true}, "code": "provision.left_behind", "params": {"branch": "feat/x", "path": "/p"}}}
+			"follow_up": {"argv": ["wtm", "clean", "feat/x", "--force"], "code": "provision.left_behind", "message": "branch feat/x is left half-created", "params": {"branch": "feat/x", "path": "/p"}}}
 	}`, enveloped(t, envelopeParams{Err: stuck}))
 }
 

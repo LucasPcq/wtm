@@ -270,11 +270,10 @@ func TestAnUndoThatFailsNamesWhatIsLeftAndTheWayOut(t *testing.T) {
 	assert.ErrorContains(t, outcome.Err, "worktree is locked")
 	followUp := outcome.Err.FollowUp
 	require.NotNil(t, followUp)
-	assert.Equal(t, "clean", followUp.Command)
-	assert.JSONEq(t, `{"branches":["feat/x"],"force":true}`, string(followUp.Request))
+	assert.Equal(t, []string{"remove", "feat/x"}, followUp.Argv)
 	assert.Equal(t, "provision.left_behind", followUp.Code)
 	assert.Equal(t, domain.Params{"branch": branchName, "path": w.path(branchName)}, followUp.Params)
-	assert.Equal(t, "branch feat/x is left half-created at "+w.path(branchName)+": remove it with `wtm clean feat/x --force`", followUp.Message)
+	assert.Equal(t, "branch feat/x is left half-created at "+w.path(branchName), followUp.Message)
 }
 
 func TestABranchThatCannotBeDeletedIsLeftBehindToo(t *testing.T) {
@@ -291,11 +290,10 @@ func TestABranchThatCannotBeDeletedIsLeftBehindToo(t *testing.T) {
 	assert.ErrorContains(t, outcome.Err, "branch is protected")
 	followUp := outcome.Err.FollowUp
 	require.NotNil(t, followUp)
-	assert.Equal(t, "clean", followUp.Command)
-	assert.JSONEq(t, `{"branches":["feat/x"],"force":true}`, string(followUp.Request))
+	assert.Equal(t, []string{"remove", "feat/x"}, followUp.Argv)
 	assert.Equal(t, "provision.left_behind", followUp.Code)
 	assert.Equal(t, domain.Params{"branch": branchName}, followUp.Params)
-	assert.Equal(t, "branch feat/x is left behind: remove it with `wtm clean feat/x --force`", followUp.Message)
+	assert.Equal(t, "branch feat/x is left behind", followUp.Message)
 }
 
 func TestACheckOutNeverDeletesTheBranchOnUndo(t *testing.T) {

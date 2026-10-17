@@ -9,6 +9,7 @@ How one command of `next/` is laid out, how its files read, and how it shares co
 - `rules.go`, `questions.go`, `port.go`
 - `cli/`: the driving adapter
 - Sharing between commands
+- A second step
 - Codes, messages and exit codes
 - Testing a slice
 - Adding a command
@@ -100,7 +101,7 @@ The numbered step comments are the one place a body carries a comment per paragr
 
 ## Sharing between commands
 
-A command never imports another command (archlint refuses it). Two commands share code in four places only, chosen by what the code is:
+A command never imports another command (archlint refuses it). Two commands share code in five places only, chosen by what the code is:
 
 | What both need | Where | Example |
 | -- | -- | -- |
@@ -108,8 +109,13 @@ A command never imports another command (archlint refuses it). Two commands shar
 | a reading of the repository | a port method returning a domain value, or a service reading through its ports | `worktree.Snapshot` from the git port, `provision.Observe` (config, snapshot, run.toml) |
 | an orchestration with I/O | `service/<name>` (concrete, its own ports) | `provision.Service.Run`, `provision.Service.FastForwardEach` (typed outcomes each command words as its warnings), `operation.Service` |
 | presentation | `ui/…` | `uicli.Run` (a command's run plumbing: streams, output format, quiet, failures, envelope), the wizard engine, `output.DryRun`, `output.FollowUpSteps` |
+| the command line of another command | injected by `cmd/wtm-next`, the only package that knows every command | `provision.Service.LeftBehind` (the `wtm clean <branch> --force` a failed undo suggests) |
 
 Extract on the second use, not before; until then a slice keeps its own code. A shared piece speaks the domain's language; each command maps it onto its own codes and messages (`worktree.Place` returns a sealed `Placement`, create and extract each turn it into their refusals).
+
+## A second step
+
+A command that offers a step after its outcome (sync's "push now?" once the result is read, clean's retry with sudo) gives it a second exported entry in its use case: its own request, operation, fingerprint and CLI spelling, run like the first. The first entry never runs it: it returns a `domain.FollowUp`, the argv of the line that triggers the second step, with its code, params and message. The CLI prints the argv word by word quoted for the shell (`output.FollowUpSteps`), the JSON envelope carries it as `error.follow_up{argv, code, message, params}`, and a caller runs it if it wants. Today a follow-up rides only on a failure (`error.follow_up`); the follow-ups of a success will go in the envelope's top-level `follow_ups`, whose shape LUC-313 decides. A follow-up that names another command gets its argv from `cmd/wtm-next`, so no service or `ui/` package knows that command.
 
 ## Codes, messages and exit codes
 
