@@ -124,7 +124,7 @@ func TestWorktreesReadsTheBranchABisectStartedFrom(t *testing.T) {
 		detached bool
 		want     worktree.State
 	}{
-		{name: "from a branch", want: worktree.Rebasing{Branch: "feature"}},
+		{name: "from a branch", want: worktree.Bisecting{Branch: "feature"}},
 		{name: "from a detached HEAD", detached: true, want: worktree.Detached{}},
 	}
 	for _, c := range cases {

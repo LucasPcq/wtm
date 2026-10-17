@@ -287,7 +287,8 @@ type buildWorktreeParams struct {
 }
 
 // buildWorktree adds the worktree in its seeded state, a rebase faked by its
-// rebase-merge state, then deletes its directory when the seed lists it gone.
+// rebase-merge state and a bisect by its BISECT_START, then deletes its
+// directory when the seed lists it gone.
 func buildWorktree(t testing.TB, params buildWorktreeParams) {
 	t.Helper()
 	path := params.Worktree.Path
@@ -301,6 +302,12 @@ func buildWorktree(t testing.TB, params buildWorktreeParams) {
 			t.Fatal(err)
 		}
 		if err := os.WriteFile(filepath.Join(rebaseMerge, "head-name"), []byte("refs/heads/"+state.Branch+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	case worktree.Bisecting:
+		Git(t, params.Main, "worktree", "add", "-q", "--detach", path, state.Branch)
+		bisectStart := filepath.Join(Output(t, path, "rev-parse", "--absolute-git-dir"), "BISECT_START")
+		if err := os.WriteFile(bisectStart, []byte(state.Branch+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	case worktree.Detached, worktree.Bare:

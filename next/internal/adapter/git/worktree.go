@@ -204,8 +204,8 @@ func parseWorktrees(out string) []worktree.Worktree {
 	return worktrees
 }
 
-// detachedState is what a detached worktree is doing: rebasing the branch its
-// rebase or bisect state names, or plainly detached. A worktree whose .git is
+// detachedState is what a detached worktree is doing: rebasing or bisecting the
+// branch its rebase or bisect state names, or plainly detached. A worktree whose .git is
 // gone, or whose rebase or bisect began on no branch, reads as detached.
 func detachedState(path string) (worktree.State, error) {
 	adminDir, err := adminDirOf(path)
@@ -235,8 +235,8 @@ func detachedState(path string) (worktree.State, error) {
 }
 
 // bisectState is the state of a detached worktree whose git directory is
-// adminDir: rebasing the branch a bisect in progress started from, as a rebase
-// is reported, or detached.
+// adminDir: bisecting the branch a bisect in progress started from, or
+// detached.
 func bisectState(adminDir string) (worktree.State, error) {
 	start, err := os.ReadFile(filepath.Join(adminDir, "BISECT_START"))
 	if errors.Is(err, fs.ErrNotExist) {
@@ -251,7 +251,7 @@ func bisectState(adminDir string) (worktree.State, error) {
 	if name == "" || isObjectID(name) {
 		return worktree.Detached{}, nil
 	}
-	return worktree.Rebasing{Branch: name}, nil
+	return worktree.Bisecting{Branch: name}, nil
 }
 
 // isObjectID reports whether s spells a full SHA-1 or SHA-256 object id.

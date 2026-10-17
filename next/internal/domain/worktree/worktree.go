@@ -14,7 +14,7 @@ type Worktree struct {
 
 //go-sumtype:decl State
 
-// State is what a worktree has checked out: OnBranch, Rebasing, Detached or Bare.
+// State is what a worktree has checked out: OnBranch, Rebasing, Bisecting, Detached or Bare.
 type State interface{ state() }
 
 // OnBranch is a worktree on a branch.
@@ -23,16 +23,20 @@ type OnBranch struct{ Branch string }
 // Rebasing is a worktree in the middle of a rebase of a branch.
 type Rebasing struct{ Branch string }
 
+// Bisecting is a worktree in the middle of a bisect started from a branch.
+type Bisecting struct{ Branch string }
+
 // Detached is a worktree on a commit, on no branch.
 type Detached struct{}
 
 // Bare is the bare repository's entry, which has no working tree.
 type Bare struct{}
 
-func (OnBranch) state() {}
-func (Rebasing) state() {}
-func (Detached) state() {}
-func (Bare) state()     {}
+func (OnBranch) state()  {}
+func (Rebasing) state()  {}
+func (Bisecting) state() {}
+func (Detached) state()  {}
+func (Bare) state()      {}
 
 // Merge asks to fast-forward the branch checked out in the worktree at Path onto Onto.
 type Merge struct {
@@ -40,12 +44,14 @@ type Merge struct {
 	Onto Ref
 }
 
-// Branch returns the branch the worktree is on or rebasing, "" when it is on none.
+// Branch returns the branch the worktree is on, rebasing or bisecting, "" when it is on none.
 func (w Worktree) Branch() string {
 	switch state := w.State.(type) {
 	case OnBranch:
 		return state.Branch
 	case Rebasing:
+		return state.Branch
+	case Bisecting:
 		return state.Branch
 	case Detached, Bare:
 	}
