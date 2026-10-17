@@ -2,13 +2,6 @@
 
 Complete setups for common projects. Each one shows the `run.toml` it ends with (in `.git/wtm/run.toml`) and the commands that use it. `wtm run init` writes most of this from detection; the recipes show where to take it by hand, with `wtm run job add|edit` or an editor. Every key is described in the [`run.toml` reference](run-toml.md).
 
-- [A pnpm or turbo monorepo](#a-pnpm-or-turbo-monorepo)
-- [A docker compose app](#a-docker-compose-app)
-- [One postgres, a database per worktree](#one-postgres-a-database-per-worktree)
-- [Several AI agents, each in its own worktree](#several-ai-agents-each-in-its-own-worktree)
-- [Stacked pull requests](#stacked-pull-requests)
-- [Run a command across worktrees](#run-a-command-across-worktrees)
-
 ## A pnpm or turbo monorepo
 
 One root script (`turbo run dev`, `pnpm -r --parallel run dev`) starts every app. Declare each app as a job with its own port, then the root script as a **runner** that `runs` them:
@@ -112,7 +105,7 @@ port = "DB_PORT"
 - `wtm run init` finds literal host ports (`"5432:5432"`) and absolute names (`container_name`, a volume's `name`) and offers to rewrite them; `--patch-compose` does it unattended. A renamed volume starts empty.
 - A `docker compose up` typed by hand in the worktree is isolated too, since the `.env` carries the ports and `COMPOSE_PROJECT_NAME`.
 
-See [How `wtm run` works](how-run-works.md) for compose names and the port check.
+See [How `wtm run` works](how-run-works.md#absolute-names) for compose names and [Ports and .env](ports-and-env.md#the-port-check) for the port check.
 
 ## One postgres, a database per worktree
 
@@ -212,7 +205,7 @@ wtm clean "$branch" --yes                                # add --force once the 
 
 - `run up --yes` leaves the other worktrees' jobs running, so agents starting at the same time do not stop each other. Setting `concurrency = "parallel"` in `run.toml` makes that the answer for people too.
 - Under `--yes` a missing choice is an error naming its flag, never a picker: `run start` needs `--job`, `create` needs the branch.
-- Exit codes are stable: `10` the worktree already exists, `11` the branch does not exist, `12` the repository was never initialized with wtm, `14` a job or profile `run.toml` does not declare, `16` no `run.toml`, `18` a `wtm env --check` that found drift, `19` an interactive run you backed out of (so `wtm create x && wtm go x` stops there), `20` a `wtm events` that received an event of a newer schema, `21` not in a git repository, `22` a state file written by a newer wtm, `2` a usage error. Which of them `wtm events` treats as final is in [The event stream](events.md#when-it-exits).
+- Every failure has its own exit code (`10` the worktree already exists, `19` an interactive run you backed out of, so `wtm create x && wtm go x` stops there…): the full table is in [Exit codes](integrations.md#exit-codes). An agent watching `wtm events` stops retrying on `2` (usage), `12` (repository not initialized), `20` (an event of a newer schema) and `21` (not in a git repository): see [When it exits](events.md#when-it-exits).
 - `wtm run ps --output json` lists everything running, across repositories, and `wtm list --output json` every worktree with its state.
 - `clean --yes` still refuses a worktree with uncommitted or unpushed work; that refusal is lifted only by `--force`.
 
@@ -220,44 +213,7 @@ wtm clean "$branch" --yes                                # add --force once the 
 
 ## Stacked pull requests
 
-Each branch builds on the previous one, and every worktree records its parent:
-
-```bash
-wtm create feat/api --yes
-wtm create feat/api-client --from feat/api --yes
-wtm create feat/checkout-ui --from feat/api-client --yes
-```
-
-```console
-$ wtm tree
-
-  main
-  └─ feat/api
-     └─ feat/api-client
-        └─ feat/checkout-ui
-```
-
-When `main` moves, or you amend `feat/api`, rebase the chain in order, parents first:
-
-```bash
-wtm sync --all --dry-run              # the plan, nothing changed
-wtm sync feat/api feat/api-client feat/checkout-ui
-wtm sync --all --yes --push           # unattended, then force-push with lease
-```
-
-On a conflict, `sync` aborts that branch's rebase and skips its descendants; `--keep-conflict` leaves the rebase in progress to resolve by hand. `--yes` never pushes unless `--push` is given.
-
-When `feat/api` is merged (squash or rebase merges included), move its child onto `main` and remove it:
-
-```bash
-wtm reparent feat/api-client --to main --yes
-wtm sync feat/api-client feat/checkout-ui --yes --push
-wtm clean feat/api --yes
-```
-
-Or in one pass once several PRs are merged, with `gh` installed: `wtm prune --merged --reparent-children --yes`. `wtm tree --output mermaid` prints the stack as a flowchart for a PR description.
-
-`prune` only reads the branches that have a worktree: it asks GitHub for their pull requests in one query, however old the pull request, and its fetch refreshes only their remote-tracking refs, so a repository with thousands of branches costs it no more than one with ten. The remote-tracking refs of the other branches are left as they are: `git fetch --prune` refreshes them.
+Branches built on each other, each in its own worktree, rebased in order with `wtm sync` and moved past a merged parent with `wtm reparent` or `wtm prune`: the whole workflow is in [Stacked branches](stacked-branches.md).
 
 ## Run a command across worktrees
 
@@ -289,3 +245,29 @@ $ wtm clean feat/login fix/header --yes
 - The run exits `1` when any command failed; each worktree's own exit code is in the report, and in `--output json` (`{command, results: [{branch, path, status, exit_code, …}], failed: [branch…]}`) for a script or an agent.
 
 `create` and `clean` with several branches go one after the other, and a failure does not stop the others: the run ends with what succeeded and what failed, and exits with the first failure's code. Under `--yes`, `clean` refuses the whole batch before removing anything when one worktree is unsafe (dirty, unpushed, open PR, locked): pass `--force`, or name only the safe ones. Their `--output json` is an envelope, `{"results": [...], "failed": [...]}` (see [Migrating to 0.29](migrating-to-0.29.md)).
+
+## Sharing `run.toml` with the team
+
+`run.toml` lives in `.git/wtm/`, so it is never committed: each clone has its own. One person who has it working exports it as JSON, and everyone else imports that file:
+
+```bash
+wtm run export > acme-run.json           # in the clone that has it
+```
+
+Commit `acme-run.json` wherever the team keeps such files, with the scripts its jobs call (`scripts/db-worktree-add.sh`…), or pass it around. In every other clone:
+
+```console
+$ wtm run import acme-run.json --yes
+
+  ✓ 2 job(s): web, api
+  ✓ 1 profile(s): dev
+  ✓ 3 .env port link(s)
+
+  → wtm env   reconcile the .env files against this configuration
+
+$ for b in $(wtm list --output json | jq -r '.[].branch'); do wtm env "$b" --yes; done
+```
+
+- The import replaces the whole `run.toml`: jobs, profiles, `.env` links and project settings. Without `--yes` it asks to confirm; with no terminal and no `--yes` it refuses, since it overwrites a file.
+- It reconciles nothing itself. `wtm env <branch>` settles each worktree's `.env` on the new ports and addresses; the loop above does every worktree, the main checkout included.
+- Nothing in the file is tied to one machine: `cwd` and `.env` paths are relative to the repository, and the ports are the base ports, from which each clone derives its worktrees' own. `wtm run import -` reads the payload from stdin.

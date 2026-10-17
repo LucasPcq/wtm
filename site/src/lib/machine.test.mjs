@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AGENTS, INITIAL, panel, worktree } from './machine.mjs';
+import { card, lanes, worktree } from './machine.mjs';
 
 const entry = (wt, path, key) => wt.files.find((f) => f.path === path).entries.find((e) => e.key === key);
 
@@ -25,14 +25,13 @@ test('a worktree shifts its ports by ten per ordinal and names its own resources
   });
 });
 
-test('no two worktrees on the page share a port', () => {
-  const all = [...INITIAL, ...AGENTS].map((branch, ordinal) => worktree(branch, ordinal));
-  const ports = all.flatMap((wt) => wt.files.flatMap((f) => f.entries.filter((e) => e.key === 'PORT').map((e) => e.value)));
-  assert.equal(new Set(ports).size, ports.length);
+test('a card reads the identity off what wtm writes', () => {
+  assert.deepEqual(card(worktree('agent/checkout', 2)), {
+    branch: 'agent/checkout', url: 'web.agent-checkout.acme.localhost', webPort: '3020', apiPort: '4020', compose: 'acme-agent-checkout', database: 'app_agent-checkout',
+  });
 });
 
-test('a changed value is preceded by what main has, as a shell comment', () => {
-  const html = panel(worktree('feat/login', 1));
-  assert.match(html, /<span class="ln m"># main: 3000<\/span><span class="ln"><span class="m">PORT=<\/span><span class="p">3010<\/span>/);
-  assert.doesNotMatch(panel(worktree('main', 0)), /# main:/);
+test('no two lanes on the page share a port, a project or a database', () => {
+  const all = lanes();
+  for (const key of ['webPort', 'apiPort', 'compose', 'database', 'url']) assert.equal(new Set(all.map((l) => l[key])).size, all.length, key);
 });

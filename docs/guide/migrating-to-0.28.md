@@ -19,7 +19,7 @@ wtm env feat/login --isolation isolated   # its own ports and a new compose proj
 wtm env feat/login --isolation verbatim   # stay on its source's values
 ```
 
-The interactive `wtm env` offers the same choice and says what it changes. See [Isolation](isolation.md).
+The interactive `wtm env` offers the same choice, or to keep the worktree as it is for now, and says what each answer changes. See [Isolation](isolation.md).
 
 ## Hooks
 

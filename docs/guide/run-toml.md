@@ -1,6 +1,6 @@
 # `run.toml` reference
 
-`<git-common-dir>/wtm/run.toml` (`.git/wtm/run.toml` in a normal clone) declares the jobs of the `run` module. It is per-clone and never committed; share it with `wtm run export | wtm run import -`. `wtm run init` writes it from detection, `wtm run job …` / `wtm run profile …` edit it, and a hand edit is fine: the file is validated every time it is read, and every write puts its JSON schema beside it (`schemas/run.schema.json`) for editor autocomplete.
+`<git-common-dir>/wtm/run.toml` (`.git/wtm/run.toml` in a normal clone) declares the jobs of the `run` module. It is per-clone and never committed; share it with `wtm run export > run.json` in one clone and `wtm run import run.json` in another. `wtm run init` writes it from detection, `wtm run job …` / `wtm run profile …` edit it, and a hand edit is fine: the file is validated every time it is read, and every write puts its JSON schema beside it (`schemas/run.schema.json`) for editor autocomplete.
 
 **Validation is strict.** An unknown key, a misspelt `kind`, a reference to an undeclared job, or two links claiming the same key refuse the file, naming the cause. A refused file never fails a core command (`create`, `extract`, `checkout`, `env`, `clean`…): only the run part is skipped, with a warning. `run up` and `run start` refuse it; `run down`, `run stop` and `run ps` warn and carry on, so what is running can always be stopped.
 
@@ -55,7 +55,7 @@ port = "DB_PORT"
 | `addressing` | `"names"` | what an `[[env_port]]` link writes into a value pointing at a job that publishes a URL: its named origin (`"names"`) or its port (`"ports"`), see [Addressing](addressing.md) |
 | `concurrency` | unset (asked once) | the standing answer when another worktree runs jobs: `"parallel"` keeps them, `"exclusive"` stops them first |
 | `port_offset_block` | `10` | the spacing between two worktrees' ports: worktree `n` binds `base + n × block` |
-| `port_probe_timeout` | `15` | seconds `run up` / `run start` wait for a declared port to answer; a negative value turns the check off |
+| `port_probe_timeout` | `15` | seconds `run up` / `run start` wait for a declared port to answer; a negative value turns the [port check](ports-and-env.md#the-port-check) off |
 
 ## `[[job]]`
 
@@ -75,7 +75,7 @@ port = "DB_PORT"
 | `scope` | no | `"shared"`: one instance for the repository, run in the main checkout, see [Shared services](shared-services.md). Absent means one per worktree |
 | `namespace` | no | shared services only: `{ name, create, remove, env }`, the worktree's own part of the service. `name` and `create` are required together |
 
-A job runs with the worktree's identity in its environment: `WTM_BRANCH`, `WTM_WORKTREE` (the branch as a slug), `WTM_ORDINAL` (the main checkout is `0`), `WTM_PORT_OFFSET`, `WTM_ISOLATION`, `COMPOSE_PROJECT_NAME` (isolated worktrees and the main checkout) and its declared ports. Two base ports a multiple of `port_offset_block` apart are refused, since two worktrees would meet on the same port.
+A job runs with the worktree's identity and its declared ports in its environment: see [the job environment](how-run-works.md#the-job-environment). Two base ports a multiple of `port_offset_block` apart are refused, since two worktrees would meet on the same port.
 
 ## `[[profile]]`
 
@@ -87,7 +87,7 @@ A job runs with the worktree's identity in its environment: `WTM_BRANCH`, `WTM_W
 
 ## `[[env_port]]`
 
-Links a `.env` key to a declared port, so the port inside its value follows the worktree:
+Links a `.env` key to a declared port, so the port inside its value follows the worktree ([how the value is rewritten](ports-and-env.md#ports-hard-coded-in-a-env)):
 
 | Key | Meaning |
 | --- | --- |
@@ -96,18 +96,16 @@ Links a `.env` key to a declared port, so the port inside its value follows the 
 | `job` | the job declaring the port, required since two jobs may both declare a `PORT` |
 | `port` | the declared port name |
 
-wtm finds the declared base inside the value and shifts only that number or, under `addressing = "names"`, writes the job's whole named origin when the value is a URL and the job publishes one. A value where the base is missing or appears twice is reported and left alone. The rest of the line stays as written: its quotes or their absence (a libpq `host=… port=5432 dbname=app` stays unquoted), its inline comment, `export` and line ending; quotes are added only when the new value would not read back without them.
-
 ## `[[env]]`
 
-Writes a `.env` key's whole value from a template: what a worktree holds of a shared service, which no port can say:
+Writes a `.env` key's whole value from a template, for a value [that is not a port](ports-and-env.md#values-that-are-not-a-port) such as a shared service's namespace:
 
 | Key | Meaning |
 | --- | --- |
 | `file` | a `.env` target configured in `config.toml` |
 | `key` | the key wtm owns |
 | `job` | the job the value speaks about |
-| `value` | a template over `{namespace}`, `{port.NAME}`, `{origin}`, `{worktree}`, `{ordinal}` |
+| `value` | a template over `{namespace}` (the job's namespace in this worktree), `{port.NAME}` (a port of that job, as it resolves in the worktree), `{origin}` (the job's published address), `{worktree}` and `{ordinal}`; any other placeholder is refused |
 
 A key is written by an `[[env]]` link or an `[[env_port]]` link, never both.
 

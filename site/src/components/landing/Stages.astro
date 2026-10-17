@@ -1,0 +1,26 @@
+---
+const stages = [
+  { cmd: 'wtm create', title: 'Ready to code', text: '.env copied, hooks run, from any base. Several at once.' },
+  { cmd: 'wtm run up', title: 'Running, isolated', text: 'Its own ports, Compose project, database and URL.', peak: true },
+  { cmd: 'wtm sync', title: 'Kept in order', text: 'Stacked branches rebased onto their parents.' },
+  { cmd: 'wtm prune', title: 'Gone once merged', text: 'Never with uncommitted or unpushed work.' },
+];
+---
+<section class="section">
+  <div class="wrap">
+    <div class="heading-row">
+      <h2>The life of a branch</h2>
+      <p class="small">One tool from the first commit to the merge.</p>
+    </div>
+    <div class="timeline">
+      {stages.map((s) => (
+        <div class:list={{ peak: s.peak }}>
+          <span class="dot"></span>
+          <p class="label">{s.cmd}</p>
+          <h3>{s.title}</h3>
+          <p class="small">{s.text}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

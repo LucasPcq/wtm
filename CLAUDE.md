@@ -14,6 +14,7 @@ Mandatory coding standards for `wtm`. For Go idioms and their sources, consult t
 | [`docs/dev/cli.md`](docs/dev/cli.md) | touching `internal/surface/cli` itself: the root (signals, `--quiet`, exit code), flag wiring |
 | [`docs/dev/output.md`](docs/dev/output.md) | adding a command or changing what one prints (frame, glyphs, block helpers, `--quiet`, JSON contract, hook view) |
 | [`docs/dev/lint.md`](docs/dev/lint.md) | adding an `archlint` rule or an exception, or when `make lint` fails and the reason is unclear |
+| [`docs/dev/identity.md`](docs/dev/identity.md) | touching the landing, the docs theme, the README pitch, the social preview or any launch material (positioning, voice, colours, type, logo, layout) |
 | [`docs/dev/changelog.md`](docs/dev/changelog.md) | writing a `CHANGELOG.md` entry |
 | [`docs/dev/run-addressing.md`](docs/dev/run-addressing.md), [`docs/dev/shared-services.md`](docs/dev/shared-services.md) | touching the run proxy / addressing, or `scope = "shared"` jobs |
 
@@ -21,13 +22,14 @@ Mandatory coding standards for `wtm`. For Go idioms and their sources, consult t
 
 ## Docs & README
 
-- **User-facing agent skill** — `internal/surface/cli/agents/assets/using-wtm/` is shipped to end users so their LLM can drive `wtm`: a short `SKILL.md` (driving rules, exit codes, which reference to read when) and `references/*.md` (worktrees, stacks, run, run-config, json). A new fact goes in the reference whose topic it is, never in `SKILL.md` unless every task needs it. Update it in the same session whenever the command surface or agent-relevant behaviour changes (new/renamed command or flag, `--output json` shape, failure/abort semantics, interactive-vs-non-interactive behaviour). Skip internal refactors and TUI-only changes.
-- **`docs/wtm_*.md` is generated** by `tools/gendocs` from the Cobra tree — never hand-edit it. Whenever a command or flag is added, modified or removed: run `make docs`; if a command was added/renamed/removed, update the `README.md` overview table (grouped like the root `--help`). Never re-add per-command flag tables to the README.
-- **`docs/dev/`** (developer docs) and **`docs/guide/`** (user guide: configuration, isolation, jobs and profiles, `wtm run`, shared services, addressing, `run.toml`, state files, migration notes) are hand-written. A concept a user needs and no `--help` can carry goes in the guide, linked from the README. Update both in the same change as the behaviour they describe.
-- **The docs site** (`site/`, Starlight) is built from `docs/`, `README.md` and `CHANGELOG.md` as they are: `site/scripts/sync-docs.mjs` only adds front matter and turns repository links into site routes, so never write site-only Markdown in `docs/`. The landing page (`site/src/pages/index.astro`, sections in `site/src/components/landing/`) is a plain Astro page outside Starlight, like `privacy.astro` and `terms.astro` beside it (keep them true to what wtm sends over the network); its numbers come from `site/src/lib/facts.mjs` (git tags, `CHANGELOG.md`), `machine.mjs` (what wtm writes per worktree: ports, `.env` values, job environment) and `dashboard.mjs` (a `wtm ui` frame), tested by `npm test`; its terminals replay output captured with the `wtm-sandbox` skill, so re-capture them when a shown command's output changes. The docs (`src/styles/theme.css`) share its fonts, colours and branch mark. The docs home is `site/src/docs-home.mdx`, published at `/docs/` with `__BASE__` replaced. `DOMAIN` in `site/site.config.mjs` sets the site URL, the base path, the `CNAME` and the contact address; the command reference sidebar follows `docs/commands.json` (written by `make docs`); each release minor before the current one is archived from its tag (`site/site.config.mjs`), and `internal/schemas/*.json` are published under `/schemas/`. `make site` builds it (links validated), `make site-dev` serves it; the `docs-site` workflow publishes it to GitHub Pages on each release tag.
-- **`README.md` is the product page**, not a reference: pitch, one short section per feature with its GIF, install, quick start, the command-overview table. Anything longer belongs in `docs/guide/`. GIFs are recorded from `docs/demos/*.tape` (VHS, `docs/demos/setup.sh`): when a change alters what a recorded command prints, run `make demos`.
-- **`CHANGELOG.md`** is in English, in Keep a Changelog shape, following [`docs/dev/changelog.md`](docs/dev/changelog.md) (template + rules): a few one-line bullets per release linking into the guide, the migration detail in `docs/guide/migrating-to-<version>.md`. Each release section is published as the GitHub release notes by `make release-notes VERSION=x.y.z`.
-- **Markdown:** never hard-wrap prose — one paragraph is one line.
+Two skills carry the detail: **`wtm-docs`** for any documentation change (where a fact belongs, the guide page shape, the guide index, audits) and **`wtm-site`** for the landing, the legal pages, the docs theme and the README pitch (identity rules in code, before/after screenshots). What every change must respect:
+
+- **Docs follow the code in the same change.** A command, flag, output or behaviour that changes updates its docs in the same session: `make docs` regenerates `docs/wtm_*.md` and `docs/commands.json` from the Cobra tree (never hand-edit them), the guide (`docs/guide/`) and developer docs (`docs/dev/`) are hand-written.
+- **User-facing agent skill** — `internal/surface/cli/agents/assets/using-wtm/` ships to end users so their LLM can drive `wtm`: a short `SKILL.md` and `references/*.md` by topic. Update it whenever the command surface or agent-relevant behaviour changes (command or flag, `--output json` shape, failure/abort semantics, interactive vs non-interactive). Skip internal refactors and TUI-only changes.
+- **The docs site** (`site/`, Starlight) is built from `docs/`, `README.md` and `CHANGELOG.md` as they are: never write site-only Markdown in `docs/`. The guide sidebar is built from the sections of `docs/guide/README.md`, so a guide page not listed there does not appear. `make site` builds it and validates links, `make site-dev` serves it; the `docs-site` workflow publishes it on each release tag. `site/site.config.mjs` holds the domain, the base path and the archived versions.
+- **The landing and the README** follow `docs/dev/identity.md`; their terminals and visuals replay real output (the `wtm-sandbox` skill, `make demos` for the README GIFs), re-captured when a shown command's output changes.
+- **`CHANGELOG.md`** follows [`docs/dev/changelog.md`](docs/dev/changelog.md); each release section becomes the GitHub release notes (`make release-notes VERSION=x.y.z`).
+- **Markdown:** English, never hard-wrapped — one paragraph is one line.
 
 ## 1. Immutability first
 
@@ -158,7 +160,7 @@ Every commit message — subject and body — is in English, whatever language t
 make lint          # fmt + vet + arch (tools/archlint) + dead (deadcode) + sumtype (go-sumtype) + staticcheck — all gating
 make test          # go test ./... -race -count=1
 make docs          # regenerate docs/ from the Cobra tree
-make demos         # re-record the README GIFs (needs vhs)
+make demos         # re-record the README GIFs and stills (needs vhs)
 make release-notes VERSION=x.y.z   # print a CHANGELOG section as release notes
 make dupl          # clone report, informative only
 ```

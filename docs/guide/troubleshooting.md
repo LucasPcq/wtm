@@ -2,15 +2,6 @@
 
 Common problems, what causes them, and the command that fixes each one.
 
-- [A port is already in use](#a-port-is-already-in-use)
-- [A job is reported crashed](#a-job-is-reported-crashed)
-- [The daemon is another version](#the-daemon-is-another-version)
-- [A stack started by 0.27 is still running](#a-stack-started-by-027-is-still-running)
-- [`wtm go` does not change directory](#wtm-go-does-not-change-directory)
-- [No `run.toml` (exit 16)](#no-runtoml-exit-16)
-- [A named URL does not answer](#a-named-url-does-not-answer)
-- [A `.env` is out of date](#a-env-is-out-of-date)
-
 ## A port is already in use
 
 **Symptom.** `wtm run up` reports a job started, then `wtm run ps` shows it `crashed`, and its log ends with `Address already in use` (or `EADDRINUSE`).
@@ -28,7 +19,7 @@ lsof -nP -iTCP:5183 -sTCP:LISTEN        # any other process
 - **Another worktree's job**: every isolated worktree has its own ports, so this is usually a **verbatim** worktree and its source, which share their ports on purpose. `run up` offers to stop the other one; under `--yes`, pass `--exclusive`. To run both at once, give the worktree its own ports: `wtm env <branch> --isolation isolated`.
 - **A port in another project** that happens to fall on one of yours: move this project's ports with `port_offset_block` at the top of `run.toml`, or change the base port with `wtm run job edit <job> --port PORT=<base> --yes`, then `wtm env <branch>` to settle each worktree's `.env`.
 
-**A related warning: "Ports declared but not bound".** Nothing answers on the port wtm gave the job, often because something answers on the base port instead. The command never read its variable: pass it explicitly (`--cmd 'pnpm dev --port ${PORT}'`), check that the app's `.env` does not pin a port, and in a Turborepo let the variable through (`globalPassThroughEnv` in `turbo.json`). `probe = false` on a job silences the check. See [Checking the ports](jobs-and-profiles.md#checking-the-ports).
+**A related warning: "Ports declared but not bound".** Nothing answers on the port wtm gave the job, often because something answers on the base port instead. The command never read its variable: pass it explicitly (`--cmd 'pnpm dev --port ${PORT}'`), check that the app's `.env` does not pin a port, and in a Turborepo let the variable through (`globalPassThroughEnv` in `turbo.json`). `probe = false` on a job silences the check. See [The port check](ports-and-env.md#the-port-check).
 
 ## A job is reported crashed
 
@@ -95,16 +86,13 @@ For fish, add `wtm shell-init | source` to `config.fish`. After an upgrade, open
 
 **Cause.** The `run` module is opt-in, and `run.toml` lives in `.git/wtm/`: it is per clone and never committed. A new clone has none, even when a teammate's does. Every worktree of a clone shares the same file.
 
-**Fix.** Create it from detection, or copy it from a clone that has one:
+**Fix.** Create it from detection:
 
 ```bash
 wtm run init                                  # detect compose files and scripts
-
-wtm run export > run.json                     # in the clone that has it
-wtm run import run.json                       # in this one
 ```
 
-After an import, `wtm env <branch>` settles each worktree's `.env` on it.
+Or import the one a teammate exported, then settle each worktree's `.env` on it: see [Sharing `run.toml` with the team](recipes.md#sharing-runtoml-with-the-team).
 
 ## A named URL does not answer
 

@@ -1,13 +1,15 @@
 // What wtm writes for a worktree of the sandbox repository `acme`, following its
-// rules (docs/guide/how-run-works.md, shared-services.md): the main checkout keeps
+// rules (docs/guide/ports-and-env.md, shared-services.md): the main checkout keeps
 // the defaults, worktree n adds n × 10 to every port and names its own resources.
 const REPO = 'acme';
 const BLOCK = 10;
 
-export const INITIAL = ['main', 'feat/login', 'feat/search'];
-export const AGENTS = ['agent/checkout', 'agent/billing', 'agent/oauth'];
-
-const esc = (s) => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+// The three branches the landing follows, in the order wtm created them.
+export const LANES = [
+  { branch: 'feat/login', who: 'you' },
+  { branch: 'agent/checkout', who: 'claude' },
+  { branch: 'agent/search', who: 'codex' },
+];
 
 export const worktree = (branch, ordinal) => {
   const slug = branch.replaceAll('/', '-');
@@ -50,12 +52,16 @@ export const worktree = (branch, ordinal) => {
   };
 };
 
-const line = (e) => {
-  const changed = e.was !== undefined && e.was !== e.value;
-  const value = changed ? `<span class="p">${esc(e.value)}</span>` : esc(e.value);
-  const note = changed ? `<span class="ln m"># main: ${esc(e.was)}</span>` : '';
-  return `${note}<span class="ln"><span class="m">${e.key}=</span>${value}</span>`;
-};
+const value = (wt, path, key) => wt.files.find((f) => f.path === path).entries.find((e) => e.key === key).value;
 
-export const panel = (wt) =>
-  wt.files.map((f) => `<div class="envfile"><div class="envfile-head"><span>${esc(f.path)}</span><span class="m">${f.by}</span></div><div class="envfile-body">${f.entries.map(line).join('')}</div></div>`).join('');
+// One worktree's identity as the landing shows it: its address, ports, Compose project and database.
+export const card = (wt) => ({
+  branch: wt.branch,
+  url: `web.${wt.slug}.${REPO}.localhost`,
+  webPort: value(wt, 'apps/web/.env', 'PORT'),
+  apiPort: value(wt, 'apps/api/.env', 'PORT'),
+  compose: value(wt, 'environment of every job', 'COMPOSE_PROJECT_NAME'),
+  database: value(wt, 'apps/api/.env', 'DATABASE_URL').split('/').pop(),
+});
+
+export const lanes = () => LANES.map((lane, i) => ({ ...lane, ...card(worktree(lane.branch, i + 1)) }));

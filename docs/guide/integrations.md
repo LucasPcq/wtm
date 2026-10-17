@@ -8,14 +8,6 @@ wtm list --output json | jq -r '.[] | select(.is_dirty) | .branch'
 wtm events --output json | jq -c 'select(.type == "worktree.provisioned")'
 ```
 
-| You want to | Use |
-| --- | --- |
-| run a command without prompts and parse its result | [`--yes` and `--output json`](#the-contract---yes-and---output-json) |
-| teach an AI agent the commands | [the `using-wtm` skill](#ai-agents-wtm-agents-install) |
-| react to worktrees changing, whoever changed them | [`wtm events`](#reacting-to-changes-wtm-events) |
-| know whether the installed wtm speaks your contract | [`wtm version --output json`](#checking-the-installed-version) |
-| tell your command's events from everyone else's | [`WTM_CORRELATION_ID`](#tying-events-to-your-command-wtm_correlation_id) |
-
 ## The contract: `--yes` and `--output json`
 
 - **`--output json`** on every data command writes one JSON document on stdout. Human text, warnings and errors go to stderr, so stdout parses as is.
@@ -40,7 +32,11 @@ $ wtm create feat/login --if-not-exists --yes --output json
 }
 ```
 
-Check the exit code first, and parse stdout only when it is non-empty. A command that got far enough to have per-item results (`create`, `clean`, `exec`, `run up`, `sync`, `prune`…) writes its whole document, then exits non-zero, with the failures named in it: `create` and `clean` exit with the first failure's code, `exec` with `1`. One that failed before writes nothing on stdout. The exit codes are stable:
+Check the exit code first, and parse stdout only when it is non-empty. A command that got far enough to have per-item results (`create`, `clean`, `exec`, `run up`, `sync`, `prune`…) writes its whole document, then exits non-zero, with the failures named in it: `create` and `clean` exit with the first failure's code, `exec` with `1`. One that failed before writes nothing on stdout.
+
+### Exit codes
+
+The codes are stable, and the same for every command:
 
 | Code | Means |
 | --- | --- |
@@ -89,27 +85,7 @@ It installs the `using-wtm` skill into Claude Code (`.claude/`) or Cursor (`.cur
 
 ## Reacting to changes: `wtm events`
 
-`wtm list --output json` answers once. `wtm events --output json` keeps answering: a snapshot of every worktree, then one JSON line per change (created, provisioned, updated, relocated, reparented, deprovisioned, removed), whoever made it. Run outside a repository, it follows every repository wtm was used in. It is the way to keep a sidebar, a set of editor windows or terminal panes in step with the worktrees. The full contract, the events and the exit codes are in [The event stream](events.md).
-
-## Checking the installed version
-
-```console
-$ wtm version --output json
-{
-  "version": "0.29.0",
-  "events": 1
-}
-```
-
-`version` is the binary's version (`dev` for a local build), and every other key is the version of a contract an integration reads; today `events`, the schema version of `wtm events`. Ignore keys you do not know. `wtm version` exiting `2`, or a missing `events` key, means a wtm older than the stream: ask the user to upgrade (`wtm upgrade`).
-
-## Tying events to your command: `WTM_CORRELATION_ID`
-
-```bash
-WTM_CORRELATION_ID=popup-42 wtm create feat/login --yes
-```
-
-Every event that command publishes, including those of its hooks' own wtm commands, carries `"correlation_id":"popup-42"`, so a host can wait for *its* `worktree.provisioned` while an agent works in the next pane. Any string up to 256 bytes without a control character; anything else exits `2` before the command does anything. A complete example is in [End to end](events.md#end-to-end-create-a-worktree-and-open-it-once-it-is-ready).
+`wtm list --output json` answers once. `wtm events --output json` keeps answering: a snapshot of every worktree, then one JSON line per change (created, provisioned, updated, relocated, reparented, deprovisioned, removed, and each job started, crashed or stopped), whoever made it. Run outside a repository, it follows every repository wtm was used in. It is the way to keep a sidebar, a set of editor windows or terminal panes in step with the worktrees. The full contract is in [The event stream](events.md), with [`wtm version --output json`](events.md#checking-compatibility) to check that the installed wtm speaks it and [`WTM_CORRELATION_ID`](events.md#recognising-your-own-command) to pick out the events of a command you started.
 
 ## Built on wtm
 

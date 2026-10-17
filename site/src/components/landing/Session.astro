@@ -1,14 +1,13 @@
 ---
 import { render, type Line } from '../../lib/term.mjs';
 
-interface Props { title: string; lines: Line[]; class?: string }
-const { title, lines, class: extra } = Astro.props;
+interface Props { title: string; lines: Line[]; wide?: boolean; wrapped?: boolean }
+const { title, lines, wide, wrapped } = Astro.props;
 ---
-<figure class:list={['term', extra]} data-play>
+<figure class="term" data-play>
   <div class="term-bar">
-    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-    <span class="title">{title}</span>
+    <span>{title}</span>
     <button class="replay" type="button" hidden>replay</button>
   </div>
-  <div class="screen" set:html={render(lines)} />
+  <div class:list={['screen', { wide, wrapped }]} set:html={render(lines)} />
 </figure>

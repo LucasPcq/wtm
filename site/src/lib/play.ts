@@ -2,8 +2,9 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const runs = new WeakMap<Element, number>();
 
-// Types each command and reveals its output line by line. Lines keep their space
-// while hidden, so the terminal never changes height.
+// Reveals a replayed session line by line, each line whole: a command, then its
+// output at the pace wtm printed it. Lines keep their space while hidden, so the
+// terminal never changes height.
 export const play = async (screen: Element) => {
   if (reduced) return;
   const run = (runs.get(screen) ?? 0) + 1;
@@ -13,30 +14,8 @@ export const play = async (screen: Element) => {
   for (const line of lines) {
     if (runs.get(screen) !== run) return;
     line.classList.remove('pending');
-    const typed = line.querySelector<HTMLElement>('.typed');
-    if (!typed) {
-      await sleep(Number(line.dataset.delay ?? 55));
-      continue;
-    }
-    const text = line.dataset.text ?? '';
-    line.classList.add('typing');
-    for (let i = 0; i <= text.length; i++) {
-      if (runs.get(screen) !== run) return;
-      typed.textContent = text.slice(0, i);
-      await sleep(14);
-    }
-    await sleep(300);
-    line.classList.remove('typing');
+    await sleep(line.classList.contains('cmd') ? 500 : Number(line.dataset.delay ?? 55));
   }
-};
-
-export const stop = (screen: Element) => {
-  runs.set(screen, (runs.get(screen) ?? 0) + 1);
-  screen.querySelectorAll<HTMLElement>('.ln').forEach((line) => {
-    line.classList.remove('pending', 'typing');
-    const typed = line.querySelector<HTMLElement>('.typed');
-    if (typed) typed.textContent = line.dataset.text ?? '';
-  });
 };
 
 const whenSeen = (element: Element, callback: () => void) => {
@@ -59,4 +38,27 @@ export const wireSessions = () => {
     }
     whenSeen(term, () => play(screen));
   }
+};
+
+// The hero figure: three lanes braid into one port, the errors dim, the lanes
+// split and three worktrees arrive. Played once when seen; replay restarts it.
+export const wireCollision = () => {
+  const figure = document.querySelector<HTMLElement>('.collision');
+  if (!figure) return;
+  if (reduced) {
+    figure.dataset.phase = '3';
+    return;
+  }
+  let timers: number[] = [];
+  const start = () => {
+    timers.forEach(clearTimeout);
+    figure.dataset.phase = '0';
+    timers = [1900, 2700, 3200].map((at, i) => window.setTimeout(() => (figure.dataset.phase = String(i + 1)), at));
+  };
+  const replay = figure.querySelector<HTMLButtonElement>('.replay');
+  if (replay) {
+    replay.hidden = false;
+    replay.addEventListener('click', start);
+  }
+  whenSeen(figure, start);
 };

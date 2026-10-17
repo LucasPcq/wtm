@@ -1,4 +1,4 @@
-# A worktree's state: `wtm status`
+# A worktree's state
 
 `wtm status` answers one question about a worktree: is it ready, and if not, what do I run? It reads everything a worktree is made of in one pass — how it runs, which of its `.env` files exist, what its jobs are doing — and names each problem with the command that fixes it.
 

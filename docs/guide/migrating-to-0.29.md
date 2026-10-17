@@ -1,5 +1,7 @@
 # Migrating to 0.29
 
+0.29 lets `create` and `clean` act on several worktrees in one run. Their JSON output becomes an envelope, the wizard asks for a list of branches, and two exit codes change.
+
 ## `wtm create --output json` answers with an envelope
 
 `create` can now make several worktrees in one run, so its JSON document is always an envelope, even for a single branch.
@@ -7,13 +9,13 @@
 Before:
 
 ```json
-{"branch": "feat/login", "path": "/repo/.worktrees/feat-login", "already_exists": false, ...}
+{"branch": "feat/login", "path": "/code/.trees/feat-login", "already_exists": false, ...}
 ```
 
 After:
 
 ```json
-{"results": [{"branch": "feat/login", "path": "/repo/.worktrees/feat-login", "already_exists": false, ...}], "failed": []}
+{"results": [{"branch": "feat/login", "path": "/code/.trees/feat-login", "already_exists": false, ...}], "failed": []}
 ```
 
 A script reading `.path` reads `.results[0].path`. A branch that could not be created is in `failed`, with its `error`, its `exit_code`, and its `path` when the worktree exists but an `on_create` hook failed. The process still exits with the first failure's code, so a script that only checks the exit code needs no change.
@@ -25,13 +27,13 @@ A script reading `.path` reads `.results[0].path`. A branch that could not be cr
 Before:
 
 ```json
-{"branch": "feat/login", "path": "/repo/.worktrees/feat-login", "already_absent": false, "namespaces": []}
+{"branch": "feat/login", "path": "/code/.trees/feat-login", "already_absent": false, "namespaces": []}
 ```
 
 After:
 
 ```json
-{"results": [{"branch": "feat/login", "path": "/repo/.worktrees/feat-login", "already_absent": false}], "failed": [], "skipped": [], "reparented": [], "orphaned_children": [], "namespaces": []}
+{"results": [{"branch": "feat/login", "path": "/code/.trees/feat-login", "already_absent": false}], "failed": [], "skipped": [], "reparented": [], "orphaned_children": [], "namespaces": []}
 ```
 
 A script reading `.already_absent` reads `.results[0].already_absent`. `reparented`, `orphaned_children` and `namespaces` stay at the top level, each entry naming its `branch`. A worktree that could not be removed is in `failed` with its `error` and `exit_code`; the process still exits with the first failure's code.
@@ -42,7 +44,7 @@ A script reading `.already_absent` reads `.results[0].already_absent`. `reparent
 
 ## `wtm clean` takes several worktrees
 
-`wtm clean feat/a feat/b` removes both; without arguments the picker lets you check several. Under `--yes`, one unsafe worktree (dirty, unpushed, open PR) refuses the whole run before anything is removed, so pass `--force` or name only the safe ones. The dashboard (`wtm ui`) offers the same from its global menu, « Delete worktrees »; the row menu still deletes the one worktree it was opened from.
+`wtm clean feat/login fix/header` removes both; without arguments the picker lets you check several. Under `--yes`, one unsafe worktree (dirty, unpushed, open PR) refuses the whole run before anything is removed, so pass `--force` or name only the safe ones. The dashboard (`wtm ui`) offers the same from its global menu, "Delete worktrees"; the row menu still deletes the one worktree it was opened from.
 
 ## Two exit codes changed
 
@@ -51,4 +53,4 @@ A script reading `.already_absent` reads `.results[0].already_absent`. `reparent
 | `21` | any command run outside a git repository | `1` |
 | `19` | every interactive cancellation: Esc, Ctrl-C, "No, cancel", a declined confirmation. Never under `--yes` | `0` |
 
-`wtm create x && wtm go x` now stops when the wizard is cancelled. A script that tested `1` for "not a repository", or read `0` after a cancelled prompt, checks for `21` or `19`. The full list is in [Integrations](integrations.md#the-contract---yes-and---output-json).
+`wtm create x && wtm go x` now stops when the wizard is cancelled. A script that tested `1` for "not a repository", or read `0` after a cancelled prompt, checks for `21` or `19`. The full list is in [Exit codes](integrations.md#exit-codes).

@@ -14,7 +14,7 @@ scope = "shared"
   [job.ports]
   POSTGRES_PORT = 5432
   [job.namespace]
-  name   = "app_{worktree}"                 # app_feat-x in worktree feat/x
+  name   = "app_{worktree}"                 # app_feat-login in worktree feat/login
   create = "scripts/db-worktree-add.sh"     # run on every start: must be safe to run again
   remove = "scripts/db-worktree-drop.sh"    # run by wtm clean and wtm prune
 ```
@@ -35,13 +35,13 @@ wtm does not know what a database or a realm is: it runs your two commands at th
 - `create` runs on **every** start of the shared service, retried for a short while in case the service is not accepting connections yet. It must create the namespace if it is absent and do nothing if it is there.
 - `remove` runs when the worktree is removed, never on `run stop` or `run down`. Leave it empty to keep the data.
 
-Both are `/bin/sh` lines (or a script path) that read `$WTM_NAMESPACE`, `$WTM_WORKTREE`, `$WTM_ORDINAL`, the worktree's declared ports and URLs, and the extra variables of `namespace.env`. A `create` that clones main's database (`CREATE DATABASE "$WTM_NAMESPACE" TEMPLATE app`) starts each worktree from main's data without sharing it; see [the developer notes](../dev/shared-services.md#starting-a-namespace-from-mains-data) for a complete script.
+Both are `/bin/sh` lines (or a script path) that read `$WTM_NAMESPACE`, `$WTM_WORKTREE`, `$WTM_ORDINAL`, the worktree's declared ports and URLs, and the extra variables of `namespace.env`. A `create` that clones main's database (`CREATE DATABASE "$WTM_NAMESPACE" TEMPLATE app`) starts each worktree from main's data without sharing it; the [one postgres recipe](recipes.md#one-postgres-a-database-per-worktree) has the complete scripts.
 
 A worktree records each namespace it actually created in its `meta.json` (`namespaces`), the moment the service reports started. A worktree created and thrown away without ever starting the service owes nothing.
 
 ## Telling the app: `[[env]]`
 
-A port link (`[[env_port]]`) says where the shared service answers: the same address for everyone. Which namespace a worktree holds is said by an `[[env]]` link, which writes a key's **whole** value from a template:
+A port link (`[[env_port]]`) says where the shared service answers: the same address for everyone. Which namespace a worktree holds is said by an [`[[env]]` link](ports-and-env.md#values-that-are-not-a-port), which writes a key's **whole** value from a template:
 
 ```toml
 [[env]]
@@ -51,7 +51,7 @@ job   = "postgres"
 value = "postgresql://app:app@localhost:{port.POSTGRES_PORT}/{namespace}"
 ```
 
-The placeholders are `{namespace}`, `{port.NAME}` (a port of that job, as it resolves in the worktree), `{origin}` (the job's published address), `{worktree}` and `{ordinal}`; anything else is refused when `run.toml` is read. A key may be written by an `[[env]]` link or an `[[env_port]]` link, never both. The links are settled when a worktree is created and whenever `wtm env` reconciles it, no daemon needed. The main checkout gets none: its databases and realms are its own, so its `.env` keeps the values it has, and `wtm env main` puts back the template's value of any key an earlier wtm wrote there (`wt_main`, `acme-main`).
+`{namespace}` becomes `app_feat-login` in `feat/login`; the other placeholders are listed in the [`run.toml` reference](run-toml.md#env). The main checkout gets none: its databases and realms are its own, so its `.env` keeps the values it has, and `wtm env main` puts back the template's value of any key an earlier wtm wrote there (`wt_main`, `acme-main`).
 
 ## What `clean` and `prune` do with the data
 

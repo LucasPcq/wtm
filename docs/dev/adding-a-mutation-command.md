@@ -179,10 +179,9 @@ func (p splitPresenter) Split(outcome splitflow.Outcome) error {
 
 ## 7. Documentation
 
-1. `make docs` — regenerates `docs/`, never hand-edited.
-2. Add the command to the `README.md` overview table, in the same group as the root `--help`.
-3. Update the agent skill (`internal/surface/cli/agents/assets/using-wtm/`, the reference file of the command's topic) if the agent-facing surface changed (a new command, a new flag, a changed JSON shape, changed failure/abort semantics).
-4. Run the `build-validator` subagent: `make lint` fails if `internal/flow/` gained a forbidden import.
+1. `make docs` — regenerates `docs/`, never hand-edited, and the command reference on the docs site with it. The README has no command table.
+2. Update the agent skill (`internal/surface/cli/agents/assets/using-wtm/`, the reference file of the command's topic) if the agent-facing surface changed (a new command, a new flag, a changed JSON shape, changed failure/abort semantics).
+3. Run the `build-validator` subagent. Step 6 fails the run if `internal/flow/` gained a forbidden import.
 
 ## In the dashboard
 

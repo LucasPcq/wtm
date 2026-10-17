@@ -12,7 +12,7 @@ wtm is built for macOS and Linux, on amd64 and arm64. Windows runs it through WS
 | Named URLs on the proxy port (`:11080`) | ✓ | ✓ | ✓ | ✗ |
 | Named URLs on port 80 (`wtm run proxy install`) | ✓ | ✗ | ✗ | ✗ |
 | `wtm upgrade` | ✓ | ✓ | ✓ | ✗ |
-| Tested | daily use | CI (`make test` on every pull request) | not yet | ✗ |
+| Tested in CI | ✗ (used daily by the maintainer) | ✓ (`make test` on Ubuntu, every pull request) | ✗ | ✗ |
 
 ## Linux
 

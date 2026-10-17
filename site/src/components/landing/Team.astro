@@ -1,0 +1,25 @@
+---
+import Session from './Session.astro';
+import { base } from '../../lib/base.mjs';
+import { cmd, note, out } from '../../lib/term.mjs';
+
+const lines = [
+  note('once, by the person who knows the stack'),
+  cmd('wtm run init'),
+  cmd('wtm run export > acme-run.json'),
+  out(),
+  note('everyone else, and their agents'),
+  cmd('wtm run import acme-run.json'),
+  cmd('wtm run up'),
+];
+---
+<section class="section">
+  <div class="wrap split">
+    <div>
+      <p class="label">run.toml</p>
+      <h2>Configured once.<br />Run by everyone.</h2>
+      <p>wtm knows nothing about Postgres or Keycloak. It gives each worktree an identity and runs your scripts at the right time. One person writes them, the whole team imports them. <a href={`${base}guide/run-toml/`}>The run.toml reference</a></p>
+    </div>
+    <Session title="the team" lines={lines} />
+  </div>
+</section>
