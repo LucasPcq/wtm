@@ -29,15 +29,15 @@ type leftBehind struct {
 	Worktree bool
 }
 
-type cleanRequest struct {
+type CleanRequest struct {
 	Branches []string `json:"branches"`
 	Force    bool     `json:"force"`
 }
 
 func (p *provisioning) leftBehind(left leftBehind) *wtm.Error {
 	branch, path := p.Worktree.Branch, p.Worktree.Path
-	request, _ := json.Marshal(cleanRequest{Branches: []string{branch}, Force: true})
-	clean := "remove it with `wtm clean --force " + branch + "`"
+	request, _ := json.Marshal(CleanRequest{Branches: []string{branch}, Force: true})
+	clean := "remove it with `wtm clean " + branch + " --force`"
 	message, kept := "could not delete the branch, left behind: branch", "branch"
 	followUp := &wtm.FollowUp{Message: "branch " + branch + " is left behind: " + clean, Params: wtm.Params{"branch": branch}}
 	if left.Worktree {

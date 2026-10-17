@@ -90,7 +90,7 @@ func TestAnUndoThatFailsNamesWhatIsLeftAndTheWayOut(t *testing.T) {
 	assert.JSONEq(t, `{"branches":["feat/x"],"force":true}`, string(followUp.Request))
 	assert.Equal(t, "provision.left_behind", followUp.Code)
 	assert.Equal(t, wtm.Params{"branch": branchName, "path": w.path(branchName)}, followUp.Params)
-	assert.Equal(t, "branch feat/x is left half-created at "+w.path(branchName)+": remove it with `wtm clean --force feat/x`", followUp.Message)
+	assert.Equal(t, "branch feat/x is left half-created at "+w.path(branchName)+": remove it with `wtm clean feat/x --force`", followUp.Message)
 }
 
 func TestABranchThatCannotBeDeletedIsLeftBehindToo(t *testing.T) {
@@ -111,7 +111,7 @@ func TestABranchThatCannotBeDeletedIsLeftBehindToo(t *testing.T) {
 	assert.JSONEq(t, `{"branches":["feat/x"],"force":true}`, string(followUp.Request))
 	assert.Equal(t, "provision.left_behind", followUp.Code)
 	assert.Equal(t, wtm.Params{"branch": branchName}, followUp.Params)
-	assert.Equal(t, "branch feat/x is left behind: remove it with `wtm clean --force feat/x`", followUp.Message)
+	assert.Equal(t, "branch feat/x is left behind: remove it with `wtm clean feat/x --force`", followUp.Message)
 }
 
 func TestACheckOutNeverDeletesTheBranchOnUndo(t *testing.T) {

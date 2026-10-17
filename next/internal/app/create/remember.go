@@ -18,7 +18,7 @@ func (p ApplyParams) remember(ctx context.Context, items []Item) []wtm.Warning {
 		return []wtm.Warning{{Code: "create.remember_failed", Message: "could not remember the answer: " + err.Error(), Params: wtm.Params{"cause": err.Error()}}}
 	}
 	if written.Unlocked {
-		return []wtm.Warning{{Code: "locks.unavailable", Message: "ran without operation locks"}}
+		return []wtm.Warning{wtm.LocksUnavailable}
 	}
 	return nil
 }

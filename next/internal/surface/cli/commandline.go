@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/app/create"
+	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 )
 
@@ -40,13 +41,8 @@ func (l createLine) String() string {
 	return strings.Join(words, " ")
 }
 
-type cleanRequest struct {
-	Branches []string `json:"branches"`
-	Force    bool     `json:"force"`
-}
-
 func followUpLine(followUp *wtm.FollowUp) string {
-	var request cleanRequest
+	var request provision.CleanRequest
 	_ = json.Unmarshal(followUp.Request, &request)
 	words := append([]string{"wtm", followUp.Command}, quoted(request.Branches)...)
 	if request.Force {

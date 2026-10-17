@@ -61,3 +61,14 @@ func TestANamedProjectDirOutsideAnyRepositoryIsRefused(t *testing.T) {
 	assert.Equal(t, wtm.CodeNotARepository, failure.Code)
 	assert.Equal(t, gittest.Resolved(t, named)+" is not a git repository", failure.Message)
 }
+
+func TestACorrelationIDWithAControlCharacterIsAUsageError(t *testing.T) {
+	t.Setenv(correlationIDEnv, "bad\x01id")
+
+	_, err := open(t.Context())
+
+	failure, ok := errors.AsType[*wtm.Error](err)
+	require.True(t, ok, "%v", err)
+	assert.Equal(t, wtm.KindInvalid, failure.Kind)
+	assert.Equal(t, "$WTM_CORRELATION_ID contains a control character: invalid correlation id", failure.Message)
+}

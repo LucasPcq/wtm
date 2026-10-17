@@ -81,7 +81,7 @@ func (a *App) Create(ctx context.Context, params CreateParams) (CreateOutcome, e
 	outcome.Result = &result
 	outcome.Warnings = append(outcome.Warnings, result.Warnings...)
 	if !held.Protected() {
-		outcome.Warnings = append(outcome.Warnings, wtm.Warning{Code: "locks.unavailable", Message: "ran without operation locks"})
+		outcome.Warnings = append(outcome.Warnings, wtm.LocksUnavailable)
 	}
 	outcome.Warnings = once(outcome.Warnings)
 	return outcome, nil
@@ -137,7 +137,7 @@ func (a *App) planned(op operation.Operation, s settled) (CreateOutcome, error) 
 	if err != nil {
 		return CreateOutcome{Op: op.ID}, err
 	}
-	fingerprint, err := fingerprintOf(plan)
+	fingerprint, err := fingerprintOf(fingerprinted{Plan: plan, Isolation: s.Request.Isolation})
 	if err != nil {
 		return CreateOutcome{Op: op.ID}, err
 	}

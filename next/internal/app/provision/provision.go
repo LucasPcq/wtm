@@ -184,7 +184,7 @@ func interrupted(i interruption) *wtm.Error {
 func (p *provisioning) outcome(outcome Outcome) Outcome {
 	outcome.Warnings = p.warnings
 	if p.unlocked {
-		outcome.Warnings = append(outcome.Warnings, wtm.Warning{Code: "locks.unavailable", Message: "ran without operation locks"})
+		outcome.Warnings = append(outcome.Warnings, wtm.LocksUnavailable)
 	}
 	return outcome
 }

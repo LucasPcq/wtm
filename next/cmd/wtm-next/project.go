@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	"github.com/LucasPcq/wtm/next/internal/surface/cli"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/wtm/operation"
 )
 
 const (
@@ -19,6 +20,9 @@ const (
 )
 
 func open(ctx context.Context) (cli.Project, error) {
+	if err := operation.CorrelationProblem(os.Getenv(correlationIDEnv)); err != nil {
+		return cli.Project{}, wtm.InvalidMessage("$" + correlationIDEnv + " " + err.Error() + ": invalid correlation id")
+	}
 	cwd, err := os.Getwd()
 	if err != nil {
 		return cli.Project{}, err

@@ -246,3 +246,17 @@ func TestAnOutcomeFailsOnItsFirstFailedItemAndAPreviewNever(t *testing.T) {
 	assert.Same(t, failure, applied.Failure())
 	assert.Nil(t, app.CreateOutcome{}.Failure())
 }
+
+func TestAPreviewIsStaleOnceTheIsolationItWouldRecordChanged(t *testing.T) {
+	w := newWorld(t, seed{Run: "isolation = \"verbatim\"\n"})
+	a := app.New(w.deps)
+	preview, err := a.Create(t.Context(), app.CreateParams{Request: create.Request{Branches: []string{branchName}}, DryRun: true})
+	require.NoError(t, err)
+	require.Empty(t, preview.Plan.Isolation)
+
+	writeFile(t, filepath.Join(w.stateDir, "run.toml"), "isolation = \"isolated\"\n")
+	_, staleErr := a.Create(t.Context(), app.CreateParams{Request: create.Request{Branches: []string{branchName}}, ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
+
+	assert.Equal(t, app.CodePlanStale, refusal(t, staleErr).Code)
+	assert.NoDirExists(t, w.path(branchName))
+}

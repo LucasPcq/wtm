@@ -195,5 +195,5 @@ func TestAWorktreeLeftHalfCreatedPointsAtTheCleanThatRemovesIt(t *testing.T) {
 	got := runCreate(t, w, branchName)
 
 	assert.Equal(t, exitError, got.Code)
-	assert.Contains(t, got.Stdout, "→ wtm clean feat/x --force   branch feat/x is left half-created at /repo/.trees/feat-x: remove it with `wtm clean --force feat/x`")
+	assert.Contains(t, got.Stdout, "→ wtm clean feat/x --force   branch feat/x is left half-created at /repo/.trees/feat-x: remove it with `wtm clean feat/x --force`")
 }

@@ -1,7 +1,12 @@
 // Package operation is an operation in progress as its holder file records it, and the locks it holds, shared with wtm.
 package operation
 
-import "time"
+import (
+	"errors"
+	"strings"
+	"time"
+	"unicode"
+)
 
 type Operation struct {
 	ID            string    `json:"op_id"`
@@ -38,4 +43,16 @@ func (l Lock) Key() string {
 		return string(l.Scope) + ":" + l.Name
 	}
 	return string(l.Scope)
+}
+
+const correlationIDMaxBytes = 256
+
+func CorrelationProblem(id string) error {
+	if len(id) > correlationIDMaxBytes {
+		return errors.New("is longer than 256 bytes")
+	}
+	if strings.IndexFunc(id, unicode.IsControl) >= 0 {
+		return errors.New("contains a control character")
+	}
+	return nil
 }

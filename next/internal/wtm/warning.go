@@ -5,3 +5,5 @@ type Warning struct {
 	Params  Params `json:"params,omitempty"`
 	Message string `json:"message"`
 }
+
+var LocksUnavailable = Warning{Code: "locks.unavailable", Message: "ran without operation locks"}

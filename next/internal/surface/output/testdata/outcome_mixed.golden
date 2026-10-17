@@ -24,4 +24,4 @@
   → wtm go linked
   → wtm go feat/c
   → wtm go feat/d
-  → wtm clean feat/e --force   branch feat/e is left half-created at /trees/feat-e: remove it with `wtm clean --force feat/e`
+  → wtm clean feat/e --force   branch feat/e is left half-created at /trees/feat-e: remove it with `wtm clean feat/e --force`

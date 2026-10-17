@@ -16,7 +16,7 @@ func TestTwoBranchesCreatedAreCountedRowedAndPointedAt(t *testing.T) {
 func TestAMixedRunNamesEachAnomalyAndEachUnfinishedBranch(t *testing.T) {
 
 	golden(t, "outcome_mixed", rendered(func(w *bytes.Buffer) {
-		Outcome(w, OutcomeParams{Outcome: mixed(trees), Cwd: cwd, FollowUps: []NextStep{{Command: "wtm clean feat/e --force", Note: "branch feat/e is left half-created at /trees/feat-e: remove it with `wtm clean --force feat/e`"}}})
+		Outcome(w, OutcomeParams{Outcome: mixed(trees), Cwd: cwd, FollowUps: []NextStep{{Command: "wtm clean feat/e --force", Note: "branch feat/e is left half-created at /trees/feat-e: remove it with `wtm clean feat/e --force`"}}})
 	}))
 }
 
