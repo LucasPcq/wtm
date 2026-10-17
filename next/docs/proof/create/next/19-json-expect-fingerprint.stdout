@@ -1,0 +1,26 @@
+{
+  "v": 2,
+  "command": "create",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/json",
+      "status": "done",
+      "reason": "unchanged",
+      "detail": {
+        "path": "<SB>/acme.trees/feat-json",
+        "metadata": {
+          "source_branch": "main",
+          "created_at": "<T>",
+          "env_strategy": "example",
+          "ordinal": 9,
+          "isolation": "isolated"
+        },
+        "existing_branch": false
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

@@ -1,0 +1,21 @@
+{
+  "v": 2,
+  "command": "create",
+  "ok": true,
+  "op": "<OP>",
+  "plan": {
+    "branches": [
+      {
+        "branch": "feat/json",
+        "path": "<SB>/acme.trees/feat-json",
+        "action": "unchanged"
+      }
+    ],
+    "from": "main",
+    "env_from": "main",
+    "isolation": "isolated"
+  },
+  "fingerprint": "<FP>",
+  "follow_ups": [],
+  "warnings": []
+}

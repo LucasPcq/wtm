@@ -107,9 +107,10 @@ run_side() {
     fingerprint=$(grep -o 'fingerprint  [0-9a-f]*' "$dir/15-dry-run.stdout" | awk '{print $2}' || true)
     scenario 16-expect-fingerprint create feat/dry --env-from main --remember env_from --expect-fingerprint "${fingerprint:-none}"
     scenario 17-stale-fingerprint create feat/stale --expect-fingerprint 000000000000000000000000
-    scenario 18-json-dry-run create feat/jdry --output json --dry-run
+    # an apply that changes nothing (feat/json is open since 09), so tty.sh finds the sandbox as before
+    scenario 18-json-dry-run create feat/json --if-not-exists --output json --dry-run
     fingerprint=$(grep -o '"fingerprint": "[0-9a-f]*"' "$dir/18-json-dry-run.stdout" | grep -o '[0-9a-f]\{24\}' || true)
-    scenario 19-json-expect-fingerprint create feat/jdry --output json --expect-fingerprint "${fingerprint:-none}"
+    scenario 19-json-expect-fingerprint create feat/json --if-not-exists --output json --expect-fingerprint "${fingerprint:-none}"
     scenario 20-json-stale-fingerprint create feat/jstale --output json --expect-fingerprint 000000000000000000000000
   )
   sed -i '' -E \
