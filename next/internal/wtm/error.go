@@ -45,6 +45,7 @@ type FieldError struct {
 	Template string
 	Params   Params
 	Accepted []string
+	With     []string
 }
 
 func (f FieldError) Message(path string) string {

@@ -23,6 +23,7 @@ type hookView struct {
 	rewrite bool
 	tail    []string
 	header  string
+	notice  string
 	painted int
 }
 
@@ -74,6 +75,11 @@ func (v *hookView) finish(end hookEnd) {
 	}
 }
 
+func (v *hookView) notify(notice string) {
+	v.notice = notice
+	v.repaint()
+}
+
 func (v *hookView) close() {
 	v.flush()
 	v.clear()
@@ -105,6 +111,10 @@ func (v *hookView) repaint() {
 	width := v.width()
 	fmt.Fprintf(v.w, "%s%s\n", indent, truncate(v.header, width))
 	v.painted++
+	if v.notice != "" {
+		message(v.w, truncate(v.notice, width))
+		v.painted++
+	}
 	for _, line := range v.tail {
 		body := truncate(expandTabs(line), max(width-len(indent), hookMinWidth))
 		fmt.Fprintf(v.w, "%s%s%s\n", indent, indent, muted.Render(body))

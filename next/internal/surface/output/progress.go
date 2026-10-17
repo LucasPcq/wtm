@@ -58,8 +58,8 @@ func (p *Progress) cancelling(watch, run context.Context) {
 		return
 	}
 	if p.hook != nil {
-		p.hook.close()
-		p.hook = nil
+		p.hook.notify(p.status)
+		return
 	}
 	p.paint()
 }
@@ -122,6 +122,9 @@ func (p *Progress) openPhase() {
 	}
 	p.erase()
 	p.hook = newHookView(hookViewParams{W: p.w, Label: p.label(), LogPath: p.phaseLog})
+	if p.status != "" {
+		p.hook.notify(p.status)
+	}
 }
 
 func (p *Progress) phaseFinished(failed bool) {
@@ -153,13 +156,10 @@ func (p *Progress) width() int {
 }
 
 func (p *Progress) line() string {
-	switch {
-	case p.status == "":
+	if p.status == "" {
 		return p.unit
-	case p.unit == "":
-		return p.status
 	}
-	return p.unit + " · " + p.status
+	return p.status
 }
 
 func (p *Progress) erase() {

@@ -93,7 +93,7 @@ func (f Facts) crossProblems(q Questions) []wtm.FieldError {
 		})
 	}
 	if from != "" && slices.Contains(branches, from) {
-		problems = append(problems, wtm.FieldError{Path: "from", Code: "self_parent", Template: "{value} cannot be its own parent: pass another value to {path}", Params: wtm.Params{"value": from}})
+		problems = append(problems, wtm.FieldError{Path: "from", Code: "self_parent", Template: "{value} cannot be its own parent: pass another value to {path}", Params: wtm.Params{"value": from}, With: []string{"branches"}})
 	}
 	return problems
 }

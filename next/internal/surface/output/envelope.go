@@ -66,6 +66,7 @@ type envelopeField struct {
 	Code     string     `json:"code"`
 	Params   wtm.Params `json:"params,omitempty"`
 	Accepted []string   `json:"accepted,omitempty"`
+	With     []string   `json:"with,omitempty"`
 	Flag     string     `json:"flag"`
 	Message  string     `json:"message"`
 }
@@ -124,7 +125,7 @@ func errorOf(err *wtm.Error) *envelopeError {
 	}
 	for _, field := range err.Fields {
 		flag := Flag(field.Path)
-		doc.Fields = append(doc.Fields, envelopeField{Path: field.Path, Code: field.Code, Params: field.Params, Accepted: field.Accepted, Flag: flag, Message: field.Message(flag)})
+		doc.Fields = append(doc.Fields, envelopeField{Path: field.Path, Code: field.Code, Params: field.Params, Accepted: field.Accepted, With: field.With, Flag: flag, Message: field.Message(flag)})
 	}
 	return doc
 }

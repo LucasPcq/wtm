@@ -102,3 +102,11 @@ func TestAnEnvelopeNeverEscapesItsHTMLAndNeverLeavesAPlaceholder(t *testing.T) {
 	assert.Contains(t, doc, "<branches>[1]")
 	assert.NotContains(t, doc, "{path}")
 }
+
+func TestAFieldNamesTheOtherFieldsItIsCheckedWith(t *testing.T) {
+	selfParent := wtm.Invalid([]wtm.FieldError{{Path: "from", Code: "self_parent", Template: "{value} cannot be its own parent: pass another value to {path}", Params: wtm.Params{"value": "feat/x"}, With: []string{"branches"}}})
+
+	assert.Contains(t, envelopeOf(t, EnvelopeParams{Err: selfParent}), `"with": [
+          "branches"
+        ],`)
+}

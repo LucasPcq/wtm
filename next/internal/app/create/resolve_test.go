@@ -106,7 +106,7 @@ func TestABranchIsNeverItsOwnSource(t *testing.T) {
 
 	_, err := resolve(t, w, create.Request{Branches: []string{branchName}, From: branchName})
 
-	assert.Contains(t, fieldsOf(t, err), wtm.FieldError{Path: "from", Code: "self_parent", Template: "{value} cannot be its own parent: pass another value to {path}", Params: wtm.Params{"value": branchName}})
+	assert.Contains(t, fieldsOf(t, err), wtm.FieldError{Path: "from", Code: "self_parent", Template: "{value} cannot be its own parent: pass another value to {path}", Params: wtm.Params{"value": branchName}, With: []string{"branches"}})
 }
 
 func TestEachEntryIsRefusedForWhatStandsInItsWay(t *testing.T) {

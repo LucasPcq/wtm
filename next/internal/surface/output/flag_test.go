@@ -15,3 +15,7 @@ func TestAFieldIsSpelledAsTheCommandLineTakesIt(t *testing.T) {
 	assert.Equal(t, "--if-not-exists", Flag("if_not_exists"))
 	assert.Equal(t, "--remember[0]", Flag("remember[0]"))
 }
+
+func TestAPathTheCommandLineDoesNotKnowIsLeftAsItIs(t *testing.T) {
+	assert.Equal(t, "target.base", Flag("target.base"))
+}

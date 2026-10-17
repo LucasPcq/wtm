@@ -1,22 +1,25 @@
 package output
 
-import (
-	"strings"
-)
+import "strings"
 
-const positional = "branches"
+var flags = map[string]string{
+	"branches":      "<branches>",
+	"from":          "--from",
+	"env_from":      "--env-from",
+	"isolation":     "--isolation",
+	"fast_forward":  "--ff",
+	"if_not_exists": "--if-not-exists",
+	"remember":      "--remember",
+}
 
 func Flag(path string) string {
 	name, index, indexed := strings.Cut(path, "[")
-	suffix := ""
-	if indexed {
-		suffix = "[" + index
+	flag, known := flags[name]
+	switch {
+	case !known:
+		return path
+	case indexed:
+		return flag + "[" + index
 	}
-	switch name {
-	case positional:
-		return "<" + positional + ">" + suffix
-	case "fast_forward":
-		return "--ff" + suffix
-	}
-	return "--" + strings.ReplaceAll(name, "_", "-") + suffix
+	return flag
 }
