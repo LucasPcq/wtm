@@ -71,7 +71,7 @@ func (w world) applyIn(ctx context.Context, t *testing.T, req create.Request) (c
 	planned, _, err := create.Plan(facts, resolved)
 	require.NoError(t, err)
 	report := &recorder{}
-	return create.Apply(ctx, create.ApplyParams{Deps: w.deps, Facts: facts, Request: resolved, Plan: planned, Report: report.add}), report
+	return create.Apply(ctx, create.ApplyParams{Deps: w.deps, Facts: facts, Plan: planned, FastForward: *resolved.FastForward, Report: report.add}), report
 }
 
 func problems(err error) map[string]string {

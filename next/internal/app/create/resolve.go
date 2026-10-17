@@ -14,7 +14,19 @@ const (
 	codeOneOf    = "one_of"
 )
 
-var rememberable = []string{"env_from", "isolation", "fast_forward"}
+var remembered = []struct{ field, id string }{
+	{"env_from", project.RememberEnvStrategy},
+	{"isolation", project.RememberIsolation},
+	{"fast_forward", project.RememberSourceUpdate},
+}
+
+func rememberable() []string {
+	fields := make([]string, 0, len(remembered))
+	for _, r := range remembered {
+		fields = append(fields, r.field)
+	}
+	return fields
+}
 
 func Resolve(f Facts, req Request) (Request, error) {
 	questions := Form(f, req)
@@ -50,7 +62,7 @@ func (f Facts) problems(q Questions) []wtm.FieldError {
 		problems = append(problems, oneOf(choice{Path: "isolation", Value: string(q.Isolation.Value), Accepted: names(run.Isolations())})...)
 	}
 	for index, id := range q.Remember {
-		problems = append(problems, oneOf(choice{Path: "remember[" + strconv.Itoa(index) + "]", Value: id, Accepted: rememberable})...)
+		problems = append(problems, oneOf(choice{Path: "remember[" + strconv.Itoa(index) + "]", Value: id, Accepted: rememberable()})...)
 	}
 	return append(problems, f.crossProblems(q)...)
 }
@@ -72,7 +84,7 @@ func (f Facts) branchProblems(q Questions) []wtm.FieldError {
 func (f Facts) crossProblems(q Questions) []wtm.FieldError {
 	var problems []wtm.FieldError
 	branches, from := q.Branches.Given, q.From.Value
-	if from == "" && slices.ContainsFunc(branches, f.existing) {
+	if from == "" && f.checksOut(Request{Branches: branches, IfNotExists: q.IfNotExists}) {
 		problems = append(problems, wtm.FieldError{
 			Path:     "from",
 			Code:     codeRequired,

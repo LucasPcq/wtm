@@ -68,7 +68,7 @@ func TestABranchThatFailsBeforeItsWorktreeHasNoDetail(t *testing.T) {
 	facts := w.facts(t)
 	planned := create.Planned{Branches: []create.BranchPlan{{Branch: branchName, Path: w.path(branchName), Action: create.ActionCreate}}, From: "main", EnvFrom: project.EnvMain}
 
-	result := create.Apply(t.Context(), create.ApplyParams{Deps: w.deps, Facts: facts, Request: create.Request{Branches: []string{branchName}, From: "main", EnvFrom: project.EnvMain}, Plan: planned, Report: (&recorder{}).add})
+	result := create.Apply(t.Context(), create.ApplyParams{Deps: w.deps, Facts: facts, Plan: planned, Report: (&recorder{}).add})
 
 	assert.Equal(t, wtm.StatusFailed, result.Items[0].Status)
 	assert.Nil(t, result.Items[0].Detail)

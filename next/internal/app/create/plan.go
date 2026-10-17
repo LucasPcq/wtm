@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm"
+	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
 	"github.com/LucasPcq/wtm/next/internal/wtm/envcopy"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
 	"github.com/LucasPcq/wtm/next/internal/wtm/run"
@@ -74,18 +75,17 @@ func (f Facts) fastForwarded(req Request) []string {
 	if req.FastForward == nil || !*req.FastForward {
 		return nil
 	}
-	return f.behind(req)
+	return f.subjectsAt(req, branch.Behind)
 }
 
 func (f Facts) divergedWarnings(req Request) []wtm.Warning {
 	var warnings []wtm.Warning
-	for _, subject := range f.diverged(req) {
+	for _, subject := range f.subjectsAt(req, branch.Diverged) {
 		counts := f.Divergence[subject]
-		ahead, behind := strconv.Itoa(counts.Ahead), strconv.Itoa(counts.Behind)
 		warnings = append(warnings, wtm.Warning{
 			Code:    "create.source_diverged",
-			Message: "branch " + subject + " has diverged from origin (" + ahead + " ahead, " + behind + " behind) and can't be fast-forwarded: the worktree starts from your local branch, missing commits that are on origin — you may have to rebase or resolve conflicts later",
-			Params:  wtm.Params{"branch": subject, "ahead": ahead, "behind": behind},
+			Message: "branch " + subject + " has diverged from origin (" + aheadAndBehind(counts) + ") and can't be fast-forwarded: the worktree starts from your local branch, missing commits that are on origin — you may have to rebase or resolve conflicts later",
+			Params:  wtm.Params{"branch": subject, "ahead": strconv.Itoa(counts.Ahead), "behind": strconv.Itoa(counts.Behind)},
 		})
 	}
 	return warnings

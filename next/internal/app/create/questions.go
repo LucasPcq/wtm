@@ -103,7 +103,7 @@ func (f Facts) from(req Request) From {
 	switch base := f.Config.Worktrees.BaseBranch; {
 	case req.From != "":
 		question.Answer = Answer[string]{Value: req.From, Origin: OriginRequest}
-	case base != "" && !slices.ContainsFunc(req.Branches, f.existing):
+	case base != "" && !f.checksOut(req):
 		question.Answer = Answer[string]{Value: base, Origin: OriginConfig}
 	}
 	return question
@@ -126,14 +126,13 @@ func (f Facts) sourceOptions(creating []string) []Option {
 
 func (f Facts) badge(name string) string {
 	counts := f.Divergence[name]
-	ahead, behind := strconv.Itoa(counts.Ahead)+" ahead", strconv.Itoa(counts.Behind)+" behind"
 	switch f.standing(name) {
 	case branch.Behind:
-		return behind
+		return strconv.Itoa(counts.Behind) + " behind"
 	case branch.Ahead:
-		return ahead
+		return strconv.Itoa(counts.Ahead) + " ahead"
 	case branch.Diverged:
-		return ahead + ", " + behind
+		return aheadAndBehind(counts)
 	case branch.NoOrigin, branch.UpToDate:
 	}
 	return ""
@@ -174,7 +173,7 @@ func (f Facts) isolation(given run.Isolation) Choice[run.Isolation] {
 
 func (f Facts) fastForward(req Request) Confirm {
 	question := Confirm{}
-	if len(f.behind(req)) == 0 {
+	if len(f.subjectsAt(req, branch.Behind)) == 0 {
 		question.Skip = "nothing to fast-forward: no branch it starts from is behind origin"
 	}
 	remembered, found := f.remembered(project.RememberSourceUpdate)

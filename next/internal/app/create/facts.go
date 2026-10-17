@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm"
@@ -109,12 +110,8 @@ func (f Facts) remote(name string) bool {
 }
 
 func (f Facts) candidate(name string) bool {
-	remote, onOrigin := strings.CutPrefix(name, remotePrefix)
+	remote, onOrigin := cutRemote(name)
 	return f.local(name) || onOrigin && f.remote(remote)
-}
-
-func (f Facts) existing(name string) bool {
-	return f.local(name) && f.checkedOutAt(name) == ""
 }
 
 func (f Facts) checkedOutAt(name string) string {
@@ -150,4 +147,12 @@ func (f Facts) live() []string {
 		names = append(names, w.Branch())
 	}
 	return names
+}
+
+func cutRemote(name string) (string, bool) {
+	return strings.CutPrefix(name, remotePrefix)
+}
+
+func aheadAndBehind(counts branch.AheadBehind) string {
+	return strconv.Itoa(counts.Ahead) + " ahead, " + strconv.Itoa(counts.Behind) + " behind"
 }

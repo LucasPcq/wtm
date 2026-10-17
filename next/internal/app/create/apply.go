@@ -2,7 +2,6 @@ package create
 
 import (
 	"context"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/app/provision"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
@@ -12,11 +11,11 @@ import (
 )
 
 type ApplyParams struct {
-	Deps    Deps
-	Facts   Facts
-	Request Request
-	Plan    Planned
-	Report  wtm.Report
+	Deps        Deps
+	Facts       Facts
+	Plan        Planned
+	FastForward bool
+	Report      wtm.Report
 }
 
 type Result struct {
@@ -49,55 +48,50 @@ type Standing struct {
 	Upstream       string            `json:"upstream,omitempty"`
 }
 
-type applying struct {
-	ApplyParams
-}
-
 func Apply(ctx context.Context, params ApplyParams) Result {
-	a := applying{ApplyParams: params}
-	warnings := a.fastForward(ctx)
+	warnings := params.fastForward(ctx)
 	items := make([]Item, 0, len(params.Plan.Branches))
 	for _, planned := range params.Plan.Branches {
-		items = append(items, a.item(ctx, planned))
+		items = append(items, params.item(ctx, planned))
 	}
-	return Result{Items: items, Warnings: append(warnings, a.remember(ctx, items)...)}
+	return Result{Items: items, Warnings: append(warnings, params.remember(ctx, items)...)}
 }
 
-func (a applying) item(ctx context.Context, planned BranchPlan) Item {
+func (p ApplyParams) item(ctx context.Context, planned BranchPlan) Item {
 	switch {
 	case planned.Action == ActionUnchanged:
-		return a.unchanged(planned)
+		return p.unchanged(planned)
 	case ctx.Err() != nil:
 		return Item{Subject: planned.Branch, Status: wtm.StatusSkipped, Reason: wtm.ReasonInterrupted}
 	}
-	a.Report(wtm.UnitStarted{Subject: planned.Branch})
-	outcome := provision.Run(ctx, a.provisionParams(planned))
+	p.Report(wtm.UnitStarted{Subject: planned.Branch})
+	outcome := provision.Run(ctx, p.provisionParams(planned))
 	item := Item{Subject: planned.Branch, Status: outcome.Status, Reason: outcome.Reason, Err: outcome.Err, Warnings: outcome.Warnings}
 	if outcome.Provisioned.Meta.CreatedAt != "" {
 		item.Detail = &Detail{
 			Path:     planned.Path,
 			Metadata: outcome.Provisioned.Meta,
-			Standing: a.Facts.standingOf(planned),
+			Standing: p.Facts.standingOf(planned),
 			Ordinal:  outcome.Provisioned.Ordinal,
 			EnvPorts: outcome.Provisioned.EnvPorts,
 		}
 	}
-	a.Report(wtm.UnitFinished{Subject: planned.Branch, Status: item.Status})
+	p.Report(wtm.UnitFinished{Subject: planned.Branch, Status: item.Status})
 	return item
 }
 
-func (a applying) unchanged(planned BranchPlan) Item {
-	recorded, _ := a.Deps.Provision.Meta.Load(planned.Branch)
+func (p ApplyParams) unchanged(planned BranchPlan) Item {
+	recorded, _ := p.Deps.Provision.Meta.Load(planned.Branch)
 	return Item{Subject: planned.Branch, Status: wtm.StatusDone, Reason: wtm.ReasonUnchanged, Detail: &Detail{Path: planned.Path, Metadata: recorded}}
 }
 
-func (a applying) provisionParams(planned BranchPlan) provision.Params {
-	f, req := a.Facts, a.Request
+func (p ApplyParams) provisionParams(planned BranchPlan) provision.Params {
+	f := p.Facts
 	return provision.Params{
-		Deps: a.Deps.Provision,
+		Deps: p.Deps.Provision,
 		Project: provision.Project{
 			MainPath: f.MainPath,
-			StateDir: a.Deps.StateDir,
+			StateDir: p.Deps.StateDir,
 			EnvFiles: f.Config.Env.Files,
 			OnCreate: f.Config.OnCreate,
 			Run:      f.Run,
@@ -107,17 +101,17 @@ func (a applying) provisionParams(planned BranchPlan) provision.Params {
 		Worktree: provision.Worktree{
 			Branch:     planned.Branch,
 			Path:       planned.Path,
-			Checkout:   a.checkout(planned),
-			Source:     req.From,
-			ParentPath: f.checkedOutAt(req.From),
-			Strategy:   req.EnvFrom,
-			Isolation:  req.Isolation,
+			Checkout:   p.checkout(planned),
+			Source:     p.Plan.From,
+			ParentPath: f.checkedOutAt(p.Plan.From),
+			Strategy:   p.Plan.EnvFrom,
+			Isolation:  p.Plan.Isolation,
 		},
-		Report: a.Report,
+		Report: p.Report,
 	}
 }
 
-func (a applying) checkout(planned BranchPlan) worktree.Checkout {
+func (p ApplyParams) checkout(planned BranchPlan) worktree.Checkout {
 	switch planned.Action {
 	case ActionCheckOut:
 		return worktree.ExistingBranch{Name: planned.Branch}
@@ -125,11 +119,11 @@ func (a applying) checkout(planned BranchPlan) worktree.Checkout {
 		return worktree.TrackingBranch{Name: planned.Branch}
 	case ActionCreate, ActionUnchanged:
 	}
-	return worktree.NewBranch{Name: planned.Branch, From: a.Facts.ref(a.Request.From)}
+	return worktree.NewBranch{Name: planned.Branch, From: p.Facts.ref(p.Plan.From)}
 }
 
 func (f Facts) ref(from string) branch.Ref {
-	if remote, onOrigin := strings.CutPrefix(from, remotePrefix); onOrigin && !f.local(from) {
+	if remote, onOrigin := cutRemote(from); onOrigin && !f.local(from) {
 		return branch.RemoteBranch{Name: remote}
 	}
 	return branch.LocalBranch{Name: from}

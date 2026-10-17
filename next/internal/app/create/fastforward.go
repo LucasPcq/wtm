@@ -2,47 +2,21 @@ package create
 
 import (
 	"context"
-	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/branch"
 	"github.com/LucasPcq/wtm/next/internal/wtm/worktree"
 )
 
-func (f Facts) subjects(req Request) []string {
-	var subjects []string
-	for _, name := range req.Branches {
-		subject := ""
-		switch {
-		case f.existing(name):
-			subject = name
-		case !f.local(name) && !f.remote(name) && f.local(req.From):
-			subject = req.From
-		}
-		if subject != "" && !slices.Contains(subjects, subject) {
-			subjects = append(subjects, subject)
-		}
-	}
-	return subjects
-}
-
-func (f Facts) behind(req Request) []string {
-	return slices.DeleteFunc(f.subjects(req), func(subject string) bool { return f.standing(subject) != branch.Behind })
-}
-
-func (f Facts) diverged(req Request) []string {
-	return slices.DeleteFunc(f.subjects(req), func(subject string) bool { return f.standing(subject) != branch.Diverged })
-}
-
-func (a applying) fastForward(ctx context.Context) []wtm.Warning {
+func (p ApplyParams) fastForward(ctx context.Context) []wtm.Warning {
 	var warnings []wtm.Warning
-	for _, subject := range a.Plan.FastForward {
+	for _, subject := range p.Plan.FastForward {
 		if ctx.Err() != nil {
 			return warnings
 		}
-		a.Report(wtm.PhaseStarted{Subject: subject, Phase: "fast_forward"})
-		warning, failed := a.advance(ctx, subject)
-		a.Report(wtm.PhaseFinished{Subject: subject, Phase: "fast_forward", Failed: failed})
+		p.Report(wtm.PhaseStarted{Subject: subject, Phase: "fast_forward"})
+		warning, failed := p.advance(ctx, subject)
+		p.Report(wtm.PhaseFinished{Subject: subject, Phase: "fast_forward", Failed: failed})
 		if failed && ctx.Err() == nil {
 			warnings = append(warnings, warning)
 		}
@@ -50,15 +24,15 @@ func (a applying) fastForward(ctx context.Context) []wtm.Warning {
 	return warnings
 }
 
-func (a applying) advance(ctx context.Context, subject string) (wtm.Warning, bool) {
-	at := a.Facts.checkedOutAt(subject)
+func (p ApplyParams) advance(ctx context.Context, subject string) (wtm.Warning, bool) {
+	at := p.Facts.checkedOutAt(subject)
 	if at == "" {
-		return notAdvanced(subject, a.Deps.Git.FastForwardRef(ctx, subject))
+		return notAdvanced(subject, p.Deps.Git.FastForwardRef(ctx, subject))
 	}
-	if err := a.Deps.Git.FetchRef(ctx, subject); err != nil {
+	if err := p.Deps.Git.FetchRef(ctx, subject); err != nil {
 		return notAdvanced(subject, err)
 	}
-	dirty, err := a.Deps.Git.Dirty(ctx, at)
+	dirty, err := p.Deps.Git.Dirty(ctx, at)
 	if err != nil {
 		return notAdvanced(subject, err)
 	}
@@ -69,7 +43,7 @@ func (a applying) advance(ctx context.Context, subject string) (wtm.Warning, boo
 			Params:  wtm.Params{"branch": subject},
 		}, true
 	}
-	return notAdvanced(subject, a.Deps.Git.MergeFFOnly(ctx, worktree.Merge{Path: at, Onto: branch.RemoteBranch{Name: subject}}))
+	return notAdvanced(subject, p.Deps.Git.MergeFFOnly(ctx, worktree.Merge{Path: at, Onto: branch.RemoteBranch{Name: subject}}))
 }
 
 func notAdvanced(subject string, err error) (wtm.Warning, bool) {
