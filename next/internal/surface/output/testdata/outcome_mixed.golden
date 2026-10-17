@@ -1,0 +1,27 @@
+  ✗ create: 1 done · 1 unchanged · 1 failed · 1 skipped · 1 cancelled
+
+  Branches   feature (existing), linked (already open), feat/c, feat/d, remote-only (resumes origin/remote-only)
+  From       main
+  Env        main
+  Isolation  isolated
+  feature    .trees/feature · 1 port settled (offset +10)
+  linked     elsewhere/linked · already open
+  feat/c     .trees/feat-c
+  feat/d     .trees/feat-d
+
+  ! feature is 2 commit(s) behind origin — the worktree starts from your local branch.
+  ! Env ports left alone
+    ── .env ────────────────────────
+    DB  pg  no such key in this file
+  ! feat/c  no template found for .env, skipping
+  ! couldn't fast-forward main: its worktree has uncommitted changes — it starts from your local branch
+
+  ✗ feat/c  on_create failed: hook failed: exit status 3 · left incomplete
+  ! feat/d  interrupted · left incomplete
+  ! remote-only  interrupted
+
+  → wtm go feature
+  → wtm go linked
+  → wtm go feat/c
+  → wtm go feat/d
+  → wtm clean feat/e --force   branch feat/e is left half-created at /trees/feat-e: remove it with `wtm clean --force feat/e`

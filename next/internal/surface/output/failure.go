@@ -1,0 +1,37 @@
+package output
+
+import (
+	"io"
+	"strings"
+
+	"github.com/LucasPcq/wtm/next/internal/wtm"
+)
+
+type FailureParams struct {
+	Err  *wtm.Error
+	Next []NextStep
+}
+
+func Failure(w io.Writer, params FailureParams) {
+	errorLine(w, errorText(params.Err))
+	for _, line := range fieldLines(params.Err) {
+		message(w, indent+line)
+	}
+	nextSteps(w, params.Next)
+}
+
+func FailureLine(err *wtm.Error) string {
+	fields := fieldLines(err)
+	if len(fields) == 0 {
+		return errorText(err)
+	}
+	return errorText(err) + ": " + strings.Join(fields, "; ")
+}
+
+func fieldLines(err *wtm.Error) []string {
+	lines := make([]string, 0, len(err.Fields))
+	for _, field := range err.Fields {
+		lines = append(lines, field.Message(Flag(field.Path)))
+	}
+	return lines
+}

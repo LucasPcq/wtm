@@ -1,0 +1,10 @@
+  = create: 2 unchanged
+
+  Branches  feat/a (already open), feat/b (already open)
+  Parent    main
+  Env       example
+  feat/a    .trees/feat-a · already open
+  feat/b    .trees/feat-b · already open
+
+  → wtm go feat/a
+  → wtm go feat/b
