@@ -446,7 +446,7 @@ func selectParams(step flow.Step, content flow.StepContent) components.NewSelect
 	params.Toggle = domain.RememberToggleLabel
 	if memory.Reask && memory.Value != "" {
 		params.ToggleOn = true
-		params.Start = memory.Value
+		params.Start = flow.RememberedAnswer(memory)
 	}
 	return params
 }

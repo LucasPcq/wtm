@@ -4,6 +4,14 @@ All notable changes to wtm are documented here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.30.1] - 2026-10-17
+
+"Use config default" can be remembered like any other answer.
+
+### Fixed
+
+- **"Always use this answer" on "Use config default"** is remembered (`env_strategy = "config"`, which follows `env.strategy`) instead of being dropped without a word. → [Remembered answers](docs/guide/configuration.md#remembered-answers)
+
 ## [0.30.0] - 2026-10-17
 
 Wizards stop asking what you already answered, an interrupt never leaves a worktree or a state file half done, and `wtm status` reads a worktree's whole state at once.
@@ -764,7 +772,8 @@ Initial release.
 - **Detection** of the base branch, env files, package manager, Docker Compose and pnpm workspaces.
 - **Install** with Homebrew (`brew install LucasPcq/tap/wtm`), release binaries or `go install`.
 
-[Unreleased]: https://github.com/LucasPcq/wtm/compare/v0.30.0...HEAD
+[Unreleased]: https://github.com/LucasPcq/wtm/compare/v0.30.1...HEAD
+[0.30.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.30.1
 [0.30.0]: https://github.com/LucasPcq/wtm/releases/tag/v0.30.0
 [0.29.2]: https://github.com/LucasPcq/wtm/releases/tag/v0.29.2
 [0.29.1]: https://github.com/LucasPcq/wtm/releases/tag/v0.29.1

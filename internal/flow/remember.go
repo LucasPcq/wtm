@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/LucasPcq/wtm/internal/domain"
+	"github.com/LucasPcq/wtm/internal/domain/remember"
 	"github.com/LucasPcq/wtm/internal/rules"
 )
 
@@ -64,7 +65,24 @@ func Recalled(step Step) (string, bool) {
 	if memory.Value == "" || memory.Reask {
 		return "", false
 	}
-	return memory.Value, Rememberable(step, memory.Value)
+	value := RememberedAnswer(memory)
+	return value, Rememberable(step, value)
+}
+
+// RememberedAnswer is the answer value a memory stands for: "config" is the
+// empty "Use config default" answer.
+func RememberedAnswer(memory Memory) string {
+	if memory.Value == remember.ConfigDefault {
+		return ""
+	}
+	return memory.Value
+}
+
+func rememberedSpelling(value string) string {
+	if value == "" {
+		return remember.ConfigDefault
+	}
+	return value
 }
 
 func Rememberable(step Step, value string) bool {
@@ -72,7 +90,7 @@ func Rememberable(step Step, value string) bool {
 		return false
 	}
 	allowed, known := rules.RememberableValues(step.Memory.ID)
-	if !known || !slices.Contains(allowed, value) {
+	if !known || !slices.Contains(allowed, rememberedSpelling(value)) {
 		return false
 	}
 	if len(step.Options) == 0 {
@@ -104,7 +122,7 @@ func Remembering(session Session, answers Answers) rules.RememberedChange {
 		}
 		answer = Asked(step, answer)
 		if answer.Remember {
-			change.Remember[step.Memory.ID] = answer.Value
+			change.Remember[step.Memory.ID] = rememberedSpelling(answer.Value)
 			continue
 		}
 		if answer.Forget {
