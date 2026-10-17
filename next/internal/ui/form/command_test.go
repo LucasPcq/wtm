@@ -40,7 +40,7 @@ func TestARunAsksOnlyWhenTheUserCanSeeTheQuestionsAndAnswerThem(t *testing.T) {
 	}
 }
 
-func bound(t *testing.T, args ...string) (*Command[*app, request, questions, outcome], *cobra.Command) {
+func bound(t *testing.T, args ...string) (*Command[request, questions, outcome], *cobra.Command) {
 	t.Helper()
 	command, cmd := fakeCommand(), &cobra.Command{Use: "fake"}
 	command.Bind(cmd, &uicli.Run{})

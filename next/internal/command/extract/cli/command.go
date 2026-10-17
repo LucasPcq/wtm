@@ -65,44 +65,35 @@ func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, 
 }
 
 func (c *extractCommand) run(cmd *cobra.Command, args []string) error {
-	return c.form.Launch(cmd, args, func(ran form.Ran[extract.Request, extract.Outcome], err error) error {
-		return c.conclude(cmd, concluded{Outcome: ran.Outcome, Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: ran.Request, Cwd: c.io.Env.Cwd})
-	})
-}
-
-// concluded is how a run ended, for conclude: its outcome, its refusal, the request that ran and where.
-type concluded struct {
-	Outcome extract.Outcome
-	Err     *domain.Error
-	Request extract.Request
-	Cwd     string
+	return c.form.Launch(cmd, args, c.conclude)
 }
 
 // conclude prints how the run ended — the JSON envelope, a refusal, nothing to extract, the dry run and the line that applies it, or the outcome — and returns the failure that sets the exit code.
-func (c *extractCommand) conclude(cmd *cobra.Command, done concluded) error {
-	outcome := done.Outcome
-	line := extractLine{Command: cmd.CommandPath(), Request: done.Request}
+func (c *extractCommand) conclude(cmd *cobra.Command, ran form.Ran[extract.Request, extract.Outcome], err error) error {
+	failure := domain.AsError(domain.AsErrorParams{Err: err})
+	argv := c.form.Argv(cmd.CommandPath(), ran.Request)
+	outcome := ran.Outcome
 	if !c.io.Human() {
-		doc := done.Outcome.Envelope(done.Err)
-		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, line.Argv())...)
+		doc := ran.Outcome.Envelope(failure)
+		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, argv)...)
 		return c.io.Envelope(doc)
 	}
 
 	stdout, _ := c.io.Writers()
 	switch {
-	case done.Err != nil:
-		return c.io.Refuse(done.Err, line.Argv())
+	case failure != nil:
+		return c.io.Refuse(failure, argv)
 	case outcome.Result == nil && outcome.Plan.Nothing():
 		output.Frame(stdout, func(w io.Writer) { drawNothing(w, outcome.Plan) })
 		return nil
 	case outcome.Result == nil:
-		apply := line.String() + " --expect-fingerprint " + outcome.Fingerprint
+		apply := output.Line(argv) + " --expect-fingerprint " + outcome.Fingerprint
 		output.Frame(stdout, func(w io.Writer) {
 			output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(outcome.Plan), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: apply})
 		})
 		return nil
 	}
 
-	output.Frame(stdout, func(w io.Writer) { drawOutcome(w, outcome, done.Cwd) })
+	output.Frame(stdout, func(w io.Writer) { drawOutcome(w, outcome, c.io.Env.Cwd) })
 	return c.io.Failed(outcome.Failure())
 }

@@ -23,12 +23,12 @@ type sheet interface {
 	problems(answers ...domain.Answered) ([]domain.FieldError, error)
 }
 
-func (s *Session[U, R, Q, O]) values(path string) []string {
+func (s *Session[R, Q, O]) values(path string) []string {
 	return s.req.Values(path)
 }
 
 // problems are the problems of the request as answered so far with answers given too.
-func (s *Session[U, R, Q, O]) problems(answers ...domain.Answered) ([]domain.FieldError, error) {
+func (s *Session[R, Q, O]) problems(answers ...domain.Answered) ([]domain.FieldError, error) {
 	questions, err := s.Check(answers...)
 	if err != nil {
 		return nil, err

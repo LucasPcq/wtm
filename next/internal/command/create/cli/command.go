@@ -62,46 +62,37 @@ func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, 
 }
 
 func (c *createCommand) run(cmd *cobra.Command, args []string) error {
-	return c.form.Launch(cmd, args, func(ran form.Ran[create.Request, create.Outcome], err error) error {
-		return c.conclude(cmd, concluded{Outcome: ran.Outcome, Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: ran.Request, Cwd: c.io.Env.Cwd})
-	})
-}
-
-// concluded is how a run ended, for conclude: its outcome, its refusal, the request that ran and where.
-type concluded struct {
-	Outcome create.Outcome
-	Err     *domain.Error
-	Request create.Request
-	Cwd     string
+	return c.form.Launch(cmd, args, c.conclude)
 }
 
 // conclude prints how the run ended — the JSON envelope, a refusal, the dry run and the line that applies it, or the outcome — and returns the failure that sets the exit code.
-func (c *createCommand) conclude(cmd *cobra.Command, done concluded) error {
-	line := createLine{Command: cmd.CommandPath(), Request: done.Request}
+func (c *createCommand) conclude(cmd *cobra.Command, ran form.Ran[create.Request, create.Outcome], err error) error {
+	failure := domain.AsError(domain.AsErrorParams{Err: err})
+	argv := c.form.Argv(cmd.CommandPath(), ran.Request)
 	if !c.io.Human() {
-		doc := done.Outcome.Envelope(done.Err)
-		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, line.Argv())...)
+		doc := ran.Outcome.Envelope(failure)
+		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, argv)...)
 		return c.io.Envelope(doc)
 	}
 
 	stdout, _ := c.io.Writers()
 	switch {
-	case done.Err != nil:
-		return c.io.Refuse(done.Err, line.Argv())
-	case done.Outcome.Result == nil:
-		apply := line.String() + " --expect-fingerprint " + done.Outcome.Fingerprint
+	case failure != nil:
+		return c.io.Refuse(failure, argv)
+	case ran.Outcome.Result == nil:
+		apply := output.Line(argv) + " --expect-fingerprint " + ran.Outcome.Fingerprint
 		output.Frame(stdout, func(w io.Writer) {
-			output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(done.Outcome.Plan), Warnings: done.Outcome.Warnings, Fingerprint: done.Outcome.Fingerprint, Apply: apply})
+			output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(ran.Outcome.Plan), Warnings: ran.Outcome.Warnings, Fingerprint: ran.Outcome.Fingerprint, Apply: apply})
 		})
 		return nil
 	}
 
-	followUps := itemFollowUps(done.Outcome.Result.Items)
+	followUps := itemFollowUps(ran.Outcome.Result.Items)
 	output.Frame(stdout, func(w io.Writer) {
-		drawOutcome(w, done.Outcome, followUps, done.Cwd)
+		drawOutcome(w, ran.Outcome, followUps, c.io.Env.Cwd)
 	})
 
-	return c.io.Failed(cmp.Or(done.Err, done.Outcome.Failure()))
+	return c.io.Failed(cmp.Or(failure, ran.Outcome.Failure()))
 }
 
 // itemFollowUps are the commands the failed branches suggest, to repair what they left behind.

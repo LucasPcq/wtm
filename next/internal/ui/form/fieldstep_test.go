@@ -10,9 +10,9 @@ import (
 )
 
 // asking opens the wizard of the fake command on the step at, every step before it given.
-func asking(t *testing.T, a *app, given request) (*driver, *Session[*app, request, questions, outcome]) {
+func asking(t *testing.T, a *app, given request) (*driver, *Session[request, questions, outcome]) {
 	t.Helper()
-	s := fakeCommand().Session(t.Context(), SessionParams[*app, request]{App: a, Request: given})
+	s := fakeCommand().Session(t.Context(), SessionParams[request, questions, outcome]{App: a, Request: given})
 	return start(New(t.Context(), s.Params())), s
 }
 

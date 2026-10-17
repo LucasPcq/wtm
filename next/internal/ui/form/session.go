@@ -12,10 +12,10 @@ import (
 
 // A Session is a command's form as the wizard walks it: the request as given and as answered so far, the questions observed last, the plan previewed and the outcome of the apply.
 // The request is always the one given with the answer of each step still answered applied in step order, so going back before a step forgets its answer without a reset of its own.
-type Session[U any, R Request[R], Q Questions, O Outcome] struct {
+type Session[R Request[R], Q Questions, O Outcome] struct {
 	ctx     context.Context
-	command *Command[U, R, Q, O]
-	app     U
+	command *Command[R, Q, O]
+	app     UseCase[R, Q, O]
 	given   R
 	opts    domain.RunOptions
 	answers map[int]stepAnswer
@@ -35,15 +35,15 @@ type stepAnswer struct {
 }
 
 // SessionParams is what a session asks: the use case it calls, the request as given, and the options of its runs (DryRun, CorrelationID and Report; the session sets the surface and the fingerprint).
-type SessionParams[U any, R any] struct {
-	App     U
+type SessionParams[R, Q, O any] struct {
+	App     UseCase[R, Q, O]
 	Request R
 	Options domain.RunOptions
 }
 
 // Session returns the session of params, a step per field of the command's form: the command's own where Special gives one, else the step of the field's kind.
-func (c *Command[U, R, Q, O]) Session(ctx context.Context, params SessionParams[U, R]) *Session[U, R, Q, O] {
-	s := &Session[U, R, Q, O]{ctx: ctx, command: c, app: params.App, given: params.Request, req: params.Request, opts: params.Options, answers: map[int]stepAnswer{}, form: c.schema()}
+func (c *Command[R, Q, O]) Session(ctx context.Context, params SessionParams[R, Q, O]) *Session[R, Q, O] {
+	s := &Session[R, Q, O]{ctx: ctx, command: c, app: params.App, given: params.Request, req: params.Request, opts: params.Options, answers: map[int]stepAnswer{}, form: c.schema()}
 
 	for at, field := range s.form.Fields {
 		var step Step
@@ -60,7 +60,7 @@ func (c *Command[U, R, Q, O]) Session(ctx context.Context, params SessionParams[
 }
 
 // Params is what the wizard walks: the steps, and how the session observes, previews, draws, labels and applies.
-func (s *Session[U, R, Q, O]) Params() Params {
+func (s *Session[R, Q, O]) Params() Params {
 	script := Script{
 		Steps:   s.steps,
 		Observe: s.observe,
@@ -81,42 +81,37 @@ func (s *Session[U, R, Q, O]) Params() Params {
 // What a step reads
 
 // Request is the request as answered so far.
-func (s *Session[U, R, Q, O]) Request() R {
+func (s *Session[R, Q, O]) Request() R {
 	return s.req
 }
 
-// Given is the request as the command line gave it.
-func (s *Session[U, R, Q, O]) Given() R {
-	return s.given
-}
-
 // Preview is the plan the recap showed, nil before it lands or when it failed.
-func (s *Session[U, R, Q, O]) Preview() *O {
+func (s *Session[R, Q, O]) Preview() *O {
 	return s.preview
 }
 
 // Questions are the questions observed last.
-func (s *Session[U, R, Q, O]) Questions() Q {
+func (s *Session[R, Q, O]) Questions() Q {
 	return s.q
 }
 
 // Step is the step at, among those built before it: a command's own step finds the one it pairs with.
-func (s *Session[U, R, Q, O]) Step(at int) Step {
+func (s *Session[R, Q, O]) Step(at int) Step {
 	return s.steps[at]
 }
 
 // Field is the field of step at, on the questions observed last.
-func (s *Session[U, R, Q, O]) Field(at int) domain.Field {
+func (s *Session[R, Q, O]) Field(at int) domain.Field {
 	return s.form.Fields[at]
 }
 
 // Problems are the problems of the questions observed last that name the field at path or one of its entries.
-func (s *Session[U, R, Q, O]) Problems(path string) []domain.FieldError {
+func (s *Session[R, Q, O]) Problems(path string) []domain.FieldError {
 	return domain.ProblemsOf(s.form.Problems, path)
 }
 
 // Standing is where the answer of step at stands on the questions observed last: its value as the trail shows it, where it comes from, why it is not asked, whether it is refused, and the flag that gave it, if the command line did.
-func (s *Session[U, R, Q, O]) Standing(at int) Standing {
+func (s *Session[R, Q, O]) Standing(at int) Standing {
 	field := s.Field(at)
 	spec := field.Spec()
 	st := Standing{Value: trailOf(field), Origin: spec.Origin, Skip: spec.Skip, Erred: len(s.Problems(spec.Path)) > 0}
@@ -128,7 +123,7 @@ func (s *Session[U, R, Q, O]) Standing(at int) Standing {
 }
 
 // Label spells a field path with the label of the first field that answers it, keeping an entry's index: branches[1] reads Branches[1].
-func (s *Session[U, R, Q, O]) Label(path string) string {
+func (s *Session[R, Q, O]) Label(path string) string {
 	name, index, indexed := strings.Cut(path, "[")
 	at := slices.IndexFunc(s.command.schema().Fields, func(f domain.Field) bool { return f.Spec().Path == name })
 	switch {
@@ -142,39 +137,39 @@ func (s *Session[U, R, Q, O]) Label(path string) string {
 }
 
 // Check observes the questions of the request as answered so far with answers given too, without keeping them: a step checks what is typed before it answers.
-func (s *Session[U, R, Q, O]) Check(answers ...domain.Answered) (Q, error) {
+func (s *Session[R, Q, O]) Check(answers ...domain.Answered) (Q, error) {
 	trial, err := domain.Fold(s.req, answers)
 	if err != nil {
 		var none Q
 		return none, err
 	}
 
-	return s.command.Questions(s.app, s.ctx, trial)
+	return s.app.Questions(s.ctx, trial)
 }
 
 // ----------------------------------------------------------------------------
 // What a step answers
 
 // Answer records answers as those of step at, in place of what it answered before.
-func (s *Session[U, R, Q, O]) Answer(at int, answers ...domain.Answered) {
+func (s *Session[R, Q, O]) Answer(at int, answers ...domain.Answered) {
 	s.answers[at] = stepAnswer{answers: answers}
 	s.rebuild()
 }
 
 // remembering records answers as those of step at, and whether to remember the answer of the field at path.
-func (s *Session[U, R, Q, O]) remembering(at int, path string, on bool, answers ...domain.Answered) {
+func (s *Session[R, Q, O]) remembering(at int, path string, on bool, answers ...domain.Answered) {
 	s.answers[at] = stepAnswer{answers: answers, remember: path, on: on}
 	s.rebuild()
 }
 
 // Forget forgets what step at answered, the user having gone back before it.
-func (s *Session[U, R, Q, O]) Forget(at int) {
+func (s *Session[R, Q, O]) Forget(at int) {
 	delete(s.answers, at)
 	s.rebuild()
 }
 
 // rebuild answers the request given with each step's answer in step order, then the fields to remember.
-func (s *Session[U, R, Q, O]) rebuild() {
+func (s *Session[R, Q, O]) rebuild() {
 	req := s.given
 	remember := slices.Clone(s.given.Values(domain.PathRemember))
 
@@ -205,8 +200,8 @@ func (s *Session[U, R, Q, O]) rebuild() {
 // Observe, preview, apply
 
 // observe reads the questions for the request as answered so far.
-func (s *Session[U, R, Q, O]) observe(ctx context.Context) (func(), error) {
-	questions, err := s.command.Questions(s.app, ctx, s.req)
+func (s *Session[R, Q, O]) observe(ctx context.Context) (func(), error) {
+	questions, err := s.app.Questions(ctx, s.req)
 	return func() {
 		if err == nil {
 			s.q, s.form = questions, questions.Form()
@@ -215,10 +210,10 @@ func (s *Session[U, R, Q, O]) observe(ctx context.Context) (func(), error) {
 }
 
 // previewPlan dry-runs the request as answered, for the recap to show the plan its apply will be held to.
-func (s *Session[U, R, Q, O]) previewPlan(ctx context.Context) (func(), error) {
+func (s *Session[R, Q, O]) previewPlan(ctx context.Context) (func(), error) {
 	opts := s.opts
 	opts.DryRun, opts.Surface, opts.Report = true, uicli.SurfaceTUI, nil
-	outcome, err := s.command.Run(s.app, ctx, s.req, opts)
+	outcome, err := s.app.Run(ctx, s.req, opts)
 	if err != nil {
 		return func() { s.preview = nil }, err
 	}
@@ -227,14 +222,14 @@ func (s *Session[U, R, Q, O]) previewPlan(ctx context.Context) (func(), error) {
 }
 
 // apply runs the request as answered, held to the fingerprint of the plan previewed unless on a dry run; a stale plan leaves the outcome alone, since the wizard starts again.
-func (s *Session[U, R, Q, O]) apply(ctx context.Context) error {
+func (s *Session[R, Q, O]) apply(ctx context.Context) error {
 	opts := s.opts
 	opts.Surface = uicli.SurfaceTUI
 	if !opts.DryRun {
 		opts.ExpectFingerprint = (*s.preview).PlanFingerprint()
 	}
 
-	outcome, err := s.command.Run(s.app, ctx, s.req, opts)
+	outcome, err := s.app.Run(ctx, s.req, opts)
 	if !domain.PlanStale(err) {
 		s.outcome = outcome
 	}

@@ -277,7 +277,7 @@ type Answered struct {
 	Values []string
 }
 
-// Answers are the answer of each field of the form, in order, then the fields whose answer is to be remembered.
+// Answers are the answer of each field of the form, in order, then the fields whose answer is to be remembered: the inverse of Fold, which a surface or a test folds back into the request the form stands for.
 func (f Form) Answers() []Answered {
 	answers := make([]Answered, 0, len(f.Fields)+1)
 	for _, field := range f.Fields {

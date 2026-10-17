@@ -31,9 +31,12 @@ const (
 	fingerprint = "0123456789abcdef01234567"
 )
 
+// useCase is what the form calls of create's use case, so a test can stand in for it.
+type useCase = form.UseCase[create.Request, create.Questions, create.Outcome]
+
 type (
-	session       = form.Session[useCase, create.Request, create.Questions, create.Outcome]
-	sessionParams = form.SessionParams[useCase, create.Request]
+	session       = form.Session[create.Request, create.Questions, create.Outcome]
+	sessionParams = form.SessionParams[create.Request, create.Questions, create.Outcome]
 )
 
 // The steps of create's form, in the order asked, then the recap.

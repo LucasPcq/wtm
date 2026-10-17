@@ -162,7 +162,7 @@ type app struct {
 	runs       []domain.RunOptions
 }
 
-func (a *app) questions(_ context.Context, req request) (questions, error) {
+func (a *app) Questions(_ context.Context, req request) (questions, error) {
 	q := questions{req: req, remembered: a.remembered}
 	for i, branch := range req["branches"] {
 		if branch == "taken" {
@@ -172,17 +172,15 @@ func (a *app) questions(_ context.Context, req request) (questions, error) {
 	return q, nil
 }
 
-func (a *app) run(_ context.Context, req request, opts domain.RunOptions) (outcome, error) {
+func (a *app) Run(_ context.Context, req request, opts domain.RunOptions) (outcome, error) {
 	a.runs = append(a.runs, opts)
 	return outcome{req: req, fingerprint: "print"}, nil
 }
 
-func fakeCommand() *Command[*app, request, questions, outcome] {
-	return &Command[*app, request, questions, outcome]{
-		YesUsage:  "Run unattended",
-		Open:      func(context.Context, string) (*app, error) { return &app{}, nil },
-		Questions: (*app).questions,
-		Run:       (*app).run,
+func fakeCommand() *Command[request, questions, outcome] {
+	return &Command[request, questions, outcome]{
+		YesUsage: "Run unattended",
+		Open:     func(context.Context, string) (UseCase[request, questions, outcome], error) { return &app{}, nil },
 		Plan: func(o outcome, _ int, _ *output.Styles) string {
 			return "plan of " + strings.Join(o.req["branches"], ", ")
 		},
@@ -190,9 +188,9 @@ func fakeCommand() *Command[*app, request, questions, outcome] {
 }
 
 // observed is a session of the fake command over a, its first read landed.
-func observed(t *testing.T, a *app, given request) *Session[*app, request, questions, outcome] {
+func observed(t *testing.T, a *app, given request) *Session[request, questions, outcome] {
 	t.Helper()
-	s := fakeCommand().Session(t.Context(), SessionParams[*app, request]{App: a, Request: given})
+	s := fakeCommand().Session(t.Context(), SessionParams[request, questions, outcome]{App: a, Request: given})
 	apply, err := s.observe(t.Context())
 	require.NoError(t, err)
 	apply()
