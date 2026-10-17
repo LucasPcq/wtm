@@ -29,75 +29,29 @@ var labels = [stepCount]string{"Branches", "Source branch", "Env strategy", "Iso
 
 var paths = [stepCount]string{"branches", "from", "env_from", "isolation", "fast_forward", "if_not_exists", ""}
 
-type mark struct {
-	asked bool
-	ruled string
-	line  string
-}
-
-type standing struct {
-	value   string
-	flagged bool
-	origin  domain.Origin
-	skip    string
-}
-
-func (w *wizard) standing(s step) standing {
+func (w *wizard) standing(s step) form.Standing {
 	q := w.q
+	st, flagged := form.Standing{}, false
 	switch s {
 	case stepBranches:
-		return standing{value: strings.Join(q.Branches.Given, ", "), flagged: len(w.given.Branches) > 0}
+		st, flagged = form.Standing{Value: strings.Join(q.Branches.Given, ", ")}, len(w.given.Branches) > 0
 	case stepFrom:
-		return standing{value: q.From.Value, flagged: w.given.From != "", origin: q.From.Origin}
+		st, flagged = form.Standing{Value: q.From.Value, Origin: q.From.Origin}, w.given.From != ""
 	case stepEnvFrom:
-		return standing{value: string(q.EnvFrom.Value), flagged: w.given.EnvFrom != "", origin: q.EnvFrom.Origin}
+		st, flagged = form.Standing{Value: string(q.EnvFrom.Value), Origin: q.EnvFrom.Origin}, w.given.EnvFrom != ""
 	case stepIsolation:
-		return standing{value: string(q.Isolation.Value), flagged: w.given.Isolation != "", origin: q.Isolation.Origin, skip: q.Isolation.Skip}
+		st, flagged = form.Standing{Value: string(q.Isolation.Value), Origin: q.Isolation.Origin, Skip: q.Isolation.Skip}, w.given.Isolation != ""
 	case stepFastForward:
-		return standing{value: yesNo(q.FastForward.Value), flagged: w.given.FastForward != nil, origin: q.FastForward.Origin, skip: q.FastForward.Skip}
+		st, flagged = form.Standing{Value: yesNo(q.FastForward.Value), Origin: q.FastForward.Origin, Skip: q.FastForward.Skip}, w.given.FastForward != nil
 	case stepIfNotExists:
-		return standing{value: yesNo(q.IfNotExists.Value), skip: q.IfNotExists.Skip}
+		st = form.Standing{Value: yesNo(q.IfNotExists.Value), Skip: q.IfNotExists.Skip}
 	case stepRecap, stepCount:
 	}
-	return standing{}
-}
-
-func (w *wizard) decide(s step) mark {
-	st := w.standing(s)
-	value := cmp.Or(st.value, none)
-	switch {
-	case s == stepRecap:
-		return mark{asked: true}
-	case st.skip != "":
-		return mark{ruled: st.skip}
-	case w.erred(paths[s]):
-		return mark{asked: true}
-	case st.flagged:
-		return mark{line: value + trail + createFlags.Spell(paths[s])}
-	case w.answered[s]:
-		return mark{line: value}
-	case st.origin == domain.OriginRemembered:
-		return mark{line: value + trail + string(domain.OriginRemembered)}
+	st.Erred = w.erred(paths[s])
+	if flagged {
+		st.Flag = createFlags.Spell(paths[s])
 	}
-	return mark{asked: true}
-}
-
-func (w *wizard) asks() bool {
-	return slices.ContainsFunc([]step{stepBranches, stepFrom, stepEnvFrom, stepIsolation, stepFastForward, stepIfNotExists}, func(s step) bool { return w.decide(s).asked })
-}
-
-type answer struct {
-	Step  step
-	Shown string
-}
-
-func (w *wizard) summarized(a answer) string {
-	offered := w.standing(a.Step)
-	kept := offered.origin == domain.OriginConfig || offered.origin == domain.OriginDefault
-	if kept && a.Shown == offered.value {
-		return a.Shown + trail + string(offered.origin)
-	}
-	return a.Shown
+	return st
 }
 
 func (w *wizard) erred(path string) bool {

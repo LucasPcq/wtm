@@ -6,6 +6,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,9 +36,9 @@ func TestTheRequestIsWhatWasAnswered(t *testing.T) {
 
 	d.keys("feat/a", "enter", "enter", "down", "tab", "enter", "enter")
 
-	require.True(t, d.w.finished)
-	assert.Equal(t, create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvMain, Remember: []string{"env_from"}}, d.w.req)
-	assert.NotEmpty(t, d.w.preview.Fingerprint)
+	require.Equal(t, form.Finished, d.w.Ending())
+	assert.Equal(t, create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvMain, Remember: []string{"env_from"}}, d.c.req)
+	assert.NotEmpty(t, d.c.preview.Fingerprint)
 }
 
 func TestAKeptDefaultSaysWhereItCameFrom(t *testing.T) {
@@ -58,7 +59,7 @@ func TestAnEntryIsCheckedAsItIsAdded(t *testing.T) {
 	assert.Contains(t, d.screen(), "✗ Branch feat/x is checked out at /elsewhere/feat-x — run `wtm go feat/x` to jump in")
 
 	d.keys("enter")
-	assert.Equal(t, stepBranches, d.w.current)
+	assert.Equal(t, int(stepBranches), d.w.Current())
 }
 
 func TestNoEntryIsRequired(t *testing.T) {
@@ -72,7 +73,7 @@ func TestNoEntryIsRequired(t *testing.T) {
 func TestWhatAFlagOrARememberedAnswerSettledIsNotAsked(t *testing.T) {
 	d := open(t, wizardParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: "main"}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main"}})
 
-	assert.Equal(t, stepRecap, d.w.current)
+	assert.Equal(t, int(stepRecap), d.w.Current())
 	screen := d.screen()
 	assert.Contains(t, screen, "✓ Branches: feat/a · <branches>")
 	assert.Contains(t, screen, "✓ Source branch: main · --from")
@@ -83,32 +84,32 @@ func TestWhatAFlagOrARememberedAnswerSettledIsNotAsked(t *testing.T) {
 func TestAskAsksARememberedAnswerAgainStartingOnIt(t *testing.T) {
 	d := open(t, wizardParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: "main"}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Ask: true}})
 
-	assert.Equal(t, stepEnvFrom, d.w.current)
-	assert.Equal(t, "main", d.w.envFrom.Value())
+	assert.Equal(t, int(stepEnvFrom), d.w.Current())
+	assert.Equal(t, "main", d.c.envFrom.list.Value())
 	assert.Contains(t, d.screen(), "[x] Always use this answer in this repo")
 }
 
 func TestASourceBehindOriginIsOfferedAFastForward(t *testing.T) {
 	d := open(t, wizardParams{App: newApp(seed{Behind: true}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}})
 
-	assert.Equal(t, stepFastForward, d.w.current)
+	assert.Equal(t, int(stepFastForward), d.w.Current())
 	d.keys("up", "enter")
 
-	assert.Equal(t, new(true), d.w.req.FastForward)
+	assert.Equal(t, new(true), d.c.req.FastForward)
 	assert.Contains(t, d.screen(), "Fast-forward  main")
 }
 
 func TestTheSourceListPinsTheBaseBranchAndRefreshes(t *testing.T) {
 	d := open(t, wizardParams{App: newApp(seed{Behind: true}), Request: create.Request{Branches: []string{"feat/a"}}})
 
-	assert.Equal(t, stepFrom, d.w.current)
+	assert.Equal(t, int(stepFrom), d.w.Current())
 	assert.Contains(t, d.screen(), "▌› main")
 	assert.Contains(t, d.screen(), "1 behind")
 
 	d.keys("down", "r")
 
-	assert.Equal(t, "feature", d.w.from.Value())
-	assert.Empty(t, d.w.loading)
+	assert.Equal(t, "feature", d.c.from.list.Value())
+	assert.NotContains(t, d.screen(), "Refreshing")
 }
 
 func TestEachWayOutCancels(t *testing.T) {
@@ -126,7 +127,7 @@ func TestEachWayOutCancels(t *testing.T) {
 
 		d.keys(c.Keys...)
 
-		assert.True(t, d.w.aborted, name)
+		assert.Equal(t, form.Cancelled, d.w.Ending(), name)
 	}
 }
 
@@ -143,11 +144,11 @@ func TestAPlanThatCannotApplySaysWhyAndOffersOnlyToCancel(t *testing.T) {
 func TestAStaleRunAsksNothingAgainAndSaysWhy(t *testing.T) {
 	d := open(t, wizardParams{App: newApp(seed{})})
 	d.keys("feat/a", "enter", "enter", "enter")
-	require.Equal(t, stepRecap, d.w.current)
+	require.Equal(t, int(stepRecap), d.w.Current())
 
-	again := start(t, d.w.again())
+	again := start(t, d.c, d.w.Again())
 
-	assert.Equal(t, stepRecap, again.w.current)
+	assert.Equal(t, int(stepRecap), again.w.Current())
 	screen := again.screen()
 	assert.Contains(t, screen, "✓ Source branch: main\n")
 	assert.Contains(t, screen, "! the facts changed since the preview")
@@ -159,6 +160,6 @@ func TestADryRunAsksTheQuestionsAndNoConfirmation(t *testing.T) {
 	assert.Contains(t, d.screen(), "Step 1/6 • Branches")
 	d.keys("feat/a", "enter", "enter", "enter")
 
-	assert.True(t, d.w.finished)
-	assert.Nil(t, d.w.preview)
+	assert.Equal(t, form.Finished, d.w.Ending())
+	assert.Nil(t, d.c.preview)
 }

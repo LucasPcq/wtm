@@ -1,34 +1,32 @@
-package cli
+package form
 
 import (
 	"fmt"
 	"strings"
 
-	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
-func (w *wizard) View() string {
+func (w *Wizard) View() string {
 	switch {
-	case w.finished || w.aborted:
+	case w.ending != Asking:
 		return ""
 	case !w.loaded:
 		return "\n" + w.status() + "\n"
 	}
 	head, tail := w.head(), w.tail()
-	body := form.Size{Width: w.size.Width}
+	body := Size{Width: w.size.Width}
 	if w.size.Height > 0 {
 		body.Height = max(minListRows, w.size.Height-strings.Count(head+tail, "\n"))
 	}
 	return head + w.field().View(body) + tail
 }
 
-func (w *wizard) status() string {
-	return form.StatusBox.Render(w.spinner.View() + " " + output.Muted.Render(w.loading))
+func (w *Wizard) status() string {
+	return StatusBox.Render(w.spinner.View() + " " + output.Muted.Render(w.loading))
 }
 
-func (w *wizard) head() string {
+func (w *Wizard) head() string {
 	var b strings.Builder
 	b.WriteString("\n" + w.breadcrumb() + "\n\n")
 	if w.loading != "" {
@@ -40,40 +38,41 @@ func (w *wizard) head() string {
 	if w.current > 0 {
 		b.WriteString("\n")
 	}
-	if w.current == stepRecap {
+	if w.atRecap() {
 		return b.String() + w.review() + "\n\n"
 	}
-	b.WriteString(output.Muted.Render(form.Indented(form.Wrap(descriptions[paths[w.current]], w.size.Width-len(output.Indent)-1))) + "\n\n")
+	b.WriteString(output.Muted.Render(Indented(Wrap(w.script.Steps[w.current].Description(), w.size.Width-len(output.Indent)-1))) + "\n\n")
 	return b.String()
 }
 
-func (w *wizard) breadcrumb() string {
-	title := labels[w.current]
-	if w.current == stepRecap {
-		title = w.recapTitle()
+func (w *Wizard) breadcrumb() string {
+	title := w.recapTitle()
+	if !w.atRecap() {
+		title = w.script.Steps[w.current].Label()
 	}
-	return output.Muted.Render(fmt.Sprintf("%sStep %d/%d", output.Indent, w.current+1, w.last())) + output.Muted.Render(form.HelpSeparator) + form.Accent.Render(title)
+	return output.Muted.Render(fmt.Sprintf("%sStep %d/%d", output.Indent, w.current+1, w.last())) + output.Muted.Render(HelpSeparator) + Accent.Render(title)
 }
 
-func (w *wizard) summaries() string {
+func (w *Wizard) summaries() string {
 	var lines []string
 	for s := range w.current {
 		m := w.marks[s]
+		label := w.script.Steps[s].Label()
 		switch {
 		case m.ruled != "":
-			lines = append(lines, output.Muted.Render(output.Indent+"· "+labels[s]+" — "+m.ruled))
+			lines = append(lines, output.Muted.Render(output.Indent+"· "+label+" — "+m.ruled))
 		default:
-			lines = append(lines, form.Summary.Render(output.Indent+"✓ "+labels[s]+": "+m.line))
+			lines = append(lines, Summary.Render(output.Indent+"✓ "+label+": "+m.line))
 		}
 	}
 	return strings.Join(lines, "\n")
 }
 
-func (w *wizard) tail() string {
+func (w *Wizard) tail() string {
 	return "\n\n" + output.Muted.Render(w.helpLine()) + "\n"
 }
 
-func (w *wizard) helpLine() string {
+func (w *Wizard) helpLine() string {
 	h := w.field().Help()
 	if h.Modal != "" {
 		return h.Modal
@@ -83,7 +82,7 @@ func (w *wizard) helpLine() string {
 		parts = append(parts, "↑↓ navigate")
 	}
 	parts = append(parts, h.Actions...)
-	if w.current == stepFrom {
+	if _, ok := w.refresher(); ok {
 		parts = append(parts, "r refresh")
 	}
 	parts = append(parts, "enter confirm")
@@ -92,18 +91,14 @@ func (w *wizard) helpLine() string {
 	} else {
 		parts = append(parts, "esc cancel")
 	}
-	return output.Indent + strings.Join(parts, form.HelpSeparator)
+	return output.Indent + strings.Join(parts, HelpSeparator)
 }
 
-func (w *wizard) canGoBack() bool {
+func (w *Wizard) canGoBack() bool {
 	for s := w.current - 1; s >= 0; s-- {
 		if w.marks[s].asked {
 			return true
 		}
 	}
 	return false
-}
-
-func asError(err error) *domain.Error {
-	return domain.AsError(domain.AsErrorParams{Err: err})
 }

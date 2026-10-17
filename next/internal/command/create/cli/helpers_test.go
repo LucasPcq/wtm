@@ -12,6 +12,7 @@ import (
 	"time"
 
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -101,17 +102,19 @@ const settleWithin = 100 * time.Millisecond
 
 type driver struct {
 	t *testing.T
-	w *wizard
+	w *form.Wizard
+	c *wizard
 }
 
 func open(t *testing.T, params wizardParams) *driver {
 	t.Helper()
-	return start(t, newWizard(t.Context(), params))
+	c := newWizard(t.Context(), params)
+	return start(t, c, form.New(t.Context(), c.form()))
 }
 
-func start(t *testing.T, w *wizard) *driver {
+func start(t *testing.T, c *wizard, w *form.Wizard) *driver {
 	t.Helper()
-	d := &driver{t: t, w: w}
+	d := &driver{t: t, w: w, c: c}
 	d.send(tea.WindowSizeMsg{Width: 100, Height: 40})
 	d.run(w.Init())
 	return d

@@ -9,29 +9,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
-	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
-	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-)
-
-const (
-	readingText  = "Reading the repository…"
-	refreshText  = "Refreshing…"
-	planText     = "Computing the plan…"
-	recapTitle   = "Apply this plan?"
-	failedTitle  = "Cannot apply this plan"
-	reviewTitle  = "Review & confirm"
-	staleText    = "the facts changed since the preview"
-	applyValue   = "apply"
-	cancelValue  = "cancel"
-	none         = "none"
-	trail        = " · "
-	keyInterrupt = "ctrl+c"
-	keyRefresh   = "r"
-	defaultWidth = 80
-	minListRows  = 3
 )
 
 type wizard struct {
@@ -40,232 +20,175 @@ type wizard struct {
 	given    create.Request
 	req      create.Request
 	dryRun   bool
-	stale    bool
-	answered [stepCount]bool
+	report   domain.Report
 	q        create.Questions
-	loaded   bool
-	marks    [stepCount]mark
-	current  step
-	branches *form.TextList
-	from     *form.SelectList
-	envFrom  *form.SelectList
-	isolate  *form.SelectList
-	ff       *form.Confirm
-	recap    *form.SelectList
 	preview  *create.Outcome
-	failure  *domain.Error
-	loading  string
-	spinner  spinner.Model
-	size     form.Size
-	finished bool
-	aborted  bool
-	err      error
+	outcome  create.Outcome
+	branches *branchesStep
+	from     *sourceStep
+	envFrom  *choiceStep
+	isolate  *choiceStep
+	ff       *fastForwardStep
 }
 
 type wizardParams struct {
 	App     useCase
 	Request create.Request
 	DryRun  bool
+	Report  domain.Report
 }
 
 func newWizard(ctx context.Context, params wizardParams) *wizard {
-	s := spinner.New()
-	s.Spinner, s.Style = spinner.MiniDot, output.Muted
-	return &wizard{ctx: ctx, app: params.App, given: params.Request, req: params.Request, dryRun: params.DryRun, spinner: s, size: form.Size{Width: defaultWidth}}
+	w := &wizard{ctx: ctx, app: params.App, given: params.Request, req: params.Request, dryRun: params.DryRun, report: params.Report}
+	w.branches = &branchesStep{at: at{w: w, step: stepBranches}}
+	w.from = &sourceStep{at: at{w: w, step: stepFrom}}
+	w.envFrom = &choiceStep{at: at{w: w, step: stepEnvFrom}}
+	w.isolate = &choiceStep{at: at{w: w, step: stepIsolation}}
+	w.ff = &fastForwardStep{at: at{w: w, step: stepFastForward}}
+	return w
 }
 
-func (w *wizard) again() *wizard {
-	next := newWizard(w.ctx, wizardParams{App: w.app, Request: w.given, DryRun: w.dryRun})
-	next.req, next.stale = w.req, true
-	for s := range stepCount {
-		next.answered[s] = w.marks[s].asked
-	}
-	return next
-}
-
-type questionsMsg struct {
-	questions create.Questions
-	err       error
-	refresh   bool
-}
-
-type previewMsg struct {
-	outcome create.Outcome
-	err     error
-}
-
-func (w *wizard) Init() tea.Cmd {
-	return tea.Batch(w.load(readingText), w.observe(false))
-}
-
-func (w *wizard) load(text string) tea.Cmd {
-	w.loading = text
-	return w.spinner.Tick
-}
-
-func (w *wizard) observe(refresh bool) tea.Cmd {
-	req := w.req
-	return func() tea.Msg {
-		questions, err := w.app.Questions(w.ctx, req)
-		return questionsMsg{questions: questions, err: err, refresh: refresh}
+func (w *wizard) form() form.Params {
+	return form.Params{
+		Script: form.Script{
+			Steps:   []form.Step{w.branches, w.from, w.envFrom, w.isolate, w.ff, ifNotExistsStep{at: at{w: w, step: stepIfNotExists}}},
+			Observe: w.observe,
+			Preview: w.previewPlan,
+			Plan:    w.plan,
+			Label:   label,
+			Apply:   w.apply,
+			Stale:   stale,
+		},
+		DryRun: w.dryRun,
 	}
 }
 
-func (w *wizard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch m := msg.(type) {
-	case tea.KeyMsg:
-		return w, w.key(m)
-	case tea.WindowSizeMsg:
-		w.size = form.Size{Width: m.Width, Height: m.Height}
-		return w, nil
-	case spinner.TickMsg:
-		if w.loading == "" {
-			return w, nil
-		}
-		var cmd tea.Cmd
-		w.spinner, cmd = w.spinner.Update(m)
-		return w, cmd
-	case questionsMsg:
-		return w, w.observed(m)
-	case previewMsg:
-		w.previewed(m)
-		return w, nil
-	}
-	if field := w.field(); field != nil {
-		_, cmd := field.Update(msg)
-		return w, cmd
-	}
-	return w, nil
+func (w *wizard) observe(ctx context.Context) error {
+	questions, err := w.app.Questions(ctx, w.req)
+	w.q = questions
+	return err
 }
 
-func (w *wizard) key(m tea.KeyMsg) tea.Cmd {
-	if m.String() == keyInterrupt {
-		w.aborted = true
-		return tea.Quit
-	}
-	field := w.field()
-	if field == nil || w.loading != "" {
-		return nil
-	}
-	if m.String() == keyRefresh && w.current == stepFrom && !w.from.Filtering() {
-		return tea.Batch(w.load(refreshText), w.observe(true))
-	}
-	verdict, cmd := field.Update(m)
-	switch verdict {
-	case form.Done:
-		return w.answer()
-	case form.Back:
-		return w.back()
-	case form.Stay:
-	}
-	return cmd
+type at struct {
+	w    *wizard
+	step step
 }
 
-func (w *wizard) observed(m questionsMsg) tea.Cmd {
-	w.loading = ""
-	if m.err != nil {
-		w.err = m.err
-		return tea.Quit
-	}
-	w.q = m.questions
-	if !m.refresh {
-		w.loaded = true
-		return w.enter(stepBranches)
-	}
-	kept := w.from.Value()
-	w.from = w.sourceList()
-	w.from.StartOn(kept)
+func (a at) Label() string {
+	return labels[a.step]
+}
+
+func (a at) Description() string {
+	return descriptions[paths[a.step]]
+}
+
+func (a at) Standing() form.Standing {
+	return a.w.standing(a.step)
+}
+
+func (a at) Reset() {
+	a.w.reset(a.step)
+}
+
+type branchesStep struct {
+	at
+	list *form.TextList
+}
+
+func (s *branchesStep) Open() tea.Cmd {
+	s.list = form.NewTextList(form.TextListParams{Entries: s.w.req.Branches, Check: s.w.branchProblem, Badge: s.w.branchBadge})
+	return textinput.Blink
+}
+
+func (s *branchesStep) Field() form.Field {
+	return s.list
+}
+
+func (s *branchesStep) Answer() string {
+	s.w.req.Branches = s.list.Entries()
+	return strings.Join(s.w.req.Branches, ", ")
+}
+
+type sourceStep struct {
+	at
+	list *form.SelectList
+}
+
+func (s *sourceStep) Open() tea.Cmd {
+	s.list = s.w.sourceList()
 	return nil
 }
 
-func (w *wizard) last() step {
-	if w.dryRun {
-		return stepRecap
-	}
-	return stepCount
+func (s *sourceStep) Field() form.Field {
+	return s.list
 }
 
-func (w *wizard) enter(from step) tea.Cmd {
-	for s := from; s < w.last(); s++ {
-		w.marks[s] = w.decide(s)
-		if w.marks[s].asked {
-			w.current = s
-			return w.open(s)
-		}
-	}
-	w.finished = true
-	return tea.Quit
+func (s *sourceStep) Answer() string {
+	s.w.req.From = s.list.Value()
+	return s.w.req.From
 }
 
-func (w *wizard) open(s step) tea.Cmd {
-	switch s {
-	case stepBranches:
-		w.branches = form.NewTextList(form.TextListParams{Entries: w.req.Branches, Check: w.branchProblem, Badge: w.branchBadge})
-		return textinput.Blink
-	case stepFrom:
-		w.from = w.sourceList()
-	case stepEnvFrom:
-		w.envFrom = choiceList(w.choices(s))
-	case stepIsolation:
-		w.isolate = choiceList(w.choices(s))
-	case stepFastForward:
-		w.ff = form.NewConfirm(w.q.FastForward.Value)
-	case stepRecap:
-		return w.previewing()
-	case stepIfNotExists, stepCount:
-	}
+func (s *sourceStep) Refreshable() bool {
+	return !s.list.Filtering()
+}
+
+func (s *sourceStep) Refreshed() {
+	kept := s.list.Value()
+	s.list = s.w.sourceList()
+	s.list.StartOn(kept)
+}
+
+type choiceStep struct {
+	at
+	list *form.SelectList
+}
+
+func (s *choiceStep) Open() tea.Cmd {
+	s.list = choiceList(s.w.choices(s.step))
 	return nil
 }
 
-func (w *wizard) field() form.Field {
-	if !w.loaded || w.finished || w.aborted {
-		return nil
-	}
-	switch w.current {
-	case stepBranches:
-		return w.branches
-	case stepFrom:
-		return w.from
-	case stepEnvFrom:
-		return w.envFrom
-	case stepIsolation:
-		return w.isolate
-	case stepFastForward:
-		return w.ff
-	case stepRecap:
-		return w.recap
-	case stepIfNotExists, stepCount:
-	}
+func (s *choiceStep) Field() form.Field {
+	return s.list
+}
+
+func (s *choiceStep) Answer() string {
+	return s.w.choose(chosen{Step: s.step, Value: s.list.Value(), Remember: s.list.Remember()})
+}
+
+type fastForwardStep struct {
+	at
+	box *form.Confirm
+}
+
+func (s *fastForwardStep) Open() tea.Cmd {
+	s.box = form.NewConfirm(s.w.q.FastForward.Value)
 	return nil
 }
 
-func (w *wizard) answer() tea.Cmd {
-	s := w.current
-	var shown string
-	switch s {
-	case stepBranches:
-		w.req.Branches = w.branches.Entries()
-		shown = strings.Join(w.req.Branches, ", ")
-	case stepFrom:
-		w.req.From = w.from.Value()
-		shown = w.req.From
-	case stepEnvFrom:
-		shown = w.choose(chosen{Step: s, Value: w.envFrom.Value(), Remember: w.envFrom.Remember()})
-	case stepIsolation:
-		shown = w.choose(chosen{Step: s, Value: w.isolate.Value(), Remember: w.isolate.Remember()})
-	case stepFastForward:
-		w.req.FastForward = new(w.ff.Yes())
-		shown = yesNo(w.ff.Yes())
-	case stepRecap:
-		return w.confirmed()
-	case stepIfNotExists, stepCount:
-	}
-	w.marks[s].line = w.summarized(answer{Step: s, Shown: shown})
-	if err := w.reobserve(); err != nil {
-		w.err = err
-		return tea.Quit
-	}
-	return w.enter(s + 1)
+func (s *fastForwardStep) Field() form.Field {
+	return s.box
+}
+
+func (s *fastForwardStep) Answer() string {
+	s.w.req.FastForward = new(s.box.Yes())
+	return yesNo(s.box.Yes())
+}
+
+type ifNotExistsStep struct {
+	at
+}
+
+func (ifNotExistsStep) Open() tea.Cmd {
+	return nil
+}
+
+func (ifNotExistsStep) Field() form.Field {
+	return nil
+}
+
+func (ifNotExistsStep) Answer() string {
+	return ""
 }
 
 type chosen struct {
@@ -288,43 +211,7 @@ func (w *wizard) choose(c chosen) string {
 	return c.Value
 }
 
-func (w *wizard) confirmed() tea.Cmd {
-	if w.recap.Value() == applyValue {
-		w.finished = true
-	} else {
-		w.aborted = true
-	}
-	return tea.Quit
-}
-
-func (w *wizard) reobserve() error {
-	questions, err := w.app.Questions(w.ctx, w.req)
-	w.q = questions
-	return err
-}
-
-func (w *wizard) back() tea.Cmd {
-	to := w.current - 1
-	for to >= 0 && !w.marks[to].asked {
-		to--
-	}
-	if to < 0 {
-		w.aborted = true
-		return tea.Quit
-	}
-	for s := to + 1; s <= w.current; s++ {
-		w.reset(s)
-	}
-	w.current = to
-	if err := w.reobserve(); err != nil {
-		w.err = err
-		return tea.Quit
-	}
-	return nil
-}
-
 func (w *wizard) reset(s step) {
-	w.marks[s] = mark{}
 	switch s {
 	case stepBranches:
 		w.req.Branches = w.given.Branches

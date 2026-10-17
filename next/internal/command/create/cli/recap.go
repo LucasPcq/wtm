@@ -1,79 +1,39 @@
 package cli
 
 import (
-	"strings"
+	"context"
+	"errors"
 
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
-	"github.com/LucasPcq/wtm/next/internal/ui/form"
-	"github.com/LucasPcq/wtm/next/internal/ui/output"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
-const (
-	applyLabel  = "Yes, apply"
-	cancelLabel = "No, cancel"
-	detailHang  = "    "
-)
-
-func (w *wizard) previewing() tea.Cmd {
-	w.preview, w.failure = nil, nil
-	w.recap = form.NewSelectList(form.SelectParams{})
-	req := w.req
-	return tea.Batch(w.load(planText), func() tea.Msg {
-		outcome, err := w.app.Run(w.ctx, req, operation.Options{DryRun: true, Surface: surfaceTUI})
-		return previewMsg{outcome: outcome, err: err}
-	})
+func (w *wizard) previewPlan(ctx context.Context) error {
+	w.preview = nil
+	outcome, err := w.app.Run(ctx, w.req, operation.Options{DryRun: true, Surface: surfaceTUI})
+	if err == nil {
+		w.preview = &outcome
+	}
+	return err
 }
 
-func (w *wizard) previewed(m previewMsg) {
-	w.loading = ""
-	options := []form.Option{{Label: cancelLabel, Value: cancelValue}}
-	if failure := asError(m.err); failure != nil {
-		w.failure = failure
-	} else {
-		w.preview = &m.outcome
-		options = append([]form.Option{{Label: applyLabel, Value: applyValue}, {Separator: true}}, options...)
-	}
-	w.recap = form.NewSelectList(form.SelectParams{Options: options})
+func (w *wizard) plan(width int) string {
+	return planTextOf(planTextParams{Plan: w.preview.Plan, Warnings: w.preview.Warnings, Width: width})
 }
 
-func (w *wizard) recapTitle() string {
-	if w.failure != nil {
-		return failedTitle
+func (w *wizard) apply(ctx context.Context) error {
+	opts := operation.Options{DryRun: w.dryRun, Surface: surfaceTUI, Report: w.report}
+	if !w.dryRun {
+		opts.ExpectFingerprint = w.preview.Fingerprint
 	}
-	return recapTitle
+	outcome, err := w.app.Run(ctx, w.req, opts)
+	if !stale(err) {
+		w.outcome = outcome
+	}
+	return err
 }
 
-func (w *wizard) recapBody() string {
-	switch {
-	case w.failure != nil:
-		return w.failureText()
-	case w.preview == nil:
-		return planText
-	}
-	plan := planTextOf(planTextParams{Plan: w.preview.Plan, Warnings: w.preview.Warnings, Width: w.recapWidth() - form.RecapBox.GetHorizontalPadding()})
-	if !w.stale {
-		return plan
-	}
-	return output.Warning.Render(output.GlyphAttention) + " " + staleText + "\n\n" + plan
-}
-
-func (w *wizard) failureText() string {
-	first := w.failure.Error()
-	if len(w.failure.Fields) > 0 {
-		first = w.failure.Message
-	}
-	lines := []string{output.Danger.Render(output.GlyphFailure) + " " + first}
-	for _, found := range w.failure.Fields {
-		lines = append(lines, detailHang+found.Message(label(found.Path)))
-	}
-	return strings.Join(lines, "\n")
-}
-
-func (w *wizard) recapWidth() int {
-	return max(w.size.Width-8, 24)
-}
-
-func (w *wizard) review() string {
-	return form.RecapBox.Width(w.recapWidth()).Render(form.Accent.Render(reviewTitle) + "\n\n" + w.recapBody())
+func stale(err error) bool {
+	found, ok := errors.AsType[*domain.Error](err)
+	return ok && found.Code == operation.CodePlanStale
 }
