@@ -1,235 +1,102 @@
 package cli
 
 import (
-	"cmp"
 	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
+
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
-// A step is the index of a question of the wizard, in the order asked; stepLabels and stepPaths are indexed by it.
-type step int
+// createTarget is the value the target list gives its option with no value, a worktree to create.
+const createTarget = "\x00new-worktree"
 
-const (
-	stepSource step = iota
-	stepFiles
-	stepTarget
-	stepBranch
-	stepFrom
-	stepIsolation
-	stepFastForward
-	stepMode
-	stepOnConflict
-	stepRecap
-	stepCount
-)
-
-// stepLabels are the steps' names in the breadcrumb, the trail and the problems the wizard shows, and stepPaths the field path each step answers (the branch of a created target is the target's), both read from extract's form.
-var stepLabels, stepPaths = steps(schema)
-
-// steps are the label and path of each field of form, a step per field in its order, then the recap.
-func steps(form domain.Form) (labels, paths [stepCount]string) {
-	for at, field := range form.Fields {
-		labels[at], paths[at] = field.Spec().Label, field.Spec().Path
-	}
-	labels[stepRecap] = "Confirm"
-
-	return labels, paths
-}
-
-const (
-	createTarget = "\x00new-worktree"
-	newWorktree  = "new worktree"
-	emptyFiles   = "Select at least one file"
-)
-
-// field is the field step s answers, on the questions observed last; nil for the recap.
-func (w *wizard) field(s step) domain.Field {
-	fields := w.q.Form().Fields
-	if int(s) >= len(fields) {
-		return nil
-	}
-
-	return fields[s]
-}
-
-// description is the help of step s on the answers so far.
-func (w *wizard) description(s step) string {
-	if field := w.field(s); field != nil {
-		return field.Spec().Help
-	}
-
-	return ""
-}
-
-// standing is where the answer of step s stands on the questions observed last, with the flag that set it, if one did.
-func (w *wizard) standing(s step) form.Standing {
-	q, given, creating := w.q, w.given, w.creating()
-	st, flagged := form.Standing{}, false
-	switch s {
-	case stepSource:
-		st, flagged = form.Standing{Value: q.Source.Given}, given.Source != ""
-	case stepFiles:
-		st, flagged = form.Standing{Value: w.fileSummary()}, len(given.Files) > 0
-	case stepTarget:
-		st, flagged = form.Standing{Value: w.req.To}, given.To != ""
-		if creating {
-			st.Value = newWorktree
+// special returns the steps extract asks its own way: the file picker, and the target, picked as a worktree then, for one to create, typed as its branch; both answer to.
+func special(s *session, at int, field domain.Field) form.Step {
+	switch field := field.(type) {
+	case domain.MultiSelectField:
+		return &filesStep{own: own{s: s, at: at}}
+	case domain.SelectField:
+		if field.Path == "to" {
+			return &targetStep{own: own{s: s, at: at}}
 		}
-	case stepBranch:
-		st, flagged = form.Standing{Value: w.req.To}, given.To != "" && creating
-	case stepFrom:
-		st, flagged = form.Standing{Value: q.From.Value, Origin: q.From.Origin}, given.From != ""
-	case stepIsolation:
-		st, flagged = form.Standing{Value: string(q.Isolation.Value), Origin: q.Isolation.Origin}, given.Isolation != ""
-	case stepFastForward:
-		st, flagged = form.Standing{Value: yesNo(q.FastForward.Value), Origin: q.FastForward.Origin}, given.FastForward != nil
-	case stepMode:
-		st, flagged = form.Standing{Value: mode(q.Keep.Value), Origin: q.Keep.Origin}, given.Keep != nil
-	case stepOnConflict:
-		st, flagged = form.Standing{Value: string(q.OnConflict.Value), Origin: q.OnConflict.Origin}, given.OnConflict != ""
-	case stepRecap, stepCount:
+	case domain.TextField:
+		for before := range at {
+			if target, isTarget := s.Step(before).(*targetStep); isTarget {
+				return &branchStep{own: own{s: s, at: at}, target: target}
+			}
+		}
+	case domain.ConfirmField, domain.TextListField:
 	}
 
-	// The branch is the target's: its problems are the target step's while an existing worktree is picked, the branch step's once one is created.
-	st.Erred = w.erred(stepPaths[s]) && (stepPaths[s] != "to" || (s == stepBranch) == creating)
-	if field := w.field(s); field != nil {
-		st.Skip = field.Spec().Skip
-	}
-	if flagged {
-		st.Flag = extractFlags.Spell(stepPaths[s])
+	return nil
+}
+
+// An own is the place of one of extract's own steps in its session, which gives it its label, description and reset.
+type own struct {
+	s  *session
+	at int
+}
+
+// Label is the field's label.
+func (o own) Label() string {
+	return o.s.Field(o.at).Spec().Label
+}
+
+// Description is the field's help.
+func (o own) Description() string {
+	return o.s.Field(o.at).Spec().Help
+}
+
+// Reset forgets the step's answer.
+func (o own) Reset() {
+	o.s.Forget(o.at)
+}
+
+// ----------------------------------------------------------------------------
+// The files
+
+// filesStep asks the changes to extract in a multi-select, each tagged with its status in its tone.
+type filesStep struct {
+	own
+	picks *form.MultiSelect
+}
+
+// Standing counts the changes the files answered stand for, a directory standing for every change under it.
+func (f *filesStep) Standing() form.Standing {
+	st := f.s.Standing(f.at)
+	st.Value = ""
+
+	files := f.s.Request().Files
+	if len(files) == 0 {
+		return st
 	}
 
+	selected, missed := worktree.SelectChanges(f.s.Questions().Files.Options, files)
+	if missed != "" {
+		st.Value = fileCount(len(files))
+		return st
+	}
+
+	st.Value = fileCount(len(selected))
 	return st
 }
 
-// fileSummary counts the changes the files answered stand for, a directory standing for every change under it.
-func (w *wizard) fileSummary() string {
-	if len(w.req.Files) == 0 {
-		return ""
-	}
-
-	selected, missed := worktree.SelectChanges(w.q.Files.Options, w.req.Files)
-	if missed != "" {
-		return fileCount(len(w.req.Files))
-	}
-
-	return fileCount(len(selected))
-}
-
-// erred reports whether a problem names the field at path or one of its entries.
-func (w *wizard) erred(path string) bool {
-	return len(domain.ProblemsOf(w.q.Errors, path)) > 0
-}
-
-// list offers the options of the select step s, starting on the answer so far.
-func (w *wizard) list(s step) *form.SelectList {
-	switch field := w.field(s).(type) {
-	case domain.SelectField:
-		return w.selectList(s, field)
-	case domain.ConfirmField:
-		return w.confirmList(s, field)
-	case domain.MultiSelectField, domain.TextField, domain.TextListField, nil:
-	}
-
-	return form.NewSelectList(form.SelectParams{})
-}
-
-// selectList offers the options of field; the target's option with no value, a worktree to create, is picked by the sentinel createTarget.
-func (w *wizard) selectList(s step, field domain.SelectField) *form.SelectList {
-	switch s {
-	case stepTarget:
-		options := optionsOf(field.Options)
-		if at := slices.IndexFunc(field.Options, func(o domain.Option) bool { return o.Value == "" }); at >= 0 {
-			options[at].Value = createTarget
-			options = slices.Insert(options, at+1, form.Option{Separator: true})
-		}
-		start := w.req.To
-		if w.creating() {
-			start = createTarget
-		}
-		return form.NewSelectList(form.SelectParams{Options: options, Start: start})
-	case stepFrom:
-		return fromList(field)
-	case stepIsolation:
-		return remembering(remembered{Options: optionsOf(field.Options), Value: field.Value, Remembered: field.Remembered, Ticked: w.ticked(s)})
-	}
-
-	return form.NewSelectList(form.SelectParams{Options: optionsOf(field.Options), Start: field.Value})
-}
-
-// confirmList offers the two answers of field: the source update with its toggle, the mode move first.
-func (w *wizard) confirmList(s step, field domain.ConfirmField) *form.SelectList {
-	start := field.No.Value
-	if field.Value {
-		start = field.Yes.Value
-	}
-
-	if s == stepFastForward {
-		options := []form.Option{optionOf(field.Yes), {Separator: true}, optionOf(field.No)}
-		ticked := w.ticked(s) || field.Origin == domain.OriginRemembered
-		return form.NewSelectList(form.SelectParams{Options: options, Start: start, Toggle: true, ToggleOn: ticked})
-	}
-
-	return form.NewSelectList(form.SelectParams{Options: []form.Option{optionOf(field.No), optionOf(field.Yes)}, Start: start})
-}
-
-func optionsOf(found []domain.Option) []form.Option {
-	options := make([]form.Option, 0, len(found))
-	for _, o := range found {
-		options = append(options, optionOf(o))
-	}
-
-	return options
-}
-
-func optionOf(o domain.Option) form.Option {
-	return form.Option{Label: cmp.Or(o.Label, o.Value), Value: o.Value, Badge: o.Badge}
-}
-
-// fromList offers the source branches, the pinned one first, starting on the answer so far.
-func fromList(field domain.SelectField) *form.SelectList {
-	options := optionsOf(field.Options)
-	if at := slices.IndexFunc(options, func(o form.Option) bool { return o.Value == field.Pinned }); at > 0 {
-		pinned := options[at]
-		options = append([]form.Option{pinned}, slices.Delete(options, at, at+1)...)
-	}
-
-	return form.NewSelectList(form.SelectParams{Options: options, Start: cmp.Or(field.Value, field.Pinned)})
-}
-
-// remembered are the options of a choice, its answer so far, its remembered answer and whether its toggle is ticked.
-type remembered struct {
-	Options    []form.Option
-	Value      string
-	Remembered string
-	Ticked     bool
-}
-
-// remembering offers a choice with its "always use this answer" toggle; a remembered answer starts the list on it, the toggle ticked.
-func remembering(params remembered) *form.SelectList {
-	if params.Remembered != "" {
-		return form.NewSelectList(form.SelectParams{Options: params.Options, Start: params.Remembered, Toggle: true, ToggleOn: true})
-	}
-
-	return form.NewSelectList(form.SelectParams{Options: params.Options, Start: params.Value, Toggle: true, ToggleOn: params.Ticked})
-}
-
-func (w *wizard) ticked(s step) bool {
-	return slices.Contains(w.req.Remember, stepPaths[s])
-}
-
-// files offers the source's changes, each tagged with its status, those answered so far picked.
-func (w *wizard) files() *form.MultiSelect {
-	changes := w.q.Files.Options
+// Open builds the multi-select of the source's changes, those answered so far picked.
+func (f *filesStep) Open() tea.Cmd {
+	field, _ := f.s.Field(f.at).(domain.MultiSelectField)
+	files := f.s.Request().Files
+	changes := f.s.Questions().Files.Options
 	picks := make([]form.Pick, 0, len(changes))
 	for _, change := range changes {
-		picks = append(picks, form.Pick{Label: change.Label(), Value: change.Path, Tag: change.Status.Tag(), Tone: tone(change.Status), Picked: slices.Contains(w.req.Files, change.Path)})
+		picks = append(picks, form.Pick{Label: change.Label(), Value: change.Path, Tag: change.Status.Tag(), Tone: tone(change.Status), Picked: slices.Contains(files, change.Path)})
 	}
 
-	return form.NewMultiSelect(form.MultiSelectParams{Options: picks, Empty: emptyFiles})
+	f.picks = form.NewMultiSelect(form.MultiSelectParams{Options: picks, Empty: field.Empty})
+	return nil
 }
 
 // tone is the colour of a change's tag: an addition, a loss, a risk, or a rename that changes no content.
@@ -247,42 +114,159 @@ func tone(status worktree.ChangeStatus) form.Tone {
 	return form.ToneMuted
 }
 
-// branchProblem checks the branch typed for a created target against the repository, as the wizard shows it.
-func (w *wizard) branchProblem(branch string) error {
-	if held := w.q.NewTarget(branch); len(held) > 0 {
-		return form.Problem(held[0], stepLabels[stepBranch])
+// Field is the multi-select.
+func (f *filesStep) Field() form.Field {
+	return f.picks
+}
+
+// Answer records the changes picked as the request's files.
+func (f *filesStep) Answer() string {
+	f.s.Answer(f.at, domain.Answered{Path: "files", Values: f.picks.Values()})
+	return fileCount(len(f.picks.Values()))
+}
+
+// ----------------------------------------------------------------------------
+// The target
+
+// targetStep asks the target among the worktrees, or a worktree to create, whose branch the branch step asks next.
+type targetStep struct {
+	own
+	list      *form.SelectList
+	newTarget bool // the user picked a worktree to create
+}
+
+// Standing is the target answered, "new worktree" for one to create; its problems are the branch step's once one is created.
+func (t *targetStep) Standing() form.Standing {
+	st := t.s.Standing(t.at)
+	st.Erred = st.Erred && !t.creating()
+	if t.creating() {
+		st.Value = t.created()
 	}
 
-	req := w.req
-	req.To = branch
-	questions, err := w.app.Questions(w.ctx, req)
+	return st
+}
+
+// created is how the trail names a worktree to create: the Short of the target's option with no value.
+func (t *targetStep) created() string {
+	field, _ := t.s.Field(t.at).(domain.SelectField)
+	at := slices.IndexFunc(field.Options, func(o domain.Option) bool { return o.Value == "" })
+	if at < 0 {
+		return ""
+	}
+
+	return field.Options[at].Short
+}
+
+// Open lists the worktrees after the option to create one, picked by the sentinel createTarget, set apart by a rule.
+func (t *targetStep) Open() tea.Cmd {
+	field, _ := t.s.Field(t.at).(domain.SelectField)
+	options := form.Options(field.Options)
+	if at := slices.IndexFunc(field.Options, func(o domain.Option) bool { return o.Value == "" }); at >= 0 {
+		options[at].Value = createTarget
+		options = slices.Insert(options, at+1, form.Option{Separator: true})
+	}
+
+	start := t.s.Request().To
+	if t.creating() {
+		start = createTarget
+	}
+
+	t.list = form.NewSelectList(form.SelectParams{Options: options, Start: start})
+	return nil
+}
+
+// Field is the select list.
+func (t *targetStep) Field() form.Field {
+	return t.list
+}
+
+// Answer records an existing worktree as the target, or a worktree to create, keeping the branch already given to one.
+func (t *targetStep) Answer() string {
+	value := t.list.Value()
+	if value != createTarget {
+		t.newTarget = false
+		t.s.Answer(t.at, domain.Answered{Path: "to", Values: []string{value}})
+		return value
+	}
+
+	if t.creating() {
+		t.s.Answer(t.at)
+	} else {
+		t.s.Answer(t.at, domain.Answered{Path: "to", Values: []string{""}})
+	}
+	t.newTarget = true
+	return t.created()
+}
+
+// Reset forgets the target picked.
+func (t *targetStep) Reset() {
+	t.newTarget = false
+	t.own.Reset()
+}
+
+// creating reports whether the target is a worktree to create: picked as one, or a branch that no worktree other than the source holds.
+func (t *targetStep) creating() bool {
+	req := t.s.Request()
+	held := slices.ContainsFunc(t.s.Questions().To.Options, func(o domain.Option) bool { return o.Value == req.To })
+	return t.newTarget || req.To != "" && req.To != req.Source && !held
+}
+
+// ----------------------------------------------------------------------------
+// The branch of a created target
+
+// branchStep asks the branch of a created target, checked against the repository once typed.
+type branchStep struct {
+	own
+	target *targetStep
+	text   *form.Text
+}
+
+// Standing is the branch answered; its flag and its problems are the target's own while an existing worktree is picked.
+func (b *branchStep) Standing() form.Standing {
+	st := b.s.Standing(b.at)
+	creating := b.target.creating()
+	st.Erred = st.Erred && creating
+	if !creating {
+		st.Flag = ""
+	}
+
+	return st
+}
+
+// Open builds the text field on the branch answered so far and starts the cursor blinking.
+func (b *branchStep) Open() tea.Cmd {
+	b.text = form.NewText(b.s.Request().To, b.check)
+	return textinput.Blink
+}
+
+// check refuses a branch a worktree already holds, then checks it against the repository.
+func (b *branchStep) check(branch string) error {
+	label := b.Label()
+	if held := b.s.Questions().NewTarget(branch); len(held) > 0 {
+		return form.Problem(held[0], label)
+	}
+
+	questions, err := b.s.Check(domain.Answered{Path: "to", Values: []string{branch}})
 	if err != nil {
 		return form.Sentence(err)
 	}
 
 	for _, found := range questions.Errors {
-		if found.Path == stepPaths[stepBranch] {
-			return form.Problem(found, stepLabels[stepBranch])
+		if found.Path == "to" {
+			return form.Problem(found, label)
 		}
 	}
 
 	return nil
 }
 
-// label spells a field path with the label of the first step that answers it.
-func label(path string) string {
-	at := slices.Index(stepPaths[:], path)
-	if at < 0 {
-		return path
-	}
-
-	return stepLabels[at]
+// Field is the text field.
+func (b *branchStep) Field() form.Field {
+	return b.text
 }
 
-func yesNo(value bool) string {
-	if value {
-		return "yes"
-	}
-
-	return "no"
+// Answer records the branch typed as the request's target.
+func (b *branchStep) Answer() string {
+	b.s.Answer(b.at, domain.Answered{Path: "to", Values: []string{b.text.Value()}})
+	return b.text.Value()
 }

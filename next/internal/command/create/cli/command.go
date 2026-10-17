@@ -5,12 +5,11 @@ import (
 	"cmp"
 	"context"
 	"io"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
 	"github.com/spf13/cobra"
@@ -44,107 +43,28 @@ const (
   wtm create feat/login --if-not-exists --output json`
 
 	yesUsage = "Run unattended: no question, no confirmation; what is not given takes its default"
-
-	flagFF = "ff"
 )
 
 type createCommand struct {
-	io          uicli.Run
-	open        func(ctx context.Context, dir string) (create.UseCase, error)
-	from        string
-	envFrom     string
-	isolation   string
-	ff          bool
-	ifNotExists bool
-	remember    []string
-	yes         bool
-	dryRun      bool
-	expect      string
-	ask         bool
+	io   uicli.Run
+	form *createForm
 }
 
 // New returns the create command: its flags become a create.Request, answered in the wizard when the user can see and answer it, else run unattended; it draws the outcome on streams, or the v2 JSON envelope with --output json.
 func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (create.UseCase, error)) *cobra.Command {
 	// exits are the exit codes of create's own codes, ahead of those of their kind.
 	exits := map[string]int{create.CodeConfigNotFound: uicli.ExitConfigNotFound}
-	c := &createCommand{io: uicli.Run{Command: commandName, Streams: streams, Env: env, Flags: createFlags, Exits: exits}, open: open}
+	c := &createCommand{io: uicli.Run{Command: commandName, Streams: streams, Env: env, Flags: createFlags, Exits: exits}, form: newForm(open)}
 	cmd := &cobra.Command{Use: "create [branch...]", Short: createShort, Long: createLong, Example: createExample, Args: cobra.ArbitraryArgs, RunE: c.run}
-
-	flags := cmd.Flags()
-	flags.StringVar(&c.from, "from", "", descriptions["from"])
-	flags.StringVar(&c.envFrom, "env-from", "", descriptions["env_from"])
-	flags.StringVar(&c.isolation, "isolation", "", descriptions["isolation"])
-	flags.BoolVar(&c.ff, flagFF, false, descriptions["fast_forward"])
-	flags.BoolVar(&c.ifNotExists, "if-not-exists", false, descriptions["if_not_exists"])
-	flags.StringArrayVar(&c.remember, "remember", nil, descriptions["remember"])
-	flags.BoolVarP(&c.yes, "yes", "y", false, yesUsage)
-	flags.StringVar(&c.io.Output, "output", uicli.OutputText, uicli.OutputUsage)
-	flags.BoolVarP(&c.dryRun, "dry-run", "n", false, uicli.DryRunUsage)
-	flags.StringVar(&c.expect, "expect-fingerprint", "", uicli.ExpectUsage)
-	flags.BoolVar(&c.ask, "ask", false, uicli.AskUsage)
-
-	_ = cmd.RegisterFlagCompletionFunc("env-from", cobra.FixedCompletions(domain.Names(project.EnvStrategies()), cobra.ShellCompDirectiveNoFileComp))
-	_ = cmd.RegisterFlagCompletionFunc("isolation", cobra.FixedCompletions(domain.Names(project.Isolations()), cobra.ShellCompDirectiveNoFileComp))
+	c.form.Bind(cmd, &c.io)
 
 	return cmd
 }
 
 func (c *createCommand) run(cmd *cobra.Command, args []string) error {
-	if err := c.io.Begin(cmd); err != nil {
-		return err
-	}
-
-	req := c.request(cmd, args)
-
-	ctx := cmd.Context()
-	useCase, err := c.open(ctx, c.io.Env.ProjectDir)
-	if err != nil {
-		return c.io.Refuse(domain.AsError(domain.AsErrorParams{Err: err}), createLine{Command: cmd.CommandPath(), Request: req}.Argv())
-	}
-
-	progress := c.io.Progress(ctx)
-	ran, err := c.create(cmd, useCase, req, progress.Report)
-	progress.Close()
-
-	return c.conclude(cmd, concluded{Outcome: ran.Outcome, Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: ran.Request, Cwd: c.io.Env.Cwd})
-}
-
-// create runs the request in the wizard when the user can answer it, else unattended; it returns the request that ran, the wizard's answers included.
-func (c *createCommand) create(cmd *cobra.Command, useCase create.UseCase, req create.Request, report domain.Report) (ran, error) {
-	ctx := cmd.Context()
-
-	if c.interactive() {
-		return runForm(ctx, formParams{App: useCase, Request: req, Options: domain.RunOptions{DryRun: c.dryRun, CorrelationID: c.io.Env.CorrelationID, Report: report}, In: c.io.Streams.In, Out: c.io.Streams.Err})
-	}
-
-	outcome, err := useCase.Run(ctx, req, domain.RunOptions{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, CorrelationID: c.io.Env.CorrelationID, Report: report})
-	return ran{Outcome: outcome, Request: req}, err
-}
-
-func (c *createCommand) request(cmd *cobra.Command, args []string) create.Request {
-	req := create.Request{
-		From:        c.from,
-		EnvFrom:     project.EnvStrategy(c.envFrom),
-		Isolation:   project.Isolation(c.isolation),
-		IfNotExists: c.ifNotExists,
-		Remember:    c.remember,
-		Ask:         c.ask,
-	}
-
-	for _, arg := range args {
-		req.Branches = append(req.Branches, strings.TrimSpace(arg))
-	}
-
-	if cmd.Flags().Changed(flagFF) {
-		req.FastForward = new(c.ff)
-	}
-
-	return req
-}
-
-// interactive reports whether the wizard runs: the user can see and answer it, the output is for a human, and neither --yes nor a previewed plan to apply asks for an unattended run.
-func (c *createCommand) interactive() bool {
-	return c.io.Streams.CanPrompt() && c.expect == "" && c.io.Human() && !c.yes
+	return c.form.Launch(cmd, args, func(ran form.Ran[create.Request, create.Outcome], err error) error {
+		return c.conclude(cmd, concluded{Outcome: ran.Outcome, Err: domain.AsError(domain.AsErrorParams{Err: err}), Request: ran.Request, Cwd: c.io.Env.Cwd})
+	})
 }
 
 // concluded is how a run ended, for conclude: its outcome, its refusal, the request that ran and where.

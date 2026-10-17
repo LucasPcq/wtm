@@ -7,5 +7,5 @@
   Conflicts    apps/api/a.txt (modified)
   On conflict  resolve
   fingerprint  1c216aef1d1f9fdb493d1cac
-  → wtm-next extract feat/login --files apps/api --to feat/split --on-conflict resolve --expect-fingerprint 1c216aef1d1f9fdb493d1cac   apply this plan
+  → wtm-next extract feat/login --files apps/api --on-conflict resolve --to feat/split --expect-fingerprint 1c216aef1d1f9fdb493d1cac   apply this plan
 

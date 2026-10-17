@@ -15,31 +15,6 @@ const (
 	ReplanNote = "the plan the facts give now"
 )
 
-// A FlagValue is a flag and the value a command line passes it.
-type FlagValue struct {
-	Name  string
-	Value string
-}
-
-// FlagWords returns the words that pass flag on a command line, or none when its value is empty.
-func FlagWords(flag FlagValue) []string {
-	if flag.Value == "" {
-		return nil
-	}
-	return []string{"--" + flag.Name, flag.Value}
-}
-
-// SwitchWords returns the words that pass the boolean flag name as given, --name or --name=false, or none when it was not given.
-func SwitchWords(name string, value *bool) []string {
-	switch {
-	case value == nil:
-		return nil
-	case *value:
-		return []string{"--" + name}
-	}
-	return []string{"--" + name + "=false"}
-}
-
 // Quoted returns each of words quoted for the shell.
 func Quoted(words []string) []string {
 	out := make([]string, 0, len(words))

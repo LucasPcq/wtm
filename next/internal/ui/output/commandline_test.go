@@ -8,8 +8,6 @@ import (
 
 func TestAWordIsQuotedOnlyWhenTheShellWouldReadItOtherwise(t *testing.T) {
 	assert.Equal(t, []string{"feat/a", `'it'\''s'`, "''", "'two words'"}, Quoted([]string{"feat/a", "it's", "", "two words"}))
-	assert.Nil(t, FlagWords(FlagValue{Name: "from"}))
-	assert.Equal(t, []string{"--from", "main"}, FlagWords(FlagValue{Name: "from", Value: "main"}))
 }
 
 func TestAFollowUpIsItsCommandLineEachWordQuotedForTheShell(t *testing.T) {

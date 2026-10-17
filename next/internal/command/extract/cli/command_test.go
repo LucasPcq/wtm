@@ -224,8 +224,8 @@ func TestFFAndKeepEnterTheRequestOnlyWhenGiven(t *testing.T) {
 		Line  string
 	}{
 		"neither":  {Line: "→ wtm-next extract feat/login --files old.txt --to feat/other --expect-fingerprint"},
-		"both off": {Flags: []string{"--ff=false", "--keep=false"}, Line: "→ wtm-next extract feat/login --files old.txt --to feat/other --ff=false --keep=false --expect-fingerprint"},
-		"both on":  {Flags: []string{"--ff", "--keep"}, Line: "→ wtm-next extract feat/login --files old.txt --to feat/other --ff --keep --expect-fingerprint"},
+		"both off": {Flags: []string{"--ff=false", "--keep=false"}, Line: "→ wtm-next extract feat/login --ff=false --files old.txt --keep=false --to feat/other --expect-fingerprint"},
+		"both on":  {Flags: []string{"--ff", "--keep"}, Line: "→ wtm-next extract feat/login --ff --files old.txt --keep --to feat/other --expect-fingerprint"},
 	}
 	for name, c := range cases {
 		words := append([]string{source, "--files", "old.txt", "--to", other, "--dry-run"}, c.Flags...)

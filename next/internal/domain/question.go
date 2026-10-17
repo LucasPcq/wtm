@@ -23,11 +23,12 @@ type Answer[T any] struct {
 	Origin Origin
 }
 
-// Option is one value a choice offers, how it reads (Label, empty when it reads as its value), and a badge the wizard shows beside it (`on origin`, a count of changes).
+// Option is one value a choice offers, how it reads (Label, empty when it reads as its value), a badge the wizard shows beside it (`on origin`, a count of changes), and how a trail names it once picked (Short, empty when by its value).
 type Option struct {
 	Value string `json:"value"`
 	Label string `json:"label"`
 	Badge string `json:"badge,omitempty"`
+	Short string `json:"short,omitempty"`
 }
 
 // Choice is a question with a closed set of options: its answer, its options, the reason it is not asked (Skip, empty when it is), and the answer remembered for it.

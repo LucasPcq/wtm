@@ -61,6 +61,9 @@ func orEmpty[T any](list []T) []T {
 // PathRemember is the path of the fields whose answer is remembered: the contract's --remember, accepting the paths of the form's rememberable fields.
 const PathRemember = "remember"
 
+// PathAsk is the path of the request's --ask: true to ask again the questions whose answer is remembered.
+const PathAsk = "ask"
+
 //go-sumtype:decl Field
 
 // Field is one field of a Form, of one kind: SelectField, MultiSelectField, TextField, TextListField or ConfirmField, each carrying only what is valid for it.
@@ -88,7 +91,7 @@ func (s FieldSpec) Spec() FieldSpec {
 	return s
 }
 
-// SelectField asks one of its options; Pinned is the option listed first, Remembered the answer remembered for it, Remember whether this run's answer is to be.
+// SelectField asks one of its options; Pinned is the option listed first, Remembered the answer remembered for it, Remember whether this run's answer is to be, Refreshable whether its options are facts the user may read again while it is asked.
 type SelectField struct {
 	FieldSpec
 	Value        string   `json:"value"`
@@ -97,13 +100,15 @@ type SelectField struct {
 	Remembered   string   `json:"remembered,omitempty"`
 	Rememberable bool     `json:"rememberable"`
 	Remember     bool     `json:"remember"`
+	Refreshable  bool     `json:"refreshable"`
 }
 
-// MultiSelectField asks any of its options.
+// MultiSelectField asks any of its options; Empty is the problem of answering none.
 type MultiSelectField struct {
 	FieldSpec
 	Picked  []string `json:"picked"`
 	Options []Option `json:"options"`
+	Empty   string   `json:"empty,omitempty"`
 }
 
 // TextField asks one line of text.
@@ -119,12 +124,13 @@ type TextListField struct {
 	Options []Option `json:"options"`
 }
 
-// ConfirmField asks yes or no; Yes and No are its two options, valued true and false, with how each reads.
+// ConfirmField asks yes or no; Yes and No are its two options, valued true and false, with how each reads (Yes and No when they say nothing), listed No first when NoFirst.
 type ConfirmField struct {
 	FieldSpec
 	Value        bool   `json:"value"`
 	Yes          Option `json:"yes"`
 	No           Option `json:"no"`
+	NoFirst      bool   `json:"no_first"`
 	Rememberable bool   `json:"rememberable"`
 	Remember     bool   `json:"remember"`
 }
@@ -260,4 +266,64 @@ func Yes(params AnswerParams) (bool, error) {
 	}
 
 	return false, Invalid([]FieldError{{Path: params.Path, Code: CodeOneOf, Template: "{path} must be one of {accepted}, not {value}", Params: Params{"value": value}, Accepted: []string{"true", "false"}}})
+}
+
+// Answerable is a command's request, which takes the answer of a field at a time.
+type Answerable[R any] interface {
+	Answer(path string, values []string) (R, error)
+}
+
+// Answered is the answer to the field at Path, as its command's Request.Answer takes it.
+type Answered struct {
+	Path   string
+	Values []string
+}
+
+// Answers are the answer of each field of the form, in order, then the fields whose answer is to be remembered.
+func (f Form) Answers() []Answered {
+	answers := make([]Answered, 0, len(f.Fields)+1)
+	for _, field := range f.Fields {
+		answers = append(answers, Answered{Path: field.Spec().Path, Values: field.Answer()})
+	}
+
+	return append(answers, Answered{Path: PathRemember, Values: f.Remembering()})
+}
+
+// Fold is req with each of answers given in turn; it stops at the first one req refuses.
+func Fold[R Answerable[R]](req R, answers []Answered) (R, error) {
+	for _, answer := range answers {
+		var err error
+		if req, err = req.Answer(answer.Path, answer.Values); err != nil {
+			return req, err
+		}
+	}
+
+	return req, nil
+}
+
+// Spelled is value as a field's answer, the way a Request's Values spells it: none when empty.
+func Spelled[T ~string](value T) []string {
+	if value == "" {
+		return nil
+	}
+
+	return []string{string(value)}
+}
+
+// Said is the answer to a ConfirmField the request gives, spelled as Yes reads it: none when it does not say.
+func Said(value *bool) []string {
+	if value == nil {
+		return nil
+	}
+
+	return []string{strconv.FormatBool(*value)}
+}
+
+// SaidYes is the answer of a ConfirmField whose no is its default: true when on, else none.
+func SaidYes(on bool) []string {
+	if !on {
+		return nil
+	}
+
+	return []string{"true"}
 }

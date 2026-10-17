@@ -108,18 +108,18 @@ const settleWithin = 100 * time.Millisecond
 type driver struct {
 	t *testing.T
 	w *form.Wizard
-	c *wizard
+	s *session
 }
 
-func open(t *testing.T, params wizardParams) *driver {
+func open(t *testing.T, params sessionParams) *driver {
 	t.Helper()
-	c := newWizard(t.Context(), params)
-	return start(t, c, form.New(t.Context(), c.form()))
+	s := newForm(nil).Session(t.Context(), params)
+	return start(t, s, form.New(t.Context(), s.Params()))
 }
 
-func start(t *testing.T, c *wizard, w *form.Wizard) *driver {
+func start(t *testing.T, s *session, w *form.Wizard) *driver {
 	t.Helper()
-	d := &driver{t: t, w: w, c: c}
+	d := &driver{t: t, w: w, s: s}
 	d.send(tea.WindowSizeMsg{Width: 100, Height: 40})
 	d.run(w.Init())
 	return d

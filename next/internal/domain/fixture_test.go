@@ -1,6 +1,10 @@
 package domain
 
-import "github.com/LucasPcq/wtm/next/internal/domain/worktree"
+import (
+	"maps"
+
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+)
 
 var identity = worktree.Identity{Path: "/trees/feat-x", Branch: "feat/x"}
 
@@ -23,3 +27,16 @@ type wrapper struct{ inner error }
 
 func (w wrapper) Error() string { return "wrapped" }
 func (w wrapper) Unwrap() error { return w.inner }
+
+// answers is a request that takes every path but "nope".
+type answers map[string][]string
+
+func (a answers) Answer(path string, values []string) (answers, error) {
+	if path == "nope" {
+		return a, Unknown(path)
+	}
+
+	next := maps.Clone(a)
+	next[path] = values
+	return next, nil
+}

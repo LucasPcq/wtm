@@ -20,6 +20,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
@@ -28,6 +29,22 @@ const (
 	stateDir    = "/repo/main/.git/wtm"
 	branchName  = "feat/x"
 	fingerprint = "0123456789abcdef01234567"
+)
+
+type (
+	session       = form.Session[useCase, create.Request, create.Questions, create.Outcome]
+	sessionParams = form.SessionParams[useCase, create.Request]
+)
+
+// The steps of create's form, in the order asked, then the recap.
+const (
+	stepBranches = iota
+	stepFrom
+	stepEnvFrom
+	stepIsolation
+	stepFastForward
+	stepIfNotExists
+	stepRecap
 )
 
 var createdAt = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)

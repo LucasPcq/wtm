@@ -70,6 +70,8 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 		var yes bool
 		yes, err = domain.Yes(answer)
 		next.Keep = &yes
+	case domain.PathAsk:
+		next.Ask, err = domain.Yes(answer)
 	default:
 		err = domain.Unknown(path)
 	}
@@ -79,6 +81,34 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 	}
 
 	return next, nil
+}
+
+// Values is the request's answer to the field at path, spelled as Answer takes it; nil when the request leaves the field to its default.
+func (r Request) Values(path string) []string {
+	switch path {
+	case "files":
+		return r.Files
+	case domain.PathRemember:
+		return r.Remember
+	case "source":
+		return domain.Spelled(r.Source)
+	case "to":
+		return domain.Spelled(r.To)
+	case "from":
+		return domain.Spelled(r.From)
+	case "isolation":
+		return domain.Spelled(r.Isolation)
+	case "on_conflict":
+		return domain.Spelled(r.OnConflict)
+	case "fast_forward":
+		return domain.Said(r.FastForward)
+	case "keep":
+		return domain.Said(r.Keep)
+	case domain.PathAsk:
+		return domain.SaidYes(r.Ask)
+	}
+
+	return nil
 }
 
 // ----------------------------------------------------------------------------
@@ -173,21 +203,23 @@ func (q Questions) Form() domain.Form {
 			FieldSpec: domain.FieldSpec{Path: "files", Flag: "--files", Label: "Files", Help: q.filesHelp(), Usage: "Files to extract, or a directory to take everything below it (skips interactive selection)"},
 			Picked:    q.Files.Given,
 			Options:   q.fileOptions(),
+			Empty:     "Select at least one file",
 		},
 		domain.SelectField{
 			FieldSpec: domain.FieldSpec{Path: "to", Flag: "--to", Label: "Target worktree", Help: "Where to move the selected files", Usage: "Target worktree branch; created if it does not exist"},
 			Value:     to,
-			Options:   append([]domain.Option{{Label: "+ Create a new worktree…"}}, q.To.Options...),
+			Options:   append([]domain.Option{{Label: "+ Create a new worktree…", Short: "new worktree"}}, q.To.Options...),
 		},
 		domain.TextField{
 			FieldSpec: domain.FieldSpec{Path: "to", Flag: "--to", Label: "Branch name", Help: "Name for the new worktree branch", Skip: q.branchSkip()},
 			Value:     to,
 		},
 		domain.SelectField{
-			FieldSpec: domain.FieldSpec{Path: "from", Flag: "--from", Label: "Source branch", Help: "Branch to base the new worktree on", Usage: "Parent branch when creating the target worktree", Origin: q.From.Origin, Skip: q.From.Skip},
-			Value:     q.From.Value,
-			Options:   q.From.Options,
-			Pinned:    q.From.Pinned,
+			FieldSpec:   domain.FieldSpec{Path: "from", Flag: "--from", Label: "Source branch", Help: "Branch to base the new worktree on", Usage: "Parent branch when creating the target worktree", Origin: q.From.Origin, Skip: q.From.Skip},
+			Value:       q.From.Value,
+			Options:     q.From.Options,
+			Pinned:      q.From.Pinned,
+			Refreshable: true,
 		},
 		domain.SelectField{
 			FieldSpec:    domain.FieldSpec{Path: "isolation", Flag: "--isolation", Label: "Isolation", Help: domain.IsolationHelp, Origin: q.Isolation.Origin, Skip: q.Isolation.Skip},
@@ -216,8 +248,9 @@ func (q Questions) Form() domain.Form {
 		domain.ConfirmField{
 			FieldSpec: domain.FieldSpec{Path: "keep", Flag: "--keep", Label: "Mode", Help: "Move removes the files from the source; copy keeps them.", Usage: "Copy instead of move (keep the changes in the source)", Origin: q.Keep.Origin},
 			Value:     q.Keep.Value,
-			Yes:       domain.Option{Value: "true", Label: "Copy — keep the files in " + source},
-			No:        domain.Option{Value: "false", Label: "Move — remove the files from " + source},
+			Yes:       domain.Option{Value: "true", Label: "Copy — keep the files in " + source, Short: "copy"},
+			No:        domain.Option{Value: "false", Label: "Move — remove the files from " + source, Short: "move"},
+			NoFirst:   true,
 		},
 		domain.SelectField{
 			FieldSpec: domain.FieldSpec{Path: "on_conflict", Flag: "--on-conflict", Label: "On conflict", Help: q.conflictHelp(), Usage: "On conflict: abort (default) or resolve (write conflict markers in the target)", Origin: q.OnConflict.Origin, Skip: q.OnConflict.Skip},

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTheRequestIsSpelledWithItsFlagsInOrderAndQuoted(t *testing.T) {
+func TestTheRequestIsSpelledWithItsFlagsSortedAndQuoted(t *testing.T) {
 	req := extract.Request{
 		Source:      "feat/login",
 		Files:       []string{"apps/api", "two words.txt"},
@@ -22,7 +22,7 @@ func TestTheRequestIsSpelledWithItsFlagsInOrderAndQuoted(t *testing.T) {
 		Ask:         true,
 	}
 
-	assert.Equal(t, `wtm-next extract feat/login --files apps/api --files 'two words.txt' --to feat/split --ff --from main --isolation verbatim --keep=false --on-conflict resolve --remember isolation --ask`, extractLine{Command: "wtm-next extract", Request: req}.String())
+	assert.Equal(t, `wtm-next extract feat/login --ff --files apps/api --files 'two words.txt' --from main --isolation verbatim --keep=false --on-conflict resolve --remember isolation --to feat/split --ask`, extractLine{Command: "wtm-next extract", Request: req}.String())
 }
 
 func TestAnUnsetRequestIsTheBareCommand(t *testing.T) {
