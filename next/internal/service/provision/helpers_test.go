@@ -106,5 +106,3 @@ func gitStateNames(t *testing.T, w world) []string {
 	t.Helper()
 	return gittest.Names(gitState(t, w).Branches.Local)
 }
-
-func removeLine(branch string) []string { return []string{"remove", branch} }

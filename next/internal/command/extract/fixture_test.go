@@ -113,6 +113,7 @@ func newWorld(t *testing.T, s seed) world {
 				PublicPort: func(context.Context, int) int { return 0 },
 				Shield:     shell.Shield,
 				Now:        func() time.Time { return createdAt },
+				LeftBehind: cleanLine,
 			},
 			MainPath: main,
 			StateDir: stateDir,
@@ -171,3 +172,5 @@ type halfMoving struct {
 func (halfMoving) Move(context.Context, worktree.Move) (worktree.Moved, error) {
 	return worktree.Moved{}, &worktree.HalfMoved{Cause: errors.New("source busy")}
 }
+
+func cleanLine(branch string) []string { return []string{"wtm", "clean", branch, "--force"} }

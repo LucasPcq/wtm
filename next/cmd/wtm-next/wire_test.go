@@ -58,3 +58,7 @@ func TestEventsAreFiledUnderGitsCommonDirWhereverTheStateLives(t *testing.T) {
 
 	assert.Equal(t, "/repo/.git", params.publisherParams(domain.Operation{ID: "op-1"}).CommonDir)
 }
+
+func TestAnUndoLeftBehindIsRemovedByTheLegacyClean(t *testing.T) {
+	assert.Equal(t, []string{"wtm", "clean", "feat/x", "--force"}, wire(wireParams{}).Create.Provision.LeftBehind("feat/x"))
+}

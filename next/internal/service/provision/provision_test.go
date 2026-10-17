@@ -259,8 +259,6 @@ func TestAnUndoThatFailsNamesWhatIsLeftAndTheWayOut(t *testing.T) {
 		Store:   storetest.FakeParams{Fail: map[string]error{"Update": errors.New("disk full")}},
 	})
 
-	w.service.LeftBehind = removeLine
-
 	outcome := w.service.Run(t.Context(), w.params(&recorder{}))
 
 	require.Equal(t, domain.StatusFailed, outcome.Status)
@@ -275,7 +273,7 @@ func TestAnUndoThatFailsNamesWhatIsLeftAndTheWayOut(t *testing.T) {
 	assert.Equal(t, []string{"remove", "feat/x"}, followUp.Argv)
 	assert.Equal(t, "provision.left_behind", followUp.Code)
 	assert.Equal(t, domain.Params{"branch": branchName, "path": w.path(branchName)}, followUp.Params)
-	assert.Equal(t, "branch feat/x is left half-created at "+w.path(branchName)+": remove it with `remove feat/x`", followUp.Message)
+	assert.Equal(t, "branch feat/x is left half-created at "+w.path(branchName), followUp.Message)
 }
 
 func TestABranchThatCannotBeDeletedIsLeftBehindToo(t *testing.T) {
@@ -283,8 +281,6 @@ func TestABranchThatCannotBeDeletedIsLeftBehindToo(t *testing.T) {
 		GitFail: map[string]error{"DeleteBranch": errors.New("branch is protected")},
 		Store:   storetest.FakeParams{Fail: map[string]error{"Update": errors.New("disk full")}},
 	})
-
-	w.service.LeftBehind = removeLine
 
 	outcome := w.service.Run(t.Context(), w.params(&recorder{}))
 
@@ -297,7 +293,7 @@ func TestABranchThatCannotBeDeletedIsLeftBehindToo(t *testing.T) {
 	assert.Equal(t, []string{"remove", "feat/x"}, followUp.Argv)
 	assert.Equal(t, "provision.left_behind", followUp.Code)
 	assert.Equal(t, domain.Params{"branch": branchName}, followUp.Params)
-	assert.Equal(t, "branch feat/x is left behind: remove it with `remove feat/x`", followUp.Message)
+	assert.Equal(t, "branch feat/x is left behind", followUp.Message)
 }
 
 func TestACheckOutNeverDeletesTheBranchOnUndo(t *testing.T) {

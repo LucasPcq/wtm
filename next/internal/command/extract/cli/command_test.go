@@ -162,6 +162,7 @@ func TestAFailedHookInTheCreatedTargetExitsOneAndNamesIt(t *testing.T) {
 
 	assert.Equal(t, uicli.ExitError, got.Code)
 	assert.Contains(t, got.Stdout, "✗ feat/split  on_create failed")
+	assert.NotContains(t, got.Stdout, "wtm clean")
 	assert.Empty(t, w.git.Moves())
 }
 
@@ -171,7 +172,7 @@ func TestATargetLeftHalfCreatedPointsAtTheCleanThatRemovesIt(t *testing.T) {
 	got := runExtract(t, w, source, "--files", "old.txt", "--to", split)
 
 	assert.Equal(t, uicli.ExitError, got.Code)
-	assert.Contains(t, got.Stdout, "→ wtm clean feat/split --force   branch feat/split is left half-created at /repo/.trees/feat-split: remove it with `wtm clean feat/split --force`")
+	assert.Contains(t, got.Stdout, "→ wtm clean feat/split --force   branch feat/split is left half-created at /repo/.trees/feat-split")
 	assert.Empty(t, w.git.Moves())
 }
 

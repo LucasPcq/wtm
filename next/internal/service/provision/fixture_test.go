@@ -91,6 +91,7 @@ func service(git provision.Git, meta provision.Meta, env provision.EnvFiles) pro
 		PublicPort: func(context.Context, int) int { return 0 },
 		Shield:     shell.Shield,
 		Now:        func() time.Time { return createdAt },
+		LeftBehind: removeLine,
 	}
 }
 
@@ -197,7 +198,7 @@ func behindOrigin(t *testing.T, seed upstreamSeed) upstream {
 	if seed.Dirty {
 		params.Dirty = []string{linked}
 	}
-	return upstream{main: params.Main, linked: linked, service: provision.Service{Git: gittest.Build(t, params)}}
+	return upstream{main: params.Main, linked: linked, service: provision.Service{Git: gittest.Build(t, params), LeftBehind: removeLine}}
 }
 
 // configured is a project's config as Observe loads it: its config.toml or the
@@ -225,3 +226,5 @@ func (u upstream) snapshotOf() worktree.Snapshot {
 	}
 	return worktree.Snapshot{Worktrees: []worktree.Worktree{{Path: u.linked, State: worktree.OnBranch{Branch: existing}}}}
 }
+
+func removeLine(branch string) []string { return []string{"remove", branch} }
