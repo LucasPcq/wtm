@@ -1,7 +1,6 @@
 package output
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -14,10 +13,9 @@ func TestAWordIsQuotedOnlyWhenTheShellWouldReadItOtherwise(t *testing.T) {
 	assert.Equal(t, []string{"--from", "main"}, FlagWords(FlagValue{Name: "from", Value: "main"}))
 }
 
-func TestAFollowUpIsTheCommandItNamesWithItsBranchesFirst(t *testing.T) {
-	line := FollowUpLine(&domain.FollowUp{Command: "clean", Request: json.RawMessage(`{"branches":["feat/x"],"force":true}`)})
-
-	assert.Equal(t, "wtm clean feat/x --force", line)
+func TestAFollowUpIsItsCommandLineEachWordQuotedForTheShell(t *testing.T) {
+	assert.Equal(t, "wtm clean feat/x --force", FollowUpLine(&domain.FollowUp{Argv: []string{"wtm", "clean", "feat/x", "--force"}}))
+	assert.Equal(t, `wtm clean 'it'\''s' 'a$b;c!' --force`, FollowUpLine(&domain.FollowUp{Argv: []string{"wtm", "clean", "it's", "a$b;c!", "--force"}}))
 }
 
 func TestAPathIsShownRelativeToWhereItRuns(t *testing.T) {

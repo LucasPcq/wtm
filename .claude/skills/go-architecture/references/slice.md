@@ -108,8 +108,13 @@ A command never imports another command (archlint refuses it). Two commands shar
 | a reading of the repository | a port method returning a domain value, or a service reading through its ports | `worktree.Snapshot` from the git port, `provision.Observe` (config, snapshot, run.toml) |
 | an orchestration with I/O | `service/<name>` (concrete, its own ports) | `provision.Service.Run`, `provision.Service.FastForwardEach` (typed outcomes each command words as its warnings), `operation.Service` |
 | presentation | `ui/…` | `uicli.Run` (a command's run plumbing: streams, output format, quiet, failures, envelope), the wizard engine, `output.DryRun`, `output.FollowUpSteps` |
+| the command line of another command | injected by `cmd/wtm-next`, the only package that knows every command | `provision.Service.LeftBehind` (the `wtm clean <branch> --force` a failed undo suggests) |
 
 Extract on the second use, not before; until then a slice keeps its own code. A shared piece speaks the domain's language; each command maps it onto its own codes and messages (`worktree.Place` returns a sealed `Placement`, create and extract each turn it into their refusals).
+
+## A second step
+
+A command that offers a step after its outcome (sync's "push now?" once the result is read, clean's retry with sudo) gives it a second exported entry in its use case: its own request, operation, fingerprint and CLI spelling, run like the first. The first entry never runs it: it returns a `domain.FollowUp` on its outcome or failure, the argv of the line that triggers the second step, with its code, params and message. The CLI prints the argv word by word quoted for the shell (`output.FollowUpSteps`), the JSON envelope carries it as `follow_up{argv, code, message, params}`, and a caller runs it if it wants. A follow-up that names another command gets its argv from `cmd/wtm-next`, so no service or `ui/` package knows that command.
 
 ## Codes, messages and exit codes
 

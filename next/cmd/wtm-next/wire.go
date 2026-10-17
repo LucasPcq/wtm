@@ -60,6 +60,8 @@ func wire(params wireParams) app {
 		PublicPort: proxyport.Port{Plist: proxyport.PlistPath()}.Public,
 		Shield:     shell.Shield,
 		Now:        time.Now,
+		// clean exists only in the legacy wtm until it migrates
+		LeftBehind: func(branch string) []string { return []string{"wtm", "clean", branch, "--force"} },
 	}
 
 	return app{

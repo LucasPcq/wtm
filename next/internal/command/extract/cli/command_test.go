@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -161,6 +162,16 @@ func TestAFailedHookInTheCreatedTargetExitsOneAndNamesIt(t *testing.T) {
 
 	assert.Equal(t, uicli.ExitError, got.Code)
 	assert.Contains(t, got.Stdout, "✗ feat/split  on_create failed")
+	assert.Empty(t, w.git.Moves())
+}
+
+func TestATargetLeftHalfCreatedPointsAtTheCleanThatRemovesIt(t *testing.T) {
+	w := newWorld(seed{GitFails: map[string]error{"RemoveWorktree": errors.New("busy")}, StoreFails: map[string]error{"Update": errors.New("disk full")}})
+
+	got := runExtract(t, w, source, "--files", "old.txt", "--to", split)
+
+	assert.Equal(t, uicli.ExitError, got.Code)
+	assert.Contains(t, got.Stdout, "→ wtm clean feat/split --force   branch feat/split is left half-created at /repo/.trees/feat-split: remove it with `wtm clean feat/split --force`")
 	assert.Empty(t, w.git.Moves())
 }
 

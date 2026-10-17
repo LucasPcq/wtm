@@ -3,8 +3,8 @@ package provision
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -341,16 +341,16 @@ type leftBehind struct {
 // that cleans what it left.
 func (p *provisioning) leftBehind(left leftBehind) *domain.Error {
 	branch, path := p.Worktree.Branch, p.Worktree.Path
-	request, _ := json.Marshal(domain.CleanRequest{Branches: []string{branch}, Force: true})
+	argv := p.Service.LeftBehind(branch)
 
-	clean := "remove it with `wtm clean " + branch + " --force`"
+	clean := "remove it with `" + strings.Join(argv, " ") + "`"
 	message, kept := "could not delete the branch, left behind: branch", "branch"
 	followUp := &domain.FollowUp{Message: "branch " + branch + " is left behind: " + clean, Params: domain.Params{"branch": branch}}
 	if left.Worktree {
 		message, kept = "could not remove the worktree, left behind: worktree", "worktree"
 		followUp = &domain.FollowUp{Message: "branch " + branch + " is left half-created at " + path + ": " + clean, Params: domain.Params{"branch": branch, "path": path}}
 	}
-	followUp.Command, followUp.Request, followUp.Code = "clean", request, "provision.left_behind"
+	followUp.Argv, followUp.Code = argv, "provision.left_behind"
 
 	return &domain.Error{
 		Kind:     domain.KindInternal,

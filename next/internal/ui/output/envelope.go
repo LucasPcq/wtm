@@ -55,10 +55,10 @@ type envelopeItem struct {
 }
 
 type envelopeFollow struct {
-	Command string          `json:"command"`
-	Request json.RawMessage `json:"request,omitempty"`
-	Code    string          `json:"code"`
-	Params  domain.Params   `json:"params,omitempty"`
+	Argv    []string      `json:"argv"`
+	Code    string        `json:"code"`
+	Message string        `json:"message"`
+	Params  domain.Params `json:"params,omitempty"`
 }
 
 type envelopeError struct {
@@ -114,7 +114,7 @@ func errorOf(params FailureParams) *envelopeError {
 
 	doc := &envelopeError{Kind: err.Kind, Code: err.Code, Message: ErrorText(err), Params: err.Params}
 	if follow := err.FollowUp; follow != nil {
-		doc.FollowUp = &envelopeFollow{Command: follow.Command, Request: follow.Request, Code: follow.Code, Params: follow.Params}
+		doc.FollowUp = &envelopeFollow{Argv: follow.Argv, Code: follow.Code, Message: follow.Message, Params: follow.Params}
 	}
 
 	for _, field := range err.Fields {

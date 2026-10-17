@@ -3,7 +3,6 @@ package domain
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -67,19 +66,12 @@ func (f FieldError) Message(path string) string {
 	return strings.NewReplacer(pairs...).Replace(f.Template)
 }
 
-// FollowUp is the command a failure suggests to repair what it left behind.
+// FollowUp is the command line a failure suggests to repair what it left behind.
 type FollowUp struct {
-	Command string          // the command to run (`clean`)
-	Request json.RawMessage // its request, in the command's JSON shape
+	Argv    []string // the command line to run next, word by word
 	Code    string
 	Message string
 	Params  Params
-}
-
-// CleanRequest is the request of a `clean` follow-up, as FollowUp.Request carries it.
-type CleanRequest struct {
-	Branches []string `json:"branches"`
-	Force    bool     `json:"force"`
 }
 
 // Error returns the message, followed by the cause's when there is one.

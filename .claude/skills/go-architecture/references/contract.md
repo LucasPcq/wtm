@@ -47,7 +47,7 @@ What every mutating command of `next/` promises its callers — people at a term
 
 - Human output is framed once (`ui/output.Frame`) on stdout; progress, hook output and warnings that come while it runs go to stderr; refusals are framed on stderr. Colour is decided per stream (`NO_COLOR`, `TERM=dumb`, not a terminal), so `2>log` gets no escape codes.
 - A flag error (unknown flag, bad value) prints the failure, then one line pointing at the help (`→ wtm-next create --help`), never the usage dump.
-- `--output json` prints one v2 envelope on stdout, never framed, nothing else on stdout: `{v: 2, command, ok, op, items[{subject, status, reason, error, warnings, detail}], plan, fingerprint, follow_ups, warnings, error{kind, code, message, params, follow_up, fields[{path, code, flag, message…}]}}`.
+- `--output json` prints one v2 envelope on stdout, never framed, nothing else on stdout: `{v: 2, command, ok, op, items[{subject, status, reason, error, warnings, detail}], plan, fingerprint, follow_ups, warnings, error{kind, code, message, params, follow_up{argv, code, message, params}, fields[{path, code, flag, message…}]}}`; `follow_up.argv` is the command line to run next, word by word.
 - `-q`/`--quiet` silences human output; errors and the exit code are unchanged, and JSON still prints its document.
 - Success contracts to a count; anomalies are named one by one; every outcome ends with the next step (`→ wtm go <branch>`).
 
