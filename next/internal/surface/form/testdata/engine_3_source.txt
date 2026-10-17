@@ -1,0 +1,11 @@
+
+  Step 2/7 • Source branch
+
+  ✓ Branches: feat/a, feature
+
+  The branch a new branch starts from, or the parent recorded for wtm sync of one that already
+  exists
+
+▌▸ main
+
+  ↑↓ navigate • / filter • r refresh • enter confirm • esc back

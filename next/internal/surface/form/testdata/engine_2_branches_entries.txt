@@ -1,0 +1,10 @@
+
+  Step 1/7 • Branches
+
+  The branches to create a worktree for; one that already exists is checked out as it is
+
+❯
+  feat/a
+  feature  existing
+
+  tab add another • backspace remove last • enter confirm • esc cancel

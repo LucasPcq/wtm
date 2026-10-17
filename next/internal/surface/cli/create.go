@@ -9,6 +9,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/app"
 	"github.com/LucasPcq/wtm/next/internal/app/create"
+	"github.com/LucasPcq/wtm/next/internal/surface/form"
 	"github.com/LucasPcq/wtm/next/internal/surface/output"
 	"github.com/LucasPcq/wtm/next/internal/wtm"
 	"github.com/LucasPcq/wtm/next/internal/wtm/project"
@@ -108,9 +109,6 @@ func (c *createCommand) run(cmd *cobra.Command, args []string) error {
 		c.output = outputText
 		return c.fail(cmd, refused, req)
 	}
-	if c.interactive(cmd) {
-		return c.fail(cmd, wtm.InvalidMessage("the form is not yet available: pass --yes"), req)
-	}
 	ctx := cmd.Context()
 	project, err := c.open(ctx)
 	if err != nil {
@@ -118,9 +116,24 @@ func (c *createCommand) run(cmd *cobra.Command, args []string) error {
 	}
 	_, stderr := c.streams(cmd)
 	progress := output.NewProgress(ctx, output.ProgressParams{W: stderr, Human: c.human(), Live: output.IsTerminal(stderr)})
-	outcome, err := project.App.Create(ctx, app.CreateParams{Request: req, DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: surfaceCLI, Report: progress.Report})
+	ran, err := c.create(cmd, creating{App: project.App, Request: req, Report: progress.Report})
 	progress.Close()
-	return c.conclude(cmd, concluded{Outcome: outcome, Err: wtm.AsError(wtm.AsErrorParams{Err: err}), Request: req, Cwd: project.Cwd})
+	return c.conclude(cmd, concluded{Outcome: ran.Outcome, Err: wtm.AsError(wtm.AsErrorParams{Err: err}), Request: ran.Request, Cwd: project.Cwd})
+}
+
+type creating struct {
+	App     *app.App
+	Request create.Request
+	Report  wtm.Report
+}
+
+func (c *createCommand) create(cmd *cobra.Command, params creating) (form.Ran, error) {
+	ctx := cmd.Context()
+	if c.interactive(cmd) {
+		return form.Run(ctx, form.Params{App: params.App, Request: params.Request, DryRun: c.dryRun, Report: params.Report, In: cmd.InOrStdin(), Out: cmd.ErrOrStderr()})
+	}
+	outcome, err := params.App.Create(ctx, app.CreateParams{Request: params.Request, DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: surfaceCLI, Report: params.Report})
+	return form.Ran{Outcome: outcome, Request: params.Request}, err
 }
 
 func (c *createCommand) request(cmd *cobra.Command, args []string) create.Request {
