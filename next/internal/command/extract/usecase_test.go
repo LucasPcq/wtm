@@ -428,11 +428,11 @@ func TestACreatedTargetGetsItsEnvByTheStrategyAsked(t *testing.T) {
 		given  project.EnvStrategy
 		want   string
 	}{
-		"config.toml's strategy by default":             {config: envToml, want: exampleEnv},
-		"the strategy given":                            {config: envToml, given: project.EnvMain, want: mainEnv},
-		"the strategy remembered":                       {config: envToml + "\n[wizard.remembered]\nenv_strategy = \"main\"\n", want: mainEnv},
-		"the config default over a remembered strategy": {config: envToml + "\n[wizard.remembered]\nenv_strategy = \"main\"\n", given: provision.EnvFromConfig, want: exampleEnv},
-		"the config default remembered":                 {config: envToml + "\n[wizard.remembered]\nenv_strategy = \"config\"\n", want: exampleEnv},
+		"config_strategy_default":        {config: envToml, want: exampleEnv},
+		"strategy_given":                 {config: envToml, given: project.EnvMain, want: mainEnv},
+		"strategy_remembered":            {config: envToml + "\n[wizard.remembered]\nenv_strategy = \"main\"\n", want: mainEnv},
+		"config_default_over_remembered": {config: envToml + "\n[wizard.remembered]\nenv_strategy = \"main\"\n", given: provision.EnvFromConfig, want: exampleEnv},
+		"config_default_remembered":      {config: envToml + "\n[wizard.remembered]\nenv_strategy = \"config\"\n", want: exampleEnv},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -52,10 +52,10 @@ func TestAPortRunTomlWouldWriteWrongIsRefused(t *testing.T) {
 		jobs string
 		want string
 	}{
-		{"a port outside the range a socket binds", "[[job]]\nname = \"web\"\nports = { PORT = 99999 }\n", `invalid run config: job "web": port PORT is 99999, outside 1-65535`},
-		{"a port name no shell can export", "[[job]]\nname = \"web\"\nports = { 1PORT = 3000 }\n", `invalid run config: job "web": port "1PORT" is not a valid environment variable name`},
-		{"two jobs on the same base", "[[job]]\nname = \"a\"\nports = { A = 3000 }\n\n[[job]]\nname = \"b\"\nports = { B = 3000 }\n", `invalid run config: ports A (job "a") and B (job "b") both declare base 3000 — they would bind the same port in every worktree`},
-		{"two bases a block apart", "[[job]]\nname = \"web\"\nports = { ADMIN = 3010, PORT = 3000 }\n", `invalid run config: ports ADMIN (job "web", base 3010) and PORT (job "web", base 3000) collide 1 worktree(s) apart with a port_offset_block of 10 — move one base so the gap between them is not a multiple of 10`},
+		{"port_out_of_range", "[[job]]\nname = \"web\"\nports = { PORT = 99999 }\n", `invalid run config: job "web": port PORT is 99999, outside 1-65535`},
+		{"invalid_port_name", "[[job]]\nname = \"web\"\nports = { 1PORT = 3000 }\n", `invalid run config: job "web": port "1PORT" is not a valid environment variable name`},
+		{"jobs_share_base", "[[job]]\nname = \"a\"\nports = { A = 3000 }\n\n[[job]]\nname = \"b\"\nports = { B = 3000 }\n", `invalid run config: ports A (job "a") and B (job "b") both declare base 3000 — they would bind the same port in every worktree`},
+		{"bases_block_apart", "[[job]]\nname = \"web\"\nports = { ADMIN = 3010, PORT = 3000 }\n", `invalid run config: ports ADMIN (job "web", base 3010) and PORT (job "web", base 3000) collide 1 worktree(s) apart with a port_offset_block of 10 — move one base so the gap between them is not a multiple of 10`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -79,9 +79,16 @@ func TestADuplicateJobNameStillLoads(t *testing.T) {
 }
 
 func TestANegativeOrZeroBlockLoadsAndReadsAsTheDefault(t *testing.T) {
-	for _, block := range []string{"-10", "0"} {
-		t.Run(block, func(t *testing.T) {
-			_, err := Project{StateDir: stateWithRun(t, "port_offset_block = "+block+"\n\n[[job]]\nname = \"web\"\nkind = \"service\"\ncmd = \"pnpm dev\"\n")}.LoadRun()
+	cases := []struct {
+		name  string
+		block string
+	}{
+		{"negative", "-10"},
+		{"zero", "0"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Project{StateDir: stateWithRun(t, "port_offset_block = "+tc.block+"\n\n[[job]]\nname = \"web\"\nkind = \"service\"\ncmd = \"pnpm dev\"\n")}.LoadRun()
 
 			assert.NoError(t, err)
 		})
@@ -208,14 +215,14 @@ func TestAnInvalidRunTomlIsRefusedSayingWhy(t *testing.T) {
 		content string
 		want    string
 	}{
-		{"an unknown addressing", "addressing = \"nope\"\n", `invalid run config: unknown addressing "nope" (expected "ports" or "names")`},
-		{"an unknown isolation", "isolation = \"keep\"\n", `invalid run config: unknown isolation "keep" (expected "isolated" or "verbatim")`},
-		{"an unknown kind", "[[job]]\nname = \"api\"\nkind = \"servce\"\ncmd = \"pnpm dev\"\n", `invalid run config: job "api": unknown kind "servce" (expected service or task)`},
-		{"an unknown scope", "[[job]]\nname = \"db\"\ncmd = \"x\"\nscope = \"global\"\n", `invalid run config: job "db": unknown scope "global" (expected "shared")`},
-		{"a namespace on a per-worktree job", "[[job]]\nname = \"db\"\ncmd = \"x\"\n\n[job.namespace]\nname = \"app_{worktree}\"\ncreate = \"createdb\"\n", `invalid run config: job "db": [job.namespace] only means something on a job with scope = "shared"`},
-		{"an incomplete namespace", "[[job]]\nname = \"db\"\ncmd = \"x\"\nscope = \"shared\"\n\n[job.namespace]\nname = \"app_{worktree}\"\n", `invalid run config: job "db": a [job.namespace] block needs both a name and a create command`},
-		{"a namespace with a bad token", "[[job]]\nname = \"db\"\ncmd = \"x\"\nscope = \"shared\"\n\n[job.namespace]\nname = \"app_{branch}\"\ncreate = \"createdb\"\n", `invalid run config: job "db": unknown placeholder in a [job.namespace] value: {branch}`},
-		{"a namespace env with a bad token", "[[job]]\nname = \"db\"\ncmd = \"x\"\nscope = \"shared\"\n\n[job.namespace]\nname = \"app_{worktree}\"\ncreate = \"createdb\"\nenv = { DB = \"{branch}\" }\n", `invalid run config: job "db": unknown placeholder in a [job.namespace] value: {branch}`},
+		{"unknown_addressing", "addressing = \"nope\"\n", `invalid run config: unknown addressing "nope" (expected "ports" or "names")`},
+		{"unknown_isolation", "isolation = \"keep\"\n", `invalid run config: unknown isolation "keep" (expected "isolated" or "verbatim")`},
+		{"unknown_kind", "[[job]]\nname = \"api\"\nkind = \"servce\"\ncmd = \"pnpm dev\"\n", `invalid run config: job "api": unknown kind "servce" (expected service or task)`},
+		{"unknown_scope", "[[job]]\nname = \"db\"\ncmd = \"x\"\nscope = \"global\"\n", `invalid run config: job "db": unknown scope "global" (expected "shared")`},
+		{"namespace_on_per_worktree_job", "[[job]]\nname = \"db\"\ncmd = \"x\"\n\n[job.namespace]\nname = \"app_{worktree}\"\ncreate = \"createdb\"\n", `invalid run config: job "db": [job.namespace] only means something on a job with scope = "shared"`},
+		{"incomplete_namespace", "[[job]]\nname = \"db\"\ncmd = \"x\"\nscope = \"shared\"\n\n[job.namespace]\nname = \"app_{worktree}\"\n", `invalid run config: job "db": a [job.namespace] block needs both a name and a create command`},
+		{"namespace_bad_token", "[[job]]\nname = \"db\"\ncmd = \"x\"\nscope = \"shared\"\n\n[job.namespace]\nname = \"app_{branch}\"\ncreate = \"createdb\"\n", `invalid run config: job "db": unknown placeholder in a [job.namespace] value: {branch}`},
+		{"namespace_env_bad_token", "[[job]]\nname = \"db\"\ncmd = \"x\"\nscope = \"shared\"\n\n[job.namespace]\nname = \"app_{worktree}\"\ncreate = \"createdb\"\nenv = { DB = \"{branch}\" }\n", `invalid run config: job "db": unknown placeholder in a [job.namespace] value: {branch}`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

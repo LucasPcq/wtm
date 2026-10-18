@@ -79,8 +79,8 @@ func TestWorktreesReadsTheBranchOfARebaseInProgress(t *testing.T) {
 		backend string
 		linked  bool
 	}{
-		{name: "merge backend, in a linked worktree", backend: "--merge", linked: true},
-		{name: "apply backend, in the main worktree", backend: "--apply", linked: false},
+		{name: "merge_backend_linked", backend: "--merge", linked: true},
+		{name: "apply_backend_main", backend: "--apply", linked: false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -124,8 +124,8 @@ func TestWorktreesReadsTheBranchABisectStartedFrom(t *testing.T) {
 		detached bool
 		want     worktree.State
 	}{
-		{name: "from a branch", want: worktree.Bisecting{Branch: "feature"}},
-		{name: "from a detached HEAD", detached: true, want: worktree.Detached{}},
+		{name: "from_branch", want: worktree.Bisecting{Branch: "feature"}},
+		{name: "from_detached_head", detached: true, want: worktree.Detached{}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -370,7 +370,7 @@ func TestTheFakeAndGitStartATrackingBranchWhereTheRemoteOneIs(t *testing.T) {
 func TestTheFakeAndGitDropTheBranchAnAddRefusedForItsPathLeft(t *testing.T) {
 	for _, impl := range implementations(t) {
 		for _, folder := range []string{"taken", "gone"} {
-			t.Run(impl.name+": "+folder, func(t *testing.T) {
+			t.Run(impl.name+"_"+folder, func(t *testing.T) {
 				before := gittest.StateOf(t, impl.port)
 
 				err := impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, folder), Checkout: worktree.NewBranch{Name: "into-" + folder, From: worktree.LocalBranch{Name: "main"}}})
@@ -413,37 +413,37 @@ func TestTheFakeAndGitRefuseTheSameWorktreeChanges(t *testing.T) {
 		name string
 		call func(t *testing.T, impl implementation) error
 	}{
-		{name: "a branch checked out elsewhere", call: func(t *testing.T, impl implementation) error {
+		{name: "branch_checked_out_elsewhere", call: func(t *testing.T, impl implementation) error {
 			return impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "new"), Checkout: worktree.ExistingBranch{Name: "main"}})
 		}},
-		{name: "a branch a rebase will move", call: func(t *testing.T, impl implementation) error {
+		{name: "rebasing_branch", call: func(t *testing.T, impl implementation) error {
 			return impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "new"), Checkout: worktree.ExistingBranch{Name: "rebasing"}})
 		}},
-		{name: "a branch only the remote has", call: func(t *testing.T, impl implementation) error {
+		{name: "remote_only_branch", call: func(t *testing.T, impl implementation) error {
 			return impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "new"), Checkout: worktree.ExistingBranch{Name: "remote-only"}})
 		}},
-		{name: "an existing branch into a taken folder", call: func(t *testing.T, impl implementation) error {
+		{name: "existing_branch_taken_folder", call: func(t *testing.T, impl implementation) error {
 			return impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "taken"), Checkout: worktree.ExistingBranch{Name: "feature"}})
 		}},
-		{name: "a new branch that exists", call: func(t *testing.T, impl implementation) error {
+		{name: "new_branch_exists", call: func(t *testing.T, impl implementation) error {
 			return impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "new"), Checkout: worktree.NewBranch{Name: "feature", From: worktree.LocalBranch{Name: "main"}}})
 		}},
-		{name: "a start point that does not exist", call: func(t *testing.T, impl implementation) error {
+		{name: "missing_start_point", call: func(t *testing.T, impl implementation) error {
 			return impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "new"), Checkout: worktree.NewBranch{Name: "topic", From: worktree.RemoteBranch{Name: "nope"}}})
 		}},
-		{name: "an existing branch that does not exist", call: func(t *testing.T, impl implementation) error {
+		{name: "existing_branch_missing", call: func(t *testing.T, impl implementation) error {
 			return impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "new"), Checkout: worktree.ExistingBranch{Name: "nope"}})
 		}},
-		{name: "removing the main worktree", call: func(t *testing.T, impl implementation) error {
+		{name: "remove_main_worktree", call: func(t *testing.T, impl implementation) error {
 			return impl.port.RemoveWorktree(t.Context(), filepath.Join(impl.root, "main"))
 		}},
-		{name: "removing what is not a worktree", call: func(t *testing.T, impl implementation) error {
+		{name: "remove_non_worktree", call: func(t *testing.T, impl implementation) error {
 			return impl.port.RemoveWorktree(t.Context(), filepath.Join(impl.root, "taken"))
 		}},
 	}
 	for _, impl := range implementations(t) {
 		for _, refusal := range refusals {
-			t.Run(impl.name+": "+refusal.name, func(t *testing.T) {
+			t.Run(impl.name+"_"+refusal.name, func(t *testing.T) {
 				before := gittest.StateOf(t, impl.port)
 
 				err := refusal.call(t, impl)

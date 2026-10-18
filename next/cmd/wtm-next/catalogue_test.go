@@ -79,10 +79,10 @@ func TestAnInvalidCallIsRefusedWithTheStatusOfItsKind(t *testing.T) {
 		Status  int
 		Code    string
 	}{
-		"an unknown field":        {Dir: main, Request: `{"branches": ["feat/x"], "brnach": "x"}`, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
-		"a field of another type": {Dir: main, Request: `{"branches": "feat/x"}`, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
-		"no branch":               {Dir: main, Request: `{}`, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
-		"no repository":           {Dir: t.TempDir(), Request: `{"branches": ["feat/x"]}`, Status: http.StatusPreconditionFailed, Code: domain.CodeNotARepository},
+		"unknown_field":    {Dir: main, Request: `{"branches": ["feat/x"], "brnach": "x"}`, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
+		"wrong_field_type": {Dir: main, Request: `{"branches": "feat/x"}`, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
+		"no_branch":        {Dir: main, Request: `{}`, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
+		"no_repository":    {Dir: t.TempDir(), Request: `{"branches": ["feat/x"]}`, Status: http.StatusPreconditionFailed, Code: domain.CodeNotARepository},
 	} {
 		t.Run(name, func(t *testing.T) {
 			got := create.Execute(t.Context(), api.Call{Dir: c.Dir, Request: json.RawMessage(c.Request)})

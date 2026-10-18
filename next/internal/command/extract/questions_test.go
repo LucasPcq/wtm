@@ -216,8 +216,8 @@ func TestARecordedParentThatNoLongerExistsFallsBackToTheBaseBranch(t *testing.T)
 
 func TestEachFieldOfTheFormAnswersTheRequestBack(t *testing.T) {
 	cases := map[string]extract.Request{
-		"to an existing worktree": {Source: source, Files: []string{"a.txt"}, To: other, Keep: new(true), OnConflict: extract.OnConflictResolve},
-		"to a new branch": {
+		"to_existing_worktree": {Source: source, Files: []string{"a.txt"}, To: other, Keep: new(true), OnConflict: extract.OnConflictResolve},
+		"to_new_branch": {
 			Source:     source,
 			Files:      []string{"a.txt"},
 			To:         split,
@@ -268,10 +268,10 @@ func TestAnAnswerTheRequestCannotTakeIsRefusedAndChangesNothing(t *testing.T) {
 		values []string
 		code   string
 	}{
-		"an unknown field":             {"branches", []string{"a"}, domain.CodeUnknown},
-		"an unknown field, two values": {"typo", []string{"a", "b"}, domain.CodeUnknown},
-		"two values for one":           {"to", []string{other, split}, domain.CodeOneValue},
-		"a confirmation unspelt":       {"keep", []string{"copy"}, domain.CodeOneOf},
+		"unknown_field":            {"branches", []string{"a"}, domain.CodeUnknown},
+		"unknown_field_two_values": {"typo", []string{"a", "b"}, domain.CodeUnknown},
+		"two_values_for_one":       {"to", []string{other, split}, domain.CodeOneValue},
+		"confirmation_misspelt":    {"keep", []string{"copy"}, domain.CodeOneOf},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

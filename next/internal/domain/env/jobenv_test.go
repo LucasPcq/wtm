@@ -19,27 +19,27 @@ func TestAWorktreeLearnsItsIdentityItsOffsetAndItsComposeProject(t *testing.T) {
 		want   map[string]string
 	}{
 		{
-			name:   "the main branch on ordinal 0 keeps the base ports",
+			name:   "main_ordinal_zero_base_ports",
 			params: JobParams{Branch: "main", ProjectDir: "/src/myproject", Run: project.Run{PortOffsetBlock: 10}},
 			want:   map[string]string{"WTM_WORKTREE": "main", "WTM_BRANCH": "main", "WTM_ORDINAL": "0", "WTM_PORT_OFFSET": "0", "COMPOSE_PROJECT_NAME": "myproject-main", "WTM_PROJECT": "myproject", "WTM_ISOLATION": "isolated"},
 		},
 		{
-			name:   "the offset is the ordinal times the block",
+			name:   "offset_ordinal_times_block",
 			params: JobParams{Branch: "feat/x", ProjectDir: "/src/myproject", Ordinal: 3, Run: project.Run{PortOffsetBlock: 10}},
 			want:   map[string]string{"WTM_WORKTREE": "feat-x", "WTM_BRANCH": "feat/x", "WTM_ORDINAL": "3", "WTM_PORT_OFFSET": "30", "COMPOSE_PROJECT_NAME": "myproject-feat-x", "WTM_PROJECT": "myproject", "WTM_ISOLATION": "isolated"},
 		},
 		{
-			name:   "no block falls back to the default",
+			name:   "no_block_default",
 			params: JobParams{Branch: "feat/x", ProjectDir: "/src/myproject", Ordinal: 2},
 			want:   map[string]string{"WTM_WORKTREE": "feat-x", "WTM_BRANCH": "feat/x", "WTM_ORDINAL": "2", "WTM_PORT_OFFSET": "20", "COMPOSE_PROJECT_NAME": "myproject-feat-x", "WTM_PROJECT": "myproject", "WTM_ISOLATION": "isolated"},
 		},
 		{
-			name:   "the repository is made a host label and a slug",
+			name:   "repository_host_label_slug",
 			params: JobParams{Branch: "feat/x", ProjectDir: "/src/My.App", Ordinal: 1, Run: project.Run{PortOffsetBlock: 10}},
 			want:   map[string]string{"WTM_WORKTREE": "feat-x", "WTM_BRANCH": "feat/x", "WTM_ORDINAL": "1", "WTM_PORT_OFFSET": "10", "COMPOSE_PROJECT_NAME": "my-app-feat-x", "WTM_PROJECT": "my-app", "WTM_ISOLATION": "isolated"},
 		},
 		{
-			name:   "verbatim runs on the base ports with no compose project made up",
+			name:   "verbatim_base_ports_no_project",
 			params: JobParams{Branch: "feat/x", ProjectDir: "/src/myproject", Ordinal: 3, Isolation: project.Verbatim, Run: project.Run{PortOffsetBlock: 10}},
 			want:   map[string]string{"WTM_WORKTREE": "feat-x", "WTM_BRANCH": "feat/x", "WTM_ORDINAL": "3", "WTM_PORT_OFFSET": "0", "WTM_PROJECT": "myproject", "WTM_ISOLATION": "verbatim"},
 		},
@@ -77,9 +77,9 @@ func TestTheOffsetBlockIsTheDeclaredOneElseTheDefault(t *testing.T) {
 		config project.Run
 		want   int
 	}{
-		{"unset falls back to the default", project.Run{}, defaultOffsetBlock},
-		{"a negative block is not one either", project.Run{PortOffsetBlock: -5}, defaultOffsetBlock},
-		{"declared wins", project.Run{PortOffsetBlock: 100}, 100},
+		{"unset_default", project.Run{}, defaultOffsetBlock},
+		{"negative_block_default", project.Run{PortOffsetBlock: -5}, defaultOffsetBlock},
+		{"declared_wins", project.Run{PortOffsetBlock: 100}, 100},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -176,11 +176,11 @@ func TestHooksReadTheRunEnvOnlyOfAWorktreeThatChoseAndAComposeStack(t *testing.T
 		isolation project.Isolation
 		want      bool
 	}{
-		{"isolated with a compose job", compose, project.Isolated, true},
-		{"verbatim with a compose job", compose, project.Verbatim, true},
-		{"never chose", compose, "", false},
-		{"no compose job", script, project.Isolated, false},
-		{"no run config", project.Run{}, project.Isolated, false},
+		{"isolated_compose_job", compose, project.Isolated, true},
+		{"verbatim_compose_job", compose, project.Verbatim, true},
+		{"never_chose", compose, "", false},
+		{"no_compose_job", script, project.Isolated, false},
+		{"no_run_config", project.Run{}, project.Isolated, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -36,9 +36,9 @@ func TestWorktreeLocksHoldTheRepositoryAndEachWorktreeOnceInOrder(t *testing.T) 
 		worktrees []string
 		want      []Lock
 	}{
-		"none":                 {nil, []Lock{{Scope: ScopeRepo, Mode: LockShared}}},
-		"an empty name":        {[]string{""}, []Lock{{Scope: ScopeRepo, Mode: LockShared}}},
-		"sorted and compacted": {[]string{"b", "", "a", "b"}, []Lock{{Scope: ScopeRepo, Mode: LockShared}, {Scope: ScopeWorktree, Name: "a", Mode: LockExclusive}, {Scope: ScopeWorktree, Name: "b", Mode: LockExclusive}}},
+		"none":             {nil, []Lock{{Scope: ScopeRepo, Mode: LockShared}}},
+		"empty_name":       {[]string{""}, []Lock{{Scope: ScopeRepo, Mode: LockShared}}},
+		"sorted_compacted": {[]string{"b", "", "a", "b"}, []Lock{{Scope: ScopeRepo, Mode: LockShared}, {Scope: ScopeWorktree, Name: "a", Mode: LockExclusive}, {Scope: ScopeWorktree, Name: "b", Mode: LockExclusive}}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

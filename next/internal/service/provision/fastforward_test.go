@@ -55,7 +55,7 @@ func TestASourceWorktreeStoppedInARebaseIsLeftWhereItIs(t *testing.T) {
 }
 
 func TestAFastForwardThatFailsCarriesItsCause(t *testing.T) {
-	for name, seed := range map[string]upstreamSeed{"without worktree": {}, "in its worktree": {Linked: true}} {
+	for name, seed := range map[string]upstreamSeed{"without_worktree": {}, "in_worktree": {Linked: true}} {
 		t.Run(name, func(t *testing.T) {
 			u := behindOrigin(t, seed)
 			before := gittest.Output(t, u.main, "rev-parse", existing)
@@ -76,8 +76,8 @@ func TestEachSubjectIsFastForwardedBetweenItsPhaseEventsAndOnlyThoseLeftBehindAr
 		missed []provision.Missed
 	}{
 		"moved":      {upstreamSeed{}, nil},
-		"left dirty": {upstreamSeed{Linked: true, Dirty: true}, []provision.Missed{{Subject: existing, FastForwarded: provision.FastForwarded{Dirty: true}}}},
-		"left busy":  {upstreamSeed{Linked: true, Rebasing: true}, []provision.Missed{{Subject: existing, FastForwarded: provision.FastForwarded{Busy: true}}}},
+		"left_dirty": {upstreamSeed{Linked: true, Dirty: true}, []provision.Missed{{Subject: existing, FastForwarded: provision.FastForwarded{Dirty: true}}}},
+		"left_busy":  {upstreamSeed{Linked: true, Rebasing: true}, []provision.Missed{{Subject: existing, FastForwarded: provision.FastForwarded{Busy: true}}}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

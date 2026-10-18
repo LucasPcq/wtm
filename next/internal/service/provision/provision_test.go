@@ -200,8 +200,8 @@ func TestAWriteWithoutItsLockIsSaidOnce(t *testing.T) {
 
 func TestAnEnvThatCannotBeCopiedLeavesNothingBehind(t *testing.T) {
 	for name, params := range map[string]func(world, *recorder) provision.Params{
-		"a new branch":       world.params,
-		"an existing branch": world.existing,
+		"new_branch":      world.params,
+		"existing_branch": world.existing,
 	} {
 		t.Run(name, func(t *testing.T) {
 			w := onDisk(t)

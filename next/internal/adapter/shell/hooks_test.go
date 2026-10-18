@@ -121,10 +121,20 @@ func TestAHookRunsInItsOwnCwdElseInTheWorktree(t *testing.T) {
 }
 
 func TestAPlaceholderPathReachesTheCommandAsSpelledOnDisk(t *testing.T) {
-	for _, name := range []string{"it's", "cost$HOME", `a"b`, "sp ace", "back`tick`"} {
-		t.Run(name, func(t *testing.T) {
+	cases := []struct {
+		name   string
+		folder string
+	}{
+		{"apostrophe", "it's"},
+		{"dollar", "cost$HOME"},
+		{"double_quote", `a"b`},
+		{"space", "sp ace"},
+		{"backtick", "back`tick`"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
-			worktree := filepath.Join(root, name)
+			worktree := filepath.Join(root, tc.folder)
 			require.NoError(t, os.MkdirAll(worktree, 0o755))
 			hooks := []project.Hook{
 				{Cmd: "printf %s {{worktree}} > {{root}}/unquoted"},

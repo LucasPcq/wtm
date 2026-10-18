@@ -18,10 +18,10 @@ func TestAMetaDirHoldsTheBranchAsOneEscapedSegment(t *testing.T) {
 
 func TestAMetaDirIsRefusedRatherThanGuessed(t *testing.T) {
 	cases := map[string]MetaDirParams{
-		"no state dir":      {Branch: "feat/x"},
-		"no branch":         {StateDir: "/state"},
-		"a branch named ..": {StateDir: "/state", Branch: ".."},
-		"a branch named .":  {StateDir: "/state", Branch: "."},
+		"no_state_dir":   {Branch: "feat/x"},
+		"no_branch":      {StateDir: "/state"},
+		"branch_dot_dot": {StateDir: "/state", Branch: ".."},
+		"branch_dot":     {StateDir: "/state", Branch: "."},
 	}
 	for name, params := range cases {
 		t.Run(name, func(t *testing.T) {

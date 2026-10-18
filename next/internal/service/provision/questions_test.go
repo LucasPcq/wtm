@@ -18,12 +18,12 @@ func TestTheEnvStrategyIsTheOneGivenElseRememberedElseConfigDefault(t *testing.T
 		want       domain.Answer[project.EnvStrategy]
 		strategy   project.EnvStrategy
 	}{
-		"given":                         {provision.Given{EnvFrom: project.EnvMain}, remembered, domain.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: domain.OriginRequest}, project.EnvMain},
-		"the config default given":      {provision.Given{EnvFrom: provision.EnvFromConfig}, remembered, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginRequest}, project.EnvExample},
-		"remembered":                    {provision.Given{}, remembered, domain.Answer[project.EnvStrategy]{Value: project.EnvParent, Origin: domain.OriginRemembered}, project.EnvParent},
-		"asked again":                   {provision.Given{Ask: true}, remembered, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginDefault}, project.EnvExample},
-		"the config default remembered": {provision.Given{}, map[string]string{project.RememberEnvStrategy: project.RememberEnvConfig}, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginRemembered}, project.EnvExample},
-		"nothing given nor remembered":  {provision.Given{}, nil, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginDefault}, project.EnvExample},
+		"given":                     {provision.Given{EnvFrom: project.EnvMain}, remembered, domain.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: domain.OriginRequest}, project.EnvMain},
+		"config_default_given":      {provision.Given{EnvFrom: provision.EnvFromConfig}, remembered, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginRequest}, project.EnvExample},
+		"remembered":                {provision.Given{}, remembered, domain.Answer[project.EnvStrategy]{Value: project.EnvParent, Origin: domain.OriginRemembered}, project.EnvParent},
+		"asked_again":               {provision.Given{Ask: true}, remembered, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginDefault}, project.EnvExample},
+		"config_default_remembered": {provision.Given{}, map[string]string{project.RememberEnvStrategy: project.RememberEnvConfig}, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginRemembered}, project.EnvExample},
+		"nothing_given":             {provision.Given{}, nil, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginDefault}, project.EnvExample},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

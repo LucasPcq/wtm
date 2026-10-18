@@ -267,15 +267,15 @@ func TestAChangeThatIsNotARegularFileIsRefusedBeforeAnythingMoves(t *testing.T) 
 		path string
 		make func(t *testing.T, source string)
 	}{
-		{name: "a symlink to a file outside", path: "cfg.json", make: func(t *testing.T, source string) {
+		{name: "symlink_outside", path: "cfg.json", make: func(t *testing.T, source string) {
 			secret := filepath.Join(t.TempDir(), "secret")
 			write(t, secret, "secret\n")
 			require.NoError(t, os.Symlink(secret, filepath.Join(source, "cfg.json")))
 		}},
-		{name: "a dangling symlink", path: "dangling", make: func(t *testing.T, source string) {
+		{name: "dangling_symlink", path: "dangling", make: func(t *testing.T, source string) {
 			require.NoError(t, os.Symlink(filepath.Join(source, "nowhere"), filepath.Join(source, "dangling")))
 		}},
-		{name: "a nested repository", path: "nested/", make: func(t *testing.T, source string) {
+		{name: "nested_repository", path: "nested/", make: func(t *testing.T, source string) {
 			nested := filepath.Join(source, "nested")
 			write(t, filepath.Join(nested, "x.txt"), "x\n")
 			gittest.Git(t, nested, "init", "-q")

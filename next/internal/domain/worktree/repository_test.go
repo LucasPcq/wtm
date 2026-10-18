@@ -22,10 +22,10 @@ func TestOnlyARunThatNamesWorktreesMakesTheirNamesClash(t *testing.T) {
 		runErr error
 		want   []string
 	}{
-		"no jobs nor profiles": {project.Run{}, nil, nil},
+		"no_jobs_nor_profiles": {project.Run{}, nil, nil},
 		"jobs":                 {project.Run{Jobs: []project.Job{{Name: "web"}}}, nil, []string{"main"}},
 		"profiles":             {project.Run{Profiles: []project.Profile{{}}}, nil, []string{"main"}},
-		"a run that failed":    {project.Run{}, errors.New("bad run.toml"), []string{"main"}},
+		"run_failed":           {project.Run{}, errors.New("bad run.toml"), []string{"main"}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

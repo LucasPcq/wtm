@@ -50,10 +50,10 @@ func TestTheSettlementNoteCountsPortsAndOwnedValues(t *testing.T) {
 		plan env.Redacted
 		want string
 	}{
-		{name: "nothing moved", plan: env.Redacted{Offset: 20, Entries: []env.Entry{unchanged}, Owned: []env.OwnedEntry{kept}}, want: ""},
-		{name: "one port", plan: env.Redacted{Offset: 20, Entries: []env.Entry{rewrite, unchanged}}, want: "1 port settled (offset +20)"},
-		{name: "several ports", plan: env.Redacted{Offset: 10, Entries: []env.Entry{rewrite, rewrite}}, want: "2 ports settled (offset +10)"},
-		{name: "owned values only", plan: env.Redacted{Owned: []env.OwnedEntry{written, kept, written}}, want: "2 owned values written"},
+		{name: "nothing_moved", plan: env.Redacted{Offset: 20, Entries: []env.Entry{unchanged}, Owned: []env.OwnedEntry{kept}}, want: ""},
+		{name: "one_port", plan: env.Redacted{Offset: 20, Entries: []env.Entry{rewrite, unchanged}}, want: "1 port settled (offset +20)"},
+		{name: "several_ports", plan: env.Redacted{Offset: 10, Entries: []env.Entry{rewrite, rewrite}}, want: "2 ports settled (offset +10)"},
+		{name: "owned_values_only", plan: env.Redacted{Owned: []env.OwnedEntry{written, kept, written}}, want: "2 owned values written"},
 		{name: "both", plan: env.Redacted{Offset: 10, Entries: []env.Entry{rewrite}, Owned: []env.OwnedEntry{written}}, want: "1 port settled (offset +10) · 1 owned value written"},
 	}
 	for _, tc := range cases {

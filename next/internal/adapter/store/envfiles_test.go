@@ -118,12 +118,12 @@ func TestCopyTakesEachFileFromItsStrategysSource(t *testing.T) {
 		parent   string
 		want     string
 	}{
-		{name: "example, pinned template", strategy: project.EnvExample, file: project.EnvFile{Target: ".env", Template: ".env.dist"}, want: "FROM=dist"},
-		{name: "example, first candidate", strategy: project.EnvExample, file: project.EnvFile{Target: ".env"}, want: "FROM=example"},
+		{name: "example_pinned_template", strategy: project.EnvExample, file: project.EnvFile{Target: ".env", Template: ".env.dist"}, want: "FROM=dist"},
+		{name: "example_first_candidate", strategy: project.EnvExample, file: project.EnvFile{Target: ".env"}, want: "FROM=example"},
 		{name: "main", strategy: project.EnvMain, file: project.EnvFile{Target: ".env"}, want: "FROM=main"},
-		{name: "main, nested", strategy: project.EnvMain, file: project.EnvFile{Target: "apps/api/.env"}, want: "FROM=main-api"},
+		{name: "main_nested", strategy: project.EnvMain, file: project.EnvFile{Target: "apps/api/.env"}, want: "FROM=main-api"},
 		{name: "parent", strategy: project.EnvParent, file: project.EnvFile{Target: ".env"}, parent: parent, want: "FROM=parent"},
-		{name: "parent unknown", strategy: project.EnvParent, file: project.EnvFile{Target: ".env"}, want: "FROM=main"},
+		{name: "parent_unknown", strategy: project.EnvParent, file: project.EnvFile{Target: ".env"}, want: "FROM=main"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
