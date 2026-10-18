@@ -82,6 +82,22 @@ const (
 	ActionResume   Action = "resume"    // a branch only origin has, tracking it
 )
 
+// start is how the worktree of the action begins; "" for an action that makes none.
+func (a Action) start() worktree.Start {
+	switch a {
+	case ActionCreate:
+		return worktree.StartCreate
+	case ActionCheckOut:
+		return worktree.StartCheckOut
+	case ActionResume:
+		return worktree.StartResume
+	case ActionExisting:
+		return ""
+	}
+
+	panic("extract: an action with no start: " + string(a))
+}
+
 // A Target is the worktree the changes go to: its branch, its path, how it gets there, and the remote branch it resumes.
 type Target struct {
 	Branch   string `json:"branch"`
@@ -96,7 +112,7 @@ func (t Target) creates() bool {
 
 // placement is the target's action as the domain places it, for its checkout and its standing.
 func (t Target) placement() worktree.Placed {
-	return worktree.Placed{Start: worktree.Start(t.Action), Upstream: t.Upstream}
+	return worktree.Placed{Start: t.Action.start(), Upstream: t.Upstream}
 }
 
 //go-sumtype:decl decision
@@ -183,12 +199,12 @@ func (f Facts) subjectAt(req Request, standing worktree.Divergence) string {
 		return ""
 	}
 
-	subjects := f.SubjectsAt(standing, req.From, []worktree.BranchStart{{Branch: target.Branch, Start: worktree.Start(target.Action)}})
-	if len(subjects) == 0 {
+	subject := f.StartsFrom(target.Branch, target.Action.start(), req.From)
+	if subject == "" || f.Standing(subject) != standing {
 		return ""
 	}
 
-	return subjects[0]
+	return subject
 }
 
 // conflictCheck asks which selected changes would conflict in the target: in its worktree when it exists, else in the tree of the ref it will start from, as origin has it when the apply fast-forwards that ref first.

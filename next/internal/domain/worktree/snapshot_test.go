@@ -105,14 +105,11 @@ func TestTheStandingOfAPlacedBranchIsItsCountsWhenCheckedOutAndItsUpstreamWhenRe
 	}
 }
 
-func TestTheSubjectsAtAStandingAreTheBranchesTheWorktreesStartFromEachOnce(t *testing.T) {
-	snapshot := Snapshot{
-		Branches:   Branches{Local: []Branch{{Name: "main"}, {Name: "feat/old"}}, Remote: []Branch{{Name: "main"}, {Name: "feat/old"}}},
-		Divergence: map[string]AheadBehind{"main": {Behind: 2}, "feat/old": {Behind: 1}},
-	}
-	starts := []BranchStart{{Branch: "feat/a", Start: StartCreate}, {Branch: "feat/old", Start: StartCheckOut}, {Branch: "feat/b", Start: StartCreate}, {Branch: "feat/r", Start: StartResume}}
+func TestANewWorktreeStartsFromTheBranchItChecksOutOrTheLocalSource(t *testing.T) {
+	snapshot := Snapshot{Branches: Branches{Local: []Branch{{Name: "main"}}}}
 
-	assert.Equal(t, []string{"main", "feat/old"}, snapshot.SubjectsAt(Behind, "main", starts))
-	assert.Equal(t, []string{"feat/old"}, snapshot.SubjectsAt(Behind, "origin/main", starts))
-	assert.Empty(t, snapshot.SubjectsAt(Diverged, "main", starts))
+	assert.Equal(t, "feat/old", snapshot.StartsFrom("feat/old", StartCheckOut, "main"))
+	assert.Equal(t, "main", snapshot.StartsFrom("feat/a", StartCreate, "main"))
+	assert.Empty(t, snapshot.StartsFrom("feat/a", StartCreate, "origin/main"))
+	assert.Empty(t, snapshot.StartsFrom("feat/r", StartResume, "main"))
 }

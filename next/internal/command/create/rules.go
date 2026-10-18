@@ -168,14 +168,20 @@ func (f Facts) checksOut(req Request) bool {
 
 // subjectsAt is each local branch a planned worktree starts from whose standing against origin is standing, each once.
 func (f Facts) subjectsAt(req Request, standing worktree.Divergence) []string {
-	var starts []worktree.BranchStart
+	var subjects []string
 	for _, d := range f.decisions(req) {
-		if planned, isPlanned := d.(BranchPlan); isPlanned {
-			starts = append(starts, worktree.BranchStart{Branch: planned.Branch, Start: worktree.Start(planned.Action)})
+		planned, isPlanned := d.(BranchPlan)
+		if !isPlanned {
+			continue
+		}
+
+		subject := f.StartsFrom(planned.Branch, planned.Action.start(), req.From)
+		if subject != "" && f.Standing(subject) == standing && !slices.Contains(subjects, subject) {
+			subjects = append(subjects, subject)
 		}
 	}
 
-	return f.SubjectsAt(standing, req.From, starts)
+	return subjects
 }
 
 // ----------------------------------------------------------------------------
@@ -256,6 +262,22 @@ const (
 	ActionUnchanged Action = "unchanged" // its worktree is already open (--if-not-exists)
 )
 
+// start is how the worktree of the action begins; "" for an action that makes none.
+func (a Action) start() worktree.Start {
+	switch a {
+	case ActionCreate:
+		return worktree.StartCreate
+	case ActionCheckOut:
+		return worktree.StartCheckOut
+	case ActionResume:
+		return worktree.StartResume
+	case ActionUnchanged:
+		return ""
+	}
+
+	panic("create: an action with no start: " + string(a))
+}
+
 // A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: each branch's worktree, the source, the env strategy, the isolation, the sources to fast-forward first and the answers to remember.
 type Plan struct {
 	Branches    []BranchPlan        `json:"branches"`
@@ -298,5 +320,5 @@ func (r Request) Locks() []domain.Lock {
 
 // placement is the branch's action as the domain places it, for its checkout and its standing.
 func (b BranchPlan) placement() worktree.Placed {
-	return worktree.Placed{Start: worktree.Start(b.Action), Upstream: b.Upstream}
+	return worktree.Placed{Start: b.Action.start(), Upstream: b.Upstream}
 }
