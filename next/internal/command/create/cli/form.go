@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
@@ -23,5 +24,25 @@ func newForm(open func(ctx context.Context, dir string) (create.UseCase, error))
 		Plan: func(previewed create.Outcome, width int, st *output.Styles) string {
 			return planTextOf(previewed.Plan, previewed.Warnings, width, st)
 		},
+		ApplyLabel: applyLabel,
 	}
+}
+
+// applyLabel counts the worktrees the plan previewed opens, a worktree already open aside.
+func applyLabel(previewed create.Outcome) string {
+	count := 0
+	for _, planned := range previewed.Plan.Branches {
+		if planned.Action != create.ActionUnchanged {
+			count++
+		}
+	}
+
+	switch count {
+	case 0:
+		return "Yes, apply"
+	case 1:
+		return "Yes, create worktree"
+	}
+
+	return "Yes, create " + strconv.Itoa(count) + " worktrees"
 }

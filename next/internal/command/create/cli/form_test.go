@@ -61,3 +61,17 @@ func TestTheFormRunsThePreviewAndTheApplyWithTheCorrelationID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"corr-1", "corr-1"}, app.ids)
 }
+
+func TestTheRecapCountsTheWorktreesItCreates(t *testing.T) {
+	plan := func(actions ...create.Action) create.Outcome {
+		outcome := create.Outcome{}
+		for _, action := range actions {
+			outcome.Plan.Branches = append(outcome.Plan.Branches, create.BranchPlan{Action: action})
+		}
+		return outcome
+	}
+
+	assert.Equal(t, "Yes, create worktree", applyLabel(plan(create.ActionCreate, create.ActionUnchanged)))
+	assert.Equal(t, "Yes, create 2 worktrees", applyLabel(plan(create.ActionCreate, create.ActionCheckOut)))
+	assert.Equal(t, "Yes, apply", applyLabel(plan(create.ActionUnchanged)))
+}

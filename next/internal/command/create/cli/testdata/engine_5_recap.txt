@@ -15,7 +15,7 @@
   ┃  Env       main
   ┃  Remember  env_from
 
-▌› Yes, apply
+▌› Yes, create 2 worktrees
   ────────────────────────────────────────────────────────────────────────────────────────────────
    No, cancel
 

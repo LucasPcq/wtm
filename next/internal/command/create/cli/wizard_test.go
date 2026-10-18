@@ -139,7 +139,7 @@ func TestAPlanThatCannotApplySaysWhyAndOffersOnlyToCancel(t *testing.T) {
 	screen := d.screen()
 	assert.Contains(t, screen, "Step 7/7 • Cannot apply this plan")
 	assert.Contains(t, screen, "✗ the request is invalid\n  ┃      Source branch: ghost not found")
-	assert.NotContains(t, screen, "Yes, apply")
+	assert.NotContains(t, screen, "Yes, ")
 }
 
 func TestAStaleRunAsksNothingAgainAndSaysWhy(t *testing.T) {
