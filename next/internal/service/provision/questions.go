@@ -69,6 +69,8 @@ func (g Given) Values(path string) []string {
 	return nil
 }
 
+const isolationHelp = "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated"
+
 // EnvFromConfig is the answer to the env strategy that follows config.toml's strategy, remembered as such.
 const EnvFromConfig project.EnvStrategy = project.RememberEnvConfig
 
@@ -117,7 +119,7 @@ func NewQuestions(params QuestionsParams) Questions {
 	}
 	questions.EnvFrom.Remembered = project.EnvStrategy(recalled[project.RememberEnvStrategy])
 	questions.Isolation.Remembered = project.Isolation(recalled[project.RememberIsolation])
-	questions.FastForward.Remembered = domain.RememberedFastForward(recalled[project.RememberSourceUpdate])
+	questions.FastForward.Remembered = rememberedFastForward(recalled[project.RememberSourceUpdate])
 	return questions
 }
 
@@ -150,18 +152,48 @@ func isolation(params QuestionsParams) domain.Choice[project.Isolation] {
 	case params.Given.Isolation != "":
 		question.Answer = domain.Answer[project.Isolation]{Value: params.Given.Isolation, Origin: domain.OriginRequest}
 	case params.Exists == "":
-		question.Answer = domain.IsolationAnswer(project.Isolation(params.Repository.Config.Remembered[project.RememberIsolation]), params.Repository.Run)
+		question.Answer = isolationAnswer(project.Isolation(params.Repository.Config.Remembered[project.RememberIsolation]), params.Repository.Run)
 	}
 
 	return question
 }
 
+// isolationAnswer is the isolation a question the request leaves unanswered settles on: the remembered one (empty when none) while run.toml declares something a worktree isolates, else run.toml's, else isolated.
+func isolationAnswer(remembered project.Isolation, run project.Run) domain.Answer[project.Isolation] {
+	switch {
+	case remembered != "" && run.IsolationApplies():
+		return domain.Answer[project.Isolation]{Value: remembered, Origin: domain.OriginRemembered}
+	case run.Isolation != "":
+		return domain.Answer[project.Isolation]{Value: run.Isolation.Effective(), Origin: domain.OriginConfig}
+	}
+
+	return domain.Answer[project.Isolation]{Value: project.Isolated, Origin: domain.OriginDefault}
+}
+
+// fastForward is the question whether to fast-forward the source first: the request's answer, none while the question is skipped, else the remembered one, else no.
 func fastForward(params QuestionsParams) domain.Confirm {
-	return domain.FastForwardAnswer(domain.FastForwardParams{
-		Given:      params.Given.FastForward,
-		Remembered: params.Repository.Config.Remembered[project.RememberSourceUpdate],
-		Skip:       cmp.Or(params.Exists, params.NotBehind),
-	})
+	remembered := params.Repository.Config.Remembered[project.RememberSourceUpdate]
+	question := domain.Confirm{Skip: cmp.Or(params.Exists, params.NotBehind)}
+	switch {
+	case params.Given.FastForward != nil:
+		question.Answer = domain.Answer[bool]{Value: *params.Given.FastForward, Origin: domain.OriginRequest}
+	case question.Skip != "":
+	case remembered != "":
+		question.Answer = domain.Answer[bool]{Value: remembered == project.SourceUpdateFastForward, Origin: domain.OriginRemembered}
+	default:
+		question.Answer = domain.Answer[bool]{Origin: domain.OriginDefault}
+	}
+
+	return question
+}
+
+// rememberedFastForward is the answer a remembered source update gives, nil when none is.
+func rememberedFastForward(remembered string) *bool {
+	if remembered == "" {
+		return nil
+	}
+
+	return new(remembered == project.SourceUpdateFastForward)
 }
 
 // envFroms are the answers to the env strategy, in the order the wizard offers them.
@@ -188,7 +220,7 @@ func (q Questions) Fields(wording Wording) []domain.Field {
 			Remember:     q.Remembers(PathEnvFrom),
 		},
 		domain.SelectField{
-			FieldSpec:    domain.FieldSpec{Path: PathIsolation, Flag: "--isolation", Label: "Isolation", Help: domain.IsolationHelp, Origin: q.Isolation.Origin, Skip: q.Isolation.Skip},
+			FieldSpec:    domain.FieldSpec{Path: PathIsolation, Flag: "--isolation", Label: "Isolation", Help: isolationHelp, Origin: q.Isolation.Origin, Skip: q.Isolation.Skip},
 			Value:        string(q.Isolation.Value),
 			Options:      domain.Options(project.Isolations()),
 			Remembered:   string(q.Isolation.Remembered),

@@ -71,6 +71,53 @@ func TestAWorktreeThatIsNotCreatedIsAskedNothingAndRemembersNothing(t *testing.T
 	assert.Empty(t, questions.Given().Remember)
 }
 
+func TestAnIsolationLeftUnansweredIsTheRememberedOneElseTheRunsElseIsolated(t *testing.T) {
+	isolating := project.Run{EnvPorts: []project.EnvPortLink{{}}}
+	verbatim := map[string]string{project.RememberIsolation: string(project.Verbatim)}
+	cases := map[string]struct {
+		remembered map[string]string
+		run        project.Run
+		want       domain.Answer[project.Isolation]
+	}{
+		"remembered":       {verbatim, isolating, domain.Answer[project.Isolation]{Value: project.Verbatim, Origin: domain.OriginRemembered}},
+		"nothingToIsolate": {verbatim, project.Run{Isolation: project.Isolated}, domain.Answer[project.Isolation]{Value: project.Isolated, Origin: domain.OriginConfig}},
+		"run":              {nil, project.Run{Isolation: project.Verbatim}, domain.Answer[project.Isolation]{Value: project.Verbatim, Origin: domain.OriginConfig}},
+		"default":          {nil, isolating, domain.Answer[project.Isolation]{Value: project.Isolated, Origin: domain.OriginDefault}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			repo := repository(c.remembered)
+			repo.Run = c.run
+
+			assert.Equal(t, c.want, provision.NewQuestions(provision.QuestionsParams{Repository: repo}).Isolation.Answer)
+		})
+	}
+}
+
+func TestTheFastForwardIsTheRequestsElseNoneWhenSkippedElseTheRememberedElseNo(t *testing.T) {
+	ff := map[string]string{project.RememberSourceUpdate: project.SourceUpdateFastForward}
+	keep := map[string]string{project.RememberSourceUpdate: project.SourceUpdateKeep}
+	cases := map[string]struct {
+		given      *bool
+		notBehind  string
+		remembered map[string]string
+		want       domain.Confirm
+	}{
+		"given":          {new(true), "behind nothing", keep, domain.Confirm{Answer: domain.Answer[bool]{Value: true, Origin: domain.OriginRequest}, Skip: "behind nothing", Remembered: new(false)}},
+		"skipped":        {nil, "behind nothing", ff, domain.Confirm{Skip: "behind nothing", Remembered: new(true)}},
+		"remembered":     {nil, "", ff, domain.Confirm{Answer: domain.Answer[bool]{Value: true, Origin: domain.OriginRemembered}, Remembered: new(true)}},
+		"rememberedKeep": {nil, "", keep, domain.Confirm{Answer: domain.Answer[bool]{Origin: domain.OriginRemembered}, Remembered: new(false)}},
+		"default":        {nil, "", nil, domain.Confirm{Answer: domain.Answer[bool]{Origin: domain.OriginDefault}}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			params := provision.QuestionsParams{Given: provision.Given{FastForward: c.given}, Repository: repository(c.remembered), NotBehind: c.notBehind}
+
+			assert.Equal(t, c.want, provision.NewQuestions(params).FastForward)
+		})
+	}
+}
+
 func TestTheFastForwardIsSkippedWhenNothingIsBehind(t *testing.T) {
 	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Remember: []string{"fast_forward", "env_from", "env_from"}}, Repository: repository(nil), NotBehind: "up to date"})
 
