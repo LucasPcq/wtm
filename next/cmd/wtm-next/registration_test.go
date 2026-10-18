@@ -2,8 +2,11 @@ package main
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/LucasPcq/wtm/next/internal/command/list"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,5 +34,17 @@ func TestEachRegisteredCommandIsInTheCatalogueAndWired(t *testing.T) {
 	assert.ElementsMatch(t, registered, listed, "main.go registers a command catalogue.go does not list, or the reverse")
 	for _, name := range registered {
 		assert.True(t, wired[name], "%s is registered in main.go but wire.go builds no %s.UseCase", name, name)
+	}
+}
+
+func TestNoCommandListNamesInAFollowUpHasMigrated(t *testing.T) {
+	registered := registeredCommands(t)
+	for _, action := range []list.Action{list.ActionGo, list.ActionRunUp, list.ActionRunDown, list.ActionLogs, list.ActionClean} {
+		argv := listCommands(action, list.Detail{Branch: "feat/a"})
+		require.GreaterOrEqual(t, len(argv), 2, action)
+		require.Equal(t, "wtm", argv[0], action)
+		_, listed := catalogue().Find(argv[1])
+
+		assert.False(t, listed || slices.Contains(registered, argv[1]), "%s has migrated: build list's follow-up from its schema (command + request) instead of a hard-coded argv", argv[1])
 	}
 }

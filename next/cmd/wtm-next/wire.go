@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"crypto/rand"
 	"encoding/hex"
-	"strconv"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
@@ -109,7 +108,7 @@ func listCommands(action list.Action, detail list.Detail) []string {
 		return []string{"wtm", "go", worktree}
 	case list.ActionOpenPR:
 		if detail.PR != nil {
-			return []string{"gh", "pr", "view", strconv.Itoa(detail.PR.Number), "--web"}
+			return github.ViewCommand(detail.PR.Number)
 		}
 	case list.ActionRunUp:
 		return []string{"wtm", "run", "up", worktree}

@@ -26,6 +26,11 @@ type GitHub struct {
 	Binary string
 }
 
+// ViewCommand is gh's command line that opens pull request number in the browser.
+func ViewCommand(number int) []string {
+	return []string{cli, "pr", "view", strconv.Itoa(number), "--web"}
+}
+
 // PullRequests returns the open pull requests of the repository, the most
 // recent first and capped, a pull request from a fork left out since its branch
 // is not this repository's. Every failure wraps worktree.ErrPullRequestsUnavailable
