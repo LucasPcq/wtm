@@ -23,6 +23,9 @@ func planRowsOf(plan extract.Plan) []output.PlanRow {
 	if plan.Target.Action == extract.ActionCheckOut {
 		rows = append(rows, output.PlanRow{Label: "Parent", Values: []string{plan.From}})
 	}
+	if plan.EnvFrom != "" {
+		rows = append(rows, output.PlanRow{Label: "Env", Values: []string{string(plan.EnvFrom)}})
+	}
 	if plan.Isolation != "" {
 		rows = append(rows, output.PlanRow{Label: "Isolation", Values: []string{string(plan.Isolation)}})
 	}

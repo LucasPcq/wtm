@@ -139,15 +139,6 @@ func RememberableValues(id string) ([]string, bool) {
 	return nil, false
 }
 
-// RememberedEnvStrategy returns the env strategy the remembered answer stands for: RememberEnvConfig stands for configured.
-func RememberedEnvStrategy(remembered string, configured EnvStrategy) EnvStrategy {
-	if remembered == RememberEnvConfig {
-		return configured
-	}
-
-	return EnvStrategy(remembered)
-}
-
 // RememberIDs returns the IDs of the questions whose answer the wizard can remember.
 func RememberIDs() []string {
 	return []string{RememberEnvStrategy, RememberIsolation, RememberSourceUpdate}
@@ -160,17 +151,4 @@ func SourceUpdate(fastForward bool) string {
 	}
 
 	return SourceUpdateKeep
-}
-
-// RememberedAnswers are the answers to remember, keyed by their id in config.toml: the value of each field of remember, as the request names it (env_from, isolation, fast_forward), taken from values, those with no value left out.
-func RememberedAnswers(values map[string]string, remember []string) map[string]string {
-	ids := map[string]string{"env_from": RememberEnvStrategy, "isolation": RememberIsolation, "fast_forward": RememberSourceUpdate}
-	answers := map[string]string{}
-	for _, field := range remember {
-		if id, value := ids[field], values[field]; id != "" && value != "" {
-			answers[id] = value
-		}
-	}
-
-	return answers
 }

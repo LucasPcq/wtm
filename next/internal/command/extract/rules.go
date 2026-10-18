@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 )
 
 // ----------------------------------------------------------------------------
@@ -246,12 +247,12 @@ func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain
 		return planned, f.ignored(req, planned.Target), nil
 	}
 
+	planned.settled = f.newWorktree(req).Answers()
 	planned.From = req.From
-	planned.Isolation = f.Run.PlannedIsolation(req.Isolation)
+	planned.EnvFrom = planned.settled.EnvFrom()
+	planned.Isolation = f.Run.PlannedIsolation(planned.settled.Isolation())
 	planned.FastForward = f.fastForwarded(req)
 	planned.Remember = req.Remember
-	planned.isolation = req.Isolation
-	planned.fastForward = req.FastForward != nil && *req.FastForward
 	return planned, append(f.divergedWarnings(req), f.fallbackWarnings(planned)...), nil
 }
 
@@ -311,6 +312,10 @@ func (f Facts) ignored(req Request, target Target) []domain.Warning {
 		warnings = append(warnings, domain.Warning{Code: "extract.from_ignored", Message: "--from ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
 	}
 
+	if req.EnvFrom != "" {
+		warnings = append(warnings, domain.Warning{Code: "extract.env_from_ignored", Message: "--env-from ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
+	}
+
 	if req.FastForward != nil && *req.FastForward {
 		warnings = append(warnings, domain.Warning{Code: "extract.fast_forward_ignored", Message: "--ff ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
 	}
@@ -352,7 +357,7 @@ func (f Facts) divergedWarnings(req Request) []domain.Warning {
 
 func (f Facts) fallbackWarnings(planned Plan) []domain.Warning {
 	fallsBack := env.ParentFallsBackToMain(env.ParentFallbackParams{
-		Strategy:          f.Config.Env.Strategy,
+		Strategy:          planned.EnvFrom,
 		HasFiles:          len(f.Config.Env.Files) > 0,
 		SourceHasWorktree: f.CheckedOutAt(planned.From) != "",
 	})
@@ -366,12 +371,13 @@ func (f Facts) fallbackWarnings(planned Plan) []domain.Warning {
 // ----------------------------------------------------------------------------
 // The plan
 
-// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the source and the files to take from it, the target, how a created target is made (its source, isolation, fast-forward), whether the files are copied rather than moved, the conflicts and what to do with them, and the answers to remember.
+// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the source and the files to take from it, the target, how a created target is made (its source, env strategy, isolation, fast-forward), whether the files are copied rather than moved, the conflicts and what to do with them, and the answers to remember.
 type Plan struct {
 	Source      string              `json:"source"`
 	Files       []worktree.Change   `json:"files"`
 	Target      Target              `json:"target,omitzero"`
 	From        string              `json:"from,omitempty"`
+	EnvFrom     project.EnvStrategy `json:"env_from,omitempty"`
 	Isolation   project.Isolation   `json:"isolation,omitempty"`
 	FastForward []string            `json:"fast_forward,omitempty"`
 	Keep        bool                `json:"keep"`
@@ -379,8 +385,7 @@ type Plan struct {
 	OnConflict  OnConflict          `json:"on_conflict,omitempty"`
 	Remember    []string            `json:"remember,omitempty"`
 	facts       Facts
-	isolation   project.Isolation // as resolved, handed to provisioning even where the plan shows none
-	fastForward bool              // as answered, even with nothing to fast-forward, for the remembered answer
+	settled     provision.Answers // as resolved, handed to provisioning even where the plan shows none, and remembered
 }
 
 // Nothing reports whether the plan has no file to extract: the source holds no uncommitted change.
@@ -404,7 +409,7 @@ func (p Plan) Fingerprinted() any {
 		Run       project.Run       `json:"run"`
 		RunErr    string            `json:"run_err,omitempty"`
 		Global    project.Global    `json:"global"`
-	}{Plan: p, Isolation: p.isolation, Env: f.Config.Env, OnCreate: f.Config.OnCreate, Run: f.Run, RunErr: errorText(f.RunErr), Global: f.Global}
+	}{Plan: p, Isolation: p.settled.Isolation(), Env: f.Config.Env, OnCreate: f.Config.OnCreate, Run: f.Run, RunErr: errorText(f.RunErr), Global: f.Global}
 }
 
 func errorText(err error) string {
@@ -434,6 +439,5 @@ func (p Plan) move() worktree.Move {
 
 // answers are the answers to remember, keyed by their id in config.toml.
 func (p Plan) answers() map[string]string {
-	values := map[string]string{"isolation": string(p.Isolation), "fast_forward": project.SourceUpdate(p.fastForward)}
-	return project.RememberedAnswers(values, p.Remember)
+	return p.settled.Remembered(p.Remember)
 }

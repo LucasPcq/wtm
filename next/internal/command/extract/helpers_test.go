@@ -223,3 +223,13 @@ func answeredTrue(t *testing.T, req extract.Request, path string) bool {
 	require.NotNil(t, answers[path], path)
 	return *answers[path]
 }
+
+// withEnvFiles is a world whose config.toml is config, its main checkout holding a .env and its template, and its source a change to extract.
+func withEnvFiles(t *testing.T, config string) world {
+	t.Helper()
+	w := newWorld(t, seed{Config: config})
+	writeFile(t, filepath.Join(w.main, ".env"), mainEnv)
+	writeFile(t, filepath.Join(w.main, ".env.example"), exampleEnv)
+	w.change(t, source, "a.txt", "a\n")
+	return w
+}

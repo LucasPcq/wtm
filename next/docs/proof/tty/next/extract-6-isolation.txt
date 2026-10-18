@@ -1,12 +1,13 @@
 $ wtmx extract; echo EXIT=$?
 
-  Step 6/10 • Isolation
+  Step 7/11 • Isolation
 
   ✓ Source worktree: feat/form
   ✓ Files: 1 file
   ✓ Target worktree: new worktree
   ✓ Branch name: feat/moved
   ✓ Source branch: main · default
+  ✓ Env strategy: main · remembered
 
   How the new worktree stands against its source: isolated (its own ports, compose project and
   namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as

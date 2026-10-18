@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 )
 
 // ----------------------------------------------------------------------------
@@ -203,16 +204,16 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning) {
 		branches = append(branches, planned)
 	}
 
+	answers := f.newWorktree(req).Answers()
 	planned := Plan{
 		Branches:    branches,
 		From:        req.From,
-		EnvFrom:     req.EnvFrom,
-		Isolation:   f.Run.PlannedIsolation(req.Isolation),
+		EnvFrom:     answers.EnvFrom(),
+		Isolation:   f.Run.PlannedIsolation(answers.Isolation()),
 		FastForward: f.fastForwarded(req),
 		Remember:    req.Remember,
 		facts:       f,
-		isolation:   req.Isolation,
-		fastForward: req.FastForward != nil && *req.FastForward,
+		settled:     answers,
 	}
 	return planned, append(f.divergedWarnings(req), f.fallbackWarnings(planned)...)
 }
@@ -276,8 +277,7 @@ type Plan struct {
 	FastForward []string            `json:"fast_forward,omitempty"`
 	Remember    []string            `json:"remember,omitempty"`
 	facts       Facts
-	isolation   project.Isolation // as resolved, handed to provisioning even where the plan shows none
-	fastForward bool              // as answered, even with nothing to fast-forward, for the remembered answer
+	settled     provision.Answers // as resolved, handed to provisioning even where the plan shows none, and remembered
 }
 
 // A BranchPlan is what becomes of one branch: the path of its worktree, how it gets there, and the remote branch it resumes.
@@ -309,7 +309,7 @@ func (p Plan) Fingerprinted() any {
 		Run       project.Run       `json:"run"`
 		RunErr    string            `json:"run_err,omitempty"`
 		Global    project.Global    `json:"global"`
-	}{Plan: p, Isolation: p.isolation, EnvFiles: f.Config.Env.Files, OnCreate: f.Config.OnCreate, Run: f.Run, RunErr: errorText(f.RunErr), Global: f.Global}
+	}{Plan: p, Isolation: p.settled.Isolation(), EnvFiles: f.Config.Env.Files, OnCreate: f.Config.OnCreate, Run: f.Run, RunErr: errorText(f.RunErr), Global: f.Global}
 }
 
 func errorText(err error) string {
@@ -332,6 +332,5 @@ func (b BranchPlan) placement() worktree.Placed {
 
 // answers are the answers to remember, keyed by their id in config.toml.
 func (p Plan) answers() map[string]string {
-	values := map[string]string{"env_from": string(p.EnvFrom), "isolation": string(p.Isolation), "fast_forward": project.SourceUpdate(p.fastForward)}
-	return project.RememberedAnswers(values, p.Remember)
+	return p.settled.Remembered(p.Remember)
 }

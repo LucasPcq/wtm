@@ -19,7 +19,7 @@ next/
       rules.go          pure: facts → plan
       questions.go      pure: the request, its form model, its validation
       cli/              its driving adapter: cobra command over form.Command, its own wizard steps, output
-    service/            what use cases call: operation (locks, plan under them, fingerprint, events), provision (a new worktree made whole), repository (the facts a command decides from) + <name>test contracts (operationtest)
+    service/            what use cases call: operation (locks, plan under them, fingerprint, events), provision (a new worktree made whole, and the questions every command that creates one asks), repository (the facts a command decides from) + <name>test contracts (operationtest)
     domain/             the model, pure: errors, events, operations and their run options, question vocabulary; worktree/ (with the stack graph), project/, env/, dotenv/
     adapter/<name>/     driven adapters implementing the ports (git, store, config, shell, oplock, events…) + <name>test fakes
     ui/                 the presentation kit, knowing no command: cli (root, exit codes, signals), output (frames, envelope), form (form.Command: flags, launch and wizard of any command's schema; components)
@@ -52,6 +52,7 @@ Why a package per command, when the Go guides prefer a package per concept and B
 | is an interface to the outside world one command needs | `command/<name>/port.go` |
 | renders output, asks a step of one command its own way | `command/<name>/cli/` |
 | registers flags, builds the request, launches, asks a field of any kind, from the schema | `ui/form` |
+| is a question two commands ask | the service that consumes its answers (`service/provision/questions.go`), embedded in each command's form |
 | is a pure rule or a type two commands need | `domain/…` |
 | orchestrates I/O two commands need | `service/<name>` (with its own `port.go`) |
 | is presentation two commands need | `ui/…` |

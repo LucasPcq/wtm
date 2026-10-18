@@ -161,11 +161,11 @@ func TestATemplateOrAParentThatIsMissingIsNamed(t *testing.T) {
 	w, _ := inMemory(t, seeds{})
 	example := w.params(&recorder{})
 	example.Project.EnvFiles = []project.EnvFile{{Target: "web/.env"}}
-	example.Worktree.Strategy = project.EnvExample
+	example.Worktree.Answers = answered(provision.Given{EnvFrom: project.EnvExample})
 	parent := w.params(&recorder{})
 	parent.Worktree.Branch, parent.Worktree.Path = "feat/y", w.path("feat/y")
 	parent.Worktree.Checkout = worktree.NewBranch{Name: "feat/y", From: worktree.LocalBranch{Name: "main"}}
-	parent.Worktree.Strategy = project.EnvParent
+	parent.Worktree.Answers = answered(provision.Given{EnvFrom: project.EnvParent})
 	parent.Worktree.ParentPath = w.path("elsewhere")
 
 	fromTemplate := w.service.Run(t.Context(), example)

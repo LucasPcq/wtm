@@ -40,15 +40,14 @@ func ProjectOf(repo worktree.Repository, stateDir string) Project {
 }
 
 // Worktree is the worktree Run adds: its branch, where it goes, what it checks
-// out and where its env comes from.
+// out, and the answers to the questions of a new worktree it is made with.
 type Worktree struct {
 	Branch     string
 	Path       string
 	Checkout   worktree.Checkout
 	Source     string // the branch it starts from, recorded as its parent
 	ParentPath string // the parent's worktree, where a parent env strategy copies from; empty when it has none
-	Strategy   project.EnvStrategy
-	Isolation  project.Isolation
+	Answers    Answers
 }
 
 // Params is one worktree to provision and where its events go.
@@ -84,7 +83,11 @@ type Outcome struct {
 // phase that fails stops the rest and keeps the worktree. Run never returns
 // an error of its own: the Outcome carries it.
 func (s Service) Run(ctx context.Context, params Params) Outcome {
-	params.Worktree.Isolation = params.Worktree.Isolation.Effective()
+	if !params.Worktree.Answers.asked {
+		return Outcome{Status: domain.StatusFailed, Err: &domain.Error{Kind: domain.KindInternal, Code: "provision.unasked", Message: "the questions of a new worktree were not asked: Answers come from Questions.Answers", Params: domain.Params{"branch": params.Worktree.Branch}}}
+	}
+
+	params.Worktree.Answers.isolation = params.Worktree.Answers.isolation.Effective()
 	p := &provisioning{Params: params, Service: s, hookLog: env.HookLogPath(env.HookLogPathParams{StateDir: params.Project.StateDir, Branch: params.Worktree.Branch})}
 	p.kept, p.ignored = env.Targets(params.Project.Run, params.Project.EnvFiles)
 
@@ -266,8 +269,8 @@ func (p *provisioning) meta() worktree.Meta {
 	return worktree.Meta{
 		SourceBranch: p.Worktree.Source,
 		CreatedAt:    p.Service.Now().UTC().Format(time.RFC3339),
-		EnvStrategy:  p.Worktree.Strategy,
-		Isolation:    p.Worktree.Isolation,
+		EnvStrategy:  p.Worktree.Answers.strategy,
+		Isolation:    p.Worktree.Answers.isolation,
 	}
 }
 
@@ -279,7 +282,7 @@ func (p *provisioning) copyEnv(ctx context.Context) error {
 	}
 
 	copied, err := p.Service.EnvFiles.Copy(ctx, env.CopyRequest{
-		Strategy:   p.Worktree.Strategy,
+		Strategy:   p.Worktree.Answers.strategy,
 		Files:      p.Project.EnvFiles,
 		TargetDir:  p.Worktree.Path,
 		MainPath:   p.Project.MainPath,

@@ -1,6 +1,6 @@
 $ wtmx extract; echo EXIT=$?
 
-  Step 4/10 • Branch name
+  Step 4/11 • Branch name
 
   ✓ Source worktree: feat/form
   ✓ Files: 1 file

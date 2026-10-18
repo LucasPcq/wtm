@@ -36,6 +36,7 @@ func TestThePlanIsTheJSONOfWhatMovesWhere(t *testing.T) {
 		"files": [{"path": "a.txt", "status": "untracked"}],
 		"target": {"branch": "feat/split", "path": "`+w.path(split)+`", "action": "create"},
 		"from": "main",
+		"env_from": "example",
 		"keep": false,
 		"conflicts": [],
 		"on_conflict": "abort"
@@ -120,13 +121,15 @@ func TestAnExistingTargetIgnoresTheCreationAnswersAndSaysSo(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.change(t, source, "a.txt", "a\n")
 	req := moving("a.txt")
-	req.From, req.FastForward, req.Isolation = "main", new(true), project.Verbatim
+	req.From, req.EnvFrom, req.FastForward, req.Isolation = "main", project.EnvMain, new(true), project.Verbatim
 
 	planned, warnings := w.plan(t, req)
 
-	assert.Equal(t, []string{"extract.from_ignored", "extract.fast_forward_ignored", "extract.isolation_ignored"}, codes(warnings))
-	assert.Equal(t, "--isolation verbatim ignored: feat/other already exists and stays isolated — switch it with `wtm env feat/other --isolation verbatim`", warnings[2].Message)
+	assert.Equal(t, []string{"extract.from_ignored", "extract.env_from_ignored", "extract.fast_forward_ignored", "extract.isolation_ignored"}, codes(warnings))
+	assert.Equal(t, "--env-from ignored: feat/other already exists, so nothing is created", warnings[1].Message)
+	assert.Equal(t, "--isolation verbatim ignored: feat/other already exists and stays isolated — switch it with `wtm env feat/other --isolation verbatim`", warnings[3].Message)
 	assert.Empty(t, planned.From)
+	assert.Empty(t, planned.EnvFrom)
 	assert.Empty(t, planned.FastForward)
 	assert.Empty(t, planned.Isolation)
 }

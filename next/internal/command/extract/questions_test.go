@@ -1,6 +1,7 @@
 package extract_test
 
 import (
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"path/filepath"
 	"testing"
 
@@ -217,15 +218,13 @@ func TestEachFieldOfTheFormAnswersTheRequestBack(t *testing.T) {
 	cases := map[string]extract.Request{
 		"to an existing worktree": {Source: source, Files: []string{"a.txt"}, To: other, Keep: new(true), OnConflict: extract.OnConflictResolve},
 		"to a new branch": {
-			Source:      source,
-			Files:       []string{"a.txt"},
-			To:          split,
-			From:        "main",
-			Isolation:   project.Verbatim,
-			FastForward: new(true),
-			Keep:        new(false),
-			OnConflict:  extract.OnConflictAbort,
-			Remember:    []string{"fast_forward", "isolation", "fast_forward"},
+			Source:     source,
+			Files:      []string{"a.txt"},
+			To:         split,
+			From:       "main",
+			Given:      provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(true), Remember: []string{"fast_forward", "env_from", "isolation", "fast_forward"}},
+			Keep:       new(false),
+			OnConflict: extract.OnConflictAbort,
 		},
 	}
 	for name, req := range cases {
@@ -245,11 +244,11 @@ func TestTheFormExistsBeforeAnyRead(t *testing.T) {
 	form := extract.Questions{}.Form()
 
 	flags, usages := form.Flags()
-	assert.Equal(t, map[string]string{"source": "<source>", "files": "--files", "to": "--to", "from": "--from", "isolation": "--isolation", "fast_forward": "--ff", "keep": "--keep", "on_conflict": "--on-conflict", "remember": "--remember"}, flags)
-	assert.Equal(t, "The answers to always use in this repository: isolation, fast_forward (repeatable)", usages["remember"])
+	assert.Equal(t, map[string]string{"source": "<source>", "files": "--files", "to": "--to", "from": "--from", "env_from": "--env-from", "isolation": "--isolation", "fast_forward": "--ff", "keep": "--keep", "on_conflict": "--on-conflict", "remember": "--remember"}, flags)
+	assert.Equal(t, "The answers to always use in this repository: env_from, isolation, fast_forward (repeatable)", usages["remember"])
 	assert.Equal(t, []string{"isolated", "verbatim"}, isolationOptions(form))
-	assert.Equal(t, []string{"isolation", "fast_forward"}, form.Rememberable())
-	assert.Len(t, form.Fields, 9, "a step per field: the target is asked as a worktree, then as a branch")
+	assert.Equal(t, []string{"env_from", "isolation", "fast_forward"}, form.Rememberable())
+	assert.Len(t, form.Fields, 10, "a step per field: the target is asked as a worktree, then as a branch")
 }
 
 func TestABranchAWorktreeHoldsIsNoNewTarget(t *testing.T) {
@@ -303,7 +302,7 @@ func TestAConfirmationsOptionsAreItsAnswers(t *testing.T) {
 }
 
 func TestEachAnswerReadsBackAsAnswerTakesIt(t *testing.T) {
-	req := extract.Request{Source: "feat/login", Files: []string{"a.txt"}, To: "feat/split", From: "main", FastForward: new(true), Isolation: project.Verbatim, Keep: new(false), OnConflict: extract.OnConflictResolve, Remember: []string{"isolation"}, Ask: true}
+	req := extract.Request{Source: "feat/login", Files: []string{"a.txt"}, To: "feat/split", From: "main", Keep: new(false), OnConflict: extract.OnConflictResolve, Given: provision.Given{EnvFrom: project.EnvParent, FastForward: new(true), Isolation: project.Verbatim, Remember: []string{"isolation"}, Ask: true}}
 	paths := []string{domain.PathRemember, domain.PathAsk}
 	for _, field := range (extract.Questions{}).Form().Fields {
 		paths = append(paths, field.Spec().Path)
@@ -323,7 +322,7 @@ func TestARememberedSourceUpdateIsShownEvenWhenAskedAgain(t *testing.T) {
 	w := newWorld(t, seed{Config: remembering, Behind: true})
 	w.change(t, source, "a.txt", "a\n")
 
-	asked := w.questions(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Ask: true}).FastForward
+	asked := w.questions(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Ask: true}}).FastForward
 
 	assert.Equal(t, new(true), asked.Remembered)
 	assert.Equal(t, domain.OriginDefault, asked.Origin)

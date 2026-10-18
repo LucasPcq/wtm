@@ -1,11 +1,12 @@
 
-  Step 9/10 • On conflict
+  Step 10/11 • On conflict
 
   ✓ Source worktree: feat/login · <source>
   ✓ Files: 2 files · --files
   ✓ Target worktree: feat/other · --to
   · Branch name — the target worktree exists: nothing is created
   · Source branch — the target worktree exists: nothing is created
+  · Env strategy — the target worktree exists: nothing is created
   · Isolation — the target worktree exists: nothing is created
   · Source update — the target worktree exists: nothing is created
   ✓ Mode: move · default

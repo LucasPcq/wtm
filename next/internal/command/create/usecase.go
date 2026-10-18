@@ -323,8 +323,7 @@ func (u UseCase) provisionParams(plan Plan, planned BranchPlan, report domain.Re
 			Checkout:   planned.placement().Checkout(planned.Branch, f.Ref(plan.From)),
 			Source:     plan.From,
 			ParentPath: f.CheckedOutAt(plan.From),
-			Strategy:   plan.EnvFrom,
-			Isolation:  plan.isolation,
+			Answers:    plan.settled,
 		},
 		Report: report,
 	}

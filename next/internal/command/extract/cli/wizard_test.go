@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/stretchr/testify/assert"
@@ -99,7 +101,11 @@ func TestABranchCreatedIsAskedItsSourceThenTheMode(t *testing.T) {
 	assert.Contains(t, d.screen(), "› main")
 
 	d.keys("enter")
+	assert.Equal(t, stepEnvFrom, d.w.Current())
+
+	d.keys("enter")
 	assert.Equal(t, stepMode, d.w.Current())
+	assert.Contains(t, d.screen(), "✓ Env strategy: config default · default")
 	assert.Contains(t, d.screen(), "· Isolation — run.toml declares nothing a worktree isolates")
 
 	d.keys("enter")
@@ -166,6 +172,9 @@ func TestTheWizardDrawsEachStepOfANewTarget(t *testing.T) {
 	d.looksLike("from")
 
 	d.keys("enter")
+	d.looksLike("env_from")
+
+	d.keys("enter")
 	d.looksLike("isolation")
 
 	d.keys("enter")
@@ -190,4 +199,17 @@ func TestABranchAWorktreeHoldsIsRefusedAsANewTarget(t *testing.T) {
 
 	assert.Equal(t, stepBranch, d.w.Current())
 	assert.Contains(t, d.screen(), "✗ feat/other already has a worktree — pick it as the target worktree")
+}
+
+func TestANewTargetStartsOnARememberedConfigDefaultTicked(t *testing.T) {
+	remembered := map[string]string{project.RememberEnvStrategy: project.RememberEnvConfig}
+	d := open(t, sessionParams{App: newWorld(seed{Remembered: remembered}).usecase(), Request: extract.Request{Source: source, Files: []string{"old.txt"}, To: split, Given: provision.Given{Ask: true}}})
+	d.keys("enter")
+
+	require.Equal(t, stepEnvFrom, d.w.Current())
+	assert.Contains(t, d.screen(), "▌› Use config default (example)")
+	assert.Contains(t, d.screen(), "[x] Always use this answer in this repo")
+
+	d.keys("down", "down", "enter")
+	assert.Equal(t, project.EnvMain, d.s.Request().EnvFrom)
 }

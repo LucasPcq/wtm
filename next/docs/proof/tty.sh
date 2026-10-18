@@ -85,8 +85,12 @@ tmux send-keys -t "$session" Enter
 capture extract-4-branch 'Step 4'
 tmux send-keys -t "$session" "feat/moved" Enter
 capture extract-5-from 'Step 5'
+# next settles a new target's env strategy from the answer the create form remembered, one step
+# before isolation; legacy never asks it
+isolation_step='Step 6'
+[[ $side == next ]] && isolation_step='Step 7'
 tmux send-keys -t "$session" Enter
-capture extract-6-isolation 'Step 6'
+capture extract-6-isolation "$isolation_step"
 tmux send-keys -t "$session" Enter
 capture extract-7-mode 'Mode'
 tmux send-keys -t "$session" Enter

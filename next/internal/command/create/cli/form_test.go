@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,7 @@ import (
 
 func TestADryRunWithNothingToAskDrawsNothing(t *testing.T) {
 	streams, _, _, out := output.Test()
-	req := create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}
+	req := create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvExample}}
 
 	ran, err := newForm(nil).Ask(t.Context(), form.AskParams[create.Request, create.Questions, create.Outcome]{App: newApp(seed{}), Request: req, Options: domain.RunOptions{DryRun: true}, In: streams.In, Out: streams.Err})
 
@@ -30,7 +31,7 @@ func TestTheFormAppliesThePlanItPreviewedAndPreviewsAgainWhenItTurnedStale(t *te
 	stale := &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodePlanStale}
 	app := &previewing{useCase: newApp(seed{}), errs: []error{stale, nil}}
 	streams, _, _, _ := output.Test()
-	req := create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}
+	req := create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvExample}}
 
 	_, err := newForm(nil).Ask(t.Context(), form.AskParams[create.Request, create.Questions, create.Outcome]{App: app, Request: req, In: enters{}, Out: streams.Err})
 
@@ -42,7 +43,7 @@ func TestAFailedApplyEndsTheFormWithoutAskingAgain(t *testing.T) {
 	failed := errors.New("hook failed")
 	app := &previewing{useCase: newApp(seed{}), errs: []error{failed}}
 	streams, _, _, _ := output.Test()
-	req := create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}
+	req := create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvExample}}
 
 	_, err := newForm(nil).Ask(t.Context(), form.AskParams[create.Request, create.Questions, create.Outcome]{App: app, Request: req, In: enters{}, Out: streams.Err})
 
@@ -53,7 +54,7 @@ func TestAFailedApplyEndsTheFormWithoutAskingAgain(t *testing.T) {
 func TestTheFormRunsThePreviewAndTheApplyWithTheCorrelationID(t *testing.T) {
 	app := &previewing{useCase: newApp(seed{}), errs: []error{nil}}
 	streams, _, _, _ := output.Test()
-	req := create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}
+	req := create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvExample}}
 
 	_, err := newForm(nil).Ask(t.Context(), form.AskParams[create.Request, create.Questions, create.Outcome]{App: app, Request: req, Options: domain.RunOptions{CorrelationID: "corr-1"}, In: enters{}, Out: streams.Err})
 

@@ -1,11 +1,12 @@
 
-  Step 7/10 • Source update
+  Step 8/11 • Source update
 
   ✓ Source worktree: feat/login · <source>
   ✓ Files: 1 file · --files
   ✓ Target worktree: new worktree
   ✓ Branch name: feat/split
   ✓ Source branch: main · config
+  ✓ Env strategy: config default · default
   ✓ Isolation: isolated · default
 
   Fast-forward the parent branch to origin before creating the target; skipped when it has diverged

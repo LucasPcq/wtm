@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"io"
 	"os"
 	"os/exec"
@@ -73,7 +74,7 @@ func TestOneBranchThatFailsLeavesTheOthersCreated(t *testing.T) {
 
 func TestABranchThatFailsBeforeItsWorktreeHasNoDetail(t *testing.T) {
 	w := newWorld(t, seed{})
-	planned := decided(t, w.facts(t, branchName), create.Request{Branches: []string{branchName}, From: "main", EnvFrom: project.EnvMain})
+	planned := decided(t, w.facts(t, branchName), create.Request{Branches: []string{branchName}, From: "main", Given: provision.Given{EnvFrom: project.EnvMain}})
 	require.Equal(t, []create.BranchPlan{{Branch: branchName, Path: w.path(branchName), Action: create.ActionCreate}}, planned.Branches)
 	writeFile(t, w.path(branchName), "a file where the worktree goes")
 
@@ -163,7 +164,7 @@ func TestTheFailureOfARunIsItsFirstInterruptElseItsFirstFailure(t *testing.T) {
 func TestTheSourceIsFastForwardedBeforeTheWorktreeStartsFromIt(t *testing.T) {
 	w := newWorld(t, seed{Behind: true, NoEnv: true})
 
-	result, report := w.apply(t, create.Request{Branches: []string{branchName}, FastForward: new(true)})
+	result, report := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{FastForward: new(true)}})
 
 	assert.Empty(t, result.Warnings)
 	upstream := gittest.Output(t, w.main, "rev-parse", "origin/main")
@@ -178,7 +179,7 @@ func TestTheSourceIsFastForwardedBeforeTheWorktreeStartsFromIt(t *testing.T) {
 func TestASourceWithUncommittedChangesIsLeftWhereItIsAndSaysSo(t *testing.T) {
 	w := newWorld(t, seed{Behind: true})
 
-	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, FastForward: new(true)})
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{FastForward: new(true)}})
 
 	assert.Equal(t, []domain.Warning{{
 		Code:    "create.ff_dirty",
@@ -194,7 +195,7 @@ func TestAFastForwardThatFailsIsAWarningAndTheBranchStillStarts(t *testing.T) {
 	behindOrigin(t, w, existing)
 	gittest.Git(t, w.main, "remote", "set-url", "origin", w.root+"/gone")
 
-	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, From: existing, FastForward: new(true)})
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, From: existing, Given: provision.Given{FastForward: new(true)}})
 
 	assert.Equal(t, []string{"create.ff_failed"}, codes(result.Warnings))
 	assert.Contains(t, result.Warnings[0].Message, "couldn't fast-forward feature: ")
@@ -205,7 +206,7 @@ func TestAFastForwardThatFailsIsAWarningAndTheBranchStillStarts(t *testing.T) {
 func TestTheAnswersAskedToBeRememberedAreKeptOnceABranchIsCreated(t *testing.T) {
 	w := newWorld(t, seed{Run: jobsToml, Behind: true})
 
-	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, EnvFrom: project.EnvExample, Isolation: project.Verbatim, FastForward: new(false), Remember: []string{"env_from", "isolation", "fast_forward"}})
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{EnvFrom: project.EnvExample, Isolation: project.Verbatim, FastForward: new(false), Remember: []string{"env_from", "isolation", "fast_forward"}}})
 
 	assert.Empty(t, result.Warnings)
 	config := readFile(t, filepath.Join(w.stateDir, "config.toml"))
@@ -217,17 +218,17 @@ func TestTheAnswersAskedToBeRememberedAreKeptOnceABranchIsCreated(t *testing.T) 
 func TestAnIsolationNotAskedIsNotRemembered(t *testing.T) {
 	w := newWorld(t, seed{})
 
-	w.apply(t, create.Request{Branches: []string{branchName}, Remember: []string{"isolation", "env_from"}})
+	w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"isolation", "env_from"}}})
 
 	config := readFile(t, filepath.Join(w.stateDir, "config.toml"))
-	assert.Contains(t, config, `env_strategy = "main"`)
+	assert.Contains(t, config, `env_strategy = "config"`)
 	assert.NotContains(t, config, "isolation")
 }
 
 func TestAFastForwardNotAskedNeverOverwritesTheOneRemembered(t *testing.T) {
 	w := newWorld(t, seed{Config: projectToml + "\n[wizard.remembered]\nsource_update = \"ff\"\n"})
 
-	w.apply(t, create.Request{Branches: []string{branchName}, FastForward: new(false), Remember: []string{"fast_forward"}})
+	w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{FastForward: new(false), Remember: []string{"fast_forward"}}})
 
 	assert.Contains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), `source_update = "ff"`)
 }
@@ -235,7 +236,7 @@ func TestAFastForwardNotAskedNeverOverwritesTheOneRemembered(t *testing.T) {
 func TestNothingIsRememberedWhenNoBranchWasCreated(t *testing.T) {
 	w := newWorld(t, seed{Linked: []string{"linked"}})
 
-	w.apply(t, create.Request{Branches: []string{"linked"}, IfNotExists: true, EnvFrom: project.EnvExample, Remember: []string{"env_from"}})
+	w.apply(t, create.Request{Branches: []string{"linked"}, IfNotExists: true, Given: provision.Given{EnvFrom: project.EnvExample, Remember: []string{"env_from"}}})
 
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "env_strategy")
 }
@@ -244,7 +245,7 @@ func TestAnAnswerThatCannotBeRememberedIsAWarningOfTheRun(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.usecase.Answers = answering{err: errors.New("read-only file system")}
 
-	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Remember: []string{"env_from"}})
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from"}}})
 
 	assert.Equal(t, []string{"create.remember_failed"}, codes(result.Warnings))
 	assert.Equal(t, "could not remember the answer: read-only file system", result.Warnings[0].Message)
@@ -255,7 +256,7 @@ func TestARememberedAnswerWrittenWithoutItsLockSaysSo(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.usecase.Answers = answering{written: domain.Written{Changed: true, Unlocked: true}}
 
-	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Remember: []string{"env_from"}})
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from"}}})
 
 	assert.Equal(t, []string{"locks.unavailable"}, codes(result.Warnings))
 }
@@ -275,9 +276,9 @@ func TestARunThatFastForwardsTheSourceHoldsItToo(t *testing.T) {
 	facts := w.facts(t, branchName, "main")
 	source := domain.Lock{Scope: domain.ScopeWorktree, Name: "main", Mode: domain.LockExclusive}
 
-	moved := decided(t, facts, create.Request{Branches: []string{branchName}, From: "main", FastForward: new(true)}).Locks()
-	kept := decided(t, facts, create.Request{Branches: []string{branchName}, From: "main", FastForward: new(false)}).Locks()
-	fromRemote := decided(t, facts, create.Request{Branches: []string{branchName}, From: "origin/main", FastForward: new(true)}).Locks()
+	moved := decided(t, facts, create.Request{Branches: []string{branchName}, From: "main", Given: provision.Given{FastForward: new(true)}}).Locks()
+	kept := decided(t, facts, create.Request{Branches: []string{branchName}, From: "main", Given: provision.Given{FastForward: new(false)}}).Locks()
+	fromRemote := decided(t, facts, create.Request{Branches: []string{branchName}, From: "origin/main", Given: provision.Given{FastForward: new(true)}}).Locks()
 
 	assert.Contains(t, moved, source)
 	assert.NotContains(t, kept, source)
@@ -289,7 +290,7 @@ func TestALocalSourceNamedLikeARemoteOneIsLockedWhenItIsFastForwarded(t *testing
 	gittest.Git(t, w.main, "branch", "origin/foo", "main")
 	ahead := gittest.Output(t, w.main, "commit-tree", "main^{tree}", "-p", "main", "-m", "upstream")
 	gittest.Git(t, w.main, "update-ref", "refs/remotes/origin/origin/foo", ahead)
-	req := create.Request{Branches: []string{branchName}, From: "origin/foo", FastForward: new(true)}
+	req := create.Request{Branches: []string{branchName}, From: "origin/foo", Given: provision.Given{FastForward: new(true)}}
 	facts := w.facts(t, branchName)
 
 	planned, _ := create.Decide(facts, req)
@@ -300,7 +301,7 @@ func TestALocalSourceNamedLikeARemoteOneIsLockedWhenItIsFastForwarded(t *testing
 
 func TestASourceThatWillNotMoveIsNotLocked(t *testing.T) {
 	w := newWorld(t, seed{})
-	req := create.Request{Branches: []string{branchName}, From: "main", FastForward: new(true)}
+	req := create.Request{Branches: []string{branchName}, From: "main", Given: provision.Given{FastForward: new(true)}}
 
 	assert.NotContains(t, decided(t, w.facts(t, branchName), req).Locks(), domain.Lock{Scope: domain.ScopeWorktree, Name: "main", Mode: domain.LockExclusive})
 }
@@ -438,7 +439,7 @@ func TestARunWithoutItsLocksSaysSoOnce(t *testing.T) {
 func TestTheWarningsOfThePlanComeWithThoseOfTheRun(t *testing.T) {
 	w := newWorld(t, seed{})
 
-	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}, From: "feature", EnvFrom: project.EnvParent}, domain.RunOptions{Report: (&recorder{}).add})
+	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}, From: "feature", Given: provision.Given{EnvFrom: project.EnvParent}}, domain.RunOptions{Report: (&recorder{}).add})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"create.env_parent_fallback"}, codes(outcome.Warnings))
@@ -470,7 +471,7 @@ func TestARunWithoutLocksThatRemembersSaysSoOnce(t *testing.T) {
 	w.usecase.Operations.Locker = unprotected{}
 	w.usecase.Answers = answering{written: domain.Written{Changed: true, Unlocked: true}}
 
-	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}, Remember: []string{"env_from"}}, domain.RunOptions{Report: (&recorder{}).add})
+	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from"}}}, domain.RunOptions{Report: (&recorder{}).add})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"locks.unavailable"}, codes(outcome.Warnings))
@@ -510,7 +511,7 @@ func TestAPreviewIsStaleOnceTheIsolationItWouldRecordChanged(t *testing.T) {
 func TestNothingIsRememberedWhenTheOnlyBranchFailsToProvision(t *testing.T) {
 	w := newWorld(t, seed{Run: jobsToml, Config: withHook("exit 1")})
 
-	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Isolation: project.Verbatim, Remember: []string{"isolation"}})
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation"}}})
 
 	require.Equal(t, domain.StatusFailed, result.Items[0].Status)
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "isolation")
@@ -543,7 +544,7 @@ func TestAChangeToWhatTheApplyRunsMakesThePreviewStale(t *testing.T) {
 
 func TestACancelDuringTheFastForwardIsNoWarningAndSkipsEveryBranch(t *testing.T) {
 	w := newWorld(t, seed{Behind: true, NoEnv: true})
-	planned, _ := w.plan(t, create.Request{Branches: []string{branchName, other}, FastForward: new(true)})
+	planned, _ := w.plan(t, create.Request{Branches: []string{branchName, other}, Given: provision.Given{FastForward: new(true)}})
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
@@ -567,7 +568,7 @@ func TestASourceInTheMiddleOfARebaseIsNotFastForwardedAndSaysSo(t *testing.T) {
 	behindOrigin(t, w, existing)
 	rebasing(t, w, existing)
 
-	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, From: existing, FastForward: new(true)})
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, From: existing, Given: provision.Given{FastForward: new(true)}})
 
 	assert.Equal(t, []domain.Warning{{
 		Code:    "create.ff_busy",
@@ -575,4 +576,15 @@ func TestASourceInTheMiddleOfARebaseIsNotFastForwardedAndSaysSo(t *testing.T) {
 		Params:  domain.Params{"branch": existing},
 	}}, result.Warnings)
 	assert.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
+}
+
+func TestTheConfigDefaultFollowsEnvStrategyOverARememberedAnswerAndIsRememberedAsSuch(t *testing.T) {
+	w := newWorld(t, seed{Config: projectToml + "\n[wizard.remembered]\nenv_strategy = \"example\"\n"})
+
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{EnvFrom: provision.EnvFromConfig, Remember: []string{"env_from"}}})
+
+	require.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
+	assert.Equal(t, mainEnv, readFile(t, filepath.Join(w.path(branchName), ".env")))
+	assert.Equal(t, project.EnvMain, result.Items[0].Detail.Metadata.EnvStrategy)
+	assert.Contains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), `env_strategy = "config"`)
 }

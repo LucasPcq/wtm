@@ -238,3 +238,22 @@ func paths(problems []domain.FieldError) []string {
 	}
 	return found
 }
+
+func fieldAt(form domain.Form, path string) domain.Field {
+	for _, field := range form.Fields {
+		if field.Spec().Path == path {
+			return field
+		}
+	}
+
+	return nil
+}
+
+func valuesOf(options []domain.Option) []string {
+	values := make([]string, 0, len(options))
+	for _, option := range options {
+		values = append(values, option.Value)
+	}
+
+	return values
+}

@@ -2,6 +2,7 @@ package extract_test
 
 import (
 	"context"
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -180,7 +181,7 @@ func TestAnInterruptDuringTheMoveLetsItFinish(t *testing.T) {
 func TestABehindSubjectIsFastForwardedBeforeTheTargetStartsFromIt(t *testing.T) {
 	w := newWorld(t, seed{Behind: true})
 	w.change(t, source, "a.txt", "a\n")
-	req := extract.Request{Source: source, Files: []string{"a.txt"}, To: split, FastForward: new(true)}
+	req := extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{FastForward: new(true)}}
 	planned, _ := w.plan(t, req)
 
 	result, report := w.apply(t, req)
@@ -204,7 +205,7 @@ func TestTheAnswersAskedToBeRememberedAreKeptOnceTheTargetIsCreated(t *testing.T
 	w := newWorld(t, seed{Run: jobsToml})
 	w.change(t, source, "a.txt", "a\n")
 
-	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Isolation: project.Verbatim, Remember: []string{"isolation", "fast_forward"}})
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation", "fast_forward"}}})
 
 	assert.Empty(t, result.Warnings)
 	assert.Equal(t, project.Verbatim, result.Item.Detail.Isolation)
@@ -245,9 +246,9 @@ func TestARefTheApplyFastForwardsIsCheckedForConflictsAsOriginHasIt(t *testing.T
 	var checks []worktree.ConflictCheck
 	w.usecase.Git = checking{Repo: w.repo, checks: &checks}
 
-	w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, FastForward: new(true)})
-	w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, FastForward: new(false)})
-	w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: existing, From: "main", FastForward: new(true)})
+	w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{FastForward: new(true)}})
+	w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{FastForward: new(false)}})
+	w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: existing, From: "main", Given: provision.Given{FastForward: new(true)}})
 
 	assert.Equal(t, []string{"origin/main", "main", "origin/" + existing}, targetRefs(checks))
 }
@@ -256,7 +257,7 @@ func TestNothingIsRememberedNorMovedWhenTheTargetFailsToProvision(t *testing.T) 
 	w := newWorld(t, seed{Run: jobsToml, Config: withHook("exit 1")})
 	w.change(t, source, "a.txt", "a\n")
 
-	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Isolation: project.Verbatim, Remember: []string{"isolation"}})
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation"}}})
 
 	require.Equal(t, domain.StatusFailed, result.Item.Status)
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "isolation")
@@ -269,7 +270,7 @@ func TestNothingIsRememberedWhenTheMoveIsRefused(t *testing.T) {
 	w.change(t, source, "a.txt", "a\n")
 	w.usecase.Git = halfMoving{Repo: w.repo}
 
-	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Isolation: project.Verbatim, Remember: []string{"isolation"}})
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation"}}})
 
 	require.Equal(t, domain.StatusFailed, result.Item.Status)
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "isolation")
@@ -354,7 +355,7 @@ func TestASourceWithUncommittedChangesIsNotFastForwardedAndSaysSo(t *testing.T) 
 	w.change(t, source, "a.txt", "a\n")
 	writeFile(t, filepath.Join(w.main, "dirty"), "dirty\n")
 
-	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, FastForward: new(true)})
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{FastForward: new(true)}})
 
 	assert.Equal(t, []domain.Warning{{
 		Code:    "extract.ff_dirty",
@@ -370,7 +371,7 @@ func TestAFastForwardThatFailsIsAWarningAndTheTargetStillStarts(t *testing.T) {
 	behindOrigin(t, w, existing)
 	gittest.Git(t, w.main, "remote", "set-url", "origin", w.root+"/gone")
 
-	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, From: existing, FastForward: new(true)})
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, From: existing, Given: provision.Given{FastForward: new(true)}})
 
 	assert.Equal(t, []string{"extract.ff_failed"}, codes(result.Warnings))
 	assert.Contains(t, result.Warnings[0].Message, "couldn't fast-forward feature: ")
@@ -384,7 +385,7 @@ func TestASourceInTheMiddleOfARebaseIsNotFastForwardedAndSaysSo(t *testing.T) {
 	behindOrigin(t, w, existing)
 	rebasing(t, w, existing)
 
-	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, From: existing, FastForward: new(true)})
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, From: existing, Given: provision.Given{FastForward: new(true)}})
 
 	assert.Equal(t, []domain.Warning{{
 		Code:    "extract.ff_busy",
@@ -392,4 +393,51 @@ func TestASourceInTheMiddleOfARebaseIsNotFastForwardedAndSaysSo(t *testing.T) {
 		Params:  domain.Params{"branch": existing},
 	}}, result.Warnings)
 	assert.Equal(t, domain.StatusDone, result.Item.Status, result.Item.Err)
+}
+
+func TestACreatedTargetGetsItsEnvByTheStrategyAsked(t *testing.T) {
+	cases := map[string]struct {
+		config string
+		given  project.EnvStrategy
+		want   string
+	}{
+		"config.toml's strategy by default":             {config: envToml, want: exampleEnv},
+		"the strategy given":                            {config: envToml, given: project.EnvMain, want: mainEnv},
+		"the strategy remembered":                       {config: envToml + "\n[wizard.remembered]\nenv_strategy = \"main\"\n", want: mainEnv},
+		"the config default over a remembered strategy": {config: envToml + "\n[wizard.remembered]\nenv_strategy = \"main\"\n", given: provision.EnvFromConfig, want: exampleEnv},
+		"the config default remembered":                 {config: envToml + "\n[wizard.remembered]\nenv_strategy = \"config\"\n", want: exampleEnv},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := withEnvFiles(t, c.config)
+			req := extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{EnvFrom: c.given}}
+
+			result, _ := w.apply(t, req)
+
+			require.Equal(t, domain.StatusDone, result.Item.Status, result.Item.Err)
+			assert.Equal(t, c.want, readFile(t, filepath.Join(w.path(split), ".env")))
+		})
+	}
+}
+
+func TestTheEnvStrategyAskedToBeRememberedIsKeptOnceTheTargetIsCreated(t *testing.T) {
+	w := withEnvFiles(t, envToml)
+
+	w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{EnvFrom: project.EnvMain, Remember: []string{"env_from"}}})
+
+	recorded, err := w.meta.Load(split)
+	require.NoError(t, err)
+	assert.Equal(t, project.EnvMain, recorded.EnvStrategy)
+	assert.Contains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), `env_strategy = "main"`)
+}
+
+func TestTheConfigDefaultIsRememberedAsSuchOnceTheTargetIsCreated(t *testing.T) {
+	w := withEnvFiles(t, envToml)
+
+	w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{EnvFrom: provision.EnvFromConfig, Remember: []string{"env_from"}}})
+
+	recorded, err := w.meta.Load(split)
+	require.NoError(t, err)
+	assert.Equal(t, project.EnvExample, recorded.EnvStrategy)
+	assert.Contains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), `env_strategy = "config"`)
 }

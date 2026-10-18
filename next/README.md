@@ -22,7 +22,7 @@ internal/
   service/             what the use cases call
     operation/         the operation every mutating use case goes through: its record, its locks, its plan under them and fingerprinted, its events
     operationtest/     the contract every mutating use case's Run passes (no lock nor event on a dry run, a stale plan refused before any event, events in order), for tests
-    provision/         a new worktree made whole and a source fast-forwarded, shared by the commands that create one
+    provision/         a new worktree made whole and a source fast-forwarded, shared by the commands that create one, with the questions each of them asks (questions.go: the fragment their forms embed, whose Answers are all Run takes)
     repository/        the facts of the repository a command decides from: config, run.toml, snapshot
   adapter/             what the ports reach out to: git, statefile, store, config, shell, oplock, events, proxyport
     <name>test/        a stateful fake of an adapter, for tests

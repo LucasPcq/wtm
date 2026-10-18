@@ -17,11 +17,12 @@
       "action": "create"
     },
     "from": "main",
+    "env_from": "example",
     "keep": false,
     "conflicts": [],
     "on_conflict": "abort"
   },
-  "fingerprint": "9a887f8d0471c114ed8b1d7d",
+  "fingerprint": "90800692957e37dddb988947",
   "follow_ups": [],
   "warnings": []
 }
