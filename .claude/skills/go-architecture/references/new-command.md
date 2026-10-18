@@ -18,7 +18,7 @@ command/<name>/
   *_test.go        beside each file; fixture_test.go, helpers_test.go, contract_test.go
 ```
 
-A read (a command that changes nothing) has the same files, `command/list` its reference: its `Run` returns a `domain.Read[Detail]` without an operation, its `cli` is a `form.Query`, and it has no `contract_test.go` (`contract.md`, "A read"). A command named with a dash lives without it (`fast-forward` → `command/fastforward`). It never imports another command: what it shares with an existing one moves to `domain/`, `service/` or `ui/` in the same change. A shared piece speaks the domain, and each command turns it into its own codes and messages: `worktree.Place` returns a sealed `worktree.Placement`, which create and extract each word as their own refusals; the fast-forward outcomes of `provision.Service.FastForwardEach` become each command's warnings the same way.
+A read, a command that changes nothing (`command/list`), has the same files under the contract of `contract.md`, "A read". A command named with a dash lives without it (`fast-forward` → `command/fastforward`). It never imports another command: what it shares with an existing one moves to `domain/`, `service/` or `ui/` in the same change. A shared piece speaks the domain, and each command turns it into its own codes and messages: `worktree.Place` returns a sealed `worktree.Placement`, which create and extract each word as their own refusals; the fast-forward outcomes of `provision.Service.FastForwardEach` become each command's warnings the same way.
 
 ## 3. `usecase.go`
 

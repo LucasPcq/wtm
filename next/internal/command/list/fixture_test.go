@@ -39,7 +39,7 @@ type seed struct {
 	Base      string // the base branch, main when empty
 	Jobs      []run.Job
 	JobsErr   error
-	PRs       []worktree.PullRequest
+	PRs       worktree.PullRequests
 	PRsErr    error
 }
 
@@ -69,7 +69,7 @@ func newWorld(s seed) world {
 			Git:  git,
 			Meta: meta,
 			Jobs: func(context.Context) ([]run.Job, error) { return s.Jobs, s.JobsErr },
-			PullRequests: func(context.Context) ([]worktree.PullRequest, error) {
+			PullRequests: func(context.Context) (worktree.PullRequests, error) {
 				asked++
 				return s.PRs, s.PRsErr
 			},
@@ -87,4 +87,16 @@ func newWorld(s seed) world {
 // linked is a linked worktree under /repo/.trees on branch.
 func linked(branch string) worktree.Worktree {
 	return worktree.Worktree{Path: "/repo/.trees/" + branch, State: worktree.OnBranch{Branch: branch}}
+}
+
+// snapshotOf is git's snapshot with its worktrees replaced by worktrees, for a layout the fake does not build.
+type snapshotOf struct {
+	git       *gittest.Fake
+	worktrees []worktree.Worktree
+}
+
+func (s snapshotOf) Snapshot(ctx context.Context) (worktree.Snapshot, error) {
+	snapshot, err := s.git.Snapshot(ctx)
+	snapshot.Worktrees = s.worktrees
+	return snapshot, err
 }

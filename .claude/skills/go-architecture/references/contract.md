@@ -64,9 +64,11 @@ The kind decides (`ui/cli/exit.go`); a command maps its own codes in its `cli/` 
 
 ## A read
 
-A command that changes nothing — `list`, and later `status` or `tree` — is a read, and keeps a smaller contract through the same shared pieces.
+A command that changes nothing, `command/list`, keeps this contract in place of the operation's.
 
-- `Run(ctx, req, opts)` keeps the signature, so `api.Bind` binds it as any command, and returns a `domain.Read[Detail]`: one `Unit` per subject (`done` with its detail, or `failed` with the error that kept it from being read), the warnings, and the follow-ups chosen. No lock, no operation, no event, no plan, no fingerprint: its envelope has no `op`, `plan` nor `fingerprint`. A refresh that fetches from origin is a field of the request, best effort.
-- Its `cli` is a `form.Query`: the flags of its schema and `--output`, no `--yes`, `--dry-run`, `--expect-fingerprint`, `--remember` nor `--ask`; a refusal and the envelope as every command prints them, the read drawn by its `Draw`, the exit code of its first failed subject.
-- What the read cannot ask (GitHub, the run daemon) is a warning with the read's code (`list.prs_unavailable`, `list.jobs_unknown`), exit 0, its fields `null`; a read never starts the run daemon.
-- A picker (`Query.Pick`) opens only when stdin, stdout and stderr are terminals and the output is human — a read piped elsewhere is asked for its data. It walks `form.Script` steps with no recap (`Preview` nil), `Later` for what is slow to read, `Refresh` for `r`, and ends on a `domain.FollowUp` the use case builds (its argv injected from `cmd/wtm-next`), printed by the conclusion; leaving it is `cancelled`, exit 19. Todo: run that follow-up in-process once every command it names has migrated.
+- `Run(ctx, req, opts)` returns a `domain.Read[Detail]`, the signature `api.Bind` binds: one `Unit` per subject (`done` with its detail, `failed` with the error that kept it from being read, `cancelled` once the context is), the warnings, the follow-ups chosen. `[test]`
+- It takes no lock, runs no operation and publishes no event: its envelope has no `op`, `plan` nor `fingerprint`, and it has no `contract_test.go`. `[test]` (`cmd/wtm-next`, `TestListIsReadThroughTheCatalogueWithNoOperation`)
+- Its `cli` is a `form.Query`: the flags of its schema and `--output`, none of `--yes`, `--dry-run`, `--expect-fingerprint`, `--remember`, `--ask`. `[test]`
+- What it cannot ask (a forge, the run daemon) is a warning under its own code, exit 0, the fields it would fill `null`; it never starts the run daemon. `[review]`
+- It exits with the code of its first subject not read, after a pick too. `[test]`
+- Its picker (`Query.Pick`) opens only when stdin, stdout and stderr are terminals, the output is human and `--quiet` is off; it walks `form.Script` steps with no recap (`Preview` nil), `Later` for a slow read, `Refresh` for `r`, and ends on a `domain.FollowUp` whose argv `cmd/wtm-next` gives; leaving it is `cancelled`, exit 19. `[test]`

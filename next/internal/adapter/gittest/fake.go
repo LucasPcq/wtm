@@ -359,6 +359,18 @@ func (f *Fake) deleteBranch(name string) error {
 	return nil
 }
 
+// Fetch updates every remote branch to origin's.
+func (f *Fake) Fetch(context.Context) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("Fetch", ""); err != nil {
+		return err
+	}
+
+	maps.Copy(f.remote, f.origin)
+	return nil
+}
+
 // FetchRef updates the remote branch name to origin's.
 func (f *Fake) FetchRef(_ context.Context, name string) error {
 	f.mu.Lock()
@@ -546,11 +558,11 @@ func (f *Fake) place(path, name string) error {
 }
 
 // listed returns the worktrees in git's order: the main one, then by path, a
-// gone one prunable as git lists it.
+// gone one prunable as git lists it unless it is locked.
 func (f *Fake) listed() []worktree.Worktree {
 	worktrees := slices.Clone(f.worktrees)
 	for i, w := range worktrees {
-		worktrees[i].Prunable = slices.Contains(f.gone, w.Path)
+		worktrees[i].Prunable = slices.Contains(f.gone, w.Path) && !w.Locked
 	}
 	slices.SortStableFunc(worktrees[1:], func(a, b worktree.Worktree) int { return strings.Compare(a.Path, b.Path) })
 	return worktrees

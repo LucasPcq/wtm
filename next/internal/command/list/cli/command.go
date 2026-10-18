@@ -28,21 +28,24 @@ const (
   wtm list --with-prs --output json`
 )
 
+// query is list's form: a read.
+type query = form.Query[list.Request, list.Questions, list.Outcome]
+
 type listCommand struct {
 	io    uicli.Run
-	query *form.Query[list.Request, list.Questions, list.Outcome]
+	query *query
 	app   list.UseCase // the use case opened, for the picker's follow-ups
 }
 
 // listFlags spells the failures: list's only field is a flag.
-var listFlags = (&form.Query[list.Request, list.Questions, list.Outcome]{}).Flags()
+var listFlags = (&query{}).Flags()
 
 // New returns the list command: its flags become a list.Request, read, then picked from when the user can see and answer it; it draws the list on streams, or the v2 JSON envelope with --output json.
 func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (list.UseCase, error)) *cobra.Command {
 	// exits are the exit codes of list's own codes, ahead of those of their kind.
 	exits := map[string]int{list.CodeConfigNotFound: uicli.ExitConfigNotFound, list.CodeConfigInvalid: uicli.ExitError}
 	c := &listCommand{io: uicli.Run{Command: list.Name, Streams: streams, Env: env, Flags: listFlags, Exits: exits}}
-	c.query = &form.Query[list.Request, list.Questions, list.Outcome]{Open: c.open(open), Draw: drawList, Pick: c.pick}
+	c.query = &query{Open: c.open(open), Draw: drawList, Pick: c.pick}
 	cmd := &cobra.Command{Use: list.Name, Short: listShort, Long: listLong, Example: listExample, Args: cobra.NoArgs, RunE: c.run}
 	c.query.Bind(cmd, &c.io)
 

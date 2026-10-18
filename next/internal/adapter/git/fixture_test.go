@@ -24,6 +24,7 @@ type port interface {
 	AddWorktree(ctx context.Context, addition worktree.Addition) error
 	RemoveWorktree(ctx context.Context, path string) error
 	DeleteBranch(ctx context.Context, name string) error
+	Fetch(ctx context.Context) error
 	FetchRef(ctx context.Context, name string) error
 	FastForwardRef(ctx context.Context, name string) error
 	MergeFFOnly(ctx context.Context, merge worktree.Merge) error
@@ -65,8 +66,9 @@ func seed(root string) gittest.FakeParams {
 			{Path: filepath.Join(root, "detached"), State: worktree.Detached{}},
 			{Path: filepath.Join(root, "rebasing"), State: worktree.Rebasing{Branch: "rebasing"}},
 			{Path: filepath.Join(root, "locked"), State: worktree.OnBranch{Branch: "locked"}, Locked: true},
+			{Path: filepath.Join(root, "locked-gone"), State: worktree.OnBranch{Branch: "locked-gone"}, Locked: true},
 		},
-		Gone:    []string{filepath.Join(root, "gone")},
+		Gone:    []string{filepath.Join(root, "gone"), filepath.Join(root, "locked-gone")},
 		Folders: []string{filepath.Join(root, "taken")},
 		Empty:   []string{filepath.Join(root, "empty")},
 		Dirty:   []string{filepath.Join(root, "dirty")},

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/list"
@@ -36,7 +37,7 @@ func TestWithPRsAWorktreeShowsItsPullRequest(t *testing.T) {
 }
 
 func TestWhatCannotBeAskedIsAWarningUnderTheList(t *testing.T) {
-	got := runList(t, world{PRsErr: worktree.ErrGitHubSignedOut, JobsErr: run.ErrUnknown}, "--with-prs")
+	got := runList(t, world{PRsErr: fmt.Errorf("%w: run `gh auth login`", worktree.ErrPullRequestsUnavailable), JobsErr: run.ErrUnknown}, "--with-prs")
 
 	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
 	formtest.Golden(t, "list_warnings", got.Stdout)

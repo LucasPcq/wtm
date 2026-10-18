@@ -73,9 +73,9 @@ func (q *Query[R, Q, O]) Launch(cmd *cobra.Command, args []string) error {
 	return q.conclude(read, err)
 }
 
-// interactive reports whether the user can see and answer a picker, and the output is for a human: stdout too is a terminal, since a read piped elsewhere is asked for its data.
+// interactive reports whether the user can see and answer a picker, and see what it ends on: stdout too is a terminal, since a read piped elsewhere is asked for its data, the output is for a human and --quiet does not silence it.
 func (q *Query[R, Q, O]) interactive() bool {
-	return q.io.Streams.CanPrompt() && q.io.Streams.Out.IsTerminal() && q.io.Human()
+	return q.io.Streams.CanPrompt() && q.io.Streams.Out.IsTerminal() && q.io.Human() && !q.io.Quiet
 }
 
 // conclude prints how the read ended — the JSON envelope, a refusal, the follow-ups the user picked, or what Draw draws of the read — and returns the failure that sets the exit code.
@@ -93,7 +93,7 @@ func (q *Query[R, Q, O]) conclude(read O, err error) error {
 	// todo: run the follow-up the user picked, in this process, once every command it names has migrated; it is printed until then.
 	if len(doc.FollowUps) > 0 {
 		output.Frame(stdout, func(w io.Writer) { output.NextSteps(w, nextSteps(doc.FollowUps)) })
-		return nil
+		return q.io.Failed(read.Failure())
 	}
 
 	output.Frame(stdout, func(w io.Writer) { q.Draw(w, read, q.io.Env.Cwd) })

@@ -90,7 +90,7 @@ func wire(params wireParams) app {
 		List: list.UseCase{
 			Git:          repo,
 			Meta:         meta,
-			Jobs:         daemon.Daemon{SocketPath: events.SocketPath(), IndexPath: daemon.IndexPath()}.Jobs,
+			Jobs:         daemon.Daemon{SocketPath: events.SocketPath()}.Jobs,
 			PullRequests: github.GitHub{Dir: params.MainPath}.PullRequests,
 			Repository:   facts,
 			Commands:     listCommands,

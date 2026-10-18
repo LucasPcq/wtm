@@ -45,11 +45,11 @@ type Item = domain.Unit[Detail]
 // ----------------------------------------------------------------------------
 // Run
 
-// Run reads every worktree of the repository, its pull request when the request asks for them, after fetching their branches from origin when it asks to; a read, it takes no lock and runs no operation. An error returned is a refusal of the repository.
+// Run reads every worktree of the repository, its pull request when the request asks for them, after fetching origin when it asks to; a read, it takes no lock and runs no operation. An error returned is a refusal of the repository.
 func (u UseCase) Run(ctx context.Context, req Request, _ domain.RunOptions) (Outcome, error) {
-	// 1. A refresh fetches the branches of the worktrees first, best effort: an origin out of reach leaves the counts of the refs already fetched.
+	// 1. A refresh fetches origin first, best effort: an origin out of reach leaves the counts of the refs already fetched.
 	if req.Fetch {
-		u.fetch(ctx)
+		_ = u.Git.Fetch(ctx)
 	}
 
 	// 2. Read the repository and each worktree.
@@ -78,11 +78,11 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, err
 	}
 
-	facts := Facts{Repository: repo, WithPRs: req.WithPRs}
+	facts := Facts{Repository: repo}
 	var (
 		wg           sync.WaitGroup
 		jobs         []run.Job
-		pullRequests []worktree.PullRequest
+		pullRequests worktree.PullRequests
 		jobsErr      error
 		prsErr       error
 	)
@@ -103,7 +103,7 @@ func (u UseCase) states(ctx context.Context, facts Facts) map[string]State {
 	states := make(map[string]State, len(facts.Worktrees))
 	readers := make(chan struct{}, stateReaders)
 	var wg sync.WaitGroup
-	for _, w := range facts.Worktrees {
+	for _, w := range facts.listed() {
 		readers <- struct{}{}
 		wg.Go(func() {
 			defer func() { <-readers }()
@@ -118,13 +118,21 @@ func (u UseCase) states(ctx context.Context, facts Facts) map[string]State {
 	return states
 }
 
-// state reads one worktree: its changes, unless its directory is gone, the commits its branch has past the base branch, and its meta record, which a worktree wtm did not create lacks.
+// state reads one worktree: its meta record, which a worktree wtm did not create lacks, whether its directory is gone, then, if it is there, its changes and the commits its branch has past the base branch.
 func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) State {
 	var state State
 	if branch := w.Branch(); branch != "" {
 		state.Meta, _ = u.Meta.Load(branch)
 	}
-	if w.Prunable {
+
+	// git never lists a locked worktree prunable, even with its directory gone: the disk is asked.
+	state.Missing = w.Prunable
+	if !state.Missing {
+		var location worktree.Location
+		location, state.Err = u.Git.Locate(ctx, w.Path)
+		state.Missing = state.Err == nil && !location.Exists
+	}
+	if state.Missing || state.Err != nil {
 		return state
 	}
 
@@ -133,23 +141,7 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 		return state
 	}
 
-	state.Ahead, state.Err = u.Git.Count(ctx, worktree.Span{Branch: w.Branch(), Base: facts.Config.Worktrees.BaseBranch})
+	// A branch with no commit yet, an orphan, has nothing to count: it is not counted rather than unreadable.
+	state.Ahead, _ = u.Git.Count(ctx, worktree.Span{Branch: w.Branch(), Base: facts.Config.Worktrees.BaseBranch})
 	return state
-}
-
-// ----------------------------------------------------------------------------
-// Helpers
-
-// fetch fetches from origin the branch of each worktree origin has, ignoring a fetch that fails.
-func (u UseCase) fetch(ctx context.Context) {
-	repo, err := u.Repository.Observe(ctx, Name)
-	if err != nil {
-		return
-	}
-
-	for _, branch := range repo.Live() {
-		if branch != "" && repo.Remote(branch) {
-			_ = u.Git.FetchRef(ctx, branch)
-		}
-	}
 }

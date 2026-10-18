@@ -63,7 +63,7 @@ func TestWorktreesReadsAWorktreeWhoseDirectoryIsGoneAsOnItsBranch(t *testing.T) 
 	assert.Equal(t, worktree.OnBranch{Branch: "gone"}, worktrees[1].State)
 }
 
-func TestTheFakeAndGitListALockedWorktreeAndAGoneOneAsPrunable(t *testing.T) {
+func TestTheFakeAndGitListALockedWorktreeAndAGoneOneUnlockedAsPrunable(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {
 			worktrees, err := impl.port.Worktrees(t.Context())
@@ -78,7 +78,7 @@ func TestTheFakeAndGitListALockedWorktreeAndAGoneOneAsPrunable(t *testing.T) {
 					prunable = append(prunable, w.Path)
 				}
 			}
-			assert.Equal(t, []string{impl.at("locked")}, locked)
+			assert.Equal(t, []string{impl.at("locked"), impl.at("locked-gone")}, locked)
 			assert.Equal(t, []string{impl.at("gone")}, prunable)
 		})
 	}
@@ -300,10 +300,11 @@ func TestTheFakeAndGitReadTheSameRepository(t *testing.T) {
 					{Path: at("gone"), State: worktree.OnBranch{Branch: "gone"}, Prunable: true},
 					{Path: at("linked"), State: worktree.OnBranch{Branch: "linked"}},
 					{Path: at("locked"), State: worktree.OnBranch{Branch: "locked"}, Locked: true},
+					{Path: at("locked-gone"), State: worktree.OnBranch{Branch: "locked-gone"}, Locked: true},
 					{Path: at("rebasing"), State: worktree.Rebasing{Branch: "rebasing"}},
 				},
 				Branches: worktree.Branches{
-					Local:  named("dirty", "diverged", "feature", "gone", "linked", "locked", "main", "rebasing", "unmerged"),
+					Local:  named("dirty", "diverged", "feature", "gone", "linked", "locked", "locked-gone", "main", "rebasing", "unmerged"),
 					Remote: named("diverged", "feature", "main", "remote-only"),
 				},
 			}, gittest.StateOf(t, impl.port))

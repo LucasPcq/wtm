@@ -1,7 +1,9 @@
 
-  main                    main  • active                          ✓ clean
-  feat/a                                      base ↑2  origin ↑1  ! dirty
-  feat/b                  ! locked                                ✓ clean
-  feat/gone                                                       ✗ missing
-  ../acme.trees/detached                                          ✓ clean
+  main                    main  • active                      ✓ clean
+  feat/a                                  base ↑2  origin ↑1  ! dirty
+  feat/b                  ! locked                            ✓ clean
+  feat/gone                                                   ✗ missing
+  ../acme.trees/detached                                      ✓ clean
+  locked-gone             ! locked                            ✗ missing
+  orphan                                                      ✓ clean
 

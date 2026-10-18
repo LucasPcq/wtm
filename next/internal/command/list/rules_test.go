@@ -12,11 +12,12 @@ func TestAWorktreeOffersWhatItsStateAllows(t *testing.T) {
 		detail list.Detail
 		offers []list.Action
 	}{
-		"linked":   {detail: list.Detail{Branch: "feat/a"}, offers: []list.Action{list.ActionGo, list.ActionRunUp, list.ActionRunDown, list.ActionLogs, list.ActionClean}},
-		"with_pr":  {detail: list.Detail{Branch: "feat/a", PR: &list.PR{Number: 12}}, offers: []list.Action{list.ActionGo, list.ActionOpenPR, list.ActionRunUp, list.ActionRunDown, list.ActionLogs, list.ActionClean}},
-		"main":     {detail: list.Detail{Branch: "main", Main: true}, offers: []list.Action{list.ActionGo, list.ActionRunUp, list.ActionRunDown, list.ActionLogs}},
-		"detached": {detail: list.Detail{Path: "/repo/.trees/x"}, offers: []list.Action{list.ActionGo}},
-		"missing":  {detail: list.Detail{Branch: "feat/gone", Missing: true}, offers: []list.Action{list.ActionClean}},
+		"linked":           {detail: list.Detail{Branch: "feat/a"}, offers: []list.Action{list.ActionGo, list.ActionRunUp, list.ActionRunDown, list.ActionLogs, list.ActionClean}},
+		"with_pr":          {detail: list.Detail{Branch: "feat/a", PR: &list.PR{Number: 12}}, offers: []list.Action{list.ActionGo, list.ActionOpenPR, list.ActionRunUp, list.ActionRunDown, list.ActionLogs, list.ActionClean}},
+		"main":             {detail: list.Detail{Branch: "main", Main: true}, offers: []list.Action{list.ActionGo, list.ActionRunUp, list.ActionRunDown, list.ActionLogs}},
+		"detached":         {detail: list.Detail{Path: "/repo/.trees/x"}, offers: []list.Action{list.ActionGo}},
+		"missing":          {detail: list.Detail{Branch: "feat/gone", Missing: true}, offers: []list.Action{list.ActionClean}},
+		"missing_detached": {detail: list.Detail{Path: "/repo/.trees/x", Missing: true}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

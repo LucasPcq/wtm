@@ -100,13 +100,49 @@
         "pr": null,
         "services": []
       }
+    },
+    {
+      "subject": "locked-gone",
+      "status": "done",
+      "detail": {
+        "branch": "locked-gone",
+        "path": "<SB>/acme.trees/locked-gone",
+        "main": false,
+        "dirty": false,
+        "locked": true,
+        "rebasing": false,
+        "missing": true,
+        "commits_ahead": 0,
+        "created_at": null,
+        "origin": null,
+        "pr": null,
+        "services": []
+      }
+    },
+    {
+      "subject": "orphan",
+      "status": "done",
+      "detail": {
+        "branch": "orphan",
+        "path": "<SB>/acme.trees/orphan",
+        "main": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "commits_ahead": 0,
+        "created_at": null,
+        "origin": null,
+        "pr": null,
+        "services": []
+      }
     }
   ],
   "follow_ups": [],
   "warnings": [
     {
       "code": "list.prs_unavailable",
-      "message": "GitHub not connected: run `gh auth login` to see pull requests"
+      "message": "pull requests unavailable: run `gh auth login`"
     }
   ]
 }

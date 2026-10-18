@@ -45,10 +45,12 @@ func serve(t *testing.T, answer string) (string, <-chan map[string]any) {
 	return socket, requests
 }
 
-// index writes the daemon's index of jobs with content and returns its path.
-func index(t *testing.T, content string) string {
+// unanswered returns the path of a socket no daemon listens on, the daemon's index of jobs beside it holding content, none when content is empty.
+func unanswered(t *testing.T, content string) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "jobs.json")
-	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
-	return path
+	dir := t.TempDir()
+	if content != "" {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "jobs.json"), []byte(content), 0o644))
+	}
+	return filepath.Join(dir, "wtm.sock")
 }

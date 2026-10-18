@@ -80,11 +80,9 @@ A use case or a service declares the ports it needs in its `port.go`, interface 
 
 A second command is its own `command/<name>/` (use case, ports, rules, questions, `cli/`) and one line in each list of `cmd/wtm-next`: its constructor in `main.go`'s `Commands`, its opener in `project.go` (`opener(func(a app) <name>.UseCase { return a.<Name> })`), its binding in `catalogue.go` (`api.Bind(<name>.Name, Questions{}.Form(), open, UseCase.Run)`), its adapters wired in `wire.go`. `registration_test.go` fails when a command of `main.go` is missing from the catalogue or from the wiring.
 
-## A read
+A read, `command/list`, walks the same hops with a `form.Query` in place of a `form.Command`, under the contract of a read (`.claude/skills/go-architecture/references/contract.md`, "A read").
 
-`wtm-next list` is a read: it observes and reports, and changes nothing. Its `Run` takes no lock, runs no operation, publishes no event and has no plan nor fingerprint: it returns a `domain.Read[Detail]` (one `Unit` per subject, the warnings, the follow-ups chosen), whose envelope has no `op`, `plan` nor `fingerprint`, and the catalogue binds it as any command. Its `cli` hands a `form.Query` its use case instead of a `form.Command`: the flags of its schema and `--output`, without `--yes`, `--dry-run`, `--expect-fingerprint`, `--remember` nor `--ask`. A read may offer a picker (`Query.Pick`), opened only when stdin, stdout and stderr are terminals and the output is human: it walks `form.Script` steps with no recap (`Preview` nil), what is slow to read landing once the first step shows (`Script.Later`) and `r` reading with a refresh of its own (`Script.Refresh`), and ends on the follow-up picked. What a read cannot ask (GitHub, the run daemon) is a warning, never a failure; a subject it cannot read is a failed item.
-
-Todo: the follow-up a read's picker ends on is printed (`form.Query`'s conclusion); once every command it names has migrated, it runs in this process instead, and that conclusion is the only place to change.
+Todo: the follow-up a read's picker ends on is printed by `form.Query`; once every command it names has migrated, it runs in this process instead.
 
 ## Comments
 

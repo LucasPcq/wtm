@@ -2,6 +2,7 @@ package list
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"path/filepath"
 	"slices"
@@ -16,23 +17,23 @@ import (
 // ----------------------------------------------------------------------------
 // The facts
 
-// Facts are what list reads: the repository, what each worktree holds, the run daemon's jobs and the open pull requests, each with the error that kept it from being read.
+// Facts are what list reads: the repository, what each worktree holds, the run daemon's jobs and the open pull requests, each with the error that kept it from being read; PullRequests is zero when GitHub was not asked.
 type Facts struct {
 	worktree.Repository
 	States       map[string]State // by worktree path
 	Jobs         []run.Job
 	JobsErr      error
-	PullRequests []worktree.PullRequest
+	PullRequests worktree.PullRequests
 	PRsErr       error
-	WithPRs      bool
 }
 
-// A State is what one worktree holds: whether it has uncommitted changes, the commits its branch has that the base branch lacks, its meta record, and the error that kept it from being read.
+// A State is what one worktree holds: whether its directory is gone, whether it has uncommitted changes, the commits its branch has that the base branch lacks, its meta record, and the error that kept it from being read.
 type State struct {
-	Dirty bool
-	Ahead int
-	Meta  worktree.Meta
-	Err   error
+	Missing bool
+	Dirty   bool
+	Ahead   int
+	Meta    worktree.Meta
+	Err     error
 }
 
 // ----------------------------------------------------------------------------
@@ -61,6 +62,9 @@ type Origin struct {
 	State  worktree.Divergence `json:"state"`
 }
 
+// prOpen is the state of every pull request listed: only the open ones are; the JSON keeps the field the legacy wtm reports.
+const prOpen = "open"
+
 // PR is a worktree's open pull request.
 type PR struct {
 	Number int    `json:"number"`
@@ -71,6 +75,7 @@ type PR struct {
 // The codes of list's warnings and failures.
 const (
 	CodePRsUnavailable = Name + ".prs_unavailable"
+	CodePRsCapped      = Name + ".prs_capped"
 	CodeJobsUnknown    = Name + ".jobs_unknown"
 	CodeBaseMissing    = Name + ".base_missing"
 	CodeUnreadable     = Name + ".unreadable"
@@ -81,7 +86,7 @@ const (
 
 // List is each worktree of facts as an item, the main one first, then the others by creation, the oldest first and those with no record last, and the warnings of what could not be read.
 func List(facts Facts) ([]Item, []domain.Warning) {
-	worktrees := slices.Clone(facts.Worktrees)
+	worktrees := facts.listed()
 	slices.SortStableFunc(worktrees, func(a, b worktree.Worktree) int {
 		if a.Main != b.Main {
 			return compareTrue(a.Main, b.Main)
@@ -100,6 +105,9 @@ func List(facts Facts) ([]Item, []domain.Warning) {
 func (f Facts) item(w worktree.Worktree) Item {
 	state := f.States[w.Path]
 	subject := cmp.Or(w.Branch(), w.Path)
+	if errors.Is(state.Err, context.Canceled) {
+		return Item{Subject: subject, Status: domain.StatusCancelled, Reason: domain.ReasonInterrupted}
+	}
 	if state.Err != nil {
 		return Item{Subject: subject, Status: domain.StatusFailed, Err: &domain.Error{
 			Kind: domain.KindInternal, Code: CodeUnreadable, Message: "couldn't read " + w.Path, Params: domain.Params{"path": w.Path}, Cause: state.Err,
@@ -114,7 +122,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Dirty:        state.Dirty,
 		Locked:       w.Locked,
 		Rebasing:     rebasing,
-		Missing:      w.Prunable,
+		Missing:      state.Missing,
 		CommitsAhead: state.Ahead,
 		CreatedAt:    createdAt(state.Meta.CreatedAt),
 		Origin:       f.origin(w.Branch()),
@@ -136,13 +144,13 @@ func (f Facts) origin(branch string) *Origin {
 }
 
 func (f Facts) pr(branch string) *PR {
-	at := slices.IndexFunc(f.PullRequests, func(pr worktree.PullRequest) bool { return branch != "" && pr.Branch == branch })
+	at := slices.IndexFunc(f.PullRequests.Open, func(pr worktree.PullRequest) bool { return branch != "" && pr.Branch == branch })
 	if at < 0 {
 		return nil
 	}
 
-	found := f.PullRequests[at]
-	return &PR{Number: found.Number, URL: found.URL, State: found.State}
+	found := f.PullRequests.Open[at]
+	return &PR{Number: found.Number, URL: found.URL, State: prOpen}
 }
 
 // services are the jobs up in the worktree at path, by name, none when the daemon could not tell.
@@ -170,8 +178,11 @@ func (f Facts) warnings() []domain.Warning {
 	if f.JobsErr != nil {
 		warnings = append(warnings, domain.Warning{Code: CodeJobsUnknown, Message: jobsUnknown(f.JobsErr)})
 	}
-	if f.WithPRs && f.PRsErr != nil {
-		warnings = append(warnings, domain.Warning{Code: CodePRsUnavailable, Message: prsUnavailable(f.PRsErr)})
+	if f.PRsErr != nil {
+		warnings = append(warnings, domain.Warning{Code: CodePRsUnavailable, Message: f.PRsErr.Error()})
+	}
+	if f.PullRequests.Capped {
+		warnings = append(warnings, domain.Warning{Code: CodePRsCapped, Message: "only the most recent open pull requests were listed: an older one is not shown"})
 	}
 
 	return warnings
@@ -185,21 +196,18 @@ func jobsUnknown(err error) string {
 	return "couldn't ask the run daemon which jobs are up: " + err.Error()
 }
 
-func prsUnavailable(err error) string {
-	switch {
-	case errors.Is(err, worktree.ErrGitHubMissing):
-		return "GitHub CLI not installed: install gh to see pull requests"
-	case errors.Is(err, worktree.ErrGitHubSignedOut):
-		return "GitHub not connected: run `gh auth login` to see pull requests"
-	}
-
-	return "couldn't ask GitHub for pull requests: " + err.Error()
-}
-
-// counted reports whether the commits a worktree's branch has past the base branch are counted: not for the main worktree, a worktree on no branch or whose directory is gone, nor when the base branch does not exist.
+// counted reports whether the commits a worktree's branch has past the base branch are counted: not for the main worktree, a worktree on no branch, nor when the base branch does not exist.
 func (f Facts) counted(w worktree.Worktree) bool {
 	base := f.Config.Worktrees.BaseBranch
-	return !w.Main && !w.Prunable && w.Branch() != "" && base != "" && f.Local(base)
+	return !w.Main && w.Branch() != "" && base != "" && f.Local(base)
+}
+
+// listed are the worktrees list reports: all but a bare repository's entry, which has no working tree.
+func (f Facts) listed() []worktree.Worktree {
+	return slices.DeleteFunc(slices.Clone(f.Worktrees), func(w worktree.Worktree) bool {
+		_, bare := w.State.(worktree.Bare)
+		return bare
+	})
 }
 
 // ----------------------------------------------------------------------------
@@ -218,9 +226,11 @@ const (
 	ActionClean   Action = "clean"
 )
 
-// Offers are the actions a worktree offers: only clean when its directory is gone, only go when it is on no branch, open its pull request when it has one.
+// Offers are the actions a worktree offers: only clean when its directory is gone, none when it is on no branch too (clean takes a branch), only go when it is on no branch, open its pull request when it has one.
 func Offers(detail Detail) []Action {
 	switch {
+	case detail.Missing && detail.Branch == "":
+		return nil
 	case detail.Missing:
 		return []Action{ActionClean}
 	case detail.Branch == "":

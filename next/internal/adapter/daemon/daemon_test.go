@@ -1,7 +1,6 @@
 package daemon_test
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
@@ -22,19 +21,18 @@ func TestJobsAreThoseTheDaemonLists(t *testing.T) {
 }
 
 func TestNoDaemonAnsweringIsNoJobUnlessItsIndexHoldsSome(t *testing.T) {
-	nowhere := filepath.Join(t.TempDir(), "wtm.sock")
 	cases := map[string]struct {
 		index string
 		err   error
 	}{
-		"no_index":    {index: filepath.Join(t.TempDir(), "jobs.json")},
-		"empty_index": {index: index(t, `{"version": 2, "jobs": []}`)},
-		"torn_index":  {index: index(t, `{"version": 2, "jobs": [`)},
-		"held_jobs":   {index: index(t, `{"version": 2, "jobs": [{"name": "web"}]}`), err: run.ErrUnknown},
+		"no_index":    {},
+		"empty_index": {index: `{"version": 2, "jobs": []}`},
+		"torn_index":  {index: `{"version": 2, "jobs": [`},
+		"held_jobs":   {index: `{"version": 2, "jobs": [{"name": "web"}]}`, err: run.ErrUnknown},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			jobs, err := daemon.Daemon{SocketPath: nowhere, IndexPath: c.index}.Jobs(t.Context())
+			jobs, err := daemon.Daemon{SocketPath: unanswered(t, c.index)}.Jobs(t.Context())
 
 			assert.Empty(t, jobs)
 			assert.ErrorIs(t, err, c.err)

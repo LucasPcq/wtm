@@ -38,12 +38,30 @@ type driver struct {
 
 func picking(t *testing.T, w world, req list.Request) *driver {
 	t.Helper()
+	p := newPicker(t, w, req)
+	return &driver{Driver: formtest.Start(form.New(t.Context(), p.script()), tea.WindowSizeMsg{Width: 100, Height: 30}), t: t, p: p}
+}
+
+// newPicker is the picker of what req reads of w, before it is walked.
+func newPicker(t *testing.T, w world, req list.Request) *picker {
+	t.Helper()
 	app, err := w.open(t.Context(), mainPath)
 	require.NoError(t, err)
 	read, err := app.Run(t.Context(), req, domain.RunOptions{})
 	require.NoError(t, err)
-	p := &picker{app: app, req: req, read: read, cwd: w.env().Cwd, withPRs: req.WithPRs}
-	return &driver{Driver: formtest.Start(form.New(t.Context(), p.script()), tea.WindowSizeMsg{Width: 100, Height: 30}), t: t, p: p}
+	return &picker{app: app, read: read, cwd: w.env().Cwd, withPRs: req.WithPRs}
+}
+
+// shownDetail is the detail of subject in the read p shows.
+func shownDetail(t *testing.T, p *picker, subject string) list.Detail {
+	t.Helper()
+	for _, item := range p.read.Items {
+		if item.Subject == subject && item.Detail != nil {
+			return *item.Detail
+		}
+	}
+	t.Fatalf("no detail of %s shown", subject)
+	return list.Detail{}
 }
 
 func (d *driver) looksLike(name string) {

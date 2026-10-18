@@ -6,6 +6,13 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
+// Fetch fetches every branch of the remote, updating its remote-tracking
+// branches only.
+func (r Repo) Fetch(ctx context.Context) error {
+	_, err := r.git(ctx, "fetch", "--quiet", origin)
+	return err
+}
+
 // FetchRef fetches the branch name from the remote, updating its remote-tracking
 // branch only. Branches are named in full so a tag of the same name, or a
 // branch named tags/..., is never fetched instead.

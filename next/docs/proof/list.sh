@@ -39,7 +39,11 @@ prepare() {
   echo "x" >"$trees/feat-a/dirty.txt"
   git worktree lock "$trees/feat-b"
   git worktree add -q --detach "$trees/detached"
+  git worktree add -q --orphan -b orphan "$trees/orphan"
   rm -rf "$trees/feat-gone"
+  git worktree add -q -b locked-gone "$trees/locked-gone"
+  git worktree lock "$trees/locked-gone"
+  rm -rf "$trees/locked-gone"
   mkdir -p "$root/plain" "$root/bare"
   git -C "$root/bare" init -q
 }
@@ -104,7 +108,14 @@ tty() {
   start
   # the picker is ready once the pull requests had their say: GitHub is not connected in a sandbox
   capture 1-worktrees 'gh auth login'
-  tmux send-keys -t "$session" Down Enter
+  # down to feat/a: the two sides order the worktrees without a meta record differently
+  local moves=0
+  until screen | grep -Eq '^▌. feat/a( |$)'; do
+    ((moves++ < 10)) || { echo "list.sh: feat/a never selected" >&2; return 1; }
+    tmux send-keys -t "$session" Down
+    sleep 0.3
+  done
+  tmux send-keys -t "$session" Enter
   capture 2-actions 'Clean'
   tmux send-keys -t "$session" Enter
   capture 3-go 'EXIT='
@@ -150,6 +161,16 @@ run_side() {
     -e "s#$bin#<BIN>#g" \
     -e 's#wtm-next list#wtm list#g' \
     "$dir_out"/*
+  if [[ $side == legacy ]]; then
+    # legacy lists a worktree's jobs in the daemon's order, which varies between runs
+    for json in "$dir_out"/*json.stdout; do
+      python3 -c 'import json, sys
+doc = json.load(open(sys.argv[1]))
+for entry in doc if isinstance(doc, list) else []:
+    entry["services"] = sorted(entry["services"])
+open(sys.argv[1], "w").write(json.dumps(doc, indent=2, ensure_ascii=False) + "\n")' "$json" 2>/dev/null || true
+    done
+  fi
 }
 
 roots=()

@@ -23,3 +23,11 @@ func TestColumnsAlignCellsByTheColumnsTheyTakeNotTheirBytes(t *testing.T) {
 		"  feat/a            base ↑2  ! dirty\n"+
 		"  feat/b  ! locked\n", got)
 }
+
+func TestAColumnEmptyInEveryRowTakesNoGap(t *testing.T) {
+	got := rendered(func(w *bytes.Buffer) {
+		Columns(w, [][]string{{"main", "", "✓ clean"}, {"feat/a", "", "! dirty"}})
+	})
+
+	assert.Equal(t, "  main    ✓ clean\n  feat/a  ! dirty\n", got)
+}

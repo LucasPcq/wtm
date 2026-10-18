@@ -10,7 +10,7 @@ import (
 
 const columnGap = "  "
 
-// Columns writes rows to w as an aligned table, one line per row: each cell padded to the widest of its column as the terminal draws it, escape codes and wide runes counted for the columns they take, and nothing after a line's last cell.
+// Columns writes rows to w as an aligned table, one line per row: each cell padded to the widest of its column as the terminal draws it, escape codes and wide runes counted for the columns they take, a column empty in every row left out, and nothing after a line's last cell.
 func Columns(w io.Writer, rows [][]string) {
 	var widths []int
 	for _, row := range rows {
@@ -23,13 +23,13 @@ func Columns(w io.Writer, rows [][]string) {
 	}
 
 	for _, row := range rows {
-		var line strings.Builder
+		var cells []string
 		for i, cell := range row {
-			if i > 0 {
-				line.WriteString(columnGap)
+			if widths[i] > 0 {
+				cells = append(cells, cell+strings.Repeat(" ", widths[i]-ansi.StringWidth(cell)))
 			}
-			line.WriteString(cell + strings.Repeat(" ", widths[i]-ansi.StringWidth(cell)))
 		}
-		fmt.Fprintf(w, "%s%s\n", Indent, strings.TrimRight(line.String(), " "))
+		line := strings.Join(cells, columnGap)
+		fmt.Fprintf(w, "%s%s\n", Indent, strings.TrimRight(line, " "))
 	}
 }

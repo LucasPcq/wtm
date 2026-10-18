@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
+	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 
@@ -87,4 +88,27 @@ func TestTwoExecutionsInOneProcessKeepTheirOwnRepositoryAndCorrelationID(t *test
 		assert.Equal(t, commonDirs[run.id], last.CommonDir)
 	}
 	assert.Len(t, published, 3)
+}
+
+func TestEachActionOfListIsTheCommandLineThatCarriesItOut(t *testing.T) {
+	branch := list.Detail{Branch: "feat/a", Path: "/repo/.trees/feat-a", PR: &list.PR{Number: 12}}
+	detached := list.Detail{Path: "/repo/.trees/detached"}
+	cases := map[string]struct {
+		action list.Action
+		detail list.Detail
+		argv   []string
+	}{
+		"go":          {action: list.ActionGo, detail: branch, argv: []string{"wtm", "go", "feat/a"}},
+		"go_detached": {action: list.ActionGo, detail: detached, argv: []string{"cd", "/repo/.trees/detached"}},
+		"open_pr":     {action: list.ActionOpenPR, detail: branch, argv: []string{"gh", "pr", "view", "12", "--web"}},
+		"run_up":      {action: list.ActionRunUp, detail: branch, argv: []string{"wtm", "run", "up", "feat/a"}},
+		"run_down":    {action: list.ActionRunDown, detail: branch, argv: []string{"wtm", "run", "down", "feat/a"}},
+		"logs":        {action: list.ActionLogs, detail: branch, argv: []string{"wtm", "run", "logs", "feat/a"}},
+		"clean":       {action: list.ActionClean, detail: branch, argv: []string{"wtm", "clean", "feat/a"}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.argv, listCommands(c.action, c.detail))
+		})
+	}
 }

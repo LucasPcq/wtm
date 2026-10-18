@@ -14,27 +14,15 @@ import (
 )
 
 const (
-	askTimeout    = 2 * time.Second
-	globalDirName = "wtm"
-	indexName     = "jobs.json"
-	actionList    = "list"
-	statusError   = "error"
+	askTimeout  = 2 * time.Second
+	indexName   = "jobs.json"
+	actionList  = "list"
+	statusError = "error"
 )
 
-// Daemon is the run daemon listening on SocketPath, whose index of the jobs it runs is at IndexPath.
+// Daemon is the run daemon listening on SocketPath, whose index of the jobs it runs lies beside it.
 type Daemon struct {
 	SocketPath string
-	IndexPath  string
-}
-
-// IndexPath is where the daemon keeps its index of jobs, in the user's wtm directory; "" when that directory is unknown.
-func IndexPath() string {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return ""
-	}
-
-	return filepath.Join(dir, globalDirName, indexName)
 }
 
 // Jobs returns the jobs the daemon runs. When no daemon answers it returns none,
@@ -74,7 +62,7 @@ func (d Daemon) Jobs(ctx context.Context) ([]run.Job, error) {
 
 // unanswered is why no daemon answering tells nothing: nil when its index holds no job, run.ErrUnknown when it holds some.
 func (d Daemon) unanswered() error {
-	data, err := os.ReadFile(d.IndexPath)
+	data, err := os.ReadFile(filepath.Join(filepath.Dir(d.SocketPath), indexName))
 	if err != nil {
 		return nil
 	}
