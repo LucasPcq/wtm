@@ -16,7 +16,7 @@ import (
 
 func newRepo(t *testing.T) git.Repo {
 	t.Helper()
-	return git.Repo{Dir: gittest.Resolved(t, gittest.InitRepo(t)), Remote: remote}
+	return git.Repo{Dir: gittest.Resolved(t, gittest.InitRepo(t))}
 }
 
 func newRepoWithOrigin(t *testing.T) (git.Repo, string) {

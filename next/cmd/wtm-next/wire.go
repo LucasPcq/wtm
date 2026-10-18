@@ -20,10 +20,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
-const (
-	remote    = "origin"
-	opIDBytes = 8
-)
+const opIDBytes = 8
 
 // wireParams is where the repository a command runs on keeps its files; it also publishes the events of the operations on it.
 type wireParams struct {
@@ -40,7 +37,7 @@ type app struct {
 
 // wire builds each adapter of the repository params locates once and injects it into every use case.
 func wire(params wireParams) app {
-	repo := git.Repo{Dir: params.MainPath, Remote: remote}
+	repo := git.Repo{Dir: params.MainPath}
 	projectConfig := config.Project{StateDir: params.StateDir, GlobalPath: config.GlobalPath()}
 
 	facts := repository.Service{Config: projectConfig, Git: repo, MainPath: params.MainPath}

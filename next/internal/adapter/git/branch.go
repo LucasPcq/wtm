@@ -30,7 +30,7 @@ func (r Repo) refName(ref worktree.Ref) (string, error) {
 }
 
 // remotePrefix is the ref prefix of the remote's branches.
-func (r Repo) remotePrefix() string { return remotesPrefix + r.Remote + "/" }
+func (r Repo) remotePrefix() string { return remotesPrefix + origin + "/" }
 
 // Branches returns the local branches and the remote's branches with their
 // tips, the remote's HEAD left out.

@@ -34,7 +34,7 @@ func TestARepoWithNoDirReadsTheCurrentDirectory(t *testing.T) {
 	repo := newRepo(t)
 	t.Chdir(repo.Dir)
 
-	main, err := git.Repo{Remote: remote}.MainWorktree(t.Context())
+	main, err := git.Repo{}.MainWorktree(t.Context())
 
 	require.NoError(t, err)
 	assert.Equal(t, repo.Dir, main.Path)
@@ -44,7 +44,7 @@ func TestAnErrorCarriesTheCallAndWhatGitSaid(t *testing.T) {
 	t.Setenv("LC_ALL", "C")
 	dir := t.TempDir()
 
-	_, err := git.Repo{Dir: dir, Remote: remote}.Worktrees(t.Context())
+	_, err := git.Repo{Dir: dir}.Worktrees(t.Context())
 
 	var gitErr *git.Error
 	require.ErrorAs(t, err, &gitErr)
@@ -59,7 +59,7 @@ func TestAnErrorCarriesTheCallAndWhatGitSaid(t *testing.T) {
 func TestAnErrorWithoutAnExitStatusSaysWhy(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 
-	_, err := git.Repo{Dir: t.TempDir(), Remote: remote}.Worktrees(t.Context())
+	_, err := git.Repo{Dir: t.TempDir()}.Worktrees(t.Context())
 
 	var gitErr *git.Error
 	require.ErrorAs(t, err, &gitErr)

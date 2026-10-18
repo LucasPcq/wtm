@@ -535,7 +535,7 @@ func (r Repo) clean(ctx context.Context, params cleanParams) error {
 
 // at is the same repository run from the worktree at dir.
 func (r Repo) at(dir string) Repo {
-	return Repo{Dir: dir, Remote: r.Remote}
+	return Repo{Dir: dir}
 }
 
 // paths returns the path of each of files.

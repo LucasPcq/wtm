@@ -14,9 +14,11 @@ import (
 // Repo is a git repository, run from Dir with git's own repository discovery.
 // Its methods implement the git ports of the use cases and services.
 type Repo struct {
-	Dir    string // a directory inside the repository: the main worktree or a linked one
-	Remote string // the remote whose branches are origin's, usually "origin"
+	Dir string // a directory inside the repository: the main worktree or a linked one
 }
+
+// origin is the remote whose branches are the branches of origin, the only one wtm reads.
+const origin = "origin"
 
 // Error is a git command that failed: its arguments, its exit code (-1 when it
 // did not exit, cancelled or not started), what it printed on stderr and the
