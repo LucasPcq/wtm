@@ -15,7 +15,7 @@ next/
   internal/
     command/<name>/    one command: usecase.go, port.go, rules.go, questions.go, cli/
     service/<name>/    what use cases share with I/O: operation, provision, repository; <name>test kits
-    domain/            the pure model and vocabulary; worktree/, project/, env/, dotenv/ by subject
+    domain/            the pure model and vocabulary; worktree/, project/, env/, dotenv/, run/ by subject
     adapter/<name>/    git, store, config, shell, oplock, events, statefile, proxyport, daemon, github; <name>test fakes
     ui/                cli (root, exit codes, env), output (streams, frames, envelope), form (flags, wizard, conclusion), widget (a step's inputs), formtest (the cli tests' kit)
     api/               the catalogue of commands for a surface other than the CLI
@@ -31,7 +31,7 @@ next/
 | is one command's request, its form schema and its validation | `command/<name>/questions.go` |
 | is a port one command needs (an interface, or a function type) | `command/<name>/port.go` |
 | draws one command's output, or asks one of its fields its own way | `command/<name>/cli/` |
-| is a pure rule, type or vocabulary two commands need | `domain/<subject>/` (`worktree`, `project`, `env`, `dotenv`), the root `domain` only for the cross-cutting contract (errors, events, outcomes, forms) |
+| is a pure rule, type or vocabulary two commands need | `domain/<subject>/` (`worktree`, `project`, `env`, `dotenv`, `run`), the root `domain` only for the cross-cutting contract (errors, events, outcomes, forms) |
 | orchestrates I/O two commands need | `service/<name>/` (concrete, with its own `port.go`) |
 | is a question two commands ask | the fragment of the service that consumes its answers (`service/provision/questions.go`) |
 | is presentation two commands need, or any field kind of the wizard | `ui/output`, `ui/form`, an input in `ui/widget` |
