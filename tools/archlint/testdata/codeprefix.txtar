@@ -1,0 +1,47 @@
+-- github.com/LucasPcq/wtm/next/internal/domain/domain.go --
+// Package domain is the domain.
+package domain
+
+const CodeRequired = "required"
+
+type Warning struct{ Code, Message string }
+-- github.com/LucasPcq/wtm/next/internal/command/create/create.go --
+// Package create creates worktrees.
+package create
+
+import "github.com/LucasPcq/wtm/next/internal/domain"
+
+const CodeConfigNotFound = "create.config_not_found"
+
+const codeRequired = "required" // want `code "required" is declared in command/create: it must start with "create."`
+
+const codec = "json"
+
+var (
+	_ = domain.Warning{Code: "create.ff_dirty"}
+	_ = domain.Warning{Code: "extract.ff_dirty"} // want `code "extract.ff_dirty" is declared in command/create`
+	_ = domain.Warning{Code: "distinct", Message: "not_found"} // want `code "distinct" is declared in command/create`
+	_ = domain.Warning{Code: domain.CodeRequired}
+	_ = domain.Warning{Code: codeRequired}
+	_ = codec
+)
+-- github.com/LucasPcq/wtm/next/internal/command/create/create_test.go --
+package create
+
+import "github.com/LucasPcq/wtm/next/internal/domain"
+
+var _ = domain.Warning{Code: "anything"}
+-- github.com/LucasPcq/wtm/next/internal/command/create/cli/cli.go --
+// Package cli is create's command line.
+package cli
+
+import "github.com/LucasPcq/wtm/next/internal/domain"
+
+var _ = domain.Warning{Code: "cli.flag"} // want `code "cli.flag" is declared in command/create`
+-- github.com/LucasPcq/wtm/next/internal/service/provision/provision.go --
+// Package provision is shared.
+package provision
+
+import "github.com/LucasPcq/wtm/next/internal/domain"
+
+var _ = domain.Warning{Code: "provision.hook"}

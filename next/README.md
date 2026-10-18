@@ -57,6 +57,8 @@ A use case reads in one place. `command/<name>/usecase.go` tells the whole reque
 
 A package in no row is refused: the root of `next/`, a second `cmd/<name>`, anything outside these directories. A name ending in `test` under `service/`, `adapter/` or `ui/` is reserved for the kit of the package beside it: `service/latest`, with no `service/la`, is refused. A service is one package: a sub-package `service/<name>/<sub>` falls in the `service/<name>` row and may not import `service/<name>`; a command's `cli` likewise imports no sub-package of its own.
 
+A code a command declares starts with its name (`create.path_exists`); a code several commands share is a `domain` constant (archlint, rule `codeprefix`).
+
 A use case or a service declares the interfaces it needs in its `port.go`; an adapter exports a concrete type that satisfies them, checked by the compiler in `cmd/wtm-next`.
 
 ## Reading a command
