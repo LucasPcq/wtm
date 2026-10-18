@@ -1,0 +1,84 @@
+{
+  "skill_name": "go-architecture",
+  "evals": [
+    {
+      "id": 1,
+      "name": "add-prune",
+      "prompt": "I'm migrating `wtm prune` (removes worktrees whose branch is merged or gone) to next/. Before I write any code, give me the complete plan: every file I create or edit, the shape of its Run, how the command gets registered, how its error codes are named, and which tests and proofs it needs. Don't write the implementation.",
+      "expected_output": "A plan with command/prune/{usecase.go, port.go, rules.go, questions.go, cli/}, a Run in numbered steps over service/operation, the registrations in cmd/wtm-next (main.go, catalogue.go, wire.go, project.go opener) checked by registration_test.go, codes prefixed prune., the operationtest contract test, cli goldens, and a proof script against the legacy.",
+      "files": [],
+      "assertions": [
+        "Lists command/prune/ with usecase.go, port.go, rules.go, questions.go and a cli/ sub-folder",
+        "Run is described as numbered steps: begin the operation (locks), plan under the locks, fingerprint and stop on a dry run, refuse a stale plan (Expect), apply between the started and finished events",
+        "Names the three registrations in cmd/wtm-next: main.go, catalogue.go and wire.go",
+        "Says registration_test.go (or a test of cmd/wtm-next) checks that the registrations agree",
+        "Codes are prefixed with the command's name (prune.<name>), e.g. prune.config_not_found",
+        "Includes the operationtest.Contract test over Run (contract_test.go)",
+        "Says prune never imports another command (create/extract); what it shares goes to domain/, service/ or ui/",
+        "Mentions a proof against the legacy wtm (next/docs/proof) and the legacy-gap rules (no gap left unlisted)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "shared-question",
+      "prompt": "create and extract both need a new question: \"Run the on_create hooks now?\" (yes/no, with a --run-hooks flag). Where does this question live in next/, and how do both commands end up asking it? Point me at the exact files.",
+      "expected_output": "The question goes in the shared fragment of service/provision/questions.go (Given, Questions, Fields, Answers), which create and extract embed; not duplicated in each command's questions.go.",
+      "files": [],
+      "assertions": [
+        "Puts the question in service/provision/questions.go (the shared fragment of a new worktree)",
+        "Explains the fragment's parts: the Given request fields, the Questions, Fields spliced into each command's Form, and Answers that provision.Run takes",
+        "Says create and extract get it by embedding the fragment, without writing the question in their own questions.go",
+        "Does not put the question in ui/form, in one command imported by the other, or duplicated in both commands"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "shared-slug",
+      "prompt": "create and a future `rename` command both need the same pure function that turns a branch name into the directory slug of its worktree (feat/x -> feat-x). No I/O. Where does it go in next/, and how is it tested?",
+      "expected_output": "domain/worktree, a pure function with its test beside it (testify, fixture_test.go/helpers_test.go layout).",
+      "files": [],
+      "assertions": [
+        "Puts the function in domain/worktree (not the root of domain/, not a service, not a command)",
+        "Says neither command imports the other, so a pure rule two commands share goes to domain",
+        "Says the test sits beside it in domain/worktree, table-driven, with short identifier-like subtest names or testify"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "internal-non-trigger",
+      "prompt": "Add a --keep-branch flag to `wtm clean` (the legacy command under internal/) that removes the worktree but keeps its local branch. Tell me which files to touch.",
+      "expected_output": "Recognises that wtm clean lives in internal/ (legacy, frozen) and follows CLAUDE.md and docs/dev/adding-a-mutation-command.md, not the next/ slice layout.",
+      "files": [],
+      "assertions": [
+        "Works in internal/ (internal/flow/clean, internal/surface/cli...) and the legacy conventions of CLAUDE.md / docs/dev, not a next/ command folder",
+        "Does not tell the user to create next/internal/command/clean or apply the next/ slice layout to the legacy command"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "review-snippets",
+      "prompt": "Review these four changes proposed for next/, and for each say OK or NOT OK with the rule and what enforces it:\n(a) command/extract/port.go gains `type Now func() time.Time` beside its interfaces.\n(b) service/provision/provision.go reads os.Getenv(\"WTM_HOOK_TIMEOUT\") to bound hooks.\n(c) a new test in command/create: t.Run(\"a branch that already exists is checked out\", ...).\n(d) a new unexported helper in ui/output: `func label(params labelParams) string` with `type labelParams struct { Path string; Width int }`.",
+      "expected_output": "(a) OK: a function type is a port too. (b) NOT OK: a service never reads the environment; the process env is read once at the edge and travels in the request or options. (c) NOT OK: subtest names are short identifiers (Google), description goes elsewhere. (d) NOT OK: two inputs of different types are positional.",
+      "files": [],
+      "assertions": [
+        "(a) is judged OK: a function type is an acceptable port in port.go",
+        "(b) is judged NOT OK: a service does not read the environment; it comes in through the request/options or the wiring",
+        "(c) is judged NOT OK: subtest names are short and identifier-like, not sentences",
+        "(d) is judged NOT OK: two inputs of different types stay positional parameters, no Params struct"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "dry-run-locks",
+      "prompt": "A user runs `wtm-next extract feat/a --to feat/b --dry-run` while another wtm-next create is applying in the same repository, and asks whether the dry run will wait on the other command's locks. Answer from how next/ is built, pointing at the code, and tell me what a new command's Run must do so it behaves the same.",
+      "expected_output": "No: a dry run takes no lock and publishes no event, and plans once (operation.Service.Begin returns without taking locks on DryRun; PlanUnderLocks plans once). A new command gets this by keeping Run's canonical steps over service/operation; operationtest.Contract checks it.",
+      "files": [],
+      "assertions": [
+        "Says a dry run takes no operation lock (so it does not wait on the other command)",
+        "Points at service/operation (Begin skipping the locks on a dry run, or PlanUnderLocks planning once)",
+        "Says a new command gets the behaviour by keeping Run's canonical steps over service/operation, not by handling locks itself",
+        "Names operationtest.Contract (contract_test.go) as the check that a dry run takes no lock and publishes no event"
+      ]
+    }
+  ]
+}
