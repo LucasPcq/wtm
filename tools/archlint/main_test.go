@@ -4,6 +4,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -16,6 +17,29 @@ func TestAPackageThatDoesNotTypeCheckIsAnError(t *testing.T) {
 	t.Chdir(dir)
 	if _, err := analyze(analyzeParams{Roots: []string{"broken"}, Systems: []string{"linux"}}); err == nil {
 		t.Error("a package with a type error was analysed: archlint would print `clean` over code it never understood")
+	}
+}
+
+// analysistest loads the tests of a package, so only the driver, which does not, shows a directory of tests alone.
+func TestADirectoryOfNextHoldingOnlyTestsIsRefused(t *testing.T) {
+	dir := t.TempDir()
+	extract(t, dir, "testonly")
+	t.Chdir(dir)
+	findings, err := analyze(analyzeParams{Roots: []string{"next"}, Systems: []string{"darwin"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	findings = slices.DeleteFunc(findings, func(f finding) bool { return f.rule != nextAnalyzer.Name })
+	var refused []string
+	for _, f := range findings {
+		if strings.Contains(f.msg, "holds only tests") {
+			refused = append(refused, f.pos.Filename)
+		}
+	}
+	// a file compiled on no target system leaves its directory with tests alone, as the driver sees it
+	want := []string{"next/internal/command/ignored/x_test.go", "next/internal/command/windows/x_test.go", "next/internal/command/zzprobe/x_test.go"}
+	if !slices.Equal(refused, want) || len(findings) != len(want) {
+		t.Errorf("findings = %v, want %v refused for holding only tests", findings, want)
 	}
 }
 

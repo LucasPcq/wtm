@@ -96,6 +96,11 @@ func analyze(params analyzeParams) ([]finding, error) {
 		}
 		batches = append(batches, batch)
 	}
+	alone, err := testsAlone(params.Roots)
+	if err != nil {
+		return nil, err
+	}
+	batches = append(batches, alone)
 	findings := collapseLegacy(collapseLegacyParams{Findings: mergeFindings(batches), Budgets: legacyBudgets()})
 	sort.Slice(findings, func(i, j int) bool {
 		if findings[i].rule != findings[j].rule {

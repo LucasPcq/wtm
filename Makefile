@@ -2,7 +2,7 @@ BINARY      := wtm
 BINARY_NEXT := wtm-next
 BUILD_DIR   := bin
 
-.PHONY: build next test vet fmt lint next-lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
+.PHONY: build next test test-next vet fmt lint lint-next next-lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
@@ -12,6 +12,11 @@ next:
 
 test:
 	go test ./... -race -count=1
+
+# test-next and lint-next are the gates scoped to next/ and tools/, for a change
+# that leaves the frozen internal/ alone; lint and test stay the full gates.
+test-next:
+	go test ./next/... ./tools/... -race -count=1
 
 vet:
 	go vet ./...
@@ -34,8 +39,8 @@ arch:
 # code reachable by a route the analysis cannot follow — are listed with their
 # reason in .deadcode-ignore; everything else fails.
 dead:
-	@go tool deadcode -test ./... | grep -v -E -f .deadcode-ignore > /tmp/wtm-deadcode || true
-	@test ! -s /tmp/wtm-deadcode || { echo "unreachable code:"; cat /tmp/wtm-deadcode; exit 1; }
+	@dead=$$(go tool deadcode -test ./... | grep -v -E -f .deadcode-ignore || true); \
+		test -z "$$dead" || { echo "unreachable code:"; echo "$$dead"; exit 1; }
 
 # dead-strict is dead without -test: what only a test still calls. Informative,
 # not part of lint — a helper built for tests (testutil/, processtest/) lives
@@ -51,6 +56,15 @@ sumtype:
 
 lint: fmt vet arch dead sumtype next-lint
 	go tool staticcheck ./...
+
+# archlint runs whole: it loads internal/ and next/ in about two seconds.
+lint-next: arch next-lint
+	@test -z "$$(gofmt -l next tools)" || { echo "gofmt needed:"; gofmt -l next tools; exit 1; }
+	go vet ./next/... ./tools/...
+	@dead=$$(go tool deadcode -test -filter 'wtm/(next|tools)/' ./next/... ./tools/... | grep -v -E -f .deadcode-ignore || true); \
+		test -z "$$dead" || { echo "unreachable code:"; echo "$$dead"; exit 1; }
+	go tool go-sumtype $$(go list ./next/...)
+	go tool staticcheck ./next/... ./tools/...
 
 # next-lint holds next/ to Go's doc-comment and naming conventions with revive
 # (next/revive.toml); staticcheck already runs every check on next/ from

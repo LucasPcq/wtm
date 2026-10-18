@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Usage: create.sh <wtm binary> <wtm-next binary> <out dir>
+# Prints the two sandboxes it leaves behind, legacy then next, for tty.sh.
 # Runs the same create scenarios in two identical sandboxes (the docs/demos "acme"
 # project, same ports), one per binary: legacy `wtm create` against `wtm-next
 # create`. After each scenario it records the exit code, the output and the state
@@ -8,8 +9,13 @@
 # only where next/docs/proof/README.md says why.
 set -euo pipefail
 
-legacy=${1:?wtm binary}
-next=${2:?wtm-next binary}
+# absolute <binary>: the binary's absolute path, since each scenario runs from inside its sandbox.
+absolute() {
+  [[ -f $1 && -x $1 ]] || { echo "$0: $1 is not an executable" >&2; return 1; }
+  echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+}
+legacy=$(absolute "${1:?wtm binary}")
+next=$(absolute "${2:?wtm-next binary}")
 out=${3:?out dir}
 mkdir -p "$out" && out=$(cd "$out" && pwd)
 repo=$(git rev-parse --show-toplevel)
@@ -81,7 +87,10 @@ state() {
 run_side() {
   local side=$1
   bin=$2
-  local root=/tmp/wtmcmp-${side:0:1}
+  # each run its own sandbox, as long as /tmp/wtmcmp-l was: a screen of tty.sh wraps a path at 100 columns
+  local root
+  root=$(mktemp -d /tmp/wtmXXXXX)
+  roots+=("$root")
   dir=$out/$side
   rm -rf "$dir" && mkdir -p "$dir"
   (
@@ -114,7 +123,7 @@ run_side() {
     scenario 20-json-stale-fingerprint create feat/jstale --output json --expect-fingerprint 000000000000000000000000
   )
   sed -i '' -E \
-    -e "s#(/private)?/tmp/wtmcmp-${side:0:1}#<SB>#g" \
+    -e "s#(/private)?$root#<SB>#g" \
     -e 's#"created_at": "[^"]*"#"created_at": "<T>"#g' \
     -e 's#"op": "[0-9a-f]{16}"#"op": "<OP>"#g' \
     -e 's#[0-9a-f]{24}#<FP>#g' \
@@ -123,6 +132,9 @@ run_side() {
     "$dir"/*
 }
 
+roots=()
+# kept for tty.sh on success, removed on a failure
+trap '[[ -n ${keep:-} ]] || rm -rf ${roots[@]+"${roots[@]}"}' EXIT
 run_side legacy "$legacy"
 run_side next "$next"
 {
@@ -132,4 +144,5 @@ run_side next "$next"
     diff -u --label "legacy/$name" --label "next/$name" "$state" "$out/next/$name.state" || true
   done
 } >"$out/states.diff"
-echo "$out/states.diff"
+keep=1
+echo "${roots[@]}"
