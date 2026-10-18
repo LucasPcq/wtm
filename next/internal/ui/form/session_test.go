@@ -22,9 +22,9 @@ const (
 func TestAStepGivenByAFlagSaysWhichAndOneLeftOpenIsAsked(t *testing.T) {
 	s := observed(t, &app{}, request{"from": {"main"}})
 
-	assert.Equal(t, Standing{Value: "main", Flag: "--from"}, s.Standing(atFrom))
+	assert.Equal(t, Standing{Value: "main", Given: true, Flag: "--from"}, s.Standing(atFrom))
 	assert.Equal(t, Standing{Value: "move"}, s.Standing(atKeep))
-	assert.Equal(t, Standing{Value: "feat/a", Flag: "<branches>"}, observed(t, &app{}, request{"branches": {"feat/a"}}).Standing(atBranches))
+	assert.Equal(t, Standing{Value: "feat/a", Given: true}, observed(t, &app{}, request{"branches": {"feat/a"}}).Standing(atBranches))
 }
 
 func TestAStepARefusedEntryNamesIsErred(t *testing.T) {

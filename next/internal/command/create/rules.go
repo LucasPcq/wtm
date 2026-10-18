@@ -288,6 +288,7 @@ type Plan struct {
 	Remember    []string            `json:"remember,omitempty"`
 	facts       Facts
 	settled     provision.Answers // as resolved, handed to provisioning even where the plan shows none, and remembered
+	recalled    []string          // the fields answered from memory, as the request was resolved
 }
 
 // A BranchPlan is what becomes of one branch: the path of its worktree, how it gets there, and the remote branch it resumes.
@@ -325,7 +326,7 @@ func (b BranchPlan) placement() worktree.Placed {
 
 // Recalled are the fields of the plan answered from memory.
 func (p Plan) Recalled() []string {
-	return p.settled.Recalled()
+	return p.recalled
 }
 
 // EnvFollowsConfig reports whether the env strategy follows config.toml's, EnvFrom being the strategy it stands for now.

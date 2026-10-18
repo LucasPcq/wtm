@@ -392,12 +392,18 @@ func (q Questions) facing(conflicts []worktree.Conflict) Questions {
 
 // Resolve settles the request on the facts, every field answered as NewQuestions answers it; a request with problems is refused with all of them, by domain.Invalid.
 func Resolve(f Facts, req Request) (Request, error) {
+	questions, err := resolve(f, req)
+	return questions.Request(), err
+}
+
+// resolve is the questions of the request on the facts, refused when one is not settled.
+func resolve(f Facts, req Request) (Questions, error) {
 	questions := NewQuestions(f, req)
 	if len(questions.Errors) > 0 {
-		return Request{}, domain.Invalid(questions.Errors)
+		return Questions{}, domain.Invalid(questions.Errors)
 	}
 
-	return questions.Request(), nil
+	return questions, nil
 }
 
 // Request is the request the questions answer.

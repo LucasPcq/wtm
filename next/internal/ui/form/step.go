@@ -2,7 +2,6 @@ package form
 
 import (
 	"cmp"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	tea "github.com/charmbracelet/bubbletea"
@@ -38,7 +37,8 @@ type Refresher interface {
 // Standing is where a step's answer stands before the user is asked.
 type Standing struct {
 	Value  string        // the answer the step holds
-	Flag   string        // the flag that set Value, if one did: the step is not asked
+	Given  bool          // reports whether the command line set Value, by a flag or an argument: the step is not asked
+	Flag   string        // the flag that set Value, if one did, named in the trail
 	Origin domain.Origin // where Value comes from; a remembered answer is not asked
 	Skip   string        // why the step does not apply, if it does not: the step is not asked
 	Erred  bool          // reports whether Value is refused, so the step is asked even when a flag set it
@@ -59,9 +59,9 @@ func decided(st Standing, answered bool) mark {
 		return mark{ruled: st.Skip}
 	case st.Erred:
 		return mark{asked: true}
-	case st.Flag != "" && !strings.HasPrefix(st.Flag, "<"):
+	case st.Given && st.Flag != "":
 		return mark{line: value + trail + st.Flag}
-	case st.Flag != "":
+	case st.Given:
 		return mark{line: value}
 	case answered:
 		return mark{line: value}

@@ -187,8 +187,12 @@ func TestEachAnswerOfANewWorktreeReadsBackAsAnswerTakesIt(t *testing.T) {
 func TestTheAnswersToRememberAreKeyedAsConfigTomlKeepsThem(t *testing.T) {
 	answers := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{EnvFrom: provision.EnvFromConfig, Isolation: project.Verbatim, FastForward: new(true)}, Repository: repository(nil)}).Answers()
 
-	assert.Equal(t, map[string]string{"env_strategy": "config", "isolation": "verbatim", "source_update": "ff"}, answers.Remembered([]string{"env_from", "isolation", "fast_forward"}))
-	assert.Equal(t, map[string]string{"isolation": "verbatim"}, answers.Remembered([]string{"isolation", "keep"}))
+	all, allFields := answers.Remembered([]string{"env_from", "isolation", "fast_forward"})
+	assert.Equal(t, map[string]string{"env_strategy": "config", "isolation": "verbatim", "source_update": "ff"}, all)
+	assert.Equal(t, []string{"env_from", "isolation", "fast_forward"}, allFields)
+	one, oneField := answers.Remembered([]string{"isolation", "keep"})
+	assert.Equal(t, map[string]string{"isolation": "verbatim"}, one)
+	assert.Equal(t, []string{"isolation"}, oneField)
 	assert.Equal(t, project.EnvExample, answers.EnvFrom())
 }
 

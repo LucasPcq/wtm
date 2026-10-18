@@ -21,16 +21,6 @@ type Given struct {
 	FastForward *bool               `json:"fast_forward"` // nil when not given, so a remembered answer can apply
 	Remember    []string            `json:"remember"`
 	Ask         bool                `json:"ask"`
-	recalled    []string            // the fields Questions.Given settled from memory
-}
-
-// origin is where the answer the request gives to the field at path comes from: the request, unless settled from memory.
-func (g Given) origin(path string) domain.Origin {
-	if slices.Contains(g.recalled, path) {
-		return domain.OriginRemembered
-	}
-
-	return domain.OriginRequest
 }
 
 // Answer is the request with the field at path answered by values, spelled as the field's Answer spells them; a value the field cannot take, or a path that is not one of these questions, leaves the request as it was.
@@ -142,7 +132,7 @@ func envFrom(params QuestionsParams) domain.Choice[project.EnvStrategy] {
 	remembered := project.EnvStrategy(params.Repository.Config.Remembered[project.RememberEnvStrategy])
 	switch {
 	case params.Given.EnvFrom != "":
-		question.Answer = domain.Answer[project.EnvStrategy]{Value: params.Given.EnvFrom, Origin: params.Given.origin(domain.PathEnvFrom)}
+		question.Answer = domain.Answer[project.EnvStrategy]{Value: params.Given.EnvFrom, Origin: domain.OriginRequest}
 	case params.Exists != "":
 	case remembered != "":
 		question.Answer = domain.Answer[project.EnvStrategy]{Value: remembered, Origin: domain.OriginRemembered}
@@ -164,7 +154,7 @@ func isolation(params QuestionsParams) domain.Choice[project.Isolation] {
 
 	switch {
 	case params.Given.Isolation != "":
-		question.Answer = domain.Answer[project.Isolation]{Value: params.Given.Isolation, Origin: params.Given.origin(domain.PathIsolation)}
+		question.Answer = domain.Answer[project.Isolation]{Value: params.Given.Isolation, Origin: domain.OriginRequest}
 	case params.Exists == "":
 		question.Answer = isolationAnswer(project.Isolation(params.Repository.Config.Remembered[project.RememberIsolation]), params.Repository.Run)
 	}
@@ -193,7 +183,7 @@ func fastForward(params QuestionsParams) domain.Confirm {
 	}
 	switch {
 	case params.Given.FastForward != nil:
-		question.Answer = domain.Answer[bool]{Value: *params.Given.FastForward, Origin: params.Given.origin(domain.PathFastForward)}
+		question.Answer = domain.Answer[bool]{Value: *params.Given.FastForward, Origin: domain.OriginRequest}
 	case question.Skip != "":
 	case remembered != "":
 		question.Answer = domain.Answer[bool]{Value: remembered == project.SourceUpdateFastForward, Origin: domain.OriginRemembered}
@@ -319,9 +309,9 @@ func rememberable() []string {
 	return []string{domain.PathEnvFrom, domain.PathIsolation, domain.PathFastForward}
 }
 
-// Given is the request the questions answer, each field as settled, those answered from memory still known as such; --ask is kept, so a request settled again sets the remembered answers aside as this one did.
+// Given is the request the questions answer, each field as settled; --ask is kept, so a request settled again sets the remembered answers aside as this one did.
 func (q Questions) Given() Given {
-	return Given{EnvFrom: q.EnvFrom.Value, Isolation: q.Isolation.Value, FastForward: new(q.FastForward.Value), Remember: q.remembered(), Ask: q.Ask, recalled: q.recalled()}
+	return Given{EnvFrom: q.EnvFrom.Value, Isolation: q.Isolation.Value, FastForward: new(q.FastForward.Value), Remember: q.remembered(), Ask: q.Ask}
 }
 
 // remembered are the fields whose answer is to be remembered, in the order of the form and each once; a field whose question is skipped is not.
@@ -345,7 +335,6 @@ type Answers struct {
 	strategy    project.EnvStrategy // the strategy it stands for
 	isolation   project.Isolation
 	fastForward bool
-	recalled    []string // the fields answered from memory
 	asked       bool
 }
 
@@ -356,11 +345,11 @@ func (q Questions) Answers() Answers {
 		strategy = q.Configured
 	}
 
-	return Answers{envFrom: q.EnvFrom.Value, strategy: strategy, isolation: q.Isolation.Value, fastForward: q.FastForward.Value, recalled: q.recalled(), asked: true}
+	return Answers{envFrom: q.EnvFrom.Value, strategy: strategy, isolation: q.Isolation.Value, fastForward: q.FastForward.Value, asked: true}
 }
 
-// recalled are the fields answered from memory, in the order of the form.
-func (q Questions) recalled() []string {
+// Recalled are the fields answered from memory, in the order of the form.
+func (q Questions) Recalled() []string {
 	origins := map[string]domain.Origin{domain.PathEnvFrom: q.EnvFrom.Origin, domain.PathIsolation: q.Isolation.Origin, domain.PathFastForward: q.FastForward.Origin}
 	var recalled []string
 	for _, field := range rememberable() {
@@ -370,11 +359,6 @@ func (q Questions) recalled() []string {
 	}
 
 	return recalled
-}
-
-// Recalled are the fields answered from memory, in the order of the form.
-func (a Answers) Recalled() []string {
-	return a.recalled
 }
 
 // FollowsConfig reports whether the env strategy follows config.toml's (EnvFromConfig) rather than naming one.
@@ -392,19 +376,21 @@ func (a Answers) Isolation() project.Isolation {
 	return a.isolation
 }
 
-// Remembered are the answers of fields to remember, keyed by their id in config.toml.
-func (a Answers) Remembered(fields []string) map[string]string {
+// Remembered are the answers of fields to remember, keyed by their id in config.toml, and those fields, a field without an answer left out.
+func (a Answers) Remembered(fields []string) (map[string]string, []string) {
 	values := map[string][2]string{
 		domain.PathEnvFrom:     {project.RememberEnvStrategy, string(a.envFrom)},
 		domain.PathIsolation:   {project.RememberIsolation, string(a.isolation)},
 		domain.PathFastForward: {project.RememberSourceUpdate, project.SourceUpdate(a.fastForward)},
 	}
 	answers := map[string]string{}
+	var kept []string
 	for _, field := range fields {
 		if id, value := values[field][0], values[field][1]; id != "" && value != "" {
 			answers[id] = value
+			kept = append(kept, field)
 		}
 	}
 
-	return answers
+	return answers, kept
 }

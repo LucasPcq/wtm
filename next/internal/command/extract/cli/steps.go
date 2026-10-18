@@ -200,7 +200,7 @@ func (b *branchStep) Standing() form.Standing {
 	creating := b.target.creating()
 	st.Erred = st.Erred && creating
 	if !creating {
-		st.Flag = ""
+		st.Given, st.Flag = false, ""
 	}
 
 	return st

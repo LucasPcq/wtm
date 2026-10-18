@@ -117,10 +117,11 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 		return Plan{}, nil, err
 	}
 
-	resolved, err := Resolve(facts, req)
+	questions, err := resolve(facts, req)
 	if err != nil {
 		return Plan{}, nil, err
 	}
+	resolved := questions.Request()
 
 	// Conflicts depend on the resolved target and files, so they are read only once the request is settled.
 	conflicts, err := u.Git.Conflicts(ctx, facts.conflictCheck(resolved))
@@ -128,7 +129,9 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 		return Plan{}, nil, err
 	}
 
-	return Decide(facts, resolved, conflicts)
+	planned, warnings, err := Decide(facts, resolved, conflicts)
+	planned.recalled = questions.Recalled()
+	return planned, warnings, err
 }
 
 // ----------------------------------------------------------------------------

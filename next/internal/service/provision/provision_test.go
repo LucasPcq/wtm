@@ -369,6 +369,15 @@ func TestARememberThatFailsIsTheCommandsWarning(t *testing.T) {
 	assert.Equal(t, domain.Params{"cause": "read-only file system"}, warnings[0].Params)
 }
 
+func TestARememberReturnsTheFieldsItWrote(t *testing.T) {
+	service := provision.Service{Answers: storetest.NewFake(storetest.FakeParams{Config: &project.Config{}})}
+
+	remembered, warnings := service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), []string{domain.PathEnvFrom, "keep"})
+
+	assert.Equal(t, []string{domain.PathEnvFrom}, remembered)
+	assert.Empty(t, warnings)
+}
+
 func TestNothingToRememberWritesNothing(t *testing.T) {
 	service := provision.Service{Answers: storetest.NewFake(storetest.FakeParams{Fail: map[string]error{"Remember": errors.New("read-only file system")}})}
 

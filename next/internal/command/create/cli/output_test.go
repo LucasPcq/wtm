@@ -2,9 +2,9 @@ package cli
 
 import (
 	"bytes"
-	"strings"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
