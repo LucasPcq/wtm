@@ -1,0 +1,91 @@
+-- github.com/LucasPcq/wtm/next/internal/domain/domain.go --
+// Package domain is the domain.
+package domain
+
+const CodeRequired = "required"
+
+type Code string
+
+type Warning struct{ Code, Message string }
+-- github.com/LucasPcq/wtm/next/internal/command/create/create.go --
+// Package create creates worktrees.
+package create
+
+import "github.com/LucasPcq/wtm/next/internal/domain"
+
+const Name = "create"
+
+const CodeConfigNotFound = "create.config_not_found"
+
+const codeRequired = "required" // want `code "required" is declared in command/create: it must start with "create."`
+
+const codeConverted = domain.Code("converted") // want `code "converted" is declared in command/create`
+
+const codeJoined = Name + ".joined"
+
+const codec = "json"
+
+var codeVar = "var" // want `code "var" is declared in command/create`
+
+var (
+	_ = domain.Warning{Code: "create.ff_dirty"}
+	_ = domain.Warning{Code: "extract.ff_dirty"} // want `code "extract.ff_dirty" is declared in command/create`
+	_ = domain.Warning{Code: "distinct", Message: "not_found"} // want `code "distinct" is declared in command/create`
+	_ = domain.Warning{Code: ("paren")} // want `code "paren" is declared in command/create`
+	_ = domain.Warning{Code: Name + ".built"}
+	_ = domain.Warning{Code: domain.CodeRequired}
+	_ = domain.Warning{Code: codeRequired}
+	_ = codec
+	_ = codeVar
+)
+-- github.com/LucasPcq/wtm/next/internal/command/create/create_test.go --
+package create
+
+import "github.com/LucasPcq/wtm/next/internal/domain"
+
+var _ = domain.Warning{Code: "anything"}
+-- github.com/LucasPcq/wtm/next/internal/command/create/cli/cli.go --
+// Package cli is create's command line.
+package cli
+
+import (
+	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+)
+
+var _ = domain.Warning{Code: "cli.flag"} // want `code "cli.flag" is declared in command/create`
+
+var _ = domain.Warning{Code: create.Name + ".flag"}
+-- github.com/LucasPcq/wtm/next/internal/command/fastforward/fastforward.go --
+// Package fastforward advances branches: its Name is not its directory's.
+package fastforward
+
+import "github.com/LucasPcq/wtm/next/internal/domain"
+
+const Name = "fast-forward"
+
+var (
+	_ = domain.Warning{Code: "fast-forward.busy"}
+	_ = domain.Warning{Code: "fastforward.busy"} // want `code "fastforward.busy" is declared in command/fastforward: it must start with "fast-forward."`
+)
+-- github.com/LucasPcq/wtm/next/internal/command/fastforward/cli/cli.go --
+// Package cli is fast-forward's command line.
+package cli
+
+import (
+	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+)
+
+var (
+	_ = fastforward.Name
+	_ = domain.Warning{Code: "fast-forward.flag"}
+	_ = domain.Warning{Code: "fastforward.flag"} // want `code "fastforward.flag" is declared in command/fastforward`
+)
+-- github.com/LucasPcq/wtm/next/internal/service/provision/provision.go --
+// Package provision is shared.
+package provision
+
+import "github.com/LucasPcq/wtm/next/internal/domain"
+
+var _ = domain.Warning{Code: "provision.hook"}

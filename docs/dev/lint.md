@@ -56,11 +56,12 @@ A glyph table alone does not hold a surface of sixty commands: "nothing to do" g
 
 ### `next/`
 
-The driver loads `internal/` and `next/` in one run (`go run ./tools/archlint [root…]`, both by default). The rules written for `internal/` act on its packages only (`internalOnly` in `analyzers.go`); `typeassert` and `fontcover`, which hold for any Go code of the project, act on both. One rule is `next/`'s own, from [`next/README.md`](../../next/README.md):
+The driver loads `internal/` and `next/` in one run (`go run ./tools/archlint [root…]`, both by default). The rules written for `internal/` act on its packages only (`internalOnly` in `analyzers.go`); `typeassert` and `fontcover`, which hold for any Go code of the project, act on both. Two rules are `next/`'s own, from [`next/README.md`](../../next/README.md):
 
 | Rule | Catches |
 | -- | -- |
 | `next` | an import outside the package's row of the `next/` import table (`domain/`, `service/<name>`, `service/<name>test`, `command/<name>`, `command/<name>/cli`, `adapter/<name>`, `adapter/<name>test`, `ui/<name>`, `ui/<name>test`, `api`, `cmd/wtm-next`), a package in no row (the root of `next/` and any `cmd/` but `cmd/wtm-next` included), a name ending in `test` under `service/`, `adapter/` or `ui/` with no package of the name before the suffix beside it, an import of `internal/` from a source or a test file, a directory holding only tests (the driver loads no tests, so no other check would read it), and a fake (`<layer>/<name>test`) imported from anything but a test or the fake's own package |
+| `codeprefix` | a code a command declares (the constant value given to a `Code:` field, or to a `Code…`/`code…` constant or variable) in `command/<name>`, its `cli` or their sub-packages that does not start with the command's `Name` and a dot (`fast-forward.`, even in `command/fastforward`): a code shared by several commands is a `domain` constant. A code passed by position or through a helper is not seen |
 
 Comments in `next/` follow Go's doc-comment conventions (the `go-style` skill): `staticcheck` runs every check there, the naming and doc-comment ones included (`next/staticcheck.conf`, which staticcheck reads for the packages under it), and `make next-lint`, part of `make lint`, runs revive with `next/revive.toml` (`exported`, `package-comments`, naming and error-flow rules).
 
