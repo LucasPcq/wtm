@@ -1,0 +1,110 @@
+{
+  "v": 2,
+  "command": "list",
+  "ok": true,
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "branch": "main",
+        "path": "<SB>/acme",
+        "main": true,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "commits_ahead": 0,
+        "created_at": null,
+        "origin": {
+          "ahead": 0,
+          "behind": 0,
+          "state": "up-to-date"
+        },
+        "pr": null,
+        "services": []
+      }
+    },
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "branch": "feat/a",
+        "path": "<SB>/acme.trees/feat-a",
+        "main": false,
+        "dirty": true,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "commits_ahead": 2,
+        "created_at": "<T>",
+        "origin": {
+          "ahead": 1,
+          "behind": 0,
+          "state": "ahead"
+        },
+        "pr": null,
+        "services": [
+          "api",
+          "web"
+        ]
+      }
+    },
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "main": false,
+        "dirty": false,
+        "locked": true,
+        "rebasing": false,
+        "missing": false,
+        "commits_ahead": 0,
+        "created_at": "<T>",
+        "origin": null,
+        "pr": null,
+        "services": []
+      }
+    },
+    {
+      "subject": "feat/gone",
+      "status": "done",
+      "detail": {
+        "branch": "feat/gone",
+        "path": "<SB>/acme.trees/feat-gone",
+        "main": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": true,
+        "commits_ahead": 0,
+        "created_at": "<T>",
+        "origin": null,
+        "pr": null,
+        "services": []
+      }
+    },
+    {
+      "subject": "<SB>/acme.trees/detached",
+      "status": "done",
+      "detail": {
+        "branch": "",
+        "path": "<SB>/acme.trees/detached",
+        "main": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "commits_ahead": 0,
+        "created_at": null,
+        "origin": null,
+        "pr": null,
+        "services": []
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

@@ -101,10 +101,25 @@ func (c *Command[R, Q, O]) Flags() output.Flags {
 // Bind registers on cmd a flag per field of the schema, by its kind, with its usage and the values it accepts, then the flags every command shares: --remember when a field is rememberable, --ask, --yes, --output, --dry-run and --expect-fingerprint; run is where the command prints its run.
 func (c *Command[R, Q, O]) Bind(cmd *cobra.Command, run *uicli.Run) {
 	c.io = run
-	flags := cmd.Flags()
-	_, usages := c.schema().Flags()
+	usages := bindFields(cmd, c.schema())
 
-	for _, field := range c.bound() {
+	flags := cmd.Flags()
+	if usage, rememberable := usages[domain.PathRemember]; rememberable {
+		flags.StringArray(domain.PathRemember, nil, usage)
+	}
+	flags.Bool(domain.PathAsk, false, uicli.AskUsage)
+	flags.BoolVarP(&c.yes, "yes", "y", false, c.YesUsage)
+	flags.StringVar(&run.Output, "output", uicli.OutputText, uicli.OutputUsage)
+	flags.BoolVarP(&c.dryRun, uicli.FlagDryRun, "n", false, uicli.DryRunUsage)
+	flags.StringVar(&c.expect, uicli.FlagExpectFingerprint, "", uicli.ExpectUsage)
+}
+
+// bindFields registers on cmd a flag per field of schema, by its kind, with its usage and the values it accepts, and returns the usage of each path.
+func bindFields(cmd *cobra.Command, schema domain.Form) map[string]string {
+	flags := cmd.Flags()
+	_, usages := schema.Flags()
+
+	for _, field := range bound(schema) {
 		name, usage := flagName(field), usages[field.Spec().Path]
 		switch field := field.(type) {
 		case domain.ConfirmField:
@@ -121,21 +136,14 @@ func (c *Command[R, Q, O]) Bind(cmd *cobra.Command, run *uicli.Run) {
 		}
 	}
 
-	if usage, rememberable := usages[domain.PathRemember]; rememberable {
-		flags.StringArray(domain.PathRemember, nil, usage)
-	}
-	flags.Bool(domain.PathAsk, false, uicli.AskUsage)
-	flags.BoolVarP(&c.yes, "yes", "y", false, c.YesUsage)
-	flags.StringVar(&run.Output, "output", uicli.OutputText, uicli.OutputUsage)
-	flags.BoolVarP(&c.dryRun, uicli.FlagDryRun, "n", false, uicli.DryRunUsage)
-	flags.StringVar(&c.expect, uicli.FlagExpectFingerprint, "", uicli.ExpectUsage)
+	return usages
 }
 
-// bound are the fields a flag sets, the first of each path, in the order of the form.
-func (c *Command[R, Q, O]) bound() []domain.Field {
+// bound are the fields of schema a flag sets, the first of each path, in the order of the form.
+func bound(schema domain.Form) []domain.Field {
 	var fields []domain.Field
 	seen := map[string]bool{}
-	for _, field := range c.schema().Fields {
+	for _, field := range schema.Fields {
 		path := field.Spec().Path
 		if seen[path] || positional(field) {
 			continue
@@ -169,8 +177,31 @@ func accepting(options []domain.Option) []string {
 
 // request is the request cmd's flags and args give: each flag the user set answers its field, and the arguments the positional field.
 func (c *Command[R, Q, O]) request(cmd *cobra.Command, args []string) R {
+	answers := fieldAnswers(cmd, args, c.schema())
+
+	flags := cmd.Flags()
+	if flags.Changed(domain.PathRemember) {
+		remember, _ := flags.GetStringArray(domain.PathRemember)
+		answers = append(answers, domain.Answered{Path: domain.PathRemember, Values: remember})
+	}
+	if ask, _ := flags.GetBool(domain.PathAsk); flags.Changed(domain.PathAsk) {
+		answers = append(answers, domain.Answered{Path: domain.PathAsk, Values: []string{strconv.FormatBool(ask)}})
+	}
+
+	return folded[R](answers)
+}
+
+// folded is the request answers give; a flag holds a value of its field's own type, which the request always takes.
+func folded[R Request[R]](answers []domain.Answered) R {
+	var req R
+	req, _ = domain.Fold(req, answers)
+	return req
+}
+
+// fieldAnswers are the answers cmd's flags and args give the fields of schema: each flag the user set answers its field, and the arguments the positional field.
+func fieldAnswers(cmd *cobra.Command, args []string, schema domain.Form) []domain.Answered {
 	var answers []domain.Answered
-	for _, field := range c.schema().Fields {
+	for _, field := range schema.Fields {
 		if positional(field) && len(args) > 0 {
 			answers = append(answers, domain.Answered{Path: field.Spec().Path, Values: arguments(field, args)})
 			break
@@ -178,7 +209,7 @@ func (c *Command[R, Q, O]) request(cmd *cobra.Command, args []string) R {
 	}
 
 	flags := cmd.Flags()
-	for _, field := range c.bound() {
+	for _, field := range bound(schema) {
 		name := flagName(field)
 		if !flags.Changed(name) {
 			continue
@@ -198,18 +229,7 @@ func (c *Command[R, Q, O]) request(cmd *cobra.Command, args []string) R {
 		answers = append(answers, domain.Answered{Path: field.Spec().Path, Values: values})
 	}
 
-	if flags.Changed(domain.PathRemember) {
-		remember, _ := flags.GetStringArray(domain.PathRemember)
-		answers = append(answers, domain.Answered{Path: domain.PathRemember, Values: remember})
-	}
-	if ask, _ := flags.GetBool(domain.PathAsk); flags.Changed(domain.PathAsk) {
-		answers = append(answers, domain.Answered{Path: domain.PathAsk, Values: []string{strconv.FormatBool(ask)}})
-	}
-
-	// A flag holds a value of its field's own type, which the request always takes.
-	var req R
-	req, _ = domain.Fold(req, answers)
-	return req
+	return answers
 }
 
 // arguments are the words given to the positional field, trimmed: every one for a list, the first otherwise.
@@ -335,7 +355,7 @@ func (c *Command[R, Q, O]) Argv(command string, req R) []string {
 		words []string
 	}
 	var flags []given
-	for _, field := range c.bound() {
+	for _, field := range bound(c.schema()) {
 		flags = append(flags, given{name: flagName(field), words: flagWords(field, req.Values(field.Spec().Path))})
 	}
 

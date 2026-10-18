@@ -1,0 +1,18 @@
+$ <BIN> list; echo EXIT=$?
+
+  Step 1/2 • Select a worktree
+
+  ╭──────────────────────────────────────────────╮
+  │ GitHub not connected                         │
+  │ Connect to see PRs linked to your worktrees: │
+  │ run `gh auth login`                          │
+  ╰──────────────────────────────────────────────╯
+
+▌▸ main                                                                  parent  ● active   ✓ clean
+   feat/a                                                              base ↑2  origin ↑1   ⚠ dirty
+   feat/b                                                                          locked   ✓ clean
+   feat/gone                                                                                ✓ clean
+                                                                                            ✓ clean
+
+  ↑↓ navigate • / filter • r refresh • enter confirm • esc cancel
+

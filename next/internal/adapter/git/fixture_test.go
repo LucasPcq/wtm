@@ -19,6 +19,7 @@ type port interface {
 	Locate(ctx context.Context, path string) (worktree.Location, error)
 	Branches(ctx context.Context) (worktree.Branches, error)
 	AheadBehind(ctx context.Context, name string) (worktree.AheadBehind, error)
+	Count(ctx context.Context, span worktree.Span) (int, error)
 	Dirty(ctx context.Context, path string) (bool, error)
 	AddWorktree(ctx context.Context, addition worktree.Addition) error
 	RemoveWorktree(ctx context.Context, path string) error
@@ -63,6 +64,7 @@ func seed(root string) gittest.FakeParams {
 			{Path: filepath.Join(root, "gone"), State: worktree.OnBranch{Branch: "gone"}},
 			{Path: filepath.Join(root, "detached"), State: worktree.Detached{}},
 			{Path: filepath.Join(root, "rebasing"), State: worktree.Rebasing{Branch: "rebasing"}},
+			{Path: filepath.Join(root, "locked"), State: worktree.OnBranch{Branch: "locked"}, Locked: true},
 		},
 		Gone:    []string{filepath.Join(root, "gone")},
 		Folders: []string{filepath.Join(root, "taken")},

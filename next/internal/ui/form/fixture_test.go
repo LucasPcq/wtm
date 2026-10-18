@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"io"
 	"maps"
 	"slices"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/stretchr/testify/require"
 
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
@@ -178,4 +180,30 @@ func observed(t *testing.T, a *app, given request) *form.Session[request, questi
 	require.NoError(t, err)
 	apply()
 	return s
+}
+
+// A read is what the fake read command found.
+type read = domain.Read[struct{}]
+
+// reader is a fake read use case that finds read.
+type reader struct{ read read }
+
+func (r reader) Run(context.Context, request, domain.RunOptions) (read, error) { return r.read, nil }
+
+// fakeQuery is a read command over the fake request, finding one subject, whose picker picks `wtm go feat/x` and counts its picks.
+func fakeQuery() (*form.Query[request, questions, read], *int) {
+	picked := 0
+	return &form.Query[request, questions, read]{
+		Open: func(context.Context, string) (form.Reader[request, read], error) {
+			return reader{read: read{Items: []domain.Unit[struct{}]{{Subject: "feat/x", Status: domain.StatusDone}}}}, nil
+		},
+		Draw: func(w io.Writer, got read, _ string) {
+			_, _ = io.WriteString(w, "read "+strconv.Itoa(len(got.Items))+"\n")
+		},
+		Pick: func(_ context.Context, got read, _ request, _ *uicli.Run) (read, error) {
+			picked++
+			got.FollowUps = []domain.FollowUp{{Argv: []string{"wtm", "go", "feat/x"}, Message: "Go there"}}
+			return got, nil
+		},
+	}, &picked
 }

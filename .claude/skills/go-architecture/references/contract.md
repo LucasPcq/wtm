@@ -61,3 +61,12 @@ The kind decides (`ui/cli/exit.go`); a command maps its own codes in its `cli/` 
 - A mutating command runs inside an operation (`service/operation`): a record under the state directory, a shared lock on the repository, an exclusive lock per worktree, taken before observing; a plan naming a worktree the request did not is planned again once that lock is held. A dry run takes none.
 - Events (`operation.*`, `unit.*`, `phase.*`, `worktree.created`/`provisioned`/`updated`/`numbered`) go out through the operation's report; a command adds an event only for a change another process must see.
 - The first Ctrl+C cancels the context: the section in progress finishes (a shield), later items are skipped as interrupted, exit 19; the second kills the children's process groups. Details: `next/README.md`, "Cancellation".
+
+## A read
+
+A command that changes nothing — `list`, and later `status` or `tree` — is a read, and keeps a smaller contract through the same shared pieces.
+
+- `Run(ctx, req, opts)` keeps the signature, so `api.Bind` binds it as any command, and returns a `domain.Read[Detail]`: one `Unit` per subject (`done` with its detail, or `failed` with the error that kept it from being read), the warnings, and the follow-ups chosen. No lock, no operation, no event, no plan, no fingerprint: its envelope has no `op`, `plan` nor `fingerprint`. A refresh that fetches from origin is a field of the request, best effort.
+- Its `cli` is a `form.Query`: the flags of its schema and `--output`, no `--yes`, `--dry-run`, `--expect-fingerprint`, `--remember` nor `--ask`; a refusal and the envelope as every command prints them, the read drawn by its `Draw`, the exit code of its first failed subject.
+- What the read cannot ask (GitHub, the run daemon) is a warning with the read's code (`list.prs_unavailable`, `list.jobs_unknown`), exit 0, its fields `null`; a read never starts the run daemon.
+- A picker (`Query.Pick`) opens only when stdin, stdout and stderr are terminals and the output is human — a read piped elsewhere is asked for its data. It walks `form.Script` steps with no recap (`Preview` nil), `Later` for what is slow to read, `Refresh` for `r`, and ends on a `domain.FollowUp` the use case builds (its argv injected from `cmd/wtm-next`), printed by the conclusion; leaving it is `cancelled`, exit 19. Todo: run that follow-up in-process once every command it names has migrated.

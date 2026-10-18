@@ -20,7 +20,7 @@ type Styles struct {
 	renderer *lipgloss.Renderer
 	bold     lipgloss.Style
 	Muted    lipgloss.Style // chrome and lines that report no event
-	success  lipgloss.Style
+	Success  lipgloss.Style // a glyph of something done
 	Warning  lipgloss.Style
 	primary  lipgloss.Style
 	Danger   lipgloss.Style
@@ -33,7 +33,7 @@ func newStyles(r *lipgloss.Renderer) *Styles {
 		renderer: r,
 		bold:     r.NewStyle().Bold(true),
 		Muted:    r.NewStyle().Foreground(ColorMuted),
-		success:  r.NewStyle().Foreground(ColorSuccess),
+		Success:  r.NewStyle().Foreground(ColorSuccess),
 		Warning:  r.NewStyle().Foreground(ColorWarning),
 		primary:  r.NewStyle().Foreground(ColorPrimary),
 		Danger:   r.NewStyle().Foreground(ColorDanger),

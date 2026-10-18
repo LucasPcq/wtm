@@ -81,6 +81,22 @@ func TestTheFakeAndGitAgreeOnTheTipsAndCountsOfTheirBranches(t *testing.T) {
 	}
 }
 
+func TestTheFakeAndGitCountTheCommitsABranchHasThatItsBaseLacks(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			unmerged, unmergedErr := impl.port.Count(t.Context(), worktree.Span{Branch: "unmerged", Base: "main"})
+			merged, mergedErr := impl.port.Count(t.Context(), worktree.Span{Branch: "feature", Base: "main"})
+			_, missingErr := impl.port.Count(t.Context(), worktree.Span{Branch: "unmerged", Base: "nope"})
+
+			require.NoError(t, unmergedErr)
+			assert.Equal(t, 1, unmerged)
+			require.NoError(t, mergedErr)
+			assert.Zero(t, merged)
+			require.Error(t, missingErr)
+		})
+	}
+}
+
 func TestTheFakeAndGitRefuseTheSameBranchChanges(t *testing.T) {
 	refusals := []struct {
 		name string

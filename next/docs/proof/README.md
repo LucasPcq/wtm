@@ -13,6 +13,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./tty.sh legacy "${sandboxes% *}" "$wtm" tty/legacy
 ./tty.sh next "${sandboxes#* }" "$next" tty/next
 ./extract.sh "$wtm" "$next" extract
+./list.sh "$wtm" "$next" list
 git diff --stat .
 ```
 
@@ -88,6 +89,31 @@ The reference is the legacy `wtm extract` of 0.30.1. Its output differs by desig
   - 11: next copies main's `.env` (`FROM=main`, `env_strategy: main` in its meta) where legacy has no `--env-from` and refuses the flag (exit 2). Next asks a new target its env strategy as create does, with its flag and its remembered answer — a deliberate departure from legacy, whose extract always follows `env.strategy`.
   - 12: both move the file; the states differ only by those of 7 and 11.
   - 13: legacy refuses `--output json` without `--yes` (exit 2); next runs it unattended and creates `feat/jny`.
+
+# Proof: `wtm list` (legacy `surface/cli/wt`) vs `wtm-next list`
+
+The reference is the legacy `wtm list` of 0.30.1. `list` is a read: the proof checks that neither binary changes anything on disk, and keeps both outputs side by side.
+
+- `list.sh <wtm> <wtm-next> list`: two identical sandboxes (the `docs/demos` "acme" project with a bare `origin`; `feat/a` two commits ahead of main, one ahead of origin, with an untracked file; `feat/b` locked; `feat/gone` whose directory was deleted; a detached worktree; a git repository with no wtm config; a plain directory), the same scenarios run by each binary without a terminal; each records the exit code, stdout and stderr, and the state before and after it (every ref, `git worktree list`, each worktree's status, every `meta.json`, wtm's global directory) into `<side>/unchanged.diff`, empty for both sides. The sandbox's gh is not signed in (its HOME is the sandbox's), so `--with-prs` shows GitHub unreachable, as it is.
+  1. the text
+  2. `--output json`
+  3. `--with-prs`
+  4. `--with-prs --output json`
+  5. from inside `feat/a`
+  6. with `feat/a`'s profile up (`wtm run up feat/a -d`)
+  7. the same, `--output json`
+  8. `-q`
+  9. an argument, `list feat/a`
+  10. a repository with no wtm config
+  11. the same, `--output json`
+  12. a directory outside any repository, `--output json`
+- Then the picker in tmux at 100×30 (`tty-*.txt`): the worktrees once the pull requests had their say, `feat/a`'s actions, Go, and a picker left with esc.
+- The differences, all approved by the owner:
+  - **The JSON is the v2 envelope of a read** (`{v, command, ok, items[{subject, status, detail}], follow_ups, warnings}`, no `op`, `plan` nor `fingerprint`) where legacy prints a bare array (2, 4, 7). The detail renames `is_parent` to `main` (wtm's parent is the branch a worktree was created from), `is_dirty` to `dirty`, `is_locked` to `locked`, `rebase_in_progress` to `rebasing`; it adds `missing`; `created_at` is `null` without a meta record where legacy made one up from the directory's mtime (the main worktree, always); `services` is `null` when the run daemon cannot tell; the subject is the branch, else the path. A refusal is the envelope on stdout (11, 12) where legacy printed text on stderr and nothing on stdout.
+  - **What cannot be asked is a warning, exit 0**: `--with-prs` without gh or signed out says ``! GitHub not connected: run `gh auth login` to see pull requests`` (`list.prs_unavailable`, 3, 4) where legacy said nothing; with no daemon listening but jobs in its index, `list.jobs_unknown` and `services: null`. A read never starts the run daemon, where legacy started one to read its index back.
+  - **The uniform text**: `main` for the main worktree (legacy `(parent)`), `• active` (legacy `● active`, missing from common monospace fonts), `! dirty`, `! rebasing`, `✓ clean` (legacy `⚠`), the columns aligned whatever the glyphs (legacy pads two columns too far after `●` and `↑`), a worktree whose directory is gone `✗ missing` (legacy `✓ clean`), one on no branch named by its path from where the command runs (legacy: an empty name), the warnings under the table (1, 3, 5, 6).
+  - **An argument is refused** (9): exit 2, where legacy listed and ignored it.
+  - **The picker** (`tty-*`): opens only when stdin, stdout and stderr are terminals (legacy: stdin alone, so `wtm list | cat` drew its wizard into the pipe); its rows badged as the table's, the GitHub warning under its title instead of a box; the actions read `Go to the worktree`, `Open the pull request` (only for a worktree with one, where legacy offered it to every worktree), `Start the profile`, `Stop the profile`, `View the logs`, `Clean (delete the worktree)` (not for the main worktree; only this for a missing one; only Go for one on no branch); the action chosen ends the run on its command line, `→ wtm go feat/a   Go to the worktree`, where legacy ran it (Go printed the path); leaving it exits 19 (legacy 0). `r` reads again after fetching the worktrees' branches from origin, as legacy's.
 
 # Deliberate differences from legacy
 

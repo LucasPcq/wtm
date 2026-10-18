@@ -287,8 +287,8 @@ type buildWorktreeParams struct {
 }
 
 // buildWorktree adds the worktree in its seeded state, a rebase faked by its
-// rebase-merge state and a bisect by its BISECT_START, then deletes its
-// directory when the seed lists it gone.
+// rebase-merge state and a bisect by its BISECT_START, locks it when seeded
+// locked, then deletes its directory when the seed lists it gone.
 func buildWorktree(t testing.TB, params buildWorktreeParams) {
 	t.Helper()
 	path := params.Worktree.Path
@@ -312,6 +312,10 @@ func buildWorktree(t testing.TB, params buildWorktreeParams) {
 		}
 	case worktree.Detached, worktree.Bare:
 		Git(t, params.Main, "worktree", "add", "-q", "--detach", path, params.Root)
+	}
+
+	if params.Worktree.Locked {
+		Git(t, params.Main, "worktree", "lock", path)
 	}
 
 	if slices.Contains(params.Seed.Gone, path) {

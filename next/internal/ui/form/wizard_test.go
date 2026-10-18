@@ -316,3 +316,46 @@ func TestTheRecapNamesItsApplyAsTheScriptSays(t *testing.T) {
 	assert.Contains(t, d.Screen(), "Yes, extract")
 	assert.NotContains(t, d.Screen(), "Yes, apply")
 }
+
+func TestAScriptWithoutPreviewEndsOnItsLastStepWithNoRecap(t *testing.T) {
+	f := newFake()
+	script := f.script()
+	script.Preview = nil
+	d := open(t, script)
+
+	assert.Contains(t, d.Screen(), "Step 1/2 • First")
+	d.Keys("enter", "enter")
+
+	assert.Equal(t, form.Finished, d.Wizard.Ending())
+	assert.Zero(t, f.applied)
+}
+
+func TestARefreshReadsWithTheScriptsRefreshWhenItHasOne(t *testing.T) {
+	f := newFake()
+	refreshing := &refreshingStep{fakeStep: f.first}
+	refreshes := 0
+	script := f.script()
+	script.Steps[0] = refreshing
+	script.Refresh = func(context.Context) (func(), error) { return func() { refreshes++ }, nil }
+	d := open(t, script)
+
+	d.Keys("r")
+
+	assert.Equal(t, 1, f.observed)
+	assert.Equal(t, 1, refreshes)
+	assert.Equal(t, 1, refreshing.refreshed)
+}
+
+func TestWhatLandsLaterRebuildsTheStepAsked(t *testing.T) {
+	f := newFake()
+	refreshing := &refreshingStep{fakeStep: f.first}
+	landed := 0
+	script := f.script()
+	script.Steps[0] = refreshing
+	script.Later = func(context.Context) (func(), error) { return func() { landed++ }, nil }
+	d := open(t, script)
+
+	assert.Equal(t, 1, landed)
+	assert.Equal(t, 1, refreshing.refreshed)
+	assert.Equal(t, 0, d.Wizard.Current())
+}

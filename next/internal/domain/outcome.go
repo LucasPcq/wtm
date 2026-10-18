@@ -110,3 +110,25 @@ func (u Unit[D]) item() Item {
 func (u Unit[D]) interrupted() bool {
 	return u.Status == StatusCancelled || u.Reason == ReasonInterrupted
 }
+
+// A Read is what a read command found: one Unit per subject, in order, its warnings, and the follow-ups the caller chose of it. A read runs no operation: it has no plan, fingerprint, lock nor event.
+type Read[D any] struct {
+	Items     []Unit[D]
+	Warnings  []Warning
+	FollowUps []FollowUp
+}
+
+// Failure is the error the read ends on: the first subject it failed to read, else nil.
+func (r Read[D]) Failure() *Error {
+	return Result[D]{Items: r.Items}.Failure()
+}
+
+// Envelope is how the read of command ended for every surface, err being its refusal if any: its items, warnings and follow-ups, with no op, plan nor fingerprint.
+func (r Read[D]) Envelope(command string, err *Error) Envelope {
+	doc := Envelope{Command: command, Err: cmp.Or(err, r.Failure()), Warnings: r.Warnings, FollowUps: r.FollowUps}
+	for _, unit := range r.Items {
+		doc.Items = append(doc.Items, unit.item())
+	}
+
+	return doc
+}

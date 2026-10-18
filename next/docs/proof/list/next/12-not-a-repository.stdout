@@ -1,0 +1,12 @@
+{
+  "v": 2,
+  "command": "list",
+  "ok": false,
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "precondition",
+    "code": "git.not_a_repository",
+    "message": "<SB>/plain is not a git repository"
+  }
+}

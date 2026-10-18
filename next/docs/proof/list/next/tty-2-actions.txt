@@ -1,0 +1,16 @@
+$ <BIN> list; echo EXIT=$?
+
+  Step 2/2 • Action
+
+  ✓ Worktree: feat/a
+
+  What to do with feat/a
+
+▌› Go to the worktree
+   Start the profile
+   Stop the profile
+   View the logs
+   Clean (delete the worktree)
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

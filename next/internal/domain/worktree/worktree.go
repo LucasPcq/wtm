@@ -5,11 +5,13 @@ import (
 	"slices"
 )
 
-// Worktree is one worktree as git lists it: its path, whether it is the main one, and what it has checked out.
+// Worktree is one worktree as git lists it: its path, whether it is the main one, what it has checked out, whether it is locked, and whether its directory is gone (git calls it prunable).
 type Worktree struct {
-	Path  string
-	Main  bool
-	State State
+	Path     string
+	Main     bool
+	State    State
+	Locked   bool
+	Prunable bool
 }
 
 //go-sumtype:decl State

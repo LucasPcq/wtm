@@ -181,7 +181,7 @@ func (r Repo) RemoveWorktree(ctx context.Context, path string) error {
 
 // parseWorktrees reads git worktree list --porcelain -z; the first worktree is
 // the main one and each starts detached until a branch or bare line says
-// otherwise.
+// otherwise. A locked or prunable line, with or without its reason, marks it so.
 func parseWorktrees(out string) []worktree.Worktree {
 	var worktrees []worktree.Worktree
 	var current *worktree.Worktree
@@ -196,6 +196,10 @@ func parseWorktrees(out string) []worktree.Worktree {
 			current.State = worktree.OnBranch{Branch: strings.TrimPrefix(value, headsPrefix)}
 		case key == "bare":
 			current.State = worktree.Bare{}
+		case key == "locked":
+			current.Locked = true
+		case key == "prunable":
+			current.Prunable = true
 		case field == "":
 			current = nil
 		}

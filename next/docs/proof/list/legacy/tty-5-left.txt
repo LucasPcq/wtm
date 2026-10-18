@@ -1,0 +1,4 @@
+$ <BIN> list; echo EXIT=$?
+EXIT=0
+$
+

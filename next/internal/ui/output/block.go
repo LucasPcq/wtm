@@ -12,7 +12,7 @@ import (
 const (
 	Indent         = "  "
 	Dot            = " · "
-	glyphSuccess   = "✓"
+	GlyphSuccess   = "✓"
 	GlyphAttention = "!"
 	GlyphFailure   = "✗"
 	glyphUnchanged = "="
@@ -25,7 +25,7 @@ const (
 
 // SuccessLine writes msg to w as something done.
 func SuccessLine(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", Indent, StylesOf(w).success.Render(glyphSuccess), msg)
+	fmt.Fprintf(w, "%s%s %s\n", Indent, StylesOf(w).Success.Render(GlyphSuccess), msg)
 }
 
 // WarningLine writes msg to w as something the reader should look at.
