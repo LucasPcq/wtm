@@ -31,7 +31,7 @@ Layers are files, not folders: in Go a folder is a package, so a folder per laye
 
 A reader opens `usecase.go` and reads the whole request from the top. Order its sections, each under a separator (see go-style `comments.md`):
 
-1. **The use case**: the `UseCase` struct (its ports, the services it calls, its paths), `Outcome`.
+1. **The use case**: the `UseCase` struct (its ports, the services it calls), `Outcome`, `Result` and `Item` (aliases of `domain.Outcome`, `domain.Result` and `domain.Unit` over its plan and detail).
 2. **Run**: the story, its steps numbered.
 3. **Plan**: observe → resolve → decide.
 4. **Apply**: the steps that change the world.
@@ -94,7 +94,7 @@ The numbered step comments are the one place a body carries a comment per paragr
 - `rules.go` is pure (no port, no context): `Facts` and the queries over them, `Decide(facts, req, …) (Plan, []domain.Warning, error)`, the `Plan` type with `Locks()` and `Fingerprinted()`. A refusal decided here carries the command's code.
 - `questions.go` is pure: `Request`, the form model (`Questions`, built from the domain question vocabulary `domain.Choice`, `domain.Confirm`, `domain.Answer`), `NewQuestions(facts, req)` and `Resolve(facts, req)` (defaults, then validation into field errors), and the schema (below).
 - The schema is the request as data a surface renders without knowing the command: `Questions.Form() domain.Form` lists its fields in the order the wizard asks them (a step per field, so "Step n/m" counts the fields plus the recap) with the request's problems (`Form.Problems`, each naming a field, an entry of one or `remember[i]`; `domain.ProblemsOf` picks a field's), `Request.Answer(path, values) (Request, error)` writes a field's answer back, leaving the request as it was when the value is refused (`"remember"` answers the fields to remember, `"ask"` the run's `--ask`), and `Request.Values(path) []string` reads it back spelled the same way, nil when the request leaves the field to its default (the generic code cannot read a struct's fields). A `domain.Field` is a sealed interface, one type per kind — `SelectField`, `MultiSelectField`, `TextField`, `TextListField`, `ConfirmField` — each carrying only what is valid for it; every kind embeds a `FieldSpec`: path, flag, label, `Help` (one text: the wizard's description and the flag's usage), origin, skip. Options are `domain.Option` with their label, badge and `Short` (how the trail names it, when not by its value); a confirmation's two options are valued `true` and `false`, as `Answer` takes them (`NoFirst` lists no first); a select may be `Refreshable` (r reads its options again), a multi-select says its `Empty` problem. The form is computable from a zero `Questions`, since the flags and `--help` exist before any repository read: the `ui/form` engine registers the flags and usages from it (`Form.Flags`, `--remember` included when a field is rememberable), spells the command line from it and `Request.Values`, and builds a step per field, which reads its help, options, skip and problems from the form of the questions observed last. Labels, help, flag names, option labels and a rule the wizard shows (extract's `Questions.NewTarget`) live in `questions.go`; a field two steps answer (extract's target, picked as a worktree then typed as a branch) appears once per step. Round-trip tests per command check that folding the answers of `Form()` (`domain.Fold(Request{}, form.Answers())`, the fold the engine uses too) gives back the request, and that `Answer` takes back what `Values` spells.
-- `port.go` declares only interfaces, one per outside thing the use case reaches (git, config, a store), each with exactly the methods this command calls (go-style `interfaces.md`: consumer-side, small). Services are not ports: the use case holds `operation.Service` and `provision.Service` as concrete fields, and calls `repository.Observe` as a free function.
+- `port.go` declares only interfaces, one per outside thing the use case reaches (git, config, a store), each with exactly the methods this command calls (go-style `interfaces.md`: consumer-side, small). Services are not ports: the use case holds `repository.Service`, `operation.Service` and `provision.Service` as concrete fields.
 
 ## `cli/`: the driving adapter
 
@@ -107,7 +107,7 @@ A command never imports another command (archlint refuses it). Two commands shar
 | What both need | Where | Example |
 | -- | -- | -- |
 | a pure rule or a vocabulary | `domain/…` | `worktree.Place` (where a branch lands), `worktree.StackOf` (the stack of worktrees, from the live ones and their meta records), `worktree.Repository` (the facts every command decides from: main path, config, run.toml, snapshot), `worktree.SelectChanges`, `domain.WorktreeLocks`, `domain.IsolationAnswer`, `domain.Choice` |
-| a reading of the repository | a port method returning a domain value, or a service reading through its ports | `worktree.Snapshot` from the git port, `repository.Observe` (config, snapshot, run.toml) |
+| a reading of the repository | a port method returning a domain value, or a service reading through its ports | `worktree.Snapshot` from the git port, `repository.Service.Observe` (config, snapshot, run.toml) |
 | an orchestration with I/O | `service/<name>` (concrete, its own ports) | `provision.Service.Run`, `provision.Service.FastForwardEach` (typed outcomes each command words as its warnings), `operation.Service` |
 | presentation | `ui/…` | `uicli.Run` (a command's run plumbing: streams, output format, quiet, failures, envelope), the wizard engine, `output.DryRun`, `output.FollowUpSteps` |
 | questions two commands ask | the service that consumes their answers, as a schema fragment each command embeds | `provision.Questions` (env strategy, isolation, source update): create and extract embed its `Given` in their `Request` and its `Fields` in their `Form`, and `provision.Worktree` takes only its `Answers` |
@@ -140,7 +140,7 @@ A command that offers a step after its outcome (sync's "push now?" once the resu
 
 1. `command/<name>/port.go`: the ports it needs, method by method.
 2. `rules.go` and `questions.go`: facts, plan, request, form, validation — pure, tested first.
-3. `usecase.go`: `UseCase`, `Run` (the canonical shape above), `Plan`, `Apply`, `Questions`, `Observe`, `Outcome.Envelope`.
+3. `usecase.go`: `UseCase`, `Run` (the canonical shape above), `Plan`, `Apply`, `Questions`, `Observe`, and the aliases `Outcome`, `Result`, `Item`.
 4. `cli/`: the command over `form.Command`, its output, the steps it asks its own way if any; a refusal goes through `uicli.Run.Refuse` with the request's argv, which adds the `--dry-run` replay to a stale plan (a next step, or `follow_ups` in JSON).
 5. `cmd/wtm-next`: its adapters wired in `wire.go`, its cobra command registered in `main.go`, its binding in `catalogue.go`.
 6. Anything it shares with an existing command moves to `domain/`, `service/` or `ui/` in the same change.
