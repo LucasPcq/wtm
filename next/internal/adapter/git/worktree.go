@@ -167,7 +167,7 @@ func (r Repo) add(ctx context.Context, addition worktree.Addition) error {
 		_, err = r.git(ctx, "worktree", "add", "--", addition.Path, checkout.Name)
 		return err
 	case worktree.TrackingBranch:
-		_, err := r.git(ctx, "worktree", "add", "--track", "-b", checkout.Name, "--", addition.Path, r.remotePrefix()+checkout.Name)
+		_, err := r.git(ctx, "worktree", "add", "--track", "-b", checkout.Name, "--", addition.Path, remotePrefix+checkout.Name)
 		return err
 	}
 	return errNoCheckout
