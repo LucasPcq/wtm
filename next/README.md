@@ -23,7 +23,7 @@ internal/
     operation/         the operation every mutating use case goes through: its record, its locks, its plan under them and fingerprinted, its events
     operationtest/     the contract every mutating use case's Run passes (no lock nor event on a dry run, a stale plan refused before any event, events in order), for tests
     provision/         a new worktree made whole and a source fast-forwarded, shared by the commands that create one, with the questions each of them asks (questions.go: the fragment their forms embed, whose Answers are all Run takes), the fingerprint of a plan that provisions and the answers remembered
-    repository/        the facts of the repository a command decides from (config, run.toml, snapshot), wired once, refusing a repository with no wtm config with the command's `<name>.config_not_found`
+    repository/        the facts of the repository a command decides from (config, run.toml, snapshot), wired once, refusing a repository with no wtm config with the command's `<name>.config_not_found`, and one whose config.toml does not parse or validate with `<name>.config_invalid`
   adapter/             what the ports reach out to: git, statefile, store, config, shell, oplock, events, proxyport
     <name>test/        a stateful fake of an adapter, for tests
   ui/                  the presentation kit every command's cli shares, knowing no command

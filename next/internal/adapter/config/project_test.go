@@ -46,12 +46,15 @@ func TestAMissingConfigIsNotFound(t *testing.T) {
 func TestAConfigThatIsNotTOMLIsRefused(t *testing.T) {
 	_, _, err := loadState(t, stateWithConfig(t, "[worktrees\nthis is not valid toml !!!\n"))
 
-	assert.Error(t, err)
+	var invalid *project.InvalidConfigError
+	assert.ErrorAs(t, err, &invalid)
 }
 
 func TestAnUnknownKeyInConfigTomlIsRefused(t *testing.T) {
 	_, _, err := loadState(t, stateWithConfig(t, "[worktrees]\nbase_paht = \"../.trees\"\n"))
 
+	var invalid *project.InvalidConfigError
+	assert.ErrorAs(t, err, &invalid)
 	assert.ErrorContains(t, err, "unknown keys in")
 	assert.ErrorContains(t, err, "worktrees.base_paht")
 }
@@ -90,6 +93,8 @@ func TestAnInvalidConfigIsRefusedSayingWhy(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, err := loadState(t, stateWithConfig(t, tc.content))
 
+			var invalid *project.InvalidConfigError
+			assert.ErrorAs(t, err, &invalid)
 			assert.ErrorContains(t, err, tc.want)
 		})
 	}

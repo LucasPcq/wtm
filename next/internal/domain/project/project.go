@@ -10,6 +10,21 @@ import (
 // ErrConfigNotFound is returned when the project has no config.toml: wtm init has not run.
 var ErrConfigNotFound = errors.New("config file not found")
 
+// An InvalidConfigError is a config.toml that does not parse or does not validate; Reason says why.
+type InvalidConfigError struct {
+	Reason error
+}
+
+// Error is the reason.
+func (e *InvalidConfigError) Error() string {
+	return e.Reason.Error()
+}
+
+// Unwrap returns the reason, so errors.Is and errors.As see through it.
+func (e *InvalidConfigError) Unwrap() error {
+	return e.Reason
+}
+
 // The defaults of config.toml's [worktrees] section.
 const (
 	DefaultBasePath   = "../.trees"

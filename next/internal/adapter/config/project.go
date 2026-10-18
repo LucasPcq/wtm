@@ -59,7 +59,8 @@ type Project struct {
 // Load returns the project's config.toml with its defaults applied, and the
 // global config. A missing config.toml is project.ErrConfigNotFound, wrapped;
 // a missing global config is an empty one. An unknown key, a malformed hook or
-// an invalid value in either file is an error naming it.
+// an invalid value in either file is an error naming it, a
+// *project.InvalidConfigError for config.toml.
 func (p Project) Load() (project.Config, project.Global, error) {
 	path := filepath.Join(p.StateDir, configFileName)
 	data, err := os.ReadFile(path)
@@ -72,7 +73,7 @@ func (p Project) Load() (project.Config, project.Global, error) {
 
 	saved, err := parseProject(path, data)
 	if err != nil {
-		return project.Config{}, project.Global{}, fmt.Errorf("project config: %w", err)
+		return project.Config{}, project.Global{}, &project.InvalidConfigError{Reason: err}
 	}
 
 	global, err := loadGlobal(p.GlobalPath)
@@ -82,7 +83,7 @@ func (p Project) Load() (project.Config, project.Global, error) {
 
 	config := withDefaults(saved.Config)
 	if err := validateProject(config); err != nil {
-		return project.Config{}, project.Global{}, err
+		return project.Config{}, project.Global{}, &project.InvalidConfigError{Reason: err}
 	}
 	if err := global.validate(); err != nil {
 		return project.Config{}, project.Global{}, err

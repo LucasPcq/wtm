@@ -22,6 +22,9 @@ const Name = "create"
 // CodeConfigNotFound refuses a repository with no wtm config: `wtm init` has not run there.
 const CodeConfigNotFound = Name + repository.ConfigNotFound
 
+// CodeConfigInvalid refuses a repository whose config.toml does not parse or validate.
+const CodeConfigInvalid = Name + repository.ConfigInvalid
+
 // A UseCase creates worktrees in one repository: the ports it reaches the repository through and the services it shares with the other commands.
 type UseCase struct {
 	Git        Git

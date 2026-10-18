@@ -135,6 +135,21 @@ func TestWithoutConfigCreateExitsOnItsOwnCode(t *testing.T) {
 	assert.Contains(t, got.Stderr, "run `wtm init` first")
 }
 
+func TestAnInvalidConfigIsReportedAsSuch(t *testing.T) {
+	w := newWorld(seed{ConfigErr: &project.InvalidConfigError{Reason: errors.New("base_path must be relative to the repository: /tmp/trees")}})
+
+	human := runCreate(t, w, branchName, "--yes")
+	machine := runCreate(t, w, branchName, "--yes", "--output", "json")
+
+	assert.Equal(t, uicli.ExitError, human.Code)
+	assert.Contains(t, human.Stderr, "✗ invalid config.toml: base_path must be relative to the repository: /tmp/trees")
+	assert.NotContains(t, human.Stderr, "internal error")
+	assert.Equal(t, uicli.ExitError, machine.Code)
+	doc := decoded(t, machine.Stdout)
+	require.NotNil(t, doc.Error)
+	assert.Equal(t, formtest.Error{Kind: "precondition", Code: "create.config_invalid", Message: "invalid config.toml: base_path must be relative to the repository: /tmp/trees"}, *doc.Error)
+}
+
 func TestAHeldLockIsAConflict(t *testing.T) {
 	held := &domain.Error{Kind: domain.KindConflict, Code: "lock.held", Message: "repo is held by create (pid 42)"}
 
