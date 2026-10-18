@@ -109,6 +109,19 @@ func Invalid(fields []FieldError) *Error {
 	return &Error{Kind: KindInvalid, Code: CodeInvalidRequest, Message: "the request is invalid", Fields: fields}
 }
 
+// The field-error codes every command spells the same, with no command prefix.
+const (
+	CodeRequired   = "required"    // the field has no value
+	CodeNotFound   = "not_found"   // the value names nothing the repository holds
+	CodeSelfParent = "self_parent" // the branch is given as its own parent
+	CodeDistinct   = "distinct"    // the value is given twice
+)
+
+// Required returns the problem of the field at path left without a value.
+func Required(path string) FieldError {
+	return FieldError{Path: path, Code: CodeRequired, Template: "{path} is required"}
+}
+
 // InvalidMessage returns the failure of a request that is wrong as a whole, described by message.
 func InvalidMessage(message string) *Error {
 	return &Error{Kind: KindInvalid, Code: CodeInvalidRequest, Message: message}

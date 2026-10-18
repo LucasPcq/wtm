@@ -42,17 +42,15 @@ func (f Facts) pathsOf(branches []string) []string {
 type decision interface{ decision() }
 
 // A refusal is why one branch is refused, as a field error of that branch.
-type refusal struct {
-	Code     string
-	Template string
-	Params   domain.Params
-}
+type refusal domain.FieldError
 
 func (BranchPlan) decision() {}
 func (refusal) decision()    {}
 
 func (r refusal) field(index int) domain.FieldError {
-	return domain.FieldError{Path: branchPath(index), Code: r.Code, Template: r.Template, Params: r.Params}
+	problem := domain.FieldError(r)
+	problem.Path = branchPath(index)
+	return problem
 }
 
 // An entry is one branch asked, with what deciding it needs of the rest of the request.
@@ -100,11 +98,11 @@ func (f Facts) decide(e entry) decision {
 // invalid is the refusal of a branch that the request itself rules out, whatever the repository holds: blank, given twice, not a valid branch name, or sharing its path or derived name with a branch asked before it.
 func (f Facts) invalid(e entry) (refusal, bool) {
 	if worktree.BlankBranch(e.name) {
-		return refusal{Code: codeRequired, Template: "{path} is required"}, true
+		return refusal(domain.Required("")), true
 	}
 
 	if slices.Contains(e.earlier, e.name) {
-		return refusal{Code: "distinct", Template: "{path}: {value} is given twice", Params: domain.Params{"value": e.name}}, true
+		return refusal{Code: domain.CodeDistinct, Template: "{path}: {value} is given twice", Params: domain.Params{"value": e.name}}, true
 	}
 
 	if err := worktree.BranchProblem(e.name); err != nil {

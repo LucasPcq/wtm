@@ -382,12 +382,6 @@ func (q Questions) facing(conflicts []worktree.Conflict) Questions {
 // ----------------------------------------------------------------------------
 // Resolve and validation
 
-// The field-error codes extract spells as every command does, with no extract. prefix.
-const (
-	codeRequired = "required"
-	codeNotFound = "not_found"
-)
-
 // Resolve settles the request on the facts, every field answered as NewQuestions answers it; a request with problems is refused with all of them, by domain.Invalid.
 func Resolve(f Facts, req Request) (Request, error) {
 	questions := NewQuestions(f, req)
@@ -433,9 +427,9 @@ func (f Facts) problems(req Request, q Questions) []domain.FieldError {
 func (f Facts) sourceProblems(source string) []domain.FieldError {
 	switch {
 	case source == "":
-		return []domain.FieldError{{Path: "source", Code: codeRequired, Template: "{path} is required"}}
+		return []domain.FieldError{domain.Required("source")}
 	case f.CheckedOutAt(source) == "":
-		return []domain.FieldError{{Path: "source", Code: codeNotFound, Template: "{path}: no worktree holds {value}", Params: domain.Params{"value": source}}}
+		return []domain.FieldError{{Path: "source", Code: domain.CodeNotFound, Template: "{path}: no worktree holds {value}", Params: domain.Params{"value": source}}}
 	}
 
 	return nil
@@ -447,7 +441,7 @@ func (f Facts) fileProblems(req Request) []domain.FieldError {
 	case f.CheckedOutAt(req.Source) == "":
 		return nil
 	case len(req.Files) == 0:
-		return []domain.FieldError{{Path: "files", Code: codeRequired, Template: "{path} is required"}}
+		return []domain.FieldError{domain.Required("files")}
 	}
 
 	if _, missed := worktree.SelectChanges(f.Changes[req.Source], req.Files); missed != "" {
@@ -467,16 +461,16 @@ func (f Facts) fromProblems(req Request) []domain.FieldError {
 	case from == "" && target.Action == ActionCheckOut:
 		return []domain.FieldError{{
 			Path:     "from",
-			Code:     codeRequired,
+			Code:     domain.CodeRequired,
 			Template: "{path} is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)",
 			Params:   domain.Params{"because": "extract.parent_required"},
 		}}
 	case from == "":
-		return []domain.FieldError{{Path: "from", Code: codeRequired, Template: "{path} is required: no parent is recorded for the source and no base branch is configured"}}
+		return []domain.FieldError{{Path: "from", Code: domain.CodeRequired, Template: "{path} is required: no parent is recorded for the source and no base branch is configured"}}
 	case from == target.Branch:
-		return []domain.FieldError{{Path: "from", Code: "self_parent", Template: "{value} cannot be its own parent: pass another value to {path}", Params: domain.Params{"value": from}, With: []string{"to"}}}
+		return []domain.FieldError{{Path: "from", Code: domain.CodeSelfParent, Template: "{value} cannot be its own parent: pass another value to {path}", Params: domain.Params{"value": from}, With: []string{"to"}}}
 	case !f.Candidate(from):
-		return []domain.FieldError{{Path: "from", Code: codeNotFound, Template: "{path}: {value} not found", Params: domain.Params{"value": from}}}
+		return []domain.FieldError{{Path: "from", Code: domain.CodeNotFound, Template: "{path}: {value} not found", Params: domain.Params{"value": from}}}
 	}
 
 	return nil

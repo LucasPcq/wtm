@@ -105,17 +105,15 @@ func (t Target) placement() worktree.Placed {
 type decision interface{ decision() }
 
 // A refusal is why the target is refused, as a field error of --to.
-type refusal struct {
-	Code     string
-	Template string
-	Params   domain.Params
-}
+type refusal domain.FieldError
 
 func (Target) decision()  {}
 func (refusal) decision() {}
 
 func (r refusal) field(path string) domain.FieldError {
-	return domain.FieldError{Path: path, Code: r.Code, Template: r.Template, Params: r.Params}
+	problem := domain.FieldError(r)
+	problem.Path = path
+	return problem
 }
 
 // target decides the target: the worktree of to when it has one, else a worktree placed for it as create would place it.
@@ -123,7 +121,7 @@ func (f Facts) target(req Request) decision {
 	to := req.To
 	switch {
 	case worktree.BlankBranch(to):
-		return refusal{Code: codeRequired, Template: "{path} is required"}
+		return refusal(domain.Required(""))
 	case to == req.Source:
 		return refusal{Code: "extract.same_worktree", Template: "{path}: {value} is the source — pick another worktree", Params: domain.Params{"value": to}}
 	}

@@ -182,9 +182,6 @@ func ifNotExists(given bool) domain.Confirm {
 // ----------------------------------------------------------------------------
 // Resolve and validation
 
-// codeRequired is the field-error code create spells as every command does, with no create. prefix.
-const codeRequired = "required"
-
 // Resolve settles the request on the facts, every field answered as NewQuestions answers it; a request with problems is refused with all of them, by domain.Invalid.
 func Resolve(f Facts, req Request) (Request, error) {
 	questions := NewQuestions(f, req)
@@ -208,7 +205,7 @@ func (q Questions) Request() Request {
 func (f Facts) problems(q Questions) []domain.FieldError {
 	problems := f.branchProblems(q)
 	if from := q.From.Value; from != "" && !f.Candidate(from) {
-		problems = append(problems, domain.FieldError{Path: "from", Code: "not_found", Template: "{path}: {value} not found", Params: domain.Params{"value": from}})
+		problems = append(problems, domain.FieldError{Path: "from", Code: domain.CodeNotFound, Template: "{path}: {value} not found", Params: domain.Params{"value": from}})
 	}
 
 	problems = append(problems, q.Questions.Problems()...)
@@ -219,7 +216,7 @@ func (f Facts) problems(q Questions) []domain.FieldError {
 func (f Facts) branchProblems(q Questions) []domain.FieldError {
 	branches := q.Branches.Given
 	if len(branches) == 0 {
-		return []domain.FieldError{{Path: "branches", Code: codeRequired, Template: "{path} is required"}}
+		return []domain.FieldError{domain.Required("branches")}
 	}
 
 	var problems []domain.FieldError
@@ -239,14 +236,14 @@ func (f Facts) crossProblems(q Questions) []domain.FieldError {
 	if from == "" && f.checksOut(Request{Branches: branches, IfNotExists: q.IfNotExists.Value}) {
 		problems = append(problems, domain.FieldError{
 			Path:     "from",
-			Code:     codeRequired,
+			Code:     domain.CodeRequired,
 			Template: "{path} is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)",
 			Params:   domain.Params{"because": "create.parent_required"},
 		})
 	}
 
 	if from != "" && slices.Contains(branches, from) {
-		problems = append(problems, domain.FieldError{Path: "from", Code: "self_parent", Template: "{value} cannot be its own parent: pass another value to {path}", Params: domain.Params{"value": from}, With: []string{"branches"}})
+		problems = append(problems, domain.FieldError{Path: "from", Code: domain.CodeSelfParent, Template: "{value} cannot be its own parent: pass another value to {path}", Params: domain.Params{"value": from}, With: []string{"branches"}})
 	}
 
 	return problems
