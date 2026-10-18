@@ -52,6 +52,7 @@ func (p *provisioning) number(ctx context.Context, provisioned *Provisioned) err
 	}
 
 	provisioned.Ordinal = &ordinal
+	provisioned.Meta.Ordinal = ordinal
 	return nil
 }
 

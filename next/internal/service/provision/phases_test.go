@@ -39,6 +39,17 @@ func TestAWorktreeGetsTheSmallestOrdinalNoLiveWorktreeHolds(t *testing.T) {
 	assert.Equal(t, "main", recorded.SourceBranch)
 }
 
+func TestTheProvisionedRecordCarriesItsOrdinal(t *testing.T) {
+	w, files := inMemory(t, seeds{Store: storetest.FakeParams{Meta: map[string]worktree.Meta{"feat/a": {Ordinal: 1}}}, Worktrees: []worktree.Worktree{{Path: "/trees/a", State: worktree.OnBranch{Branch: "feat/a"}}}})
+
+	outcome := w.service.Run(t.Context(), portLinked(w.params(&recorder{})))
+
+	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
+	recorded, _ := files.Meta(branchName)
+	assert.Equal(t, 2, recorded.Ordinal)
+	assert.Equal(t, recorded, outcome.Provisioned.Meta)
+}
+
 func TestTheOrdinalOfADetachedWorktreeIsNeverGivenAgain(t *testing.T) {
 	w, _ := inMemory(t, seeds{
 		Worktrees: []worktree.Worktree{{Path: "/trees/a", State: worktree.Detached{}}},
