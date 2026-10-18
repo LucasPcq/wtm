@@ -24,9 +24,9 @@ const Name = "extract"
 
 // The codes extract refuses or fails with that a caller may act on.
 const (
-	CodeConfigNotFound = "extract.config_not_found" // no wtm config: `wtm init` has not run in the repository
-	CodeConflict       = "extract.conflict"         // the changes conflict with the target and the request does not resolve them
-	CodeHalfMoved      = "extract.half_moved"       // the changes reached the target but could not be removed from the source
+	CodeConfigNotFound = Name + repository.ConfigNotFound // no wtm config: `wtm init` has not run in the repository
+	CodeConflict       = "extract.conflict"               // the changes conflict with the target and the request does not resolve them
+	CodeHalfMoved      = "extract.half_moved"             // the changes reached the target but could not be removed from the source
 )
 
 // A UseCase moves changes between the worktrees of one repository: the ports it reaches the repository through and the services it shares with the other commands.

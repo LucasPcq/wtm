@@ -20,7 +20,7 @@ import (
 const Name = "create"
 
 // CodeConfigNotFound refuses a repository with no wtm config: `wtm init` has not run there.
-const CodeConfigNotFound = "create.config_not_found"
+const CodeConfigNotFound = Name + repository.ConfigNotFound
 
 // A UseCase creates worktrees in one repository: the ports it reaches the repository through and the services it shares with the other commands.
 type UseCase struct {
