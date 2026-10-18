@@ -3,6 +3,7 @@ package main
 import (
 	"go/ast"
 	"go/token"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -21,14 +22,19 @@ func newSubtestnameAnalyzer(testsOf testFiles) *analysis.Analyzer {
 	}
 }
 
-// shortcut: a name is followed syntactically, within the function that runs it, so one built by a helper or fmt.Sprintf escapes; resolve through go/types if it bites.
+// shortcut: a name is followed syntactically, within its test function and file, so a table declared in another file or a name built by fmt.Sprintf or a helper escapes; and the name: catch-all reads any field called name in a test, a branch's included. Resolve through go/types if either bites.
 func runSubtestname(pass *analysis.Pass, testsOf testFiles) (any, error) {
-	if _, ok := nextRel(pass); !ok {
+	rel, ok := nextRel(pass)
+	if !ok {
 		return nil, nil
 	}
-	tests, err := testsOf(pass)
+	files, err := testsOf(pass)
 	if err != nil {
 		return nil, err
+	}
+	// A test kit runs subtests from its sources: every command's contract_test.go calls operationtest.Contract.
+	if from, ok := nextPackageOf(rel); ok && slices.Contains(nextKits, from.layer) {
+		files = append(files, sourcesOf(pass)...)
 	}
 	reported := map[token.Pos]bool{}
 	check := func(lit *ast.BasicLit) {
@@ -39,25 +45,28 @@ func runSubtestname(pass *analysis.Pass, testsOf testFiles) (any, error) {
 		reported[lit.Pos()] = true
 		pass.Reportf(lit.Pos(), "subtest name %q has a space: name a subtest like an identifier, its description in a field of its own (Google \"Subtest names\", go-style)", name)
 	}
-	for _, file := range tests {
-		ast.Inspect(file, func(node ast.Node) bool {
-			if lit, ok := node.(*ast.CompositeLit); ok {
-				for _, elt := range lit.Elts {
-					if kv, ok := elt.(*ast.KeyValueExpr); ok && isIdent(kv.Key, nameField) {
-						eachLiteral(kv.Value, check)
+	for _, file := range files {
+		if isTestFile(pass, file) {
+			ast.Inspect(file, func(node ast.Node) bool {
+				if lit, ok := node.(*ast.CompositeLit); ok {
+					for _, elt := range lit.Elts {
+						if kv, ok := elt.(*ast.KeyValueExpr); ok && isIdent(kv.Key, nameField) {
+							eachLiteral(kv.Value, check)
+						}
 					}
 				}
-			}
-			return true
-		})
+				return true
+			})
+		}
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
 			if !ok || fn.Body == nil {
 				continue
 			}
+			handles := testHandles(fn)
 			ast.Inspect(fn.Body, func(node ast.Node) bool {
-				if call, ok := node.(*ast.CallExpr); ok && isSubtest(call) {
-					for _, lit := range namesOf(call.Args[0], scope{fn: fn.Body, file: file}) {
+				if call, ok := node.(*ast.CallExpr); ok && isSubtest(call, handles) {
+					for _, lit := range namesOf(call.Args[0], scope{fn: fn.Body, file: file, at: call.Pos()}) {
 						check(lit)
 					}
 				}
@@ -68,27 +77,47 @@ func runSubtestname(pass *analysis.Pass, testsOf testFiles) (any, error) {
 	return nil, nil
 }
 
-// isSubtest is true of t.Run(name, func(t *testing.T) {…}), and of b.Run's.
-func isSubtest(call *ast.CallExpr) bool {
+// testHandles returns the names fn and the function literals in it give a *testing.T or a *testing.B.
+func testHandles(fn *ast.FuncDecl) map[string]bool {
+	handles := map[string]bool{}
+	ast.Inspect(fn, func(node ast.Node) bool {
+		typ, ok := node.(*ast.FuncType)
+		if !ok || typ.Params == nil {
+			return true
+		}
+		for _, field := range typ.Params.List {
+			star, ok := field.Type.(*ast.StarExpr)
+			if !ok {
+				continue
+			}
+			sel, ok := star.X.(*ast.SelectorExpr)
+			if !ok || !isIdent(sel.X, "testing") || sel.Sel.Name != "T" && sel.Sel.Name != "B" {
+				continue
+			}
+			for _, name := range field.Names {
+				handles[name.Name] = true
+			}
+		}
+		return true
+	})
+	return handles
+}
+
+// isSubtest is true of t.Run(name, f) on a *testing.T or *testing.B the function holds, f a literal or any function value.
+func isSubtest(call *ast.CallExpr, handles map[string]bool) bool {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Run" || len(call.Args) != 2 {
 		return false
 	}
-	lit, ok := call.Args[1].(*ast.FuncLit)
-	if !ok || len(lit.Type.Params.List) != 1 {
-		return false
-	}
-	star, ok := lit.Type.Params.List[0].Type.(*ast.StarExpr)
-	if !ok {
-		return false
-	}
-	typ, ok := star.X.(*ast.SelectorExpr)
-	return ok && isIdent(typ.X, "testing") && (typ.Sel.Name == "T" || typ.Sel.Name == "B")
+	recv, ok := sel.X.(*ast.Ident)
+	return ok && handles[recv.Name]
 }
 
+// scope is where a subtest's name is looked for: the test function and its file, and the t.Run the name is given to.
 type scope struct {
 	fn   *ast.BlockStmt
 	file *ast.File
+	at   token.Pos
 }
 
 // namesOf returns the string literals a subtest's name is built from: the literal itself, the operands of a concatenation, and, for a range variable or a field of one, the matching keys, elements or field values of the literal table ranged over.
@@ -103,7 +132,7 @@ func namesOf(expr ast.Expr, in scope) []*ast.BasicLit {
 	case *ast.Ident:
 		loop, key := rangeOf(expr.Name, in)
 		if loop == nil {
-			return nil
+			return literals(valueOf(expr.Name, in))
 		}
 		var lits []*ast.BasicLit
 		for _, row := range rowsOf(loop.X, in) {
@@ -137,22 +166,25 @@ func namesOf(expr ast.Expr, in scope) []*ast.BasicLit {
 	return nil
 }
 
-// rangeOf returns the range statement of the function that declares name, and whether name is its key.
+// rangeOf returns the innermost range statement around the t.Run that declares name, and whether name is its key.
 func rangeOf(name string, in scope) (*ast.RangeStmt, bool) {
 	var found *ast.RangeStmt
 	key := false
 	ast.Inspect(in.fn, func(node ast.Node) bool {
 		loop, ok := node.(*ast.RangeStmt)
-		if !ok || found != nil {
-			return found == nil
+		if !ok {
+			return true
+		}
+		if loop.Body.Pos() > in.at || in.at >= loop.Body.End() {
+			return false
 		}
 		switch {
 		case isIdent(loop.Key, name):
 			found, key = loop, true
 		case isIdent(loop.Value, name):
-			found = loop
+			found, key = loop, false
 		}
-		return found == nil
+		return true
 	})
 	return found, key
 }
@@ -177,38 +209,41 @@ func rowsOf(expr ast.Expr, in scope) []row {
 }
 
 func tableOf(expr ast.Expr, in scope) *ast.CompositeLit {
-	switch expr := ast.Unparen(expr).(type) {
-	case *ast.CompositeLit:
-		return expr
-	case *ast.Ident:
-		var table *ast.CompositeLit
-		find := func(node ast.Node) bool {
-			if table != nil {
-				return false
-			}
-			switch node := node.(type) {
-			case *ast.AssignStmt:
-				for i, lhs := range node.Lhs {
-					if isIdent(lhs, expr.Name) && i < len(node.Rhs) {
-						table, _ = ast.Unparen(node.Rhs[i]).(*ast.CompositeLit)
-					}
-				}
-			case *ast.ValueSpec:
-				for i, name := range node.Names {
-					if name.Name == expr.Name && i < len(node.Values) {
-						table, _ = ast.Unparen(node.Values[i]).(*ast.CompositeLit)
-					}
-				}
-			}
-			return table == nil
-		}
-		ast.Inspect(in.fn, find)
-		if table == nil {
-			ast.Inspect(in.file, find)
-		}
-		return table
+	if ident, ok := ast.Unparen(expr).(*ast.Ident); ok {
+		expr = valueOf(ident.Name, in)
 	}
-	return nil
+	table, _ := ast.Unparen(expr).(*ast.CompositeLit)
+	return table
+}
+
+// valueOf returns the value the test function, else its file, first assigns to name.
+func valueOf(name string, in scope) ast.Expr {
+	var value ast.Expr
+	find := func(node ast.Node) bool {
+		if value != nil {
+			return false
+		}
+		switch node := node.(type) {
+		case *ast.AssignStmt:
+			for i, lhs := range node.Lhs {
+				if isIdent(lhs, name) && i < len(node.Rhs) && len(node.Lhs) == len(node.Rhs) {
+					value = node.Rhs[i]
+				}
+			}
+		case *ast.ValueSpec:
+			for i, n := range node.Names {
+				if n.Name == name && i < len(node.Values) {
+					value = node.Values[i]
+				}
+			}
+		}
+		return value == nil
+	}
+	ast.Inspect(in.fn, find)
+	if value == nil {
+		ast.Inspect(in.file, find)
+	}
+	return value
 }
 
 // rowType returns the struct type of a table's rows: a slice's or a map's elements, written inline or declared in the file.

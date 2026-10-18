@@ -13,6 +13,8 @@ package create // want `next/internal/command/create/helpers.go: the root of a c
 package create
 -- github.com/LucasPcq/wtm/next/internal/command/create/contract_test.go --
 package create
+-- github.com/LucasPcq/wtm/next/internal/command/create/testdata/plan.golden --
+golden
 -- github.com/LucasPcq/wtm/next/internal/command/create/notes.md --
 notes
 -- github.com/LucasPcq/wtm/next/internal/command/create/cli/cli.go --

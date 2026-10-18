@@ -8,14 +8,18 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-var envReaders = []string{"Getenv", "LookupEnv", "Environ"}
+// The functions of the stdlib that read the process's environment, by package.
+var envReaders = map[string][]string{
+	"os":      {"Getenv", "LookupEnv", "Environ", "ExpandEnv", "UserHomeDir", "UserConfigDir", "UserCacheDir"},
+	"syscall": {"Getenv", "Environ"},
+}
 
 // The edges that read the process's environment: the root reads it once (ui/cli.ReadEnv), the streams their terminal, the composition root $WTM_STATE_DIR, and an adapter what its own tool needs.
 var envEdges = []string{"internal/ui/cli", "internal/ui/output", nextRoot, "internal/adapter/"}
 
 var envreadAnalyzer = &analysis.Analyzer{
 	Name: "envread",
-	Doc:  "os.Getenv, os.LookupEnv and os.Environ are called in next/ only from ui/cli, ui/output, cmd/wtm-next and adapter/*",
+	Doc:  "the stdlib functions that read the environment (os.Getenv, os.LookupEnv, os.Environ, os.ExpandEnv, os.UserHomeDir, os.UserConfigDir, os.UserCacheDir and syscall's Getenv, Environ) are called in next/ only from ui/cli, ui/output, cmd/wtm-next and adapter/*",
 	Run:  runEnvread,
 }
 
@@ -34,10 +38,10 @@ func runEnvread(pass *analysis.Pass) (any, error) {
 				return true
 			}
 			obj := pass.TypesInfo.Uses[sel.Sel]
-			if obj == nil || obj.Pkg() == nil || obj.Pkg().Path() != "os" || !slices.Contains(envReaders, obj.Name()) {
+			if obj == nil || obj.Pkg() == nil || !slices.Contains(envReaders[obj.Pkg().Path()], obj.Name()) {
 				return true
 			}
-			pass.Reportf(sel.Pos(), "next/%s reads the environment (os.%s): only ui/cli, ui/output, cmd/wtm-next and an adapter read it, at the edge; take the value as an input (next/README.md)", rel, obj.Name())
+			pass.Reportf(sel.Pos(), "next/%s reads the environment (%s.%s): only ui/cli, ui/output, cmd/wtm-next and an adapter read it, at the edge; take the value as an input (next/README.md)", rel, obj.Pkg().Name(), obj.Name())
 			return true
 		})
 	}

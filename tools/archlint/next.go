@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"golang.org/x/tools/go/analysis"
 )
@@ -89,8 +90,7 @@ func runNext(pass *analysis.Pass, testsOf testFiles) (any, error) {
 		pass.Reportf(firstFile(pass).Package, "next/%s: a name ending in %q is reserved for a test kit beside its package, and there is no %s beside it: rename it (next/README.md)", rel, testSuffix, sibling)
 		return nil, nil
 	}
-	sources := slices.DeleteFunc(slices.Clone(pass.Files), func(file *ast.File) bool { return isTestFile(pass, file) })
-	for _, spec := range importsOf(sources) {
+	for _, spec := range importsOf(sourcesOf(pass)) {
 		target, err := strconv.Unquote(spec.Path.Value)
 		if err != nil {
 			return nil, err
@@ -114,13 +114,36 @@ func runNext(pass *analysis.Pass, testsOf testFiles) (any, error) {
 type testFiles func(pass *analysis.Pass) ([]*ast.File, error)
 
 func isTestFile(pass *analysis.Pass, file *ast.File) bool {
-	return strings.HasSuffix(pass.Fset.File(file.Pos()).Name(), "_test.go")
+	return strings.HasSuffix(baseName(pass, file), "_test.go")
 }
+
+func baseName(pass *analysis.Pass, file *ast.File) string {
+	return filepath.Base(pass.Fset.File(file.Pos()).Name())
+}
+
+func sourcesOf(pass *analysis.Pass) []*ast.File {
+	return slices.DeleteFunc(slices.Clone(pass.Files), func(file *ast.File) bool { return isTestFile(pass, file) })
+}
+
+type testsKey struct {
+	fset *token.FileSet
+	dir  string
+}
+
+// Several rules read a package's tests: each directory is parsed once per load, into the load's file set.
+var parsedTests sync.Map
 
 func testFilesOnDisk(pass *analysis.Pass) ([]*ast.File, error) {
 	// archlint loads the packages without their tests: they are parsed into the
 	// pass's file set, where a finding can point at them.
 	dirPath := filepath.Dir(pass.Fset.File(pass.Files[0].Pos()).Name())
+	parse, _ := parsedTests.LoadOrStore(testsKey{fset: pass.Fset, dir: dirPath}, sync.OnceValues(func() ([]*ast.File, error) {
+		return parseTests(pass.Fset, dirPath)
+	}))
+	return parse.(func() ([]*ast.File, error))()
+}
+
+func parseTests(fset *token.FileSet, dirPath string) ([]*ast.File, error) {
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
 		return nil, err
@@ -130,7 +153,7 @@ func testFilesOnDisk(pass *analysis.Pass) ([]*ast.File, error) {
 		if !strings.HasSuffix(entry.Name(), "_test.go") {
 			continue
 		}
-		file, err := parser.ParseFile(pass.Fset, filepath.Join(dirPath, entry.Name()), nil, parser.ParseComments)
+		file, err := parser.ParseFile(fset, filepath.Join(dirPath, entry.Name()), nil, parser.ParseComments)
 		if err != nil {
 			return nil, err
 		}

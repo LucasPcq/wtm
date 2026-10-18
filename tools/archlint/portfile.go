@@ -3,7 +3,6 @@ package main
 import (
 	"go/ast"
 	"go/token"
-	"path/filepath"
 
 	"golang.org/x/tools/go/analysis"
 )
@@ -22,7 +21,7 @@ func runPortfile(pass *analysis.Pass) (any, error) {
 		return nil, nil
 	}
 	for _, file := range pass.Files {
-		if filepath.Base(pass.Fset.File(file.Pos()).Name()) != portFile {
+		if baseName(pass, file) != portFile {
 			continue
 		}
 		for _, decl := range file.Decls {
@@ -43,8 +42,8 @@ func reportPortDecl(pass *analysis.Pass, rel string, decl *ast.GenDecl) {
 		return
 	case token.TYPE:
 		for _, spec := range decl.Specs {
-			spec, ok := spec.(*ast.TypeSpec)
-			if !ok || spec.Assign.IsValid() {
+			spec := spec.(*ast.TypeSpec) // a type declaration holds only type specs
+			if spec.Assign.IsValid() {
 				pass.Reportf(decl.Pos(), "next/%s/%s declares a type alias: a port.go declares only interface and function types (next/README.md)", rel, portFile)
 				continue
 			}

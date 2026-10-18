@@ -33,7 +33,7 @@ type Ran struct {
 
 // Contract checks the contract on the Subject that subject returns, a new one for each check, wired to the operations service it is given.
 func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Subject) {
-	t.Run("a dry run takes no lock and publishes nothing", func(t *testing.T) {
+	t.Run("dry_run_no_lock_no_event", func(t *testing.T) {
 		rec := &recorder{}
 		run := subject(t, rec.service()).Run
 		reported := &events{}
@@ -47,7 +47,7 @@ func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Su
 		assert.Empty(t, reported.list)
 	})
 
-	t.Run("a stale plan is refused before any event", func(t *testing.T) {
+	t.Run("stale_plan_refused_before_events", func(t *testing.T) {
 		rec := &recorder{}
 		s := subject(t, rec.service())
 		preview, err := s.Run(t.Context(), domain.RunOptions{DryRun: true})
@@ -63,7 +63,7 @@ func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Su
 		assert.True(t, rec.released(), "a lock is still held")
 	})
 
-	t.Run("events arrive in order and every unit started finishes", func(t *testing.T) {
+	t.Run("events_in_order", func(t *testing.T) {
 		rec := &recorder{}
 		run := subject(t, rec.service()).Run
 		reported := &events{}
@@ -74,7 +74,7 @@ func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Su
 		inOrder(t, rec, reported.list, true)
 	})
 
-	t.Run("the correlation ID of the options reaches the record and every event", func(t *testing.T) {
+	t.Run("correlation_id_recorded", func(t *testing.T) {
 		rec := &recorder{}
 		run := subject(t, rec.service()).Run
 
@@ -88,7 +88,7 @@ func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Su
 		}
 	})
 
-	t.Run("an invalid correlation ID is refused before any lock or event", func(t *testing.T) {
+	t.Run("invalid_correlation_id_refused", func(t *testing.T) {
 		rec := &recorder{}
 		run := subject(t, rec.service()).Run
 		reported := &events{}
@@ -104,7 +104,7 @@ func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Su
 		assert.Empty(t, reported.list)
 	})
 
-	t.Run("a failed apply still finishes every unit it started", func(t *testing.T) {
+	t.Run("failed_apply_finishes_units", func(t *testing.T) {
 		rec := &recorder{}
 		s := subject(t, rec.service())
 		s.Fail(t)

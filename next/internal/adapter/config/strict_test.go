@@ -7,12 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type sample struct {
-	Name  string         `toml:"name"`
-	Port  int            `toml:"port"`
-	Hooks map[string]any `toml:"hooks"`
-}
-
 func TestAValidFileDecodes(t *testing.T) {
 	var decoded sample
 

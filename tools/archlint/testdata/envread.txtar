@@ -5,6 +5,7 @@ package provision
 import (
 	"os"
 	sys "os"
+	"syscall"
 )
 
 var (
@@ -13,6 +14,14 @@ var (
 	_    = sys.Environ()           // want `reads the environment \(os.Environ\)`
 	_    = os.Getenv               // want `reads the environment \(os.Getenv\)`
 	_    = os.Getpid()
+	_    = os.ExpandEnv("$HOME")   // want `reads the environment \(os.ExpandEnv\)`
+	_, _ = os.UserHomeDir()        // want `reads the environment \(os.UserHomeDir\)`
+	_, _ = os.UserConfigDir()      // want `reads the environment \(os.UserConfigDir\)`
+	_, _ = os.UserCacheDir()       // want `reads the environment \(os.UserCacheDir\)`
+	_    = syscall.Getenv          // want `reads the environment \(syscall.Getenv\)`
+	_, _ = syscall.Getenv("X")     // want `reads the environment \(syscall.Getenv\)`
+	_    = syscall.Environ()       // want `reads the environment \(syscall.Environ\)`
+	_    = syscall.Getpid()
 )
 -- github.com/LucasPcq/wtm/next/internal/service/provision/provision_test.go --
 package provision
@@ -69,6 +78,8 @@ package git
 import "os"
 
 var _, _ = os.LookupEnv("GIT_SSH_COMMAND")
+
+var _, _ = os.UserConfigDir()
 -- github.com/LucasPcq/wtm/next/internal/adapter/gittest/fake.go --
 // Package gittest fakes git.
 package gittest

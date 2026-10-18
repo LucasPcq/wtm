@@ -8,7 +8,18 @@ package env
 
 import "testing"
 
-type world struct{}
+type world struct{} // want `world is no Test, Benchmark, Fuzz or Example function`
+
+type (
+	row  struct{} // want `row is no Test, Benchmark, Fuzz or Example function`
+	rows []row    // want `rows is no Test, Benchmark, Fuzz or Example function`
+)
+
+var probe = func() {} // want `probe is no Test, Benchmark, Fuzz or Example function`
+
+var table = []string{"a"}
+
+const name = "x"
 
 func TestMain(m *testing.M) { m.Run() }
 

@@ -78,11 +78,67 @@ func BenchmarkStyle(b *testing.B) {
 	b.Run("per op", func(b *testing.B) {}) // want `subtest name "per op" has a space`
 }
 
+func TestTwoLoops(t *testing.T) {
+	for _, tc := range []struct{ in string }{{in: "first loop input"}} {
+		_ = tc
+	}
+	for _, tc := range []struct{ desc string }{{desc: "second loop desc"}} { // want `subtest name "second loop desc" has a space`
+		t.Run(tc.desc, func(t *testing.T) {})
+	}
+}
+
+func TestTwoLoopsInverse(t *testing.T) {
+	for _, tc := range []struct{ desc string }{{desc: "not a subtest"}} {
+		_ = tc
+	}
+	for _, tc := range []struct{ desc string }{{desc: "second_loop"}} {
+		t.Run(tc.desc, func(t *testing.T) {})
+	}
+}
+
+func TestNested(t *testing.T) {
+	for _, outer := range []string{"outer_ok"} {
+		for _, inner := range []string{"inner one"} { // want `subtest name "inner one" has a space`
+			t.Run(outer+"_"+inner, func(t *testing.T) {})
+		}
+	}
+}
+
+func TestLocalName(t *testing.T) {
+	name := "a local name"           // want `subtest name "a local name" has a space`
+	t.Run(name, func(t *testing.T) {})
+}
+
+func TestFunctionValue(t *testing.T) {
+	t.Run("a named function", probe) // want `subtest name "a named function" has a space`
+}
+
+func probe(t *testing.T) {}
+
 func TestNotASubtest(t *testing.T) {
 	var u struct{ Run func(string, int) }
 	u.Run = func(string, int) {}
 	u.Run("not a subtest", 1)
 }
+-- github.com/LucasPcq/wtm/next/internal/service/operationtest/contract.go --
+// Package operationtest is the contract every use case's Run passes.
+package operationtest
+
+import "testing"
+
+func Contract(t *testing.T) {
+	t.Run("a dry run takes no lock", func(t *testing.T) {}) // want `subtest name "a dry run takes no lock" has a space`
+	t.Run("dry_run_no_lock", func(t *testing.T) {})
+}
+-- github.com/LucasPcq/wtm/next/internal/service/provision/provision.go --
+// Package provision is a service: its sources run no subtest.
+package provision
+
+type T struct{}
+
+func (T) Run(name string, f func()) {}
+
+func run(t T) { t.Run("not a test kit", func() {}) }
 -- github.com/LucasPcq/wtm/internal/rules/env/env_test.go --
 package env
 
