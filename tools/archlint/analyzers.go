@@ -29,6 +29,7 @@ var analyzers = append(internalOnly(
 	testlayoutAnalyzer,
 	portfileAnalyzer,
 	envreadAnalyzer,
+	slicefilesAnalyzer,
 )
 
 func internalOnly(written ...*analysis.Analyzer) []*analysis.Analyzer {
