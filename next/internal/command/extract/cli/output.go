@@ -12,8 +12,8 @@ import (
 
 const commandName = extract.Name
 
-// planRowsOf are the rows of the plan the dry run shows.
-func planRowsOf(plan extract.Plan) []output.PlanRow {
+// planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome; a value whose answer is remembered carries note.
+func planRowsOf(plan extract.Plan, note string) []output.PlanRow {
 	rows := []output.PlanRow{
 		{Label: "Source", Values: []string{plan.Source}},
 		{Label: "Files", Values: labels(plan.Files)},
@@ -24,13 +24,13 @@ func planRowsOf(plan extract.Plan) []output.PlanRow {
 		rows = append(rows, output.PlanRow{Label: "Parent", Values: []string{plan.From}})
 	}
 	if plan.EnvFrom != "" {
-		rows = append(rows, output.PlanRow{Label: "Env", Values: []string{string(plan.EnvFrom)}})
+		rows = append(rows, output.PlanRow{Label: "Env", Values: []string{string(plan.EnvFrom) + output.RememberedNote(plan.Remember, "env_from", note)}})
 	}
 	if plan.Isolation != "" {
-		rows = append(rows, output.PlanRow{Label: "Isolation", Values: []string{string(plan.Isolation)}})
+		rows = append(rows, output.PlanRow{Label: "Isolation", Values: []string{string(plan.Isolation) + output.RememberedNote(plan.Remember, "isolation", note)}})
 	}
-	if len(plan.FastForward) > 0 {
-		rows = append(rows, output.PlanRow{Label: "Fast-forward", Values: plan.FastForward})
+	if ff := output.Noted(output.NotedParams{Values: plan.FastForward, Note: output.RememberedNote(plan.Remember, "fast_forward", note), None: "keep as-is"}); len(ff) > 0 {
+		rows = append(rows, output.PlanRow{Label: "Fast-forward", Values: ff})
 	}
 
 	rows = append(rows, output.PlanRow{Label: "Mode", Values: []string{mode(plan.Keep)}})
@@ -40,10 +40,6 @@ func planRowsOf(plan extract.Plan) []output.PlanRow {
 			output.PlanRow{Label: "On conflict", Values: []string{string(plan.OnConflict)}},
 		)
 	}
-	if len(plan.Remember) > 0 {
-		rows = append(rows, output.PlanRow{Label: "Remember", Values: plan.Remember})
-	}
-
 	return rows
 }
 

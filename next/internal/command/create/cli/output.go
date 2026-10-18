@@ -15,22 +15,19 @@ import (
 
 const commandName = create.Name
 
-// planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome.
-func planRowsOf(plan create.Plan) []output.PlanRow {
+// planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome; a value whose answer is remembered carries note.
+func planRowsOf(plan create.Plan, note string) []output.PlanRow {
 	rows := []output.PlanRow{
 		{Label: "Branches", Values: plannedBranches(plan.Branches)},
 		{Label: sourceLabel(plan.Branches), Values: []string{plan.From}},
-		{Label: "Env", Values: []string{string(plan.EnvFrom)}},
+		{Label: "Env", Values: []string{string(plan.EnvFrom) + output.RememberedNote(plan.Remember, "env_from", note)}},
 	}
 
 	if plan.Isolation != "" {
-		rows = append(rows, output.PlanRow{Label: "Isolation", Values: []string{string(plan.Isolation)}})
+		rows = append(rows, output.PlanRow{Label: "Isolation", Values: []string{string(plan.Isolation) + output.RememberedNote(plan.Remember, "isolation", note)}})
 	}
-	if len(plan.FastForward) > 0 {
-		rows = append(rows, output.PlanRow{Label: "Fast-forward", Values: plan.FastForward})
-	}
-	if len(plan.Remember) > 0 {
-		rows = append(rows, output.PlanRow{Label: "Remember", Values: plan.Remember})
+	if ff := output.Noted(output.NotedParams{Values: plan.FastForward, Note: output.RememberedNote(plan.Remember, "fast_forward", note), None: "keep as-is"}); len(ff) > 0 {
+		rows = append(rows, output.PlanRow{Label: "Fast-forward", Values: ff})
 	}
 
 	return rows
@@ -104,7 +101,7 @@ func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextSte
 	var anomalies []string
 	var next []output.NextStep
 	if len(items) > 0 {
-		rows = planRowsOf(outcome.Plan)
+		rows = planRowsOf(outcome.Plan, output.Remembered)
 	}
 
 	for _, item := range items {
@@ -202,5 +199,5 @@ func tallyKey(item create.Item) string {
 
 // planTextOf is the plan as the wizard's recap shows it, in width columns.
 func planTextOf(plan create.Plan, warnings []domain.Warning, width int, st *output.Styles) string {
-	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(plan), Warnings: output.Messages(warnings), Width: width, Styles: st}), "\n")
+	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(plan, output.WillBeRemembered), Warnings: output.Messages(warnings), Width: width, Styles: st}), "\n")
 }

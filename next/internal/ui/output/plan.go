@@ -3,6 +3,7 @@ package output
 import (
 	"cmp"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -19,6 +20,21 @@ const (
 
 // NothingToDo is what a plan with no row shows.
 const NothingToDo = "nothing to do"
+
+// The notes of a plan's value whose answer is remembered for the next runs: before the apply, and once applied.
+const (
+	WillBeRemembered = Dot + "will be remembered"
+	Remembered       = Dot + "remembered"
+)
+
+// RememberedNote is note when remember names the field at path, else empty: what follows the value of that field in a plan.
+func RememberedNote(remember []string, path, note string) string {
+	if !slices.Contains(remember, path) {
+		return ""
+	}
+
+	return note
+}
 
 // A PlanRow is one line of a plan: a label and the values it applies to.
 type PlanRow struct {
@@ -52,6 +68,26 @@ func PlanLines(params PlanParams) []string {
 		}
 	}
 	return lines
+}
+
+// NotedParams are the values of a plan's row, the note the row carries and the value it shows when it has none but a note.
+type NotedParams struct {
+	Values []string
+	Note   string
+	None   string
+}
+
+// Noted are the values of params, the last carrying its note; its None, noted, when there are no values but a note; none when there is neither.
+func Noted(params NotedParams) []string {
+	switch {
+	case params.Note == "":
+		return params.Values
+	case len(params.Values) == 0:
+		return []string{params.None + params.Note}
+	}
+
+	last := len(params.Values) - 1
+	return append(slices.Clone(params.Values[:last]), params.Values[last]+params.Note)
 }
 
 func planRows(params PlanParams, st *Styles) []string {

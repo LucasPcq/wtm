@@ -31,7 +31,7 @@ func newForm(open func(ctx context.Context, dir string) (extract.UseCase, error)
 }
 
 func plan(previewed extract.Outcome, width int, st *output.Styles) string {
-	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(previewed.Plan), Warnings: output.Messages(previewed.Warnings), Width: width, Styles: st}), "\n")
+	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(previewed.Plan, output.WillBeRemembered), Warnings: output.Messages(previewed.Warnings), Width: width, Styles: st}), "\n")
 }
 
 // applyLabel names the apply of the plan previewed: it creates the target first when the target does not exist.

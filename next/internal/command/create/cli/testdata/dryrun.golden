@@ -1,9 +1,8 @@
   create · dry run, nothing applied
   Branches      feat/a, feat/b
   From          main
-  Env           example
+  Env           example · will be remembered
   Fast-forward  main
-  Remember      env_from
 
   ! The "parent" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main.
 

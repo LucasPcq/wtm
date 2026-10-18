@@ -12,8 +12,7 @@
   ┃
   ┃  Branches  feat/a, feature (existing)
   ┃  From      main
-  ┃  Env       main
-  ┃  Remember  env_from
+  ┃  Env       main · will be remembered
 
 ▌› Yes, create 2 worktrees
   ────────────────────────────────────────────────────────────────────────────────────────────────
