@@ -61,7 +61,7 @@ A package in no row is refused: the root of `next/`, a second `cmd/<name>`, anyt
 
 A code a command declares starts with its `Name` and a dot (`create.path_exists`); a code several commands share is a `domain` constant (archlint, rule `codeprefix`).
 
-A use case or a service declares the interfaces it needs in its `port.go`; an adapter exports a concrete type that satisfies them, checked by the compiler in `cmd/wtm-next`.
+A use case or a service declares the ports it needs in its `port.go`, interface types and function types only (archlint, rule `portfile`); an adapter exports a concrete type that satisfies them, checked by the compiler in `cmd/wtm-next`.
 
 ## Reading a command
 

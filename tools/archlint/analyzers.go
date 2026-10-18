@@ -27,6 +27,7 @@ var analyzers = append(internalOnly(
 	codeprefixAnalyzer,
 	subtestnameAnalyzer,
 	testlayoutAnalyzer,
+	portfileAnalyzer,
 )
 
 func internalOnly(written ...*analysis.Analyzer) []*analysis.Analyzer {

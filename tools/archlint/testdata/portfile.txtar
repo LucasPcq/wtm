@@ -1,0 +1,42 @@
+-- github.com/LucasPcq/wtm/next/internal/command/create/port.go --
+// Package create creates worktrees.
+package create
+
+import "context"
+
+type Git interface {
+	Fetch(ctx context.Context) error
+}
+
+type (
+	Meta interface{ Read() error }
+
+	Shield func(ctx context.Context) (context.Context, func())
+)
+
+type Generic[T any] interface{ Get() T }
+
+type Facts struct{} // want `declares Facts, neither an interface nor a function type`
+
+type Name string // want `declares Name, neither an interface nor a function type`
+
+type Alias = Git // want `declares a type alias`
+
+const Default = "main" // want `declares a const`
+
+var Nothing Meta // want `declares a var`
+
+func NewGit() Git { return nil } // want `declares the function NewGit`
+
+func (Facts) Read() error { return nil } // want `declares the function Read`
+-- github.com/LucasPcq/wtm/next/internal/command/create/usecase.go --
+package create
+
+type Plan struct{}
+
+const Name2 = "create"
+-- github.com/LucasPcq/wtm/internal/service/port/port.go --
+// Package port is internal.
+package port
+
+type Facts struct{}
