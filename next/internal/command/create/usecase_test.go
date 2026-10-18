@@ -54,10 +54,9 @@ func TestEachItemDetailsItsWorktreeAndWhereItsBranchStands(t *testing.T) {
 }
 
 func TestTheDetailIsTheJSONOfTheEnvelope(t *testing.T) {
-	ordinal := 2
-	detail := create.Detail{Path: "/trees/feat-x", Metadata: worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Isolation: project.Isolated}, Standing: worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 1}, Ordinal: &ordinal}
+	detail := create.Detail{Path: "/trees/feat-x", Metadata: worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Ordinal: 2, Isolation: project.Isolated}, Standing: worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 1}}
 
-	assert.JSONEq(t, `{"path":"/trees/feat-x","metadata":{"source_branch":"main","created_at":"2026-10-16T12:00:00Z","env_strategy":"main","isolation":"isolated"},"existing_branch":true,"origin_state":"behind","origin_behind":1,"ordinal":2}`, jsonOf(t, detail))
+	assert.JSONEq(t, `{"path":"/trees/feat-x","metadata":{"source_branch":"main","created_at":"2026-10-16T12:00:00Z","env_strategy":"main","ordinal":2,"isolation":"isolated"},"existing_branch":true,"origin_state":"behind","origin_behind":1}`, jsonOf(t, detail))
 }
 
 func TestOneBranchThatFailsLeavesTheOthersCreated(t *testing.T) {

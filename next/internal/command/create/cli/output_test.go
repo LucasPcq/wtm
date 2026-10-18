@@ -65,14 +65,14 @@ func TestAPlanReadsAsItsRowsThenItsWarnings(t *testing.T) {
 func TestAnAppliedRunWritesEachItemWithItsDetail(t *testing.T) {
 	outcome := twoCreated("/trees")
 	outcome.Result.Items[1].Detail.Standing = worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2}
-	outcome.Result.Items[1].Detail.Ordinal = new(2)
+	outcome.Result.Items[1].Detail.Metadata.Ordinal = 2
 	outcome.Warnings = []domain.Warning{{Code: "locks.unavailable", Message: "ran without operation locks"}}
 
 	assert.JSONEq(t, `{
 		"v": 2, "command": "create", "ok": true, "op": "op-1",
 		"items": [
 			{"subject": "feat/a", "status": "done", "detail": {"path": "/trees/feat-a", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "isolation": "isolated"}, "existing_branch": false}},
-			{"subject": "feat/b", "status": "done", "detail": {"path": "/trees/feat-b", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "isolation": "isolated"}, "existing_branch": true, "origin_state": "behind", "origin_behind": 2, "ordinal": 2}}
+			{"subject": "feat/b", "status": "done", "detail": {"path": "/trees/feat-b", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "ordinal": 2, "isolation": "isolated"}, "existing_branch": true, "origin_state": "behind", "origin_behind": 2}}
 		],
 		"follow_ups": [],
 		"warnings": [{"code": "locks.unavailable", "message": "ran without operation locks"}]

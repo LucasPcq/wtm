@@ -40,12 +40,11 @@ type Result = domain.Result[Detail]
 // An Item is what became of one branch: its status and why, the error it failed on, its warnings, and its Detail once its worktree stands.
 type Item = domain.Unit[Detail]
 
-// A Detail describes a branch's worktree as the JSON envelope reports it: where it is, its meta record, where the branch stood against origin, its ordinal and the env ports it was given.
+// A Detail describes a branch's worktree as the JSON envelope reports it: where it is, its meta record, where the branch stood against origin and the env ports it was given.
 type Detail struct {
 	Path     string        `json:"path"`
 	Metadata worktree.Meta `json:"metadata"`
 	worktree.Standing
-	Ordinal  *int         `json:"ordinal,omitempty"`
 	EnvPorts env.Redacted `json:"env_ports,omitzero"`
 }
 
@@ -225,7 +224,6 @@ func (u UseCase) item(ctx context.Context, plan Plan, planned BranchPlan, report
 			Path:     planned.Path,
 			Metadata: outcome.Provisioned.Meta,
 			Standing: plan.facts.StandingOf(planned.Branch, planned.placement()),
-			Ordinal:  outcome.Provisioned.Ordinal,
 			EnvPorts: outcome.Provisioned.EnvPorts,
 		}
 	}
