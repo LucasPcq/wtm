@@ -3,12 +3,10 @@ package create
 
 import (
 	"context"
-	"errors"
 	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
-	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
@@ -23,13 +21,12 @@ const name = "create"
 // CodeConfigNotFound refuses a repository with no wtm config: `wtm init` has not run there.
 const CodeConfigNotFound = "create.config_not_found"
 
-// A UseCase creates worktrees in one repository: the ports it reaches the repository through, the services it shares with the other commands, and the paths of the main checkout and of wtm's state.
+// A UseCase creates worktrees in one repository: the ports it reaches the repository through and the services it shares with the other commands.
 type UseCase struct {
 	Git        Git
-	Config     Config
+	Repository repository.Service
 	Operations operation.Service
 	Provision  provision.Service
-	MainPath   string
 }
 
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, or a refusal before the apply).
@@ -144,10 +141,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 
 // Observe reads what create decides from: the project's config, the repository's snapshot and what lies at the path each of branches would take. A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, branches []string) (Facts, error) {
-	repo, err := repository.Observe(ctx, repository.ObserveParams{Config: u.Config, Git: u.Git, MainPath: u.MainPath})
-	if errors.Is(err, project.ErrConfigNotFound) {
-		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeConfigNotFound, Message: "no wtm config found — run `wtm init` first", Cause: err}
-	}
+	repo, err := u.Repository.Observe(ctx, name)
 	if err != nil {
 		return Facts{}, err
 	}

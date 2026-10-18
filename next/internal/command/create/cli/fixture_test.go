@@ -19,6 +19,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -127,8 +128,8 @@ func (w world) usecase() create.UseCase {
 		runHooks = func(context.Context, env.HookChain) error { return nil }
 	}
 	return create.UseCase{
-		Git:    w.git,
-		Config: stored{w.store},
+		Git:        w.git,
+		Repository: repository.Service{Config: stored{w.store}, Git: w.git, MainPath: mainPath},
 		Operations: operation.Service{
 			Locker:    locker{err: w.seed.Locks, seen: w.seen},
 			Publisher: locker{},
@@ -147,7 +148,6 @@ func (w world) usecase() create.UseCase {
 			Now:        func() time.Time { return createdAt },
 			LeftBehind: cleanLine,
 		},
-		MainPath: mainPath,
 	}
 }
 
@@ -285,8 +285,8 @@ func newApp(s seed) create.UseCase {
 	}
 	store := storetest.NewFake(storetest.FakeParams{Config: &config})
 	return create.UseCase{
-		Git:    git,
-		Config: loaded{config: config},
+		Git:        git,
+		Repository: repository.Service{Config: loaded{config: config}, Git: git, MainPath: mainPath},
 		Operations: operation.Service{
 			Locker:    held{},
 			Publisher: held{},
@@ -305,7 +305,6 @@ func newApp(s seed) create.UseCase {
 			Now:        func() time.Time { return createdAt },
 			LeftBehind: cleanLine,
 		},
-		MainPath: mainPath,
 	}
 }
 

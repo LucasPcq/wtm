@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// repository returns the main worktree of a new repository configured for wtm, its worktrees under ../.trees.
-func repository(t *testing.T) string {
+// configured returns the main worktree of a new repository configured for wtm, its worktrees under ../.trees.
+func configured(t *testing.T) string {
 	t.Helper()
 	main := filepath.Join(gittest.TempDir(t), "main")
 	gittest.Build(t, gittest.FakeParams{Main: main, Branch: "main"})

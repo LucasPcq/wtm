@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
@@ -18,7 +19,7 @@ func TestTheRepositoryObservedIsTheConfigTheSnapshotAndTheRunWithItsError(t *tes
 	runErr := errors.New("bad run.toml")
 	loadRun := 0
 
-	repo, err := repository.Observe(t.Context(), repository.ObserveParams{Config: configured{config: config, runErr: runErr, loadRun: &loadRun}, Git: git, MainPath: "/repo/main"})
+	repo, err := repository.Service{Config: configured{config: config, runErr: runErr, loadRun: &loadRun}, Git: git, MainPath: "/repo/main"}.Observe(t.Context(), "greet")
 
 	require.NoError(t, err)
 	snapshot, err := git.Snapshot(t.Context())
@@ -29,8 +30,12 @@ func TestTheRepositoryObservedIsTheConfigTheSnapshotAndTheRunWithItsError(t *tes
 func TestARepositoryWithoutConfigIsNotObservedFurther(t *testing.T) {
 	loadRun := 0
 
-	_, err := repository.Observe(t.Context(), repository.ObserveParams{Config: configured{err: project.ErrConfigNotFound, loadRun: &loadRun}, Git: gittest.NewFake(gittest.FakeParams{Main: "/repo/main", Branch: "main"})})
+	_, err := repository.Service{Config: configured{err: project.ErrConfigNotFound, loadRun: &loadRun}, Git: gittest.NewFake(gittest.FakeParams{Main: "/repo/main", Branch: "main"})}.Observe(t.Context(), "greet")
 
+	refused, ok := errors.AsType[*domain.Error](err)
+	require.True(t, ok, err)
+	assert.Equal(t, domain.KindPrecondition, refused.Kind)
+	assert.Equal(t, "greet.config_not_found", refused.Code)
 	assert.ErrorIs(t, err, project.ErrConfigNotFound)
 	assert.Zero(t, loadRun)
 }

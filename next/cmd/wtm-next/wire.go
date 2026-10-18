@@ -17,6 +17,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
 const (
@@ -42,6 +43,8 @@ func wire(params wireParams) app {
 	repo := git.Repo{Dir: params.MainPath, Remote: remote}
 	projectConfig := config.Project{StateDir: params.StateDir, GlobalPath: config.GlobalPath()}
 
+	facts := repository.Service{Config: projectConfig, Git: repo, MainPath: params.MainPath}
+
 	operations := operation.Service{
 		Locker:    locker{oplock.Locks{StateDir: params.StateDir}},
 		Publisher: params,
@@ -66,19 +69,17 @@ func wire(params wireParams) app {
 	return app{
 		Create: create.UseCase{
 			Git:        repo,
-			Config:     projectConfig,
+			Repository: facts,
 			Operations: operations,
 			Provision:  provisions,
-			MainPath:   params.MainPath,
 		},
 		Extract: extract.UseCase{
 			Git:        repo,
-			Config:     projectConfig,
+			Repository: facts,
 			Meta:       provisions.Meta,
 			Shield:     shell.Shield,
 			Operations: operations,
 			Provision:  provisions,
-			MainPath:   params.MainPath,
 		},
 	}
 }

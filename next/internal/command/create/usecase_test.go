@@ -411,7 +411,7 @@ func TestAPreviewStillHoldsWhenAnUnrelatedBranchMoved(t *testing.T) {
 func TestALockTheDefaultsNameIsTakenThenTheFactsObservedAgain(t *testing.T) {
 	w := newWorld(t, seed{Behind: true, Config: projectToml + "\n[wizard.remembered]\nsource_update = \"ff\"\n"})
 	observed := 0
-	w.usecase.Git = counted{Repo: w.repo, observed: &observed}
+	w.usecase.Repository.Git = counted{Repo: w.repo, observed: &observed}
 	held, err := oplock.Locks{StateDir: w.stateDir}.Take(domain.Operation{ID: "other", Command: "sync", PID: 7, Locks: []domain.Lock{{Scope: domain.ScopeWorktree, Name: "main", Mode: domain.LockExclusive}}})
 	require.NoError(t, err)
 

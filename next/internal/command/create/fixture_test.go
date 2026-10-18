@@ -16,6 +16,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
@@ -87,8 +88,8 @@ func newWorld(t *testing.T, s seed) world {
 		meta:      meta,
 		published: published,
 		usecase: create.UseCase{
-			Git:    repo,
-			Config: projectConfig,
+			Git:        repo,
+			Repository: repository.Service{Config: projectConfig, Git: repo, MainPath: main},
 			Operations: operation.Service{
 				Locker:    locks{oplock.Locks{StateDir: stateDir}},
 				Publisher: published,
@@ -110,7 +111,6 @@ func newWorld(t *testing.T, s seed) world {
 				Now:        func() time.Time { return createdAt },
 				LeftBehind: cleanLine,
 			},
-			MainPath: main,
 		},
 	}
 }

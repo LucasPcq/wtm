@@ -17,7 +17,7 @@ import (
 )
 
 func TestTheAppIsWiredOntoTheRealAdapters(t *testing.T) {
-	main := repository(t)
+	main := configured(t)
 	root := filepath.Dir(main)
 	t.Setenv("HOME", t.TempDir())
 
@@ -68,7 +68,7 @@ func TestTwoExecutionsInOneProcessKeepTheirOwnRepositoryAndCorrelationID(t *test
 	creates := map[string]create.UseCase{}
 	commonDirs := map[string]string{}
 	for _, id := range []string{"a", "b"} {
-		params, err := locate(t.Context(), repository(t))
+		params, err := locate(t.Context(), configured(t))
 		require.NoError(t, err)
 		useCase := wire(params).Create
 		useCase.Operations.Publisher = recorded{wireParams: params, published: &published}

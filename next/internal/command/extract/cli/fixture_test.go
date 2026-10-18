@@ -19,6 +19,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
 
@@ -145,10 +146,10 @@ func (w world) usecase() extract.UseCase {
 		runHooks = func(context.Context, env.HookChain) error { return nil }
 	}
 	return extract.UseCase{
-		Git:    w.git,
-		Config: stored{Fake: w.store, isolates: w.seed.Isolates},
-		Meta:   w.store,
-		Shield: shell.Shield,
+		Git:        w.git,
+		Repository: repository.Service{Config: stored{Fake: w.store, isolates: w.seed.Isolates}, Git: w.git, MainPath: mainPath},
+		Meta:       w.store,
+		Shield:     shell.Shield,
 		Operations: operation.Service{
 			Locker:    locker{seen: w.seen},
 			Publisher: locker{},
@@ -167,7 +168,6 @@ func (w world) usecase() extract.UseCase {
 			Now:        func() time.Time { return createdAt },
 			LeftBehind: cleanLine,
 		},
-		MainPath: mainPath,
 	}
 }
 

@@ -28,15 +28,14 @@ const (
 	CodeHalfMoved      = "extract.half_moved"       // the changes reached the target but could not be removed from the source
 )
 
-// A UseCase moves changes between the worktrees of one repository: the ports it reaches the repository through, the services it shares with the other commands, and the paths of the main checkout and of wtm's state.
+// A UseCase moves changes between the worktrees of one repository: the ports it reaches the repository through and the services it shares with the other commands.
 type UseCase struct {
 	Git        Git
-	Config     Config
 	Meta       Meta
 	Shield     Shield
+	Repository repository.Service
 	Operations operation.Service
 	Provision  provision.Service
-	MainPath   string
 }
 
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, nothing to extract, or a refusal before the apply).
@@ -182,10 +181,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 
 // Observe reads what extract decides from: the project's config, the repository's snapshot, the uncommitted changes of the source (of every worktree when none is given), the meta records of the source and target, and what lies at the path a new target would take. A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
-	repo, err := repository.Observe(ctx, repository.ObserveParams{Config: u.Config, Git: u.Git, MainPath: u.MainPath})
-	if errors.Is(err, project.ErrConfigNotFound) {
-		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeConfigNotFound, Message: "no wtm config found — run `wtm init` first", Cause: err}
-	}
+	repo, err := u.Repository.Observe(ctx, name)
 	if err != nil {
 		return Facts{}, err
 	}
