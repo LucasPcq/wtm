@@ -6,9 +6,9 @@ $ wtmx extract; echo EXIT=$?
   ✓ Files: 1 file
   ✓ Target worktree: new worktree
   ✓ Branch name: feat/moved
-  ✓ Source branch: main · default
+  ✓ Source branch: main
   ✓ Env strategy: main · remembered
-  ✓ Isolation: isolated · default
+  ✓ Isolation: isolated
   · Source update — nothing to fast-forward: the source is not behind origin
 
   Copy instead of move (keep the changes in the source)

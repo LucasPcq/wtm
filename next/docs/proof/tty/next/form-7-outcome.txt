@@ -6,7 +6,7 @@ $ wtmx create --ask; echo EXIT=$?
 ┃
 ┃  Branches   feat/form, topic (existing)
 ┃  From       main
-┃  Env        main · remembered
+┃  Env        main · saved for next runs
 ┃  Isolation  isolated
 ┃  feat/form  ../acme.trees/feat-form · 3 ports settled (offset +140)
 ┃  topic      ../acme.trees/topic · 3 ports settled (offset +150)

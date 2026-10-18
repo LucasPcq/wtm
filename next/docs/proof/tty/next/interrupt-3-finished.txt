@@ -6,7 +6,7 @@ $ wtmx create feat/slow --yes; echo EXIT=$?
 ┃
 ┃  Branches   feat/slow
 ┃  From       main
-┃  Env        main
+┃  Env        main · remembered
 ┃  Isolation  isolated
 ┃  feat/slow  ../acme.trees/feat-slow · 3 ports settled (offset +160)
 ┃

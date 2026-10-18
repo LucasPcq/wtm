@@ -32,7 +32,9 @@ Tab
 Sleep 1s
 Enter
 Wait+Screen@15s /Review/
-Sleep 2.5s
+Sleep 1s
+Screenshot form-recap.png
+Sleep 1.5s
 Enter
 Wait+Screen@20s /create: 2 done/
 Sleep 3s

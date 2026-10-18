@@ -1,11 +1,11 @@
 $ wtmx create --ask; echo EXIT=$?
 
-  Step 7/7 • Apply this plan?
+  Step 7/7 • Confirm
 
   ✓ Branches: feat/form, topic
   ✓ Source branch: main
   ✓ Env strategy: main
-  ✓ Isolation: isolated · default
+  ✓ Isolation: isolated
   · Source update — nothing to fast-forward: the source is not behind origin
   · If not exists — set by its flag only
 

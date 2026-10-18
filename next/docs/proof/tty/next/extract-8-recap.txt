@@ -1,16 +1,16 @@
 $ wtmx extract; echo EXIT=$?
 
-  Step 11/11 • Apply this plan?
+  Step 11/11 • Confirm
 
   ✓ Source worktree: feat/form
   ✓ Files: 1 file
   ✓ Target worktree: new worktree
   ✓ Branch name: feat/moved
-  ✓ Source branch: main · default
+  ✓ Source branch: main
   ✓ Env strategy: main · remembered
-  ✓ Isolation: isolated · default
+  ✓ Isolation: isolated
   · Source update — nothing to fast-forward: the source is not behind origin
-  ✓ Mode: move · default
+  ✓ Mode: move
   · On conflict — nothing conflicts with the target
 
   ┃  Review & confirm
@@ -18,9 +18,11 @@ $ wtmx extract; echo EXIT=$?
   ┃  Source     feat/form
   ┃  Files      mod README.md
   ┃  Target     new worktree feat/moved from main
-  ┃  Env        main
+  ┃  Env        main · remembered
   ┃  Isolation  isolated
   ┃  Mode       move
+  ┃
+  ┃  Remembered answers are not asked: --ask asks them again.
 
 ▌› Yes, create & extract
   ────────────────────────────────────────────────────────────────────────────────────────────────

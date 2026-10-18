@@ -6,7 +6,7 @@ $ wtmx extract; echo EXIT=$?
 ┃  Source      feat/form
 ┃  Files       mod README.md
 ┃  Target      new worktree feat/moved from main
-┃  Env         main
+┃  Env         main · remembered
 ┃  Isolation   isolated
 ┃  Mode        move
 ┃  feat/moved  ../acme.trees/feat-moved · 3 ports settled (offset +180)
