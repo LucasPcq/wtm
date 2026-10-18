@@ -1,6 +1,9 @@
 package worktree
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // ChangeStatus is what an uncommitted change does to its file.
 type ChangeStatus string
@@ -143,6 +146,16 @@ type Move struct {
 	Resolve     bool   // merge conflicting text files with conflict markers rather than refuse
 	TargetLabel string // the target's name in conflict markers
 	SourceLabel string // the source's name in conflict markers
+}
+
+// Refusal is the refusal of the move meeting conflicts: a binary conflict cannot take conflict markers, so it is refused even when the move resolves them, and any conflict is refused when it does not; nil when the move can go on.
+func (m Move) Refusal(conflicts []Conflict) *ConflictRefusal {
+	binary := slices.ContainsFunc(conflicts, func(c Conflict) bool { return c.Kind == ConflictBinary })
+	if !binary && (len(conflicts) == 0 || m.Resolve) {
+		return nil
+	}
+
+	return &ConflictRefusal{Conflicts: conflicts}
 }
 
 // Moved is what a move did: the paths it merged with conflict markers, and whether the source kept its changes.

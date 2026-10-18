@@ -127,3 +127,29 @@ func (s Snapshot) StandingOf(branch string, placed Placed) Standing {
 
 	return Standing{}
 }
+
+// A BranchStart is a branch that gets a new worktree, and how that worktree begins.
+type BranchStart struct {
+	Branch string
+	Start  Start
+}
+
+// SubjectsAt is each local branch the new worktrees of starts begin from — the existing branch one checks out, or from when a new branch starts from that local branch — whose standing against origin is standing, each once.
+func (s Snapshot) SubjectsAt(standing Divergence, from string, starts []BranchStart) []string {
+	var subjects []string
+	for _, start := range starts {
+		subject := ""
+		switch {
+		case start.Start == StartCheckOut:
+			subject = start.Branch
+		case start.Start == StartCreate && s.Local(from):
+			subject = from
+		}
+
+		if subject != "" && s.Standing(subject) == standing && !slices.Contains(subjects, subject) {
+			subjects = append(subjects, subject)
+		}
+	}
+
+	return subjects
+}

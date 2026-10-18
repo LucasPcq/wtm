@@ -469,9 +469,8 @@ func (f *Fake) Move(_ context.Context, move worktree.Move) (worktree.Moved, erro
 	f.moves = append(f.moves, move)
 
 	conflicts := f.conflictsOf(move.Changes)
-	binary := slices.ContainsFunc(conflicts, func(c worktree.Conflict) bool { return c.Kind == worktree.ConflictBinary })
-	if binary || (len(conflicts) > 0 && !move.Resolve) {
-		return worktree.Moved{}, &worktree.ConflictRefusal{Conflicts: conflicts}
+	if refusal := move.Refusal(conflicts); refusal != nil {
+		return worktree.Moved{}, refusal
 	}
 
 	target := realPath(move.Target)

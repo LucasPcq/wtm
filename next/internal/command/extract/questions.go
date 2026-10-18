@@ -319,7 +319,7 @@ func (f Facts) from(req Request) From {
 		recorded = ""
 	}
 	base := f.Config.Worktrees.BaseBranch
-	question := From{Options: f.fromOptions(req.To), Pinned: cmp.Or(recorded, base)}
+	question := From{Options: domain.SourceOptions(f.Snapshot, req.To), Pinned: cmp.Or(recorded, base)}
 	target, decided := f.planned(req)
 	if decided && !target.creates() {
 		question.Skip = existingSkip
@@ -336,24 +336,6 @@ func (f Facts) from(req Request) From {
 	}
 
 	return question
-}
-
-// fromOptions are the branches a created target can start from, the target excepted; a branch only on origin is offered as origin/<branch>.
-func (f Facts) fromOptions(to string) []domain.Option {
-	options := make([]domain.Option, 0, len(f.Branches.Local)+len(f.Branches.Remote))
-	for _, local := range f.Branches.Local {
-		if local.Name != to {
-			options = append(options, domain.Option{Value: local.Name, Badge: f.Badge(local.Name)})
-		}
-	}
-
-	for _, remote := range f.Branches.Remote {
-		if !f.Local(remote.Name) && remote.Name != to {
-			options = append(options, domain.Option{Value: worktree.OriginPrefix + remote.Name})
-		}
-	}
-
-	return options
 }
 
 // newWorktree are the questions of the target to create, on the facts: none is asked of a target that exists, and the fast-forward is asked while the branch it starts from is behind origin.

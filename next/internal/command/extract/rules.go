@@ -178,23 +178,19 @@ func (f Facts) existing(req Request) bool {
 	return ok && !target.creates()
 }
 
-// subjectAt is the local branch a created target starts from — the existing branch it checks out, or the source of a new branch — when its standing against origin is standing, else "".
+// subjectAt is the local branch a created target starts from when its standing against origin is standing, else "".
 func (f Facts) subjectAt(req Request, standing worktree.Divergence) string {
 	target, ok := f.planned(req)
-	subject := ""
-	switch {
-	case !ok:
-	case target.Action == ActionCheckOut:
-		subject = target.Branch
-	case target.Action == ActionCreate && f.Local(req.From):
-		subject = req.From
-	}
-
-	if subject == "" || f.Standing(subject) != standing {
+	if !ok {
 		return ""
 	}
 
-	return subject
+	subjects := f.SubjectsAt(standing, req.From, []worktree.BranchStart{{Branch: target.Branch, Start: worktree.Start(target.Action)}})
+	if len(subjects) == 0 {
+		return ""
+	}
+
+	return subjects[0]
 }
 
 // conflictCheck asks which selected changes would conflict in the target: in its worktree when it exists, else in the tree of the ref it will start from, as origin has it when the apply fast-forwards that ref first.
@@ -258,8 +254,7 @@ func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain
 
 // refusedFor is the refusal of the conflicts, nil when there are none or the request resolves them; a binary conflict cannot take conflict markers, so it is refused even then.
 func refusedFor(target string, onConflict OnConflict, conflicts []worktree.Conflict) *domain.Error {
-	binary := slices.ContainsFunc(conflicts, func(c worktree.Conflict) bool { return c.Kind == worktree.ConflictBinary })
-	if !binary && (len(conflicts) == 0 || onConflict == OnConflictResolve) {
+	if (worktree.Move{Resolve: onConflict == OnConflictResolve}).Refusal(conflicts) == nil {
 		return nil
 	}
 

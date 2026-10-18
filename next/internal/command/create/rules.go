@@ -168,26 +168,16 @@ func (f Facts) checksOut(req Request) bool {
 	})
 }
 
-// subjectsAt is each local branch a planned worktree starts from — the existing branch it checks out, or the source of a new branch — whose standing against origin is standing, each once.
+// subjectsAt is each local branch a planned worktree starts from whose standing against origin is standing, each once.
 func (f Facts) subjectsAt(req Request, standing worktree.Divergence) []string {
-	var subjects []string
+	var starts []worktree.BranchStart
 	for _, d := range f.decisions(req) {
-		planned, isPlanned := d.(BranchPlan)
-		subject := ""
-		switch {
-		case !isPlanned:
-		case planned.Action == ActionCheckOut:
-			subject = planned.Branch
-		case planned.Action == ActionCreate && f.Local(req.From):
-			subject = req.From
-		}
-
-		if subject != "" && f.Standing(subject) == standing && !slices.Contains(subjects, subject) {
-			subjects = append(subjects, subject)
+		if planned, isPlanned := d.(BranchPlan); isPlanned {
+			starts = append(starts, worktree.BranchStart{Branch: planned.Branch, Start: worktree.Start(planned.Action)})
 		}
 	}
 
-	return subjects
+	return f.SubjectsAt(standing, req.From, starts)
 }
 
 // ----------------------------------------------------------------------------

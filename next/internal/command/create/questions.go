@@ -149,7 +149,7 @@ func (f Facts) branchOptions() []domain.Option {
 
 // from answers the source with the base branch only when no branch is checked out as it exists, since such a branch's parent must be named.
 func (f Facts) from(req Request) From {
-	question := From{Options: f.sourceOptions(req.Branches), Pinned: f.Config.Worktrees.BaseBranch}
+	question := From{Options: domain.SourceOptions(f.Snapshot, req.Branches...), Pinned: f.Config.Worktrees.BaseBranch}
 	switch base := f.Config.Worktrees.BaseBranch; {
 	case req.From != "":
 		question.Answer = domain.Answer[string]{Value: req.From, Origin: domain.OriginRequest}
@@ -158,24 +158,6 @@ func (f Facts) from(req Request) From {
 	}
 
 	return question
-}
-
-// sourceOptions are the branches a new branch can start from, the branches being created excepted; a branch only on origin is offered as origin/<branch>.
-func (f Facts) sourceOptions(creating []string) []domain.Option {
-	options := make([]domain.Option, 0, len(f.Branches.Local)+len(f.Branches.Remote))
-	for _, local := range f.Branches.Local {
-		if !slices.Contains(creating, local.Name) {
-			options = append(options, domain.Option{Value: local.Name, Badge: f.Badge(local.Name)})
-		}
-	}
-
-	for _, remote := range f.Branches.Remote {
-		if !f.Local(remote.Name) && !slices.Contains(creating, remote.Name) {
-			options = append(options, domain.Option{Value: worktree.OriginPrefix + remote.Name})
-		}
-	}
-
-	return options
 }
 
 // newWorktree are the questions of the new worktrees, on the facts; the fast-forward is asked while a branch they start from is behind origin.
