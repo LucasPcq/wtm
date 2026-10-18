@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	_ "github.com/LucasPcq/wtm/next/internal/domain"
+	_ "github.com/LucasPcq/wtm/next/internal/service/operation" // want `next/internal/domain/branch must not import "github.com/LucasPcq/wtm/next/internal/service/operation" — the domain`
 	_ "github.com/spf13/cobra" // want `next/internal/domain/branch must not import "github.com/spf13/cobra" — the domain`
 )
 
@@ -36,9 +37,12 @@ import (
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/service/operationtest must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — a service's test kit`
 	_ "github.com/LucasPcq/wtm/next/internal/domain"
 	_ "github.com/LucasPcq/wtm/next/internal/service/operation"
-	_ "github.com/LucasPcq/wtm/next/internal/service/provision" // want `next/internal/service/operationtest must not import "github.com/LucasPcq/wtm/next/internal/service/provision" — a service's test kit`
+	_ "github.com/LucasPcq/wtm/next/internal/service/repository" // want `next/internal/service/operationtest must not import "github.com/LucasPcq/wtm/next/internal/service/repository" — a service's test kit`
 	_ "github.com/spf13/cobra"
 )
+-- github.com/LucasPcq/wtm/next/internal/service/repository/repository.go --
+// Package repository reads the repository.
+package repository
 -- github.com/LucasPcq/wtm/next/internal/service/provision/provision.go --
 // Package provision makes a new worktree whole.
 package provision
@@ -46,7 +50,10 @@ package provision
 import (
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/service/provision must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — a service`
 	_ "github.com/LucasPcq/wtm/next/internal/domain/branch"
+	_ "github.com/LucasPcq/wtm/next/internal/command/create" // want `next/internal/service/provision must not import "github.com/LucasPcq/wtm/next/internal/command/create" — a service`
 	_ "github.com/LucasPcq/wtm/next/internal/service/operation" // want `next/internal/service/provision must not import "github.com/LucasPcq/wtm/next/internal/service/operation" — a service`
+	_ "github.com/LucasPcq/wtm/next/internal/ui/output" // want `next/internal/service/provision must not import "github.com/LucasPcq/wtm/next/internal/ui/output" — a service`
+	_ "github.com/spf13/cobra" // want `next/internal/service/provision must not import "github.com/spf13/cobra" — a service`
 )
 -- github.com/LucasPcq/wtm/next/internal/command/clean/clean.go --
 // Package clean removes worktrees.
@@ -63,11 +70,12 @@ import (
 	_ "github.com/LucasPcq/wtm/internal/domain" // want `next/internal/command/create must not import "github.com/LucasPcq/wtm/internal/domain" — next/ never imports internal/`
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/command/create must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — a use case`
 	_ "github.com/LucasPcq/wtm/next/internal/command/clean" // want `next/internal/command/create must not import "github.com/LucasPcq/wtm/next/internal/command/clean" — a use case`
+	_ "github.com/LucasPcq/wtm/next/internal/command/clean/cli" // want `next/internal/command/create must not import "github.com/LucasPcq/wtm/next/internal/command/clean/cli" — a use case`
 	_ "github.com/LucasPcq/wtm/next/internal/domain/branch"
 	_ "github.com/LucasPcq/wtm/next/internal/service/operation"
 	_ "github.com/LucasPcq/wtm/next/internal/service/operationtest" // want `next/internal/command/create must not import "github.com/LucasPcq/wtm/next/internal/service/operationtest" — a fake`
-	_ "github.com/LucasPcq/wtm/next/internal/service/provision"
 	_ "github.com/LucasPcq/wtm/next/internal/ui/output" // want `next/internal/command/create must not import "github.com/LucasPcq/wtm/next/internal/ui/output" — a use case`
+	_ "github.com/spf13/cobra" // want `next/internal/command/create must not import "github.com/spf13/cobra" — a use case`
 )
 
 var _ context.Context
@@ -103,16 +111,81 @@ import (
 // Package gittest is a stateful fake of git.
 package gittest
 
-import _ "github.com/LucasPcq/wtm/next/internal/adapter/git"
+import (
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/git"
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/gittest/clock"
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/shell"
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/store" // want `next/internal/adapter/gittest must not import "github.com/LucasPcq/wtm/next/internal/adapter/store" — an adapter's test kit`
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/storetest" // want `next/internal/adapter/gittest must not import "github.com/LucasPcq/wtm/next/internal/adapter/storetest" — a fake`
+	_ "github.com/LucasPcq/wtm/next/internal/command/clean" // want `next/internal/adapter/gittest must not import "github.com/LucasPcq/wtm/next/internal/command/clean" — an adapter's test kit`
+	_ "github.com/LucasPcq/wtm/next/internal/domain"
+	_ "github.com/spf13/cobra"
+)
+-- github.com/LucasPcq/wtm/next/internal/adapter/gittest/clock/clock.go --
+// Package clock is a fake clock for gittest.
+package clock
+-- github.com/LucasPcq/wtm/next/internal/adapter/shelltest/fake.go --
+// Package shelltest is a fake of shell.
+package shelltest
+
+import _ "github.com/LucasPcq/wtm/next/internal/adapter/shell"
+-- github.com/LucasPcq/wtm/next/internal/adapter/storetest/fake.go --
+// Package storetest is a stateful fake of the store.
+package storetest
+
+import _ "github.com/LucasPcq/wtm/next/internal/adapter/store"
+-- github.com/LucasPcq/wtm/next/internal/adapter/latest/latest.go --
+// Package latest is no test kit.
+package latest // want `next/internal/adapter/latest: a name ending in "test" is reserved for a test kit`
+-- github.com/LucasPcq/wtm/next/internal/service/latest/latest.go --
+// Package latest is no test kit.
+package latest // want `next/internal/service/latest: a name ending in "test" is reserved for a test kit`
+-- github.com/LucasPcq/wtm/next/internal/service/test/test.go --
+// Package test is no test kit.
+package test // want `next/internal/service/test: a name ending in "test" is reserved for a test kit`
+-- github.com/LucasPcq/wtm/next/internal/service/provision/sub/sub.go --
+// Package sub splits a service.
+package sub
+
+import _ "github.com/LucasPcq/wtm/next/internal/service/provision" // want `next/internal/service/provision/sub must not import "github.com/LucasPcq/wtm/next/internal/service/provision" — a service`
+-- github.com/LucasPcq/wtm/next/internal/command/create/cli/sub/sub.go --
+// Package sub splits a command line.
+package sub
+-- github.com/LucasPcq/wtm/next/internal/ui/form/form.go --
+// Package form asks the questions.
+package form
+-- github.com/LucasPcq/wtm/next/internal/ui/form/form_test.go --
+package form_test
+
+import (
+	"testing"
+
+	_ "github.com/LucasPcq/wtm/next/internal/ui/formtest"
+)
+
+func TestForm(t *testing.T) {}
+-- github.com/LucasPcq/wtm/next/internal/ui/formtest/driver.go --
+// Package formtest drives a form, for tests.
+package formtest
+
+import (
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/ui/formtest must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — a ui test kit`
+	_ "github.com/LucasPcq/wtm/next/internal/command/clean" // want `next/internal/ui/formtest must not import "github.com/LucasPcq/wtm/next/internal/command/clean" — a ui test kit`
+	_ "github.com/LucasPcq/wtm/next/internal/domain"
+	_ "github.com/LucasPcq/wtm/next/internal/service/operation" // want `next/internal/ui/formtest must not import "github.com/LucasPcq/wtm/next/internal/service/operation" — a ui test kit`
+	_ "github.com/LucasPcq/wtm/next/internal/ui/form"
+	_ "github.com/spf13/cobra"
+)
 -- github.com/LucasPcq/wtm/next/internal/adapter/store/store.go --
 // Package store writes the state files.
 package store
 
 import (
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — an adapter`
-	_ "github.com/LucasPcq/wtm/next/internal/adapter/gittest" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/adapter/gittest" — a fake`
-	_ "github.com/LucasPcq/wtm/next/internal/command/create" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/command/create" — an adapter`
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/shelltest" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/adapter/shelltest" — a fake`
+	_ "github.com/LucasPcq/wtm/next/internal/command/clean" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/command/clean" — an adapter`
 	_ "github.com/LucasPcq/wtm/next/internal/service/operation" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/service/operation" — an adapter`
+	_ "github.com/LucasPcq/wtm/next/internal/ui/output" // want `next/internal/adapter/store must not import "github.com/LucasPcq/wtm/next/internal/ui/output" — an adapter`
 )
 -- github.com/LucasPcq/wtm/next/internal/ui/output/output.go --
 // Package output prints results.
@@ -123,6 +196,7 @@ import (
 	_ "github.com/LucasPcq/wtm/next/internal/command/clean" // want `next/internal/ui/output must not import "github.com/LucasPcq/wtm/next/internal/command/clean" — ui/ is`
 	_ "github.com/LucasPcq/wtm/next/internal/domain"
 	_ "github.com/LucasPcq/wtm/next/internal/service/operation" // want `next/internal/ui/output must not import "github.com/LucasPcq/wtm/next/internal/service/operation" — ui/ is`
+	_ "github.com/LucasPcq/wtm/next/internal/ui/formtest" // want `next/internal/ui/output must not import "github.com/LucasPcq/wtm/next/internal/ui/formtest" — a fake`
 	_ "github.com/spf13/cobra"
 )
 -- github.com/LucasPcq/wtm/next/internal/ui/cli/root.go --
@@ -147,6 +221,7 @@ import (
 	_ "github.com/LucasPcq/wtm/next/internal/command/clean" // want `next/internal/command/create/cli must not import "github.com/LucasPcq/wtm/next/internal/command/clean" — a command's cli`
 	_ "github.com/LucasPcq/wtm/next/internal/command/clean/cli" // want `next/internal/command/create/cli must not import "github.com/LucasPcq/wtm/next/internal/command/clean/cli" — a command's cli`
 	_ "github.com/LucasPcq/wtm/next/internal/command/create"
+	_ "github.com/LucasPcq/wtm/next/internal/command/create/cli/sub" // want `next/internal/command/create/cli must not import "github.com/LucasPcq/wtm/next/internal/command/create/cli/sub" — a command's cli`
 	_ "github.com/LucasPcq/wtm/next/internal/domain"
 	_ "github.com/LucasPcq/wtm/next/internal/service/operation" // want `next/internal/command/create/cli must not import "github.com/LucasPcq/wtm/next/internal/service/operation" — a command's cli`
 	_ "github.com/LucasPcq/wtm/next/internal/service/provision" // want `next/internal/command/create/cli must not import "github.com/LucasPcq/wtm/next/internal/service/provision" — a command's cli`
@@ -169,10 +244,16 @@ func TestCommand(t *testing.T) {}
 package main
 
 import (
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/gittest" // want `next/cmd/wtm-next must not import "github.com/LucasPcq/wtm/next/internal/adapter/gittest" — a fake`
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/store"
 	_ "github.com/LucasPcq/wtm/next/internal/command/create/cli"
 	_ "github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
+
+func main() {}
+-- github.com/LucasPcq/wtm/next/cmd/other/main.go --
+// Command other is a second root.
+package main // want `next/cmd/other is in no row of next/'s import table`
 
 func main() {}
 -- github.com/LucasPcq/wtm/next/internal/stray/stray.go --
@@ -188,6 +269,7 @@ package api
 import (
 	"context"
 
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/api must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — the catalogue knows no command`
 	_ "github.com/LucasPcq/wtm/next/internal/command/create" // want `next/internal/api must not import "github.com/LucasPcq/wtm/next/internal/command/create" — the catalogue knows no command`
 	_ "github.com/LucasPcq/wtm/next/internal/domain"
 	_ "github.com/LucasPcq/wtm/next/internal/service/operation" // want `next/internal/api must not import "github.com/LucasPcq/wtm/next/internal/service/operation" — the catalogue knows no command`

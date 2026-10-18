@@ -1,0 +1,21 @@
+-- go.mod --
+module github.com/LucasPcq/wtm
+
+go 1.26.1
+-- internal/domain/domain.go --
+package domain
+
+type Worktree struct{}
+-- next/internal/domain/domain.go --
+// Package domain is the domain.
+package domain
+-- next/internal/command/zzprobe/x_test.go --
+package zzprobe
+
+import (
+	"testing"
+
+	_ "github.com/LucasPcq/wtm/internal/domain"
+)
+
+func TestX(t *testing.T) {}

@@ -4,6 +4,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -16,6 +17,21 @@ func TestAPackageThatDoesNotTypeCheckIsAnError(t *testing.T) {
 	t.Chdir(dir)
 	if _, err := analyze(analyzeParams{Roots: []string{"broken"}, Systems: []string{"linux"}}); err == nil {
 		t.Error("a package with a type error was analysed: archlint would print `clean` over code it never understood")
+	}
+}
+
+// analysistest loads the tests of a package, so only the driver, which does not, shows a directory of tests alone.
+func TestADirectoryOfNextHoldingOnlyTestsIsRefused(t *testing.T) {
+	dir := t.TempDir()
+	extract(t, dir, "testonly")
+	t.Chdir(dir)
+	findings, err := analyze(analyzeParams{Roots: []string{"next"}, Systems: []string{"darwin"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	findings = slices.DeleteFunc(findings, func(f finding) bool { return f.rule != nextAnalyzer.Name })
+	if len(findings) != 1 || findings[0].pos.Filename != "next/internal/command/zzprobe/x_test.go" || !strings.Contains(findings[0].msg, "holds only tests") {
+		t.Errorf("findings = %v, want next/internal/command/zzprobe refused for holding only tests", findings)
 	}
 }
 

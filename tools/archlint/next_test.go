@@ -19,6 +19,18 @@ func TestANextPackageImportsOnlyWhatItsRowAllows(t *testing.T) {
 		nextPrefix+"internal/command/clean",
 		nextPrefix+"cmd/wtm-next",
 		nextPrefix+"internal/stray",
+		nextPrefix+"internal/adapter/gittest/clock",
+		nextPrefix+"internal/adapter/storetest",
+		nextPrefix+"internal/adapter/shelltest",
+		nextPrefix+"internal/service/repository",
+		nextPrefix+"internal/adapter/latest",
+		nextPrefix+"internal/service/latest",
+		nextPrefix+"internal/service/test",
+		nextPrefix+"internal/service/provision/sub",
+		nextPrefix+"internal/command/create/cli/sub",
+		nextPrefix+"internal/ui/form",
+		nextPrefix+"internal/ui/formtest",
+		nextPrefix+"cmd/other",
 	)
 }
 

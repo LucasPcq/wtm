@@ -2,6 +2,22 @@
 
 The reference is the legacy `wtm create` of 0.30.1. Its output differs by design (next speaks the v2 envelope and plans before it acts), so the proof compares what each leaves on disk and keeps both outputs side by side.
 
+## How to run
+
+From the repository root, after `make build next`:
+
+```bash
+cd next/docs/proof
+wtm=../../../bin/wtm next=../../../bin/wtm-next
+sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behind, legacy then next
+./tty.sh legacy "${sandboxes% *}" "$wtm" tty/legacy
+./tty.sh next "${sandboxes#* }" "$next" tty/next
+./extract.sh "$wtm" "$next" extract
+git diff --stat .
+```
+
+Each run makes its own sandboxes (`mktemp`, `/tmp/wtm` and five random characters, as long as the paths the captures were taken with, since a screen wraps a path at 100 columns) and names its tmux sessions after them, so two runs at once, from two worktrees, never meet: no lock is needed. `tty.sh` replays in the sandbox `create.sh` printed and removes it when done; `extract.sh` removes its own. Paths are normalised to `<SB>`, so the captures do not depend on the run.
+
 - `create.sh <wtm> <wtm-next> create`: two identical sandboxes (the `docs/demos` "acme" project with the same ports, a bare `origin`, a local `feature` and `topic`, a branch only `origin` has, and an `on_create` hook that fails on `feat/bad*` and sleeps on `feat/slow*`), the same scenarios run by each binary; after each, the exit code, stdout, stderr and the state (branches, worktrees, every `meta.json`, every `.env`, `config.toml`). Paths, timestamps, op ids, fingerprints and durations are normalised. `create/states.diff` holds the differences of state.
   1. a new branch
   2. three branches with one failing hook
@@ -27,12 +43,12 @@ The reference is the legacy `wtm create` of 0.30.1. Its output differs by design
   - 3 is refused by both; next exits 2 (an invalid request, its field naming `--from`) where legacy exits 1. 12 likewise: next exits 2 where legacy exits 10.
   - 14 gives both the configured strategy, `main`.
   - 15 to 20: legacy has no dry run, fingerprint nor `--remember`, and refuses the flag (exit 2). Next plans 15 and 18 without applying them, applies 16 (`feat/dry`, `env_from` remembered as `main`) and 19 (nothing to change), and refuses 17 and 20 (exit 25).
-- `tty.sh <side> <binary> tty/<side>`, after `create.sh`: tmux at 100×40 in that side's sandbox, `tty/legacy/` and `tty/next/` hold the screens.
+- `tty.sh <side> <sandbox> <binary> tty/<side>`, after `create.sh`: tmux at 100×40 in that side's sandbox, `tty/legacy/` and `tty/next/` hold the screens.
   - The form under `--ask`: branches, then source, env strategy (the remembered answer ticked), isolation and the recap, then apply and the outcome. Next asks one step more (`If not exists`, shown settled) and draws its recap as the plan. Both offer the same env rows, "Use config default (main)" first; each ticks the answer its sandbox remembers: `config` on legacy, `main` on next, which 16 remembered (`--env-from main --remember env_from`, which legacy refuses).
   - One Ctrl+C during a hook: both exit 19, next saying `Cancelling — finishing on_create of feat/slow; Ctrl+C again to stop now`.
   - Two Ctrl+C: the run dies by SIGINT, exit 130 for both.
   - The extract form (`extract-*`), on a change made in `feat/form`: source, files, a new target `feat/moved`, its source branch, isolation, mode and the recap, then apply and the outcome. Next has one step more, the new target's env strategy, settled by the answer the create form remembered (`✓ Env strategy: main · remembered`); legacy's extract never asks it. Both skip the source update (main is not behind) and next shows the conflict question settled; legacy's target list is sorted, since it follows git's order, which varies between runs.
-  - Each screen is captured once it shows what it waits for and holds still. Run the three scripts in one go under `lockf -t 1800 /tmp/wtm-proof.lock`: the sandboxes and tmux sessions are fixed, so two runs at once spoil each other.
+  - Each screen is captured once it shows what it waits for and holds still.
 - `form.gif`, `form-recap.png` and `apply-hooks.gif` are recorded from `form.tape` and `hooks.tape` in the next sandbox: the form through its recap and apply, and three branches whose hooks run, one failing.
 
 # Proof: `wtm extract` (legacy `flow/`) vs `wtm-next extract`

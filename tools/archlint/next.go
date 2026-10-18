@@ -3,6 +3,7 @@ package main
 import (
 	"go/ast"
 	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"slices"
@@ -23,6 +24,8 @@ const (
 	nextDomain      nextLayer = "domain"
 	nextService     nextLayer = "service"
 	nextServiceTest nextLayer = "service/test"
+	nextAdapterTest nextLayer = "adapter/test"
+	nextUITest      nextLayer = "ui/test"
 	nextCommand     nextLayer = "command"
 	nextAdapter     nextLayer = "adapter"
 	nextCLI         nextLayer = "command/cli"
@@ -34,7 +37,10 @@ const (
 const (
 	cliDir     = "cli"
 	testSuffix = "test"
+	nextRoot   = "cmd/wtm-next"
 )
+
+var nextKits = []nextLayer{nextServiceTest, nextAdapterTest, nextUITest}
 
 var sharedAdapters = []string{"statefile", "shell"}
 
@@ -50,9 +56,11 @@ var nextWhy = map[nextLayer]string{
 	nextServiceTest: "a service's test kit checks what the service promises: service/<its name>, domain/*, the stdlib and third parties, never another service, a command, an adapter or ui/*",
 	nextCLI:         "a command's cli drives its own use case: command/<its name>, domain/*, ui/*, the stdlib and third parties, never another command, a service or an adapter",
 	nextAdapter:     "an adapter reaches domain/*, adapter/statefile, adapter/shell, the stdlib and third parties, never a service, a command or ui/*, nor another adapter",
+	nextAdapterTest: "an adapter's test kit reaches adapter/<its name>, domain/*, adapter/statefile, adapter/shell, the stdlib and third parties, never a service, a command or ui/*, nor another adapter",
+	nextUITest:      "a ui test kit reaches domain/*, ui/*, the stdlib and third parties, never a command, a service or an adapter",
 	nextUI:          "ui/ is the presentation kit every command's cli shares and knows no command: domain/*, ui/*, the stdlib and third parties, never a command, a service or an adapter",
 	nextAPI:         "the catalogue knows no command: domain/* and the stdlib only",
-	nextCmd:         "the composition root wires what is under next/",
+	nextCmd:         "the composition root wires what is under next/, never a fake",
 }
 
 var nextAnalyzer = newNextAnalyzer(testFilesOnDisk)
@@ -60,7 +68,7 @@ var nextAnalyzer = newNextAnalyzer(testFilesOnDisk)
 func newNextAnalyzer(testsOf testFiles) *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name: "next",
-		Doc:  "a package of next/ imports only what its row of next/README.md allows, never internal/ (its tests neither), and a fake only from a test",
+		Doc:  "a package of next/ sits in a row of next/README.md and imports only what that row allows, never internal/ (its tests neither), and a fake only from a test",
 		Run:  func(pass *analysis.Pass) (any, error) { return runNext(pass, testsOf) },
 	}
 }
@@ -72,7 +80,11 @@ func runNext(pass *analysis.Pass, testsOf testFiles) (any, error) {
 	}
 	from, ok := nextPackageOf(rel)
 	if !ok {
-		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under domain/, service/, command/ (its cli/ beside it), adapter/, ui/, api/ or cmd/ (next/README.md)", rel)
+		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under domain/, service/, command/ (its cli/ beside it), adapter/, ui/, api/ or cmd/wtm-next (next/README.md)", rel)
+		return nil, nil
+	}
+	if sibling, ok := kitOf(from); ok && !siblingExists(pass, rel, sibling) {
+		pass.Reportf(firstFile(pass).Package, "next/%s: a name ending in %q is reserved for a test kit beside its package, and there is no %s beside it: rename it (next/README.md)", rel, testSuffix, sibling)
 		return nil, nil
 	}
 	sources := slices.DeleteFunc(slices.Clone(pass.Files), func(file *ast.File) bool { return isTestFile(pass, file) })
@@ -135,8 +147,9 @@ func importsOf(files []*ast.File) []*ast.ImportSpec {
 
 func nextRel(pass *analysis.Pass) (string, bool) {
 	rel, ok := cutNext(pass.Pkg.Path())
-	// analysistest also loads the main package go test generates for a test binary.
-	generated := pass.Pkg.Name() == "main" && strings.HasSuffix(rel, ".test")
+	// analysistest also loads the main package go test generates for a test binary, and a
+	// package's external tests as their own package: the driver reads those from disk.
+	generated := pass.Pkg.Name() == "main" && strings.HasSuffix(rel, ".test") || strings.HasSuffix(rel, "_test")
 	return rel, ok && len(pass.Files) > 0 && !generated
 }
 
@@ -158,7 +171,7 @@ func nextPackageOf(rel string) (nextPackage, bool) {
 		unit = parts[2]
 	}
 	switch {
-	case parts[0] == "cmd":
+	case rel == nextRoot:
 		return nextPackage{layer: nextCmd}, true
 	case parts[0] != "internal":
 		return nextPackage{}, false
@@ -166,20 +179,46 @@ func nextPackageOf(rel string) (nextPackage, bool) {
 		return nextPackage{layer: nextAPI}, true
 	case parts[1] == "domain":
 		return nextPackage{layer: nextDomain}, true
-	case parts[1] == "service" && nested && strings.HasSuffix(unit, testSuffix):
-		return nextPackage{layer: nextServiceTest, unit: unit}, true
 	case parts[1] == "service" && nested:
-		return nextPackage{layer: nextService, unit: unit}, true
+		return kitOr(nextService, nextServiceTest, unit), true
 	case parts[1] == "command" && len(parts) > 3 && parts[3] == cliDir:
 		return nextPackage{layer: nextCLI, unit: unit}, true
 	case parts[1] == "command" && nested:
 		return nextPackage{layer: nextCommand, unit: unit}, true
 	case parts[1] == "adapter" && nested:
-		return nextPackage{layer: nextAdapter, unit: unit}, true
+		return kitOr(nextAdapter, nextAdapterTest, unit), true
 	case parts[1] == "ui" && nested:
-		return nextPackage{layer: nextUI, unit: unit}, true
+		return kitOr(nextUI, nextUITest, unit), true
 	}
 	return nextPackage{}, false
+}
+
+func kitOr(layer, kit nextLayer, unit string) nextPackage {
+	if strings.HasSuffix(unit, testSuffix) {
+		return nextPackage{layer: kit, unit: unit}
+	}
+	return nextPackage{layer: layer, unit: unit}
+}
+
+// kitOf returns the package a test kit's name promises: service/<x> for service/<x>test.
+func kitOf(pkg nextPackage) (string, bool) {
+	if !slices.Contains(nextKits, pkg.layer) {
+		return "", false
+	}
+	return strings.TrimSuffix(pkg.unit, testSuffix), true
+}
+
+func siblingExists(pass *analysis.Pass, rel, sibling string) bool {
+	if sibling == "" {
+		return false
+	}
+	// rel is internal/<layer>/<kit>[/sub…]: the layer's directory is that many levels above the package's.
+	layerDir := filepath.Dir(pass.Fset.File(firstFile(pass).Pos()).Name())
+	for range len(strings.Split(rel, "/")) - 2 {
+		layerDir = filepath.Dir(layerDir)
+	}
+	info, err := os.Stat(filepath.Join(layerDir, sibling))
+	return err == nil && info.IsDir()
 }
 
 type nextImport struct {
@@ -194,7 +233,7 @@ func nextRefuses(imp nextImport) (string, bool) {
 	rel, inNext := cutNext(imp.Target)
 	to, inRow := nextPackageOf(rel)
 	inNext = inNext && inRow
-	fake := inNext && (to.layer == nextAdapter && strings.HasSuffix(to.unit, testSuffix) || to.layer == nextServiceTest)
+	fake := inNext && slices.Contains(nextKits, to.layer)
 	if fake && !(imp.From.layer == to.layer && imp.From.unit == to.unit) {
 		return "a fake is imported from a _test.go only", true
 	}
@@ -225,10 +264,13 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 	case nextServiceTest:
 		return stdlib || thirdParty || in(nextDomain) || in(nextService) && from.unit == to.pkg.unit+testSuffix
 	case nextAdapter:
-		return stdlib || thirdParty || in(nextDomain) || in(nextAdapter) && admitsAdapter(imp, to.pkg)
+		return stdlib || thirdParty || in(nextDomain) || in(nextAdapter) && (to.pkg.unit == from.unit || slices.Contains(sharedAdapters, to.pkg.unit))
+	case nextAdapterTest:
+		return stdlib || thirdParty || in(nextDomain) || in(nextAdapterTest) && to.pkg.unit == from.unit ||
+			in(nextAdapter) && (slices.Contains(sharedAdapters, to.pkg.unit) || from.unit == to.pkg.unit+testSuffix)
 	case nextCLI:
 		return stdlib || thirdParty || in(nextDomain, nextUI) || in(nextCommand) && to.pkg.unit == from.unit
-	case nextUI:
+	case nextUI, nextUITest:
 		return stdlib || thirdParty || in(nextDomain, nextUI)
 	case nextCmd:
 		return stdlib || thirdParty || to.inNext
@@ -236,7 +278,59 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 	return false
 }
 
-func admitsAdapter(imp nextImport, to nextPackage) bool {
-	from := imp.From
-	return to.unit == from.unit || slices.Contains(sharedAdapters, to.unit) || from.unit == to.unit+testSuffix
+func testsAlone(roots []string) ([]finding, error) {
+	// go/packages, loaded without tests, sees no package in a directory of tests alone: no analyzer reads its imports.
+	var findings []finding
+	for _, root := range roots {
+		err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !entry.IsDir() {
+				return nil
+			}
+			if path != root && (entry.Name() == "testdata" || strings.HasPrefix(entry.Name(), ".") || strings.HasPrefix(entry.Name(), "_")) {
+				return filepath.SkipDir
+			}
+			rel := filepath.ToSlash(filepath.Clean(path))
+			if rel != "next" && !strings.HasPrefix(rel, "next/") {
+				return nil
+			}
+			test, ok, err := onlyTests(path)
+			if err != nil || !ok {
+				return err
+			}
+			findings = append(findings, finding{
+				pos:  token.Position{Filename: filepath.Join(path, test), Line: 1, Column: 1},
+				rule: nextAnalyzer.Name,
+				msg:  rel + " holds only tests, which no rule reads: a test sits beside the package it tests (next/README.md)",
+			})
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	return findings, nil
+}
+
+func onlyTests(dir string) (string, bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", false, err
+	}
+	first := ""
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") {
+			continue
+		}
+		if !strings.HasSuffix(name, "_test.go") {
+			return "", false, nil
+		}
+		if first == "" {
+			first = name
+		}
+	}
+	return first, first != "", nil
 }

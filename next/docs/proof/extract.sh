@@ -72,7 +72,10 @@ env_of() {
 run_side() {
   local side=$1
   bin=$2
-  local root=/tmp/wtmext-${side:0:1}
+  # each run its own sandbox, as long as /tmp/wtmext-l was, removed on exit
+  local root
+  root=$(mktemp -d /tmp/wtmXXXXX)
+  roots+=("$root")
   dir=$out/$side
   rm -rf "$dir" && mkdir -p "$dir"
   (
@@ -100,7 +103,7 @@ run_side() {
     env_of feat-env-main >"$dir/11-env-from-main.env"
   )
   sed -i '' -E \
-    -e "s#(/private)?/tmp/wtmext-${side:0:1}#<SB>#g" \
+    -e "s#(/private)?$root#<SB>#g" \
     -e 's#"created_at": "[^"]*"#"created_at": "<T>"#g' \
     -e 's#"op": "[0-9a-f]{16}"#"op": "<OP>"#g' \
     -e 's#[0-9a-f]{24}#<FP>#g' \
@@ -110,6 +113,8 @@ run_side() {
 }
 
 mkdir -p "$out"
+roots=()
+trap 'rm -rf "${roots[@]}"' EXIT
 run_side legacy "$legacy"
 run_side next "$next"
 {

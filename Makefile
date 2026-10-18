@@ -2,7 +2,7 @@ BINARY      := wtm
 BINARY_NEXT := wtm-next
 BUILD_DIR   := bin
 
-.PHONY: build next test vet fmt lint next-lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
+.PHONY: build next test test-next vet fmt lint lint-next next-lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
@@ -12,6 +12,11 @@ next:
 
 test:
 	go test ./... -race -count=1
+
+# test-next and lint-next are the gates scoped to next/ and tools/, for a change
+# that leaves the frozen internal/ alone; lint and test stay the full gates.
+test-next:
+	go test ./next/... ./tools/... -race -count=1
 
 vet:
 	go vet ./...
@@ -51,6 +56,15 @@ sumtype:
 
 lint: fmt vet arch dead sumtype next-lint
 	go tool staticcheck ./...
+
+# archlint runs whole: it loads internal/ and next/ in about two seconds.
+lint-next: arch next-lint
+	@test -z "$$(gofmt -l next tools)" || { echo "gofmt needed:"; gofmt -l next tools; exit 1; }
+	go vet ./next/... ./tools/...
+	@go tool deadcode -test ./next/... | grep -v -E -f .deadcode-ignore > /tmp/wtm-deadcode-next || true
+	@test ! -s /tmp/wtm-deadcode-next || { echo "unreachable code:"; cat /tmp/wtm-deadcode-next; exit 1; }
+	go tool go-sumtype $$(go list ./next/...)
+	go tool staticcheck ./next/... ./tools/...
 
 # next-lint holds next/ to Go's doc-comment and naming conventions with revive
 # (next/revive.toml); staticcheck already runs every check on next/ from

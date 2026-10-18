@@ -5,6 +5,8 @@
 ```
 make lint         # fmt + vet + arch + dead + sumtype + next-lint + staticcheck — all gating
 make test         # go test ./... -race -count=1
+make lint-next    # the same gates over next/ and tools/ only (archlint whole) — for a change that leaves internal/ alone
+make test-next    # go test ./next/... ./tools/... -race -count=1
 make dupl         # clone report, informative only
 make dead-strict  # deadcode without -test: code only a test still reaches, informative only
 ```
@@ -58,7 +60,7 @@ The driver loads `internal/` and `next/` in one run (`go run ./tools/archlint [r
 
 | Rule | Catches |
 | -- | -- |
-| `next` | an import outside the package's row of the `next/` import table (`domain/`, `service/`, `command/<name>`, `command/<name>/cli`, `adapter/<name>`, `ui/`, `cmd/`), a package in no row (the root of `next/` included), an import of `internal/` from a source or a test file, and a fake (`adapter/<name>test`) imported from anything but a test or the adapter it fakes |
+| `next` | an import outside the package's row of the `next/` import table (`domain/`, `service/<name>`, `service/<name>test`, `command/<name>`, `command/<name>/cli`, `adapter/<name>`, `adapter/<name>test`, `ui/<name>`, `ui/<name>test`, `api`, `cmd/wtm-next`), a package in no row (the root of `next/` and any `cmd/` but `cmd/wtm-next` included), a name ending in `test` under `service/`, `adapter/` or `ui/` with no package of the name before the suffix beside it, an import of `internal/` from a source or a test file, a directory holding only tests (the driver loads no tests, so no other check would read it), and a fake (`<layer>/<name>test`) imported from anything but a test or the fake's own package |
 
 Comments in `next/` follow Go's doc-comment conventions (the `go-style` skill): `staticcheck` runs every check there, the naming and doc-comment ones included (`next/staticcheck.conf`, which staticcheck reads for the packages under it), and `make next-lint`, part of `make lint`, runs revive with `next/revive.toml` (`exported`, `package-comments`, naming and error-flow rules).
 

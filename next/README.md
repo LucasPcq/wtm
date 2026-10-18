@@ -49,10 +49,13 @@ A use case reads in one place. `command/<name>/usecase.go` tells the whole reque
 | `command/<name>/cli` | `command/<name>`, `domain/*`, `ui/*`, stdlib, third party — never another command nor its `cli`, `service/*`, `adapter/*` |
 | `adapter/<name>` | `domain/*`, `adapter/statefile`, `adapter/shell` (the one way to start a child), stdlib, third party — never `service/*`, `command/*`, `ui/*`, another adapter |
 | `adapter/<name>test` | what `adapter/<name>` may, and `adapter/<name>`; imported from a `_test.go` only |
-| `ui/*` | `domain/*`, `ui/*`, stdlib, third party — never `command/*`, `service/*`, `adapter/*` |
+| `ui/<name>` | `domain/*`, `ui/*`, stdlib, third party — never `command/*`, `service/*`, `adapter/*` |
+| `ui/<name>test` | what `ui/<name>` may, `ui/<name>` included; imported from a `_test.go` only |
 | `api` | `domain/*`, stdlib — never `command/*`, `service/*`, `adapter/*`, `ui/*`, third party |
-| any test | never `github.com/LucasPcq/wtm/internal/…` |
-| `cmd/wtm-next` | anything under `next/` |
+| any test | never `github.com/LucasPcq/wtm/internal/…`; it sits beside the package it tests, never in a directory of tests alone |
+| `cmd/wtm-next` | anything under `next/` except a fake |
+
+A package in no row is refused: the root of `next/`, a second `cmd/<name>`, anything outside these directories. A name ending in `test` under `service/`, `adapter/` or `ui/` is reserved for the kit of the package beside it: `service/latest`, with no `service/la`, is refused. A service is one package: a sub-package `service/<name>/<sub>` falls in the `service/<name>` row and may not import `service/<name>`; a command's `cli` likewise imports no sub-package of its own.
 
 A use case or a service declares the interfaces it needs in its `port.go`; an adapter exports a concrete type that satisfies them, checked by the compiler in `cmd/wtm-next`.
 
@@ -68,7 +71,7 @@ A use case or a service declares the interfaces it needs in its `port.go`; an ad
 6. `adapter/git/worktree.go → Repo.AddWorktree`: the port's implementation runs `git worktree add`.
 7. Back in `command/create/cli/command.go → createCommand.conclude`: `output.go` draws the outcome or the dry run with the kit of `ui/output`; with `--output json`, `create.Outcome.Envelope` reports the run as a `domain.Envelope`, which `ui/output.Envelope` writes with each field spelled as its flag.
 
-A second command is its own `command/<name>/` (use case, ports, rules, questions, `cli/`) and one line in each list of `cmd/wtm-next`: its constructor in `main.go`'s `Commands`, its binding in `catalogue.go` (`api.Bind(name, Questions{}.Form(), open, UseCase.Run)`), its adapters wired in `wire.go`.
+A second command is its own `command/<name>/` (use case, ports, rules, questions, `cli/`) and one line in each list of `cmd/wtm-next`: its constructor in `main.go`'s `Commands`, its binding in `catalogue.go` (`api.Bind(name, Questions{}.Form(), open, UseCase.Run)`), its adapters wired in `wire.go`. `registration_test.go` fails when a command of `main.go` is missing from the catalogue or from the wiring.
 
 ## Comments
 
