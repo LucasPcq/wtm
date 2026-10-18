@@ -2,11 +2,9 @@ package cli
 
 import (
 	"context"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
-	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
 type (
@@ -20,18 +18,13 @@ var extractFlags = newForm(nil).Flags()
 
 func newForm(open func(ctx context.Context, dir string) (extract.UseCase, error)) *extractForm {
 	return &extractForm{
-		YesUsage: yesUsage,
-		Open: func(ctx context.Context, dir string) (form.UseCase[extract.Request, extract.Questions, extract.Outcome], error) {
-			return open(ctx, dir)
-		},
-		Plan:       plan,
+		YesUsage:   yesUsage,
+		Open:       form.Opener[extract.Request, extract.Questions, extract.Outcome](open),
+		Preview:    preview,
+		Draw:       drawOutcome,
 		ApplyLabel: applyLabel,
 		Special:    special,
 	}
-}
-
-func plan(previewed extract.Outcome, width int, st *output.Styles) string {
-	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(previewed.Plan, previewMarks(previewed.Plan)), Warnings: output.Messages(previewed.Warnings), Hint: output.RecalledHintOf(previewed.Plan.Recalled()), Width: width, Styles: st}), "\n")
 }
 
 // applyLabel names the apply of the plan previewed: it creates the target first when the target does not exist.

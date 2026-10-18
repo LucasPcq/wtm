@@ -2,14 +2,10 @@
 package cli
 
 import (
-	"cmp"
 	"context"
-	"io"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
-	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
 	"github.com/spf13/cobra"
@@ -54,8 +50,8 @@ type createCommand struct {
 // New returns the create command: its flags become a create.Request, answered in the wizard when the user can see and answer it, else run unattended; it draws the outcome on streams, or the v2 JSON envelope with --output json.
 func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (create.UseCase, error)) *cobra.Command {
 	// exits are the exit codes of create's own codes, ahead of those of their kind.
-	exits := map[string]int{create.CodeConfigNotFound: uicli.ExitConfigNotFound}
-	c := &createCommand{io: uicli.Run{Command: commandName, Streams: streams, Env: env, Flags: createFlags, Exits: exits}, form: newForm(open)}
+	exits := map[string]int{create.CodeConfigNotFound: uicli.ExitConfigNotFound, create.CodeConfigInvalid: uicli.ExitError}
+	c := &createCommand{io: uicli.Run{Command: create.Name, Streams: streams, Env: env, Flags: createFlags, Exits: exits}, form: newForm(open)}
 	cmd := &cobra.Command{Use: create.Name + " [branch...]", Short: createShort, Long: createLong, Example: createExample, Args: cobra.ArbitraryArgs, RunE: c.run}
 	c.form.Bind(cmd, &c.io)
 
@@ -63,45 +59,5 @@ func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, 
 }
 
 func (c *createCommand) run(cmd *cobra.Command, args []string) error {
-	return c.form.Launch(cmd, args, c.conclude)
-}
-
-// conclude prints how the run ended — the JSON envelope, a refusal, the dry run and the line that applies it, or the outcome — and returns the failure that sets the exit code.
-func (c *createCommand) conclude(cmd *cobra.Command, ran form.Ran[create.Request, create.Outcome], err error) error {
-	failure := domain.AsError(domain.AsErrorParams{Err: err})
-	argv := c.form.Argv(cmd.CommandPath(), ran.Request)
-	if !c.io.Human() {
-		doc := ran.Outcome.Envelope(commandName, failure)
-		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, argv)...)
-		return c.io.Envelope(doc)
-	}
-
-	stdout, _ := c.io.Writers()
-	switch {
-	case failure != nil:
-		return c.io.Refuse(failure, argv)
-	case ran.Outcome.Result == nil:
-		apply := output.Line(argv) + " --expect-fingerprint " + ran.Outcome.Fingerprint
-		output.Frame(stdout, func(w io.Writer) {
-			output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(ran.Outcome.Plan, previewMarks(ran.Outcome.Plan)), Warnings: ran.Outcome.Warnings, Fingerprint: ran.Outcome.Fingerprint, Apply: apply})
-		})
-		return nil
-	}
-
-	followUps := itemFollowUps(ran.Outcome.Result.Items)
-	output.Frame(stdout, func(w io.Writer) {
-		drawOutcome(w, ran.Outcome, followUps, c.io.Env.Cwd)
-	})
-
-	return c.io.Failed(cmp.Or(failure, ran.Outcome.Failure()))
-}
-
-// itemFollowUps are the commands the failed branches suggest, to repair what they left behind.
-func itemFollowUps(items []create.Item) []output.NextStep {
-	var steps []output.NextStep
-	for _, item := range items {
-		steps = append(steps, output.FollowUpSteps(item.Err)...)
-	}
-
-	return steps
+	return c.form.Launch(cmd, args, c.form.Conclude)
 }

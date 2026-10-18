@@ -2,8 +2,9 @@ package cli
 
 import (
 	"errors"
-	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"testing"
+
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

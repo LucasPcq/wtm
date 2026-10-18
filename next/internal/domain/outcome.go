@@ -41,6 +41,11 @@ func (o Outcome[P, D]) PlanFingerprint() string {
 	return o.Fingerprint
 }
 
+// Applied reports whether the run holds the Result of an apply.
+func (o Outcome[P, D]) Applied() bool {
+	return o.Result != nil
+}
+
 // Failure is the error the apply ended on, nil when it succeeded or did not run.
 func (o Outcome[P, D]) Failure() *Error {
 	if o.Result == nil {

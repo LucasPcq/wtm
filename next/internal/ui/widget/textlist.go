@@ -1,4 +1,4 @@
-package form
+package widget
 
 import (
 	"strings"
@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// A TextList is a [Field] that collects a list of typed entries: tab adds the entry typed, enter adds it and confirms the list, backspace on an empty input removes the last one.
+// A TextList is a [Widget] that collects a list of typed entries: tab adds the entry typed, enter adds it and confirms the list, backspace on an empty input removes the last one.
 // Each change is checked off the event loop before it is accepted, and keys typed meanwhile wait for the check.
 type TextList struct {
 	input    textinput.Model
@@ -148,7 +148,7 @@ func (l *TextList) replay() (Verdict, tea.Cmd) {
 
 // View draws the input, then each entry with its badge, then the error of a refused change.
 func (l *TextList) View(size Size, st *Styles) string {
-	l.input.Prompt = st.accent.Render("› ")
+	l.input.Prompt = st.Accent.Render("› ")
 	l.input.Width = max(10, size.Width-4)
 
 	var b strings.Builder

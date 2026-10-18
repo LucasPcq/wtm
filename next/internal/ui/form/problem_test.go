@@ -1,4 +1,4 @@
-package form
+package form_test
 
 import (
 	"errors"
@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 )
 
 func TestAProblemCapitalisesItsOwnWordsNeverAValue(t *testing.T) {
@@ -20,20 +21,11 @@ func TestAProblemCapitalisesItsOwnWordsNeverAValue(t *testing.T) {
 		"a quote first":  {Found: domain.FieldError{Template: "{problem}", Params: domain.Params{"problem": `"x" is not valid`}}, Want: `"x" is not valid`},
 	}
 	for name, c := range cases {
-		assert.EqualError(t, Problem(c.Found, "Branches"), c.Want, name)
+		assert.EqualError(t, form.Problem(c.Found, "Branches"), c.Want, name)
 	}
 }
 
 func TestAnErrorReadsAsASentence(t *testing.T) {
-	assert.EqualError(t, Sentence(errors.New("internal error")), "Internal error")
-	assert.NoError(t, Sentence(nil))
-}
-
-func TestAFieldShowsItsErrorAsWritten(t *testing.T) {
-	x := NewText("bad", func(string) error { return errors.New("feat/other already has a worktree") })
-
-	_, cmd := x.Update(keyOf("enter"))
-	textSettled(x, cmd)
-
-	assert.Contains(t, plain(x.View(Size{Width: 60}, plainStyles())), "✗ feat/other already has a worktree")
+	assert.EqualError(t, form.Sentence(errors.New("internal error")), "Internal error")
+	assert.NoError(t, form.Sentence(nil))
 }

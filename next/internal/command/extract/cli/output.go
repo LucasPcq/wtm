@@ -7,10 +7,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
-
-const commandName = extract.Name
 
 // planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome, each answer with its mark.
 func planRowsOf(plan extract.Plan, marks output.Marks) []output.PlanRow {
@@ -41,6 +40,12 @@ func planRowsOf(plan extract.Plan, marks output.Marks) []output.PlanRow {
 		)
 	}
 	return rows
+}
+
+// preview is what the recap and the dry run show of the plan previewed.
+func preview(previewed extract.Outcome) form.Preview {
+	plan := previewed.Plan
+	return form.Preview{Rows: planRowsOf(plan, previewMarks(plan)), Warnings: previewed.Warnings, Recalled: plan.Recalled()}
 }
 
 // previewMarks are the marks of a plan not yet applied.
@@ -92,7 +97,7 @@ func mode(keep bool) string {
 }
 
 func drawNothing(w io.Writer, plan extract.Plan) {
-	output.Tally(w, output.TallyParams{Command: commandName, Note: "no uncommitted changes in " + plan.Source})
+	output.Tally(w, output.TallyParams{Command: extract.Name, Note: "no uncommitted changes in " + plan.Source})
 }
 
 // drawOutcome draws what the apply did: the tally, the plan with the target when it stands, the anomalies and the conflicts left to resolve, the target left unfinished, and the next steps.
@@ -104,7 +109,7 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
 	detail := item.Detail
 	conflicted := detail != nil && len(detail.Conflicts) > 0
 
-	tally := output.TallyParams{Command: commandName, Items: []output.Tallied{{Status: item.Status, Reason: item.Reason}}}
+	tally := output.TallyParams{Command: extract.Name, Items: []output.Tallied{{Status: item.Status, Reason: item.Reason}}}
 	if conflicted {
 		tally.Note = "with conflicts"
 	}
@@ -116,7 +121,7 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
 	if detail != nil {
 		path := output.ShownPath(output.Shown{Cwd: cwd, Path: detail.Path})
 		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + output.MutedNote(output.SettlementNote(detail.EnvPorts), output.StylesOf(w))}})
-		next = append(next, output.NextStep{Command: "wtm go " + item.Subject})
+		next = append(next, output.GoStep(item.Subject))
 	}
 	if conflicted {
 		anomalies = append(anomalies, conflictNotes(conflictsParams{Detail: detail, Target: item.Subject, Source: outcome.Plan.Source})...)

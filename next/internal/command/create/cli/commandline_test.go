@@ -1,8 +1,9 @@
 package cli
 
 import (
-	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"testing"
+
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"

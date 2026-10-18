@@ -1,4 +1,4 @@
-package form
+package form_test
 
 import (
 	"cmp"
@@ -14,7 +14,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/require"
 
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
+	"github.com/LucasPcq/wtm/next/internal/ui/widget"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -22,24 +24,24 @@ var errStale = errors.New("stale")
 
 type fakeStep struct {
 	label    string
-	standing Standing
-	box      *SelectList
+	standing form.Standing
+	box      *widget.SelectList
 	answer   string
 	resets   int
 }
 
 func (s *fakeStep) Label() string       { return s.label }
 func (s *fakeStep) Description() string { return "What " + s.label + " asks" }
-func (s *fakeStep) Standing() Standing {
+func (s *fakeStep) Standing() form.Standing {
 	standing := s.standing
 	standing.Value = cmp.Or(standing.Value, s.answer)
 	return standing
 }
-func (s *fakeStep) Field() Field { return s.box }
-func (s *fakeStep) Reset()       { s.answer, s.resets = "", s.resets+1 }
+func (s *fakeStep) Widget() widget.Widget { return s.box }
+func (s *fakeStep) Reset()                { s.answer, s.resets = "", s.resets+1 }
 
 func (s *fakeStep) Open() tea.Cmd {
-	s.box = NewSelectList(SelectParams{Options: []Option{{Label: "Yes", Value: "yes"}, {Label: "No", Value: "no"}}})
+	s.box = widget.NewSelectList(widget.SelectParams{Options: []widget.Option{{Label: "Yes", Value: "yes"}, {Label: "No", Value: "no"}}})
 	return nil
 }
 
@@ -61,9 +63,9 @@ func newFake() *fake {
 	return &fake{first: &fakeStep{label: "First"}, second: &fakeStep{label: "Second"}}
 }
 
-func (f *fake) script() Script {
-	return Script{
-		Steps:   []Step{f.first, f.second},
+func (f *fake) script() form.Script {
+	return form.Script{
+		Steps:   []form.Step{f.first, f.second},
 		Observe: func(context.Context) (func(), error) { return func() { f.observed++ }, nil },
 		Preview: func(context.Context) (func(), error) { return func() {}, f.previewErr },
 		Plan: func(int, *output.Styles) string {
@@ -83,14 +85,6 @@ type refreshingStep struct {
 func (s *refreshingStep) Refreshable() bool { return true }
 func (s *refreshingStep) Refreshed()        { s.refreshed++ }
 
-func picks() []Pick {
-	return []Pick{
-		{Label: "a.txt", Value: "a.txt", Tag: "modified", Tone: ToneWarning},
-		{Label: "b.txt", Value: "b.txt", Tag: "untracked"},
-		{Label: "notes.md", Value: "notes.md"},
-	}
-}
-
 // enters is a terminal on which the user keeps pressing enter.
 type enters struct{}
 
@@ -98,13 +92,6 @@ func (enters) Read(p []byte) (int, error) {
 	time.Sleep(time.Millisecond)
 	p[0] = '\r'
 	return 1, nil
-}
-
-func refusingBad(value string) error {
-	if value == "bad" {
-		return errors.New("Not a valid name")
-	}
-	return nil
 }
 
 // A request is a fake command's request: the values of each path given.
@@ -149,12 +136,8 @@ func (q questions) Form() domain.Form {
 	}}
 }
 
-type outcome struct {
-	req         request
-	fingerprint string
-}
-
-func (o outcome) PlanFingerprint() string { return o.fingerprint }
+// An outcome is a run of the fake command: its plan is the request it ran.
+type outcome = domain.Outcome[request, struct{}]
 
 // app is a fake use case: a branch "taken" is refused, and each run is recorded.
 type app struct {
@@ -174,24 +157,24 @@ func (a *app) Questions(_ context.Context, req request) (questions, error) {
 
 func (a *app) Run(_ context.Context, req request, opts domain.RunOptions) (outcome, error) {
 	a.runs = append(a.runs, opts)
-	return outcome{req: req, fingerprint: "print"}, nil
+	return outcome{Plan: req, Fingerprint: "print"}, nil
 }
 
-func fakeCommand() *Command[request, questions, outcome] {
-	return &Command[request, questions, outcome]{
+func fakeCommand() *form.Command[request, questions, outcome] {
+	return &form.Command[request, questions, outcome]{
 		YesUsage: "Run unattended",
-		Open:     func(context.Context, string) (UseCase[request, questions, outcome], error) { return &app{}, nil },
-		Plan: func(o outcome, _ int, _ *output.Styles) string {
-			return "plan of " + strings.Join(o.req["branches"], ", ")
+		Open:     func(context.Context, string) (form.UseCase[request, questions, outcome], error) { return &app{}, nil },
+		Preview: func(o outcome) form.Preview {
+			return form.Preview{Rows: []output.PlanRow{{Label: "plan of", Values: o.Plan["branches"]}}}
 		},
 	}
 }
 
 // observed is a session of the fake command over a, its first read landed.
-func observed(t *testing.T, a *app, given request) *Session[request, questions, outcome] {
+func observed(t *testing.T, a *app, given request) *form.Session[request, questions, outcome] {
 	t.Helper()
-	s := fakeCommand().Session(t.Context(), SessionParams[request, questions, outcome]{App: a, Request: given})
-	apply, err := s.observe(t.Context())
+	s := fakeCommand().Session(t.Context(), form.SessionParams[request, questions, outcome]{App: a, Request: given})
+	apply, err := s.Observe(t.Context())
 	require.NoError(t, err)
 	apply()
 	return s

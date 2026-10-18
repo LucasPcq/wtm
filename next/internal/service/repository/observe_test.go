@@ -39,3 +39,18 @@ func TestARepositoryWithoutConfigIsNotObservedFurther(t *testing.T) {
 	assert.ErrorIs(t, err, project.ErrConfigNotFound)
 	assert.Zero(t, loadRun)
 }
+
+func TestARepositoryWithAnInvalidConfigIsRefusedSayingWhy(t *testing.T) {
+	loadRun := 0
+	reason := errors.New("base_path must be relative to the repository: /tmp/trees")
+
+	_, err := repository.Service{Config: configured{err: &project.InvalidConfigError{Reason: reason}, loadRun: &loadRun}, Git: gittest.NewFake(gittest.FakeParams{Main: "/repo/main", Branch: "main"})}.Observe(t.Context(), "greet")
+
+	refused, ok := errors.AsType[*domain.Error](err)
+	require.True(t, ok, err)
+	assert.Equal(t, domain.KindPrecondition, refused.Kind)
+	assert.Equal(t, "greet.config_invalid", refused.Code)
+	assert.Equal(t, "invalid config.toml: base_path must be relative to the repository: /tmp/trees", refused.Text())
+	assert.ErrorIs(t, err, reason)
+	assert.Zero(t, loadRun)
+}

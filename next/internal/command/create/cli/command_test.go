@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -19,7 +20,7 @@ func TestTheHelpOfCreateIsTheEnginesWordForWord(t *testing.T) {
 	got := runCreate(t, newWorld(seed{}), "--help")
 
 	require.Equal(t, uicli.ExitOK, got.Code)
-	golden(t, "create_help", got.Stdout)
+	formtest.Golden(t, "create_help", got.Stdout)
 }
 
 func TestCreateConcludesWithEachWorktreeRelativeToWhereItRuns(t *testing.T) {
@@ -132,6 +133,21 @@ func TestWithoutConfigCreateExitsOnItsOwnCode(t *testing.T) {
 
 	assert.Equal(t, uicli.ExitConfigNotFound, got.Code)
 	assert.Contains(t, got.Stderr, "run `wtm init` first")
+}
+
+func TestAnInvalidConfigIsReportedAsSuch(t *testing.T) {
+	w := newWorld(seed{ConfigErr: &project.InvalidConfigError{Reason: errors.New("base_path must be relative to the repository: /tmp/trees")}})
+
+	human := runCreate(t, w, branchName, "--yes")
+	machine := runCreate(t, w, branchName, "--yes", "--output", "json")
+
+	assert.Equal(t, uicli.ExitError, human.Code)
+	assert.Contains(t, human.Stderr, "✗ invalid config.toml: base_path must be relative to the repository: /tmp/trees")
+	assert.NotContains(t, human.Stderr, "internal error")
+	assert.Equal(t, uicli.ExitError, machine.Code)
+	doc := decoded(t, machine.Stdout)
+	require.NotNil(t, doc.Error)
+	assert.Equal(t, formtest.Error{Kind: "precondition", Code: "create.config_invalid", Message: "invalid config.toml: base_path must be relative to the repository: /tmp/trees"}, *doc.Error)
 }
 
 func TestAHeldLockIsAConflict(t *testing.T) {
@@ -310,7 +326,7 @@ func TestTheEnvelopeOfEachEndingIsByteForByte(t *testing.T) {
 
 			assert.Equal(t, c.Code, got.Code, got.Stdout)
 			assert.Empty(t, got.Stderr)
-			golden(t, "envelope_"+name, got.Stdout)
+			formtest.Golden(t, "envelope_"+name, got.Stdout)
 		})
 	}
 }

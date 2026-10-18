@@ -5,6 +5,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
+	"github.com/LucasPcq/wtm/next/internal/ui/widget"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -24,7 +25,7 @@ const (
 // previewing computes the plan off the event loop, the recap offering no choice until it lands.
 func (w *Wizard) previewing() tea.Cmd {
 	w.planned, w.failure = false, nil
-	w.recap = NewSelectList(SelectParams{})
+	w.recap = widget.NewSelectList(widget.SelectParams{})
 	return tea.Batch(w.load(planText), func() tea.Msg {
 		apply, err := w.script.Preview(w.ctx)
 		return previewMsg{apply: apply, err: err}
@@ -36,15 +37,15 @@ func (w *Wizard) previewed(m previewMsg) {
 	w.loading = ""
 	m.apply()
 
-	options := []Option{{Label: cancelLabel, Value: cancelValue}}
+	options := []widget.Option{{Label: cancelLabel, Value: cancelValue}}
 	if failure := domain.AsError(domain.AsErrorParams{Err: m.err}); failure != nil {
 		w.failure = failure
 	} else {
 		w.planned = true
-		options = append([]Option{{Label: w.applyLabel(), Value: applyValue}, {Separator: true}}, options...)
+		options = append([]widget.Option{{Label: w.applyLabel(), Value: applyValue}, {Separator: true}}, options...)
 	}
 
-	w.recap = NewSelectList(SelectParams{Options: options})
+	w.recap = widget.NewSelectList(widget.SelectParams{Options: options})
 }
 
 func (w *Wizard) applyLabel() string {
@@ -80,7 +81,7 @@ func (w *Wizard) recapBody() string {
 		return planText
 	}
 
-	plan := w.script.Plan(w.recapWidth()-w.styles.recapBox.GetHorizontalPadding(), w.styles.Styles)
+	plan := w.script.Plan(w.recapWidth()-w.styles.recapBox.GetHorizontalPadding(), w.styles.Styles.Styles)
 	if !w.stale {
 		return plan
 	}
@@ -107,5 +108,5 @@ func (w *Wizard) recapWidth() int {
 
 // review draws the recap's box: its title and its body.
 func (w *Wizard) review() string {
-	return w.styles.recapBox.Width(w.recapWidth()).Render(w.styles.accent.Render(reviewTitle) + "\n\n" + w.recapBody())
+	return w.styles.recapBox.Width(w.recapWidth()).Render(w.styles.Accent.Render(reviewTitle) + "\n\n" + w.recapBody())
 }

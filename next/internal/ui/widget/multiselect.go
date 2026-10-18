@@ -1,4 +1,4 @@
-package form
+package widget
 
 import (
 	"errors"
@@ -35,7 +35,7 @@ type Pick struct {
 	Picked bool // the row starts picked
 }
 
-// A MultiSelect is a [Field] that picks one or more options, filtered by typing after /; it refuses to be confirmed with none picked.
+// A MultiSelect is a [Widget] that picks one or more options, filtered by typing after /; it refuses to be confirmed with none picked.
 type MultiSelect struct {
 	options   []Pick
 	shown     []int
@@ -229,7 +229,7 @@ func (m *MultiSelect) row(p Pick, selected bool, width int, st *Styles) string {
 	fill := max(width-rowPrefix-rowLead-lipgloss.Width(label)-lipgloss.Width(p.Tag)-rowTagGap, 1)
 	if selected {
 		block := " " + label + strings.Repeat(" ", fill) + p.Tag + strings.Repeat(" ", rowTagGap)
-		return st.accent.Render("▌›") + st.tinted.Render(block)
+		return st.Accent.Render("▌›") + st.tinted.Render(block)
 	}
 	return strings.Repeat(" ", rowPrefix+rowLead) + label + strings.Repeat(" ", fill) + toned(p.Tone, st).Render(p.Tag) + strings.Repeat(" ", rowTagGap)
 }

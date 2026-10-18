@@ -46,12 +46,15 @@ func TestAMissingConfigIsNotFound(t *testing.T) {
 func TestAConfigThatIsNotTOMLIsRefused(t *testing.T) {
 	_, _, err := loadState(t, stateWithConfig(t, "[worktrees\nthis is not valid toml !!!\n"))
 
-	assert.Error(t, err)
+	var invalid *project.InvalidConfigError
+	assert.ErrorAs(t, err, &invalid)
 }
 
 func TestAnUnknownKeyInConfigTomlIsRefused(t *testing.T) {
 	_, _, err := loadState(t, stateWithConfig(t, "[worktrees]\nbase_paht = \"../.trees\"\n"))
 
+	var invalid *project.InvalidConfigError
+	assert.ErrorAs(t, err, &invalid)
 	assert.ErrorContains(t, err, "unknown keys in")
 	assert.ErrorContains(t, err, "worktrees.base_paht")
 }
@@ -84,11 +87,14 @@ func TestAnInvalidConfigIsRefusedSayingWhy(t *testing.T) {
 		{"a template that is not one of its target", "[[env.file]]\ntarget = \".env\"\ntemplate = \"other.example\"\n", "env file template must be a known template of its target: other.example is not a template of .env"},
 		{"a remembered answer no question asks", "[wizard.remembered]\ndelete = \"force\"\n", `unknown remembered answer "delete" in [wizard.remembered] (expected one of env_strategy, isolation, source_update)`},
 		{"a remembered value its question never offers", "[wizard.remembered]\nisolation = \"keep\"\n", `invalid remembered isolation "keep" in [wizard.remembered] (expected one of isolated, verbatim)`},
+		{"absoluteBasePath", "[worktrees]\nbase_path = \"/tmp/trees\"\n", "base_path must be relative to the repository: /tmp/trees"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, err := loadState(t, stateWithConfig(t, tc.content))
 
+			var invalid *project.InvalidConfigError
+			assert.ErrorAs(t, err, &invalid)
 			assert.ErrorContains(t, err, tc.want)
 		})
 	}

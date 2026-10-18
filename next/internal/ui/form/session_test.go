@@ -1,4 +1,4 @@
-package form
+package form_test
 
 import (
 	"testing"
@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 )
 
 const (
@@ -22,9 +23,9 @@ const (
 func TestAStepGivenByAFlagSaysWhichAndOneLeftOpenIsAsked(t *testing.T) {
 	s := observed(t, &app{}, request{"from": {"main"}})
 
-	assert.Equal(t, Standing{Value: "main", Given: true, Flag: "--from"}, s.Standing(atFrom))
-	assert.Equal(t, Standing{Value: "move"}, s.Standing(atKeep))
-	assert.Equal(t, Standing{Value: "feat/a", Given: true}, observed(t, &app{}, request{"branches": {"feat/a"}}).Standing(atBranches))
+	assert.Equal(t, form.Standing{Value: "main", Given: true, Flag: "--from"}, s.Standing(atFrom))
+	assert.Equal(t, form.Standing{Value: "move"}, s.Standing(atKeep))
+	assert.Equal(t, form.Standing{Value: "feat/a", Given: true}, observed(t, &app{}, request{"branches": {"feat/a"}}).Standing(atBranches))
 }
 
 func TestAStepARefusedEntryNamesIsErred(t *testing.T) {
@@ -37,9 +38,9 @@ func TestAStepARefusedEntryNamesIsErred(t *testing.T) {
 func TestTheRequestIsTheOneGivenWithEachAnswerInStepOrder(t *testing.T) {
 	s := observed(t, &app{}, request{"from": {"main"}, domain.PathRemember: {"ff"}})
 
-	s.remembering(atMode, "mode", true, domain.Answered{Path: "mode", Values: []string{"slow"}})
+	s.Remembering(atMode, "mode", true, domain.Answered{Path: "mode", Values: []string{"slow"}})
 	s.Answer(atFrom, domain.Answered{Path: "from", Values: []string{"dev"}})
-	s.remembering(atFF, "ff", false, domain.Answered{Path: "ff", Values: []string{"true"}})
+	s.Remembering(atFF, "ff", false, domain.Answered{Path: "ff", Values: []string{"true"}})
 
 	assert.Equal(t, request{"from": {"dev"}, "mode": {"slow"}, "ff": {"true"}, domain.PathRemember: {"mode"}}, s.Request())
 }
@@ -47,7 +48,7 @@ func TestTheRequestIsTheOneGivenWithEachAnswerInStepOrder(t *testing.T) {
 func TestForgettingAStepReturnsItsFieldsToWhatWasGiven(t *testing.T) {
 	s := observed(t, &app{}, request{"from": {"main"}, domain.PathRemember: {"ff"}})
 	s.Answer(atFrom, domain.Answered{Path: "from", Values: []string{"dev"}})
-	s.remembering(atFF, "ff", false, domain.Answered{Path: "ff", Values: []string{"true"}})
+	s.Remembering(atFF, "ff", false, domain.Answered{Path: "ff", Values: []string{"true"}})
 
 	s.Forget(atFF)
 	s.Forget(atFrom)
@@ -65,15 +66,15 @@ func TestAPathIsLabelledByItsFirstFieldKeepingAnEntrysIndex(t *testing.T) {
 
 func TestTheRecapAppliesThePlanItPreviewedHeldToItsFingerprint(t *testing.T) {
 	a := &app{}
-	s := fakeCommand().Session(t.Context(), SessionParams[request, questions, outcome]{App: a, Request: request{"branches": {"feat/a"}, "from": {"main"}, "mode": {"fast"}, "ff": {"false"}, "keep": {"false"}, "files": {"a.txt"}, "name": {"x"}}, Options: domain.RunOptions{CorrelationID: "corr-1"}})
-	d := start(New(t.Context(), s.Params()))
-	require.Contains(t, d.screen(), "plan of feat/a")
+	s := fakeCommand().Session(t.Context(), form.SessionParams[request, questions, outcome]{App: a, Request: request{"branches": {"feat/a"}, "from": {"main"}, "mode": {"fast"}, "ff": {"false"}, "keep": {"false"}, "files": {"a.txt"}, "name": {"x"}}, Options: domain.RunOptions{CorrelationID: "corr-1"}})
+	d := start(form.New(t.Context(), s.Params()))
+	require.Contains(t, d.Screen(), "plan of  feat/a")
 
-	d.keys("enter")
-	require.NoError(t, s.apply(t.Context()))
+	d.Keys("enter")
+	require.NoError(t, s.Apply(t.Context()))
 
 	require.Len(t, a.runs, 2)
 	assert.Equal(t, domain.RunOptions{DryRun: true, Surface: "tui", CorrelationID: "corr-1"}, a.runs[0])
 	assert.Equal(t, domain.RunOptions{ExpectFingerprint: "print", Surface: "tui", CorrelationID: "corr-1"}, a.runs[1])
-	assert.Equal(t, "print", s.outcome.PlanFingerprint())
+	assert.Equal(t, "print", s.Outcome().PlanFingerprint())
 }

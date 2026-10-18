@@ -1,4 +1,4 @@
-package form
+package widget
 
 import (
 	"strings"
@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// A Text is a [Field] that takes one typed value: enter checks it off the event loop and answers the field once it is accepted; keys typed meanwhile wait for the check.
+// A Text is a [Widget] that takes one typed value: enter checks it off the event loop and answers the field once it is accepted; keys typed meanwhile wait for the check.
 type Text struct {
 	input    textinput.Model
 	check    func(value string) error
@@ -91,7 +91,7 @@ func (t *Text) checked(err error) (Verdict, tea.Cmd) {
 
 // View draws the input, then the error of a refused value.
 func (t *Text) View(size Size, st *Styles) string {
-	t.input.Prompt = st.accent.Render("› ")
+	t.input.Prompt = st.Accent.Render("› ")
 	t.input.Width = max(10, size.Width-4)
 
 	if t.err == nil {

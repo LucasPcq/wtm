@@ -64,6 +64,7 @@ type seed struct {
 	Open       error
 	GitFails   map[string]error
 	StoreFails map[string]error
+	ConfigErr  error // what loading config.toml fails with, nil when it loads
 }
 
 type world struct {
@@ -130,7 +131,7 @@ func (w world) usecase() create.UseCase {
 	return create.UseCase{
 		Git:        w.git,
 		Meta:       w.store,
-		Repository: repository.Service{Config: stored{w.store}, Git: w.git, MainPath: mainPath},
+		Repository: repository.Service{Config: stored{Fake: w.store, err: w.seed.ConfigErr}, Git: w.git, MainPath: mainPath},
 		Operations: operation.Service{
 			Locker:    locker{err: w.seed.Locks, seen: w.seen},
 			Publisher: locker{},
@@ -154,9 +155,13 @@ func (w world) usecase() create.UseCase {
 
 type stored struct {
 	*storetest.Fake
+	err error
 }
 
 func (s stored) Load() (project.Config, project.Global, error) {
+	if s.err != nil {
+		return project.Config{}, project.Global{}, s.err
+	}
 	config, found := s.Config()
 	if !found {
 		return project.Config{}, project.Global{}, project.ErrConfigNotFound
