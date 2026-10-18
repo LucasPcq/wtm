@@ -25,6 +25,7 @@ var analyzers = append(internalOnly(
 	fontcoverAnalyzer,
 	nextAnalyzer,
 	codeprefixAnalyzer,
+	subtestnameAnalyzer,
 )
 
 func internalOnly(written ...*analysis.Analyzer) []*analysis.Analyzer {

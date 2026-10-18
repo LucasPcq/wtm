@@ -1,0 +1,96 @@
+-- github.com/LucasPcq/wtm/next/internal/domain/env/env.go --
+// Package env is a worktree's environment.
+package env
+
+type row struct{ name string }
+
+var _ = row{name: "a source file is not read"}
+-- github.com/LucasPcq/wtm/next/internal/domain/env/env_test.go --
+package env
+
+import "testing"
+
+type refusal struct {
+	name string
+	code int
+}
+
+var refusals = []refusal{
+	{"missing branch", 1}, // want `subtest name "missing branch" has a space`
+	{"unknown_ref", 2},
+}
+
+func TestLiteral(t *testing.T) {
+	t.Run("a sentence name", func(t *testing.T) {}) // want `subtest name "a sentence name" has a space`
+	t.Run("identifier_name", func(t *testing.T) {})
+	t.Run("half "+"built", func(t *testing.T) {}) // want `subtest name "half " has a space`
+}
+
+func TestKeyedTable(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+	}{
+		{name: "an empty value", in: ""}, // want `subtest name "an empty value" has a space`
+		{name: "empty_value", in: "a b"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {})
+	}
+}
+
+func TestPositionalTable(t *testing.T) {
+	cases := []struct {
+		in, name string
+	}{
+		{"a b", "plain pair"}, // want `subtest name "plain pair" has a space`
+		{"a b", "plain_pair"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {})
+	}
+}
+
+func TestMapTable(t *testing.T) {
+	for name, want := range map[string]string{
+		"sorted and compacted": "a b", // want `subtest name "sorted and compacted" has a space`
+		"none":                 "a b",
+	} {
+		t.Run(name, func(t *testing.T) { _ = want })
+	}
+}
+
+func TestValues(t *testing.T) {
+	for _, value := range []string{`say "hi"`, "plain"} { // want `subtest name "say \\"hi\\"" has a space`
+		t.Run(value, func(t *testing.T) {})
+	}
+}
+
+func TestNamedTable(t *testing.T) {
+	for _, impl := range []struct{ name string }{{"real"}, {"fake"}} {
+		for _, r := range refusals {
+			t.Run(impl.name+": "+r.name, func(t *testing.T) {}) // want `subtest name ": " has a space`
+		}
+	}
+}
+
+func BenchmarkStyle(b *testing.B) {
+	b.Run("per op", func(b *testing.B) {}) // want `subtest name "per op" has a space`
+}
+
+func TestNotASubtest(t *testing.T) {
+	var u struct{ Run func(string, int) }
+	u.Run = func(string, int) {}
+	u.Run("not a subtest", 1)
+}
+-- github.com/LucasPcq/wtm/internal/rules/env/env_test.go --
+package env
+
+import "testing"
+
+func TestOutsideNext(t *testing.T) {
+	t.Run("internal is not checked", func(t *testing.T) {})
+}
+-- github.com/LucasPcq/wtm/internal/rules/env/env.go --
+// Package env is internal.
+package env
