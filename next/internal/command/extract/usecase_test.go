@@ -208,6 +208,7 @@ func TestTheAnswersAskedToBeRememberedAreKeptOnceTheTargetIsCreated(t *testing.T
 	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation", "fast_forward"}}})
 
 	assert.Empty(t, result.Warnings)
+	assert.Equal(t, []string{"isolation"}, result.Remembered, "fast_forward is not asked, so not remembered")
 	assert.Equal(t, project.Verbatim, result.Items[0].Detail.Isolation)
 	config := readFile(t, filepath.Join(w.stateDir, "config.toml"))
 	assert.Contains(t, config, `isolation = "verbatim"`)
@@ -239,6 +240,20 @@ func TestAMoveRefusedSinceThePlanIsAConflictOfTheRun(t *testing.T) {
 	assert.Equal(t, "source\n", readFile(t, filepath.Join(w.at(source), "a.txt")))
 }
 
+func TestTheSourcesOwnBranchIsNeverFastForwarded(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+	behindOrigin(t, w, source)
+	req := extract.Request{Source: source, Files: []string{"a.txt"}, To: split, From: source, Given: provision.Given{FastForward: new(true)}}
+
+	planned, _ := w.plan(t, req)
+	questions, err := w.usecase.Questions(t.Context(), req)
+
+	require.NoError(t, err)
+	assert.Empty(t, planned.FastForward)
+	assert.Equal(t, "nothing to fast-forward: feat/login holds the changes being extracted", questions.FastForward.Skip)
+}
+
 func TestARefTheApplyFastForwardsIsCheckedForConflictsAsOriginHasIt(t *testing.T) {
 	w := newWorld(t, seed{Behind: true})
 	w.change(t, source, "a.txt", "a\n")
@@ -260,6 +275,7 @@ func TestNothingIsRememberedNorMovedWhenTheTargetFailsToProvision(t *testing.T) 
 	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation"}}})
 
 	require.Equal(t, domain.StatusFailed, result.Items[0].Status)
+	assert.Empty(t, result.Remembered)
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "isolation")
 	assert.FileExists(t, filepath.Join(w.at(source), "a.txt"))
 	assert.NoFileExists(t, filepath.Join(w.path(split), "a.txt"))
@@ -363,6 +379,17 @@ func TestASourceWithUncommittedChangesIsNotFastForwardedAndSaysSo(t *testing.T) 
 		Params:  domain.Params{"branch": "main"},
 	}}, result.Warnings)
 	assert.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
+}
+
+func TestATargetFastForwardedStandsAsOriginHasIt(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+	behindOrigin(t, w, existing)
+
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: existing, From: "main", Given: provision.Given{FastForward: new(true)}})
+
+	require.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
+	assert.Equal(t, worktree.Standing{ExistingBranch: true, OriginState: worktree.UpToDate}, result.Items[0].Detail.Standing)
 }
 
 func TestAFastForwardThatFailsIsAWarningAndTheTargetStillStarts(t *testing.T) {

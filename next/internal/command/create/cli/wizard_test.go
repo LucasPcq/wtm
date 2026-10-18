@@ -42,12 +42,12 @@ func TestTheRequestIsWhatWasAnswered(t *testing.T) {
 	assert.NotEmpty(t, d.s.Preview().Fingerprint)
 }
 
-func TestAKeptDefaultSaysWhereItCameFrom(t *testing.T) {
+func TestAKeptDefaultIsItsValueAlone(t *testing.T) {
 	d := open(t, sessionParams{App: newApp(seed{})})
 
 	d.keys("feat/a", "enter", "enter", "enter")
 
-	assert.Contains(t, d.screen(), "✓ Source branch: main · config\n  ✓ Env strategy: config default · default\n")
+	assert.Contains(t, d.screen(), "✓ Source branch: main\n  ✓ Env strategy: config default\n")
 }
 
 func TestAnEntryIsCheckedAsItIsAdded(t *testing.T) {
@@ -76,10 +76,18 @@ func TestWhatAFlagOrARememberedAnswerSettledIsNotAsked(t *testing.T) {
 
 	assert.Equal(t, stepRecap, d.w.Current())
 	screen := d.screen()
-	assert.Contains(t, screen, "✓ Branches: feat/a · <branches>")
+	assert.Contains(t, screen, "✓ Branches: feat/a\n")
 	assert.Contains(t, screen, "✓ Source branch: main · --from")
 	assert.Contains(t, screen, "✓ Env strategy: main · remembered")
 	assert.Contains(t, screen, "esc cancel")
+}
+
+func TestTheRecapMarksARecalledAnswerAndSaysHowToBeAskedIt(t *testing.T) {
+	d := open(t, sessionParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: "main"}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main"}})
+
+	screen := d.screen()
+	assert.Contains(t, screen, "┃  Env       main · remembered\n")
+	assert.Contains(t, screen, "┃  Remembered answers are not asked: --ask asks them again.")
 }
 
 func TestAskAsksARememberedAnswerAgainStartingOnIt(t *testing.T) {
@@ -139,7 +147,7 @@ func TestAPlanThatCannotApplySaysWhyAndOffersOnlyToCancel(t *testing.T) {
 	screen := d.screen()
 	assert.Contains(t, screen, "Step 7/7 • Cannot apply this plan")
 	assert.Contains(t, screen, "✗ the request is invalid\n  ┃      Source branch: ghost not found")
-	assert.NotContains(t, screen, "Yes, apply")
+	assert.NotContains(t, screen, "Yes, ")
 }
 
 func TestAStaleRunAsksNothingAgainAndSaysWhy(t *testing.T) {
@@ -177,7 +185,7 @@ func TestAskAsksARememberedSourceUpdateAgainStartingOnIt(t *testing.T) {
 	d := open(t, sessionParams{App: newApp(seed{Behind: true, Remembered: remembered}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvExample, Ask: true}}})
 
 	require.Equal(t, stepFastForward, d.w.Current())
-	assert.Contains(t, d.screen(), "▌› Yes")
+	assert.Contains(t, d.screen(), "▌› Fast-forward main to origin")
 	assert.Contains(t, d.screen(), "[x] Always use this answer in this repo")
 }
 

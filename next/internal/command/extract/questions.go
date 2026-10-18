@@ -200,7 +200,7 @@ func (q Questions) Form() domain.Form {
 			Refreshable: true,
 		},
 	}
-	fields = append(fields, q.Questions.Fields(wording)...)
+	fields = append(fields, q.Questions.Fields(envHelp)...)
 	fields = append(fields,
 		domain.ConfirmField{
 			FieldSpec: domain.FieldSpec{Path: pathKeep, Flag: "--keep", Label: "Mode", Help: "Copy instead of move (keep the changes in the source)", Origin: q.Keep.Origin},
@@ -222,12 +222,7 @@ func (q Questions) Form() domain.Form {
 	return domain.Form{Problems: q.Errors, Fields: fields}
 }
 
-var wording = provision.Wording{
-	EnvHelp:         "How the .env files of the new target are provisioned: config (config.toml's strategy), example (from its template), main (copied from the main checkout) or parent (from the worktree of the branch it starts from, --from); defaults to config.toml's strategy",
-	FastForwardHelp: "Fast-forward the parent branch to origin before creating the target; skipped when it has diverged",
-	Yes:             domain.Option{Value: "true", Label: "Fast-forward to origin"},
-	No:              domain.Option{Value: "false", Label: "Keep it as-is"},
-}
+const envHelp = "How the .env files of the new target are provisioned: config (config.toml's strategy), example (from its template), main (copied from the main checkout) or parent (from the worktree of the branch it starts from, --from); defaults to config.toml's strategy"
 
 func (q Questions) filesHelp() string {
 	if q.Source.Given != "" && len(q.Files.Options) == 0 {
@@ -329,7 +324,7 @@ func (f Facts) from(req Request) From {
 		recorded = ""
 	}
 	base := f.Config.Worktrees.BaseBranch
-	question := From{Options: domain.SourceOptions(f.Snapshot, req.To), Pinned: cmp.Or(recorded, base)}
+	question := From{Options: domain.SourceOptions(f.Repository, req.To), Pinned: cmp.Or(recorded, base)}
 	target, decided := f.planned(req)
 	if decided && !target.creates() {
 		question.Skip = existingSkip
@@ -351,11 +346,14 @@ func (f Facts) from(req Request) From {
 // newWorktree are the questions of the target to create, on the facts: none is asked of a target that exists, and the fast-forward is asked while the branch it starts from is behind origin.
 func (f Facts) newWorktree(req Request) provision.Questions {
 	params := provision.QuestionsParams{Given: req.Given, Repository: f.Repository}
+	behind := f.subjectAt(req, worktree.Behind)
 	switch {
 	case f.existing(req):
 		params.Exists = existingSkip
-	case f.subjectAt(req, worktree.Behind) == "":
-		params.NotBehind = "nothing to fast-forward: the branch it starts from is not behind origin"
+	case behind != "" && behind == req.Source:
+		params.Held = "nothing to fast-forward: " + behind + " holds the changes being extracted"
+	case behind != "":
+		params.Behind = []string{behind}
 	}
 
 	return provision.NewQuestions(params)
@@ -394,12 +392,18 @@ func (q Questions) facing(conflicts []worktree.Conflict) Questions {
 
 // Resolve settles the request on the facts, every field answered as NewQuestions answers it; a request with problems is refused with all of them, by domain.Invalid.
 func Resolve(f Facts, req Request) (Request, error) {
+	questions, err := resolve(f, req)
+	return questions.Request(), err
+}
+
+// resolve is the questions of the request on the facts, refused when one is not settled.
+func resolve(f Facts, req Request) (Questions, error) {
 	questions := NewQuestions(f, req)
 	if len(questions.Errors) > 0 {
-		return Request{}, domain.Invalid(questions.Errors)
+		return Questions{}, domain.Invalid(questions.Errors)
 	}
 
-	return questions.Request(), nil
+	return questions, nil
 }
 
 // Request is the request the questions answer.

@@ -1,12 +1,13 @@
 
-  ✓ Moved 2 files to feat/api
+  ✓ extract: 1 done
 
-    new  apps/api/new/deep/y.txt
-    new  apps/api/new/x.txt
-
-  source  feat/login · files removed
-  env     3 ports settled (offset +30)
-  path    ../acme.trees/feat-api
+  Source     feat/login
+  Files      new apps/api/new/deep/y.txt, new apps/api/new/x.txt
+  Target     new worktree feat/api from main
+  Env        example
+  Isolation  isolated
+  Mode       move
+  feat/api   ../acme.trees/feat-api · 3 ports settled (offset +30)
 
   → wtm go feat/api
 

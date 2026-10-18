@@ -20,13 +20,14 @@ const (
 	createLong  = "Create one or more git worktrees with env provisioning, metadata, and hooks.\n" +
 		"Several branches are created one after the other from the same source; a failure\n" +
 		"does not stop the others, and the run ends with what was created and what failed.\n" +
-		"A branch that already exists locally is checked out as-is, keeping its commits;\n" +
-		"its parent can't be inferred, so --from then names the branch recorded for `wtm sync`.\n" +
+		"A branch that already exists locally is checked out as-is, keeping its commits.\n" +
+		"Its parent can't be inferred, so --from then names the branch recorded for\n" +
+		"`wtm sync` — asked in the wizard, required without it.\n" +
 		"A branch only origin has is created from it, tracking it.\n" +
 		"When run.toml declares jobs, a branch whose derived name a live worktree or another\n" +
 		"branch of the run already carries (feat.x next to feat/x) is refused.\n" +
-		"Without arguments, the form asks for the branches: tab adds another, enter continues."
-	createExample = `  # Answer the form: branches, source, env strategy, isolation
+		"Without arguments, the wizard asks for the branches: tab adds another, enter continues."
+	createExample = `  # Answer the wizard: branches, source, env strategy, isolation
   wtm create
 
   # Three worktrees from the base branch, no prompts
@@ -42,7 +43,7 @@ const (
   # For a script or an agent: idempotent, with the v2 JSON envelope
   wtm create feat/login --if-not-exists --output json`
 
-	yesUsage = "Run unattended: no question, no confirmation; what is not given takes its default"
+	yesUsage = "Run unattended: no question, no confirmation; what is not given takes its default (branch names required; source defaults to the base branch for a new branch, and --from is required for one that already exists)"
 )
 
 type createCommand struct {
@@ -82,7 +83,7 @@ func (c *createCommand) conclude(cmd *cobra.Command, ran form.Ran[create.Request
 	case ran.Outcome.Result == nil:
 		apply := output.Line(argv) + " --expect-fingerprint " + ran.Outcome.Fingerprint
 		output.Frame(stdout, func(w io.Writer) {
-			output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(ran.Outcome.Plan), Warnings: ran.Outcome.Warnings, Fingerprint: ran.Outcome.Fingerprint, Apply: apply})
+			output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(ran.Outcome.Plan, previewMarks(ran.Outcome.Plan)), Warnings: ran.Outcome.Warnings, Fingerprint: ran.Outcome.Fingerprint, Apply: apply})
 		})
 		return nil
 	}

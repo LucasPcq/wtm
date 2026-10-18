@@ -51,7 +51,7 @@ func (p *provisioning) number(ctx context.Context, provisioned *Provisioned) err
 		return nil
 	}
 
-	provisioned.Ordinal = &ordinal
+	provisioned.Meta.Ordinal = ordinal
 	return nil
 }
 
@@ -174,14 +174,14 @@ func (p *provisioning) settle(ctx context.Context, provisioned *Provisioned) err
 	// The compose project name never depends on the ordinal nor on the links:
 	// it is written even when the ports cannot be.
 	run := p.Project.Run
-	if p.portsNeedOrdinal() && provisioned.Ordinal == nil {
+	if p.portsNeedOrdinal() && provisioned.Meta.Ordinal == 0 {
 		run = ownedOnly(run)
 	}
-	writes, err := p.resolve(ctx, run, provisioned.Ordinal)
+	writes, err := p.resolve(ctx, run, provisioned.ordinal())
 	if err != nil {
 		_, inRunToml := errors.AsType[*env.ValueError](err)
 		p.warn(p.notSettled(notSettled{Cause: err, InRunToml: inRunToml}))
-		writes, err = p.resolve(ctx, ownedOnly(run), provisioned.Ordinal)
+		writes, err = p.resolve(ctx, ownedOnly(run), provisioned.ordinal())
 	}
 	if err != nil {
 		p.warn(p.notSettled(notSettled{Cause: err}))
@@ -303,7 +303,7 @@ func (p *provisioning) runHooks(ctx context.Context, provisioned Provisioned) er
 	return p.Service.RunHooks(ctx, env.HookChain{
 		Hooks:   hooks,
 		WorkDir: p.Worktree.Path,
-		Env:     p.hookEnv(provisioned.Ordinal),
+		Env:     p.hookEnv(provisioned.ordinal()),
 		Unset:   env.JobKeys(),
 		Output:  func(line string) { p.Report(domain.Output{Subject: p.Worktree.Branch, Line: line}) },
 		Log:     p.hookLog,

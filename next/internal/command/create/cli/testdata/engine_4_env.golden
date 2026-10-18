@@ -8,11 +8,11 @@
   (from its template), main (copied from the main checkout) or parent (from the source's worktree);
   defaults to config.toml's strategy
 
-   Use config default (example)
+▌› Use config default (example)
    example — copy .env.example → .env
-▌› main — copy .env from the main checkout
+   main — copy .env from the main checkout
    parent — copy .env from source worktree
 
-   [x] Always use this answer in this repo
+   [ ] Always use this answer in this repo
 
   ↑↓ navigate • tab always use • / filter • enter confirm • esc back

@@ -1,0 +1,9 @@
+  ! extract: 1 skipped
+
+  Source  feat/login
+  Files   mod README.md
+  Target  new worktree feat/slow from main
+  Mode    move
+
+  ! feat/slow  interrupted
+  ! nothing was moved: the files are still in feat/login

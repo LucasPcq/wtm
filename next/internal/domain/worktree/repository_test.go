@@ -35,3 +35,11 @@ func TestOnlyARunThatNamesWorktreesMakesTheirNamesClash(t *testing.T) {
 		})
 	}
 }
+
+func TestTheBaseBranchReadsAsTheDefaultSource(t *testing.T) {
+	repo := Repository{Config: project.Config{Worktrees: project.Worktrees{BaseBranch: "main"}}}
+
+	assert.Equal(t, "main (default)", repo.SourceLabel("main"))
+	assert.Empty(t, repo.SourceLabel("feat/a"))
+	assert.Empty(t, Repository{}.SourceLabel(""))
+}

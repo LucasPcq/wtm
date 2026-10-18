@@ -3,6 +3,7 @@ package output
 import (
 	"cmp"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -20,21 +21,64 @@ const (
 // NothingToDo is what a plan with no row shows.
 const NothingToDo = "nothing to do"
 
+// The marks of a plan's value: an answer recalled from memory, an answer the apply will remember, and one it remembered.
+const (
+	Recalled         = Dot + "remembered"
+	WillBeRemembered = Dot + "will be remembered"
+	Saved            = Dot + "saved for next runs"
+)
+
+// Marks say which answers of a plan are marked, by the path of their field: those recalled from memory, and those remembered for the next runs with the mark that says so, WillBeRemembered before the apply, Saved after it.
+type Marks struct {
+	Recalled   []string
+	Remembered []string
+	Mark       string
+}
+
+// Of is the mark of the answer to the field at path, empty when it has none.
+func (m Marks) Of(path string) string {
+	switch {
+	case slices.Contains(m.Remembered, path):
+		return m.Mark
+	case slices.Contains(m.Recalled, path):
+		return Recalled
+	}
+
+	return ""
+}
+
+// EnvValueParams is the env strategy of a plan: the strategy, whether it follows config.toml's, and its mark.
+type EnvValueParams struct {
+	Strategy      string
+	FollowsConfig bool
+	Mark          string
+}
+
+// EnvValue spells the env strategy with its mark; a marked answer that follows config.toml's reads config default, since that, not the strategy, is what is remembered.
+func EnvValue(params EnvValueParams) string {
+	if params.FollowsConfig && params.Mark != "" {
+		return "config default (" + params.Strategy + ")" + params.Mark
+	}
+
+	return params.Strategy + params.Mark
+}
+
 // A PlanRow is one line of a plan: a label and the values it applies to.
 type PlanRow struct {
 	Label  string
 	Values []string
 }
 
-// PlanParams is a plan to draw: its rows, the warnings under them, and the width and styles to draw them with.
+// PlanParams is a plan to draw: its rows, the warnings under them, a muted hint closing it, and the width and styles to draw them with.
 type PlanParams struct {
 	Rows     []PlanRow
 	Warnings []string
+	Hint     string
 	Width    int     // the columns a line may fill; 0 or less wraps nothing
 	Styles   *Styles // nil draws no colour
 }
 
-// PlanLines returns the lines of the plan params describes: its rows with their values aligned in one column and wrapped to its width, then its warnings after an empty line.
+// PlanLines returns the lines of the plan params describes: its rows with their values aligned in one column and wrapped to its width, then its warnings and its hint, each after an empty line.
 func PlanLines(params PlanParams) []string {
 	st := cmp.Or(params.Styles, plainStyles)
 	lines := planRows(params, st)
@@ -51,7 +95,51 @@ func PlanLines(params PlanParams) []string {
 			}
 		}
 	}
+	if params.Hint != "" {
+		lines = append(lines, "", st.Muted.Render(params.Hint))
+	}
 	return lines
+}
+
+// RecalledHint closes a recap that answered a question from memory: how to be asked it again.
+const RecalledHint = "Remembered answers are not asked: --ask asks them again."
+
+// RecalledHintOf is RecalledHint when recalled names a field, else empty.
+func RecalledHintOf(recalled []string) string {
+	if len(recalled) == 0 {
+		return ""
+	}
+
+	return RecalledHint
+}
+
+// MutedNote is note after a dot, muted, as a plan's value carries it; nothing when note is empty.
+func MutedNote(note string, st *Styles) string {
+	if note == "" {
+		return ""
+	}
+
+	return st.Muted.Render(Dot + note)
+}
+
+// NotedParams are the values of a plan's row, the note the row carries and the value it shows when it has none but a note.
+type NotedParams struct {
+	Values []string
+	Note   string
+	None   string
+}
+
+// Noted are the values of params, the last carrying its note; its None, noted, when there are no values but a note; none when there is neither.
+func Noted(params NotedParams) []string {
+	switch {
+	case params.Note == "":
+		return params.Values
+	case len(params.Values) == 0:
+		return []string{params.None + params.Note}
+	}
+
+	last := len(params.Values) - 1
+	return append(slices.Clone(params.Values[:last]), params.Values[last]+params.Note)
 }
 
 func planRows(params PlanParams, st *Styles) []string {

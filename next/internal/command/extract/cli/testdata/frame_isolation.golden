@@ -1,19 +1,19 @@
 
   Step 7/11 • Isolation
 
-  ✓ Source worktree: feat/login · <source>
+  ✓ Source worktree: feat/login
   ✓ Files: 1 file · --files
   ✓ Target worktree: new worktree
   ✓ Branch name: feat/split
-  ✓ Source branch: main · config
-  ✓ Env strategy: config default · default
+  ✓ Source branch: main
+  ✓ Env strategy: config default
 
   How the new worktree stands against its source: isolated (its own ports, compose project and
   namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as
   copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated
 
-▌› isolated
-   verbatim
+▌› isolated — its own ports, compose project and namespaces
+   verbatim — keep the copied .env, one of the two runs at a time
 
    [ ] Always use this answer in this repo
 

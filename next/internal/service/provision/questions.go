@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -32,11 +33,11 @@ func (g Given) Answer(path string, values []string) (Given, error) {
 		next.Remember = values
 	case domain.PathAsk:
 		next.Ask, err = domain.Yes(answer)
-	case PathEnvFrom:
+	case domain.PathEnvFrom:
 		next.EnvFrom, err = domain.One[project.EnvStrategy](answer)
-	case PathIsolation:
+	case domain.PathIsolation:
 		next.Isolation, err = domain.One[project.Isolation](answer)
-	case PathFastForward:
+	case domain.PathFastForward:
 		var yes bool
 		yes, err = domain.Yes(answer)
 		next.FastForward = &yes
@@ -58,11 +59,11 @@ func (g Given) Values(path string) []string {
 		return g.Remember
 	case domain.PathAsk:
 		return domain.SaidYes(g.Ask)
-	case PathEnvFrom:
+	case domain.PathEnvFrom:
 		return domain.Spelled(g.EnvFrom)
-	case PathIsolation:
+	case domain.PathIsolation:
 		return domain.Spelled(g.Isolation)
-	case PathFastForward:
+	case domain.PathFastForward:
 		return domain.Said(g.FastForward)
 	}
 
@@ -72,33 +73,36 @@ func (g Given) Values(path string) []string {
 // EnvFromConfig is the answer to the env strategy that follows config.toml's strategy, remembered as such.
 const EnvFromConfig project.EnvStrategy = project.RememberEnvConfig
 
-// The paths of the questions of a new worktree.
-const (
-	PathEnvFrom     = "env_from"
-	PathIsolation   = "isolation"
-	PathFastForward = "fast_forward"
-)
-
 // ----------------------------------------------------------------------------
 // The questions
 
-// Questions are the questions every command that creates a worktree asks: where its .env files come from (EnvFromConfig, or a strategy), how it stands against its source, and whether its source is fast-forwarded first; with config.toml's strategy, which EnvFromConfig follows, the fields whose answer is to be remembered and whether the remembered answers are set aside.
+// Questions are the questions every command that creates a worktree asks: where its .env files come from (EnvFromConfig, or a strategy), how it stands against its source, and whether its source is fast-forwarded first; with config.toml's strategy, which EnvFromConfig follows, the branches the fast-forward updates, whether several worktrees are created, the fields whose answer is to be remembered and whether the remembered answers are set aside.
 type Questions struct {
 	EnvFrom     domain.Choice[project.EnvStrategy]
 	Isolation   domain.Choice[project.Isolation]
 	FastForward domain.Confirm
 	Configured  project.EnvStrategy
+	Behind      []string
+	Many        bool
 	Remember    []string
 	Ask         bool
 }
 
-// QuestionsParams is what the questions of a new worktree settle from: the request's answers, the repository (its remembered answers, which Given.Ask sets aside for the run while the form still shows them, its env strategy, its run.toml), why nothing is asked (Exists: the worktree is not created) and why the fast-forward is not (NotBehind: nothing it starts from is behind origin, worded by the command).
+// QuestionsParams is what the questions of a new worktree settle from: the request's answers, the repository (its remembered answers, which Given.Ask sets aside for the run while the form still shows them, its env strategy, its run.toml), why nothing is asked (Exists: the worktree is not created), the branches behind origin the fast-forward would update (none: it is not asked) and whether several worktrees are created.
 type QuestionsParams struct {
 	Given      Given
 	Repository worktree.Repository
 	Exists     string
-	NotBehind  string
+	Behind     []string
+	Held       string // why a branch behind origin is not fast-forwarded all the same, set by the command
+	Many       bool
 }
+
+const (
+	isolationHelp   = "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated"
+	fastForwardHelp = "Fast-forward to origin first the branch a new worktree starts from, or the branch itself when it already exists locally, when it is behind; one that has diverged or holds uncommitted changes starts as it is"
+	notBehind       = "nothing to fast-forward: the source is not behind origin"
+)
 
 // NewQuestions builds the questions of a new worktree: a field given keeps its value, an empty one takes its remembered answer, its configured value or its default; none is answered by default when the worktree is not created.
 func NewQuestions(params QuestionsParams) Questions {
@@ -112,12 +116,14 @@ func NewQuestions(params QuestionsParams) Questions {
 		Isolation:   isolation(params),
 		FastForward: fastForward(params),
 		Configured:  params.Repository.Config.Env.Strategy,
+		Behind:      params.Behind,
+		Many:        params.Many,
 		Remember:    params.Given.Remember,
 		Ask:         params.Given.Ask,
 	}
 	questions.EnvFrom.Remembered = project.EnvStrategy(recalled[project.RememberEnvStrategy])
 	questions.Isolation.Remembered = project.Isolation(recalled[project.RememberIsolation])
-	questions.FastForward.Remembered = domain.RememberedFastForward(recalled[project.RememberSourceUpdate])
+	questions.FastForward.Remembered = rememberedFastForward(recalled[project.RememberSourceUpdate])
 	return questions
 }
 
@@ -150,18 +156,51 @@ func isolation(params QuestionsParams) domain.Choice[project.Isolation] {
 	case params.Given.Isolation != "":
 		question.Answer = domain.Answer[project.Isolation]{Value: params.Given.Isolation, Origin: domain.OriginRequest}
 	case params.Exists == "":
-		question.Answer = domain.IsolationAnswer(project.Isolation(params.Repository.Config.Remembered[project.RememberIsolation]), params.Repository.Run)
+		question.Answer = isolationAnswer(project.Isolation(params.Repository.Config.Remembered[project.RememberIsolation]), params.Repository.Run)
 	}
 
 	return question
 }
 
+// isolationAnswer is the isolation a question the request leaves unanswered settles on: the remembered one (empty when none) while run.toml declares something a worktree isolates, else run.toml's, else isolated.
+func isolationAnswer(remembered project.Isolation, run project.Run) domain.Answer[project.Isolation] {
+	switch {
+	case remembered != "" && run.IsolationApplies():
+		return domain.Answer[project.Isolation]{Value: remembered, Origin: domain.OriginRemembered}
+	case run.Isolation != "":
+		return domain.Answer[project.Isolation]{Value: run.Isolation.Effective(), Origin: domain.OriginConfig}
+	}
+
+	return domain.Answer[project.Isolation]{Value: project.Isolated, Origin: domain.OriginDefault}
+}
+
+// fastForward is the question whether to fast-forward the source first: the request's answer, none while the question is skipped, else the remembered one, else no.
 func fastForward(params QuestionsParams) domain.Confirm {
-	return domain.FastForwardAnswer(domain.FastForwardParams{
-		Given:      params.Given.FastForward,
-		Remembered: params.Repository.Config.Remembered[project.RememberSourceUpdate],
-		Skip:       cmp.Or(params.Exists, params.NotBehind),
-	})
+	remembered := params.Repository.Config.Remembered[project.RememberSourceUpdate]
+	question := domain.Confirm{Skip: cmp.Or(params.Exists, params.Held)}
+	if question.Skip == "" && len(params.Behind) == 0 {
+		question.Skip = notBehind
+	}
+	switch {
+	case params.Given.FastForward != nil:
+		question.Answer = domain.Answer[bool]{Value: *params.Given.FastForward, Origin: domain.OriginRequest}
+	case question.Skip != "":
+	case remembered != "":
+		question.Answer = domain.Answer[bool]{Value: remembered == project.SourceUpdateFastForward, Origin: domain.OriginRemembered}
+	default:
+		question.Answer = domain.Answer[bool]{Origin: domain.OriginDefault}
+	}
+
+	return question
+}
+
+// rememberedFastForward is the answer a remembered source update gives, nil when none is.
+func rememberedFastForward(remembered string) *bool {
+	if remembered == "" {
+		return nil
+	}
+
+	return new(remembered == project.SourceUpdateFastForward)
 }
 
 // envFroms are the answers to the env strategy, in the order the wizard offers them.
@@ -169,41 +208,57 @@ func envFroms() []project.EnvStrategy {
 	return append([]project.EnvStrategy{EnvFromConfig}, project.EnvStrategies()...)
 }
 
-// Wording is how a command words the questions for its own subjects: the env strategy's help, the source update's help and its two options, the engine's own when zero.
-type Wording struct {
-	EnvHelp         string
-	FastForwardHelp string
-	Yes, No         domain.Option
-}
-
-// Fields are the questions as the fields of a form, in the order a wizard asks them, for a command to embed in its own.
-func (q Questions) Fields(wording Wording) []domain.Field {
+// Fields are the questions as the fields of a form, in the order a wizard asks them, for a command to embed in its own; envHelp says where the command's new worktree takes its .env files from.
+func (q Questions) Fields(envHelp string) []domain.Field {
 	return []domain.Field{
 		domain.SelectField{
-			FieldSpec:    domain.FieldSpec{Path: PathEnvFrom, Flag: "--env-from", Label: "Env strategy", Help: wording.EnvHelp, Origin: q.EnvFrom.Origin, Skip: q.EnvFrom.Skip},
+			FieldSpec:    domain.FieldSpec{Path: domain.PathEnvFrom, Flag: "--env-from", Label: "Env strategy", Help: envHelp, Origin: q.EnvFrom.Origin, Skip: q.EnvFrom.Skip},
 			Value:        string(q.EnvFrom.Value),
 			Options:      q.envOptions(),
 			Remembered:   string(q.EnvFrom.Remembered),
 			Rememberable: true,
-			Remember:     q.Remembers(PathEnvFrom),
+			Remember:     q.Remembers(domain.PathEnvFrom),
 		},
 		domain.SelectField{
-			FieldSpec:    domain.FieldSpec{Path: PathIsolation, Flag: "--isolation", Label: "Isolation", Help: domain.IsolationHelp, Origin: q.Isolation.Origin, Skip: q.Isolation.Skip},
+			FieldSpec:    domain.FieldSpec{Path: domain.PathIsolation, Flag: "--isolation", Label: "Isolation", Help: isolationHelp, Origin: q.Isolation.Origin, Skip: q.Isolation.Skip},
 			Value:        string(q.Isolation.Value),
-			Options:      domain.Options(project.Isolations()),
+			Options:      q.isolationOptions(),
 			Remembered:   string(q.Isolation.Remembered),
 			Rememberable: true,
-			Remember:     q.Remembers(PathIsolation),
+			Remember:     q.Remembers(domain.PathIsolation),
 		},
 		domain.ConfirmField{
-			FieldSpec:    domain.FieldSpec{Path: PathFastForward, Flag: "--ff", Label: "Source update", Help: wording.FastForwardHelp, Origin: q.FastForward.Origin, Skip: q.FastForward.Skip},
+			FieldSpec:    domain.FieldSpec{Path: domain.PathFastForward, Flag: "--ff", Label: "Source update", Help: fastForwardHelp, Origin: q.FastForward.Origin, Skip: q.FastForward.Skip},
 			Value:        q.FastForward.Value,
-			Yes:          wording.Yes,
-			No:           wording.No,
+			Yes:          domain.Option{Value: "true", Label: q.fastForwardLabel(), Short: "fast-forward to origin"},
+			No:           domain.Option{Value: "false", Label: "Keep it as-is", Short: "keep as-is"},
 			Remembered:   q.FastForward.Remembered,
 			Rememberable: true,
-			Remember:     q.Remembers(PathFastForward),
+			Remember:     q.Remembers(domain.PathFastForward),
 		},
+	}
+}
+
+func (q Questions) fastForwardLabel() string {
+	if len(q.Behind) == 0 {
+		return "Fast-forward to origin"
+	}
+
+	return "Fast-forward " + strings.Join(q.Behind, ", ") + " to origin"
+}
+
+// isolationOptions are the isolations as the legacy wizard offers them, worded for one worktree or several.
+func (q Questions) isolationOptions() []domain.Option {
+	if q.Many {
+		return []domain.Option{
+			{Value: string(project.Isolated), Label: "isolated — each its own ports, compose project and namespaces"},
+			{Value: string(project.Verbatim), Label: "verbatim — keep the copied .env, one of them runs at a time"},
+		}
+	}
+
+	return []domain.Option{
+		{Value: string(project.Isolated), Label: "isolated — its own ports, compose project and namespaces"},
+		{Value: string(project.Verbatim), Label: "verbatim — keep the copied .env, one of the two runs at a time"},
 	}
 }
 
@@ -224,11 +279,11 @@ func (q Questions) Remembers(path string) bool {
 
 func (q Questions) skipped(path string) bool {
 	switch path {
-	case PathEnvFrom:
+	case domain.PathEnvFrom:
 		return q.EnvFrom.Skip != ""
-	case PathIsolation:
+	case domain.PathIsolation:
 		return q.Isolation.Skip != ""
-	case PathFastForward:
+	case domain.PathFastForward:
 		return q.FastForward.Skip != ""
 	}
 
@@ -237,9 +292,9 @@ func (q Questions) skipped(path string) bool {
 
 // Problems are the problems of the answers as field errors: a strategy or, given, an isolation that is not one of those accepted, and a field to remember that is not one of these questions.
 func (q Questions) Problems() []domain.FieldError {
-	problems := domain.OneOf(domain.OneOfParams{Path: PathEnvFrom, Value: string(q.EnvFrom.Value), Accepted: domain.Names(envFroms())})
+	problems := domain.OneOf(domain.OneOfParams{Path: domain.PathEnvFrom, Value: string(q.EnvFrom.Value), Accepted: domain.Names(envFroms())})
 	if q.Isolation.Origin == domain.OriginRequest {
-		problems = append(problems, domain.OneOf(domain.OneOfParams{Path: PathIsolation, Value: string(q.Isolation.Value), Accepted: domain.Names(project.Isolations())})...)
+		problems = append(problems, domain.OneOf(domain.OneOfParams{Path: domain.PathIsolation, Value: string(q.Isolation.Value), Accepted: domain.Names(project.Isolations())})...)
 	}
 
 	for index, id := range q.Remember {
@@ -251,7 +306,7 @@ func (q Questions) Problems() []domain.FieldError {
 
 // rememberable are the questions whose answer can be remembered, in the order of the form.
 func rememberable() []string {
-	return []string{PathEnvFrom, PathIsolation, PathFastForward}
+	return []string{domain.PathEnvFrom, domain.PathIsolation, domain.PathFastForward}
 }
 
 // Given is the request the questions answer, each field as settled; --ask is kept, so a request settled again sets the remembered answers aside as this one did.
@@ -293,6 +348,24 @@ func (q Questions) Answers() Answers {
 	return Answers{envFrom: q.EnvFrom.Value, strategy: strategy, isolation: q.Isolation.Value, fastForward: q.FastForward.Value, asked: true}
 }
 
+// Recalled are the fields answered from memory, in the order of the form.
+func (q Questions) Recalled() []string {
+	origins := map[string]domain.Origin{domain.PathEnvFrom: q.EnvFrom.Origin, domain.PathIsolation: q.Isolation.Origin, domain.PathFastForward: q.FastForward.Origin}
+	var recalled []string
+	for _, field := range rememberable() {
+		if origins[field] == domain.OriginRemembered && !q.skipped(field) {
+			recalled = append(recalled, field)
+		}
+	}
+
+	return recalled
+}
+
+// FollowsConfig reports whether the env strategy follows config.toml's (EnvFromConfig) rather than naming one.
+func (a Answers) FollowsConfig() bool {
+	return a.envFrom == EnvFromConfig
+}
+
 // EnvFrom is where the worktree's .env files come from: the strategy EnvFromConfig stands for when the answer follows config.toml.
 func (a Answers) EnvFrom() project.EnvStrategy {
 	return a.strategy
@@ -303,19 +376,21 @@ func (a Answers) Isolation() project.Isolation {
 	return a.isolation
 }
 
-// Remembered are the answers of fields to remember, keyed by their id in config.toml.
-func (a Answers) Remembered(fields []string) map[string]string {
+// Remembered are the answers of fields to remember, keyed by their id in config.toml, and those fields, a field without an answer left out.
+func (a Answers) Remembered(fields []string) (map[string]string, []string) {
 	values := map[string][2]string{
-		PathEnvFrom:     {project.RememberEnvStrategy, string(a.envFrom)},
-		PathIsolation:   {project.RememberIsolation, string(a.isolation)},
-		PathFastForward: {project.RememberSourceUpdate, project.SourceUpdate(a.fastForward)},
+		domain.PathEnvFrom:     {project.RememberEnvStrategy, string(a.envFrom)},
+		domain.PathIsolation:   {project.RememberIsolation, string(a.isolation)},
+		domain.PathFastForward: {project.RememberSourceUpdate, project.SourceUpdate(a.fastForward)},
 	}
 	answers := map[string]string{}
+	var kept []string
 	for _, field := range fields {
 		if id, value := values[field][0], values[field][1]; id != "" && value != "" {
 			answers[id] = value
+			kept = append(kept, field)
 		}
 	}
 
-	return answers
+	return answers, kept
 }

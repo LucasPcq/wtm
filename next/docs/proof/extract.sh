@@ -106,6 +106,11 @@ run_side() {
     env_of feat-env-default >"$dir/10-env-default.env"
     scenario 11-env-from-main extract feat/login --files apps/api/env-a.txt --to feat/env-main --env-from main --yes
     env_of feat-env-main >"$dir/11-env-from-main.env"
+    echo "same" >"$root/acme.trees/feat-login/apps/web/same.txt"
+    echo "same" >"$root/acme.trees/topic/apps/web/same.txt"
+    scenario 12-identical-in-target extract feat/login --files apps/web/same.txt --to topic --yes
+    echo "j" >"$root/acme.trees/feat-login/apps/web/json.txt"
+    scenario 13-json-without-yes extract feat/login --files apps/web/json.txt --to feat/jny --output json
   )
   sed -i '' -E \
     -e "s#(/private)?$root#<SB>#g" \

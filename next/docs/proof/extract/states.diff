@@ -99,3 +99,110 @@
  ## .git/wtm/worktrees/feat%2Fjson/meta.json
  {
    "source_branch": "main",
+=== 12-identical-in-target: exit legacy 0, next 0
+--- legacy/12-identical-in-target
++++ next/12-identical-in-target
+@@ -2,6 +2,7 @@
+ feat/api
+ feat/c
+ feat/env-default
++feat/env-main
+ feat/json
+ feat/local
+ feat/login
+@@ -15,18 +16,17 @@
+    apps/api/new/deep/y.txt 9063a9f0e032
+    apps/api/new/x.txt 6fcf9dfbd479
+ ## feat-c status
+- M README.md
+-   README.md cfe9a2ed459a
+ ## feat-env-default status
+ ?? apps/api/env-b.txt
+    apps/api/env-b.txt 89e6c98d9288
++## feat-env-main status
++?? apps/api/env-a.txt
++   apps/api/env-a.txt 3f786850e387
+ ## feat-json status
+ ?? apps/web/login.ts
+    apps/web/login.ts 2baaedadd43f
+ ## feat-login status
+  M README.md
+-?? apps/api/env-a.txt
+-   apps/api/env-a.txt 3f786850e387
+    README.md 190b171b0321
+ ## feat-misc status
+ D  apps/web/package.json
+@@ -60,6 +60,13 @@
+   "ordinal": 7,
+   "isolation": "isolated"
+ }
++## .git/wtm/worktrees/feat%2Fenv-main/meta.json
++{
++  "source_branch": "main",
++  "env_strategy": "main",
++  "ordinal": 8,
++  "isolation": "isolated"
++}
+ ## .git/wtm/worktrees/feat%2Fjson/meta.json
+ {
+   "source_branch": "main",
+=== 13-json-without-yes: exit legacy 2, next 0
+--- legacy/13-json-without-yes
++++ next/13-json-without-yes
+@@ -2,6 +2,8 @@
+ feat/api
+ feat/c
+ feat/env-default
++feat/env-main
++feat/jny
+ feat/json
+ feat/local
+ feat/login
+@@ -15,20 +17,20 @@
+    apps/api/new/deep/y.txt 9063a9f0e032
+    apps/api/new/x.txt 6fcf9dfbd479
+ ## feat-c status
+- M README.md
+-   README.md cfe9a2ed459a
+ ## feat-env-default status
+ ?? apps/api/env-b.txt
+    apps/api/env-b.txt 89e6c98d9288
++## feat-env-main status
++?? apps/api/env-a.txt
++   apps/api/env-a.txt 3f786850e387
++## feat-jny status
++?? apps/web/json.txt
++   apps/web/json.txt 3eedd8854d1e
+ ## feat-json status
+ ?? apps/web/login.ts
+    apps/web/login.ts 2baaedadd43f
+ ## feat-login status
+  M README.md
+-?? apps/api/env-a.txt
+-?? apps/web/json.txt
+-   apps/api/env-a.txt 3f786850e387
+-   apps/web/json.txt 3eedd8854d1e
+    README.md 190b171b0321
+ ## feat-misc status
+ D  apps/web/package.json
+@@ -62,6 +64,20 @@
+   "ordinal": 7,
+   "isolation": "isolated"
+ }
++## .git/wtm/worktrees/feat%2Fenv-main/meta.json
++{
++  "source_branch": "main",
++  "env_strategy": "main",
++  "ordinal": 8,
++  "isolation": "isolated"
++}
++## .git/wtm/worktrees/feat%2Fjny/meta.json
++{
++  "source_branch": "main",
++  "env_strategy": "example",
++  "ordinal": 9,
++  "isolation": "isolated"
++}
+ ## .git/wtm/worktrees/feat%2Fjson/meta.json
+ {
+   "source_branch": "main",

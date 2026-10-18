@@ -1,10 +1,6 @@
 package domain
 
-import (
-	"slices"
-
-	"github.com/LucasPcq/wtm/next/internal/domain/project"
-)
+import "slices"
 
 // Origin says where an answer to a question came from.
 type Origin string
@@ -46,53 +42,6 @@ type Confirm struct {
 	Remembered *bool
 }
 
-// IsolationHelp is the help of the isolation question, the same in every command that asks it.
-const IsolationHelp = "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated"
-
-// IsolationAnswer is the isolation a question the request leaves unanswered settles on: the remembered one (empty when none) while run.toml declares something a worktree isolates, else run.toml's, else isolated.
-func IsolationAnswer(remembered project.Isolation, run project.Run) Answer[project.Isolation] {
-	switch {
-	case remembered != "" && run.IsolationApplies():
-		return Answer[project.Isolation]{Value: remembered, Origin: OriginRemembered}
-	case run.Isolation != "":
-		return Answer[project.Isolation]{Value: run.Isolation.Effective(), Origin: OriginConfig}
-	}
-
-	return Answer[project.Isolation]{Value: project.Isolated, Origin: OriginDefault}
-}
-
-// FastForwardParams is what the question whether to fast-forward the source first settles from: the request's answer, why the question is skipped, and the remembered source update.
-type FastForwardParams struct {
-	Given      *bool  // nil when the request does not say
-	Skip       string // why the question is not asked, empty when it is
-	Remembered string // project.SourceUpdateFastForward or project.SourceUpdateKeep, empty when none
-}
-
-// RememberedFastForward is the answer to the question whether to fast-forward the source first that a remembered source update gives, nil when none is.
-func RememberedFastForward(remembered string) *bool {
-	if remembered == "" {
-		return nil
-	}
-
-	return new(remembered == project.SourceUpdateFastForward)
-}
-
-// FastForwardAnswer is the question whether to fast-forward the source first: the request's answer, none while the question is skipped, else the remembered one, else no.
-func FastForwardAnswer(params FastForwardParams) Confirm {
-	question := Confirm{Skip: params.Skip}
-	switch {
-	case params.Given != nil:
-		question.Answer = Answer[bool]{Value: *params.Given, Origin: OriginRequest}
-	case params.Skip != "":
-	case params.Remembered != "":
-		question.Answer = Answer[bool]{Value: params.Remembered == project.SourceUpdateFastForward, Origin: OriginRemembered}
-	default:
-		question.Answer = Answer[bool]{Origin: OriginDefault}
-	}
-
-	return question
-}
-
 // CodeOneOf is the field-error code of a value that is not one of those its field accepts.
 const CodeOneOf = "one_of"
 
@@ -123,16 +72,6 @@ func Names[T ~string](values []T) []string {
 	found := make([]string, 0, len(values))
 	for _, value := range values {
 		found = append(found, string(value))
-	}
-
-	return found
-}
-
-// Options offers each of values as an option that reads as its value, in order.
-func Options[T ~string](values []T) []Option {
-	found := make([]Option, 0, len(values))
-	for _, value := range values {
-		found = append(found, Option{Value: string(value)})
 	}
 
 	return found

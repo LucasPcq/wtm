@@ -1,10 +1,11 @@
 
-  ✓ Copied 1 file to topic
+  ✓ extract: 1 done
 
-    new  apps/web/login.ts
-
-  source  feat/login · files kept
-  path    ../acme.trees/topic
+  Source  feat/login
+  Files   new apps/web/login.ts
+  Target  topic
+  Mode    copy
+  topic   ../acme.trees/topic
 
   → wtm go topic
 

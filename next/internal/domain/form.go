@@ -63,6 +63,13 @@ const PathRemember = "remember"
 // PathAsk is the path of the request's --ask: true to ask again the questions whose answer is remembered.
 const PathAsk = "ask"
 
+// The paths of the questions every command that creates a worktree asks, the fields --remember accepts: where its .env files come from, how it stands against its source, whether its source is fast-forwarded first.
+const (
+	PathEnvFrom     = "env_from"
+	PathIsolation   = "isolation"
+	PathFastForward = "fast_forward"
+)
+
 //go-sumtype:decl Field
 
 // Field is one field of a Form, of one kind: SelectField, MultiSelectField, TextField, TextListField or ConfirmField, each carrying only what is valid for it.

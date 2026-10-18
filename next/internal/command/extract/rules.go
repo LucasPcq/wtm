@@ -341,9 +341,10 @@ func (f Facts) ignored(req Request, target Target) []domain.Warning {
 	return warnings
 }
 
+// fastForwarded is the branch the apply fast-forwards: the one the target starts from, behind origin and asked to, unless the source's own, whose worktree holds the changes and so is never clean.
 func (f Facts) fastForwarded(req Request) []string {
 	subject := f.subjectAt(req, worktree.Behind)
-	if req.FastForward == nil || !*req.FastForward || subject == "" {
+	if req.FastForward == nil || !*req.FastForward || subject == "" || subject == req.Source {
 		return nil
 	}
 
@@ -395,6 +396,7 @@ type Plan struct {
 	Remember    []string            `json:"remember,omitempty"`
 	facts       Facts
 	settled     provision.Answers // as resolved, handed to provisioning even where the plan shows none, and remembered
+	recalled    []string          // the fields answered from memory, as the request was resolved
 }
 
 // Nothing reports whether the plan has no file to extract: the source holds no uncommitted change.
@@ -427,4 +429,14 @@ func (p Plan) move() worktree.Move {
 		TargetLabel: p.Target.Branch,
 		SourceLabel: p.Source,
 	}
+}
+
+// Recalled are the fields of the plan answered from memory.
+func (p Plan) Recalled() []string {
+	return p.recalled
+}
+
+// EnvFollowsConfig reports whether the env strategy follows config.toml's, EnvFrom being the strategy it stands for now.
+func (p Plan) EnvFollowsConfig() bool {
+	return p.settled.FollowsConfig()
 }

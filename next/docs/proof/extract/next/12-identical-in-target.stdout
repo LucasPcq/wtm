@@ -1,0 +1,11 @@
+
+  ✓ extract: 1 done
+
+  Source  feat/login
+  Files   new apps/web/same.txt
+  Target  topic
+  Mode    move
+  topic   ../acme.trees/topic
+
+  → wtm go topic
+

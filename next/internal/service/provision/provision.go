@@ -94,12 +94,20 @@ func ParamsOf(repo worktree.Repository, planned Planned, report domain.Report) P
 	}
 }
 
-// Provisioned is what a worktree was given: its record, its ordinal when it was
-// numbered (nil otherwise) and the values settled in its .env files.
+// Provisioned is what a worktree was given: its record, its ordinal in it once
+// numbered, and the values settled in its .env files.
 type Provisioned struct {
 	Meta     worktree.Meta
-	Ordinal  *int
 	EnvPorts env.Redacted
+}
+
+// ordinal is the worktree's ordinal, nil until it is numbered.
+func (p Provisioned) ordinal() *int {
+	if p.Meta.Ordinal == 0 {
+		return nil
+	}
+
+	return new(p.Meta.Ordinal)
 }
 
 // Stands reports whether the worktree stands: its meta record was written, even when a later phase failed.
@@ -173,21 +181,21 @@ func errorText(err error) string {
 }
 
 // Remember writes the answers to the fields asked to be remembered, as answers settles them; a write that fails is command's warning <command>.remember_failed, what was made standing all the same.
-func (s Service) Remember(ctx context.Context, command string, answers Answers, fields []string) []domain.Warning {
-	remembered := answers.Remembered(fields)
+func (s Service) Remember(ctx context.Context, command string, answers Answers, fields []string) ([]string, []domain.Warning) {
+	remembered, kept := answers.Remembered(fields)
 	if len(remembered) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	written, err := s.Answers.Remember(ctx, remembered)
 	if err != nil {
-		return []domain.Warning{{Code: command + ".remember_failed", Message: "could not remember the answer: " + err.Error(), Params: domain.Params{"cause": err.Error()}}}
+		return nil, []domain.Warning{{Code: command + ".remember_failed", Message: "could not remember the answer: " + err.Error(), Params: domain.Params{"cause": err.Error()}}}
 	}
 	if written.Unlocked {
-		return []domain.Warning{domain.LocksUnavailable}
+		return kept, []domain.Warning{domain.LocksUnavailable}
 	}
 
-	return nil
+	return kept, nil
 }
 
 // ----------------------------------------------------------------------------
@@ -234,7 +242,7 @@ func (p *provisioning) phases(provisioned *Provisioned) []phase {
 // ctx cancelled.
 func (p *provisioning) complete(ctx context.Context, provisioned Provisioned) Outcome {
 	for _, next := range p.phases(&provisioned) {
-		numbered := provisioned.Ordinal != nil
+		numbered := provisioned.Meta.Ordinal != 0
 
 		err := ctx.Err()
 		if err == nil {
@@ -244,7 +252,7 @@ func (p *provisioning) complete(ctx context.Context, provisioned Provisioned) Ou
 			return p.stopped(ctx, err, next.name, provisioned)
 		}
 
-		if !numbered && provisioned.Ordinal != nil {
+		if !numbered && provisioned.Meta.Ordinal != 0 {
 			p.Report(domain.WorktreeNumbered{Worktree: p.identity(provisioned)})
 		}
 	}
@@ -297,7 +305,7 @@ func (p *provisioning) identity(provisioned Provisioned) worktree.Identity {
 		Branch:    p.Worktree.Branch,
 		Path:      p.Worktree.Path,
 		Parent:    provisioned.Meta.SourceBranch,
-		Ordinal:   provisioned.Ordinal,
+		Ordinal:   provisioned.ordinal(),
 		Isolation: provisioned.Meta.Isolation,
 		CreatedAt: provisioned.Meta.CreatedAt,
 	}

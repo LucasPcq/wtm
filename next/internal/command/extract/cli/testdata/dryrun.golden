@@ -1,7 +1,7 @@
 
   extract · dry run, nothing applied
   Source       feat/login
-  Files        apps/api/a.txt, apps/api/new.txt
+  Files        mod apps/api/a.txt, new apps/api/new.txt
   Target       new worktree feat/split from main
   Env          example
   Mode         move

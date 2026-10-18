@@ -34,3 +34,12 @@ func (r Repository) NamedLive() []string {
 
 	return r.Live()
 }
+
+// SourceLabel is how a list of source branches reads name: marked (default) when it is the base branch, empty (as its name) otherwise.
+func (r Repository) SourceLabel(name string) string {
+	if name == "" || name != r.Config.Worktrees.BaseBranch {
+		return ""
+	}
+
+	return name + " (default)"
+}

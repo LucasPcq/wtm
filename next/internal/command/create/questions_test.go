@@ -95,7 +95,7 @@ func TestTheFastForwardIsAskedOnlyWhenTheBranchItStartsFromIsBehind(t *testing.T
 	upToDate := newWorld(t, seed{})
 	behind := newWorld(t, seed{Behind: true})
 
-	assert.Equal(t, "nothing to fast-forward: no branch it starts from is behind origin", upToDate.questions(t, create.Request{Branches: []string{branchName}}).FastForward.Skip)
+	assert.Equal(t, "nothing to fast-forward: the source is not behind origin", upToDate.questions(t, create.Request{Branches: []string{branchName}}).FastForward.Skip)
 	assert.Empty(t, behind.questions(t, create.Request{Branches: []string{branchName}}).FastForward.Skip)
 }
 
@@ -131,7 +131,7 @@ func TestTheSourcePickerListsEveryBranchButThoseBeingCreated(t *testing.T) {
 func TestTheSourceBadgesSayWhereABranchStandsAgainstOrigin(t *testing.T) {
 	behind := newWorld(t, seed{Behind: true})
 
-	assert.Equal(t, domain.Option{Value: "main", Badge: "1 behind"}, behind.questions(t, create.Request{Branches: []string{branchName}}).From.Options[1])
+	assert.Equal(t, domain.Option{Value: "main", Label: "main (default)", Badge: "1 behind"}, behind.questions(t, create.Request{Branches: []string{branchName}}).From.Options[1])
 }
 
 func TestTheQuestionsCarryTheProblemsOfTheRequest(t *testing.T) {

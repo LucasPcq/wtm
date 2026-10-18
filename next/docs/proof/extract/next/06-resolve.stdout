@@ -1,12 +1,16 @@
 
-  ! Applied to topic with conflicts
+  ! extract: 1 done · with conflicts
 
-  Conflicts to resolve
-    README.md
+  Source       feat/login
+  Files        mod README.md
+  Target       topic
+  Mode         move
+  Conflicts    README.md (modified)
+  On conflict  resolve
+  topic        ../acme.trees/topic
 
-  Nothing was removed from feat/login: to undo, discard the applied files in topic.
-
-  path  ../acme.trees/topic
+  ! README.md left with conflict markers in topic.
+  ! Nothing was removed from feat/login: to undo, discard the applied files in topic.
 
   → wtm go topic   resolve the conflicts, then discard the same files in feat/login
 

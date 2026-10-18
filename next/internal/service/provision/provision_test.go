@@ -124,7 +124,7 @@ func TestAnInterruptDuringTheAddFinishesItsEnvAndRecordThenStops(t *testing.T) {
 	recorded, err := w.meta.Load(branchName)
 	require.NoError(t, err)
 	assert.Zero(t, recorded.Ordinal)
-	assert.Nil(t, outcome.Provisioned.Ordinal)
+	assert.Zero(t, outcome.Provisioned.Meta.Ordinal)
 	assert.Empty(t, report.lines())
 	assert.Equal(t, domain.WorktreeProvisioned{Worktree: worktree.Identity{Branch: branchName, Path: w.path(branchName), Parent: "main", Isolation: project.Isolated, CreatedAt: "2026-10-16T12:00:00Z"}}, report.worktreeEvents()[1])
 }
@@ -361,15 +361,28 @@ func TestTheFingerprintCoversTheEnvFilesButNotTheConfiguredStrategy(t *testing.T
 func TestARememberThatFailsIsTheCommandsWarning(t *testing.T) {
 	service := provision.Service{Answers: storetest.NewFake(storetest.FakeParams{Fail: map[string]error{"Remember": errors.New("read-only file system")}})}
 
-	warnings := service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), []string{provision.PathEnvFrom})
+	remembered, warnings := service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), []string{domain.PathEnvFrom})
 
+	assert.Empty(t, remembered)
 	require.Len(t, warnings, 1)
 	assert.Equal(t, "greet.remember_failed", warnings[0].Code)
 	assert.Equal(t, domain.Params{"cause": "read-only file system"}, warnings[0].Params)
 }
 
+func TestARememberReturnsTheFieldsItWrote(t *testing.T) {
+	service := provision.Service{Answers: storetest.NewFake(storetest.FakeParams{Config: &project.Config{}})}
+
+	remembered, warnings := service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), []string{domain.PathEnvFrom, "keep"})
+
+	assert.Equal(t, []string{domain.PathEnvFrom}, remembered)
+	assert.Empty(t, warnings)
+}
+
 func TestNothingToRememberWritesNothing(t *testing.T) {
 	service := provision.Service{Answers: storetest.NewFake(storetest.FakeParams{Fail: map[string]error{"Remember": errors.New("read-only file system")}})}
 
-	assert.Empty(t, service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), nil))
+	remembered, warnings := service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), nil)
+
+	assert.Empty(t, remembered)
+	assert.Empty(t, warnings)
 }

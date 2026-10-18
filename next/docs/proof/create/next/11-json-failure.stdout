@@ -22,10 +22,10 @@
           "source_branch": "main",
           "created_at": "<T>",
           "env_strategy": "example",
+          "ordinal": 10,
           "isolation": "isolated"
         },
         "existing_branch": false,
-        "ordinal": 10,
         "env_ports": {
           "offset": 100,
           "entries": [

@@ -26,7 +26,7 @@ func TestEachAskedStepIsEnteredThenTheRecapApplies(t *testing.T) {
 
 	d.keys("down", "enter")
 	screen := d.screen()
-	assert.Contains(t, screen, "Step 3/3 • Apply this plan?")
+	assert.Contains(t, screen, "Step 3/3 • Confirm")
 	assert.Contains(t, screen, "✓ Second: no")
 	assert.Contains(t, screen, "plan: yes, no")
 
@@ -41,7 +41,7 @@ func TestASettledStepIsNotAskedAndSaysWhatSettledIt(t *testing.T) {
 		Standing Standing
 		Line     string
 	}{
-		"a flag":             {Standing: Standing{Value: "x", Flag: "--first"}, Line: "✓ First: x · --first"},
+		"a flag":             {Standing: Standing{Value: "x", Given: true, Flag: "--first"}, Line: "✓ First: x · --first"},
 		"a remembered value": {Standing: Standing{Value: "x", Origin: domain.OriginRemembered}, Line: "✓ First: x · remembered"},
 		"a skip":             {Standing: Standing{Skip: "not needed"}, Line: "· First — not needed"},
 	}
@@ -58,20 +58,20 @@ func TestASettledStepIsNotAskedAndSaysWhatSettledIt(t *testing.T) {
 
 func TestAnErredStepIsAskedEvenWhenAFlagSettledIt(t *testing.T) {
 	f := newFake()
-	f.first.standing = Standing{Value: "x", Flag: "--first", Erred: true}
+	f.first.standing = Standing{Value: "x", Given: true, Flag: "--first", Erred: true}
 	d := open(t, Params{Script: f.script()})
 
 	assert.Equal(t, 0, d.w.Current())
 }
 
-func TestAKeptDefaultSaysWhereItCameFrom(t *testing.T) {
+func TestAKeptDefaultIsItsValueAlone(t *testing.T) {
 	f := newFake()
 	f.first.standing = Standing{Value: "yes", Origin: domain.OriginConfig}
 	d := open(t, Params{Script: f.script()})
 
 	d.keys("enter")
 
-	assert.Contains(t, d.screen(), "✓ First: yes · config")
+	assert.Contains(t, d.screen(), "✓ First: yes\n")
 }
 
 func TestBackReturnsToTheLastAskedStepAndResetsTheOnesAfter(t *testing.T) {

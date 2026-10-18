@@ -1,11 +1,13 @@
 
-  ✓ Moved 1 file to feat/env-default
+  ✓ extract: 1 done
 
-    new  apps/api/env-b.txt
-
-  source  feat/login · files removed
-  env     3 ports settled (offset +70)
-  path    ../acme.trees/feat-env-default
+  Source            feat/login
+  Files             new apps/api/env-b.txt
+  Target            new worktree feat/env-default from main
+  Env               example
+  Isolation         isolated
+  Mode              move
+  feat/env-default  ../acme.trees/feat-env-default · 3 ports settled (offset +70)
 
   → wtm go feat/env-default
 

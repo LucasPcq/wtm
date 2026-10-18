@@ -37,7 +37,8 @@ type Refresher interface {
 // Standing is where a step's answer stands before the user is asked.
 type Standing struct {
 	Value  string        // the answer the step holds
-	Flag   string        // the flag that set Value, if one did: the step is not asked
+	Given  bool          // reports whether the command line set Value, by a flag or an argument: the step is not asked
+	Flag   string        // the flag that set Value, if one did, named in the trail
 	Origin domain.Origin // where Value comes from; a remembered answer is not asked
 	Skip   string        // why the step does not apply, if it does not: the step is not asked
 	Erred  bool          // reports whether Value is refused, so the step is asked even when a flag set it
@@ -58,21 +59,14 @@ func decided(st Standing, answered bool) mark {
 		return mark{ruled: st.Skip}
 	case st.Erred:
 		return mark{asked: true}
-	case st.Flag != "":
+	case st.Given && st.Flag != "":
 		return mark{line: value + trail + st.Flag}
+	case st.Given:
+		return mark{line: value}
 	case answered:
 		return mark{line: value}
 	case st.Origin == domain.OriginRemembered:
 		return mark{line: value + trail + string(domain.OriginRemembered)}
 	}
 	return mark{asked: true}
-}
-
-// summarized returns the trail line of an answer shown, naming its origin when the user kept the value the config or the default offered.
-func summarized(offered Standing, shown string) string {
-	kept := offered.Origin == domain.OriginConfig || offered.Origin == domain.OriginDefault
-	if kept && shown == offered.Value {
-		return shown + trail + string(offered.Origin)
-	}
-	return shown
 }

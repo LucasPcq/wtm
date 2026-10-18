@@ -1,0 +1,12 @@
+  ✗ extract: 1 failed
+
+  Source    feat/login
+  Files     mod README.md
+  Target    new worktree feat/bad from main
+  Mode      move
+  feat/bad  ../repo.trees/feat-bad
+
+  ✗ feat/bad  on_create failed: hook failed: exit status 3 · left incomplete
+  ! nothing was moved: the files are still in feat/login
+
+  → wtm go feat/bad

@@ -1,21 +1,20 @@
 
-  Step 7/7 • Apply this plan?
+  Step 7/7 • Confirm
 
   ✓ Branches: feat/a, feature
   ✓ Source branch: main
   ✓ Env strategy: main
-  ⊘ Isolation — run.toml declares nothing a worktree isolates
-  ⊘ Source update — nothing to fast-forward: no branch it starts from is behind origin
-  ⊘ If not exists — set by its flag only
+  · Isolation — run.toml declares nothing a worktree isolates
+  · Source update — nothing to fast-forward: the source is not behind origin
+  · If not exists — set by its flag only
 
   ┃  Review & confirm
   ┃
   ┃  Branches  feat/a, feature (existing)
   ┃  From      main
-  ┃  Env       main
-  ┃  Remember  env_from
+  ┃  Env       main · will be remembered
 
-▌▸ Yes, apply
+▌› Yes, create 2 worktrees
   ────────────────────────────────────────────────────────────────────────────────────────────────
    No, cancel
 

@@ -54,10 +54,9 @@ func TestEachItemDetailsItsWorktreeAndWhereItsBranchStands(t *testing.T) {
 }
 
 func TestTheDetailIsTheJSONOfTheEnvelope(t *testing.T) {
-	ordinal := 2
-	detail := create.Detail{Path: "/trees/feat-x", Metadata: worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Isolation: project.Isolated}, Standing: worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 1}, Ordinal: &ordinal}
+	detail := create.Detail{Path: "/trees/feat-x", Metadata: worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvMain, Ordinal: 2, Isolation: project.Isolated}, Standing: worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 1}}
 
-	assert.JSONEq(t, `{"path":"/trees/feat-x","metadata":{"source_branch":"main","created_at":"2026-10-16T12:00:00Z","env_strategy":"main","isolation":"isolated"},"existing_branch":true,"origin_state":"behind","origin_behind":1,"ordinal":2}`, jsonOf(t, detail))
+	assert.JSONEq(t, `{"path":"/trees/feat-x","metadata":{"source_branch":"main","created_at":"2026-10-16T12:00:00Z","env_strategy":"main","ordinal":2,"isolation":"isolated"},"existing_branch":true,"origin_state":"behind","origin_behind":1}`, jsonOf(t, detail))
 }
 
 func TestOneBranchThatFailsLeavesTheOthersCreated(t *testing.T) {
@@ -176,6 +175,16 @@ func TestTheSourceIsFastForwardedBeforeTheWorktreeStartsFromIt(t *testing.T) {
 	}, report.all()[:2])
 }
 
+func TestABranchFastForwardedStandsAsOriginHasIt(t *testing.T) {
+	w := newWorld(t, seed{})
+	behindOrigin(t, w, existing)
+
+	result, _ := w.apply(t, create.Request{Branches: []string{existing}, From: "main", Given: provision.Given{FastForward: new(true)}})
+
+	require.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
+	assert.Equal(t, worktree.Standing{ExistingBranch: true, OriginState: worktree.UpToDate}, result.Items[0].Detail.Standing)
+}
+
 func TestASourceWithUncommittedChangesIsLeftWhereItIsAndSaysSo(t *testing.T) {
 	w := newWorld(t, seed{Behind: true})
 
@@ -209,6 +218,7 @@ func TestTheAnswersAskedToBeRememberedAreKeptOnceABranchIsCreated(t *testing.T) 
 	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{EnvFrom: project.EnvExample, Isolation: project.Verbatim, FastForward: new(false), Remember: []string{"env_from", "isolation", "fast_forward"}}})
 
 	assert.Empty(t, result.Warnings)
+	assert.Equal(t, []string{"env_from", "isolation", "fast_forward"}, result.Remembered)
 	config := readFile(t, filepath.Join(w.stateDir, "config.toml"))
 	assert.Contains(t, config, `env_strategy = "example"`)
 	assert.Contains(t, config, `isolation = "verbatim"`)
@@ -236,8 +246,9 @@ func TestAFastForwardNotAskedNeverOverwritesTheOneRemembered(t *testing.T) {
 func TestNothingIsRememberedWhenNoBranchWasCreated(t *testing.T) {
 	w := newWorld(t, seed{Linked: []string{"linked"}})
 
-	w.apply(t, create.Request{Branches: []string{"linked"}, IfNotExists: true, Given: provision.Given{EnvFrom: project.EnvExample, Remember: []string{"env_from"}}})
+	result, _ := w.apply(t, create.Request{Branches: []string{"linked"}, IfNotExists: true, Given: provision.Given{EnvFrom: project.EnvExample, Remember: []string{"env_from"}}})
 
+	assert.Empty(t, result.Remembered)
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "env_strategy")
 }
 
@@ -248,6 +259,7 @@ func TestAnAnswerThatCannotBeRememberedIsAWarningOfTheRun(t *testing.T) {
 	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from"}}})
 
 	assert.Equal(t, []string{"create.remember_failed"}, codes(result.Warnings))
+	assert.Empty(t, result.Remembered)
 	assert.Equal(t, "could not remember the answer: read-only file system", result.Warnings[0].Message)
 	assert.Equal(t, domain.Params{"cause": "read-only file system"}, result.Warnings[0].Params)
 }

@@ -40,12 +40,11 @@ type Result = domain.Result[Detail]
 // An Item is what became of one branch: its status and why, the error it failed on, its warnings, and its Detail once its worktree stands.
 type Item = domain.Unit[Detail]
 
-// A Detail describes a branch's worktree as the JSON envelope reports it: where it is, its meta record, where the branch stood against origin, its ordinal and the env ports it was given.
+// A Detail describes a branch's worktree as the JSON envelope reports it: where it is, its meta record, where the branch stood against origin and the env ports it was given.
 type Detail struct {
 	Path     string        `json:"path"`
 	Metadata worktree.Meta `json:"metadata"`
 	worktree.Standing
-	Ordinal  *int         `json:"ordinal,omitempty"`
 	EnvPorts env.Redacted `json:"env_ports,omitzero"`
 }
 
@@ -101,12 +100,13 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 		return Plan{}, nil, err
 	}
 
-	resolved, err := Resolve(facts, req)
+	questions, err := resolve(facts, req)
 	if err != nil {
 		return Plan{}, nil, err
 	}
 
-	planned, warnings := Decide(facts, resolved)
+	planned, warnings := Decide(facts, questions.Request())
+	planned.recalled = questions.Recalled()
 	return planned, warnings, nil
 }
 
@@ -115,14 +115,19 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 
 // Apply carries out the plan, reporting each step: it fast-forwards the sources asked, provisions each branch in turn, a failure stopping none of the others, and remembers the answers asked once a worktree is created. Once ctx is cancelled, the branches not yet started are skipped.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
-	warnings := u.fastForward(ctx, plan, report)
+	advanced, warnings := u.fastForward(ctx, plan, report)
 
 	items := make([]Item, 0, len(plan.Branches))
 	for _, planned := range plan.Branches {
-		items = append(items, u.item(ctx, plan, planned, report))
+		item := u.item(ctx, plan, planned, report)
+		if item.Detail != nil && slices.Contains(advanced, item.Subject) {
+			item.Detail.Standing = item.Detail.Standing.FastForwarded()
+		}
+		items = append(items, item)
 	}
 
-	return Result{Items: items, Warnings: append(warnings, u.remember(ctx, plan, items)...)}
+	remembered, failed := u.remember(ctx, plan, items)
+	return Result{Items: items, Warnings: append(warnings, failed...), Remembered: remembered}
 }
 
 // ----------------------------------------------------------------------------
@@ -173,14 +178,16 @@ func (u UseCase) locate(ctx context.Context, paths []string) (map[string]worktre
 // ----------------------------------------------------------------------------
 // The steps of Apply
 
-// fastForward fast-forwards each source the plan names; one that cannot be is a warning, its worktrees starting from the local branch.
-func (u UseCase) fastForward(ctx context.Context, plan Plan, report domain.Report) []domain.Warning {
+// fastForward fast-forwards each source the plan names and returns those it advanced; one that cannot be is a warning, its worktrees starting from the local branch.
+func (u UseCase) fastForward(ctx context.Context, plan Plan, report domain.Report) ([]string, []domain.Warning) {
+	advanced := slices.Clone(plan.FastForward)
 	var warnings []domain.Warning
 	for _, missed := range u.Provision.FastForwardEach(ctx, provision.FastForwardEachParams{Subjects: plan.FastForward, Snapshot: plan.facts.Snapshot, Report: report}) {
+		advanced = slices.DeleteFunc(advanced, func(subject string) bool { return subject == missed.Subject })
 		warnings = append(warnings, notAdvanced(missed))
 	}
 
-	return warnings
+	return advanced, warnings
 }
 
 func notAdvanced(missed provision.Missed) domain.Warning {
@@ -225,7 +232,6 @@ func (u UseCase) item(ctx context.Context, plan Plan, planned BranchPlan, report
 			Path:     planned.Path,
 			Metadata: outcome.Provisioned.Meta,
 			Standing: plan.facts.StandingOf(planned.Branch, planned.placement()),
-			Ordinal:  outcome.Provisioned.Ordinal,
 			EnvPorts: outcome.Provisioned.EnvPorts,
 		}
 	}
@@ -240,10 +246,10 @@ func (u UseCase) unchanged(planned BranchPlan) Item {
 	return Item{Subject: planned.Branch, Status: domain.StatusDone, Reason: domain.ReasonUnchanged, Detail: &Detail{Path: planned.Path, Metadata: recorded}}
 }
 
-// remember writes the answers the plan asks to remember, once at least one worktree was created.
-func (u UseCase) remember(ctx context.Context, plan Plan, items []Item) []domain.Warning {
+// remember writes the answers the plan asks to remember, once at least one worktree was created, and returns the fields it remembered.
+func (u UseCase) remember(ctx context.Context, plan Plan, items []Item) ([]string, []domain.Warning) {
 	if !slices.ContainsFunc(items, created) {
-		return nil
+		return nil, nil
 	}
 
 	return u.Provision.Remember(ctx, Name, plan.settled, plan.Remember)

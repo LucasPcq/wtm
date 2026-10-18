@@ -1,5 +1,5 @@
 
-  Step 11/11 • Apply this plan?
+  Step 11/11 • Confirm
 
   ✓ Source worktree: feat/login
   ✓ Files: 2 files
@@ -9,13 +9,13 @@
   · Env strategy — the target worktree exists: nothing is created
   · Isolation — the target worktree exists: nothing is created
   · Source update — the target worktree exists: nothing is created
-  ✓ Mode: move · default
+  ✓ Mode: move
   · On conflict — nothing conflicts with the target
 
   ┃  Review & confirm
   ┃
   ┃  Source  feat/login
-  ┃  Files   apps/api/a.txt, apps/api/new.txt
+  ┃  Files   mod apps/api/a.txt, new apps/api/new.txt
   ┃  Target  feat/other
   ┃  Mode    move
 

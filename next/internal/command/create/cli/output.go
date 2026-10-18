@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
@@ -15,25 +14,27 @@ import (
 
 const commandName = create.Name
 
-// planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome.
-func planRowsOf(plan create.Plan) []output.PlanRow {
+// planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome, each answer with its mark.
+func planRowsOf(plan create.Plan, marks output.Marks) []output.PlanRow {
 	rows := []output.PlanRow{
 		{Label: "Branches", Values: plannedBranches(plan.Branches)},
 		{Label: sourceLabel(plan.Branches), Values: []string{plan.From}},
-		{Label: "Env", Values: []string{string(plan.EnvFrom)}},
+		{Label: "Env", Values: []string{output.EnvValue(output.EnvValueParams{Strategy: string(plan.EnvFrom), FollowsConfig: plan.EnvFollowsConfig(), Mark: marks.Of(domain.PathEnvFrom)})}},
 	}
 
 	if plan.Isolation != "" {
-		rows = append(rows, output.PlanRow{Label: "Isolation", Values: []string{string(plan.Isolation)}})
+		rows = append(rows, output.PlanRow{Label: "Isolation", Values: []string{string(plan.Isolation) + marks.Of(domain.PathIsolation)}})
 	}
-	if len(plan.FastForward) > 0 {
-		rows = append(rows, output.PlanRow{Label: "Fast-forward", Values: plan.FastForward})
-	}
-	if len(plan.Remember) > 0 {
-		rows = append(rows, output.PlanRow{Label: "Remember", Values: plan.Remember})
+	if ff := output.Noted(output.NotedParams{Values: plan.FastForward, Note: marks.Of(domain.PathFastForward), None: "keep as-is"}); len(ff) > 0 {
+		rows = append(rows, output.PlanRow{Label: "Fast-forward", Values: ff})
 	}
 
 	return rows
+}
+
+// previewMarks are the marks of a plan not yet applied.
+func previewMarks(plan create.Plan) output.Marks {
+	return output.Marks{Recalled: plan.Recalled(), Remembered: plan.Remember, Mark: output.WillBeRemembered}
 }
 
 // plannedBranches spells each planned branch, how it gets its worktree in parentheses unless it is created.
@@ -68,34 +69,28 @@ func sourceLabel(branches []create.BranchPlan) string {
 
 // itemNote is the muted note after an item's path: already open, else how its env ports were settled, if worth saying.
 func itemNote(item create.Item, st *output.Styles) string {
-	note := output.SettlementNote(item.Detail.EnvPorts)
 	if item.Reason == domain.ReasonUnchanged {
-		note = "already open"
+		return output.MutedNote("already open", st)
 	}
 
-	if note == "" {
-		return ""
-	}
-
-	return st.Muted.Render(output.Dot + note)
+	return output.MutedNote(output.SettlementNote(item.Detail.EnvPorts), st)
 }
 
-// anomaliesOf are what the reader of an item should act on: a branch checked out behind or diverged from origin, the env ports left alone.
+// anomaliesOf are what the reader of an item should act on: a branch checked out behind origin, the env ports left alone.
 func anomaliesOf(item create.Item) []string {
 	var anomalies []string
 	standing := item.Detail.Standing
 	switch standing.OriginState {
 	case worktree.Behind:
 		anomalies = append(anomalies, fmt.Sprintf("%s is %d commit(s) behind origin — the worktree starts from your local branch.", item.Subject, standing.OriginBehind))
-	case worktree.Diverged:
-		anomalies = append(anomalies, fmt.Sprintf("%s has diverged from origin (%d ahead, %d behind) — the worktree starts from your local branch, missing commits that are on origin.", item.Subject, standing.OriginAhead, standing.OriginBehind))
-	case worktree.NoOrigin, worktree.UpToDate, worktree.Ahead:
+	// A diverged branch is the plan's create.source_diverged warning already.
+	case worktree.Diverged, worktree.NoOrigin, worktree.UpToDate, worktree.Ahead:
 	}
 
 	return append(anomalies, output.PortAnomalies(item.Detail.EnvPorts)...)
 }
 
-// drawOutcome draws what the apply did: the tally, the plan with each worktree that stands and the anomalies, the branches left unfinished, and the next steps.
+// drawOutcome draws what the apply did: the tally, the plan with each worktree that exists and the anomalies, the branches left unfinished, and the next steps.
 func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextStep, cwd string) {
 	items := outcome.Result.Items
 	headline(w, items)
@@ -104,11 +99,11 @@ func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextSte
 	var anomalies []string
 	var next []output.NextStep
 	if len(items) > 0 {
-		rows = planRowsOf(outcome.Plan)
+		rows = planRowsOf(outcome.Plan, output.Marks{Recalled: outcome.Plan.Recalled(), Remembered: outcome.Result.Remembered, Mark: output.Saved})
 	}
 
 	for _, item := range items {
-		if !stands(item) || item.Detail == nil {
+		if item.Detail == nil {
 			continue
 		}
 		path := output.ShownPath(output.Shown{Cwd: cwd, Path: item.Detail.Path})
@@ -154,53 +149,17 @@ func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextSte
 	}
 }
 
-// stands reports whether the item's worktree stands: created, or left incomplete by a later step of its provisioning.
-func stands(item create.Item) bool {
-	return item.Status == domain.StatusDone || item.Reason == domain.ReasonIncomplete
-}
-
-// headline is the tally of the items by status, in the colour of the worst.
+// headline is the tally of the items by status.
 func headline(w io.Writer, items []create.Item) {
-	if len(items) == 0 {
-		output.UnchangedLine(w, commandName+": "+output.NothingToDo)
-		return
-	}
-
-	count := map[string]int{}
+	tallied := make([]output.Tallied, 0, len(items))
 	for _, item := range items {
-		count[tallyKey(item)]++
+		tallied = append(tallied, output.Tallied{Status: item.Status, Reason: item.Reason})
 	}
 
-	var parts []string
-	for _, key := range []string{"done", "unchanged", "failed", "skipped", "cancelled"} {
-		if count[key] > 0 {
-			parts = append(parts, strconv.Itoa(count[key])+" "+key)
-		}
-	}
-
-	line := commandName + ": " + strings.Join(parts, output.Dot)
-	switch {
-	case count["failed"] > 0:
-		output.ErrorLine(w, line)
-	case count["skipped"]+count["cancelled"] > 0:
-		output.WarningLine(w, line)
-	case count["done"] == 0:
-		output.UnchangedLine(w, line)
-	default:
-		output.SuccessLine(w, line)
-	}
-}
-
-// tallyKey is the column of the tally an item counts in: a worktree already open counts as unchanged, not done.
-func tallyKey(item create.Item) string {
-	if item.Status == domain.StatusDone && item.Reason == domain.ReasonUnchanged {
-		return "unchanged"
-	}
-
-	return string(item.Status)
+	output.Tally(w, output.TallyParams{Command: commandName, Items: tallied})
 }
 
 // planTextOf is the plan as the wizard's recap shows it, in width columns.
 func planTextOf(plan create.Plan, warnings []domain.Warning, width int, st *output.Styles) string {
-	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(plan), Warnings: output.Messages(warnings), Width: width, Styles: st}), "\n")
+	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(plan, previewMarks(plan)), Warnings: output.Messages(warnings), Hint: output.RecalledHintOf(plan.Recalled()), Width: width, Styles: st}), "\n")
 }

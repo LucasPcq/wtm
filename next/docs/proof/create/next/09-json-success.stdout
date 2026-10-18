@@ -13,10 +13,10 @@
           "source_branch": "main",
           "created_at": "<T>",
           "env_strategy": "example",
+          "ordinal": 9,
           "isolation": "isolated"
         },
         "existing_branch": false,
-        "ordinal": 9,
         "env_ports": {
           "offset": 90,
           "entries": [

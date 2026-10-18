@@ -121,7 +121,7 @@ func (q Questions) Form() domain.Form {
 			Refreshable: true,
 		},
 	}
-	fields = append(fields, q.Questions.Fields(wording)...)
+	fields = append(fields, q.Questions.Fields(envHelp)...)
 	fields = append(fields, domain.ConfirmField{
 		FieldSpec: domain.FieldSpec{Path: pathIfNotExists, Flag: "--if-not-exists", Label: "If not exists", Help: "Succeed without a change when the worktree already exists (idempotent)", Origin: q.IfNotExists.Origin, Skip: q.IfNotExists.Skip},
 		Value:     q.IfNotExists.Value,
@@ -130,10 +130,7 @@ func (q Questions) Form() domain.Form {
 	return domain.Form{Problems: q.Errors, Fields: fields}
 }
 
-var wording = provision.Wording{
-	EnvHelp:         "How the .env files of the new worktrees are provisioned: config (config.toml's strategy), example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy",
-	FastForwardHelp: "Fast-forward to origin first the branch each worktree starts from, when it is behind; one that has diverged or holds uncommitted changes starts as it is",
-}
+const envHelp = "How the .env files of the new worktrees are provisioned: config (config.toml's strategy), example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy"
 
 func (f Facts) branchOptions() []domain.Option {
 	options := make([]domain.Option, 0, len(f.Branches.Local)+len(f.Branches.Remote))
@@ -156,7 +153,7 @@ func (f Facts) branchOptions() []domain.Option {
 
 // from answers the source with the base branch only when no branch is checked out as it exists, since such a branch's parent must be named.
 func (f Facts) from(req Request) From {
-	question := From{Options: domain.SourceOptions(f.Snapshot, req.Branches...), Pinned: f.Config.Worktrees.BaseBranch}
+	question := From{Options: domain.SourceOptions(f.Repository, req.Branches...), Pinned: f.Config.Worktrees.BaseBranch}
 	switch base := f.Config.Worktrees.BaseBranch; {
 	case req.From != "":
 		question.Answer = domain.Answer[string]{Value: req.From, Origin: domain.OriginRequest}
@@ -169,12 +166,7 @@ func (f Facts) from(req Request) From {
 
 // newWorktree are the questions of the new worktrees, on the facts; the fast-forward is asked while a branch they start from is behind origin.
 func (f Facts) newWorktree(req Request) provision.Questions {
-	params := provision.QuestionsParams{Given: req.Given, Repository: f.Repository}
-	if len(f.subjectsAt(req, worktree.Behind)) == 0 {
-		params.NotBehind = "nothing to fast-forward: no branch it starts from is behind origin"
-	}
-
-	return provision.NewQuestions(params)
+	return provision.NewQuestions(provision.QuestionsParams{Given: req.Given, Repository: f.Repository, Behind: f.subjectsAt(req, worktree.Behind), Many: len(req.Branches) > 1})
 }
 
 // ifNotExists is never asked, its flag the only way to set it; given, it stands in the trail with its flag.
@@ -191,12 +183,18 @@ func ifNotExists(given bool) domain.Confirm {
 
 // Resolve settles the request on the facts, every field answered as NewQuestions answers it; a request with problems is refused with all of them, by domain.Invalid.
 func Resolve(f Facts, req Request) (Request, error) {
+	questions, err := resolve(f, req)
+	return questions.Request(), err
+}
+
+// resolve is the questions of the request on the facts, refused when one is not settled.
+func resolve(f Facts, req Request) (Questions, error) {
 	questions := NewQuestions(f, req)
 	if len(questions.Errors) > 0 {
-		return Request{}, domain.Invalid(questions.Errors)
+		return Questions{}, domain.Invalid(questions.Errors)
 	}
 
-	return questions.Request(), nil
+	return questions, nil
 }
 
 // Request is the request the questions answer.

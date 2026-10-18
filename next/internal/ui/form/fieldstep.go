@@ -260,6 +260,8 @@ func confirmed(field domain.ConfirmField, yes bool) string {
 // ----------------------------------------------------------------------------
 // A text list
 
+const newBadge = "new"
+
 // textListStep asks a list of entries, each checked against the repository as it is added, each badged with what the repository knows of it.
 type textListStep struct {
 	Asked
@@ -295,12 +297,12 @@ func (s *textListStep) check(check EntryCheck) error {
 	return nil
 }
 
-// badge is the badge of the option an entry names, "" for a value the field does not offer.
+// badge is the badge of the option an entry names, "new" for a value the field does not offer.
 func (s *textListStep) badge(entry string) string {
 	field, _ := s.sheet.Field(s.at).(domain.TextListField)
 	at := slices.IndexFunc(field.Options, func(o domain.Option) bool { return o.Value == entry })
 	if at < 0 {
-		return ""
+		return newBadge
 	}
 
 	return field.Options[at].Badge

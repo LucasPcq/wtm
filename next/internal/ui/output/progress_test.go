@@ -117,6 +117,23 @@ func TestALiveInterruptDuringAHookIsSaidInsideItsViewAndLosesNoLine(t *testing.T
 	assert.Equal(t, []string{"    before", "    after", "  full output:  /state/hooks/x.log"}, screen[1:])
 }
 
+func TestALiveSilentHookThatFailsStillSaysWhereItsLogIs(t *testing.T) {
+	var out bytes.Buffer
+	progress := NewProgress(t.Context(), ProgressParams{W: &out, Human: true, Live: true})
+	progress.Report(domain.UnitStarted{Subject: "feat/x"})
+	progress.Report(domain.PhaseStarted{Subject: "feat/x", Phase: "env"})
+	progress.Report(domain.PhaseFinished{Subject: "feat/x", Phase: "env", Failed: true})
+	progress.Report(domain.PhaseStarted{Subject: "feat/x", Phase: "on_create", Log: "/state/hooks/x.log"})
+	progress.Report(domain.PhaseFinished{Subject: "feat/x", Phase: "on_create", Failed: true})
+	progress.Report(domain.UnitFinished{Subject: "feat/x", Status: domain.StatusFailed})
+	progress.Close()
+
+	screen := finalScreen(out.String())
+	require.Len(t, screen, 2, "a phase without a log, as env, stays silent")
+	assert.True(t, strings.HasPrefix(screen[0], "  ✗ on_create · feat/x ("), screen)
+	assert.Equal(t, "  full output:  /state/hooks/x.log", screen[1])
+}
+
 func TestALiveInterruptBetweenPhasesIsTheOnlyLine(t *testing.T) {
 	var out bytes.Buffer
 	ctx, cancel := context.WithCancel(t.Context())

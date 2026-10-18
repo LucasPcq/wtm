@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
@@ -17,6 +18,33 @@ import (
 func TestTwoBranchesCreatedAreCountedRowedAndPointedAt(t *testing.T) {
 
 	golden(t, "outcome_two_done", rendered(func(w *bytes.Buffer) { drawOutcome(w, twoCreated(trees), nil, cwd) }))
+}
+
+func TestAnAppliedRunMarksOnlyTheAnswersItRemembered(t *testing.T) {
+	outcome := twoCreated(trees)
+	outcome.Plan.Isolation = "isolated"
+	outcome.Plan.Remember = []string{"isolation", "fast_forward"}
+
+	nothingWritten := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, nil, cwd) })
+	outcome.Result.Remembered = outcome.Plan.Remember
+	written := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, nil, cwd) })
+
+	assert.Contains(t, nothingWritten, "Isolation  isolated\n")
+	assert.NotContains(t, nothingWritten, "Fast-forward")
+	assert.Contains(t, written, "Env           example\n")
+	assert.Contains(t, written, "Isolation     isolated · saved for next runs\n")
+	assert.Contains(t, written, "Fast-forward  keep as-is · saved for next runs\n")
+	assert.NotContains(t, written, "Remember")
+}
+
+func TestADivergedBranchIsWarnedOnce(t *testing.T) {
+	outcome := twoCreated(trees)
+	outcome.Result.Items[0].Detail.Standing = worktree.Standing{ExistingBranch: true, OriginState: worktree.Diverged, OriginAhead: 1, OriginBehind: 1}
+	outcome.Warnings = []domain.Warning{{Code: "create.source_diverged", Message: "branch feat/a has diverged from origin (1 ahead, 1 behind) and can't be fast-forwarded"}}
+
+	text := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, nil, cwd) })
+
+	assert.Equal(t, 1, strings.Count(text, "diverged"), text)
 }
 
 func TestAMixedRunNamesEachAnomalyAndEachUnfinishedBranch(t *testing.T) {
@@ -50,7 +78,7 @@ func TestADryRunShowsThePlanItsWarningsItsFingerprintAndHowToApplyIt(t *testing.
 	outcome.Warnings = []domain.Warning{{Code: "create.env_parent_fallback", Message: `The "parent" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main.`}}
 
 	golden(t, "dryrun", rendered(func(w *bytes.Buffer) {
-		output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(outcome.Plan), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: "wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567"})
+		output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(outcome.Plan, previewMarks(outcome.Plan)), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: "wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567"})
 	}))
 }
 
@@ -65,14 +93,14 @@ func TestAPlanReadsAsItsRowsThenItsWarnings(t *testing.T) {
 func TestAnAppliedRunWritesEachItemWithItsDetail(t *testing.T) {
 	outcome := twoCreated("/trees")
 	outcome.Result.Items[1].Detail.Standing = worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2}
-	outcome.Result.Items[1].Detail.Ordinal = new(2)
+	outcome.Result.Items[1].Detail.Metadata.Ordinal = 2
 	outcome.Warnings = []domain.Warning{{Code: "locks.unavailable", Message: "ran without operation locks"}}
 
 	assert.JSONEq(t, `{
 		"v": 2, "command": "create", "ok": true, "op": "op-1",
 		"items": [
 			{"subject": "feat/a", "status": "done", "detail": {"path": "/trees/feat-a", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "isolation": "isolated"}, "existing_branch": false}},
-			{"subject": "feat/b", "status": "done", "detail": {"path": "/trees/feat-b", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "isolation": "isolated"}, "existing_branch": true, "origin_state": "behind", "origin_behind": 2, "ordinal": 2}}
+			{"subject": "feat/b", "status": "done", "detail": {"path": "/trees/feat-b", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "ordinal": 2, "isolation": "isolated"}, "existing_branch": true, "origin_state": "behind", "origin_behind": 2}}
 		],
 		"follow_ups": [],
 		"warnings": [{"code": "locks.unavailable", "message": "ran without operation locks"}]

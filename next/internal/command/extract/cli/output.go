@@ -2,7 +2,7 @@ package cli
 
 import (
 	"io"
-	"strconv"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -12,8 +12,8 @@ import (
 
 const commandName = extract.Name
 
-// planRowsOf are the rows of the plan the dry run shows.
-func planRowsOf(plan extract.Plan) []output.PlanRow {
+// planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome, each answer with its mark.
+func planRowsOf(plan extract.Plan, marks output.Marks) []output.PlanRow {
 	rows := []output.PlanRow{
 		{Label: "Source", Values: []string{plan.Source}},
 		{Label: "Files", Values: labels(plan.Files)},
@@ -24,13 +24,13 @@ func planRowsOf(plan extract.Plan) []output.PlanRow {
 		rows = append(rows, output.PlanRow{Label: "Parent", Values: []string{plan.From}})
 	}
 	if plan.EnvFrom != "" {
-		rows = append(rows, output.PlanRow{Label: "Env", Values: []string{string(plan.EnvFrom)}})
+		rows = append(rows, output.PlanRow{Label: "Env", Values: []string{output.EnvValue(output.EnvValueParams{Strategy: string(plan.EnvFrom), FollowsConfig: plan.EnvFollowsConfig(), Mark: marks.Of(domain.PathEnvFrom)})}})
 	}
 	if plan.Isolation != "" {
-		rows = append(rows, output.PlanRow{Label: "Isolation", Values: []string{string(plan.Isolation)}})
+		rows = append(rows, output.PlanRow{Label: "Isolation", Values: []string{string(plan.Isolation) + marks.Of(domain.PathIsolation)}})
 	}
-	if len(plan.FastForward) > 0 {
-		rows = append(rows, output.PlanRow{Label: "Fast-forward", Values: plan.FastForward})
+	if ff := output.Noted(output.NotedParams{Values: plan.FastForward, Note: marks.Of(domain.PathFastForward), None: "keep as-is"}); len(ff) > 0 {
+		rows = append(rows, output.PlanRow{Label: "Fast-forward", Values: ff})
 	}
 
 	rows = append(rows, output.PlanRow{Label: "Mode", Values: []string{mode(plan.Keep)}})
@@ -40,11 +40,12 @@ func planRowsOf(plan extract.Plan) []output.PlanRow {
 			output.PlanRow{Label: "On conflict", Values: []string{string(plan.OnConflict)}},
 		)
 	}
-	if len(plan.Remember) > 0 {
-		rows = append(rows, output.PlanRow{Label: "Remember", Values: plan.Remember})
-	}
-
 	return rows
+}
+
+// previewMarks are the marks of a plan not yet applied.
+func previewMarks(plan extract.Plan) output.Marks {
+	return output.Marks{Recalled: plan.Recalled(), Remembered: plan.Remember, Mark: output.WillBeRemembered}
 }
 
 // plannedTarget spells the target and how it gets its worktree; an existing one is its branch alone.
@@ -63,10 +64,11 @@ func plannedTarget(plan extract.Plan) string {
 	return target.Branch
 }
 
+// labels spell each file with its tag.
 func labels(files []worktree.Change) []string {
 	values := make([]string, 0, len(files))
 	for _, file := range files {
-		values = append(values, file.Label())
+		values = append(values, file.Status.Tag()+" "+file.Label())
 	}
 
 	return values
@@ -90,58 +92,66 @@ func mode(keep bool) string {
 }
 
 func drawNothing(w io.Writer, plan extract.Plan) {
-	output.UnchangedLine(w, "No uncommitted changes to extract in "+plan.Source)
+	output.Tally(w, output.TallyParams{Command: commandName, Note: "no uncommitted changes in " + plan.Source})
 }
 
-// drawOutcome draws what the apply did: the files moved or the conflicts left to resolve, where the source and the target stand, the anomalies, and the next step; an unfinished target is drawn by drawUnfinished.
+// drawOutcome draws what the apply did: the tally, the plan with the target when it stands, the anomalies and the conflicts left to resolve, the target left unfinished, and the next steps.
 func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
 	item, ok := targetOf(outcome)
 	if !ok {
 		return
 	}
-	if item.Status != domain.StatusDone {
-		drawUnfinished(w, outcome, cwd)
-		return
-	}
-
 	detail := item.Detail
-	source := outcome.Plan.Source
-	conflicted := len(detail.Conflicts) > 0
+	conflicted := detail != nil && len(detail.Conflicts) > 0
 
-	var rows []output.PlanRow
-	next := output.NextStep{Command: "wtm go " + item.Subject}
+	tally := output.TallyParams{Command: commandName, Items: []output.Tallied{{Status: item.Status, Reason: item.Reason}}}
 	if conflicted {
-		drawConflicts(w, conflictsParams{Detail: detail, Target: item.Subject, Source: source})
-		next.Note = "resolve the conflicts, then discard the same files in " + source
-	} else {
-		drawApplied(w, detail, item.Subject)
-		rows = append(rows, output.PlanRow{Label: "source", Values: []string{source + output.Dot + sourceNote(detail.Kept)}})
+		tally.Note = "with conflicts"
+	}
+	output.Tally(w, tally)
+
+	rows := planRowsOf(outcome.Plan, output.Marks{Recalled: outcome.Plan.Recalled(), Remembered: outcome.Result.Remembered, Mark: output.Saved})
+	anomalies := anomaliesOf(outcome)
+	var next []output.NextStep
+	if detail != nil {
+		path := output.ShownPath(output.Shown{Cwd: cwd, Path: detail.Path})
+		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + output.MutedNote(output.SettlementNote(detail.EnvPorts), output.StylesOf(w))}})
+		next = append(next, output.NextStep{Command: "wtm go " + item.Subject})
+	}
+	if conflicted {
+		anomalies = append(anomalies, conflictNotes(conflictsParams{Detail: detail, Target: item.Subject, Source: outcome.Plan.Source})...)
+		next[0].Note = "resolve the conflicts, then discard the same files in " + outcome.Plan.Source
 	}
 
-	if note := output.SettlementNote(detail.EnvPorts); note != "" {
-		rows = append(rows, output.PlanRow{Label: "env", Values: []string{note}})
+	output.Blank(w)
+	output.DrawPlan(w, output.PlanParams{Rows: rows, Warnings: anomalies})
+
+	if item.Status != domain.StatusDone {
+		output.Blank(w)
+		output.UnfinishedLine(w, output.Unfinished{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err})
+		if note := untouched(outcome.Plan, item); note != "" {
+			output.WarningLine(w, note)
+		}
 	}
-	rows = append(rows, output.PlanRow{Label: "path", Values: []string{output.ShownPath(output.Shown{Cwd: cwd, Path: detail.Path})}})
 
-	output.Blank(w)
-	output.DrawPlan(w, output.PlanParams{Rows: rows, Warnings: anomaliesOf(outcome)})
-
-	output.Blank(w)
-	output.NextSteps(w, []output.NextStep{next})
+	next = append(next, output.FollowUpSteps(item.Err)...)
+	if len(next) > 0 {
+		output.Blank(w)
+		output.NextSteps(w, next)
+	}
 }
 
-// drawApplied draws the files moved, or copied, cleanly into target.
-func drawApplied(w io.Writer, detail *extract.Detail, target string) {
-	verb := "Moved "
-	if detail.Kept {
-		verb = "Copied "
+// untouched says that a target left unfinished received nothing, the source still holding every file; a half move says for itself where the files are.
+func untouched(plan extract.Plan, item extract.Item) string {
+	if item.Err != nil && item.Err.Code == extract.CodeHalfMoved {
+		return ""
 	}
 
-	output.SuccessLine(w, verb+fileCount(len(detail.Files))+" to "+target)
-	output.Blank(w)
-	for _, file := range detail.Files {
-		output.Message(w, output.Indent+file.Status.Tag()+"  "+file.Path)
+	if plan.Keep {
+		return "nothing was copied to " + item.Subject
 	}
+
+	return "nothing was moved: the files are still in " + plan.Source
 }
 
 // conflictsParams are the detail of a target left with conflicts, and the branches of the target and the source.
@@ -151,37 +161,17 @@ type conflictsParams struct {
 	Source string
 }
 
-// drawConflicts draws the files left with conflict markers in the target, and how to undo the extract: the source still holds every change.
-func drawConflicts(w io.Writer, params conflictsParams) {
-	output.WarningLine(w, "Applied to "+params.Target+" with conflicts")
-	output.Blank(w)
-	output.SectionTitle(w, "Conflicts to resolve")
-	for _, path := range params.Detail.Conflicts {
-		output.Message(w, output.Indent+path)
-	}
-
-	output.Blank(w)
+// conflictNotes say which files the target holds with conflict markers, and how to undo the extract: the source still holds every change.
+func conflictNotes(params conflictsParams) []string {
+	conflicts := strings.Join(params.Detail.Conflicts, ", ") + " left with conflict markers in " + params.Target
 	if len(params.Detail.Files) > len(params.Detail.Conflicts) {
-		output.Message(w, "The other files were applied cleanly.")
+		conflicts += "; the other files were applied cleanly"
 	}
 
-	output.Message(w, "Nothing was removed from "+params.Source+": to undo, discard the applied files in "+params.Target+".")
-}
-
-func fileCount(count int) string {
-	if count == 1 {
-		return "1 file"
+	return []string{
+		conflicts + ".",
+		"Nothing was removed from " + params.Source + ": to undo, discard the applied files in " + params.Target + ".",
 	}
-
-	return strconv.Itoa(count) + " files"
-}
-
-func sourceNote(kept bool) string {
-	if kept {
-		return "files kept"
-	}
-
-	return "files removed"
 }
 
 // anomaliesOf are what the reader should act on: the warnings of the run and of the target, and the env ports left alone.
@@ -194,26 +184,6 @@ func anomaliesOf(outcome extract.Outcome) []string {
 	}
 
 	return append(anomalies, output.PortAnomalies(item.Detail.EnvPorts)...)
-}
-
-// drawUnfinished draws a target that failed, was skipped or was cancelled: why, where its worktree stands if it does, and the command that repairs what it left behind.
-func drawUnfinished(w io.Writer, outcome extract.Outcome, cwd string) {
-	item, _ := targetOf(outcome)
-	output.UnfinishedLine(w, output.Unfinished{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err})
-
-	if item.Detail != nil {
-		output.Blank(w)
-		path := output.ShownPath(output.Shown{Cwd: cwd, Path: item.Detail.Path})
-		output.DrawPlan(w, output.PlanParams{Rows: []output.PlanRow{{Label: "path", Values: []string{path}}}, Warnings: anomaliesOf(outcome)})
-	}
-
-	next := output.FollowUpSteps(item.Err)
-	if len(next) == 0 {
-		return
-	}
-
-	output.Blank(w)
-	output.NextSteps(w, next)
 }
 
 // targetOf is the one item of an applied outcome, the target's; false when the outcome holds none.

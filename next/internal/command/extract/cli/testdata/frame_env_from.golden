@@ -1,11 +1,11 @@
 
   Step 6/11 • Env strategy
 
-  ✓ Source worktree: feat/login · <source>
+  ✓ Source worktree: feat/login
   ✓ Files: 1 file · --files
   ✓ Target worktree: new worktree
   ✓ Branch name: feat/split
-  ✓ Source branch: main · config
+  ✓ Source branch: main
 
   How the .env files of the new target are provisioned: config (config.toml's strategy), example
   (from its template), main (copied from the main checkout) or parent (from the worktree of the
