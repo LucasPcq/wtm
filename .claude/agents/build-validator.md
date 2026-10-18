@@ -1,6 +1,6 @@
 ---
 name: build-validator
-description: Subagent that validates this Go CLI before a commit or at the end of a task. Runs the repository's own gates — make lint (fmt, vet, archlint, deadcode, go-sumtype, staticcheck) and make test — plus dependency hygiene, then reports every failure grouped by severity. Use at the end of every development session, before any git commit, or when explicitly asked to validate. Trigger on "validate", "check the build", "run build-validator", "is the code ready", "pre-commit check", or any request to confirm the project compiles and passes its quality gates. Always trigger this after implementing a feature if the user follows the CLAUDE.md principles.
+description: Subagent that validates this Go CLI before a commit or at the end of a task. Runs the repository's own gates — make lint (fmt, vet, archlint, deadcode, go-sumtype, staticcheck) and make test, or their next/-scoped make lint-next and make test-next when the change leaves the frozen internal/ alone — plus dependency hygiene, then reports every failure grouped by severity. Use at the end of every development session, before any git commit, or when explicitly asked to validate. Trigger on "validate", "check the build", "run build-validator", "is the code ready", "pre-commit check", or any request to confirm the project compiles and passes its quality gates. Always trigger this after implementing a feature if the user follows the CLAUDE.md principles.
 tools: Bash, Read, Grep, Glob
 model: haiku
 ---
@@ -16,6 +16,29 @@ Validate this project end-to-end before commit. The mandatory last step of every
 ## Execution
 
 Run every step even after one fails — the point is a complete report, not the first error.
+
+### Step 0 — Scope
+
+The legacy `internal/` is frozen: a change that touches none of `internal/`, `docs/guide/` (a test of `internal/` reads it), a `.go` file at the root, `go.mod`/`go.sum`, the `Makefile` or `.deadcode-ignore` cannot change its verdict, so it runs the gates scoped to `next/` and `tools/`. Compare against the branch's base — its PR's base, else the parent `wtm tree` records, else `main` — renames as both paths, uncommitted and untracked files included. Run it as one command; it prints the scope:
+
+```bash
+full='^(internal/|docs/guide/|[^/]+\.go$|go\.(mod|sum)$|Makefile$|\.deadcode-ignore$)'
+branch=$(git branch --show-current)
+base=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null) ||
+  base=$(wtm tree --output json 2>/dev/null | jq -r --arg b "$branch" 'first(.. | objects | select(any(.children[]?; .branch == $b)) | .branch) // empty')
+base=${base:-main}
+fork=$(git merge-base HEAD "origin/$base" 2>/dev/null || git merge-base HEAD "$base" 2>/dev/null)
+scope=full
+if [ -n "$fork" ] && grep -q '^lint-next:' Makefile &&
+  changed=$( { git -c core.quotePath=false diff --no-renames --name-only "$fork" &&
+    git -c core.quotePath=false ls-files --others --exclude-standard; } 2>/dev/null) &&
+  ! grep -qE "$full" <<<"$changed"; then
+  scope=next
+fi
+echo "scope=$scope base=$base"
+```
+
+With `scope=next`, step 3 runs `make lint-next` and step 4 `make test-next`; with `scope=full`, `make lint` and `make test`. The report names the scope and the base.
 
 ### Step 1 — Dependency hygiene
 
@@ -34,7 +57,8 @@ go build ./...
 ### Step 3 — Lint
 
 ```bash
-make lint
+make lint-next   # scope=next (Step 0)
+make lint        # scope=full
 ```
 
 This is seven gates in one, and the output names which failed:
@@ -54,7 +78,8 @@ Every one of these is a **BLOCKER**. Report each finding verbatim with its `file
 ### Step 4 — Tests
 
 ```bash
-go test ./... -race -count=1
+make test-next   # scope=next (Step 0): go test ./next/... ./tools/... -race -count=1
+make test        # scope=full: go test ./... -race -count=1
 ```
 
 Report failed tests by package and name, and flag any data race separately: a race is a blocker even when the test passed.
@@ -76,10 +101,11 @@ Never a blocker. Report only clones **the current change introduced**, and only 
 ║        build-validator report        ║
 ╚══════════════════════════════════════╝
 
+[0 — scope]        next | full, against <base>
 [1 — go mod tidy]   ✅ clean  |  ❌ <detail>
 [2 — go build]      ✅ clean  |  ❌ <N packages>
-[3 — make lint]     ✅ clean  |  ❌ <gate: N findings>
-[4 — tests -race]   ✅ all pass  |  ❌ <N failed, N races>
+[3 — make lint(-next)] ✅ clean  |  ❌ <gate: N findings>
+[4 — make test(-next)] ✅ all pass  |  ❌ <N failed, N races>
 [5 — make dupl]     ℹ️  <N clone groups, M new>
 
 ── Issues ────────────────────────────────────────────────

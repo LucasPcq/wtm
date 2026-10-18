@@ -6,8 +6,9 @@
 # earlier in the session, and treated as still true six commits later. A hook
 # cannot forget.
 #
-# It runs `make lint` (fmt, vet, archlint, deadcode, staticcheck — about two
-# seconds) and the tidy check that the CI runs first. It does NOT run the test
+# It runs `make lint` (fmt, vet, archlint, deadcode, staticcheck), or
+# `make lint-next` when the commit leaves internal/, the root package and
+# go.mod alone, and the tidy check that the CI runs first. It does NOT run the test
 # suite: at ~70s that would be a gate people disable. Tests are the CI's job and
 # the build-validator subagent's.
 #
@@ -72,6 +73,17 @@ if ! diff -q "$tidy/go.mod" go.mod >/dev/null || ! diff -q "$tidy/go.sum" go.sum
     "\`go mod tidy\` changed them and the change has been applied. Stage it and commit again."
 fi
 
-if ! output=$(make lint 2>&1); then
-  fail "make lint failed" "$output"
+# A commit that leaves the frozen internal/, the root package and the module
+# files alone cannot change their verdict: it pays only for next/ and tools/.
+# docs/guide/ is read by a test of internal/, .deadcode-ignore and the Makefile by
+# its gates; a rename keeps both sides, and a diff git cannot compute pays in full.
+full='^(internal/|docs/guide/|[^/]+\.go$|go\.(mod|sum)$|Makefile$|\.deadcode-ignore$)'
+lint=lint
+if changed=$( { git -c core.quotePath=false diff --no-renames --name-only HEAD &&
+  git -c core.quotePath=false ls-files --others --exclude-standard; } 2>/dev/null) &&
+  ! grep -qE "$full" <<<"$changed" && grep -q '^lint-next:' Makefile; then
+  lint=lint-next
+fi
+if ! output=$(make "$lint" 2>&1); then
+  fail "make $lint failed" "$output"
 fi
