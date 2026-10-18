@@ -89,6 +89,7 @@ func newWorld(t *testing.T, s seed) world {
 		published: published,
 		usecase: create.UseCase{
 			Git:        repo,
+			Meta:       meta,
 			Repository: repository.Service{Config: projectConfig, Git: repo, MainPath: main},
 			Operations: operation.Service{
 				Locker:    locks{oplock.Locks{StateDir: stateDir}},

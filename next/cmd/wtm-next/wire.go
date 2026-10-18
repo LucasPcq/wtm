@@ -52,9 +52,11 @@ func wire(params wireParams) app {
 		Now:       time.Now,
 	}
 
+	meta := store.Meta{StateDir: params.StateDir}
+
 	provisions := provision.Service{
 		Git:        repo,
-		Meta:       store.Meta{StateDir: params.StateDir},
+		Meta:       meta,
 		EnvFiles:   store.EnvFiles{},
 		Answers:    projectConfig,
 		StateDir:   params.StateDir,
@@ -69,6 +71,7 @@ func wire(params wireParams) app {
 	return app{
 		Create: create.UseCase{
 			Git:        repo,
+			Meta:       meta,
 			Repository: facts,
 			Operations: operations,
 			Provision:  provisions,
@@ -76,7 +79,7 @@ func wire(params wireParams) app {
 		Extract: extract.UseCase{
 			Git:        repo,
 			Repository: facts,
-			Meta:       provisions.Meta,
+			Meta:       meta,
 			Shield:     shell.Shield,
 			Operations: operations,
 			Provision:  provisions,

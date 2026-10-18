@@ -129,6 +129,7 @@ func (w world) usecase() create.UseCase {
 	}
 	return create.UseCase{
 		Git:        w.git,
+		Meta:       w.store,
 		Repository: repository.Service{Config: stored{w.store}, Git: w.git, MainPath: mainPath},
 		Operations: operation.Service{
 			Locker:    locker{err: w.seed.Locks, seen: w.seen},
@@ -286,6 +287,7 @@ func newApp(s seed) create.UseCase {
 	store := storetest.NewFake(storetest.FakeParams{Config: &config})
 	return create.UseCase{
 		Git:        git,
+		Meta:       store,
 		Repository: repository.Service{Config: loaded{config: config}, Git: git, MainPath: mainPath},
 		Operations: operation.Service{
 			Locker:    held{},

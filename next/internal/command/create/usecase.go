@@ -25,6 +25,7 @@ const CodeConfigNotFound = "create.config_not_found"
 // A UseCase creates worktrees in one repository: the ports it reaches the repository through and the services it shares with the other commands.
 type UseCase struct {
 	Git        Git
+	Meta       Meta
 	Repository repository.Service
 	Operations operation.Service
 	Provision  provision.Service
@@ -235,7 +236,7 @@ func (u UseCase) item(ctx context.Context, plan Plan, planned BranchPlan, report
 
 func (u UseCase) unchanged(planned BranchPlan) Item {
 	// A record that cannot be read only leaves the detail's metadata empty: the worktree is there all the same.
-	recorded, _ := u.Provision.Meta.Load(planned.Branch)
+	recorded, _ := u.Meta.Load(planned.Branch)
 	return Item{Subject: planned.Branch, Status: domain.StatusDone, Reason: domain.ReasonUnchanged, Detail: &Detail{Path: planned.Path, Metadata: recorded}}
 }
 
