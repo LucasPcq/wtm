@@ -18,24 +18,23 @@ const (
 	stateDirName = "wtm"
 )
 
-// openCreate returns the create command's use case wired on the repository of dir.
-func openCreate(ctx context.Context, dir string) (create.UseCase, error) {
-	params, err := locate(ctx, dir)
-	if err != nil {
-		return create.UseCase{}, err
+// The openers of the use cases, each wired on the repository of the directory it is given.
+var (
+	openCreate  = opener(func(a app) create.UseCase { return a.Create })
+	openExtract = opener(func(a app) extract.UseCase { return a.Extract })
+)
+
+// opener returns the function that opens the use case useCase picks out of the app wired on the repository of a directory.
+func opener[U any](useCase func(app) U) func(ctx context.Context, dir string) (U, error) {
+	return func(ctx context.Context, dir string) (U, error) {
+		params, err := locate(ctx, dir)
+		if err != nil {
+			var none U
+			return none, err
+		}
+
+		return useCase(wire(params)), nil
 	}
-
-	return wire(params).Create, nil
-}
-
-// openExtract returns the extract command's use case wired on the repository of dir.
-func openExtract(ctx context.Context, dir string) (extract.UseCase, error) {
-	params, err := locate(ctx, dir)
-	if err != nil {
-		return extract.UseCase{}, err
-	}
-
-	return wire(params).Extract, nil
 }
 
 // locate returns where the repository of dir, any of its worktrees or a folder in one, keeps its main worktree, its common dir and wtm's state.
