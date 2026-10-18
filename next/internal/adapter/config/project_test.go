@@ -84,6 +84,7 @@ func TestAnInvalidConfigIsRefusedSayingWhy(t *testing.T) {
 		{"a template that is not one of its target", "[[env.file]]\ntarget = \".env\"\ntemplate = \"other.example\"\n", "env file template must be a known template of its target: other.example is not a template of .env"},
 		{"a remembered answer no question asks", "[wizard.remembered]\ndelete = \"force\"\n", `unknown remembered answer "delete" in [wizard.remembered] (expected one of env_strategy, isolation, source_update)`},
 		{"a remembered value its question never offers", "[wizard.remembered]\nisolation = \"keep\"\n", `invalid remembered isolation "keep" in [wizard.remembered] (expected one of isolated, verbatim)`},
+		{"absoluteBasePath", "[worktrees]\nbase_path = \"/tmp/trees\"\n", "base_path must be relative to the repository: /tmp/trees"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

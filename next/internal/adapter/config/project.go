@@ -129,6 +129,7 @@ func withDefaults(config project.Config) project.Config {
 
 var (
 	errInvalidEnvStrategy = errors.New("invalid env strategy: must be example, main, or parent")
+	errAbsoluteBasePath   = errors.New("base_path must be relative to the repository")
 	errEnvFileNoTarget    = errors.New("env file entry must have a target")
 	errEnvFileDuplicate   = errors.New("duplicate env file target")
 	errEnvFileBadTemplate = errors.New("env file template must be a known template of its target")
@@ -137,6 +138,11 @@ var (
 func validateProject(config project.Config) error {
 	if !config.Env.Strategy.Valid() {
 		return errInvalidEnvStrategy
+	}
+
+	// An absolute path would be joined under the main checkout all the same (worktree.Repository.PathOf).
+	if filepath.IsAbs(config.Worktrees.BasePath) {
+		return fmt.Errorf("%w: %s", errAbsoluteBasePath, config.Worktrees.BasePath)
 	}
 
 	if err := validateEnvFiles(config.Env.Files); err != nil {
