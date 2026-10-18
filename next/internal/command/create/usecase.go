@@ -54,9 +54,9 @@ type Detail struct {
 // ----------------------------------------------------------------------------
 // Run
 
-// Run carries out the request under its operation: it takes the locks, plans under them, fingerprints the plan, stops on a dry run, refuses a stale plan and applies it between the operation's started and finished events. An error returned is a refusal before the apply; a failure during the apply is in the Outcome's Result.
+// Run carries out the request under its operation: it takes the locks (none on a dry run, which plans once), plans under them, fingerprints the plan, stops on a dry run, refuses a stale plan and applies it between the operation's started and finished events. An error returned is a refusal before the apply; a failure during the apply is in the Outcome's Result.
 func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (Outcome, error) {
-	// 1. Take the operation's locks before reading anything, so the facts cannot change under the plan.
+	// 1. Begin the operation, which takes the request's locks before anything is read, so the facts cannot change under the plan; a dry run takes none.
 	op, err := u.Operations.Begin(Name, req.Locks(), opts)
 	if err != nil {
 		return Outcome{Op: op.ID}, err
