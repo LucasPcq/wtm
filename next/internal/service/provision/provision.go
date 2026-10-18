@@ -44,18 +44,6 @@ type Project struct {
 	Global   project.Global
 }
 
-// ProjectOf is what Run needs of the project, as repo holds it.
-func ProjectOf(repo worktree.Repository) Project {
-	return Project{
-		MainPath: repo.MainPath,
-		EnvFiles: repo.Config.Env.Files,
-		OnCreate: repo.Config.OnCreate,
-		Run:      repo.Run,
-		RunErr:   repo.RunErr,
-		Global:   repo.Global,
-	}
-}
-
 // Worktree is the worktree Run adds: its branch, where it goes, what it checks
 // out, and the answers to the questions of a new worktree it is made with.
 type Worktree struct {
@@ -83,10 +71,17 @@ type Planned struct {
 	Answers   Answers
 }
 
-// ParamsOf is the Params that provision planned in repo, its events going to report: what it checks out, and the worktree of the branch it starts from.
+// ParamsOf is the Params that provision planned in repo, its events going to report: what Run needs of the project, what the worktree checks out, and the worktree of the branch it starts from.
 func ParamsOf(repo worktree.Repository, planned Planned, report domain.Report) Params {
 	return Params{
-		Project: ProjectOf(repo),
+		Project: Project{
+			MainPath: repo.MainPath,
+			EnvFiles: repo.Config.Env.Files,
+			OnCreate: repo.Config.OnCreate,
+			Run:      repo.Run,
+			RunErr:   repo.RunErr,
+			Global:   repo.Global,
+		},
 		Worktree: Worktree{
 			Branch:     planned.Branch,
 			Path:       planned.Path,

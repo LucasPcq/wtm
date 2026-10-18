@@ -323,7 +323,7 @@ func TestTheProjectProvisionedIsTheOneObserved(t *testing.T) {
 		Run:      project.Run{Isolation: project.Verbatim},
 		RunErr:   runErr,
 		Global:   project.Global{Proxy: project.Proxy{Port: 8080}},
-	}, provision.ProjectOf(repo))
+	}, provision.ParamsOf(repo, provision.Planned{}, nil).Project)
 }
 
 func TestParamsOfCheckOutFromTheRepository(t *testing.T) {
@@ -332,7 +332,6 @@ func TestParamsOfCheckOutFromTheRepository(t *testing.T) {
 
 	params := provision.ParamsOf(repo, provision.Planned{Branch: branchName, Path: "/trees/x", Placement: worktree.Placed{Start: worktree.StartCreate}, From: "main", Answers: answers}, nil)
 
-	assert.Equal(t, provision.ProjectOf(repo), params.Project)
 	assert.Equal(t, provision.Worktree{
 		Branch:     branchName,
 		Path:       "/trees/x",
