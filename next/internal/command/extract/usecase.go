@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
@@ -135,13 +136,16 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 
 // Apply carries out the plan, reporting each step: it fast-forwards the source asked, makes the target when it does not exist, moves or copies the changes into it, and remembers the answers asked once the changes reached a target it created. Once ctx is cancelled, what is not yet started is skipped.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
-	warnings := u.fastForward(ctx, plan, report)
+	advanced, warnings := u.fastForward(ctx, plan, report)
 	if ctx.Err() != nil {
 		return Result{Items: []Item{{Subject: plan.Target.Branch, Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted}}, Warnings: warnings}
 	}
 
 	report(domain.UnitStarted{Subject: plan.Target.Branch})
 	item := u.target(ctx, plan, report)
+	if item.Detail != nil && slices.Contains(advanced, item.Subject) {
+		item.Detail.Standing = item.Detail.Standing.FastForwarded()
+	}
 	if item.Status == domain.StatusDone {
 		item = u.move(ctx, plan, item, report)
 	}
@@ -242,14 +246,16 @@ func (u UseCase) locate(ctx context.Context, path string) (worktree.Location, er
 // ----------------------------------------------------------------------------
 // The steps of Apply
 
-// fastForward fast-forwards the source the plan names; one that cannot be is a warning, the target starting from the local branch.
-func (u UseCase) fastForward(ctx context.Context, plan Plan, report domain.Report) []domain.Warning {
+// fastForward fast-forwards the source the plan names and returns it once advanced; one that cannot be is a warning, the target starting from the local branch.
+func (u UseCase) fastForward(ctx context.Context, plan Plan, report domain.Report) ([]string, []domain.Warning) {
+	advanced := slices.Clone(plan.FastForward)
 	var warnings []domain.Warning
 	for _, missed := range u.Provision.FastForwardEach(ctx, provision.FastForwardEachParams{Subjects: plan.FastForward, Snapshot: plan.facts.Snapshot, Report: report}) {
+		advanced = slices.DeleteFunc(advanced, func(subject string) bool { return subject == missed.Subject })
 		warnings = append(warnings, notAdvanced(missed))
 	}
 
-	return warnings
+	return advanced, warnings
 }
 
 func notAdvanced(missed provision.Missed) domain.Warning {

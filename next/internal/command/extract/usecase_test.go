@@ -367,6 +367,17 @@ func TestASourceWithUncommittedChangesIsNotFastForwardedAndSaysSo(t *testing.T) 
 	assert.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
 }
 
+func TestATargetFastForwardedStandsAsOriginHasIt(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+	behindOrigin(t, w, existing)
+
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: existing, From: "main", Given: provision.Given{FastForward: new(true)}})
+
+	require.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
+	assert.Equal(t, worktree.Standing{ExistingBranch: true, OriginState: worktree.UpToDate}, result.Items[0].Detail.Standing)
+}
+
 func TestAFastForwardThatFailsIsAWarningAndTheTargetStillStarts(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.change(t, source, "a.txt", "a\n")

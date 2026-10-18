@@ -175,6 +175,16 @@ func TestTheSourceIsFastForwardedBeforeTheWorktreeStartsFromIt(t *testing.T) {
 	}, report.all()[:2])
 }
 
+func TestABranchFastForwardedStandsAsOriginHasIt(t *testing.T) {
+	w := newWorld(t, seed{})
+	behindOrigin(t, w, existing)
+
+	result, _ := w.apply(t, create.Request{Branches: []string{existing}, From: "main", Given: provision.Given{FastForward: new(true)}})
+
+	require.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
+	assert.Equal(t, worktree.Standing{ExistingBranch: true, OriginState: worktree.UpToDate}, result.Items[0].Detail.Standing)
+}
+
 func TestASourceWithUncommittedChangesIsLeftWhereItIsAndSaysSo(t *testing.T) {
 	w := newWorld(t, seed{Behind: true})
 

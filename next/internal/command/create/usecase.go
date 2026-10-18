@@ -114,11 +114,15 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 
 // Apply carries out the plan, reporting each step: it fast-forwards the sources asked, provisions each branch in turn, a failure stopping none of the others, and remembers the answers asked once a worktree is created. Once ctx is cancelled, the branches not yet started are skipped.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
-	warnings := u.fastForward(ctx, plan, report)
+	advanced, warnings := u.fastForward(ctx, plan, report)
 
 	items := make([]Item, 0, len(plan.Branches))
 	for _, planned := range plan.Branches {
-		items = append(items, u.item(ctx, plan, planned, report))
+		item := u.item(ctx, plan, planned, report)
+		if item.Detail != nil && slices.Contains(advanced, item.Subject) {
+			item.Detail.Standing = item.Detail.Standing.FastForwarded()
+		}
+		items = append(items, item)
 	}
 
 	remembered, failed := u.remember(ctx, plan, items)
@@ -173,14 +177,16 @@ func (u UseCase) locate(ctx context.Context, paths []string) (map[string]worktre
 // ----------------------------------------------------------------------------
 // The steps of Apply
 
-// fastForward fast-forwards each source the plan names; one that cannot be is a warning, its worktrees starting from the local branch.
-func (u UseCase) fastForward(ctx context.Context, plan Plan, report domain.Report) []domain.Warning {
+// fastForward fast-forwards each source the plan names and returns those it advanced; one that cannot be is a warning, its worktrees starting from the local branch.
+func (u UseCase) fastForward(ctx context.Context, plan Plan, report domain.Report) ([]string, []domain.Warning) {
+	advanced := slices.Clone(plan.FastForward)
 	var warnings []domain.Warning
 	for _, missed := range u.Provision.FastForwardEach(ctx, provision.FastForwardEachParams{Subjects: plan.FastForward, Snapshot: plan.facts.Snapshot, Report: report}) {
+		advanced = slices.DeleteFunc(advanced, func(subject string) bool { return subject == missed.Subject })
 		warnings = append(warnings, notAdvanced(missed))
 	}
 
-	return warnings
+	return advanced, warnings
 }
 
 func notAdvanced(missed provision.Missed) domain.Warning {
