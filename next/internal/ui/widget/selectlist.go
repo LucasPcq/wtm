@@ -1,4 +1,4 @@
-package form
+package widget
 
 import (
 	"strings"
@@ -29,7 +29,7 @@ type Option struct {
 	Separator bool   // a rule between rows, never selected
 }
 
-// A SelectList is a [Field] that picks one option, filtered by typing after /, with an optional "always use this answer" toggle on tab.
+// A SelectList is a [Widget] that picks one option, filtered by typing after /, with an optional "always use this answer" toggle on tab.
 type SelectList struct {
 	options   []Option
 	shown     []int
@@ -250,7 +250,7 @@ func (l *SelectList) row(o Option, selected bool, width int, st *Styles) string 
 	fill := max(width-rowPrefix-rowLead-lipgloss.Width(o.Label)-lipgloss.Width(o.Badge)-rowTagGap, 1)
 	if selected {
 		block := " " + o.Label + strings.Repeat(" ", fill) + o.Badge + strings.Repeat(" ", rowTagGap)
-		return st.accent.Render("▌›") + st.tinted.Render(block)
+		return st.Accent.Render("▌›") + st.tinted.Render(block)
 	}
 	return strings.Repeat(" ", rowPrefix+rowLead) + o.Label + strings.Repeat(" ", fill) + st.Muted.Render(o.Badge) + strings.Repeat(" ", rowTagGap)
 }

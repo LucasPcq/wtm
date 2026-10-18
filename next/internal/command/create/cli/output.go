@@ -4,15 +4,13 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
-
-const commandName = create.Name
 
 // planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome, each answer with its mark.
 func planRowsOf(plan create.Plan, marks output.Marks) []output.PlanRow {
@@ -30,6 +28,12 @@ func planRowsOf(plan create.Plan, marks output.Marks) []output.PlanRow {
 	}
 
 	return rows
+}
+
+// preview is what the recap and the dry run show of the plan previewed.
+func preview(previewed create.Outcome) form.Preview {
+	plan := previewed.Plan
+	return form.Preview{Rows: planRowsOf(plan, previewMarks(plan)), Warnings: previewed.Warnings, Recalled: plan.Recalled()}
 }
 
 // previewMarks are the marks of a plan not yet applied.
@@ -90,8 +94,8 @@ func anomaliesOf(item create.Item) []string {
 	return append(anomalies, output.PortAnomalies(item.Detail.EnvPorts)...)
 }
 
-// drawOutcome draws what the apply did: the tally, the plan with each worktree that exists and the anomalies, the branches left unfinished, and the next steps.
-func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextStep, cwd string) {
+// drawOutcome draws what the apply did: the tally, the plan with each worktree that exists and the anomalies, the branches left unfinished, and the next steps, among them the commands the failed branches suggest to repair what they left behind.
+func drawOutcome(w io.Writer, outcome create.Outcome, cwd string) {
 	items := outcome.Result.Items
 	headline(w, items)
 
@@ -109,7 +113,7 @@ func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextSte
 		path := output.ShownPath(output.Shown{Cwd: cwd, Path: item.Detail.Path})
 		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + itemNote(item, output.StylesOf(w))}})
 		anomalies = append(anomalies, anomaliesOf(item)...)
-		next = append(next, output.NextStep{Command: "wtm go " + item.Subject})
+		next = append(next, output.GoStep(item.Subject))
 	}
 
 	for _, item := range items {
@@ -142,7 +146,9 @@ func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextSte
 		output.UnfinishedLine(w, output.Unfinished{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err})
 	}
 
-	next = append(next, followUps...)
+	for _, item := range items {
+		next = append(next, output.FollowUpSteps(item.Err)...)
+	}
 	if len(next) > 0 {
 		output.Blank(w)
 		output.NextSteps(w, next)
@@ -156,10 +162,5 @@ func headline(w io.Writer, items []create.Item) {
 		tallied = append(tallied, output.Tallied{Status: item.Status, Reason: item.Reason})
 	}
 
-	output.Tally(w, output.TallyParams{Command: commandName, Items: tallied})
-}
-
-// planTextOf is the plan as the wizard's recap shows it, in width columns.
-func planTextOf(plan create.Plan, warnings []domain.Warning, width int, st *output.Styles) string {
-	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(plan, previewMarks(plan)), Warnings: output.Messages(warnings), Hint: output.RecalledHintOf(plan.Recalled()), Width: width, Styles: st}), "\n")
+	output.Tally(w, output.TallyParams{Command: create.Name, Items: tallied})
 }

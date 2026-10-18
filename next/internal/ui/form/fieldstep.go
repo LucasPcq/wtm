@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/ui/widget"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -123,7 +124,7 @@ func shortOf(options []domain.Option, value string) string {
 // selectStep asks one of a field's options in a select list, the pinned one first, with the "always use this answer" toggle when the answer can be remembered.
 type selectStep struct {
 	Asked
-	list *SelectList
+	list *widget.SelectList
 }
 
 // Open builds the list on the answer so far; a remembered answer starts the list on it, the toggle ticked.
@@ -132,24 +133,24 @@ func (s *selectStep) Open() tea.Cmd {
 	return nil
 }
 
-func (s *selectStep) build() *SelectList {
+func (s *selectStep) build() *widget.SelectList {
 	field, _ := s.sheet.Field(s.at).(domain.SelectField)
 	options := Options(field.Options)
-	if at := slices.IndexFunc(options, func(o Option) bool { return o.Value == field.Pinned }); field.Pinned != "" && at > 0 {
+	if at := slices.IndexFunc(options, func(o widget.Option) bool { return o.Value == field.Pinned }); field.Pinned != "" && at > 0 {
 		pinned := options[at]
-		options = append([]Option{pinned}, slices.Delete(options, at, at+1)...)
+		options = append([]widget.Option{pinned}, slices.Delete(options, at, at+1)...)
 	}
 
-	params := SelectParams{Options: options, Start: cmp.Or(field.Value, field.Pinned), Toggle: field.Rememberable, ToggleOn: field.Remember}
+	params := widget.SelectParams{Options: options, Start: cmp.Or(field.Value, field.Pinned), Toggle: field.Rememberable, ToggleOn: field.Remember}
 	if field.Remembered != "" {
 		params.Start, params.ToggleOn = field.Remembered, true
 	}
 
-	return NewSelectList(params)
+	return widget.NewSelectList(params)
 }
 
-// Field is the select list.
-func (s *selectStep) Field() Field {
+// Widget is the select list.
+func (s *selectStep) Widget() widget.Widget {
 	return s.list
 }
 
@@ -184,10 +185,10 @@ func (s *refreshedSelectStep) Refreshed() {
 }
 
 // Options are the rows of a select list that offer options, each read as its label, else its value.
-func Options(found []domain.Option) []Option {
-	options := make([]Option, 0, len(found))
+func Options(found []domain.Option) []widget.Option {
+	options := make([]widget.Option, 0, len(found))
 	for _, o := range found {
-		options = append(options, Option{Label: cmp.Or(o.Label, o.Value), Value: o.Value, Badge: o.Badge})
+		options = append(options, widget.Option{Label: cmp.Or(o.Label, o.Value), Value: o.Value, Badge: o.Badge})
 	}
 
 	return options
@@ -204,34 +205,34 @@ const (
 // confirmStep asks yes or no in a select list of the field's two options; one whose answer can be remembered sets them apart by a rule, above the "always use this answer" toggle.
 type confirmStep struct {
 	Asked
-	list *SelectList
+	list *widget.SelectList
 }
 
 // Open builds the list on the answer so far; a remembered answer starts the list on it, the toggle ticked.
 func (s *confirmStep) Open() tea.Cmd {
 	field, _ := s.sheet.Field(s.at).(domain.ConfirmField)
-	yes := Option{Label: cmp.Or(field.Yes.Label, yesLabel), Value: strconv.FormatBool(true)}
-	no := Option{Label: cmp.Or(field.No.Label, noLabel), Value: strconv.FormatBool(false)}
+	yes := widget.Option{Label: cmp.Or(field.Yes.Label, yesLabel), Value: strconv.FormatBool(true)}
+	no := widget.Option{Label: cmp.Or(field.No.Label, noLabel), Value: strconv.FormatBool(false)}
 
-	options := []Option{yes, no}
+	options := []widget.Option{yes, no}
 	if field.NoFirst {
-		options = []Option{no, yes}
+		options = []widget.Option{no, yes}
 	}
 	if field.Rememberable {
-		options = slices.Insert(options, 1, Option{Separator: true})
+		options = slices.Insert(options, 1, widget.Option{Separator: true})
 	}
 
-	params := SelectParams{Options: options, Start: strconv.FormatBool(field.Value), Toggle: field.Rememberable, ToggleOn: field.Remember}
+	params := widget.SelectParams{Options: options, Start: strconv.FormatBool(field.Value), Toggle: field.Rememberable, ToggleOn: field.Remember}
 	if field.Remembered != nil {
 		params.Start, params.ToggleOn = strconv.FormatBool(*field.Remembered), true
 	}
 
-	s.list = NewSelectList(params)
+	s.list = widget.NewSelectList(params)
 	return nil
 }
 
-// Field is the select list.
-func (s *confirmStep) Field() Field {
+// Widget is the select list.
+func (s *confirmStep) Widget() widget.Widget {
 	return s.list
 }
 
@@ -265,17 +266,17 @@ const newBadge = "new"
 // textListStep asks a list of entries, each checked against the repository as it is added, each badged with what the repository knows of it.
 type textListStep struct {
 	Asked
-	list *TextList
+	list *widget.TextList
 }
 
 // Open builds the list from the entries answered so far and starts the cursor blinking.
 func (s *textListStep) Open() tea.Cmd {
-	s.list = NewTextList(s.sheet.values(s.path()), s.check, s.badge)
+	s.list = widget.NewTextList(s.sheet.values(s.path()), s.check, s.badge)
 	return textinput.Blink
 }
 
 // check is the first problem of the list itself or of an entry from check.From on, as the step shows it.
-func (s *textListStep) check(check EntryCheck) error {
+func (s *textListStep) check(check widget.EntryCheck) error {
 	path := s.path()
 	problems, err := s.sheet.problems(domain.Answered{Path: path, Values: check.Entries})
 	if err != nil {
@@ -308,8 +309,8 @@ func (s *textListStep) badge(entry string) string {
 	return field.Options[at].Badge
 }
 
-// Field is the text list.
-func (s *textListStep) Field() Field {
+// Widget is the text list.
+func (s *textListStep) Widget() widget.Widget {
 	return s.list
 }
 
@@ -326,7 +327,7 @@ func (s *textListStep) Answer() string {
 type TextStep struct {
 	Asked
 	Check func(value string) error
-	text  *Text
+	text  *widget.Text
 }
 
 // Open builds the text field on the answer so far and starts the cursor blinking.
@@ -336,7 +337,7 @@ func (s *TextStep) Open() tea.Cmd {
 		check = s.Check
 	}
 
-	s.text = NewText(strings.Join(s.sheet.values(s.path()), ""), check)
+	s.text = widget.NewText(strings.Join(s.sheet.values(s.path()), ""), check)
 	return textinput.Blink
 }
 
@@ -354,8 +355,8 @@ func (s *TextStep) check(value string) error {
 	return nil
 }
 
-// Field is the text field.
-func (s *TextStep) Field() Field {
+// Widget is the text field.
+func (s *TextStep) Widget() widget.Widget {
 	return s.text
 }
 
@@ -371,29 +372,29 @@ func (s *TextStep) Answer() string {
 // MultiSelectStep asks any of a field's options, those answered so far picked, each tag in the Tone a command's own step gives it (muted otherwise); none picked is refused with the field's Empty problem.
 type MultiSelectStep struct {
 	Asked
-	Tone  func(option domain.Option) Tone
-	picks *MultiSelect
+	Tone  func(option domain.Option) widget.Tone
+	picks *widget.MultiSelect
 }
 
 // Open builds the multi-select.
 func (s *MultiSelectStep) Open() tea.Cmd {
 	field, _ := s.sheet.Field(s.at).(domain.MultiSelectField)
 	picked := s.sheet.values(field.Path)
-	options := make([]Pick, 0, len(field.Options))
+	options := make([]widget.Pick, 0, len(field.Options))
 	for _, o := range field.Options {
-		pick := Pick{Label: cmp.Or(o.Label, o.Value), Value: o.Value, Tag: o.Badge, Picked: slices.Contains(picked, o.Value)}
+		pick := widget.Pick{Label: cmp.Or(o.Label, o.Value), Value: o.Value, Tag: o.Badge, Picked: slices.Contains(picked, o.Value)}
 		if s.Tone != nil {
 			pick.Tone = s.Tone(o)
 		}
 		options = append(options, pick)
 	}
 
-	s.picks = NewMultiSelect(MultiSelectParams{Options: options, Empty: field.Empty})
+	s.picks = widget.NewMultiSelect(widget.MultiSelectParams{Options: options, Empty: field.Empty})
 	return nil
 }
 
-// Field is the multi-select.
-func (s *MultiSelectStep) Field() Field {
+// Widget is the multi-select.
+func (s *MultiSelectStep) Widget() widget.Widget {
 	return s.picks
 }
 

@@ -85,6 +85,11 @@ type NextStep struct {
 	Note    string
 }
 
+// GoStep is the next step that enters the worktree of branch.
+func GoStep(branch string) NextStep {
+	return NextStep{Command: "wtm go " + branch}
+}
+
 // NextSteps writes steps to w, one per line, their notes aligned in one column.
 func NextSteps(w io.Writer, steps []NextStep) {
 	st := StylesOf(w)

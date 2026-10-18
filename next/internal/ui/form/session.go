@@ -65,7 +65,7 @@ func (s *Session[R, Q, O]) Params() Params {
 		Steps:   s.steps,
 		Observe: s.observe,
 		Preview: s.previewPlan,
-		Plan:    func(width int, st *output.Styles) string { return s.command.Plan(*s.preview, width, st) },
+		Plan:    func(width int, st *output.Styles) string { return s.command.Preview(*s.preview).text(width, st) },
 		Label:   s.Label,
 		Apply:   s.apply,
 		Stale:   domain.PlanStale,

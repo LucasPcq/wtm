@@ -1,6 +1,7 @@
-package form
+package widget
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,4 +43,13 @@ func TestTextKeepsTheKeysTypedWhileItChecks(t *testing.T) {
 
 	assert.Equal(t, Stay, textSettled(x, cmd))
 	assert.Empty(t, x.Value())
+}
+
+func TestAWidgetShowsItsErrorAsWritten(t *testing.T) {
+	x := NewText("bad", func(string) error { return errors.New("feat/other already has a worktree") })
+
+	_, cmd := x.Update(keyOf("enter"))
+	textSettled(x, cmd)
+
+	assert.Contains(t, plain(x.View(Size{Width: 60}, plainStyles())), "✗ feat/other already has a worktree")
 }

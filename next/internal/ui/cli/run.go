@@ -74,7 +74,7 @@ func Replan(failure *domain.Error, argv []string) []domain.FollowUp {
 		return nil
 	}
 
-	return []domain.FollowUp{{Argv: append(slices.Clone(argv), "--dry-run"), Code: domain.CodeReplan, Message: output.ReplanNote}}
+	return []domain.FollowUp{{Argv: append(slices.Clone(argv), "--"+FlagDryRun), Code: domain.CodeReplan, Message: output.ReplanNote}}
 }
 
 func (r *Run) fail(failure *domain.Error, followUps []domain.FollowUp, next []output.NextStep) error {

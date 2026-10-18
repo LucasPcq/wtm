@@ -7,6 +7,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,7 +28,7 @@ func TestATargetLeftIncompleteStandsAndSaysWhy(t *testing.T) {
 		Detail:  &extract.Detail{Path: "/repo.trees/feat-bad"},
 	})
 
-	golden(t, "failed", drawn(outcome))
+	formtest.Golden(t, "failed", drawn(outcome))
 }
 
 func TestAnUnfinishedTargetSaysTheFilesStayed(t *testing.T) {
@@ -58,7 +59,7 @@ func TestATargetWhoseMoveFailedStillStands(t *testing.T) {
 func TestATargetThatNeverStoodHasNoRowNorGo(t *testing.T) {
 	outcome := unfinished(extract.Item{Subject: "feat/slow", Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted})
 
-	golden(t, "interrupted", drawn(outcome))
+	formtest.Golden(t, "interrupted", drawn(outcome))
 }
 
 // unfinished is the outcome of moving README.md to a new target, ended as item.

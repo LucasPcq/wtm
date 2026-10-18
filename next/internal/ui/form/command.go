@@ -1,3 +1,4 @@
+// Package form is a command's form, generic over its schema: [Command] (its flags, its request, its launch, the conclusion of its run, its command line), the session and a step per field kind, and the wizard that walks them to a recap and applies; the inputs a step asks with are ui/widget's.
 package form
 
 import (
@@ -27,9 +28,12 @@ type Questions interface {
 	Form() domain.Form
 }
 
-// An Outcome is how a command's run ended; PlanFingerprint is the fingerprint of the plan it previewed or applied.
+// An Outcome is how a command's run ended, as [domain.Outcome] reports it: the fingerprint of the plan it previewed or applied, whether it applied it, the failure the apply ended on, and the envelope of the run.
 type Outcome interface {
 	PlanFingerprint() string
+	Applied() bool
+	Failure() *domain.Error
+	Envelope(command string, err *domain.Error) domain.Envelope
 }
 
 // A UseCase is what the form calls of a command's use case: the questions of a request, and its run.
@@ -38,13 +42,14 @@ type UseCase[R, Q, O any] interface {
 	Run(ctx context.Context, req R, opts domain.RunOptions) (O, error)
 }
 
-// A Command is what a command's cli hands the form: the use case it opens, how its recap draws, and the steps it asks its own way.
+// A Command is what a command's cli hands the form: the use case it opens, what its recap and its dry run show of a plan, how it draws an apply, and the steps it asks its own way.
 // Its flags, its request, its form and its command line are all spelled from its form's schema, the form of zero questions.
 type Command[R Request[R], Q Questions, O Outcome] struct {
 	YesUsage   string // the usage of --yes, which says what an unattended run requires
 	Open       func(ctx context.Context, dir string) (UseCase[R, Q, O], error)
-	Plan       func(previewed O, width int, st *output.Styles) string // the plan the recap draws
-	ApplyLabel func(previewed O) string                               // the recap's option that applies, nil for "Yes, apply"
+	Preview    func(previewed O) Preview                // what the recap and the dry run show of the plan previewed
+	Draw       func(w io.Writer, applied O, cwd string) // the outcome of an apply, cwd the directory its paths are shown from
+	ApplyLabel func(previewed O) string                 // the recap's option that applies, nil for "Yes, apply"
 	// Special returns the step a command asks its own way for the field at, nil for the step of the field's kind.
 	Special func(s *Session[R, Q, O], at int, field domain.Field) Step
 
@@ -52,6 +57,25 @@ type Command[R Request[R], Q Questions, O Outcome] struct {
 	yes    bool
 	dryRun bool
 	expect string
+}
+
+// A Preview is what the recap and the dry run show of a plan not yet applied: its rows, each answer with its mark, its warnings and the fields answered from memory, which the recap's hint names.
+type Preview struct {
+	Rows     []output.PlanRow
+	Warnings []domain.Warning
+	Recalled []string
+}
+
+// text is the preview as the recap draws it, in width columns.
+func (p Preview) text(width int, st *output.Styles) string {
+	return strings.Join(output.PlanLines(output.PlanParams{Rows: p.Rows, Warnings: output.Messages(p.Warnings), Hint: output.RecalledHintOf(p.Recalled), Width: width, Styles: st}), "\n")
+}
+
+// Opener is open, a command's opener of its own use case, as a [Command]'s Open.
+func Opener[R Request[R], Q Questions, O Outcome, U UseCase[R, Q, O]](open func(ctx context.Context, dir string) (U, error)) func(ctx context.Context, dir string) (UseCase[R, Q, O], error) {
+	return func(ctx context.Context, dir string) (UseCase[R, Q, O], error) {
+		return open(ctx, dir)
+	}
 }
 
 // Ran is how a run went and the request it ran, which the wizard's answers may have changed.
@@ -103,8 +127,8 @@ func (c *Command[R, Q, O]) Bind(cmd *cobra.Command, run *uicli.Run) {
 	flags.Bool(domain.PathAsk, false, uicli.AskUsage)
 	flags.BoolVarP(&c.yes, "yes", "y", false, c.YesUsage)
 	flags.StringVar(&run.Output, "output", uicli.OutputText, uicli.OutputUsage)
-	flags.BoolVarP(&c.dryRun, "dry-run", "n", false, uicli.DryRunUsage)
-	flags.StringVar(&c.expect, "expect-fingerprint", "", uicli.ExpectUsage)
+	flags.BoolVarP(&c.dryRun, uicli.FlagDryRun, "n", false, uicli.DryRunUsage)
+	flags.StringVar(&c.expect, uicli.FlagExpectFingerprint, "", uicli.ExpectUsage)
 }
 
 // bound are the fields a flag sets, the first of each path, in the order of the form.
@@ -257,6 +281,40 @@ func (c *Command[R, Q, O]) Ask(ctx context.Context, params AskParams[R, Q, O]) (
 	err := Run(ctx, s.Params(), params.In, params.Out)
 
 	return Ran[R, O]{Outcome: s.outcome, Request: s.req}, err
+}
+
+// ----------------------------------------------------------------------------
+// The conclusion
+
+// Conclude prints how the run ended — the JSON envelope, a refusal, the dry run and the line that applies it, or the outcome Draw draws — and returns the failure that sets the exit code.
+func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error) error {
+	failure := domain.AsError(domain.AsErrorParams{Err: err})
+	argv := c.Argv(cmd.CommandPath(), ran.Request)
+	if !c.io.Human() {
+		doc := ran.Outcome.Envelope(c.io.Command, failure)
+		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, argv)...)
+		return c.io.Envelope(doc)
+	}
+
+	stdout, _ := c.io.Writers()
+	switch {
+	case failure != nil:
+		return c.io.Refuse(failure, argv)
+	case !ran.Outcome.Applied():
+		previewed, fingerprint := c.Preview(ran.Outcome), ran.Outcome.PlanFingerprint()
+		output.Frame(stdout, func(w io.Writer) {
+			output.DryRun(w, output.DryRunParams{Command: c.io.Command, Rows: previewed.Rows, Warnings: previewed.Warnings, Fingerprint: fingerprint, Apply: applyLine(argv, fingerprint)})
+		})
+		return nil
+	}
+
+	output.Frame(stdout, func(w io.Writer) { c.Draw(w, ran.Outcome, c.io.Env.Cwd) })
+	return c.io.Failed(ran.Outcome.Failure())
+}
+
+// applyLine is argv, the command line of the request, held to the fingerprint of the plan it previewed.
+func applyLine(argv []string, fingerprint string) string {
+	return output.Line(append(slices.Clone(argv), "--"+uicli.FlagExpectFingerprint, fingerprint))
 }
 
 // ----------------------------------------------------------------------------

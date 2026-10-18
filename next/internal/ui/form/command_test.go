@@ -1,7 +1,9 @@
-package form
+package form_test
 
 import (
 	"cmp"
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
@@ -34,13 +37,13 @@ func TestARunAsksOnlyWhenTheUserCanSeeTheQuestionsAndAnswerThem(t *testing.T) {
 		streams.Err.SetTerminal(c.Err)
 		streams.SetDumbTerminal(c.Dumb)
 		command := fakeCommand()
-		command.io, command.yes, command.expect = &uicli.Run{Streams: streams, Output: cmp.Or(c.Output, uicli.OutputText)}, c.Yes, c.Expect
+		command.SetRun(&uicli.Run{Streams: streams, Output: cmp.Or(c.Output, uicli.OutputText)}, c.Yes, c.Expect)
 
-		assert.Equal(t, c.Asks, command.interactive(), name)
+		assert.Equal(t, c.Asks, command.Interactive(), name)
 	}
 }
 
-func bound(t *testing.T, args ...string) (*Command[request, questions, outcome], *cobra.Command) {
+func bound(t *testing.T, args ...string) (*form.Command[request, questions, outcome], *cobra.Command) {
 	t.Helper()
 	command, cmd := fakeCommand(), &cobra.Command{Use: "fake"}
 	command.Bind(cmd, &uicli.Run{})
@@ -65,7 +68,7 @@ func TestEachFieldIsAFlagOfItsKindAndTheSharedFlagsFollow(t *testing.T) {
 func TestTheFlagsGivenAndTheArgumentsAnswerTheRequest(t *testing.T) {
 	command, cmd := bound(t, "--from", "main", "--ff=false", "--files", "a.txt,b.txt", "--remember", "mode", "--ask")
 
-	req := command.request(cmd, []string{"feat/a", " feat/b "})
+	req := command.RequestOf(cmd, []string{"feat/a", " feat/b "})
 
 	assert.Equal(t, request{"branches": {"feat/a", "feat/b"}, "from": {"main"}, "ff": {"false"}, "files": {"a.txt", "b.txt"}, domain.PathRemember: {"mode"}, domain.PathAsk: {"true"}}, req)
 }
@@ -73,7 +76,7 @@ func TestTheFlagsGivenAndTheArgumentsAnswerTheRequest(t *testing.T) {
 func TestNoFlagGivenIsAnEmptyRequest(t *testing.T) {
 	command, cmd := bound(t)
 
-	assert.Empty(t, command.request(cmd, nil))
+	assert.Empty(t, command.RequestOf(cmd, nil))
 }
 
 func TestTheCommandLineSpellsThePositionalWordsThenTheFlagsSortedThenAsk(t *testing.T) {
@@ -91,5 +94,57 @@ func TestAListEntryWithACommaReadsBackAsOneEntry(t *testing.T) {
 
 	command, cmd := bound(t, argv[2:]...)
 
-	assert.Equal(t, req, command.request(cmd, nil))
+	assert.Equal(t, req, command.RequestOf(cmd, nil))
+}
+
+// concluded is how the fake command concludes ran and err, with the given --output, its stdout and the failure it returns.
+func concluded(t *testing.T, format string, ran form.Ran[request, outcome], err error) (string, error) {
+	t.Helper()
+	streams, _, stdout, _ := output.Test()
+	command, cmd := fakeCommand(), &cobra.Command{Use: "fake"}
+	command.Draw = func(w io.Writer, applied outcome, cwd string) {
+		_, _ = io.WriteString(w, "drew "+strings.Join(applied.Plan["branches"], ", ")+" from "+cwd+"\n")
+	}
+	run := &uicli.Run{Command: "fake", Streams: streams, Env: uicli.Env{Cwd: "/repo"}}
+	command.Bind(cmd, run)
+	run.Output = format
+
+	failure := command.Conclude(cmd, ran, err)
+	return stdout.String(), failure
+}
+
+func TestADryRunEndsOnTheLineThatAppliesExactlyItsPlan(t *testing.T) {
+	req := request{"branches": {"feat/a"}}
+
+	got, failure := concluded(t, uicli.OutputText, form.Ran[request, outcome]{Request: req, Outcome: outcome{Plan: req, Fingerprint: "print"}}, nil)
+
+	require.NoError(t, failure)
+	assert.Contains(t, got, "fake · dry run, nothing applied")
+	assert.Contains(t, got, "plan of  feat/a")
+	assert.Contains(t, got, "→ fake feat/a --expect-fingerprint print")
+}
+
+func TestAnApplyIsDrawnByTheCommandAndEndsOnItsFailure(t *testing.T) {
+	req := request{"branches": {"feat/a"}}
+	failed := &domain.Error{Kind: domain.KindInternal, Code: "fake.failed", Message: "failed"}
+	applied := outcome{Plan: req, Result: &domain.Result[struct{}]{Items: []domain.Unit[struct{}]{{Subject: "feat/a", Status: domain.StatusFailed, Err: failed}}}}
+
+	got, failure := concluded(t, uicli.OutputText, form.Ran[request, outcome]{Request: req, Outcome: applied}, nil)
+
+	assert.Contains(t, got, "drew feat/a from /repo")
+	var refused *uicli.Failed
+	require.ErrorAs(t, failure, &refused)
+	assert.Equal(t, failed, refused.Err)
+}
+
+func TestAStalePlanInJSONFollowsUpWithItsReplan(t *testing.T) {
+	stale := &domain.Error{Kind: domain.KindConflict, Code: domain.CodePlanStale, Message: "stale"}
+
+	got, _ := concluded(t, uicli.OutputJSON, form.Ran[request, outcome]{Request: request{"branches": {"feat/a"}}}, stale)
+
+	assert.Contains(t, got, `"argv": [
+        "fake",
+        "feat/a",
+        "--dry-run"
+      ]`)
 }

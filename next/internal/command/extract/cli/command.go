@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -58,7 +57,7 @@ type extractCommand struct {
 func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (extract.UseCase, error)) *cobra.Command {
 	// exits are the exit codes of extract's own codes, ahead of those of their kind.
 	exits := map[string]int{extract.CodeConfigNotFound: uicli.ExitConfigNotFound, extract.CodeConflict: exitConflict}
-	c := &extractCommand{io: uicli.Run{Command: commandName, Streams: streams, Env: env, Flags: extractFlags, Exits: exits}, form: newForm(open)}
+	c := &extractCommand{io: uicli.Run{Command: extract.Name, Streams: streams, Env: env, Flags: extractFlags, Exits: exits}, form: newForm(open)}
 	cmd := &cobra.Command{Use: extract.Name + " [source]", Short: extractShort, Long: extractLong, Example: extractExample, Args: cobra.MaximumNArgs(1), RunE: c.run}
 	c.form.Bind(cmd, &c.io)
 
@@ -69,32 +68,14 @@ func (c *extractCommand) run(cmd *cobra.Command, args []string) error {
 	return c.form.Launch(cmd, args, c.conclude)
 }
 
-// conclude prints how the run ended — the JSON envelope, a refusal, nothing to extract, the dry run and the line that applies it, or the outcome — and returns the failure that sets the exit code.
+// conclude prints that there was nothing to extract, else concludes the run as every command does.
 func (c *extractCommand) conclude(cmd *cobra.Command, ran form.Ran[extract.Request, extract.Outcome], err error) error {
-	failure := domain.AsError(domain.AsErrorParams{Err: err})
-	argv := c.form.Argv(cmd.CommandPath(), ran.Request)
 	outcome := ran.Outcome
-	if !c.io.Human() {
-		doc := ran.Outcome.Envelope(commandName, failure)
-		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, argv)...)
-		return c.io.Envelope(doc)
-	}
-
-	stdout, _ := c.io.Writers()
-	switch {
-	case failure != nil:
-		return c.io.Refuse(failure, argv)
-	case outcome.Result == nil && outcome.Plan.Nothing():
+	if err == nil && c.io.Human() && !outcome.Applied() && outcome.Plan.Nothing() {
+		stdout, _ := c.io.Writers()
 		output.Frame(stdout, func(w io.Writer) { drawNothing(w, outcome.Plan) })
 		return nil
-	case outcome.Result == nil:
-		apply := output.Line(argv) + " --expect-fingerprint " + outcome.Fingerprint
-		output.Frame(stdout, func(w io.Writer) {
-			output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(outcome.Plan, previewMarks(outcome.Plan)), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: apply})
-		})
-		return nil
 	}
 
-	output.Frame(stdout, func(w io.Writer) { drawOutcome(w, outcome, c.io.Env.Cwd) })
-	return c.io.Failed(outcome.Failure())
+	return c.form.Conclude(cmd, ran, err)
 }

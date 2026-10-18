@@ -4,6 +4,7 @@ import (
 	"cmp"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/ui/widget"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -19,9 +20,9 @@ type Step interface {
 	Description() string // what the answer decides, shown under the breadcrumb
 	// Standing returns where the step's answer stands on the facts observed last.
 	Standing() Standing
-	// Open builds the step's field from the facts observed last, before the step is asked, and returns its first command.
+	// Open builds the step's widget from the facts observed last, before the step is asked, and returns its first command.
 	Open() tea.Cmd
-	Field() Field // the field Open built
+	Widget() widget.Widget // the widget Open built
 	// Answer records the field's answer into the command's request and returns it as the trail shows it.
 	Answer() string
 	// Reset forgets the step's answer when the user goes back before it.

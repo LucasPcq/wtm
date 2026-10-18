@@ -8,6 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
+	"github.com/LucasPcq/wtm/next/internal/ui/widget"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -15,17 +16,25 @@ import (
 // createTarget is the value the target list gives its option with no value, a worktree to create.
 const createTarget = "\x00new-worktree"
 
-// special returns the steps extract asks its own way: the file picker, and the target, picked as a worktree then, for one to create, typed as its branch; both answer to.
+// special returns the steps extract asks its own way, picked by their field's path: the file picker, and the target, picked as a worktree then, for one to create, typed as its branch; both answer to.
 func special(s *session, at int, field domain.Field) form.Step {
-	switch field := field.(type) {
-	case domain.MultiSelectField:
+	switch field.Spec().Path {
+	case extract.PathFiles:
 		files := &filesStep{MultiSelectStep: s.MultiSelectStep(at), s: s}
 		files.Tone = files.tone
 		return files
+	case extract.PathTo:
+		return toStep(s, at, field)
+	}
+
+	return nil
+}
+
+// toStep is the step of a field of the target: the target's list, then the branch of one to create.
+func toStep(s *session, at int, field domain.Field) form.Step {
+	switch field.(type) {
 	case domain.SelectField:
-		if field.Path == extract.PathTo {
-			return &targetStep{Asked: s.Asked(at), s: s, at: at}
-		}
+		return &targetStep{Asked: s.Asked(at), s: s, at: at}
 	case domain.TextField:
 		for before := range at {
 			if target, isTarget := s.Step(before).(*targetStep); isTarget {
@@ -34,7 +43,7 @@ func special(s *session, at int, field domain.Field) form.Step {
 				return branch
 			}
 		}
-	case domain.ConfirmField, domain.TextListField:
+	case domain.ConfirmField, domain.MultiSelectField, domain.TextListField:
 	}
 
 	return nil
@@ -70,23 +79,23 @@ func (f *filesStep) Standing() form.Standing {
 }
 
 // tone is the colour of a change's tag: an addition, a loss, a risk, or a rename that changes no content.
-func (f *filesStep) tone(option domain.Option) form.Tone {
+func (f *filesStep) tone(option domain.Option) widget.Tone {
 	at := slices.IndexFunc(f.s.Questions().Files.Options, func(c worktree.Change) bool { return c.Path == option.Value })
 	if at < 0 {
-		return form.ToneMuted
+		return widget.ToneMuted
 	}
 
 	switch f.s.Questions().Files.Options[at].Status {
 	case worktree.ChangeUntracked:
-		return form.ToneSuccess
+		return widget.ToneSuccess
 	case worktree.ChangeDeleted:
-		return form.ToneDanger
+		return widget.ToneDanger
 	case worktree.ChangeModified:
-		return form.ToneWarning
+		return widget.ToneWarning
 	case worktree.ChangeRenamed:
 	}
 
-	return form.ToneMuted
+	return widget.ToneMuted
 }
 
 // Answer records the changes picked as the request's files, the trail counting them.
@@ -103,7 +112,7 @@ type targetStep struct {
 	form.Asked
 	s         *session
 	at        int
-	list      *form.SelectList
+	list      *widget.SelectList
 	newTarget bool // the user picked a worktree to create
 }
 
@@ -135,7 +144,7 @@ func (t *targetStep) Open() tea.Cmd {
 	options := form.Options(field.Options)
 	if at := slices.IndexFunc(field.Options, func(o domain.Option) bool { return o.Value == "" }); at >= 0 {
 		options[at].Value = createTarget
-		options = slices.Insert(options, at+1, form.Option{Separator: true})
+		options = slices.Insert(options, at+1, widget.Option{Separator: true})
 	}
 
 	start := t.s.Request().To
@@ -143,12 +152,12 @@ func (t *targetStep) Open() tea.Cmd {
 		start = createTarget
 	}
 
-	t.list = form.NewSelectList(form.SelectParams{Options: options, Start: start})
+	t.list = widget.NewSelectList(widget.SelectParams{Options: options, Start: start})
 	return nil
 }
 
-// Field is the select list.
-func (t *targetStep) Field() form.Field {
+// Widget is the select list.
+func (t *targetStep) Widget() widget.Widget {
 	return t.list
 }
 

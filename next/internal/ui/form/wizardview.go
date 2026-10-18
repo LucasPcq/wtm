@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
+	"github.com/LucasPcq/wtm/next/internal/ui/widget"
 )
 
 // View draws the wizard: the breadcrumb, the trail of the steps settled, the step asked or the recap, and the help line, the field taking the rows left; only the spinner before the first read lands, and nothing once the wizard has ended.
@@ -17,12 +18,12 @@ func (w *Wizard) View() string {
 	}
 
 	head, tail := w.head(), w.tail()
-	body := Size{Width: w.size.Width}
+	body := widget.Size{Width: w.size.Width}
 	if w.size.Height > 0 {
 		body.Height = max(minListRows, w.size.Height-strings.Count(head+tail, "\n"))
 	}
 
-	return head + w.field().View(body, w.styles) + tail
+	return head + w.widget().View(body, w.styles.Styles) + tail
 }
 
 func (w *Wizard) status() string {
@@ -48,7 +49,7 @@ func (w *Wizard) head() string {
 		return b.String() + w.review() + "\n\n"
 	}
 
-	b.WriteString(w.styles.Muted.Render(Indented(Wrap(w.script.Steps[w.current].Description(), w.size.Width-len(output.Indent)-1))) + "\n\n")
+	b.WriteString(w.styles.Muted.Render(Indented(widget.Wrap(w.script.Steps[w.current].Description(), w.size.Width-len(output.Indent)-1))) + "\n\n")
 	return b.String()
 }
 
@@ -60,7 +61,7 @@ func (w *Wizard) breadcrumb() string {
 	}
 
 	muted := w.styles.Muted
-	return muted.Render(fmt.Sprintf("%sStep %d/%d", output.Indent, w.current+1, w.last())) + muted.Render(HelpSeparator) + w.styles.accent.Render(title)
+	return muted.Render(fmt.Sprintf("%sStep %d/%d", output.Indent, w.current+1, w.last())) + muted.Render(HelpSeparator) + w.styles.Accent.Render(title)
 }
 
 // summaries draws the trail: a line per step before the one asked, its answer and where it comes from, or why it does not apply.
@@ -85,7 +86,7 @@ func (w *Wizard) tail() string {
 
 // helpLine draws the keys the step asked answers to, or the field's own line while it is in a mode of its own.
 func (w *Wizard) helpLine() string {
-	h := w.field().Help()
+	h := w.widget().Help()
 	if h.Modal != "" {
 		return h.Modal
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
+	"github.com/LucasPcq/wtm/next/internal/ui/widget"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -60,15 +61,15 @@ type Wizard struct {
 	marks    []mark // per step, the recap included, how it was settled
 	current  int    // the step asked, or len(script.Steps) at the recap
 	loaded   bool   // the first read has landed
-	recap    *SelectList
+	recap    *widget.SelectList
 	planned  bool          // the preview has landed with a plan
 	failure  *domain.Error // the preview's failure, shown at the recap in place of the plan
 	loading  string        // the text beside the spinner, "" when nothing loads
 	reading  bool          // a read is in flight: keys wait in queued
 	queued   []tea.KeyMsg
 	spinner  spinner.Model
-	styles   *Styles
-	size     Size
+	styles   *styles
+	size     widget.Size
 	ending   Ending
 	err      error // the failed read that ended the wizard
 }
@@ -85,7 +86,7 @@ func New(ctx context.Context, params Params) *Wizard {
 	s.Spinner = spinner.MiniDot
 
 	count := len(params.Script.Steps) + 1
-	w := &Wizard{ctx: ctx, script: params.Script, dryRun: params.DryRun, answered: make([]bool, count), marks: make([]mark, count), spinner: s, size: Size{Width: defaultWidth}}
+	w := &Wizard{ctx: ctx, script: params.Script, dryRun: params.DryRun, answered: make([]bool, count), marks: make([]mark, count), spinner: s, size: widget.Size{Width: defaultWidth}}
 	w.style(output.StylesOf(io.Discard))
 	return w
 }
@@ -99,7 +100,7 @@ func (w *Wizard) style(base *output.Styles) {
 func (w *Wizard) Again() *Wizard {
 	next := New(w.ctx, Params{Script: w.script, DryRun: w.dryRun})
 	next.stale = true
-	next.style(w.styles.Styles)
+	next.style(w.styles.Styles.Styles)
 
 	for s, m := range w.marks {
 		next.answered[s] = m.asked
@@ -137,7 +138,7 @@ func (w *Wizard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		return w, w.key(m)
 	case tea.WindowSizeMsg:
-		w.size = Size{Width: m.Width, Height: m.Height}
+		w.size = widget.Size{Width: m.Width, Height: m.Height}
 		return w, nil
 	case spinner.TickMsg:
 		if w.loading == "" {
@@ -153,7 +154,7 @@ func (w *Wizard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return w, nil
 	}
 
-	if field := w.field(); field != nil {
+	if field := w.widget(); field != nil {
 		return w, w.settle(field.Update(msg))
 	}
 	return w, nil
@@ -171,7 +172,7 @@ func (w *Wizard) key(m tea.KeyMsg) tea.Cmd {
 		return nil
 	}
 
-	field := w.field()
+	field := w.widget()
 	if field == nil || w.loading != "" {
 		return nil
 	}
@@ -184,13 +185,13 @@ func (w *Wizard) key(m tea.KeyMsg) tea.Cmd {
 }
 
 // settle moves the wizard on a field's verdict, and returns the field's own cmd while the field stays.
-func (w *Wizard) settle(verdict Verdict, cmd tea.Cmd) tea.Cmd {
+func (w *Wizard) settle(verdict widget.Verdict, cmd tea.Cmd) tea.Cmd {
 	switch verdict {
-	case Done:
+	case widget.Done:
 		return w.answer()
-	case Back:
+	case widget.Back:
 		return w.back()
-	case Stay:
+	case widget.Stay:
 	}
 	return cmd
 }
@@ -336,15 +337,15 @@ func (w *Wizard) open(s int) tea.Cmd {
 	return w.script.Steps[s].Open()
 }
 
-// field returns the field keys go to, nil before the first read lands and once the wizard has ended.
-func (w *Wizard) field() Field {
+// widget returns the widget keys go to, nil before the first read lands and once the wizard has ended.
+func (w *Wizard) widget() widget.Widget {
 	switch {
 	case !w.loaded || w.ending != Asking:
 		return nil
 	case w.atRecap():
 		return w.recap
 	}
-	return w.script.Steps[w.current].Field()
+	return w.script.Steps[w.current].Widget()
 }
 
 // answer records the answer of the step asked in the trail and reads the repository again before the next step; at the recap it ends the wizard.

@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,7 +18,7 @@ import (
 
 func TestTwoBranchesCreatedAreCountedRowedAndPointedAt(t *testing.T) {
 
-	golden(t, "outcome_two_done", rendered(func(w *bytes.Buffer) { drawOutcome(w, twoCreated(trees), nil, cwd) }))
+	formtest.Golden(t, "outcome_two_done", rendered(func(w *bytes.Buffer) { drawOutcome(w, twoCreated(trees), cwd) }))
 }
 
 func TestAnAppliedRunMarksOnlyTheAnswersItRemembered(t *testing.T) {
@@ -25,9 +26,9 @@ func TestAnAppliedRunMarksOnlyTheAnswersItRemembered(t *testing.T) {
 	outcome.Plan.Isolation = "isolated"
 	outcome.Plan.Remember = []string{"isolation", "fast_forward"}
 
-	nothingWritten := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, nil, cwd) })
+	nothingWritten := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, cwd) })
 	outcome.Result.Remembered = outcome.Plan.Remember
-	written := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, nil, cwd) })
+	written := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, cwd) })
 
 	assert.Contains(t, nothingWritten, "Isolation  isolated\n")
 	assert.NotContains(t, nothingWritten, "Fast-forward")
@@ -42,16 +43,19 @@ func TestADivergedBranchIsWarnedOnce(t *testing.T) {
 	outcome.Result.Items[0].Detail.Standing = worktree.Standing{ExistingBranch: true, OriginState: worktree.Diverged, OriginAhead: 1, OriginBehind: 1}
 	outcome.Warnings = []domain.Warning{{Code: "create.source_diverged", Message: "branch feat/a has diverged from origin (1 ahead, 1 behind) and can't be fast-forwarded"}}
 
-	text := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, nil, cwd) })
+	text := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, cwd) })
 
 	assert.Equal(t, 1, strings.Count(text, "diverged"), text)
 }
 
 func TestAMixedRunNamesEachAnomalyAndEachUnfinishedBranch(t *testing.T) {
 
-	golden(t, "outcome_mixed", rendered(func(w *bytes.Buffer) {
-		drawOutcome(w, mixed(trees), []output.NextStep{{Command: "wtm clean feat/e --force", Note: "branch feat/e is left half-created at /trees/feat-e"}}, cwd)
-	}))
+	outcome := mixed(trees)
+	failed := *outcome.Result.Items[2].Err
+	failed.FollowUp = &domain.FollowUp{Argv: []string{"wtm", "clean", "feat/e", "--force"}, Message: "branch feat/e is left half-created at /trees/feat-e"}
+	outcome.Result.Items[2].Err = &failed
+
+	formtest.Golden(t, "outcome_mixed", rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, cwd) }))
 }
 
 func TestARunOfOnlyOpenBranchesIsUnchanged(t *testing.T) {
@@ -61,12 +65,12 @@ func TestARunOfOnlyOpenBranchesIsUnchanged(t *testing.T) {
 		outcome.Plan.Branches[i].Action = create.ActionUnchanged
 	}
 
-	golden(t, "outcome_unchanged", rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, nil, cwd) }))
+	formtest.Golden(t, "outcome_unchanged", rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, cwd) }))
 }
 
 func TestARunWithNothingToDoSaysSo(t *testing.T) {
-	golden(t, "outcome_nothing", rendered(func(w *bytes.Buffer) {
-		drawOutcome(w, create.Outcome{Result: &create.Result{}}, nil, "")
+	formtest.Golden(t, "outcome_nothing", rendered(func(w *bytes.Buffer) {
+		drawOutcome(w, create.Outcome{Result: &create.Result{}}, "")
 	}))
 }
 
@@ -77,17 +81,19 @@ func TestADryRunShowsThePlanItsWarningsItsFingerprintAndHowToApplyIt(t *testing.
 	outcome.Plan.Remember = []string{"env_from"}
 	outcome.Warnings = []domain.Warning{{Code: "create.env_parent_fallback", Message: `The "parent" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main.`}}
 
-	golden(t, "dryrun", rendered(func(w *bytes.Buffer) {
-		output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(outcome.Plan, previewMarks(outcome.Plan)), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: "wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567"})
+	formtest.Golden(t, "dryrun", rendered(func(w *bytes.Buffer) {
+		output.DryRun(w, output.DryRunParams{Command: create.Name, Rows: planRowsOf(outcome.Plan, previewMarks(outcome.Plan)), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: "wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567"})
 	}))
 }
 
-func TestAPlanReadsAsItsRowsThenItsWarnings(t *testing.T) {
-	plan := twoCreated(trees).Plan
+func TestAPreviewIsThePlansRowsAndItsWarnings(t *testing.T) {
+	outcome := twoCreated(trees)
+	outcome.Warnings = []domain.Warning{{Code: "create.ff_failed", Message: "couldn't fast-forward main"}}
 
-	text := planTextOf(plan, []domain.Warning{{Code: "create.ff_failed", Message: "couldn't fast-forward main"}}, 0, nil)
+	previewed := preview(outcome)
 
-	assert.Equal(t, "Branches  feat/a, feat/b\nFrom      main\nEnv       example\n\n! couldn't fast-forward main", text)
+	assert.Equal(t, "Branches  feat/a, feat/b\nFrom      main\nEnv       example", strings.Join(output.PlanLines(output.PlanParams{Rows: previewed.Rows}), "\n"))
+	assert.Equal(t, outcome.Warnings, previewed.Warnings)
 }
 
 func TestAnAppliedRunWritesEachItemWithItsDetail(t *testing.T) {

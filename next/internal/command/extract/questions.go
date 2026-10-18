@@ -42,7 +42,7 @@ type Request struct {
 // The paths of extract's own fields; the questions of a new worktree name theirs in provision.
 const (
 	pathSource     = "source"
-	pathFiles      = "files"
+	PathFiles      = "files"
 	PathTo         = "to"
 	pathFrom       = "from"
 	pathKeep       = "keep"
@@ -55,7 +55,7 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 	next := r
 	var err error
 	switch path {
-	case pathFiles:
+	case PathFiles:
 		next.Files = values
 	case pathSource:
 		next.Source, err = domain.One[string](answer)
@@ -83,7 +83,7 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 // Values is the request's answer to the field at path, spelled as Answer takes it; nil when the request leaves the field to its default.
 func (r Request) Values(path string) []string {
 	switch path {
-	case pathFiles:
+	case PathFiles:
 		return r.Files
 	case pathSource:
 		return domain.Spelled(r.Source)
@@ -178,7 +178,7 @@ func (q Questions) Form() domain.Form {
 			Options:   q.Source.Options,
 		},
 		domain.MultiSelectField{
-			FieldSpec: domain.FieldSpec{Path: pathFiles, Flag: "--files", Label: "Files", Help: q.filesHelp()},
+			FieldSpec: domain.FieldSpec{Path: PathFiles, Flag: "--files", Label: "Files", Help: q.filesHelp()},
 			Picked:    q.Files.Given,
 			Options:   q.fileOptions(),
 			Empty:     "Select at least one file",
@@ -455,11 +455,11 @@ func (f Facts) fileProblems(req Request) []domain.FieldError {
 	case f.CheckedOutAt(req.Source) == "":
 		return nil
 	case len(req.Files) == 0:
-		return []domain.FieldError{domain.Required(pathFiles)}
+		return []domain.FieldError{domain.Required(PathFiles)}
 	}
 
 	if _, missed := worktree.SelectChanges(f.Changes[req.Source], req.Files); missed != "" {
-		return []domain.FieldError{{Path: pathFiles, Code: "extract.not_a_change", Template: "{path}: {value} is not an uncommitted change", Params: domain.Params{"value": missed}}}
+		return []domain.FieldError{{Path: PathFiles, Code: "extract.not_a_change", Template: "{path}: {value} is not an uncommitted change", Params: domain.Params{"value": missed}}}
 	}
 
 	return nil

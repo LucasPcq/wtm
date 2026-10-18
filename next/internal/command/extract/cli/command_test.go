@@ -7,6 +7,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,21 +18,21 @@ func TestTheHelpOfExtractIsTheLegacyOnesWithNextsContract(t *testing.T) {
 	got := runExtract(t, newWorld(seed{}), "--help")
 
 	require.Equal(t, uicli.ExitOK, got.Code)
-	golden(t, "extract_help", got.Stdout)
+	formtest.Golden(t, "extract_help", got.Stdout)
 }
 
 func TestADryRunOfANewTargetShowsItsConflictsAndTheLineThatAppliesIt(t *testing.T) {
 	got := runExtract(t, newWorld(seed{Conflicts: conflicting}), source, "--files", "apps/api", "--to", split, "--on-conflict", "resolve", "--dry-run")
 
 	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
-	golden(t, "dryrun", got.Stdout)
+	formtest.Golden(t, "dryrun", got.Stdout)
 }
 
 func TestAMoveToAnExistingWorktreeListsEachFileAndPointsAtIt(t *testing.T) {
 	got := runExtract(t, newWorld(seed{}), source, "--files", "apps/api,DOC.md,old.txt", "--to", other)
 
 	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
-	golden(t, "moved", got.Stdout)
+	formtest.Golden(t, "moved", got.Stdout)
 }
 
 func TestACopyToANewBranchKeepsTheSourceAndShowsWhereTheTargetIs(t *testing.T) {
@@ -40,7 +41,7 @@ func TestACopyToANewBranchKeepsTheSourceAndShowsWhereTheTargetIs(t *testing.T) {
 	got := runExtract(t, w, source, "--files", "apps/api/new.txt", "--to", split, "--from", source, "--keep")
 
 	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
-	golden(t, "copied", got.Stdout)
+	formtest.Golden(t, "copied", got.Stdout)
 	assert.Equal(t, []string{"apps/api/new.txt"}, paths(w.git.Moves()[0].Changes))
 	assert.True(t, w.git.Moves()[0].Keep)
 }
@@ -49,14 +50,14 @@ func TestAResolvedConflictNamesWhatToResolveAndHowToUndo(t *testing.T) {
 	got := runExtract(t, newWorld(seed{Conflicts: conflicting}), source, "--files", "apps/api", "--to", other, "--on-conflict", "resolve")
 
 	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
-	golden(t, "resolved", got.Stdout)
+	formtest.Golden(t, "resolved", got.Stdout)
 }
 
 func TestACleanSourceHasNothingToExtract(t *testing.T) {
 	got := runExtract(t, newWorld(seed{Clean: true}), source, "--yes")
 
 	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
-	golden(t, "nothing", got.Stdout)
+	formtest.Golden(t, "nothing", got.Stdout)
 }
 
 func TestAConflictIsRefusedOnItsOwnExitCodeBeforeAnythingMoves(t *testing.T) {
@@ -272,7 +273,7 @@ func TestTheEnvelopeOfEachEndingIsByteForByte(t *testing.T) {
 
 			assert.Equal(t, c.Code, got.Code, got.Stdout)
 			assert.Empty(t, got.Stderr)
-			golden(t, "envelope_"+name, got.Stdout)
+			formtest.Golden(t, "envelope_"+name, got.Stdout)
 		})
 	}
 }

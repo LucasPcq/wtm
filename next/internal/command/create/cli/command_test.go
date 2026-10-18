@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -19,7 +20,7 @@ func TestTheHelpOfCreateIsTheEnginesWordForWord(t *testing.T) {
 	got := runCreate(t, newWorld(seed{}), "--help")
 
 	require.Equal(t, uicli.ExitOK, got.Code)
-	golden(t, "create_help", got.Stdout)
+	formtest.Golden(t, "create_help", got.Stdout)
 }
 
 func TestCreateConcludesWithEachWorktreeRelativeToWhereItRuns(t *testing.T) {
@@ -310,7 +311,7 @@ func TestTheEnvelopeOfEachEndingIsByteForByte(t *testing.T) {
 
 			assert.Equal(t, c.Code, got.Code, got.Stdout)
 			assert.Empty(t, got.Stderr)
-			golden(t, "envelope_"+name, got.Stdout)
+			formtest.Golden(t, "envelope_"+name, got.Stdout)
 		})
 	}
 }
