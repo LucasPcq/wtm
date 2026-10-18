@@ -2,11 +2,13 @@ package main
 
 import (
 	"reflect"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/list"
+	"github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
+	"github.com/spf13/cobra"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,13 +40,25 @@ func TestEachRegisteredCommandIsInTheCatalogueAndWired(t *testing.T) {
 }
 
 func TestNoCommandListNamesInAFollowUpHasMigrated(t *testing.T) {
-	registered := registeredCommands(t)
+	streams, _, _, _ := output.Test()
+	root := cli.NewRoot(version, streams, commands(streams, cli.Env{}))
 	for _, action := range []list.Action{list.ActionGo, list.ActionRunUp, list.ActionRunDown, list.ActionLogs, list.ActionClean} {
 		argv := listCommands(action, list.Detail{Branch: "feat/a"})
-		require.GreaterOrEqual(t, len(argv), 2, action)
+		require.GreaterOrEqual(t, len(argv), 3, action)
 		require.Equal(t, "wtm", argv[0], action)
-		_, listed := catalogue().Find(argv[1])
+		path := argv[1 : len(argv)-1] // the words between wtm and the worktree
+		_, listed := catalogue().Find(strings.Join(path, " "))
 
-		assert.False(t, listed || slices.Contains(registered, argv[1]), "%s has migrated: build list's follow-up from its schema (command + request) instead of a hard-coded argv", argv[1])
+		assert.False(t, listed || runs(root, path), "%s has migrated: build list's follow-up from its schema (command + request) instead of a hard-coded argv", strings.Join(path, " "))
 	}
+}
+
+func TestTheGuardTellsARunSubcommandFromAnother(t *testing.T) {
+	root, run := &cobra.Command{Use: "wtm-next"}, &cobra.Command{Use: "run"}
+	run.AddCommand(&cobra.Command{Use: "init", Run: func(*cobra.Command, []string) {}})
+	root.AddCommand(run)
+
+	assert.True(t, runs(root, []string{"run", "init"}))
+	assert.False(t, runs(root, []string{"run", "up"}))
+	assert.False(t, runs(root, []string{"clean"}))
 }
