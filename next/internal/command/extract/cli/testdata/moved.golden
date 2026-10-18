@@ -1,13 +1,11 @@
 
-  ✓ Moved 4 files to feat/other
+  ✓ extract: 1 done
 
-    mod  apps/api/a.txt
-    new  apps/api/new.txt
-    ren  DOC.md
-    del  old.txt
-
-  source  feat/login · files removed
-  path    ../wt-feat-other
+  Source      feat/login
+  Files       mod apps/api/a.txt, new apps/api/new.txt, ren README.md → DOC.md, del old.txt
+  Target      feat/other
+  Mode        move
+  feat/other  ../wt-feat-other
 
   → wtm go feat/other
 
