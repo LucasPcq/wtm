@@ -37,6 +37,11 @@ func Line(argv []string) string {
 	return strings.Join(Quoted(argv), " ")
 }
 
+// GoStep is the next step that enters the worktree of branch, the branch quoted for the shell.
+func GoStep(branch string) NextStep {
+	return NextStep{Command: Line([]string{"wtm", "go", branch})}
+}
+
 // FollowUpSteps returns the next step that repairs what err left behind, its follow-up's command line and message; none when err is nil or has no follow-up.
 func FollowUpSteps(err *domain.Error) []NextStep {
 	if err == nil || err.FollowUp == nil {

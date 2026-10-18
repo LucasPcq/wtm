@@ -41,7 +41,7 @@ func (o Outcome[P, D]) PlanFingerprint() string {
 	return o.Fingerprint
 }
 
-// Applied reports whether the run reached the apply: false for a dry run, a refusal before the apply, or a plan with nothing to apply.
+// Applied reports whether the run holds the Result of an apply.
 func (o Outcome[P, D]) Applied() bool {
 	return o.Result != nil
 }
