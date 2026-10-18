@@ -17,7 +17,7 @@ next/
     service/<name>/    what use cases share with I/O: operation, provision, repository; <name>test kits
     domain/            the pure model and vocabulary; worktree/, project/, env/, dotenv/ by subject
     adapter/<name>/    git, store, config, shell, oplock, events, statefile, proxyport; <name>test fakes
-    ui/                cli (root, exit codes, env), output (streams, frames, envelope), form (flags, wizard)
+    ui/                cli (root, exit codes, env), output (streams, frames, envelope), form (flags, wizard, conclusion), widget (a step's inputs), formtest (the cli tests' kit)
     api/               the catalogue of commands for a surface other than the CLI
   docs/proof/          scripts that run wtm and wtm-next side by side, and their captures
 ```
@@ -34,7 +34,7 @@ next/
 | is a pure rule, type or vocabulary two commands need | `domain/<subject>/` (`worktree`, `project`, `env`, `dotenv`), the root `domain` only for the cross-cutting contract (errors, events, outcomes, forms) |
 | orchestrates I/O two commands need | `service/<name>/` (concrete, with its own `port.go`) |
 | is a question two commands ask | the fragment of the service that consumes its answers (`service/provision/questions.go`) |
-| is presentation two commands need, or any field kind of the wizard | `ui/output`, `ui/form` |
+| is presentation two commands need, or any field kind of the wizard | `ui/output`, `ui/form`, an input in `ui/widget` |
 | talks to git, a file, a process, a socket | `adapter/<name>/`, behind a port |
 | is an in-memory stand-in for an adapter, for tests | `adapter/<name>test/` |
 | checks a promise every use case keeps, for tests | `service/<name>test/` (`operationtest.Contract`) |
@@ -58,7 +58,7 @@ Each rule names what enforces it: `[archlint]` (`tools/archlint`, rule `next`), 
 9. **A value that takes one of a closed set of shapes is a sealed interface** (an unexported method, one type per shape) declared `//go-sumtype:decl` on a line of its own, so every type switch over it is checked: `domain.Field`, `domain.Event`, `worktree.Placement`, a command's `decision`. `[sumtype]`
 10. **Every package has a package comment, every exported name a doc comment** that starts with its name and states its contract. `[revive]` (`exported`, `package-comments`) and `[staticcheck]` (`checks = ["all"]`)
 11. **A long file reads in named sections:** `usecase.go` (the use case, Run, Plan, Apply, Questions, Observe, the steps of Apply, helpers), `rules.go` and `questions.go`, each section under go-style's separator (`// ` and 76 dashes, then its title). A file is named after what it declares; a package splits only past about 1,000 lines at a natural seam. `[review]`
-12. **Tests share one layout:** testify, only `Test…` functions in a test file, fixtures and fakes in `fixture_test.go`, helpers in `helpers_test.go`, goldens in `testdata/` behind `-update`. A test function reads as a sentence (`TestAStaleFingerprintIsRefused`); a subtest name is a short identifier (`existing`, `fromOrigin`), never a sentence. A `*Params` struct only for many inputs, two swappable values of one type, or a list that grows (go-style `testing.md`, `readability.md`). `[review]`
+12. **Tests share one layout:** testify, only `Test…` functions in a test file, fixtures and fakes in `fixture_test.go`, helpers in `helpers_test.go`, goldens in `testdata/` behind `-update` (`formtest.Golden` in a `cli` test). A test function reads as a sentence (`TestAStaleFingerprintIsRefused`); a subtest name is a short identifier (`existing`, `fromOrigin`), never a sentence. A `*Params` struct only for many inputs, two swappable values of one type, or a list that grows (go-style `testing.md`, `readability.md`). `[review]`
 13. **No legacy gap in limbo:** each difference between `wtm` and `wtm-next` is an owner-approved deviation listed in the PR, or a bug fixed with its test (`references/new-command.md`, step 9). `[review]`
 
 ## Read next, by task

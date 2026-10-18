@@ -34,7 +34,7 @@ The in-memory twin of an adapter, for its consumers' tests: `gittest.Fake`, `sto
 ## Test kits: `service/<name>test`, `ui/<name>test`
 
 - `service/<name>test` holds a promise a service makes every consumer, as a check the consumer runs: `operationtest.Contract(t, subject)` puts a command's `Run` through a dry run (no lock, no event), a stale plan (refused before any event), an apply (events in order, each unit finished, locks released) and a correlation ID. Each command's `contract_test.go` calls it.
-- `ui/<name>test` holds helpers the commands' `cli` tests share (a wizard driver, a golden helper). `[archlint]`
+- `ui/<name>test` holds helpers the commands' `cli` tests share: `ui/formtest` (the wizard driver, `Golden`, the envelope decoded; `form.md`). `[archlint]`
 - A kit arrives with its second user; until then a helper stays in the package's `helpers_test.go`.
 
 ## Adding a port or an adapter

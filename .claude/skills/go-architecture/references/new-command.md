@@ -24,12 +24,12 @@ A command named with a dash lives without it (`fast-forward` → `command/fastfo
 
 Sections in this order, each under go-style's separator: the use case, Run, Plan, Apply, Questions, Observe, the steps of Apply, helpers.
 
-- **The use case:** `const Name = "<name>"`; `CodeConfigNotFound = Name + repository.ConfigNotFound`; `UseCase` with its ports and the concrete services it calls (`repository.Service`, `operation.Service`, and `provision.Service` when it creates a worktree); `Outcome = domain.Outcome[Plan, Detail]`, `Result = domain.Result[Detail]`, `Item = domain.Unit[Detail]`; its `Detail`, what the JSON envelope reports per item.
+- **The use case:** `const Name = "<name>"`; `CodeConfigNotFound = Name + repository.ConfigNotFound` and `CodeConfigInvalid = Name + repository.ConfigInvalid`; `UseCase` with its ports and the concrete services it calls (`repository.Service`, `operation.Service`, and `provision.Service` when it creates a worktree); `Outcome = domain.Outcome[Plan, Detail]`, `Result = domain.Result[Detail]`, `Item = domain.Unit[Detail]`; its `Detail`, what the JSON envelope reports per item.
 - **Run:** copy `create.UseCase.Run` and keep its numbered steps: `Operations.Begin(Name, req.Locks(), opts)` with `defer op.End()`; `operation.PlanUnderLocks` around `Plan`; `operation.Fingerprint(plan.Fingerprinted())`, returning on a dry run; `op.Expect`; `op.Started()`, `Apply`, `op.Finished(result.Failure())`. A dry run takes no lock and plans once. Add a numbered step only where the story differs, as extract's step 5 ends a run with nothing to extract. A step comment says why the step is there, not what the call does.
 - **Plan:** `Observe` → `Resolve` → `Decide`, a paragraph each.
 - **Apply:** a paragraph per step; a step longer than a screen becomes a function in "the steps of Apply". One item's failure stops none of the others; a cancelled context skips the items not started.
 - **Questions:** `Observe`, then `NewQuestions(facts, req)`.
-- **Observe:** `repository.Service.Observe` (config, run.toml, snapshot; no wtm config is `<name>.config_not_found`), then what the command reads through its own ports.
+- **Observe:** `repository.Service.Observe` (config, run.toml, snapshot; no wtm config is `<name>.config_not_found`, an invalid one `<name>.config_invalid`), then what the command reads through its own ports.
 
 ## 4. `rules.go`
 
@@ -41,13 +41,15 @@ Pure: no port, no context. `Facts` (what `Observe` read); one decision per subje
 
 ## 6. `cli/`
 
-> Outline until the conclusion moves into `form.Command` (wave 2); until then copy `command/create/cli/`.
+Copy `command/create/cli/`; the engine behind it is `form.md`.
 
-- `command.go`: `New(streams, env, open) *cobra.Command` with `Use` from `Name`, `Short`, `Long`, `Example`, its `uicli.Run` (`Exits`); the run hands the command line to `form.Command.Launch`; the conclusion draws the envelope, a refusal, the dry run or the outcome (moving into `form.Command`).
-- `form.go`: its `form.Command[Request, Questions, Outcome]` (`form.md`).
-- `output.go`: the plan rows and the outcome, with the `ui/output` kit.
-- `steps.go`: only for a field the engine cannot ask by its kind.
-- `testdata/`: goldens for `--help`, the dry run, each outcome, each refusal, each JSON envelope, the wizard's frames.
+- `command.go`: `New(streams, env, open) *cobra.Command` with `Use` from `Name`, `Short`, `Long`, `Example` and `yesUsage`; its `uicli.Run{Command: <name>.Name, Streams, Env, Flags, Exits}`, `Exits` mapping the command's own codes to their exit (`<name>.config_not_found`, `<name>.config_invalid`, extract's conflict); `c.form.Bind(cmd, &c.io)`. Its run is `c.form.Launch(cmd, args, c.form.Conclude)`, or a `conclude` of its own that handles its one end case and hands the rest to `Conclude` (extract's "nothing to extract").
+- `form.go`: `newForm(open)` returns its `form.Command[Request, Questions, Outcome]` with `YesUsage`, `Open: form.Opener[…](open)`, `Preview`, `Draw`, `ApplyLabel` and `Special` when it has steps of its own; `<name>Flags = newForm(nil).Flags()` spells the failures.
+- `output.go`: `planRowsOf`, `preview` and `previewMarks` (the plan as `form.Preview`), `drawOutcome` (the apply, with the `ui/output` kit; `output.GoStep(branch)` for the step that enters a worktree, the branch quoted).
+- `steps.go`: only for a field the engine cannot ask by its kind; `special` switches on `field.Spec().Path`.
+- `testdata/`: goldens for `--help`, the dry run, each outcome, each refusal, each JSON envelope, the wizard's screens, through `ui/formtest`.
+
+No conclusion, envelope or dry-run drawing in a command's `cli/`: they are `form.Command`'s.
 
 ## 7. The registrations in `cmd/wtm-next`
 
@@ -67,7 +69,7 @@ Pure: no port, no context. `Facts` (what `Observe` read); one decision per subje
 | `rules_test.go`, `questions_test.go` | the pure decisions and the form, table-driven from facts in `fixture_test.go`; the round trip of `Form`, `Answer`, `Values` |
 | `usecase_test.go` | `Run` over the fakes (`gittest`, `storetest`): what changed, the events, the locks, cancellation |
 | `contract_test.go` | `operationtest.Contract` over `Run`, with a request that applies, a `Stale` and a `Fail` |
-| `cli/*_test.go` | the goldens, the wizard frame by frame, the exit codes |
+| `cli/*_test.go` | the goldens, the wizard screen by screen, the exit codes, the envelope, through `ui/formtest` (`form.md`, "Tests") |
 | `cmd/wtm-next` | one end-to-end test wiring the real adapters |
 
 Gates: `make lint-next`, `make test-next`, then the `build-validator` agent.

@@ -7,6 +7,7 @@ What every mutating command of `next/` promises its callers — people at a term
 - A run is its `Request` (the command's fields, snake_case JSON tags) plus `domain.RunOptions` (`DryRun`, `ExpectFingerprint`, `Surface`, `CorrelationID`, `Report`). Everything a run depends on travels with it, so one process can serve several callers and repositories: the repository is the directory the use case is opened on (`open(ctx, dir)`, resolved to its main worktree), `--ask` is the request's `ask` field, the correlation ID is recorded by `operation.Service.Begin` on the operation and every event.
 - The process environment is read once, at the edge: `ui/cli.ReadEnv` (working directory, `$WTM_PROJECT_DIR`, `$WTM_CORRELATION_ID`, an invalid one refused before any repository lookup), `ui/output.System` (which streams are terminals, `$TERM`), `$WTM_STATE_DIR` in `cmd/wtm-next/project.go`. An adapter reads only what its own tool needs (`os.UserConfigDir`, a child's environment). Domain, services and commands never read it.
 - The subject is positional (`create [branch…]`, `extract [source]`); a worktree that is not the subject is a flag named after its role (`--to`, `--from`). A flag whose absence means something (`--ff`) is a pointer in the request, set only when given.
+- config.toml is validated at load (`adapter/config`): a file that does not parse or validate, an absolute `base_path` among them, refuses the run with `<command>.config_invalid` (precondition, exit 1, `invalid config.toml: <reason>`), as no config is `<command>.config_not_found`; `repository.Service.Observe` raises both.
 - A field error names its path; the CLI spells it as its flag (`--files is required`, `<branches>[1]`).
 
 ## Interactive or unattended
@@ -41,7 +42,7 @@ What every mutating command of `next/` promises its callers — people at a term
 | Code | Meaning |
 | -- | -- |
 | 0 | success, nothing to do, dry run |
-| 1 | an item failed, or a failure no other code names |
+| 1 | an item failed, an invalid config.toml (`<command>.config_invalid`), or a failure no other code names |
 | 2 | invalid request (usage, field errors) |
 | 12 | no wtm config (`<command>.config_not_found`, mapped by each command's `Exits`) |
 | 15 | extract's conflict (`extract.conflict`) |
