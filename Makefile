@@ -39,8 +39,8 @@ arch:
 # code reachable by a route the analysis cannot follow — are listed with their
 # reason in .deadcode-ignore; everything else fails.
 dead:
-	@go tool deadcode -test ./... | grep -v -E -f .deadcode-ignore > /tmp/wtm-deadcode || true
-	@test ! -s /tmp/wtm-deadcode || { echo "unreachable code:"; cat /tmp/wtm-deadcode; exit 1; }
+	@dead=$$(go tool deadcode -test ./... | grep -v -E -f .deadcode-ignore || true); \
+		test -z "$$dead" || { echo "unreachable code:"; echo "$$dead"; exit 1; }
 
 # dead-strict is dead without -test: what only a test still calls. Informative,
 # not part of lint — a helper built for tests (testutil/, processtest/) lives
@@ -61,8 +61,8 @@ lint: fmt vet arch dead sumtype next-lint
 lint-next: arch next-lint
 	@test -z "$$(gofmt -l next tools)" || { echo "gofmt needed:"; gofmt -l next tools; exit 1; }
 	go vet ./next/... ./tools/...
-	@go tool deadcode -test ./next/... | grep -v -E -f .deadcode-ignore > /tmp/wtm-deadcode-next || true
-	@test ! -s /tmp/wtm-deadcode-next || { echo "unreachable code:"; cat /tmp/wtm-deadcode-next; exit 1; }
+	@dead=$$(go tool deadcode -test -filter 'wtm/(next|tools)/' ./next/... ./tools/... | grep -v -E -f .deadcode-ignore || true); \
+		test -z "$$dead" || { echo "unreachable code:"; echo "$$dead"; exit 1; }
 	go tool go-sumtype $$(go list ./next/...)
 	go tool staticcheck ./next/... ./tools/...
 

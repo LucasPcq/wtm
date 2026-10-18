@@ -19,3 +19,37 @@ import (
 )
 
 func TestX(t *testing.T) {}
+-- next/internal/command/ignored/x.go --
+//go:build ignore
+
+package ignored
+-- next/internal/command/ignored/x_test.go --
+package ignored
+
+import (
+	"testing"
+
+	_ "github.com/LucasPcq/wtm/internal/domain"
+)
+
+func TestX(t *testing.T) {}
+-- next/internal/command/windows/x_windows.go --
+package windows
+-- next/internal/command/windows/x_test.go --
+package windows
+
+import (
+	"testing"
+
+	_ "github.com/LucasPcq/wtm/internal/domain"
+)
+
+func TestX(t *testing.T) {}
+-- next/internal/command/sourced/x.go --
+package sourced
+-- next/internal/command/sourced/x_test.go --
+package sourced
+
+import "testing"
+
+func TestX(t *testing.T) {}

@@ -29,6 +29,17 @@ var _ = strings.TrimSpace
 package operation
 
 import _ "github.com/LucasPcq/wtm/next/internal/domain"
+-- github.com/LucasPcq/wtm/next/internal/ui/formtest/golden/golden.go --
+// Package golden compares a screen with its golden file.
+package golden
+-- github.com/LucasPcq/wtm/next/internal/service/operationtest/steps/steps.go --
+// Package steps lists the steps of a contract.
+package steps
+-- github.com/LucasPcq/wtm/next/internal/command/foo_test/foo.go --
+// Package foo_test is a source package whose path ends in _test.
+package foo_test
+
+import _ "github.com/LucasPcq/wtm/internal/domain" // want `next/internal/command/foo_test must not import "github.com/LucasPcq/wtm/internal/domain" — next/ never imports internal/`
 -- github.com/LucasPcq/wtm/next/internal/service/operationtest/contract.go --
 // Package operationtest is the contract of an operation.
 package operationtest
@@ -37,6 +48,7 @@ import (
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/service/operationtest must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — a service's test kit`
 	_ "github.com/LucasPcq/wtm/next/internal/domain"
 	_ "github.com/LucasPcq/wtm/next/internal/service/operation"
+	_ "github.com/LucasPcq/wtm/next/internal/service/operationtest/steps"
 	_ "github.com/LucasPcq/wtm/next/internal/service/repository" // want `next/internal/service/operationtest must not import "github.com/LucasPcq/wtm/next/internal/service/repository" — a service's test kit`
 	_ "github.com/spf13/cobra"
 )
@@ -174,6 +186,7 @@ import (
 	_ "github.com/LucasPcq/wtm/next/internal/domain"
 	_ "github.com/LucasPcq/wtm/next/internal/service/operation" // want `next/internal/ui/formtest must not import "github.com/LucasPcq/wtm/next/internal/service/operation" — a ui test kit`
 	_ "github.com/LucasPcq/wtm/next/internal/ui/form"
+	_ "github.com/LucasPcq/wtm/next/internal/ui/formtest/golden"
 	_ "github.com/spf13/cobra"
 )
 -- github.com/LucasPcq/wtm/next/internal/adapter/store/store.go --

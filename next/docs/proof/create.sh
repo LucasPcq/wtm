@@ -9,8 +9,13 @@
 # only where next/docs/proof/README.md says why.
 set -euo pipefail
 
-legacy=${1:?wtm binary}
-next=${2:?wtm-next binary}
+# absolute <binary>: the binary's absolute path, since each scenario runs from inside its sandbox.
+absolute() {
+  [[ -f $1 && -x $1 ]] || { echo "$0: $1 is not an executable" >&2; return 1; }
+  echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+}
+legacy=$(absolute "${1:?wtm binary}")
+next=$(absolute "${2:?wtm-next binary}")
 out=${3:?out dir}
 mkdir -p "$out" && out=$(cd "$out" && pwd)
 repo=$(git rev-parse --show-toplevel)
@@ -129,7 +134,7 @@ run_side() {
 
 roots=()
 # kept for tty.sh on success, removed on a failure
-trap 'rm -rf "${roots[@]}"' ERR
+trap '[[ -n ${keep:-} ]] || rm -rf ${roots[@]+"${roots[@]}"}' EXIT
 run_side legacy "$legacy"
 run_side next "$next"
 {
@@ -139,4 +144,5 @@ run_side next "$next"
     diff -u --label "legacy/$name" --label "next/$name" "$state" "$out/next/$name.state" || true
   done
 } >"$out/states.diff"
+keep=1
 echo "${roots[@]}"

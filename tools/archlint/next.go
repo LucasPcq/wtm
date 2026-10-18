@@ -1,7 +1,9 @@
 package main
 
 import (
+	"cmp"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"os"
@@ -53,11 +55,11 @@ var nextWhy = map[nextLayer]string{
 	nextDomain:      "the domain is pure: the stdlib and domain/* only",
 	nextService:     "a service reaches the world through the ports it declares: domain/* and the stdlib, never another service, a command, an adapter or ui/*",
 	nextCommand:     "a use case orchestrates services and reaches the world through the ports it declares: domain/*, service/* and the stdlib, never another command, its own cli, an adapter or ui/*",
-	nextServiceTest: "a service's test kit checks what the service promises: service/<its name>, domain/*, the stdlib and third parties, never another service, a command, an adapter or ui/*",
+	nextServiceTest: "a service's test kit checks what the service promises: service/<its name>, its own packages, domain/*, the stdlib and third parties, never another service, a command, an adapter or ui/*",
 	nextCLI:         "a command's cli drives its own use case: command/<its name>, domain/*, ui/*, the stdlib and third parties, never another command, a service or an adapter",
 	nextAdapter:     "an adapter reaches domain/*, adapter/statefile, adapter/shell, the stdlib and third parties, never a service, a command or ui/*, nor another adapter",
-	nextAdapterTest: "an adapter's test kit reaches adapter/<its name>, domain/*, adapter/statefile, adapter/shell, the stdlib and third parties, never a service, a command or ui/*, nor another adapter",
-	nextUITest:      "a ui test kit reaches domain/*, ui/*, the stdlib and third parties, never a command, a service or an adapter",
+	nextAdapterTest: "an adapter's test kit reaches adapter/<its name>, its own packages, domain/*, adapter/statefile, adapter/shell, the stdlib and third parties, never a service, a command or ui/*, nor another adapter",
+	nextUITest:      "a ui test kit reaches domain/*, ui/*, its own packages, the stdlib and third parties, never a command, a service or an adapter",
 	nextUI:          "ui/ is the presentation kit every command's cli shares and knows no command: domain/*, ui/*, the stdlib and third parties, never a command, a service or an adapter",
 	nextAPI:         "the catalogue knows no command: domain/* and the stdlib only",
 	nextCmd:         "the composition root wires what is under next/, never a fake",
@@ -83,7 +85,7 @@ func runNext(pass *analysis.Pass, testsOf testFiles) (any, error) {
 		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under domain/, service/, command/ (its cli/ beside it), adapter/, ui/, api/ or cmd/wtm-next (next/README.md)", rel)
 		return nil, nil
 	}
-	if sibling, ok := kitOf(from); ok && !siblingExists(pass, rel, sibling) {
+	if sibling := strings.TrimSuffix(from.unit, testSuffix); slices.Contains(nextKits, from.layer) && !siblingExists(pass, rel, sibling) {
 		pass.Reportf(firstFile(pass).Package, "next/%s: a name ending in %q is reserved for a test kit beside its package, and there is no %s beside it: rename it (next/README.md)", rel, testSuffix, sibling)
 		return nil, nil
 	}
@@ -149,8 +151,9 @@ func nextRel(pass *analysis.Pass) (string, bool) {
 	rel, ok := cutNext(pass.Pkg.Path())
 	// analysistest also loads the main package go test generates for a test binary, and a
 	// package's external tests as their own package: the driver reads those from disk.
-	generated := pass.Pkg.Name() == "main" && strings.HasSuffix(rel, ".test") || strings.HasSuffix(rel, "_test")
-	return rel, ok && len(pass.Files) > 0 && !generated
+	generated := pass.Pkg.Name() == "main" && strings.HasSuffix(rel, ".test")
+	sources := slices.ContainsFunc(pass.Files, func(file *ast.File) bool { return !isTestFile(pass, file) })
+	return rel, ok && sources && !generated
 }
 
 func cutNext(pkgPath string) (string, bool) {
@@ -200,14 +203,6 @@ func kitOr(layer, kit nextLayer, unit string) nextPackage {
 	return nextPackage{layer: layer, unit: unit}
 }
 
-// kitOf returns the package a test kit's name promises: service/<x> for service/<x>test.
-func kitOf(pkg nextPackage) (string, bool) {
-	if !slices.Contains(nextKits, pkg.layer) {
-		return "", false
-	}
-	return strings.TrimSuffix(pkg.unit, testSuffix), true
-}
-
 func siblingExists(pass *analysis.Pass, rel, sibling string) bool {
 	if sibling == "" {
 		return false
@@ -254,6 +249,9 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 	stdlib := !strings.Contains(strings.Split(to.path, "/")[0], ".")
 	thirdParty := !stdlib && !strings.HasPrefix(to.path, modulePath)
 	in := func(layers ...nextLayer) bool { return to.inNext && slices.Contains(layers, to.pkg.layer) }
+	if slices.Contains(nextKits, from.layer) && in(from.layer) && to.pkg.unit == from.unit {
+		return true
+	}
 	switch from.layer {
 	case nextDomain:
 		return stdlib || in(nextDomain)
@@ -266,8 +264,7 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 	case nextAdapter:
 		return stdlib || thirdParty || in(nextDomain) || in(nextAdapter) && (to.pkg.unit == from.unit || slices.Contains(sharedAdapters, to.pkg.unit))
 	case nextAdapterTest:
-		return stdlib || thirdParty || in(nextDomain) || in(nextAdapterTest) && to.pkg.unit == from.unit ||
-			in(nextAdapter) && (slices.Contains(sharedAdapters, to.pkg.unit) || from.unit == to.pkg.unit+testSuffix)
+		return stdlib || thirdParty || in(nextDomain) || in(nextAdapter) && (slices.Contains(sharedAdapters, to.pkg.unit) || from.unit == to.pkg.unit+testSuffix)
 	case nextCLI:
 		return stdlib || thirdParty || in(nextDomain, nextUI) || in(nextCommand) && to.pkg.unit == from.unit
 	case nextUI, nextUITest:
@@ -282,28 +279,24 @@ func testsAlone(roots []string) ([]finding, error) {
 	// go/packages, loaded without tests, sees no package in a directory of tests alone: no analyzer reads its imports.
 	var findings []finding
 	for _, root := range roots {
+		if clean := filepath.ToSlash(filepath.Clean(root)); clean != "next" && !strings.HasPrefix(clean, "next/") {
+			continue
+		}
 		err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-			if err != nil {
+			if err != nil || !entry.IsDir() {
 				return err
-			}
-			if !entry.IsDir() {
-				return nil
 			}
 			if path != root && (entry.Name() == "testdata" || strings.HasPrefix(entry.Name(), ".") || strings.HasPrefix(entry.Name(), "_")) {
 				return filepath.SkipDir
 			}
-			rel := filepath.ToSlash(filepath.Clean(path))
-			if rel != "next" && !strings.HasPrefix(rel, "next/") {
-				return nil
-			}
-			test, ok, err := onlyTests(path)
-			if err != nil || !ok {
+			test, err := onlyTests(path)
+			if err != nil || test == "" {
 				return err
 			}
 			findings = append(findings, finding{
 				pos:  token.Position{Filename: filepath.Join(path, test), Line: 1, Column: 1},
 				rule: nextAnalyzer.Name,
-				msg:  rel + " holds only tests, which no rule reads: a test sits beside the package it tests (next/README.md)",
+				msg:  filepath.ToSlash(filepath.Clean(path)) + " holds only tests, which no rule reads: a test sits beside the package it tests (next/README.md)",
 			})
 			return nil
 		})
@@ -314,10 +307,11 @@ func testsAlone(roots []string) ([]finding, error) {
 	return findings, nil
 }
 
-func onlyTests(dir string) (string, bool, error) {
+// onlyTests returns the first test file of dir when no other Go file of it is compiled on a target system.
+func onlyTests(dir string) (string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 	first := ""
 	for _, entry := range entries {
@@ -325,12 +319,26 @@ func onlyTests(dir string) (string, bool, error) {
 		if entry.IsDir() || !strings.HasSuffix(name, ".go") {
 			continue
 		}
-		if !strings.HasSuffix(name, "_test.go") {
-			return "", false, nil
+		if strings.HasSuffix(name, "_test.go") {
+			first = cmp.Or(first, name)
+			continue
 		}
-		if first == "" {
-			first = name
+		compiled, err := compiledOnATarget(dir, name)
+		if err != nil || compiled {
+			return "", err
 		}
 	}
-	return first, first != "", nil
+	return first, nil
+}
+
+func compiledOnATarget(dir, name string) (bool, error) {
+	for _, goos := range targetSystems {
+		ctx := build.Default
+		ctx.GOOS, ctx.CgoEnabled = goos, false
+		match, err := ctx.MatchFile(dir, name)
+		if err != nil || match {
+			return match, err
+		}
+	}
+	return false, nil
 }

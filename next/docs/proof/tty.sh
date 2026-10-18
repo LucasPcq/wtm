@@ -7,8 +7,10 @@
 set -euo pipefail
 side=$1 root=$2 bin=$3 out=$4
 [[ -d $root/acme ]] || { echo "tty.sh: $root is no sandbox of create.sh" >&2; exit 1; }
+[[ -f $bin && -x $bin ]] || { echo "tty.sh: $bin is not an executable" >&2; exit 1; }
 mkdir -p "$out"
 session=wtmcmp-$side-$(basename "$root")
+trap 'tmux kill-session -t "$session" 2>/dev/null; rm -rf "$root"' EXIT
 screen() { tmux capture-pane -p -t "$session" | cat -s; }
 # settle <text>: waits until the screen shows text and is the same twice in a row, else fails the run.
 settle() {
@@ -97,6 +99,4 @@ tmux send-keys -t "$session" Enter
 capture extract-8-recap 'No, cancel'
 tmux send-keys -t "$session" Enter
 capture extract-9-outcome 'EXIT=0'
-tmux kill-session -t "$session" || true
-rm -rf "$root"
 sed -i '' -E -e "s#(/private)?$root#<SB>#g" -e 's#\(([0-9.]+m?s)\)#(<DUR>)#g' -e 's#wtm-next (create|extract)#wtm \1#g' "$out"/*

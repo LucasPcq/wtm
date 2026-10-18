@@ -31,6 +31,9 @@ func TestANextPackageImportsOnlyWhatItsRowAllows(t *testing.T) {
 		nextPrefix+"internal/ui/form",
 		nextPrefix+"internal/ui/formtest",
 		nextPrefix+"cmd/other",
+		nextPrefix+"internal/ui/formtest/golden",
+		nextPrefix+"internal/service/operationtest/steps",
+		nextPrefix+"internal/command/foo_test",
 	)
 }
 

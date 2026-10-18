@@ -1,7 +1,6 @@
 package main
 
 import (
-	"go/ast"
 	"go/parser"
 	"go/token"
 	"reflect"
@@ -19,8 +18,10 @@ func TestEachRegisteredCommandIsInTheCatalogueAndWired(t *testing.T) {
 	registered := registeredCommands(t)
 	var listed []string
 	for _, command := range catalogue() {
-		listed = append(listed, command.Name)
+		// a command's folder spells its name without dashes: command/fastforward is fast-forward
+		listed = append(listed, strings.ReplaceAll(command.Name, "-", ""))
 	}
+	// shortcut: a non-zero use case is taken as wired, not checked field by field; a test that runs each command would prove more
 	wired := map[string]bool{}
 	app := reflect.ValueOf(wire(wireParams{MainPath: t.TempDir()}))
 	for i := range app.NumField() {
@@ -36,31 +37,19 @@ func TestEachRegisteredCommandIsInTheCatalogueAndWired(t *testing.T) {
 	}
 }
 
-// registeredCommands reads main.go for the commands it registers: the name of each command/<name>/cli whose New it calls.
+// registeredCommands reads main.go for the commands it registers: each command/<name>/cli it imports, which Go refuses unused.
 func registeredCommands(t *testing.T) []string {
 	t.Helper()
-	file, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, 0)
+	file, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, parser.ImportsOnly)
 	require.NoError(t, err)
-	clis := map[string]string{}
+	var names []string
 	for _, spec := range file.Imports {
 		path, err := strconv.Unquote(spec.Path.Value)
 		require.NoError(t, err)
 		name, ok := strings.CutPrefix(path, commandPrefix)
-		name, isCLI := strings.CutSuffix(name, "/cli")
-		if ok && isCLI && spec.Name != nil {
-			clis[spec.Name.Name] = name
+		if name, isCLI := strings.CutSuffix(name, "/cli"); ok && isCLI {
+			names = append(names, name)
 		}
 	}
-	var names []string
-	ast.Inspect(file, func(node ast.Node) bool {
-		sel, ok := node.(*ast.SelectorExpr)
-		if !ok || sel.Sel.Name != "New" {
-			return true
-		}
-		if pkg, ok := sel.X.(*ast.Ident); ok && clis[pkg.Name] != "" {
-			names = append(names, clis[pkg.Name])
-		}
-		return true
-	})
 	return names
 }

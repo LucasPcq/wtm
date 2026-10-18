@@ -30,8 +30,16 @@ func TestADirectoryOfNextHoldingOnlyTestsIsRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	findings = slices.DeleteFunc(findings, func(f finding) bool { return f.rule != nextAnalyzer.Name })
-	if len(findings) != 1 || findings[0].pos.Filename != "next/internal/command/zzprobe/x_test.go" || !strings.Contains(findings[0].msg, "holds only tests") {
-		t.Errorf("findings = %v, want next/internal/command/zzprobe refused for holding only tests", findings)
+	var refused []string
+	for _, f := range findings {
+		if strings.Contains(f.msg, "holds only tests") {
+			refused = append(refused, f.pos.Filename)
+		}
+	}
+	// a file compiled on no target system leaves its directory with tests alone, as the driver sees it
+	want := []string{"next/internal/command/ignored/x_test.go", "next/internal/command/windows/x_test.go", "next/internal/command/zzprobe/x_test.go"}
+	if !slices.Equal(refused, want) || len(findings) != len(want) {
+		t.Errorf("findings = %v, want %v refused for holding only tests", findings, want)
 	}
 }
 

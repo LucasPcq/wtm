@@ -8,7 +8,7 @@ Set Theme "Catppuccin Mocha"
 Set TypingSpeed 50ms
 
 Hide
-Type "source /tmp/wtmcmp-n/env.sh; clear"
+Type "source $WTM_PROOF_SANDBOX/env.sh; clear"
 Enter
 Show
 
