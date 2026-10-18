@@ -36,7 +36,9 @@ A cli's run is `c.form.Launch(cmd, args, c.form.Conclude)`. An end case of its o
 
 ## A command's own step
 
-Only for a question the engine cannot ask by its kind (extract's file picker, its target picked as a worktree then typed as a branch). In `cli/steps.go`, `special` returns it by the field's path (`switch field.Spec().Path`), never by the kind of field; it embeds the engine's `form.Asked`, `*form.TextStep` or `*form.MultiSelectStep` and overrides only what differs (its `Standing`, its check, its tone). A `form.Step` builds its input in `Open` and returns it from `Widget()`: a `widget.Widget` from `ui/widget` (`SelectList`, `MultiSelect` with `Pick` and `Tone`, `Text`, `TextList`; `Option`, `Verdict`, `Size`, `Help`, `Styles`, `Wrap`). A new input kind is a widget there, never in a command.
+Only for a question the engine cannot ask by its kind (extract's file picker, its target picked as a worktree then typed as a branch). In `cli/steps.go`, `special` picks the field by its path (`switch field.Spec().Path`); within one path a step may still vary by the field's kind (extract's `toStep`, `command/extract/cli/steps.go`). The step embeds the engine's `form.Asked`, `*form.TextStep` or `*form.MultiSelectStep` and overrides only what differs (its `Standing`, its check, its tone). A `form.Step` builds its input in `Open` and returns it from `Widget()`: a `widget.Widget` from `ui/widget` (`SelectList`, `MultiSelect` with `Pick` and `Tone`, `Text`, `TextList`; `Option`, `Verdict`, `Size`, `Help`, `Styles`, `Wrap`). A new input kind is a widget there, never in a command.
+
+A step is Bubble Tea code: it lays out from the size `tea.WindowSizeMsg` gave, never a hard-coded height; it returns its `tea.Cmd` and the wizard batches it, never runs it in `Update`; and a panic inside a `tea.Cmd` is not recovered (Bubble Tea recovers only the event loop) and leaves the terminal raw.
 
 ## Tests
 

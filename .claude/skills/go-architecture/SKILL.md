@@ -1,6 +1,6 @@
 ---
 name: go-architecture
-description: Where code goes in wtm's next/ (the wtm-next rewrite) and the rules that hold it there — a command is one folder (usecase.go, port.go, rules.go, questions.go, cli/) over shared services, a pure domain, adapters with their fakes, a ui/ kit and the wiring in cmd/wtm-next. Use it whenever you add, migrate, change, review or move code under next/ — a command, its Run, a question or flag, a port, an adapter or fake, a service, the form engine, the JSON envelope, exit codes, the registrations — or when someone asks where next/ code belongs or how two next/ commands share something. Not for the legacy internal/ (frozen; CLAUDE.md and docs/dev/ govern it). Pair it with go-style for the Go itself.
+description: Where code goes in wtm's next/ (the wtm-next rewrite) and the rules that hold it there — a command is one folder (usecase.go, port.go, rules.go, questions.go, cli/) over shared services, a pure domain, adapters with their fakes, a ui/ kit and the wiring in cmd/wtm-next. Use it whenever you add, migrate, change, review or move code under next/ — a command, its Run, a question or flag, a port, an adapter or fake, a service, the form engine, the JSON envelope, exit codes, the registrations — and whenever someone asks where wtm code goes or how two commands share something, even without saying next/ (during the migration, new code goes there). Not for the legacy internal/ (frozen; CLAUDE.md and docs/dev/ govern it). Pair it with go-style for the Go itself.
 ---
 
 # go-architecture — where code goes in next/

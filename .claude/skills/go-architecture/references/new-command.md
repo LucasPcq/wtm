@@ -18,7 +18,7 @@ command/<name>/
   *_test.go        beside each file; fixture_test.go, helpers_test.go, contract_test.go
 ```
 
-A command named with a dash lives without it (`fast-forward` → `command/fastforward`). It never imports another command: what it shares with an existing one moves to `domain/`, `service/` or `ui/` in the same change.
+A command named with a dash lives without it (`fast-forward` → `command/fastforward`). It never imports another command: what it shares with an existing one moves to `domain/`, `service/` or `ui/` in the same change. A shared piece speaks the domain, and each command turns it into its own codes and messages: `worktree.Place` returns a sealed `worktree.Placement`, which create and extract each word as their own refusals; the fast-forward outcomes of `provision.Service.FastForwardEach` become each command's warnings the same way.
 
 ## 3. `usecase.go`
 
@@ -33,7 +33,7 @@ Sections in this order, each under go-style's separator: the use case, Run, Plan
 
 ## 4. `rules.go`
 
-Pure: no port, no context. `Facts` (what `Observe` read); one decision per subject as a sealed `decision` declared `//go-sumtype:decl` (`command/create/rules.go:39`), the subject's plan or its refusal; `Decide(facts, req)` returning the `Plan` and its warnings (and an error when a refusal stops the whole request); `Plan.Locks()` (what the operation must hold) and `Plan.Fingerprinted()` (what the fingerprint covers); `Request.Locks()` (taken before planning).
+Pure: no port, no context. `Facts` (what `Observe` read); one decision per subject as a sealed `decision` declared `//go-sumtype:decl` (`command/create/rules.go:39`), the subject's plan or its refusal; `Decide(facts, req, …)`, with whatever else the command decides from (extract's takes the conflicts found), returning the `Plan` and its warnings (and an error when a refusal stops the whole request); `Plan.Locks()` (what the operation must hold) and `Plan.Fingerprinted()` (what the fingerprint covers); `Request.Locks()` (taken before planning).
 
 ## 5. Codes
 
@@ -46,10 +46,10 @@ Copy `command/create/cli/`; the engine behind it is `form.md`.
 - `command.go`: `New(streams, env, open) *cobra.Command` with `Use` from `Name`, `Short`, `Long`, `Example` and `yesUsage`; its `uicli.Run{Command: <name>.Name, Streams, Env, Flags, Exits}`, `Exits` mapping the command's own codes to their exit (`<name>.config_not_found`, `<name>.config_invalid`, extract's conflict); `c.form.Bind(cmd, &c.io)`. Its run is `c.form.Launch(cmd, args, c.form.Conclude)`, or a `conclude` of its own that handles its one end case and hands the rest to `Conclude` (extract's "nothing to extract").
 - `form.go`: `newForm(open)` returns its `form.Command[Request, Questions, Outcome]` with `YesUsage`, `Open: form.Opener[…](open)`, `Preview`, `Draw`, `ApplyLabel` and `Special` when it has steps of its own; `<name>Flags = newForm(nil).Flags()` spells the failures.
 - `output.go`: `planRowsOf`, `preview` and `previewMarks` (the plan as `form.Preview`), `drawOutcome` (the apply, with the `ui/output` kit; `output.GoStep(branch)` for the step that enters a worktree, the branch quoted).
-- `steps.go`: only for a field the engine cannot ask by its kind; `special` switches on `field.Spec().Path`.
+- `steps.go`: only for a field the engine cannot ask by its kind; `special` picks the field by `field.Spec().Path`, and within one path a step may still vary by the field's kind (extract's `toStep`, `command/extract/cli/steps.go`).
 - `testdata/`: goldens for `--help`, the dry run, each outcome, each refusal, each JSON envelope, the wizard's screens, through `ui/formtest`.
 
-No conclusion, envelope or dry-run drawing in a command's `cli/`: they are `form.Command`'s.
+No conclusion, envelope or dry-run drawing in a command's `cli/`: they are `form.Command`'s. Positional arguments are checked by cobra's `Args` (`cobra.ArbitraryArgs` for create's branches, `cobra.MaximumNArgs(1)` for extract's source). Tests cover both modes, a terminal (the wizard) and none (unattended, a missing field refused by its flag). A secret is never read from a flag.
 
 ## 7. The registrations in `cmd/wtm-next`
 
@@ -78,7 +78,7 @@ Gates: `make lint-next`, `make test-next`, then the `build-validator` agent.
 
 - `next/docs/proof/<name>.sh` runs the same scenarios against `wtm` and `wtm-next` in sandboxes and captures each exit code, stdout, stderr and the state on disk; the captures are committed, and a rerun leaves `git diff next/docs/proof` empty (`next/docs/proof/README.md`).
 - The PR shows the real output before (`wtm`) and after (`wtm-next`) and the state on disk compared.
-- Each difference is settled, never a "known difference": the legacy when it is sensible; otherwise the uniform form of `next/`, listed in the PR and in `next/docs/proof/README.md` for the owner; one word keeps one meaning across commands (` · remembered` is recalled, ` · will be remembered` will be written); nothing the legacy offers disappears without the owner's decision. Each contract break (JSON, exit code, state on disk) is listed.
+- Each difference is settled, never a "known difference": the legacy when it is sensible; otherwise the uniform form of `next/`, listed in the PR and in `next/docs/proof/README.md` for the owner; one word keeps one meaning across commands (` · remembered` is recalled, ` · will be remembered` will be written); nothing the legacy offers disappears without the owner's decision; nothing odd is added only to match the legacy. A spec that departs from the legacy is validated by the owner before it is implemented. Each contract break (JSON, exit code, state on disk) is listed.
 
 ## 10. Done
 

@@ -39,7 +39,7 @@ Comments — `references/comments.md`
 Readability — `references/readability.md`
 - Use blank lines to break a function into paragraphs, the way paragraphs break a document (Cheney).
 - Return early, reduce nesting, keep variables in the smallest scope.
-- Positional parameters are the norm; reach for an options struct when a function takes many inputs, when two values of the same type could be swapped (or a type, Cheney's fix), or when the list will grow. A struct for two inputs of different types is not a Go convention.
+- Positional parameters are the norm; reach for an options struct when a function takes many inputs, when two values of the same type could be swapped (Cheney's alternative there is a helper type, `Source.CopyTo(dest)`, not a struct), or when the list will grow. A struct for two inputs of different types is not a Go convention.
 - Prefer a nil slice to `[]T{}`, useful zero values, field names in composite literals of other packages' types; no mutable globals, no `init()` doing work.
 - No hard line-length limit; a file is focused enough that a maintainer can tell which file holds something — neither thousands of lines nor many tiny files.
 
