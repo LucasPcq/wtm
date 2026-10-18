@@ -1,0 +1,28 @@
+
+  List the worktrees of the repository: whether each holds uncommitted changes,
+  is locked or mid-rebase, its commits past the base branch, where its branch stands
+  against origin, the jobs up in it, and with --with-prs its open pull request.
+  It changes nothing.
+
+  On a terminal it opens a picker: choose a worktree, then what to do with it, and the
+  command that does it is printed (r refreshes from origin). Without a terminal, or
+  with --output json, it prints the list.
+
+  Usage:
+    wtm-next list [flags]
+
+  Examples:
+    # Pick a worktree, then what to do with it
+    wtm list
+
+    # Each worktree with its pull request, as JSON
+    wtm list --with-prs --output json
+
+  Flags:
+    -h, --help            help for list
+        --output string   Output format: text or json (default "text")
+        --with-prs        Ask GitHub for each worktree's open pull request (needs gh)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

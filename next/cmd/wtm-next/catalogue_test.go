@@ -21,7 +21,7 @@ func TestTheCatalogueListsEachCommandWithItsSchemaOutsideAnyRepository(t *testin
 		assert.NotEmpty(t, command.Form.Fields, command.Name)
 	}
 
-	assert.Equal(t, []string{"create", "extract"}, names)
+	assert.Equal(t, []string{"create", "extract", "list"}, names)
 }
 
 func TestCreateIsDrivenThroughTheCataloguePreviewedThenAppliedWithItsFingerprint(t *testing.T) {
@@ -66,6 +66,20 @@ func TestExtractIsDrivenThroughTheCataloguePreviewedThenAppliedWithItsFingerprin
 	assert.Equal(t, domain.StatusDone, applied.Envelope.Items[0].Status)
 	assert.FileExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-notes", "notes.txt"))
 	assert.NoFileExists(t, filepath.Join(main, "notes.txt"))
+}
+
+func TestListIsReadThroughTheCatalogueWithNoOperation(t *testing.T) {
+	main := configured(t)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv(stateDirEnv, "")
+
+	read := command(t, "list").Execute(t.Context(), api.Call{Dir: main, Request: json.RawMessage(`{}`)})
+
+	require.Equal(t, http.StatusOK, read.Status, read.Envelope.Err)
+	require.Len(t, read.Envelope.Items, 1)
+	assert.Equal(t, "main", read.Envelope.Items[0].Subject)
+	assert.Empty(t, read.Envelope.Op)
+	assert.NoDirExists(t, filepath.Join(main, ".git", "wtm", "ops"))
 }
 
 func TestAnInvalidCallIsRefusedWithTheStatusOfItsKind(t *testing.T) {

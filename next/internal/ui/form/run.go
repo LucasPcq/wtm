@@ -39,6 +39,13 @@ func Run(ctx context.Context, script Script, in io.Reader, out *output.Stream) e
 	}
 }
 
+// Walk asks the steps of script on the terminal, reading keys from in and drawing on out, until the last one is answered: a read's picker, with no recap nor apply. It returns a failed read of the repository, or a [domain.KindCancelled] error when the user leaves.
+func Walk(ctx context.Context, script Script, in io.Reader, out *output.Stream) error {
+	w := New(ctx, script)
+	w.style(output.StylesOf(out))
+	return ask(ctx, w, in, out)
+}
+
 // ask runs wizard as a Bubble Tea program until it ends, and returns why it did not finish: the failed read that ended it, or an interruption.
 func ask(ctx context.Context, wizard *Wizard, in io.Reader, out *output.Stream) error {
 	final, err := tea.NewProgram(wizard, tea.WithContext(ctx), tea.WithInput(in), tea.WithOutput(out.Writer), tea.WithoutSignalHandler()).Run()

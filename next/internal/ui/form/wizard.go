@@ -25,7 +25,11 @@ type Script struct {
 	Steps []Step
 	// Observe reads the repository for the request as answered so far. It runs off the event loop and returns the function that installs what it read, which the wizard calls on the loop, even on an error.
 	Observe func(ctx context.Context) (func(), error)
-	// Preview computes the plan the recap shows, the same way as Observe.
+	// Refresh reads the repository again for a [Refresher] step, the same way as Observe; nil refreshes with Observe.
+	Refresh func(ctx context.Context) (func(), error)
+	// Later reads, the same way as Observe, what is too slow to wait for: it starts with the first read, and once it lands the step asked, if a [Refresher], is rebuilt; nil reads nothing later.
+	Later func(ctx context.Context) (func(), error)
+	// Preview computes the plan the recap shows, the same way as Observe; nil has no recap: the walk ends on the last step, as a read's picker does.
 	Preview func(ctx context.Context) (func(), error)
 	// Plan draws the plan Preview computed in width columns.
 	Plan func(width int, st *output.Styles) string
@@ -116,9 +120,16 @@ func (w *Wizard) Current() int {
 // ----------------------------------------------------------------------------
 // The event loop
 
-// Init starts the spinner and the first read of the repository.
+// Init starts the spinner, the first read of the repository and the read that lands later.
 func (w *Wizard) Init() tea.Cmd {
-	return tea.Batch(w.load(readingText), w.observe(thenEnter))
+	cmds := []tea.Cmd{w.load(readingText), w.observe(thenEnter)}
+	if w.script.Later != nil {
+		cmds = append(cmds, func() tea.Msg {
+			apply, err := w.script.Later(w.ctx)
+			return laterMsg{apply: apply, err: err}
+		})
+	}
+	return tea.Batch(cmds...)
 }
 
 // load shows text beside the spinner and returns the tick that turns it.
@@ -146,6 +157,9 @@ func (w *Wizard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return w, w.observed(m)
 	case previewMsg:
 		w.previewed(m)
+		return w, nil
+	case laterMsg:
+		w.landed(m)
 		return w, nil
 	}
 
@@ -227,12 +241,33 @@ type previewMsg struct {
 	err   error
 }
 
-// observe reads the repository off the event loop and comes back with an observedMsg carrying after.
+// A laterMsg brings what the script's Later read back to the event loop.
+type laterMsg struct {
+	apply func()
+	err   error
+}
+
+// observe reads the repository off the event loop, with Refresh for a refresh when the script has one, and comes back with an observedMsg carrying after.
 func (w *Wizard) observe(after then) tea.Cmd {
 	w.reading = true
+	read := w.script.Observe
+	if after == thenRefresh && w.script.Refresh != nil {
+		read = w.script.Refresh
+	}
 	return func() tea.Msg {
-		apply, err := w.script.Observe(w.ctx)
+		apply, err := read(w.ctx)
 		return observedMsg{apply: apply, err: err, then: after}
+	}
+}
+
+// landed installs what Later read, its failure left for its apply to tell, and rebuilds the step asked when it is a [Refresher] whose field can be rebuilt now.
+func (w *Wizard) landed(m laterMsg) {
+	m.apply()
+	if !w.loaded || w.reading || w.ending != Asking {
+		return
+	}
+	if r, ok := w.refresher(); ok && r.Refreshable() {
+		r.Refreshed()
 	}
 }
 
@@ -284,9 +319,9 @@ func (w *Wizard) atRecap() bool {
 	return w.current == w.recapAt()
 }
 
-// last returns the index the walk stops before: the recap's on a dry run, the one after it otherwise.
+// last returns the index the walk stops before: the recap's on a dry run or with no recap, the one after it otherwise.
 func (w *Wizard) last() int {
-	if w.script.DryRun {
+	if w.script.DryRun || w.script.Preview == nil {
 		return w.recapAt()
 	}
 	return w.recapAt() + 1

@@ -1,0 +1,23 @@
+$ <BIN> list; echo EXIT=$?
+
+  Step 2/2 • Action
+
+  ╭──────────────────────────────────────────────╮
+  │ GitHub not connected                         │
+  │ Connect to see PRs linked to your worktrees: │
+  │ run `gh auth login`                          │
+  ╰──────────────────────────────────────────────╯
+
+  ✓ Worktree: feat/a
+
+▌▸ Go (cd to worktree)
+   Open PR
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   Start profile
+   Stop profile
+   View logs
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   Clean (delete worktree)
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

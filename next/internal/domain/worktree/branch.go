@@ -64,3 +64,9 @@ func (ab AheadBehind) Divergence() Divergence {
 func (ab AheadBehind) String() string {
 	return strconv.Itoa(ab.Ahead) + " ahead, " + strconv.Itoa(ab.Behind) + " behind"
 }
+
+// A Span is the commits Branch has that Base lacks.
+type Span struct {
+	Branch string
+	Base   string
+}

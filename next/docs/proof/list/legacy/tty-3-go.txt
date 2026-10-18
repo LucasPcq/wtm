@@ -1,0 +1,5 @@
+$ <BIN> list; echo EXIT=$?
+<SB>/acme.trees/feat-a
+EXIT=0
+$
+

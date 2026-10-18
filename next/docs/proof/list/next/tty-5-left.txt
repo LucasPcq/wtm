@@ -1,0 +1,7 @@
+$ <BIN> list; echo EXIT=$?
+
+┃  ✗ interrupted
+
+EXIT=19
+$
+

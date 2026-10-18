@@ -73,6 +73,17 @@ func (r Repo) AheadBehind(ctx context.Context, name string) (worktree.AheadBehin
 	return parseAheadBehind(string(out))
 }
 
+// Count counts the commits span's branch has that its base lacks. It fails when
+// either branch is missing.
+func (r Repo) Count(ctx context.Context, span worktree.Span) (int, error) {
+	out, err := r.git(ctx, "rev-list", "--count", headsPrefix+span.Base+".."+headsPrefix+span.Branch, "--")
+	if err != nil {
+		return 0, err
+	}
+
+	return strconv.Atoi(strings.TrimSpace(string(out)))
+}
+
 // parseAheadBehind reads the two counts of git rev-list --left-right --count.
 func parseAheadBehind(out string) (worktree.AheadBehind, error) {
 	fields := strings.Fields(out)

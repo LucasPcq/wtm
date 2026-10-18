@@ -89,6 +89,17 @@ func TestTheFakeAndGitFetchWhatTheRemoteHas(t *testing.T) {
 	}
 }
 
+func TestTheFakeAndGitFetchEveryBranchOfTheRemote(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			require.NoError(t, impl.port.Fetch(t.Context()))
+
+			assert.Equal(t, worktree.AheadBehind{Behind: 1}, aheadBehind(t, impl.port, "main"))
+			assert.True(t, has(t, impl.port, worktree.RemoteBranch{Name: "pushed"}))
+		})
+	}
+}
+
 func TestTheFakeAndGitFastForwardABranchCheckedOutNowhere(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {

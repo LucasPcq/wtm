@@ -1,0 +1,40 @@
+package domain
+
+import (
+	"encoding/json"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestAReadIsReportedWithoutOperationPlanNorFingerprint(t *testing.T) {
+	read := Read[struct {
+		Path string `json:"path"`
+	}]{
+		Items: []Unit[struct {
+			Path string `json:"path"`
+		}]{{Subject: "feat/x", Status: StatusDone, Detail: &struct {
+			Path string `json:"path"`
+		}{"/trees/feat-x"}}},
+		Warnings:  []Warning{{Code: "list.prs_unavailable", Message: "GitHub not connected"}},
+		FollowUps: []FollowUp{{Argv: []string{"wtm", "go", "feat/x"}}},
+	}
+
+	data, err := json.Marshal(read.Envelope("list", nil))
+
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"v": 2, "command": "list", "ok": true,
+		"items": [{"subject": "feat/x", "status": "done", "detail": {"path": "/trees/feat-x"}}],
+		"follow_ups": [{"argv": ["wtm", "go", "feat/x"], "code": "", "message": ""}],
+		"warnings": [{"code": "list.prs_unavailable", "message": "GitHub not connected"}]}`, string(data))
+}
+
+func TestAReadEndsOnItsRefusalElseOnTheFirstSubjectItFailedToRead(t *testing.T) {
+	unreadable := &Error{Kind: KindInternal, Code: "list.unreadable", Message: "can't read /trees/b"}
+	refused := &Error{Kind: KindPrecondition, Code: "list.config_not_found", Message: "no wtm config"}
+	read := Read[struct{}]{Items: []Unit[struct{}]{{Subject: "a", Status: StatusDone}, {Subject: "b", Status: StatusFailed, Err: unreadable}}}
+
+	assert.Equal(t, unreadable, read.Envelope("list", nil).Err)
+	assert.Equal(t, refused, Read[struct{}]{}.Envelope("list", refused).Err)
+}

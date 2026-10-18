@@ -1,0 +1,17 @@
+$ <BIN> list; echo EXIT=$?
+
+  Step 1/2 • Worktree
+
+  Select a worktree
+  ! pull requests unavailable: run `gh auth login`
+
+▌› main                                                                    main  • active  ✓ clean
+   feat/a                                                              base ↑2  origin ↑1  ! dirty
+   feat/b                                                                        ! locked  ✓ clean
+   feat/gone                                                                             ✗ missing
+   ../acme.trees/detached                                                                  ✓ clean
+   locked-gone                                                                 ! locked  ✗ missing
+   orphan                                                                                  ✓ clean
+
+  ↑↓ navigate • / filter • r refresh • enter confirm • esc cancel
+

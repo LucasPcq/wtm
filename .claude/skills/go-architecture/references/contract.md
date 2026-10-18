@@ -61,3 +61,14 @@ The kind decides (`ui/cli/exit.go`); a command maps its own codes in its `cli/` 
 - A mutating command runs inside an operation (`service/operation`): a record under the state directory, a shared lock on the repository, an exclusive lock per worktree, taken before observing; a plan naming a worktree the request did not is planned again once that lock is held. A dry run takes none.
 - Events (`operation.*`, `unit.*`, `phase.*`, `worktree.created`/`provisioned`/`updated`/`numbered`) go out through the operation's report; a command adds an event only for a change another process must see.
 - The first Ctrl+C cancels the context: the section in progress finishes (a shield), later items are skipped as interrupted, exit 19; the second kills the children's process groups. Details: `next/README.md`, "Cancellation".
+
+## A read
+
+A command that changes nothing, `command/list`, keeps this contract in place of the operation's.
+
+- `Run(ctx, req, opts)` returns a `domain.Read[Detail]`, the signature `api.Bind` binds: one `Unit` per subject (`done` with its detail, `failed` with the error that kept it from being read, `cancelled` once the context is), the warnings, the follow-ups chosen. `[test]`
+- It takes no lock, runs no operation and publishes no event: its envelope has no `op`, `plan` nor `fingerprint`, and it has no `contract_test.go`. `[test]` (`cmd/wtm-next`, `TestListIsReadThroughTheCatalogueWithNoOperation`)
+- Its `cli` is a `form.Query`: the flags of its schema and `--output`, none of `--yes`, `--dry-run`, `--expect-fingerprint`, `--remember`, `--ask`. `[test]`
+- What it cannot ask (a forge, the run daemon) is a warning under its own code, exit 0, the fields it would fill `null`; it never starts the run daemon. `[review]`
+- It exits with the code of its first subject not read, after a pick too. `[test]`
+- Its picker (`Query.Pick`) opens only when stdin, stdout and stderr are terminals, the output is human and `--quiet` is off; it walks `form.Script` steps with no recap (`Preview` nil), `Later` for a slow read, `Refresh` for `r`, and ends on a `domain.FollowUp` whose argv `cmd/wtm-next` gives; leaving it is `cancelled`, exit 19. `[test]`

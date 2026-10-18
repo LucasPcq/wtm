@@ -1,19 +1,23 @@
 package main
 
 import (
+	"cmp"
 	"crypto/rand"
 	"encoding/hex"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
+	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	"github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
+	"github.com/LucasPcq/wtm/next/internal/adapter/github"
 	"github.com/LucasPcq/wtm/next/internal/adapter/oplock"
 	"github.com/LucasPcq/wtm/next/internal/adapter/proxyport"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
+	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
@@ -33,6 +37,7 @@ type wireParams struct {
 type app struct {
 	Create  create.UseCase
 	Extract extract.UseCase
+	List    list.UseCase
 }
 
 // wire builds each adapter of the repository params locates once and injects it into every use case.
@@ -81,7 +86,41 @@ func wire(params wireParams) app {
 			Operations: operations,
 			Provision:  provisions,
 		},
+		List: list.UseCase{
+			Git:          repo,
+			Meta:         meta,
+			Jobs:         daemon.Daemon{SocketPath: events.SocketPath()}.Jobs,
+			PullRequests: github.GitHub{Dir: params.MainPath}.PullRequests,
+			Repository:   facts,
+			Commands:     listCommands,
+		},
 	}
+}
+
+// listCommands spells the command line of each action list offers on a worktree: its own commands, in the legacy wtm until they migrate, and gh's for a pull request.
+func listCommands(action list.Action, detail list.Detail) []string {
+	worktree := cmp.Or(detail.Branch, detail.Path)
+	switch action {
+	case list.ActionGo:
+		if detail.Branch == "" {
+			return []string{"cd", detail.Path}
+		}
+		return []string{"wtm", "go", worktree}
+	case list.ActionOpenPR:
+		if detail.PR != nil {
+			return github.ViewCommand(detail.PR.Number)
+		}
+	case list.ActionRunUp:
+		return []string{"wtm", "run", "up", worktree}
+	case list.ActionRunDown:
+		return []string{"wtm", "run", "down", worktree}
+	case list.ActionLogs:
+		return []string{"wtm", "run", "logs", worktree}
+	case list.ActionClean:
+		return []string{"wtm", "clean", worktree}
+	}
+
+	return nil
 }
 
 // A locker adapts [oplock.Locks] to the port of [operation.Service], whose Take returns an [operation.Hold] where oplock's returns its concrete [*oplock.Held].

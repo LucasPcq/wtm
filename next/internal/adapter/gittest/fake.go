@@ -205,6 +205,24 @@ func (f *Fake) AheadBehind(_ context.Context, name string) (worktree.AheadBehind
 	return worktree.AheadBehind{Ahead: len(of) - shared, Behind: len(against) - shared}, nil
 }
 
+// Count counts the commits of the local branch span.Branch past the history it
+// shares with the local branch span.Base; it fails when either is missing.
+func (f *Fake) Count(_ context.Context, span worktree.Span) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("Count", span.Branch); err != nil {
+		return 0, err
+	}
+
+	of, ofOK := f.historyOf(worktree.LocalBranch{Name: span.Branch})
+	base, baseOK := f.historyOf(worktree.LocalBranch{Name: span.Base})
+	if !ofOK || !baseOK {
+		return 0, fmt.Errorf("gittest: unknown branch %s or %s", span.Branch, span.Base)
+	}
+
+	return len(of) - sharedLength(of, base), nil
+}
+
 // Snapshot returns the worktrees, the branches and the divergence of each
 // local branch whose remote tip differs, as git.Repo.Snapshot does.
 func (f *Fake) Snapshot(ctx context.Context) (worktree.Snapshot, error) {
@@ -338,6 +356,18 @@ func (f *Fake) deleteBranch(name string) error {
 	}
 
 	delete(f.local, name)
+	return nil
+}
+
+// Fetch updates every remote branch to origin's.
+func (f *Fake) Fetch(context.Context) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("Fetch", ""); err != nil {
+		return err
+	}
+
+	maps.Copy(f.remote, f.origin)
 	return nil
 }
 
@@ -527,9 +557,13 @@ func (f *Fake) place(path, name string) error {
 	return nil
 }
 
-// listed returns the worktrees in git's order: the main one, then by path.
+// listed returns the worktrees in git's order: the main one, then by path, a
+// gone one prunable as git lists it unless it is locked.
 func (f *Fake) listed() []worktree.Worktree {
 	worktrees := slices.Clone(f.worktrees)
+	for i, w := range worktrees {
+		worktrees[i].Prunable = slices.Contains(f.gone, w.Path) && !w.Locked
+	}
 	slices.SortStableFunc(worktrees[1:], func(a, b worktree.Worktree) int { return strings.Compare(a.Path, b.Path) })
 	return worktrees
 }

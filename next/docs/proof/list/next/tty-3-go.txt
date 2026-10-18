@@ -1,0 +1,7 @@
+$ <BIN> list; echo EXIT=$?
+
+┃  → wtm go feat/a   Go to the worktree
+
+EXIT=0
+$
+

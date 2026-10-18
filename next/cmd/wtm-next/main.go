@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	createcli "github.com/LucasPcq/wtm/next/internal/command/create/cli"
 	extractcli "github.com/LucasPcq/wtm/next/internal/command/extract/cli"
+	listcli "github.com/LucasPcq/wtm/next/internal/command/list/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/spf13/cobra"
@@ -24,8 +25,13 @@ func main() {
 		Version:       version,
 		Streams:       streams,
 		Args:          os.Args[1:],
-		Commands:      []*cobra.Command{createcli.New(streams, env, openCreate), extractcli.New(streams, env, openExtract)},
+		Commands:      commands(streams, env),
 		KillCancelled: shell.KillCancelled,
 		AwaitShields:  shell.AwaitShields,
 	}))
+}
+
+// commands are the command lines of every command wtm-next runs, on streams in env.
+func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
+	return []*cobra.Command{createcli.New(streams, env, openCreate), extractcli.New(streams, env, openExtract), listcli.New(streams, env, openList)}
 }

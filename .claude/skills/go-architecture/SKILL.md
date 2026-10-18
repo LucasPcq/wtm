@@ -15,8 +15,8 @@ next/
   internal/
     command/<name>/    one command: usecase.go, port.go, rules.go, questions.go, cli/
     service/<name>/    what use cases share with I/O: operation, provision, repository; <name>test kits
-    domain/            the pure model and vocabulary; worktree/, project/, env/, dotenv/ by subject
-    adapter/<name>/    git, store, config, shell, oplock, events, statefile, proxyport; <name>test fakes
+    domain/            the pure model and vocabulary; worktree/, project/, env/, dotenv/, run/ by subject
+    adapter/<name>/    git, store, config, shell, oplock, events, statefile, proxyport, daemon, github; <name>test fakes
     ui/                cli (root, exit codes, env), output (streams, frames, envelope), form (flags, wizard, conclusion), widget (a step's inputs), formtest (the cli tests' kit)
     api/               the catalogue of commands for a surface other than the CLI
   docs/proof/          scripts that run wtm and wtm-next side by side, and their captures
@@ -31,7 +31,7 @@ next/
 | is one command's request, its form schema and its validation | `command/<name>/questions.go` |
 | is a port one command needs (an interface, or a function type) | `command/<name>/port.go` |
 | draws one command's output, or asks one of its fields its own way | `command/<name>/cli/` |
-| is a pure rule, type or vocabulary two commands need | `domain/<subject>/` (`worktree`, `project`, `env`, `dotenv`), the root `domain` only for the cross-cutting contract (errors, events, outcomes, forms) |
+| is a pure rule, type or vocabulary two commands need | `domain/<subject>/` (`worktree`, `project`, `env`, `dotenv`, `run`), the root `domain` only for the cross-cutting contract (errors, events, outcomes, forms) |
 | orchestrates I/O two commands need | `service/<name>/` (concrete, with its own `port.go`) |
 | is a question two commands ask | the fragment of the service that consumes its answers (`service/provision/questions.go`) |
 | is presentation two commands need, or any field kind of the wizard | `ui/output`, `ui/form`, an input in `ui/widget` |
@@ -49,7 +49,7 @@ Each rule names what enforces it: `[archlint]` (`tools/archlint`, rule `next` un
 
 1. **Imports follow the table of `next/README.md`.** Dependencies point inward; a command never imports another command, a command's `cli` never imports a service or an adapter, only `cmd/wtm-next` imports adapters, nothing imports a fake outside a test, nothing in `next/` imports `internal/`. A package in no row is refused. `[archlint]`
 2. **A command is one folder with five parts** — `usecase.go`, `port.go`, `rules.go`, `questions.go`, `cli/` — and nothing else at its root but tests and their `testdata/`. Layers are files, not packages; `cli/` is the one sub-package, so cobra and Bubble Tea stay out of the use case. `[archlint]` (`slicefiles`)
-3. **`Run` is the story, in numbered steps, the same in every command:** begin the operation, plan under its locks, fingerprint and stop on a dry run, refuse a stale plan, apply between the started and finished events. A dry run takes no lock and plans once. A command adds a step only where its story differs (extract ends early when nothing is left to extract). `[test]` (`contract_test.go` runs `operationtest.Contract`) and `[review]` for the shape.
+3. **`Run` is the story, in numbered steps, the same in every command (a read: `references/contract.md`):** begin the operation, plan under its locks, fingerprint and stop on a dry run, refuse a stale plan, apply between the started and finished events. A dry run takes no lock and plans once. A command adds a step only where its story differs (extract ends early when nothing is left to extract). `[test]` (`contract_test.go` runs `operationtest.Contract`) and `[review]` for the shape.
 4. **A command's codes start with its name:** `<Name>.<snake_case>` (`extract.conflict`), `Name` being the command's constant, declared beside the code that raises them; a code several commands share is a `domain` constant. `[archlint]` (`codeprefix`)
 5. **Every command of `main.go` is in `catalogue.go` and wired in `wire.go`.** `[test]` (`cmd/wtm-next/registration_test.go`)
 6. **Ports are consumer-side and small:** a command or a service declares in its `port.go` only the methods it calls, as an interface, or a function type for a single function (`extract.Shield`). A service is concrete, never a port; an adapter exports a concrete type. `[archlint]` (`portfile`: a `port.go` declares only interface and function types), `[review]` (consumer-side and small)

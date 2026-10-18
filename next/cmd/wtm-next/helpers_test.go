@@ -11,6 +11,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/api"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
 
@@ -48,4 +49,10 @@ func registeredCommands(t *testing.T) []string {
 		}
 	}
 	return names
+}
+
+// runs reports whether root runs the command of path, its words: a command of that full path, not its parent taking the rest as arguments.
+func runs(root *cobra.Command, path []string) bool {
+	found, _, err := root.Find(path)
+	return err == nil && found.CommandPath() == strings.Join(append([]string{root.Name()}, path...), " ")
 }

@@ -61,3 +61,20 @@ func concluded(t *testing.T, format string, ran form.Ran[request, outcome], err 
 	failure := command.Conclude(cmd, ran, err)
 	return stdout.String(), failure
 }
+
+// queryCommand is a cobra command q is bound to, printing with run.
+func queryCommand(q *form.Query[request, questions, read], run *uicli.Run) *cobra.Command {
+	cmd := &cobra.Command{Use: "fake"}
+	q.Bind(cmd, run)
+	return cmd
+}
+
+// launched launches q bound to run with args, as the command line would.
+func launched(t *testing.T, q *form.Query[request, questions, read], run *uicli.Run, args ...string) error {
+	t.Helper()
+	cmd := queryCommand(q, run)
+	cmd.Flags().Bool(uicli.FlagQuiet, false, "")
+	require.NoError(t, cmd.ParseFlags(args))
+	cmd.SetContext(t.Context())
+	return q.Launch(cmd, nil)
+}
