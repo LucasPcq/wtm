@@ -173,7 +173,7 @@ func fakeCommand() *form.Command[request, questions, outcome] {
 // observed is a session of the fake command over a, its first read landed.
 func observed(t *testing.T, a *app, given request) *form.Session[request, questions, outcome] {
 	t.Helper()
-	s := fakeCommand().Session(t.Context(), form.SessionParams[request, questions, outcome]{App: a, Request: given})
+	s := fakeCommand().Session(t.Context(), a, given, domain.RunOptions{})
 	apply, err := s.Observe(t.Context())
 	require.NoError(t, err)
 	apply()

@@ -60,8 +60,8 @@ type driver struct {
 
 func open(t *testing.T, params sessionParams) *driver {
 	t.Helper()
-	s := newForm(nil).Session(t.Context(), params)
-	return start(t, s, form.New(t.Context(), s.Params()))
+	s := newForm(nil).Session(t.Context(), params.App, params.Request, params.Options)
+	return start(t, s, form.New(t.Context(), s.Script()))
 }
 
 func start(t *testing.T, s *session, w *form.Wizard) *driver {

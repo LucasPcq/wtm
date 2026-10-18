@@ -100,7 +100,7 @@ func TestAStackHangsEachWorktreeUnderTheBranchItWasCreatedFrom(t *testing.T) {
 	}
 	for label, c := range cases {
 		t.Run(label, func(t *testing.T) {
-			stack := StackOf(StackOfParams{Worktrees: c.worktrees, Records: c.records, Base: c.base})
+			stack := StackOf(c.worktrees, c.records, c.base)
 
 			assert.Equal(t, c.roots, stack.Roots())
 			for branch, children := range c.children {
@@ -116,14 +116,14 @@ func TestAStackHangsEachWorktreeUnderTheBranchItWasCreatedFrom(t *testing.T) {
 }
 
 func TestACascadeRebasesEachParentBeforeItsChildren(t *testing.T) {
-	stack := StackOf(StackOfParams{
-		Worktrees: live("develop", "a", "a1", "b", "d", "e", "x", "y", "z"),
-		Records: map[string]Meta{
+	stack := StackOf(
+		live("develop", "a", "a1", "b", "d", "e", "x", "y", "z"),
+		map[string]Meta{
 			"develop": from("main"), "a": at("main", "2026-01-01T00:00:00Z"), "a1": from("a"), "b": at("main", "2026-02-01T00:00:00Z"),
 			"d": from("develop"), "e": from("gone"), "x": from("y"), "y": from("x"), "z": from("x"),
 		},
-		Base: "develop",
-	})
+		"develop",
+	)
 	cases := map[string]struct {
 		roots []string
 		steps []string
@@ -162,7 +162,7 @@ func TestACascadeReachingACycleIsRefusedNamingIt(t *testing.T) {
 	}
 	for label, c := range cases {
 		t.Run(label, func(t *testing.T) {
-			steps, err := StackOf(StackOfParams{Worktrees: live("a", "b", "c"), Records: c.records}).Cascade(c.roots)
+			steps, err := StackOf(live("a", "b", "c"), c.records, "").Cascade(c.roots)
 
 			var cycle *CycleError
 			require.ErrorAs(t, err, &cycle)

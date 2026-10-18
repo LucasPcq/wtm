@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
@@ -16,9 +17,14 @@ import (
 
 var size = tea.WindowSizeMsg{Width: 80, Height: 30}
 
-func open(t *testing.T, params form.Params) *formtest.Driver {
+func open(t *testing.T, script form.Script) *formtest.Driver {
 	t.Helper()
-	return start(form.New(t.Context(), params))
+	return start(form.New(t.Context(), script))
+}
+
+func dryRun(script form.Script) form.Script {
+	script.DryRun = true
+	return script
 }
 
 func start(w *form.Wizard) *formtest.Driver {
@@ -28,8 +34,8 @@ func start(w *form.Wizard) *formtest.Driver {
 // asking opens the wizard of the fake command on the step at, every step before it given.
 func asking(t *testing.T, a *app, given request) (*formtest.Driver, *form.Session[request, questions, outcome]) {
 	t.Helper()
-	s := fakeCommand().Session(t.Context(), form.SessionParams[request, questions, outcome]{App: a, Request: given})
-	return start(form.New(t.Context(), s.Params())), s
+	s := fakeCommand().Session(t.Context(), a, given, domain.RunOptions{})
+	return start(form.New(t.Context(), s.Script())), s
 }
 
 func bound(t *testing.T, args ...string) (*form.Command[request, questions, outcome], *cobra.Command) {

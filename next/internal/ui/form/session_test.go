@@ -66,8 +66,8 @@ func TestAPathIsLabelledByItsFirstFieldKeepingAnEntrysIndex(t *testing.T) {
 
 func TestTheRecapAppliesThePlanItPreviewedHeldToItsFingerprint(t *testing.T) {
 	a := &app{}
-	s := fakeCommand().Session(t.Context(), form.SessionParams[request, questions, outcome]{App: a, Request: request{"branches": {"feat/a"}, "from": {"main"}, "mode": {"fast"}, "ff": {"false"}, "keep": {"false"}, "files": {"a.txt"}, "name": {"x"}}, Options: domain.RunOptions{CorrelationID: "corr-1"}})
-	d := start(form.New(t.Context(), s.Params()))
+	s := fakeCommand().Session(t.Context(), a, request{"branches": {"feat/a"}, "from": {"main"}, "mode": {"fast"}, "ff": {"false"}, "keep": {"false"}, "files": {"a.txt"}, "name": {"x"}}, domain.RunOptions{CorrelationID: "corr-1"})
+	d := start(form.New(t.Context(), s.Script()))
 	require.Contains(t, d.Screen(), "plan of  feat/a")
 
 	d.Keys("enter")

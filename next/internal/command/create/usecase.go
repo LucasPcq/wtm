@@ -185,7 +185,7 @@ func (u UseCase) locate(ctx context.Context, paths []string) (map[string]worktre
 func (u UseCase) fastForward(ctx context.Context, plan Plan, report domain.Report) ([]string, []domain.Warning) {
 	advanced := slices.Clone(plan.FastForward)
 	var warnings []domain.Warning
-	for _, missed := range u.Provision.FastForwardEach(ctx, provision.FastForwardEachParams{Subjects: plan.FastForward, Snapshot: plan.facts.Snapshot, Report: report}) {
+	for _, missed := range u.Provision.FastForwardEach(ctx, plan.FastForward, plan.facts.Snapshot, report) {
 		advanced = slices.DeleteFunc(advanced, func(subject string) bool { return subject == missed.Subject })
 		warnings = append(warnings, notAdvanced(missed))
 	}

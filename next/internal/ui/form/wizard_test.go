@@ -15,7 +15,7 @@ import (
 
 func TestEachAskedStepIsEnteredThenTheRecapApplies(t *testing.T) {
 	f := newFake()
-	d := open(t, form.Params{Script: f.script()})
+	d := open(t, f.script())
 
 	assert.Contains(t, d.Screen(), "Step 1/3 • First")
 	assert.Contains(t, d.Screen(), "What First asks")
@@ -50,7 +50,7 @@ func TestASettledStepIsNotAskedAndSaysWhatSettledIt(t *testing.T) {
 	for name, c := range cases {
 		f := newFake()
 		f.first.standing = c.Standing
-		d := open(t, form.Params{Script: f.script()})
+		d := open(t, f.script())
 
 		assert.Equal(t, 1, d.Wizard.Current(), name)
 		assert.Contains(t, d.Screen(), c.Line, name)
@@ -61,7 +61,7 @@ func TestASettledStepIsNotAskedAndSaysWhatSettledIt(t *testing.T) {
 func TestAnErredStepIsAskedEvenWhenAFlagSettledIt(t *testing.T) {
 	f := newFake()
 	f.first.standing = form.Standing{Value: "x", Given: true, Flag: "--first", Erred: true}
-	d := open(t, form.Params{Script: f.script()})
+	d := open(t, f.script())
 
 	assert.Equal(t, 0, d.Wizard.Current())
 }
@@ -69,7 +69,7 @@ func TestAnErredStepIsAskedEvenWhenAFlagSettledIt(t *testing.T) {
 func TestAKeptDefaultIsItsValueAlone(t *testing.T) {
 	f := newFake()
 	f.first.standing = form.Standing{Value: "yes", Origin: domain.OriginConfig}
-	d := open(t, form.Params{Script: f.script()})
+	d := open(t, f.script())
 
 	d.Keys("enter")
 
@@ -78,7 +78,7 @@ func TestAKeptDefaultIsItsValueAlone(t *testing.T) {
 
 func TestBackReturnsToTheLastAskedStepAndResetsTheOnesAfter(t *testing.T) {
 	f := newFake()
-	d := open(t, form.Params{Script: f.script()})
+	d := open(t, f.script())
 	d.Keys("enter", "enter")
 	require.Equal(t, 2, d.Wizard.Current())
 
@@ -100,7 +100,7 @@ func TestEachWayOutCancels(t *testing.T) {
 	}
 	for name, keys := range cases {
 		f := newFake()
-		d := open(t, form.Params{Script: f.script()})
+		d := open(t, f.script())
 
 		d.Keys(keys...)
 
@@ -111,7 +111,7 @@ func TestEachWayOutCancels(t *testing.T) {
 func TestAPreviewThatFailsSaysWhyAndOffersOnlyToCancel(t *testing.T) {
 	f := newFake()
 	f.previewErr = domain.Invalid([]domain.FieldError{{Path: "first", Code: "required", Template: "{path} is required"}})
-	d := open(t, form.Params{Script: f.script()})
+	d := open(t, f.script())
 
 	d.Keys("enter", "enter")
 
@@ -125,7 +125,7 @@ func TestAPreviewThatFailsSaysWhyAndOffersOnlyToCancel(t *testing.T) {
 
 func TestAStaleRunAsksNothingAgainAndSaysWhy(t *testing.T) {
 	f := newFake()
-	d := open(t, form.Params{Script: f.script()})
+	d := open(t, f.script())
 	d.Keys("enter", "enter")
 
 	again := start(d.Wizard.Again())
@@ -138,7 +138,7 @@ func TestAStaleRunAsksNothingAgainAndSaysWhy(t *testing.T) {
 
 func TestADryRunAsksTheStepsAndNoConfirmation(t *testing.T) {
 	f := newFake()
-	d := open(t, form.Params{Script: f.script(), DryRun: true})
+	d := open(t, dryRun(f.script()))
 
 	assert.Contains(t, d.Screen(), "Step 1/2 • First")
 	d.Keys("enter", "enter")
@@ -148,7 +148,7 @@ func TestADryRunAsksTheStepsAndNoConfirmation(t *testing.T) {
 
 func TestTheRefreshKeyReobservesOnlyAStepThatRefreshes(t *testing.T) {
 	f := newFake()
-	d := open(t, form.Params{Script: f.script()})
+	d := open(t, f.script())
 
 	d.Keys("r")
 
@@ -162,7 +162,7 @@ func TestADryRunWithNothingToAskAppliesWithoutDrawing(t *testing.T) {
 	f.second.standing = form.Standing{Skip: "no"}
 	ios, _, _, out := output.Test()
 
-	err := form.Run(t.Context(), form.Params{Script: f.script(), DryRun: true}, ios.In, ios.Err)
+	err := form.Run(t.Context(), dryRun(f.script()), ios.In, ios.Err)
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, f.applied)
@@ -176,7 +176,7 @@ func TestAFailedObserveEndsTheRun(t *testing.T) {
 	script.Observe = func(context.Context) (func(), error) { return func() {}, failed }
 	ios, _, _, _ := output.Test()
 
-	err := form.Run(t.Context(), form.Params{Script: script, DryRun: true}, ios.In, ios.Err)
+	err := form.Run(t.Context(), dryRun(script), ios.In, ios.Err)
 
 	assert.ErrorIs(t, err, failed)
 	assert.Zero(t, f.applied)
@@ -187,7 +187,7 @@ func TestAStepThatRefreshesIsReobservedOnItsKey(t *testing.T) {
 	refreshing := &refreshingStep{fakeStep: f.first}
 	script := f.script()
 	script.Steps[0] = refreshing
-	d := open(t, form.Params{Script: script})
+	d := open(t, script)
 	assert.Contains(t, d.Screen(), "enter confirm")
 	assert.Contains(t, d.Screen(), "r refresh")
 
@@ -200,7 +200,7 @@ func TestAStepThatRefreshesIsReobservedOnItsKey(t *testing.T) {
 
 func TestAnAnswerAndABackAreObservedOffTheLoopWhileTheStepSaysItIsReading(t *testing.T) {
 	f := newFake()
-	d := open(t, form.Params{Script: f.script()})
+	d := open(t, f.script())
 
 	_, cmd := d.Wizard.Update(formtest.Key("enter"))
 	assert.Equal(t, 1, f.observed)
@@ -222,7 +222,7 @@ func TestAnAnswerAndABackAreObservedOffTheLoopWhileTheStepSaysItIsReading(t *tes
 
 func TestKeysTypedWhileTheRepositoryIsReadAreReplayedInOrder(t *testing.T) {
 	f := newFake()
-	d := open(t, form.Params{Script: f.script()})
+	d := open(t, f.script())
 
 	_, cmd := d.Wizard.Update(formtest.Key("enter"))
 	d.Wizard.Update(formtest.Key("down"))
@@ -237,7 +237,7 @@ func TestKeysTypedWhileTheRepositoryIsReadAreReplayedInOrder(t *testing.T) {
 func TestGoingBackInARestartedFormAsksAgainTheStepsItResets(t *testing.T) {
 	f := newFake()
 	f.first.standing = form.Standing{Skip: "not yet"}
-	d := open(t, form.Params{Script: f.script()})
+	d := open(t, f.script())
 	d.Keys("down", "enter")
 	require.Equal(t, 2, d.Wizard.Current())
 
@@ -266,7 +266,7 @@ func TestAStalePlanAsksAgainAndAppliesUnderThePreviewOfTheNewForm(t *testing.T) 
 	}
 	ios, _, _, _ := output.Test()
 
-	err := form.Run(t.Context(), form.Params{Script: script}, enters{}, ios.Err)
+	err := form.Run(t.Context(), script, enters{}, ios.Err)
 
 	require.NoError(t, err)
 	assert.Equal(t, []int{1, 2}, appliedAfter)
@@ -278,7 +278,7 @@ func TestAFailedApplyEndsTheRunWithoutAskingAgain(t *testing.T) {
 	f.applyErr = failed
 	ios, _, _, _ := output.Test()
 
-	err := form.Run(t.Context(), form.Params{Script: f.script()}, enters{}, ios.Err)
+	err := form.Run(t.Context(), f.script(), enters{}, ios.Err)
 
 	assert.ErrorIs(t, err, failed)
 	assert.Equal(t, 1, f.applied)
@@ -298,7 +298,7 @@ func TestAReadThatFailsAfterAnAnswerEndsTheRun(t *testing.T) {
 	}
 	ios, _, _, _ := output.Test()
 
-	err := form.Run(t.Context(), form.Params{Script: script}, enters{}, ios.Err)
+	err := form.Run(t.Context(), script, enters{}, ios.Err)
 
 	assert.ErrorIs(t, err, failed)
 	assert.Equal(t, 2, reads)
@@ -309,7 +309,7 @@ func TestTheRecapNamesItsApplyAsTheScriptSays(t *testing.T) {
 	f := newFake()
 	script := f.script()
 	script.ApplyLabel = func() string { return "Yes, extract" }
-	d := open(t, form.Params{Script: script})
+	d := open(t, script)
 
 	d.Keys("enter", "enter")
 

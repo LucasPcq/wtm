@@ -9,14 +9,13 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Run asks the form of params, reading keys from in and drawing on out, then applies the request; when the plan turns stale as it applies, it starts the form again with the answers kept ([Wizard.Again]).
+// Run asks the form of script, reading keys from in and drawing on out, then applies the request; when the plan turns stale as it applies, it starts the form again with the answers kept ([Wizard.Again]).
 // A dry run with nothing to ask applies at once, without drawing the form. Run returns Apply's error, a failed read of the repository, or a [domain.KindCancelled] error when the user leaves.
-func Run(ctx context.Context, params Params, in io.Reader, out *output.Stream) error {
-	w := New(ctx, params)
+func Run(ctx context.Context, script Script, in io.Reader, out *output.Stream) error {
+	w := New(ctx, script)
 	w.style(output.StylesOf(out))
-	script := params.Script
 
-	if params.DryRun {
+	if script.DryRun {
 		apply, err := script.Observe(ctx)
 		apply()
 		if err != nil {
@@ -33,7 +32,7 @@ func Run(ctx context.Context, params Params, in io.Reader, out *output.Stream) e
 		}
 
 		err := script.Apply(ctx)
-		if params.DryRun || !script.Stale(err) {
+		if script.DryRun || !script.Stale(err) {
 			return err
 		}
 		w = w.Again()

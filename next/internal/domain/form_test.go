@@ -61,12 +61,12 @@ func TestEachKindAnswersAsItsCommandsRequestTakesIt(t *testing.T) {
 }
 
 func TestAConfirmationTakesTrueOrFalseOnly(t *testing.T) {
-	yes, err := Yes(AnswerParams{Path: "keep", Values: ConfirmField{Value: true}.Answer()})
+	yes, err := Yes("keep", ConfirmField{Value: true}.Answer())
 	require.NoError(t, err)
 	assert.True(t, yes)
 
 	for _, values := range [][]string{{"yes"}, {""}, {}, {"true", "false"}} {
-		_, err := Yes(AnswerParams{Path: "keep", Values: values})
+		_, err := Yes("keep", values)
 		failure, ok := errors.AsType[*Error](err)
 		require.True(t, ok, values)
 		assert.Equal(t, "keep", failure.Fields[0].Path, values)
@@ -74,11 +74,11 @@ func TestAConfirmationTakesTrueOrFalseOnly(t *testing.T) {
 }
 
 func TestOneTakesASingleValueOfItsType(t *testing.T) {
-	value, err := One[Origin](AnswerParams{Path: "origin", Values: []string{"config"}})
+	value, err := One[Origin]("origin", []string{"config"})
 	require.NoError(t, err)
 	assert.Equal(t, OriginConfig, value)
 
-	_, err = One[string](AnswerParams{Path: "from", Values: []string{"a", "b"}})
+	_, err = One[string]("from", []string{"a", "b"})
 	failure, ok := errors.AsType[*Error](err)
 	require.True(t, ok)
 	assert.Equal(t, CodeOneValue, failure.Fields[0].Code)

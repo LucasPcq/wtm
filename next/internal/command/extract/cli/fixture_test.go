@@ -26,7 +26,11 @@ import (
 // useCase is what the form calls of extract's use case, so a test can stand in for it.
 type useCase = form.UseCase[extract.Request, extract.Questions, extract.Outcome]
 
-type sessionParams = form.SessionParams[extract.Request, extract.Questions, extract.Outcome]
+type sessionParams struct {
+	App     useCase
+	Request extract.Request
+	Options domain.RunOptions
+}
 
 // The steps of extract's form, in the order asked, then the recap.
 const (

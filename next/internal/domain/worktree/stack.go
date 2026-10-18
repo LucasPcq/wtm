@@ -16,32 +16,25 @@ type Stack struct {
 	cycles   map[string][]string
 }
 
-// StackOfParams are the live worktrees, the meta record of each branch, and the base branch.
-type StackOfParams struct {
-	Worktrees []Worktree
-	Records   map[string]Meta
-	Base      string
-}
-
-// StackOf builds the stack of the live worktrees from their records' source branches. It never fails: the main worktree is a root whatever its record says, and a main worktree on no branch is no node, its children then under a virtual root of the branch they name; the base branch keeps its recorded parent; a worktree with no record or no source branch is a root; and the members of a cycle are promoted to roots, the cycle recorded for Cascade to refuse. Siblings, and the roots after the main one, are ordered by creation time, then by name; the virtual roots come last, by name.
-func StackOf(params StackOfParams) Stack {
+// StackOf builds the stack of the live worktrees from records, the meta record of each branch, by their source branches; base is the base branch. It never fails: the main worktree is a root whatever its record says, and a main worktree on no branch is no node, its children then under a virtual root of the branch they name; the base branch keeps its recorded parent; a worktree with no record or no source branch is a root; and the members of a cycle are promoted to roots, the cycle recorded for Cascade to refuse. Siblings, and the roots after the main one, are ordered by creation time, then by name; the virtual roots come last, by name.
+func StackOf(worktrees []Worktree, records map[string]Meta, base string) Stack {
 	stack := Stack{parents: map[string]string{}, children: map[string][]string{}, steps: map[string]bool{}, cycles: map[string][]string{}}
 	created := map[string]time.Time{}
 	main := ""
-	for _, w := range params.Worktrees {
+	for _, w := range worktrees {
 		branch := w.Branch()
 		if branch == "" {
 			continue
 		}
 
-		created[branch], _ = time.Parse(time.RFC3339, params.Records[branch].CreatedAt)
+		created[branch], _ = time.Parse(time.RFC3339, records[branch].CreatedAt)
 		if w.Main {
 			main = branch
 			continue
 		}
 
-		stack.steps[branch] = branch != params.Base
-		if source := params.Records[branch].SourceBranch; source != "" {
+		stack.steps[branch] = branch != base
+		if source := records[branch].SourceBranch; source != "" {
 			stack.parents[branch] = source
 		}
 	}

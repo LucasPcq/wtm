@@ -111,7 +111,7 @@ func (h *Held) Release() {
 func (l Locks) try(locks []domain.Lock, asked domain.Operation) ([]*os.File, bool, error) {
 	var files []*os.File
 	for _, lock := range locks {
-		file, err := statefile.TryLock(statefile.TryLockParams{Path: l.lockPath(lock), Shared: lock.Mode == domain.LockShared})
+		file, err := statefile.TryLock(l.lockPath(lock), lock.Mode)
 		if err != nil {
 			closeAll(files)
 		}

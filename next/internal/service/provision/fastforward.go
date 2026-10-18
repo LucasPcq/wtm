@@ -28,33 +28,27 @@ func (f FastForwarded) Failed() bool {
 	return f.Dirty || f.Busy || f.Err != nil
 }
 
-// FastForwardEachParams names the branches to fast-forward, in order, the snapshot that says where each is checked out, and where their events go.
-type FastForwardEachParams struct {
-	Subjects []string
-	Snapshot worktree.Snapshot
-	Report   domain.Report
-}
-
 // A Missed is a branch FastForwardEach left where it was, and why.
 type Missed struct {
 	Subject string
 	FastForwarded
 }
 
-// FastForwardEach fast-forwards each subject in turn between its fast_forward
-// phase events, starting none once ctx is cancelled. It returns the subjects
+// FastForwardEach fast-forwards each of subjects in turn, checked out where
+// snapshot says, between its fast_forward phase events sent to report,
+// starting none once ctx is cancelled. It returns the subjects
 // left where they were, except one cut short by a cancel: the run reports the
 // interruption instead.
-func (s Service) FastForwardEach(ctx context.Context, params FastForwardEachParams) []Missed {
+func (s Service) FastForwardEach(ctx context.Context, subjects []string, snapshot worktree.Snapshot, report domain.Report) []Missed {
 	var missed []Missed
-	for _, subject := range params.Subjects {
+	for _, subject := range subjects {
 		if ctx.Err() != nil {
 			return missed
 		}
 
-		params.Report(domain.PhaseStarted{Subject: subject, Phase: "fast_forward"})
-		forwarded := s.FastForward(ctx, FastForwardParams{Subject: subject, CheckedOutAt: params.Snapshot.CheckedOutAt(subject)})
-		params.Report(domain.PhaseFinished{Subject: subject, Phase: "fast_forward", Failed: forwarded.Failed()})
+		report(domain.PhaseStarted{Subject: subject, Phase: "fast_forward"})
+		forwarded := s.FastForward(ctx, FastForwardParams{Subject: subject, CheckedOutAt: snapshot.CheckedOutAt(subject)})
+		report(domain.PhaseFinished{Subject: subject, Phase: "fast_forward", Failed: forwarded.Failed()})
 
 		if forwarded.Failed() && ctx.Err() == nil {
 			missed = append(missed, Missed{Subject: subject, FastForwarded: forwarded})

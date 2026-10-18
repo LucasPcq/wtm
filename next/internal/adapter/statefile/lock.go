@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
 const (
@@ -46,7 +48,7 @@ func WithLock(ctx context.Context, path string, do func() error) (bool, error) {
 // acquire tries the exclusive lock at path until it is free or ctx is done.
 func acquire(ctx context.Context, path string) (*os.File, error) {
 	for {
-		file, err := TryLock(TryLockParams{Path: path})
+		file, err := TryLock(path, domain.LockExclusive)
 		if !errors.Is(err, ErrBusy) {
 			return file, err
 		}
@@ -59,26 +61,19 @@ func acquire(ctx context.Context, path string) (*os.File, error) {
 	}
 }
 
-// TryLockParams names the lock file [TryLock] takes, and whether to take it
-// shared rather than exclusive.
-type TryLockParams struct {
-	Path   string
-	Shared bool
-}
-
-// TryLock takes the flock of the file at params.Path without waiting,
+// TryLock takes the flock of the file at path in mode without waiting,
 // creating the file and its directory if needed, and returns the open file
 // that holds it; the caller unlocks it with [Flock] and closes it. It returns
 // ErrBusy when another process holds the lock and errUnlockable when it cannot
 // be taken at all. A lock file that is a symbolic link is not followed.
-func TryLock(params TryLockParams) (*os.File, error) {
-	file, err := openLock(params.Path)
+func TryLock(path string, mode domain.LockMode) (*os.File, error) {
+	file, err := openLock(path)
 	if err != nil {
 		return nil, errUnlockable
 	}
 
 	how := syscall.LOCK_EX
-	if params.Shared {
+	if mode == domain.LockShared {
 		how = syscall.LOCK_SH
 	}
 	err = Flock(file, how|syscall.LOCK_NB)

@@ -47,15 +47,9 @@ type MultiSelect struct {
 	err       error
 }
 
-// MultiSelectParams is what a [MultiSelect] offers.
-type MultiSelectParams struct {
-	Options []Pick
-	Empty   string // the error shown when enter confirms with nothing picked
-}
-
-// NewMultiSelect returns a multi-select over a copy of params.Options.
-func NewMultiSelect(params MultiSelectParams) *MultiSelect {
-	m := &MultiSelect{options: append([]Pick(nil), params.Options...), empty: params.Empty}
+// NewMultiSelect returns a multi-select over a copy of options; empty is the error shown when enter confirms with nothing picked.
+func NewMultiSelect(options []Pick, empty string) *MultiSelect {
+	m := &MultiSelect{options: append([]Pick(nil), options...), empty: empty}
 	m.refilter()
 	return m
 }

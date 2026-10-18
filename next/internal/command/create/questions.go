@@ -29,16 +29,15 @@ const (
 
 // Answer is the request with the field at path answered by values, spelled as the field's Answer spells them; the path "remember" answers the fields whose answer is remembered. A value the field cannot take leaves the request as it was.
 func (r Request) Answer(path string, values []string) (Request, error) {
-	answer := domain.AnswerParams{Path: path, Values: values}
 	next := r
 	var err error
 	switch path {
 	case pathBranches:
 		next.Branches = values
 	case pathFrom:
-		next.From, err = domain.One[string](answer)
+		next.From, err = domain.One[string](path, values)
 	case pathIfNotExists:
-		next.IfNotExists, err = domain.Yes(answer)
+		next.IfNotExists, err = domain.Yes(path, values)
 	default:
 		next.Given, err = r.Given.Answer(path, values)
 	}
