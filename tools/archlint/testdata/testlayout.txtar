@@ -1,0 +1,58 @@
+-- github.com/LucasPcq/wtm/next/internal/domain/env/env.go --
+// Package env is a worktree's environment.
+package env
+
+func helper() {}
+-- github.com/LucasPcq/wtm/next/internal/domain/env/env_test.go --
+package env
+
+import "testing"
+
+type world struct{}
+
+func TestMain(m *testing.M) { m.Run() }
+
+func Test(t *testing.T) {}
+
+func TestParse(t *testing.T) {}
+
+func Test_lower(t *testing.T) {}
+
+func BenchmarkParse(b *testing.B) {}
+
+func FuzzParse(f *testing.F) {}
+
+func Example() {}
+
+func ExampleParse() {}
+
+func Testify() {} // want `Testify is no Test, Benchmark, Fuzz or Example function`
+
+func newWorld(t *testing.T) world { return world{} } // want `newWorld is no Test, Benchmark, Fuzz or Example function`
+
+func (w world) expect(t *testing.T) {} // want `expect is no Test, Benchmark, Fuzz or Example function`
+-- github.com/LucasPcq/wtm/next/internal/domain/env/fixture_test.go --
+package env
+
+type fake struct{}
+
+func newFake() fake { return fake{} }
+
+func (fake) Get() string { return "" }
+-- github.com/LucasPcq/wtm/next/internal/domain/env/helpers_test.go --
+package env
+
+import "testing"
+
+func mustParse(t *testing.T) {}
+-- github.com/LucasPcq/wtm/next/internal/domain/env/export_test.go --
+package env
+
+var Helper = helper
+-- github.com/LucasPcq/wtm/internal/rules/env/env.go --
+// Package env is internal.
+package env
+-- github.com/LucasPcq/wtm/internal/rules/env/env_test.go --
+package env
+
+func helper() {}
