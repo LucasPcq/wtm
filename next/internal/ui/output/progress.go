@@ -153,6 +153,11 @@ func (p *Progress) openPhase() {
 
 // phaseFinished closes the phase in progress, replacing its live view with one line of its result, and brings back the status line.
 func (p *Progress) phaseFinished(failed bool) {
+	// A hook that failed without a word still says where its log is.
+	if failed && p.live && !p.phaseOpen && p.phaseLog != "" {
+		p.openPhase()
+	}
+
 	label := p.label()
 	p.phase, p.phaseLog, p.phaseOpen = "", "", false
 	if p.hook == nil {
