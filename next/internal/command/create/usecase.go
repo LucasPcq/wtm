@@ -16,7 +16,8 @@ import (
 // ----------------------------------------------------------------------------
 // The use case
 
-const name = "create"
+// Name is the command's name, the one its surfaces and its codes spell.
+const Name = "create"
 
 // CodeConfigNotFound refuses a repository with no wtm config: `wtm init` has not run there.
 const CodeConfigNotFound = "create.config_not_found"
@@ -53,7 +54,7 @@ type Detail struct {
 // Run carries out the request under its operation: it takes the locks, plans under them, fingerprints the plan, stops on a dry run, refuses a stale plan and applies it between the operation's started and finished events. An error returned is a refusal before the apply; a failure during the apply is in the Outcome's Result.
 func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (Outcome, error) {
 	// 1. Take the operation's locks before reading anything, so the facts cannot change under the plan.
-	op, err := u.Operations.Begin(name, req.Locks(), opts)
+	op, err := u.Operations.Begin(Name, req.Locks(), opts)
 	if err != nil {
 		return Outcome{Op: op.ID}, err
 	}
@@ -141,7 +142,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 
 // Observe reads what create decides from: the project's config, the repository's snapshot and what lies at the path each of branches would take. A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, branches []string) (Facts, error) {
-	repo, err := u.Repository.Observe(ctx, name)
+	repo, err := u.Repository.Observe(ctx, Name)
 	if err != nil {
 		return Facts{}, err
 	}
@@ -244,7 +245,7 @@ func (u UseCase) remember(ctx context.Context, plan Plan, items []Item) []domain
 		return nil
 	}
 
-	return u.Provision.Remember(ctx, name, plan.settled, plan.Remember)
+	return u.Provision.Remember(ctx, Name, plan.settled, plan.Remember)
 }
 
 // ----------------------------------------------------------------------------

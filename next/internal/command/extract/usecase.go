@@ -19,7 +19,8 @@ import (
 // ----------------------------------------------------------------------------
 // The use case
 
-const name = "extract"
+// Name is the command's name, the one its surfaces and its codes spell.
+const Name = "extract"
 
 // The codes extract refuses or fails with that a caller may act on.
 const (
@@ -64,7 +65,7 @@ type Detail struct {
 // Run carries out the request under its operation: it takes the locks, plans under them, fingerprints the plan, stops on a dry run, refuses a stale plan, stops when there is nothing to extract and applies it between the operation's started and finished events. An error returned is a refusal before the apply; a failure during the apply is in the Outcome's Result.
 func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (Outcome, error) {
 	// 1. Take the operation's locks before reading anything, so the facts cannot change under the plan.
-	op, err := u.Operations.Begin(name, req.Locks(), opts)
+	op, err := u.Operations.Begin(Name, req.Locks(), opts)
 	if err != nil {
 		return Outcome{Op: op.ID}, err
 	}
@@ -147,7 +148,7 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	report(domain.UnitFinished{Subject: item.Subject, Status: item.Status})
 
 	if plan.Target.creates() && item.Status == domain.StatusDone {
-		warnings = append(warnings, u.Provision.Remember(ctx, name, plan.settled, plan.Remember)...)
+		warnings = append(warnings, u.Provision.Remember(ctx, Name, plan.settled, plan.Remember)...)
 	}
 
 	return Result{Items: []Item{item}, Warnings: warnings}
@@ -181,7 +182,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 
 // Observe reads what extract decides from: the project's config, the repository's snapshot, the uncommitted changes of the source (of every worktree when none is given), the meta records of the source and target, and what lies at the path a new target would take. A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
-	repo, err := u.Repository.Observe(ctx, name)
+	repo, err := u.Repository.Observe(ctx, Name)
 	if err != nil {
 		return Facts{}, err
 	}

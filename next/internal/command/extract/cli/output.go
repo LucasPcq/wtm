@@ -10,7 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
-const commandName = "extract"
+const commandName = extract.Name
 
 // planRowsOf are the rows of the plan the dry run shows.
 func planRowsOf(plan extract.Plan) []output.PlanRow {
