@@ -65,8 +65,7 @@
         "origin": null,
         "pr": {
           "number": 12,
-          "url": "https://github.com/acme/acme/pull/12",
-          "state": "open"
+          "url": "https://github.com/acme/acme/pull/12"
         },
         "services": []
       }

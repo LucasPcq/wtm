@@ -62,14 +62,10 @@ type Origin struct {
 	State  worktree.Divergence `json:"state"`
 }
 
-// prOpen is the state of every pull request listed: only the open ones are; the JSON keeps the field the legacy wtm reports.
-const prOpen = "open"
-
 // PR is a worktree's open pull request.
 type PR struct {
 	Number int    `json:"number"`
 	URL    string `json:"url"`
-	State  string `json:"state"`
 }
 
 // The codes of list's warnings and failures.
@@ -150,7 +146,7 @@ func (f Facts) pr(branch string) *PR {
 	}
 
 	found := f.PullRequests.Open[at]
-	return &PR{Number: found.Number, URL: found.URL, State: prOpen}
+	return &PR{Number: found.Number, URL: found.URL}
 }
 
 // services are the jobs up in the worktree at path, by name, none when the daemon could not tell.

@@ -14,7 +14,7 @@ import (
 func listed(n int) string {
 	prs := make([]string, 0, n)
 	for i := range n {
-		prs = append(prs, `{"number": `+strconv.Itoa(i+1)+`, "headRefName": "b`+strconv.Itoa(i+1)+`", "url": "u", "state": "OPEN"}`)
+		prs = append(prs, `{"number": `+strconv.Itoa(i+1)+`, "headRefName": "b`+strconv.Itoa(i+1)+`", "url": "u"}`)
 	}
 	return "[" + strings.Join(prs, ",") + "]"
 }

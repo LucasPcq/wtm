@@ -12,8 +12,8 @@ import (
 )
 
 func TestPullRequestsAreTheOpenOnesGHLists(t *testing.T) {
-	gh := fakeGH(t, 0, `[{"number": 12, "headRefName": "feat/a", "url": "https://github.com/acme/acme/pull/12", "state": "OPEN"},
-		{"number": 13, "headRefName": "main", "url": "https://github.com/acme/acme/pull/13", "state": "OPEN", "isCrossRepository": true}]`)
+	gh := fakeGH(t, 0, `[{"number": 12, "headRefName": "feat/a", "url": "https://github.com/acme/acme/pull/12"},
+		{"number": 13, "headRefName": "main", "url": "https://github.com/acme/acme/pull/13", "isCrossRepository": true}]`)
 
 	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequests(t.Context())
 

@@ -120,7 +120,7 @@ func TestGitHubIsAskedOnlyWhenTheRequestAsks(t *testing.T) {
 
 	assert.Equal(t, 1, *w.asked)
 	assert.Nil(t, detailOf(t, without, "feat/a").PR)
-	assert.Equal(t, &list.PR{Number: 12, URL: pr.URL, State: "open"}, detailOf(t, with, "feat/a").PR)
+	assert.Equal(t, &list.PR{Number: 12, URL: pr.URL}, detailOf(t, with, "feat/a").PR)
 	assert.Nil(t, detailOf(t, with, "main").PR)
 }
 
