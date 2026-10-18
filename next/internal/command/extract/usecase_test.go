@@ -205,7 +205,7 @@ func TestTheAnswersAskedToBeRememberedAreKeptOnceTheTargetIsCreated(t *testing.T
 	w := newWorld(t, seed{Run: jobsToml})
 	w.change(t, source, "a.txt", "a\n")
 
-	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim}, Remember: []string{"isolation", "fast_forward"}})
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation", "fast_forward"}}})
 
 	assert.Empty(t, result.Warnings)
 	assert.Equal(t, project.Verbatim, result.Item.Detail.Isolation)
@@ -257,7 +257,7 @@ func TestNothingIsRememberedNorMovedWhenTheTargetFailsToProvision(t *testing.T) 
 	w := newWorld(t, seed{Run: jobsToml, Config: withHook("exit 1")})
 	w.change(t, source, "a.txt", "a\n")
 
-	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim}, Remember: []string{"isolation"}})
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation"}}})
 
 	require.Equal(t, domain.StatusFailed, result.Item.Status)
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "isolation")
@@ -270,7 +270,7 @@ func TestNothingIsRememberedWhenTheMoveIsRefused(t *testing.T) {
 	w.change(t, source, "a.txt", "a\n")
 	w.usecase.Git = halfMoving{Repo: w.repo}
 
-	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim}, Remember: []string{"isolation"}})
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation"}}})
 
 	require.Equal(t, domain.StatusFailed, result.Item.Status)
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "isolation")
@@ -401,9 +401,11 @@ func TestACreatedTargetGetsItsEnvByTheStrategyAsked(t *testing.T) {
 		given  project.EnvStrategy
 		want   string
 	}{
-		"config.toml's strategy by default": {config: envToml, want: exampleEnv},
-		"the strategy given":                {config: envToml, given: project.EnvMain, want: mainEnv},
-		"the strategy remembered":           {config: envToml + "\n[wizard.remembered]\nenv_strategy = \"main\"\n", want: mainEnv},
+		"config.toml's strategy by default":             {config: envToml, want: exampleEnv},
+		"the strategy given":                            {config: envToml, given: project.EnvMain, want: mainEnv},
+		"the strategy remembered":                       {config: envToml + "\n[wizard.remembered]\nenv_strategy = \"main\"\n", want: mainEnv},
+		"the config default over a remembered strategy": {config: envToml + "\n[wizard.remembered]\nenv_strategy = \"main\"\n", given: provision.EnvFromConfig, want: exampleEnv},
+		"the config default remembered":                 {config: envToml + "\n[wizard.remembered]\nenv_strategy = \"config\"\n", want: exampleEnv},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -421,10 +423,21 @@ func TestACreatedTargetGetsItsEnvByTheStrategyAsked(t *testing.T) {
 func TestTheEnvStrategyAskedToBeRememberedIsKeptOnceTheTargetIsCreated(t *testing.T) {
 	w := withEnvFiles(t, envToml)
 
-	w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{EnvFrom: project.EnvMain}, Remember: []string{"env_from"}})
+	w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{EnvFrom: project.EnvMain, Remember: []string{"env_from"}}})
 
 	recorded, err := w.meta.Load(split)
 	require.NoError(t, err)
 	assert.Equal(t, project.EnvMain, recorded.EnvStrategy)
 	assert.Contains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), `env_strategy = "main"`)
+}
+
+func TestTheConfigDefaultIsRememberedAsSuchOnceTheTargetIsCreated(t *testing.T) {
+	w := withEnvFiles(t, envToml)
+
+	w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{EnvFrom: provision.EnvFromConfig, Remember: []string{"env_from"}}})
+
+	recorded, err := w.meta.Load(split)
+	require.NoError(t, err)
+	assert.Equal(t, project.EnvExample, recorded.EnvStrategy)
+	assert.Contains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), `env_strategy = "config"`)
 }

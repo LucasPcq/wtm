@@ -3,6 +3,7 @@
   Source       feat/login
   Files        apps/api/a.txt, apps/api/new.txt
   Target       new worktree feat/split from main
+  Env          example
   Mode         move
   Conflicts    apps/api/a.txt (modified)
   On conflict  resolve

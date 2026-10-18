@@ -68,6 +68,7 @@ type seed struct {
 	Behind     bool // origin's main is ahead of main
 	Isolates   bool // run.toml declares a port, so the isolation is asked
 	Conflicts  map[string]worktree.ConflictKind
+	Remembered map[string]string
 	NoConfig   bool
 	OnCreate   []project.Hook
 	RunHooks   func(ctx context.Context, chain env.HookChain) error
@@ -101,9 +102,10 @@ func newWorld(s seed) world {
 		changes = nil
 	}
 	config := &project.Config{
-		Worktrees: project.Worktrees{BasePath: project.DefaultBasePath, BaseBranch: project.DefaultBaseBranch},
-		Env:       project.Env{Strategy: project.EnvExample},
-		OnCreate:  s.OnCreate,
+		Worktrees:  project.Worktrees{BasePath: project.DefaultBasePath, BaseBranch: project.DefaultBaseBranch},
+		Env:        project.Env{Strategy: project.EnvExample},
+		OnCreate:   s.OnCreate,
+		Remembered: s.Remembered,
 	}
 	if s.NoConfig {
 		config = nil

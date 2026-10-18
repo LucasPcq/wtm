@@ -6,7 +6,7 @@
   ✓ Target worktree: new worktree
   ✓ Branch name: feat/split
   ✓ Source branch: main · config
-  ✓ Env strategy: example · config
+  ✓ Env strategy: config default · default
 
   How the new worktree stands against its source: isolated (its own ports, compose project and
   namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as

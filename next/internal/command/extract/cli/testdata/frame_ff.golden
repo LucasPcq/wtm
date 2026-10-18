@@ -6,7 +6,7 @@
   ✓ Target worktree: new worktree
   ✓ Branch name: feat/split
   ✓ Source branch: main · config
-  ✓ Env strategy: example · config
+  ✓ Env strategy: config default · default
   ✓ Isolation: isolated · default
 
   Fast-forward the parent branch to origin before creating the target; skipped when it has diverged

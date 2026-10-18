@@ -83,6 +83,10 @@ type Outcome struct {
 // phase that fails stops the rest and keeps the worktree. Run never returns
 // an error of its own: the Outcome carries it.
 func (s Service) Run(ctx context.Context, params Params) Outcome {
+	if !params.Worktree.Answers.asked {
+		return Outcome{Status: domain.StatusFailed, Err: &domain.Error{Kind: domain.KindInternal, Code: "provision.unasked", Message: "the questions of a new worktree were not asked: Answers come from Questions.Answers", Params: domain.Params{"branch": params.Worktree.Branch}}}
+	}
+
 	params.Worktree.Answers.isolation = params.Worktree.Answers.isolation.Effective()
 	p := &provisioning{Params: params, Service: s, hookLog: env.HookLogPath(env.HookLogPathParams{StateDir: params.Project.StateDir, Branch: params.Worktree.Branch})}
 	p.kept, p.ignored = env.Targets(params.Project.Run, params.Project.EnvFiles)
@@ -265,7 +269,7 @@ func (p *provisioning) meta() worktree.Meta {
 	return worktree.Meta{
 		SourceBranch: p.Worktree.Source,
 		CreatedAt:    p.Service.Now().UTC().Format(time.RFC3339),
-		EnvStrategy:  p.Worktree.Answers.envFrom,
+		EnvStrategy:  p.Worktree.Answers.strategy,
 		Isolation:    p.Worktree.Answers.isolation,
 	}
 }
@@ -278,7 +282,7 @@ func (p *provisioning) copyEnv(ctx context.Context) error {
 	}
 
 	copied, err := p.Service.EnvFiles.Copy(ctx, env.CopyRequest{
-		Strategy:   p.Worktree.Answers.envFrom,
+		Strategy:   p.Worktree.Answers.strategy,
 		Files:      p.Project.EnvFiles,
 		TargetDir:  p.Worktree.Path,
 		MainPath:   p.Project.MainPath,

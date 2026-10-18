@@ -6,7 +6,7 @@
   ✓ Target worktree: new worktree
   ✓ Branch name: feat/split
   ✓ Source branch: main · config
-  ✓ Env strategy: example · config
+  ✓ Env strategy: config default · default
   ✓ Isolation: isolated · default
   ✓ Source update: no · default
 

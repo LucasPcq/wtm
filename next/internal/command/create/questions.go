@@ -17,9 +17,7 @@ type Request struct {
 	Branches []string `json:"branches"`
 	From     string   `json:"from"`
 	provision.Given
-	IfNotExists bool     `json:"if_not_exists"`
-	Remember    []string `json:"remember"` // the fields whose answer is remembered for the next runs
-	Ask         bool     `json:"ask"`      // ignore the remembered answers for this run
+	IfNotExists bool `json:"if_not_exists"`
 }
 
 // Answer is the request with the field at path answered by values, spelled as the field's Answer spells them; the path "remember" answers the fields whose answer is remembered. A value the field cannot take leaves the request as it was.
@@ -30,14 +28,10 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 	switch path {
 	case "branches":
 		next.Branches = values
-	case domain.PathRemember:
-		next.Remember = values
 	case "from":
 		next.From, err = domain.One[string](answer)
 	case "if_not_exists":
 		next.IfNotExists, err = domain.Yes(answer)
-	case domain.PathAsk:
-		next.Ask, err = domain.Yes(answer)
 	default:
 		next.Given, err = r.Given.Answer(path, values)
 	}
@@ -54,14 +48,10 @@ func (r Request) Values(path string) []string {
 	switch path {
 	case "branches":
 		return r.Branches
-	case domain.PathRemember:
-		return r.Remember
 	case "from":
 		return domain.Spelled(r.From)
 	case "if_not_exists":
 		return domain.SaidYes(r.IfNotExists)
-	case domain.PathAsk:
-		return domain.SaidYes(r.Ask)
 	}
 
 	return r.Given.Values(path)
@@ -124,7 +114,7 @@ func (q Questions) Form() domain.Form {
 			Refreshable: true,
 		},
 	}
-	fields = append(fields, q.Questions.Fields(fastForwardWording)...)
+	fields = append(fields, q.Questions.Fields(wording)...)
 	fields = append(fields, domain.ConfirmField{
 		FieldSpec: domain.FieldSpec{Path: "if_not_exists", Flag: "--if-not-exists", Label: "If not exists", Help: "Succeed without a change when the worktree already exists (idempotent)", Origin: q.IfNotExists.Origin, Skip: q.IfNotExists.Skip},
 		Value:     q.IfNotExists.Value,
@@ -133,7 +123,10 @@ func (q Questions) Form() domain.Form {
 	return domain.Form{Problems: q.Errors, Fields: fields}
 }
 
-var fastForwardWording = provision.Wording{FastForwardHelp: "Fast-forward to origin first the branch each worktree starts from, when it is behind; one that has diverged or holds uncommitted changes starts as it is"}
+var wording = provision.Wording{
+	EnvHelp:         "How the .env files of the new worktrees are provisioned: config (config.toml's strategy), example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy",
+	FastForwardHelp: "Fast-forward to origin first the branch each worktree starts from, when it is behind; one that has diverged or holds uncommitted changes starts as it is",
+}
 
 func (f Facts) branchOptions() []domain.Option {
 	options := make([]domain.Option, 0, len(f.Branches.Local)+len(f.Branches.Remote))
@@ -187,14 +180,7 @@ func (f Facts) sourceOptions(creating []string) []domain.Option {
 
 // newWorktree are the questions of the new worktrees, on the facts; the fast-forward is asked while a branch they start from is behind origin.
 func (f Facts) newWorktree(req Request) provision.Questions {
-	params := provision.QuestionsParams{
-		Given:       req.Given,
-		Remembered:  f.Config.Remembered,
-		Ask:         req.Ask,
-		EnvStrategy: f.Config.Env.Strategy,
-		Run:         f.Run,
-		Remember:    req.Remember,
-	}
+	params := provision.QuestionsParams{Given: req.Given, Repository: f.Repository}
 	if len(f.subjectsAt(req, worktree.Behind)) == 0 {
 		params.NotBehind = "nothing to fast-forward: no branch it starts from is behind origin"
 	}
@@ -217,11 +203,6 @@ func ifNotExists(given bool) domain.Confirm {
 // codeRequired is the field-error code create spells as every command does, with no create. prefix.
 const codeRequired = "required"
 
-// rememberable are the fields whose answer can be remembered.
-func rememberable() []string {
-	return Questions{}.Form().Rememberable()
-}
-
 // Resolve settles the request on the facts, every field answered as NewQuestions answers it; a request with problems is refused with all of them, by domain.Invalid.
 func Resolve(f Facts, req Request) (Request, error) {
 	questions := NewQuestions(f, req)
@@ -239,20 +220,7 @@ func (q Questions) Request() Request {
 		From:        q.From.Value,
 		Given:       q.Questions.Given(),
 		IfNotExists: q.IfNotExists.Value,
-		Remember:    q.remembered(),
 	}
-}
-
-// remembered are the fields whose answer is to be remembered, in the order of the form and each once; a field whose question is skipped is not.
-func (q Questions) remembered() []string {
-	var remembered []string
-	for _, field := range rememberable() {
-		if q.Remembers(field) {
-			remembered = append(remembered, field)
-		}
-	}
-
-	return remembered
 }
 
 func (f Facts) problems(q Questions) []domain.FieldError {
@@ -262,11 +230,6 @@ func (f Facts) problems(q Questions) []domain.FieldError {
 	}
 
 	problems = append(problems, q.Questions.Problems()...)
-
-	for index, id := range q.Remember {
-		problems = append(problems, domain.OneOf(domain.OneOfParams{Path: "remember[" + strconv.Itoa(index) + "]", Value: id, Accepted: rememberable()})...)
-	}
-
 	return append(problems, f.crossProblems(q)...)
 }
 

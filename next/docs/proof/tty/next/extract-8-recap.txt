@@ -18,6 +18,7 @@ $ wtmx extract; echo EXIT=$?
   ┃  Source     feat/form
   ┃  Files      README.md
   ┃  Target     new worktree feat/moved from main
+  ┃  Env        main
   ┃  Isolation  isolated
   ┃  Mode       move
 

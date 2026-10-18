@@ -206,7 +206,7 @@ func TestAFastForwardThatFailsIsAWarningAndTheBranchStillStarts(t *testing.T) {
 func TestTheAnswersAskedToBeRememberedAreKeptOnceABranchIsCreated(t *testing.T) {
 	w := newWorld(t, seed{Run: jobsToml, Behind: true})
 
-	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{EnvFrom: project.EnvExample, Isolation: project.Verbatim, FastForward: new(false)}, Remember: []string{"env_from", "isolation", "fast_forward"}})
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{EnvFrom: project.EnvExample, Isolation: project.Verbatim, FastForward: new(false), Remember: []string{"env_from", "isolation", "fast_forward"}}})
 
 	assert.Empty(t, result.Warnings)
 	config := readFile(t, filepath.Join(w.stateDir, "config.toml"))
@@ -218,17 +218,17 @@ func TestTheAnswersAskedToBeRememberedAreKeptOnceABranchIsCreated(t *testing.T) 
 func TestAnIsolationNotAskedIsNotRemembered(t *testing.T) {
 	w := newWorld(t, seed{})
 
-	w.apply(t, create.Request{Branches: []string{branchName}, Remember: []string{"isolation", "env_from"}})
+	w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"isolation", "env_from"}}})
 
 	config := readFile(t, filepath.Join(w.stateDir, "config.toml"))
-	assert.Contains(t, config, `env_strategy = "main"`)
+	assert.Contains(t, config, `env_strategy = "config"`)
 	assert.NotContains(t, config, "isolation")
 }
 
 func TestAFastForwardNotAskedNeverOverwritesTheOneRemembered(t *testing.T) {
 	w := newWorld(t, seed{Config: projectToml + "\n[wizard.remembered]\nsource_update = \"ff\"\n"})
 
-	w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{FastForward: new(false)}, Remember: []string{"fast_forward"}})
+	w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{FastForward: new(false), Remember: []string{"fast_forward"}}})
 
 	assert.Contains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), `source_update = "ff"`)
 }
@@ -236,7 +236,7 @@ func TestAFastForwardNotAskedNeverOverwritesTheOneRemembered(t *testing.T) {
 func TestNothingIsRememberedWhenNoBranchWasCreated(t *testing.T) {
 	w := newWorld(t, seed{Linked: []string{"linked"}})
 
-	w.apply(t, create.Request{Branches: []string{"linked"}, IfNotExists: true, Given: provision.Given{EnvFrom: project.EnvExample}, Remember: []string{"env_from"}})
+	w.apply(t, create.Request{Branches: []string{"linked"}, IfNotExists: true, Given: provision.Given{EnvFrom: project.EnvExample, Remember: []string{"env_from"}}})
 
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "env_strategy")
 }
@@ -245,7 +245,7 @@ func TestAnAnswerThatCannotBeRememberedIsAWarningOfTheRun(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.usecase.Answers = answering{err: errors.New("read-only file system")}
 
-	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Remember: []string{"env_from"}})
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from"}}})
 
 	assert.Equal(t, []string{"create.remember_failed"}, codes(result.Warnings))
 	assert.Equal(t, "could not remember the answer: read-only file system", result.Warnings[0].Message)
@@ -256,7 +256,7 @@ func TestARememberedAnswerWrittenWithoutItsLockSaysSo(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.usecase.Answers = answering{written: domain.Written{Changed: true, Unlocked: true}}
 
-	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Remember: []string{"env_from"}})
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from"}}})
 
 	assert.Equal(t, []string{"locks.unavailable"}, codes(result.Warnings))
 }
@@ -471,7 +471,7 @@ func TestARunWithoutLocksThatRemembersSaysSoOnce(t *testing.T) {
 	w.usecase.Operations.Locker = unprotected{}
 	w.usecase.Answers = answering{written: domain.Written{Changed: true, Unlocked: true}}
 
-	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}, Remember: []string{"env_from"}}, domain.RunOptions{Report: (&recorder{}).add})
+	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from"}}}, domain.RunOptions{Report: (&recorder{}).add})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"locks.unavailable"}, codes(outcome.Warnings))
@@ -511,7 +511,7 @@ func TestAPreviewIsStaleOnceTheIsolationItWouldRecordChanged(t *testing.T) {
 func TestNothingIsRememberedWhenTheOnlyBranchFailsToProvision(t *testing.T) {
 	w := newWorld(t, seed{Run: jobsToml, Config: withHook("exit 1")})
 
-	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Isolation: project.Verbatim}, Remember: []string{"isolation"}})
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation"}}})
 
 	require.Equal(t, domain.StatusFailed, result.Items[0].Status)
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "isolation")
@@ -576,4 +576,15 @@ func TestASourceInTheMiddleOfARebaseIsNotFastForwardedAndSaysSo(t *testing.T) {
 		Params:  domain.Params{"branch": existing},
 	}}, result.Warnings)
 	assert.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
+}
+
+func TestTheConfigDefaultFollowsEnvStrategyOverARememberedAnswerAndIsRememberedAsSuch(t *testing.T) {
+	w := newWorld(t, seed{Config: projectToml + "\n[wizard.remembered]\nenv_strategy = \"example\"\n"})
+
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{EnvFrom: provision.EnvFromConfig, Remember: []string{"env_from"}}})
+
+	require.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
+	assert.Equal(t, mainEnv, readFile(t, filepath.Join(w.path(branchName), ".env")))
+	assert.Equal(t, project.EnvMain, result.Items[0].Detail.Metadata.EnvStrategy)
+	assert.Contains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), `env_strategy = "config"`)
 }

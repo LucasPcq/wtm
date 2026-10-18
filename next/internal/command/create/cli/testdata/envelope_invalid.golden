@@ -23,12 +23,13 @@
           "value": "copy"
         },
         "accepted": [
+          "config",
           "example",
           "main",
           "parent"
         ],
         "flag": "--env-from",
-        "message": "--env-from must be one of example, main, parent, not copy"
+        "message": "--env-from must be one of config, example, main, parent, not copy"
       }
     ]
   }

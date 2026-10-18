@@ -15,10 +15,8 @@ func TestTheRequestIsSpelledWithItsFlagsSortedAndQuoted(t *testing.T) {
 	req := create.Request{
 		Branches:    []string{"feat/a", "it's"},
 		From:        "two words",
-		Given:       provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(true)},
 		IfNotExists: true,
-		Remember:    []string{"env_from", "isolation"},
-		Ask:         true,
+		Given:       provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(true), Remember: []string{"env_from", "isolation"}, Ask: true},
 	}
 
 	assert.Equal(t, `wtm-next create feat/a 'it'\''s' --env-from main --ff --from 'two words' --if-not-exists --isolation verbatim --remember env_from --remember isolation --ask`, output.Line(newForm(nil).Argv("wtm-next create", req)))

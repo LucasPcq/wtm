@@ -25,7 +25,7 @@ func TestTheFormDrawsEachStepAsTheEngineDid(t *testing.T) {
 	d.keys("enter")
 	d.looksLike("4_env")
 
-	d.keys("down", "tab", "enter")
+	d.keys("down", "down", "tab", "enter")
 	d.looksLike("5_recap")
 
 	d.keys("esc")
@@ -35,10 +35,10 @@ func TestTheFormDrawsEachStepAsTheEngineDid(t *testing.T) {
 func TestTheRequestIsWhatWasAnswered(t *testing.T) {
 	d := open(t, sessionParams{App: newApp(seed{})})
 
-	d.keys("feat/a", "enter", "enter", "down", "tab", "enter", "enter")
+	d.keys("feat/a", "enter", "enter", "down", "down", "tab", "enter", "enter")
 
 	require.Equal(t, form.Finished, d.w.Ending())
-	assert.Equal(t, create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvMain}, Remember: []string{"env_from"}}, d.s.Request())
+	assert.Equal(t, create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvMain, Remember: []string{"env_from"}}}, d.s.Request())
 	assert.NotEmpty(t, d.s.Preview().Fingerprint)
 }
 
@@ -47,7 +47,7 @@ func TestAKeptDefaultSaysWhereItCameFrom(t *testing.T) {
 
 	d.keys("feat/a", "enter", "enter", "enter")
 
-	assert.Contains(t, d.screen(), "✓ Source branch: main · config\n  ✓ Env strategy: example · config")
+	assert.Contains(t, d.screen(), "✓ Source branch: main · config\n  ✓ Env strategy: config default · default\n")
 }
 
 func TestAnEntryIsCheckedAsItIsAdded(t *testing.T) {
@@ -83,7 +83,7 @@ func TestWhatAFlagOrARememberedAnswerSettledIsNotAsked(t *testing.T) {
 }
 
 func TestAskAsksARememberedAnswerAgainStartingOnIt(t *testing.T) {
-	d := open(t, sessionParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: "main"}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Ask: true}})
+	d := open(t, sessionParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: "main"}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{Ask: true}}})
 
 	assert.Equal(t, stepEnvFrom, d.w.Current())
 	assert.Contains(t, d.screen(), "▌› main")
@@ -174,9 +174,27 @@ func TestIfNotExistsGivenByItsFlagStandsInTheTrail(t *testing.T) {
 
 func TestAskAsksARememberedSourceUpdateAgainStartingOnIt(t *testing.T) {
 	remembered := map[string]string{project.RememberSourceUpdate: project.SourceUpdateFastForward}
-	d := open(t, sessionParams{App: newApp(seed{Behind: true, Remembered: remembered}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvExample}, Ask: true}})
+	d := open(t, sessionParams{App: newApp(seed{Behind: true, Remembered: remembered}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvExample, Ask: true}}})
 
 	require.Equal(t, stepFastForward, d.w.Current())
 	assert.Contains(t, d.screen(), "▌› Yes")
 	assert.Contains(t, d.screen(), "[x] Always use this answer in this repo")
+}
+
+func TestARememberedConfigDefaultStartsOnItsRowTicked(t *testing.T) {
+	d := open(t, sessionParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: project.RememberEnvConfig}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{Ask: true}}})
+
+	assert.Equal(t, stepEnvFrom, d.w.Current())
+	assert.Contains(t, d.screen(), "▌› Use config default (example)")
+	assert.Contains(t, d.screen(), "[x] Always use this answer in this repo")
+}
+
+func TestPickingTheConfigDefaultAnswersConfigOverARememberedStrategy(t *testing.T) {
+	d := open(t, sessionParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: "main"}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{Ask: true}}})
+
+	d.keys("up", "up", "enter")
+
+	assert.Equal(t, provision.EnvFromConfig, d.s.Request().EnvFrom)
+	assert.Equal(t, []string{"env_from"}, d.s.Request().Remember)
+	assert.Contains(t, d.screen(), "✓ Env strategy: config default")
 }

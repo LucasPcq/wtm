@@ -213,5 +213,10 @@ func removeLine(branch string) []string { return []string{"remove", branch} }
 
 // answered are the answers to the questions of a new worktree the request gives.
 func answered(given provision.Given) provision.Answers {
-	return provision.NewQuestions(provision.QuestionsParams{Given: given}).Answers()
+	return provision.NewQuestions(provision.QuestionsParams{Given: given, Repository: repository(nil)}).Answers()
+}
+
+// repository is a repository remembering remembered, its env strategy example.
+func repository(remembered map[string]string) worktree.Repository {
+	return worktree.Repository{Config: project.Config{Env: project.Env{Strategy: project.EnvExample}, Remembered: remembered}}
 }

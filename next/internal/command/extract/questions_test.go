@@ -222,10 +222,9 @@ func TestEachFieldOfTheFormAnswersTheRequestBack(t *testing.T) {
 			Files:      []string{"a.txt"},
 			To:         split,
 			From:       "main",
-			Given:      provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(true)},
+			Given:      provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(true), Remember: []string{"fast_forward", "env_from", "isolation", "fast_forward"}},
 			Keep:       new(false),
 			OnConflict: extract.OnConflictAbort,
-			Remember:   []string{"fast_forward", "env_from", "isolation", "fast_forward"},
 		},
 	}
 	for name, req := range cases {
@@ -303,7 +302,7 @@ func TestAConfirmationsOptionsAreItsAnswers(t *testing.T) {
 }
 
 func TestEachAnswerReadsBackAsAnswerTakesIt(t *testing.T) {
-	req := extract.Request{Source: "feat/login", Files: []string{"a.txt"}, To: "feat/split", From: "main", Given: provision.Given{EnvFrom: project.EnvParent, FastForward: new(true), Isolation: project.Verbatim}, Keep: new(false), OnConflict: extract.OnConflictResolve, Remember: []string{"isolation"}, Ask: true}
+	req := extract.Request{Source: "feat/login", Files: []string{"a.txt"}, To: "feat/split", From: "main", Keep: new(false), OnConflict: extract.OnConflictResolve, Given: provision.Given{EnvFrom: project.EnvParent, FastForward: new(true), Isolation: project.Verbatim, Remember: []string{"isolation"}, Ask: true}}
 	paths := []string{domain.PathRemember, domain.PathAsk}
 	for _, field := range (extract.Questions{}).Form().Fields {
 		paths = append(paths, field.Spec().Path)
@@ -323,7 +322,7 @@ func TestARememberedSourceUpdateIsShownEvenWhenAskedAgain(t *testing.T) {
 	w := newWorld(t, seed{Config: remembering, Behind: true})
 	w.change(t, source, "a.txt", "a\n")
 
-	asked := w.questions(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Ask: true}).FastForward
+	asked := w.questions(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Ask: true}}).FastForward
 
 	assert.Equal(t, new(true), asked.Remembered)
 	assert.Equal(t, domain.OriginDefault, asked.Origin)

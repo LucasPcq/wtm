@@ -32,7 +32,7 @@
   Flags:
         --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
     -n, --dry-run                     Show the plan and its fingerprint, apply nothing
-        --env-from string             How the .env files of the new worktrees are provisioned: example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy
+        --env-from string             How the .env files of the new worktrees are provisioned: config (config.toml's strategy), example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy
         --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
         --ff                          Fast-forward to origin first the branch each worktree starts from, when it is behind; one that has diverged or holds uncommitted changes starts as it is
         --from string                 The branch a new branch starts from, or the parent recorded for wtm sync of one that already exists

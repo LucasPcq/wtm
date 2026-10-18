@@ -17,7 +17,7 @@ func TestEachDefaultSaysWhereItComesFrom(t *testing.T) {
 	questions := w.questions(t, create.Request{Branches: []string{branchName}})
 
 	assert.Equal(t, domain.Answer[string]{Value: "main", Origin: domain.OriginConfig}, questions.From.Answer)
-	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: domain.OriginConfig}, questions.EnvFrom.Answer)
+	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginDefault}, questions.EnvFrom.Answer)
 	assert.Equal(t, domain.Answer[project.Isolation]{Value: project.Isolated, Origin: domain.OriginDefault}, questions.Isolation.Answer)
 	assert.Equal(t, domain.Answer[bool]{Value: false, Origin: domain.OriginDefault}, questions.FastForward.Answer)
 	assert.Empty(t, questions.Errors)
@@ -27,12 +27,12 @@ func TestARememberedAnswerIsTheDefaultUnlessAskedAgain(t *testing.T) {
 	w := newWorld(t, seed{Run: jobsToml, Behind: true, Config: remembering})
 
 	remembered := w.questions(t, create.Request{Branches: []string{branchName}})
-	asked := w.questions(t, create.Request{Branches: []string{branchName}, Ask: true})
+	asked := w.questions(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Ask: true}})
 
 	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: project.EnvExample, Origin: domain.OriginRemembered}, remembered.EnvFrom.Answer)
 	assert.Equal(t, domain.Answer[project.Isolation]{Value: project.Verbatim, Origin: domain.OriginRemembered}, remembered.Isolation.Answer)
 	assert.Equal(t, domain.Answer[bool]{Value: true, Origin: domain.OriginRemembered}, remembered.FastForward.Answer)
-	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: domain.OriginConfig}, asked.EnvFrom.Answer)
+	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginDefault}, asked.EnvFrom.Answer)
 	assert.Equal(t, domain.Answer[bool]{Value: false, Origin: domain.OriginDefault}, asked.FastForward.Answer)
 	assert.Equal(t, project.EnvExample, asked.EnvFrom.Remembered)
 	assert.Equal(t, project.Verbatim, asked.Isolation.Remembered)
@@ -44,8 +44,9 @@ func TestARememberedConfigDefaultFollowsTheConfiguredEnvStrategy(t *testing.T) {
 
 	questions := w.questions(t, create.Request{Branches: []string{branchName}})
 
-	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: domain.OriginRemembered}, questions.EnvFrom.Answer)
-	assert.Equal(t, project.EnvMain, questions.EnvFrom.Remembered)
+	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginRemembered}, questions.EnvFrom.Answer)
+	assert.Equal(t, provision.EnvFromConfig, questions.EnvFrom.Remembered)
+	assert.Equal(t, project.EnvMain, questions.Answers().EnvFrom())
 	assert.Empty(t, questions.Errors)
 }
 
@@ -101,7 +102,7 @@ func TestTheFastForwardIsAskedOnlyWhenTheBranchItStartsFromIsBehind(t *testing.T
 func TestTheEnvStrategiesAreTheChoices(t *testing.T) {
 	w := newWorld(t, seed{})
 
-	assert.Equal(t, []project.EnvStrategy{project.EnvExample, project.EnvMain, project.EnvParent}, w.questions(t, create.Request{}).EnvFrom.Options)
+	assert.Equal(t, []project.EnvStrategy{provision.EnvFromConfig, project.EnvExample, project.EnvMain, project.EnvParent}, w.questions(t, create.Request{}).EnvFrom.Options)
 }
 
 func TestTheBranchOptionsSayWhichAlreadyExist(t *testing.T) {
@@ -147,7 +148,7 @@ func TestANewBranchStartsFromTheBaseBranchAndTheConfiguredEnv(t *testing.T) {
 	resolved, err := resolve(t, w, create.Request{Branches: []string{branchName}})
 
 	require.NoError(t, err)
-	assert.Equal(t, create.Request{Branches: []string{branchName}, From: "main", Given: provision.Given{EnvFrom: project.EnvMain, Isolation: project.Isolated, FastForward: new(false)}}, resolved)
+	assert.Equal(t, create.Request{Branches: []string{branchName}, From: "main", Given: provision.Given{EnvFrom: provision.EnvFromConfig, Isolation: project.Isolated, FastForward: new(false)}}, resolved)
 }
 
 func TestABlankBranchIsRequiredAndANameIsTakenAsGiven(t *testing.T) {
@@ -275,11 +276,11 @@ func TestABranchAlreadyOpenIsUnchangedUnderIfNotExists(t *testing.T) {
 func TestAnAnswerOutsideItsChoicesIsRefused(t *testing.T) {
 	w := newWorld(t, seed{Run: jobsToml})
 
-	_, err := resolve(t, w, create.Request{Branches: []string{branchName}, Given: provision.Given{EnvFrom: "copy", Isolation: "keep"}, Remember: []string{"env_from", "from"}})
+	_, err := resolve(t, w, create.Request{Branches: []string{branchName}, Given: provision.Given{EnvFrom: "copy", Isolation: "keep", Remember: []string{"env_from", "from"}}})
 
 	template := "{path} must be one of {accepted}, not {value}"
 	assert.Equal(t, []domain.FieldError{
-		{Path: "env_from", Code: "one_of", Template: template, Params: domain.Params{"value": "copy"}, Accepted: []string{"example", "main", "parent"}},
+		{Path: "env_from", Code: "one_of", Template: template, Params: domain.Params{"value": "copy"}, Accepted: []string{"config", "example", "main", "parent"}},
 		{Path: "isolation", Code: "one_of", Template: template, Params: domain.Params{"value": "keep"}, Accepted: []string{"isolated", "verbatim"}},
 		{Path: "remember[1]", Code: "one_of", Template: template, Params: domain.Params{"value": "from"}, Accepted: []string{"env_from", "isolation", "fast_forward"}},
 	}, fieldsOf(t, err))
@@ -300,7 +301,7 @@ func TestAnIsolationGivenIsCheckedEvenWhenNothingIsIsolated(t *testing.T) {
 func TestAnAnswerToASkippedQuestionIsNeverRemembered(t *testing.T) {
 	w := newWorld(t, seed{})
 
-	resolved, err := resolve(t, w, create.Request{Branches: []string{branchName}, Remember: []string{"env_from", "isolation", "fast_forward"}})
+	resolved, err := resolve(t, w, create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from", "isolation", "fast_forward"}}})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"env_from"}, resolved.Remember)
@@ -331,9 +332,8 @@ func TestEachFieldOfTheFormAnswersTheRequestBack(t *testing.T) {
 		"every field given": {
 			Branches:    []string{branchName, "feat/two"},
 			From:        "main",
-			Given:       provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(true)},
+			Given:       provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(true), Remember: []string{"isolation", "env_from", "isolation", "fast_forward"}},
 			IfNotExists: true,
-			Remember:    []string{"isolation", "env_from", "isolation", "fast_forward"},
 		},
 	}
 	for name, req := range cases {
@@ -355,7 +355,7 @@ func TestTheFormExistsBeforeAnyRead(t *testing.T) {
 }
 
 func TestTheFormCarriesTheRequestsProblems(t *testing.T) {
-	questions := newWorld(t, seed{}).questions(t, create.Request{Branches: []string{branchName, branchName}, Given: provision.Given{EnvFrom: "copy"}, Remember: []string{"from"}})
+	questions := newWorld(t, seed{}).questions(t, create.Request{Branches: []string{branchName, branchName}, Given: provision.Given{EnvFrom: "copy", Remember: []string{"from"}}})
 
 	form := questions.Form()
 
@@ -389,7 +389,7 @@ func TestAnAnswerTheRequestCannotTakeIsRefusedAndChangesNothing(t *testing.T) {
 }
 
 func TestEachAnswerReadsBackAsAnswerTakesIt(t *testing.T) {
-	req := create.Request{Branches: []string{"feat/a", "feat/b"}, From: "main", Given: provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(false)}, IfNotExists: true, Remember: []string{"env_from"}, Ask: true}
+	req := create.Request{Branches: []string{"feat/a", "feat/b"}, From: "main", IfNotExists: true, Given: provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(false), Remember: []string{"env_from"}, Ask: true}}
 	paths := []string{domain.PathRemember, domain.PathAsk}
 	for _, field := range (create.Questions{}).Form().Fields {
 		paths = append(paths, field.Spec().Path)
@@ -403,4 +403,13 @@ func TestEachAnswerReadsBackAsAnswerTakesIt(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, req, got)
+}
+
+func TestTheConfigDefaultIsTheFirstEnvOptionNamingTheConfiguredStrategy(t *testing.T) {
+	form := newWorld(t, seed{}).questions(t, create.Request{Branches: []string{branchName}}).Form()
+
+	field, found := fieldAt(form, "env_from").(domain.SelectField)
+	require.True(t, found)
+	assert.Equal(t, domain.Option{Value: "config", Label: "Use config default (main)", Short: "config default"}, field.Options[0])
+	assert.Equal(t, []string{"config", "example", "main", "parent"}, valuesOf(field.Options))
 }

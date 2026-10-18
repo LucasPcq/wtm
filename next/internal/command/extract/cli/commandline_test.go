@@ -16,11 +16,9 @@ func TestTheRequestIsSpelledWithItsFlagsSortedAndQuoted(t *testing.T) {
 		Files:      []string{"apps/api", "two words.txt"},
 		To:         "feat/split",
 		From:       "main",
-		Given:      provision.Given{FastForward: new(true), Isolation: project.Verbatim},
 		Keep:       new(false),
 		OnConflict: extract.OnConflictResolve,
-		Remember:   []string{"isolation"},
-		Ask:        true,
+		Given:      provision.Given{FastForward: new(true), Isolation: project.Verbatim, Remember: []string{"isolation"}, Ask: true},
 	}
 
 	assert.Equal(t, `wtm-next extract feat/login --ff --files apps/api --files 'two words.txt' --from main --isolation verbatim --keep=false --on-conflict resolve --remember isolation --to feat/split --ask`, output.Line(newForm(nil).Argv("wtm-next extract", req)))

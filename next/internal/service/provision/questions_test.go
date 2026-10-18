@@ -10,38 +10,57 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTheEnvStrategyIsTheOneGivenElseRememberedElseConfigured(t *testing.T) {
+func TestTheEnvStrategyIsTheOneGivenElseRememberedElseConfigDefault(t *testing.T) {
 	remembered := map[string]string{project.RememberEnvStrategy: string(project.EnvParent)}
 	cases := map[string]struct {
-		params provision.QuestionsParams
-		want   domain.Answer[project.EnvStrategy]
+		given      provision.Given
+		remembered map[string]string
+		want       domain.Answer[project.EnvStrategy]
+		strategy   project.EnvStrategy
 	}{
-		"given":                            {provision.QuestionsParams{Given: provision.Given{EnvFrom: project.EnvMain}, Remembered: remembered, EnvStrategy: project.EnvExample}, domain.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: domain.OriginRequest}},
-		"remembered":                       {provision.QuestionsParams{Remembered: remembered, EnvStrategy: project.EnvExample}, domain.Answer[project.EnvStrategy]{Value: project.EnvParent, Origin: domain.OriginRemembered}},
-		"asked again":                      {provision.QuestionsParams{Remembered: remembered, Ask: true, EnvStrategy: project.EnvExample}, domain.Answer[project.EnvStrategy]{Value: project.EnvExample, Origin: domain.OriginConfig}},
-		"remembered as the config default": {provision.QuestionsParams{Remembered: map[string]string{project.RememberEnvStrategy: project.RememberEnvConfig}, EnvStrategy: project.EnvMain}, domain.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: domain.OriginRemembered}},
+		"given":                         {provision.Given{EnvFrom: project.EnvMain}, remembered, domain.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: domain.OriginRequest}, project.EnvMain},
+		"the config default given":      {provision.Given{EnvFrom: provision.EnvFromConfig}, remembered, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginRequest}, project.EnvExample},
+		"remembered":                    {provision.Given{}, remembered, domain.Answer[project.EnvStrategy]{Value: project.EnvParent, Origin: domain.OriginRemembered}, project.EnvParent},
+		"asked again":                   {provision.Given{Ask: true}, remembered, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginDefault}, project.EnvExample},
+		"the config default remembered": {provision.Given{}, map[string]string{project.RememberEnvStrategy: project.RememberEnvConfig}, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginRemembered}, project.EnvExample},
+		"nothing given nor remembered":  {provision.Given{}, nil, domain.Answer[project.EnvStrategy]{Value: provision.EnvFromConfig, Origin: domain.OriginDefault}, project.EnvExample},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			questions := provision.NewQuestions(c.params)
+			questions := provision.NewQuestions(provision.QuestionsParams{Given: c.given, Repository: repository(c.remembered)})
 
 			assert.Equal(t, c.want, questions.EnvFrom.Answer)
-			assert.Equal(t, c.want.Value, questions.Answers().EnvFrom())
+			assert.Equal(t, c.strategy, questions.Answers().EnvFrom())
 		})
 	}
 }
 
-func TestAskingAgainStillShowsWhatIsRemembered(t *testing.T) {
-	questions := provision.NewQuestions(provision.QuestionsParams{Remembered: map[string]string{project.RememberEnvStrategy: string(project.EnvParent), project.RememberSourceUpdate: project.SourceUpdateFastForward}, Ask: true})
+func TestTheConfigDefaultIsTheFirstEnvOptionNamingTheConfiguredStrategy(t *testing.T) {
+	fields := provision.NewQuestions(provision.QuestionsParams{Repository: repository(nil)}).Fields(provision.Wording{})
 
-	assert.Equal(t, project.EnvParent, questions.EnvFrom.Remembered)
+	field, isSelect := fields[0].(domain.SelectField)
+	require.True(t, isSelect)
+	assert.Equal(t, []domain.Option{
+		{Value: "config", Label: "Use config default (example)", Short: "config default"},
+		{Value: "example", Label: "example — copy .env.example → .env"},
+		{Value: "main", Label: "main — copy .env from the main checkout"},
+		{Value: "parent", Label: "parent — copy .env from source worktree"},
+	}, field.Options)
+}
+
+func TestAskingAgainStillShowsWhatIsRemembered(t *testing.T) {
+	remembered := map[string]string{project.RememberEnvStrategy: project.RememberEnvConfig, project.RememberSourceUpdate: project.SourceUpdateFastForward}
+	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Ask: true}, Repository: repository(remembered)})
+
+	assert.Equal(t, provision.EnvFromConfig, questions.EnvFrom.Remembered)
 	assert.Equal(t, new(true), questions.FastForward.Remembered)
 	assert.Equal(t, domain.OriginDefault, questions.FastForward.Origin)
+	assert.True(t, questions.Given().Ask, "a request settled again sets the remembered answers aside as this one did")
 }
 
 func TestAWorktreeThatIsNotCreatedIsAskedNothingAndRemembersNothing(t *testing.T) {
 	remembered := map[string]string{project.RememberEnvStrategy: string(project.EnvParent), project.RememberIsolation: string(project.Verbatim)}
-	questions := provision.NewQuestions(provision.QuestionsParams{Remembered: remembered, EnvStrategy: project.EnvMain, Exists: "exists", Remember: []string{"env_from", "isolation", "fast_forward"}})
+	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Remember: []string{"env_from", "isolation", "fast_forward"}}, Repository: repository(remembered), Exists: "exists"})
 
 	for _, field := range questions.Fields(provision.Wording{}) {
 		assert.Equal(t, "exists", field.Spec().Skip, field.Spec().Path)
@@ -49,34 +68,36 @@ func TestAWorktreeThatIsNotCreatedIsAskedNothingAndRemembersNothing(t *testing.T
 	}
 	assert.Empty(t, questions.EnvFrom.Value)
 	assert.Empty(t, questions.Isolation.Value)
+	assert.Empty(t, questions.Given().Remember)
 }
 
 func TestTheFastForwardIsSkippedWhenNothingIsBehind(t *testing.T) {
-	questions := provision.NewQuestions(provision.QuestionsParams{NotBehind: "up to date", Remember: []string{"fast_forward", "env_from"}})
+	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Remember: []string{"fast_forward", "env_from", "env_from"}}, Repository: repository(nil), NotBehind: "up to date"})
 
 	assert.Equal(t, "up to date", questions.FastForward.Skip)
 	assert.False(t, questions.Remembers("fast_forward"))
-	assert.True(t, questions.Remembers("env_from"))
+	assert.Equal(t, []string{"env_from"}, questions.Given().Remember)
 }
 
-func TestAnUnknownStrategyOrAGivenIsolationOutsideTheListIsAProblem(t *testing.T) {
-	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{EnvFrom: "copy", Isolation: "shared"}})
+func TestAnUnknownStrategyAGivenIsolationOutsideTheListOrAFieldNoneRemembersIsAProblem(t *testing.T) {
+	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{EnvFrom: "copy", Isolation: "shared", Remember: []string{"env_from", "from"}}, Repository: repository(nil)})
 
 	problems := questions.Problems()
 
-	require.Len(t, problems, 2)
-	assert.Equal(t, "env_from", problems[0].Path)
+	require.Len(t, problems, 3)
+	assert.Equal(t, []string{"config", "example", "main", "parent"}, problems[0].Accepted)
 	assert.Equal(t, "isolation", problems[1].Path)
+	assert.Equal(t, "remember[1]", problems[2].Path)
 }
 
 func TestEachAnswerOfANewWorktreeReadsBackAsAnswerTakesIt(t *testing.T) {
-	given := provision.Given{EnvFrom: project.EnvParent, Isolation: project.Verbatim, FastForward: new(false)}
+	given := provision.Given{EnvFrom: provision.EnvFromConfig, Isolation: project.Verbatim, FastForward: new(false), Remember: []string{"isolation"}, Ask: true}
 
 	got := provision.Given{}
-	for _, field := range (provision.Questions{}).Fields(provision.Wording{}) {
+	for _, path := range []string{"env_from", "isolation", "fast_forward", domain.PathRemember, domain.PathAsk} {
 		var err error
-		got, err = got.Answer(field.Spec().Path, given.Values(field.Spec().Path))
-		require.NoError(t, err)
+		got, err = got.Answer(path, given.Values(path))
+		require.NoError(t, err, path)
 	}
 
 	assert.Equal(t, given, got)
@@ -85,8 +106,23 @@ func TestEachAnswerOfANewWorktreeReadsBackAsAnswerTakesIt(t *testing.T) {
 }
 
 func TestTheAnswersToRememberAreKeyedAsConfigTomlKeepsThem(t *testing.T) {
-	answers := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(true)}}).Answers()
+	answers := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{EnvFrom: provision.EnvFromConfig, Isolation: project.Verbatim, FastForward: new(true)}, Repository: repository(nil)}).Answers()
 
-	assert.Equal(t, map[string]string{"env_strategy": "main", "isolation": "verbatim", "source_update": "ff"}, answers.Remembered([]string{"env_from", "isolation", "fast_forward"}))
-	assert.Equal(t, map[string]string{"isolation": "verbatim"}, answers.Remembered([]string{"isolation"}))
+	assert.Equal(t, map[string]string{"env_strategy": "config", "isolation": "verbatim", "source_update": "ff"}, answers.Remembered([]string{"env_from", "isolation", "fast_forward"}))
+	assert.Equal(t, map[string]string{"isolation": "verbatim"}, answers.Remembered([]string{"isolation", "keep"}))
+	assert.Equal(t, project.EnvExample, answers.EnvFrom())
+}
+
+func TestAnswersNoQuestionGaveAreRefusedBeforeAnythingIsMade(t *testing.T) {
+	w, _ := inMemory(t, seeds{})
+	params := w.params(&recorder{})
+	params.Worktree.Answers = provision.Answers{}
+
+	outcome := w.service.Run(t.Context(), params)
+
+	assert.Equal(t, domain.StatusFailed, outcome.Status)
+	require.NotNil(t, outcome.Err)
+	assert.Equal(t, domain.KindInternal, outcome.Err.Kind)
+	assert.Equal(t, "provision.unasked", outcome.Err.Code)
+	assert.NoDirExists(t, params.Worktree.Path)
 }
