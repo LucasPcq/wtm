@@ -52,9 +52,9 @@ type Response struct {
 	Envelope domain.Envelope
 }
 
-// An Outcome is what a command's run returns: it reports itself as an envelope, err being the run's refusal if any.
+// An Outcome is what a command's run returns: it reports itself as the envelope of command, err being the run's refusal if any.
 type Outcome interface {
-	Envelope(err *domain.Error) domain.Envelope
+	Envelope(command string, err *domain.Error) domain.Envelope
 }
 
 // Bind returns the command called name, of schema form, that opens its use case on the call's directory with open, then runs it with run, a method expression such as create.UseCase.Run.
@@ -84,7 +84,7 @@ func Bind[U, Req any, Out Outcome](name string, form domain.Form, open func(ctx 
 		}
 
 		outcome, err := run(useCase, ctx, req, opts)
-		return respond(outcome.Envelope(domain.AsError(domain.AsErrorParams{Err: err})))
+		return respond(outcome.Envelope(name, domain.AsError(domain.AsErrorParams{Err: err})))
 	}
 
 	return Command{Name: name, Form: form, Execute: execute}

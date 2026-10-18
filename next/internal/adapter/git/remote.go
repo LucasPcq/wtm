@@ -10,7 +10,7 @@ import (
 // branch only. Branches are named in full so a tag of the same name, or a
 // branch named tags/..., is never fetched instead.
 func (r Repo) FetchRef(ctx context.Context, name string) error {
-	_, err := r.git(ctx, "fetch", r.Remote, "--", headsPrefix+name)
+	_, err := r.git(ctx, "fetch", origin, "--", headsPrefix+name)
 	return err
 }
 
@@ -18,7 +18,7 @@ func (r Repo) FetchRef(ctx context.Context, name string) error {
 // local branch of that name; git refuses unless it is a fast-forward and the
 // branch is checked out nowhere.
 func (r Repo) FastForwardRef(ctx context.Context, name string) error {
-	_, err := r.git(ctx, "fetch", r.Remote, "--", headsPrefix+name+":"+headsPrefix+name)
+	_, err := r.git(ctx, "fetch", origin, "--", headsPrefix+name+":"+headsPrefix+name)
 	return err
 }
 

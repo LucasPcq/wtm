@@ -2,14 +2,11 @@
 package create
 
 import (
-	"cmp"
 	"context"
-	"errors"
 	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
-	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
@@ -19,91 +16,29 @@ import (
 // ----------------------------------------------------------------------------
 // The use case
 
-const name = "create"
+// Name is the command's name, the one its surfaces and its codes spell.
+const Name = "create"
 
 // CodeConfigNotFound refuses a repository with no wtm config: `wtm init` has not run there.
-const CodeConfigNotFound = "create.config_not_found"
+const CodeConfigNotFound = Name + repository.ConfigNotFound
 
-// A UseCase creates worktrees in one repository: the ports it reaches the repository through, the services it shares with the other commands, and the paths of the main checkout and of wtm's state.
+// A UseCase creates worktrees in one repository: the ports it reaches the repository through and the services it shares with the other commands.
 type UseCase struct {
 	Git        Git
-	Config     Config
-	Answers    Answers
+	Meta       Meta
+	Repository repository.Service
 	Operations operation.Service
 	Provision  provision.Service
-	MainPath   string
-	StateDir   string
 }
 
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, or a refusal before the apply).
-type Outcome struct {
-	Op          string
-	Plan        Plan
-	Fingerprint string
-	Warnings    []domain.Warning
-	Result      *Result
-}
-
-// PlanFingerprint is the fingerprint of the plan the run previewed or applied, the one a preview's apply is held to.
-func (o Outcome) PlanFingerprint() string {
-	return o.Fingerprint
-}
-
-// Failure is the error the apply ended on, nil when it succeeded or did not run.
-func (o Outcome) Failure() *domain.Error {
-	if o.Result == nil {
-		return nil
-	}
-
-	return o.Result.Failure()
-}
-
-// Envelope is how the run ended for every surface, err being Run's refusal if any: its items once applied, else the plan and its fingerprint unless refused.
-func (o Outcome) Envelope(err *domain.Error) domain.Envelope {
-	doc := domain.Envelope{Command: name, Op: o.Op, Err: err}
-
-	switch {
-	case o.Result != nil:
-		doc.Err = cmp.Or(doc.Err, o.Failure())
-		for _, item := range o.Result.Items {
-			doc.Items = append(doc.Items, item.envelopeItem())
-		}
-		doc.Warnings = o.Warnings
-	case doc.Err == nil:
-		doc.Plan, doc.Fingerprint, doc.Warnings = &o.Plan, o.Fingerprint, o.Warnings
-	}
-
-	return doc
-}
+type Outcome = domain.Outcome[Plan, Detail]
 
 // A Result is what the apply did: one Item per branch of the plan, in its order, and the warnings of the whole run.
-type Result struct {
-	Items    []Item
-	Warnings []domain.Warning
-}
-
-// Failure is the error the run ends on: the first interruption, else the first failed branch, else nil.
-func (r Result) Failure() *domain.Error {
-	if at := slices.IndexFunc(r.Items, interrupted); at >= 0 {
-		return cmp.Or(r.Items[at].Err, &domain.Error{Kind: domain.KindCancelled, Code: domain.CodeInterrupted, Message: "interrupted"})
-	}
-
-	if at := slices.IndexFunc(r.Items, func(item Item) bool { return item.Status == domain.StatusFailed }); at >= 0 {
-		return r.Items[at].Err
-	}
-
-	return nil
-}
+type Result = domain.Result[Detail]
 
 // An Item is what became of one branch: its status and why, the error it failed on, its warnings, and its Detail once its worktree stands.
-type Item struct {
-	Subject  string
-	Status   domain.Status
-	Reason   domain.Reason
-	Err      *domain.Error
-	Warnings []domain.Warning
-	Detail   *Detail
-}
+type Item = domain.Unit[Detail]
 
 // A Detail describes a branch's worktree as the JSON envelope reports it: where it is, its meta record, where the branch stood against origin, its ordinal and the env ports it was given.
 type Detail struct {
@@ -114,17 +49,13 @@ type Detail struct {
 	EnvPorts env.Redacted `json:"env_ports,omitzero"`
 }
 
-func (i Item) envelopeItem() domain.Item {
-	return domain.Item{Subject: i.Subject, Status: i.Status, Reason: i.Reason, Err: i.Err, Warnings: i.Warnings, Detail: domain.DetailOf(i.Detail)}
-}
-
 // ----------------------------------------------------------------------------
 // Run
 
 // Run carries out the request under its operation: it takes the locks, plans under them, fingerprints the plan, stops on a dry run, refuses a stale plan and applies it between the operation's started and finished events. An error returned is a refusal before the apply; a failure during the apply is in the Outcome's Result.
 func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (Outcome, error) {
 	// 1. Take the operation's locks before reading anything, so the facts cannot change under the plan.
-	op, err := u.Operations.Begin(name, req.Locks(), opts)
+	op, err := u.Operations.Begin(Name, req.Locks(), opts)
 	if err != nil {
 		return Outcome{Op: op.ID}, err
 	}
@@ -212,10 +143,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 
 // Observe reads what create decides from: the project's config, the repository's snapshot and what lies at the path each of branches would take. A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, branches []string) (Facts, error) {
-	repo, err := repository.Observe(ctx, repository.ObserveParams{Config: u.Config, Git: u.Git, MainPath: u.MainPath})
-	if errors.Is(err, project.ErrConfigNotFound) {
-		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeConfigNotFound, Message: "no wtm config found — run `wtm init` first", Cause: err}
-	}
+	repo, err := u.Repository.Observe(ctx, Name)
 	if err != nil {
 		return Facts{}, err
 	}
@@ -289,11 +217,10 @@ func (u UseCase) item(ctx context.Context, plan Plan, planned BranchPlan, report
 	}
 
 	report(domain.UnitStarted{Subject: planned.Branch})
-	outcome := u.Provision.Run(ctx, u.provisionParams(plan, planned, report))
+	outcome := u.Provision.Run(ctx, provision.ParamsOf(plan.facts.Repository, provision.Planned{Branch: planned.Branch, Path: planned.Path, Placement: planned.placement(), From: plan.From, Answers: plan.settled}, report))
 
 	item := Item{Subject: planned.Branch, Status: outcome.Status, Reason: outcome.Reason, Err: outcome.Err, Warnings: outcome.Warnings}
-	// A worktree whose meta record was written stands, even when a later step of its provisioning failed.
-	if outcome.Provisioned.Meta.CreatedAt != "" {
+	if outcome.Provisioned.Stands() {
 		item.Detail = &Detail{
 			Path:     planned.Path,
 			Metadata: outcome.Provisioned.Meta,
@@ -309,50 +236,21 @@ func (u UseCase) item(ctx context.Context, plan Plan, planned BranchPlan, report
 
 func (u UseCase) unchanged(planned BranchPlan) Item {
 	// A record that cannot be read only leaves the detail's metadata empty: the worktree is there all the same.
-	recorded, _ := u.Provision.Meta.Load(planned.Branch)
+	recorded, _ := u.Meta.Load(planned.Branch)
 	return Item{Subject: planned.Branch, Status: domain.StatusDone, Reason: domain.ReasonUnchanged, Detail: &Detail{Path: planned.Path, Metadata: recorded}}
 }
 
-func (u UseCase) provisionParams(plan Plan, planned BranchPlan, report domain.Report) provision.Params {
-	f := plan.facts
-	return provision.Params{
-		Project: provision.ProjectOf(f.Repository, u.StateDir),
-		Worktree: provision.Worktree{
-			Branch:     planned.Branch,
-			Path:       planned.Path,
-			Checkout:   planned.placement().Checkout(planned.Branch, f.Ref(plan.From)),
-			Source:     plan.From,
-			ParentPath: f.CheckedOutAt(plan.From),
-			Answers:    plan.settled,
-		},
-		Report: report,
-	}
-}
-
-// remember writes the answers the plan asks to remember, once at least one worktree was created; a write that fails is a warning, the worktrees standing all the same.
+// remember writes the answers the plan asks to remember, once at least one worktree was created.
 func (u UseCase) remember(ctx context.Context, plan Plan, items []Item) []domain.Warning {
-	answers := plan.answers()
-	if len(answers) == 0 || !slices.ContainsFunc(items, created) {
+	if !slices.ContainsFunc(items, created) {
 		return nil
 	}
 
-	written, err := u.Answers.Remember(ctx, answers)
-	if err != nil {
-		return []domain.Warning{{Code: "create.remember_failed", Message: "could not remember the answer: " + err.Error(), Params: domain.Params{"cause": err.Error()}}}
-	}
-	if written.Unlocked {
-		return []domain.Warning{domain.LocksUnavailable}
-	}
-
-	return nil
+	return u.Provision.Remember(ctx, Name, plan.settled, plan.Remember)
 }
 
 // ----------------------------------------------------------------------------
 // Helpers
-
-func interrupted(item Item) bool {
-	return item.Status == domain.StatusCancelled || item.Reason == domain.ReasonInterrupted
-}
 
 func created(item Item) bool {
 	return item.Status == domain.StatusDone && item.Reason != domain.ReasonUnchanged

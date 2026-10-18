@@ -13,7 +13,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
-const commandName = "create"
+const commandName = create.Name
 
 // planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome.
 func planRowsOf(plan create.Plan) []output.PlanRow {

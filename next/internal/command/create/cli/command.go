@@ -55,7 +55,7 @@ func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, 
 	// exits are the exit codes of create's own codes, ahead of those of their kind.
 	exits := map[string]int{create.CodeConfigNotFound: uicli.ExitConfigNotFound}
 	c := &createCommand{io: uicli.Run{Command: commandName, Streams: streams, Env: env, Flags: createFlags, Exits: exits}, form: newForm(open)}
-	cmd := &cobra.Command{Use: "create [branch...]", Short: createShort, Long: createLong, Example: createExample, Args: cobra.ArbitraryArgs, RunE: c.run}
+	cmd := &cobra.Command{Use: create.Name + " [branch...]", Short: createShort, Long: createLong, Example: createExample, Args: cobra.ArbitraryArgs, RunE: c.run}
 	c.form.Bind(cmd, &c.io)
 
 	return cmd
@@ -70,7 +70,7 @@ func (c *createCommand) conclude(cmd *cobra.Command, ran form.Ran[create.Request
 	failure := domain.AsError(domain.AsErrorParams{Err: err})
 	argv := c.form.Argv(cmd.CommandPath(), ran.Request)
 	if !c.io.Human() {
-		doc := ran.Outcome.Envelope(failure)
+		doc := ran.Outcome.Envelope(commandName, failure)
 		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, argv)...)
 		return c.io.Envelope(doc)
 	}

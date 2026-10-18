@@ -20,17 +20,24 @@ type Request struct {
 	IfNotExists bool `json:"if_not_exists"`
 }
 
+// The paths of create's own fields; the questions of a new worktree name theirs in provision.
+const (
+	pathBranches    = "branches"
+	pathFrom        = "from"
+	pathIfNotExists = "if_not_exists"
+)
+
 // Answer is the request with the field at path answered by values, spelled as the field's Answer spells them; the path "remember" answers the fields whose answer is remembered. A value the field cannot take leaves the request as it was.
 func (r Request) Answer(path string, values []string) (Request, error) {
 	answer := domain.AnswerParams{Path: path, Values: values}
 	next := r
 	var err error
 	switch path {
-	case "branches":
+	case pathBranches:
 		next.Branches = values
-	case "from":
+	case pathFrom:
 		next.From, err = domain.One[string](answer)
-	case "if_not_exists":
+	case pathIfNotExists:
 		next.IfNotExists, err = domain.Yes(answer)
 	default:
 		next.Given, err = r.Given.Answer(path, values)
@@ -46,11 +53,11 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 // Values is the request's answer to the field at path, spelled as Answer takes it; nil when the request leaves the field to its default.
 func (r Request) Values(path string) []string {
 	switch path {
-	case "branches":
+	case pathBranches:
 		return r.Branches
-	case "from":
+	case pathFrom:
 		return domain.Spelled(r.From)
-	case "if_not_exists":
+	case pathIfNotExists:
 		return domain.SaidYes(r.IfNotExists)
 	}
 
@@ -102,12 +109,12 @@ func NewQuestions(f Facts, req Request) Questions {
 func (q Questions) Form() domain.Form {
 	fields := []domain.Field{
 		domain.TextListField{
-			FieldSpec: domain.FieldSpec{Path: "branches", Flag: "<branches>", Label: "Branches", Help: "The branches to create a worktree for; one that already exists is checked out as it is"},
+			FieldSpec: domain.FieldSpec{Path: pathBranches, Flag: "<branches>", Label: "Branches", Help: "The branches to create a worktree for; one that already exists is checked out as it is"},
 			Entries:   q.Branches.Given,
 			Options:   q.Branches.Options,
 		},
 		domain.SelectField{
-			FieldSpec:   domain.FieldSpec{Path: "from", Flag: "--from", Label: "Source branch", Help: "The branch a new branch starts from, or the parent recorded for wtm sync of one that already exists", Origin: q.From.Origin},
+			FieldSpec:   domain.FieldSpec{Path: pathFrom, Flag: "--from", Label: "Source branch", Help: "The branch a new branch starts from, or the parent recorded for wtm sync of one that already exists", Origin: q.From.Origin},
 			Value:       q.From.Value,
 			Options:     q.From.Options,
 			Pinned:      q.From.Pinned,
@@ -116,7 +123,7 @@ func (q Questions) Form() domain.Form {
 	}
 	fields = append(fields, q.Questions.Fields(wording)...)
 	fields = append(fields, domain.ConfirmField{
-		FieldSpec: domain.FieldSpec{Path: "if_not_exists", Flag: "--if-not-exists", Label: "If not exists", Help: "Succeed without a change when the worktree already exists (idempotent)", Origin: q.IfNotExists.Origin, Skip: q.IfNotExists.Skip},
+		FieldSpec: domain.FieldSpec{Path: pathIfNotExists, Flag: "--if-not-exists", Label: "If not exists", Help: "Succeed without a change when the worktree already exists (idempotent)", Origin: q.IfNotExists.Origin, Skip: q.IfNotExists.Skip},
 		Value:     q.IfNotExists.Value,
 	})
 
@@ -149,7 +156,7 @@ func (f Facts) branchOptions() []domain.Option {
 
 // from answers the source with the base branch only when no branch is checked out as it exists, since such a branch's parent must be named.
 func (f Facts) from(req Request) From {
-	question := From{Options: f.sourceOptions(req.Branches), Pinned: f.Config.Worktrees.BaseBranch}
+	question := From{Options: domain.SourceOptions(f.Snapshot, req.Branches...), Pinned: f.Config.Worktrees.BaseBranch}
 	switch base := f.Config.Worktrees.BaseBranch; {
 	case req.From != "":
 		question.Answer = domain.Answer[string]{Value: req.From, Origin: domain.OriginRequest}
@@ -158,24 +165,6 @@ func (f Facts) from(req Request) From {
 	}
 
 	return question
-}
-
-// sourceOptions are the branches a new branch can start from, the branches being created excepted; a branch only on origin is offered as origin/<branch>.
-func (f Facts) sourceOptions(creating []string) []domain.Option {
-	options := make([]domain.Option, 0, len(f.Branches.Local)+len(f.Branches.Remote))
-	for _, local := range f.Branches.Local {
-		if !slices.Contains(creating, local.Name) {
-			options = append(options, domain.Option{Value: local.Name, Badge: f.Badge(local.Name)})
-		}
-	}
-
-	for _, remote := range f.Branches.Remote {
-		if !f.Local(remote.Name) && !slices.Contains(creating, remote.Name) {
-			options = append(options, domain.Option{Value: worktree.OriginPrefix + remote.Name})
-		}
-	}
-
-	return options
 }
 
 // newWorktree are the questions of the new worktrees, on the facts; the fast-forward is asked while a branch they start from is behind origin.
@@ -200,9 +189,6 @@ func ifNotExists(given bool) domain.Confirm {
 // ----------------------------------------------------------------------------
 // Resolve and validation
 
-// codeRequired is the field-error code create spells as every command does, with no create. prefix.
-const codeRequired = "required"
-
 // Resolve settles the request on the facts, every field answered as NewQuestions answers it; a request with problems is refused with all of them, by domain.Invalid.
 func Resolve(f Facts, req Request) (Request, error) {
 	questions := NewQuestions(f, req)
@@ -226,7 +212,7 @@ func (q Questions) Request() Request {
 func (f Facts) problems(q Questions) []domain.FieldError {
 	problems := f.branchProblems(q)
 	if from := q.From.Value; from != "" && !f.Candidate(from) {
-		problems = append(problems, domain.FieldError{Path: "from", Code: "not_found", Template: "{path}: {value} not found", Params: domain.Params{"value": from}})
+		problems = append(problems, domain.FieldError{Path: pathFrom, Code: domain.CodeNotFound, Template: "{path}: {value} not found", Params: domain.Params{"value": from}})
 	}
 
 	problems = append(problems, q.Questions.Problems()...)
@@ -237,7 +223,7 @@ func (f Facts) problems(q Questions) []domain.FieldError {
 func (f Facts) branchProblems(q Questions) []domain.FieldError {
 	branches := q.Branches.Given
 	if len(branches) == 0 {
-		return []domain.FieldError{{Path: "branches", Code: codeRequired, Template: "{path} is required"}}
+		return []domain.FieldError{domain.Required(pathBranches)}
 	}
 
 	var problems []domain.FieldError
@@ -256,20 +242,20 @@ func (f Facts) crossProblems(q Questions) []domain.FieldError {
 	branches, from := q.Branches.Given, q.From.Value
 	if from == "" && f.checksOut(Request{Branches: branches, IfNotExists: q.IfNotExists.Value}) {
 		problems = append(problems, domain.FieldError{
-			Path:     "from",
-			Code:     codeRequired,
+			Path:     pathFrom,
+			Code:     domain.CodeRequired,
 			Template: "{path} is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)",
 			Params:   domain.Params{"because": "create.parent_required"},
 		})
 	}
 
 	if from != "" && slices.Contains(branches, from) {
-		problems = append(problems, domain.FieldError{Path: "from", Code: "self_parent", Template: "{value} cannot be its own parent: pass another value to {path}", Params: domain.Params{"value": from}, With: []string{"branches"}})
+		problems = append(problems, domain.FieldError{Path: pathFrom, Code: domain.CodeSelfParent, Template: "{value} cannot be its own parent: pass another value to {path}", Params: domain.Params{"value": from}, With: []string{pathBranches}})
 	}
 
 	return problems
 }
 
 func branchPath(index int) string {
-	return "branches[" + strconv.Itoa(index) + "]"
+	return pathBranches + "[" + strconv.Itoa(index) + "]"
 }

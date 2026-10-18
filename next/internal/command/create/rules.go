@@ -42,17 +42,15 @@ func (f Facts) pathsOf(branches []string) []string {
 type decision interface{ decision() }
 
 // A refusal is why one branch is refused, as a field error of that branch.
-type refusal struct {
-	Code     string
-	Template string
-	Params   domain.Params
-}
+type refusal domain.FieldError
 
 func (BranchPlan) decision() {}
 func (refusal) decision()    {}
 
 func (r refusal) field(index int) domain.FieldError {
-	return domain.FieldError{Path: branchPath(index), Code: r.Code, Template: r.Template, Params: r.Params}
+	problem := domain.FieldError(r)
+	problem.Path = branchPath(index)
+	return problem
 }
 
 // An entry is one branch asked, with what deciding it needs of the rest of the request.
@@ -100,11 +98,11 @@ func (f Facts) decide(e entry) decision {
 // invalid is the refusal of a branch that the request itself rules out, whatever the repository holds: blank, given twice, not a valid branch name, or sharing its path or derived name with a branch asked before it.
 func (f Facts) invalid(e entry) (refusal, bool) {
 	if worktree.BlankBranch(e.name) {
-		return refusal{Code: codeRequired, Template: "{path} is required"}, true
+		return refusal(domain.Required("")), true
 	}
 
 	if slices.Contains(e.earlier, e.name) {
-		return refusal{Code: "distinct", Template: "{path}: {value} is given twice", Params: domain.Params{"value": e.name}}, true
+		return refusal{Code: domain.CodeDistinct, Template: "{path}: {value} is given twice", Params: domain.Params{"value": e.name}}, true
 	}
 
 	if err := worktree.BranchProblem(e.name); err != nil {
@@ -168,20 +166,16 @@ func (f Facts) checksOut(req Request) bool {
 	})
 }
 
-// subjectsAt is each local branch a planned worktree starts from — the existing branch it checks out, or the source of a new branch — whose standing against origin is standing, each once.
+// subjectsAt is each local branch a planned worktree starts from whose standing against origin is standing, each once.
 func (f Facts) subjectsAt(req Request, standing worktree.Divergence) []string {
 	var subjects []string
 	for _, d := range f.decisions(req) {
 		planned, isPlanned := d.(BranchPlan)
-		subject := ""
-		switch {
-		case !isPlanned:
-		case planned.Action == ActionCheckOut:
-			subject = planned.Branch
-		case planned.Action == ActionCreate && f.Local(req.From):
-			subject = req.From
+		if !isPlanned {
+			continue
 		}
 
+		subject := f.StartsFrom(planned.Branch, planned.Action.start(), req.From)
 		if subject != "" && f.Standing(subject) == standing && !slices.Contains(subjects, subject) {
 			subjects = append(subjects, subject)
 		}
@@ -268,6 +262,22 @@ const (
 	ActionUnchanged Action = "unchanged" // its worktree is already open (--if-not-exists)
 )
 
+// start is how the worktree of the action begins; "" for an action that makes none.
+func (a Action) start() worktree.Start {
+	switch a {
+	case ActionCreate:
+		return worktree.StartCreate
+	case ActionCheckOut:
+		return worktree.StartCheckOut
+	case ActionResume:
+		return worktree.StartResume
+	case ActionUnchanged:
+		return ""
+	}
+
+	panic("create: an action with no start: " + string(a))
+}
+
 // A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: each branch's worktree, the source, the env strategy, the isolation, the sources to fast-forward first and the answers to remember.
 type Plan struct {
 	Branches    []BranchPlan        `json:"branches"`
@@ -298,26 +308,9 @@ func (p Plan) Locks() []domain.Lock {
 	return domain.WorktreeLocks(append(names, p.FastForward...))
 }
 
-// Fingerprinted is what the plan's fingerprint covers: the plan, the isolation as resolved, and what the apply reads of the project to provision each worktree (its env files, its on_create hooks, its run.toml and the global settings).
+// Fingerprinted is what the plan's fingerprint covers: the plan with what the apply reads of the project to provision each worktree.
 func (p Plan) Fingerprinted() any {
-	f := p.facts
-	return struct {
-		Plan      Plan              `json:"plan"`
-		Isolation project.Isolation `json:"isolation"`
-		EnvFiles  []project.EnvFile `json:"env_files"`
-		OnCreate  []project.Hook    `json:"on_create"`
-		Run       project.Run       `json:"run"`
-		RunErr    string            `json:"run_err,omitempty"`
-		Global    project.Global    `json:"global"`
-	}{Plan: p, Isolation: p.settled.Isolation(), EnvFiles: f.Config.Env.Files, OnCreate: f.Config.OnCreate, Run: f.Run, RunErr: errorText(f.RunErr), Global: f.Global}
-}
-
-func errorText(err error) string {
-	if err == nil {
-		return ""
-	}
-
-	return err.Error()
+	return provision.Fingerprinted(p, p.facts.Repository, p.settled)
 }
 
 // Locks are the locks taken before planning: the repository shared, and each branch asked exclusive.
@@ -327,10 +320,5 @@ func (r Request) Locks() []domain.Lock {
 
 // placement is the branch's action as the domain places it, for its checkout and its standing.
 func (b BranchPlan) placement() worktree.Placed {
-	return worktree.Placed{Start: worktree.Start(b.Action), Upstream: b.Upstream}
-}
-
-// answers are the answers to remember, keyed by their id in config.toml.
-func (p Plan) answers() map[string]string {
-	return p.settled.Remembered(p.Remember)
+	return worktree.Placed{Start: b.Action.start(), Upstream: b.Upstream}
 }

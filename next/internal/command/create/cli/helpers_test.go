@@ -218,6 +218,6 @@ func jsonOf(t *testing.T, value any) string {
 func enveloped(t *testing.T, outcome create.Outcome, err *domain.Error) string {
 	t.Helper()
 	var out bytes.Buffer
-	require.NoError(t, output.Envelope(&out, outcome.Envelope(err), createFlags.Spell))
+	require.NoError(t, output.Envelope(&out, outcome.Envelope(commandName, err), createFlags.Spell))
 	return out.String()
 }

@@ -82,6 +82,22 @@ const (
 	ActionResume   Action = "resume"    // a branch only origin has, tracking it
 )
 
+// start is how the worktree of the action begins; "" for an action that makes none.
+func (a Action) start() worktree.Start {
+	switch a {
+	case ActionCreate:
+		return worktree.StartCreate
+	case ActionCheckOut:
+		return worktree.StartCheckOut
+	case ActionResume:
+		return worktree.StartResume
+	case ActionExisting:
+		return ""
+	}
+
+	panic("extract: an action with no start: " + string(a))
+}
+
 // A Target is the worktree the changes go to: its branch, its path, how it gets there, and the remote branch it resumes.
 type Target struct {
 	Branch   string `json:"branch"`
@@ -96,7 +112,7 @@ func (t Target) creates() bool {
 
 // placement is the target's action as the domain places it, for its checkout and its standing.
 func (t Target) placement() worktree.Placed {
-	return worktree.Placed{Start: worktree.Start(t.Action), Upstream: t.Upstream}
+	return worktree.Placed{Start: t.Action.start(), Upstream: t.Upstream}
 }
 
 //go-sumtype:decl decision
@@ -105,17 +121,15 @@ func (t Target) placement() worktree.Placed {
 type decision interface{ decision() }
 
 // A refusal is why the target is refused, as a field error of --to.
-type refusal struct {
-	Code     string
-	Template string
-	Params   domain.Params
-}
+type refusal domain.FieldError
 
 func (Target) decision()  {}
 func (refusal) decision() {}
 
 func (r refusal) field(path string) domain.FieldError {
-	return domain.FieldError{Path: path, Code: r.Code, Template: r.Template, Params: r.Params}
+	problem := domain.FieldError(r)
+	problem.Path = path
+	return problem
 }
 
 // target decides the target: the worktree of to when it has one, else a worktree placed for it as create would place it.
@@ -123,7 +137,7 @@ func (f Facts) target(req Request) decision {
 	to := req.To
 	switch {
 	case worktree.BlankBranch(to):
-		return refusal{Code: codeRequired, Template: "{path} is required"}
+		return refusal(domain.Required(""))
 	case to == req.Source:
 		return refusal{Code: "extract.same_worktree", Template: "{path}: {value} is the source — pick another worktree", Params: domain.Params{"value": to}}
 	}
@@ -178,18 +192,14 @@ func (f Facts) existing(req Request) bool {
 	return ok && !target.creates()
 }
 
-// subjectAt is the local branch a created target starts from — the existing branch it checks out, or the source of a new branch — when its standing against origin is standing, else "".
+// subjectAt is the local branch a created target starts from when its standing against origin is standing, else "".
 func (f Facts) subjectAt(req Request, standing worktree.Divergence) string {
 	target, ok := f.planned(req)
-	subject := ""
-	switch {
-	case !ok:
-	case target.Action == ActionCheckOut:
-		subject = target.Branch
-	case target.Action == ActionCreate && f.Local(req.From):
-		subject = req.From
+	if !ok {
+		return ""
 	}
 
+	subject := f.StartsFrom(target.Branch, target.Action.start(), req.From)
 	if subject == "" || f.Standing(subject) != standing {
 		return ""
 	}
@@ -258,8 +268,7 @@ func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain
 
 // refusedFor is the refusal of the conflicts, nil when there are none or the request resolves them; a binary conflict cannot take conflict markers, so it is refused even then.
 func refusedFor(target string, onConflict OnConflict, conflicts []worktree.Conflict) *domain.Error {
-	binary := slices.ContainsFunc(conflicts, func(c worktree.Conflict) bool { return c.Kind == worktree.ConflictBinary })
-	if !binary && (len(conflicts) == 0 || onConflict == OnConflictResolve) {
+	if !worktree.Refuses(conflicts, onConflict == OnConflictResolve) {
 		return nil
 	}
 
@@ -398,26 +407,9 @@ func (p Plan) Locks() []domain.Lock {
 	return domain.WorktreeLocks(append([]string{p.Source, p.Target.Branch}, p.FastForward...))
 }
 
-// Fingerprinted is what the plan's fingerprint covers: the plan, the isolation as resolved, and what the apply reads of the project to provision a created target (its env files and strategy, its on_create hooks, its run.toml and the global settings).
+// Fingerprinted is what the plan's fingerprint covers: the plan with what the apply reads of the project to provision a created target.
 func (p Plan) Fingerprinted() any {
-	f := p.facts
-	return struct {
-		Plan      Plan              `json:"plan"`
-		Isolation project.Isolation `json:"isolation"`
-		Env       project.Env       `json:"env"`
-		OnCreate  []project.Hook    `json:"on_create"`
-		Run       project.Run       `json:"run"`
-		RunErr    string            `json:"run_err,omitempty"`
-		Global    project.Global    `json:"global"`
-	}{Plan: p, Isolation: p.settled.Isolation(), Env: f.Config.Env, OnCreate: f.Config.OnCreate, Run: f.Run, RunErr: errorText(f.RunErr), Global: f.Global}
-}
-
-func errorText(err error) string {
-	if err == nil {
-		return ""
-	}
-
-	return err.Error()
+	return provision.Fingerprinted(p, p.facts.Repository, p.settled)
 }
 
 // Locks are the locks taken before planning: the repository shared, and the source and target given exclusive.
@@ -435,9 +427,4 @@ func (p Plan) move() worktree.Move {
 		TargetLabel: p.Target.Branch,
 		SourceLabel: p.Source,
 	}
-}
-
-// answers are the answers to remember, keyed by their id in config.toml.
-func (p Plan) answers() map[string]string {
-	return p.settled.Remembered(p.Remember)
 }

@@ -17,12 +17,10 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
-const (
-	remote    = "origin"
-	opIDBytes = 8
-)
+const opIDBytes = 8
 
 // wireParams is where the repository a command runs on keeps its files; it also publishes the events of the operations on it.
 type wireParams struct {
@@ -39,8 +37,10 @@ type app struct {
 
 // wire builds each adapter of the repository params locates once and injects it into every use case.
 func wire(params wireParams) app {
-	repo := git.Repo{Dir: params.MainPath, Remote: remote}
+	repo := git.Repo{Dir: params.MainPath}
 	projectConfig := config.Project{StateDir: params.StateDir, GlobalPath: config.GlobalPath()}
+
+	facts := repository.Service{Config: projectConfig, Git: repo, MainPath: params.MainPath}
 
 	operations := operation.Service{
 		Locker:    locker{oplock.Locks{StateDir: params.StateDir}},
@@ -49,10 +49,14 @@ func wire(params wireParams) app {
 		Now:       time.Now,
 	}
 
+	meta := store.Meta{StateDir: params.StateDir}
+
 	provisions := provision.Service{
 		Git:        repo,
-		Meta:       store.Meta{StateDir: params.StateDir},
+		Meta:       meta,
 		EnvFiles:   store.EnvFiles{},
+		Answers:    projectConfig,
+		StateDir:   params.StateDir,
 		RunHooks:   shell.RunHooks,
 		PublicPort: proxyport.Port{Plist: proxyport.PlistPath()}.Public,
 		Shield:     shell.Shield,
@@ -64,23 +68,18 @@ func wire(params wireParams) app {
 	return app{
 		Create: create.UseCase{
 			Git:        repo,
-			Config:     projectConfig,
-			Answers:    projectConfig,
+			Meta:       meta,
+			Repository: facts,
 			Operations: operations,
 			Provision:  provisions,
-			MainPath:   params.MainPath,
-			StateDir:   params.StateDir,
 		},
 		Extract: extract.UseCase{
 			Git:        repo,
-			Config:     projectConfig,
-			Answers:    projectConfig,
-			Meta:       provisions.Meta,
+			Repository: facts,
+			Meta:       meta,
 			Shield:     shell.Shield,
 			Operations: operations,
 			Provision:  provisions,
-			MainPath:   params.MainPath,
-			StateDir:   params.StateDir,
 		},
 	}
 }

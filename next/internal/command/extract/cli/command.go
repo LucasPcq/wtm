@@ -59,7 +59,7 @@ func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, 
 	// exits are the exit codes of extract's own codes, ahead of those of their kind.
 	exits := map[string]int{extract.CodeConfigNotFound: uicli.ExitConfigNotFound, extract.CodeConflict: exitConflict}
 	c := &extractCommand{io: uicli.Run{Command: commandName, Streams: streams, Env: env, Flags: extractFlags, Exits: exits}, form: newForm(open)}
-	cmd := &cobra.Command{Use: "extract [source]", Short: extractShort, Long: extractLong, Example: extractExample, Args: cobra.MaximumNArgs(1), RunE: c.run}
+	cmd := &cobra.Command{Use: extract.Name + " [source]", Short: extractShort, Long: extractLong, Example: extractExample, Args: cobra.MaximumNArgs(1), RunE: c.run}
 	c.form.Bind(cmd, &c.io)
 
 	return cmd
@@ -75,7 +75,7 @@ func (c *extractCommand) conclude(cmd *cobra.Command, ran form.Ran[extract.Reque
 	argv := c.form.Argv(cmd.CommandPath(), ran.Request)
 	outcome := ran.Outcome
 	if !c.io.Human() {
-		doc := ran.Outcome.Envelope(failure)
+		doc := ran.Outcome.Envelope(commandName, failure)
 		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, argv)...)
 		return c.io.Envelope(doc)
 	}

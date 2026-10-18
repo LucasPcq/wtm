@@ -104,3 +104,12 @@ func TestTheStandingOfAPlacedBranchIsItsCountsWhenCheckedOutAndItsUpstreamWhenRe
 		})
 	}
 }
+
+func TestANewWorktreeStartsFromTheBranchItChecksOutOrTheLocalSource(t *testing.T) {
+	snapshot := Snapshot{Branches: Branches{Local: []Branch{{Name: "main"}}}}
+
+	assert.Equal(t, "feat/old", snapshot.StartsFrom("feat/old", StartCheckOut, "main"))
+	assert.Equal(t, "main", snapshot.StartsFrom("feat/a", StartCreate, "main"))
+	assert.Empty(t, snapshot.StartsFrom("feat/a", StartCreate, "origin/main"))
+	assert.Empty(t, snapshot.StartsFrom("feat/r", StartResume, "main"))
+}

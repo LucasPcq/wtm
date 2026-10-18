@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	headsPrefix   = "refs/heads/"
-	remotesPrefix = "refs/remotes/"
-	remoteHead    = "HEAD"
+	headsPrefix  = "refs/heads/"
+	remotePrefix = "refs/remotes/" + origin + "/" // the ref prefix of origin's branches
+	remoteHead   = "HEAD"
 )
 
 var errNoRef = errors.New("no ref given")
@@ -24,18 +24,14 @@ func (r Repo) refName(ref worktree.Ref) (string, error) {
 	case worktree.LocalBranch:
 		return headsPrefix + b.Name, nil
 	case worktree.RemoteBranch:
-		return r.remotePrefix() + b.Name, nil
+		return remotePrefix + b.Name, nil
 	}
 	return "", errNoRef
 }
 
-// remotePrefix is the ref prefix of the remote's branches.
-func (r Repo) remotePrefix() string { return remotesPrefix + r.Remote + "/" }
-
 // Branches returns the local branches and the remote's branches with their
 // tips, the remote's HEAD left out.
 func (r Repo) Branches(ctx context.Context) (worktree.Branches, error) {
-	remotePrefix := r.remotePrefix()
 	out, err := r.git(ctx, "for-each-ref", "--format=%(objectname) %(refname)", strings.TrimSuffix(headsPrefix, "/"), strings.TrimSuffix(remotePrefix, "/"))
 	if err != nil {
 		return worktree.Branches{}, err

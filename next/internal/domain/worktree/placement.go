@@ -72,7 +72,7 @@ func Place(params PlacementParams) Placement {
 	case params.Local:
 		return Placed{Start: StartCheckOut}
 	case params.Remote:
-		return Placed{Start: StartResume, Upstream: "origin/" + params.Branch}
+		return Placed{Start: StartResume, Upstream: OriginPrefix + params.Branch}
 	}
 
 	return Placed{Start: StartCreate}

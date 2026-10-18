@@ -210,7 +210,7 @@ func Build(t testing.TB, params FakeParams) git.Repo {
 		}
 	}
 
-	return git.Repo{Dir: main, Remote: origin}
+	return git.Repo{Dir: main}
 }
 
 // builder makes the commits of a seed in the repository at dir, each once:

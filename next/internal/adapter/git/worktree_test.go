@@ -67,7 +67,7 @@ func TestWorktreesReadsABareRepository(t *testing.T) {
 	bare := gittest.TempDir(t)
 	gittest.Git(t, bare, "init", "--bare", "-b", "main")
 
-	worktrees, err := git.Repo{Dir: bare, Remote: remote}.Worktrees(t.Context())
+	worktrees, err := git.Repo{Dir: bare}.Worktrees(t.Context())
 
 	require.NoError(t, err)
 	assert.Equal(t, []worktree.Worktree{{Path: bare, Main: true, State: worktree.Bare{}}}, worktrees)
@@ -154,7 +154,7 @@ func TestMainWorktreeIsTheFirstEvenSeenFromALinkedOne(t *testing.T) {
 	linked := filepath.Join(gittest.TempDir(t), "feature")
 	gittest.Git(t, repo.Dir, "worktree", "add", "-b", "feature", linked)
 
-	main, err := git.Repo{Dir: linked, Remote: remote}.MainWorktree(t.Context())
+	main, err := git.Repo{Dir: linked}.MainWorktree(t.Context())
 
 	require.NoError(t, err)
 	assert.Equal(t, repo.Dir, main.Path)
@@ -162,7 +162,7 @@ func TestMainWorktreeIsTheFirstEvenSeenFromALinkedOne(t *testing.T) {
 }
 
 func TestWorktreesFailsOutsideARepository(t *testing.T) {
-	repo := git.Repo{Dir: t.TempDir(), Remote: remote}
+	repo := git.Repo{Dir: t.TempDir()}
 
 	_, err := repo.Worktrees(t.Context())
 	_, mainErr := repo.MainWorktree(t.Context())
@@ -180,7 +180,7 @@ func TestTheCommonDirIsTheMainRepositorysEvenFromInsideALinkedWorktree(t *testin
 	inside := filepath.Join(linked, "sub")
 	require.NoError(t, os.Mkdir(inside, 0o755))
 
-	common, err := git.Repo{Dir: inside, Remote: remote}.CommonDir(t.Context())
+	common, err := git.Repo{Dir: inside}.CommonDir(t.Context())
 
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(repo.Dir, ".git"), common)
@@ -189,7 +189,7 @@ func TestTheCommonDirIsTheMainRepositorysEvenFromInsideALinkedWorktree(t *testin
 func TestLocateResolvesWhatExistsAndKeepsTheRest(t *testing.T) {
 	link := gittest.Symlinked(t)
 	require.NoError(t, os.WriteFile(filepath.Join(link, "file"), nil, 0o644))
-	repo := git.Repo{Dir: link, Remote: remote}
+	repo := git.Repo{Dir: link}
 
 	file, fileErr := repo.Locate(t.Context(), "file")
 	absent, absentErr := repo.Locate(t.Context(), filepath.Join(link, "a", "b"))

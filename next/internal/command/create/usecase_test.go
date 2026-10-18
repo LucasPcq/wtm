@@ -243,7 +243,7 @@ func TestNothingIsRememberedWhenNoBranchWasCreated(t *testing.T) {
 
 func TestAnAnswerThatCannotBeRememberedIsAWarningOfTheRun(t *testing.T) {
 	w := newWorld(t, seed{})
-	w.usecase.Answers = answering{err: errors.New("read-only file system")}
+	w.usecase.Provision.Answers = answering{err: errors.New("read-only file system")}
 
 	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from"}}})
 
@@ -254,7 +254,7 @@ func TestAnAnswerThatCannotBeRememberedIsAWarningOfTheRun(t *testing.T) {
 
 func TestARememberedAnswerWrittenWithoutItsLockSaysSo(t *testing.T) {
 	w := newWorld(t, seed{})
-	w.usecase.Answers = answering{written: domain.Written{Changed: true, Unlocked: true}}
+	w.usecase.Provision.Answers = answering{written: domain.Written{Changed: true, Unlocked: true}}
 
 	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from"}}})
 
@@ -411,7 +411,7 @@ func TestAPreviewStillHoldsWhenAnUnrelatedBranchMoved(t *testing.T) {
 func TestALockTheDefaultsNameIsTakenThenTheFactsObservedAgain(t *testing.T) {
 	w := newWorld(t, seed{Behind: true, Config: projectToml + "\n[wizard.remembered]\nsource_update = \"ff\"\n"})
 	observed := 0
-	w.usecase.Git = counted{Repo: w.repo, observed: &observed}
+	w.usecase.Repository.Git = counted{Repo: w.repo, observed: &observed}
 	held, err := oplock.Locks{StateDir: w.stateDir}.Take(domain.Operation{ID: "other", Command: "sync", PID: 7, Locks: []domain.Lock{{Scope: domain.ScopeWorktree, Name: "main", Mode: domain.LockExclusive}}})
 	require.NoError(t, err)
 
@@ -469,7 +469,7 @@ func TestAnInvalidRequestIsRefusedBeforeAnythingIsLockedOrWritten(t *testing.T) 
 func TestARunWithoutLocksThatRemembersSaysSoOnce(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.usecase.Operations.Locker = unprotected{}
-	w.usecase.Answers = answering{written: domain.Written{Changed: true, Unlocked: true}}
+	w.usecase.Provision.Answers = answering{written: domain.Written{Changed: true, Unlocked: true}}
 
 	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from"}}}, domain.RunOptions{Report: (&recorder{}).add})
 
@@ -587,4 +587,33 @@ func TestTheConfigDefaultFollowsEnvStrategyOverARememberedAnswerAndIsRememberedA
 	assert.Equal(t, mainEnv, readFile(t, filepath.Join(w.path(branchName), ".env")))
 	assert.Equal(t, project.EnvMain, result.Items[0].Detail.Metadata.EnvStrategy)
 	assert.Contains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), `env_strategy = "config"`)
+}
+
+func TestAPreviewIsStaleOnlyWhenTheConfiguredStrategyChangesItsPlan(t *testing.T) {
+	cases := []struct {
+		name  string
+		given provision.Given
+		stale bool
+	}{
+		{name: "explicit", given: provision.Given{EnvFrom: project.EnvMain}},
+		{name: "configured", stale: true},
+		{name: "followsConfig", given: provision.Given{EnvFrom: provision.EnvFromConfig}, stale: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newWorld(t, seed{})
+			req := create.Request{Branches: []string{branchName}, Given: tc.given}
+			preview, err := w.usecase.Run(t.Context(), req, domain.RunOptions{DryRun: true, Report: (&recorder{}).add})
+			require.NoError(t, err)
+			writeFile(t, filepath.Join(w.stateDir, "config.toml"), strings.Replace(projectToml, `strategy = "main"`, `strategy = "parent"`, 1))
+
+			_, err = w.usecase.Run(t.Context(), req, domain.RunOptions{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
+
+			if !tc.stale {
+				require.NoError(t, err)
+				return
+			}
+			assert.Equal(t, domain.CodePlanStale, failureOf(t, err).Code)
+		})
+	}
 }

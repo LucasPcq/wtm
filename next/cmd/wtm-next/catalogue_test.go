@@ -25,7 +25,7 @@ func TestTheCatalogueListsEachCommandWithItsSchemaOutsideAnyRepository(t *testin
 }
 
 func TestCreateIsDrivenThroughTheCataloguePreviewedThenAppliedWithItsFingerprint(t *testing.T) {
-	main := repository(t)
+	main := configured(t)
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv(stateDirEnv, "")
 	create := command(t, "create")
@@ -47,7 +47,7 @@ func TestCreateIsDrivenThroughTheCataloguePreviewedThenAppliedWithItsFingerprint
 }
 
 func TestExtractIsDrivenThroughTheCataloguePreviewedThenAppliedWithItsFingerprint(t *testing.T) {
-	main := repository(t)
+	main := configured(t)
 	require.NoError(t, os.WriteFile(filepath.Join(main, "notes.txt"), []byte("notes\n"), 0o644))
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv(stateDirEnv, "")
@@ -69,7 +69,7 @@ func TestExtractIsDrivenThroughTheCataloguePreviewedThenAppliedWithItsFingerprin
 }
 
 func TestAnInvalidCallIsRefusedWithTheStatusOfItsKind(t *testing.T) {
-	main := repository(t)
+	main := configured(t)
 	t.Setenv("HOME", t.TempDir())
 	create := command(t, "create")
 

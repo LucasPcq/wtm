@@ -2,7 +2,6 @@
 package extract
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -20,94 +19,34 @@ import (
 // ----------------------------------------------------------------------------
 // The use case
 
-const name = "extract"
+// Name is the command's name, the one its surfaces and its codes spell.
+const Name = "extract"
 
 // The codes extract refuses or fails with that a caller may act on.
 const (
-	CodeConfigNotFound = "extract.config_not_found" // no wtm config: `wtm init` has not run in the repository
-	CodeConflict       = "extract.conflict"         // the changes conflict with the target and the request does not resolve them
-	CodeHalfMoved      = "extract.half_moved"       // the changes reached the target but could not be removed from the source
+	CodeConfigNotFound = Name + repository.ConfigNotFound // no wtm config: `wtm init` has not run in the repository
+	CodeConflict       = "extract.conflict"               // the changes conflict with the target and the request does not resolve them
+	CodeHalfMoved      = "extract.half_moved"             // the changes reached the target but could not be removed from the source
 )
 
-// A UseCase moves changes between the worktrees of one repository: the ports it reaches the repository through, the services it shares with the other commands, and the paths of the main checkout and of wtm's state.
+// A UseCase moves changes between the worktrees of one repository: the ports it reaches the repository through and the services it shares with the other commands.
 type UseCase struct {
 	Git        Git
-	Config     Config
-	Answers    Answers
 	Meta       Meta
 	Shield     Shield
+	Repository repository.Service
 	Operations operation.Service
 	Provision  provision.Service
-	MainPath   string
-	StateDir   string
 }
 
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, nothing to extract, or a refusal before the apply).
-type Outcome struct {
-	Op          string
-	Plan        Plan
-	Fingerprint string
-	Warnings    []domain.Warning
-	Result      *Result
-}
+type Outcome = domain.Outcome[Plan, Detail]
 
-// PlanFingerprint is the fingerprint of the plan the run previewed or applied, the one a preview's apply is held to.
-func (o Outcome) PlanFingerprint() string {
-	return o.Fingerprint
-}
-
-// Failure is the error the apply ended on, nil when it succeeded or did not run.
-func (o Outcome) Failure() *domain.Error {
-	if o.Result == nil {
-		return nil
-	}
-
-	return o.Result.Failure()
-}
-
-// Envelope is how the run ended for every surface, err being Run's refusal if any: its item once applied, else the plan and its fingerprint unless refused.
-func (o Outcome) Envelope(err *domain.Error) domain.Envelope {
-	doc := domain.Envelope{Command: name, Op: o.Op, Err: err}
-
-	switch {
-	case o.Result != nil:
-		doc.Err = cmp.Or(doc.Err, o.Failure())
-		doc.Items = []domain.Item{o.Result.Item.envelopeItem()}
-		doc.Warnings = o.Warnings
-	case doc.Err == nil:
-		doc.Plan, doc.Fingerprint, doc.Warnings = &o.Plan, o.Fingerprint, o.Warnings
-	}
-
-	return doc
-}
-
-// A Result is what the apply did: the Item of the target and the warnings of the whole run.
-type Result struct {
-	Item     Item
-	Warnings []domain.Warning
-}
-
-// Failure is the error the run ends on: the interruption, else the target's failure, else nil.
-func (r Result) Failure() *domain.Error {
-	switch {
-	case r.Item.Status == domain.StatusCancelled || r.Item.Reason == domain.ReasonInterrupted:
-		return cmp.Or(r.Item.Err, &domain.Error{Kind: domain.KindCancelled, Code: domain.CodeInterrupted, Message: "interrupted"})
-	case r.Item.Status == domain.StatusFailed:
-		return r.Item.Err
-	}
-
-	return nil
-}
+// A Result is what the apply did: the one Item of the target and the warnings of the whole run.
+type Result = domain.Result[Detail]
 
 // An Item is what became of the target: its status and why, the error it failed on, its warnings, and its Detail once its worktree stands.
-type Item struct {
-	Subject  string
-	Status   domain.Status
-	Reason   domain.Reason
-	Err      *domain.Error
-	Warnings []domain.Warning
-	Detail   *Detail
-}
+type Item = domain.Unit[Detail]
 
 // A Detail describes the target as the JSON envelope reports it: where it is, the files moved or copied there, the files left with conflict markers, its isolation, the env ports a created target was given and where its branch stood against origin.
 type Detail struct {
@@ -120,17 +59,13 @@ type Detail struct {
 	worktree.Standing
 }
 
-func (i Item) envelopeItem() domain.Item {
-	return domain.Item{Subject: i.Subject, Status: i.Status, Reason: i.Reason, Err: i.Err, Warnings: i.Warnings, Detail: domain.DetailOf(i.Detail)}
-}
-
 // ----------------------------------------------------------------------------
 // Run
 
 // Run carries out the request under its operation: it takes the locks, plans under them, fingerprints the plan, stops on a dry run, refuses a stale plan, stops when there is nothing to extract and applies it between the operation's started and finished events. An error returned is a refusal before the apply; a failure during the apply is in the Outcome's Result.
 func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (Outcome, error) {
 	// 1. Take the operation's locks before reading anything, so the facts cannot change under the plan.
-	op, err := u.Operations.Begin(name, req.Locks(), opts)
+	op, err := u.Operations.Begin(Name, req.Locks(), opts)
 	if err != nil {
 		return Outcome{Op: op.ID}, err
 	}
@@ -202,7 +137,7 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	warnings := u.fastForward(ctx, plan, report)
 	if ctx.Err() != nil {
-		return Result{Item: Item{Subject: plan.Target.Branch, Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted}, Warnings: warnings}
+		return Result{Items: []Item{{Subject: plan.Target.Branch, Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted}}, Warnings: warnings}
 	}
 
 	report(domain.UnitStarted{Subject: plan.Target.Branch})
@@ -213,10 +148,10 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	report(domain.UnitFinished{Subject: item.Subject, Status: item.Status})
 
 	if plan.Target.creates() && item.Status == domain.StatusDone {
-		warnings = append(warnings, u.remember(ctx, plan)...)
+		warnings = append(warnings, u.Provision.Remember(ctx, Name, plan.settled, plan.Remember)...)
 	}
 
-	return Result{Item: item, Warnings: warnings}
+	return Result{Items: []Item{item}, Warnings: warnings}
 }
 
 // ----------------------------------------------------------------------------
@@ -247,10 +182,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 
 // Observe reads what extract decides from: the project's config, the repository's snapshot, the uncommitted changes of the source (of every worktree when none is given), the meta records of the source and target, and what lies at the path a new target would take. A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
-	repo, err := repository.Observe(ctx, repository.ObserveParams{Config: u.Config, Git: u.Git, MainPath: u.MainPath})
-	if errors.Is(err, project.ErrConfigNotFound) {
-		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeConfigNotFound, Message: "no wtm config found — run `wtm init` first", Cause: err}
-	}
+	repo, err := u.Repository.Observe(ctx, Name)
 	if err != nil {
 		return Facts{}, err
 	}
@@ -347,33 +279,16 @@ func (u UseCase) target(ctx context.Context, plan Plan, report domain.Report) It
 		return Item{Subject: plan.Target.Branch, Status: domain.StatusDone, Detail: detail(plan.Target.Path, plan.facts.recordedIsolation(plan.Target.Branch))}
 	}
 
-	outcome := u.Provision.Run(ctx, u.provisionParams(plan, report))
+	outcome := u.Provision.Run(ctx, provision.ParamsOf(plan.facts.Repository, provision.Planned{Branch: plan.Target.Branch, Path: plan.Target.Path, Placement: plan.Target.placement(), From: plan.From, Answers: plan.settled}, report))
 
 	item := Item{Subject: plan.Target.Branch, Status: outcome.Status, Reason: outcome.Reason, Err: outcome.Err, Warnings: outcome.Warnings}
-	// A worktree whose meta record was written stands, even when a later step of its provisioning failed.
-	if outcome.Provisioned.Meta.CreatedAt != "" {
+	if outcome.Provisioned.Stands() {
 		item.Detail = detail(plan.Target.Path, outcome.Provisioned.Meta.Isolation)
 		item.Detail.EnvPorts = outcome.Provisioned.EnvPorts
 		item.Detail.Standing = plan.facts.StandingOf(plan.Target.Branch, plan.Target.placement())
 	}
 
 	return item
-}
-
-func (u UseCase) provisionParams(plan Plan, report domain.Report) provision.Params {
-	f := plan.facts
-	return provision.Params{
-		Project: provision.ProjectOf(f.Repository, u.StateDir),
-		Worktree: provision.Worktree{
-			Branch:     plan.Target.Branch,
-			Path:       plan.Target.Path,
-			Checkout:   plan.Target.placement().Checkout(plan.Target.Branch, f.Ref(plan.From)),
-			Source:     plan.From,
-			ParentPath: f.CheckedOutAt(plan.From),
-			Answers:    plan.settled,
-		},
-		Report: report,
-	}
 }
 
 // move moves or copies the planned changes into the target, between the move phase's events.
@@ -416,24 +331,6 @@ func (p Plan) failure(err error) *domain.Error {
 	}
 
 	return domain.AsError(domain.AsErrorParams{Err: err, Code: "extract.move_failed", Message: "move failed"})
-}
-
-// remember writes the answers the plan asks to remember; a write that fails is a warning, the target standing all the same.
-func (u UseCase) remember(ctx context.Context, plan Plan) []domain.Warning {
-	answers := plan.answers()
-	if len(answers) == 0 {
-		return nil
-	}
-
-	written, err := u.Answers.Remember(ctx, answers)
-	if err != nil {
-		return []domain.Warning{{Code: "extract.remember_failed", Message: "could not remember the answer: " + err.Error(), Params: domain.Params{"cause": err.Error()}}}
-	}
-	if written.Unlocked {
-		return []domain.Warning{domain.LocksUnavailable}
-	}
-
-	return nil
 }
 
 // ----------------------------------------------------------------------------

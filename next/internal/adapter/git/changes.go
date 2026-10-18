@@ -113,7 +113,7 @@ func (r Repo) Move(ctx context.Context, move worktree.Move) (worktree.Moved, err
 	if err != nil {
 		return worktree.Moved{}, err
 	}
-	if refusal := plan.refusal(move); refusal != nil {
+	if refusal := move.Refusal(plan.conflicts); refusal != nil {
 		return worktree.Moved{}, refusal
 	}
 
@@ -373,20 +373,6 @@ func (r Repo) plan(ctx context.Context, files []file) (plan, error) {
 	return p, nil
 }
 
-// refusal is the *worktree.ConflictRefusal of a plan with a binary conflict,
-// or with any conflict when move does not resolve them; nil otherwise.
-func (p plan) refusal(move worktree.Move) error {
-	binary := false
-	for _, conflict := range p.conflicts {
-		binary = binary || conflict.Kind == worktree.ConflictBinary
-	}
-
-	if binary || (len(p.conflicts) > 0 && !move.Resolve) {
-		return &worktree.ConflictRefusal{Conflicts: p.conflicts}
-	}
-	return nil
-}
-
 // ----------------------------------------------------------------------------
 // Writing the target, cleaning the source
 
@@ -549,7 +535,7 @@ func (r Repo) clean(ctx context.Context, params cleanParams) error {
 
 // at is the same repository run from the worktree at dir.
 func (r Repo) at(dir string) Repo {
-	return Repo{Dir: dir, Remote: r.Remote}
+	return Repo{Dir: dir}
 }
 
 // paths returns the path of each of files.

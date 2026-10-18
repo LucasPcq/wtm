@@ -17,7 +17,7 @@ import (
 )
 
 func TestTheAppIsWiredOntoTheRealAdapters(t *testing.T) {
-	main := repository(t)
+	main := configured(t)
 	root := filepath.Dir(main)
 	t.Setenv("HOME", t.TempDir())
 
@@ -45,7 +45,7 @@ func TestExtractIsWiredOntoTheRealAdapters(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, outcome.Result)
-	assert.Equal(t, domain.StatusDone, outcome.Result.Item.Status, outcome.Result.Item.Err)
+	assert.Equal(t, domain.StatusDone, outcome.Result.Items[0].Status, outcome.Result.Items[0].Err)
 	assert.FileExists(t, filepath.Join(root, ".trees", "feat-notes", "notes.txt"))
 	assert.NoFileExists(t, filepath.Join(main, "notes.txt"))
 }
@@ -68,7 +68,7 @@ func TestTwoExecutionsInOneProcessKeepTheirOwnRepositoryAndCorrelationID(t *test
 	creates := map[string]create.UseCase{}
 	commonDirs := map[string]string{}
 	for _, id := range []string{"a", "b"} {
-		params, err := locate(t.Context(), repository(t))
+		params, err := locate(t.Context(), configured(t))
 		require.NoError(t, err)
 		useCase := wire(params).Create
 		useCase.Operations.Publisher = recorded{wireParams: params, published: &published}

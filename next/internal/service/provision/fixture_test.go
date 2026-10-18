@@ -54,7 +54,7 @@ func onDisk(t *testing.T) world {
 	writeFile(t, filepath.Join(main, ".env"), mainEnv)
 	stateDir := filepath.Join(main, ".git", "wtm")
 	meta := store.Meta{StateDir: stateDir}
-	return world{root: root, main: main, stateDir: stateDir, git: repo, meta: meta, service: service(repo, meta, store.EnvFiles{})}
+	return world{root: root, main: main, stateDir: stateDir, git: repo, meta: meta, service: service(repo, meta, store.EnvFiles{}, stateDir)}
 }
 
 // seeds is what an in-memory world starts with: git calls that fail, linked
@@ -79,14 +79,15 @@ func inMemory(t *testing.T, seed seeds) (world, *storetest.Fake) {
 	}
 	seeded.Files[filepath.Join(main, ".env")] = mainEnv
 	files := storetest.NewFake(seeded)
-	return world{root: root, main: main, stateDir: filepath.Join(main, ".git", "wtm"), git: repo, meta: files, service: service(repo, files, files)}, files
+	return world{root: root, main: main, stateDir: filepath.Join(main, ".git", "wtm"), git: repo, meta: files, service: service(repo, files, files, filepath.Join(main, ".git", "wtm"))}, files
 }
 
-func service(git provision.Git, meta provision.Meta, env provision.EnvFiles) provision.Service {
+func service(git provision.Git, meta provision.Meta, env provision.EnvFiles, stateDir string) provision.Service {
 	return provision.Service{
 		Git:        git,
 		Meta:       meta,
 		EnvFiles:   env,
+		StateDir:   stateDir,
 		RunHooks:   shell.RunHooks,
 		PublicPort: func(context.Context, int) int { return 0 },
 		Shield:     shell.Shield,
@@ -99,7 +100,7 @@ func service(git provision.Git, meta provision.Meta, env provision.EnvFiles) pro
 // main, its events recorded by report.
 func (w world) params(report *recorder) provision.Params {
 	return provision.Params{
-		Project: provision.Project{MainPath: w.main, StateDir: w.stateDir, EnvFiles: []project.EnvFile{{Target: ".env"}}},
+		Project: provision.Project{MainPath: w.main, EnvFiles: []project.EnvFile{{Target: ".env"}}},
 		Worktree: provision.Worktree{
 			Branch:   branchName,
 			Path:     w.path(branchName),

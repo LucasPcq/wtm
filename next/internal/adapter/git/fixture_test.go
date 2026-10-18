@@ -10,8 +10,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-const remote = "origin"
-
 // port is what both git.Repo and gittest.Fake implement, so one test runs
 // against each.
 type port interface {

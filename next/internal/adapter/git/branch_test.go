@@ -31,18 +31,6 @@ func TestBranchesSplitsLocalFromRemoteAndDropsTheRemoteHead(t *testing.T) {
 	}, branches)
 }
 
-func TestBranchesFollowsTheRemoteItIsGiven(t *testing.T) {
-	repo := newRepo(t)
-	gittest.Git(t, repo.Dir, "update-ref", "refs/remotes/upstream/feature", "main")
-	gittest.Git(t, repo.Dir, "update-ref", "refs/remotes/origin/main", "main")
-	repo.Remote = "upstream"
-
-	branches, err := repo.Branches(t.Context())
-
-	require.NoError(t, err)
-	assert.Equal(t, []string{"feature"}, gittest.Names(branches.Remote))
-}
-
 func TestAheadBehindAgainstTheRemoteBranch(t *testing.T) {
 	repo, origin := newRepoWithOrigin(t)
 	commitFile(t, repo.Dir, "local", "1")

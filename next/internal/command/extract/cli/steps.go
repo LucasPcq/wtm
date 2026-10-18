@@ -3,6 +3,7 @@ package cli
 import (
 	"slices"
 
+	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
@@ -21,7 +22,7 @@ func special(s *session, at int, field domain.Field) form.Step {
 		files.Tone = files.tone
 		return files
 	case domain.SelectField:
-		if field.Path == "to" {
+		if field.Path == extract.PathTo {
 			return &targetStep{Asked: s.Asked(at), s: s, at: at}
 		}
 	case domain.TextField:
@@ -155,14 +156,14 @@ func (t *targetStep) Answer() string {
 	value := t.list.Value()
 	if value != createTarget {
 		t.newTarget = false
-		t.s.Answer(t.at, domain.Answered{Path: "to", Values: []string{value}})
+		t.s.Answer(t.at, domain.Answered{Path: extract.PathTo, Values: []string{value}})
 		return value
 	}
 
 	if t.creating() {
 		t.s.Answer(t.at)
 	} else {
-		t.s.Answer(t.at, domain.Answered{Path: "to", Values: []string{""}})
+		t.s.Answer(t.at, domain.Answered{Path: extract.PathTo, Values: []string{""}})
 	}
 	t.newTarget = true
 	return t.created()
@@ -211,13 +212,13 @@ func (b *branchStep) check(branch string) error {
 		return form.Problem(held[0], label)
 	}
 
-	questions, err := b.s.Check(domain.Answered{Path: "to", Values: []string{branch}})
+	questions, err := b.s.Check(domain.Answered{Path: extract.PathTo, Values: []string{branch}})
 	if err != nil {
 		return form.Sentence(err)
 	}
 
 	for _, found := range questions.Errors {
-		if found.Path == "to" {
+		if found.Path == extract.PathTo {
 			return form.Problem(found, label)
 		}
 	}

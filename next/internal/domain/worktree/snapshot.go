@@ -127,3 +127,15 @@ func (s Snapshot) StandingOf(branch string, placed Placed) Standing {
 
 	return Standing{}
 }
+
+// StartsFrom is the local branch the new worktree of branch begins from, started as start: branch itself when it checks out the existing branch, from when a new branch starts from that local branch, "" otherwise.
+func (s Snapshot) StartsFrom(branch string, start Start, from string) string {
+	switch {
+	case start == StartCheckOut:
+		return branch
+	case start == StartCreate && s.Local(from):
+		return from
+	}
+
+	return ""
+}
