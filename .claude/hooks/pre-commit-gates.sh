@@ -75,9 +75,15 @@ fi
 
 # A commit that leaves the frozen internal/, the root package and the module
 # files alone cannot change their verdict: it pays only for next/ and tools/.
-changed=$( { git diff --name-only HEAD; git ls-files --others --exclude-standard; } 2>/dev/null)
+# docs/guide/ is read by a test of internal/, .deadcode-ignore and the Makefile by
+# its gates; a rename keeps both sides, and a diff git cannot compute pays in full.
+full='^(internal/|docs/guide/|[^/]+\.go$|go\.(mod|sum)$|Makefile$|\.deadcode-ignore$)'
 lint=lint
-grep -qE '^(internal/|[^/]+\.go$|go\.(mod|sum)$)' <<<"$changed" || lint=lint-next
+if changed=$( { git -c core.quotePath=false diff --no-renames --name-only HEAD &&
+  git -c core.quotePath=false ls-files --others --exclude-standard; } 2>/dev/null) &&
+  ! grep -qE "$full" <<<"$changed" && grep -q '^lint-next:' Makefile; then
+  lint=lint-next
+fi
 if ! output=$(make "$lint" 2>&1); then
   fail "make $lint failed" "$output"
 fi
