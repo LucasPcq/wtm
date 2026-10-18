@@ -95,7 +95,7 @@ func TestTheFastForwardIsAskedOnlyWhenTheBranchItStartsFromIsBehind(t *testing.T
 	upToDate := newWorld(t, seed{})
 	behind := newWorld(t, seed{Behind: true})
 
-	assert.Equal(t, "nothing to fast-forward: no branch it starts from is behind origin", upToDate.questions(t, create.Request{Branches: []string{branchName}}).FastForward.Skip)
+	assert.Equal(t, "nothing to fast-forward: the source is not behind origin", upToDate.questions(t, create.Request{Branches: []string{branchName}}).FastForward.Skip)
 	assert.Empty(t, behind.questions(t, create.Request{Branches: []string{branchName}}).FastForward.Skip)
 }
 

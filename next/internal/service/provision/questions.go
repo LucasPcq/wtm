@@ -1,9 +1,9 @@
 package provision
 
 import (
-	"cmp"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -69,8 +69,6 @@ func (g Given) Values(path string) []string {
 	return nil
 }
 
-const isolationHelp = "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated"
-
 // EnvFromConfig is the answer to the env strategy that follows config.toml's strategy, remembered as such.
 const EnvFromConfig project.EnvStrategy = project.RememberEnvConfig
 
@@ -84,23 +82,32 @@ const (
 // ----------------------------------------------------------------------------
 // The questions
 
-// Questions are the questions every command that creates a worktree asks: where its .env files come from (EnvFromConfig, or a strategy), how it stands against its source, and whether its source is fast-forwarded first; with config.toml's strategy, which EnvFromConfig follows, the fields whose answer is to be remembered and whether the remembered answers are set aside.
+// Questions are the questions every command that creates a worktree asks: where its .env files come from (EnvFromConfig, or a strategy), how it stands against its source, and whether its source is fast-forwarded first; with config.toml's strategy, which EnvFromConfig follows, the branches the fast-forward updates, whether several worktrees are created, the fields whose answer is to be remembered and whether the remembered answers are set aside.
 type Questions struct {
 	EnvFrom     domain.Choice[project.EnvStrategy]
 	Isolation   domain.Choice[project.Isolation]
 	FastForward domain.Confirm
 	Configured  project.EnvStrategy
+	Behind      []string
+	Many        bool
 	Remember    []string
 	Ask         bool
 }
 
-// QuestionsParams is what the questions of a new worktree settle from: the request's answers, the repository (its remembered answers, which Given.Ask sets aside for the run while the form still shows them, its env strategy, its run.toml), why nothing is asked (Exists: the worktree is not created) and why the fast-forward is not (NotBehind: nothing it starts from is behind origin, worded by the command).
+// QuestionsParams is what the questions of a new worktree settle from: the request's answers, the repository (its remembered answers, which Given.Ask sets aside for the run while the form still shows them, its env strategy, its run.toml), why nothing is asked (Exists: the worktree is not created), the branches behind origin the fast-forward would update (none: it is not asked) and whether several worktrees are created.
 type QuestionsParams struct {
 	Given      Given
 	Repository worktree.Repository
 	Exists     string
-	NotBehind  string
+	Behind     []string
+	Many       bool
 }
+
+const (
+	isolationHelp   = "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated"
+	fastForwardHelp = "Fast-forward to origin first the branch a new worktree starts from, or the branch itself when it already exists locally, when it is behind; one that has diverged or holds uncommitted changes starts as it is"
+	notBehind       = "nothing to fast-forward: the source is not behind origin"
+)
 
 // NewQuestions builds the questions of a new worktree: a field given keeps its value, an empty one takes its remembered answer, its configured value or its default; none is answered by default when the worktree is not created.
 func NewQuestions(params QuestionsParams) Questions {
@@ -114,6 +121,8 @@ func NewQuestions(params QuestionsParams) Questions {
 		Isolation:   isolation(params),
 		FastForward: fastForward(params),
 		Configured:  params.Repository.Config.Env.Strategy,
+		Behind:      params.Behind,
+		Many:        params.Many,
 		Remember:    params.Given.Remember,
 		Ask:         params.Given.Ask,
 	}
@@ -173,7 +182,10 @@ func isolationAnswer(remembered project.Isolation, run project.Run) domain.Answe
 // fastForward is the question whether to fast-forward the source first: the request's answer, none while the question is skipped, else the remembered one, else no.
 func fastForward(params QuestionsParams) domain.Confirm {
 	remembered := params.Repository.Config.Remembered[project.RememberSourceUpdate]
-	question := domain.Confirm{Skip: cmp.Or(params.Exists, params.NotBehind)}
+	question := domain.Confirm{Skip: params.Exists}
+	if question.Skip == "" && len(params.Behind) == 0 {
+		question.Skip = notBehind
+	}
 	switch {
 	case params.Given.FastForward != nil:
 		question.Answer = domain.Answer[bool]{Value: *params.Given.FastForward, Origin: domain.OriginRequest}
@@ -201,18 +213,11 @@ func envFroms() []project.EnvStrategy {
 	return append([]project.EnvStrategy{EnvFromConfig}, project.EnvStrategies()...)
 }
 
-// Wording is how a command words the questions for its own subjects: the env strategy's help, the source update's help and its two options, the engine's own when zero.
-type Wording struct {
-	EnvHelp         string
-	FastForwardHelp string
-	Yes, No         domain.Option
-}
-
-// Fields are the questions as the fields of a form, in the order a wizard asks them, for a command to embed in its own.
-func (q Questions) Fields(wording Wording) []domain.Field {
+// Fields are the questions as the fields of a form, in the order a wizard asks them, for a command to embed in its own; envHelp says where the command's new worktree takes its .env files from.
+func (q Questions) Fields(envHelp string) []domain.Field {
 	return []domain.Field{
 		domain.SelectField{
-			FieldSpec:    domain.FieldSpec{Path: PathEnvFrom, Flag: "--env-from", Label: "Env strategy", Help: wording.EnvHelp, Origin: q.EnvFrom.Origin, Skip: q.EnvFrom.Skip},
+			FieldSpec:    domain.FieldSpec{Path: PathEnvFrom, Flag: "--env-from", Label: "Env strategy", Help: envHelp, Origin: q.EnvFrom.Origin, Skip: q.EnvFrom.Skip},
 			Value:        string(q.EnvFrom.Value),
 			Options:      q.envOptions(),
 			Remembered:   string(q.EnvFrom.Remembered),
@@ -222,20 +227,43 @@ func (q Questions) Fields(wording Wording) []domain.Field {
 		domain.SelectField{
 			FieldSpec:    domain.FieldSpec{Path: PathIsolation, Flag: "--isolation", Label: "Isolation", Help: isolationHelp, Origin: q.Isolation.Origin, Skip: q.Isolation.Skip},
 			Value:        string(q.Isolation.Value),
-			Options:      domain.Options(project.Isolations()),
+			Options:      q.isolationOptions(),
 			Remembered:   string(q.Isolation.Remembered),
 			Rememberable: true,
 			Remember:     q.Remembers(PathIsolation),
 		},
 		domain.ConfirmField{
-			FieldSpec:    domain.FieldSpec{Path: PathFastForward, Flag: "--ff", Label: "Source update", Help: wording.FastForwardHelp, Origin: q.FastForward.Origin, Skip: q.FastForward.Skip},
+			FieldSpec:    domain.FieldSpec{Path: PathFastForward, Flag: "--ff", Label: "Source update", Help: fastForwardHelp, Origin: q.FastForward.Origin, Skip: q.FastForward.Skip},
 			Value:        q.FastForward.Value,
-			Yes:          wording.Yes,
-			No:           wording.No,
+			Yes:          domain.Option{Value: "true", Label: q.fastForwardLabel()},
+			No:           domain.Option{Value: "false", Label: "Keep it as-is"},
 			Remembered:   q.FastForward.Remembered,
 			Rememberable: true,
 			Remember:     q.Remembers(PathFastForward),
 		},
+	}
+}
+
+func (q Questions) fastForwardLabel() string {
+	if len(q.Behind) == 0 {
+		return "Fast-forward to origin"
+	}
+
+	return "Fast-forward " + strings.Join(q.Behind, ", ") + " to origin"
+}
+
+// isolationOptions are the isolations as the legacy wizard offers them, worded for one worktree or several.
+func (q Questions) isolationOptions() []domain.Option {
+	if q.Many {
+		return []domain.Option{
+			{Value: string(project.Isolated), Label: "isolated — each its own ports, compose project and namespaces"},
+			{Value: string(project.Verbatim), Label: "verbatim — keep the copied .env, one of them runs at a time"},
+		}
+	}
+
+	return []domain.Option{
+		{Value: string(project.Isolated), Label: "isolated — its own ports, compose project and namespaces"},
+		{Value: string(project.Verbatim), Label: "verbatim — keep the copied .env, one of the two runs at a time"},
 	}
 }
 

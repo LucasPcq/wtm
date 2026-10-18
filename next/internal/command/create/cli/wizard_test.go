@@ -177,7 +177,7 @@ func TestAskAsksARememberedSourceUpdateAgainStartingOnIt(t *testing.T) {
 	d := open(t, sessionParams{App: newApp(seed{Behind: true, Remembered: remembered}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvExample, Ask: true}}})
 
 	require.Equal(t, stepFastForward, d.w.Current())
-	assert.Contains(t, d.screen(), "▌› Yes")
+	assert.Contains(t, d.screen(), "▌› Fast-forward main to origin")
 	assert.Contains(t, d.screen(), "[x] Always use this answer in this repo")
 }
 

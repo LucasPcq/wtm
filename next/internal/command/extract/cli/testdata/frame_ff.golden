@@ -9,9 +9,11 @@
   ✓ Env strategy: config default · default
   ✓ Isolation: isolated · default
 
-  Fast-forward the parent branch to origin before creating the target; skipped when it has diverged
+  Fast-forward to origin first the branch a new worktree starts from, or the branch itself when it
+  already exists locally, when it is behind; one that has diverged or holds uncommitted changes
+  starts as it is
 
-   Fast-forward to origin
+   Fast-forward main to origin
   ────────────────────────────────────────────────────────────────────────────────────────────────
 ▌› Keep it as-is
 

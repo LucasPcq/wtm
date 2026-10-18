@@ -187,18 +187,20 @@ func (d *driver) screen() string {
 	return strings.TrimRight(strings.Join(lines, "\n"), "\n")
 }
 
-// engineScreen is the frame the engine's form (refactor/create-pilot-engine) drew at that point, from testdata, its glyphs mapped to those this wizard draws.
+// engineScreen is the frame the form draws at that point, from testdata; -update rewrites it.
 func engineScreen(t *testing.T, name string) string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("testdata", "engine_"+name+".txt"))
 	require.NoError(t, err)
-	return strings.TrimRight(engineGlyphsFontCovered.Replace(string(data)), "\n")
+	return strings.TrimRight(string(data), "\n")
 }
-
-var engineGlyphsFontCovered = strings.NewReplacer("▸", "›", "❯", "›", "⊘", "·")
 
 func (d *driver) looksLike(name string) {
 	d.t.Helper()
+	if *update {
+		require.NoError(d.t, os.WriteFile(filepath.Join("testdata", "engine_"+name+".txt"), []byte(d.screen()+"\n"), 0o600))
+		return
+	}
 	assert.Equal(d.t, engineScreen(d.t, name), d.screen())
 }
 

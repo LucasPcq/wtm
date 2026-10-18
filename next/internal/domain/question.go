@@ -76,13 +76,3 @@ func Names[T ~string](values []T) []string {
 
 	return found
 }
-
-// Options offers each of values as an option that reads as its value, in order.
-func Options[T ~string](values []T) []Option {
-	found := make([]Option, 0, len(values))
-	for _, value := range values {
-		found = append(found, Option{Value: string(value)})
-	}
-
-	return found
-}

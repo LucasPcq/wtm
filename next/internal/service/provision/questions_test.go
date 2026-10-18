@@ -36,7 +36,7 @@ func TestTheEnvStrategyIsTheOneGivenElseRememberedElseConfigDefault(t *testing.T
 }
 
 func TestTheConfigDefaultIsTheFirstEnvOptionNamingTheConfiguredStrategy(t *testing.T) {
-	fields := provision.NewQuestions(provision.QuestionsParams{Repository: repository(nil)}).Fields(provision.Wording{})
+	fields := provision.NewQuestions(provision.QuestionsParams{Repository: repository(nil)}).Fields("")
 
 	field, isSelect := fields[0].(domain.SelectField)
 	require.True(t, isSelect)
@@ -50,7 +50,7 @@ func TestTheConfigDefaultIsTheFirstEnvOptionNamingTheConfiguredStrategy(t *testi
 
 func TestAskingAgainStillShowsWhatIsRemembered(t *testing.T) {
 	remembered := map[string]string{project.RememberEnvStrategy: project.RememberEnvConfig, project.RememberSourceUpdate: project.SourceUpdateFastForward}
-	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Ask: true}, Repository: repository(remembered)})
+	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Ask: true}, Repository: repository(remembered), Behind: []string{"main"}})
 
 	assert.Equal(t, provision.EnvFromConfig, questions.EnvFrom.Remembered)
 	assert.Equal(t, new(true), questions.FastForward.Remembered)
@@ -62,7 +62,7 @@ func TestAWorktreeThatIsNotCreatedIsAskedNothingAndRemembersNothing(t *testing.T
 	remembered := map[string]string{project.RememberEnvStrategy: string(project.EnvParent), project.RememberIsolation: string(project.Verbatim)}
 	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Remember: []string{"env_from", "isolation", "fast_forward"}}, Repository: repository(remembered), Exists: "exists"})
 
-	for _, field := range questions.Fields(provision.Wording{}) {
+	for _, field := range questions.Fields("") {
 		assert.Equal(t, "exists", field.Spec().Skip, field.Spec().Path)
 		assert.False(t, questions.Remembers(field.Spec().Path), field.Spec().Path)
 	}
@@ -97,21 +97,23 @@ func TestAnIsolationLeftUnansweredIsTheRememberedOneElseTheRunsElseIsolated(t *t
 func TestTheFastForwardIsTheRequestsElseNoneWhenSkippedElseTheRememberedElseNo(t *testing.T) {
 	ff := map[string]string{project.RememberSourceUpdate: project.SourceUpdateFastForward}
 	keep := map[string]string{project.RememberSourceUpdate: project.SourceUpdateKeep}
+	main := []string{"main"}
+	notBehind := "nothing to fast-forward: the source is not behind origin"
 	cases := map[string]struct {
 		given      *bool
-		notBehind  string
+		behind     []string
 		remembered map[string]string
 		want       domain.Confirm
 	}{
-		"given":          {new(true), "behind nothing", keep, domain.Confirm{Answer: domain.Answer[bool]{Value: true, Origin: domain.OriginRequest}, Skip: "behind nothing", Remembered: new(false)}},
-		"skipped":        {nil, "behind nothing", ff, domain.Confirm{Skip: "behind nothing", Remembered: new(true)}},
-		"remembered":     {nil, "", ff, domain.Confirm{Answer: domain.Answer[bool]{Value: true, Origin: domain.OriginRemembered}, Remembered: new(true)}},
-		"rememberedKeep": {nil, "", keep, domain.Confirm{Answer: domain.Answer[bool]{Origin: domain.OriginRemembered}, Remembered: new(false)}},
-		"default":        {nil, "", nil, domain.Confirm{Answer: domain.Answer[bool]{Origin: domain.OriginDefault}}},
+		"given":          {new(true), nil, keep, domain.Confirm{Answer: domain.Answer[bool]{Value: true, Origin: domain.OriginRequest}, Skip: notBehind, Remembered: new(false)}},
+		"skipped":        {nil, nil, ff, domain.Confirm{Skip: notBehind, Remembered: new(true)}},
+		"remembered":     {nil, main, ff, domain.Confirm{Answer: domain.Answer[bool]{Value: true, Origin: domain.OriginRemembered}, Remembered: new(true)}},
+		"rememberedKeep": {nil, main, keep, domain.Confirm{Answer: domain.Answer[bool]{Origin: domain.OriginRemembered}, Remembered: new(false)}},
+		"default":        {nil, main, nil, domain.Confirm{Answer: domain.Answer[bool]{Origin: domain.OriginDefault}}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			params := provision.QuestionsParams{Given: provision.Given{FastForward: c.given}, Repository: repository(c.remembered), NotBehind: c.notBehind}
+			params := provision.QuestionsParams{Given: provision.Given{FastForward: c.given}, Repository: repository(c.remembered), Behind: c.behind}
 
 			assert.Equal(t, c.want, provision.NewQuestions(params).FastForward)
 		})
@@ -119,11 +121,41 @@ func TestTheFastForwardIsTheRequestsElseNoneWhenSkippedElseTheRememberedElseNo(t
 }
 
 func TestTheFastForwardIsSkippedWhenNothingIsBehind(t *testing.T) {
-	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Remember: []string{"fast_forward", "env_from", "env_from"}}, Repository: repository(nil), NotBehind: "up to date"})
+	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Remember: []string{"fast_forward", "env_from", "env_from"}}, Repository: repository(nil)})
 
-	assert.Equal(t, "up to date", questions.FastForward.Skip)
+	assert.Equal(t, "nothing to fast-forward: the source is not behind origin", questions.FastForward.Skip)
 	assert.False(t, questions.Remembers("fast_forward"))
 	assert.Equal(t, []string{"env_from"}, questions.Given().Remember)
+}
+
+func TestTheSourceUpdateNamesTheBranchesItFastForwards(t *testing.T) {
+	fields := provision.NewQuestions(provision.QuestionsParams{Repository: repository(nil), Behind: []string{"main", "topic"}}).Fields("")
+
+	update, isConfirm := fields[2].(domain.ConfirmField)
+	require.True(t, isConfirm)
+	assert.Equal(t, domain.Option{Value: "true", Label: "Fast-forward main, topic to origin"}, update.Yes)
+	assert.Equal(t, domain.Option{Value: "false", Label: "Keep it as-is"}, update.No)
+	assert.Empty(t, update.Skip)
+}
+
+func TestTheIsolationOptionsAreWordedForOneWorktreeOrSeveral(t *testing.T) {
+	cases := map[string]struct {
+		many bool
+		want []string
+	}{
+		"one":     {false, []string{"isolated — its own ports, compose project and namespaces", "verbatim — keep the copied .env, one of the two runs at a time"}},
+		"several": {true, []string{"isolated — each its own ports, compose project and namespaces", "verbatim — keep the copied .env, one of them runs at a time"}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			fields := provision.NewQuestions(provision.QuestionsParams{Repository: repository(nil), Many: c.many}).Fields("")
+
+			isolation, isSelect := fields[1].(domain.SelectField)
+			require.True(t, isSelect)
+			assert.Equal(t, []string{"isolated", "verbatim"}, []string{isolation.Options[0].Value, isolation.Options[1].Value})
+			assert.Equal(t, c.want, []string{isolation.Options[0].Label, isolation.Options[1].Label})
+		})
+	}
 }
 
 func TestAnUnknownStrategyAGivenIsolationOutsideTheListOrAFieldNoneRemembersIsAProblem(t *testing.T) {

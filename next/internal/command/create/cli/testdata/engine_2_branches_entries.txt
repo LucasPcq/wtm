@@ -3,7 +3,7 @@
 
   The branches to create a worktree for; one that already exists is checked out as it is
 
-❯
+›
   feat/a
   feature  existing
 
