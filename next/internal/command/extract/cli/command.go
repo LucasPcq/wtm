@@ -75,7 +75,7 @@ func (c *extractCommand) conclude(cmd *cobra.Command, ran form.Ran[extract.Reque
 	argv := c.form.Argv(cmd.CommandPath(), ran.Request)
 	outcome := ran.Outcome
 	if !c.io.Human() {
-		doc := ran.Outcome.Envelope(failure)
+		doc := ran.Outcome.Envelope(commandName, failure)
 		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, argv)...)
 		return c.io.Envelope(doc)
 	}

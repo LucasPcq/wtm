@@ -45,7 +45,7 @@ func TestExtractIsWiredOntoTheRealAdapters(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, outcome.Result)
-	assert.Equal(t, domain.StatusDone, outcome.Result.Item.Status, outcome.Result.Item.Err)
+	assert.Equal(t, domain.StatusDone, outcome.Result.Items[0].Status, outcome.Result.Items[0].Err)
 	assert.FileExists(t, filepath.Join(root, ".trees", "feat-notes", "notes.txt"))
 	assert.NoFileExists(t, filepath.Join(main, "notes.txt"))
 }

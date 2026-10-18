@@ -26,13 +26,13 @@ func TestTheSelectedChangesMoveToAnExistingWorktree(t *testing.T) {
 
 	result, _ := w.apply(t, moving("a.txt"))
 
-	require.Equal(t, domain.StatusDone, result.Item.Status, result.Item.Err)
+	require.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
 	assert.Equal(t, &extract.Detail{
 		Path:      w.at(other),
 		Files:     []worktree.Change{{Path: "a.txt", Status: worktree.ChangeUntracked}},
 		Conflicts: []string{},
 		Isolation: project.Isolated,
-	}, result.Item.Detail)
+	}, result.Items[0].Detail)
 	assert.Equal(t, "a\n", readFile(t, filepath.Join(w.at(other), "a.txt")))
 	assert.NoFileExists(t, filepath.Join(w.at(source), "a.txt"))
 	assert.FileExists(t, filepath.Join(w.at(source), "b.txt"))
@@ -46,7 +46,7 @@ func TestANewTargetIsProvisionedUnderItsLocksThenReceivesTheChanges(t *testing.T
 
 	require.NoError(t, err)
 	require.NotNil(t, outcome.Result)
-	require.Equal(t, domain.StatusDone, outcome.Result.Item.Status, outcome.Result.Item.Err)
+	require.Equal(t, domain.StatusDone, outcome.Result.Items[0].Status, outcome.Result.Items[0].Err)
 	assert.Equal(t, extract.Target{Branch: split, Path: w.path(split), Action: extract.ActionCreate}, outcome.Plan.Target)
 	assert.Equal(t, "a\n", readFile(t, filepath.Join(w.path(split), "a.txt")))
 	assert.NoFileExists(t, filepath.Join(w.at(source), "a.txt"))
@@ -84,7 +84,7 @@ func TestKeepCopiesTheChangesAndLeavesTheSourceAsItWas(t *testing.T) {
 
 	result, _ := w.apply(t, req)
 
-	assert.True(t, result.Item.Detail.Kept)
+	assert.True(t, result.Items[0].Detail.Kept)
 	assert.Equal(t, "a\n", readFile(t, filepath.Join(w.at(other), "a.txt")))
 	assert.Equal(t, "a\n", readFile(t, filepath.Join(w.at(source), "a.txt")))
 }
@@ -98,9 +98,9 @@ func TestResolveWritesConflictMarkersInTheTargetAndKeepsTheSource(t *testing.T) 
 
 	result, _ := w.apply(t, req)
 
-	require.Equal(t, domain.StatusDone, result.Item.Status, result.Item.Err)
-	assert.Equal(t, []string{"a.txt"}, result.Item.Detail.Conflicts)
-	assert.True(t, result.Item.Detail.Kept)
+	require.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
+	assert.Equal(t, []string{"a.txt"}, result.Items[0].Detail.Conflicts)
+	assert.True(t, result.Items[0].Detail.Kept)
 	assert.Contains(t, readFile(t, filepath.Join(w.at(other), "a.txt")), ">>>>>>> incoming ("+source+")")
 	assert.Equal(t, "source\n", readFile(t, filepath.Join(w.at(source), "a.txt")))
 }
@@ -173,7 +173,7 @@ func TestAnInterruptDuringTheMoveLetsItFinish(t *testing.T) {
 	result, _ := w.applyIn(ctx, t, moving("a.txt"))
 
 	require.NoError(t, seen)
-	assert.Equal(t, domain.StatusDone, result.Item.Status, result.Item.Err)
+	assert.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
 	assert.FileExists(t, filepath.Join(w.at(other), "a.txt"))
 	assert.NoFileExists(t, filepath.Join(w.at(source), "a.txt"))
 }
@@ -208,7 +208,7 @@ func TestTheAnswersAskedToBeRememberedAreKeptOnceTheTargetIsCreated(t *testing.T
 	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation", "fast_forward"}}})
 
 	assert.Empty(t, result.Warnings)
-	assert.Equal(t, project.Verbatim, result.Item.Detail.Isolation)
+	assert.Equal(t, project.Verbatim, result.Items[0].Detail.Isolation)
 	config := readFile(t, filepath.Join(w.stateDir, "config.toml"))
 	assert.Contains(t, config, `isolation = "verbatim"`)
 	assert.NotContains(t, config, "source_update")
@@ -233,9 +233,9 @@ func TestAMoveRefusedSinceThePlanIsAConflictOfTheRun(t *testing.T) {
 
 	result := w.usecase.Apply(t.Context(), planned, (&recorder{}).add)
 
-	assert.Equal(t, domain.StatusFailed, result.Item.Status)
-	assert.Equal(t, extract.CodeConflict, result.Item.Err.Code)
-	assert.Equal(t, result.Item.Err, result.Failure())
+	assert.Equal(t, domain.StatusFailed, result.Items[0].Status)
+	assert.Equal(t, extract.CodeConflict, result.Items[0].Err.Code)
+	assert.Equal(t, result.Items[0].Err, result.Failure())
 	assert.Equal(t, "source\n", readFile(t, filepath.Join(w.at(source), "a.txt")))
 }
 
@@ -259,7 +259,7 @@ func TestNothingIsRememberedNorMovedWhenTheTargetFailsToProvision(t *testing.T) 
 
 	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation"}}})
 
-	require.Equal(t, domain.StatusFailed, result.Item.Status)
+	require.Equal(t, domain.StatusFailed, result.Items[0].Status)
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "isolation")
 	assert.FileExists(t, filepath.Join(w.at(source), "a.txt"))
 	assert.NoFileExists(t, filepath.Join(w.path(split), "a.txt"))
@@ -272,7 +272,7 @@ func TestNothingIsRememberedWhenTheMoveIsRefused(t *testing.T) {
 
 	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation"}}})
 
-	require.Equal(t, domain.StatusFailed, result.Item.Status)
+	require.Equal(t, domain.StatusFailed, result.Items[0].Status)
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "isolation")
 }
 
@@ -323,10 +323,10 @@ func TestAMoveThatLeavesTheChangesInBothWorktreesIsHalfMoved(t *testing.T) {
 
 	result, _ := w.apply(t, moving("a.txt"))
 
-	assert.Equal(t, domain.StatusFailed, result.Item.Status)
-	assert.Equal(t, extract.CodeHalfMoved, result.Item.Err.Code)
-	assert.Equal(t, `the changes are in "feat/other" but "feat/login" still holds them`, result.Item.Err.Message)
-	assert.Equal(t, result.Item.Err, result.Failure())
+	assert.Equal(t, domain.StatusFailed, result.Items[0].Status)
+	assert.Equal(t, extract.CodeHalfMoved, result.Items[0].Err.Code)
+	assert.Equal(t, `the changes are in "feat/other" but "feat/login" still holds them`, result.Items[0].Err.Message)
+	assert.Equal(t, result.Items[0].Err, result.Failure())
 }
 
 func TestACancelOnceTheTargetStandsSkipsTheMove(t *testing.T) {
@@ -342,8 +342,8 @@ func TestACancelOnceTheTargetStandsSkipsTheMove(t *testing.T) {
 		}
 	})
 
-	assert.Equal(t, domain.StatusCancelled, result.Item.Status)
-	assert.Equal(t, domain.ReasonInterrupted, result.Item.Reason)
+	assert.Equal(t, domain.StatusCancelled, result.Items[0].Status)
+	assert.Equal(t, domain.ReasonInterrupted, result.Items[0].Reason)
 	assert.Equal(t, domain.CodeInterrupted, result.Failure().Code)
 	assert.DirExists(t, w.path(split))
 	assert.NoFileExists(t, filepath.Join(w.path(split), "a.txt"))
@@ -362,7 +362,7 @@ func TestASourceWithUncommittedChangesIsNotFastForwardedAndSaysSo(t *testing.T) 
 		Message: "couldn't fast-forward main: its worktree has uncommitted changes — the target starts from your local branch",
 		Params:  domain.Params{"branch": "main"},
 	}}, result.Warnings)
-	assert.Equal(t, domain.StatusDone, result.Item.Status, result.Item.Err)
+	assert.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
 }
 
 func TestAFastForwardThatFailsIsAWarningAndTheTargetStillStarts(t *testing.T) {
@@ -376,7 +376,7 @@ func TestAFastForwardThatFailsIsAWarningAndTheTargetStillStarts(t *testing.T) {
 	assert.Equal(t, []string{"extract.ff_failed"}, codes(result.Warnings))
 	assert.Contains(t, result.Warnings[0].Message, "couldn't fast-forward feature: ")
 	assert.Contains(t, result.Warnings[0].Message, " — the target starts from your local branch")
-	assert.Equal(t, domain.StatusDone, result.Item.Status, result.Item.Err)
+	assert.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
 }
 
 func TestASourceInTheMiddleOfARebaseIsNotFastForwardedAndSaysSo(t *testing.T) {
@@ -392,7 +392,7 @@ func TestASourceInTheMiddleOfARebaseIsNotFastForwardedAndSaysSo(t *testing.T) {
 		Message: "couldn't fast-forward feature: its worktree is in the middle of a rebase or a bisect — the target starts from your local branch",
 		Params:  domain.Params{"branch": existing},
 	}}, result.Warnings)
-	assert.Equal(t, domain.StatusDone, result.Item.Status, result.Item.Err)
+	assert.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
 }
 
 func TestACreatedTargetGetsItsEnvByTheStrategyAsked(t *testing.T) {
@@ -414,7 +414,7 @@ func TestACreatedTargetGetsItsEnvByTheStrategyAsked(t *testing.T) {
 
 			result, _ := w.apply(t, req)
 
-			require.Equal(t, domain.StatusDone, result.Item.Status, result.Item.Err)
+			require.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
 			assert.Equal(t, c.want, readFile(t, filepath.Join(w.path(split), ".env")))
 		})
 	}

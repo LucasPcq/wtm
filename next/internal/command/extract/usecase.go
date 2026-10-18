@@ -2,7 +2,6 @@
 package extract
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -43,71 +42,13 @@ type UseCase struct {
 }
 
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, nothing to extract, or a refusal before the apply).
-type Outcome struct {
-	Op          string
-	Plan        Plan
-	Fingerprint string
-	Warnings    []domain.Warning
-	Result      *Result
-}
+type Outcome = domain.Outcome[Plan, Detail]
 
-// PlanFingerprint is the fingerprint of the plan the run previewed or applied, the one a preview's apply is held to.
-func (o Outcome) PlanFingerprint() string {
-	return o.Fingerprint
-}
-
-// Failure is the error the apply ended on, nil when it succeeded or did not run.
-func (o Outcome) Failure() *domain.Error {
-	if o.Result == nil {
-		return nil
-	}
-
-	return o.Result.Failure()
-}
-
-// Envelope is how the run ended for every surface, err being Run's refusal if any: its item once applied, else the plan and its fingerprint unless refused.
-func (o Outcome) Envelope(err *domain.Error) domain.Envelope {
-	doc := domain.Envelope{Command: name, Op: o.Op, Err: err}
-
-	switch {
-	case o.Result != nil:
-		doc.Err = cmp.Or(doc.Err, o.Failure())
-		doc.Items = []domain.Item{o.Result.Item.envelopeItem()}
-		doc.Warnings = o.Warnings
-	case doc.Err == nil:
-		doc.Plan, doc.Fingerprint, doc.Warnings = &o.Plan, o.Fingerprint, o.Warnings
-	}
-
-	return doc
-}
-
-// A Result is what the apply did: the Item of the target and the warnings of the whole run.
-type Result struct {
-	Item     Item
-	Warnings []domain.Warning
-}
-
-// Failure is the error the run ends on: the interruption, else the target's failure, else nil.
-func (r Result) Failure() *domain.Error {
-	switch {
-	case r.Item.Status == domain.StatusCancelled || r.Item.Reason == domain.ReasonInterrupted:
-		return cmp.Or(r.Item.Err, &domain.Error{Kind: domain.KindCancelled, Code: domain.CodeInterrupted, Message: "interrupted"})
-	case r.Item.Status == domain.StatusFailed:
-		return r.Item.Err
-	}
-
-	return nil
-}
+// A Result is what the apply did: the one Item of the target and the warnings of the whole run.
+type Result = domain.Result[Detail]
 
 // An Item is what became of the target: its status and why, the error it failed on, its warnings, and its Detail once its worktree stands.
-type Item struct {
-	Subject  string
-	Status   domain.Status
-	Reason   domain.Reason
-	Err      *domain.Error
-	Warnings []domain.Warning
-	Detail   *Detail
-}
+type Item = domain.Unit[Detail]
 
 // A Detail describes the target as the JSON envelope reports it: where it is, the files moved or copied there, the files left with conflict markers, its isolation, the env ports a created target was given and where its branch stood against origin.
 type Detail struct {
@@ -118,10 +59,6 @@ type Detail struct {
 	Isolation project.Isolation `json:"isolation,omitempty"`
 	EnvPorts  env.Redacted      `json:"env_ports,omitzero"`
 	worktree.Standing
-}
-
-func (i Item) envelopeItem() domain.Item {
-	return domain.Item{Subject: i.Subject, Status: i.Status, Reason: i.Reason, Err: i.Err, Warnings: i.Warnings, Detail: domain.DetailOf(i.Detail)}
 }
 
 // ----------------------------------------------------------------------------
@@ -202,7 +139,7 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	warnings := u.fastForward(ctx, plan, report)
 	if ctx.Err() != nil {
-		return Result{Item: Item{Subject: plan.Target.Branch, Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted}, Warnings: warnings}
+		return Result{Items: []Item{{Subject: plan.Target.Branch, Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted}}, Warnings: warnings}
 	}
 
 	report(domain.UnitStarted{Subject: plan.Target.Branch})
@@ -216,7 +153,7 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 		warnings = append(warnings, u.remember(ctx, plan)...)
 	}
 
-	return Result{Item: item, Warnings: warnings}
+	return Result{Items: []Item{item}, Warnings: warnings}
 }
 
 // ----------------------------------------------------------------------------

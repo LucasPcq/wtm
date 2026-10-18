@@ -70,7 +70,7 @@ func (c *createCommand) conclude(cmd *cobra.Command, ran form.Ran[create.Request
 	failure := domain.AsError(domain.AsErrorParams{Err: err})
 	argv := c.form.Argv(cmd.CommandPath(), ran.Request)
 	if !c.io.Human() {
-		doc := ran.Outcome.Envelope(failure)
+		doc := ran.Outcome.Envelope(commandName, failure)
 		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, argv)...)
 		return c.io.Envelope(doc)
 	}

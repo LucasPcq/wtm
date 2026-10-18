@@ -2,7 +2,6 @@
 package create
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"slices"
@@ -36,74 +35,13 @@ type UseCase struct {
 }
 
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, or a refusal before the apply).
-type Outcome struct {
-	Op          string
-	Plan        Plan
-	Fingerprint string
-	Warnings    []domain.Warning
-	Result      *Result
-}
-
-// PlanFingerprint is the fingerprint of the plan the run previewed or applied, the one a preview's apply is held to.
-func (o Outcome) PlanFingerprint() string {
-	return o.Fingerprint
-}
-
-// Failure is the error the apply ended on, nil when it succeeded or did not run.
-func (o Outcome) Failure() *domain.Error {
-	if o.Result == nil {
-		return nil
-	}
-
-	return o.Result.Failure()
-}
-
-// Envelope is how the run ended for every surface, err being Run's refusal if any: its items once applied, else the plan and its fingerprint unless refused.
-func (o Outcome) Envelope(err *domain.Error) domain.Envelope {
-	doc := domain.Envelope{Command: name, Op: o.Op, Err: err}
-
-	switch {
-	case o.Result != nil:
-		doc.Err = cmp.Or(doc.Err, o.Failure())
-		for _, item := range o.Result.Items {
-			doc.Items = append(doc.Items, item.envelopeItem())
-		}
-		doc.Warnings = o.Warnings
-	case doc.Err == nil:
-		doc.Plan, doc.Fingerprint, doc.Warnings = &o.Plan, o.Fingerprint, o.Warnings
-	}
-
-	return doc
-}
+type Outcome = domain.Outcome[Plan, Detail]
 
 // A Result is what the apply did: one Item per branch of the plan, in its order, and the warnings of the whole run.
-type Result struct {
-	Items    []Item
-	Warnings []domain.Warning
-}
-
-// Failure is the error the run ends on: the first interruption, else the first failed branch, else nil.
-func (r Result) Failure() *domain.Error {
-	if at := slices.IndexFunc(r.Items, interrupted); at >= 0 {
-		return cmp.Or(r.Items[at].Err, &domain.Error{Kind: domain.KindCancelled, Code: domain.CodeInterrupted, Message: "interrupted"})
-	}
-
-	if at := slices.IndexFunc(r.Items, func(item Item) bool { return item.Status == domain.StatusFailed }); at >= 0 {
-		return r.Items[at].Err
-	}
-
-	return nil
-}
+type Result = domain.Result[Detail]
 
 // An Item is what became of one branch: its status and why, the error it failed on, its warnings, and its Detail once its worktree stands.
-type Item struct {
-	Subject  string
-	Status   domain.Status
-	Reason   domain.Reason
-	Err      *domain.Error
-	Warnings []domain.Warning
-	Detail   *Detail
-}
+type Item = domain.Unit[Detail]
 
 // A Detail describes a branch's worktree as the JSON envelope reports it: where it is, its meta record, where the branch stood against origin, its ordinal and the env ports it was given.
 type Detail struct {
@@ -112,10 +50,6 @@ type Detail struct {
 	worktree.Standing
 	Ordinal  *int         `json:"ordinal,omitempty"`
 	EnvPorts env.Redacted `json:"env_ports,omitzero"`
-}
-
-func (i Item) envelopeItem() domain.Item {
-	return domain.Item{Subject: i.Subject, Status: i.Status, Reason: i.Reason, Err: i.Err, Warnings: i.Warnings, Detail: domain.DetailOf(i.Detail)}
 }
 
 // ----------------------------------------------------------------------------
@@ -349,10 +283,6 @@ func (u UseCase) remember(ctx context.Context, plan Plan, items []Item) []domain
 
 // ----------------------------------------------------------------------------
 // Helpers
-
-func interrupted(item Item) bool {
-	return item.Status == domain.StatusCancelled || item.Reason == domain.ReasonInterrupted
-}
 
 func created(item Item) bool {
 	return item.Status == domain.StatusDone && item.Reason != domain.ReasonUnchanged
