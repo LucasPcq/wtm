@@ -588,3 +588,32 @@ func TestTheConfigDefaultFollowsEnvStrategyOverARememberedAnswerAndIsRememberedA
 	assert.Equal(t, project.EnvMain, result.Items[0].Detail.Metadata.EnvStrategy)
 	assert.Contains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), `env_strategy = "config"`)
 }
+
+func TestAPreviewIsStaleOnlyWhenTheConfiguredStrategyChangesItsPlan(t *testing.T) {
+	cases := []struct {
+		name  string
+		given provision.Given
+		stale bool
+	}{
+		{name: "explicit", given: provision.Given{EnvFrom: project.EnvMain}},
+		{name: "configured", stale: true},
+		{name: "followsConfig", given: provision.Given{EnvFrom: provision.EnvFromConfig}, stale: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newWorld(t, seed{})
+			req := create.Request{Branches: []string{branchName}, Given: tc.given}
+			preview, err := w.usecase.Run(t.Context(), req, domain.RunOptions{DryRun: true, Report: (&recorder{}).add})
+			require.NoError(t, err)
+			writeFile(t, filepath.Join(w.stateDir, "config.toml"), strings.Replace(projectToml, `strategy = "main"`, `strategy = "parent"`, 1))
+
+			_, err = w.usecase.Run(t.Context(), req, domain.RunOptions{ExpectFingerprint: preview.Fingerprint, Report: (&recorder{}).add})
+
+			if !tc.stale {
+				require.NoError(t, err)
+				return
+			}
+			assert.Equal(t, domain.CodePlanStale, failureOf(t, err).Code)
+		})
+	}
+}

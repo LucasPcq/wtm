@@ -156,17 +156,17 @@ func (s Service) Run(ctx context.Context, params Params) Outcome {
 // ----------------------------------------------------------------------------
 // The fingerprint and the remembered answers
 
-// Fingerprinted is what the fingerprint of a plan that provisions worktrees covers: the plan, the isolation as answers resolve it, and all Run reads of repo's project (its env, its on_create hooks, its run.toml and the global settings), so the apply of a preview made on another project is refused.
+// Fingerprinted is what the fingerprint of a plan that provisions worktrees covers: the plan, the isolation as answers resolve it, and what Run reads of repo's project (its env files, its on_create hooks, its run.toml and the global settings), so the apply of a preview made on another project is refused. config.toml's env strategy is left out: Run reads only the strategy answers settle, which the plan shows.
 func Fingerprinted(plan any, repo worktree.Repository, answers Answers) any {
 	return struct {
 		Plan      any               `json:"plan"`
 		Isolation project.Isolation `json:"isolation"`
-		Env       project.Env       `json:"env"`
+		EnvFiles  []project.EnvFile `json:"env_files"`
 		OnCreate  []project.Hook    `json:"on_create"`
 		Run       project.Run       `json:"run"`
 		RunErr    string            `json:"run_err,omitempty"`
 		Global    project.Global    `json:"global"`
-	}{Plan: plan, Isolation: answers.Isolation(), Env: repo.Config.Env, OnCreate: repo.Config.OnCreate, Run: repo.Run, RunErr: errorText(repo.RunErr), Global: repo.Global}
+	}{Plan: plan, Isolation: answers.Isolation(), EnvFiles: repo.Config.Env.Files, OnCreate: repo.Config.OnCreate, Run: repo.Run, RunErr: errorText(repo.RunErr), Global: repo.Global}
 }
 
 func errorText(err error) string {

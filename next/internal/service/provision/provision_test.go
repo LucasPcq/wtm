@@ -343,16 +343,20 @@ func TestParamsOfCheckOutFromTheRepository(t *testing.T) {
 	}, params.Worktree)
 }
 
-func TestTheFingerprintCoversTheWholeEnv(t *testing.T) {
+func TestTheFingerprintCoversTheEnvFilesButNotTheConfiguredStrategy(t *testing.T) {
+	fingerprint := func(repo worktree.Repository) string {
+		data, err := json.Marshal(provision.Fingerprinted("plan", repo, answered(provision.Given{})))
+		require.NoError(t, err)
+		return string(data)
+	}
 	repo := repository(nil)
-	before, err := json.Marshal(provision.Fingerprinted("plan", repo, answered(provision.Given{})))
-	require.NoError(t, err)
+	before := fingerprint(repo)
 
-	repo.Config.Env.Strategy = project.EnvMain
-	after, err := json.Marshal(provision.Fingerprinted("plan", repo, answered(provision.Given{})))
-	require.NoError(t, err)
+	repo.Config.Env.Strategy = project.EnvParent
+	assert.Equal(t, before, fingerprint(repo))
 
-	assert.NotEqual(t, before, after)
+	repo.Config.Env.Files = []project.EnvFile{{Target: ".env"}}
+	assert.NotEqual(t, before, fingerprint(repo))
 }
 
 func TestARememberThatFailsIsTheCommandsWarning(t *testing.T) {
