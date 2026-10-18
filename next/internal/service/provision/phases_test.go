@@ -33,7 +33,7 @@ func TestAWorktreeGetsTheSmallestOrdinalNoLiveWorktreeHolds(t *testing.T) {
 	outcome := w.service.Run(t.Context(), portLinked(w.params(&recorder{})))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
-	assert.Equal(t, new(2), outcome.Provisioned.Ordinal)
+	assert.Equal(t, 2, outcome.Provisioned.Meta.Ordinal)
 	recorded, _ := files.Meta(branchName)
 	assert.Equal(t, 2, recorded.Ordinal)
 	assert.Equal(t, "main", recorded.SourceBranch)
@@ -59,7 +59,7 @@ func TestTheOrdinalOfADetachedWorktreeIsNeverGivenAgain(t *testing.T) {
 	outcome := w.service.Run(t.Context(), portLinked(w.params(&recorder{})))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
-	assert.Equal(t, new(2), outcome.Provisioned.Ordinal)
+	assert.Equal(t, 2, outcome.Provisioned.Meta.Ordinal)
 }
 
 func TestANumberIsGivenUnderTheOrdinalLock(t *testing.T) {
@@ -82,7 +82,7 @@ func TestANumberIsNeverGivenPastANeighbourWhoseRecordDoesNotRead(t *testing.T) {
 	outcome := w.service.Run(t.Context(), portLinked(w.params(&recorder{})))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
-	assert.Nil(t, outcome.Provisioned.Ordinal)
+	assert.Zero(t, outcome.Provisioned.Meta.Ordinal)
 	recorded, _ := files.Meta(branchName)
 	assert.Zero(t, recorded.Ordinal)
 	require.Equal(t, []string{"provision.ports_not_settled"}, codes(outcome.Warnings))
@@ -96,7 +96,7 @@ func TestANumberThatCannotBeGivenLeavesThePortsAsCopiedAndSaysWhy(t *testing.T) 
 	outcome := w.service.Run(t.Context(), portLinked(w.params(report)))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
-	assert.Nil(t, outcome.Provisioned.Ordinal)
+	assert.Zero(t, outcome.Provisioned.Meta.Ordinal)
 	assert.Equal(t, []domain.Warning{{
 		Code:    "provision.ports_not_settled",
 		Message: "list worktrees: git worktree list: exit status 128 — ports not settled — run `wtm env feat/x` once this is fixed",
@@ -115,7 +115,7 @@ func TestANumberOnlyHooksNeededStillGivesTheComposeNameAndSaysThePortsAreMissing
 	outcome := w.service.Run(t.Context(), hooked(composed(w.params(report)), "echo offset=$WTM_PORT_OFFSET project=$COMPOSE_PROJECT_NAME"))
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
-	assert.Nil(t, outcome.Provisioned.Ordinal)
+	assert.Zero(t, outcome.Provisioned.Meta.Ordinal)
 	assert.Equal(t, []string{"provision.hook_env_unnumbered"}, codes(outcome.Warnings))
 	assert.Equal(t, []string{"offset= project=main-feat-x"}, report.lines())
 	written, _ := files.File(filepath.Join(w.path(branchName), ".env"))
@@ -154,8 +154,7 @@ func TestAPortLinkedWorktreeIsNumberedAndItsEnvMovedOntoItsPorts(t *testing.T) {
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{"worktree", "env", "meta", "ordinal", "ports"}, report.phases())
-	require.NotNil(t, outcome.Provisioned.Ordinal)
-	assert.Equal(t, 1, *outcome.Provisioned.Ordinal)
+	assert.Equal(t, 1, outcome.Provisioned.Meta.Ordinal)
 	assert.True(t, outcome.Provisioned.EnvPorts.Applied)
 	require.NotEmpty(t, outcome.Provisioned.EnvPorts.Entries)
 	for _, entry := range outcome.Provisioned.EnvPorts.Entries {
@@ -182,7 +181,7 @@ func TestARunConfigThatDoesNotLoadLeavesTheEnvAsCopiedAndSaysWhy(t *testing.T) {
 		Message: "run.toml: line 3 — ports not settled — run `wtm env feat/x` once run.toml is fixed",
 		Params:  domain.Params{"branch": branchName, "cause": "run.toml: line 3"},
 	}}, outcome.Warnings)
-	assert.Nil(t, outcome.Provisioned.Ordinal)
+	assert.Zero(t, outcome.Provisioned.Meta.Ordinal)
 	assert.Equal(t, mainEnv, readFile(t, filepath.Join(w.path(branchName), ".env")))
 }
 
@@ -196,7 +195,7 @@ func TestAVerbatimWorktreeKeepsItsEnvAsCopiedAndHasNoNumber(t *testing.T) {
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{"worktree", "env", "meta"}, report.phases())
-	assert.Nil(t, outcome.Provisioned.Ordinal)
+	assert.Zero(t, outcome.Provisioned.Meta.Ordinal)
 	assert.Equal(t, mainEnv, readFile(t, filepath.Join(w.path(branchName), ".env")))
 }
 
@@ -266,7 +265,7 @@ func TestAPortPassThatFailsNeverFailsTheWorktree(t *testing.T) {
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{"provision.ports_not_settled"}, codes(outcome.Warnings))
-	assert.NotNil(t, outcome.Provisioned.Ordinal)
+	assert.NotZero(t, outcome.Provisioned.Meta.Ordinal)
 	assert.Empty(t, outcome.Provisioned.EnvPorts)
 }
 

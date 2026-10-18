@@ -124,7 +124,7 @@ func TestAnInterruptDuringTheAddFinishesItsEnvAndRecordThenStops(t *testing.T) {
 	recorded, err := w.meta.Load(branchName)
 	require.NoError(t, err)
 	assert.Zero(t, recorded.Ordinal)
-	assert.Nil(t, outcome.Provisioned.Ordinal)
+	assert.Zero(t, outcome.Provisioned.Meta.Ordinal)
 	assert.Empty(t, report.lines())
 	assert.Equal(t, domain.WorktreeProvisioned{Worktree: worktree.Identity{Branch: branchName, Path: w.path(branchName), Parent: "main", Isolation: project.Isolated, CreatedAt: "2026-10-16T12:00:00Z"}}, report.worktreeEvents()[1])
 }
