@@ -322,3 +322,13 @@ func (r Request) Locks() []domain.Lock {
 func (b BranchPlan) placement() worktree.Placed {
 	return worktree.Placed{Start: b.Action.start(), Upstream: b.Upstream}
 }
+
+// Recalled are the fields of the plan answered from memory.
+func (p Plan) Recalled() []string {
+	return p.settled.Recalled()
+}
+
+// EnvFollowsConfig reports whether the env strategy follows config.toml's, EnvFrom being the strategy it stands for now.
+func (p Plan) EnvFollowsConfig() bool {
+	return p.settled.FollowsConfig()
+}

@@ -19,17 +19,21 @@ func TestTwoBranchesCreatedAreCountedRowedAndPointedAt(t *testing.T) {
 	golden(t, "outcome_two_done", rendered(func(w *bytes.Buffer) { drawOutcome(w, twoCreated(trees), nil, cwd) }))
 }
 
-func TestAnAppliedRunMarksTheAnswersItRemembered(t *testing.T) {
+func TestAnAppliedRunMarksOnlyTheAnswersItRemembered(t *testing.T) {
 	outcome := twoCreated(trees)
 	outcome.Plan.Isolation = "isolated"
 	outcome.Plan.Remember = []string{"isolation", "fast_forward"}
 
-	text := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, nil, cwd) })
+	nothingWritten := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, nil, cwd) })
+	outcome.Result.Remembered = outcome.Plan.Remember
+	written := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, nil, cwd) })
 
-	assert.Contains(t, text, "Env           example\n")
-	assert.Contains(t, text, "Isolation     isolated · remembered\n")
-	assert.Contains(t, text, "Fast-forward  keep as-is · remembered\n")
-	assert.NotContains(t, text, "Remember")
+	assert.Contains(t, nothingWritten, "Isolation  isolated\n")
+	assert.NotContains(t, nothingWritten, "Fast-forward")
+	assert.Contains(t, written, "Env           example\n")
+	assert.Contains(t, written, "Isolation     isolated · saved for next runs\n")
+	assert.Contains(t, written, "Fast-forward  keep as-is · saved for next runs\n")
+	assert.NotContains(t, written, "Remember")
 }
 
 func TestAMixedRunNamesEachAnomalyAndEachUnfinishedBranch(t *testing.T) {
@@ -63,7 +67,7 @@ func TestADryRunShowsThePlanItsWarningsItsFingerprintAndHowToApplyIt(t *testing.
 	outcome.Warnings = []domain.Warning{{Code: "create.env_parent_fallback", Message: `The "parent" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main.`}}
 
 	golden(t, "dryrun", rendered(func(w *bytes.Buffer) {
-		output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(outcome.Plan, output.WillBeRemembered), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: "wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567"})
+		output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(outcome.Plan, previewMarks(outcome.Plan)), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: "wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567"})
 	}))
 }
 

@@ -83,7 +83,7 @@ func (c *createCommand) conclude(cmd *cobra.Command, ran form.Ran[create.Request
 	case ran.Outcome.Result == nil:
 		apply := output.Line(argv) + " --expect-fingerprint " + ran.Outcome.Fingerprint
 		output.Frame(stdout, func(w io.Writer) {
-			output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(ran.Outcome.Plan, output.WillBeRemembered), Warnings: ran.Outcome.Warnings, Fingerprint: ran.Outcome.Fingerprint, Apply: apply})
+			output.DryRun(w, output.DryRunParams{Command: commandName, Rows: planRowsOf(ran.Outcome.Plan, previewMarks(ran.Outcome.Plan)), Warnings: ran.Outcome.Warnings, Fingerprint: ran.Outcome.Fingerprint, Apply: apply})
 		})
 		return nil
 	}

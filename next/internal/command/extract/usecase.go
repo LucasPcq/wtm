@@ -147,11 +147,14 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	}
 	report(domain.UnitFinished{Subject: item.Subject, Status: item.Status})
 
+	var remembered []string
 	if plan.Target.creates() && item.Status == domain.StatusDone {
-		warnings = append(warnings, u.Provision.Remember(ctx, Name, plan.settled, plan.Remember)...)
+		var failed []domain.Warning
+		remembered, failed = u.Provision.Remember(ctx, Name, plan.settled, plan.Remember)
+		warnings = append(warnings, failed...)
 	}
 
-	return Result{Items: []Item{item}, Warnings: warnings}
+	return Result{Items: []Item{item}, Warnings: warnings, Remembered: remembered}
 }
 
 // ----------------------------------------------------------------------------

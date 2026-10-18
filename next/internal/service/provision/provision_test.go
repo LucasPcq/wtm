@@ -361,8 +361,9 @@ func TestTheFingerprintCoversTheEnvFilesButNotTheConfiguredStrategy(t *testing.T
 func TestARememberThatFailsIsTheCommandsWarning(t *testing.T) {
 	service := provision.Service{Answers: storetest.NewFake(storetest.FakeParams{Fail: map[string]error{"Remember": errors.New("read-only file system")}})}
 
-	warnings := service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), []string{provision.PathEnvFrom})
+	remembered, warnings := service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), []string{domain.PathEnvFrom})
 
+	assert.Empty(t, remembered)
 	require.Len(t, warnings, 1)
 	assert.Equal(t, "greet.remember_failed", warnings[0].Code)
 	assert.Equal(t, domain.Params{"cause": "read-only file system"}, warnings[0].Params)
@@ -371,5 +372,8 @@ func TestARememberThatFailsIsTheCommandsWarning(t *testing.T) {
 func TestNothingToRememberWritesNothing(t *testing.T) {
 	service := provision.Service{Answers: storetest.NewFake(storetest.FakeParams{Fail: map[string]error{"Remember": errors.New("read-only file system")}})}
 
-	assert.Empty(t, service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), nil))
+	remembered, warnings := service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), nil)
+
+	assert.Empty(t, remembered)
+	assert.Empty(t, warnings)
 }

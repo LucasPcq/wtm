@@ -173,21 +173,21 @@ func errorText(err error) string {
 }
 
 // Remember writes the answers to the fields asked to be remembered, as answers settles them; a write that fails is command's warning <command>.remember_failed, what was made standing all the same.
-func (s Service) Remember(ctx context.Context, command string, answers Answers, fields []string) []domain.Warning {
+func (s Service) Remember(ctx context.Context, command string, answers Answers, fields []string) ([]string, []domain.Warning) {
 	remembered := answers.Remembered(fields)
 	if len(remembered) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	written, err := s.Answers.Remember(ctx, remembered)
 	if err != nil {
-		return []domain.Warning{{Code: command + ".remember_failed", Message: "could not remember the answer: " + err.Error(), Params: domain.Params{"cause": err.Error()}}}
+		return nil, []domain.Warning{{Code: command + ".remember_failed", Message: "could not remember the answer: " + err.Error(), Params: domain.Params{"cause": err.Error()}}}
 	}
 	if written.Unlocked {
-		return []domain.Warning{domain.LocksUnavailable}
+		return fields, []domain.Warning{domain.LocksUnavailable}
 	}
 
-	return nil
+	return fields, nil
 }
 
 // ----------------------------------------------------------------------------

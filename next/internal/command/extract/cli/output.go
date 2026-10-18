@@ -13,8 +13,8 @@ import (
 
 const commandName = extract.Name
 
-// planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome; a value whose answer is remembered carries note.
-func planRowsOf(plan extract.Plan, note string) []output.PlanRow {
+// planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome, each answer with its mark.
+func planRowsOf(plan extract.Plan, marks output.Marks) []output.PlanRow {
 	rows := []output.PlanRow{
 		{Label: "Source", Values: []string{plan.Source}},
 		{Label: "Files", Values: labels(plan.Files)},
@@ -25,12 +25,12 @@ func planRowsOf(plan extract.Plan, note string) []output.PlanRow {
 		rows = append(rows, output.PlanRow{Label: "Parent", Values: []string{plan.From}})
 	}
 	if plan.EnvFrom != "" {
-		rows = append(rows, output.PlanRow{Label: "Env", Values: []string{string(plan.EnvFrom) + output.RememberedNote(plan.Remember, "env_from", note)}})
+		rows = append(rows, output.PlanRow{Label: "Env", Values: []string{output.EnvValue(output.EnvValueParams{Strategy: string(plan.EnvFrom), FollowsConfig: plan.EnvFollowsConfig(), Mark: marks.Of(domain.PathEnvFrom)})}})
 	}
 	if plan.Isolation != "" {
-		rows = append(rows, output.PlanRow{Label: "Isolation", Values: []string{string(plan.Isolation) + output.RememberedNote(plan.Remember, "isolation", note)}})
+		rows = append(rows, output.PlanRow{Label: "Isolation", Values: []string{string(plan.Isolation) + marks.Of(domain.PathIsolation)}})
 	}
-	if ff := output.Noted(output.NotedParams{Values: plan.FastForward, Note: output.RememberedNote(plan.Remember, "fast_forward", note), None: "keep as-is"}); len(ff) > 0 {
+	if ff := output.Noted(output.NotedParams{Values: plan.FastForward, Note: marks.Of(domain.PathFastForward), None: "keep as-is"}); len(ff) > 0 {
 		rows = append(rows, output.PlanRow{Label: "Fast-forward", Values: ff})
 	}
 
@@ -42,6 +42,11 @@ func planRowsOf(plan extract.Plan, note string) []output.PlanRow {
 		)
 	}
 	return rows
+}
+
+// previewMarks are the marks of a plan not yet applied.
+func previewMarks(plan extract.Plan) output.Marks {
+	return output.Marks{Recalled: plan.Recalled(), Remembered: plan.Remember, Mark: output.WillBeRemembered}
 }
 
 // plannedTarget spells the target and how it gets its worktree; an existing one is its branch alone.
@@ -106,7 +111,7 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
 	}
 	output.Tally(w, tally)
 
-	rows := planRowsOf(outcome.Plan, output.Remembered)
+	rows := planRowsOf(outcome.Plan, output.Marks{Recalled: outcome.Plan.Recalled(), Remembered: outcome.Result.Remembered, Mark: output.Saved})
 	anomalies := anomaliesOf(outcome)
 	var next []output.NextStep
 	if stands(item) && detail != nil {

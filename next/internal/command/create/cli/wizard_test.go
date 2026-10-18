@@ -82,6 +82,14 @@ func TestWhatAFlagOrARememberedAnswerSettledIsNotAsked(t *testing.T) {
 	assert.Contains(t, screen, "esc cancel")
 }
 
+func TestTheRecapMarksARecalledAnswerAndSaysHowToBeAskedIt(t *testing.T) {
+	d := open(t, sessionParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: "main"}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main"}})
+
+	screen := d.screen()
+	assert.Contains(t, screen, "┃  Env       main · remembered\n")
+	assert.Contains(t, screen, "┃  Remembered answers are not asked: --ask asks them again.")
+}
+
 func TestAskAsksARememberedAnswerAgainStartingOnIt(t *testing.T) {
 	d := open(t, sessionParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: "main"}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{Ask: true}}})
 

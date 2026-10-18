@@ -14,22 +14,27 @@ import (
 
 const commandName = create.Name
 
-// planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome; a value whose answer is remembered carries note.
-func planRowsOf(plan create.Plan, note string) []output.PlanRow {
+// planRowsOf are the rows of the plan, shared by the dry run, the recap and the outcome, each answer with its mark.
+func planRowsOf(plan create.Plan, marks output.Marks) []output.PlanRow {
 	rows := []output.PlanRow{
 		{Label: "Branches", Values: plannedBranches(plan.Branches)},
 		{Label: sourceLabel(plan.Branches), Values: []string{plan.From}},
-		{Label: "Env", Values: []string{string(plan.EnvFrom) + output.RememberedNote(plan.Remember, "env_from", note)}},
+		{Label: "Env", Values: []string{output.EnvValue(output.EnvValueParams{Strategy: string(plan.EnvFrom), FollowsConfig: plan.EnvFollowsConfig(), Mark: marks.Of(domain.PathEnvFrom)})}},
 	}
 
 	if plan.Isolation != "" {
-		rows = append(rows, output.PlanRow{Label: "Isolation", Values: []string{string(plan.Isolation) + output.RememberedNote(plan.Remember, "isolation", note)}})
+		rows = append(rows, output.PlanRow{Label: "Isolation", Values: []string{string(plan.Isolation) + marks.Of(domain.PathIsolation)}})
 	}
-	if ff := output.Noted(output.NotedParams{Values: plan.FastForward, Note: output.RememberedNote(plan.Remember, "fast_forward", note), None: "keep as-is"}); len(ff) > 0 {
+	if ff := output.Noted(output.NotedParams{Values: plan.FastForward, Note: marks.Of(domain.PathFastForward), None: "keep as-is"}); len(ff) > 0 {
 		rows = append(rows, output.PlanRow{Label: "Fast-forward", Values: ff})
 	}
 
 	return rows
+}
+
+// previewMarks are the marks of a plan not yet applied.
+func previewMarks(plan create.Plan) output.Marks {
+	return output.Marks{Recalled: plan.Recalled(), Remembered: plan.Remember, Mark: output.WillBeRemembered}
 }
 
 // plannedBranches spells each planned branch, how it gets its worktree in parentheses unless it is created.
@@ -100,7 +105,7 @@ func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextSte
 	var anomalies []string
 	var next []output.NextStep
 	if len(items) > 0 {
-		rows = planRowsOf(outcome.Plan, output.Remembered)
+		rows = planRowsOf(outcome.Plan, output.Marks{Recalled: outcome.Plan.Recalled(), Remembered: outcome.Result.Remembered, Mark: output.Saved})
 	}
 
 	for _, item := range items {
@@ -167,5 +172,5 @@ func headline(w io.Writer, items []create.Item) {
 
 // planTextOf is the plan as the wizard's recap shows it, in width columns.
 func planTextOf(plan create.Plan, warnings []domain.Warning, width int, st *output.Styles) string {
-	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(plan, output.WillBeRemembered), Warnings: output.Messages(warnings), Width: width, Styles: st}), "\n")
+	return strings.Join(output.PlanLines(output.PlanParams{Rows: planRowsOf(plan, previewMarks(plan)), Warnings: output.Messages(warnings), Hint: output.RecalledHintOf(plan.Recalled()), Width: width, Styles: st}), "\n")
 }

@@ -121,7 +121,8 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 		items = append(items, u.item(ctx, plan, planned, report))
 	}
 
-	return Result{Items: items, Warnings: append(warnings, u.remember(ctx, plan, items)...)}
+	remembered, failed := u.remember(ctx, plan, items)
+	return Result{Items: items, Warnings: append(warnings, failed...), Remembered: remembered}
 }
 
 // ----------------------------------------------------------------------------
@@ -238,10 +239,10 @@ func (u UseCase) unchanged(planned BranchPlan) Item {
 	return Item{Subject: planned.Branch, Status: domain.StatusDone, Reason: domain.ReasonUnchanged, Detail: &Detail{Path: planned.Path, Metadata: recorded}}
 }
 
-// remember writes the answers the plan asks to remember, once at least one worktree was created.
-func (u UseCase) remember(ctx context.Context, plan Plan, items []Item) []domain.Warning {
+// remember writes the answers the plan asks to remember, once at least one worktree was created, and returns the fields it remembered.
+func (u UseCase) remember(ctx context.Context, plan Plan, items []Item) ([]string, []domain.Warning) {
 	if !slices.ContainsFunc(items, created) {
-		return nil
+		return nil, nil
 	}
 
 	return u.Provision.Remember(ctx, Name, plan.settled, plan.Remember)

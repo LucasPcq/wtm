@@ -208,6 +208,7 @@ func TestTheAnswersAskedToBeRememberedAreKeptOnceABranchIsCreated(t *testing.T) 
 	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{EnvFrom: project.EnvExample, Isolation: project.Verbatim, FastForward: new(false), Remember: []string{"env_from", "isolation", "fast_forward"}}})
 
 	assert.Empty(t, result.Warnings)
+	assert.Equal(t, []string{"env_from", "isolation", "fast_forward"}, result.Remembered)
 	config := readFile(t, filepath.Join(w.stateDir, "config.toml"))
 	assert.Contains(t, config, `env_strategy = "example"`)
 	assert.Contains(t, config, `isolation = "verbatim"`)
@@ -235,8 +236,9 @@ func TestAFastForwardNotAskedNeverOverwritesTheOneRemembered(t *testing.T) {
 func TestNothingIsRememberedWhenNoBranchWasCreated(t *testing.T) {
 	w := newWorld(t, seed{Linked: []string{"linked"}})
 
-	w.apply(t, create.Request{Branches: []string{"linked"}, IfNotExists: true, Given: provision.Given{EnvFrom: project.EnvExample, Remember: []string{"env_from"}}})
+	result, _ := w.apply(t, create.Request{Branches: []string{"linked"}, IfNotExists: true, Given: provision.Given{EnvFrom: project.EnvExample, Remember: []string{"env_from"}}})
 
+	assert.Empty(t, result.Remembered)
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "env_strategy")
 }
 
@@ -247,6 +249,7 @@ func TestAnAnswerThatCannotBeRememberedIsAWarningOfTheRun(t *testing.T) {
 	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from"}}})
 
 	assert.Equal(t, []string{"create.remember_failed"}, codes(result.Warnings))
+	assert.Empty(t, result.Remembered)
 	assert.Equal(t, "could not remember the answer: read-only file system", result.Warnings[0].Message)
 	assert.Equal(t, domain.Params{"cause": "read-only file system"}, result.Warnings[0].Params)
 }

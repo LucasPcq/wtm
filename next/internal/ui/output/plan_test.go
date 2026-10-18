@@ -6,9 +6,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestARememberedValueCarriesItsNote(t *testing.T) {
-	assert.Equal(t, WillBeRemembered, RememberedNote([]string{"isolation", "env_from"}, "env_from", WillBeRemembered))
-	assert.Empty(t, RememberedNote([]string{"isolation"}, "env_from", WillBeRemembered))
+func TestAnAnswerIsMarkedRememberedOverRecalled(t *testing.T) {
+	marks := Marks{Recalled: []string{"isolation", "env_from"}, Remembered: []string{"env_from"}, Mark: WillBeRemembered}
+
+	assert.Equal(t, WillBeRemembered, marks.Of("env_from"))
+	assert.Equal(t, Recalled, marks.Of("isolation"))
+	assert.Empty(t, marks.Of("fast_forward"))
 }
 
 func TestTheNoteOfARowFollowsItsLastValue(t *testing.T) {
@@ -16,8 +19,8 @@ func TestTheNoteOfARowFollowsItsLastValue(t *testing.T) {
 		params NotedParams
 		want   []string
 	}{
-		"values": {NotedParams{Values: []string{"main", "topic"}, Note: Remembered, None: "none"}, []string{"main", "topic · remembered"}},
-		"none":   {NotedParams{Note: Remembered, None: "keep as-is"}, []string{"keep as-is · remembered"}},
+		"values": {NotedParams{Values: []string{"main", "topic"}, Note: Saved, None: "none"}, []string{"main", "topic · saved for next runs"}},
+		"none":   {NotedParams{Note: Saved, None: "keep as-is"}, []string{"keep as-is · saved for next runs"}},
 		"noNote": {NotedParams{Values: []string{"main"}, None: "none"}, []string{"main"}},
 		"empty":  {NotedParams{None: "none"}, nil},
 	}

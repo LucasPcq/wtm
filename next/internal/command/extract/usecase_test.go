@@ -208,6 +208,7 @@ func TestTheAnswersAskedToBeRememberedAreKeptOnceTheTargetIsCreated(t *testing.T
 	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation", "fast_forward"}}})
 
 	assert.Empty(t, result.Warnings)
+	assert.Equal(t, []string{"isolation"}, result.Remembered, "fast_forward is not asked, so not remembered")
 	assert.Equal(t, project.Verbatim, result.Items[0].Detail.Isolation)
 	config := readFile(t, filepath.Join(w.stateDir, "config.toml"))
 	assert.Contains(t, config, `isolation = "verbatim"`)
@@ -260,6 +261,7 @@ func TestNothingIsRememberedNorMovedWhenTheTargetFailsToProvision(t *testing.T) 
 	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation"}}})
 
 	require.Equal(t, domain.StatusFailed, result.Items[0].Status)
+	assert.Empty(t, result.Remembered)
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "isolation")
 	assert.FileExists(t, filepath.Join(w.at(source), "a.txt"))
 	assert.NoFileExists(t, filepath.Join(w.path(split), "a.txt"))

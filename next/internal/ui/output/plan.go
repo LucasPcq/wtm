@@ -21,19 +21,46 @@ const (
 // NothingToDo is what a plan with no row shows.
 const NothingToDo = "nothing to do"
 
-// The notes of a plan's value whose answer is remembered for the next runs: before the apply, and once applied.
+// The marks of a plan's value: an answer recalled from memory, an answer the apply will remember, and one it remembered.
 const (
+	Recalled         = Dot + "remembered"
 	WillBeRemembered = Dot + "will be remembered"
-	Remembered       = Dot + "remembered"
+	Saved            = Dot + "saved for next runs"
 )
 
-// RememberedNote is note when remember names the field at path, else empty: what follows the value of that field in a plan.
-func RememberedNote(remember []string, path, note string) string {
-	if !slices.Contains(remember, path) {
-		return ""
+// Marks say which answers of a plan are marked, by the path of their field: those recalled from memory, and those remembered for the next runs with the mark that says so, WillBeRemembered before the apply, Saved after it.
+type Marks struct {
+	Recalled   []string
+	Remembered []string
+	Mark       string
+}
+
+// Of is the mark of the answer to the field at path, empty when it has none.
+func (m Marks) Of(path string) string {
+	switch {
+	case slices.Contains(m.Remembered, path):
+		return m.Mark
+	case slices.Contains(m.Recalled, path):
+		return Recalled
 	}
 
-	return note
+	return ""
+}
+
+// EnvValueParams is the env strategy of a plan: the strategy, whether it follows config.toml's, and its mark.
+type EnvValueParams struct {
+	Strategy      string
+	FollowsConfig bool
+	Mark          string
+}
+
+// EnvValue spells the env strategy with its mark; a marked answer that follows config.toml's reads config default, since that, not the strategy, is what is remembered.
+func EnvValue(params EnvValueParams) string {
+	if params.FollowsConfig && params.Mark != "" {
+		return "config default (" + params.Strategy + ")" + params.Mark
+	}
+
+	return params.Strategy + params.Mark
 }
 
 // A PlanRow is one line of a plan: a label and the values it applies to.
@@ -42,15 +69,16 @@ type PlanRow struct {
 	Values []string
 }
 
-// PlanParams is a plan to draw: its rows, the warnings under them, and the width and styles to draw them with.
+// PlanParams is a plan to draw: its rows, the warnings under them, a muted hint closing it, and the width and styles to draw them with.
 type PlanParams struct {
 	Rows     []PlanRow
 	Warnings []string
+	Hint     string
 	Width    int     // the columns a line may fill; 0 or less wraps nothing
 	Styles   *Styles // nil draws no colour
 }
 
-// PlanLines returns the lines of the plan params describes: its rows with their values aligned in one column and wrapped to its width, then its warnings after an empty line.
+// PlanLines returns the lines of the plan params describes: its rows with their values aligned in one column and wrapped to its width, then its warnings and its hint, each after an empty line.
 func PlanLines(params PlanParams) []string {
 	st := cmp.Or(params.Styles, plainStyles)
 	lines := planRows(params, st)
@@ -67,7 +95,22 @@ func PlanLines(params PlanParams) []string {
 			}
 		}
 	}
+	if params.Hint != "" {
+		lines = append(lines, "", st.Muted.Render(params.Hint))
+	}
 	return lines
+}
+
+// RecalledHint closes a recap that answered a question from memory: how to be asked it again.
+const RecalledHint = "Remembered answers are not asked: --ask asks them again."
+
+// RecalledHintOf is RecalledHint when recalled names a field, else empty.
+func RecalledHintOf(recalled []string) string {
+	if len(recalled) == 0 {
+		return ""
+	}
+
+	return RecalledHint
 }
 
 // NotedParams are the values of a plan's row, the note the row carries and the value it shows when it has none but a note.

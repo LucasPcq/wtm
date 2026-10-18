@@ -428,3 +428,13 @@ func (p Plan) move() worktree.Move {
 		SourceLabel: p.Source,
 	}
 }
+
+// Recalled are the fields of the plan answered from memory.
+func (p Plan) Recalled() []string {
+	return p.settled.Recalled()
+}
+
+// EnvFollowsConfig reports whether the env strategy follows config.toml's, EnvFrom being the strategy it stands for now.
+func (p Plan) EnvFollowsConfig() bool {
+	return p.settled.FollowsConfig()
+}

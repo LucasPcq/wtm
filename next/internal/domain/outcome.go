@@ -68,10 +68,11 @@ func (o Outcome[P, D]) Envelope(command string, err *Error) Envelope {
 	return doc
 }
 
-// A Result is what an apply did: one Unit per subject of the plan, in its order, and the warnings of the whole run.
+// A Result is what an apply did: one Unit per subject of the plan, in its order, the warnings of the whole run and the fields whose answer it remembered for the next runs.
 type Result[D any] struct {
-	Items    []Unit[D]
-	Warnings []Warning
+	Items      []Unit[D]
+	Warnings   []Warning
+	Remembered []string
 }
 
 // Failure is the error the run ends on: the first interruption, else the first failed subject, else nil.
