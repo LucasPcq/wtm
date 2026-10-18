@@ -354,8 +354,7 @@ func (w *Wizard) answer() tea.Cmd {
 	}
 
 	step := w.script.Steps[w.current]
-	answered := step.Answer()
-	w.marks[w.current].line = summarized(step.Standing(), answered)
+	w.marks[w.current].line = step.Answer()
 
 	return tea.Batch(w.load(readingText), w.observe(thenNext))
 }

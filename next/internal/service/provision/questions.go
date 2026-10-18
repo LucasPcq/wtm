@@ -238,8 +238,8 @@ func (q Questions) Fields(envHelp string) []domain.Field {
 		domain.ConfirmField{
 			FieldSpec:    domain.FieldSpec{Path: domain.PathFastForward, Flag: "--ff", Label: "Source update", Help: fastForwardHelp, Origin: q.FastForward.Origin, Skip: q.FastForward.Skip},
 			Value:        q.FastForward.Value,
-			Yes:          domain.Option{Value: "true", Label: q.fastForwardLabel()},
-			No:           domain.Option{Value: "false", Label: "Keep it as-is"},
+			Yes:          domain.Option{Value: "true", Label: q.fastForwardLabel(), Short: "fast-forward to origin"},
+			No:           domain.Option{Value: "false", Label: "Keep it as-is", Short: "keep as-is"},
 			Remembered:   q.FastForward.Remembered,
 			Rememberable: true,
 			Remember:     q.Remembers(domain.PathFastForward),

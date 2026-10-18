@@ -1,5 +1,5 @@
 
-  Step 7/7 • Apply this plan?
+  Step 7/7 • Confirm
 
   ✓ Branches: feat/a, feature
   ✓ Source branch: main

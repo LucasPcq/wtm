@@ -133,8 +133,8 @@ func TestTheSourceUpdateNamesTheBranchesItFastForwards(t *testing.T) {
 
 	update, isConfirm := fields[2].(domain.ConfirmField)
 	require.True(t, isConfirm)
-	assert.Equal(t, domain.Option{Value: "true", Label: "Fast-forward main, topic to origin"}, update.Yes)
-	assert.Equal(t, domain.Option{Value: "false", Label: "Keep it as-is"}, update.No)
+	assert.Equal(t, domain.Option{Value: "true", Label: "Fast-forward main, topic to origin", Short: "fast-forward to origin"}, update.Yes)
+	assert.Equal(t, domain.Option{Value: "false", Label: "Keep it as-is", Short: "keep as-is"}, update.No)
 	assert.Empty(t, update.Skip)
 }
 

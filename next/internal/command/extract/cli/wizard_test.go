@@ -41,7 +41,7 @@ func TestFlagsSettleTheirStepsInTheTrail(t *testing.T) {
 
 	assert.Equal(t, stepMode, d.w.Current())
 	screen := d.screen()
-	assert.Contains(t, screen, "✓ Source worktree: feat/login · <source>")
+	assert.Contains(t, screen, "✓ Source worktree: feat/login\n")
 	assert.Contains(t, screen, "✓ Files: 2 files · --files")
 	assert.Contains(t, screen, "✓ Target worktree: feat/other · --to")
 	assert.Contains(t, screen, "· Branch name — the target worktree exists: nothing is created")
@@ -105,7 +105,7 @@ func TestABranchCreatedIsAskedItsSourceThenTheMode(t *testing.T) {
 
 	d.keys("enter")
 	assert.Equal(t, stepMode, d.w.Current())
-	assert.Contains(t, d.screen(), "✓ Env strategy: config default · default")
+	assert.Contains(t, d.screen(), "✓ Env strategy: config default\n")
 	assert.Contains(t, d.screen(), "· Isolation — run.toml declares nothing a worktree isolates")
 
 	d.keys("enter")

@@ -1,13 +1,13 @@
 
   Step 8/11 • Source update
 
-  ✓ Source worktree: feat/login · <source>
+  ✓ Source worktree: feat/login
   ✓ Files: 1 file · --files
   ✓ Target worktree: new worktree
   ✓ Branch name: feat/split
-  ✓ Source branch: main · config
-  ✓ Env strategy: config default · default
-  ✓ Isolation: isolated · default
+  ✓ Source branch: main
+  ✓ Env strategy: config default
+  ✓ Isolation: isolated
 
   Fast-forward to origin first the branch a new worktree starts from, or the branch itself when it
   already exists locally, when it is behind; one that has diverged or holds uncommitted changes

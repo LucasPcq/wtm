@@ -2,6 +2,7 @@ package form
 
 import (
 	"cmp"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	tea "github.com/charmbracelet/bubbletea"
@@ -58,21 +59,14 @@ func decided(st Standing, answered bool) mark {
 		return mark{ruled: st.Skip}
 	case st.Erred:
 		return mark{asked: true}
-	case st.Flag != "":
+	case st.Flag != "" && !strings.HasPrefix(st.Flag, "<"):
 		return mark{line: value + trail + st.Flag}
+	case st.Flag != "":
+		return mark{line: value}
 	case answered:
 		return mark{line: value}
 	case st.Origin == domain.OriginRemembered:
 		return mark{line: value + trail + string(domain.OriginRemembered)}
 	}
 	return mark{asked: true}
-}
-
-// summarized returns the trail line of an answer shown, naming its origin when the user kept the value the config or the default offered.
-func summarized(offered Standing, shown string) string {
-	kept := offered.Origin == domain.OriginConfig || offered.Origin == domain.OriginDefault
-	if kept && shown == offered.Value {
-		return shown + trail + string(offered.Origin)
-	}
-	return shown
 }

@@ -42,12 +42,12 @@ func TestTheRequestIsWhatWasAnswered(t *testing.T) {
 	assert.NotEmpty(t, d.s.Preview().Fingerprint)
 }
 
-func TestAKeptDefaultSaysWhereItCameFrom(t *testing.T) {
+func TestAKeptDefaultIsItsValueAlone(t *testing.T) {
 	d := open(t, sessionParams{App: newApp(seed{})})
 
 	d.keys("feat/a", "enter", "enter", "enter")
 
-	assert.Contains(t, d.screen(), "✓ Source branch: main · config\n  ✓ Env strategy: config default · default\n")
+	assert.Contains(t, d.screen(), "✓ Source branch: main\n  ✓ Env strategy: config default\n")
 }
 
 func TestAnEntryIsCheckedAsItIsAdded(t *testing.T) {
@@ -76,7 +76,7 @@ func TestWhatAFlagOrARememberedAnswerSettledIsNotAsked(t *testing.T) {
 
 	assert.Equal(t, stepRecap, d.w.Current())
 	screen := d.screen()
-	assert.Contains(t, screen, "✓ Branches: feat/a · <branches>")
+	assert.Contains(t, screen, "✓ Branches: feat/a\n")
 	assert.Contains(t, screen, "✓ Source branch: main · --from")
 	assert.Contains(t, screen, "✓ Env strategy: main · remembered")
 	assert.Contains(t, screen, "esc cancel")

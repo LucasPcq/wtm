@@ -30,3 +30,9 @@ func TestTheNoteOfARowFollowsItsLastValue(t *testing.T) {
 		})
 	}
 }
+
+func TestAMarkedEnvThatFollowsTheConfigReadsAsTheConfigDefault(t *testing.T) {
+	assert.Equal(t, "config default (example) · will be remembered", EnvValue(EnvValueParams{Strategy: "example", FollowsConfig: true, Mark: WillBeRemembered}))
+	assert.Equal(t, "example · will be remembered", EnvValue(EnvValueParams{Strategy: "example", Mark: WillBeRemembered}))
+	assert.Equal(t, "example", EnvValue(EnvValueParams{Strategy: "example", FollowsConfig: true}))
+}

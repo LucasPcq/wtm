@@ -10,7 +10,7 @@ import (
 
 const (
 	planText    = "Computing the plan…"
-	recapTitle  = "Apply this plan?"
+	recapTitle  = "Confirm"
 	failedTitle = "Cannot apply this plan"
 	reviewTitle = "Review & confirm"
 	staleText   = "the facts changed since the preview"

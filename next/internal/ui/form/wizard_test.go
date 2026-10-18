@@ -26,7 +26,7 @@ func TestEachAskedStepIsEnteredThenTheRecapApplies(t *testing.T) {
 
 	d.keys("down", "enter")
 	screen := d.screen()
-	assert.Contains(t, screen, "Step 3/3 • Apply this plan?")
+	assert.Contains(t, screen, "Step 3/3 • Confirm")
 	assert.Contains(t, screen, "✓ Second: no")
 	assert.Contains(t, screen, "plan: yes, no")
 
@@ -64,14 +64,14 @@ func TestAnErredStepIsAskedEvenWhenAFlagSettledIt(t *testing.T) {
 	assert.Equal(t, 0, d.w.Current())
 }
 
-func TestAKeptDefaultSaysWhereItCameFrom(t *testing.T) {
+func TestAKeptDefaultIsItsValueAlone(t *testing.T) {
 	f := newFake()
 	f.first.standing = Standing{Value: "yes", Origin: domain.OriginConfig}
 	d := open(t, Params{Script: f.script()})
 
 	d.keys("enter")
 
-	assert.Contains(t, d.screen(), "✓ First: yes · config")
+	assert.Contains(t, d.screen(), "✓ First: yes\n")
 }
 
 func TestBackReturnsToTheLastAskedStepAndResetsTheOnesAfter(t *testing.T) {
