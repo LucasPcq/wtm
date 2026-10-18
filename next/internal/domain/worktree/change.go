@@ -148,10 +148,15 @@ type Move struct {
 	SourceLabel string // the source's name in conflict markers
 }
 
-// Refusal is the refusal of the move meeting conflicts: a binary conflict cannot take conflict markers, so it is refused even when the move resolves them, and any conflict is refused when it does not; nil when the move can go on.
-func (m Move) Refusal(conflicts []Conflict) *ConflictRefusal {
+// Refuses reports whether a move meeting conflicts is refused: a binary conflict cannot take conflict markers, so it is refused even when the move resolves them, and any conflict is refused when it does not.
+func Refuses(conflicts []Conflict, resolve bool) bool {
 	binary := slices.ContainsFunc(conflicts, func(c Conflict) bool { return c.Kind == ConflictBinary })
-	if !binary && (len(conflicts) == 0 || m.Resolve) {
+	return binary || len(conflicts) > 0 && !resolve
+}
+
+// Refusal is the refusal of the move meeting conflicts, as Refuses decides it; nil when the move can go on.
+func (m Move) Refusal(conflicts []Conflict) *ConflictRefusal {
+	if !Refuses(conflicts, m.Resolve) {
 		return nil
 	}
 

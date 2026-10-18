@@ -41,12 +41,12 @@ type Request struct {
 
 // The paths of extract's own fields; the questions of a new worktree name theirs in provision.
 const (
-	PathSource     = "source"
-	PathFiles      = "files"
+	pathSource     = "source"
+	pathFiles      = "files"
 	PathTo         = "to"
-	PathFrom       = "from"
-	PathKeep       = "keep"
-	PathOnConflict = "on_conflict"
+	pathFrom       = "from"
+	pathKeep       = "keep"
+	pathOnConflict = "on_conflict"
 )
 
 // Answer is the request with the field at path answered by values, spelled as the field's Answer spells them; the path "remember" answers the fields whose answer is remembered. A value the field cannot take leaves the request as it was.
@@ -55,17 +55,17 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 	next := r
 	var err error
 	switch path {
-	case PathFiles:
+	case pathFiles:
 		next.Files = values
-	case PathSource:
+	case pathSource:
 		next.Source, err = domain.One[string](answer)
 	case PathTo:
 		next.To, err = domain.One[string](answer)
-	case PathFrom:
+	case pathFrom:
 		next.From, err = domain.One[string](answer)
-	case PathOnConflict:
+	case pathOnConflict:
 		next.OnConflict, err = domain.One[OnConflict](answer)
-	case PathKeep:
+	case pathKeep:
 		var yes bool
 		yes, err = domain.Yes(answer)
 		next.Keep = &yes
@@ -83,17 +83,17 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 // Values is the request's answer to the field at path, spelled as Answer takes it; nil when the request leaves the field to its default.
 func (r Request) Values(path string) []string {
 	switch path {
-	case PathFiles:
+	case pathFiles:
 		return r.Files
-	case PathSource:
+	case pathSource:
 		return domain.Spelled(r.Source)
 	case PathTo:
 		return domain.Spelled(r.To)
-	case PathFrom:
+	case pathFrom:
 		return domain.Spelled(r.From)
-	case PathOnConflict:
+	case pathOnConflict:
 		return domain.Spelled(r.OnConflict)
-	case PathKeep:
+	case pathKeep:
 		return domain.Said(r.Keep)
 	}
 
@@ -173,12 +173,12 @@ func (q Questions) Form() domain.Form {
 	source, to := q.Source.Given, q.To.Given
 	fields := []domain.Field{
 		domain.SelectField{
-			FieldSpec: domain.FieldSpec{Path: PathSource, Flag: "<source>", Label: "Source worktree", Help: "Which worktree to extract changes from"},
+			FieldSpec: domain.FieldSpec{Path: pathSource, Flag: "<source>", Label: "Source worktree", Help: "Which worktree to extract changes from"},
 			Value:     source,
 			Options:   q.Source.Options,
 		},
 		domain.MultiSelectField{
-			FieldSpec: domain.FieldSpec{Path: PathFiles, Flag: "--files", Label: "Files", Help: q.filesHelp()},
+			FieldSpec: domain.FieldSpec{Path: pathFiles, Flag: "--files", Label: "Files", Help: q.filesHelp()},
 			Picked:    q.Files.Given,
 			Options:   q.fileOptions(),
 			Empty:     "Select at least one file",
@@ -193,7 +193,7 @@ func (q Questions) Form() domain.Form {
 			Value:     to,
 		},
 		domain.SelectField{
-			FieldSpec:   domain.FieldSpec{Path: PathFrom, Flag: "--from", Label: "Source branch", Help: "Parent branch when creating the target worktree", Origin: q.From.Origin, Skip: q.From.Skip},
+			FieldSpec:   domain.FieldSpec{Path: pathFrom, Flag: "--from", Label: "Source branch", Help: "Parent branch when creating the target worktree", Origin: q.From.Origin, Skip: q.From.Skip},
 			Value:       q.From.Value,
 			Options:     q.From.Options,
 			Pinned:      q.From.Pinned,
@@ -203,14 +203,14 @@ func (q Questions) Form() domain.Form {
 	fields = append(fields, q.Questions.Fields(wording)...)
 	fields = append(fields,
 		domain.ConfirmField{
-			FieldSpec: domain.FieldSpec{Path: PathKeep, Flag: "--keep", Label: "Mode", Help: "Copy instead of move (keep the changes in the source)", Origin: q.Keep.Origin},
+			FieldSpec: domain.FieldSpec{Path: pathKeep, Flag: "--keep", Label: "Mode", Help: "Copy instead of move (keep the changes in the source)", Origin: q.Keep.Origin},
 			Value:     q.Keep.Value,
 			Yes:       domain.Option{Value: "true", Label: "Copy — keep the files in " + source, Short: "copy"},
 			No:        domain.Option{Value: "false", Label: "Move — remove the files from " + source, Short: "move"},
 			NoFirst:   true,
 		},
 		domain.SelectField{
-			FieldSpec: domain.FieldSpec{Path: PathOnConflict, Flag: "--on-conflict", Label: "On conflict", Help: q.conflictHelp(), Origin: q.OnConflict.Origin, Skip: q.OnConflict.Skip},
+			FieldSpec: domain.FieldSpec{Path: pathOnConflict, Flag: "--on-conflict", Label: "On conflict", Help: q.conflictHelp(), Origin: q.OnConflict.Origin, Skip: q.OnConflict.Skip},
 			Value:     string(q.OnConflict.Value),
 			Options: []domain.Option{
 				{Value: string(OnConflictAbort), Label: "Abort — leave both worktrees untouched"},
@@ -429,7 +429,7 @@ func (f Facts) problems(req Request, q Questions) []domain.FieldError {
 
 	problems = append(problems, f.fromProblems(req)...)
 	problems = append(problems, q.Questions.Problems()...)
-	problems = append(problems, domain.OneOf(domain.OneOfParams{Path: PathOnConflict, Value: string(q.OnConflict.Value), Accepted: domain.Names(OnConflicts())})...)
+	problems = append(problems, domain.OneOf(domain.OneOfParams{Path: pathOnConflict, Value: string(q.OnConflict.Value), Accepted: domain.Names(OnConflicts())})...)
 
 	return problems
 }
@@ -437,9 +437,9 @@ func (f Facts) problems(req Request, q Questions) []domain.FieldError {
 func (f Facts) sourceProblems(source string) []domain.FieldError {
 	switch {
 	case source == "":
-		return []domain.FieldError{domain.Required(PathSource)}
+		return []domain.FieldError{domain.Required(pathSource)}
 	case f.CheckedOutAt(source) == "":
-		return []domain.FieldError{{Path: PathSource, Code: domain.CodeNotFound, Template: "{path}: no worktree holds {value}", Params: domain.Params{"value": source}}}
+		return []domain.FieldError{{Path: pathSource, Code: domain.CodeNotFound, Template: "{path}: no worktree holds {value}", Params: domain.Params{"value": source}}}
 	}
 
 	return nil
@@ -451,11 +451,11 @@ func (f Facts) fileProblems(req Request) []domain.FieldError {
 	case f.CheckedOutAt(req.Source) == "":
 		return nil
 	case len(req.Files) == 0:
-		return []domain.FieldError{domain.Required(PathFiles)}
+		return []domain.FieldError{domain.Required(pathFiles)}
 	}
 
 	if _, missed := worktree.SelectChanges(f.Changes[req.Source], req.Files); missed != "" {
-		return []domain.FieldError{{Path: PathFiles, Code: "extract.not_a_change", Template: "{path}: {value} is not an uncommitted change", Params: domain.Params{"value": missed}}}
+		return []domain.FieldError{{Path: pathFiles, Code: "extract.not_a_change", Template: "{path}: {value} is not an uncommitted change", Params: domain.Params{"value": missed}}}
 	}
 
 	return nil
@@ -470,17 +470,17 @@ func (f Facts) fromProblems(req Request) []domain.FieldError {
 		return nil
 	case from == "" && target.Action == ActionCheckOut:
 		return []domain.FieldError{{
-			Path:     PathFrom,
+			Path:     pathFrom,
 			Code:     domain.CodeRequired,
 			Template: "{path} is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)",
 			Params:   domain.Params{"because": "extract.parent_required"},
 		}}
 	case from == "":
-		return []domain.FieldError{{Path: PathFrom, Code: domain.CodeRequired, Template: "{path} is required: no parent is recorded for the source and no base branch is configured"}}
+		return []domain.FieldError{{Path: pathFrom, Code: domain.CodeRequired, Template: "{path} is required: no parent is recorded for the source and no base branch is configured"}}
 	case from == target.Branch:
-		return []domain.FieldError{{Path: PathFrom, Code: domain.CodeSelfParent, Template: "{value} cannot be its own parent: pass another value to {path}", Params: domain.Params{"value": from}, With: []string{PathTo}}}
+		return []domain.FieldError{{Path: pathFrom, Code: domain.CodeSelfParent, Template: "{value} cannot be its own parent: pass another value to {path}", Params: domain.Params{"value": from}, With: []string{PathTo}}}
 	case !f.Candidate(from):
-		return []domain.FieldError{{Path: PathFrom, Code: domain.CodeNotFound, Template: "{path}: {value} not found", Params: domain.Params{"value": from}}}
+		return []domain.FieldError{{Path: pathFrom, Code: domain.CodeNotFound, Template: "{path}: {value} not found", Params: domain.Params{"value": from}}}
 	}
 
 	return nil

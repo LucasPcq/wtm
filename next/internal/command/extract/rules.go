@@ -268,7 +268,7 @@ func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain
 
 // refusedFor is the refusal of the conflicts, nil when there are none or the request resolves them; a binary conflict cannot take conflict markers, so it is refused even then.
 func refusedFor(target string, onConflict OnConflict, conflicts []worktree.Conflict) *domain.Error {
-	if (worktree.Move{Resolve: onConflict == OnConflictResolve}).Refusal(conflicts) == nil {
+	if !worktree.Refuses(conflicts, onConflict == OnConflictResolve) {
 		return nil
 	}
 
