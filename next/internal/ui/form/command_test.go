@@ -2,11 +2,8 @@ package form_test
 
 import (
 	"cmp"
-	"io"
-	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,14 +38,6 @@ func TestARunAsksOnlyWhenTheUserCanSeeTheQuestionsAndAnswerThem(t *testing.T) {
 
 		assert.Equal(t, c.Asks, command.Interactive(), name)
 	}
-}
-
-func bound(t *testing.T, args ...string) (*form.Command[request, questions, outcome], *cobra.Command) {
-	t.Helper()
-	command, cmd := fakeCommand(), &cobra.Command{Use: "fake"}
-	command.Bind(cmd, &uicli.Run{})
-	require.NoError(t, cmd.ParseFlags(args))
-	return command, cmd
 }
 
 func TestEachFieldIsAFlagOfItsKindAndTheSharedFlagsFollow(t *testing.T) {
@@ -95,22 +84,6 @@ func TestAListEntryWithACommaReadsBackAsOneEntry(t *testing.T) {
 	command, cmd := bound(t, argv[2:]...)
 
 	assert.Equal(t, req, command.RequestOf(cmd, nil))
-}
-
-// concluded is how the fake command concludes ran and err, with the given --output, its stdout and the failure it returns.
-func concluded(t *testing.T, format string, ran form.Ran[request, outcome], err error) (string, error) {
-	t.Helper()
-	streams, _, stdout, _ := output.Test()
-	command, cmd := fakeCommand(), &cobra.Command{Use: "fake"}
-	command.Draw = func(w io.Writer, applied outcome, cwd string) {
-		_, _ = io.WriteString(w, "drew "+strings.Join(applied.Plan["branches"], ", ")+" from "+cwd+"\n")
-	}
-	run := &uicli.Run{Command: "fake", Streams: streams, Env: uicli.Env{Cwd: "/repo"}}
-	command.Bind(cmd, run)
-	run.Output = format
-
-	failure := command.Conclude(cmd, ran, err)
-	return stdout.String(), failure
 }
 
 func TestADryRunEndsOnTheLineThatAppliesExactlyItsPlan(t *testing.T) {

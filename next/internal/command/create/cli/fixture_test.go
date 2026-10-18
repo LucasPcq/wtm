@@ -371,3 +371,14 @@ func (enters) Read(p []byte) (int, error) {
 }
 
 func cleanLine(branch string) []string { return []string{"wtm", "clean", branch, "--force"} }
+
+func armedUntilCancelled(ctx context.Context, _ env.HookChain) error {
+	fmt.Println("armed")
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func armedForever(context.Context, env.HookChain) error {
+	fmt.Println("armed")
+	select {}
+}

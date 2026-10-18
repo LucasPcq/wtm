@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
@@ -71,4 +73,21 @@ func start(t *testing.T, s *session, w *form.Wizard) *driver {
 func (d *driver) looksLike(name string) {
 	d.t.Helper()
 	formtest.Golden(d.t, "frame_"+name, d.Screen()+"\n")
+}
+
+// unfinished is the outcome of moving README.md to a new target, ended as item.
+func unfinished(item extract.Item) extract.Outcome {
+	plan := extract.Plan{
+		Source: "feat/login",
+		Files:  []worktree.Change{{Path: "README.md", Status: worktree.ChangeModified}},
+		Target: extract.Target{Branch: item.Subject, Action: extract.ActionCreate},
+		From:   "main",
+	}
+	return extract.Outcome{Plan: plan, Result: &extract.Result{Items: []extract.Item{item}}}
+}
+
+func drawn(outcome extract.Outcome) string {
+	var out bytes.Buffer
+	drawOutcome(&out, outcome, "/repo")
+	return out.String()
 }
