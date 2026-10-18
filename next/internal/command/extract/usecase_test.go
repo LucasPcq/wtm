@@ -441,3 +441,30 @@ func TestTheConfigDefaultIsRememberedAsSuchOnceTheTargetIsCreated(t *testing.T) 
 	assert.Equal(t, project.EnvExample, recorded.EnvStrategy)
 	assert.Contains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), `env_strategy = "config"`)
 }
+
+func TestAnApplyReportsTheTargetAsItsOneItem(t *testing.T) {
+	cases := []struct {
+		name   string
+		ctx    func(t *testing.T) context.Context
+		status domain.Status
+	}{
+		{name: "done", ctx: func(t *testing.T) context.Context { return t.Context() }, status: domain.StatusDone},
+		{name: "cancelledFirst", ctx: func(t *testing.T) context.Context {
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+			return ctx
+		}, status: domain.StatusSkipped},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newWorld(t, seed{})
+			w.change(t, source, "a.txt", "a\n")
+			planned, _ := w.plan(t, moving("a.txt"))
+
+			result := w.usecase.Apply(tc.ctx(t), planned, func(domain.Event) {})
+
+			require.Len(t, result.Items, 1)
+			assert.Equal(t, tc.status, result.Items[0].Status)
+		})
+	}
+}

@@ -95,7 +95,10 @@ func drawNothing(w io.Writer, plan extract.Plan) {
 
 // drawOutcome draws what the apply did: the files moved or the conflicts left to resolve, where the source and the target stand, the anomalies, and the next step; an unfinished target is drawn by drawUnfinished.
 func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
-	item := outcome.Result.Items[0]
+	item, ok := targetOf(outcome)
+	if !ok {
+		return
+	}
 	if item.Status != domain.StatusDone {
 		drawUnfinished(w, outcome, cwd)
 		return
@@ -183,7 +186,7 @@ func sourceNote(kept bool) string {
 
 // anomaliesOf are what the reader should act on: the warnings of the run and of the target, and the env ports left alone.
 func anomaliesOf(outcome extract.Outcome) []string {
-	item := outcome.Result.Items[0]
+	item, _ := targetOf(outcome)
 	anomalies := append(output.Messages(outcome.Warnings), output.Messages(item.Warnings)...)
 
 	if item.Detail == nil {
@@ -195,7 +198,7 @@ func anomaliesOf(outcome extract.Outcome) []string {
 
 // drawUnfinished draws a target that failed, was skipped or was cancelled: why, where its worktree stands if it does, and the command that repairs what it left behind.
 func drawUnfinished(w io.Writer, outcome extract.Outcome, cwd string) {
-	item := outcome.Result.Items[0]
+	item, _ := targetOf(outcome)
 	output.UnfinishedLine(w, output.Unfinished{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err})
 
 	if item.Detail != nil {
@@ -211,4 +214,13 @@ func drawUnfinished(w io.Writer, outcome extract.Outcome, cwd string) {
 
 	output.Blank(w)
 	output.NextSteps(w, next)
+}
+
+// targetOf is the one item of an applied outcome, the target's; false when the outcome holds none.
+func targetOf(outcome extract.Outcome) (extract.Item, bool) {
+	if outcome.Result == nil || len(outcome.Result.Items) == 0 {
+		return extract.Item{}, false
+	}
+
+	return outcome.Result.Items[0], true
 }
