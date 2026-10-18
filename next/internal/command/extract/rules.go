@@ -341,9 +341,10 @@ func (f Facts) ignored(req Request, target Target) []domain.Warning {
 	return warnings
 }
 
+// fastForwarded is the branch the apply fast-forwards: the one the target starts from, behind origin and asked to, unless the source's own, whose worktree holds the changes and so is never clean.
 func (f Facts) fastForwarded(req Request) []string {
 	subject := f.subjectAt(req, worktree.Behind)
-	if req.FastForward == nil || !*req.FastForward || subject == "" {
+	if req.FastForward == nil || !*req.FastForward || subject == "" || subject == req.Source {
 		return nil
 	}
 

@@ -240,6 +240,20 @@ func TestAMoveRefusedSinceThePlanIsAConflictOfTheRun(t *testing.T) {
 	assert.Equal(t, "source\n", readFile(t, filepath.Join(w.at(source), "a.txt")))
 }
 
+func TestTheSourcesOwnBranchIsNeverFastForwarded(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+	behindOrigin(t, w, source)
+	req := extract.Request{Source: source, Files: []string{"a.txt"}, To: split, From: source, Given: provision.Given{FastForward: new(true)}}
+
+	planned, _ := w.plan(t, req)
+	questions, err := w.usecase.Questions(t.Context(), req)
+
+	require.NoError(t, err)
+	assert.Empty(t, planned.FastForward)
+	assert.Equal(t, "nothing to fast-forward: feat/login holds the changes being extracted", questions.FastForward.Skip)
+}
+
 func TestARefTheApplyFastForwardsIsCheckedForConflictsAsOriginHasIt(t *testing.T) {
 	w := newWorld(t, seed{Behind: true})
 	w.change(t, source, "a.txt", "a\n")

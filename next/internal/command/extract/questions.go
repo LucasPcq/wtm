@@ -350,6 +350,8 @@ func (f Facts) newWorktree(req Request) provision.Questions {
 	switch {
 	case f.existing(req):
 		params.Exists = existingSkip
+	case behind != "" && behind == req.Source:
+		params.Held = "nothing to fast-forward: " + behind + " holds the changes being extracted"
 	case behind != "":
 		params.Behind = []string{behind}
 	}

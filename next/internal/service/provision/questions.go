@@ -1,6 +1,7 @@
 package provision
 
 import (
+	"cmp"
 	"slices"
 	"strconv"
 	"strings"
@@ -103,6 +104,7 @@ type QuestionsParams struct {
 	Repository worktree.Repository
 	Exists     string
 	Behind     []string
+	Held       string // why a branch behind origin is not fast-forwarded all the same, set by the command
 	Many       bool
 }
 
@@ -185,7 +187,7 @@ func isolationAnswer(remembered project.Isolation, run project.Run) domain.Answe
 // fastForward is the question whether to fast-forward the source first: the request's answer, none while the question is skipped, else the remembered one, else no.
 func fastForward(params QuestionsParams) domain.Confirm {
 	remembered := params.Repository.Config.Remembered[project.RememberSourceUpdate]
-	question := domain.Confirm{Skip: params.Exists}
+	question := domain.Confirm{Skip: cmp.Or(params.Exists, params.Held)}
 	if question.Skip == "" && len(params.Behind) == 0 {
 		question.Skip = notBehind
 	}
