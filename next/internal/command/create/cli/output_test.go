@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"strings"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -34,6 +35,16 @@ func TestAnAppliedRunMarksOnlyTheAnswersItRemembered(t *testing.T) {
 	assert.Contains(t, written, "Isolation     isolated · saved for next runs\n")
 	assert.Contains(t, written, "Fast-forward  keep as-is · saved for next runs\n")
 	assert.NotContains(t, written, "Remember")
+}
+
+func TestADivergedBranchIsWarnedOnce(t *testing.T) {
+	outcome := twoCreated(trees)
+	outcome.Result.Items[0].Detail.Standing = worktree.Standing{ExistingBranch: true, OriginState: worktree.Diverged, OriginAhead: 1, OriginBehind: 1}
+	outcome.Warnings = []domain.Warning{{Code: "create.source_diverged", Message: "branch feat/a has diverged from origin (1 ahead, 1 behind) and can't be fast-forwarded"}}
+
+	text := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, nil, cwd) })
+
+	assert.Equal(t, 1, strings.Count(text, "diverged"), text)
 }
 
 func TestAMixedRunNamesEachAnomalyAndEachUnfinishedBranch(t *testing.T) {

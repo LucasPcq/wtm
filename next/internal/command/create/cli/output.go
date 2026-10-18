@@ -76,16 +76,15 @@ func itemNote(item create.Item, st *output.Styles) string {
 	return output.MutedNote(output.SettlementNote(item.Detail.EnvPorts), st)
 }
 
-// anomaliesOf are what the reader of an item should act on: a branch checked out behind or diverged from origin, the env ports left alone.
+// anomaliesOf are what the reader of an item should act on: a branch checked out behind origin, the env ports left alone.
 func anomaliesOf(item create.Item) []string {
 	var anomalies []string
 	standing := item.Detail.Standing
 	switch standing.OriginState {
 	case worktree.Behind:
 		anomalies = append(anomalies, fmt.Sprintf("%s is %d commit(s) behind origin — the worktree starts from your local branch.", item.Subject, standing.OriginBehind))
-	case worktree.Diverged:
-		anomalies = append(anomalies, fmt.Sprintf("%s has diverged from origin (%d ahead, %d behind) — the worktree starts from your local branch, missing commits that are on origin.", item.Subject, standing.OriginAhead, standing.OriginBehind))
-	case worktree.NoOrigin, worktree.UpToDate, worktree.Ahead:
+	// A diverged branch is the plan's create.source_diverged warning already.
+	case worktree.Diverged, worktree.NoOrigin, worktree.UpToDate, worktree.Ahead:
 	}
 
 	return append(anomalies, output.PortAnomalies(item.Detail.EnvPorts)...)
