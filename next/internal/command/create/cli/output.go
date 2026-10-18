@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
@@ -156,45 +155,14 @@ func stands(item create.Item) bool {
 	return item.Status == domain.StatusDone || item.Reason == domain.ReasonIncomplete
 }
 
-// headline is the tally of the items by status, in the colour of the worst.
+// headline is the tally of the items by status.
 func headline(w io.Writer, items []create.Item) {
-	if len(items) == 0 {
-		output.UnchangedLine(w, commandName+": "+output.NothingToDo)
-		return
-	}
-
-	count := map[string]int{}
+	tallied := make([]output.Tallied, 0, len(items))
 	for _, item := range items {
-		count[tallyKey(item)]++
+		tallied = append(tallied, output.Tallied{Status: item.Status, Reason: item.Reason})
 	}
 
-	var parts []string
-	for _, key := range []string{"done", "unchanged", "failed", "skipped", "cancelled"} {
-		if count[key] > 0 {
-			parts = append(parts, strconv.Itoa(count[key])+" "+key)
-		}
-	}
-
-	line := commandName + ": " + strings.Join(parts, output.Dot)
-	switch {
-	case count["failed"] > 0:
-		output.ErrorLine(w, line)
-	case count["skipped"]+count["cancelled"] > 0:
-		output.WarningLine(w, line)
-	case count["done"] == 0:
-		output.UnchangedLine(w, line)
-	default:
-		output.SuccessLine(w, line)
-	}
-}
-
-// tallyKey is the column of the tally an item counts in: a worktree already open counts as unchanged, not done.
-func tallyKey(item create.Item) string {
-	if item.Status == domain.StatusDone && item.Reason == domain.ReasonUnchanged {
-		return "unchanged"
-	}
-
-	return string(item.Status)
+	output.Tally(w, output.TallyParams{Command: commandName, Items: tallied})
 }
 
 // planTextOf is the plan as the wizard's recap shows it, in width columns.
