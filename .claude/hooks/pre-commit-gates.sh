@@ -6,8 +6,9 @@
 # earlier in the session, and treated as still true six commits later. A hook
 # cannot forget.
 #
-# It runs `make lint` (fmt, vet, archlint, deadcode, staticcheck — about two
-# seconds) and the tidy check that the CI runs first. It does NOT run the test
+# It runs `make lint` (fmt, vet, archlint, deadcode, staticcheck), or
+# `make lint-next` when the commit leaves internal/, the root package and
+# go.mod alone, and the tidy check that the CI runs first. It does NOT run the test
 # suite: at ~70s that would be a gate people disable. Tests are the CI's job and
 # the build-validator subagent's.
 #
@@ -72,6 +73,11 @@ if ! diff -q "$tidy/go.mod" go.mod >/dev/null || ! diff -q "$tidy/go.sum" go.sum
     "\`go mod tidy\` changed them and the change has been applied. Stage it and commit again."
 fi
 
-if ! output=$(make lint 2>&1); then
-  fail "make lint failed" "$output"
+# A commit that leaves the frozen internal/, the root package and the module
+# files alone cannot change their verdict: it pays only for next/ and tools/.
+changed=$( { git diff --name-only HEAD; git ls-files --others --exclude-standard; } 2>/dev/null)
+lint=lint
+grep -qE '^(internal/|[^/]+\.go$|go\.(mod|sum)$)' <<<"$changed" || lint=lint-next
+if ! output=$(make "$lint" 2>&1); then
+  fail "make $lint failed" "$output"
 fi

@@ -158,8 +158,10 @@ Every commit message — subject and body — is in English, whatever language t
 
 ```
 make lint          # fmt + vet + arch (tools/archlint) + dead (deadcode) + sumtype (go-sumtype) + next-lint (revive on next/) + staticcheck — all gating
+make lint-next     # the same gates over next/ and tools/ only (archlint whole), for a change that leaves internal/, the root package and go.mod alone
 make next          # build bin/wtm-next, the next/ pilot
 make test          # go test ./... -race -count=1
+make test-next     # go test ./next/... ./tools/... -race -count=1
 make docs          # regenerate docs/ from the Cobra tree
 make demos         # re-record the README GIFs and stills (needs vhs)
 make release-notes VERSION=x.y.z   # print a CHANGELOG section as release notes
@@ -168,7 +170,7 @@ make dupl          # clone report, informative only
 
 - Tests of `infra/fs`, `store/`, the `statefile` packages and the `rules/` sub-packages use testify (`assert`, `require`); each test file holds only `Test…` functions, the example and fakes in `fixture_test.go`, shared helpers in `helpers_test.go`. The rest of the repository keeps stdlib `testing`.
 - A new architectural rule goes into `tools/archlint`, not into a paragraph here. `.archlint-migrating` and `.deadcode-ignore` may only shrink; a new entry needs a stated reason. See `docs/dev/lint.md`.
-- `.claude/hooks/pre-commit-gates.sh` runs `make lint` and a `go mod tidy` check on every `git commit` and blocks it on failure. It does not run the tests. `WTM_SKIP_GATES=1 git commit …` only when the gate itself is wrong.
+- `.claude/hooks/pre-commit-gates.sh` runs `make lint` (`make lint-next` when the commit leaves `internal/`, the root package and `go.mod` alone) and a `go mod tidy` check on every `git commit` and blocks it on failure. It does not run the tests. `build-validator` scopes its lint and tests the same way against the branch's base. `WTM_SKIP_GATES=1 git commit …` only when the gate itself is wrong.
 - **Invoke the `build-validator` subagent before marking any task done** — it adds the `-race` test suite, dependency hygiene and the duplication report.
 - **See it run before calling it done** — the `wtm-sandbox` skill drives the built binary in an isolated sandbox (tmux, VHS). **Open a PR with the `open-pr` skill**: base from `wtm tree`, that proof attached, the short body template.
 - **Several issues at once** — the `orchestrate` skill makes this session the orchestrator: one wtm worktree and one Claude worker per Linear issue in herdr panes, product questions relayed to the user, PRs verified before they are reported.
