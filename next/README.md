@@ -36,7 +36,7 @@ internal/
 ```
 No file format lives in `domain/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `domain/project`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
 
-A use case reads in one place. `command/<name>/usecase.go` tells the whole request top to bottom in `Run`: begin the operation (`service/operation`), plan under its locks, fingerprint, stop on a dry run, refuse a stale plan, apply between the started and finished events; then `Plan` (observe what the repository holds, settle the request on it, decide), `Apply` and `Questions` when it asks. `rules.go` holds what it observes and decides from, pure; `questions.go` its form, the schema of its fields (labels, help, flags, options) and validation; `port.go` the interfaces it reaches the world through. A service is concrete and called directly; a port is an interface, for the outside world only. A package is split only when it passes about 1,000 lines and a seam is natural.
+A use case reads in one place. `command/<name>/usecase.go` tells the whole request top to bottom in `Run`: begin the operation (`service/operation`), plan under its locks, fingerprint, stop on a dry run, refuse a stale plan, apply between the started and finished events; then `Plan` (observe what the repository holds, settle the request on it, decide), `Apply` and `Questions` when it asks. `rules.go` holds what it observes and decides from, pure; `questions.go` its form, the schema of its fields (labels, help, flags, options) and validation; `port.go` the interfaces it reaches the world through. The root of a command holds these four files, their tests and `cli/`, nothing else (archlint, rule `slicefiles`). A service is concrete and called directly; a port is an interface, for the outside world only. A package is split only when it passes about 1,000 lines and a seam is natural.
 
 ## Import rules
 
@@ -61,7 +61,9 @@ A package in no row is refused: the root of `next/`, a second `cmd/<name>`, anyt
 
 A code a command declares starts with its `Name` and a dot (`create.path_exists`); a code several commands share is a `domain` constant (archlint, rule `codeprefix`).
 
-A use case or a service declares the interfaces it needs in its `port.go`; an adapter exports a concrete type that satisfies them, checked by the compiler in `cmd/wtm-next`.
+Only the edges read the environment: `ui/cli` once (`ReadEnv`), `ui/output` the terminal, `cmd/wtm-next` `$WTM_STATE_DIR`, an adapter what its own tool needs; never a domain package, a service or a command, which take the value as an input (archlint, rule `envread`).
+
+A use case or a service declares the ports it needs in its `port.go`, interface types and function types only (archlint, rule `portfile`); an adapter exports a concrete type that satisfies them, checked by the compiler in `cmd/wtm-next`.
 
 ## Reading a command
 

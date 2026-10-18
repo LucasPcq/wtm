@@ -329,7 +329,7 @@ func TestDecidingABranchWhoseFolderWasNeverLocatedIsAProgrammingError(t *testing
 func TestEachFieldOfTheFormAnswersTheRequestBack(t *testing.T) {
 	cases := map[string]create.Request{
 		"defaults": {Branches: []string{branchName}},
-		"every field given": {
+		"every_field": {
 			Branches:    []string{branchName, "feat/two"},
 			From:        "main",
 			Given:       provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(true), Remember: []string{"isolation", "env_from", "isolation", "fast_forward"}},
@@ -370,10 +370,10 @@ func TestAnAnswerTheRequestCannotTakeIsRefusedAndChangesNothing(t *testing.T) {
 		values []string
 		code   string
 	}{
-		"an unknown field":             {"files", []string{"a"}, domain.CodeUnknown},
-		"an unknown field, two values": {"typo", []string{"a", "b"}, domain.CodeUnknown},
-		"two values for one":           {"from", []string{"main", "dev"}, domain.CodeOneValue},
-		"a confirmation unspelt":       {"fast_forward", []string{"yes"}, domain.CodeOneOf},
+		"unknown_field":            {"files", []string{"a"}, domain.CodeUnknown},
+		"unknown_field_two_values": {"typo", []string{"a", "b"}, domain.CodeUnknown},
+		"two_values_for_one":       {"from", []string{"main", "dev"}, domain.CodeOneValue},
+		"confirmation_misspelt":    {"fast_forward", []string{"yes"}, domain.CodeOneOf},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

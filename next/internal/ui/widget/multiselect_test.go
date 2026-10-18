@@ -7,7 +7,7 @@ import (
 )
 
 func TestSpaceTogglesTheRowUnderTheCursor(t *testing.T) {
-	m := NewMultiSelect(MultiSelectParams{Options: picks()})
+	m := NewMultiSelect(picks(), "")
 
 	pressed(m, "space", "down", "down", "space", "space", "up", "space")
 
@@ -15,7 +15,7 @@ func TestSpaceTogglesTheRowUnderTheCursor(t *testing.T) {
 }
 
 func TestAPicksEveryShownRow(t *testing.T) {
-	m := NewMultiSelect(MultiSelectParams{Options: picks()})
+	m := NewMultiSelect(picks(), "")
 
 	pressed(m, "a")
 
@@ -23,7 +23,7 @@ func TestAPicksEveryShownRow(t *testing.T) {
 }
 
 func TestAFilterNarrowsWhatAPicks(t *testing.T) {
-	m := NewMultiSelect(MultiSelectParams{Options: picks()})
+	m := NewMultiSelect(picks(), "")
 
 	pressed(m, "/", "t", "x", "t", "esc", "a")
 
@@ -34,7 +34,7 @@ func TestAFilterNarrowsWhatAPicks(t *testing.T) {
 }
 
 func TestEnterRefusesAnEmptySelectionWithTheCallersMessage(t *testing.T) {
-	m := NewMultiSelect(MultiSelectParams{Options: picks(), Empty: "Pick at least one file"})
+	m := NewMultiSelect(picks(), "Pick at least one file")
 
 	assert.Equal(t, Stay, pressed(m, "enter"))
 	assert.Contains(t, plain(m.View(Size{Width: 40}, plainStyles())), "✗ Pick at least one file")
@@ -44,13 +44,13 @@ func TestEnterRefusesAnEmptySelectionWithTheCallersMessage(t *testing.T) {
 }
 
 func TestEscGoesBack(t *testing.T) {
-	m := NewMultiSelect(MultiSelectParams{Options: picks()})
+	m := NewMultiSelect(picks(), "")
 
 	assert.Equal(t, Back, pressed(m, "esc"))
 }
 
 func TestTheViewMarksEachPickAndItsTag(t *testing.T) {
-	m := NewMultiSelect(MultiSelectParams{Options: picks()})
+	m := NewMultiSelect(picks(), "")
 	pressed(m, "down", "space")
 
 	assert.Equal(t, "   [ ] a.txt                  modified\n▌› [x] b.txt                 untracked\n   [ ] notes.md", plain(m.View(Size{Width: 40}, plainStyles())))
@@ -60,7 +60,7 @@ func TestTheViewMarksEachPickAndItsTag(t *testing.T) {
 }
 
 func TestTheViewScrollsToTheCursor(t *testing.T) {
-	m := NewMultiSelect(MultiSelectParams{Options: picks()})
+	m := NewMultiSelect(picks(), "")
 	pressed(m, "down", "down")
 
 	assert.Equal(t, "   [ ] b.txt                 untracked\n▌› [ ] notes.md", plain(m.View(Size{Width: 40, Height: 2}, plainStyles())))

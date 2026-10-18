@@ -149,25 +149,25 @@ func TestTheFakeAndGitRefuseTheSameRemoteChanges(t *testing.T) {
 		name string
 		call func(t *testing.T, impl implementation) error
 	}{
-		{name: "fetching a branch the remote lacks", call: func(t *testing.T, impl implementation) error {
+		{name: "fetch_missing_remote_branch", call: func(t *testing.T, impl implementation) error {
 			return impl.port.FetchRef(t.Context(), "nope")
 		}},
-		{name: "fast-forwarding a branch checked out", call: func(t *testing.T, impl implementation) error {
+		{name: "fast_forward_checked_out", call: func(t *testing.T, impl implementation) error {
 			err := impl.port.FastForwardRef(t.Context(), "main")
 			return err
 		}},
-		{name: "merging onto an unknown ref", call: func(t *testing.T, impl implementation) error {
+		{name: "merge_unknown_ref", call: func(t *testing.T, impl implementation) error {
 			err := impl.port.MergeFFOnly(t.Context(), worktree.Merge{Path: filepath.Join(impl.root, "main"), Onto: worktree.RemoteBranch{Name: "nope"}})
 			return err
 		}},
-		{name: "merging what is not a fast-forward", call: func(t *testing.T, impl implementation) error {
+		{name: "merge_not_fast_forward", call: func(t *testing.T, impl implementation) error {
 			err := impl.port.MergeFFOnly(t.Context(), worktree.Merge{Path: filepath.Join(impl.root, "linked"), Onto: worktree.LocalBranch{Name: "unmerged"}})
 			return err
 		}},
 	}
 	for _, impl := range implementations(t) {
 		for _, refusal := range refusals {
-			t.Run(impl.name+": "+refusal.name, func(t *testing.T) {
+			t.Run(impl.name+"_"+refusal.name, func(t *testing.T) {
 				before := gittest.StateOf(t, impl.port)
 
 				err := refusal.call(t, impl)

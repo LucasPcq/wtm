@@ -7,16 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/ui/form"
-	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 )
-
-// asking opens the wizard of the fake command on the step at, every step before it given.
-func asking(t *testing.T, a *app, given request) (*formtest.Driver, *form.Session[request, questions, outcome]) {
-	t.Helper()
-	s := fakeCommand().Session(t.Context(), form.SessionParams[request, questions, outcome]{App: a, Request: given})
-	return start(form.New(t.Context(), s.Params())), s
-}
 
 func TestATextListBadgesItsEntriesAndRefusesOneAsItIsAdded(t *testing.T) {
 	d, s := asking(t, &app{}, nil)

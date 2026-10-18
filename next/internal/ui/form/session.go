@@ -34,16 +34,9 @@ type stepAnswer struct {
 	on       bool
 }
 
-// SessionParams is what a session asks: the use case it calls, the request as given, and the options of its runs (DryRun, CorrelationID and Report; the session sets the surface and the fingerprint).
-type SessionParams[R, Q, O any] struct {
-	App     UseCase[R, Q, O]
-	Request R
-	Options domain.RunOptions
-}
-
-// Session returns the session of params, a step per field of the command's form: the command's own where Special gives one, else the step of the field's kind.
-func (c *Command[R, Q, O]) Session(ctx context.Context, params SessionParams[R, Q, O]) *Session[R, Q, O] {
-	s := &Session[R, Q, O]{ctx: ctx, command: c, app: params.App, given: params.Request, req: params.Request, opts: params.Options, answers: map[int]stepAnswer{}, form: c.schema()}
+// Session returns a session that asks app the request req as given, under opts (DryRun, CorrelationID and Report; the session sets the surface and the fingerprint), with a step per field of the command's form: the command's own where Special gives one, else the step of the field's kind.
+func (c *Command[R, Q, O]) Session(ctx context.Context, app UseCase[R, Q, O], req R, opts domain.RunOptions) *Session[R, Q, O] {
+	s := &Session[R, Q, O]{ctx: ctx, command: c, app: app, given: req, req: req, opts: opts, answers: map[int]stepAnswer{}, form: c.schema()}
 
 	for at, field := range s.form.Fields {
 		var step Step
@@ -59,8 +52,8 @@ func (c *Command[R, Q, O]) Session(ctx context.Context, params SessionParams[R, 
 	return s
 }
 
-// Params is what the wizard walks: the steps, and how the session observes, previews, draws, labels and applies.
-func (s *Session[R, Q, O]) Params() Params {
+// Script is what the wizard walks: the steps, how the session observes, previews, draws, labels and applies, and whether it is a dry run.
+func (s *Session[R, Q, O]) Script() Script {
 	script := Script{
 		Steps:   s.steps,
 		Observe: s.observe,
@@ -69,12 +62,13 @@ func (s *Session[R, Q, O]) Params() Params {
 		Label:   s.Label,
 		Apply:   s.apply,
 		Stale:   domain.PlanStale,
+		DryRun:  s.opts.DryRun,
 	}
 	if s.command.ApplyLabel != nil {
 		script.ApplyLabel = func() string { return s.command.ApplyLabel(*s.preview) }
 	}
 
-	return Params{Script: script, DryRun: s.opts.DryRun}
+	return script
 }
 
 // ----------------------------------------------------------------------------

@@ -33,7 +33,7 @@ type Ran struct {
 
 // Contract checks the contract on the Subject that subject returns, a new one for each check, wired to the operations service it is given.
 func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Subject) {
-	t.Run("a dry run takes no lock and publishes nothing", func(t *testing.T) {
+	t.Run("dry_run_no_lock_no_event", func(t *testing.T) {
 		rec := &recorder{}
 		run := subject(t, rec.service()).Run
 		reported := &events{}
@@ -47,7 +47,7 @@ func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Su
 		assert.Empty(t, reported.list)
 	})
 
-	t.Run("a stale plan is refused before any event", func(t *testing.T) {
+	t.Run("stale_plan_refused_before_events", func(t *testing.T) {
 		rec := &recorder{}
 		s := subject(t, rec.service())
 		preview, err := s.Run(t.Context(), domain.RunOptions{DryRun: true})
@@ -63,7 +63,7 @@ func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Su
 		assert.True(t, rec.released(), "a lock is still held")
 	})
 
-	t.Run("events arrive in order and every unit started finishes", func(t *testing.T) {
+	t.Run("events_in_order", func(t *testing.T) {
 		rec := &recorder{}
 		run := subject(t, rec.service()).Run
 		reported := &events{}
@@ -71,10 +71,10 @@ func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Su
 		_, err := run(t.Context(), domain.RunOptions{Surface: "cli", Report: reported.add})
 
 		require.NoError(t, err)
-		inOrder(t, inOrderParams{Recorder: rec, Reported: reported.list, OK: true})
+		inOrder(t, rec, reported.list, true)
 	})
 
-	t.Run("the correlation ID of the options reaches the record and every event", func(t *testing.T) {
+	t.Run("correlation_id_recorded", func(t *testing.T) {
 		rec := &recorder{}
 		run := subject(t, rec.service()).Run
 
@@ -88,7 +88,7 @@ func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Su
 		}
 	})
 
-	t.Run("an invalid correlation ID is refused before any lock or event", func(t *testing.T) {
+	t.Run("invalid_correlation_id_refused", func(t *testing.T) {
 		rec := &recorder{}
 		run := subject(t, rec.service()).Run
 		reported := &events{}
@@ -104,7 +104,7 @@ func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Su
 		assert.Empty(t, reported.list)
 	})
 
-	t.Run("a failed apply still finishes every unit it started", func(t *testing.T) {
+	t.Run("failed_apply_finishes_units", func(t *testing.T) {
 		rec := &recorder{}
 		s := subject(t, rec.service())
 		s.Fail(t)
@@ -113,29 +113,23 @@ func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Su
 		_, err := s.Run(t.Context(), domain.RunOptions{Surface: "cli", Report: reported.add})
 
 		require.NoError(t, err, "a failure during the apply is in the outcome, not a refusal")
-		inOrder(t, inOrderParams{Recorder: rec, Reported: reported.list, OK: false})
+		inOrder(t, rec, reported.list, false)
 	})
 }
 
-type inOrderParams struct {
-	Recorder *recorder
-	Reported []domain.Event
-	OK       bool // whether the operation finished OK
-}
-
-// inOrder checks the events of an apply: published as reported, opened by OperationStarted, closed by OperationFinished, with every unit and phase started finished in between, and the locks released.
-func inOrder(t *testing.T, p inOrderParams) {
+// inOrder checks the events of an apply: published as reported, opened by OperationStarted, closed by OperationFinished OK or not, with every unit and phase started finished in between, and the locks released.
+func inOrder(t *testing.T, rec *recorder, reported []domain.Event, wantOK bool) {
 	t.Helper()
-	published := p.Recorder.published.list
+	published := rec.published.list
 	require.NotEmpty(t, published, "the run published no event")
 	assert.IsType(t, domain.OperationStarted{}, published[0])
 	finished, ok := published[len(published)-1].(domain.OperationFinished)
 	require.True(t, ok, "the last event is %T, want domain.OperationFinished", published[len(published)-1])
-	assert.Equal(t, p.OK, finished.OK, "OperationFinished.OK (code %q)", finished.Code)
-	assert.Equal(t, published, p.Reported)
+	assert.Equal(t, wantOK, finished.OK, "OperationFinished.OK (code %q)", finished.Code)
+	assert.Equal(t, published, reported)
 	assert.True(t, slices.ContainsFunc(published, func(e domain.Event) bool { _, ok := e.(domain.UnitStarted); return ok }), "no unit started: nothing to check the order of")
 	assert.Empty(t, unfinished(published))
-	assert.True(t, p.Recorder.released(), "a lock is still held")
+	assert.True(t, rec.released(), "a lock is still held")
 }
 
 // unfinished names the units and phases started in events and not finished after.

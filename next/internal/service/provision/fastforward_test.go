@@ -6,6 +6,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,7 +56,7 @@ func TestASourceWorktreeStoppedInARebaseIsLeftWhereItIs(t *testing.T) {
 }
 
 func TestAFastForwardThatFailsCarriesItsCause(t *testing.T) {
-	for name, seed := range map[string]upstreamSeed{"without worktree": {}, "in its worktree": {Linked: true}} {
+	for name, seed := range map[string]upstreamSeed{"without_worktree": {}, "in_worktree": {Linked: true}} {
 		t.Run(name, func(t *testing.T) {
 			u := behindOrigin(t, seed)
 			before := gittest.Output(t, u.main, "rev-parse", existing)
@@ -76,15 +77,15 @@ func TestEachSubjectIsFastForwardedBetweenItsPhaseEventsAndOnlyThoseLeftBehindAr
 		missed []provision.Missed
 	}{
 		"moved":      {upstreamSeed{}, nil},
-		"left dirty": {upstreamSeed{Linked: true, Dirty: true}, []provision.Missed{{Subject: existing, FastForwarded: provision.FastForwarded{Dirty: true}}}},
-		"left busy":  {upstreamSeed{Linked: true, Rebasing: true}, []provision.Missed{{Subject: existing, FastForwarded: provision.FastForwarded{Busy: true}}}},
+		"left_dirty": {upstreamSeed{Linked: true, Dirty: true}, []provision.Missed{{Subject: existing, FastForwarded: provision.FastForwarded{Dirty: true}}}},
+		"left_busy":  {upstreamSeed{Linked: true, Rebasing: true}, []provision.Missed{{Subject: existing, FastForwarded: provision.FastForwarded{Busy: true}}}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			u := behindOrigin(t, c.seed)
 			report := &recorder{}
 
-			missed := u.service.FastForwardEach(t.Context(), provision.FastForwardEachParams{Subjects: []string{existing}, Snapshot: u.snapshotOf(), Report: report.add})
+			missed := u.service.FastForwardEach(t.Context(), []string{existing}, u.snapshotOf(), report.add)
 
 			assert.Equal(t, c.missed, missed)
 			assert.Equal(t, []domain.Event{
@@ -102,7 +103,7 @@ func TestNoSubjectIsFastForwardedOnceCancelled(t *testing.T) {
 	cancel()
 	report := &recorder{}
 
-	missed := u.service.FastForwardEach(ctx, provision.FastForwardEachParams{Subjects: []string{existing}, Report: report.add})
+	missed := u.service.FastForwardEach(ctx, []string{existing}, worktree.Snapshot{}, report.add)
 
 	assert.Empty(t, missed)
 	assert.Empty(t, report.all())

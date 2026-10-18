@@ -277,8 +277,8 @@ type AskParams[R, Q, O any] struct {
 
 // Ask runs the wizard on the terminal through to the apply; it returns the request as answered and its outcome, with [Run]'s error: a cancel, a failed read of the repository, or the refusal of the run.
 func (c *Command[R, Q, O]) Ask(ctx context.Context, params AskParams[R, Q, O]) (Ran[R, O], error) {
-	s := c.Session(ctx, SessionParams[R, Q, O]{App: params.App, Request: params.Request, Options: params.Options})
-	err := Run(ctx, s.Params(), params.In, params.Out)
+	s := c.Session(ctx, params.App, params.Request, params.Options)
+	err := Run(ctx, s.Script(), params.In, params.Out)
 
 	return Ran[R, O]{Outcome: s.outcome, Request: s.req}, err
 }

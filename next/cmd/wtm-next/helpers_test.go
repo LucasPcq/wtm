@@ -1,8 +1,12 @@
 package main
 
 import (
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
@@ -27,4 +31,21 @@ func command(t *testing.T, name string) api.Command {
 	found, ok := catalogue().Find(name)
 	require.True(t, ok, name)
 	return found
+}
+
+// registeredCommands reads main.go for the commands it registers: each command/<name>/cli it imports, which Go refuses unused.
+func registeredCommands(t *testing.T) []string {
+	t.Helper()
+	file, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, parser.ImportsOnly)
+	require.NoError(t, err)
+	var names []string
+	for _, spec := range file.Imports {
+		path, err := strconv.Unquote(spec.Path.Value)
+		require.NoError(t, err)
+		name, ok := strings.CutPrefix(path, commandPrefix)
+		if name, isCLI := strings.CutSuffix(name, "/cli"); ok && isCLI {
+			names = append(names, name)
+		}
+	}
+	return names
 }

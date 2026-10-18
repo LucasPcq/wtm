@@ -1,0 +1,104 @@
+-- github.com/LucasPcq/wtm/next/internal/service/provision/provision.go --
+// Package provision makes a worktree whole.
+package provision
+
+import (
+	"os"
+	sys "os"
+	"syscall"
+)
+
+var (
+	_    = os.Getenv("HOME")       // want `next/internal/service/provision reads the environment \(os.Getenv\)`
+	_, _ = os.LookupEnv("HOME")    // want `reads the environment \(os.LookupEnv\)`
+	_    = sys.Environ()           // want `reads the environment \(os.Environ\)`
+	_    = os.Getenv               // want `reads the environment \(os.Getenv\)`
+	_    = os.Getpid()
+	_    = os.ExpandEnv("$HOME")   // want `reads the environment \(os.ExpandEnv\)`
+	_, _ = os.UserHomeDir()        // want `reads the environment \(os.UserHomeDir\)`
+	_, _ = os.UserConfigDir()      // want `reads the environment \(os.UserConfigDir\)`
+	_, _ = os.UserCacheDir()       // want `reads the environment \(os.UserCacheDir\)`
+	_    = syscall.Getenv          // want `reads the environment \(syscall.Getenv\)`
+	_, _ = syscall.Getenv("X")     // want `reads the environment \(syscall.Getenv\)`
+	_    = syscall.Environ()       // want `reads the environment \(syscall.Environ\)`
+	_    = syscall.Getpid()
+)
+-- github.com/LucasPcq/wtm/next/internal/service/provision/provision_test.go --
+package provision
+
+import "os"
+
+var _ = os.Getenv("HELPER")
+-- github.com/LucasPcq/wtm/next/internal/domain/env/env.go --
+// Package env is pure.
+package env
+
+import "os"
+
+var _ = os.Getenv("PORT") // want `next/internal/domain/env reads the environment`
+-- github.com/LucasPcq/wtm/next/internal/command/create/create.go --
+// Package create creates worktrees.
+package create
+
+import "os"
+
+var _ = os.Environ() // want `next/internal/command/create reads the environment`
+-- github.com/LucasPcq/wtm/next/internal/command/create/cli/cli.go --
+// Package cli is create's command line.
+package cli
+
+import "os"
+
+var _ = os.Getenv("TERM") // want `next/internal/command/create/cli reads the environment`
+-- github.com/LucasPcq/wtm/next/internal/ui/cli/env.go --
+// Package cli is the root.
+package cli
+
+import "os"
+
+var _ = os.Getenv("WTM_PROJECT_DIR")
+-- github.com/LucasPcq/wtm/next/internal/ui/output/streams.go --
+// Package output is the streams.
+package output
+
+import "os"
+
+var _ = os.Getenv("TERM")
+-- github.com/LucasPcq/wtm/next/internal/ui/form/form.go --
+// Package form is a command's form.
+package form
+
+import "os"
+
+var _ = os.Getenv("TERM") // want `next/internal/ui/form reads the environment`
+-- github.com/LucasPcq/wtm/next/internal/adapter/git/repo.go --
+// Package git runs git.
+package git
+
+import "os"
+
+var _, _ = os.LookupEnv("GIT_SSH_COMMAND")
+
+var _, _ = os.UserConfigDir()
+-- github.com/LucasPcq/wtm/next/internal/adapter/gittest/fake.go --
+// Package gittest fakes git.
+package gittest
+
+import "os"
+
+var _ = os.Environ()
+-- github.com/LucasPcq/wtm/next/cmd/wtm-next/main.go --
+package main
+
+import "os"
+
+var _ = os.Getenv("WTM_STATE_DIR")
+
+func main() {}
+-- github.com/LucasPcq/wtm/internal/service/env/env.go --
+// Package env is internal.
+package env
+
+import "os"
+
+var _ = os.Getenv("HOME")

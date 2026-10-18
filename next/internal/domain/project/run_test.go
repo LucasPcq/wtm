@@ -47,15 +47,15 @@ func TestIsolationAppliesWhenRunTomlDeclaresSomethingToIsolate(t *testing.T) {
 		config Run
 		want   bool
 	}{
-		{name: "no run.toml", config: Run{}, want: false},
-		{name: "a task and nothing else", config: Run{Jobs: []Job{{Name: "lint", Kind: Task, Cmd: "pnpm lint"}}}, want: false},
-		{name: "a port", config: Run{Jobs: []Job{{Name: "web", Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}}}, want: true},
-		{name: "a compose stack", config: Run{Jobs: []Job{{Name: "db", Cmd: "docker compose up -d db"}}}, want: true},
-		{name: "a compose stop", config: Run{Jobs: []Job{{Name: "db", Cmd: "./up.sh", Stop: "docker-compose down"}}}, want: true},
-		{name: "a namespace", config: Run{Jobs: []Job{{Name: "pg", Scope: Shared, Namespace: &Namespace{Name: "{worktree}", Create: "createdb {namespace}"}}}}, want: true},
-		{name: "a namespace that creates nothing", config: Run{Jobs: []Job{{Name: "pg", Namespace: &Namespace{Name: "{worktree}"}}}}, want: false},
-		{name: "an [[env_port]] link", config: Run{EnvPorts: []EnvPortLink{{File: ".env", Key: "API_URL", Job: "api", Port: "PORT"}}}, want: true},
-		{name: "an [[env]] link", config: Run{EnvValues: []EnvValueLink{{File: ".env", Key: "REALM", Job: "kc", Value: "{worktree}"}}}, want: true},
+		{name: "no_run_toml", config: Run{}, want: false},
+		{name: "task_only", config: Run{Jobs: []Job{{Name: "lint", Kind: Task, Cmd: "pnpm lint"}}}, want: false},
+		{name: "port", config: Run{Jobs: []Job{{Name: "web", Cmd: "pnpm dev", Ports: map[string]int{"PORT": 3000}}}}, want: true},
+		{name: "compose_stack", config: Run{Jobs: []Job{{Name: "db", Cmd: "docker compose up -d db"}}}, want: true},
+		{name: "compose_stop", config: Run{Jobs: []Job{{Name: "db", Cmd: "./up.sh", Stop: "docker-compose down"}}}, want: true},
+		{name: "namespace", config: Run{Jobs: []Job{{Name: "pg", Scope: Shared, Namespace: &Namespace{Name: "{worktree}", Create: "createdb {namespace}"}}}}, want: true},
+		{name: "namespace_creates_nothing", config: Run{Jobs: []Job{{Name: "pg", Namespace: &Namespace{Name: "{worktree}"}}}}, want: false},
+		{name: "env_port_link", config: Run{EnvPorts: []EnvPortLink{{File: ".env", Key: "API_URL", Job: "api", Port: "PORT"}}}, want: true},
+		{name: "env_value_link", config: Run{EnvValues: []EnvValueLink{{File: ".env", Key: "REALM", Job: "kc", Value: "{worktree}"}}}, want: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

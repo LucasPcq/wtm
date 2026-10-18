@@ -12,10 +12,10 @@ func TestTheProxyPortIsTheConfiguredOneElseTheDefaultUnlessSwitchedOff(t *testin
 		global Global
 		want   int
 	}{
-		{"absent: the default", Global{}, defaultProxyPort},
-		{"a chosen port", Global{Proxy: Proxy{Port: 5000}}, 5000},
-		{"switched off", Global{Proxy: Proxy{Enabled: new(false), Port: 5000}}, 0},
-		{"switched on without a port", Global{Proxy: Proxy{Enabled: new(true)}}, defaultProxyPort},
+		{"absent_default", Global{}, defaultProxyPort},
+		{"chosen_port", Global{Proxy: Proxy{Port: 5000}}, 5000},
+		{"switched_off", Global{Proxy: Proxy{Enabled: new(false), Port: 5000}}, 0},
+		{"switched_on_no_port", Global{Proxy: Proxy{Enabled: new(true)}}, defaultProxyPort},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

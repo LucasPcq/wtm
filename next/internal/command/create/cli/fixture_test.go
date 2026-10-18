@@ -35,10 +35,13 @@ const (
 // useCase is what the form calls of create's use case, so a test can stand in for it.
 type useCase = form.UseCase[create.Request, create.Questions, create.Outcome]
 
-type (
-	session       = form.Session[create.Request, create.Questions, create.Outcome]
-	sessionParams = form.SessionParams[create.Request, create.Questions, create.Outcome]
-)
+type session = form.Session[create.Request, create.Questions, create.Outcome]
+
+type sessionParams struct {
+	App     useCase
+	Request create.Request
+	Options domain.RunOptions
+}
 
 // The steps of create's form, in the order asked, then the recap.
 const (
@@ -371,3 +374,14 @@ func (enters) Read(p []byte) (int, error) {
 }
 
 func cleanLine(branch string) []string { return []string{"wtm", "clean", branch, "--force"} }
+
+func armedUntilCancelled(ctx context.Context, _ env.HookChain) error {
+	fmt.Println("armed")
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func armedForever(context.Context, env.HookChain) error {
+	fmt.Println("armed")
+	select {}
+}

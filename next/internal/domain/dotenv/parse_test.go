@@ -13,18 +13,18 @@ func TestEachLineIsClassified(t *testing.T) {
 		content string
 		want    Line
 	}{
-		{"plain pair", "KEY=value", Line{Kind: Pair, Key: "KEY", Value: "value", Raw: "KEY=value"}},
-		{"export pair", "export FOO=bar", Line{Kind: Pair, Key: "FOO", Value: "bar", Export: true, Raw: "export FOO=bar"}},
-		{"hash inside quotes is not a comment", `KEY="a # b"`, Line{Kind: Pair, Key: "KEY", Value: "a # b", Raw: `KEY="a # b"`}},
-		{"inline comment stripped from value", "KEY=val # comment", Line{Kind: Pair, Key: "KEY", Value: "val", Raw: "KEY=val # comment"}},
-		{"only first equals splits key", "URL=postgres://a=b", Line{Kind: Pair, Key: "URL", Value: "postgres://a=b", Raw: "URL=postgres://a=b"}},
-		{"single quoted value", "KEY='raw value'", Line{Kind: Pair, Key: "KEY", Value: "raw value", Raw: "KEY='raw value'"}},
-		{"a carriage return is not part of the value", "KEY=value\r", Line{Kind: Pair, Key: "KEY", Value: "value", Raw: "KEY=value\r"}},
-		{"full line comment", "# a comment", Line{Kind: Comment, Raw: "# a comment"}},
-		{"blank line", "", Line{Kind: Blank, Raw: ""}},
-		{"degenerate line is a comment", "just some prose", Line{Kind: Comment, Raw: "just some prose"}},
-		{"leading digit key is degenerate", "1KEY=value", Line{Kind: Comment, Raw: "1KEY=value"}},
-		{"an unterminated quote is kept as a comment", `KEY="open`, Line{Kind: Comment, Raw: `KEY="open`}},
+		{"plain_pair", "KEY=value", Line{Kind: Pair, Key: "KEY", Value: "value", Raw: "KEY=value"}},
+		{"export_pair", "export FOO=bar", Line{Kind: Pair, Key: "FOO", Value: "bar", Export: true, Raw: "export FOO=bar"}},
+		{"hash_inside_quotes", `KEY="a # b"`, Line{Kind: Pair, Key: "KEY", Value: "a # b", Raw: `KEY="a # b"`}},
+		{"inline_comment_stripped", "KEY=val # comment", Line{Kind: Pair, Key: "KEY", Value: "val", Raw: "KEY=val # comment"}},
+		{"first_equals_splits", "URL=postgres://a=b", Line{Kind: Pair, Key: "URL", Value: "postgres://a=b", Raw: "URL=postgres://a=b"}},
+		{"single_quoted", "KEY='raw value'", Line{Kind: Pair, Key: "KEY", Value: "raw value", Raw: "KEY='raw value'"}},
+		{"carriage_return_excluded", "KEY=value\r", Line{Kind: Pair, Key: "KEY", Value: "value", Raw: "KEY=value\r"}},
+		{"full_line_comment", "# a comment", Line{Kind: Comment, Raw: "# a comment"}},
+		{"blank_line", "", Line{Kind: Blank, Raw: ""}},
+		{"degenerate_line_comment", "just some prose", Line{Kind: Comment, Raw: "just some prose"}},
+		{"leading_digit_key_degenerate", "1KEY=value", Line{Kind: Comment, Raw: "1KEY=value"}},
+		{"unterminated_quote_comment", `KEY="open`, Line{Kind: Comment, Raw: `KEY="open`}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

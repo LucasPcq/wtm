@@ -13,17 +13,17 @@ func TestWhereABranchAskedForANewWorktreeLands(t *testing.T) {
 		params PlacementParams
 		want   Placement
 	}{
-		"checked out elsewhere":                   {PlacementParams{Branch: "feat/x", CheckedOutAt: "/wt"}, CheckedOutElsewhere{Path: "/wt"}},
-		"checked out, if not exists":              {PlacementParams{Branch: "feat/x", CheckedOutAt: "/wt", IfNotExists: true}, Unchanged{Path: "/wt"}},
-		"path taken by a folder":                  {PlacementParams{Branch: "feat/x", Path: path, Location: taken}, PathTaken{}},
-		"path taken by the branch":                {PlacementParams{Branch: "feat/x", Path: path, Location: taken, Occupant: "feat/x"}, PathTaken{}},
-		"path taken by the branch, if not exists": {PlacementParams{Branch: "feat/x", Path: path, Location: taken, Occupant: "feat/x", IfNotExists: true}, Unchanged{Path: path}},
-		"path taken by a folder, if not exists":   {PlacementParams{Branch: "feat/x", Path: path, Location: taken, IfNotExists: true}, PathTaken{}},
-		"path taken by another branch":            {PlacementParams{Branch: "feat/x", Path: path, Location: taken, Occupant: "feat-x"}, Clash{Branch: "feat-x", Name: "feat-x"}},
-		"name clash with a live worktree":         {PlacementParams{Branch: "feat/x", Path: path, Live: []string{"main", "feat-x"}}, Clash{Branch: "feat-x", Name: "feat-x"}},
-		"a local branch is checked out":           {PlacementParams{Branch: "feat/x", Path: path, Local: true, Remote: true}, Placed{Start: StartCheckOut}},
-		"a branch on origin is resumed":           {PlacementParams{Branch: "feat/x", Path: path, Remote: true}, Placed{Start: StartResume, Upstream: "origin/feat/x"}},
-		"a new branch is created":                 {PlacementParams{Branch: "feat/x", Path: path, Live: []string{"main"}}, Placed{Start: StartCreate}},
+		"checked_out_elsewhere":              {PlacementParams{Branch: "feat/x", CheckedOutAt: "/wt"}, CheckedOutElsewhere{Path: "/wt"}},
+		"checked_out_if_not_exists":          {PlacementParams{Branch: "feat/x", CheckedOutAt: "/wt", IfNotExists: true}, Unchanged{Path: "/wt"}},
+		"path_taken_by_folder":               {PlacementParams{Branch: "feat/x", Path: path, Location: taken}, PathTaken{}},
+		"path_taken_by_branch":               {PlacementParams{Branch: "feat/x", Path: path, Location: taken, Occupant: "feat/x"}, PathTaken{}},
+		"path_taken_by_branch_if_not_exists": {PlacementParams{Branch: "feat/x", Path: path, Location: taken, Occupant: "feat/x", IfNotExists: true}, Unchanged{Path: path}},
+		"path_taken_by_folder_if_not_exists": {PlacementParams{Branch: "feat/x", Path: path, Location: taken, IfNotExists: true}, PathTaken{}},
+		"path_taken_by_other_branch":         {PlacementParams{Branch: "feat/x", Path: path, Location: taken, Occupant: "feat-x"}, Clash{Branch: "feat-x", Name: "feat-x"}},
+		"name_clash_live_worktree":           {PlacementParams{Branch: "feat/x", Path: path, Live: []string{"main", "feat-x"}}, Clash{Branch: "feat-x", Name: "feat-x"}},
+		"local_branch_checked_out":           {PlacementParams{Branch: "feat/x", Path: path, Local: true, Remote: true}, Placed{Start: StartCheckOut}},
+		"origin_branch_resumed":              {PlacementParams{Branch: "feat/x", Path: path, Remote: true}, Placed{Start: StartResume, Upstream: "origin/feat/x"}},
+		"new_branch_created":                 {PlacementParams{Branch: "feat/x", Path: path, Live: []string{"main"}}, Placed{Start: StartCreate}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

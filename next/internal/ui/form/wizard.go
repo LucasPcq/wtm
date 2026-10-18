@@ -37,6 +37,8 @@ type Script struct {
 	Apply func(ctx context.Context) error
 	// Stale reports whether err, an error of Apply, is a plan the facts changed under, which starts the wizard again.
 	Stale func(err error) bool
+	// DryRun ends the walk before the recap: the plan is printed, not confirmed.
+	DryRun bool
 }
 
 // An Ending is how a wizard ended.
@@ -55,7 +57,6 @@ const (
 type Wizard struct {
 	ctx      context.Context
 	script   Script
-	dryRun   bool   // a dry run stops before the recap: its plan is printed, not confirmed
 	stale    bool   // the plan the user confirmed changed before it applied: the recap says so
 	answered []bool // per step, whether the user answered it in the form a stale plan restarted
 	marks    []mark // per step, the recap included, how it was settled
@@ -74,19 +75,13 @@ type Wizard struct {
 	err      error // the failed read that ended the wizard
 }
 
-// Params is what a wizard walks: its script, and whether it is a dry run, which ends before the recap.
-type Params struct {
-	Script Script
-	DryRun bool
-}
-
-// New returns a wizard over params that reads and previews under ctx, drawn without colour until [Run] gives it its stream's styles.
-func New(ctx context.Context, params Params) *Wizard {
+// New returns a wizard over script that reads and previews under ctx, drawn without colour until [Run] gives it its stream's styles.
+func New(ctx context.Context, script Script) *Wizard {
 	s := spinner.New()
 	s.Spinner = spinner.MiniDot
 
-	count := len(params.Script.Steps) + 1
-	w := &Wizard{ctx: ctx, script: params.Script, dryRun: params.DryRun, answered: make([]bool, count), marks: make([]mark, count), spinner: s, size: widget.Size{Width: defaultWidth}}
+	count := len(script.Steps) + 1
+	w := &Wizard{ctx: ctx, script: script, answered: make([]bool, count), marks: make([]mark, count), spinner: s, size: widget.Size{Width: defaultWidth}}
 	w.style(output.StylesOf(io.Discard))
 	return w
 }
@@ -98,7 +93,7 @@ func (w *Wizard) style(base *output.Styles) {
 
 // Again returns a new wizard over the same script, for a plan that turned stale as it applied: the steps the user answered keep their answers unless the facts now refuse them, and the recap warns that the facts changed.
 func (w *Wizard) Again() *Wizard {
-	next := New(w.ctx, Params{Script: w.script, DryRun: w.dryRun})
+	next := New(w.ctx, w.script)
 	next.stale = true
 	next.style(w.styles.Styles.Styles)
 
@@ -291,7 +286,7 @@ func (w *Wizard) atRecap() bool {
 
 // last returns the index the walk stops before: the recap's on a dry run, the one after it otherwise.
 func (w *Wizard) last() int {
-	if w.dryRun {
+	if w.script.DryRun {
 		return w.recapAt()
 	}
 	return w.recapAt() + 1

@@ -124,15 +124,15 @@ func TestANumberOnlyHooksNeededStillGivesTheComposeNameAndSaysThePortsAreMissing
 
 func TestAComposeStackWhosePortsCannotBeSettledStillGetsItsProjectName(t *testing.T) {
 	for name, seed := range map[string]seeds{
-		"no ordinal":         {GitFail: map[string]error{"Worktrees": errors.New("exit status 128")}},
-		"a value unresolved": {},
+		"no_ordinal":       {GitFail: map[string]error{"Worktrees": errors.New("exit status 128")}},
+		"value_unresolved": {},
 	} {
 		t.Run(name, func(t *testing.T) {
 			w, files := inMemory(t, seed)
 			params := composed(w.params(&recorder{}))
 			params.Project.Run.Jobs = append(params.Project.Run.Jobs, project.Job{Name: "web", Kind: project.Service, Cmd: "npm start", Ports: map[string]int{"http": 3000}})
 			params.Project.Run.EnvPorts = []project.EnvPortLink{{File: ".env", Key: "PORT", Job: "web", Port: "http"}}
-			if name == "a value unresolved" {
+			if name == "value_unresolved" {
 				params.Project.Run.EnvValues = []project.EnvValueLink{{File: ".env", Key: "API", Job: "ghost", Value: "x"}}
 			}
 

@@ -20,15 +20,15 @@ func TestALinkedValueIsRewrittenOnlyWhereItsBaseSitsOnce(t *testing.T) {
 		wantStatus Status
 		wantValue  string
 	}{
-		{"bare port", "URL=5432\n", 5432, 10, StatusRewrite, "5442"},
-		{"port inside a database url", "URL=postgres://u:pw@localhost:5432/app\n", 5432, 10, StatusRewrite, "postgres://u:pw@localhost:5442/app"},
-		{"port inside an http url", "URL=http://localhost:3000/api\n", 3000, 10, StatusRewrite, "http://localhost:3010/api"},
-		{"quoted value", "URL=\"http://localhost:3000\"\n", 3000, 10, StatusRewrite, "http://localhost:3010"},
-		{"offset zero leaves the value alone", "URL=postgres://localhost:5432/app\n", 5432, 0, StatusUnchanged, ""},
-		{"already carries the resolved port", "URL=postgres://localhost:5442/app\n", 5432, 10, StatusUnchanged, ""},
-		{"base absent from the value", "URL=postgres://localhost:6000/app\n", 5432, 10, StatusNotFound, ""},
-		{"base twice in the value", "URL=http://localhost:3000/v3000\n", 3000, 10, StatusAmbiguous, ""},
-		{"key absent from the file", "OTHER=1\n", 5432, 10, StatusMissingKey, ""},
+		{"bare_port", "URL=5432\n", 5432, 10, StatusRewrite, "5442"},
+		{"port_in_database_url", "URL=postgres://u:pw@localhost:5432/app\n", 5432, 10, StatusRewrite, "postgres://u:pw@localhost:5442/app"},
+		{"port_in_http_url", "URL=http://localhost:3000/api\n", 3000, 10, StatusRewrite, "http://localhost:3010/api"},
+		{"quoted_value", "URL=\"http://localhost:3000\"\n", 3000, 10, StatusRewrite, "http://localhost:3010"},
+		{"offset_zero_unchanged", "URL=postgres://localhost:5432/app\n", 5432, 0, StatusUnchanged, ""},
+		{"already_resolved", "URL=postgres://localhost:5442/app\n", 5432, 10, StatusUnchanged, ""},
+		{"base_absent", "URL=postgres://localhost:6000/app\n", 5432, 10, StatusNotFound, ""},
+		{"base_twice", "URL=http://localhost:3000/v3000\n", 3000, 10, StatusAmbiguous, ""},
+		{"key_absent", "OTHER=1\n", 5432, 10, StatusMissingKey, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -47,9 +47,9 @@ func TestABaseNeverMatchesInsideALongerNumber(t *testing.T) {
 		wantStatus Status
 		wantValue  string
 	}{
-		{"base is a prefix of a longer number", "URL=http://localhost:54321/x\n", StatusNotFound, ""},
-		{"base is a suffix of a longer number", "URL=http://localhost:15432/x\n", StatusNotFound, ""},
-		{"longer number alongside a real match", "URL=http://a:54321/b:5432\n", StatusRewrite, "http://a:54321/b:5442"},
+		{"base_prefix_of_number", "URL=http://localhost:54321/x\n", StatusNotFound, ""},
+		{"base_suffix_of_number", "URL=http://localhost:15432/x\n", StatusNotFound, ""},
+		{"longer_number_beside_match", "URL=http://a:54321/b:5432\n", StatusRewrite, "http://a:54321/b:5442"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -128,13 +128,13 @@ func TestAPortValueRewindsToItsBase(t *testing.T) {
 		base  int
 		want  string
 	}{
-		{"a shifted port rewinds to its base", "postgres://localhost:5442/app", 5432, "postgres://localhost:5432/app"},
-		{"the base is already the base", "postgres://localhost:5432/app", 5432, "postgres://localhost:5432/app"},
-		{"another worktree's offset rewinds too", "postgres://localhost:5472/app", 5432, "postgres://localhost:5432/app"},
-		{"a port off the block is left alone", "postgres://localhost:6000/app", 5432, "postgres://localhost:6000/app"},
-		{"a port below the base is left alone", "postgres://localhost:5422/app", 5432, "postgres://localhost:5422/app"},
-		{"two candidates leave the value alone", "http://a:3000/b:3010", 3000, "http://a:3000/b:3010"},
-		{"an unrelated number is ignored", "http://localhost:3010/api/v1", 3000, "http://localhost:3000/api/v1"},
+		{"shifted_port_rewinds", "postgres://localhost:5442/app", 5432, "postgres://localhost:5432/app"},
+		{"base_already_base", "postgres://localhost:5432/app", 5432, "postgres://localhost:5432/app"},
+		{"foreign_offset_rewinds", "postgres://localhost:5472/app", 5432, "postgres://localhost:5432/app"},
+		{"off_block_left", "postgres://localhost:6000/app", 5432, "postgres://localhost:6000/app"},
+		{"below_base_left", "postgres://localhost:5422/app", 5432, "postgres://localhost:5422/app"},
+		{"two_candidates_left", "http://a:3000/b:3010", 3000, "http://a:3000/b:3010"},
+		{"unrelated_number_ignored", "http://localhost:3010/api/v1", 3000, "http://localhost:3000/api/v1"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -24,12 +24,12 @@ func TestASnapshotKnowsItsBranches(t *testing.T) {
 		name                     string
 		local, remote, candidate bool
 	}{
-		"local and on origin":  {name: "main", local: true, remote: true, candidate: true},
-		"local only":           {name: "feat/x", local: true, candidate: true},
-		"on origin only":       {name: "remote-only", remote: true},
-		"origin/ of a branch":  {name: "origin/remote-only", candidate: true},
-		"origin/ of no branch": {name: "origin/nope"},
-		"unknown":              {name: "nope"},
+		"local_and_origin":    {name: "main", local: true, remote: true, candidate: true},
+		"local_only":          {name: "feat/x", local: true, candidate: true},
+		"origin_only":         {name: "remote-only", remote: true},
+		"origin_of_branch":    {name: "origin/remote-only", candidate: true},
+		"origin_of_no_branch": {name: "origin/nope"},
+		"unknown":             {name: "nope"},
 	}
 	for label, c := range cases {
 		t.Run(label, func(t *testing.T) {
@@ -63,8 +63,8 @@ func TestASnapshotSaysWhereABranchStandsAgainstOrigin(t *testing.T) {
 	}{
 		"behind":        {name: "main", want: Behind, counts: AheadBehind{Behind: 2}},
 		"ahead":         {name: "ahead", want: Ahead, counts: AheadBehind{Ahead: 1}},
-		"same tip":      {name: "same", want: UpToDate},
-		"not on origin": {name: "feat/x", want: NoOrigin},
+		"same_tip":      {name: "same", want: UpToDate},
+		"not_on_origin": {name: "feat/x", want: NoOrigin},
 	}
 	for label, c := range cases {
 		t.Run(label, func(t *testing.T) {
@@ -94,7 +94,7 @@ func TestTheStandingOfAPlacedBranchIsItsCountsWhenCheckedOutAndItsUpstreamWhenRe
 		placed Placed
 		want   Standing
 	}{
-		"checked out": {"main", Placed{Start: StartCheckOut}, Standing{ExistingBranch: true, OriginState: Behind, OriginBehind: 2}},
+		"checked_out": {"main", Placed{Start: StartCheckOut}, Standing{ExistingBranch: true, OriginState: Behind, OriginBehind: 2}},
 		"resumed":     {"remote-only", Placed{Start: StartResume, Upstream: "origin/remote-only"}, Standing{Upstream: "origin/remote-only"}},
 		"created":     {"main", Placed{Start: StartCreate}, Standing{}},
 	}

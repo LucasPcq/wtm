@@ -1,0 +1,32 @@
+-- github.com/LucasPcq/wtm/next/internal/command/create/usecase.go --
+// Package create creates worktrees.
+package create
+-- github.com/LucasPcq/wtm/next/internal/command/create/port.go --
+package create
+-- github.com/LucasPcq/wtm/next/internal/command/create/rules.go --
+package create
+-- github.com/LucasPcq/wtm/next/internal/command/create/questions.go --
+package create
+-- github.com/LucasPcq/wtm/next/internal/command/create/helpers.go --
+package create // want `next/internal/command/create/helpers.go: the root of a command holds only` `next/internal/command/create/notes.md: the root` `next/internal/command/create/sub: the root`
+-- github.com/LucasPcq/wtm/next/internal/command/create/usecase_test.go --
+package create
+-- github.com/LucasPcq/wtm/next/internal/command/create/contract_test.go --
+package create
+-- github.com/LucasPcq/wtm/next/internal/command/create/testdata/plan.golden --
+golden
+-- github.com/LucasPcq/wtm/next/internal/command/create/notes.md --
+notes
+-- github.com/LucasPcq/wtm/next/internal/command/create/cli/cli.go --
+// Package cli is create's command line.
+package cli
+
+type extra struct{}
+-- github.com/LucasPcq/wtm/next/internal/command/create/cli/output.go --
+package cli
+-- github.com/LucasPcq/wtm/next/internal/command/create/sub/sub.go --
+// Package sub is no part of a slice.
+package sub
+-- github.com/LucasPcq/wtm/next/internal/service/provision/fastforward.go --
+// Package provision is a service: its files are its own.
+package provision

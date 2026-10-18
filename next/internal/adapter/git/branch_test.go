@@ -86,23 +86,23 @@ func TestTheFakeAndGitRefuseTheSameBranchChanges(t *testing.T) {
 		name string
 		call func(t *testing.T, impl implementation) error
 	}{
-		{name: "deleting a branch checked out", call: func(t *testing.T, impl implementation) error {
+		{name: "delete_checked_out_branch", call: func(t *testing.T, impl implementation) error {
 			return impl.port.DeleteBranch(t.Context(), "main")
 		}},
-		{name: "deleting a branch a rebase will move", call: func(t *testing.T, impl implementation) error {
+		{name: "delete_rebasing_branch", call: func(t *testing.T, impl implementation) error {
 			return impl.port.DeleteBranch(t.Context(), "rebasing")
 		}},
-		{name: "deleting a branch that does not exist", call: func(t *testing.T, impl implementation) error {
+		{name: "delete_missing_branch", call: func(t *testing.T, impl implementation) error {
 			return impl.port.DeleteBranch(t.Context(), "nope")
 		}},
-		{name: "counting against an unknown ref", call: func(t *testing.T, impl implementation) error {
+		{name: "count_unknown_ref", call: func(t *testing.T, impl implementation) error {
 			_, err := impl.port.AheadBehind(t.Context(), "unmerged")
 			return err
 		}},
 	}
 	for _, impl := range implementations(t) {
 		for _, refusal := range refusals {
-			t.Run(impl.name+": "+refusal.name, func(t *testing.T) {
+			t.Run(impl.name+"_"+refusal.name, func(t *testing.T) {
 				before := gittest.StateOf(t, impl.port)
 
 				err := refusal.call(t, impl)

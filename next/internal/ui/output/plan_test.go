@@ -19,10 +19,10 @@ func TestTheNoteOfARowFollowsItsLastValue(t *testing.T) {
 		params NotedParams
 		want   []string
 	}{
-		"values": {NotedParams{Values: []string{"main", "topic"}, Note: Saved, None: "none"}, []string{"main", "topic · saved for next runs"}},
-		"none":   {NotedParams{Note: Saved, None: "keep as-is"}, []string{"keep as-is · saved for next runs"}},
-		"noNote": {NotedParams{Values: []string{"main"}, None: "none"}, []string{"main"}},
-		"empty":  {NotedParams{None: "none"}, nil},
+		"values":  {NotedParams{Values: []string{"main", "topic"}, Note: Saved, None: "none"}, []string{"main", "topic · saved for next runs"}},
+		"none":    {NotedParams{Note: Saved, None: "keep as-is"}, []string{"keep as-is · saved for next runs"}},
+		"no_note": {NotedParams{Values: []string{"main"}, None: "none"}, []string{"main"}},
+		"empty":   {NotedParams{None: "none"}, nil},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

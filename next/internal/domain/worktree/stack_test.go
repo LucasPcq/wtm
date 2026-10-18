@@ -16,34 +16,34 @@ func TestAStackHangsEachWorktreeUnderTheBranchItWasCreatedFrom(t *testing.T) {
 		children  map[string][]string
 		parents   map[string]string
 	}{
-		"a linear stack": {
+		"linear_stack": {
 			worktrees: live("a", "b", "c"),
 			records:   map[string]Meta{"a": from("main"), "b": from("a"), "c": from("b")},
 			roots:     []string{"main"},
 			children:  map[string][]string{"main": {"a"}, "a": {"b"}, "b": {"c"}, "c": nil},
 			parents:   map[string]string{"a": "main", "b": "a", "c": "b"},
 		},
-		"a fan-out ordered by creation time, then by name": {
+		"fan_out_ordered": {
 			worktrees: live("late", "early", "tie-b", "tie-a"),
 			records:   map[string]Meta{"late": at("main", "2026-03-01T00:00:00Z"), "early": at("main", "2026-01-01T00:00:00+02:00"), "tie-b": at("main", "2026-02-01T00:00:00Z"), "tie-a": at("main", "2026-02-01T00:00:00Z")},
 			roots:     []string{"main"},
 			children:  map[string][]string{"main": {"early", "tie-a", "tie-b", "late"}},
 		},
-		"several roots, main first, a worktree with no record or no source among them": {
+		"several_roots_main_first": {
 			worktrees: live("newer", "older", "unrecorded"),
 			records:   map[string]Meta{"newer": at("", "2026-02-01T00:00:00Z"), "older": at("", "2026-01-01T00:00:00Z")},
 			roots:     []string{"main", "unrecorded", "older", "newer"},
 			children:  map[string][]string{"main": nil},
 			parents:   map[string]string{"newer": "", "older": "", "unrecorded": ""},
 		},
-		"the main worktree is a root whatever its record says": {
+		"main_always_root": {
 			worktrees: live("a"),
 			records:   map[string]Meta{"main": from("a"), "a": from("main")},
 			roots:     []string{"main"},
 			children:  map[string][]string{"main": {"a"}},
 			parents:   map[string]string{"main": "", "a": "main"},
 		},
-		"the base branch keeps its recorded parent": {
+		"base_branch_keeps_parent": {
 			worktrees: live("develop", "feat"),
 			records:   map[string]Meta{"develop": from("main"), "feat": from("develop")},
 			base:      "develop",
@@ -51,47 +51,47 @@ func TestAStackHangsEachWorktreeUnderTheBranchItWasCreatedFrom(t *testing.T) {
 			children:  map[string][]string{"main": {"develop"}, "develop": {"feat"}},
 			parents:   map[string]string{"develop": "main"},
 		},
-		"a main worktree on no branch is no node, its children under a virtual root": {
+		"detached_main_virtual_root": {
 			worktrees: []Worktree{{Path: "/repo", Main: true, State: Detached{}}, {Path: "/trees/a", State: OnBranch{Branch: "a"}}},
 			records:   map[string]Meta{"a": from("main")},
 			roots:     []string{"main"},
 			children:  map[string][]string{"main": {"a"}},
 			parents:   map[string]string{"a": "main"},
 		},
-		"a deleted parent is a virtual root holding its children": {
+		"deleted_parent_virtual_root": {
 			worktrees: live("a", "b"),
 			records:   map[string]Meta{"a": from("gone"), "b": from("gone"), "gone": from("main")},
 			roots:     []string{"main", "gone"},
 			children:  map[string][]string{"gone": {"a", "b"}, "main": nil},
 			parents:   map[string]string{"a": "gone", "gone": ""},
 		},
-		"a branch of origin, as create records --from origin/x, is a virtual root": {
+		"origin_branch_virtual_root": {
 			worktrees: live("a", "b"),
 			records:   map[string]Meta{"a": from("origin/x"), "b": from("unmanaged")},
 			roots:     []string{"main", "origin/x", "unmanaged"},
 			children:  map[string][]string{"origin/x": {"a"}, "unmanaged": {"b"}},
 		},
-		"the members of a cycle are promoted to roots, what hangs from them stays": {
+		"cycle_members_promoted": {
 			worktrees: live("a", "b", "c"),
 			records:   map[string]Meta{"a": at("b", "2026-01-01T00:00:00Z"), "b": at("a", "2026-02-01T00:00:00Z"), "c": from("a")},
 			roots:     []string{"main", "a", "b"},
 			children:  map[string][]string{"a": {"c"}, "b": nil},
 			parents:   map[string]string{"a": "", "b": "", "c": "a"},
 		},
-		"a worktree created from itself is a root": {
+		"self_source_root": {
 			worktrees: live("a"),
 			records:   map[string]Meta{"a": from("a")},
 			roots:     []string{"main", "a"},
 			children:  map[string][]string{"a": nil},
 			parents:   map[string]string{"a": ""},
 		},
-		"a detached worktree is not a node, a rebasing one is its branch's": {
+		"detached_not_node_rebasing_is": {
 			worktrees: append(live(), Worktree{Path: "/trees/detached", State: Detached{}}, Worktree{Path: "/trees/a", State: Rebasing{Branch: "a"}}),
 			records:   map[string]Meta{"a": from("main"), "": from("a")},
 			roots:     []string{"main"},
 			children:  map[string][]string{"main": {"a"}, "a": nil},
 		},
-		"a record with no live worktree is not a node": {
+		"record_without_worktree": {
 			worktrees: live("a"),
 			records:   map[string]Meta{"a": from("main"), "removed": from("main")},
 			roots:     []string{"main"},
@@ -100,7 +100,7 @@ func TestAStackHangsEachWorktreeUnderTheBranchItWasCreatedFrom(t *testing.T) {
 	}
 	for label, c := range cases {
 		t.Run(label, func(t *testing.T) {
-			stack := StackOf(StackOfParams{Worktrees: c.worktrees, Records: c.records, Base: c.base})
+			stack := StackOf(c.worktrees, c.records, c.base)
 
 			assert.Equal(t, c.roots, stack.Roots())
 			for branch, children := range c.children {
@@ -116,28 +116,28 @@ func TestAStackHangsEachWorktreeUnderTheBranchItWasCreatedFrom(t *testing.T) {
 }
 
 func TestACascadeRebasesEachParentBeforeItsChildren(t *testing.T) {
-	stack := StackOf(StackOfParams{
-		Worktrees: live("develop", "a", "a1", "b", "d", "e", "x", "y", "z"),
-		Records: map[string]Meta{
+	stack := StackOf(
+		live("develop", "a", "a1", "b", "d", "e", "x", "y", "z"),
+		map[string]Meta{
 			"develop": from("main"), "a": at("main", "2026-01-01T00:00:00Z"), "a1": from("a"), "b": at("main", "2026-02-01T00:00:00Z"),
 			"d": from("develop"), "e": from("gone"), "x": from("y"), "y": from("x"), "z": from("x"),
 		},
-		Base: "develop",
-	})
+		"develop",
+	)
 	cases := map[string]struct {
 		roots []string
 		steps []string
 	}{
-		"level by level, main never a step":          {roots: []string{"main"}, steps: []string{"a", "b", "d", "a1"}},
-		"the base branch never a step, its children": {roots: []string{"develop"}, steps: []string{"d"}},
-		"a root that is a worktree is a step":        {roots: []string{"a"}, steps: []string{"a", "a1"}},
-		"a virtual root never a step":                {roots: []string{"gone"}, steps: []string{"e"}},
-		"each branch once":                           {roots: []string{"main", "a", "a1"}, steps: []string{"a", "b", "d", "a1"}},
-		"a parent before a child given first":        {roots: []string{"a1", "a"}, steps: []string{"a", "a1"}},
-		"a child given beside its ancestor at depth": {roots: []string{"main", "a1"}, steps: []string{"a", "b", "d", "a1"}},
-		"an unknown branch nothing":                  {roots: []string{"nope"}},
-		"a branch under a cycle, without the cycle":  {roots: []string{"z"}, steps: []string{"z"}},
-		"a cycle out of reach does not refuse":       {roots: []string{"main", "develop", "gone"}, steps: []string{"a", "b", "e", "d", "a1"}},
+		"level_by_level_main_skipped":       {roots: []string{"main"}, steps: []string{"a", "b", "d", "a1"}},
+		"base_branch_skipped_children_kept": {roots: []string{"develop"}, steps: []string{"d"}},
+		"worktree_root_is_step":             {roots: []string{"a"}, steps: []string{"a", "a1"}},
+		"virtual_root_skipped":              {roots: []string{"gone"}, steps: []string{"e"}},
+		"each_branch_once":                  {roots: []string{"main", "a", "a1"}, steps: []string{"a", "b", "d", "a1"}},
+		"parent_before_child":               {roots: []string{"a1", "a"}, steps: []string{"a", "a1"}},
+		"child_beside_ancestor":             {roots: []string{"main", "a1"}, steps: []string{"a", "b", "d", "a1"}},
+		"unknown_branch":                    {roots: []string{"nope"}},
+		"branch_under_cycle":                {roots: []string{"z"}, steps: []string{"z"}},
+		"cycle_out_of_reach":                {roots: []string{"main", "develop", "gone"}, steps: []string{"a", "b", "e", "d", "a1"}},
 	}
 	for label, c := range cases {
 		t.Run(label, func(t *testing.T) {
@@ -155,14 +155,14 @@ func TestACascadeReachingACycleIsRefusedNamingIt(t *testing.T) {
 		roots   []string
 		cycle   []string
 	}{
-		"two worktrees created from each other": {records: map[string]Meta{"a": from("b"), "b": from("a")}, roots: []string{"b"}, cycle: []string{"a", "b"}},
-		"a worktree created from itself":        {records: map[string]Meta{"a": from("a"), "b": from("main")}, roots: []string{"b", "a"}, cycle: []string{"a"}},
-		"a member above a branch under it":      {records: map[string]Meta{"a": from("b"), "b": from("a"), "c": from("a")}, roots: []string{"c", "a"}, cycle: []string{"a", "b"}},
-		"a longer loop":                         {records: map[string]Meta{"a": from("c"), "b": from("a"), "c": from("b")}, roots: []string{"main", "c"}, cycle: []string{"a", "b", "c"}},
+		"mutual_pair":         {records: map[string]Meta{"a": from("b"), "b": from("a")}, roots: []string{"b"}, cycle: []string{"a", "b"}},
+		"self_source":         {records: map[string]Meta{"a": from("a"), "b": from("main")}, roots: []string{"b", "a"}, cycle: []string{"a"}},
+		"member_above_branch": {records: map[string]Meta{"a": from("b"), "b": from("a"), "c": from("a")}, roots: []string{"c", "a"}, cycle: []string{"a", "b"}},
+		"longer_loop":         {records: map[string]Meta{"a": from("c"), "b": from("a"), "c": from("b")}, roots: []string{"main", "c"}, cycle: []string{"a", "b", "c"}},
 	}
 	for label, c := range cases {
 		t.Run(label, func(t *testing.T) {
-			steps, err := StackOf(StackOfParams{Worktrees: live("a", "b", "c"), Records: c.records}).Cascade(c.roots)
+			steps, err := StackOf(live("a", "b", "c"), c.records, "").Cascade(c.roots)
 
 			var cycle *CycleError
 			require.ErrorAs(t, err, &cycle)

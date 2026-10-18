@@ -81,12 +81,12 @@ func TestAnInvalidConfigIsRefusedSayingWhy(t *testing.T) {
 		content string
 		want    string
 	}{
-		{"an unknown env strategy", "[env]\nstrategy = \"copy\"\n", "invalid env strategy: must be example, main, or parent"},
-		{"an env file without a target", "[[env.file]]\ntemplate = \".env.example\"\n", "env file entry must have a target"},
-		{"two env files on one target", "[[env.file]]\ntarget = \".env\"\n\n[[env.file]]\ntarget = \".env\"\n", "duplicate env file target: .env"},
-		{"a template that is not one of its target", "[[env.file]]\ntarget = \".env\"\ntemplate = \"other.example\"\n", "env file template must be a known template of its target: other.example is not a template of .env"},
-		{"a remembered answer no question asks", "[wizard.remembered]\ndelete = \"force\"\n", `unknown remembered answer "delete" in [wizard.remembered] (expected one of env_strategy, isolation, source_update)`},
-		{"a remembered value its question never offers", "[wizard.remembered]\nisolation = \"keep\"\n", `invalid remembered isolation "keep" in [wizard.remembered] (expected one of isolated, verbatim)`},
+		{"unknown_env_strategy", "[env]\nstrategy = \"copy\"\n", "invalid env strategy: must be example, main, or parent"},
+		{"env_file_without_target", "[[env.file]]\ntemplate = \".env.example\"\n", "env file entry must have a target"},
+		{"duplicate_env_target", "[[env.file]]\ntarget = \".env\"\n\n[[env.file]]\ntarget = \".env\"\n", "duplicate env file target: .env"},
+		{"foreign_template", "[[env.file]]\ntarget = \".env\"\ntemplate = \"other.example\"\n", "env file template must be a known template of its target: other.example is not a template of .env"},
+		{"unknown_remembered_answer", "[wizard.remembered]\ndelete = \"force\"\n", `unknown remembered answer "delete" in [wizard.remembered] (expected one of env_strategy, isolation, source_update)`},
+		{"invalid_remembered_value", "[wizard.remembered]\nisolation = \"keep\"\n", `invalid remembered isolation "keep" in [wizard.remembered] (expected one of isolated, verbatim)`},
 		{"absoluteBasePath", "[worktrees]\nbase_path = \"/tmp/trees\"\n", "base_path must be relative to the repository: /tmp/trees"},
 	}
 	for _, tc := range cases {
@@ -101,9 +101,19 @@ func TestAnInvalidConfigIsRefusedSayingWhy(t *testing.T) {
 }
 
 func TestEveryConventionalTemplateOfATargetIsAccepted(t *testing.T) {
-	for _, suffix := range []string{".example", ".dist", ".sample", ".template", ".tmpl"} {
-		t.Run(suffix, func(t *testing.T) {
-			_, _, err := loadState(t, stateWithConfig(t, "[[env.file]]\ntarget = \".env\"\ntemplate = \".env"+suffix+"\"\n"))
+	cases := []struct {
+		name   string
+		suffix string
+	}{
+		{"example", ".example"},
+		{"dist", ".dist"},
+		{"sample", ".sample"},
+		{"template", ".template"},
+		{"tmpl", ".tmpl"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := loadState(t, stateWithConfig(t, "[[env.file]]\ntarget = \".env\"\ntemplate = \".env"+tc.suffix+"\"\n"))
 
 			assert.NoError(t, err)
 		})

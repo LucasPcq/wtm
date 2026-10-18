@@ -239,27 +239,21 @@ func Unknown(path string) error {
 	return Invalid([]FieldError{{Path: path, Code: CodeUnknown, Template: "{path} is not a field of this request"}})
 }
 
-// AnswerParams are the values given to the field at path.
-type AnswerParams struct {
-	Path   string
-	Values []string
-}
-
 // CodeOneValue is the field-error code of a field given a count of values other than one.
 const CodeOneValue = "one_value"
 
-// One is the single value given to a field, else the problem of a count other than one.
-func One[T ~string](params AnswerParams) (T, error) {
-	if len(params.Values) != 1 {
-		return "", Invalid([]FieldError{{Path: params.Path, Code: CodeOneValue, Template: "{path} takes one value, not {count}", Params: Params{"count": strconv.Itoa(len(params.Values))}}})
+// One is the single value given to the field at path, else the problem of a count other than one.
+func One[T ~string](path string, values []string) (T, error) {
+	if len(values) != 1 {
+		return "", Invalid([]FieldError{{Path: path, Code: CodeOneValue, Template: "{path} takes one value, not {count}", Params: Params{"count": strconv.Itoa(len(values))}}})
 	}
 
-	return T(params.Values[0]), nil
+	return T(values[0]), nil
 }
 
 // Yes is the answer given to a ConfirmField, spelled as its Answer and its options spell it: true or false.
-func Yes(params AnswerParams) (bool, error) {
-	value, err := One[string](params)
+func Yes(path string, values []string) (bool, error) {
+	value, err := One[string](path, values)
 	if err != nil {
 		return false, err
 	}
@@ -271,7 +265,7 @@ func Yes(params AnswerParams) (bool, error) {
 		return false, nil
 	}
 
-	return false, Invalid([]FieldError{{Path: params.Path, Code: CodeOneOf, Template: "{path} must be one of {accepted}, not {value}", Params: Params{"value": value}, Accepted: []string{"true", "false"}}})
+	return false, Invalid([]FieldError{{Path: path, Code: CodeOneOf, Template: "{path} must be one of {accepted}, not {value}", Params: Params{"value": value}, Accepted: []string{"true", "false"}}})
 }
 
 // Answerable is a command's request, which takes the answer of a field at a time.

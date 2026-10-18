@@ -1,9 +1,15 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
+	"os"
+	"os/exec"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -67,8 +73,8 @@ type driver struct {
 
 func open(t *testing.T, params sessionParams) *driver {
 	t.Helper()
-	s := newForm(nil).Session(t.Context(), params)
-	return start(t, s, form.New(t.Context(), s.Params()))
+	s := newForm(nil).Session(t.Context(), params.App, params.Request, params.Options)
+	return start(t, s, form.New(t.Context(), s.Script()))
 }
 
 func start(t *testing.T, s *session, w *form.Wizard) *driver {
@@ -99,4 +105,54 @@ func enveloped(t *testing.T, outcome create.Outcome, err *domain.Error) string {
 	var out bytes.Buffer
 	require.NoError(t, output.Envelope(&out, outcome.Envelope(create.Name, err), createFlags.Spell))
 	return out.String()
+}
+
+type helper struct {
+	cmd    *exec.Cmd
+	lines  *bufio.Scanner
+	stderr *bytes.Buffer
+}
+
+func startHelper(t *testing.T, test string) helper {
+	t.Helper()
+	cmd := exec.Command(os.Args[0], "-test.run=^"+test+"$")
+	cmd.Env = append(os.Environ(), helperEnv+"=1")
+	stdout, err := cmd.StdoutPipe()
+	require.NoError(t, err)
+	stderr := &bytes.Buffer{}
+	cmd.Stderr = stderr
+	require.NoError(t, cmd.Start())
+	t.Cleanup(func() { _ = cmd.Process.Kill() })
+	return helper{cmd: cmd, lines: bufio.NewScanner(stdout), stderr: stderr}
+}
+
+func (h helper) expect(t *testing.T, want string) {
+	t.Helper()
+	for h.lines.Scan() {
+		if h.lines.Text() == want {
+			return
+		}
+	}
+	t.Fatalf("the helper never said %q", want)
+}
+
+func (h helper) wait(t *testing.T) syscall.WaitStatus {
+	t.Helper()
+	done := make(chan error, 1)
+	go func() {
+		for h.lines.Scan() {
+		}
+		done <- h.cmd.Wait()
+	}()
+	select {
+	case err := <-done:
+		exitErr, ok := errors.AsType[*exec.ExitError](err)
+		require.True(t, ok, "the helper ended with %v", err)
+		status, ok := exitErr.Sys().(syscall.WaitStatus)
+		require.True(t, ok)
+		return status
+	case <-time.After(10 * time.Second):
+		t.Fatal("the helper did not stop")
+	}
+	return 0
 }

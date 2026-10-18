@@ -10,17 +10,17 @@ import (
 )
 
 func TestAValueResolvesTheClosedVocabulary(t *testing.T) {
-	cases := []struct{ value, want string }{
-		{"{namespace}", "realm_feat-a"},
-		{"{worktree}", "feat-a"},
-		{"{ordinal}", "2"},
-		{"{origin}", "http://keycloak.demo.localhost"},
-		{"{origin}/realms/{namespace}", "http://keycloak.demo.localhost/realms/realm_feat-a"},
-		{"{port.KEYCLOAK_PORT}", "8080"},
-		{"nothing to expand", "nothing to expand"},
+	cases := []struct{ name, value, want string }{
+		{"namespace", "{namespace}", "realm_feat-a"},
+		{"worktree", "{worktree}", "feat-a"},
+		{"ordinal", "{ordinal}", "2"},
+		{"origin", "{origin}", "http://keycloak.demo.localhost"},
+		{"origin_and_namespace", "{origin}/realms/{namespace}", "http://keycloak.demo.localhost/realms/realm_feat-a"},
+		{"port", "{port.KEYCLOAK_PORT}", "8080"},
+		{"no_placeholder", "nothing to expand", "nothing to expand"},
 	}
 	for _, tc := range cases {
-		t.Run(tc.value, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			got, err := keycloakWorktree(sharedKeycloakJob()).expand(keycloakValue(tc.value))
 
 			require.NoError(t, err)

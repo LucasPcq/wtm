@@ -72,6 +72,8 @@ No conclusion, envelope or dry-run drawing in a command's `cli/`: they are `form
 | `cli/*_test.go` | the goldens, the wizard screen by screen, the exit codes, the envelope, through `ui/formtest` (`form.md`, "Tests") |
 | `cmd/wtm-next` | one end-to-end test wiring the real adapters |
 
+A test file holds only `Test…` functions, its fakes in `fixture_test.go` and helpers in `helpers_test.go` (archlint `testlayout`); a subtest is named like an identifier, `stale_fingerprint_refused`, never a sentence (archlint `subtestname`).
+
 Gates: `make lint-next`, `make test-next`, then the `build-validator` agent.
 
 ## 9. Proofs and the legacy gaps

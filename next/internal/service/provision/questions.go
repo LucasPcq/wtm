@@ -25,21 +25,20 @@ type Given struct {
 
 // Answer is the request with the field at path answered by values, spelled as the field's Answer spells them; a value the field cannot take, or a path that is not one of these questions, leaves the request as it was.
 func (g Given) Answer(path string, values []string) (Given, error) {
-	answer := domain.AnswerParams{Path: path, Values: values}
 	next := g
 	var err error
 	switch path {
 	case domain.PathRemember:
 		next.Remember = values
 	case domain.PathAsk:
-		next.Ask, err = domain.Yes(answer)
+		next.Ask, err = domain.Yes(path, values)
 	case domain.PathEnvFrom:
-		next.EnvFrom, err = domain.One[project.EnvStrategy](answer)
+		next.EnvFrom, err = domain.One[project.EnvStrategy](path, values)
 	case domain.PathIsolation:
-		next.Isolation, err = domain.One[project.Isolation](answer)
+		next.Isolation, err = domain.One[project.Isolation](path, values)
 	case domain.PathFastForward:
 		var yes bool
-		yes, err = domain.Yes(answer)
+		yes, err = domain.Yes(path, values)
 		next.FastForward = &yes
 	default:
 		err = domain.Unknown(path)

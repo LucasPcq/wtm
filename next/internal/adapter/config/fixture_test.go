@@ -52,3 +52,9 @@ on_clean = [
   "say \"hi\" \\ C:\\tmp 'q'\nnext\ttab \u007f",
 ]
 `
+
+type sample struct {
+	Name  string         `toml:"name"`
+	Port  int            `toml:"port"`
+	Hooks map[string]any `toml:"hooks"`
+}

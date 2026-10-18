@@ -6,7 +6,6 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/stretchr/testify/assert"
 )
@@ -60,21 +59,4 @@ func TestATargetThatNeverStoodHasNoRowNorGo(t *testing.T) {
 	outcome := unfinished(extract.Item{Subject: "feat/slow", Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted})
 
 	formtest.Golden(t, "interrupted", drawn(outcome))
-}
-
-// unfinished is the outcome of moving README.md to a new target, ended as item.
-func unfinished(item extract.Item) extract.Outcome {
-	plan := extract.Plan{
-		Source: "feat/login",
-		Files:  []worktree.Change{{Path: "README.md", Status: worktree.ChangeModified}},
-		Target: extract.Target{Branch: item.Subject, Action: extract.ActionCreate},
-		From:   "main",
-	}
-	return extract.Outcome{Plan: plan, Result: &extract.Result{Items: []extract.Item{item}}}
-}
-
-func drawn(outcome extract.Outcome) string {
-	var out bytes.Buffer
-	drawOutcome(&out, outcome, "/repo")
-	return out.String()
 }
