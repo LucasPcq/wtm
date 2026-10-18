@@ -60,6 +60,15 @@ state() {
   done
 }
 
+env_of() {
+  local wt=$root/acme.trees/$1
+  [[ -d $wt ]] || { echo "(no worktree)"; return; }
+  for file in apps/web/.env apps/api/.env; do
+    echo "## $file"
+    cat "$wt/$file" 2>/dev/null || echo "(missing)"
+  done
+}
+
 run_side() {
   local side=$1
   bin=$2
@@ -81,6 +90,14 @@ run_side() {
     scenario 07-conflict-committed-in-target extract feat/login --files README.md --to feat/c --yes
     scenario 08-nothing-to-extract extract main --files README.md --to feat/x --yes
     scenario 09-json extract feat/login --files apps/web/login.ts --to feat/json --output json --yes
+    # main's .env now differs from its template, so each target's .env says where it came from
+    echo "FROM=main" >>"$root/acme/apps/api/.env"
+    echo "a" >"$root/acme.trees/feat-login/apps/api/env-a.txt"
+    echo "b" >"$root/acme.trees/feat-login/apps/api/env-b.txt"
+    scenario 10-env-default extract feat/login --files apps/api/env-b.txt --to feat/env-default --yes
+    env_of feat-env-default >"$dir/10-env-default.env"
+    scenario 11-env-from-main extract feat/login --files apps/api/env-a.txt --to feat/env-main --env-from main --yes
+    env_of feat-env-main >"$dir/11-env-from-main.env"
   )
   sed -i '' -E \
     -e "s#(/private)?/tmp/wtmext-${side:0:1}#<SB>#g" \

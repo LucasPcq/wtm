@@ -99,7 +99,11 @@ func TestABranchCreatedIsAskedItsSourceThenTheMode(t *testing.T) {
 	assert.Contains(t, d.screen(), "› main")
 
 	d.keys("enter")
+	assert.Equal(t, stepEnvFrom, d.w.Current())
+
+	d.keys("enter")
 	assert.Equal(t, stepMode, d.w.Current())
+	assert.Contains(t, d.screen(), "✓ Env strategy: example · config")
 	assert.Contains(t, d.screen(), "· Isolation — run.toml declares nothing a worktree isolates")
 
 	d.keys("enter")
@@ -164,6 +168,9 @@ func TestTheWizardDrawsEachStepOfANewTarget(t *testing.T) {
 
 	d.keys("feat/split", "enter")
 	d.looksLike("from")
+
+	d.keys("enter")
+	d.looksLike("env_from")
 
 	d.keys("enter")
 	d.looksLike("isolation")

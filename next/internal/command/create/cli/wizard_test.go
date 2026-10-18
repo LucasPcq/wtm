@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
@@ -37,7 +38,7 @@ func TestTheRequestIsWhatWasAnswered(t *testing.T) {
 	d.keys("feat/a", "enter", "enter", "down", "tab", "enter", "enter")
 
 	require.Equal(t, form.Finished, d.w.Ending())
-	assert.Equal(t, create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvMain, Remember: []string{"env_from"}}, d.s.Request())
+	assert.Equal(t, create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvMain}, Remember: []string{"env_from"}}, d.s.Request())
 	assert.NotEmpty(t, d.s.Preview().Fingerprint)
 }
 
@@ -90,7 +91,7 @@ func TestAskAsksARememberedAnswerAgainStartingOnIt(t *testing.T) {
 }
 
 func TestASourceBehindOriginIsOfferedAFastForward(t *testing.T) {
-	d := open(t, sessionParams{App: newApp(seed{Behind: true}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}})
+	d := open(t, sessionParams{App: newApp(seed{Behind: true}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvExample}}})
 
 	assert.Equal(t, stepFastForward, d.w.Current())
 	d.keys("up", "enter")
@@ -113,7 +114,7 @@ func TestTheSourceListPinsTheBaseBranchAndRefreshes(t *testing.T) {
 }
 
 func TestEachWayOutCancels(t *testing.T) {
-	settled := create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}
+	settled := create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvExample}}
 	cases := map[string]struct {
 		Request create.Request
 		Keys    []string
@@ -133,7 +134,7 @@ func TestEachWayOutCancels(t *testing.T) {
 
 func TestAPlanThatCannotApplySaysWhyAndOffersOnlyToCancel(t *testing.T) {
 	refused := domain.Invalid([]domain.FieldError{{Path: "from", Code: "not_found", Template: "{path}: {value} not found", Params: domain.Params{"value": "ghost"}}})
-	d := open(t, sessionParams{App: refusing{useCase: newApp(seed{}), err: refused}, Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample}})
+	d := open(t, sessionParams{App: refusing{useCase: newApp(seed{}), err: refused}, Request: create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvExample}}})
 
 	screen := d.screen()
 	assert.Contains(t, screen, "Step 7/7 • Cannot apply this plan")
@@ -165,7 +166,7 @@ func TestADryRunAsksTheQuestionsAndNoConfirmation(t *testing.T) {
 }
 
 func TestIfNotExistsGivenByItsFlagStandsInTheTrail(t *testing.T) {
-	d := open(t, sessionParams{App: newApp(seed{}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample, IfNotExists: true}})
+	d := open(t, sessionParams{App: newApp(seed{}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvExample}, IfNotExists: true}})
 
 	assert.Equal(t, stepRecap, d.w.Current())
 	assert.Contains(t, d.screen(), "✓ If not exists: yes · --if-not-exists")
@@ -173,7 +174,7 @@ func TestIfNotExistsGivenByItsFlagStandsInTheTrail(t *testing.T) {
 
 func TestAskAsksARememberedSourceUpdateAgainStartingOnIt(t *testing.T) {
 	remembered := map[string]string{project.RememberSourceUpdate: project.SourceUpdateFastForward}
-	d := open(t, sessionParams{App: newApp(seed{Behind: true, Remembered: remembered}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", EnvFrom: project.EnvExample, Ask: true}})
+	d := open(t, sessionParams{App: newApp(seed{Behind: true, Remembered: remembered}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{EnvFrom: project.EnvExample}, Ask: true}})
 
 	require.Equal(t, stepFastForward, d.w.Current())
 	assert.Contains(t, d.screen(), "▌› Yes")

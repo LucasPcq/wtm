@@ -34,6 +34,7 @@ const (
 	stepTarget
 	stepBranch
 	stepFrom
+	stepEnvFrom
 	stepIsolation
 	stepFastForward
 	stepMode

@@ -29,6 +29,9 @@ const (
 	projectToml = "[worktrees]\nbase_path = \"../.trees\"\nbase_branch = \"main\"\n"
 	jobsToml    = "[[job]]\nname = \"web\"\nkind = \"service\"\ncmd = \"npm start\"\nports = { PORT = 3000 }\n"
 	remembering = projectToml + "\n[wizard.remembered]\nisolation = \"verbatim\"\nsource_update = \"ff\"\n"
+	envToml     = projectToml + "\n[env]\nstrategy = \"example\"\n\n[[env.file]]\ntarget = \".env\"\n"
+	mainEnv     = "FROM=main\n"
+	exampleEnv  = "FROM=example\n"
 )
 
 var createdAt = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)

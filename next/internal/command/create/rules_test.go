@@ -2,6 +2,7 @@ package create_test
 
 import (
 	"errors"
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"os"
 	"path/filepath"
 	"testing"
@@ -76,9 +77,9 @@ func TestThePlanNamesTheIsolationOnlyWhenTheRunIsolatesSomething(t *testing.T) {
 	isolating := newWorld(t, seed{Run: jobsToml})
 	bare := newWorld(t, seed{})
 
-	given, _ := isolating.plan(t, create.Request{Branches: []string{branchName}, Isolation: project.Verbatim})
+	given, _ := isolating.plan(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Isolation: project.Verbatim}})
 	defaulted, _ := isolating.plan(t, create.Request{Branches: []string{branchName}})
-	ignored, _ := bare.plan(t, create.Request{Branches: []string{branchName}, Isolation: project.Verbatim})
+	ignored, _ := bare.plan(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Isolation: project.Verbatim}})
 
 	assert.Equal(t, project.Verbatim, given.Isolation)
 	assert.Equal(t, project.Isolated, defaulted.Isolation)
@@ -89,8 +90,8 @@ func TestThePlanFastForwardsOnlyWhatIsBehindAndOnlyWhenAsked(t *testing.T) {
 	w := newWorld(t, seed{Behind: true})
 
 	kept, _ := w.plan(t, create.Request{Branches: []string{branchName}})
-	asked, _ := w.plan(t, create.Request{Branches: []string{branchName}, FastForward: new(true)})
-	fromRemote, _ := w.plan(t, create.Request{Branches: []string{branchName}, From: "origin/main", FastForward: new(true)})
+	asked, _ := w.plan(t, create.Request{Branches: []string{branchName}, Given: provision.Given{FastForward: new(true)}})
+	fromRemote, _ := w.plan(t, create.Request{Branches: []string{branchName}, From: "origin/main", Given: provision.Given{FastForward: new(true)}})
 
 	assert.Empty(t, kept.FastForward)
 	assert.Equal(t, []string{"main"}, asked.FastForward)
@@ -101,7 +102,7 @@ func TestAnExistingBranchIsItsOwnFastForwardSubject(t *testing.T) {
 	w := newWorld(t, seed{})
 	behindOrigin(t, w, existing)
 
-	planned, _ := w.plan(t, create.Request{Branches: []string{existing}, From: "main", FastForward: new(true)})
+	planned, _ := w.plan(t, create.Request{Branches: []string{existing}, From: "main", Given: provision.Given{FastForward: new(true)}})
 
 	assert.Equal(t, []string{existing}, planned.FastForward)
 }
@@ -121,9 +122,9 @@ func TestADivergedSourceIsAWarningOfThePlan(t *testing.T) {
 func TestTheParentStrategyWithoutTheSourcesWorktreeFallsBackToMainAndSaysSo(t *testing.T) {
 	w := newWorld(t, seed{Linked: []string{"linked"}})
 
-	_, fromMain := w.plan(t, create.Request{Branches: []string{branchName}, EnvFrom: project.EnvParent})
-	_, fromExisting := w.plan(t, create.Request{Branches: []string{branchName}, From: existing, EnvFrom: project.EnvParent})
-	_, unchanged := w.plan(t, create.Request{Branches: []string{"linked"}, From: existing, EnvFrom: project.EnvParent, IfNotExists: true})
+	_, fromMain := w.plan(t, create.Request{Branches: []string{branchName}, Given: provision.Given{EnvFrom: project.EnvParent}})
+	_, fromExisting := w.plan(t, create.Request{Branches: []string{branchName}, From: existing, Given: provision.Given{EnvFrom: project.EnvParent}})
+	_, unchanged := w.plan(t, create.Request{Branches: []string{"linked"}, From: existing, Given: provision.Given{EnvFrom: project.EnvParent}, IfNotExists: true})
 
 	assert.Empty(t, fromMain)
 	assert.Equal(t, []domain.Warning{{Code: "create.env_parent_fallback", Message: "The \"parent\" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main."}}, fromExisting)

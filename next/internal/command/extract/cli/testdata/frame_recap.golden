@@ -1,11 +1,12 @@
 
-  Step 10/10 • Apply this plan?
+  Step 11/11 • Apply this plan?
 
   ✓ Source worktree: feat/login
   ✓ Files: 2 files
   ✓ Target worktree: feat/other
   · Branch name — the target worktree exists: nothing is created
   · Source branch — the target worktree exists: nothing is created
+  · Env strategy — the target worktree exists: nothing is created
   · Isolation — the target worktree exists: nothing is created
   · Source update — the target worktree exists: nothing is created
   ✓ Mode: move · default

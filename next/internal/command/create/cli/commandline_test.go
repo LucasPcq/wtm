@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
@@ -14,9 +15,7 @@ func TestTheRequestIsSpelledWithItsFlagsSortedAndQuoted(t *testing.T) {
 	req := create.Request{
 		Branches:    []string{"feat/a", "it's"},
 		From:        "two words",
-		EnvFrom:     project.EnvMain,
-		Isolation:   project.Verbatim,
-		FastForward: new(true),
+		Given:       provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(true)},
 		IfNotExists: true,
 		Remember:    []string{"env_from", "isolation"},
 		Ask:         true,
@@ -27,7 +26,7 @@ func TestTheRequestIsSpelledWithItsFlagsSortedAndQuoted(t *testing.T) {
 
 func TestAnUnsetRequestIsTheBareCommand(t *testing.T) {
 	assert.Equal(t, "wtm-next create feat/a", output.Line(newForm(nil).Argv("wtm-next create", create.Request{Branches: []string{"feat/a"}})))
-	assert.Equal(t, "wtm-next create feat/a --ff=false", output.Line(newForm(nil).Argv("wtm-next create", create.Request{Branches: []string{"feat/a"}, FastForward: new(false)})))
+	assert.Equal(t, "wtm-next create feat/a --ff=false", output.Line(newForm(nil).Argv("wtm-next create", create.Request{Branches: []string{"feat/a"}, Given: provision.Given{FastForward: new(false)}})))
 }
 
 func TestTheArgvKeepsEachWordAsTheRequestHasIt(t *testing.T) {

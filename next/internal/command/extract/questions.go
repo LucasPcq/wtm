@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 )
 
 // ----------------------------------------------------------------------------
@@ -30,16 +30,15 @@ func OnConflicts() []OnConflict {
 
 // A Request is what the caller asks of extract, as given: a field left empty takes its remembered answer, its recorded or configured value or its default when the request is resolved.
 type Request struct {
-	Source      string            `json:"source"`
-	Files       []string          `json:"files"` // paths of changes, or directories to take every change below
-	To          string            `json:"to"`
-	From        string            `json:"from"`
-	FastForward *bool             `json:"fast_forward"` // nil when not given, so a remembered answer can apply
-	Isolation   project.Isolation `json:"isolation"`
-	Keep        *bool             `json:"keep"` // copy rather than move; nil when not given
-	OnConflict  OnConflict        `json:"on_conflict"`
-	Remember    []string          `json:"remember"` // the fields whose answer is remembered for the next runs
-	Ask         bool              `json:"ask"`      // ignore the remembered answers for this run
+	Source string   `json:"source"`
+	Files  []string `json:"files"` // paths of changes, or directories to take every change below
+	To     string   `json:"to"`
+	From   string   `json:"from"`
+	provision.Given
+	Keep       *bool      `json:"keep"` // copy rather than move; nil when not given
+	OnConflict OnConflict `json:"on_conflict"`
+	Remember   []string   `json:"remember"` // the fields whose answer is remembered for the next runs
+	Ask        bool       `json:"ask"`      // ignore the remembered answers for this run
 }
 
 // Answer is the request with the field at path answered by values, spelled as the field's Answer spells them; the path "remember" answers the fields whose answer is remembered. A value the field cannot take leaves the request as it was.
@@ -58,14 +57,8 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 		next.To, err = domain.One[string](answer)
 	case "from":
 		next.From, err = domain.One[string](answer)
-	case "isolation":
-		next.Isolation, err = domain.One[project.Isolation](answer)
 	case "on_conflict":
 		next.OnConflict, err = domain.One[OnConflict](answer)
-	case "fast_forward":
-		var yes bool
-		yes, err = domain.Yes(answer)
-		next.FastForward = &yes
 	case "keep":
 		var yes bool
 		yes, err = domain.Yes(answer)
@@ -73,7 +66,7 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 	case domain.PathAsk:
 		next.Ask, err = domain.Yes(answer)
 	default:
-		err = domain.Unknown(path)
+		next.Given, err = r.Given.Answer(path, values)
 	}
 
 	if err != nil {
@@ -96,36 +89,30 @@ func (r Request) Values(path string) []string {
 		return domain.Spelled(r.To)
 	case "from":
 		return domain.Spelled(r.From)
-	case "isolation":
-		return domain.Spelled(r.Isolation)
 	case "on_conflict":
 		return domain.Spelled(r.OnConflict)
-	case "fast_forward":
-		return domain.Said(r.FastForward)
 	case "keep":
 		return domain.Said(r.Keep)
 	case domain.PathAsk:
 		return domain.SaidYes(r.Ask)
 	}
 
-	return nil
+	return r.Given.Values(path)
 }
 
 // ----------------------------------------------------------------------------
 // The form
 
-// Questions is the request as a form: each question with its options, its answer so far and where that answer comes from, the fields whose answer is to be remembered, and the request's problems as field errors.
+// Questions is the request as a form: each question with its options, its answer so far and where that answer comes from, the questions of a created target with the fields whose answer is to be remembered, and the request's problems as field errors.
 type Questions struct {
-	Source      Source
-	Files       Files
-	To          To
-	From        From
-	Isolation   domain.Choice[project.Isolation]
-	FastForward domain.Confirm
-	Keep        domain.Confirm
-	OnConflict  Conflicting
-	Remember    []string
-	Errors      []domain.FieldError
+	Source Source
+	Files  Files
+	To     To
+	From   From
+	provision.Questions
+	Keep       domain.Confirm
+	OnConflict Conflicting
+	Errors     []domain.FieldError
 }
 
 // Source is the question of the worktree to extract from: the branch given, and the worktrees that hold changes, each badged with how many.
@@ -164,29 +151,19 @@ const existingSkip = "the target worktree exists: nothing is created"
 
 // NewQuestions builds the questions for the request on the facts: a field given keeps its value, an empty one takes its remembered answer (unless the request asks again), its recorded or configured value or its default. Its conflict question has no conflicts yet: they are read once the request has no problem (UseCase.Questions).
 func NewQuestions(f Facts, req Request) Questions {
-	recalled := f.Config.Remembered
-	if req.Ask {
-		f.Config.Remembered = nil
-	}
-
 	// The source branch is settled first: whether a fast-forward is asked depends on the branch the target starts from.
 	from := f.from(req)
 	req.From = from.Value
 
 	questions := Questions{
-		Source:      Source{Given: req.Source, Options: f.sourceOptions()},
-		Files:       Files{Given: req.Files, Options: f.Changes[req.Source]},
-		To:          To{Given: req.To, Options: f.targetOptions(req.Source)},
-		From:        from,
-		Isolation:   f.isolation(req),
-		FastForward: f.fastForward(req),
-		Keep:        keep(req.Keep),
-		OnConflict:  onConflict(req.OnConflict),
-		Remember:    req.Remember,
+		Source:     Source{Given: req.Source, Options: f.sourceOptions()},
+		Files:      Files{Given: req.Files, Options: f.Changes[req.Source]},
+		To:         To{Given: req.To, Options: f.targetOptions(req.Source)},
+		From:       from,
+		Questions:  f.newWorktree(req),
+		Keep:       keep(req.Keep),
+		OnConflict: onConflict(req.OnConflict),
 	}
-	// Even under --ask, the question carries what is remembered, so a form can show it to keep or untick.
-	questions.Isolation.Remembered = project.Isolation(recalled[project.RememberIsolation])
-	questions.FastForward.Remembered = domain.RememberedFastForward(recalled[project.RememberSourceUpdate])
 	questions.Errors = f.problems(req, questions)
 	return questions
 }
@@ -194,7 +171,7 @@ func NewQuestions(f Facts, req Request) Questions {
 // Form is the questions as the schema a surface renders: the fields in the order the wizard asks them, each with its flag, label, help and answer so far. The target is asked twice: as a worktree to pick, then, for one to create, as its branch. A zero Questions gives the schema the flags and --help are spelled from.
 func (q Questions) Form() domain.Form {
 	source, to := q.Source.Given, q.To.Given
-	return domain.Form{Problems: q.Errors, Fields: []domain.Field{
+	fields := []domain.Field{
 		domain.SelectField{
 			FieldSpec: domain.FieldSpec{Path: "source", Flag: "<source>", Label: "Source worktree", Help: "Which worktree to extract changes from"},
 			Value:     source,
@@ -222,30 +199,9 @@ func (q Questions) Form() domain.Form {
 			Pinned:      q.From.Pinned,
 			Refreshable: true,
 		},
-		domain.SelectField{
-			FieldSpec:    domain.FieldSpec{Path: "isolation", Flag: "--isolation", Label: "Isolation", Help: domain.IsolationHelp, Origin: q.Isolation.Origin, Skip: q.Isolation.Skip},
-			Value:        string(q.Isolation.Value),
-			Options:      domain.Options(project.Isolations()),
-			Remembered:   string(q.Isolation.Remembered),
-			Rememberable: true,
-			Remember:     q.remembers("isolation"),
-		},
-		domain.ConfirmField{
-			FieldSpec: domain.FieldSpec{
-				Path:   "fast_forward",
-				Flag:   "--ff",
-				Label:  "Source update",
-				Help:   "Fast-forward the parent branch to origin before creating the target; skipped when it has diverged",
-				Origin: q.FastForward.Origin,
-				Skip:   q.FastForward.Skip,
-			},
-			Value:        q.FastForward.Value,
-			Yes:          domain.Option{Value: "true", Label: "Fast-forward to origin"},
-			No:           domain.Option{Value: "false", Label: "Keep it as-is"},
-			Remembered:   q.FastForward.Remembered,
-			Rememberable: true,
-			Remember:     q.remembers("fast_forward"),
-		},
+	}
+	fields = append(fields, q.Questions.Fields(fastForwardWording)...)
+	fields = append(fields,
 		domain.ConfirmField{
 			FieldSpec: domain.FieldSpec{Path: "keep", Flag: "--keep", Label: "Mode", Help: "Copy instead of move (keep the changes in the source)", Origin: q.Keep.Origin},
 			Value:     q.Keep.Value,
@@ -261,7 +217,15 @@ func (q Questions) Form() domain.Form {
 				{Value: string(OnConflictResolve), Label: "Resolve — write conflict markers in " + to},
 			},
 		},
-	}}
+	)
+
+	return domain.Form{Problems: q.Errors, Fields: fields}
+}
+
+var fastForwardWording = provision.Wording{
+	FastForwardHelp: "Fast-forward the parent branch to origin before creating the target; skipped when it has diverged",
+	Yes:             domain.Option{Value: "true", Label: "Fast-forward to origin"},
+	No:              domain.Option{Value: "false", Label: "Keep it as-is"},
 }
 
 func (q Questions) filesHelp() string {
@@ -401,36 +365,24 @@ func (f Facts) fromOptions(to string) []domain.Option {
 	return options
 }
 
-func (f Facts) isolation(req Request) domain.Choice[project.Isolation] {
-	question := domain.Choice[project.Isolation]{Options: project.Isolations()}
-	existing := f.existing(req)
-	switch {
-	case existing:
-		question.Skip = existingSkip
-	case !f.Run.IsolationApplies():
-		question.Skip = "run.toml declares nothing a worktree isolates"
+// newWorktree are the questions of the target to create, on the facts: none is asked of a target that exists, and the fast-forward is asked while the branch it starts from is behind origin.
+func (f Facts) newWorktree(req Request) provision.Questions {
+	params := provision.QuestionsParams{
+		Given:       req.Given,
+		Remembered:  f.Config.Remembered,
+		Ask:         req.Ask,
+		EnvStrategy: f.Config.Env.Strategy,
+		Run:         f.Run,
+		Remember:    req.Remember,
 	}
-
-	switch {
-	case req.Isolation != "":
-		question.Answer = domain.Answer[project.Isolation]{Value: req.Isolation, Origin: domain.OriginRequest}
-	case !existing:
-		question.Answer = domain.IsolationAnswer(project.Isolation(f.Config.Remembered[project.RememberIsolation]), f.Run)
-	}
-
-	return question
-}
-
-func (f Facts) fastForward(req Request) domain.Confirm {
-	params := domain.FastForwardParams{Given: req.FastForward, Remembered: f.Config.Remembered[project.RememberSourceUpdate]}
 	switch {
 	case f.existing(req):
-		params.Skip = existingSkip
+		params.Exists = existingSkip
 	case f.subjectAt(req, worktree.Behind) == "":
-		params.Skip = "nothing to fast-forward: the branch it starts from is not behind origin"
+		params.NotBehind = "nothing to fast-forward: the branch it starts from is not behind origin"
 	}
 
-	return domain.FastForwardAnswer(params)
+	return provision.NewQuestions(params)
 }
 
 func keep(given *bool) domain.Confirm {
@@ -488,15 +440,14 @@ func Resolve(f Facts, req Request) (Request, error) {
 // Request is the request the questions answer.
 func (q Questions) Request() Request {
 	return Request{
-		Source:      q.Source.Given,
-		Files:       q.Files.Given,
-		To:          q.To.Given,
-		From:        q.From.Value,
-		FastForward: new(q.FastForward.Value),
-		Isolation:   q.Isolation.Value,
-		Keep:        new(q.Keep.Value),
-		OnConflict:  q.OnConflict.Value,
-		Remember:    q.remembered(),
+		Source:     q.Source.Given,
+		Files:      q.Files.Given,
+		To:         q.To.Given,
+		From:       q.From.Value,
+		Given:      q.Questions.Given(),
+		Keep:       new(q.Keep.Value),
+		OnConflict: q.OnConflict.Value,
+		Remember:   q.remembered(),
 	}
 }
 
@@ -504,20 +455,12 @@ func (q Questions) Request() Request {
 func (q Questions) remembered() []string {
 	var remembered []string
 	for _, field := range rememberable() {
-		if q.remembers(field) {
+		if q.Remembers(field) {
 			remembered = append(remembered, field)
 		}
 	}
 
 	return remembered
-}
-
-func (q Questions) remembers(field string) bool {
-	return slices.Contains(q.Remember, field) && !q.skipped(field)
-}
-
-func (q Questions) skipped(field string) bool {
-	return field == "isolation" && q.Isolation.Skip != "" || field == "fast_forward" && q.FastForward.Skip != ""
 }
 
 // problems are the request's problems as field errors; a source with nothing to extract has no other, since nothing more is asked of it.
@@ -533,9 +476,7 @@ func (f Facts) problems(req Request, q Questions) []domain.FieldError {
 	}
 
 	problems = append(problems, f.fromProblems(req)...)
-	if q.Isolation.Origin == domain.OriginRequest {
-		problems = append(problems, domain.OneOf(domain.OneOfParams{Path: "isolation", Value: string(q.Isolation.Value), Accepted: domain.Names(project.Isolations())})...)
-	}
+	problems = append(problems, q.Questions.Problems()...)
 
 	problems = append(problems, domain.OneOf(domain.OneOfParams{Path: "on_conflict", Value: string(q.OnConflict.Value), Accepted: domain.Names(OnConflicts())})...)
 	for index, id := range q.Remember {

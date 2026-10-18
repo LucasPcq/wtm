@@ -4,8 +4,9 @@
 
   On a terminal the wizard asks what the flags leave open: the source worktree,
   the files, the target (an existing worktree, or a new one: its branch, source
-  branch and isolation), move or copy, and what to do when the files conflict
-  with the target; its recap previews the plan, then applies exactly that plan.
+  branch, env strategy and isolation), move or copy, and what to do when the
+  files conflict with the target; its recap previews the plan, then applies
+  exactly that plan.
   With --yes, --output json or no terminal nothing is asked: a source, --files
   and --to are then required.
 
@@ -38,6 +39,7 @@
   Flags:
         --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
     -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --env-from string             How the .env files of the new worktrees are provisioned: example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy
         --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
         --ff                          Fast-forward the parent branch to origin before creating the target; skipped when it has diverged
         --files strings               Files to extract, or a directory to take everything below it
@@ -47,7 +49,7 @@
         --keep                        Copy instead of move (keep the changes in the source)
         --on-conflict string          On conflict: abort (default) or resolve (write conflict markers in the target)
         --output string               Output format: text or json (default "text")
-        --remember stringArray        The answers to always use in this repository: isolation, fast_forward (repeatable)
+        --remember stringArray        The answers to always use in this repository: env_from, isolation, fast_forward (repeatable)
         --to string                   Target worktree branch; created if it does not exist
     -y, --yes                         Run unattended: no question, no confirmation; what is not given takes its default (a source, --files and --to are required, and --from when --to already exists locally)
 

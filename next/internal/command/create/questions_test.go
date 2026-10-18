@@ -1,6 +1,7 @@
 package create_test
 
 import (
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
@@ -61,7 +62,7 @@ func TestIfNotExistsIsSetByItsFlagOnly(t *testing.T) {
 func TestAnAnswerGivenWinsOverARememberedOne(t *testing.T) {
 	w := newWorld(t, seed{Run: jobsToml, Behind: true, Config: remembering})
 
-	questions := w.questions(t, create.Request{Branches: []string{branchName}, EnvFrom: project.EnvParent, Isolation: project.Isolated, FastForward: new(false)})
+	questions := w.questions(t, create.Request{Branches: []string{branchName}, Given: provision.Given{EnvFrom: project.EnvParent, Isolation: project.Isolated, FastForward: new(false)}})
 
 	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: project.EnvParent, Origin: domain.OriginRequest}, questions.EnvFrom.Answer)
 	assert.Equal(t, domain.Answer[project.Isolation]{Value: project.Isolated, Origin: domain.OriginRequest}, questions.Isolation.Answer)
@@ -146,7 +147,7 @@ func TestANewBranchStartsFromTheBaseBranchAndTheConfiguredEnv(t *testing.T) {
 	resolved, err := resolve(t, w, create.Request{Branches: []string{branchName}})
 
 	require.NoError(t, err)
-	assert.Equal(t, create.Request{Branches: []string{branchName}, From: "main", EnvFrom: project.EnvMain, Isolation: project.Isolated, FastForward: new(false)}, resolved)
+	assert.Equal(t, create.Request{Branches: []string{branchName}, From: "main", Given: provision.Given{EnvFrom: project.EnvMain, Isolation: project.Isolated, FastForward: new(false)}}, resolved)
 }
 
 func TestABlankBranchIsRequiredAndANameIsTakenAsGiven(t *testing.T) {
@@ -274,7 +275,7 @@ func TestABranchAlreadyOpenIsUnchangedUnderIfNotExists(t *testing.T) {
 func TestAnAnswerOutsideItsChoicesIsRefused(t *testing.T) {
 	w := newWorld(t, seed{Run: jobsToml})
 
-	_, err := resolve(t, w, create.Request{Branches: []string{branchName}, EnvFrom: "copy", Isolation: "keep", Remember: []string{"env_from", "from"}})
+	_, err := resolve(t, w, create.Request{Branches: []string{branchName}, Given: provision.Given{EnvFrom: "copy", Isolation: "keep"}, Remember: []string{"env_from", "from"}})
 
 	template := "{path} must be one of {accepted}, not {value}"
 	assert.Equal(t, []domain.FieldError{
@@ -288,8 +289,8 @@ func TestAnAnswerOutsideItsChoicesIsRefused(t *testing.T) {
 func TestAnIsolationGivenIsCheckedEvenWhenNothingIsIsolated(t *testing.T) {
 	w := newWorld(t, seed{})
 
-	_, refused := resolve(t, w, create.Request{Branches: []string{branchName}, Isolation: "keep"})
-	kept, err := resolve(t, w, create.Request{Branches: []string{branchName}, Isolation: project.Verbatim})
+	_, refused := resolve(t, w, create.Request{Branches: []string{branchName}, Given: provision.Given{Isolation: "keep"}})
+	kept, err := resolve(t, w, create.Request{Branches: []string{branchName}, Given: provision.Given{Isolation: project.Verbatim}})
 
 	assert.Equal(t, map[string]string{"isolation": "one_of"}, problems(refused))
 	require.NoError(t, err)
@@ -308,7 +309,7 @@ func TestAnAnswerToASkippedQuestionIsNeverRemembered(t *testing.T) {
 func TestTheBranchesAreCheckedFirstThenTheOtherFieldsThenTheRulesAcrossThem(t *testing.T) {
 	w := newWorld(t, seed{})
 
-	_, err := resolve(t, w, create.Request{Branches: []string{existing, existing}, From: existing, EnvFrom: "copy"})
+	_, err := resolve(t, w, create.Request{Branches: []string{existing, existing}, From: existing, Given: provision.Given{EnvFrom: "copy"}})
 
 	paths := make([]string, 0)
 	for _, field := range fieldsOf(t, err) {
@@ -330,9 +331,7 @@ func TestEachFieldOfTheFormAnswersTheRequestBack(t *testing.T) {
 		"every field given": {
 			Branches:    []string{branchName, "feat/two"},
 			From:        "main",
-			EnvFrom:     project.EnvMain,
-			Isolation:   project.Verbatim,
-			FastForward: new(true),
+			Given:       provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(true)},
 			IfNotExists: true,
 			Remember:    []string{"isolation", "env_from", "isolation", "fast_forward"},
 		},
@@ -356,7 +355,7 @@ func TestTheFormExistsBeforeAnyRead(t *testing.T) {
 }
 
 func TestTheFormCarriesTheRequestsProblems(t *testing.T) {
-	questions := newWorld(t, seed{}).questions(t, create.Request{Branches: []string{branchName, branchName}, EnvFrom: "copy", Remember: []string{"from"}})
+	questions := newWorld(t, seed{}).questions(t, create.Request{Branches: []string{branchName, branchName}, Given: provision.Given{EnvFrom: "copy"}, Remember: []string{"from"}})
 
 	form := questions.Form()
 
@@ -378,7 +377,7 @@ func TestAnAnswerTheRequestCannotTakeIsRefusedAndChangesNothing(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			req := create.Request{From: "feature", FastForward: new(true)}
+			req := create.Request{From: "feature", Given: provision.Given{FastForward: new(true)}}
 
 			got, err := req.Answer(c.path, c.values)
 
@@ -390,7 +389,7 @@ func TestAnAnswerTheRequestCannotTakeIsRefusedAndChangesNothing(t *testing.T) {
 }
 
 func TestEachAnswerReadsBackAsAnswerTakesIt(t *testing.T) {
-	req := create.Request{Branches: []string{"feat/a", "feat/b"}, From: "main", EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(false), IfNotExists: true, Remember: []string{"env_from"}, Ask: true}
+	req := create.Request{Branches: []string{"feat/a", "feat/b"}, From: "main", Given: provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim, FastForward: new(false)}, IfNotExists: true, Remember: []string{"env_from"}, Ask: true}
 	paths := []string{domain.PathRemember, domain.PathAsk}
 	for _, field := range (create.Questions{}).Form().Fields {
 		paths = append(paths, field.Spec().Path)

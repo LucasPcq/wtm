@@ -6,6 +6,6 @@
   Mode         move
   Conflicts    apps/api/a.txt (modified)
   On conflict  resolve
-  fingerprint  1c216aef1d1f9fdb493d1cac
-  → wtm-next extract feat/login --files apps/api --on-conflict resolve --to feat/split --expect-fingerprint 1c216aef1d1f9fdb493d1cac   apply this plan
+  fingerprint  8b4d60e8766b1b0179b3da89
+  → wtm-next extract feat/login --files apps/api --on-conflict resolve --to feat/split --expect-fingerprint 8b4d60e8766b1b0179b3da89   apply this plan
 

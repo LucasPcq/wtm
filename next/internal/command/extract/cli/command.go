@@ -20,8 +20,9 @@ const (
 		"(new or existing) to split an oversized PR or isolate unrelated work.\n\n" +
 		"On a terminal the wizard asks what the flags leave open: the source worktree,\n" +
 		"the files, the target (an existing worktree, or a new one: its branch, source\n" +
-		"branch and isolation), move or copy, and what to do when the files conflict\n" +
-		"with the target; its recap previews the plan, then applies exactly that plan.\n" +
+		"branch, env strategy and isolation), move or copy, and what to do when the\n" +
+		"files conflict with the target; its recap previews the plan, then applies\n" +
+		"exactly that plan.\n" +
 		"With --yes, --output json or no terminal nothing is asked: a source, --files\n" +
 		"and --to are then required.\n\n" +
 		"A --to branch that already exists locally is checked out as-is, keeping its\n" +

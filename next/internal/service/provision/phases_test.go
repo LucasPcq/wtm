@@ -14,6 +14,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -178,7 +179,7 @@ func TestAVerbatimWorktreeKeepsItsEnvAsCopiedAndHasNoNumber(t *testing.T) {
 	w := onDisk(t)
 	report := &recorder{}
 	params := portLinked(w.params(report))
-	params.Worktree.Isolation = project.Verbatim
+	params.Worktree.Answers = answered(provision.Given{EnvFrom: project.EnvMain, Isolation: project.Verbatim})
 
 	outcome := w.service.Run(t.Context(), params)
 

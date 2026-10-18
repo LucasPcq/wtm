@@ -1,6 +1,6 @@
 $ wtmx extract; echo EXIT=$?
 
-  Step 1/10 • Source worktree
+  Step 1/11 • Source worktree
 
   Which worktree to extract changes from
 

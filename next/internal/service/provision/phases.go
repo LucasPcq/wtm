@@ -26,13 +26,13 @@ func (p *provisioning) needsOrdinal() bool {
 
 // portsNeedOrdinal reports whether the worktree's ports derive from its ordinal.
 func (p *provisioning) portsNeedOrdinal() bool {
-	return env.NeedsOrdinal(p.Worktree.Isolation, p.kept)
+	return env.NeedsOrdinal(p.Worktree.Answers.isolation, p.kept)
 }
 
 // hooksReadRun reports whether the on_create hooks run with the worktree's run
 // environment.
 func (p *provisioning) hooksReadRun() bool {
-	return len(p.Project.OnCreate) > 0 && env.HooksReadRun(p.Project.Run, p.Worktree.Isolation)
+	return len(p.Project.OnCreate) > 0 && env.HooksReadRun(p.Project.Run, p.Worktree.Answers.isolation)
 }
 
 // number gives the worktree a free ordinal. Failing to find one stops the run
@@ -146,7 +146,7 @@ func (p *provisioning) settlesPorts() bool {
 	switch {
 	case p.Project.RunErr != nil || len(p.ignored) > 0:
 		return true
-	case p.Worktree.Isolation == project.Verbatim:
+	case p.Worktree.Answers.isolation == project.Verbatim:
 		return false
 	case len(p.kept.EnvPorts) > 0 || len(p.kept.EnvValues) > 0:
 		return true
@@ -167,7 +167,7 @@ func (p *provisioning) settle(ctx context.Context, provisioned *Provisioned) err
 		p.warn(ignoredWarning(link))
 	}
 
-	if p.Worktree.Isolation == project.Verbatim {
+	if p.Worktree.Answers.isolation == project.Verbatim {
 		return nil
 	}
 
@@ -223,7 +223,7 @@ func ownedOnly(run project.Run) project.Run {
 // jobParams is what the worktree's job environment derives from; a nil ordinal
 // leaves it at 0.
 func (p *provisioning) jobParams(ordinal *int) env.JobParams {
-	params := env.JobParams{Branch: p.Worktree.Branch, ProjectDir: p.Project.MainPath, Isolation: p.Worktree.Isolation, Run: p.Project.Run}
+	params := env.JobParams{Branch: p.Worktree.Branch, ProjectDir: p.Project.MainPath, Isolation: p.Worktree.Answers.isolation, Run: p.Project.Run}
 
 	if ordinal != nil {
 		params.Ordinal = *ordinal

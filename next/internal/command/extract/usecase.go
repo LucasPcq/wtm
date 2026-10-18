@@ -370,8 +370,7 @@ func (u UseCase) provisionParams(plan Plan, report domain.Report) provision.Para
 			Checkout:   plan.Target.placement().Checkout(plan.Target.Branch, f.Ref(plan.From)),
 			Source:     plan.From,
 			ParentPath: f.CheckedOutAt(plan.From),
-			Strategy:   f.Config.Env.Strategy,
-			Isolation:  plan.isolation,
+			Answers:    plan.settled,
 		},
 		Report: report,
 	}

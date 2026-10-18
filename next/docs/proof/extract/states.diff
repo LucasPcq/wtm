@@ -40,3 +40,62 @@
  ## feat-json status
  ?? apps/web/login.ts
     apps/web/login.ts 2baaedadd43f
+=== 10-env-default: exit legacy 0, next 0
+--- legacy/10-env-default
++++ next/10-env-default
+@@ -15,8 +15,6 @@
+    apps/api/new/deep/y.txt 9063a9f0e032
+    apps/api/new/x.txt 6fcf9dfbd479
+ ## feat-c status
+- M README.md
+-   README.md cfe9a2ed459a
+ ## feat-env-default status
+ ?? apps/api/env-b.txt
+    apps/api/env-b.txt 89e6c98d9288
+=== 11-env-from-main: exit legacy 2, next 0
+--- legacy/11-env-from-main
++++ next/11-env-from-main
+@@ -2,6 +2,7 @@
+ feat/api
+ feat/c
+ feat/env-default
++feat/env-main
+ feat/json
+ feat/local
+ feat/login
+@@ -15,18 +16,17 @@
+    apps/api/new/deep/y.txt 9063a9f0e032
+    apps/api/new/x.txt 6fcf9dfbd479
+ ## feat-c status
+- M README.md
+-   README.md cfe9a2ed459a
+ ## feat-env-default status
+ ?? apps/api/env-b.txt
+    apps/api/env-b.txt 89e6c98d9288
++## feat-env-main status
++?? apps/api/env-a.txt
++   apps/api/env-a.txt 3f786850e387
+ ## feat-json status
+ ?? apps/web/login.ts
+    apps/web/login.ts 2baaedadd43f
+ ## feat-login status
+  M README.md
+-?? apps/api/env-a.txt
+-   apps/api/env-a.txt 3f786850e387
+    README.md 190b171b0321
+ ## feat-misc status
+ D  apps/web/package.json
+@@ -58,6 +58,13 @@
+   "ordinal": 7,
+   "isolation": "isolated"
+ }
++## .git/wtm/worktrees/feat%2Fenv-main/meta.json
++{
++  "source_branch": "main",
++  "env_strategy": "main",
++  "ordinal": 8,
++  "isolation": "isolated"
++}
+ ## .git/wtm/worktrees/feat%2Fjson/meta.json
+ {
+   "source_branch": "main",
