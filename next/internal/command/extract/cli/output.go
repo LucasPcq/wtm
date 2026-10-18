@@ -114,7 +114,7 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
 	rows := planRowsOf(outcome.Plan, output.Marks{Recalled: outcome.Plan.Recalled(), Remembered: outcome.Result.Remembered, Mark: output.Saved})
 	anomalies := anomaliesOf(outcome)
 	var next []output.NextStep
-	if stands(item) && detail != nil {
+	if detail != nil {
 		path := output.ShownPath(output.Shown{Cwd: cwd, Path: detail.Path})
 		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + itemNote(detail, output.StylesOf(w))}})
 		next = append(next, output.NextStep{Command: "wtm go " + item.Subject})
@@ -130,6 +130,9 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
 	if item.Status != domain.StatusDone {
 		output.Blank(w)
 		output.UnfinishedLine(w, output.Unfinished{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err})
+		if note := untouched(outcome.Plan, item); note != "" {
+			output.WarningLine(w, note)
+		}
 	}
 
 	next = append(next, output.FollowUpSteps(item.Err)...)
@@ -137,11 +140,6 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
 		output.Blank(w)
 		output.NextSteps(w, next)
 	}
-}
-
-// stands reports whether the target's worktree stands: extracted to, or left incomplete by a later step of its provisioning.
-func stands(item extract.Item) bool {
-	return item.Status == domain.StatusDone || item.Reason == domain.ReasonIncomplete
 }
 
 // itemNote is the muted note after the target's path: how its env ports were settled, if worth saying.
@@ -152,6 +150,19 @@ func itemNote(detail *extract.Detail, st *output.Styles) string {
 	}
 
 	return st.Muted.Render(output.Dot + note)
+}
+
+// untouched says that a target left unfinished received nothing, the source still holding every file; a half move says for itself where the files are.
+func untouched(plan extract.Plan, item extract.Item) string {
+	if item.Err != nil && item.Err.Code == extract.CodeHalfMoved {
+		return ""
+	}
+
+	if plan.Keep {
+		return "nothing was copied to " + item.Subject
+	}
+
+	return "nothing was moved: the files are still in " + plan.Source
 }
 
 // conflictsParams are the detail of a target left with conflicts, and the branches of the target and the source.

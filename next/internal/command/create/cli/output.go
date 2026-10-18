@@ -96,7 +96,7 @@ func anomaliesOf(item create.Item) []string {
 	return append(anomalies, output.PortAnomalies(item.Detail.EnvPorts)...)
 }
 
-// drawOutcome draws what the apply did: the tally, the plan with each worktree that stands and the anomalies, the branches left unfinished, and the next steps.
+// drawOutcome draws what the apply did: the tally, the plan with each worktree that exists and the anomalies, the branches left unfinished, and the next steps.
 func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextStep, cwd string) {
 	items := outcome.Result.Items
 	headline(w, items)
@@ -109,7 +109,7 @@ func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextSte
 	}
 
 	for _, item := range items {
-		if !stands(item) || item.Detail == nil {
+		if item.Detail == nil {
 			continue
 		}
 		path := output.ShownPath(output.Shown{Cwd: cwd, Path: item.Detail.Path})
@@ -153,11 +153,6 @@ func drawOutcome(w io.Writer, outcome create.Outcome, followUps []output.NextSte
 		output.Blank(w)
 		output.NextSteps(w, next)
 	}
-}
-
-// stands reports whether the item's worktree stands: created, or left incomplete by a later step of its provisioning.
-func stands(item create.Item) bool {
-	return item.Status == domain.StatusDone || item.Reason == domain.ReasonIncomplete
 }
 
 // headline is the tally of the items by status.
