@@ -2,7 +2,6 @@ package cli
 
 import (
 	"io"
-	"strconv"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
@@ -116,7 +115,7 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
 	var next []output.NextStep
 	if detail != nil {
 		path := output.ShownPath(output.Shown{Cwd: cwd, Path: detail.Path})
-		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + itemNote(detail, output.StylesOf(w))}})
+		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + output.MutedNote(output.SettlementNote(detail.EnvPorts), output.StylesOf(w))}})
 		next = append(next, output.NextStep{Command: "wtm go " + item.Subject})
 	}
 	if conflicted {
@@ -140,16 +139,6 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
 		output.Blank(w)
 		output.NextSteps(w, next)
 	}
-}
-
-// itemNote is the muted note after the target's path: how its env ports were settled, if worth saying.
-func itemNote(detail *extract.Detail, st *output.Styles) string {
-	note := output.SettlementNote(detail.EnvPorts)
-	if note == "" {
-		return ""
-	}
-
-	return st.Muted.Render(output.Dot + note)
 }
 
 // untouched says that a target left unfinished received nothing, the source still holding every file; a half move says for itself where the files are.
@@ -195,14 +184,6 @@ func anomaliesOf(outcome extract.Outcome) []string {
 	}
 
 	return append(anomalies, output.PortAnomalies(item.Detail.EnvPorts)...)
-}
-
-func fileCount(count int) string {
-	if count == 1 {
-		return "1 file"
-	}
-
-	return strconv.Itoa(count) + " files"
 }
 
 // targetOf is the one item of an applied outcome, the target's; false when the outcome holds none.

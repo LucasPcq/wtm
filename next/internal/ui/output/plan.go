@@ -113,6 +113,15 @@ func RecalledHintOf(recalled []string) string {
 	return RecalledHint
 }
 
+// MutedNote is note after a dot, muted, as a plan's value carries it; nothing when note is empty.
+func MutedNote(note string, st *Styles) string {
+	if note == "" {
+		return ""
+	}
+
+	return st.Muted.Render(Dot + note)
+}
+
 // NotedParams are the values of a plan's row, the note the row carries and the value it shows when it has none but a note.
 type NotedParams struct {
 	Values []string

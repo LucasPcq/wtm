@@ -69,16 +69,11 @@ func sourceLabel(branches []create.BranchPlan) string {
 
 // itemNote is the muted note after an item's path: already open, else how its env ports were settled, if worth saying.
 func itemNote(item create.Item, st *output.Styles) string {
-	note := output.SettlementNote(item.Detail.EnvPorts)
 	if item.Reason == domain.ReasonUnchanged {
-		note = "already open"
+		return output.MutedNote("already open", st)
 	}
 
-	if note == "" {
-		return ""
-	}
-
-	return st.Muted.Render(output.Dot + note)
+	return output.MutedNote(output.SettlementNote(item.Detail.EnvPorts), st)
 }
 
 // anomaliesOf are what the reader of an item should act on: a branch checked out behind or diverged from origin, the env ports left alone.

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"slices"
+	"strconv"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -224,4 +225,12 @@ func (b *branchStep) check(branch string) error {
 	}
 
 	return nil
+}
+
+func fileCount(count int) string {
+	if count == 1 {
+		return "1 file"
+	}
+
+	return strconv.Itoa(count) + " files"
 }
