@@ -324,7 +324,7 @@ func (f Facts) from(req Request) From {
 		recorded = ""
 	}
 	base := f.Config.Worktrees.BaseBranch
-	question := From{Options: domain.SourceOptions(f.Snapshot, req.To), Pinned: cmp.Or(recorded, base)}
+	question := From{Options: domain.SourceOptions(f.Repository, req.To), Pinned: cmp.Or(recorded, base)}
 	target, decided := f.planned(req)
 	if decided && !target.creates() {
 		question.Skip = existingSkip

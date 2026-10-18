@@ -29,6 +29,14 @@ func TestATextListBadgesItsEntriesAndRefusesOneAsItIsAdded(t *testing.T) {
 	assert.Contains(t, d.screen(), "✓ Branches: feature")
 }
 
+func TestATextListBadgesAnEntryItDoesNotOfferAsNew(t *testing.T) {
+	d, _ := asking(t, &app{}, nil)
+
+	d.keys("feat/a", "tab")
+
+	assert.Contains(t, d.screen(), "feat/a  new")
+}
+
 func TestASelectPinsItsOptionAndRefreshes(t *testing.T) {
 	d, _ := asking(t, &app{}, request{"branches": {"feat/a"}})
 

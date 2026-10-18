@@ -153,7 +153,7 @@ func (f Facts) branchOptions() []domain.Option {
 
 // from answers the source with the base branch only when no branch is checked out as it exists, since such a branch's parent must be named.
 func (f Facts) from(req Request) From {
-	question := From{Options: domain.SourceOptions(f.Snapshot, req.Branches...), Pinned: f.Config.Worktrees.BaseBranch}
+	question := From{Options: domain.SourceOptions(f.Repository, req.Branches...), Pinned: f.Config.Worktrees.BaseBranch}
 	switch base := f.Config.Worktrees.BaseBranch; {
 	case req.From != "":
 		question.Answer = domain.Answer[string]{Value: req.From, Origin: domain.OriginRequest}

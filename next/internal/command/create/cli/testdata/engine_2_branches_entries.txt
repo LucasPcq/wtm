@@ -4,7 +4,7 @@
   The branches to create a worktree for; one that already exists is checked out as it is
 
 ›
-  feat/a
+  feat/a  new
   feature  existing
 
   tab add another • backspace remove last • enter confirm • esc cancel

@@ -8,7 +8,7 @@
 
   Parent branch when creating the target worktree
 
-▌› main                                                                                   1 behind
+▌› main (default)                                                                         1 behind
    feat/login
    feat/other
 

@@ -131,7 +131,7 @@ func TestTheSourcePickerListsEveryBranchButThoseBeingCreated(t *testing.T) {
 func TestTheSourceBadgesSayWhereABranchStandsAgainstOrigin(t *testing.T) {
 	behind := newWorld(t, seed{Behind: true})
 
-	assert.Equal(t, domain.Option{Value: "main", Badge: "1 behind"}, behind.questions(t, create.Request{Branches: []string{branchName}}).From.Options[1])
+	assert.Equal(t, domain.Option{Value: "main", Label: "main (default)", Badge: "1 behind"}, behind.questions(t, create.Request{Branches: []string{branchName}}).From.Options[1])
 }
 
 func TestTheQuestionsCarryTheProblemsOfTheRequest(t *testing.T) {

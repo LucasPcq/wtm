@@ -3,6 +3,7 @@ package domain
 import (
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 )
@@ -13,5 +14,7 @@ func TestTheSourceOptionsAreTheLocalBranchesThenThoseOnlyOnOriginTheExceptedLeft
 		Divergence: map[string]worktree.AheadBehind{"main": {Behind: 2}},
 	}
 
-	assert.Equal(t, []Option{{Value: "main", Badge: "2 behind"}, {Value: "origin/feat/y"}}, SourceOptions(snapshot, "feat/x", "feat/z"))
+	repo := worktree.Repository{Config: project.Config{Worktrees: project.Worktrees{BaseBranch: "main"}}, Snapshot: snapshot}
+
+	assert.Equal(t, []Option{{Value: "main", Label: "main (default)", Badge: "2 behind"}, {Value: "origin/feat/y"}}, SourceOptions(repo, "feat/x", "feat/z"))
 }
