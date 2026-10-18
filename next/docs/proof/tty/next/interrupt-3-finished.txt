@@ -1,4 +1,6 @@
 $ wtmx create feat/slow --yes; echo EXIT=$?
+  ✗ on_create · feat/slow (<DUR>)
+  full output:  <SB>/acme/.git/wtm/hooks/on_create-feat%2Fslow.log
 
 ┃  ! create: 1 cancelled
 ┃

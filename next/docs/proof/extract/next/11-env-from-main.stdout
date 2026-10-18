@@ -1,11 +1,13 @@
 
-  ✓ Moved 1 file to feat/env-main
+  ✓ extract: 1 done
 
-    new  apps/api/env-a.txt
-
-  source  feat/login · files removed
-  env     3 ports settled (offset +80)
-  path    ../acme.trees/feat-env-main
+  Source         feat/login
+  Files          new apps/api/env-a.txt
+  Target         new worktree feat/env-main from main
+  Env            main
+  Isolation      isolated
+  Mode           move
+  feat/env-main  ../acme.trees/feat-env-main · 3 ports settled (offset +80)
 
   → wtm go feat/env-main
 

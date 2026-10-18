@@ -3,9 +3,8 @@
 
   Branches   feat/dry
   From       main
-  Env        main
+  Env        main · remembered
   Isolation  isolated
-  Remember   env_from
   feat/dry   ../acme.trees/feat-dry · 3 ports settled (offset +130)
 
   → wtm go feat/dry

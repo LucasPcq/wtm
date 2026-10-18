@@ -9,7 +9,7 @@ $ wtmx extract; echo EXIT=$?
   ✓ Source branch: main · default
   ✓ Env strategy: main · remembered
   ✓ Isolation: isolated · default
-  · Source update — nothing to fast-forward: the branch it starts from is not behind origin
+  · Source update — nothing to fast-forward: the source is not behind origin
 
   Copy instead of move (keep the changes in the source)
 

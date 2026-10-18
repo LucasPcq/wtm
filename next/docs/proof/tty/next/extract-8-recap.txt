@@ -9,14 +9,14 @@ $ wtmx extract; echo EXIT=$?
   ✓ Source branch: main · default
   ✓ Env strategy: main · remembered
   ✓ Isolation: isolated · default
-  · Source update — nothing to fast-forward: the branch it starts from is not behind origin
+  · Source update — nothing to fast-forward: the source is not behind origin
   ✓ Mode: move · default
   · On conflict — nothing conflicts with the target
 
   ┃  Review & confirm
   ┃
   ┃  Source     feat/form
-  ┃  Files      README.md
+  ┃  Files      mod README.md
   ┃  Target     new worktree feat/moved from main
   ┃  Env        main
   ┃  Isolation  isolated

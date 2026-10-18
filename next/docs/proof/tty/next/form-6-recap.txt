@@ -6,18 +6,17 @@ $ wtmx create --ask; echo EXIT=$?
   ✓ Source branch: main
   ✓ Env strategy: main
   ✓ Isolation: isolated · default
-  · Source update — nothing to fast-forward: no branch it starts from is behind origin
+  · Source update — nothing to fast-forward: the source is not behind origin
   · If not exists — set by its flag only
 
   ┃  Review & confirm
   ┃
   ┃  Branches   feat/form, topic (existing)
   ┃  From       main
-  ┃  Env        main
+  ┃  Env        main · will be remembered
   ┃  Isolation  isolated
-  ┃  Remember   env_from
 
-▌› Yes, apply
+▌› Yes, create 2 worktrees
   ────────────────────────────────────────────────────────────────────────────────────────────────
    No, cancel
 

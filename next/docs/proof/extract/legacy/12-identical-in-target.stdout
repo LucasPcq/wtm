@@ -1,0 +1,10 @@
+
+  ✓ Moved 1 file to topic
+
+    new  apps/web/same.txt
+
+  source  feat/login · files removed
+  path    ../acme.trees/topic
+
+  → wtm go topic
+

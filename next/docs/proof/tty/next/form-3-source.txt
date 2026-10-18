@@ -7,7 +7,7 @@ $ wtmx create --ask; echo EXIT=$?
   The branch a new branch starts from, or the parent recorded for wtm sync of one that already
   exists
 
-▌› main
+▌› main (default)
    feat/a
    feat/bad
    feat/bad-json

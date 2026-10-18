@@ -9,7 +9,7 @@ $ wtmx extract; echo EXIT=$?
 
   Parent branch when creating the target worktree
 
-▌› main
+▌› main (default)
    feat/a
    feat/bad
    feat/bad-json
