@@ -94,11 +94,10 @@ func newWorld(t *testing.T, s seed) world {
 		meta:      meta,
 		published: published,
 		usecase: extract.UseCase{
-			Git:     repo,
-			Config:  projectConfig,
-			Answers: projectConfig,
-			Meta:    meta,
-			Shield:  shell.Shield,
+			Git:    repo,
+			Config: projectConfig,
+			Meta:   meta,
+			Shield: shell.Shield,
 			Operations: operation.Service{
 				Locker:    locks{oplock.Locks{StateDir: stateDir}},
 				Publisher: published,
@@ -112,6 +111,8 @@ func newWorld(t *testing.T, s seed) world {
 				Git:        repo,
 				Meta:       meta,
 				EnvFiles:   store.EnvFiles{},
+				StateDir:   stateDir,
+				Answers:    projectConfig,
 				RunHooks:   shell.RunHooks,
 				PublicPort: func(context.Context, int) int { return 0 },
 				Shield:     shell.Shield,
@@ -119,7 +120,6 @@ func newWorld(t *testing.T, s seed) world {
 				LeftBehind: cleanLine,
 			},
 			MainPath: main,
-			StateDir: stateDir,
 		},
 	}
 }

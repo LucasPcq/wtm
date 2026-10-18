@@ -13,12 +13,30 @@ import (
 )
 
 // ----------------------------------------------------------------------------
+// The service
+
+// Service provisions new worktrees and fast-forwards their sources for the
+// commands that create one. Every field must be set before Run.
+type Service struct {
+	Git      Git
+	Meta     Meta
+	EnvFiles EnvFiles
+	Answers  AnswerStore
+	StateDir string // wtm's state, where each worktree's hook log goes
+
+	RunHooks   func(ctx context.Context, chain env.HookChain) error // runs the on_create hooks, failing with an *env.HookFailure
+	PublicPort func(ctx context.Context, configured int) int        // the port a named URL announces, given the proxy's configured one; 0 with no proxy
+	Shield     func(ctx context.Context) (context.Context, func())  // a context the first cancel does not reach, and its release
+	Now        func() time.Time
+	LeftBehind func(branch string) []string // the command line that removes a branch an undo left behind, and its worktree
+}
+
+// ----------------------------------------------------------------------------
 // Request, outcome and Run
 
 // Project is what Run needs of the project a worktree is added to.
 type Project struct {
 	MainPath string
-	StateDir string
 	EnvFiles []project.EnvFile
 	OnCreate []project.Hook
 	Run      project.Run
@@ -26,11 +44,10 @@ type Project struct {
 	Global   project.Global
 }
 
-// ProjectOf is what Run needs of the project, as repo holds it, with the path of wtm's state.
-func ProjectOf(repo worktree.Repository, stateDir string) Project {
+// ProjectOf is what Run needs of the project, as repo holds it.
+func ProjectOf(repo worktree.Repository) Project {
 	return Project{
 		MainPath: repo.MainPath,
-		StateDir: stateDir,
 		EnvFiles: repo.Config.Env.Files,
 		OnCreate: repo.Config.OnCreate,
 		Run:      repo.Run,
@@ -57,12 +74,42 @@ type Params struct {
 	Report   domain.Report
 }
 
+// Planned is a new worktree as a command's plan places it: its branch, its path, how it starts, the branch it starts from and the answers it is made with.
+type Planned struct {
+	Branch    string
+	Path      string
+	Placement worktree.Placed
+	From      string
+	Answers   Answers
+}
+
+// ParamsOf is the Params that provision planned in repo, its events going to report: what it checks out, and the worktree of the branch it starts from.
+func ParamsOf(repo worktree.Repository, planned Planned, report domain.Report) Params {
+	return Params{
+		Project: ProjectOf(repo),
+		Worktree: Worktree{
+			Branch:     planned.Branch,
+			Path:       planned.Path,
+			Checkout:   planned.Placement.Checkout(planned.Branch, repo.Ref(planned.From)),
+			Source:     planned.From,
+			ParentPath: repo.CheckedOutAt(planned.From),
+			Answers:    planned.Answers,
+		},
+		Report: report,
+	}
+}
+
 // Provisioned is what a worktree was given: its record, its ordinal when it was
 // numbered (nil otherwise) and the values settled in its .env files.
 type Provisioned struct {
 	Meta     worktree.Meta
 	Ordinal  *int
 	EnvPorts env.Redacted
+}
+
+// Stands reports whether the worktree stands: its meta record was written, even when a later phase failed.
+func (p Provisioned) Stands() bool {
+	return p.Meta.CreatedAt != ""
 }
 
 // Outcome is how provisioning a worktree ended. Status is done, failed or
@@ -88,7 +135,7 @@ func (s Service) Run(ctx context.Context, params Params) Outcome {
 	}
 
 	params.Worktree.Answers.isolation = params.Worktree.Answers.isolation.Effective()
-	p := &provisioning{Params: params, Service: s, hookLog: env.HookLogPath(env.HookLogPathParams{StateDir: params.Project.StateDir, Branch: params.Worktree.Branch})}
+	p := &provisioning{Params: params, Service: s, hookLog: env.HookLogPath(env.HookLogPathParams{StateDir: s.StateDir, Branch: params.Worktree.Branch})}
 	p.kept, p.ignored = env.Targets(params.Project.Run, params.Project.EnvFiles)
 
 	if err := ctx.Err(); err != nil {
@@ -104,6 +151,48 @@ func (s Service) Run(ctx context.Context, params Params) Outcome {
 	outcome := p.complete(ctx, provisioned)
 	p.Report(p.provisionedEvent(outcome))
 	return outcome
+}
+
+// ----------------------------------------------------------------------------
+// The fingerprint and the remembered answers
+
+// Fingerprinted is what the fingerprint of a plan that provisions worktrees covers: the plan, the isolation as answers resolve it, and all Run reads of repo's project (its env, its on_create hooks, its run.toml and the global settings), so the apply of a preview made on another project is refused.
+func Fingerprinted(plan any, repo worktree.Repository, answers Answers) any {
+	return struct {
+		Plan      any               `json:"plan"`
+		Isolation project.Isolation `json:"isolation"`
+		Env       project.Env       `json:"env"`
+		OnCreate  []project.Hook    `json:"on_create"`
+		Run       project.Run       `json:"run"`
+		RunErr    string            `json:"run_err,omitempty"`
+		Global    project.Global    `json:"global"`
+	}{Plan: plan, Isolation: answers.Isolation(), Env: repo.Config.Env, OnCreate: repo.Config.OnCreate, Run: repo.Run, RunErr: errorText(repo.RunErr), Global: repo.Global}
+}
+
+func errorText(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	return err.Error()
+}
+
+// Remember writes the answers to the fields asked to be remembered, as answers settles them; a write that fails is command's warning <command>.remember_failed, what was made standing all the same.
+func (s Service) Remember(ctx context.Context, command string, answers Answers, fields []string) []domain.Warning {
+	remembered := answers.Remembered(fields)
+	if len(remembered) == 0 {
+		return nil
+	}
+
+	written, err := s.Answers.Remember(ctx, remembered)
+	if err != nil {
+		return []domain.Warning{{Code: command + ".remember_failed", Message: "could not remember the answer: " + err.Error(), Params: domain.Params{"cause": err.Error()}}}
+	}
+	if written.Unlocked {
+		return []domain.Warning{domain.LocksUnavailable}
+	}
+
+	return nil
 }
 
 // ----------------------------------------------------------------------------

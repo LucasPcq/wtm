@@ -53,6 +53,8 @@ func wire(params wireParams) app {
 		Git:        repo,
 		Meta:       store.Meta{StateDir: params.StateDir},
 		EnvFiles:   store.EnvFiles{},
+		Answers:    projectConfig,
+		StateDir:   params.StateDir,
 		RunHooks:   shell.RunHooks,
 		PublicPort: proxyport.Port{Plist: proxyport.PlistPath()}.Public,
 		Shield:     shell.Shield,
@@ -65,22 +67,18 @@ func wire(params wireParams) app {
 		Create: create.UseCase{
 			Git:        repo,
 			Config:     projectConfig,
-			Answers:    projectConfig,
 			Operations: operations,
 			Provision:  provisions,
 			MainPath:   params.MainPath,
-			StateDir:   params.StateDir,
 		},
 		Extract: extract.UseCase{
 			Git:        repo,
 			Config:     projectConfig,
-			Answers:    projectConfig,
 			Meta:       provisions.Meta,
 			Shield:     shell.Shield,
 			Operations: operations,
 			Provision:  provisions,
 			MainPath:   params.MainPath,
-			StateDir:   params.StateDir,
 		},
 	}
 }

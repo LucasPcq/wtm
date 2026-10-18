@@ -145,11 +145,10 @@ func (w world) usecase() extract.UseCase {
 		runHooks = func(context.Context, env.HookChain) error { return nil }
 	}
 	return extract.UseCase{
-		Git:     w.git,
-		Config:  stored{Fake: w.store, isolates: w.seed.Isolates},
-		Answers: w.store,
-		Meta:    w.store,
-		Shield:  shell.Shield,
+		Git:    w.git,
+		Config: stored{Fake: w.store, isolates: w.seed.Isolates},
+		Meta:   w.store,
+		Shield: shell.Shield,
 		Operations: operation.Service{
 			Locker:    locker{seen: w.seen},
 			Publisher: locker{},
@@ -160,6 +159,8 @@ func (w world) usecase() extract.UseCase {
 			Git:        w.git,
 			Meta:       w.store,
 			EnvFiles:   w.store,
+			StateDir:   stateDir,
+			Answers:    w.store,
 			RunHooks:   runHooks,
 			PublicPort: func(context.Context, int) int { return 0 },
 			Shield:     shell.Shield,
@@ -167,7 +168,6 @@ func (w world) usecase() extract.UseCase {
 			LeftBehind: cleanLine,
 		},
 		MainPath: mainPath,
-		StateDir: stateDir,
 	}
 }
 

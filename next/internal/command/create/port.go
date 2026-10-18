@@ -3,7 +3,6 @@ package create
 import (
 	"context"
 
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
@@ -18,9 +17,4 @@ type Git interface {
 type Config interface {
 	Load() (project.Config, project.Global, error)
 	LoadRun() (project.Run, error)
-}
-
-// Answers keeps the answers a user asked to remember, keyed by their id in config.toml.
-type Answers interface {
-	Remember(ctx context.Context, answers map[string]string) (domain.Written, error)
 }

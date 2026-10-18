@@ -127,9 +127,8 @@ func (w world) usecase() create.UseCase {
 		runHooks = func(context.Context, env.HookChain) error { return nil }
 	}
 	return create.UseCase{
-		Git:     w.git,
-		Config:  stored{w.store},
-		Answers: w.store,
+		Git:    w.git,
+		Config: stored{w.store},
 		Operations: operation.Service{
 			Locker:    locker{err: w.seed.Locks, seen: w.seen},
 			Publisher: locker{},
@@ -140,6 +139,8 @@ func (w world) usecase() create.UseCase {
 			Git:        w.git,
 			Meta:       w.store,
 			EnvFiles:   w.store,
+			StateDir:   stateDir,
+			Answers:    w.store,
 			RunHooks:   runHooks,
 			PublicPort: func(context.Context, int) int { return 0 },
 			Shield:     shell.Shield,
@@ -147,7 +148,6 @@ func (w world) usecase() create.UseCase {
 			LeftBehind: cleanLine,
 		},
 		MainPath: mainPath,
-		StateDir: stateDir,
 	}
 }
 
@@ -285,9 +285,8 @@ func newApp(s seed) create.UseCase {
 	}
 	store := storetest.NewFake(storetest.FakeParams{Config: &config})
 	return create.UseCase{
-		Git:     git,
-		Config:  loaded{config: config},
-		Answers: store,
+		Git:    git,
+		Config: loaded{config: config},
 		Operations: operation.Service{
 			Locker:    held{},
 			Publisher: held{},
@@ -298,6 +297,8 @@ func newApp(s seed) create.UseCase {
 			Git:        git,
 			Meta:       store,
 			EnvFiles:   store,
+			StateDir:   mainPath + "/.git/wtm",
+			Answers:    store,
 			RunHooks:   func(context.Context, env.HookChain) error { return nil },
 			PublicPort: func(context.Context, int) int { return 0 },
 			Shield:     shell.Shield,
@@ -305,7 +306,6 @@ func newApp(s seed) create.UseCase {
 			LeftBehind: cleanLine,
 		},
 		MainPath: mainPath,
-		StateDir: mainPath + "/.git/wtm",
 	}
 }
 

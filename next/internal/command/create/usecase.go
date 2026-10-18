@@ -27,11 +27,9 @@ const CodeConfigNotFound = "create.config_not_found"
 type UseCase struct {
 	Git        Git
 	Config     Config
-	Answers    Answers
 	Operations operation.Service
 	Provision  provision.Service
 	MainPath   string
-	StateDir   string
 }
 
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, or a refusal before the apply).
@@ -223,11 +221,10 @@ func (u UseCase) item(ctx context.Context, plan Plan, planned BranchPlan, report
 	}
 
 	report(domain.UnitStarted{Subject: planned.Branch})
-	outcome := u.Provision.Run(ctx, u.provisionParams(plan, planned, report))
+	outcome := u.Provision.Run(ctx, provision.ParamsOf(plan.facts.Repository, provision.Planned{Branch: planned.Branch, Path: planned.Path, Placement: planned.placement(), From: plan.From, Answers: plan.settled}, report))
 
 	item := Item{Subject: planned.Branch, Status: outcome.Status, Reason: outcome.Reason, Err: outcome.Err, Warnings: outcome.Warnings}
-	// A worktree whose meta record was written stands, even when a later step of its provisioning failed.
-	if outcome.Provisioned.Meta.CreatedAt != "" {
+	if outcome.Provisioned.Stands() {
 		item.Detail = &Detail{
 			Path:     planned.Path,
 			Metadata: outcome.Provisioned.Meta,
@@ -247,38 +244,13 @@ func (u UseCase) unchanged(planned BranchPlan) Item {
 	return Item{Subject: planned.Branch, Status: domain.StatusDone, Reason: domain.ReasonUnchanged, Detail: &Detail{Path: planned.Path, Metadata: recorded}}
 }
 
-func (u UseCase) provisionParams(plan Plan, planned BranchPlan, report domain.Report) provision.Params {
-	f := plan.facts
-	return provision.Params{
-		Project: provision.ProjectOf(f.Repository, u.StateDir),
-		Worktree: provision.Worktree{
-			Branch:     planned.Branch,
-			Path:       planned.Path,
-			Checkout:   planned.placement().Checkout(planned.Branch, f.Ref(plan.From)),
-			Source:     plan.From,
-			ParentPath: f.CheckedOutAt(plan.From),
-			Answers:    plan.settled,
-		},
-		Report: report,
-	}
-}
-
-// remember writes the answers the plan asks to remember, once at least one worktree was created; a write that fails is a warning, the worktrees standing all the same.
+// remember writes the answers the plan asks to remember, once at least one worktree was created.
 func (u UseCase) remember(ctx context.Context, plan Plan, items []Item) []domain.Warning {
-	answers := plan.answers()
-	if len(answers) == 0 || !slices.ContainsFunc(items, created) {
+	if !slices.ContainsFunc(items, created) {
 		return nil
 	}
 
-	written, err := u.Answers.Remember(ctx, answers)
-	if err != nil {
-		return []domain.Warning{{Code: "create.remember_failed", Message: "could not remember the answer: " + err.Error(), Params: domain.Params{"cause": err.Error()}}}
-	}
-	if written.Unlocked {
-		return []domain.Warning{domain.LocksUnavailable}
-	}
-
-	return nil
+	return u.Provision.Remember(ctx, name, plan.settled, plan.Remember)
 }
 
 // ----------------------------------------------------------------------------

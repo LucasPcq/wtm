@@ -398,26 +398,9 @@ func (p Plan) Locks() []domain.Lock {
 	return domain.WorktreeLocks(append([]string{p.Source, p.Target.Branch}, p.FastForward...))
 }
 
-// Fingerprinted is what the plan's fingerprint covers: the plan, the isolation as resolved, and what the apply reads of the project to provision a created target (its env files and strategy, its on_create hooks, its run.toml and the global settings).
+// Fingerprinted is what the plan's fingerprint covers: the plan with what the apply reads of the project to provision a created target.
 func (p Plan) Fingerprinted() any {
-	f := p.facts
-	return struct {
-		Plan      Plan              `json:"plan"`
-		Isolation project.Isolation `json:"isolation"`
-		Env       project.Env       `json:"env"`
-		OnCreate  []project.Hook    `json:"on_create"`
-		Run       project.Run       `json:"run"`
-		RunErr    string            `json:"run_err,omitempty"`
-		Global    project.Global    `json:"global"`
-	}{Plan: p, Isolation: p.settled.Isolation(), Env: f.Config.Env, OnCreate: f.Config.OnCreate, Run: f.Run, RunErr: errorText(f.RunErr), Global: f.Global}
-}
-
-func errorText(err error) string {
-	if err == nil {
-		return ""
-	}
-
-	return err.Error()
+	return provision.Fingerprinted(p, p.facts.Repository, p.settled)
 }
 
 // Locks are the locks taken before planning: the repository shared, and the source and target given exclusive.
@@ -435,9 +418,4 @@ func (p Plan) move() worktree.Move {
 		TargetLabel: p.Target.Branch,
 		SourceLabel: p.Source,
 	}
-}
-
-// answers are the answers to remember, keyed by their id in config.toml.
-func (p Plan) answers() map[string]string {
-	return p.settled.Remembered(p.Remember)
 }

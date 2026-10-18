@@ -14,7 +14,7 @@
     "from": "main",
     "env_from": "example"
   },
-  "fingerprint": "6f1d820770431ef1514b6bb5",
+  "fingerprint": "6d38aad698cf8e703b5b100e",
   "follow_ups": [],
   "warnings": []
 }

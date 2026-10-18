@@ -243,7 +243,7 @@ func TestNothingIsRememberedWhenNoBranchWasCreated(t *testing.T) {
 
 func TestAnAnswerThatCannotBeRememberedIsAWarningOfTheRun(t *testing.T) {
 	w := newWorld(t, seed{})
-	w.usecase.Answers = answering{err: errors.New("read-only file system")}
+	w.usecase.Provision.Answers = answering{err: errors.New("read-only file system")}
 
 	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from"}}})
 
@@ -254,7 +254,7 @@ func TestAnAnswerThatCannotBeRememberedIsAWarningOfTheRun(t *testing.T) {
 
 func TestARememberedAnswerWrittenWithoutItsLockSaysSo(t *testing.T) {
 	w := newWorld(t, seed{})
-	w.usecase.Answers = answering{written: domain.Written{Changed: true, Unlocked: true}}
+	w.usecase.Provision.Answers = answering{written: domain.Written{Changed: true, Unlocked: true}}
 
 	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from"}}})
 
@@ -469,7 +469,7 @@ func TestAnInvalidRequestIsRefusedBeforeAnythingIsLockedOrWritten(t *testing.T) 
 func TestARunWithoutLocksThatRemembersSaysSoOnce(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.usecase.Operations.Locker = unprotected{}
-	w.usecase.Answers = answering{written: domain.Written{Changed: true, Unlocked: true}}
+	w.usecase.Provision.Answers = answering{written: domain.Written{Changed: true, Unlocked: true}}
 
 	outcome, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}, Given: provision.Given{Remember: []string{"env_from"}}}, domain.RunOptions{Report: (&recorder{}).add})
 

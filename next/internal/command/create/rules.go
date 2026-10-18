@@ -298,26 +298,9 @@ func (p Plan) Locks() []domain.Lock {
 	return domain.WorktreeLocks(append(names, p.FastForward...))
 }
 
-// Fingerprinted is what the plan's fingerprint covers: the plan, the isolation as resolved, and what the apply reads of the project to provision each worktree (its env files, its on_create hooks, its run.toml and the global settings).
+// Fingerprinted is what the plan's fingerprint covers: the plan with what the apply reads of the project to provision each worktree.
 func (p Plan) Fingerprinted() any {
-	f := p.facts
-	return struct {
-		Plan      Plan              `json:"plan"`
-		Isolation project.Isolation `json:"isolation"`
-		EnvFiles  []project.EnvFile `json:"env_files"`
-		OnCreate  []project.Hook    `json:"on_create"`
-		Run       project.Run       `json:"run"`
-		RunErr    string            `json:"run_err,omitempty"`
-		Global    project.Global    `json:"global"`
-	}{Plan: p, Isolation: p.settled.Isolation(), EnvFiles: f.Config.Env.Files, OnCreate: f.Config.OnCreate, Run: f.Run, RunErr: errorText(f.RunErr), Global: f.Global}
-}
-
-func errorText(err error) string {
-	if err == nil {
-		return ""
-	}
-
-	return err.Error()
+	return provision.Fingerprinted(p, p.facts.Repository, p.settled)
 }
 
 // Locks are the locks taken before planning: the repository shared, and each branch asked exclusive.
@@ -328,9 +311,4 @@ func (r Request) Locks() []domain.Lock {
 // placement is the branch's action as the domain places it, for its checkout and its standing.
 func (b BranchPlan) placement() worktree.Placed {
 	return worktree.Placed{Start: worktree.Start(b.Action), Upstream: b.Upstream}
-}
-
-// answers are the answers to remember, keyed by their id in config.toml.
-func (p Plan) answers() map[string]string {
-	return p.settled.Remembered(p.Remember)
 }

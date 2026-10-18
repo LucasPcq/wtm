@@ -32,13 +32,11 @@ const (
 type UseCase struct {
 	Git        Git
 	Config     Config
-	Answers    Answers
 	Meta       Meta
 	Shield     Shield
 	Operations operation.Service
 	Provision  provision.Service
 	MainPath   string
-	StateDir   string
 }
 
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, nothing to extract, or a refusal before the apply).
@@ -150,7 +148,7 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	report(domain.UnitFinished{Subject: item.Subject, Status: item.Status})
 
 	if plan.Target.creates() && item.Status == domain.StatusDone {
-		warnings = append(warnings, u.remember(ctx, plan)...)
+		warnings = append(warnings, u.Provision.Remember(ctx, name, plan.settled, plan.Remember)...)
 	}
 
 	return Result{Items: []Item{item}, Warnings: warnings}
@@ -284,33 +282,16 @@ func (u UseCase) target(ctx context.Context, plan Plan, report domain.Report) It
 		return Item{Subject: plan.Target.Branch, Status: domain.StatusDone, Detail: detail(plan.Target.Path, plan.facts.recordedIsolation(plan.Target.Branch))}
 	}
 
-	outcome := u.Provision.Run(ctx, u.provisionParams(plan, report))
+	outcome := u.Provision.Run(ctx, provision.ParamsOf(plan.facts.Repository, provision.Planned{Branch: plan.Target.Branch, Path: plan.Target.Path, Placement: plan.Target.placement(), From: plan.From, Answers: plan.settled}, report))
 
 	item := Item{Subject: plan.Target.Branch, Status: outcome.Status, Reason: outcome.Reason, Err: outcome.Err, Warnings: outcome.Warnings}
-	// A worktree whose meta record was written stands, even when a later step of its provisioning failed.
-	if outcome.Provisioned.Meta.CreatedAt != "" {
+	if outcome.Provisioned.Stands() {
 		item.Detail = detail(plan.Target.Path, outcome.Provisioned.Meta.Isolation)
 		item.Detail.EnvPorts = outcome.Provisioned.EnvPorts
 		item.Detail.Standing = plan.facts.StandingOf(plan.Target.Branch, plan.Target.placement())
 	}
 
 	return item
-}
-
-func (u UseCase) provisionParams(plan Plan, report domain.Report) provision.Params {
-	f := plan.facts
-	return provision.Params{
-		Project: provision.ProjectOf(f.Repository, u.StateDir),
-		Worktree: provision.Worktree{
-			Branch:     plan.Target.Branch,
-			Path:       plan.Target.Path,
-			Checkout:   plan.Target.placement().Checkout(plan.Target.Branch, f.Ref(plan.From)),
-			Source:     plan.From,
-			ParentPath: f.CheckedOutAt(plan.From),
-			Answers:    plan.settled,
-		},
-		Report: report,
-	}
 }
 
 // move moves or copies the planned changes into the target, between the move phase's events.
@@ -353,24 +334,6 @@ func (p Plan) failure(err error) *domain.Error {
 	}
 
 	return domain.AsError(domain.AsErrorParams{Err: err, Code: "extract.move_failed", Message: "move failed"})
-}
-
-// remember writes the answers the plan asks to remember; a write that fails is a warning, the target standing all the same.
-func (u UseCase) remember(ctx context.Context, plan Plan) []domain.Warning {
-	answers := plan.answers()
-	if len(answers) == 0 {
-		return nil
-	}
-
-	written, err := u.Answers.Remember(ctx, answers)
-	if err != nil {
-		return []domain.Warning{{Code: "extract.remember_failed", Message: "could not remember the answer: " + err.Error(), Params: domain.Params{"cause": err.Error()}}}
-	}
-	if written.Unlocked {
-		return []domain.Warning{domain.LocksUnavailable}
-	}
-
-	return nil
 }
 
 // ----------------------------------------------------------------------------

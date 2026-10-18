@@ -2,7 +2,6 @@ package provision
 
 import (
 	"context"
-	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
@@ -39,16 +38,7 @@ type EnvFiles interface {
 	Edit(ctx context.Context, edit dotenv.Edit) (domain.Written, error)
 }
 
-// Service provisions new worktrees and fast-forwards their sources for the
-// commands that create one. Every field must be set before Run.
-type Service struct {
-	Git      Git
-	Meta     Meta
-	EnvFiles EnvFiles
-
-	RunHooks   func(ctx context.Context, chain env.HookChain) error // runs the on_create hooks, failing with an *env.HookFailure
-	PublicPort func(ctx context.Context, configured int) int        // the port a named URL announces, given the proxy's configured one; 0 with no proxy
-	Shield     func(ctx context.Context) (context.Context, func())  // a context the first cancel does not reach, and its release
-	Now        func() time.Time
-	LeftBehind func(branch string) []string // the command line that removes a branch an undo left behind, and its worktree
+// AnswerStore keeps the answers a user asked to remember, keyed by their id in config.toml.
+type AnswerStore interface {
+	Remember(ctx context.Context, answers map[string]string) (domain.Written, error)
 }

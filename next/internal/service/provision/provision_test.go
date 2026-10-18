@@ -2,6 +2,7 @@ package provision_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -317,11 +318,55 @@ func TestTheProjectProvisionedIsTheOneObserved(t *testing.T) {
 
 	assert.Equal(t, provision.Project{
 		MainPath: "/repo/main",
-		StateDir: "/state",
 		EnvFiles: []project.EnvFile{{Target: ".env"}},
 		OnCreate: []project.Hook{{Cmd: "make"}},
 		Run:      project.Run{Isolation: project.Verbatim},
 		RunErr:   runErr,
 		Global:   project.Global{Proxy: project.Proxy{Port: 8080}},
-	}, provision.ProjectOf(repo, "/state"))
+	}, provision.ProjectOf(repo))
+}
+
+func TestParamsOfCheckOutFromTheRepository(t *testing.T) {
+	repo := worktree.Repository{MainPath: "/repo/main", Snapshot: worktree.Snapshot{Worktrees: []worktree.Worktree{{Path: "/repo/main", State: worktree.OnBranch{Branch: "main"}}}}}
+	answers := answered(provision.Given{})
+
+	params := provision.ParamsOf(repo, provision.Planned{Branch: branchName, Path: "/trees/x", Placement: worktree.Placed{Start: worktree.StartCreate}, From: "main", Answers: answers}, nil)
+
+	assert.Equal(t, provision.ProjectOf(repo), params.Project)
+	assert.Equal(t, provision.Worktree{
+		Branch:     branchName,
+		Path:       "/trees/x",
+		Checkout:   worktree.NewBranch{Name: branchName, From: worktree.LocalBranch{Name: "main"}},
+		Source:     "main",
+		ParentPath: "/repo/main",
+		Answers:    answers,
+	}, params.Worktree)
+}
+
+func TestTheFingerprintCoversTheWholeEnv(t *testing.T) {
+	repo := repository(nil)
+	before, err := json.Marshal(provision.Fingerprinted("plan", repo, answered(provision.Given{})))
+	require.NoError(t, err)
+
+	repo.Config.Env.Strategy = project.EnvMain
+	after, err := json.Marshal(provision.Fingerprinted("plan", repo, answered(provision.Given{})))
+	require.NoError(t, err)
+
+	assert.NotEqual(t, before, after)
+}
+
+func TestARememberThatFailsIsTheCommandsWarning(t *testing.T) {
+	service := provision.Service{Answers: storetest.NewFake(storetest.FakeParams{Fail: map[string]error{"Remember": errors.New("read-only file system")}})}
+
+	warnings := service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), []string{provision.PathEnvFrom})
+
+	require.Len(t, warnings, 1)
+	assert.Equal(t, "greet.remember_failed", warnings[0].Code)
+	assert.Equal(t, domain.Params{"cause": "read-only file system"}, warnings[0].Params)
+}
+
+func TestNothingToRememberWritesNothing(t *testing.T) {
+	service := provision.Service{Answers: storetest.NewFake(storetest.FakeParams{Fail: map[string]error{"Remember": errors.New("read-only file system")}})}
+
+	assert.Empty(t, service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), nil))
 }
