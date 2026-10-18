@@ -31,6 +31,8 @@ Which tools keep Go code conventional and what each one enforces: formatting (`g
 
 ## golangci-lint: one runner, a deliberate set
 
+This section is the general recommendation. wtm does not use golangci-lint: its Makefile runs gofmt, vet, staticcheck, revive, deadcode, go-sumtype and archlint directly (`SKILL.md`, "This repository").
+
 - **Run linters through golangci-lint, configured in a checked-in `.golangci.yml`.** Why: Uber recommends it "as the go-to lint runner for Go code, largely due to its performance in larger codebases and ability to configure and use many canonical linters at once". Source: [Uber — Lint Runners](https://github.com/uber-go/guide/blob/master/style.md#lint-runners).
 - **Lint consistently rather than maximally.** Why: "More importantly than any "blessed" set of linters, lint consistently across a codebase." Source: [Uber — Linting](https://github.com/uber-go/guide/blob/master/style.md#linting).
 - **Start from the `standard` set: `errcheck`, `govet`, `ineffassign`, `staticcheck`, `unused`**, and add on purpose; do not use `default: all`. Why: `all` turns on opinionated linters that contradict each other and the guides. Source: [golangci-lint — Configuration file](https://golangci-lint.run/docs/configuration/file/) ("`standard`: the "Default" linters").

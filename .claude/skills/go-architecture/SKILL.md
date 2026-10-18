@@ -1,69 +1,75 @@
 ---
 name: go-architecture
-description: The architecture of wtm's next/ — a hexagon of vertical slices where each command is one folder (its use case, its ports, its rules, its questions, its CLI) over shared services, a pure domain, driven adapters and a UI kit. Use this skill whenever you add, change, review or move code under next/ — a command, a use case, a port, a service, an adapter, the ui kit, the wiring in cmd/wtm-next — whenever someone asks where code should go, how a request flows through the code, how two commands share something, or how a CLI/TUI command should behave (flags, --yes/--force, dry run, JSON envelope, exit codes, wizard). Also use it for architecture questions about this repository (hexagonal, ports and adapters, vertical slices) even if next/ is not named. Pair it with the go-style skill, which governs how the Go itself is written.
+description: Where code goes in wtm's next/ (the wtm-next rewrite) and the rules that hold it there — a command is one folder (usecase.go, port.go, rules.go, questions.go, cli/) over shared services, a pure domain, adapters with their fakes, a ui/ kit and the wiring in cmd/wtm-next. Use it whenever you add, migrate, change, review or move code under next/ — a command, its Run, a question or flag, a port, an adapter or fake, a service, the form engine, the JSON envelope, exit codes, the registrations — and whenever someone asks where wtm code goes or how two commands share something, even without saying next/ (during the migration, new code goes there). Not for the legacy internal/ (frozen; CLAUDE.md and docs/dev/ govern it). Pair it with go-style for the Go itself.
 ---
 
-# go-architecture — how next/ is built
+# go-architecture — where code goes in next/
 
-`next/` is wtm rebuilt as a hexagon of vertical slices: **a command is one folder**, and inside it a **use case tells the whole request** top to bottom, reaching the outside world only through the **ports** it declares and calling **services** shared with other commands. The Go itself follows the `go-style` skill; this skill says where things go and how they talk. The legacy code under `internal/` follows `CLAUDE.md` and `docs/dev/` until it moves here.
+`next/` is wtm rebuilt as vertical slices over a small hexagon: **a command is one folder** whose `usecase.go` tells the whole request, reaching the world only through the **ports** it declares and calling **services** shared with the other commands. This skill says where code goes and which rules hold it there; the Go itself follows `go-style`. `next/README.md` keeps the import table archlint enforces and the hop-by-hop reading of a request.
 
 ## The map
 
 ```
 next/
-  cmd/wtm-next/         composition root: wire.go builds every adapter once and injects it; main.go registers each command's CLI
+  cmd/wtm-next/        composition root: main.go (the commands), project.go (openers), catalogue.go (api), wire.go (adapters)
   internal/
-    command/<name>/     one command, one vertical slice
-      usecase.go        the use case: Run (the story), Plan, Apply, Questions, Observe
-      port.go           the driven ports it calls (interfaces)
-      rules.go          pure: facts → plan
-      questions.go      pure: the request, its form model, its validation
-      cli/              its driving adapter: cobra command over form.Command, its own wizard steps, output
-    service/            what use cases call: operation (locks, plan under them, fingerprint, events), provision (a new worktree made whole, and the questions every command that creates one asks), repository (the facts a command decides from) + <name>test contracts (operationtest)
-    domain/             the model, pure: errors, events, operations and their run options, question vocabulary; worktree/ (with the stack graph), project/, env/, dotenv/
-    adapter/<name>/     driven adapters implementing the ports (git, store, config, shell, oplock, events…) + <name>test fakes
-    ui/                 the presentation kit, knowing no command: cli (root, exit codes, signals), output (frames, envelope), form (form.Command: flags, launch and wizard of any command's schema; components)
-    api/                the catalogue of the commands for a surface other than the CLI: name, schema, execution (JSON request → domain.Envelope + status); domain and stdlib only
+    command/<name>/    one command: usecase.go, port.go, rules.go, questions.go, cli/
+    service/<name>/    what use cases share with I/O: operation, provision, repository; <name>test kits
+    domain/            the pure model and vocabulary; worktree/, project/, env/, dotenv/ by subject
+    adapter/<name>/    git, store, config, shell, oplock, events, statefile, proxyport; <name>test fakes
+    ui/                cli (root, exit codes, env), output (streams, frames, envelope), form (flags, wizard, conclusion), widget (a step's inputs), formtest (the cli tests' kit)
+    api/               the catalogue of commands for a surface other than the CLI
+  docs/proof/          scripts that run wtm and wtm-next side by side, and their captures
 ```
-
-Dependencies point inward, checked by `make lint` (archlint `next`): `domain` imports nothing of next/; a `service` imports `domain`; a `command` imports `domain` and `service`; its `cli/` imports its command, `domain` and `ui`, never a service; an `adapter` imports `domain`; `ui` imports `domain`; only `cmd/wtm-next` sees everything. A command never imports another command.
-
-Why a package per command, when the Go guides prefer a package per concept and Ben Johnson warns against grouping by module: a command *is* a concept with its own API (its request, its plan, its outcome), large CLIs do the same (the GitHub CLI's `pkg/cmd/<group>/<cmd>/`), and the two risks of grouping by feature are closed by construction — import cycles by the dependency rule above, repeated names (`create.CreateRequest`) by naming inside the package (`create.Request`). Ports follow go-style `interfaces.md`: each use case declares, consumer-side, the small interfaces it calls.
-
-## Reading a request
-
-`wtm-next create feat/x --from main`, hop by hop:
-
-1. `cmd/wtm-next/main.go`: the root runs with each command's CLI registered.
-2. `command/create/cli/command.go` → `ui/form` `Command.Launch`: flags (registered from create's schema) → `create.Request` + `domain.RunOptions` (the correlation ID from the process's `uicli.Env`, read once by `main`), the repository opened from `Env.ProjectDir`; the wizard on a terminal, else `UseCase.Run`.
-3. `command/create/usecase.go` → `Run`: begin the operation (locks), plan under the locks, fingerprint, stop on a dry run, refuse a stale plan, apply between the events.
-4. `Plan`: `Observe` reads the repository through the ports of `port.go`; `Resolve` (`questions.go`) settles the request; `Decide` (`rules.go`) makes the plan.
-5. `Apply`: its steps, calling `service/provision` for each new worktree.
-6. `adapter/git`: the port's implementation runs git.
-7. Back in `cli/command.go`: `output.go` draws the outcome with the `ui/` kit, or `Outcome.Envelope` reports it as the JSON envelope.
 
 ## Where does this code go?
 
 | The code… | Goes in |
 | -- | -- |
-| decides something from facts, no I/O, for one command | `command/<name>/rules.go` |
-| validates or defaults the request, builds the form model and its schema (labels, help, flag names, option labels) | `command/<name>/questions.go` |
-| sequences the request, calls ports and services | `command/<name>/usecase.go` |
-| is an interface to the outside world one command needs | `command/<name>/port.go` |
-| renders output, asks a step of one command its own way | `command/<name>/cli/` |
-| registers flags, builds the request, launches, asks a field of any kind, from the schema | `ui/form` |
-| is a question two commands ask | the service that consumes its answers (`service/provision/questions.go`), embedded in each command's form |
-| is a pure rule or a type two commands need | `domain/…` |
-| orchestrates I/O two commands need | `service/<name>` (with its own `port.go`) |
-| is presentation two commands need | `ui/…` |
-| talks to git, the filesystem, a process, a socket | `adapter/<name>`, behind a port |
+| sequences one command's request: Run, Plan, Apply, Questions, Observe | `command/<name>/usecase.go` |
+| decides from facts, pure, for one command (Facts, Decide, Plan, its locks and fingerprint) | `command/<name>/rules.go` |
+| is one command's request, its form schema and its validation | `command/<name>/questions.go` |
+| is a port one command needs (an interface, or a function type) | `command/<name>/port.go` |
+| draws one command's output, or asks one of its fields its own way | `command/<name>/cli/` |
+| is a pure rule, type or vocabulary two commands need | `domain/<subject>/` (`worktree`, `project`, `env`, `dotenv`), the root `domain` only for the cross-cutting contract (errors, events, outcomes, forms) |
+| orchestrates I/O two commands need | `service/<name>/` (concrete, with its own `port.go`) |
+| is a question two commands ask | the fragment of the service that consumes its answers (`service/provision/questions.go`) |
+| is presentation two commands need, or any field kind of the wizard | `ui/output`, `ui/form`, an input in `ui/widget` |
+| talks to git, a file, a process, a socket | `adapter/<name>/`, behind a port |
+| is an in-memory stand-in for an adapter, for tests | `adapter/<name>test/` |
+| checks a promise every use case keeps, for tests | `service/<name>test/` (`operationtest.Contract`) |
 | chooses which adapter backs which port | `cmd/wtm-next/wire.go` |
+| names another command's command line (a follow-up) | injected from `cmd/wtm-next`, the only package that knows every command |
 
-## Read next
+Share on the second user, not before: until a second command needs it, code stays in its slice.
 
-- **`references/slice.md`** — the anatomy of a command folder: the order of `usecase.go`, the canonical `Run`, what `rules.go`/`questions.go`/`port.go` hold, how commands share code, codes and exit codes, testing a slice, the steps to add a command. Read it before writing or reviewing any file under `command/`.
-- **`references/contract.md`** — what every command promises: request and options, interactive vs unattended, `--yes` vs `--force`, remembered answers, dry run and fingerprint, human output vs the JSON envelope, exit codes, locks and events. Read it before touching flags, output or a command's behaviour.
-- **`references/cli.md`** — community conventions for a Go CLI (clig.dev, Cobra, the GitHub CLI's command anatomy, IOStreams) and how `next/` applies them.
-- **`references/tui.md`** — community conventions for a Bubble Tea TUI (the Elm loop, commands for I/O, model composition, huh) and how the `ui/form` wizard engine applies them.
+## The rules
 
-`next/README.md` is the human-facing map of the same architecture and carries the import table archlint enforces; keep it, this skill and the code in step in the same change.
+Each rule names what enforces it: `[archlint]` (`tools/archlint`, rule `next`), `[revive]`, `[staticcheck]`, `[sumtype]` (`go-sumtype`), `[test]` (a test fails), or `[review]` (nothing but a reviewer catches it: check it yourself).
+
+1. **Imports follow the table of `next/README.md`.** Dependencies point inward; a command never imports another command, a command's `cli` never imports a service or an adapter, only `cmd/wtm-next` imports adapters, nothing imports a fake outside a test, nothing in `next/` imports `internal/`. A package in no row is refused. `[archlint]`
+2. **A command is one folder with five parts** — `usecase.go`, `port.go`, `rules.go`, `questions.go`, `cli/` — and nothing else at its root but tests. Layers are files, not packages; `cli/` is the one sub-package, so cobra and Bubble Tea stay out of the use case. `[review]`
+3. **`Run` is the story, in numbered steps, the same in every command:** begin the operation, plan under its locks, fingerprint and stop on a dry run, refuse a stale plan, apply between the started and finished events. A dry run takes no lock and plans once. A command adds a step only where its story differs (extract ends early when nothing is left to extract). `[test]` (`contract_test.go` runs `operationtest.Contract`) and `[review]` for the shape.
+4. **A command's codes start with its name:** `<Name>.<snake_case>` (`extract.conflict`), `Name` being the command's constant, declared beside the code that raises them; a code several commands share is a `domain` constant. `[archlint]` (`codeprefix`)
+5. **Every command of `main.go` is in `catalogue.go` and wired in `wire.go`.** `[test]` (`cmd/wtm-next/registration_test.go`)
+6. **Ports are consumer-side and small:** a command or a service declares in its `port.go` only the methods it calls, as an interface, or a function type for a single function (`extract.Shield`). A service is concrete, never a port; an adapter exports a concrete type. `[review]`
+7. **A fake is an adapter's twin** in `adapter/<name>test`: it keeps the adapter's contract, and a parity test runs the same cases on both. `[archlint]` (where it lives, who imports it), `[review]` (the parity)
+8. **The process environment is read once, at the edge:** `ui/cli.ReadEnv` (working directory, `$WTM_PROJECT_DIR`, `$WTM_CORRELATION_ID`), `ui/output.System` (the streams and `$TERM`), `$WTM_STATE_DIR` in `cmd/wtm-next`; an adapter reads only what its own tool needs (`os.UserConfigDir`, a child's `os.Environ`). Domain, services and commands never read it: what they need travels in the request, the run options or the wiring. `[review]`
+9. **A value that takes one of a closed set of shapes is a sealed interface** (an unexported method, one type per shape) declared `//go-sumtype:decl` on a line of its own, so every type switch over it is checked: `domain.Field`, `domain.Event`, `worktree.Placement`, a command's `decision`. `[sumtype]`
+10. **Every package has a package comment, every exported name a doc comment** that starts with its name and states its contract. `[revive]` (`exported`, `package-comments`) and `[staticcheck]` (`checks = ["all"]`)
+11. **A long file reads in named sections:** `usecase.go` (the use case, Run, Plan, Apply, Questions, Observe, the steps of Apply, helpers), `rules.go` and `questions.go`, each section under go-style's separator (`// ` and 76 dashes, then its title). A file is named after what it declares; a package splits only past about 1,000 lines at a natural seam. `[review]`
+12. **Tests share one layout:** testify, only `Test…` functions in a test file, fixtures and fakes in `fixture_test.go`, helpers in `helpers_test.go`, goldens in `testdata/` behind `-update` (`formtest.Golden` in a `cli` test). A test function reads as a sentence (`TestAStaleFingerprintIsRefused`); a subtest name is a short identifier (`existing`, `fromOrigin`), never a sentence. A `*Params` struct only for many inputs, two swappable values of one type, or a list that grows (go-style `testing.md`, `readability.md`). `[review]`
+13. **No legacy gap in limbo:** each difference between `wtm` and `wtm-next` is an owner-approved deviation listed in the PR, or a bug fixed with its test (`references/new-command.md`, step 9). `[review]`
+
+## Read next, by task
+
+| You are… | Read |
+| -- | -- |
+| adding or migrating a command | `references/new-command.md` |
+| adding a question, a flag or a field, or sharing one between commands | `references/questions.md` |
+| touching what a command promises: `--yes`/`--force`, dry run and fingerprint, JSON envelope, exit codes, locks, events | `references/contract.md` |
+| adding a port, an adapter, a fake or a test kit | `references/ports-adapters.md` |
+| changing the wizard engine (`ui/form`) or a command's own step | `references/form.md` |
+| following a request hop by hop, or checking what a package may import | `next/README.md` |
+
+Change the code, `next/README.md` and this skill in the same change when a rule moves.

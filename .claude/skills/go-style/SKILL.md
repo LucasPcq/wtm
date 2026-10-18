@@ -14,30 +14,32 @@ Every rule here comes from a source the Go community recognizes, cited in the re
 
 A project's established convention wins over a general rule when the two conflict (consistency inside a codebase is itself a rule of every guide); say so when you follow the project against the community, and propose aligning it when the project rule has no reason left.
 
+A rule a linter already checks is marked with it — `[gofmt]`, `[vet]`, `[staticcheck STxxxx]`, `[revive rule]` — as configured in this repository ("This repository" below); an unmarked rule is caught only in review.
+
 ## The rules that matter most
 
 Naming — `references/naming.md`
 - A name's length follows the distance between its declaration and its uses: short for a local in a small scope, descriptive for a package-level name.
-- Call the error `err` and reuse it; give distinct short names only when two errors are alive at once (`er`/`ew` in `io.copyBuffer`). Watch `:=` shadowing inside a block.
-- Don't repeat the package in what it exports (`bufio.Reader`, `widget.New`); no `util`/`common`/`misc` packages; initialisms keep one case (`URL`, `ID`); no ALL_CAPS constants.
-- Receivers are one or two letters, the same in every method, never `this`/`self`; getters are `Owner()`, not `GetOwner()`.
+- Call the error `err` and reuse it; give distinct short names only when two errors are alive at once (`er`/`ew` in `io.copyBuffer`). Watch `:=` shadowing inside a block. A sentinel is `ErrX`, an error type `XError` `[staticcheck ST1012]` `[revive error-naming]`.
+- Don't repeat the package in what it exports (`bufio.Reader`, `widget.New`) `[revive exported]`; no `util`/`common`/`misc` packages; initialisms keep one case (`URL`, `ID`) and no ALL_CAPS constants `[staticcheck ST1003]` `[revive var-naming]`.
+- Receivers are one or two letters, the same in every method, never `this`/`self` `[staticcheck ST1006, ST1016]` `[revive receiver-naming]`; getters are `Owner()`, not `GetOwner()`.
 
 Errors — `references/errors.md`
 - Check every error and handle it once: return it or log it, never both.
-- Handle the error first and return; the happy path stays at the left margin, never in an `else`.
-- Add context naming the operation (`"open config: %w"`); error strings are lowercase with no final punctuation.
+- Handle the error first and return; the happy path stays at the left margin, never in an `else` `[revive indent-error-flow, early-return, superfluous-else]`.
+- Add context naming the operation (`"open config: %w"`); error strings are lowercase with no final punctuation `[staticcheck ST1005]` `[revive error-strings]`.
 - Wrap with `%w` only when callers should inspect the cause — wrapping makes it part of your API; inspect with `errors.Is`/`errors.As`, never by string.
 - Errors are opaque by default; export an `ErrX` sentinel or an `XError` type only when callers must branch on it. Panic only for programmer errors.
 
 Comments — `references/comments.md`
-- Every exported name has a doc comment: a full sentence that starts with the name (`// Run carries out …`), "reports whether" for booleans, the contract not the algorithm.
+- Every exported name has a doc comment: a full sentence that starts with the name (`// Run carries out …`), "reports whether" for booleans, the contract not the algorithm `[revive exported]` `[staticcheck ST1020–ST1022]`; every package has a package comment `[revive package-comments]` `[staticcheck ST1000]`.
 - A comment inside a body says why (or how, for a step the code can't make obvious); a block that needs a comment because it does something separate becomes a function named after it.
 - Section separators (`// ` + 76 dashes, then a title line, then a blank line) only in a long file whose declarations fall into named groups; otherwise split the file.
 
 Readability — `references/readability.md`
 - Use blank lines to break a function into paragraphs, the way paragraphs break a document (Cheney).
 - Return early, reduce nesting, keep variables in the smallest scope.
-- Positional parameters are the norm; reach for an options struct when a function takes many inputs or the call site would be unreadable, and break up several parameters of the same type that a caller could swap (a type, or a struct where it reads better). A struct for two parameters is not a Go convention.
+- Positional parameters are the norm; reach for an options struct when a function takes many inputs, when two values of the same type could be swapped (Cheney's alternative there is a helper type, `Source.CopyTo(dest)`, not a struct), or when the list will grow. A struct for two inputs of different types is not a Go convention.
 - Prefer a nil slice to `[]T{}`, useful zero values, field names in composite literals of other packages' types; no mutable globals, no `init()` doing work.
 - No hard line-length limit; a file is focused enough that a maintainer can tell which file holds something — neither thousands of lines nor many tiny files.
 
@@ -52,18 +54,28 @@ Interfaces — `references/interfaces.md`
 
 Tests — `references/testing.md`
 - Failures read `Func(in) = got, want want`; compare with `cmp.Diff` labelled `(-want +got)`; errors with `errors.Is`/`errors.As`.
-- `t.Error` to keep going, `t.Fatal` for setup or inside a subtest; helpers call `t.Helper()` and register teardown with `t.Cleanup`; use `t.TempDir`, `t.Setenv`.
-- Table-driven tests with `t.Run`; fixtures in `testdata/`; golden files behind an `-update` flag.
+- `t.Error` to keep going, `t.Fatal` for setup or inside a subtest, never from a goroutine the test started `[vet testinggoroutine]`; helpers call `t.Helper()` and register teardown with `t.Cleanup`; use `t.TempDir`, `t.Setenv`.
+- Table-driven tests with `t.Run`; a subtest name is a short identifier, never a sentence — a longer description goes in a field of the row (Google, "Subtest names"); fixtures in `testdata/`; golden files behind an `-update` flag.
 - Prefer real implementations, then fakes; the Go team and Google advise against assertion libraries — a project already on testify keeps it consistently (`require` where the test cannot go on, `assert` otherwise).
 
 Tooling — `references/tooling.md`
-- `gofmt`/`goimports` are not negotiable; `go vet`, staticcheck with `checks: ["all"]` (its defaults leave the naming and doc-comment checks off), `go test -race` and `go mod tidy` in CI.
-- golangci-lint with a deliberate set: the standard set + revive `exported` (doc comments), errorlint, gocritic (diagnostic), unparam, misspell, nolintlint, thelper, usetesting.
+- `gofmt`/`goimports` are not negotiable `[gofmt]`; `go vet`, staticcheck with `checks: ["all"]` (its defaults leave the naming and doc-comment checks off), `go test -race` and `go mod tidy` in CI.
+- In general, golangci-lint with a deliberate set: the standard set + revive `exported` (doc comments), errorlint, gocritic (diagnostic), unparam, misspell, nolintlint, thelper, usetesting. This repository runs the linters directly instead ("This repository" below).
 
 Concurrency — `references/concurrency.md`
-- `context.Context` is the first parameter, never stored in a struct; always call `cancel`.
+- `context.Context` is the first parameter `[revive context-as-argument]`, never stored in a struct; always call `cancel` `[vet lostcancel]`.
 - Every goroutine has a known exit and someone waiting for it (`sync.WaitGroup`, `errgroup`); prefer synchronous functions and let the caller add concurrency.
-- Mutexes use their zero value, are named fields, are never copied; channels are unbuffered or size one unless a reason is written down.
+- Mutexes use their zero value, are named fields, are never copied `[vet copylocks]`; channels are unbuffered or size one unless a reason is written down.
+
+## This repository
+
+What wtm runs instead of the general setup of `tooling.md`, and the conventions it adds; `next/` follows this skill, `internal/` follows `CLAUDE.md` where the two differ.
+
+- **No golangci-lint.** The Makefile runs each tool directly: `gofmt -l` (fails, never rewrites), `go vet`, `staticcheck` (`next/staticcheck.conf`: `checks = ["all"]`), `revive` on `next/` (`next/revive.toml`: `exported`, `package-comments`, `var-naming`, `receiver-naming`, `error-strings`, `error-naming`, `context-as-argument`, `indent-error-flow`, `early-return`, `superfluous-else`, and the other rules listed there), `deadcode -test` (exceptions in `.deadcode-ignore`), `go-sumtype` (every type switch over an interface declared `//go-sumtype:decl` handles each variant), and `tools/archlint` (the import table of `next/README.md` and the repository's own rules). errcheck, errorlint, unparam and thelper are not run: those rules are caught in review.
+- **Gates.** `make lint` and `make test` (`-race`) for the whole repository; `make lint-next` and `make test-next` for a change that leaves `internal/`, the root package and `go.mod` alone. The pre-commit hook runs the lint gate, `build-validator` adds the tests.
+- **testify**, already standard here: `require` where the test cannot go on, `assert` otherwise, `want` first. Each test file holds only `Test…` functions; the fixtures and fakes go in `fixture_test.go`, the helpers shared by a package's tests in `helpers_test.go`.
+- **Fakes** of an adapter live in `adapter/<name>test` and keep its contract; the go-architecture skill (`references/ports-adapters.md`) has the details.
+- **Sealed interfaces** (an unexported method, one type per variant) carry `//go-sumtype:decl <Name>` on a line of their own, outside the doc comment, so gofmt keeps it.
 
 ## Read next
 
