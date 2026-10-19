@@ -115,7 +115,7 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 
 	planned, warnings := Decide(facts, questions.Request())
 	planned.Recalled = questions.Recalled()
-	planned.Recap = planned.previewRecap()
+	planned.Recap, planned.Creates = planned.previewRecap(), planned.opens()
 	return planned, warnings, nil
 }
 

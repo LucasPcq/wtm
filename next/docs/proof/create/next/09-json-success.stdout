@@ -91,6 +91,7 @@
     "from": "main",
     "env_from": "example",
     "isolation": "isolated",
+    "creates": 1,
     "recap": [
       {
         "key": "branches",

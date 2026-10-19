@@ -24,15 +24,9 @@ func newForm(open func(ctx context.Context, dir string) (create.UseCase, error))
 	}
 }
 
-// applyLabel counts the worktrees the plan previewed opens, a worktree already open aside.
+// applyLabel names the apply of the plan previewed by the worktrees it opens.
 func applyLabel(previewed create.Outcome) string {
-	count := 0
-	for _, planned := range previewed.Plan.Branches {
-		if planned.Action != create.ActionUnchanged {
-			count++
-		}
-	}
-
+	count := previewed.Plan.Creates
 	switch count {
 	case 0:
 		return "Yes, apply"

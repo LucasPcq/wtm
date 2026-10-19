@@ -286,6 +286,7 @@ type Plan struct {
 	Isolation   project.Isolation   `json:"isolation,omitempty"`
 	FastForward []string            `json:"fast_forward,omitempty"`
 	Remember    []string            `json:"remember,omitempty"`
+	Creates     int                 `json:"creates,omitempty"`  // the worktrees the apply opens, one already open aside; out of the fingerprint, which the actions cover
 	Recalled    []string            `json:"recalled,omitempty"` // the fields answered from memory, as the request was resolved
 	Recap       []domain.RecapRow   `json:"recap,omitempty"`    // the plan as every surface shows it, its answers marked as the run left them
 	facts       Facts
@@ -312,8 +313,19 @@ func (p Plan) Locks() []domain.Lock {
 
 // Fingerprinted is what the plan's fingerprint covers: the plan with what the apply reads of the project to provision each worktree.
 func (p Plan) Fingerprinted() any {
-	p.Recalled, p.Recap = nil, nil
+	p.Recalled, p.Recap, p.Creates = nil, nil, 0
 	return provision.Fingerprinted(p, p.facts.Repository, p.settled)
+}
+
+// opens counts the worktrees the plan opens, a worktree already open aside.
+func (p Plan) opens() int {
+	count := 0
+	for _, planned := range p.Branches {
+		if planned.Action != ActionUnchanged {
+			count++
+		}
+	}
+	return count
 }
 
 // Locks are the locks taken before planning: the repository shared, and each branch asked exclusive.

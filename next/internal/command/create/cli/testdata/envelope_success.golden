@@ -29,6 +29,7 @@
     ],
     "from": "main",
     "env_from": "example",
+    "creates": 1,
     "recap": [
       {
         "key": "branches",
