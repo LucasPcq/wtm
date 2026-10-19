@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -58,7 +59,7 @@ type fake struct {
 	observed   int
 	previewErr error
 	applyErr   error
-	applied    int
+	applied    atomic.Int32 // set from the apply's cmd, which Bubble Tea runs on a goroutine of its own
 }
 
 func newFake() *fake {
@@ -74,7 +75,7 @@ func (f *fake) script() form.Script {
 			return "plan: " + strings.Join([]string{f.first.answer, f.second.answer}, ", ")
 		},
 		Label: strings.ToUpper,
-		Apply: func(context.Context) error { f.applied++; return f.applyErr },
+		Apply: func(context.Context) error { f.applied.Add(1); return f.applyErr },
 		Stale: func(err error) bool { return errors.Is(err, errStale) },
 	}
 }
