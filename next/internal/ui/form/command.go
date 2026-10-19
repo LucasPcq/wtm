@@ -320,7 +320,7 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 	stdout, _ := c.io.Writers()
 	switch {
 	case failure != nil:
-		return c.io.Refuse(failure, argv)
+		return c.io.FailWith(failure, replanStep(failure, argv))
 	case !ran.Outcome.Applied():
 		previewed, fingerprint := c.Preview(ran.Outcome), ran.Outcome.PlanFingerprint()
 		output.Frame(stdout, func(w io.Writer) {
@@ -331,6 +331,14 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 
 	output.Frame(stdout, func(w io.Writer) { c.Draw(w, ran.Outcome, c.io.View()) })
 	return c.io.Failed(ran.Outcome.Failure())
+}
+
+// replanStep is the next step of a stale plan: argv, the command line of the request, run again with --dry-run; none for any other failure.
+func replanStep(failure *domain.Error, argv []string) []output.NextStep {
+	if !domain.PlanStale(failure) {
+		return nil
+	}
+	return []output.NextStep{{Command: output.Line(append(slices.Clone(argv), "--"+uicli.FlagDryRun)), Note: domain.ReplanNote}}
 }
 
 // applyLine is argv, the command line of the request, held to the fingerprint of the plan it previewed.

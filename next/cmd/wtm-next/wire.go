@@ -98,21 +98,27 @@ func wire(params wireParams) app {
 	}
 }
 
+// pathForce is the answer that lifts a legacy command's safety refusals, spelled --force.
+const pathForce = "force"
+
 // leftBehind is the repair of a branch an undo left behind, and of its worktree: clean, forced, in the legacy wtm until it migrates.
 func leftBehind(branch string) domain.FollowUp {
-	return domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: domain.PathForce, Values: []string{"true"}}}}
+	return domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: pathForce, Values: []string{"true"}}}}
 }
 
-// commandLine spells a follow-up as the legacy wtm runs it until its command migrates, a worktree on no branch entered with cd, and a pull request opened by gh; nothing for a follow-up with neither a command nor a link.
+// commandLine spells a follow-up as the legacy wtm runs it until its command migrates, a worktree on no branch entered with cd, and a pull request opened by gh.
 func commandLine(followUp domain.FollowUp) []string {
 	argv, _ := spelled(followUp)
 	return argv
 }
 
-// spelled is followUp's command line and the paths of the answers it could not spell, which a test requires none of: the worktree is positional, force and a dry run are flags.
+// spelled is followUp's command line and what of it could not be spelled, which a test requires nothing of: an answer's path, or url for a follow-up with neither a command nor a pull request to open. The worktree is positional, force and a dry run are flags.
 func spelled(followUp domain.FollowUp) (argv, unspelled []string) {
 	if followUp.Command == "" {
-		return pullRequestLine(followUp), nil
+		if argv = pullRequestLine(followUp); argv == nil {
+			return nil, []string{"url"}
+		}
+		return argv, nil
 	}
 
 	var worktree, flags []string
@@ -120,8 +126,8 @@ func spelled(followUp domain.FollowUp) (argv, unspelled []string) {
 		switch {
 		case answer.Path == domain.PathWorktree:
 			worktree = answer.Values
-		case answer.Path == domain.PathForce && slices.Equal(answer.Values, []string{"true"}):
-			flags = append(flags, "--"+domain.PathForce)
+		case answer.Path == pathForce && slices.Equal(answer.Values, []string{"true"}):
+			flags = append(flags, "--"+pathForce)
 		default:
 			unspelled = append(unspelled, answer.Path)
 		}

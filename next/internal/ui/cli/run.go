@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"io"
-	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -61,24 +60,6 @@ func (r *Run) Progress(ctx context.Context) *output.Progress {
 
 // FailWith prints failure followed by next, or the envelope that carries it with --output json, and returns the failure that sets the exit code.
 func (r *Run) FailWith(failure *domain.Error, next []output.NextStep) error {
-	return r.fail(failure, next)
-}
-
-// Refuse prints failure as FailWith does, followed, when it refuses a stale plan, by argv, the command line of the request, run again with --dry-run; with --output json the caller puts the replan in the envelope itself.
-func (r *Run) Refuse(failure *domain.Error, argv []string) error {
-	var next []output.NextStep
-	if domain.PlanStale(failure) {
-		next = []output.NextStep{{Command: output.Line(append(slices.Clone(argv), "--"+FlagDryRun)), Note: domain.ReplanNote}}
-	}
-	return r.fail(failure, next)
-}
-
-// View is what the command's outcome is drawn from: the working directory and how its follow-ups are spelled.
-func (r *Run) View() output.View {
-	return output.View{Cwd: r.Env.Cwd, CommandLine: r.CommandLine}
-}
-
-func (r *Run) fail(failure *domain.Error, next []output.NextStep) error {
 	if !r.Human() {
 		return r.Envelope(domain.Envelope{Command: r.Command, Err: failure})
 	}
@@ -89,6 +70,11 @@ func (r *Run) fail(failure *domain.Error, next []output.NextStep) error {
 	})
 
 	return r.Failed(failure)
+}
+
+// View is what the command's outcome is drawn from: the working directory and how its follow-ups are spelled.
+func (r *Run) View() output.View {
+	return output.View{Cwd: r.Env.Cwd, CommandLine: r.CommandLine}
 }
 
 // Envelope writes the v2 JSON envelope doc on stdout, each field it refuses spelled as its flag, and returns its failure; an envelope that cannot be written is the failure.

@@ -122,12 +122,12 @@
       "skip": "set by its flag only",
       "value": false,
       "yes": {
-        "value": "",
-        "label": ""
+        "value": "true",
+        "label": "Yes"
       },
       "no": {
-        "value": "",
-        "label": ""
+        "value": "false",
+        "label": "No"
       },
       "no_first": false,
       "rememberable": false,

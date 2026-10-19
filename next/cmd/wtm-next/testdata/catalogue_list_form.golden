@@ -8,12 +8,12 @@
       "help": "Ask GitHub for each worktree's open pull request (needs gh)",
       "value": false,
       "yes": {
-        "value": "",
-        "label": ""
+        "value": "true",
+        "label": "Yes"
       },
       "no": {
-        "value": "",
-        "label": ""
+        "value": "false",
+        "label": "No"
       },
       "no_first": false,
       "rememberable": false,
@@ -27,12 +27,12 @@
       "help": "Fetch origin first, as the picker's refresh (r) does",
       "value": false,
       "yes": {
-        "value": "",
-        "label": ""
+        "value": "true",
+        "label": "Yes"
       },
       "no": {
-        "value": "",
-        "label": ""
+        "value": "false",
+        "label": "No"
       },
       "no_first": false,
       "rememberable": false,

@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"path/filepath"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/api"
@@ -44,6 +45,9 @@ func TestAnInvalidCallIsRefusedWithTheStatusOfItsKind(t *testing.T) {
 			require.NotNil(t, got.Envelope.Err)
 			assert.Equal(t, c.Code, got.Envelope.Err.Code)
 			assert.Equal(t, "create", got.Envelope.Command)
+			if c.Dir == main {
+				shapes{t: t, command: "create", root: filepath.Dir(main)}.golden("invalid_"+name, got.Envelope)
+			}
 		})
 	}
 }

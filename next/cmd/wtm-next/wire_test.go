@@ -110,7 +110,6 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"left_behind": {followUp: leftBehind("feat/x"), argv: []string{"wtm", "clean", "feat/x", "--force"}},
 		"dry_run":     {followUp: dryRun, argv: []string{"wtm", "clean", "feat/x", "--force", "--dry-run"}},
 		"pr_url_only": {followUp: domain.FollowUp{URL: pr.URL}, argv: []string{"gh", "pr", "view", pr.URL, "--web"}},
-		"nothing":     {followUp: domain.FollowUp{Code: "list.open_pr"}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -129,4 +128,11 @@ func TestAnAnswerTheCommandLineCannotSpellIsReported(t *testing.T) {
 	_, unspelled := spelled(followUp)
 
 	assert.Equal(t, []string{"profile"}, unspelled)
+}
+
+func TestAFollowUpWithNothingToRunIsReported(t *testing.T) {
+	argv, unspelled := spelled(domain.FollowUp{Code: "list.open_pr"})
+
+	assert.Empty(t, argv)
+	assert.Equal(t, []string{"url"}, unspelled)
 }

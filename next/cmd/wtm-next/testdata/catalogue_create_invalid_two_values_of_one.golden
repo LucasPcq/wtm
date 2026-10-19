@@ -1,0 +1,23 @@
+{
+  "v": 2,
+  "command": "create",
+  "ok": false,
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "from",
+        "code": "one_value",
+        "params": {
+          "count": "2"
+        },
+        "flag": "from",
+        "message": "from takes one value, not 2"
+      }
+    ]
+  }
+}

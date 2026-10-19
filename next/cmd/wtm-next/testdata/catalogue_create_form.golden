@@ -101,12 +101,12 @@
       "help": "Succeed without a change when the worktree already exists (idempotent)",
       "value": false,
       "yes": {
-        "value": "",
-        "label": ""
+        "value": "true",
+        "label": "Yes"
       },
       "no": {
-        "value": "",
-        "label": ""
+        "value": "false",
+        "label": "No"
       },
       "no_first": false,
       "rememberable": false,

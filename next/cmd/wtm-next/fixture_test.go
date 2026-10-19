@@ -23,13 +23,14 @@ func (r recorded) Open(op domain.Operation) domain.Report {
 	return func(domain.Event) {}
 }
 
-// A mutation is a command of the catalogue the contract drives through api alone, on a repository configured for wtm: the answers that change it, what it needs first, what makes its preview stale, and what its apply leaves.
+// A mutation is a command of the catalogue the contract drives through api alone, on a repository configured for wtm: the answers that change it, its subject's first, what it needs first, what makes its preview stale, what a refused apply leaves as it was, and what its apply leaves.
 type mutation struct {
-	name    string
-	answers []domain.Answered
-	setup   func(t *testing.T, main string)
-	stale   func(t *testing.T, main string)
-	applied func(t *testing.T, main string)
+	name      string
+	answers   []domain.Answered
+	setup     func(t *testing.T, main string)
+	stale     func(t *testing.T, main string)
+	untouched func(t *testing.T, main string)
+	applied   func(t *testing.T, main string)
 }
 
 // mutations are the commands of the catalogue that change a repository.
@@ -41,6 +42,9 @@ func mutations() []mutation {
 			// the env strategy settles where the new worktree's .env comes from: a plan made before no longer holds
 			stale: func(t *testing.T, main string) {
 				writeConfig(t, main, "[env]\nstrategy = \"main\"\n")
+			},
+			untouched: func(t *testing.T, main string) {
+				assert.NoDirExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-x"))
 			},
 			applied: func(t *testing.T, main string) {
 				assert.DirExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-x"))
@@ -55,6 +59,10 @@ func mutations() []mutation {
 			// staging the file changes its status, which the plan moves by
 			stale: func(t *testing.T, main string) {
 				gittest.Git(t, main, "add", "notes.txt")
+			},
+			untouched: func(t *testing.T, main string) {
+				assert.FileExists(t, filepath.Join(main, "notes.txt"))
+				assert.NoDirExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-notes"))
 			},
 			applied: func(t *testing.T, main string) {
 				assert.FileExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-notes", "notes.txt"))

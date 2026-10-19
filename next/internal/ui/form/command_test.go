@@ -111,6 +111,13 @@ func TestAnApplyIsDrawnByTheCommandAndEndsOnItsFailure(t *testing.T) {
 	assert.Equal(t, failed, refused.Err)
 }
 
+func TestAStalePlanIsFollowedByTheDryRunThatPlansAgain(t *testing.T) {
+	stale := &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodePlanStale}
+
+	assert.Equal(t, []output.NextStep{{Command: `wtm-next create 'it'\''s' --dry-run`, Note: domain.ReplanNote}}, form.ReplanStep(stale, []string{"wtm-next", "create", "it's"}))
+	assert.Empty(t, form.ReplanStep(&domain.Error{Kind: domain.KindConflict, Code: "lock.held"}, []string{"wtm-next", "create", "feat/x"}))
+}
+
 func TestAStalePlanInJSONFollowsUpWithItsReplan(t *testing.T) {
 	stale := &domain.Error{Kind: domain.KindConflict, Code: domain.CodePlanStale, Message: "stale"}
 

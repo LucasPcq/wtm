@@ -111,6 +111,14 @@ func TestAFormIsEncodedWithTheKindOfEachField(t *testing.T) {
 	}`, string(data))
 }
 
+func TestAConfirmationPublishesTheValuesItsAnswerTakes(t *testing.T) {
+	data, err := json.Marshal(Form{Fields: []Field{ConfirmField{FieldSpec: FieldSpec{Path: "fetch"}}}})
+
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"yes":{"value":"true","label":"Yes"}`)
+	assert.Contains(t, string(data), `"no":{"value":"false","label":"No"}`)
+}
+
 func TestAFormWithoutProblemsHasAnEmptyList(t *testing.T) {
 	data, err := json.Marshal(Form{})
 

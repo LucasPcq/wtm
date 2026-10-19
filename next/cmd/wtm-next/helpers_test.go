@@ -75,15 +75,16 @@ func writeConfig(t *testing.T, main, extra string) {
 // keepsTheMutationContract drives m through the catalogue alone: its questions, their answers, a dry run, the same plan refused once stale with the replan that follows it up, that replan, then the apply held to its fingerprint.
 func keepsTheMutationContract(t *testing.T, m mutation) {
 	t.Helper()
-	main := configured(t)
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv(stateDirEnv, "")
+	main, c, shape := drive(t, m.name)
 	if m.setup != nil {
 		m.setup(t, main)
 	}
-	c := command(t, m.name)
-	shape := shapes{t: t, command: m.name, root: filepath.Dir(main)}
-	shape.golden("form", c.Form)
+
+	empty, err := c.Questions(t.Context(), api.Call{Dir: main})
+	require.NoError(t, err)
+	// a later answer's problem may wait on the subject's, as extract's files wait on their source
+	subject := m.answers[0].Path
+	assert.NotEmpty(t, domain.ProblemsOf(empty.Problems, subject), "an empty request is not asked its %s", subject)
 
 	asked, err := c.Questions(t.Context(), api.Call{Dir: main, Answers: m.answers})
 	require.NoError(t, err)
@@ -107,6 +108,8 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 	replan := stale.Envelope.FollowUps[0]
 	assert.Equal(t, m.name, replan.Command)
 	assert.True(t, replan.DryRun)
+	assert.Empty(t, stale.Envelope.Items, "a stale plan applies nothing")
+	m.untouched(t, main)
 	shape.golden("stale", stale.Envelope)
 
 	replanned := c.Execute(t.Context(), api.Call{Dir: main, Answers: replan.Answers, Options: domain.RunOptions{DryRun: replan.DryRun}})
@@ -138,12 +141,7 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 // keepsTheReadContract drives the read called name through the catalogue alone: its questions, then the read of their answers, with no operation, plan nor fingerprint.
 func keepsTheReadContract(t *testing.T, name string) {
 	t.Helper()
-	main := configured(t)
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv(stateDirEnv, "")
-	c := command(t, name)
-	shape := shapes{t: t, command: name, root: filepath.Dir(main)}
-	shape.golden("form", c.Form)
+	main, c, shape := drive(t, name)
 
 	asked, err := c.Questions(t.Context(), api.Call{Dir: main})
 	require.NoError(t, err)
@@ -157,6 +155,19 @@ func keepsTheReadContract(t *testing.T, name string) {
 	assert.Empty(t, read.Envelope.Fingerprint)
 	assert.Nil(t, read.Envelope.Plan)
 	assert.NoDirExists(t, filepath.Join(main, ".git", "wtm", "ops"), "a read runs no operation")
+}
+
+// drive is the command of the catalogue called name, the main worktree of a new repository configured for wtm it runs on, with a home and a global config of its own, and the shapes it gives, its schema checked first.
+func drive(t *testing.T, name string) (string, api.Command, shapes) {
+	t.Helper()
+	main := configured(t)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv(stateDirEnv, "")
+	c := command(t, name)
+	shape := shapes{t: t, command: name, root: filepath.Dir(main)}
+	shape.golden("form", c.Form)
+	return main, c, shape
 }
 
 // shapes compares each JSON document a command of the catalogue gives a surface with its golden, testdata/catalogue_<command>_<part>.golden: the published shapes a surface's types are generated from.

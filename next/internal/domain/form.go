@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"cmp"
 	"encoding/json"
 	"strconv"
 	"strings"
@@ -45,6 +46,9 @@ func fieldKind(field Field) (string, Field) {
 		field.Entries, field.Options = orEmpty(field.Entries), orEmpty(field.Options)
 		return "text_list", field
 	case ConfirmField:
+		// a surface answers with an option's value, which Yes reads: true or false, whatever the option says
+		field.Yes.Value, field.Yes.Label = "true", cmp.Or(field.Yes.Label, "Yes")
+		field.No.Value, field.No.Label = "false", cmp.Or(field.No.Label, "No")
 		return "confirm", field
 	}
 	return "", field
