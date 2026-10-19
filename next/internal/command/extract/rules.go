@@ -381,7 +381,7 @@ func (f Facts) fallbackWarnings(planned Plan) []domain.Warning {
 // ----------------------------------------------------------------------------
 // The plan
 
-// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the source and the files to take from it, the target, how a created target is made (its source, env strategy, isolation, fast-forward), whether the files are copied rather than moved, the conflicts and what to do with them, and the answers to remember.
+// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the source and the files to take from it, the target, how a created target is made (its source, env strategy, isolation, fast-forward), whether the files are copied rather than moved, the conflicts and what to do with them, and the answers to remember; then the answers recalled and the recap, which the fingerprint leaves out since they change nothing the apply does.
 type Plan struct {
 	Source      string              `json:"source"`
 	Files       []worktree.Change   `json:"files"`
@@ -394,9 +394,10 @@ type Plan struct {
 	Conflicts   []worktree.Conflict `json:"conflicts"`
 	OnConflict  OnConflict          `json:"on_conflict,omitempty"`
 	Remember    []string            `json:"remember,omitempty"`
+	Recalled    []string            `json:"recalled,omitempty"` // the fields answered from memory, as the request was resolved
+	Recap       []domain.RecapRow   `json:"recap,omitempty"`    // the plan as every surface shows it, its answers marked as the run left them
 	facts       Facts
 	settled     provision.Answers // as resolved, handed to provisioning even where the plan shows none, and remembered
-	recalled    []string          // the fields answered from memory, as the request was resolved
 }
 
 // Nothing reports whether the plan has no file to extract: the source holds no uncommitted change.
@@ -411,6 +412,7 @@ func (p Plan) Locks() []domain.Lock {
 
 // Fingerprinted is what the plan's fingerprint covers: the plan with what the apply reads of the project to provision a created target.
 func (p Plan) Fingerprinted() any {
+	p.Recalled, p.Recap = nil, nil
 	return provision.Fingerprinted(p, p.facts.Repository, p.settled)
 }
 
@@ -431,12 +433,91 @@ func (p Plan) move() worktree.Move {
 	}
 }
 
-// Recalled are the fields of the plan answered from memory.
-func (p Plan) Recalled() []string {
-	return p.recalled
+// ----------------------------------------------------------------------------
+// The recap
+
+// CodeResolveThenDiscard is the step left after an extract with conflicts: resolve them in the target, then discard the same files in the source.
+const CodeResolveThenDiscard = Name + ".resolve_then_discard"
+
+// NoteNew notes a target of the recap to create, from the source of its params; the others are worktree's notes.
+const NoteNew = "new"
+
+func (p Plan) previewRecap() []domain.RecapRow {
+	return p.recap(domain.Marks{Recalled: p.Recalled, Remembered: p.Remember, Mark: domain.MarkRemember})
 }
 
-// EnvFollowsConfig reports whether the env strategy follows config.toml's, EnvFrom being the strategy it stands for now.
-func (p Plan) EnvFollowsConfig() bool {
-	return p.settled.FollowsConfig()
+// appliedRecap is the recap of the plan once applied, the fields remembered by the apply marked saved; Run sets it as the applied plan's Recap.
+func (p Plan) appliedRecap(remembered []string) []domain.RecapRow {
+	return p.recap(domain.Marks{Recalled: p.Recalled, Remembered: remembered, Mark: domain.MarkSaved})
+}
+
+// recap is the plan row by row, none when there is nothing to extract: the source, its files, the target and how it gets its worktree, the parent of a branch checked out, the answers of a created target, the mode, then the conflicts and what to do with them.
+func (p Plan) recap(marks domain.Marks) []domain.RecapRow {
+	if p.Nothing() {
+		return nil
+	}
+
+	rows := []domain.RecapRow{
+		{Key: pathSource, Label: "Source", Path: pathSource, Values: domain.RecapValues([]string{p.Source})},
+		{Key: PathFiles, Label: "Files", Path: PathFiles, Values: recappedFiles(p.Files)},
+		{Key: "target", Label: "Target", Path: PathTo, Values: []domain.RecapValue{p.recappedTarget()}},
+	}
+	if p.Target.Action == ActionCheckOut {
+		rows = append(rows, domain.RecapRow{Key: "parent", Label: "Parent", Path: pathFrom, Values: domain.RecapValues([]string{p.From})})
+	}
+	rows = append(rows, provision.RecapRows(provision.RecapParams{EnvFrom: p.EnvFrom, FollowsConfig: p.settled.FollowsConfig(), Isolation: p.Isolation, FastForward: p.FastForward, Marks: marks})...)
+
+	mode := "move"
+	if p.Keep {
+		mode = "copy"
+	}
+	rows = append(rows, domain.RecapRow{Key: "mode", Label: "Mode", Path: pathKeep, Values: domain.RecapValues([]string{mode})})
+	if len(p.Conflicts) > 0 {
+		rows = append(rows,
+			domain.RecapRow{Key: "conflicts", Label: "Conflicts", Values: recappedConflicts(p.Conflicts)},
+			domain.RecapRow{Key: pathOnConflict, Label: "On conflict", Path: pathOnConflict, Values: domain.RecapValues([]string{string(p.OnConflict)})},
+		)
+	}
+
+	return rows
+}
+
+func (p Plan) recappedTarget() domain.RecapValue {
+	target := p.Target
+	value := domain.RecapValue{Value: target.Branch, Text: target.Branch}
+	switch target.Action {
+	case ActionCreate:
+		value.Note, value.Params, value.Text = NoteNew, domain.Params{"from": p.From}, "new worktree "+target.Branch+" from "+p.From
+	case ActionCheckOut:
+		value.Note, value.Text = worktree.NoteExisting, target.Branch+" (existing local branch — reused)"
+	case ActionResume:
+		value.Note, value.Params, value.Text = worktree.NoteResumes, domain.Params{"upstream": target.Upstream}, worktree.Resumes(target.Branch, target.Upstream)
+	case ActionExisting:
+	}
+
+	return value
+}
+
+// recappedFiles are the files, each noted with its status, a renamed one with its old path, and spelled with its tag.
+func recappedFiles(files []worktree.Change) []domain.RecapValue {
+	values := make([]domain.RecapValue, 0, len(files))
+	for _, file := range files {
+		value := domain.RecapValue{Value: file.Path, Note: string(file.Status), Text: file.Status.Tag() + " " + file.Label()}
+		if file.OrigPath != "" {
+			value.Params = domain.Params{"orig_path": file.OrigPath}
+		}
+		values = append(values, value)
+	}
+
+	return values
+}
+
+// recappedConflicts are the files in conflict, each noted with why.
+func recappedConflicts(conflicts []worktree.Conflict) []domain.RecapValue {
+	values := make([]domain.RecapValue, 0, len(conflicts))
+	for _, conflict := range conflicts {
+		values = append(values, domain.RecapValue{Value: conflict.Path, Note: string(conflict.Kind), Text: conflict.Path + " (" + string(conflict.Kind) + ")"})
+	}
+
+	return values
 }

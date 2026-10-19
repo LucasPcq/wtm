@@ -1,0 +1,20 @@
+  ✗ extract: 1 failed
+
+  Source  feat/login
+  Files   mod README.md
+  Target  new worktree feat/x from main
+  Mode    move
+  feat/x  ../repo.trees/feat-x
+
+  ! couldn't fast-forward main: its worktree has uncommitted changes — the target starts from your local branch
+
+  ✗ feat/x  on_create failed: hook failed: exit status 3 · left incomplete
+  ! no template found for .env, skipping
+  ! Env ports left alone
+    ── .env ────────────────────────────────
+    DB   pg    no such key in this file
+    ── api/.env ────────────────────────────
+    API  http  no 3000 to shift in the value
+  ! nothing was moved: the files are still in feat/login
+
+  → wtm go feat/x

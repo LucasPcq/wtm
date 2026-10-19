@@ -4,6 +4,7 @@ package create
 import (
 	"context"
 	"slices"
+	"strconv"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
@@ -89,6 +90,7 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 	op.Finished(result.Failure())
 
 	outcome.Result = &result
+	outcome.Plan.Recap = plan.appliedRecap(result.Remembered)
 	outcome.Warnings = op.Warnings(append(outcome.Warnings, result.Warnings...))
 	return outcome, nil
 }
@@ -109,7 +111,8 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 	}
 
 	planned, warnings := Decide(facts, questions.Request())
-	planned.recalled = questions.Recalled()
+	planned.Recalled = questions.Recalled()
+	planned.Recap = planned.previewRecap()
 	return planned, warnings, nil
 }
 
@@ -125,6 +128,9 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 		item := u.item(ctx, plan, planned, report)
 		if item.Detail != nil && slices.Contains(advanced, item.Subject) {
 			item.Detail.Standing = item.Detail.Standing.FastForwarded()
+		}
+		if item.Detail != nil && item.Detail.OriginState == worktree.Behind {
+			item.Warnings = append([]domain.Warning{behindOrigin(item.Detail.Standing)}, item.Warnings...)
 		}
 		items = append(items, item)
 	}
@@ -214,6 +220,16 @@ func notAdvanced(missed provision.Missed) domain.Warning {
 		Code:    "create.ff_failed",
 		Message: "couldn't fast-forward " + subject + ": " + missed.Err.Error() + " — it starts from your local branch",
 		Params:  domain.Params{"branch": subject, "cause": missed.Err.Error()},
+	}
+}
+
+// behindOrigin warns that a branch checked out behind origin starts its worktree from the local branch; a diverged one is the plan's create.source_diverged warning already.
+func behindOrigin(standing worktree.Standing) domain.Warning {
+	behind := strconv.Itoa(standing.OriginBehind)
+	return domain.Warning{
+		Code:    "create.behind_origin",
+		Message: behind + " commit(s) behind origin — the worktree starts from your local branch.",
+		Params:  domain.Params{"behind": behind},
 	}
 }
 

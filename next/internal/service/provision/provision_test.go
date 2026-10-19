@@ -12,6 +12,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
@@ -44,6 +45,18 @@ func TestAWorktreeIsCreatedNumberedThenProvisionedInThatOrder(t *testing.T) {
 		domain.WorktreeNumbered{Worktree: numbered},
 		domain.WorktreeProvisioned{Worktree: numbered, OK: true},
 	}, report.worktreeEvents())
+}
+
+func TestAPortItCouldNotShiftIsAWarningOfTheWorktree(t *testing.T) {
+	w := onDisk(t)
+	params := portLinked(w.params(&recorder{}))
+	params.Project.Run.EnvPorts = append(params.Project.Run.EnvPorts, project.EnvPortLink{File: ".env", Key: "DB", Job: "web", Port: "http"})
+
+	outcome := w.service.Run(t.Context(), params)
+
+	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
+	require.Len(t, outcome.Warnings, 1)
+	assert.Equal(t, domain.Warning{Code: env.CodePortsLeftAlone, Message: "Env ports left alone", Params: domain.Params{"count": "1"}}, outcome.Warnings[0])
 }
 
 func TestEachPhaseIsReportedUnderItsBranch(t *testing.T) {

@@ -156,3 +156,8 @@ func (h helper) wait(t *testing.T) syscall.WaitStatus {
 	}
 	return 0
 }
+
+// recapRow is a row of a plan's recap labelled label, each of values its text.
+func recapRow(label string, values ...string) domain.RecapRow {
+	return domain.RecapRow{Label: label, Values: domain.RecapValues(values)}
+}

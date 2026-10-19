@@ -39,6 +39,17 @@ const (
 	StartResume   Start = "resume"    // a local branch tracking the branch of origin
 )
 
+// The notes a plan's recap gives a branch by how its worktree begins.
+const (
+	NoteExisting = "existing" // StartCheckOut: the local branch as it is
+	NoteResumes  = "resumes"  // StartResume: tracking the upstream of its params
+)
+
+// Resumes spells branch tracking upstream, as a recap shows a branch that resumes.
+func Resumes(branch, upstream string) string {
+	return branch + " (resumes " + upstream + ")"
+}
+
 // Placed is a branch that gets a new worktree, started as Start; Upstream is the branch of origin it tracks, for StartResume.
 type Placed struct {
 	Start    Start

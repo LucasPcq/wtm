@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 )
 
@@ -57,16 +58,6 @@ func AnomalyLines(plan env.Redacted) []string {
 	return lines
 }
 
-// PortAnomalies returns the ports plan could not shift as one anomaly, its lines under the title "Env ports left alone"; nil when there are none.
-func PortAnomalies(plan env.Redacted) []string {
-	lines := AnomalyLines(plan)
-	if len(lines) == 0 {
-		return nil
-	}
-
-	return []string{"Env ports left alone\n" + strings.Join(lines, "\n")}
-}
-
 func anomalyReason(entry env.Entry) string {
 	switch entry.Status {
 	case env.StatusMissingKey:
@@ -93,6 +84,18 @@ func filesOf(entries []env.Entry) []string {
 
 func pad(s string, width int) string {
 	return s + strings.Repeat(" ", max(0, width-len([]rune(s))))
+}
+
+// WarningMessages are the messages of an item's warnings, the ports left alone followed by their table, drawn from ports, the item's env ports.
+func WarningMessages(warnings []domain.Warning, ports env.Redacted) []string {
+	messages := Messages(warnings)
+	for i, warned := range warnings {
+		if lines := AnomalyLines(ports); warned.Code == env.CodePortsLeftAlone && len(lines) > 0 {
+			messages[i] += "\n" + strings.Join(lines, "\n")
+		}
+	}
+
+	return messages
 }
 
 func changedOwned(owned []env.OwnedEntry) int {

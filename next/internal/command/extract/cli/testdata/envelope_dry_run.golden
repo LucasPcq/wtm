@@ -20,7 +20,69 @@
     "env_from": "example",
     "keep": false,
     "conflicts": [],
-    "on_conflict": "abort"
+    "on_conflict": "abort",
+    "recap": [
+      {
+        "key": "source",
+        "label": "Source",
+        "path": "source",
+        "values": [
+          {
+            "value": "feat/login",
+            "text": "feat/login"
+          }
+        ]
+      },
+      {
+        "key": "files",
+        "label": "Files",
+        "path": "files",
+        "values": [
+          {
+            "value": "old.txt",
+            "note": "deleted",
+            "text": "del old.txt"
+          }
+        ]
+      },
+      {
+        "key": "target",
+        "label": "Target",
+        "path": "to",
+        "values": [
+          {
+            "value": "feat/split",
+            "note": "new",
+            "params": {
+              "from": "main"
+            },
+            "text": "new worktree feat/split from main"
+          }
+        ]
+      },
+      {
+        "key": "env_from",
+        "label": "Env",
+        "path": "env_from",
+        "values": [
+          {
+            "value": "example",
+            "text": "example"
+          }
+        ]
+      },
+      {
+        "key": "mode",
+        "label": "Mode",
+        "path": "keep",
+        "values": [
+          {
+            "value": "move",
+            "text": "move"
+          }
+        ]
+      }
+    ]
   },
   "fingerprint": "9034161e33da1d2fa035ac88",
   "follow_ups": [],

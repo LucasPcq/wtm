@@ -21,23 +21,6 @@ func TestTwoBranchesCreatedAreCountedRowedAndPointedAt(t *testing.T) {
 	formtest.Golden(t, "outcome_two_done", rendered(func(w *bytes.Buffer) { drawOutcome(w, twoCreated(trees), cwd) }))
 }
 
-func TestAnAppliedRunMarksOnlyTheAnswersItRemembered(t *testing.T) {
-	outcome := twoCreated(trees)
-	outcome.Plan.Isolation = "isolated"
-	outcome.Plan.Remember = []string{"isolation", "fast_forward"}
-
-	nothingWritten := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, cwd) })
-	outcome.Result.Remembered = outcome.Plan.Remember
-	written := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, cwd) })
-
-	assert.Contains(t, nothingWritten, "Isolation  isolated\n")
-	assert.NotContains(t, nothingWritten, "Fast-forward")
-	assert.Contains(t, written, "Env           example\n")
-	assert.Contains(t, written, "Isolation     isolated · saved for next runs\n")
-	assert.Contains(t, written, "Fast-forward  keep as-is · saved for next runs\n")
-	assert.NotContains(t, written, "Remember")
-}
-
 func TestADivergedBranchIsWarnedOnce(t *testing.T) {
 	outcome := twoCreated(trees)
 	outcome.Result.Items[0].Detail.Standing = worktree.Standing{ExistingBranch: true, OriginState: worktree.Diverged, OriginAhead: 1, OriginBehind: 1}
@@ -64,6 +47,7 @@ func TestARunOfOnlyOpenBranchesIsUnchanged(t *testing.T) {
 		outcome.Result.Items[i].Reason = "unchanged"
 		outcome.Plan.Branches[i].Action = create.ActionUnchanged
 	}
+	outcome.Plan.Recap = []domain.RecapRow{recapRow("Branches", "feat/a (already open)", "feat/b (already open)"), recapRow("Parent", "main"), recapRow("Env", "example")}
 
 	formtest.Golden(t, "outcome_unchanged", rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, cwd) }))
 }
@@ -77,12 +61,14 @@ func TestARunWithNothingToDoSaysSo(t *testing.T) {
 func TestADryRunShowsThePlanItsWarningsItsFingerprintAndHowToApplyIt(t *testing.T) {
 	outcome := twoCreated(trees)
 	outcome.Result = nil
-	outcome.Plan.FastForward = []string{"main"}
-	outcome.Plan.Remember = []string{"env_from"}
+	outcome.Plan.Recap = []domain.RecapRow{
+		recapRow("Branches", "feat/a", "feat/b"), recapRow("From", "main"),
+		{Label: "Env", Mark: domain.MarkRemember, Values: domain.RecapValues([]string{"example"})}, recapRow("Fast-forward", "main"),
+	}
 	outcome.Warnings = []domain.Warning{{Code: "create.env_parent_fallback", Message: `The "parent" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main.`}}
 
 	formtest.Golden(t, "dryrun", rendered(func(w *bytes.Buffer) {
-		output.DryRun(w, output.DryRunParams{Command: create.Name, Rows: planRowsOf(outcome.Plan, previewMarks(outcome.Plan)), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: "wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567"})
+		output.DryRun(w, output.DryRunParams{Command: create.Name, Rows: output.RecapRows(outcome.Plan.Recap), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: "wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567"})
 	}))
 }
 
@@ -101,9 +87,11 @@ func TestAnAppliedRunWritesEachItemWithItsDetail(t *testing.T) {
 	outcome.Result.Items[1].Detail.Standing = worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2}
 	outcome.Result.Items[1].Detail.Metadata.Ordinal = 2
 	outcome.Warnings = []domain.Warning{{Code: "locks.unavailable", Message: "ran without operation locks"}}
+	outcome.Plan.Recap = nil
 
 	assert.JSONEq(t, `{
 		"v": 2, "command": "create", "ok": true, "op": "op-1",
+		"plan": {"branches": [{"branch": "feat/a", "path": "/trees/feat-a", "action": "create"}, {"branch": "feat/b", "path": "/trees/feat-b", "action": "create"}], "from": "main", "env_from": "example"},
 		"items": [
 			{"subject": "feat/a", "status": "done", "detail": {"path": "/trees/feat-a", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "isolation": "isolated"}, "existing_branch": false}},
 			{"subject": "feat/b", "status": "done", "detail": {"path": "/trees/feat-b", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "ordinal": 2, "isolation": "isolated"}, "existing_branch": true, "origin_state": "behind", "origin_behind": 2}}
@@ -134,6 +122,7 @@ func TestADryRunWritesThePlanAndItsFingerprintInsteadOfItems(t *testing.T) {
 	outcome := twoCreated("/trees")
 	outcome.Result = nil
 	outcome.Warnings = []domain.Warning{{Code: "create.env_parent_fallback", Message: "from main"}}
+	outcome.Plan.Recap = nil
 
 	assert.JSONEq(t, `{
 		"v": 2, "command": "create", "ok": true, "op": "op-1",

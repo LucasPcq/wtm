@@ -242,7 +242,7 @@ func (q Questions) fileOptions() []domain.Option {
 
 // branchSkip skips the branch of the target while the target is a worktree that exists: the source, or another one.
 func (q Questions) branchSkip() string {
-	if to := q.To.Given; to != "" && (to == q.Source.Given || q.held(to)) {
+	if to := q.To.Given; to != "" && !q.CreatesTarget(to) {
 		return existingSkip
 	}
 
@@ -279,6 +279,11 @@ func (q Questions) NewTarget(branch string) []domain.FieldError {
 	}
 
 	return []domain.FieldError{{Path: PathTo, Code: "extract.has_worktree", Template: "{value} already has a worktree — pick it as the target worktree", Params: domain.Params{"value": branch}}}
+}
+
+// CreatesTarget reports whether to names a target to create: a branch that no worktree but the source's holds.
+func (q Questions) CreatesTarget(to string) bool {
+	return to != "" && to != q.Source.Given && !q.held(to)
 }
 
 // held reports whether a worktree other than the source holds branch.

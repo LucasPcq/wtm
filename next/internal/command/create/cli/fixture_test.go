@@ -220,6 +220,7 @@ func twoCreated(trees string) create.Outcome {
 			},
 			From:    "main",
 			EnvFrom: project.EnvExample,
+			Recap:   []domain.RecapRow{recapRow("Branches", "feat/a", "feat/b"), recapRow("From", "main"), recapRow("Env", "example")},
 		},
 		Fingerprint: "0123456789abcdef01234567",
 		Result: &create.Result{Items: []create.Item{
@@ -245,10 +246,17 @@ func mixed(trees string) create.Outcome {
 			From:      "main",
 			EnvFrom:   project.EnvMain,
 			Isolation: project.Isolated,
+			Recap: []domain.RecapRow{
+				recapRow("Branches", "feature (existing)", "linked (already open)", "feat/c", "feat/d", "remote-only (resumes origin/remote-only)"),
+				recapRow("From", "main"), recapRow("Env", "main"), recapRow("Isolation", "isolated"),
+			},
 		},
 		Warnings: []domain.Warning{{Code: "create.ff_dirty", Message: "couldn't fast-forward main: its worktree has uncommitted changes — it starts from your local branch", Params: domain.Params{"branch": "main"}}},
 		Result: &create.Result{Items: []create.Item{
-			{Subject: "feature", Status: domain.StatusDone, Detail: &create.Detail{
+			{Subject: "feature", Status: domain.StatusDone, Warnings: []domain.Warning{
+				{Code: "create.behind_origin", Message: "2 commit(s) behind origin — the worktree starts from your local branch.", Params: domain.Params{"behind": "2"}},
+				{Code: "provision.env_ports_left_alone", Message: "Env ports left alone", Params: domain.Params{"count": "1"}},
+			}, Detail: &create.Detail{
 				Path: filepath.Join(trees, "feature"), Metadata: meta,
 				Standing: worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2},
 				EnvPorts: env.Redacted{Offset: 10, Applied: true, Entries: []env.Entry{

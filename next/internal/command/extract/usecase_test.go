@@ -103,6 +103,11 @@ func TestResolveWritesConflictMarkersInTheTargetAndKeepsTheSource(t *testing.T) 
 	assert.True(t, result.Items[0].Detail.Kept)
 	assert.Contains(t, readFile(t, filepath.Join(w.at(other), "a.txt")), ">>>>>>> incoming ("+source+")")
 	assert.Equal(t, "source\n", readFile(t, filepath.Join(w.at(source), "a.txt")))
+	assert.Equal(t, []domain.Warning{
+		{Code: "extract.conflict_markers", Message: "a.txt left with conflict markers in feat/other.", Params: domain.Params{"files": "a.txt", "target": other}},
+		{Code: "extract.source_kept", Message: "Nothing was removed from feat/login: to undo, discard the applied files in feat/other.", Params: domain.Params{"source": source, "target": other}},
+		{Code: extract.CodeResolveThenDiscard, Message: "resolve the conflicts, then discard the same files in feat/login", Params: domain.Params{"source": source, "target": other}},
+	}, result.Items[0].Warnings)
 }
 
 func TestAConflictUnderAbortIsRefusedAtPlanTimeAndNothingIsCreatedOrMoved(t *testing.T) {
@@ -279,6 +284,18 @@ func TestNothingIsRememberedNorMovedWhenTheTargetFailsToProvision(t *testing.T) 
 	assert.NotContains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), "isolation")
 	assert.FileExists(t, filepath.Join(w.at(source), "a.txt"))
 	assert.NoFileExists(t, filepath.Join(w.path(split), "a.txt"))
+	assert.Contains(t, result.Items[0].Warnings, domain.Warning{Code: "extract.untouched", Message: "nothing was moved: the files are still in feat/login", Params: domain.Params{"source": source, "target": split}})
+}
+
+func TestATargetLeftUnfinishedByACopySaysNothingWasCopied(t *testing.T) {
+	w := newWorld(t, seed{Config: withHook("exit 1")})
+	w.change(t, source, "a.txt", "a\n")
+
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split, Keep: new(true)})
+
+	require.Equal(t, domain.StatusFailed, result.Items[0].Status)
+	assert.Equal(t, []string{"extract.untouched"}, codes(result.Items[0].Warnings))
+	assert.Equal(t, "nothing was copied to feat/split", result.Items[0].Warnings[0].Message)
 }
 
 func TestNothingIsRememberedWhenTheMoveIsRefused(t *testing.T) {
@@ -343,6 +360,7 @@ func TestAMoveThatLeavesTheChangesInBothWorktreesIsHalfMoved(t *testing.T) {
 	assert.Equal(t, extract.CodeHalfMoved, result.Items[0].Err.Code)
 	assert.Equal(t, `the changes are in "feat/other" but "feat/login" still holds them`, result.Items[0].Err.Message)
 	assert.Equal(t, result.Items[0].Err, result.Failure())
+	assert.Empty(t, result.Items[0].Warnings)
 }
 
 func TestACancelOnceTheTargetStandsSkipsTheMove(t *testing.T) {
@@ -364,6 +382,7 @@ func TestACancelOnceTheTargetStandsSkipsTheMove(t *testing.T) {
 	assert.DirExists(t, w.path(split))
 	assert.NoFileExists(t, filepath.Join(w.path(split), "a.txt"))
 	assert.FileExists(t, filepath.Join(w.at(source), "a.txt"))
+	assert.Equal(t, []string{"extract.untouched"}, codes(result.Items[0].Warnings))
 }
 
 func TestASourceWithUncommittedChangesIsNotFastForwardedAndSaysSo(t *testing.T) {

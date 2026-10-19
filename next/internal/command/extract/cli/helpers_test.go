@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
@@ -82,6 +83,10 @@ func unfinished(item extract.Item) extract.Outcome {
 		Files:  []worktree.Change{{Path: "README.md", Status: worktree.ChangeModified}},
 		Target: extract.Target{Branch: item.Subject, Action: extract.ActionCreate},
 		From:   "main",
+		Recap: []domain.RecapRow{
+			recapRow("Source", "feat/login"), recapRow("Files", "mod README.md"),
+			recapRow("Target", "new worktree "+item.Subject+" from main"), recapRow("Mode", "move"),
+		},
 	}
 	return extract.Outcome{Plan: plan, Result: &extract.Result{Items: []extract.Item{item}}}
 }
@@ -90,4 +95,13 @@ func drawn(outcome extract.Outcome) string {
 	var out bytes.Buffer
 	drawOutcome(&out, outcome, "/repo")
 	return out.String()
+}
+
+func untouched(message string) domain.Warning {
+	return domain.Warning{Code: "extract.untouched", Message: message}
+}
+
+// recapRow is a row of a plan's recap labelled label, each of values its text.
+func recapRow(label string, values ...string) domain.RecapRow {
+	return domain.RecapRow{Label: label, Values: domain.RecapValues(values)}
 }

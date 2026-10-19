@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/domain"
+
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 
 	"github.com/stretchr/testify/assert"
@@ -38,6 +40,13 @@ func TestAnAnomalyLineNeverNamesAForeignHost(t *testing.T) {
 
 func TestAPlanWithNoRefusalHasNoAnomalyLine(t *testing.T) {
 	assert.Empty(t, AnomalyLines(env.Redacted{Entries: []env.Entry{{File: ".env", Key: "PORT", Status: env.StatusRewrite}}}))
+}
+
+func TestTheWarningOfThePortsLeftAloneCarriesTheirTable(t *testing.T) {
+	ports := env.Redacted{Entries: []env.Entry{{File: ".env", Key: "DB", Port: "pg", Status: env.StatusMissingKey}}}
+	warnings := []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping"}, {Code: env.CodePortsLeftAlone, Message: "Env ports left alone"}}
+
+	assert.Equal(t, []string{"no template found for .env, skipping", "Env ports left alone\n── .env ────────────────────────\nDB  pg  no such key in this file"}, WarningMessages(warnings, ports))
 }
 
 func TestTheSettlementNoteCountsPortsAndOwnedValues(t *testing.T) {

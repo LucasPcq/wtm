@@ -6,6 +6,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,25 +21,31 @@ func TestAnOutcomeWithoutItsTargetDrawsNothing(t *testing.T) {
 
 func TestATargetLeftIncompleteStandsAndSaysWhy(t *testing.T) {
 	outcome := unfinished(extract.Item{
-		Subject: "feat/bad",
-		Status:  domain.StatusFailed,
-		Reason:  domain.ReasonIncomplete,
-		Err:     &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed: hook failed: exit status 3"},
-		Detail:  &extract.Detail{Path: "/repo.trees/feat-bad"},
+		Subject:  "feat/bad",
+		Status:   domain.StatusFailed,
+		Reason:   domain.ReasonIncomplete,
+		Err:      &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed: hook failed: exit status 3"},
+		Warnings: []domain.Warning{untouched("nothing was moved: the files are still in feat/login")},
+		Detail:   &extract.Detail{Path: "/repo.trees/feat-bad"},
 	})
 
 	formtest.Golden(t, "failed", drawn(outcome))
 }
 
-func TestAnUnfinishedTargetSaysTheFilesStayed(t *testing.T) {
-	failed := extract.Item{Subject: "feat/x", Status: domain.StatusFailed, Err: &domain.Error{Code: "unit.phase_failed", Message: "on_create failed"}}
-	copied := unfinished(failed)
-	copied.Plan.Keep = true
-	half := unfinished(extract.Item{Subject: "feat/x", Status: domain.StatusFailed, Err: &domain.Error{Code: extract.CodeHalfMoved, Message: "the changes are in \"feat/x\" but \"feat/login\" still holds them"}})
+func TestTheWarningsOfAnUnfinishedTargetFollowItsLine(t *testing.T) {
+	ports := env.Redacted{Entries: []env.Entry{
+		{File: ".env", Key: "DB", Port: "pg", Status: env.StatusMissingKey},
+		{File: "api/.env", Key: "API", Port: "http", Base: 3000, Status: env.StatusNotFound},
+	}}
+	outcome := unfinished(extract.Item{
+		Subject: "feat/x", Status: domain.StatusFailed, Reason: domain.ReasonIncomplete,
+		Err:      &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed: hook failed: exit status 3"},
+		Detail:   &extract.Detail{Path: "/repo.trees/feat-x", EnvPorts: ports},
+		Warnings: []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping"}, {Code: env.CodePortsLeftAlone, Message: "Env ports left alone"}, untouched("nothing was moved: the files are still in feat/login")},
+	})
+	outcome.Warnings = []domain.Warning{{Code: "extract.ff_dirty", Message: "couldn't fast-forward main: its worktree has uncommitted changes — the target starts from your local branch"}}
 
-	assert.Contains(t, drawn(unfinished(failed)), "! nothing was moved: the files are still in feat/login\n")
-	assert.Contains(t, drawn(copied), "! nothing was copied to feat/x\n")
-	assert.NotContains(t, drawn(half), "nothing was")
+	formtest.Golden(t, "unfinished_warnings", drawn(outcome))
 }
 
 func TestATargetWhoseMoveFailedStillStands(t *testing.T) {
@@ -56,7 +63,7 @@ func TestATargetWhoseMoveFailedStillStands(t *testing.T) {
 }
 
 func TestATargetThatNeverStoodHasNoRowNorGo(t *testing.T) {
-	outcome := unfinished(extract.Item{Subject: "feat/slow", Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted})
+	outcome := unfinished(extract.Item{Subject: "feat/slow", Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted, Warnings: []domain.Warning{untouched("nothing was moved: the files are still in feat/login")}})
 
 	formtest.Golden(t, "interrupted", drawn(outcome))
 }

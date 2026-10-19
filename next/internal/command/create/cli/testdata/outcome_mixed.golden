@@ -9,8 +9,8 @@
   feat/c     .trees/feat-c
   feat/d     .trees/feat-d
 
-  ! feature is 2 commit(s) behind origin — the worktree starts from your local branch.
-  ! Env ports left alone
+  ! feature  2 commit(s) behind origin — the worktree starts from your local branch.
+  ! feature  Env ports left alone
     ── .env ────────────────────────
     DB  pg  no such key in this file
   ! feat/c  no template found for .env, skipping
