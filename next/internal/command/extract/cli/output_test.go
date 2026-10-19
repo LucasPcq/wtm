@@ -6,6 +6,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/stretchr/testify/assert"
 )
@@ -32,13 +33,19 @@ func TestATargetLeftIncompleteStandsAndSaysWhy(t *testing.T) {
 }
 
 func TestTheWarningsOfAnUnfinishedTargetFollowItsLine(t *testing.T) {
-	outcome := unfinished(extract.Item{Subject: "feat/x", Status: domain.StatusFailed, Err: &domain.Error{Code: "unit.phase_failed", Message: "on_create failed"}, Warnings: []domain.Warning{
-		{Code: "provision.env_ports_left_alone", Message: "Env ports left alone\n── .env ──\nDB  pg  no such key in this file"},
-		untouched("nothing was copied to feat/x"),
-	}})
-	outcome.Warnings = []domain.Warning{{Code: "create.ff_dirty", Message: "couldn't fast-forward main"}}
+	ports := env.Redacted{Entries: []env.Entry{
+		{File: ".env", Key: "DB", Port: "pg", Status: env.StatusMissingKey},
+		{File: "api/.env", Key: "API", Port: "http", Base: 3000, Status: env.StatusNotFound},
+	}}
+	outcome := unfinished(extract.Item{
+		Subject: "feat/x", Status: domain.StatusFailed, Reason: domain.ReasonIncomplete,
+		Err:      &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed: hook failed: exit status 3"},
+		Detail:   &extract.Detail{Path: "/repo.trees/feat-x", EnvPorts: ports},
+		Warnings: []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping"}, {Code: env.CodePortsLeftAlone, Message: "Env ports left alone"}, untouched("nothing was moved: the files are still in feat/login")},
+	})
+	outcome.Warnings = []domain.Warning{{Code: "extract.ff_dirty", Message: "couldn't fast-forward main: its worktree has uncommitted changes — the target starts from your local branch"}}
 
-	assert.Contains(t, drawn(outcome), "  Mode    move\n\n  ! couldn't fast-forward main\n\n  ✗ feat/x  on_create failed\n  ! Env ports left alone\n    ── .env ──\n    DB  pg  no such key in this file\n  ! nothing was copied to feat/x\n")
+	formtest.Golden(t, "unfinished_warnings", drawn(outcome))
 }
 
 func TestATargetWhoseMoveFailedStillStands(t *testing.T) {

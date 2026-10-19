@@ -105,6 +105,7 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 	op.Finished(result.Failure())
 
 	outcome.Result = &result
+	outcome.Plan.Recap = plan.appliedRecap(result.Remembered)
 	outcome.Warnings = op.Warnings(append(outcome.Warnings, result.Warnings...))
 	return outcome, nil
 }
@@ -133,7 +134,7 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 
 	planned, warnings, err := Decide(facts, resolved, conflicts)
 	planned.Recalled = questions.Recalled()
-	planned.Recap = planned.PreviewRecap()
+	planned.Recap = planned.previewRecap()
 	return planned, warnings, err
 }
 
@@ -332,7 +333,7 @@ func (u UseCase) move(ctx context.Context, plan Plan, item Item, report domain.R
 	return item
 }
 
-// aftermath warns of what the target is left with: the files it holds with conflict markers and how to undo them, or, for a target left unfinished, that it received nothing; a half move says for itself where the files are.
+// aftermath warns of what the target is left with: the files it holds with conflict markers, how to undo them and what to do next, or, for a target left unfinished, that it received nothing; a half move says for itself where the files are.
 func (p Plan) aftermath(item Item) []domain.Warning {
 	target := item.Subject
 	params := domain.Params{"source": p.Source, "target": target}
@@ -346,6 +347,7 @@ func (p Plan) aftermath(item Item) []domain.Warning {
 		return []domain.Warning{
 			{Code: "extract.conflict_markers", Message: markers + ".", Params: domain.Params{"files": conflicts, "target": target}},
 			{Code: "extract.source_kept", Message: "Nothing was removed from " + p.Source + ": to undo, discard the applied files in " + target + ".", Params: params},
+			{Code: CodeResolveThenDiscard, Message: "resolve the conflicts, then discard the same files in " + p.Source, Params: params},
 		}
 	case item.Status == domain.StatusDone, item.Err != nil && item.Err.Code == CodeHalfMoved:
 		return nil

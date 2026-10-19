@@ -83,6 +83,30 @@ func TestEachBranchStateGivesItsAction(t *testing.T) {
 	assert.Equal(t, extract.Target{Branch: remote, Path: w.path(remote), Action: extract.ActionResume, Upstream: "origin/" + remote}, resumed.Target)
 }
 
+func TestTheRecapSpellsHowTheTargetGetsItsWorktree(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+
+	checkedOut, _ := w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: existing, From: "main"})
+	resumed, _ := w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: remote})
+
+	assert.Equal(t, domain.RecapValue{Value: existing, Note: worktree.NoteExisting, Text: existing + " (existing local branch — reused)"}, checkedOut.Recap[2].Values[0])
+	assert.Equal(t, domain.RecapRow{Key: "parent", Label: "Parent", Path: "from", Values: domain.RecapValues([]string{"main"})}, checkedOut.Recap[3])
+	assert.Equal(t, domain.RecapValue{Value: remote, Note: worktree.NoteResumes, Params: domain.Params{"upstream": "origin/" + remote}, Text: remote + " (resumes origin/" + remote + ")"}, resumed.Recap[2].Values[0])
+	assert.NotEqual(t, "parent", resumed.Recap[3].Key)
+}
+
+func TestTheRecapAndTheRecalledAnswersLeaveTheFingerprintAlone(t *testing.T) {
+	w := newWorld(t, seed{Config: remembering, Run: jobsToml})
+	w.change(t, source, "a.txt", "a\n")
+	planned, _ := w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split})
+	bare := planned
+	bare.Recalled, bare.Recap = nil, nil
+
+	assert.NotEmpty(t, planned.Recalled)
+	assert.Equal(t, jsonOf(t, bare.Fingerprinted()), jsonOf(t, planned.Fingerprinted()))
+}
+
 func TestConflictsUnderResolveArePlanned(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.change(t, source, "a.txt", "a\n")

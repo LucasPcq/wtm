@@ -22,6 +22,70 @@
       }
     }
   ],
+  "plan": {
+    "source": "feat/login",
+    "files": [
+      {
+        "path": "apps/api/new.txt",
+        "status": "untracked"
+      }
+    ],
+    "target": {
+      "branch": "feat/other",
+      "path": "/repo/wt-feat-other",
+      "action": "existing"
+    },
+    "keep": false,
+    "conflicts": [],
+    "on_conflict": "abort",
+    "recap": [
+      {
+        "key": "source",
+        "label": "Source",
+        "path": "source",
+        "values": [
+          {
+            "value": "feat/login",
+            "text": "feat/login"
+          }
+        ]
+      },
+      {
+        "key": "files",
+        "label": "Files",
+        "path": "files",
+        "values": [
+          {
+            "value": "apps/api/new.txt",
+            "note": "untracked",
+            "text": "new apps/api/new.txt"
+          }
+        ]
+      },
+      {
+        "key": "target",
+        "label": "Target",
+        "path": "to",
+        "values": [
+          {
+            "value": "feat/other",
+            "text": "feat/other"
+          }
+        ]
+      },
+      {
+        "key": "mode",
+        "label": "Mode",
+        "path": "keep",
+        "values": [
+          {
+            "value": "move",
+            "text": "move"
+          }
+        ]
+      }
+    ]
+  },
   "follow_ups": [],
   "warnings": []
 }

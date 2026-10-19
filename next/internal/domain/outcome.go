@@ -55,7 +55,7 @@ func (o Outcome[P, D]) Failure() *Error {
 	return o.Result.Failure()
 }
 
-// Envelope is how the run of command ended for every surface, err being the run's refusal if any: its items once applied, else the plan and its fingerprint unless refused.
+// Envelope is how the run of command ended for every surface, err being the run's refusal if any: the plan with its items once applied, else the plan and its fingerprint unless refused.
 func (o Outcome[P, D]) Envelope(command string, err *Error) Envelope {
 	doc := Envelope{Command: command, Op: o.Op, Err: err}
 
@@ -65,7 +65,7 @@ func (o Outcome[P, D]) Envelope(command string, err *Error) Envelope {
 		for _, unit := range o.Result.Items {
 			doc.Items = append(doc.Items, unit.item())
 		}
-		doc.Warnings = o.Warnings
+		doc.Plan, doc.Warnings = &o.Plan, o.Warnings
 	case doc.Err == nil:
 		doc.Plan, doc.Fingerprint, doc.Warnings = &o.Plan, o.Fingerprint, o.Warnings
 	}

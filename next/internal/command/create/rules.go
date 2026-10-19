@@ -287,7 +287,7 @@ type Plan struct {
 	FastForward []string            `json:"fast_forward,omitempty"`
 	Remember    []string            `json:"remember,omitempty"`
 	Recalled    []string            `json:"recalled,omitempty"` // the fields answered from memory, as the request was resolved
-	Recap       []domain.RecapRow   `json:"recap,omitempty"`    // the plan as every surface shows it before the apply
+	Recap       []domain.RecapRow   `json:"recap,omitempty"`    // the plan as every surface shows it, its answers marked as the run left them
 	facts       Facts
 	settled     provision.Answers // as resolved, handed to provisioning even where the plan shows none, and remembered
 }
@@ -329,20 +329,15 @@ func (b BranchPlan) placement() worktree.Placed {
 // ----------------------------------------------------------------------------
 // The recap
 
-// The notes of a branch's value in the recap, beside the action they spell.
-const (
-	NoteExisting    = "existing"     // checked out as it is
-	NoteResumes     = "resumes"      // tracks the remote branch of its params' upstream
-	NoteAlreadyOpen = "already_open" // its worktree is open already
-)
+// NoteAlreadyOpen notes a branch of the recap whose worktree is open already; the others are worktree's notes.
+const NoteAlreadyOpen = "already_open"
 
-// AppliedRecap is the recap of the plan once applied, the fields remembered by the apply marked saved.
-func (p Plan) AppliedRecap(remembered []string) []domain.RecapRow {
+// appliedRecap is the recap of the plan once applied, the fields remembered by the apply marked saved; Run sets it as the applied plan's Recap.
+func (p Plan) appliedRecap(remembered []string) []domain.RecapRow {
 	return p.recap(domain.Marks{Recalled: p.Recalled, Remembered: remembered, Mark: domain.MarkSaved})
 }
 
-// PreviewRecap is the recap of the plan not yet applied, the fields it will remember marked so; Plan sets it as the plan's Recap.
-func (p Plan) PreviewRecap() []domain.RecapRow {
+func (p Plan) previewRecap() []domain.RecapRow {
 	return p.recap(domain.Marks{Recalled: p.Recalled, Remembered: p.Remember, Mark: domain.MarkRemember})
 }
 
@@ -363,9 +358,9 @@ func recappedBranches(branches []BranchPlan) []domain.RecapValue {
 		value := domain.RecapValue{Value: planned.Branch, Text: planned.Branch}
 		switch planned.Action {
 		case ActionCheckOut:
-			value.Note, value.Text = NoteExisting, planned.Branch+" (existing)"
+			value.Note, value.Text = worktree.NoteExisting, planned.Branch+" (existing)"
 		case ActionResume:
-			value.Note, value.Params, value.Text = NoteResumes, domain.Params{"upstream": planned.Upstream}, planned.Branch+" (resumes "+planned.Upstream+")"
+			value.Note, value.Params, value.Text = worktree.NoteResumes, domain.Params{"upstream": planned.Upstream}, worktree.Resumes(planned.Branch, planned.Upstream)
 		case ActionUnchanged:
 			value.Note, value.Text = NoteAlreadyOpen, planned.Branch+" (already open)"
 		case ActionCreate:

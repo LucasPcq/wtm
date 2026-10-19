@@ -2,9 +2,11 @@ package cli
 
 import (
 	"io"
+	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
@@ -35,19 +37,20 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
 	}
 	output.Tally(w, tally)
 
-	rows := output.RecapRows(outcome.Plan.AppliedRecap(outcome.Result.Remembered))
+	rows := output.RecapRows(outcome.Plan.Recap)
+	own, note := stepOf(item.Warnings)
+	targetWarnings := output.WarningMessages(own, envPortsOf(item))
 	warnings := output.Messages(outcome.Warnings)
 	if finished {
-		warnings = append(warnings, output.Messages(item.Warnings)...)
+		warnings = append(warnings, targetWarnings...)
 	}
 	var next []output.NextStep
 	if detail != nil {
 		path := output.ShownPath(output.Shown{Cwd: cwd, Path: detail.Path})
 		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + output.MutedNote(output.SettlementNote(detail.EnvPorts), output.StylesOf(w))}})
-		next = append(next, output.GoStep(item.Subject))
-	}
-	if conflicted {
-		next[0].Note = "resolve the conflicts, then discard the same files in " + outcome.Plan.Source
+		step := output.GoStep(item.Subject)
+		step.Note = note
+		next = append(next, step)
 	}
 
 	output.Blank(w)
@@ -56,7 +59,7 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
 	if !finished {
 		output.Blank(w)
 		output.UnfinishedLine(w, output.Unfinished{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err})
-		for _, text := range output.Messages(item.Warnings) {
+		for _, text := range targetWarnings {
 			output.WarningLine(w, text)
 		}
 	}
@@ -66,6 +69,24 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
 		output.Blank(w)
 		output.NextSteps(w, next)
 	}
+}
+
+// stepOf parts the target's warnings from the step left to take, which the step to the target carries as its note.
+func stepOf(warnings []domain.Warning) ([]domain.Warning, string) {
+	at := slices.IndexFunc(warnings, func(warned domain.Warning) bool { return warned.Code == extract.CodeResolveThenDiscard })
+	if at < 0 {
+		return warnings, ""
+	}
+
+	return slices.Delete(slices.Clone(warnings), at, at+1), warnings[at].Message
+}
+
+func envPortsOf(item extract.Item) env.Redacted {
+	if item.Detail == nil {
+		return env.Redacted{}
+	}
+
+	return item.Detail.EnvPorts
 }
 
 // targetOf is the one item of an applied outcome, the target's; false when the outcome holds none.

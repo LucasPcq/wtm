@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -647,7 +648,7 @@ func TestThePlanRecapsWhatItDecidedAndTheAnswersItRecalled(t *testing.T) {
 
 	assert.Equal(t, []string{domain.PathEnvFrom}, planned.Recalled)
 	assert.Equal(t, []domain.RecapRow{
-		{Key: "branches", Label: "Branches", Path: "branches", Values: []domain.RecapValue{{Value: existing, Note: create.NoteExisting, Text: existing + " (existing)"}}},
+		{Key: "branches", Label: "Branches", Path: "branches", Values: []domain.RecapValue{{Value: existing, Note: worktree.NoteExisting, Text: existing + " (existing)"}}},
 		{Key: "parent", Label: "Parent", Path: "from", Values: domain.RecapValues([]string{"main"})},
 		{Key: "env_from", Label: "Env", Path: "env_from", Mark: domain.MarkRecalled, Values: domain.RecapValues([]string{"example"})},
 	}, planned.Recap)
@@ -661,4 +662,35 @@ func TestTheRecapAndTheRecalledAnswersLeaveTheFingerprintAlone(t *testing.T) {
 
 	assert.NotEmpty(t, planned.Recap)
 	assert.Equal(t, jsonOf(t, bare.Fingerprinted()), jsonOf(t, planned.Fingerprinted()))
+}
+
+func TestTheAppliedRecapMarksOnlyTheAnswersTheApplySaved(t *testing.T) {
+	req := create.Request{Branches: []string{branchName}, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation"}}}
+	cases := map[string]struct {
+		config string
+		want   domain.Mark
+	}{
+		"saved":       {projectToml, domain.MarkSaved},
+		"not_created": {withHook("exit 1"), ""},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t, seed{Run: jobsToml, Config: c.config})
+
+			outcome, err := w.usecase.Run(t.Context(), req, domain.RunOptions{Report: (&recorder{}).add})
+
+			require.NoError(t, err)
+			at := slices.IndexFunc(outcome.Plan.Recap, func(row domain.RecapRow) bool { return row.Key == domain.PathIsolation })
+			require.GreaterOrEqual(t, at, 0)
+			assert.Equal(t, c.want, outcome.Plan.Recap[at].Mark)
+		})
+	}
+}
+
+func TestAWorktreeWithNoEnvFileStillRecapsItsStrategy(t *testing.T) {
+	w := newWorld(t, seed{NoEnv: true})
+
+	planned, _ := w.plan(t, create.Request{Branches: []string{branchName}})
+
+	assert.True(t, slices.ContainsFunc(planned.Recap, func(row domain.RecapRow) bool { return row.Key == domain.PathEnvFrom }), planned.Recap)
 }

@@ -28,6 +28,16 @@ func TestADryRunOfANewTargetShowsItsConflictsAndTheLineThatAppliesIt(t *testing.
 	formtest.Golden(t, "dryrun", got.Stdout)
 }
 
+func TestARenamedFileKeepsItsOldPathInTheRecap(t *testing.T) {
+	got := runExtract(t, newWorld(seed{}), source, "--files", "DOC.md", "--to", other, "--dry-run", "--output", "json")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	assert.Contains(t, got.Stdout, `"note": "renamed",
+            "params": {
+              "orig_path": "README.md"
+            },`)
+}
+
 func TestAMoveToAnExistingWorktreeListsEachFileAndPointsAtIt(t *testing.T) {
 	got := runExtract(t, newWorld(seed{}), source, "--files", "apps/api,DOC.md,old.txt", "--to", other)
 

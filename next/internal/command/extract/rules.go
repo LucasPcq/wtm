@@ -395,7 +395,7 @@ type Plan struct {
 	OnConflict  OnConflict          `json:"on_conflict,omitempty"`
 	Remember    []string            `json:"remember,omitempty"`
 	Recalled    []string            `json:"recalled,omitempty"` // the fields answered from memory, as the request was resolved
-	Recap       []domain.RecapRow   `json:"recap,omitempty"`    // the plan as every surface shows it before the apply
+	Recap       []domain.RecapRow   `json:"recap,omitempty"`    // the plan as every surface shows it, its answers marked as the run left them
 	facts       Facts
 	settled     provision.Answers // as resolved, handed to provisioning even where the plan shows none, and remembered
 }
@@ -436,20 +436,18 @@ func (p Plan) move() worktree.Move {
 // ----------------------------------------------------------------------------
 // The recap
 
-// The notes of the target's value in the recap, beside the action they spell.
-const (
-	NoteNew      = "new"      // a worktree to create, from its params' source
-	NoteExisting = "existing" // a local branch checked out as it is
-	NoteResumes  = "resumes"  // tracks the remote branch of its params' upstream
-)
+// CodeResolveThenDiscard is the step left after an extract with conflicts: resolve them in the target, then discard the same files in the source.
+const CodeResolveThenDiscard = Name + ".resolve_then_discard"
 
-// PreviewRecap is the recap of the plan not yet applied, the fields it will remember marked so; Plan sets it as the plan's Recap.
-func (p Plan) PreviewRecap() []domain.RecapRow {
+// NoteNew notes a target of the recap to create, from the source of its params; the others are worktree's notes.
+const NoteNew = "new"
+
+func (p Plan) previewRecap() []domain.RecapRow {
 	return p.recap(domain.Marks{Recalled: p.Recalled, Remembered: p.Remember, Mark: domain.MarkRemember})
 }
 
-// AppliedRecap is the recap of the plan once applied, the fields remembered by the apply marked saved.
-func (p Plan) AppliedRecap(remembered []string) []domain.RecapRow {
+// appliedRecap is the recap of the plan once applied, the fields remembered by the apply marked saved; Run sets it as the applied plan's Recap.
+func (p Plan) appliedRecap(remembered []string) []domain.RecapRow {
 	return p.recap(domain.Marks{Recalled: p.Recalled, Remembered: remembered, Mark: domain.MarkSaved})
 }
 
@@ -491,20 +489,24 @@ func (p Plan) recappedTarget() domain.RecapValue {
 	case ActionCreate:
 		value.Note, value.Params, value.Text = NoteNew, domain.Params{"from": p.From}, "new worktree "+target.Branch+" from "+p.From
 	case ActionCheckOut:
-		value.Note, value.Text = NoteExisting, target.Branch+" (existing local branch — reused)"
+		value.Note, value.Text = worktree.NoteExisting, target.Branch+" (existing local branch — reused)"
 	case ActionResume:
-		value.Note, value.Params, value.Text = NoteResumes, domain.Params{"upstream": target.Upstream}, target.Branch+" (resumes "+target.Upstream+")"
+		value.Note, value.Params, value.Text = worktree.NoteResumes, domain.Params{"upstream": target.Upstream}, worktree.Resumes(target.Branch, target.Upstream)
 	case ActionExisting:
 	}
 
 	return value
 }
 
-// recappedFiles are the files, each noted with its status and spelled with its tag.
+// recappedFiles are the files, each noted with its status, a renamed one with its old path, and spelled with its tag.
 func recappedFiles(files []worktree.Change) []domain.RecapValue {
 	values := make([]domain.RecapValue, 0, len(files))
 	for _, file := range files {
-		values = append(values, domain.RecapValue{Value: file.Path, Note: string(file.Status), Text: file.Status.Tag() + " " + file.Label()})
+		value := domain.RecapValue{Value: file.Path, Note: string(file.Status), Text: file.Status.Tag() + " " + file.Label()}
+		if file.OrigPath != "" {
+			value.Params = domain.Params{"orig_path": file.OrigPath}
+		}
+		values = append(values, value)
 	}
 
 	return values

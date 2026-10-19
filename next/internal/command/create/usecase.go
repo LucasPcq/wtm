@@ -90,6 +90,7 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 	op.Finished(result.Failure())
 
 	outcome.Result = &result
+	outcome.Plan.Recap = plan.appliedRecap(result.Remembered)
 	outcome.Warnings = op.Warnings(append(outcome.Warnings, result.Warnings...))
 	return outcome, nil
 }
@@ -111,7 +112,7 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 
 	planned, warnings := Decide(facts, questions.Request())
 	planned.Recalled = questions.Recalled()
-	planned.Recap = planned.PreviewRecap()
+	planned.Recap = planned.previewRecap()
 	return planned, warnings, nil
 }
 

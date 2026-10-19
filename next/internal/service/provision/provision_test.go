@@ -12,6 +12,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
@@ -55,8 +56,7 @@ func TestAPortItCouldNotShiftIsAWarningOfTheWorktree(t *testing.T) {
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	require.Len(t, outcome.Warnings, 1)
-	assert.Equal(t, "provision.env_ports_left_alone", outcome.Warnings[0].Code)
-	assert.Contains(t, outcome.Warnings[0].Message, "DB  http  no such key in this file")
+	assert.Equal(t, domain.Warning{Code: env.CodePortsLeftAlone, Message: "Env ports left alone", Params: domain.Params{"count": "1"}}, outcome.Warnings[0])
 }
 
 func TestEachPhaseIsReportedUnderItsBranch(t *testing.T) {

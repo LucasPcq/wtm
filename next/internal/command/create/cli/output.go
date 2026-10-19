@@ -6,6 +6,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
@@ -34,7 +35,7 @@ func drawOutcome(w io.Writer, outcome create.Outcome, cwd string) {
 	var anomalies []string
 	var next []output.NextStep
 	if len(items) > 0 {
-		rows = output.RecapRows(outcome.Plan.AppliedRecap(outcome.Result.Remembered))
+		rows = output.RecapRows(outcome.Plan.Recap)
 	}
 
 	for _, item := range items {
@@ -47,8 +48,8 @@ func drawOutcome(w io.Writer, outcome create.Outcome, cwd string) {
 	}
 
 	for _, item := range items {
-		for _, warned := range item.Warnings {
-			anomalies = append(anomalies, item.Subject+"  "+warned.Message)
+		for _, message := range output.WarningMessages(item.Warnings, envPortsOf(item)) {
+			anomalies = append(anomalies, item.Subject+"  "+message)
 		}
 	}
 
@@ -83,6 +84,14 @@ func drawOutcome(w io.Writer, outcome create.Outcome, cwd string) {
 		output.Blank(w)
 		output.NextSteps(w, next)
 	}
+}
+
+func envPortsOf(item create.Item) env.Redacted {
+	if item.Detail == nil {
+		return env.Redacted{}
+	}
+
+	return item.Detail.EnvPorts
 }
 
 // headline is the tally of the items by status.
