@@ -28,9 +28,13 @@ func SuccessLine(w io.Writer, msg string) {
 	fmt.Fprintf(w, "%s%s %s\n", Indent, StylesOf(w).Success.Render(GlyphSuccess), msg)
 }
 
-// WarningLine writes msg to w as something the reader should look at.
+// WarningLine writes msg to w as something the reader should look at, its first line after the glyph and the others hung under it.
 func WarningLine(w io.Writer, msg string) {
-	fmt.Fprintf(w, "%s%s %s\n", Indent, StylesOf(w).Warning.Render(GlyphAttention), msg)
+	lines := strings.Split(strings.TrimRight(msg, "\n"), "\n")
+	fmt.Fprintf(w, "%s%s %s\n", Indent, StylesOf(w).Warning.Render(GlyphAttention), lines[0])
+	for _, line := range lines[1:] {
+		fmt.Fprintf(w, "%s  %s\n", Indent, line)
+	}
 }
 
 // UnchangedLine writes msg to w, muted, as something left as it was.

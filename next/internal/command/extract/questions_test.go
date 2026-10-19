@@ -262,6 +262,18 @@ func TestABranchAWorktreeHoldsIsNoNewTarget(t *testing.T) {
 	assert.Empty(t, questions.NewTarget(split))
 }
 
+func TestOnlyABranchNoWorktreeButTheSourcesHoldsCreatesATarget(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+
+	questions := w.questions(t, extract.Request{Source: source})
+
+	assert.True(t, questions.CreatesTarget(split))
+	assert.False(t, questions.CreatesTarget(other))
+	assert.False(t, questions.CreatesTarget(source))
+	assert.False(t, questions.CreatesTarget(""))
+}
+
 func TestAnAnswerTheRequestCannotTakeIsRefusedAndChangesNothing(t *testing.T) {
 	cases := map[string]struct {
 		path   string

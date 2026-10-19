@@ -12,7 +12,42 @@
       }
     ],
     "from": "main",
-    "env_from": "example"
+    "env_from": "example",
+    "recap": [
+      {
+        "key": "branches",
+        "label": "Branches",
+        "path": "branches",
+        "values": [
+          {
+            "value": "feat/x",
+            "text": "feat/x"
+          }
+        ]
+      },
+      {
+        "key": "from",
+        "label": "From",
+        "path": "from",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "env_from",
+        "label": "Env",
+        "path": "env_from",
+        "values": [
+          {
+            "value": "example",
+            "text": "example"
+          }
+        ]
+      }
+    ]
   },
   "fingerprint": "6f1d820770431ef1514b6bb5",
   "follow_ups": [],

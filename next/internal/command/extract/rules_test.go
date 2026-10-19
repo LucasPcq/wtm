@@ -39,7 +39,14 @@ func TestThePlanIsTheJSONOfWhatMovesWhere(t *testing.T) {
 		"env_from": "example",
 		"keep": false,
 		"conflicts": [],
-		"on_conflict": "abort"
+		"on_conflict": "abort",
+		"recap": [
+			{"key": "source", "label": "Source", "path": "source", "values": [{"value": "feat/login", "text": "feat/login"}]},
+			{"key": "files", "label": "Files", "path": "files", "values": [{"value": "a.txt", "note": "untracked", "text": "new a.txt"}]},
+			{"key": "target", "label": "Target", "path": "to", "values": [{"value": "feat/split", "note": "new", "params": {"from": "main"}, "text": "new worktree feat/split from main"}]},
+			{"key": "env_from", "label": "Env", "path": "env_from", "values": [{"value": "example", "text": "example"}]},
+			{"key": "mode", "label": "Mode", "path": "keep", "values": [{"value": "move", "text": "move"}]}
+		]
 	}`, jsonOf(t, planned))
 	assert.Equal(t, []domain.Lock{
 		{Scope: domain.ScopeRepo, Mode: domain.LockShared},

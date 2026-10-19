@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"slices"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
@@ -131,7 +132,8 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 	}
 
 	planned, warnings, err := Decide(facts, resolved, conflicts)
-	planned.recalled = questions.Recalled()
+	planned.Recalled = questions.Recalled()
+	planned.Recap = planned.PreviewRecap()
 	return planned, warnings, err
 }
 
@@ -142,7 +144,9 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	advanced, warnings := u.fastForward(ctx, plan, report)
 	if ctx.Err() != nil {
-		return Result{Items: []Item{{Subject: plan.Target.Branch, Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted}}, Warnings: warnings}
+		skipped := Item{Subject: plan.Target.Branch, Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted}
+		skipped.Warnings = plan.aftermath(skipped)
+		return Result{Items: []Item{skipped}, Warnings: warnings}
 	}
 
 	report(domain.UnitStarted{Subject: plan.Target.Branch})
@@ -153,6 +157,7 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	if item.Status == domain.StatusDone {
 		item = u.move(ctx, plan, item, report)
 	}
+	item.Warnings = append(item.Warnings, plan.aftermath(item)...)
 	report(domain.UnitFinished{Subject: item.Subject, Status: item.Status})
 
 	var remembered []string
@@ -325,6 +330,30 @@ func (u UseCase) move(ctx context.Context, plan Plan, item Item, report domain.R
 	item.Detail.Files, item.Detail.Kept = plan.Files, moved.Kept
 	item.Detail.Conflicts = append(item.Detail.Conflicts, moved.Merged...)
 	return item
+}
+
+// aftermath warns of what the target is left with: the files it holds with conflict markers and how to undo them, or, for a target left unfinished, that it received nothing; a half move says for itself where the files are.
+func (p Plan) aftermath(item Item) []domain.Warning {
+	target := item.Subject
+	params := domain.Params{"source": p.Source, "target": target}
+	switch {
+	case item.Detail != nil && len(item.Detail.Conflicts) > 0:
+		conflicts := strings.Join(item.Detail.Conflicts, ", ")
+		markers := conflicts + " left with conflict markers in " + target
+		if len(item.Detail.Files) > len(item.Detail.Conflicts) {
+			markers += "; the other files were applied cleanly"
+		}
+		return []domain.Warning{
+			{Code: "extract.conflict_markers", Message: markers + ".", Params: domain.Params{"files": conflicts, "target": target}},
+			{Code: "extract.source_kept", Message: "Nothing was removed from " + p.Source + ": to undo, discard the applied files in " + target + ".", Params: params},
+		}
+	case item.Status == domain.StatusDone, item.Err != nil && item.Err.Code == CodeHalfMoved:
+		return nil
+	case p.Keep:
+		return []domain.Warning{{Code: "extract.untouched", Message: "nothing was copied to " + target, Params: params}}
+	}
+
+	return []domain.Warning{{Code: "extract.untouched", Message: "nothing was moved: the files are still in " + p.Source, Params: params}}
 }
 
 // failure turns the error a move failed on into extract's: a conflict found at the last moment is refused with CodeConflict, changes left in both worktrees fail with CodeHalfMoved.

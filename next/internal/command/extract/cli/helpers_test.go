@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
@@ -90,4 +91,8 @@ func drawn(outcome extract.Outcome) string {
 	var out bytes.Buffer
 	drawOutcome(&out, outcome, "/repo")
 	return out.String()
+}
+
+func untouched(message string) domain.Warning {
+	return domain.Warning{Code: "extract.untouched", Message: message}
 }

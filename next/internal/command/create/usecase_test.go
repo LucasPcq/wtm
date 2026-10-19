@@ -629,3 +629,36 @@ func TestAPreviewIsStaleOnlyWhenTheConfiguredStrategyChangesItsPlan(t *testing.T
 		})
 	}
 }
+
+func TestABranchCheckedOutBehindOriginIsWarnedOnItsItem(t *testing.T) {
+	w := newWorld(t, seed{})
+	behindOrigin(t, w, existing)
+
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName, existing}, From: "main"})
+
+	assert.Empty(t, result.Items[0].Warnings)
+	assert.Equal(t, []domain.Warning{{Code: "create.behind_origin", Message: "1 commit(s) behind origin — the worktree starts from your local branch.", Params: domain.Params{"behind": "1"}}}, result.Items[1].Warnings)
+}
+
+func TestThePlanRecapsWhatItDecidedAndTheAnswersItRecalled(t *testing.T) {
+	w := newWorld(t, seed{Config: projectToml + "\n[wizard.remembered]\nenv_strategy = \"example\"\n"})
+
+	planned, _ := w.plan(t, create.Request{Branches: []string{existing}, From: "main"})
+
+	assert.Equal(t, []string{domain.PathEnvFrom}, planned.Recalled)
+	assert.Equal(t, []domain.RecapRow{
+		{Key: "branches", Label: "Branches", Path: "branches", Values: []domain.RecapValue{{Value: existing, Note: create.NoteExisting, Text: existing + " (existing)"}}},
+		{Key: "parent", Label: "Parent", Path: "from", Values: domain.RecapValues([]string{"main"})},
+		{Key: "env_from", Label: "Env", Path: "env_from", Mark: domain.MarkRecalled, Values: domain.RecapValues([]string{"example"})},
+	}, planned.Recap)
+}
+
+func TestTheRecapAndTheRecalledAnswersLeaveTheFingerprintAlone(t *testing.T) {
+	w := newWorld(t, seed{})
+	planned, _ := w.plan(t, create.Request{Branches: []string{branchName}})
+	bare := planned
+	bare.Recalled, bare.Recap = nil, nil
+
+	assert.NotEmpty(t, planned.Recap)
+	assert.Equal(t, jsonOf(t, bare.Fingerprinted()), jsonOf(t, planned.Fingerprinted()))
+}

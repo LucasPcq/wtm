@@ -46,6 +46,19 @@ func TestAWorktreeIsCreatedNumberedThenProvisionedInThatOrder(t *testing.T) {
 	}, report.worktreeEvents())
 }
 
+func TestAPortItCouldNotShiftIsAWarningOfTheWorktree(t *testing.T) {
+	w := onDisk(t)
+	params := portLinked(w.params(&recorder{}))
+	params.Project.Run.EnvPorts = append(params.Project.Run.EnvPorts, project.EnvPortLink{File: ".env", Key: "DB", Job: "web", Port: "http"})
+
+	outcome := w.service.Run(t.Context(), params)
+
+	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
+	require.Len(t, outcome.Warnings, 1)
+	assert.Equal(t, "provision.env_ports_left_alone", outcome.Warnings[0].Code)
+	assert.Contains(t, outcome.Warnings[0].Message, "DB  http  no such key in this file")
+}
+
 func TestEachPhaseIsReportedUnderItsBranch(t *testing.T) {
 	w, _ := inMemory(t, seeds{})
 	report := &recorder{}

@@ -3,7 +3,6 @@ package output
 import (
 	"cmp"
 	"io"
-	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -28,45 +27,41 @@ const (
 	Saved            = Dot + "saved for next runs"
 )
 
-// Marks say which answers of a plan are marked, by the path of their field: those recalled from memory, and those remembered for the next runs with the mark that says so, WillBeRemembered before the apply, Saved after it.
-type Marks struct {
-	Recalled   []string
-	Remembered []string
-	Mark       string
-}
-
-// Of is the mark of the answer to the field at path, empty when it has none.
-func (m Marks) Of(path string) string {
-	switch {
-	case slices.Contains(m.Remembered, path):
-		return m.Mark
-	case slices.Contains(m.Recalled, path):
+// MarkText spells mark as a plan's value carries it, after a dot; nothing when there is no mark.
+func MarkText(mark domain.Mark) string {
+	switch mark {
+	case domain.MarkRecalled:
 		return Recalled
+	case domain.MarkRemember:
+		return WillBeRemembered
+	case domain.MarkSaved:
+		return Saved
 	}
 
 	return ""
-}
-
-// EnvValueParams is the env strategy of a plan: the strategy, whether it follows config.toml's, and its mark.
-type EnvValueParams struct {
-	Strategy      string
-	FollowsConfig bool
-	Mark          string
-}
-
-// EnvValue spells the env strategy with its mark; a marked answer that follows config.toml's reads config default, since that, not the strategy, is what is remembered.
-func EnvValue(params EnvValueParams) string {
-	if params.FollowsConfig && params.Mark != "" {
-		return "config default (" + params.Strategy + ")" + params.Mark
-	}
-
-	return params.Strategy + params.Mark
 }
 
 // A PlanRow is one line of a plan: a label and the values it applies to.
 type PlanRow struct {
 	Label  string
 	Values []string
+}
+
+// RecapRows are the rows of recap as a plan draws them: each value's text, the last carrying the row's mark.
+func RecapRows(recap []domain.RecapRow) []PlanRow {
+	rows := make([]PlanRow, 0, len(recap))
+	for _, row := range recap {
+		values := make([]string, 0, len(row.Values))
+		for _, value := range row.Values {
+			values = append(values, value.Text)
+		}
+		if last := len(values) - 1; last >= 0 {
+			values[last] += MarkText(row.Mark)
+		}
+		rows = append(rows, PlanRow{Label: row.Label, Values: values})
+	}
+
+	return rows
 }
 
 // PlanParams is a plan to draw: its rows, the warnings under them, a muted hint closing it, and the width and styles to draw them with.
@@ -120,26 +115,6 @@ func MutedNote(note string, st *Styles) string {
 	}
 
 	return st.Muted.Render(Dot + note)
-}
-
-// NotedParams are the values of a plan's row, the note the row carries and the value it shows when it has none but a note.
-type NotedParams struct {
-	Values []string
-	Note   string
-	None   string
-}
-
-// Noted are the values of params, the last carrying its note; its None, noted, when there are no values but a note; none when there is neither.
-func Noted(params NotedParams) []string {
-	switch {
-	case params.Note == "":
-		return params.Values
-	case len(params.Values) == 0:
-		return []string{params.None + params.Note}
-	}
-
-	last := len(params.Values) - 1
-	return append(slices.Clone(params.Values[:last]), params.Values[last]+params.Note)
 }
 
 func planRows(params PlanParams, st *Styles) []string {

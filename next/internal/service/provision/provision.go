@@ -285,13 +285,14 @@ func interrupted(err error, params domain.Params) *domain.Error {
 	return &domain.Error{Kind: domain.KindCancelled, Code: domain.CodeInterrupted, Message: "interrupted", Params: params, Cause: err}
 }
 
-// outcome returns outcome with the run's warnings, and domain.LocksUnavailable
-// when a write went unlocked.
+// outcome returns outcome with the run's warnings, domain.LocksUnavailable
+// when a write went unlocked, and the env ports left alone.
 func (p *provisioning) outcome(outcome Outcome) Outcome {
 	outcome.Warnings = p.warnings
 	if p.unlocked {
 		outcome.Warnings = append(outcome.Warnings, domain.LocksUnavailable)
 	}
+	outcome.Warnings = append(outcome.Warnings, portsLeftAlone(outcome.Provisioned.EnvPorts)...)
 	return outcome
 }
 

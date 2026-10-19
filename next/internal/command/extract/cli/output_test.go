@@ -20,25 +20,25 @@ func TestAnOutcomeWithoutItsTargetDrawsNothing(t *testing.T) {
 
 func TestATargetLeftIncompleteStandsAndSaysWhy(t *testing.T) {
 	outcome := unfinished(extract.Item{
-		Subject: "feat/bad",
-		Status:  domain.StatusFailed,
-		Reason:  domain.ReasonIncomplete,
-		Err:     &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed: hook failed: exit status 3"},
-		Detail:  &extract.Detail{Path: "/repo.trees/feat-bad"},
+		Subject:  "feat/bad",
+		Status:   domain.StatusFailed,
+		Reason:   domain.ReasonIncomplete,
+		Err:      &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed: hook failed: exit status 3"},
+		Warnings: []domain.Warning{untouched("nothing was moved: the files are still in feat/login")},
+		Detail:   &extract.Detail{Path: "/repo.trees/feat-bad"},
 	})
 
 	formtest.Golden(t, "failed", drawn(outcome))
 }
 
-func TestAnUnfinishedTargetSaysTheFilesStayed(t *testing.T) {
-	failed := extract.Item{Subject: "feat/x", Status: domain.StatusFailed, Err: &domain.Error{Code: "unit.phase_failed", Message: "on_create failed"}}
-	copied := unfinished(failed)
-	copied.Plan.Keep = true
-	half := unfinished(extract.Item{Subject: "feat/x", Status: domain.StatusFailed, Err: &domain.Error{Code: extract.CodeHalfMoved, Message: "the changes are in \"feat/x\" but \"feat/login\" still holds them"}})
+func TestTheWarningsOfAnUnfinishedTargetFollowItsLine(t *testing.T) {
+	outcome := unfinished(extract.Item{Subject: "feat/x", Status: domain.StatusFailed, Err: &domain.Error{Code: "unit.phase_failed", Message: "on_create failed"}, Warnings: []domain.Warning{
+		{Code: "provision.env_ports_left_alone", Message: "Env ports left alone\n── .env ──\nDB  pg  no such key in this file"},
+		untouched("nothing was copied to feat/x"),
+	}})
+	outcome.Warnings = []domain.Warning{{Code: "create.ff_dirty", Message: "couldn't fast-forward main"}}
 
-	assert.Contains(t, drawn(unfinished(failed)), "! nothing was moved: the files are still in feat/login\n")
-	assert.Contains(t, drawn(copied), "! nothing was copied to feat/x\n")
-	assert.NotContains(t, drawn(half), "nothing was")
+	assert.Contains(t, drawn(outcome), "  Mode    move\n\n  ! couldn't fast-forward main\n\n  ✗ feat/x  on_create failed\n  ! Env ports left alone\n    ── .env ──\n    DB  pg  no such key in this file\n  ! nothing was copied to feat/x\n")
 }
 
 func TestATargetWhoseMoveFailedStillStands(t *testing.T) {
@@ -56,7 +56,7 @@ func TestATargetWhoseMoveFailedStillStands(t *testing.T) {
 }
 
 func TestATargetThatNeverStoodHasNoRowNorGo(t *testing.T) {
-	outcome := unfinished(extract.Item{Subject: "feat/slow", Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted})
+	outcome := unfinished(extract.Item{Subject: "feat/slow", Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted, Warnings: []domain.Warning{untouched("nothing was moved: the files are still in feat/login")}})
 
 	formtest.Golden(t, "interrupted", drawn(outcome))
 }

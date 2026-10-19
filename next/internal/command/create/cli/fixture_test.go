@@ -248,7 +248,10 @@ func mixed(trees string) create.Outcome {
 		},
 		Warnings: []domain.Warning{{Code: "create.ff_dirty", Message: "couldn't fast-forward main: its worktree has uncommitted changes — it starts from your local branch", Params: domain.Params{"branch": "main"}}},
 		Result: &create.Result{Items: []create.Item{
-			{Subject: "feature", Status: domain.StatusDone, Detail: &create.Detail{
+			{Subject: "feature", Status: domain.StatusDone, Warnings: []domain.Warning{
+				{Code: "create.behind_origin", Message: "2 commit(s) behind origin — the worktree starts from your local branch.", Params: domain.Params{"behind": "2"}},
+				{Code: "provision.env_ports_left_alone", Message: "Env ports left alone\n── .env ────────────────────────\nDB  pg  no such key in this file", Params: domain.Params{"count": "1"}},
+			}, Detail: &create.Detail{
 				Path: filepath.Join(trees, "feature"), Metadata: meta,
 				Standing: worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2},
 				EnvPorts: env.Redacted{Offset: 10, Applied: true, Entries: []env.Entry{

@@ -82,13 +82,14 @@ func TestADryRunShowsThePlanItsWarningsItsFingerprintAndHowToApplyIt(t *testing.
 	outcome.Warnings = []domain.Warning{{Code: "create.env_parent_fallback", Message: `The "parent" env strategy needs the source branch checked out to copy its .env; without a worktree it comes from main.`}}
 
 	formtest.Golden(t, "dryrun", rendered(func(w *bytes.Buffer) {
-		output.DryRun(w, output.DryRunParams{Command: create.Name, Rows: planRowsOf(outcome.Plan, previewMarks(outcome.Plan)), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: "wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567"})
+		output.DryRun(w, output.DryRunParams{Command: create.Name, Rows: output.RecapRows(outcome.Plan.PreviewRecap()), Warnings: outcome.Warnings, Fingerprint: outcome.Fingerprint, Apply: "wtm create feat/a feat/b --env-from example --remember env_from --expect-fingerprint 0123456789abcdef01234567"})
 	}))
 }
 
 func TestAPreviewIsThePlansRowsAndItsWarnings(t *testing.T) {
 	outcome := twoCreated(trees)
 	outcome.Warnings = []domain.Warning{{Code: "create.ff_failed", Message: "couldn't fast-forward main"}}
+	outcome.Plan.Recap = outcome.Plan.PreviewRecap()
 
 	previewed := preview(outcome)
 

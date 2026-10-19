@@ -187,9 +187,7 @@ func (t *targetStep) Reset() {
 
 // creating reports whether the target is a worktree to create: picked as one, or a branch that no worktree other than the source holds.
 func (t *targetStep) creating() bool {
-	req := t.s.Request()
-	held := slices.ContainsFunc(t.s.Questions().To.Options, func(o domain.Option) bool { return o.Value == req.To })
-	return t.newTarget || req.To != "" && req.To != req.Source && !held
+	return t.newTarget || t.s.Questions().CreatesTarget(t.s.Request().To)
 }
 
 // ----------------------------------------------------------------------------

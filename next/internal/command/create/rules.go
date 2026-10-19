@@ -278,7 +278,7 @@ func (a Action) start() worktree.Start {
 	panic("create: an action with no start: " + string(a))
 }
 
-// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: each branch's worktree, the source, the env strategy, the isolation, the sources to fast-forward first and the answers to remember.
+// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: each branch's worktree, the source, the env strategy, the isolation, the sources to fast-forward first and the answers to remember; then the answers recalled and the recap, which the fingerprint leaves out since they change nothing the apply does.
 type Plan struct {
 	Branches    []BranchPlan        `json:"branches"`
 	From        string              `json:"from,omitempty"`
@@ -286,9 +286,10 @@ type Plan struct {
 	Isolation   project.Isolation   `json:"isolation,omitempty"`
 	FastForward []string            `json:"fast_forward,omitempty"`
 	Remember    []string            `json:"remember,omitempty"`
+	Recalled    []string            `json:"recalled,omitempty"` // the fields answered from memory, as the request was resolved
+	Recap       []domain.RecapRow   `json:"recap,omitempty"`    // the plan as every surface shows it before the apply
 	facts       Facts
 	settled     provision.Answers // as resolved, handed to provisioning even where the plan shows none, and remembered
-	recalled    []string          // the fields answered from memory, as the request was resolved
 }
 
 // A BranchPlan is what becomes of one branch: the path of its worktree, how it gets there, and the remote branch it resumes.
@@ -311,6 +312,7 @@ func (p Plan) Locks() []domain.Lock {
 
 // Fingerprinted is what the plan's fingerprint covers: the plan with what the apply reads of the project to provision each worktree.
 func (p Plan) Fingerprinted() any {
+	p.Recalled, p.Recap = nil, nil
 	return provision.Fingerprinted(p, p.facts.Repository, p.settled)
 }
 
@@ -324,12 +326,52 @@ func (b BranchPlan) placement() worktree.Placed {
 	return worktree.Placed{Start: b.Action.start(), Upstream: b.Upstream}
 }
 
-// Recalled are the fields of the plan answered from memory.
-func (p Plan) Recalled() []string {
-	return p.recalled
+// ----------------------------------------------------------------------------
+// The recap
+
+// The notes of a branch's value in the recap, beside the action they spell.
+const (
+	NoteExisting    = "existing"     // checked out as it is
+	NoteResumes     = "resumes"      // tracks the remote branch of its params' upstream
+	NoteAlreadyOpen = "already_open" // its worktree is open already
+)
+
+// AppliedRecap is the recap of the plan once applied, the fields remembered by the apply marked saved.
+func (p Plan) AppliedRecap(remembered []string) []domain.RecapRow {
+	return p.recap(domain.Marks{Recalled: p.Recalled, Remembered: remembered, Mark: domain.MarkSaved})
 }
 
-// EnvFollowsConfig reports whether the env strategy follows config.toml's, EnvFrom being the strategy it stands for now.
-func (p Plan) EnvFollowsConfig() bool {
-	return p.settled.FollowsConfig()
+// PreviewRecap is the recap of the plan not yet applied, the fields it will remember marked so; Plan sets it as the plan's Recap.
+func (p Plan) PreviewRecap() []domain.RecapRow {
+	return p.recap(domain.Marks{Recalled: p.Recalled, Remembered: p.Remember, Mark: domain.MarkRemember})
+}
+
+// recap is the plan row by row: the branches with how each gets its worktree, the source, From when a branch is created from it, else Parent, the branch recorded for wtm sync, then the answers of a new worktree.
+func (p Plan) recap(marks domain.Marks) []domain.RecapRow {
+	source := domain.RecapRow{Key: "parent", Label: "Parent", Path: pathFrom, Values: domain.RecapValues([]string{p.From})}
+	if slices.ContainsFunc(p.Branches, func(b BranchPlan) bool { return b.Action == ActionCreate }) {
+		source.Key, source.Label = "from", "From"
+	}
+
+	rows := []domain.RecapRow{{Key: pathBranches, Label: "Branches", Path: pathBranches, Values: recappedBranches(p.Branches)}, source}
+	return append(rows, provision.RecapRows(provision.RecapParams{EnvFrom: p.EnvFrom, FollowsConfig: p.settled.FollowsConfig(), Isolation: p.Isolation, FastForward: p.FastForward, Marks: marks})...)
+}
+
+func recappedBranches(branches []BranchPlan) []domain.RecapValue {
+	values := make([]domain.RecapValue, 0, len(branches))
+	for _, planned := range branches {
+		value := domain.RecapValue{Value: planned.Branch, Text: planned.Branch}
+		switch planned.Action {
+		case ActionCheckOut:
+			value.Note, value.Text = NoteExisting, planned.Branch+" (existing)"
+		case ActionResume:
+			value.Note, value.Params, value.Text = NoteResumes, domain.Params{"upstream": planned.Upstream}, planned.Branch+" (resumes "+planned.Upstream+")"
+		case ActionUnchanged:
+			value.Note, value.Text = NoteAlreadyOpen, planned.Branch+" (already open)"
+		case ActionCreate:
+		}
+		values = append(values, value)
+	}
+
+	return values
 }
