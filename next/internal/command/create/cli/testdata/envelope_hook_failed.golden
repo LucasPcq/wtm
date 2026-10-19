@@ -38,6 +38,7 @@
     ],
     "from": "main",
     "env_from": "example",
+    "creates": 1,
     "recap": [
       {
         "key": "branches",
@@ -74,7 +75,21 @@
       }
     ]
   },
-  "follow_ups": [],
+  "follow_ups": [
+    {
+      "command": "go",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/x"
+          ]
+        }
+      ],
+      "code": "create.go",
+      "message": ""
+    }
+  ],
   "warnings": [],
   "error": {
     "kind": "internal",

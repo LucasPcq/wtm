@@ -89,7 +89,80 @@
       }
     }
   ],
-  "follow_ups": [],
+  "plan": {
+    "branches": [
+      {
+        "branch": "feat/bad-json",
+        "path": "<SB>/acme.trees/feat-bad-json",
+        "action": "create"
+      }
+    ],
+    "from": "main",
+    "env_from": "example",
+    "isolation": "isolated",
+    "creates": 1,
+    "recap": [
+      {
+        "key": "branches",
+        "label": "Branches",
+        "path": "branches",
+        "values": [
+          {
+            "value": "feat/bad-json",
+            "text": "feat/bad-json"
+          }
+        ]
+      },
+      {
+        "key": "from",
+        "label": "From",
+        "path": "from",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "env_from",
+        "label": "Env",
+        "path": "env_from",
+        "values": [
+          {
+            "value": "example",
+            "text": "example"
+          }
+        ]
+      },
+      {
+        "key": "isolation",
+        "label": "Isolation",
+        "path": "isolation",
+        "values": [
+          {
+            "value": "isolated",
+            "text": "isolated"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "go",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/bad-json"
+          ]
+        }
+      ],
+      "code": "create.go",
+      "message": ""
+    }
+  ],
   "warnings": [],
   "error": {
     "kind": "internal",

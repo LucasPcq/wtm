@@ -19,6 +19,7 @@
     wtm list --with-prs --output json
 
   Flags:
+        --fetch           Fetch origin first, as the picker's refresh (r) does
     -h, --help            help for list
         --output string   Output format: text or json (default "text")
         --with-prs        Ask GitHub for each worktree's open pull request (needs gh)

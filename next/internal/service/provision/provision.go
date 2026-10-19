@@ -28,7 +28,7 @@ type Service struct {
 	PublicPort func(ctx context.Context, configured int) int        // the port a named URL announces, given the proxy's configured one; 0 with no proxy
 	Shield     func(ctx context.Context) (context.Context, func())  // a context the first cancel does not reach, and its release
 	Now        func() time.Time
-	LeftBehind func(branch string) []string // the command line that removes a branch an undo left behind, and its worktree
+	LeftBehind func(branch string) domain.FollowUp // the command, with its answers, that removes a branch an undo left behind, and its worktree
 }
 
 // ----------------------------------------------------------------------------
@@ -450,19 +450,19 @@ type leftBehind struct {
 func (p *provisioning) leftBehind(left leftBehind) *domain.Error {
 	branch, path := p.Worktree.Branch, p.Worktree.Path
 	message, kept := "could not delete the branch, left behind: branch", "branch"
-	followUp := &domain.FollowUp{Message: "branch " + branch + " is left behind", Params: domain.Params{"branch": branch}}
+	followUp := p.Service.LeftBehind(branch)
+	followUp.Code, followUp.Message, followUp.Params = "provision.left_behind", "branch "+branch+" is left behind", domain.Params{"branch": branch}
 	if left.Worktree {
 		message, kept = "could not remove the worktree, left behind: worktree", "worktree"
-		followUp = &domain.FollowUp{Message: "branch " + branch + " is left half-created at " + path, Params: domain.Params{"branch": branch, "path": path}}
+		followUp.Message, followUp.Params = "branch "+branch+" is left half-created at "+path, domain.Params{"branch": branch, "path": path}
 	}
-	followUp.Argv, followUp.Code = p.Service.LeftBehind(branch), "provision.left_behind"
 
 	return &domain.Error{
 		Kind:     domain.KindInternal,
 		Code:     "unit.undo_failed",
 		Message:  message,
 		Params:   domain.Params{"left": kept},
-		FollowUp: followUp,
+		FollowUp: &followUp,
 		Cause:    errors.Join(left.Failure, left.Err),
 	}
 }

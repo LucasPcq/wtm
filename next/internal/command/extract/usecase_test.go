@@ -106,8 +106,11 @@ func TestResolveWritesConflictMarkersInTheTargetAndKeepsTheSource(t *testing.T) 
 	assert.Equal(t, []domain.Warning{
 		{Code: "extract.conflict_markers", Message: "a.txt left with conflict markers in feat/other.", Params: domain.Params{"files": "a.txt", "target": other}},
 		{Code: "extract.source_kept", Message: "Nothing was removed from feat/login: to undo, discard the applied files in feat/other.", Params: domain.Params{"source": source, "target": other}},
-		{Code: extract.CodeResolveThenDiscard, Message: "resolve the conflicts, then discard the same files in feat/login", Params: domain.Params{"source": source, "target": other}},
 	}, result.Items[0].Warnings)
+	assert.Equal(t, []domain.FollowUp{{
+		Command: "go", Answers: []domain.Answered{{Path: "worktree", Values: []string{other}}},
+		Code: extract.CodeResolveThenDiscard, Message: "resolve the conflicts, then discard the same files in feat/login", Params: domain.Params{"source": source, "target": other},
+	}}, result.FollowUps, "the step left is a follow-up, never a warning the cli picks out")
 }
 
 func TestAConflictUnderAbortIsRefusedAtPlanTimeAndNothingIsCreatedOrMoved(t *testing.T) {

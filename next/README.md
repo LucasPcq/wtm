@@ -7,7 +7,7 @@
 ```
 cmd/wtm-next/          the composition root: builds each adapter once (wire.go), opens the project on demand, registers each command's cobra command on the root
 internal/
-  domain/              the contract every use case speaks: errors, warnings, events and their stream, outcomes (`Outcome`, `Result`, `Unit`, generic over a command's plan and detail; `Read`, a read's) and the envelope that reports them, operations and their locks, the vocabulary of a question and a form's schema, and the JSON of each a surface receives — pure, stdlib only
+  domain/              the contract every use case speaks: errors, warnings, events and their stream, outcomes (`Outcome`, `Result`, `Unit`, generic over a command's plan and detail; `Read`, a read's) and the envelope that reports them, operations and their locks, the vocabulary of a question and a form's schema, a follow-up (a command and its answers, or a link), a plan's recap (`recap.go`: `RecapRow`, `RecapValue`, the marks of an answer), and the JSON of each a surface receives — pure, stdlib only
     worktree/          branches and worktrees as git lists them: names, refs, where a branch stands against origin, where a branch asked for a new worktree lands, a checkout, meta.json, identity, the stack of worktrees by the branch each was created from, a branch's pull request
     project/           what a use case reads of config.toml, run.toml (isolation included) and the global settings
     dotenv/            .env files parsed and rendered byte for byte
@@ -33,7 +33,7 @@ internal/
     form/              a command's form, generic over its schema: form.Command (its flags, its request, its launch, the conclusion of its run, its command line), form.Query (the same for a read, with its picker), the session and a step per field kind, the wizard that walks them to a recap and applies, or to the last step of a read's picker
     widget/            the inputs a step asks with: select list, multi-select, text field, text list, their styles
     formtest/          for a command's tests: the driver that plays its wizard key by key, golden files, the v2 envelope decoded
-  api/                 the catalogue of the commands, knowing none of them: each one's name, its schema (domain.Form) and its execution, a JSON request in and a domain.Envelope out with the status of its kind, for a surface other than the command line
+  api/                 the catalogue of the commands, knowing none of them: each one's name, its schema (domain.Form), its questions as the repository stands and its execution, the answers by field in and a domain.Envelope out with the status of its kind, for a surface other than the command line
 ```
 No file format lives in `domain/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `domain/project`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
 
@@ -70,7 +70,7 @@ A use case or a service declares the ports it needs in its `port.go`, interface 
 
 `wtm-next create feat/x --from main`, hop by hop:
 
-1. `cmd/wtm-next/main.go → main`: `ui/output.System()` reads the process's streams and `ui/cli.ReadEnv()` its environment once (the working directory, `$WTM_PROJECT_DIR`, `$WTM_CORRELATION_ID`), and `ui/cli.Main` runs the root with `command/create/cli.New(streams, env, openCreate)` registered on it; `ui/cli/root.go → Execute` maps the failure a command returns onto its exit code.
+1. `cmd/wtm-next/main.go → main`: `ui/output.System()` reads the process's streams and `ui/cli.ReadEnv()` its environment once (the working directory, `$WTM_PROJECT_DIR`, `$WTM_CORRELATION_ID`), and `ui/cli.Main` runs the root with `command/create/cli.New(streams, env, openCreate, commandLine)` registered on it; `ui/cli/root.go → Execute` maps the failure a command returns onto its exit code.
 2. `command/create/cli/command.go → createCommand.run` hands the command line to `ui/form/command.go → Command.Launch`: `uicli.Run.Begin` refuses an invalid correlation ID before any repository is looked up, the flags, registered from create's schema, become a `create.Request`, `openCreate(ctx, env.ProjectDir)` (`cmd/wtm-next/project.go`) finds the repository of that directory, always from its main worktree, and wires the use case (`cmd/wtm-next/wire.go → wire`), then it runs the wizard when the user can see and answer it (stdin and stderr terminals, `TERM` not `dumb`, human output, no `--yes` nor `--expect-fingerprint`: `output.Streams.CanPrompt`, `Command.Ask`), else `create.UseCase.Run` with its `domain.RunOptions`, the correlation ID among them; `Launch` hands the run to `Command.Conclude`.
 3. `command/create/usecase.go → UseCase.Run`: `operation.Service.Begin` records the operation with the options' correlation ID, refusing an invalid one, and takes its locks (`service/operation/operation.go`), `operation.PlanUnderLocks` plans under them, `operation.Fingerprint` fingerprints the plan, a dry run stops there, `Op.Expect` refuses a stale plan, then `Apply` runs between the started and finished events.
 4. `command/create/usecase.go → UseCase.Plan`: `Observe` reads the repository (`repository.Service.Observe`: config, snapshot, run.toml) and what create reads itself through the ports of `port.go`, `Resolve` (`questions.go`) settles the request on those facts, `Decide` (`rules.go`) turns them into the plan.
@@ -78,11 +78,11 @@ A use case or a service declares the ports it needs in its `port.go`, interface 
 6. `adapter/git/worktree.go → Repo.AddWorktree`: the port's implementation runs `git worktree add`.
 7. Back in `ui/form/command.go → Command.Conclude`: a refusal, or the dry run drawn from create's `Preview` (`command/create/cli/output.go → preview`) and ended on the line that applies exactly that plan, or the outcome create's `Draw` draws (`output.go → drawOutcome`) with the kit of `ui/output`; with `--output json`, `create.Outcome.Envelope` (`domain.Outcome.Envelope`) reports the run as a `domain.Envelope`, which `ui/output.Envelope` writes with each field spelled as its flag.
 
-A second command is its own `command/<name>/` (use case, ports, rules, questions, `cli/`) and one line in each list of `cmd/wtm-next`: its constructor in `main.go`'s `Commands`, its opener in `project.go` (`opener(func(a app) <name>.UseCase { return a.<Name> })`), its binding in `catalogue.go` (`api.Bind(<name>.Name, Questions{}.Form(), open, UseCase.Run)`), its adapters wired in `wire.go`. `registration_test.go` fails when a command of `main.go` is missing from the catalogue or from the wiring.
+A second command is its own `command/<name>/` (use case, ports, rules, questions, `cli/`) and one line in each list of `cmd/wtm-next`: its constructor in `main.go`'s `commands`, its opener in `project.go` (`opener(func(a app) <name>.UseCase { return a.<Name> })`), its binding in `catalogue.go` (`api.Bind(<name>.Name, open, UseCase.Questions, UseCase.Run)`), its adapters wired in `wire.go`. `registration_test.go` fails when a command of `main.go` is missing from the catalogue or from the wiring, and `contract_test.go` when it is not in the catalogue contract (`.claude/skills/go-architecture/references/contract.md`, "The catalogue contract").
 
 A read, `command/list`, walks the same hops with a `form.Query` in place of a `form.Command`, under the contract of a read (`.claude/skills/go-architecture/references/contract.md`, "A read").
 
-Todo: the follow-up a read's picker ends on is printed by `form.Query`; once every command it names has migrated, it runs in this process instead, built from that command's schema rather than `listCommands`' argv (`cmd/wtm-next`).
+Todo: the follow-up a read's picker ends on is printed by `form.Query`; once every command it names has migrated, it runs in this process instead (`api.Catalogue.Find(followUp.Command)` with its answers), and its command line is spelled from that command's schema rather than by `commandLine` (`cmd/wtm-next/wire.go`, handed to each command's `cli.New`).
 
 ## Comments
 

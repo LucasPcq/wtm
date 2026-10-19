@@ -24,7 +24,7 @@ type printed struct {
 func runExtract(t *testing.T, w world, words ...string) printed {
 	t.Helper()
 	streams, _, stdout, stderr := output.Test()
-	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.env(), w.open)})
+	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.env(), w.open, formtest.CommandLine)})
 	code := uicli.Execute(t.Context(), root, append([]string{"extract"}, words...))
 	return printed{Stdout: stdout.String(), Stderr: stderr.String(), Code: code}
 }
@@ -88,12 +88,16 @@ func unfinished(item extract.Item) extract.Outcome {
 			recapRow("Target", "new worktree "+item.Subject+" from main"), recapRow("Mode", "move"),
 		},
 	}
-	return extract.Outcome{Plan: plan, Result: &extract.Result{Items: []extract.Item{item}}}
+	result := &extract.Result{Items: []extract.Item{item}}
+	if item.Detail != nil {
+		result.FollowUps = []domain.FollowUp{{Command: "go", Answers: []domain.Answered{{Path: "worktree", Values: []string{item.Subject}}}, Code: extract.CodeGo}}
+	}
+	return extract.Outcome{Plan: plan, Result: result}
 }
 
 func drawn(outcome extract.Outcome) string {
 	var out bytes.Buffer
-	drawOutcome(&out, outcome, "/repo")
+	drawOutcome(&out, outcome, output.View{Cwd: "/repo", CommandLine: formtest.CommandLine})
 	return out.String()
 }
 

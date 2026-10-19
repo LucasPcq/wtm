@@ -1,9 +1,12 @@
 package main
 
 import (
-	"cmp"
 	"crypto/rand"
 	"encoding/hex"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
@@ -66,8 +69,7 @@ func wire(params wireParams) app {
 		PublicPort: proxyport.Port{Plist: proxyport.PlistPath()}.Public,
 		Shield:     shell.Shield,
 		Now:        time.Now,
-		// clean exists only in the legacy wtm until it migrates
-		LeftBehind: func(branch string) []string { return []string{"wtm", "clean", branch, "--force"} },
+		LeftBehind: leftBehind,
 	}
 
 	return app{
@@ -92,35 +94,65 @@ func wire(params wireParams) app {
 			Jobs:         daemon.Daemon{SocketPath: events.SocketPath()}.Jobs,
 			PullRequests: github.GitHub{Dir: params.MainPath}.PullRequests,
 			Repository:   facts,
-			Commands:     listCommands,
 		},
 	}
 }
 
-// listCommands spells the command line of each action list offers on a worktree: its own commands, in the legacy wtm until they migrate, and gh's for a pull request.
-func listCommands(action list.Action, detail list.Detail) []string {
-	worktree := cmp.Or(detail.Branch, detail.Path)
-	switch action {
-	case list.ActionGo:
-		if detail.Branch == "" {
-			return []string{"cd", detail.Path}
+// pathForce is the answer that lifts a legacy command's safety refusals, spelled --force.
+const pathForce = "force"
+
+// leftBehind is the repair of a branch an undo left behind, and of its worktree: clean, forced, in the legacy wtm until it migrates.
+func leftBehind(branch string) domain.FollowUp {
+	return domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: pathForce, Values: []string{"true"}}}}
+}
+
+// commandLine spells a follow-up as the legacy wtm runs it until its command migrates, a worktree on no branch entered with cd, and a pull request opened by gh.
+func commandLine(followUp domain.FollowUp) []string {
+	argv, _ := spelled(followUp)
+	return argv
+}
+
+// spelled is followUp's command line and what of it could not be spelled, which a test requires nothing of: an answer's path, or url for a follow-up with neither a command nor a pull request to open. The worktree is positional, force and a dry run are flags.
+func spelled(followUp domain.FollowUp) (argv, unspelled []string) {
+	if followUp.Command == "" {
+		if argv = pullRequestLine(followUp); argv == nil {
+			return nil, []string{"url"}
 		}
-		return []string{"wtm", "go", worktree}
-	case list.ActionOpenPR:
-		if detail.PR != nil {
-			return github.ViewCommand(detail.PR.Number)
-		}
-	case list.ActionRunUp:
-		return []string{"wtm", "run", "up", worktree}
-	case list.ActionRunDown:
-		return []string{"wtm", "run", "down", worktree}
-	case list.ActionLogs:
-		return []string{"wtm", "run", "logs", worktree}
-	case list.ActionClean:
-		return []string{"wtm", "clean", worktree}
+		return argv, nil
 	}
 
-	return nil
+	var worktree, flags []string
+	for _, answer := range followUp.Answers {
+		switch {
+		case answer.Path == domain.PathWorktree:
+			worktree = answer.Values
+		case answer.Path == pathForce && slices.Equal(answer.Values, []string{"true"}):
+			flags = append(flags, "--"+pathForce)
+		default:
+			unspelled = append(unspelled, answer.Path)
+		}
+	}
+	if followUp.DryRun {
+		flags = append(flags, "--dry-run")
+	}
+	// a branch never starts with a slash: an absolute worktree is one on no branch, which wtm go cannot name
+	if followUp.Command == domain.CommandGo && len(worktree) == 1 && filepath.IsAbs(worktree[0]) {
+		return []string{"cd", worktree[0]}, unspelled
+	}
+
+	argv = append([]string{"wtm"}, strings.Fields(followUp.Command)...)
+	return append(append(argv, worktree...), flags...), unspelled
+}
+
+// pullRequestLine opens the pull request a follow-up links to: by its number, else by its URL; nothing without either.
+func pullRequestLine(followUp domain.FollowUp) []string {
+	if number, err := strconv.Atoi(followUp.Params[list.ParamNumber]); err == nil {
+		return github.ViewCommand(number)
+	}
+	if followUp.URL == "" {
+		return nil
+	}
+	return []string{"gh", "pr", "view", followUp.URL, "--web"}
 }
 
 // A locker adapts [oplock.Locks] to the port of [operation.Service], whose Take returns an [operation.Hold] where oplock's returns its concrete [*oplock.Held].

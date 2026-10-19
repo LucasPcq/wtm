@@ -176,4 +176,6 @@ func (halfMoving) Move(context.Context, worktree.Move) (worktree.Moved, error) {
 	return worktree.Moved{}, &worktree.HalfMoved{Cause: errors.New("source busy")}
 }
 
-func cleanLine(branch string) []string { return []string{"wtm", "clean", branch, "--force"} }
+func cleanLine(branch string) domain.FollowUp {
+	return domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}, {Path: "force", Values: []string{"true"}}}}
+}

@@ -27,7 +27,7 @@ func itemNote(item create.Item, st *output.Styles) string {
 }
 
 // drawOutcome draws what the apply did: the tally, the plan with each worktree that exists and the warnings, each item's under its subject, the branches left unfinished, and the next steps, among them the commands the failed branches suggest to repair what they left behind.
-func drawOutcome(w io.Writer, outcome create.Outcome, cwd string) {
+func drawOutcome(w io.Writer, outcome create.Outcome, view output.View) {
 	items := outcome.Result.Items
 	headline(w, items)
 
@@ -42,9 +42,11 @@ func drawOutcome(w io.Writer, outcome create.Outcome, cwd string) {
 		if item.Detail == nil {
 			continue
 		}
-		path := output.ShownPath(output.Shown{Cwd: cwd, Path: item.Detail.Path})
+		path := output.ShownPath(output.Shown{Cwd: view.Cwd, Path: item.Detail.Path})
 		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + itemNote(item, output.StylesOf(w))}})
-		next = append(next, output.GoStep(item.Subject))
+	}
+	for _, followUp := range outcome.Result.FollowUps {
+		next = append(next, output.FollowUpStep(followUp, view.CommandLine))
 	}
 
 	for _, item := range items {
@@ -78,7 +80,7 @@ func drawOutcome(w io.Writer, outcome create.Outcome, cwd string) {
 	}
 
 	for _, item := range items {
-		next = append(next, output.FollowUpSteps(item.Err)...)
+		next = append(next, output.FollowUpSteps(item.Err, view.CommandLine)...)
 	}
 	if len(next) > 0 {
 		output.Blank(w)

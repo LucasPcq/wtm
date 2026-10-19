@@ -111,6 +111,14 @@ func TestAFormIsEncodedWithTheKindOfEachField(t *testing.T) {
 	}`, string(data))
 }
 
+func TestAConfirmationPublishesTheValuesItsAnswerTakes(t *testing.T) {
+	data, err := json.Marshal(Form{Fields: []Field{ConfirmField{FieldSpec: FieldSpec{Path: "fetch"}}}})
+
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"yes":{"value":"true","label":"Yes"}`)
+	assert.Contains(t, string(data), `"no":{"value":"false","label":"No"}`)
+}
+
 func TestAFormWithoutProblemsHasAnEmptyList(t *testing.T) {
 	data, err := json.Marshal(Form{})
 
@@ -128,6 +136,23 @@ func TestAFormFoldsIntoTheRequestItsFieldsAnswer(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, answers{"branches": {"feat/a"}, "isolation": {"verbatim"}, PathRemember: {"isolation"}}, req)
+}
+
+func TestAFormWithNothingToRememberAnswersNoRemember(t *testing.T) {
+	form := Form{Fields: []Field{ConfirmField{FieldSpec: FieldSpec{Path: "with_prs"}}}}
+
+	assert.Equal(t, []Answered{{Path: "with_prs", Values: form.Fields[0].Answer()}}, form.Answers())
+}
+
+func TestARequestAnswersEachPathOnceThenWhatItRemembersAndAsks(t *testing.T) {
+	form := Form{Fields: []Field{
+		SelectField{FieldSpec: FieldSpec{Path: "to"}},
+		TextField{FieldSpec: FieldSpec{Path: "to"}},
+		TextField{FieldSpec: FieldSpec{Path: "from"}},
+	}}
+	req := answers{"to": {"feat/x"}, PathRemember: {"to"}, PathAsk: {"true"}}
+
+	assert.Equal(t, []Answered{{Path: "to", Values: []string{"feat/x"}}, {Path: PathRemember, Values: []string{"to"}}, {Path: PathAsk, Values: []string{"true"}}}, AnswersOf(form, req))
 }
 
 func TestAFoldStopsAtTheFirstAnswerRefused(t *testing.T) {

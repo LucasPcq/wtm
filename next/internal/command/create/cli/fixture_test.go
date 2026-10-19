@@ -22,6 +22,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
+	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
@@ -84,10 +85,11 @@ type seen struct {
 }
 
 func (w world) env() uicli.Env {
-	if w.seed.Env != (uicli.Env{}) {
-		return w.seed.Env
+	env := uicli.Env{Cwd: mainPath, ProjectDir: mainPath}
+	if w.seed.Env.ProjectDir != "" {
+		env = w.seed.Env
 	}
-	return uicli.Env{Cwd: mainPath, ProjectDir: mainPath}
+	return env
 }
 
 func newWorld(s seed) world {
@@ -115,7 +117,7 @@ func newWorld(s seed) world {
 
 func (w world) params(args []string) uicli.Params {
 	streams := output.System()
-	return uicli.Params{Version: "1.2.3", Streams: streams, Args: args, Commands: []*cobra.Command{New(streams, w.env(), w.open)}, KillCancelled: shell.KillCancelled, AwaitShields: shell.AwaitShields}
+	return uicli.Params{Version: "1.2.3", Streams: streams, Args: args, Commands: []*cobra.Command{New(streams, w.env(), w.open, formtest.CommandLine)}, KillCancelled: shell.KillCancelled, AwaitShields: shell.AwaitShields}
 }
 
 func (w world) open(_ context.Context, dir string) (create.UseCase, error) {
@@ -223,10 +225,10 @@ func twoCreated(trees string) create.Outcome {
 			Recap:   []domain.RecapRow{recapRow("Branches", "feat/a", "feat/b"), recapRow("From", "main"), recapRow("Env", "example")},
 		},
 		Fingerprint: "0123456789abcdef01234567",
-		Result: &create.Result{Items: []create.Item{
+		Result: entered(&create.Result{Items: []create.Item{
 			{Subject: "feat/a", Status: domain.StatusDone, Detail: &create.Detail{Path: filepath.Join(trees, "feat-a"), Metadata: meta}},
 			{Subject: "feat/b", Status: domain.StatusDone, Detail: &create.Detail{Path: filepath.Join(trees, "feat-b"), Metadata: meta}},
-		}},
+		}}),
 	}
 }
 
@@ -252,7 +254,7 @@ func mixed(trees string) create.Outcome {
 			},
 		},
 		Warnings: []domain.Warning{{Code: "create.ff_dirty", Message: "couldn't fast-forward main: its worktree has uncommitted changes — it starts from your local branch", Params: domain.Params{"branch": "main"}}},
-		Result: &create.Result{Items: []create.Item{
+		Result: entered(&create.Result{Items: []create.Item{
 			{Subject: "feature", Status: domain.StatusDone, Warnings: []domain.Warning{
 				{Code: "create.behind_origin", Message: "2 commit(s) behind origin — the worktree starts from your local branch.", Params: domain.Params{"behind": "2"}},
 				{Code: "provision.env_ports_left_alone", Message: "Env ports left alone", Params: domain.Params{"count": "1"}},
@@ -268,8 +270,20 @@ func mixed(trees string) create.Outcome {
 			{Subject: "feat/c", Status: domain.StatusFailed, Reason: domain.ReasonIncomplete, Err: hook, Warnings: []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping", Params: domain.Params{"target": ".env"}}}, Detail: &create.Detail{Path: filepath.Join(trees, "feat-c"), Metadata: meta}},
 			{Subject: "feat/d", Status: domain.StatusCancelled, Reason: domain.ReasonIncomplete, Err: &domain.Error{Kind: domain.KindCancelled, Code: "unit.interrupted", Message: "interrupted", Params: domain.Params{"phase": "on_create"}}, Detail: &create.Detail{Path: filepath.Join(trees, "feat-d"), Metadata: meta}},
 			{Subject: "remote-only", Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted},
-		}},
+		}}),
 	}
+}
+
+// entered is result ending, as an apply does, on the step into each worktree that stands.
+func entered(result *create.Result) *create.Result {
+	for _, item := range result.Items {
+		if item.Detail != nil {
+			enter := domain.Enter(item.Subject)
+			enter.Code = create.CodeGo
+			result.FollowUps = append(result.FollowUps, enter)
+		}
+	}
+	return result
 }
 
 func invalid() *domain.Error {
@@ -381,7 +395,9 @@ func (enters) Read(p []byte) (int, error) {
 	return 1, nil
 }
 
-func cleanLine(branch string) []string { return []string{"wtm", "clean", branch, "--force"} }
+func cleanLine(branch string) domain.FollowUp {
+	return domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}, {Path: "force", Values: []string{"true"}}}}
+}
 
 func armedUntilCancelled(ctx context.Context, _ env.HookChain) error {
 	fmt.Println("armed")

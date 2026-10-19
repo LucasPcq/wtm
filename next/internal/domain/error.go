@@ -66,12 +66,27 @@ func (f FieldError) Message(path string) string {
 	return strings.NewReplacer(pairs...).Replace(f.Template)
 }
 
-// FollowUp is the command line a failure suggests to repair what it left behind.
+// FollowUp is what to do next, a failure's repair or an action offered: a wtm command, as the command line spells it after the program's name, with its request as the answers of that command's fields, run as a dry run when DryRun is set; or, with no command, a link to open, URL.
+// The command line spells it at print time, each surface its own way.
 type FollowUp struct {
-	Argv    []string `json:"argv"` // the command line to run next, word by word
-	Code    string   `json:"code"`
-	Message string   `json:"message"`
-	Params  Params   `json:"params,omitempty"`
+	Command string     `json:"command,omitempty"`
+	Answers []Answered `json:"answers,omitempty"`
+	DryRun  bool       `json:"dry_run,omitempty"`
+	URL     string     `json:"url,omitempty"`
+	Code    string     `json:"code"`
+	Message string     `json:"message"`
+	Params  Params     `json:"params,omitempty"`
+}
+
+// The vocabulary a follow-up names a command with, for the commands not yet migrated whose follow-ups several commands give: go enters a worktree, answered by PathWorktree.
+const (
+	CommandGo    = "go"
+	PathWorktree = "worktree" // the worktree a follow-up acts on: its branch or, on no branch, its path
+)
+
+// Enter is the follow-up that enters worktree, by its branch or, on no branch, its path.
+func Enter(worktree string) FollowUp {
+	return FollowUp{Command: CommandGo, Answers: []Answered{{Path: PathWorktree, Values: []string{worktree}}}}
 }
 
 // Error returns the message, followed by the cause's when there is one.

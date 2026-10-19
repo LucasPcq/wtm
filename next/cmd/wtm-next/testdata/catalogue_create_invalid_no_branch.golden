@@ -1,0 +1,21 @@
+{
+  "v": 2,
+  "command": "create",
+  "ok": false,
+  "op": "<id>",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "branches",
+        "code": "required",
+        "flag": "branches",
+        "message": "branches is required"
+      }
+    ]
+  }
+}

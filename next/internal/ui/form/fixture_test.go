@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -58,7 +59,7 @@ type fake struct {
 	observed   int
 	previewErr error
 	applyErr   error
-	applied    int
+	applied    atomic.Int32 // set from the apply's cmd, which Bubble Tea runs on a goroutine of its own
 }
 
 func newFake() *fake {
@@ -74,7 +75,7 @@ func (f *fake) script() form.Script {
 			return "plan: " + strings.Join([]string{f.first.answer, f.second.answer}, ", ")
 		},
 		Label: strings.ToUpper,
-		Apply: func(context.Context) error { f.applied++; return f.applyErr },
+		Apply: func(context.Context) error { f.applied.Add(1); return f.applyErr },
 		Stale: func(err error) bool { return errors.Is(err, errStale) },
 	}
 }
@@ -197,12 +198,12 @@ func fakeQuery() (*form.Query[request, questions, read], *int) {
 		Open: func(context.Context, string) (form.Reader[request, read], error) {
 			return reader{read: read{Items: []domain.Unit[struct{}]{{Subject: "feat/x", Status: domain.StatusDone}}}}, nil
 		},
-		Draw: func(w io.Writer, got read, _ string) {
+		Draw: func(w io.Writer, got read, _ output.View) {
 			_, _ = io.WriteString(w, "read "+strconv.Itoa(len(got.Items))+"\n")
 		},
 		Pick: func(_ context.Context, got read, _ request, _ *uicli.Run) (read, error) {
 			picked++
-			got.FollowUps = []domain.FollowUp{{Argv: []string{"wtm", "go", "feat/x"}, Message: "Go there"}}
+			got.FollowUps = []domain.FollowUp{{Command: "go", Answers: []domain.Answered{{Path: "worktree", Values: []string{"feat/x"}}}, Message: "Go there"}}
 			return got, nil
 		},
 	}, &picked

@@ -1,0 +1,81 @@
+{
+  "v": 2,
+  "command": "list",
+  "ok": true,
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "branch": "main",
+        "path": "<root>/main",
+        "main": true,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "commits_ahead": 0,
+        "created_at": null,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": [
+          {
+            "command": "go",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "main"
+                ]
+              }
+            ],
+            "code": "list.go",
+            "message": "Go to the worktree"
+          },
+          {
+            "command": "run up",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "main"
+                ]
+              }
+            ],
+            "code": "list.run_up",
+            "message": "Start the profile"
+          },
+          {
+            "command": "run down",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "main"
+                ]
+              }
+            ],
+            "code": "list.run_down",
+            "message": "Stop the profile"
+          },
+          {
+            "command": "run logs",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "main"
+                ]
+              }
+            ],
+            "code": "list.logs",
+            "message": "View the logs"
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

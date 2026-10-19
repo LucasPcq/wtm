@@ -5,12 +5,16 @@
   "op": "op-1",
   "follow_ups": [
     {
-      "argv": [
-        "wtm-next",
-        "create",
-        "feat/x",
-        "--dry-run"
+      "command": "create",
+      "answers": [
+        {
+          "path": "branches",
+          "values": [
+            "feat/x"
+          ]
+        }
       ],
+      "dry_run": true,
       "code": "plan.replan",
       "message": "the plan the facts give now"
     }

@@ -74,9 +74,6 @@ func newWorld(s seed) world {
 				return s.PRs, s.PRsErr
 			},
 			Repository: repository.Service{Config: configured{config: config, err: s.ConfigErr}, Git: git, MainPath: mainPath},
-			Commands: func(action list.Action, detail list.Detail) []string {
-				return []string{"wtm", string(action), detail.Branch}
-			},
 		},
 		git:   git,
 		meta:  meta,

@@ -5,16 +5,28 @@
   "op": "op-1",
   "follow_ups": [
     {
-      "argv": [
-        "wtm-next",
-        "extract",
-        "feat/login",
-        "--files",
-        "old.txt",
-        "--to",
-        "feat/other",
-        "--dry-run"
+      "command": "extract",
+      "answers": [
+        {
+          "path": "source",
+          "values": [
+            "feat/login"
+          ]
+        },
+        {
+          "path": "files",
+          "values": [
+            "old.txt"
+          ]
+        },
+        {
+          "path": "to",
+          "values": [
+            "feat/other"
+          ]
+        }
       ],
+      "dry_run": true,
       "code": "plan.replan",
       "message": "the plan the facts give now"
     }

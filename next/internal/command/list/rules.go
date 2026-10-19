@@ -6,6 +6,7 @@ import (
 	"errors"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,6 +54,8 @@ type Detail struct {
 	Origin       *Origin    `json:"origin"`     // null when origin has no branch of that name
 	PR           *PR        `json:"pr"`         // null without one, or when GitHub was not asked
 	Services     []string   `json:"services"`   // the jobs up in it, null when that cannot be told
+	// Actions are what may be done next with it, as Offers lists them, each the command that does it and its answers.
+	Actions []domain.FollowUp `json:"actions"`
 }
 
 // Origin is where a worktree's branch stands against origin's.
@@ -125,6 +128,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 		PR:           f.pr(w.Branch()),
 		Services:     f.services(w.Path),
 	}
+	detail.Actions = Actions(detail)
 
 	return Item{Subject: subject, Status: domain.StatusDone, Detail: &detail}
 }
@@ -245,14 +249,64 @@ func Offers(detail Detail) []Action {
 	return actions
 }
 
-// Labels are what each action reads as in the picker, and as the note of its follow-up.
-var Labels = map[Action]string{
-	ActionGo:      "Go to the worktree",
-	ActionOpenPR:  "Open the pull request",
-	ActionRunUp:   "Start the profile",
-	ActionRunDown: "Stop the profile",
-	ActionLogs:    "View the logs",
-	ActionClean:   "Clean (delete the worktree)",
+// ParamNumber is the param of the action that opens a pull request: its number, beside its URL.
+const ParamNumber = "number"
+
+// byAction is what each action runs, the wtm command as its command line spells it after the program's name, none to open a pull request, and what it reads as in the picker and as the note of its follow-up.
+var byAction = map[Action]struct{ command, label string }{
+	ActionGo:      {domain.CommandGo, "Go to the worktree"},
+	ActionOpenPR:  {"", "Open the pull request"},
+	ActionRunUp:   {"run up", "Start the profile"},
+	ActionRunDown: {"run down", "Stop the profile"},
+	ActionLogs:    {"run logs", "View the logs"},
+	ActionClean:   {"clean", "Clean (delete the worktree)"},
+}
+
+// Actions are the follow-ups the worktree of detail offers, as Offers lists them.
+func Actions(detail Detail) []domain.FollowUp {
+	actions := []domain.FollowUp{}
+	for _, action := range Offers(detail) {
+		actions = append(actions, followUpOf(action, detail))
+	}
+
+	return actions
+}
+
+// followUpOf is action on the worktree of detail as the follow-up that carries it out, with its code and its label: its wtm command and answers, or the URL of its pull request and its number.
+func followUpOf(action Action, detail Detail) domain.FollowUp {
+	followUp := domain.FollowUp{Code: Name + "." + string(action), Message: byAction[action].label}
+	if action == ActionOpenPR && detail.PR != nil {
+		followUp.URL, followUp.Params = detail.PR.URL, domain.Params{ParamNumber: strconv.Itoa(detail.PR.Number)}
+		return followUp
+	}
+
+	followUp.Command, followUp.Answers = byAction[action].command, []domain.Answered{{Path: domain.PathWorktree, Values: []string{cmp.Or(detail.Branch, detail.Path)}}}
+	return followUp
+}
+
+// WithPullRequests is shown with the pull request of each worktree as from read it, what each offers then, and the warnings of asking GitHub: what a read that did not ask for them becomes once they land.
+func WithPullRequests(shown, from Outcome) Outcome {
+	merged := shown
+	merged.Items = slices.Clone(shown.Items)
+	for i, item := range merged.Items {
+		at := slices.IndexFunc(from.Items, func(other Item) bool { return other.Subject == item.Subject && other.Detail != nil })
+		if item.Detail == nil || at < 0 {
+			continue
+		}
+		detail := *item.Detail
+		detail.PR = from.Items[at].Detail.PR
+		detail.Actions = Actions(detail)
+		merged.Items[i].Detail = &detail
+	}
+
+	merged.Warnings = slices.Clone(shown.Warnings)
+	for _, warning := range from.Warnings {
+		if warning.Code == CodePRsUnavailable || warning.Code == CodePRsCapped {
+			merged.Warnings = append(merged.Warnings, warning)
+		}
+	}
+
+	return merged
 }
 
 // Holding returns the subject of the item whose worktree holds the directory cwd, the deepest one, "" when none does.

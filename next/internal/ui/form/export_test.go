@@ -35,3 +35,5 @@ func (s *Session[R, Q, O]) Apply(ctx context.Context) error {
 func (s *Session[R, Q, O]) Outcome() O {
 	return s.outcome
 }
+
+var ReplanStep = replanStep

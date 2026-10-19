@@ -284,7 +284,8 @@ func TestAnUndoThatFailsNamesWhatIsLeftAndTheWayOut(t *testing.T) {
 	assert.ErrorContains(t, outcome.Err, "worktree is locked")
 	followUp := outcome.Err.FollowUp
 	require.NotNil(t, followUp)
-	assert.Equal(t, []string{"remove", "feat/x"}, followUp.Argv)
+	assert.Equal(t, removeLine("feat/x").Command, followUp.Command)
+	assert.Equal(t, removeLine("feat/x").Answers, followUp.Answers)
 	assert.Equal(t, "provision.left_behind", followUp.Code)
 	assert.Equal(t, domain.Params{"branch": branchName, "path": w.path(branchName)}, followUp.Params)
 	assert.Equal(t, "branch feat/x is left half-created at "+w.path(branchName), followUp.Message)
@@ -304,7 +305,7 @@ func TestABranchThatCannotBeDeletedIsLeftBehindToo(t *testing.T) {
 	assert.ErrorContains(t, outcome.Err, "branch is protected")
 	followUp := outcome.Err.FollowUp
 	require.NotNil(t, followUp)
-	assert.Equal(t, []string{"remove", "feat/x"}, followUp.Argv)
+	assert.Equal(t, "remove", followUp.Command)
 	assert.Equal(t, "provision.left_behind", followUp.Code)
 	assert.Equal(t, domain.Params{"branch": branchName}, followUp.Params)
 	assert.Equal(t, "branch feat/x is left behind", followUp.Message)

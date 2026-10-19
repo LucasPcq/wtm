@@ -51,10 +51,10 @@ func concluded(t *testing.T, format string, ran form.Ran[request, outcome], err 
 	t.Helper()
 	streams, _, stdout, _ := output.Test()
 	command, cmd := fakeCommand(), &cobra.Command{Use: "fake"}
-	command.Draw = func(w io.Writer, applied outcome, cwd string) {
-		_, _ = io.WriteString(w, "drew "+strings.Join(applied.Plan["branches"], ", ")+" from "+cwd+"\n")
+	command.Draw = func(w io.Writer, applied outcome, view output.View) {
+		_, _ = io.WriteString(w, "drew "+strings.Join(applied.Plan["branches"], ", ")+" from "+view.Cwd+"\n")
 	}
-	run := &uicli.Run{Command: "fake", Streams: streams, Env: uicli.Env{Cwd: "/repo"}}
+	run := &uicli.Run{Command: "fake", Streams: streams, Env: uicli.Env{Cwd: "/repo"}, CommandLine: formtest.CommandLine}
 	command.Bind(cmd, run)
 	run.Output = format
 

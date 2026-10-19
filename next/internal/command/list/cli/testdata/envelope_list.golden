@@ -22,7 +22,61 @@
           "state": "up-to-date"
         },
         "pr": null,
-        "services": []
+        "services": [],
+        "actions": [
+          {
+            "command": "go",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "main"
+                ]
+              }
+            ],
+            "code": "list.go",
+            "message": "Go to the worktree"
+          },
+          {
+            "command": "run up",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "main"
+                ]
+              }
+            ],
+            "code": "list.run_up",
+            "message": "Start the profile"
+          },
+          {
+            "command": "run down",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "main"
+                ]
+              }
+            ],
+            "code": "list.run_down",
+            "message": "Stop the profile"
+          },
+          {
+            "command": "run logs",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "main"
+                ]
+              }
+            ],
+            "code": "list.logs",
+            "message": "View the logs"
+          }
+        ]
       }
     },
     {
@@ -46,6 +100,73 @@
         "pr": null,
         "services": [
           "web"
+        ],
+        "actions": [
+          {
+            "command": "go",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/a"
+                ]
+              }
+            ],
+            "code": "list.go",
+            "message": "Go to the worktree"
+          },
+          {
+            "command": "run up",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/a"
+                ]
+              }
+            ],
+            "code": "list.run_up",
+            "message": "Start the profile"
+          },
+          {
+            "command": "run down",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/a"
+                ]
+              }
+            ],
+            "code": "list.run_down",
+            "message": "Stop the profile"
+          },
+          {
+            "command": "run logs",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/a"
+                ]
+              }
+            ],
+            "code": "list.logs",
+            "message": "View the logs"
+          },
+          {
+            "command": "clean",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/a"
+                ]
+              }
+            ],
+            "code": "list.clean",
+            "message": "Clean (delete the worktree)"
+          }
         ]
       }
     },
@@ -67,7 +188,82 @@
           "number": 12,
           "url": "https://github.com/acme/acme/pull/12"
         },
-        "services": []
+        "services": [],
+        "actions": [
+          {
+            "command": "go",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/b"
+                ]
+              }
+            ],
+            "code": "list.go",
+            "message": "Go to the worktree"
+          },
+          {
+            "url": "https://github.com/acme/acme/pull/12",
+            "code": "list.open_pr",
+            "message": "Open the pull request",
+            "params": {
+              "number": "12"
+            }
+          },
+          {
+            "command": "run up",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/b"
+                ]
+              }
+            ],
+            "code": "list.run_up",
+            "message": "Start the profile"
+          },
+          {
+            "command": "run down",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/b"
+                ]
+              }
+            ],
+            "code": "list.run_down",
+            "message": "Stop the profile"
+          },
+          {
+            "command": "run logs",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/b"
+                ]
+              }
+            ],
+            "code": "list.logs",
+            "message": "View the logs"
+          },
+          {
+            "command": "clean",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/b"
+                ]
+              }
+            ],
+            "code": "list.clean",
+            "message": "Clean (delete the worktree)"
+          }
+        ]
       }
     },
     {
@@ -85,7 +281,22 @@
         "created_at": null,
         "origin": null,
         "pr": null,
-        "services": []
+        "services": [],
+        "actions": [
+          {
+            "command": "go",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "/repo/.trees/detached"
+                ]
+              }
+            ],
+            "code": "list.go",
+            "message": "Go to the worktree"
+          }
+        ]
       }
     },
     {
@@ -103,7 +314,22 @@
         "created_at": null,
         "origin": null,
         "pr": null,
-        "services": []
+        "services": [],
+        "actions": [
+          {
+            "command": "clean",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/gone"
+                ]
+              }
+            ],
+            "code": "list.clean",
+            "message": "Clean (delete the worktree)"
+          }
+        ]
       }
     }
   ],

@@ -26,7 +26,7 @@ type Reader[R, O any] interface {
 // A read asks no question, has no plan and takes no lock: its flags are its schema's and --output, without --yes, --dry-run, --expect-fingerprint, --remember nor --ask.
 type Query[R Request[R], Q Questions, O ReadOutcome] struct {
 	Open func(ctx context.Context, dir string) (Reader[R, O], error)
-	Draw func(w io.Writer, read O, cwd string) // what was read, cwd the directory its paths are shown from
+	Draw func(w io.Writer, read O, view output.View) // what was read, drawn from view
 	// Pick lets the user pick a follow-up of what was read, when the user can see and answer it: it returns the read with the follow-ups chosen. Nil only draws the read.
 	Pick func(ctx context.Context, read O, req R, run *uicli.Run) (O, error)
 
@@ -92,18 +92,18 @@ func (q *Query[R, Q, O]) conclude(read O, err error) error {
 	stdout, _ := q.io.Writers()
 	// todo: run the follow-up the user picked, in this process, once every command it names has migrated; it is printed until then.
 	if len(doc.FollowUps) > 0 {
-		output.Frame(stdout, func(w io.Writer) { output.NextSteps(w, nextSteps(doc.FollowUps)) })
+		output.Frame(stdout, func(w io.Writer) { output.NextSteps(w, q.nextSteps(doc.FollowUps)) })
 		return q.io.Failed(read.Failure())
 	}
 
-	output.Frame(stdout, func(w io.Writer) { q.Draw(w, read, q.io.Env.Cwd) })
+	output.Frame(stdout, func(w io.Writer) { q.Draw(w, read, q.io.View()) })
 	return q.io.Failed(read.Failure())
 }
 
-func nextSteps(followUps []domain.FollowUp) []output.NextStep {
+func (q *Query[R, Q, O]) nextSteps(followUps []domain.FollowUp) []output.NextStep {
 	steps := make([]output.NextStep, 0, len(followUps))
 	for _, followUp := range followUps {
-		steps = append(steps, output.NextStep{Command: output.Line(followUp.Argv), Note: followUp.Message})
+		steps = append(steps, output.FollowUpStep(followUp, q.io.CommandLine))
 	}
 
 	return steps

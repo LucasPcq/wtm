@@ -198,4 +198,6 @@ func (a answering) Remember(context.Context, map[string]string) (domain.Written,
 	return a.written, a.err
 }
 
-func cleanLine(branch string) []string { return []string{"wtm", "clean", branch, "--force"} }
+func cleanLine(branch string) domain.FollowUp {
+	return domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}, {Path: "force", Values: []string{"true"}}}}
+}

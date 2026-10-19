@@ -2,12 +2,8 @@
 package api
 
 import (
-	"bytes"
 	"cmp"
 	"context"
-	"encoding/json"
-	"errors"
-	"io"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -32,17 +28,19 @@ func (c Catalogue) Find(name string) (Command, bool) {
 	return Command{}, false
 }
 
-// A Command is one command of the catalogue: its name, the schema of its request as a surface renders it, and its execution.
+// A Command is one command of the catalogue: its name, the schema of its request as a surface renders it, its questions and its execution.
 type Command struct {
-	Name    string
-	Form    domain.Form
-	Execute func(ctx context.Context, call Call) Response
+	Name string
+	Form domain.Form // the schema outside any repository: no option observed, no answer remembered
+	// Questions is the form of the call's request as the repository stands: the options observed, the answers remembered, the problems of each field by its path; the call's options are not read.
+	Questions func(ctx context.Context, call Call) (domain.Form, error)
+	Execute   func(ctx context.Context, call Call) Response
 }
 
-// A Call is one execution of a command: the directory of the repository it runs on, its request as JSON, and its run options.
+// A Call is one execution of a command: the directory of the repository it runs on, its request as the answer of each field by its path, folded as the command line folds its flags, and its run options.
 type Call struct {
 	Dir     string
-	Request json.RawMessage
+	Answers []domain.Answered
 	Options domain.RunOptions
 }
 
@@ -57,53 +55,70 @@ type Outcome interface {
 	Envelope(command string, err *domain.Error) domain.Envelope
 }
 
-// Bind returns the command called name, of schema form, that opens its use case on the call's directory with open, then runs it with run, a method expression such as create.UseCase.Run.
-// The use case is opened on every execution, so the catalogue lists its commands outside any repository; the request is decoded strictly, a field it does not know refused.
-func Bind[U, Req any, Out Outcome](name string, form domain.Form, open func(ctx context.Context, dir string) (U, error), run func(useCase U, ctx context.Context, req Req, opts domain.RunOptions) (Out, error)) Command {
-	refused := func(err error) Response {
-		return respond(domain.Envelope{Command: name, Err: domain.AsError(domain.AsErrorParams{Err: err})})
+// A Request is a command's request: it takes the answer of a field at a time and says the answer it gives each.
+type Request[R any] interface {
+	domain.Answerable[R]
+	domain.Valued
+}
+
+// A Form is a command's questions as its use case observed them: its schema, as a surface renders it.
+type Form interface {
+	Form() domain.Form
+}
+
+// Bind returns the command called name that opens its use case on the call's directory with open, then asks it the call's request with questions or runs it with run, method expressions such as create.UseCase.Questions and create.UseCase.Run.
+// The use case is opened on every call, so the catalogue lists its commands outside any repository, with the form of zero questions; an answer the request refuses is refused by its path. A stale plan is followed up by its request as a dry run, as the command line follows it up.
+func Bind[U any, Req Request[Req], Q Form, Out Outcome](name string, open func(ctx context.Context, dir string) (U, error), questions func(useCase U, ctx context.Context, req Req) (Q, error), run func(useCase U, ctx context.Context, req Req, opts domain.RunOptions) (Out, error)) Command {
+	var zero Q
+	form := zero.Form()
+
+	prepare := func(ctx context.Context, call Call) (U, Req, error) {
+		var (
+			useCase U
+			req     Req
+		)
+		// A relative directory would resolve against the server process's own working directory.
+		if !filepath.IsAbs(call.Dir) {
+			return useCase, req, domain.InvalidMessage("the directory of a " + name + " call must be absolute, not " + strconv.Quote(call.Dir))
+		}
+
+		req, err := domain.Fold(req, call.Answers)
+		if err != nil {
+			return useCase, req, err
+		}
+
+		useCase, err = open(ctx, call.Dir)
+		return useCase, req, err
+	}
+
+	ask := func(ctx context.Context, call Call) (domain.Form, error) {
+		useCase, req, err := prepare(ctx, call)
+		if err != nil {
+			return domain.Form{}, err
+		}
+
+		asked, err := questions(useCase, ctx, req)
+		if err != nil {
+			return domain.Form{}, err
+		}
+		return asked.Form(), nil
 	}
 
 	execute := func(ctx context.Context, call Call) Response {
-		// A relative directory would resolve against the server process's own working directory.
-		if !filepath.IsAbs(call.Dir) {
-			return refused(domain.InvalidMessage("the directory of a " + name + " call must be absolute, not " + strconv.Quote(call.Dir)))
-		}
-
-		req, err := decoded[Req](call.Request)
+		useCase, req, err := prepare(ctx, call)
 		if err != nil {
-			return refused(domain.InvalidMessage("invalid " + name + " request: " + err.Error()))
+			return respond(domain.Envelope{Command: name, Err: domain.AsError(domain.AsErrorParams{Err: err})})
 		}
 
 		opts := call.Options
 		opts.Surface = cmp.Or(opts.Surface, surfaceAPI)
-
-		useCase, err := open(ctx, call.Dir)
-		if err != nil {
-			return refused(err)
-		}
-
 		outcome, err := run(useCase, ctx, req, opts)
-		return respond(outcome.Envelope(name, domain.AsError(domain.AsErrorParams{Err: err})))
+		doc := outcome.Envelope(name, domain.AsError(domain.AsErrorParams{Err: err}))
+		doc.FollowUps = append(doc.FollowUps, domain.Replan(doc.Err, name, domain.AnswersOf(form, req))...)
+		return respond(doc)
 	}
 
-	return Command{Name: name, Form: form, Execute: execute}
-}
-
-// decoded is the one JSON object of data as a Req, refusing a field Req does not have and anything after the object.
-func decoded[Req any](data []byte) (Req, error) {
-	var req Req
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&req); err != nil {
-		return req, err
-	}
-
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		return req, errors.New("unexpected data after the request")
-	}
-
-	return req, nil
+	return Command{Name: name, Form: form, Questions: ask, Execute: execute}
 }
 
 // statusClientClosed is the status of an operation its caller cancelled: nginx's 499, which net/http does not name.

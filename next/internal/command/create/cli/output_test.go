@@ -18,7 +18,7 @@ import (
 
 func TestTwoBranchesCreatedAreCountedRowedAndPointedAt(t *testing.T) {
 
-	formtest.Golden(t, "outcome_two_done", rendered(func(w *bytes.Buffer) { drawOutcome(w, twoCreated(trees), cwd) }))
+	formtest.Golden(t, "outcome_two_done", rendered(func(w *bytes.Buffer) { drawOutcome(w, twoCreated(trees), drawnFrom(cwd)) }))
 }
 
 func TestADivergedBranchIsWarnedOnce(t *testing.T) {
@@ -26,7 +26,7 @@ func TestADivergedBranchIsWarnedOnce(t *testing.T) {
 	outcome.Result.Items[0].Detail.Standing = worktree.Standing{ExistingBranch: true, OriginState: worktree.Diverged, OriginAhead: 1, OriginBehind: 1}
 	outcome.Warnings = []domain.Warning{{Code: "create.source_diverged", Message: "branch feat/a has diverged from origin (1 ahead, 1 behind) and can't be fast-forwarded"}}
 
-	text := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, cwd) })
+	text := rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, drawnFrom(cwd)) })
 
 	assert.Equal(t, 1, strings.Count(text, "diverged"), text)
 }
@@ -35,10 +35,10 @@ func TestAMixedRunNamesEachAnomalyAndEachUnfinishedBranch(t *testing.T) {
 
 	outcome := mixed(trees)
 	failed := *outcome.Result.Items[2].Err
-	failed.FollowUp = &domain.FollowUp{Argv: []string{"wtm", "clean", "feat/e", "--force"}, Message: "branch feat/e is left half-created at /trees/feat-e"}
+	failed.FollowUp = &domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: "worktree", Values: []string{"feat/e"}}, {Path: "force", Values: []string{"true"}}}, Message: "branch feat/e is left half-created at /trees/feat-e"}
 	outcome.Result.Items[2].Err = &failed
 
-	formtest.Golden(t, "outcome_mixed", rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, cwd) }))
+	formtest.Golden(t, "outcome_mixed", rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, drawnFrom(cwd)) }))
 }
 
 func TestARunOfOnlyOpenBranchesIsUnchanged(t *testing.T) {
@@ -49,12 +49,12 @@ func TestARunOfOnlyOpenBranchesIsUnchanged(t *testing.T) {
 	}
 	outcome.Plan.Recap = []domain.RecapRow{recapRow("Branches", "feat/a (already open)", "feat/b (already open)"), recapRow("Parent", "main"), recapRow("Env", "example")}
 
-	formtest.Golden(t, "outcome_unchanged", rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, cwd) }))
+	formtest.Golden(t, "outcome_unchanged", rendered(func(w *bytes.Buffer) { drawOutcome(w, outcome, drawnFrom(cwd)) }))
 }
 
 func TestARunWithNothingToDoSaysSo(t *testing.T) {
 	formtest.Golden(t, "outcome_nothing", rendered(func(w *bytes.Buffer) {
-		drawOutcome(w, create.Outcome{Result: &create.Result{}}, "")
+		drawOutcome(w, create.Outcome{Result: &create.Result{}}, drawnFrom(""))
 	}))
 }
 
@@ -96,7 +96,7 @@ func TestAnAppliedRunWritesEachItemWithItsDetail(t *testing.T) {
 			{"subject": "feat/a", "status": "done", "detail": {"path": "/trees/feat-a", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "isolation": "isolated"}, "existing_branch": false}},
 			{"subject": "feat/b", "status": "done", "detail": {"path": "/trees/feat-b", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "ordinal": 2, "isolation": "isolated"}, "existing_branch": true, "origin_state": "behind", "origin_behind": 2}}
 		],
-		"follow_ups": [],
+		"follow_ups": [{"command": "go", "answers": [{"path": "worktree", "values": ["feat/a"]}], "code": "create.go", "message": ""}, {"command": "go", "answers": [{"path": "worktree", "values": ["feat/b"]}], "code": "create.go", "message": ""}],
 		"warnings": [{"code": "locks.unavailable", "message": "ran without operation locks"}]
 	}`, enveloped(t, outcome, nil))
 }
@@ -149,7 +149,7 @@ func TestAnInvalidRequestNamesEachFieldByItsPathAndItsFlag(t *testing.T) {
 func TestAFailureLeftBehindCarriesItsFollowUp(t *testing.T) {
 	stuck := &domain.Error{
 		Kind: domain.KindInternal, Code: "unit.undo_failed", Message: "could not remove the worktree, left behind: worktree", Params: domain.Params{"left": "worktree"},
-		FollowUp: &domain.FollowUp{Argv: []string{"wtm", "clean", "feat/x", "--force"}, Code: "provision.left_behind", Message: "branch feat/x is left half-created", Params: domain.Params{"branch": "feat/x", "path": "/p"}},
+		FollowUp: &domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: "worktree", Values: []string{"feat/x"}}, {Path: "force", Values: []string{"true"}}}, Code: "provision.left_behind", Message: "branch feat/x is left half-created", Params: domain.Params{"branch": "feat/x", "path": "/p"}},
 		Cause:    errors.New("env failed: disk full"),
 	}
 
@@ -157,7 +157,7 @@ func TestAFailureLeftBehindCarriesItsFollowUp(t *testing.T) {
 		"v": 2, "command": "create", "ok": false,
 		"follow_ups": [], "warnings": [],
 		"error": {"kind": "internal", "code": "unit.undo_failed", "message": "could not remove the worktree, left behind: worktree: env failed: disk full", "params": {"left": "worktree"},
-			"follow_up": {"argv": ["wtm", "clean", "feat/x", "--force"], "code": "provision.left_behind", "message": "branch feat/x is left half-created", "params": {"branch": "feat/x", "path": "/p"}}}
+			"follow_up": {"command": "clean", "answers": [{"path": "worktree", "values": ["feat/x"]}, {"path": "force", "values": ["true"]}], "code": "provision.left_behind", "message": "branch feat/x is left half-created", "params": {"branch": "feat/x", "path": "/p"}}}
 	}`, enveloped(t, create.Outcome{}, stuck))
 }
 

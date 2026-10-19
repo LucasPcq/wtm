@@ -21,8 +21,9 @@ const (
 	glyphBehind = "↓"
 )
 
-// drawList draws a row per worktree read, the one holding cwd marked active, then each worktree that could not be read and the warnings.
-func drawList(w io.Writer, read list.Outcome, cwd string) {
+// drawList draws a row per worktree read, the one holding the view's directory marked active, then each worktree that could not be read and the warnings.
+func drawList(w io.Writer, read list.Outcome, view output.View) {
+	cwd := view.Cwd
 	st := output.StylesOf(w)
 	active := list.Holding(read.Items, cwd)
 

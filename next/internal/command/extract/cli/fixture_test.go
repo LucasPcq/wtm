@@ -95,10 +95,11 @@ type seen struct {
 }
 
 func (w world) env() uicli.Env {
-	if w.seed.Env != (uicli.Env{}) {
-		return w.seed.Env
+	env := uicli.Env{Cwd: mainPath, ProjectDir: mainPath}
+	if w.seed.Env.ProjectDir != "" {
+		env = w.seed.Env
 	}
-	return uicli.Env{Cwd: mainPath, ProjectDir: mainPath}
+	return env
 }
 
 func newWorld(s seed) world {
@@ -254,4 +255,6 @@ func settled() extract.Request {
 	return extract.Request{Source: source, Files: []string{"apps/api/a.txt", "apps/api/new.txt"}, To: other}
 }
 
-func cleanLine(branch string) []string { return []string{"wtm", "clean", branch, "--force"} }
+func cleanLine(branch string) domain.FollowUp {
+	return domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}, {Path: "force", Values: []string{"true"}}}}
+}

@@ -74,8 +74,5 @@ func (w world) open(context.Context, string) (list.UseCase, error) {
 		},
 		PullRequests: func(context.Context) (worktree.PullRequests, error) { return prs, w.PRsErr },
 		Repository:   repository.Service{Config: configured{err: w.ConfigErr}, Git: git, MainPath: mainPath},
-		Commands: func(action list.Action, detail list.Detail) []string {
-			return []string{"wtm", string(action), detail.Branch}
-		},
 	}, nil
 }

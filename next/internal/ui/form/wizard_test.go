@@ -3,6 +3,8 @@ package form_test
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -165,7 +167,7 @@ func TestADryRunWithNothingToAskAppliesWithoutDrawing(t *testing.T) {
 	err := form.Run(t.Context(), dryRun(f.script()), ios.In, ios.Err)
 
 	require.NoError(t, err)
-	assert.Equal(t, 1, f.applied)
+	assert.EqualValues(t, 1, f.applied.Load())
 	assert.Empty(t, out.String())
 }
 
@@ -179,7 +181,7 @@ func TestAFailedObserveEndsTheRun(t *testing.T) {
 	err := form.Run(t.Context(), dryRun(script), ios.In, ios.Err)
 
 	assert.ErrorIs(t, err, failed)
-	assert.Zero(t, f.applied)
+	assert.Zero(t, f.applied.Load())
 }
 
 func TestAStepThatRefreshesIsReobservedOnItsKey(t *testing.T) {
@@ -254,11 +256,17 @@ func TestGoingBackInARestartedFormAsksAgainTheStepsItResets(t *testing.T) {
 func TestAStalePlanAsksAgainAndAppliesUnderThePreviewOfTheNewForm(t *testing.T) {
 	f := newFake()
 	script := f.script()
-	previews := 0
-	script.Preview = func(context.Context) (func(), error) { previews++; return func() {}, nil }
-	var appliedAfter []int
+	// both run in cmds, on goroutines of Bubble Tea's own
+	var previews atomic.Int32
+	script.Preview = func(context.Context) (func(), error) { previews.Add(1); return func() {}, nil }
+	var (
+		mu           sync.Mutex
+		appliedAfter []int32
+	)
 	script.Apply = func(context.Context) error {
-		appliedAfter = append(appliedAfter, previews)
+		mu.Lock()
+		defer mu.Unlock()
+		appliedAfter = append(appliedAfter, previews.Load())
 		if len(appliedAfter) == 1 {
 			return errStale
 		}
@@ -269,7 +277,9 @@ func TestAStalePlanAsksAgainAndAppliesUnderThePreviewOfTheNewForm(t *testing.T) 
 	err := form.Run(t.Context(), script, enters{}, ios.Err)
 
 	require.NoError(t, err)
-	assert.Equal(t, []int{1, 2}, appliedAfter)
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, []int32{1, 2}, appliedAfter)
 }
 
 func TestAFailedApplyEndsTheRunWithoutAskingAgain(t *testing.T) {
@@ -281,17 +291,16 @@ func TestAFailedApplyEndsTheRunWithoutAskingAgain(t *testing.T) {
 	err := form.Run(t.Context(), f.script(), enters{}, ios.Err)
 
 	assert.ErrorIs(t, err, failed)
-	assert.Equal(t, 1, f.applied)
+	assert.EqualValues(t, 1, f.applied.Load())
 }
 
 func TestAReadThatFailsAfterAnAnswerEndsTheRun(t *testing.T) {
 	f := newFake()
 	failed := errors.New("repository gone")
 	script := f.script()
-	reads := 0
+	var reads atomic.Int32 // Observe runs in a cmd, on a goroutine of Bubble Tea's own
 	script.Observe = func(context.Context) (func(), error) {
-		reads++
-		if reads > 1 {
+		if reads.Add(1) > 1 {
 			return func() {}, failed
 		}
 		return func() {}, nil
@@ -301,8 +310,8 @@ func TestAReadThatFailsAfterAnAnswerEndsTheRun(t *testing.T) {
 	err := form.Run(t.Context(), script, enters{}, ios.Err)
 
 	assert.ErrorIs(t, err, failed)
-	assert.Equal(t, 2, reads)
-	assert.Zero(t, f.applied)
+	assert.EqualValues(t, 2, reads.Load())
+	assert.Zero(t, f.applied.Load())
 }
 
 func TestTheRecapNamesItsApplyAsTheScriptSays(t *testing.T) {
@@ -327,7 +336,7 @@ func TestAScriptWithoutPreviewEndsOnItsLastStepWithNoRecap(t *testing.T) {
 	d.Keys("enter", "enter")
 
 	assert.Equal(t, form.Finished, d.Wizard.Ending())
-	assert.Zero(t, f.applied)
+	assert.Zero(t, f.applied.Load())
 }
 
 func TestARefreshReadsWithTheScriptsRefreshWhenItHasOne(t *testing.T) {

@@ -1,0 +1,123 @@
+{
+  "v": 2,
+  "command": "extract",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "feat/notes",
+      "status": "done",
+      "detail": {
+        "path": "<root>/.trees/feat-notes",
+        "files": [
+          {
+            "path": "notes.txt",
+            "status": "modified"
+          }
+        ],
+        "kept": false,
+        "conflicts": [],
+        "isolation": "isolated",
+        "existing_branch": false
+      }
+    }
+  ],
+  "plan": {
+    "source": "main",
+    "files": [
+      {
+        "path": "notes.txt",
+        "status": "modified"
+      }
+    ],
+    "target": {
+      "branch": "feat/notes",
+      "path": "<root>/.trees/feat-notes",
+      "action": "create"
+    },
+    "from": "main",
+    "env_from": "example",
+    "creates": true,
+    "keep": false,
+    "conflicts": [],
+    "on_conflict": "abort",
+    "recap": [
+      {
+        "key": "source",
+        "label": "Source",
+        "path": "source",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "files",
+        "label": "Files",
+        "path": "files",
+        "values": [
+          {
+            "value": "notes.txt",
+            "note": "modified",
+            "text": "mod notes.txt"
+          }
+        ]
+      },
+      {
+        "key": "target",
+        "label": "Target",
+        "path": "to",
+        "values": [
+          {
+            "value": "feat/notes",
+            "note": "new",
+            "params": {
+              "from": "main"
+            },
+            "text": "new worktree feat/notes from main"
+          }
+        ]
+      },
+      {
+        "key": "env_from",
+        "label": "Env",
+        "path": "env_from",
+        "values": [
+          {
+            "value": "example",
+            "text": "example"
+          }
+        ]
+      },
+      {
+        "key": "mode",
+        "label": "Mode",
+        "path": "keep",
+        "values": [
+          {
+            "value": "move",
+            "text": "move"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "go",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/notes"
+          ]
+        }
+      ],
+      "code": "extract.go",
+      "message": ""
+    }
+  ],
+  "warnings": []
+}

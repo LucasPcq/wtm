@@ -2,6 +2,7 @@ package form_test
 
 import (
 	"cmp"
+	"encoding/json"
 	"testing"
 
 	"github.com/spf13/pflag"
@@ -110,14 +111,27 @@ func TestAnApplyIsDrawnByTheCommandAndEndsOnItsFailure(t *testing.T) {
 	assert.Equal(t, failed, refused.Err)
 }
 
+func TestAStalePlanIsFollowedByTheDryRunThatPlansAgain(t *testing.T) {
+	stale := &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodePlanStale}
+
+	assert.Equal(t, []output.NextStep{{Command: `wtm-next create 'it'\''s' --dry-run`, Note: domain.ReplanNote}}, form.ReplanStep(stale, []string{"wtm-next", "create", "it's"}))
+	assert.Empty(t, form.ReplanStep(&domain.Error{Kind: domain.KindConflict, Code: "lock.held"}, []string{"wtm-next", "create", "feat/x"}))
+}
+
 func TestAStalePlanInJSONFollowsUpWithItsReplan(t *testing.T) {
 	stale := &domain.Error{Kind: domain.KindConflict, Code: domain.CodePlanStale, Message: "stale"}
 
-	got, _ := concluded(t, uicli.OutputJSON, form.Ran[request, outcome]{Request: request{"branches": {"feat/a"}}}, stale)
+	got, _ := concluded(t, uicli.OutputJSON, form.Ran[request, outcome]{Request: request{"branches": {"feat/a"}, domain.PathRemember: {"mode"}, domain.PathAsk: {"true"}}}, stale)
 
-	assert.Contains(t, got, `"argv": [
-        "fake",
-        "feat/a",
-        "--dry-run"
-      ]`)
+	var doc struct {
+		FollowUps []domain.FollowUp `json:"follow_ups"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(got), &doc))
+	assert.Equal(t, []domain.FollowUp{{
+		Command: "fake",
+		Answers: []domain.Answered{{Path: "branches", Values: []string{"feat/a"}}, {Path: domain.PathRemember, Values: []string{"mode"}}, {Path: domain.PathAsk, Values: []string{"true"}}},
+		DryRun:  true,
+		Code:    domain.CodeReplan,
+		Message: domain.ReplanNote,
+	}}, doc.FollowUps)
 }

@@ -21,6 +21,83 @@
       }
     }
   ],
-  "follow_ups": [],
+  "plan": {
+    "branches": [
+      {
+        "branch": "feat/json",
+        "path": "<SB>/acme.trees/feat-json",
+        "action": "unchanged"
+      }
+    ],
+    "from": "main",
+    "env_from": "main",
+    "isolation": "isolated",
+    "recalled": [
+      "env_from"
+    ],
+    "recap": [
+      {
+        "key": "branches",
+        "label": "Branches",
+        "path": "branches",
+        "values": [
+          {
+            "value": "feat/json",
+            "note": "already_open",
+            "text": "feat/json (already open)"
+          }
+        ]
+      },
+      {
+        "key": "parent",
+        "label": "Parent",
+        "path": "from",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "env_from",
+        "label": "Env",
+        "path": "env_from",
+        "mark": "recalled",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "isolation",
+        "label": "Isolation",
+        "path": "isolation",
+        "values": [
+          {
+            "value": "isolated",
+            "text": "isolated"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "go",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/json"
+          ]
+        }
+      ],
+      "code": "create.go",
+      "message": ""
+    }
+  ],
   "warnings": []
 }

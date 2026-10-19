@@ -1,0 +1,20 @@
+{
+  "v": 2,
+  "command": "create",
+  "ok": false,
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "brnach",
+        "code": "unknown",
+        "flag": "brnach",
+        "message": "brnach is not a field of this request"
+      }
+    ]
+  }
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
+	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
 	"github.com/spf13/pflag"
@@ -44,7 +45,7 @@ func TestAReadPicksOnlyWhenStdinStdoutAndStderrAreTerminals(t *testing.T) {
 			streams.Err.SetTerminal(true)
 			streams.Out.SetTerminal(c.Out)
 
-			err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams}, c.Args...)
+			err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine}, c.Args...)
 
 			require.NoError(t, err)
 			assert.Equal(t, c.Picks, *picked > 0)
@@ -67,7 +68,7 @@ func TestAReadRefusedWithJSONIsItsEnvelopeOnStdout(t *testing.T) {
 	}
 	streams, _, stdout, stderr := output.Test()
 
-	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams}, "--output", "json")
+	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine}, "--output", "json")
 
 	require.Error(t, err)
 	assert.Empty(t, stderr.String())
@@ -80,10 +81,12 @@ func TestAReadThatFailedOnASubjectDrawsItAndFails(t *testing.T) {
 	q.Open = func(context.Context, string) (form.Reader[request, read], error) {
 		return reader{read: read{Items: []domain.Unit[struct{}]{{Subject: "a", Status: domain.StatusFailed, Err: &domain.Error{Kind: domain.KindInternal, Code: "fake.unreadable", Message: "couldn't read a"}}}}}, nil
 	}
-	q.Draw = func(w io.Writer, got read, _ string) { _, _ = io.WriteString(w, "drew "+got.Items[0].Subject+"\n") }
+	q.Draw = func(w io.Writer, got read, _ output.View) {
+		_, _ = io.WriteString(w, "drew "+got.Items[0].Subject+"\n")
+	}
 	streams, _, stdout, _ := output.Test()
 
-	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams})
+	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine})
 
 	failed, ok := errors.AsType[*uicli.Failed](err)
 	require.True(t, ok, err)
@@ -101,7 +104,7 @@ func TestAPickKeepsTheFailureOfTheReadInItsExitCode(t *testing.T) {
 	streams.Err.SetTerminal(true)
 	streams.Out.SetTerminal(true)
 
-	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams})
+	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine})
 
 	failed, ok := errors.AsType[*uicli.Failed](err)
 	require.True(t, ok, err)

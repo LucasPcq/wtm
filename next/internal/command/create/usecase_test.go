@@ -336,6 +336,18 @@ func TestADryRunPlansDespiteAHeldLockAndWritesNothing(t *testing.T) {
 	assert.NoDirExists(t, filepath.Join(w.stateDir, "worktrees"))
 }
 
+func TestAPlanCountsTheWorktreesItOpens(t *testing.T) {
+	w := newWorld(t, seed{})
+
+	one, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{DryRun: true})
+	require.NoError(t, err)
+	two, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName, "feat/other"}}, domain.RunOptions{DryRun: true})
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, one.Plan.Creates)
+	assert.Equal(t, 2, two.Plan.Creates)
+}
+
 func TestAWorktreeIsCreatedUnderItsLocksAndAnnouncedFromStartToFinish(t *testing.T) {
 	w := newWorld(t, seed{Run: jobsToml})
 

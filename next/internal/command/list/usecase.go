@@ -26,14 +26,13 @@ const CodeConfigInvalid = Name + repository.ConfigInvalid
 // stateReaders bounds the worktrees read at once, each costing a few git commands.
 const stateReaders = 8
 
-// A UseCase lists the worktrees of one repository: the ports it reads them through, the service that reads the repository, and the command lines of the actions a worktree offers.
+// A UseCase lists the worktrees of one repository: the ports it reads them through and the service that reads the repository.
 type UseCase struct {
 	Git          Git
 	Meta         Meta
 	Jobs         Jobs
 	PullRequests PullRequests
 	Repository   repository.Service
-	Commands     Commands
 }
 
 // An Outcome is what Run read: one Item per worktree, the warnings of what could not be read, and the follow-ups chosen of it.
@@ -58,14 +57,17 @@ func (u UseCase) Run(ctx context.Context, req Request, _ domain.RunOptions) (Out
 		return Outcome{}, err
 	}
 
-	// 3. Report each worktree, the main one first.
+	// 3. Report each worktree, the main one first, with what it offers.
 	items, warnings := List(facts)
 	return Outcome{Items: items, Warnings: warnings}, nil
 }
 
-// FollowUp is the command line that carries out action on the worktree of detail, as the next step of a read.
-func (u UseCase) FollowUp(detail Detail, action Action) domain.FollowUp {
-	return domain.FollowUp{Argv: u.Commands(action, detail), Code: Name + "." + string(action), Message: Labels[action]}
+// ----------------------------------------------------------------------------
+// Questions
+
+// Questions is list's form: a read, it asks nothing the repository decides.
+func (u UseCase) Questions(context.Context, Request) (Questions, error) {
+	return Questions{}, nil
 }
 
 // ----------------------------------------------------------------------------

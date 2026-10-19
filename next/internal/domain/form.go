@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"cmp"
 	"encoding/json"
 	"strconv"
 	"strings"
@@ -45,6 +46,9 @@ func fieldKind(field Field) (string, Field) {
 		field.Entries, field.Options = orEmpty(field.Entries), orEmpty(field.Options)
 		return "text_list", field
 	case ConfirmField:
+		// a surface answers with an option's value, which Yes reads: true or false, whatever the option says
+		field.Yes.Value, field.Yes.Label = "true", cmp.Or(field.Yes.Label, "Yes")
+		field.No.Value, field.No.Label = "false", cmp.Or(field.No.Label, "No")
 		return "confirm", field
 	}
 	return "", field
@@ -275,18 +279,47 @@ type Answerable[R any] interface {
 
 // Answered is the answer to the field at Path, as its command's Request.Answer takes it.
 type Answered struct {
-	Path   string
-	Values []string
+	Path   string   `json:"path"`
+	Values []string `json:"values"`
 }
 
-// Answers are the answer of each field of the form, in order, then the fields whose answer is to be remembered: the inverse of Fold, which a surface or a test folds back into the request the form stands for.
+// Answers are the answer of each field of the form, in order, then, when a field is rememberable, the fields whose answer is to be remembered: the inverse of Fold, which a surface or a test folds back into the request the form stands for.
 func (f Form) Answers() []Answered {
 	answers := make([]Answered, 0, len(f.Fields)+1)
 	for _, field := range f.Fields {
 		answers = append(answers, Answered{Path: field.Spec().Path, Values: field.Answer()})
 	}
+	if len(f.Rememberable()) == 0 {
+		return answers
+	}
 
 	return append(answers, Answered{Path: PathRemember, Values: f.Remembering()})
+}
+
+// Valued is a command's request, which says its answer to the field at path, nil when it leaves the field to its default.
+type Valued interface {
+	Values(path string) []string
+}
+
+// AnswersOf are the answers req gives the fields of form, a path shared by two fields once, then the fields it asks to remember and whether it asks again: what Fold folds back into req.
+func AnswersOf(form Form, req Valued) []Answered {
+	paths := make([]string, 0, len(form.Fields)+2)
+	for _, field := range form.Fields {
+		paths = append(paths, field.Spec().Path)
+	}
+
+	var answers []Answered
+	seen := map[string]bool{}
+	for _, path := range append(paths, PathRemember, PathAsk) {
+		values := req.Values(path)
+		if seen[path] || values == nil {
+			continue
+		}
+		seen[path] = true
+		answers = append(answers, Answered{Path: path, Values: values})
+	}
+
+	return answers
 }
 
 // Fold is req with each of answers given in turn; it stops at the first one req refuses.
