@@ -39,15 +39,18 @@ func TestEachRegisteredCommandIsInTheCatalogueAndWired(t *testing.T) {
 	}
 }
 
-func TestNoCommandListNamesInAFollowUpHasMigrated(t *testing.T) {
+func TestNoCommandAFollowUpNamesHasMigrated(t *testing.T) {
 	streams, _, _, _ := output.Test()
 	root := cli.NewRoot(version, streams, commands(streams, cli.Env{}))
+	named := []string{leftBehind("feat/a").Command}
 	for _, action := range []list.Action{list.ActionGo, list.ActionRunUp, list.ActionRunDown, list.ActionLogs, list.ActionClean} {
-		command := list.FollowUpOf(action, list.Detail{Branch: "feat/a"}).Command
-		require.NotEmpty(t, command, action)
+		named = append(named, list.FollowUpOf(action, list.Detail{Branch: "feat/a"}).Command)
+	}
+	for _, command := range named {
+		require.NotEmpty(t, command)
 		_, listed := catalogue().Find(command)
 
-		assert.False(t, listed || runs(root, strings.Fields(command)), "%s has migrated: check list's answers against its schema and spell its command line from it in commandLine", command)
+		assert.False(t, listed || runs(root, strings.Fields(command)), "%s has migrated: check the answers its follow-ups give against its schema and spell its command line from it in commandLine", command)
 	}
 }
 

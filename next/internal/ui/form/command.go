@@ -47,9 +47,9 @@ type UseCase[R, Q, O any] interface {
 type Command[R Request[R], Q Questions, O Outcome] struct {
 	YesUsage   string // the usage of --yes, which says what an unattended run requires
 	Open       func(ctx context.Context, dir string) (UseCase[R, Q, O], error)
-	Preview    func(previewed O) Preview                // what the recap and the dry run show of the plan previewed
-	Draw       func(w io.Writer, applied O, cwd string) // the outcome of an apply, cwd the directory its paths are shown from
-	ApplyLabel func(previewed O) string                 // the recap's option that applies, nil for "Yes, apply"
+	Preview    func(previewed O) Preview                   // what the recap and the dry run show of the plan previewed
+	Draw       func(w io.Writer, applied O, env uicli.Env) // the outcome of an apply, its paths shown from env's Cwd, its follow-ups spelled by env's CommandLine
+	ApplyLabel func(previewed O) string                    // the recap's option that applies, nil for "Yes, apply"
 	// Special returns the step a command asks its own way for the field at, nil for the step of the field's kind.
 	Special func(s *Session[R, Q, O], at int, field domain.Field) Step
 
@@ -262,7 +262,7 @@ func (c *Command[R, Q, O]) Launch(cmd *cobra.Command, args []string, conclude fu
 	ctx := cmd.Context()
 	app, err := c.Open(ctx, c.io.Env.ProjectDir)
 	if err != nil {
-		return c.io.Refuse(domain.AsError(domain.AsErrorParams{Err: err}), c.rerun(cmd, req))
+		return c.io.Refuse(domain.AsError(domain.AsErrorParams{Err: err}), c.rerun(req), c.Argv(cmd.CommandPath(), req))
 	}
 
 	progress := c.io.Progress(ctx)
@@ -309,7 +309,7 @@ func (c *Command[R, Q, O]) Ask(ctx context.Context, params AskParams[R, Q, O]) (
 // Conclude prints how the run ended — the JSON envelope, a refusal, the dry run and the line that applies it, or the outcome Draw draws — and returns the failure that sets the exit code.
 func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error) error {
 	failure := domain.AsError(domain.AsErrorParams{Err: err})
-	rerun := c.rerun(cmd, ran.Request)
+	rerun, argv := c.rerun(ran.Request), c.Argv(cmd.CommandPath(), ran.Request)
 	if !c.io.Human() {
 		doc := ran.Outcome.Envelope(c.io.Command, failure)
 		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, rerun)...)
@@ -317,10 +317,9 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 	}
 
 	stdout, _ := c.io.Writers()
-	argv := rerun.Argv
 	switch {
 	case failure != nil:
-		return c.io.Refuse(failure, rerun)
+		return c.io.Refuse(failure, rerun, argv)
 	case !ran.Outcome.Applied():
 		previewed, fingerprint := c.Preview(ran.Outcome), ran.Outcome.PlanFingerprint()
 		output.Frame(stdout, func(w io.Writer) {
@@ -329,7 +328,7 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 		return nil
 	}
 
-	output.Frame(stdout, func(w io.Writer) { c.Draw(w, ran.Outcome, c.io.Env.Cwd) })
+	output.Frame(stdout, func(w io.Writer) { c.Draw(w, ran.Outcome, c.io.Env) })
 	return c.io.Failed(ran.Outcome.Failure())
 }
 
@@ -341,9 +340,9 @@ func applyLine(argv []string, fingerprint string) string {
 // ----------------------------------------------------------------------------
 // The command line
 
-// rerun is the follow-up that runs req again: the command, the request's answers, and its command line as cmd spells it.
-func (c *Command[R, Q, O]) rerun(cmd *cobra.Command, req R) domain.FollowUp {
-	return domain.FollowUp{Command: c.io.Command, Answers: domain.AnswersOf(c.schema(), req), Argv: c.Argv(cmd.CommandPath(), req)}
+// rerun is the follow-up that runs req again: the command and the request's answers.
+func (c *Command[R, Q, O]) rerun(req R) domain.FollowUp {
+	return domain.FollowUp{Command: c.io.Command, Answers: domain.AnswersOf(c.schema(), req)}
 }
 
 // Argv spells command and req word by word, unquoted: the positional field's words, each flag given sorted by name, then --ask.

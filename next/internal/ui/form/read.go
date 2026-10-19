@@ -92,7 +92,7 @@ func (q *Query[R, Q, O]) conclude(read O, err error) error {
 	stdout, _ := q.io.Writers()
 	// todo: run the follow-up the user picked, in this process, once every command it names has migrated; it is printed until then.
 	if len(doc.FollowUps) > 0 {
-		output.Frame(stdout, func(w io.Writer) { output.NextSteps(w, nextSteps(doc.FollowUps)) })
+		output.Frame(stdout, func(w io.Writer) { output.NextSteps(w, q.nextSteps(doc.FollowUps)) })
 		return q.io.Failed(read.Failure())
 	}
 
@@ -100,10 +100,10 @@ func (q *Query[R, Q, O]) conclude(read O, err error) error {
 	return q.io.Failed(read.Failure())
 }
 
-func nextSteps(followUps []domain.FollowUp) []output.NextStep {
+func (q *Query[R, Q, O]) nextSteps(followUps []domain.FollowUp) []output.NextStep {
 	steps := make([]output.NextStep, 0, len(followUps))
 	for _, followUp := range followUps {
-		steps = append(steps, output.NextStep{Command: output.Line(followUp.Argv), Note: followUp.Message})
+		steps = append(steps, output.FollowUpStep(followUp, q.io.Env.CommandLine))
 	}
 
 	return steps

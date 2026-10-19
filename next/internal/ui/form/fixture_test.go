@@ -202,7 +202,7 @@ func fakeQuery() (*form.Query[request, questions, read], *int) {
 		},
 		Pick: func(_ context.Context, got read, _ request, _ *uicli.Run) (read, error) {
 			picked++
-			got.FollowUps = []domain.FollowUp{{Argv: []string{"wtm", "go", "feat/x"}, Message: "Go there"}}
+			got.FollowUps = []domain.FollowUp{{Command: "go", Answers: []domain.Answered{{Path: "worktree", Values: []string{"feat/x"}}}, Message: "Go there"}}
 			return got, nil
 		},
 	}, &picked

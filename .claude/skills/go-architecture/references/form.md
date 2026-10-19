@@ -11,7 +11,7 @@
 | `YesUsage` | the usage of `--yes`, saying what an unattended run requires |
 | `Open` | `form.Opener[R, Q, O](open)`: the project's use case as a `form.UseCase[R, Q, O]` (its `Questions` and `Run`) |
 | `Preview(previewed) form.Preview` | the plan not yet applied: `Rows` (`output.PlanRow`, each answer with its mark), `Warnings`, `Recalled` (the fields answered from memory, which the recap's hint names). The recap and the dry run both draw it. |
-| `Draw(w, applied, cwd)` | the outcome of an apply, paths shown from `cwd` |
+| `Draw(w, applied, env)` | the outcome of an apply, paths shown from `env.Cwd`, follow-ups spelled by `env.CommandLine` (`output.FollowUpStep`) |
 | `ApplyLabel(previewed)` | the recap's option that applies, nil for "Yes, apply" |
 | `Special(session, at, field)` | the command's own step for a field, nil for the step of its kind |
 

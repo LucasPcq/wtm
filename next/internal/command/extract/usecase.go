@@ -168,7 +168,7 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 		warnings = append(warnings, failed...)
 	}
 
-	return Result{Items: []Item{item}, Warnings: warnings, Remembered: remembered}
+	return Result{Items: []Item{item}, Warnings: warnings, Remembered: remembered, FollowUps: plan.next(item)}
 }
 
 // ----------------------------------------------------------------------------
@@ -347,7 +347,6 @@ func (p Plan) aftermath(item Item) []domain.Warning {
 		return []domain.Warning{
 			{Code: "extract.conflict_markers", Message: markers + ".", Params: domain.Params{"files": conflicts, "target": target}},
 			{Code: "extract.source_kept", Message: "Nothing was removed from " + p.Source + ": to undo, discard the applied files in " + target + ".", Params: params},
-			{Code: CodeResolveThenDiscard, Message: "resolve the conflicts, then discard the same files in " + p.Source, Params: params},
 		}
 	case item.Status == domain.StatusDone, item.Err != nil && item.Err.Code == CodeHalfMoved:
 		return nil
@@ -356,6 +355,20 @@ func (p Plan) aftermath(item Item) []domain.Warning {
 	}
 
 	return []domain.Warning{{Code: "extract.untouched", Message: "nothing was moved: the files are still in " + p.Source, Params: params}}
+}
+
+// next is the step into the target once it exists, after resolving its conflicts when it holds some.
+func (p Plan) next(item Item) []domain.FollowUp {
+	if item.Detail == nil {
+		return nil
+	}
+
+	goTo := domain.FollowUp{Command: "go", Answers: []domain.Answered{{Path: "worktree", Values: []string{item.Subject}}}, Code: CodeGo}
+	if len(item.Detail.Conflicts) > 0 {
+		goTo.Code, goTo.Message = CodeResolveThenDiscard, "resolve the conflicts, then discard the same files in "+p.Source
+		goTo.Params = domain.Params{"source": p.Source, "target": item.Subject}
+	}
+	return []domain.FollowUp{goTo}
 }
 
 // failure turns the error a move failed on into extract's: a conflict found at the last moment is refused with CodeConflict, changes left in both worktrees fail with CodeHalfMoved.

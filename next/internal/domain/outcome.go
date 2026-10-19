@@ -65,7 +65,7 @@ func (o Outcome[P, D]) Envelope(command string, err *Error) Envelope {
 		for _, unit := range o.Result.Items {
 			doc.Items = append(doc.Items, unit.item())
 		}
-		doc.Plan, doc.Warnings = &o.Plan, o.Warnings
+		doc.Plan, doc.Warnings, doc.FollowUps = &o.Plan, o.Warnings, o.Result.FollowUps
 	case doc.Err == nil:
 		doc.Plan, doc.Fingerprint, doc.Warnings = &o.Plan, o.Fingerprint, o.Warnings
 	}
@@ -73,11 +73,12 @@ func (o Outcome[P, D]) Envelope(command string, err *Error) Envelope {
 	return doc
 }
 
-// A Result is what an apply did: one Unit per subject of the plan, in its order, the warnings of the whole run and the fields whose answer it remembered for the next runs.
+// A Result is what an apply did: one Unit per subject of the plan, in its order, the warnings of the whole run, the fields whose answer it remembered for the next runs, and what to do next.
 type Result[D any] struct {
 	Items      []Unit[D]
 	Warnings   []Warning
 	Remembered []string
+	FollowUps  []FollowUp
 }
 
 // Failure is the error the run ends on: the first interruption, else the first failed subject, else nil.

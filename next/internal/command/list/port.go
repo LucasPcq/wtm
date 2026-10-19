@@ -3,8 +3,6 @@ package list
 import (
 	"context"
 
-	"github.com/LucasPcq/wtm/next/internal/domain"
-
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
@@ -27,6 +25,3 @@ type Jobs func(ctx context.Context) ([]run.Job, error)
 
 // PullRequests lists the open pull requests of the repository, none from a fork; it fails with worktree.ErrPullRequestsUnavailable, wrapped with what to do about it.
 type PullRequests func(ctx context.Context) (worktree.PullRequests, error)
-
-// Commands spells a follow-up as the command line that carries it out, word by word.
-type Commands func(followUp domain.FollowUp) []string

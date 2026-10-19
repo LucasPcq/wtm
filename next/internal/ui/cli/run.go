@@ -63,29 +63,28 @@ func (r *Run) FailWith(failure *domain.Error, next []output.NextStep) error {
 	return r.fail(failure, nil, next)
 }
 
-// Refuse prints failure as FailWith does, followed by what [Replan] makes of request, the follow-up that runs the request again: in the envelope's follow_ups with --output json.
-func (r *Run) Refuse(failure *domain.Error, request domain.FollowUp) error {
-	return r.fail(failure, Replan(failure, request), nil)
+// Refuse prints failure as FailWith does, followed by what [Replan] makes of request, the follow-up that runs the request again, whose command line is argv: in the envelope's follow_ups with --output json.
+func (r *Run) Refuse(failure *domain.Error, request domain.FollowUp, argv []string) error {
+	followUps := Replan(failure, request)
+	var next []output.NextStep
+	if len(followUps) > 0 {
+		next = []output.NextStep{{Command: output.Line(append(slices.Clone(argv), "--"+FlagDryRun)), Note: output.ReplanNote}}
+	}
+	return r.fail(failure, followUps, next)
 }
 
-// Replan returns the follow-up of a stale plan: request, the follow-up that runs the request again, as a dry run that previews the plan the facts give now, its command line with --dry-run; none for any other failure.
+// Replan returns the follow-up of a stale plan: request, the follow-up that runs the request again, as a dry run that previews the plan the facts give now; none for any other failure.
 func Replan(failure *domain.Error, request domain.FollowUp) []domain.FollowUp {
 	if failure == nil || failure.Code != domain.CodePlanStale {
 		return nil
 	}
 
-	replan := domain.Replan(request.Command, request.Answers)
-	replan.Argv = append(slices.Clone(request.Argv), "--"+FlagDryRun)
-	return []domain.FollowUp{replan}
+	return []domain.FollowUp{domain.Replan(request.Command, request.Answers)}
 }
 
 func (r *Run) fail(failure *domain.Error, followUps []domain.FollowUp, next []output.NextStep) error {
 	if !r.Human() {
 		return r.Envelope(domain.Envelope{Command: r.Command, Err: failure, FollowUps: followUps})
-	}
-
-	for _, followUp := range followUps {
-		next = append(next, output.NextStep{Command: output.Line(followUp.Argv), Note: followUp.Message})
 	}
 
 	_, stderr := r.Writers()

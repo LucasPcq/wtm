@@ -21,6 +21,7 @@ var version = "dev"
 func main() {
 	streams := output.System()
 	env := cli.ReadEnv()
+	env.CommandLine = commandLine
 	os.Exit(cli.Main(cli.Params{
 		Version:       version,
 		Streams:       streams,

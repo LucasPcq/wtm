@@ -86,6 +86,20 @@
       }
     ]
   },
-  "follow_ups": [],
+  "follow_ups": [
+    {
+      "command": "go",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/other"
+          ]
+        }
+      ],
+      "code": "extract.go",
+      "message": ""
+    }
+  ],
   "warnings": []
 }

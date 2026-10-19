@@ -34,5 +34,5 @@ func realPath(t *testing.T, path string) string {
 
 // rerun is the follow-up that runs create again on branch.
 func rerun(branch string) domain.FollowUp {
-	return domain.FollowUp{Command: "create", Answers: []domain.Answered{{Path: "branches", Values: []string{branch}}}, Argv: []string{"wtm-next", "create", branch}}
+	return domain.FollowUp{Command: "create", Answers: []domain.Answered{{Path: "branches", Values: []string{branch}}}}
 }

@@ -67,13 +67,12 @@ func (f FieldError) Message(path string) string {
 }
 
 // FollowUp is what to do next, a failure's repair or an action offered: a wtm command, as the command line spells it after the program's name, with its request as the answers of that command's fields, run as a dry run when DryRun is set; or, with no command, a link to open, URL.
-// Argv is the same step as the command line spells it, word by word, unquoted, filled by the speller cmd/wtm-next injects; it is the CLI's alone, never in the JSON.
+// The command line spells it at print time, each surface its own way.
 type FollowUp struct {
 	Command string     `json:"command,omitempty"`
 	Answers []Answered `json:"answers,omitempty"`
 	DryRun  bool       `json:"dry_run,omitempty"`
 	URL     string     `json:"url,omitempty"`
-	Argv    []string   `json:"-"`
 	Code    string     `json:"code"`
 	Message string     `json:"message"`
 	Params  Params     `json:"params,omitempty"`

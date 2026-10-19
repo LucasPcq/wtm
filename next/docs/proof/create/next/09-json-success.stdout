@@ -80,6 +80,64 @@
       }
     }
   ],
+  "plan": {
+    "branches": [
+      {
+        "branch": "feat/json",
+        "path": "<SB>/acme.trees/feat-json",
+        "action": "create"
+      }
+    ],
+    "from": "main",
+    "env_from": "example",
+    "isolation": "isolated",
+    "recap": [
+      {
+        "key": "branches",
+        "label": "Branches",
+        "path": "branches",
+        "values": [
+          {
+            "value": "feat/json",
+            "text": "feat/json"
+          }
+        ]
+      },
+      {
+        "key": "from",
+        "label": "From",
+        "path": "from",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "env_from",
+        "label": "Env",
+        "path": "env_from",
+        "values": [
+          {
+            "value": "example",
+            "text": "example"
+          }
+        ]
+      },
+      {
+        "key": "isolation",
+        "label": "Isolation",
+        "path": "isolation",
+        "values": [
+          {
+            "value": "isolated",
+            "text": "isolated"
+          }
+        ]
+      }
+    ]
+  },
   "follow_ups": [],
   "warnings": []
 }

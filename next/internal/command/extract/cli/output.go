@@ -2,11 +2,11 @@ package cli
 
 import (
 	"io"
-	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
+	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
@@ -22,7 +22,7 @@ func drawNothing(w io.Writer, plan extract.Plan) {
 }
 
 // drawOutcome draws what the apply did: the tally, the plan with the target when it stands and the warnings, the target left unfinished followed by its own warnings, and the next steps.
-func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
+func drawOutcome(w io.Writer, outcome extract.Outcome, env uicli.Env) {
 	item, ok := targetOf(outcome)
 	if !ok {
 		return
@@ -38,19 +38,18 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
 	output.Tally(w, tally)
 
 	rows := output.RecapRows(outcome.Plan.Recap)
-	own, note := stepOf(item.Warnings)
-	targetWarnings := output.WarningMessages(own, envPortsOf(item))
+	targetWarnings := output.WarningMessages(item.Warnings, envPortsOf(item))
 	warnings := output.Messages(outcome.Warnings)
 	if finished {
 		warnings = append(warnings, targetWarnings...)
 	}
 	var next []output.NextStep
 	if detail != nil {
-		path := output.ShownPath(output.Shown{Cwd: cwd, Path: detail.Path})
+		path := output.ShownPath(output.Shown{Cwd: env.Cwd, Path: detail.Path})
 		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + output.MutedNote(output.SettlementNote(detail.EnvPorts), output.StylesOf(w))}})
-		step := output.GoStep(item.Subject)
-		step.Note = note
-		next = append(next, step)
+	}
+	for _, followUp := range outcome.Result.FollowUps {
+		next = append(next, output.FollowUpStep(followUp, env.CommandLine))
 	}
 
 	output.Blank(w)
@@ -64,21 +63,11 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, cwd string) {
 		}
 	}
 
-	next = append(next, output.FollowUpSteps(item.Err)...)
+	next = append(next, output.FollowUpSteps(item.Err, env.CommandLine)...)
 	if len(next) > 0 {
 		output.Blank(w)
 		output.NextSteps(w, next)
 	}
-}
-
-// stepOf parts the target's warnings from the step left to take, which the step to the target carries as its note.
-func stepOf(warnings []domain.Warning) ([]domain.Warning, string) {
-	at := slices.IndexFunc(warnings, func(warned domain.Warning) bool { return warned.Code == extract.CodeResolveThenDiscard })
-	if at < 0 {
-		return warnings, ""
-	}
-
-	return slices.Delete(slices.Clone(warnings), at, at+1), warnings[at].Message
 }
 
 func envPortsOf(item extract.Item) env.Redacted {

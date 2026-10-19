@@ -18,7 +18,7 @@ func TestAReadIsReportedWithoutOperationPlanNorFingerprint(t *testing.T) {
 			Path string `json:"path"`
 		}{"/trees/feat-x"}}},
 		Warnings:  []Warning{{Code: "list.prs_unavailable", Message: "GitHub not connected"}},
-		FollowUps: []FollowUp{{Command: "go", Answers: []Answered{{Path: "worktree", Values: []string{"feat/x"}}}, Argv: []string{"wtm", "go", "feat/x"}, Code: "list.go", Message: "Go to the worktree"}},
+		FollowUps: []FollowUp{{Command: "go", Answers: []Answered{{Path: "worktree", Values: []string{"feat/x"}}}, Code: "list.go", Message: "Go to the worktree"}},
 	}
 
 	data, err := json.Marshal(read.Envelope("list", nil))

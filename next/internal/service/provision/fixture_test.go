@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
@@ -210,7 +211,9 @@ func (u upstream) snapshotOf() worktree.Snapshot {
 	return worktree.Snapshot{Worktrees: []worktree.Worktree{{Path: u.linked, State: worktree.OnBranch{Branch: existing}}}}
 }
 
-func removeLine(branch string) []string { return []string{"remove", branch} }
+func removeLine(branch string) domain.FollowUp {
+	return domain.FollowUp{Command: "remove", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}}}
+}
 
 // answered are the answers to the questions of a new worktree the request gives.
 func answered(given provision.Given) provision.Answers {

@@ -58,7 +58,11 @@ func TestEventsAreFiledUnderGitsCommonDirWhereverTheStateLives(t *testing.T) {
 }
 
 func TestAnUndoLeftBehindIsRemovedByTheLegacyClean(t *testing.T) {
-	assert.Equal(t, []string{"wtm", "clean", "feat/x", "--force"}, wire(wireParams{}).Create.Provision.LeftBehind("feat/x"))
+	assert.Equal(t, []string{"wtm", "clean", "feat/x", "--force"}, commandLine(wire(wireParams{}).Create.Provision.LeftBehind("feat/x")))
+}
+
+func TestAPullRequestWithNoNumberIsOpenedByItsURL(t *testing.T) {
+	assert.Equal(t, []string{"gh", "pr", "view", "https://github.com/acme/acme/pull/12", "--web"}, commandLine(domain.FollowUp{URL: "https://github.com/acme/acme/pull/12"}))
 }
 
 func TestTwoExecutionsInOneProcessKeepTheirOwnRepositoryAndCorrelationID(t *testing.T) {

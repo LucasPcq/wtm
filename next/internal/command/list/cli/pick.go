@@ -98,7 +98,7 @@ func (p *picker) withPullRequests(from list.Outcome) list.Outcome {
 		}
 		detail := *item.Detail
 		detail.PR = from.Items[at].Detail.PR
-		detail.Actions = p.app.Actions(detail)
+		detail.Actions = list.Actions(detail)
 		merged.Items[i].Detail = &detail
 	}
 

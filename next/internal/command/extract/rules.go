@@ -436,8 +436,11 @@ func (p Plan) move() worktree.Move {
 // ----------------------------------------------------------------------------
 // The recap
 
-// CodeResolveThenDiscard is the step left after an extract with conflicts: resolve them in the target, then discard the same files in the source.
-const CodeResolveThenDiscard = Name + ".resolve_then_discard"
+// CodeGo is the step into the target an extract ends on; CodeResolveThenDiscard the same step after an extract with conflicts: resolve them in the target, then discard the same files in the source.
+const (
+	CodeGo                 = Name + ".go"
+	CodeResolveThenDiscard = Name + ".resolve_then_discard"
+)
 
 // NoteNew notes a target of the recap to create, from the source of its params; the others are worktree's notes.
 const NoteNew = "new"

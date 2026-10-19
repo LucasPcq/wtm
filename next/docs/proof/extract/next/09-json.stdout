@@ -82,6 +82,113 @@
       }
     }
   ],
-  "follow_ups": [],
+  "plan": {
+    "source": "feat/login",
+    "files": [
+      {
+        "path": "apps/web/login.ts",
+        "status": "untracked"
+      }
+    ],
+    "target": {
+      "branch": "feat/json",
+      "path": "<SB>/acme.trees/feat-json",
+      "action": "create"
+    },
+    "from": "main",
+    "env_from": "example",
+    "isolation": "isolated",
+    "keep": false,
+    "conflicts": [],
+    "on_conflict": "abort",
+    "recap": [
+      {
+        "key": "source",
+        "label": "Source",
+        "path": "source",
+        "values": [
+          {
+            "value": "feat/login",
+            "text": "feat/login"
+          }
+        ]
+      },
+      {
+        "key": "files",
+        "label": "Files",
+        "path": "files",
+        "values": [
+          {
+            "value": "apps/web/login.ts",
+            "note": "untracked",
+            "text": "new apps/web/login.ts"
+          }
+        ]
+      },
+      {
+        "key": "target",
+        "label": "Target",
+        "path": "to",
+        "values": [
+          {
+            "value": "feat/json",
+            "note": "new",
+            "params": {
+              "from": "main"
+            },
+            "text": "new worktree feat/json from main"
+          }
+        ]
+      },
+      {
+        "key": "env_from",
+        "label": "Env",
+        "path": "env_from",
+        "values": [
+          {
+            "value": "example",
+            "text": "example"
+          }
+        ]
+      },
+      {
+        "key": "isolation",
+        "label": "Isolation",
+        "path": "isolation",
+        "values": [
+          {
+            "value": "isolated",
+            "text": "isolated"
+          }
+        ]
+      },
+      {
+        "key": "mode",
+        "label": "Mode",
+        "path": "keep",
+        "values": [
+          {
+            "value": "move",
+            "text": "move"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "go",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/json"
+          ]
+        }
+      ],
+      "code": "extract.go",
+      "message": ""
+    }
+  ],
   "warnings": []
 }

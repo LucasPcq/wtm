@@ -42,12 +42,20 @@ func GoStep(branch string) NextStep {
 	return NextStep{Command: Line([]string{"wtm", "go", branch})}
 }
 
-// FollowUpSteps returns the next step that repairs what err left behind, its follow-up's command line and message; none when err is nil or has no follow-up.
-func FollowUpSteps(err *domain.Error) []NextStep {
+// A CommandLine spells a follow-up as the command line that carries it out, word by word, unquoted: the one function that knows every command, which cmd/wtm-next gives.
+type CommandLine func(followUp domain.FollowUp) []string
+
+// FollowUpStep is followUp as a next step: its command line, spelled by spell, and its message.
+func FollowUpStep(followUp domain.FollowUp, spell CommandLine) NextStep {
+	return NextStep{Command: Line(spell(followUp)), Note: followUp.Message}
+}
+
+// FollowUpSteps returns the next step that repairs what err left behind, its follow-up spelled by spell; none when err is nil or has no follow-up.
+func FollowUpSteps(err *domain.Error, spell CommandLine) []NextStep {
 	if err == nil || err.FollowUp == nil {
 		return nil
 	}
-	return []NextStep{{Command: Line(err.FollowUp.Argv), Note: err.FollowUp.Message}}
+	return []NextStep{FollowUpStep(*err.FollowUp, spell)}
 }
 
 // Shown is a path to show and the directory the command runs in.

@@ -128,6 +128,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 		PR:           f.pr(w.Branch()),
 		Services:     f.services(w.Path),
 	}
+	detail.Actions = Actions(detail)
 
 	return Item{Subject: subject, Status: domain.StatusDone, Detail: &detail}
 }
@@ -264,7 +265,17 @@ var byAction = map[Action]struct{ command, label string }{
 	ActionClean:   {"clean", "Clean (delete the worktree)"},
 }
 
-// FollowUpOf is action on the worktree of detail as the follow-up that carries it out, with its code and its label: its wtm command and answers, or the URL of its pull request and its number; its Argv is left to the surface that spells it.
+// Actions are the follow-ups the worktree of detail offers, as Offers lists them.
+func Actions(detail Detail) []domain.FollowUp {
+	actions := []domain.FollowUp{}
+	for _, action := range Offers(detail) {
+		actions = append(actions, FollowUpOf(action, detail))
+	}
+
+	return actions
+}
+
+// FollowUpOf is action on the worktree of detail as the follow-up that carries it out, with its code and its label: its wtm command and answers, or the URL of its pull request and its number.
 func FollowUpOf(action Action, detail Detail) domain.FollowUp {
 	followUp := domain.FollowUp{Code: Name + "." + string(action), Message: byAction[action].label}
 	if action == ActionOpenPR && detail.PR != nil {

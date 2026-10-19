@@ -82,7 +82,7 @@ A second command is its own `command/<name>/` (use case, ports, rules, questions
 
 A read, `command/list`, walks the same hops with a `form.Query` in place of a `form.Command`, under the contract of a read (`.claude/skills/go-architecture/references/contract.md`, "A read").
 
-Todo: the follow-up a read's picker ends on is printed by `form.Query`; once every command it names has migrated, it runs in this process instead (`api.Catalogue.Find(followUp.Command)` with its answers), and its command line is spelled from that command's schema rather than by `commandLine` (`cmd/wtm-next/wire.go`).
+Todo: the follow-up a read's picker ends on is printed by `form.Query`; once every command it names has migrated, it runs in this process instead (`api.Catalogue.Find(followUp.Command)` with its answers), and its command line is spelled from that command's schema rather than by `commandLine` (`cmd/wtm-next/wire.go`, injected as `uicli.Env.CommandLine`).
 
 ## Comments
 

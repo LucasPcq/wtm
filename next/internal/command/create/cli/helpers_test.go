@@ -161,3 +161,8 @@ func (h helper) wait(t *testing.T) syscall.WaitStatus {
 func recapRow(label string, values ...string) domain.RecapRow {
 	return domain.RecapRow{Label: label, Values: domain.RecapValues(values)}
 }
+
+// drawnFrom is the environment an outcome is drawn in from cwd.
+func drawnFrom(cwd string) uicli.Env {
+	return uicli.Env{Cwd: cwd, CommandLine: formtest.CommandLine}
+}

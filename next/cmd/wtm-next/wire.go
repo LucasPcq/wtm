@@ -68,8 +68,7 @@ func wire(params wireParams) app {
 		PublicPort: proxyport.Port{Plist: proxyport.PlistPath()}.Public,
 		Shield:     shell.Shield,
 		Now:        time.Now,
-		// clean exists only in the legacy wtm until it migrates
-		LeftBehind: func(branch string) []string { return []string{"wtm", "clean", branch, "--force"} },
+		LeftBehind: leftBehind,
 	}
 
 	return app{
@@ -94,22 +93,32 @@ func wire(params wireParams) app {
 			Jobs:         daemon.Daemon{SocketPath: events.SocketPath()}.Jobs,
 			PullRequests: github.GitHub{Dir: params.MainPath}.PullRequests,
 			Repository:   facts,
-			Commands:     commandLine,
 		},
 	}
 }
 
-// commandLine spells an action list offers: a wtm command in the legacy wtm until it migrates, a worktree on no branch entered with cd, and a pull request opened by gh.
+// leftBehind is the repair of a branch an undo left behind, and of its worktree: clean, forced, in the legacy wtm until it migrates.
+func leftBehind(branch string) domain.FollowUp {
+	return domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: list.PathWorktree, Values: []string{branch}}, {Path: "force", Values: []string{"true"}}}}
+}
+
+// commandLine spells a follow-up naming another command than the one that offers it: a wtm command in the legacy wtm until it migrates, its worktree positional and each answer said true a flag, a worktree on no branch entered with cd, and a pull request opened by gh.
 func commandLine(followUp domain.FollowUp) []string {
 	if followUp.URL != "" {
-		number, _ := strconv.Atoi(followUp.Params[list.ParamNumber])
+		number, err := strconv.Atoi(followUp.Params[list.ParamNumber])
+		if err != nil {
+			return []string{"gh", "pr", "view", followUp.URL, "--web"}
+		}
 		return github.ViewCommand(number)
 	}
 
-	var worktree []string
+	var worktree, flags []string
 	for _, answer := range followUp.Answers {
-		if answer.Path == list.PathWorktree {
+		switch {
+		case answer.Path == list.PathWorktree:
 			worktree = answer.Values
+		case len(answer.Values) == 1 && answer.Values[0] == "true":
+			flags = append(flags, "--"+answer.Path)
 		}
 	}
 	// a branch never starts with a slash: an absolute worktree is one on no branch, which wtm go cannot name
@@ -117,7 +126,8 @@ func commandLine(followUp domain.FollowUp) []string {
 		return []string{"cd", worktree[0]}
 	}
 
-	return append(append([]string{"wtm"}, strings.Fields(followUp.Command)...), worktree...)
+	argv := append([]string{"wtm"}, strings.Fields(followUp.Command)...)
+	return append(append(argv, worktree...), flags...)
 }
 
 // A locker adapts [oplock.Locks] to the port of [operation.Service], whose Take returns an [operation.Hold] where oplock's returns its concrete [*oplock.Held].

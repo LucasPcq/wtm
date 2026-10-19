@@ -7,6 +7,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
+	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,7 +15,7 @@ import (
 func TestAnOutcomeWithoutItsTargetDrawsNothing(t *testing.T) {
 	var out bytes.Buffer
 
-	drawOutcome(&out, extract.Outcome{Result: &extract.Result{}}, "")
+	drawOutcome(&out, extract.Outcome{Result: &extract.Result{}}, uicli.Env{})
 
 	assert.Empty(t, out.String())
 }

@@ -3,6 +3,8 @@ package cli
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
 // The environment variables a command line run reads.
@@ -11,11 +13,12 @@ const (
 	CorrelationIDEnv = "WTM_CORRELATION_ID" // ties an operation's events to the caller's own run
 )
 
-// An Env is what a command line run takes from its process, read once by [ReadEnv]: the directory it runs in, the one it opens the repository from, and the correlation ID [Run.Begin] checks.
+// An Env is what a command line run takes from its process, read once by [ReadEnv]: the directory it runs in, the one it opens the repository from, and the correlation ID [Run.Begin] checks; and from the composition root, how a follow-up is spelled.
 type Env struct {
 	Cwd           string // the working directory with its symbolic links resolved, from which paths are shown
 	ProjectDir    string // $WTM_PROJECT_DIR with its symbolic links resolved, else the working directory as the system gives it
 	CorrelationID string // $WTM_CORRELATION_ID
+	CommandLine   output.CommandLine
 }
 
 // ReadEnv reads the process's Env. A working directory that cannot be read leaves Cwd empty: paths then show absolute, and opening the repository from it fails on its own.
