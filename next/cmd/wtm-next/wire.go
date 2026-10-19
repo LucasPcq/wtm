@@ -1,9 +1,11 @@
 package main
 
 import (
-	"cmp"
 	"crypto/rand"
 	"encoding/hex"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
@@ -92,35 +94,30 @@ func wire(params wireParams) app {
 			Jobs:         daemon.Daemon{SocketPath: events.SocketPath()}.Jobs,
 			PullRequests: github.GitHub{Dir: params.MainPath}.PullRequests,
 			Repository:   facts,
-			Commands:     listCommands,
+			Commands:     commandLine,
 		},
 	}
 }
 
-// listCommands spells the command line of each action list offers on a worktree: its own commands, in the legacy wtm until they migrate, and gh's for a pull request.
-func listCommands(action list.Action, detail list.Detail) []string {
-	worktree := cmp.Or(detail.Branch, detail.Path)
-	switch action {
-	case list.ActionGo:
-		if detail.Branch == "" {
-			return []string{"cd", detail.Path}
-		}
-		return []string{"wtm", "go", worktree}
-	case list.ActionOpenPR:
-		if detail.PR != nil {
-			return github.ViewCommand(detail.PR.Number)
-		}
-	case list.ActionRunUp:
-		return []string{"wtm", "run", "up", worktree}
-	case list.ActionRunDown:
-		return []string{"wtm", "run", "down", worktree}
-	case list.ActionLogs:
-		return []string{"wtm", "run", "logs", worktree}
-	case list.ActionClean:
-		return []string{"wtm", "clean", worktree}
+// commandLine spells an action list offers: a wtm command in the legacy wtm until it migrates, a worktree on no branch entered with cd, and a pull request opened by gh.
+func commandLine(followUp domain.FollowUp) []string {
+	if followUp.URL != "" {
+		number, _ := strconv.Atoi(followUp.Params[list.ParamNumber])
+		return github.ViewCommand(number)
 	}
 
-	return nil
+	var worktree []string
+	for _, answer := range followUp.Answers {
+		if answer.Path == list.PathWorktree {
+			worktree = answer.Values
+		}
+	}
+	// a branch never starts with a slash: an absolute worktree is one on no branch, which wtm go cannot name
+	if followUp.Command == "go" && len(worktree) == 1 && filepath.IsAbs(worktree[0]) {
+		return []string{"cd", worktree[0]}
+	}
+
+	return append(append([]string{"wtm"}, strings.Fields(followUp.Command)...), worktree...)
 }
 
 // A locker adapts [oplock.Locks] to the port of [operation.Service], whose Take returns an [operation.Hold] where oplock's returns its concrete [*oplock.Held].

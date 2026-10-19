@@ -91,7 +91,7 @@ func TestTwoExecutionsInOneProcessKeepTheirOwnRepositoryAndCorrelationID(t *test
 }
 
 func TestEachActionOfListIsTheCommandLineThatCarriesItOut(t *testing.T) {
-	branch := list.Detail{Branch: "feat/a", Path: "/repo/.trees/feat-a", PR: &list.PR{Number: 12}}
+	branch := list.Detail{Branch: "feat/a", Path: "/repo/.trees/feat-a", PR: &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12"}}
 	detached := list.Detail{Path: "/repo/.trees/detached"}
 	cases := map[string]struct {
 		action list.Action
@@ -108,7 +108,7 @@ func TestEachActionOfListIsTheCommandLineThatCarriesItOut(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, c.argv, listCommands(c.action, c.detail))
+			assert.Equal(t, c.argv, commandLine(list.FollowUpOf(c.action, c.detail)))
 		})
 	}
 }

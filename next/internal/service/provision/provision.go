@@ -455,6 +455,7 @@ func (p *provisioning) leftBehind(left leftBehind) *domain.Error {
 		message, kept = "could not remove the worktree, left behind: worktree", "worktree"
 		followUp = &domain.FollowUp{Message: "branch " + branch + " is left half-created at " + path, Params: domain.Params{"branch": branch, "path": path}}
 	}
+	followUp.Command, followUp.Answers = "clean", []domain.Answered{{Path: "worktree", Values: []string{branch}}, {Path: "force", Values: []string{"true"}}}
 	followUp.Argv, followUp.Code = p.Service.LeftBehind(branch), "provision.left_behind"
 
 	return &domain.Error{

@@ -57,7 +57,7 @@ No conclusion, envelope or dry-run drawing in a command's `cli/`: they are `form
 | -- | -- |
 | `main.go` | `<name>cli.New(streams, env, open<Name>)` in `Commands` |
 | `project.go` | `open<Name> = opener(func(a app) <name>.UseCase { return a.<Name> })` |
-| `catalogue.go` | `api.Bind(<name>.Name, <name>.Questions{}.Form(), open<Name>, <name>.UseCase.Run)` |
+| `catalogue.go` | `api.Bind(<name>.Name, open<Name>, <name>.UseCase.Questions, <name>.UseCase.Run)` |
 | `wire.go` | its field in `app`, its use case built from the adapters `wire` builds once |
 
 `registration_test.go` fails when a command of `main.go` is missing from the catalogue or from the wiring.

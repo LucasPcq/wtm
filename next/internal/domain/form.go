@@ -275,8 +275,8 @@ type Answerable[R any] interface {
 
 // Answered is the answer to the field at Path, as its command's Request.Answer takes it.
 type Answered struct {
-	Path   string
-	Values []string
+	Path   string   `json:"path"`
+	Values []string `json:"values"`
 }
 
 // Answers are the answer of each field of the form, in order, then the fields whose answer is to be remembered: the inverse of Fold, which a surface or a test folds back into the request the form stands for.

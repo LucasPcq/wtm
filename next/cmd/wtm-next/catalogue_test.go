@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/api"
+	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 
 	"github.com/stretchr/testify/assert"
@@ -19,6 +20,7 @@ func TestTheCatalogueListsEachCommandWithItsSchemaOutsideAnyRepository(t *testin
 	for _, command := range catalogue() {
 		names = append(names, command.Name)
 		assert.NotEmpty(t, command.Form.Fields, command.Name)
+		assert.NotNil(t, command.Questions, "%s asks no questions through the catalogue", command.Name)
 	}
 
 	assert.Equal(t, []string{"create", "extract", "list"}, names)
@@ -68,6 +70,27 @@ func TestExtractIsDrivenThroughTheCataloguePreviewedThenAppliedWithItsFingerprin
 	assert.NoFileExists(t, filepath.Join(main, "notes.txt"))
 }
 
+func TestCreateIsDrivenThroughTheCatalogueByItsAnswers(t *testing.T) {
+	main := configured(t)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv(stateDirEnv, "")
+	create := command(t, "create")
+	answers := []domain.Answered{{Path: "branches", Values: []string{"feat/x"}}}
+
+	empty, err := create.Questions(t.Context(), api.Call{Dir: main})
+	require.NoError(t, err)
+	asked, err := create.Questions(t.Context(), api.Call{Dir: main, Answers: answers})
+	require.NoError(t, err)
+	preview := create.Execute(t.Context(), api.Call{Dir: main, Answers: asked.Answers(), Options: domain.RunOptions{DryRun: true}})
+	applied := create.Execute(t.Context(), api.Call{Dir: main, Answers: asked.Answers(), Options: domain.RunOptions{ExpectFingerprint: preview.Envelope.Fingerprint}})
+
+	assert.NotEmpty(t, domain.ProblemsOf(empty.Problems, "branches"), "an empty request is asked its branches")
+	assert.Empty(t, domain.ProblemsOf(asked.Problems, "branches"))
+	require.Equal(t, http.StatusOK, preview.Status, preview.Envelope.Err)
+	require.Equal(t, http.StatusOK, applied.Status, applied.Envelope.Err)
+	assert.DirExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-x"))
+}
+
 func TestListIsReadThroughTheCatalogueWithNoOperation(t *testing.T) {
 	main := configured(t)
 	t.Setenv("HOME", t.TempDir())
@@ -78,6 +101,9 @@ func TestListIsReadThroughTheCatalogueWithNoOperation(t *testing.T) {
 	require.Equal(t, http.StatusOK, read.Status, read.Envelope.Err)
 	require.Len(t, read.Envelope.Items, 1)
 	assert.Equal(t, "main", read.Envelope.Items[0].Subject)
+	detail, ok := read.Envelope.Items[0].Detail.(*list.Detail)
+	require.True(t, ok)
+	assert.Equal(t, "go", detail.Actions[0].Command, "a worktree's actions are commands a surface runs with their answers")
 	assert.Empty(t, read.Envelope.Op)
 	assert.NoDirExists(t, filepath.Join(main, ".git", "wtm", "ops"))
 }

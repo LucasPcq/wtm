@@ -6,6 +6,7 @@ import (
 	"errors"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,6 +54,8 @@ type Detail struct {
 	Origin       *Origin    `json:"origin"`     // null when origin has no branch of that name
 	PR           *PR        `json:"pr"`         // null without one, or when GitHub was not asked
 	Services     []string   `json:"services"`   // the jobs up in it, null when that cannot be told
+	// Actions are what may be done next with it, as Offers lists them, each the command that does it and its answers.
+	Actions []domain.FollowUp `json:"actions"`
 }
 
 // Origin is where a worktree's branch stands against origin's.
@@ -243,6 +246,33 @@ func Offers(detail Detail) []Action {
 	}
 
 	return actions
+}
+
+// PathWorktree is the path of the answer an action's command takes: the worktree, by its branch or, on no branch, its path.
+const PathWorktree = "worktree"
+
+// ParamNumber is the param of the action that opens a pull request: its number, beside its URL.
+const ParamNumber = "number"
+
+// commands name the wtm command each action runs, as its command line spells it after the program's name; opening a pull request runs none.
+var commands = map[Action]string{
+	ActionGo:      "go",
+	ActionRunUp:   "run up",
+	ActionRunDown: "run down",
+	ActionLogs:    "run logs",
+	ActionClean:   "clean",
+}
+
+// FollowUpOf is action on the worktree of detail as the follow-up that carries it out, with its code and its label: its wtm command and answers, or the URL of its pull request and its number; its Argv is left to the surface that spells it.
+func FollowUpOf(action Action, detail Detail) domain.FollowUp {
+	followUp := domain.FollowUp{Code: Name + "." + string(action), Message: Labels[action]}
+	if action == ActionOpenPR && detail.PR != nil {
+		followUp.URL, followUp.Params = detail.PR.URL, domain.Params{ParamNumber: strconv.Itoa(detail.PR.Number)}
+		return followUp
+	}
+
+	followUp.Command, followUp.Answers = commands[action], []domain.Answered{{Path: PathWorktree, Values: []string{cmp.Or(detail.Branch, detail.Path)}}}
+	return followUp
 }
 
 // Labels are what each action reads as in the picker, and as the note of its follow-up.

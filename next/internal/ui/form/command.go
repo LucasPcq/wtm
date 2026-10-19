@@ -262,7 +262,7 @@ func (c *Command[R, Q, O]) Launch(cmd *cobra.Command, args []string, conclude fu
 	ctx := cmd.Context()
 	app, err := c.Open(ctx, c.io.Env.ProjectDir)
 	if err != nil {
-		return c.io.Refuse(domain.AsError(domain.AsErrorParams{Err: err}), c.Argv(cmd.CommandPath(), req))
+		return c.io.Refuse(domain.AsError(domain.AsErrorParams{Err: err}), c.rerun(cmd, req))
 	}
 
 	progress := c.io.Progress(ctx)
@@ -309,17 +309,18 @@ func (c *Command[R, Q, O]) Ask(ctx context.Context, params AskParams[R, Q, O]) (
 // Conclude prints how the run ended — the JSON envelope, a refusal, the dry run and the line that applies it, or the outcome Draw draws — and returns the failure that sets the exit code.
 func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error) error {
 	failure := domain.AsError(domain.AsErrorParams{Err: err})
-	argv := c.Argv(cmd.CommandPath(), ran.Request)
+	rerun := c.rerun(cmd, ran.Request)
 	if !c.io.Human() {
 		doc := ran.Outcome.Envelope(c.io.Command, failure)
-		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, argv)...)
+		doc.FollowUps = append(doc.FollowUps, uicli.Replan(doc.Err, rerun)...)
 		return c.io.Envelope(doc)
 	}
 
 	stdout, _ := c.io.Writers()
+	argv := rerun.Argv
 	switch {
 	case failure != nil:
-		return c.io.Refuse(failure, argv)
+		return c.io.Refuse(failure, rerun)
 	case !ran.Outcome.Applied():
 		previewed, fingerprint := c.Preview(ran.Outcome), ran.Outcome.PlanFingerprint()
 		output.Frame(stdout, func(w io.Writer) {
@@ -339,6 +340,22 @@ func applyLine(argv []string, fingerprint string) string {
 
 // ----------------------------------------------------------------------------
 // The command line
+
+// rerun is the follow-up that runs req again: the command, the request's answers, and its command line as cmd spells it.
+func (c *Command[R, Q, O]) rerun(cmd *cobra.Command, req R) domain.FollowUp {
+	var paths []string
+	for _, field := range c.schema().Fields {
+		paths = append(paths, field.Spec().Path)
+	}
+	var answers []domain.Answered
+	for _, path := range append(paths, domain.PathRemember, domain.PathAsk) {
+		if values := req.Values(path); values != nil {
+			answers = append(answers, domain.Answered{Path: path, Values: values})
+		}
+	}
+
+	return domain.FollowUp{Command: c.io.Command, Answers: answers, Argv: c.Argv(cmd.CommandPath(), req)}
+}
 
 // Argv spells command and req word by word, unquoted: the positional field's words, each flag given sorted by name, then --ask.
 func (c *Command[R, Q, O]) Argv(command string, req R) []string {

@@ -18,7 +18,7 @@ func TestAReadIsReportedWithoutOperationPlanNorFingerprint(t *testing.T) {
 			Path string `json:"path"`
 		}{"/trees/feat-x"}}},
 		Warnings:  []Warning{{Code: "list.prs_unavailable", Message: "GitHub not connected"}},
-		FollowUps: []FollowUp{{Argv: []string{"wtm", "go", "feat/x"}}},
+		FollowUps: []FollowUp{{Command: "go", Answers: []Answered{{Path: "worktree", Values: []string{"feat/x"}}}, Argv: []string{"wtm", "go", "feat/x"}, Code: "list.go", Message: "Go to the worktree"}},
 	}
 
 	data, err := json.Marshal(read.Envelope("list", nil))
@@ -26,7 +26,7 @@ func TestAReadIsReportedWithoutOperationPlanNorFingerprint(t *testing.T) {
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"v": 2, "command": "list", "ok": true,
 		"items": [{"subject": "feat/x", "status": "done", "detail": {"path": "/trees/feat-x"}}],
-		"follow_ups": [{"argv": ["wtm", "go", "feat/x"], "code": "", "message": ""}],
+		"follow_ups": [{"command": "go", "answers": [{"path": "worktree", "values": ["feat/x"]}], "code": "list.go", "message": "Go to the worktree"}],
 		"warnings": [{"code": "list.prs_unavailable", "message": "GitHub not connected"}]}`, string(data))
 }
 

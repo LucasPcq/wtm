@@ -149,7 +149,7 @@ func TestAnInvalidRequestNamesEachFieldByItsPathAndItsFlag(t *testing.T) {
 func TestAFailureLeftBehindCarriesItsFollowUp(t *testing.T) {
 	stuck := &domain.Error{
 		Kind: domain.KindInternal, Code: "unit.undo_failed", Message: "could not remove the worktree, left behind: worktree", Params: domain.Params{"left": "worktree"},
-		FollowUp: &domain.FollowUp{Argv: []string{"wtm", "clean", "feat/x", "--force"}, Code: "provision.left_behind", Message: "branch feat/x is left half-created", Params: domain.Params{"branch": "feat/x", "path": "/p"}},
+		FollowUp: &domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: "worktree", Values: []string{"feat/x"}}}, Argv: []string{"wtm", "clean", "feat/x", "--force"}, Code: "provision.left_behind", Message: "branch feat/x is left half-created", Params: domain.Params{"branch": "feat/x", "path": "/p"}},
 		Cause:    errors.New("env failed: disk full"),
 	}
 
@@ -157,7 +157,7 @@ func TestAFailureLeftBehindCarriesItsFollowUp(t *testing.T) {
 		"v": 2, "command": "create", "ok": false,
 		"follow_ups": [], "warnings": [],
 		"error": {"kind": "internal", "code": "unit.undo_failed", "message": "could not remove the worktree, left behind: worktree: env failed: disk full", "params": {"left": "worktree"},
-			"follow_up": {"argv": ["wtm", "clean", "feat/x", "--force"], "code": "provision.left_behind", "message": "branch feat/x is left half-created", "params": {"branch": "feat/x", "path": "/p"}}}
+			"follow_up": {"command": "clean", "answers": [{"path": "worktree", "values": ["feat/x"]}], "code": "provision.left_behind", "message": "branch feat/x is left half-created", "params": {"branch": "feat/x", "path": "/p"}}}
 	}`, enveloped(t, create.Outcome{}, stuck))
 }
 

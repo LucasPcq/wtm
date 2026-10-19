@@ -115,9 +115,17 @@ func TestAStalePlanInJSONFollowsUpWithItsReplan(t *testing.T) {
 
 	got, _ := concluded(t, uicli.OutputJSON, form.Ran[request, outcome]{Request: request{"branches": {"feat/a"}}}, stale)
 
-	assert.Contains(t, got, `"argv": [
-        "fake",
-        "feat/a",
-        "--dry-run"
-      ]`)
+	assert.Contains(t, got, `"follow_ups": [
+    {
+      "command": "fake",
+      "answers": [
+        {
+          "path": "branches",
+          "values": [
+            "feat/a"
+          ]
+        }
+      ],
+      "dry_run": true,
+      "code": "plan.replan",`)
 }

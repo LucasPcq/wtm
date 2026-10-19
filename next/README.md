@@ -33,7 +33,7 @@ internal/
     form/              a command's form, generic over its schema: form.Command (its flags, its request, its launch, the conclusion of its run, its command line), form.Query (the same for a read, with its picker), the session and a step per field kind, the wizard that walks them to a recap and applies, or to the last step of a read's picker
     widget/            the inputs a step asks with: select list, multi-select, text field, text list, their styles
     formtest/          for a command's tests: the driver that plays its wizard key by key, golden files, the v2 envelope decoded
-  api/                 the catalogue of the commands, knowing none of them: each one's name, its schema (domain.Form) and its execution, a JSON request in and a domain.Envelope out with the status of its kind, for a surface other than the command line
+  api/                 the catalogue of the commands, knowing none of them: each one's name, its schema (domain.Form), its questions as the repository stands and its execution, the answers by field (and an optional JSON request) in and a domain.Envelope out with the status of its kind, for a surface other than the command line
 ```
 No file format lives in `domain/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `domain/project`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
 
@@ -78,11 +78,11 @@ A use case or a service declares the ports it needs in its `port.go`, interface 
 6. `adapter/git/worktree.go → Repo.AddWorktree`: the port's implementation runs `git worktree add`.
 7. Back in `ui/form/command.go → Command.Conclude`: a refusal, or the dry run drawn from create's `Preview` (`command/create/cli/output.go → preview`) and ended on the line that applies exactly that plan, or the outcome create's `Draw` draws (`output.go → drawOutcome`) with the kit of `ui/output`; with `--output json`, `create.Outcome.Envelope` (`domain.Outcome.Envelope`) reports the run as a `domain.Envelope`, which `ui/output.Envelope` writes with each field spelled as its flag.
 
-A second command is its own `command/<name>/` (use case, ports, rules, questions, `cli/`) and one line in each list of `cmd/wtm-next`: its constructor in `main.go`'s `Commands`, its opener in `project.go` (`opener(func(a app) <name>.UseCase { return a.<Name> })`), its binding in `catalogue.go` (`api.Bind(<name>.Name, Questions{}.Form(), open, UseCase.Run)`), its adapters wired in `wire.go`. `registration_test.go` fails when a command of `main.go` is missing from the catalogue or from the wiring.
+A second command is its own `command/<name>/` (use case, ports, rules, questions, `cli/`) and one line in each list of `cmd/wtm-next`: its constructor in `main.go`'s `Commands`, its opener in `project.go` (`opener(func(a app) <name>.UseCase { return a.<Name> })`), its binding in `catalogue.go` (`api.Bind(<name>.Name, open, UseCase.Questions, UseCase.Run)`), its adapters wired in `wire.go`. `registration_test.go` fails when a command of `main.go` is missing from the catalogue or from the wiring, and `catalogue_test.go` when one asks no questions through it.
 
 A read, `command/list`, walks the same hops with a `form.Query` in place of a `form.Command`, under the contract of a read (`.claude/skills/go-architecture/references/contract.md`, "A read").
 
-Todo: the follow-up a read's picker ends on is printed by `form.Query`; once every command it names has migrated, it runs in this process instead, built from that command's schema rather than `listCommands`' argv (`cmd/wtm-next`).
+Todo: the follow-up a read's picker ends on is printed by `form.Query`; once every command it names has migrated, it runs in this process instead (`api.Catalogue.Find(followUp.Command)` with its answers), and its command line is spelled from that command's schema rather than by `commandLine` (`cmd/wtm-next/wire.go`).
 
 ## Comments
 

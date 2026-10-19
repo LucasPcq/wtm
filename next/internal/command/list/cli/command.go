@@ -34,7 +34,7 @@ type query = form.Query[list.Request, list.Questions, list.Outcome]
 type listCommand struct {
 	io    uicli.Run
 	query *query
-	app   list.UseCase // the use case opened, for the picker's follow-ups
+	app   list.UseCase // the use case opened, for the picker to read again
 }
 
 // listFlags spells the failures: list's only field is a flag.

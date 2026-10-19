@@ -40,8 +40,8 @@ type picker struct {
 	cwd      string
 	withPRs  bool
 	worktree string
-	picked   list.Detail // the worktree picked, as it was read then
-	action   list.Action
+	picked   list.Detail     // the worktree picked, as it was read then
+	action   domain.FollowUp // the action picked of those it offers
 }
 
 // script walks the worktree, then the action; the pull requests land later unless the request asked for them.
@@ -53,10 +53,10 @@ func (p *picker) script() form.Script {
 	return script
 }
 
-// chosen is the read shown, with the command line of the action picked on the worktree picked as its follow-up.
+// chosen is the read shown, with the action picked on the worktree picked as its follow-up.
 func (p *picker) chosen() list.Outcome {
 	chosen := p.read
-	chosen.FollowUps = []domain.FollowUp{p.app.FollowUp(p.picked, p.action)}
+	chosen.FollowUps = []domain.FollowUp{p.action}
 	return chosen
 }
 
@@ -86,7 +86,7 @@ func (p *picker) later(ctx context.Context) (func(), error) {
 	}, err
 }
 
-// withPullRequests is shown with the pull request of each worktree as from read has it, and the warnings of asking GitHub.
+// withPullRequests is shown with the pull request of each worktree as from read has it, and what it offers with it, and the warnings of asking GitHub.
 func withPullRequests(shown, from list.Outcome) list.Outcome {
 	merged := shown
 	merged.Items = slices.Clone(shown.Items)
@@ -96,7 +96,7 @@ func withPullRequests(shown, from list.Outcome) list.Outcome {
 			continue
 		}
 		detail := *item.Detail
-		detail.PR = from.Items[at].Detail.PR
+		detail.PR, detail.Actions = from.Items[at].Detail.PR, from.Items[at].Detail.Actions
 		merged.Items[i].Detail = &detail
 	}
 
@@ -159,7 +159,7 @@ func (s *worktreeStep) build() *widget.SelectList {
 	active := list.Holding(s.p.read.Items, s.p.cwd)
 	var options []widget.Option
 	for _, item := range s.p.read.Items {
-		if item.Detail != nil && len(list.Offers(*item.Detail)) > 0 {
+		if item.Detail != nil && len(item.Detail.Actions) > 0 {
 			options = append(options, widget.Option{Label: shown(item, s.p.cwd), Value: item.Subject, Badge: badge(cellsOf(*item.Detail, item.Subject == active, plain))})
 		}
 	}
@@ -206,12 +206,12 @@ func (s *actionStep) Label() string { return actionLabel }
 
 func (s *actionStep) Description() string { return "What to do with " + s.p.worktree }
 
-func (s *actionStep) Standing() form.Standing { return form.Standing{Value: list.Labels[s.p.action]} }
+func (s *actionStep) Standing() form.Standing { return form.Standing{Value: s.p.action.Message} }
 
 func (s *actionStep) Open() tea.Cmd {
 	var options []widget.Option
-	for _, action := range list.Offers(s.p.picked) {
-		options = append(options, widget.Option{Label: list.Labels[action], Value: string(action)})
+	for _, action := range s.p.picked.Actions {
+		options = append(options, widget.Option{Label: action.Message, Value: action.Code})
 	}
 	s.list = widget.NewSelectList(widget.SelectParams{Options: options})
 	return nil
@@ -220,8 +220,11 @@ func (s *actionStep) Open() tea.Cmd {
 func (s *actionStep) Widget() widget.Widget { return s.list }
 
 func (s *actionStep) Answer() string {
-	s.p.action = list.Action(s.list.Value())
-	return list.Labels[s.p.action]
+	at := slices.IndexFunc(s.p.picked.Actions, func(action domain.FollowUp) bool { return action.Code == s.list.Value() })
+	if at >= 0 {
+		s.p.action = s.p.picked.Actions[at]
+	}
+	return s.p.action.Message
 }
 
-func (s *actionStep) Reset() { s.p.action = "" }
+func (s *actionStep) Reset() { s.p.action = domain.FollowUp{} }

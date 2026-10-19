@@ -8,10 +8,11 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEachCallOpensTheUseCaseOnItsDirectory(t *testing.T) {
-	greet := Bind("greet", domain.Form{}, func(_ context.Context, dir string) (useCase, error) { return useCase{dir: dir}, nil }, useCase.Run)
+	greet := greet(func(_ context.Context, dir string) (useCase, error) { return useCase{dir: dir}, nil })
 
 	first := greet.Execute(t.Context(), Call{Dir: "/a", Request: json.RawMessage(`{"name": "x"}`)})
 	second := greet.Execute(t.Context(), Call{Dir: "/b", Request: json.RawMessage(`{"name": "y"}`), Options: domain.RunOptions{Surface: "desktop"}})
@@ -31,7 +32,7 @@ func TestARefusalHasTheStatusOfItsKind(t *testing.T) {
 		"unheard of":            http.StatusInternalServerError,
 	} {
 		refusing := useCase{refusal: &domain.Error{Kind: kind, Code: "greet.refused"}}
-		greet := Bind("greet", domain.Form{}, func(context.Context, string) (useCase, error) { return refusing, nil }, useCase.Run)
+		greet := greet(func(context.Context, string) (useCase, error) { return refusing, nil })
 
 		got := greet.Execute(t.Context(), Call{Dir: "/repo", Request: json.RawMessage(`{}`)})
 
@@ -42,7 +43,7 @@ func TestARefusalHasTheStatusOfItsKind(t *testing.T) {
 
 func TestARequestIsDecodedStrictly(t *testing.T) {
 	opened := false
-	greet := Bind("greet", domain.Form{}, func(context.Context, string) (useCase, error) { opened = true; return useCase{}, nil }, useCase.Run)
+	greet := greet(func(context.Context, string) (useCase, error) { opened = true; return useCase{}, nil })
 
 	for request, message := range map[string]string{
 		`{"nmae": "x"}`:               `invalid greet request: json: unknown field "nmae"`,
@@ -60,7 +61,7 @@ func TestARequestIsDecodedStrictly(t *testing.T) {
 
 func TestADirectoryThatIsNotAbsoluteIsRefusedBeforeAnythingOpens(t *testing.T) {
 	opened := false
-	greet := Bind("greet", domain.Form{}, func(context.Context, string) (useCase, error) { opened = true; return useCase{}, nil }, useCase.Run)
+	greet := greet(func(context.Context, string) (useCase, error) { opened = true; return useCase{}, nil })
 
 	for _, dir := range []string{"", ".", "repo/main"} {
 		got := greet.Execute(t.Context(), Call{Dir: dir, Request: json.RawMessage(`{"name": "x"}`)})
@@ -68,6 +69,53 @@ func TestADirectoryThatIsNotAbsoluteIsRefusedBeforeAnythingOpens(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, got.Status, dir)
 		assert.Equal(t, domain.CodeInvalidRequest, got.Envelope.Err.Code, dir)
 	}
+	assert.False(t, opened)
+}
+
+func TestAnswersAreFoldedOverTheRequestAsTheCommandLineFoldsItsFlags(t *testing.T) {
+	greet := greet(func(_ context.Context, dir string) (useCase, error) { return useCase{dir: dir}, nil })
+
+	answered := greet.Execute(t.Context(), Call{Dir: "/a", Answers: []domain.Answered{{Path: "name", Values: []string{"x"}}}})
+	over := greet.Execute(t.Context(), Call{Dir: "/a", Request: json.RawMessage(`{"name": "y", "loud": true}`), Answers: []domain.Answered{{Path: "name", Values: []string{"x"}}}})
+
+	assert.Equal(t, http.StatusOK, answered.Status)
+	assert.Equal(t, "/a:x:api", answered.Envelope.Op)
+	assert.Equal(t, "/a:x:api", over.Envelope.Op)
+}
+
+func TestAnAnswerTheRequestRefusesIsRefusedByItsPath(t *testing.T) {
+	opened := false
+	greet := greet(func(context.Context, string) (useCase, error) { opened = true; return useCase{}, nil })
+
+	got := greet.Execute(t.Context(), Call{Dir: "/repo", Answers: []domain.Answered{{Path: "nmae", Values: []string{"x"}}}})
+
+	assert.Equal(t, http.StatusBadRequest, got.Status)
+	require.NotNil(t, got.Envelope.Err)
+	require.Len(t, got.Envelope.Err.Fields, 1)
+	assert.Equal(t, "nmae", got.Envelope.Err.Fields[0].Path)
+	assert.Equal(t, domain.CodeUnknown, got.Envelope.Err.Fields[0].Code)
+	assert.False(t, opened)
+}
+
+func TestTheQuestionsAreAskedOfTheRequestAnsweredOnTheCallsDirectory(t *testing.T) {
+	greet := greet(func(_ context.Context, dir string) (useCase, error) { return useCase{dir: dir}, nil })
+
+	asked, err := greet.Questions(t.Context(), Call{Dir: "/a", Answers: []domain.Answered{{Path: "name", Values: []string{"x"}}}})
+
+	require.NoError(t, err)
+	assert.Equal(t, "/a:x", asked.Fields[0].Spec().Label)
+	assert.Empty(t, greet.Form.Fields[0].Spec().Label, "the catalogue lists the form of zero questions")
+}
+
+func TestTheQuestionsOfAnInvalidCallAreRefusedBeforeAnythingOpens(t *testing.T) {
+	opened := false
+	greet := greet(func(context.Context, string) (useCase, error) { opened = true; return useCase{}, nil })
+
+	_, relative := greet.Questions(t.Context(), Call{Dir: "repo"})
+	_, unknown := greet.Questions(t.Context(), Call{Dir: "/repo", Request: json.RawMessage(`{"nmae": "x"}`)})
+
+	assert.Equal(t, domain.KindInvalid, domain.AsError(domain.AsErrorParams{Err: relative}).Kind)
+	assert.Equal(t, domain.KindInvalid, domain.AsError(domain.AsErrorParams{Err: unknown}).Kind)
 	assert.False(t, opened)
 }
 

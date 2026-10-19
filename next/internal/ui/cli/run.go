@@ -63,18 +63,20 @@ func (r *Run) FailWith(failure *domain.Error, next []output.NextStep) error {
 	return r.fail(failure, nil, next)
 }
 
-// Refuse prints failure as FailWith does, followed by what [Replan] makes of argv, the command line of the request: in the envelope's follow_ups with --output json.
-func (r *Run) Refuse(failure *domain.Error, argv []string) error {
-	return r.fail(failure, Replan(failure, argv), nil)
+// Refuse prints failure as FailWith does, followed by what [Replan] makes of request, the follow-up that runs the request again: in the envelope's follow_ups with --output json.
+func (r *Run) Refuse(failure *domain.Error, request domain.FollowUp) error {
+	return r.fail(failure, Replan(failure, request), nil)
 }
 
-// Replan returns the follow-up of a stale plan: argv, the command line of the request, run again with --dry-run to preview the plan the facts give now; none for any other failure.
-func Replan(failure *domain.Error, argv []string) []domain.FollowUp {
+// Replan returns the follow-up of a stale plan: request, the follow-up that runs the request again, as a dry run that previews the plan the facts give now, its command line with --dry-run; none for any other failure.
+func Replan(failure *domain.Error, request domain.FollowUp) []domain.FollowUp {
 	if failure == nil || failure.Code != domain.CodePlanStale {
 		return nil
 	}
 
-	return []domain.FollowUp{{Argv: append(slices.Clone(argv), "--"+FlagDryRun), Code: domain.CodeReplan, Message: output.ReplanNote}}
+	request.DryRun, request.Argv = true, append(slices.Clone(request.Argv), "--"+FlagDryRun)
+	request.Code, request.Message = domain.CodeReplan, output.ReplanNote
+	return []domain.FollowUp{request}
 }
 
 func (r *Run) fail(failure *domain.Error, followUps []domain.FollowUp, next []output.NextStep) error {

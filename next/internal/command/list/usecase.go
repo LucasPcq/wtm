@@ -26,7 +26,7 @@ const CodeConfigInvalid = Name + repository.ConfigInvalid
 // stateReaders bounds the worktrees read at once, each costing a few git commands.
 const stateReaders = 8
 
-// A UseCase lists the worktrees of one repository: the ports it reads them through, the service that reads the repository, and the command lines of the actions a worktree offers.
+// A UseCase lists the worktrees of one repository: the ports it reads them through, the service that reads the repository, and how the command line spells the actions a worktree offers.
 type UseCase struct {
 	Git          Git
 	Meta         Meta
@@ -58,14 +58,34 @@ func (u UseCase) Run(ctx context.Context, req Request, _ domain.RunOptions) (Out
 		return Outcome{}, err
 	}
 
-	// 3. Report each worktree, the main one first.
+	// 3. Report each worktree, the main one first, with what it offers.
 	items, warnings := List(facts)
+	for _, item := range items {
+		if item.Detail != nil {
+			item.Detail.Actions = u.actions(*item.Detail)
+		}
+	}
 	return Outcome{Items: items, Warnings: warnings}, nil
 }
 
-// FollowUp is the command line that carries out action on the worktree of detail, as the next step of a read.
-func (u UseCase) FollowUp(detail Detail, action Action) domain.FollowUp {
-	return domain.FollowUp{Argv: u.Commands(action, detail), Code: Name + "." + string(action), Message: Labels[action]}
+// actions are the follow-ups the worktree of detail offers, each with the command line that carries it out.
+func (u UseCase) actions(detail Detail) []domain.FollowUp {
+	actions := []domain.FollowUp{}
+	for _, action := range Offers(detail) {
+		followUp := FollowUpOf(action, detail)
+		followUp.Argv = u.Commands(followUp)
+		actions = append(actions, followUp)
+	}
+
+	return actions
+}
+
+// ----------------------------------------------------------------------------
+// Questions
+
+// Questions is list's form: a read, it asks nothing the repository decides.
+func (u UseCase) Questions(context.Context, Request) (Questions, error) {
+	return Questions{}, nil
 }
 
 // ----------------------------------------------------------------------------

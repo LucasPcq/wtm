@@ -2,11 +2,13 @@ package list_test
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -74,9 +76,7 @@ func newWorld(s seed) world {
 				return s.PRs, s.PRsErr
 			},
 			Repository: repository.Service{Config: configured{config: config, err: s.ConfigErr}, Git: git, MainPath: mainPath},
-			Commands: func(action list.Action, detail list.Detail) []string {
-				return []string{"wtm", string(action), detail.Branch}
-			},
+			Commands:   spelled,
 		},
 		git:   git,
 		meta:  meta,
@@ -99,4 +99,16 @@ func (s snapshotOf) Snapshot(ctx context.Context) (worktree.Snapshot, error) {
 	snapshot, err := s.git.Snapshot(ctx)
 	snapshot.Worktrees = s.worktrees
 	return snapshot, err
+}
+
+// spelled is a command line made of the command's words, then each answer's values, or a link opened.
+func spelled(followUp domain.FollowUp) []string {
+	if followUp.URL != "" {
+		return []string{"open", followUp.URL}
+	}
+	argv := append([]string{"wtm"}, strings.Fields(followUp.Command)...)
+	for _, answer := range followUp.Answers {
+		argv = append(argv, answer.Values...)
+	}
+	return argv
 }

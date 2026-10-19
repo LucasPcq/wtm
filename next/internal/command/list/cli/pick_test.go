@@ -23,7 +23,7 @@ func TestThePickerAsksAWorktreeThenWhatToDoWithIt(t *testing.T) {
 	d.Keys("down", "enter")
 
 	assert.Equal(t, form.Finished, d.Wizard.Ending())
-	assert.Equal(t, []domain.FollowUp{{Argv: []string{"wtm", "open_pr", "feat/b"}, Code: "list.open_pr", Message: "Open the pull request"}}, d.p.chosen().FollowUps)
+	assert.Equal(t, []domain.FollowUp{{URL: "https://github.com/acme/acme/pull/12", Argv: []string{"open", "https://github.com/acme/acme/pull/12"}, Code: "list.open_pr", Message: "Open the pull request", Params: domain.Params{list.ParamNumber: "12"}}}, d.p.chosen().FollowUps)
 }
 
 func TestLeavingThePickerCancels(t *testing.T) {

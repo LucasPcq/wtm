@@ -39,7 +39,7 @@ next/
 | is an in-memory stand-in for an adapter, for tests | `adapter/<name>test/` |
 | checks a promise every use case keeps, for tests | `service/<name>test/` (`operationtest.Contract`) |
 | chooses which adapter backs which port | `cmd/wtm-next/wire.go` |
-| names another command's command line (a follow-up) | injected from `cmd/wtm-next`, the only package that knows every command |
+| names another command (a follow-up) | a `domain.FollowUp` of that command's name and answers; its command line is spelled by a function `cmd/wtm-next` injects, the only package that knows every command |
 
 Share on the second user, not before: until a second command needs it, code stays in its slice.
 
