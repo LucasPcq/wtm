@@ -11,7 +11,7 @@
 | `YesUsage` | the usage of `--yes`, saying what an unattended run requires |
 | `Open` | `form.Opener[R, Q, O](open)`: the project's use case as a `form.UseCase[R, Q, O]` (its `Questions` and `Run`) |
 | `Preview(previewed) form.Preview` | the plan not yet applied: `Rows` (`output.PlanRow`, each answer with its mark), `Warnings`, `Recalled` (the fields answered from memory, which the recap's hint names). The recap and the dry run both draw it. |
-| `Draw(w, applied, env)` | the outcome of an apply, paths shown from `env.Cwd`, follow-ups spelled by `env.CommandLine` (`output.FollowUpStep`) |
+| `Draw(w, applied, view)` | the outcome of an apply, drawn from `output.View`: paths shown from `view.Cwd`, follow-ups spelled by `view.CommandLine` (`output.FollowUpStep`); `form.Query.Draw` takes the same view |
 | `ApplyLabel(previewed)` | the recap's option that applies, nil for "Yes, apply" |
 | `Special(session, at, field)` | the command's own step for a field, nil for the step of its kind |
 
@@ -21,7 +21,7 @@
 
 - `Bind(cmd, &run)`: registers each field's flag and usage from `Q{}.Form()` by its kind, plus `--remember` when a field is rememberable, `--ask`, `--yes`, `--output`, `--dry-run`, `--expect-fingerprint` (`uicli.FlagDryRun`, `uicli.FlagExpectFingerprint`).
 - `Launch(cmd, args, conclude)`: refuses an invalid `--output` or correlation ID, turns the command line into `R` and `domain.RunOptions`, opens the use case on the project's directory, runs the wizard when the user can see and answer it (`Streams.CanPrompt`, human output, no `--yes` nor `--expect-fingerprint`), else `UseCase.Run` with its progress; hands the `form.Ran{Request, Outcome}` and the error to `conclude`.
-- `Conclude(cmd, ran, err)`, in order: the JSON envelope (with `uicli.Replan` on a stale plan); a refusal; the framed dry run from `Preview` with the line that applies it (`--expect-fingerprint <hash>`); the outcome from `Draw`; then the failure the apply ended on, which sets the exit code.
+- `Conclude(cmd, ran, err)`, in order: the JSON envelope (with `domain.Replan` on a stale plan); a refusal; the framed dry run from `Preview` with the line that applies it (`--expect-fingerprint <hash>`); the outcome from `Draw`; then the failure the apply ended on, which sets the exit code.
 - `Argv(command, req)`: spells the request back as a command line from `R.Values` (the apply line, the `--dry-run` replay).
 
 A cli's run is `c.form.Launch(cmd, args, c.form.Conclude)`. An end case of its own wraps `Conclude` and hands it everything else: extract's "nothing to extract" (`command/extract/cli/command.go`, `conclude`).

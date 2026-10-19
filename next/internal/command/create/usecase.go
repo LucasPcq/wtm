@@ -23,6 +23,9 @@ const Name = "create"
 // CodeConfigNotFound refuses a repository with no wtm config: `wtm init` has not run there.
 const CodeConfigNotFound = Name + repository.ConfigNotFound
 
+// CodeGo is the step into a worktree an apply ends on.
+const CodeGo = Name + ".go"
+
 // CodeConfigInvalid refuses a repository whose config.toml does not parse or validate.
 const CodeConfigInvalid = Name + repository.ConfigInvalid
 
@@ -119,11 +122,12 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // ----------------------------------------------------------------------------
 // Apply
 
-// Apply carries out the plan, reporting each step: it fast-forwards the sources asked, provisions each branch in turn, a failure stopping none of the others, and remembers the answers asked once a worktree is created. Once ctx is cancelled, the branches not yet started are skipped.
+// Apply carries out the plan, reporting each step: it fast-forwards the sources asked, provisions each branch in turn, a failure stopping none of the others, and remembers the answers asked once a worktree is created; it ends on the step into each worktree that stands. Once ctx is cancelled, the branches not yet started are skipped.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	advanced, warnings := u.fastForward(ctx, plan, report)
 
 	items := make([]Item, 0, len(plan.Branches))
+	var next []domain.FollowUp
 	for _, planned := range plan.Branches {
 		item := u.item(ctx, plan, planned, report)
 		if item.Detail != nil && slices.Contains(advanced, item.Subject) {
@@ -133,10 +137,16 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 			item.Warnings = append([]domain.Warning{behindOrigin(item.Detail.Standing)}, item.Warnings...)
 		}
 		items = append(items, item)
+		// a worktree that stands can be entered, done or not
+		if item.Detail != nil {
+			enter := domain.Enter(item.Subject)
+			enter.Code = CodeGo
+			next = append(next, enter)
+		}
 	}
 
 	remembered, failed := u.remember(ctx, plan, items)
-	return Result{Items: items, Warnings: append(warnings, failed...), Remembered: remembered}
+	return Result{Items: items, Warnings: append(warnings, failed...), Remembered: remembered, FollowUps: next}
 }
 
 // ----------------------------------------------------------------------------

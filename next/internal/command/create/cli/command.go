@@ -47,11 +47,11 @@ type createCommand struct {
 	form *createForm
 }
 
-// New returns the create command: its flags become a create.Request, answered in the wizard when the user can see and answer it, else run unattended; it draws the outcome on streams, or the v2 JSON envelope with --output json.
-func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (create.UseCase, error)) *cobra.Command {
+// New returns the create command: its flags become a create.Request, answered in the wizard when the user can see and answer it, else run unattended; it draws the outcome on streams, or the v2 JSON envelope with --output json, its follow-ups spelled by commandLine.
+func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (create.UseCase, error), commandLine output.CommandLine) *cobra.Command {
 	// exits are the exit codes of create's own codes, ahead of those of their kind.
 	exits := map[string]int{create.CodeConfigNotFound: uicli.ExitConfigNotFound, create.CodeConfigInvalid: uicli.ExitError}
-	c := &createCommand{io: uicli.Run{Command: create.Name, Streams: streams, Env: env, Flags: createFlags, Exits: exits}, form: newForm(open)}
+	c := &createCommand{io: uicli.Run{Command: create.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: createFlags, Exits: exits}, form: newForm(open)}
 	cmd := &cobra.Command{Use: create.Name + " [branch...]", Short: createShort, Long: createLong, Example: createExample, Args: cobra.ArbitraryArgs, RunE: c.run}
 	c.form.Bind(cmd, &c.io)
 

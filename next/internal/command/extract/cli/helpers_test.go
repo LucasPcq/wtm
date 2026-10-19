@@ -24,7 +24,7 @@ type printed struct {
 func runExtract(t *testing.T, w world, words ...string) printed {
 	t.Helper()
 	streams, _, stdout, stderr := output.Test()
-	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.env(), w.open)})
+	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.env(), w.open, formtest.CommandLine)})
 	code := uicli.Execute(t.Context(), root, append([]string{"extract"}, words...))
 	return printed{Stdout: stdout.String(), Stderr: stderr.String(), Code: code}
 }
@@ -97,7 +97,7 @@ func unfinished(item extract.Item) extract.Outcome {
 
 func drawn(outcome extract.Outcome) string {
 	var out bytes.Buffer
-	drawOutcome(&out, outcome, uicli.Env{Cwd: "/repo", CommandLine: formtest.CommandLine})
+	drawOutcome(&out, outcome, output.View{Cwd: "/repo", CommandLine: formtest.CommandLine})
 	return out.String()
 }
 

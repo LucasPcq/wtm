@@ -24,7 +24,7 @@ type printed struct {
 func runList(t *testing.T, w world, words ...string) printed {
 	t.Helper()
 	streams, _, stdout, stderr := output.Test()
-	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.env(), w.open)})
+	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.env(), w.open, formtest.CommandLine)})
 	code := uicli.Execute(t.Context(), root, append([]string{list.Name}, words...))
 	return printed{Stdout: stdout.String(), Stderr: stderr.String(), Code: code}
 }

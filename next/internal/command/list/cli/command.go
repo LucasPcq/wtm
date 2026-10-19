@@ -40,11 +40,11 @@ type listCommand struct {
 // listFlags spells the failures: list's only field is a flag.
 var listFlags = (&query{}).Flags()
 
-// New returns the list command: its flags become a list.Request, read, then picked from when the user can see and answer it; it draws the list on streams, or the v2 JSON envelope with --output json.
-func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (list.UseCase, error)) *cobra.Command {
+// New returns the list command: its flags become a list.Request, read, then picked from when the user can see and answer it; it draws the list on streams, or the v2 JSON envelope with --output json, its follow-ups spelled by commandLine.
+func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (list.UseCase, error), commandLine output.CommandLine) *cobra.Command {
 	// exits are the exit codes of list's own codes, ahead of those of their kind.
 	exits := map[string]int{list.CodeConfigNotFound: uicli.ExitConfigNotFound, list.CodeConfigInvalid: uicli.ExitError}
-	c := &listCommand{io: uicli.Run{Command: list.Name, Streams: streams, Env: env, Flags: listFlags, Exits: exits}}
+	c := &listCommand{io: uicli.Run{Command: list.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: listFlags, Exits: exits}}
 	c.query = &query{Open: c.open(open), Draw: drawList, Pick: c.pick}
 	cmd := &cobra.Command{Use: list.Name, Short: listShort, Long: listLong, Example: listExample, Args: cobra.NoArgs, RunE: c.run}
 	c.query.Bind(cmd, &c.io)

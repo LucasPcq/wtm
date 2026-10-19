@@ -197,7 +197,7 @@ func fakeQuery() (*form.Query[request, questions, read], *int) {
 		Open: func(context.Context, string) (form.Reader[request, read], error) {
 			return reader{read: read{Items: []domain.Unit[struct{}]{{Subject: "feat/x", Status: domain.StatusDone}}}}, nil
 		},
-		Draw: func(w io.Writer, got read, _ string) {
+		Draw: func(w io.Writer, got read, _ output.View) {
 			_, _ = io.WriteString(w, "read "+strconv.Itoa(len(got.Items))+"\n")
 		},
 		Pick: func(_ context.Context, got read, _ request, _ *uicli.Run) (read, error) {

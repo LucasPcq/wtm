@@ -21,7 +21,6 @@ var version = "dev"
 func main() {
 	streams := output.System()
 	env := cli.ReadEnv()
-	env.CommandLine = commandLine
 	os.Exit(cli.Main(cli.Params{
 		Version:       version,
 		Streams:       streams,
@@ -32,7 +31,11 @@ func main() {
 	}))
 }
 
-// commands are the command lines of every command wtm-next runs, on streams in env.
+// commands are the command lines of every command wtm-next runs, on streams in env, their follow-ups spelled by commandLine.
 func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
-	return []*cobra.Command{createcli.New(streams, env, openCreate), extractcli.New(streams, env, openExtract), listcli.New(streams, env, openList)}
+	return []*cobra.Command{
+		createcli.New(streams, env, openCreate, commandLine),
+		extractcli.New(streams, env, openExtract, commandLine),
+		listcli.New(streams, env, openList, commandLine),
+	}
 }

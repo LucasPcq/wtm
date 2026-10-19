@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/spf13/cobra"
 )
@@ -30,9 +29,4 @@ func realPath(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return resolvedPath
-}
-
-// rerun is the follow-up that runs create again on branch.
-func rerun(branch string) domain.FollowUp {
-	return domain.FollowUp{Command: "create", Answers: []domain.Answered{{Path: "branches", Values: []string{branch}}}}
 }

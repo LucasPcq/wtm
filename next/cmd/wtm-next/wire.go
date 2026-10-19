@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -99,35 +100,53 @@ func wire(params wireParams) app {
 
 // leftBehind is the repair of a branch an undo left behind, and of its worktree: clean, forced, in the legacy wtm until it migrates.
 func leftBehind(branch string) domain.FollowUp {
-	return domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: list.PathWorktree, Values: []string{branch}}, {Path: "force", Values: []string{"true"}}}}
+	return domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: domain.PathForce, Values: []string{"true"}}}}
 }
 
-// commandLine spells a follow-up naming another command than the one that offers it: a wtm command in the legacy wtm until it migrates, its worktree positional and each answer said true a flag, a worktree on no branch entered with cd, and a pull request opened by gh.
+// commandLine spells a follow-up as the legacy wtm runs it until its command migrates, a worktree on no branch entered with cd, and a pull request opened by gh; nothing for a follow-up with neither a command nor a link.
 func commandLine(followUp domain.FollowUp) []string {
-	if followUp.URL != "" {
-		number, err := strconv.Atoi(followUp.Params[list.ParamNumber])
-		if err != nil {
-			return []string{"gh", "pr", "view", followUp.URL, "--web"}
-		}
-		return github.ViewCommand(number)
+	argv, _ := spelled(followUp)
+	return argv
+}
+
+// spelled is followUp's command line and the paths of the answers it could not spell, which a test requires none of: the worktree is positional, force and a dry run are flags.
+func spelled(followUp domain.FollowUp) (argv, unspelled []string) {
+	if followUp.Command == "" {
+		return pullRequestLine(followUp), nil
 	}
 
 	var worktree, flags []string
 	for _, answer := range followUp.Answers {
 		switch {
-		case answer.Path == list.PathWorktree:
+		case answer.Path == domain.PathWorktree:
 			worktree = answer.Values
-		case len(answer.Values) == 1 && answer.Values[0] == "true":
-			flags = append(flags, "--"+answer.Path)
+		case answer.Path == domain.PathForce && slices.Equal(answer.Values, []string{"true"}):
+			flags = append(flags, "--"+domain.PathForce)
+		default:
+			unspelled = append(unspelled, answer.Path)
 		}
 	}
+	if followUp.DryRun {
+		flags = append(flags, "--dry-run")
+	}
 	// a branch never starts with a slash: an absolute worktree is one on no branch, which wtm go cannot name
-	if followUp.Command == "go" && len(worktree) == 1 && filepath.IsAbs(worktree[0]) {
-		return []string{"cd", worktree[0]}
+	if followUp.Command == domain.CommandGo && len(worktree) == 1 && filepath.IsAbs(worktree[0]) {
+		return []string{"cd", worktree[0]}, unspelled
 	}
 
-	argv := append([]string{"wtm"}, strings.Fields(followUp.Command)...)
-	return append(append(argv, worktree...), flags...)
+	argv = append([]string{"wtm"}, strings.Fields(followUp.Command)...)
+	return append(append(argv, worktree...), flags...), unspelled
+}
+
+// pullRequestLine opens the pull request a follow-up links to: by its number, else by its URL; nothing without either.
+func pullRequestLine(followUp domain.FollowUp) []string {
+	if number, err := strconv.Atoi(followUp.Params[list.ParamNumber]); err == nil {
+		return github.ViewCommand(number)
+	}
+	if followUp.URL == "" {
+		return nil
+	}
+	return []string{"gh", "pr", "view", followUp.URL, "--web"}
 }
 
 // A locker adapts [oplock.Locks] to the port of [operation.Service], whose Take returns an [operation.Hold] where oplock's returns its concrete [*oplock.Held].

@@ -363,7 +363,8 @@ func (p Plan) next(item Item) []domain.FollowUp {
 		return nil
 	}
 
-	goTo := domain.FollowUp{Command: "go", Answers: []domain.Answered{{Path: "worktree", Values: []string{item.Subject}}}, Code: CodeGo}
+	goTo := domain.Enter(item.Subject)
+	goTo.Code = CodeGo
 	if len(item.Detail.Conflicts) > 0 {
 		goTo.Code, goTo.Message = CodeResolveThenDiscard, "resolve the conflicts, then discard the same files in "+p.Source
 		goTo.Params = domain.Params{"source": p.Source, "target": item.Subject}

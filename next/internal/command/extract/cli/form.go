@@ -27,13 +27,10 @@ func newForm(open func(ctx context.Context, dir string) (extract.UseCase, error)
 	}
 }
 
-// applyLabel names the apply of the plan previewed: it creates the target first when the target does not exist.
+// applyLabel names the apply of the plan previewed, which creates the target first when the plan says so.
 func applyLabel(previewed extract.Outcome) string {
-	switch previewed.Plan.Target.Action {
-	case extract.ActionCreate, extract.ActionCheckOut, extract.ActionResume:
+	if previewed.Plan.Creates {
 		return "Yes, create & extract"
-	case extract.ActionExisting:
 	}
-
 	return "Yes, extract"
 }

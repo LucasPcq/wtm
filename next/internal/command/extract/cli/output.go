@@ -6,7 +6,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
-	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
@@ -22,7 +21,7 @@ func drawNothing(w io.Writer, plan extract.Plan) {
 }
 
 // drawOutcome draws what the apply did: the tally, the plan with the target when it stands and the warnings, the target left unfinished followed by its own warnings, and the next steps.
-func drawOutcome(w io.Writer, outcome extract.Outcome, env uicli.Env) {
+func drawOutcome(w io.Writer, outcome extract.Outcome, view output.View) {
 	item, ok := targetOf(outcome)
 	if !ok {
 		return
@@ -45,11 +44,11 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, env uicli.Env) {
 	}
 	var next []output.NextStep
 	if detail != nil {
-		path := output.ShownPath(output.Shown{Cwd: env.Cwd, Path: detail.Path})
+		path := output.ShownPath(output.Shown{Cwd: view.Cwd, Path: detail.Path})
 		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + output.MutedNote(output.SettlementNote(detail.EnvPorts), output.StylesOf(w))}})
 	}
 	for _, followUp := range outcome.Result.FollowUps {
-		next = append(next, output.FollowUpStep(followUp, env.CommandLine))
+		next = append(next, output.FollowUpStep(followUp, view.CommandLine))
 	}
 
 	output.Blank(w)
@@ -63,7 +62,7 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, env uicli.Env) {
 		}
 	}
 
-	next = append(next, output.FollowUpSteps(item.Err, env.CommandLine)...)
+	next = append(next, output.FollowUpSteps(item.Err, view.CommandLine)...)
 	if len(next) > 0 {
 		output.Blank(w)
 		output.NextSteps(w, next)

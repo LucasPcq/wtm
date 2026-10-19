@@ -43,9 +43,9 @@ Pure: no port, no context. `Facts` (what `Observe` read); one decision per subje
 
 Copy `command/create/cli/`; the engine behind it is `form.md`.
 
-- `command.go`: `New(streams, env, open) *cobra.Command` with `Use` from `Name`, `Short`, `Long`, `Example` and `yesUsage`; its `uicli.Run{Command: <name>.Name, Streams, Env, Flags, Exits}`, `Exits` mapping the command's own codes to their exit (`<name>.config_not_found`, `<name>.config_invalid`, extract's conflict); `c.form.Bind(cmd, &c.io)`. Its run is `c.form.Launch(cmd, args, c.form.Conclude)`, or a `conclude` of its own that handles its one end case and hands the rest to `Conclude` (extract's "nothing to extract").
+- `command.go`: `New(streams, env, open, commandLine) *cobra.Command` with `Use` from `Name`, `Short`, `Long`, `Example` and `yesUsage`; its `uicli.Run{Command: <name>.Name, Streams, Env, CommandLine, Flags, Exits}`, `Exits` mapping the command's own codes to their exit (`<name>.config_not_found`, `<name>.config_invalid`, extract's conflict); `c.form.Bind(cmd, &c.io)`. Its run is `c.form.Launch(cmd, args, c.form.Conclude)`, or a `conclude` of its own that handles its one end case and hands the rest to `Conclude` (extract's "nothing to extract").
 - `form.go`: `newForm(open)` returns its `form.Command[Request, Questions, Outcome]` with `YesUsage`, `Open: form.Opener[…](open)`, `Preview`, `Draw`, `ApplyLabel` and `Special` when it has steps of its own; `<name>Flags = newForm(nil).Flags()` spells the failures.
-- `output.go`: `preview` (the plan's recap as `form.Preview`, through `output.RecapRows`) and `drawOutcome` (the apply, with the `ui/output` kit, its follow-ups through `output.FollowUpStep` with `env.CommandLine`). A command builds its recap in `rules.go`, shares the new-worktree rows through `provision.RecapRows`, and its cli has no `planRowsOf` or `anomaliesOf`: it draws what the use case decided, never choosing by code.
+- `output.go`: `preview` (the plan's recap as `form.Preview`, through `output.RecapRows`) and `drawOutcome` (the apply, with the `ui/output` kit, its follow-ups, those of its result included, through `output.FollowUpStep` with `view.CommandLine`). A command builds its recap in `rules.go`, shares the new-worktree rows through `provision.RecapRows`, and its cli has no `planRowsOf` or `anomaliesOf`: it draws what the use case decided, never choosing by code.
 - `steps.go`: only for a field the engine cannot ask by its kind; `special` picks the field by `field.Spec().Path`, and within one path a step may still vary by the field's kind (extract's `toStep`, `command/extract/cli/steps.go`).
 - `testdata/`: goldens for `--help`, the dry run, each outcome, each refusal, each JSON envelope, the wizard's screens, through `ui/formtest`.
 
@@ -55,7 +55,7 @@ No conclusion, envelope or dry-run drawing in a command's `cli/`: they are `form
 
 | File | Line |
 | -- | -- |
-| `main.go` | `<name>cli.New(streams, env, open<Name>)` in `Commands` |
+| `main.go` | `<name>cli.New(streams, env, open<Name>, commandLine)` in `commands` |
 | `project.go` | `open<Name> = opener(func(a app) <name>.UseCase { return a.<Name> })` |
 | `catalogue.go` | `api.Bind(<name>.Name, open<Name>, <name>.UseCase.Questions, <name>.UseCase.Run)` |
 | `wire.go` | its field in `app`, its use case built from the adapters `wire` builds once |

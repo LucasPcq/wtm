@@ -80,36 +80,10 @@ func (p *picker) later(ctx context.Context) (func(), error) {
 	read, err := p.app.Run(ctx, list.Request{WithPRs: true}, domain.RunOptions{Surface: uicli.SurfaceTUI})
 	return func() {
 		if err == nil && !p.withPRs {
-			p.read = p.withPullRequests(read)
+			p.read = list.WithPullRequests(p.read, read)
 		}
 		p.withPRs = true
 	}, err
-}
-
-// withPullRequests is the read shown with the pull request of each worktree as from has it, what it offers then, and the warnings of asking GitHub.
-func (p *picker) withPullRequests(from list.Outcome) list.Outcome {
-	shown := p.read
-	merged := shown
-	merged.Items = slices.Clone(shown.Items)
-	for i, item := range merged.Items {
-		at := slices.IndexFunc(from.Items, func(other list.Item) bool { return other.Subject == item.Subject && other.Detail != nil })
-		if item.Detail == nil || at < 0 {
-			continue
-		}
-		detail := *item.Detail
-		detail.PR = from.Items[at].Detail.PR
-		detail.Actions = list.Actions(detail)
-		merged.Items[i].Detail = &detail
-	}
-
-	merged.Warnings = slices.Clone(shown.Warnings)
-	for _, warning := range from.Warnings {
-		if warning.Code == list.CodePRsUnavailable || warning.Code == list.CodePRsCapped {
-			merged.Warnings = append(merged.Warnings, warning)
-		}
-	}
-
-	return merged
 }
 
 // detail is the worktree picked.

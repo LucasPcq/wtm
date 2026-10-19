@@ -96,7 +96,8 @@ func TestAStalePlanIsFollowedUpByItsRequestAsADryRun(t *testing.T) {
 	got := greet.Execute(t.Context(), Call{Dir: "/repo", Answers: named("x")})
 
 	assert.Equal(t, http.StatusPreconditionFailed, got.Status)
-	assert.Equal(t, []domain.FollowUp{domain.Replan("greet", []domain.Answered{{Path: "name", Values: []string{"x"}}})}, got.Envelope.FollowUps)
+	assert.Equal(t, domain.Replan(got.Envelope.Err, "greet", named("x")), got.Envelope.FollowUps)
+	assert.Len(t, got.Envelope.FollowUps, 1)
 }
 
 func TestACommandIsFoundByItsName(t *testing.T) {

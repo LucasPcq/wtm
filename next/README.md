@@ -70,7 +70,7 @@ A use case or a service declares the ports it needs in its `port.go`, interface 
 
 `wtm-next create feat/x --from main`, hop by hop:
 
-1. `cmd/wtm-next/main.go → main`: `ui/output.System()` reads the process's streams and `ui/cli.ReadEnv()` its environment once (the working directory, `$WTM_PROJECT_DIR`, `$WTM_CORRELATION_ID`), and `ui/cli.Main` runs the root with `command/create/cli.New(streams, env, openCreate)` registered on it; `ui/cli/root.go → Execute` maps the failure a command returns onto its exit code.
+1. `cmd/wtm-next/main.go → main`: `ui/output.System()` reads the process's streams and `ui/cli.ReadEnv()` its environment once (the working directory, `$WTM_PROJECT_DIR`, `$WTM_CORRELATION_ID`), and `ui/cli.Main` runs the root with `command/create/cli.New(streams, env, openCreate, commandLine)` registered on it; `ui/cli/root.go → Execute` maps the failure a command returns onto its exit code.
 2. `command/create/cli/command.go → createCommand.run` hands the command line to `ui/form/command.go → Command.Launch`: `uicli.Run.Begin` refuses an invalid correlation ID before any repository is looked up, the flags, registered from create's schema, become a `create.Request`, `openCreate(ctx, env.ProjectDir)` (`cmd/wtm-next/project.go`) finds the repository of that directory, always from its main worktree, and wires the use case (`cmd/wtm-next/wire.go → wire`), then it runs the wizard when the user can see and answer it (stdin and stderr terminals, `TERM` not `dumb`, human output, no `--yes` nor `--expect-fingerprint`: `output.Streams.CanPrompt`, `Command.Ask`), else `create.UseCase.Run` with its `domain.RunOptions`, the correlation ID among them; `Launch` hands the run to `Command.Conclude`.
 3. `command/create/usecase.go → UseCase.Run`: `operation.Service.Begin` records the operation with the options' correlation ID, refusing an invalid one, and takes its locks (`service/operation/operation.go`), `operation.PlanUnderLocks` plans under them, `operation.Fingerprint` fingerprints the plan, a dry run stops there, `Op.Expect` refuses a stale plan, then `Apply` runs between the started and finished events.
 4. `command/create/usecase.go → UseCase.Plan`: `Observe` reads the repository (`repository.Service.Observe`: config, snapshot, run.toml) and what create reads itself through the ports of `port.go`, `Resolve` (`questions.go`) settles the request on those facts, `Decide` (`rules.go`) turns them into the plan.
@@ -82,7 +82,7 @@ A second command is its own `command/<name>/` (use case, ports, rules, questions
 
 A read, `command/list`, walks the same hops with a `form.Query` in place of a `form.Command`, under the contract of a read (`.claude/skills/go-architecture/references/contract.md`, "A read").
 
-Todo: the follow-up a read's picker ends on is printed by `form.Query`; once every command it names has migrated, it runs in this process instead (`api.Catalogue.Find(followUp.Command)` with its answers), and its command line is spelled from that command's schema rather than by `commandLine` (`cmd/wtm-next/wire.go`, injected as `uicli.Env.CommandLine`).
+Todo: the follow-up a read's picker ends on is printed by `form.Query`; once every command it names has migrated, it runs in this process instead (`api.Catalogue.Find(followUp.Command)` with its answers), and its command line is spelled from that command's schema rather than by `commandLine` (`cmd/wtm-next/wire.go`, handed to each command's `cli.New`).
 
 ## Comments
 

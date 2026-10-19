@@ -61,10 +61,6 @@ func TestAnUndoLeftBehindIsRemovedByTheLegacyClean(t *testing.T) {
 	assert.Equal(t, []string{"wtm", "clean", "feat/x", "--force"}, commandLine(wire(wireParams{}).Create.Provision.LeftBehind("feat/x")))
 }
 
-func TestAPullRequestWithNoNumberIsOpenedByItsURL(t *testing.T) {
-	assert.Equal(t, []string{"gh", "pr", "view", "https://github.com/acme/acme/pull/12", "--web"}, commandLine(domain.FollowUp{URL: "https://github.com/acme/acme/pull/12"}))
-}
-
 func TestTwoExecutionsInOneProcessKeepTheirOwnRepositoryAndCorrelationID(t *testing.T) {
 	t.Setenv(cli.CorrelationIDEnv, "from-env")
 	t.Setenv("HOME", t.TempDir())
@@ -94,25 +90,43 @@ func TestTwoExecutionsInOneProcessKeepTheirOwnRepositoryAndCorrelationID(t *test
 	assert.Len(t, published, 3)
 }
 
-func TestEachActionOfListIsTheCommandLineThatCarriesItOut(t *testing.T) {
-	branch := list.Detail{Branch: "feat/a", Path: "/repo/.trees/feat-a", PR: &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12"}}
-	detached := list.Detail{Path: "/repo/.trees/detached"}
+func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
+	pr := &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12"}
+	actions := list.Actions(list.Detail{Branch: "feat/a", Path: "/repo/.trees/feat-a", PR: pr})
+	dryRun := leftBehind("feat/x")
+	dryRun.DryRun = true
 	cases := map[string]struct {
-		action list.Action
-		detail list.Detail
-		argv   []string
+		followUp domain.FollowUp
+		argv     []string
 	}{
-		"go":          {action: list.ActionGo, detail: branch, argv: []string{"wtm", "go", "feat/a"}},
-		"go_detached": {action: list.ActionGo, detail: detached, argv: []string{"cd", "/repo/.trees/detached"}},
-		"open_pr":     {action: list.ActionOpenPR, detail: branch, argv: []string{"gh", "pr", "view", "12", "--web"}},
-		"run_up":      {action: list.ActionRunUp, detail: branch, argv: []string{"wtm", "run", "up", "feat/a"}},
-		"run_down":    {action: list.ActionRunDown, detail: branch, argv: []string{"wtm", "run", "down", "feat/a"}},
-		"logs":        {action: list.ActionLogs, detail: branch, argv: []string{"wtm", "run", "logs", "feat/a"}},
-		"clean":       {action: list.ActionClean, detail: branch, argv: []string{"wtm", "clean", "feat/a"}},
+		"go":          {followUp: actions[0], argv: []string{"wtm", "go", "feat/a"}},
+		"open_pr":     {followUp: actions[1], argv: []string{"gh", "pr", "view", "12", "--web"}},
+		"run_up":      {followUp: actions[2], argv: []string{"wtm", "run", "up", "feat/a"}},
+		"run_down":    {followUp: actions[3], argv: []string{"wtm", "run", "down", "feat/a"}},
+		"logs":        {followUp: actions[4], argv: []string{"wtm", "run", "logs", "feat/a"}},
+		"clean":       {followUp: actions[5], argv: []string{"wtm", "clean", "feat/a"}},
+		"go_detached": {followUp: list.Actions(list.Detail{Path: "/repo/.trees/detached"})[0], argv: []string{"cd", "/repo/.trees/detached"}},
+		"enter":       {followUp: domain.Enter("feat/notes"), argv: []string{"wtm", "go", "feat/notes"}},
+		"left_behind": {followUp: leftBehind("feat/x"), argv: []string{"wtm", "clean", "feat/x", "--force"}},
+		"dry_run":     {followUp: dryRun, argv: []string{"wtm", "clean", "feat/x", "--force", "--dry-run"}},
+		"pr_url_only": {followUp: domain.FollowUp{URL: pr.URL}, argv: []string{"gh", "pr", "view", pr.URL, "--web"}},
+		"nothing":     {followUp: domain.FollowUp{Code: "list.open_pr"}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, c.argv, commandLine(list.FollowUpOf(c.action, c.detail)))
+			argv, unspelled := spelled(c.followUp)
+
+			assert.Equal(t, c.argv, argv)
+			assert.Empty(t, unspelled)
 		})
 	}
+}
+
+func TestAnAnswerTheCommandLineCannotSpellIsReported(t *testing.T) {
+	followUp := domain.Enter("feat/a")
+	followUp.Answers = append(followUp.Answers, domain.Answered{Path: "profile", Values: []string{"web"}})
+
+	_, unspelled := spelled(followUp)
+
+	assert.Equal(t, []string{"profile"}, unspelled)
 }

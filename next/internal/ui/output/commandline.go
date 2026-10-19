@@ -9,11 +9,8 @@ import (
 
 const shellSpecial = " \t\n'\"$`\\|&;<>()*?[]{}~#!"
 
-// The notes of the next steps that replay a dry run: ApplyNote beside the command that applies the plan just shown, ReplanNote beside the dry run to run again when the facts changed.
-const (
-	ApplyNote  = "apply this plan"
-	ReplanNote = domain.ReplanNote
-)
+// ApplyNote is the note beside the command that applies the plan a dry run just showed.
+const ApplyNote = "apply this plan"
 
 // Quoted returns each of words quoted for the shell.
 func Quoted(words []string) []string {
@@ -37,13 +34,14 @@ func Line(argv []string) string {
 	return strings.Join(Quoted(argv), " ")
 }
 
-// GoStep is the next step that enters the worktree of branch, the branch quoted for the shell.
-func GoStep(branch string) NextStep {
-	return NextStep{Command: Line([]string{"wtm", "go", branch})}
-}
-
 // A CommandLine spells a follow-up as the command line that carries it out, word by word, unquoted: the one function that knows every command, which cmd/wtm-next gives.
 type CommandLine func(followUp domain.FollowUp) []string
+
+// A View is what a command draws its outcome from beside the outcome: the directory its paths are shown from, and how its follow-ups are spelled.
+type View struct {
+	Cwd         string
+	CommandLine CommandLine
+}
 
 // FollowUpStep is followUp as a next step: its command line, spelled by spell, and its message.
 func FollowUpStep(followUp domain.FollowUp, spell CommandLine) NextStep {

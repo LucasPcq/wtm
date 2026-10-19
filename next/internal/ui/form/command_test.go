@@ -125,6 +125,6 @@ func TestAStalePlanInJSONFollowsUpWithItsReplan(t *testing.T) {
 		Answers: []domain.Answered{{Path: "branches", Values: []string{"feat/a"}}, {Path: domain.PathRemember, Values: []string{"mode"}}, {Path: domain.PathAsk, Values: []string{"true"}}},
 		DryRun:  true,
 		Code:    domain.CodeReplan,
-		Message: output.ReplanNote,
+		Message: domain.ReplanNote,
 	}}, doc.FollowUps)
 }

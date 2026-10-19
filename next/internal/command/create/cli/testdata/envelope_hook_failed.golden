@@ -74,7 +74,21 @@
       }
     ]
   },
-  "follow_ups": [],
+  "follow_ups": [
+    {
+      "command": "go",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/x"
+          ]
+        }
+      ],
+      "code": "create.go",
+      "message": ""
+    }
+  ],
   "warnings": [],
   "error": {
     "kind": "internal",

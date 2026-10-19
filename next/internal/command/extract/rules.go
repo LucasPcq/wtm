@@ -243,7 +243,7 @@ func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain
 	if !isTarget {
 		panic(fmt.Sprintf("extract: decide %s: the request was not resolved on these facts", req.To))
 	}
-	planned.Target = target
+	planned.Target, planned.Creates = target, target.creates()
 
 	if refused := refusedFor(planned.Target.Branch, req.OnConflict, conflicts); refused != nil {
 		return Plan{}, nil, refused
@@ -390,6 +390,7 @@ type Plan struct {
 	EnvFrom     project.EnvStrategy `json:"env_from,omitempty"`
 	Isolation   project.Isolation   `json:"isolation,omitempty"`
 	FastForward []string            `json:"fast_forward,omitempty"`
+	Creates     bool                `json:"creates,omitempty"` // the apply creates the target first; left out of the fingerprint, which the target's action covers
 	Keep        bool                `json:"keep"`
 	Conflicts   []worktree.Conflict `json:"conflicts"`
 	OnConflict  OnConflict          `json:"on_conflict,omitempty"`
@@ -412,7 +413,7 @@ func (p Plan) Locks() []domain.Lock {
 
 // Fingerprinted is what the plan's fingerprint covers: the plan with what the apply reads of the project to provision a created target.
 func (p Plan) Fingerprinted() any {
-	p.Recalled, p.Recap = nil, nil
+	p.Recalled, p.Recap, p.Creates = nil, nil, false
 	return provision.Fingerprinted(p, p.facts.Repository, p.settled)
 }
 

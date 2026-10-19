@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
-	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
@@ -100,7 +99,6 @@ func (w world) env() uicli.Env {
 	if w.seed.Env.ProjectDir != "" {
 		env = w.seed.Env
 	}
-	env.CommandLine = formtest.CommandLine
 	return env
 }
 

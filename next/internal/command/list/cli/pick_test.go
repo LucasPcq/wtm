@@ -78,7 +78,7 @@ func TestAWorktreeShownOffersWhatItsRowShowsWhenThePullRequestsLand(t *testing.T
 		Branch: "feat/b", Missing: true, PR: &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12"}, Actions: []domain.FollowUp{{Command: "clean", Code: "list.clean"}},
 	}}}}
 
-	merged := p.withPullRequests(from)
+	merged := list.WithPullRequests(p.read, from)
 
 	p.read = merged
 	shown := shownDetail(t, p, "feat/b")

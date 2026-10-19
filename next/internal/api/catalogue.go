@@ -114,9 +114,7 @@ func Bind[U any, Req Request[Req], Q Form, Out Outcome](name string, open func(c
 		opts.Surface = cmp.Or(opts.Surface, surfaceAPI)
 		outcome, err := run(useCase, ctx, req, opts)
 		doc := outcome.Envelope(name, domain.AsError(domain.AsErrorParams{Err: err}))
-		if doc.Err != nil && doc.Err.Code == domain.CodePlanStale {
-			doc.FollowUps = append(doc.FollowUps, domain.Replan(name, domain.AnswersOf(form, req)))
-		}
+		doc.FollowUps = append(doc.FollowUps, domain.Replan(doc.Err, name, domain.AnswersOf(form, req))...)
 		return respond(doc)
 	}
 

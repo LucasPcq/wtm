@@ -249,15 +249,12 @@ func Offers(detail Detail) []Action {
 	return actions
 }
 
-// PathWorktree is the path of the answer an action's command takes: the worktree, by its branch or, on no branch, its path.
-const PathWorktree = "worktree"
-
 // ParamNumber is the param of the action that opens a pull request: its number, beside its URL.
 const ParamNumber = "number"
 
 // byAction is what each action runs, the wtm command as its command line spells it after the program's name, none to open a pull request, and what it reads as in the picker and as the note of its follow-up.
 var byAction = map[Action]struct{ command, label string }{
-	ActionGo:      {"go", "Go to the worktree"},
+	ActionGo:      {domain.CommandGo, "Go to the worktree"},
 	ActionOpenPR:  {"", "Open the pull request"},
 	ActionRunUp:   {"run up", "Start the profile"},
 	ActionRunDown: {"run down", "Stop the profile"},
@@ -269,22 +266,47 @@ var byAction = map[Action]struct{ command, label string }{
 func Actions(detail Detail) []domain.FollowUp {
 	actions := []domain.FollowUp{}
 	for _, action := range Offers(detail) {
-		actions = append(actions, FollowUpOf(action, detail))
+		actions = append(actions, followUpOf(action, detail))
 	}
 
 	return actions
 }
 
-// FollowUpOf is action on the worktree of detail as the follow-up that carries it out, with its code and its label: its wtm command and answers, or the URL of its pull request and its number.
-func FollowUpOf(action Action, detail Detail) domain.FollowUp {
+// followUpOf is action on the worktree of detail as the follow-up that carries it out, with its code and its label: its wtm command and answers, or the URL of its pull request and its number.
+func followUpOf(action Action, detail Detail) domain.FollowUp {
 	followUp := domain.FollowUp{Code: Name + "." + string(action), Message: byAction[action].label}
 	if action == ActionOpenPR && detail.PR != nil {
 		followUp.URL, followUp.Params = detail.PR.URL, domain.Params{ParamNumber: strconv.Itoa(detail.PR.Number)}
 		return followUp
 	}
 
-	followUp.Command, followUp.Answers = byAction[action].command, []domain.Answered{{Path: PathWorktree, Values: []string{cmp.Or(detail.Branch, detail.Path)}}}
+	followUp.Command, followUp.Answers = byAction[action].command, []domain.Answered{{Path: domain.PathWorktree, Values: []string{cmp.Or(detail.Branch, detail.Path)}}}
 	return followUp
+}
+
+// WithPullRequests is shown with the pull request of each worktree as from read it, what each offers then, and the warnings of asking GitHub: what a read that did not ask for them becomes once they land.
+func WithPullRequests(shown, from Outcome) Outcome {
+	merged := shown
+	merged.Items = slices.Clone(shown.Items)
+	for i, item := range merged.Items {
+		at := slices.IndexFunc(from.Items, func(other Item) bool { return other.Subject == item.Subject && other.Detail != nil })
+		if item.Detail == nil || at < 0 {
+			continue
+		}
+		detail := *item.Detail
+		detail.PR = from.Items[at].Detail.PR
+		detail.Actions = Actions(detail)
+		merged.Items[i].Detail = &detail
+	}
+
+	merged.Warnings = slices.Clone(shown.Warnings)
+	for _, warning := range from.Warnings {
+		if warning.Code == CodePRsUnavailable || warning.Code == CodePRsCapped {
+			merged.Warnings = append(merged.Warnings, warning)
+		}
+	}
+
+	return merged
 }
 
 // Holding returns the subject of the item whose worktree holds the directory cwd, the deepest one, "" when none does.

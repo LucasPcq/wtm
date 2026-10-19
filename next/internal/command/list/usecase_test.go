@@ -184,23 +184,23 @@ func TestEachWorktreeReportsItsActionsAsCommandsWithTheirAnswers(t *testing.T) {
 	require.Len(t, actions, 5)
 	assert.Equal(t, domain.FollowUp{
 		Command: "run up",
-		Answers: []domain.Answered{{Path: list.PathWorktree, Values: []string{"feat/a"}}},
+		Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}},
 		Code:    "list.run_up",
 		Message: "Start the profile",
 	}, actions[1])
 }
 
 func TestAPullRequestIsALinkToOpenNotACommand(t *testing.T) {
-	followUp := list.FollowUpOf(list.ActionOpenPR, list.Detail{Branch: "feat/a", PR: &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12"}})
+	followUp := list.Actions(list.Detail{Branch: "feat/a", PR: &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12"}})[1]
 
 	assert.Equal(t, domain.FollowUp{URL: "https://github.com/acme/acme/pull/12", Code: "list.open_pr", Message: "Open the pull request", Params: domain.Params{list.ParamNumber: "12"}}, followUp)
 }
 
 func TestAWorktreeOnNoBranchIsAnsweredByItsPath(t *testing.T) {
-	followUp := list.FollowUpOf(list.ActionGo, list.Detail{Path: "/repo/.trees/x"})
+	followUp := list.Actions(list.Detail{Path: "/repo/.trees/x"})[0]
 
 	assert.Equal(t, "go", followUp.Command)
-	assert.Equal(t, []domain.Answered{{Path: list.PathWorktree, Values: []string{"/repo/.trees/x"}}}, followUp.Answers)
+	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{"/repo/.trees/x"}}}, followUp.Answers)
 }
 
 func TestALockedWorktreeWhoseDirectoryIsGoneIsMissing(t *testing.T) {

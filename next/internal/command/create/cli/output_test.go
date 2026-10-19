@@ -96,7 +96,7 @@ func TestAnAppliedRunWritesEachItemWithItsDetail(t *testing.T) {
 			{"subject": "feat/a", "status": "done", "detail": {"path": "/trees/feat-a", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "isolation": "isolated"}, "existing_branch": false}},
 			{"subject": "feat/b", "status": "done", "detail": {"path": "/trees/feat-b", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "ordinal": 2, "isolation": "isolated"}, "existing_branch": true, "origin_state": "behind", "origin_behind": 2}}
 		],
-		"follow_ups": [],
+		"follow_ups": [{"command": "go", "answers": [{"path": "worktree", "values": ["feat/a"]}], "code": "create.go", "message": ""}, {"command": "go", "answers": [{"path": "worktree", "values": ["feat/b"]}], "code": "create.go", "message": ""}],
 		"warnings": [{"code": "locks.unavailable", "message": "ran without operation locks"}]
 	}`, enveloped(t, outcome, nil))
 }

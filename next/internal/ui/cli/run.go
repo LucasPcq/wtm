@@ -11,15 +11,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// A Run is what a command prints its run with: its name, its streams, the environment of its process, the --output format and --quiet the user gave, the flags its failures are spelled with and the exit codes of its own codes.
+// A Run is what a command prints its run with: its name, its streams, the environment of its process, how its follow-ups are spelled, the --output format and --quiet the user gave, the flags its failures are spelled with and the exit codes of its own codes.
 type Run struct {
-	Command string // the name the envelope reports
-	Streams *output.Streams
-	Env     Env
-	Output  string // bound to the command's --output flag
-	Quiet   bool   // read from --quiet by [Run.Begin]
-	Flags   output.Flags
-	Exits   map[string]int
+	Command     string // the name the envelope reports
+	Streams     *output.Streams
+	Env         Env
+	CommandLine output.CommandLine // given by the composition root, the one that knows every command
+	Output      string             // bound to the command's --output flag
+	Quiet       bool               // read from --quiet by [Run.Begin]
+	Flags       output.Flags
+	Exits       map[string]int
 }
 
 // Begin reads --quiet and refuses an --output format other than text or json, printed as text, the one format sure to be understood, followed by the way to cmd's help; then it refuses an invalid $WTM_CORRELATION_ID, before any repository is looked up.
@@ -60,31 +61,26 @@ func (r *Run) Progress(ctx context.Context) *output.Progress {
 
 // FailWith prints failure followed by next, or the envelope that carries it with --output json, and returns the failure that sets the exit code.
 func (r *Run) FailWith(failure *domain.Error, next []output.NextStep) error {
-	return r.fail(failure, nil, next)
+	return r.fail(failure, next)
 }
 
-// Refuse prints failure as FailWith does, followed by what [Replan] makes of request, the follow-up that runs the request again, whose command line is argv: in the envelope's follow_ups with --output json.
-func (r *Run) Refuse(failure *domain.Error, request domain.FollowUp, argv []string) error {
-	followUps := Replan(failure, request)
+// Refuse prints failure as FailWith does, followed, when it refuses a stale plan, by argv, the command line of the request, run again with --dry-run; with --output json the caller puts the replan in the envelope itself.
+func (r *Run) Refuse(failure *domain.Error, argv []string) error {
 	var next []output.NextStep
-	if len(followUps) > 0 {
-		next = []output.NextStep{{Command: output.Line(append(slices.Clone(argv), "--"+FlagDryRun)), Note: output.ReplanNote}}
+	if domain.PlanStale(failure) {
+		next = []output.NextStep{{Command: output.Line(append(slices.Clone(argv), "--"+FlagDryRun)), Note: domain.ReplanNote}}
 	}
-	return r.fail(failure, followUps, next)
+	return r.fail(failure, next)
 }
 
-// Replan returns the follow-up of a stale plan: request, the follow-up that runs the request again, as a dry run that previews the plan the facts give now; none for any other failure.
-func Replan(failure *domain.Error, request domain.FollowUp) []domain.FollowUp {
-	if failure == nil || failure.Code != domain.CodePlanStale {
-		return nil
-	}
-
-	return []domain.FollowUp{domain.Replan(request.Command, request.Answers)}
+// View is what the command's outcome is drawn from: the working directory and how its follow-ups are spelled.
+func (r *Run) View() output.View {
+	return output.View{Cwd: r.Env.Cwd, CommandLine: r.CommandLine}
 }
 
-func (r *Run) fail(failure *domain.Error, followUps []domain.FollowUp, next []output.NextStep) error {
+func (r *Run) fail(failure *domain.Error, next []output.NextStep) error {
 	if !r.Human() {
-		return r.Envelope(domain.Envelope{Command: r.Command, Err: failure, FollowUps: followUps})
+		return r.Envelope(domain.Envelope{Command: r.Command, Err: failure})
 	}
 
 	_, stderr := r.Writers()

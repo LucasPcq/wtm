@@ -43,8 +43,8 @@ func TestNoCommandAFollowUpNamesHasMigrated(t *testing.T) {
 	streams, _, _, _ := output.Test()
 	root := cli.NewRoot(version, streams, commands(streams, cli.Env{}))
 	named := []string{leftBehind("feat/a").Command}
-	for _, action := range []list.Action{list.ActionGo, list.ActionRunUp, list.ActionRunDown, list.ActionLogs, list.ActionClean} {
-		named = append(named, list.FollowUpOf(action, list.Detail{Branch: "feat/a"}).Command)
+	for _, action := range list.Actions(list.Detail{Branch: "feat/a"}) {
+		named = append(named, action.Command)
 	}
 	for _, command := range named {
 		require.NotEmpty(t, command)

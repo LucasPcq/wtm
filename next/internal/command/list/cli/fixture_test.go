@@ -11,7 +11,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
-	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 )
 
 const (
@@ -46,7 +45,7 @@ func (w world) env() uicli.Env {
 	if cwd == "" {
 		cwd = mainPath
 	}
-	return uicli.Env{Cwd: cwd, ProjectDir: cwd, CommandLine: formtest.CommandLine}
+	return uicli.Env{Cwd: cwd, ProjectDir: cwd}
 }
 
 func (w world) open(context.Context, string) (list.UseCase, error) {

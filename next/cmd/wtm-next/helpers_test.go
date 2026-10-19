@@ -122,6 +122,11 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 	applied := c.Execute(t.Context(), api.Call{Dir: main, Answers: replan.Answers, Options: domain.RunOptions{ExpectFingerprint: replanned.Envelope.Fingerprint, Report: report}})
 	require.Equal(t, http.StatusOK, applied.Status, applied.Envelope.Err)
 	shape.golden("applied", applied.Envelope)
+	for _, followUp := range applied.Envelope.FollowUps {
+		argv, unspelled := spelled(followUp)
+		assert.NotEmpty(t, argv, followUp.Code)
+		assert.Empty(t, unspelled, "the command line drops answers of %s", followUp.Code)
+	}
 	shape.golden("events", events)
 	require.NotEmpty(t, applied.Envelope.Items)
 	for _, item := range applied.Envelope.Items {

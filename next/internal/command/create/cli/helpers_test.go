@@ -37,7 +37,7 @@ func runOn(t *testing.T, w world, setUp func(*output.Streams), args ...string) p
 	t.Helper()
 	streams, _, stdout, stderr := output.Test()
 	setUp(streams)
-	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.env(), w.open)})
+	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.env(), w.open, formtest.CommandLine)})
 	code := uicli.Execute(t.Context(), root, args)
 	return printed{Stdout: stdout.String(), Stderr: stderr.String(), Code: code}
 }
@@ -162,7 +162,7 @@ func recapRow(label string, values ...string) domain.RecapRow {
 	return domain.RecapRow{Label: label, Values: domain.RecapValues(values)}
 }
 
-// drawnFrom is the environment an outcome is drawn in from cwd.
-func drawnFrom(cwd string) uicli.Env {
-	return uicli.Env{Cwd: cwd, CommandLine: formtest.CommandLine}
+// drawnFrom is the view an outcome is drawn from at cwd.
+func drawnFrom(cwd string) output.View {
+	return output.View{Cwd: cwd, CommandLine: formtest.CommandLine}
 }
