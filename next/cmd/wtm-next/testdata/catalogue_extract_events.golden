@@ -1,0 +1,91 @@
+[
+  {
+    "type": "operation.started",
+    "command": "extract",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "feat/notes"
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/notes",
+    "phase": "worktree"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/notes",
+    "phase": "worktree",
+    "failed": false
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/notes",
+    "phase": "env"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/notes",
+    "phase": "env",
+    "failed": false
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/notes",
+    "phase": "meta"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/notes",
+    "phase": "meta",
+    "failed": false
+  },
+  {
+    "type": "worktree.created",
+    "worktree": {
+      "branch": "feat/notes",
+      "path": "<root>/.trees/feat-notes",
+      "parent": "main",
+      "ordinal": null,
+      "isolation": "isolated",
+      "is_main": false,
+      "created_at": "<time>"
+    }
+  },
+  {
+    "type": "worktree.provisioned",
+    "worktree": {
+      "branch": "feat/notes",
+      "path": "<root>/.trees/feat-notes",
+      "parent": "main",
+      "ordinal": null,
+      "isolation": "isolated",
+      "is_main": false,
+      "created_at": "<time>"
+    },
+    "ok": true
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/notes",
+    "phase": "move"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/notes",
+    "phase": "move",
+    "failed": false
+  },
+  {
+    "type": "unit.finished",
+    "subject": "feat/notes",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "extract",
+    "surface": "api",
+    "ok": true
+  }
+]

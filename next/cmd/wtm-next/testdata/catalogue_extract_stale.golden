@@ -1,0 +1,80 @@
+{
+  "v": 2,
+  "command": "extract",
+  "ok": false,
+  "op": "<id>",
+  "follow_ups": [
+    {
+      "command": "extract",
+      "answers": [
+        {
+          "path": "source",
+          "values": [
+            "main"
+          ]
+        },
+        {
+          "path": "files",
+          "values": [
+            "notes.txt"
+          ]
+        },
+        {
+          "path": "to",
+          "values": [
+            "feat/notes"
+          ]
+        },
+        {
+          "path": "from",
+          "values": [
+            "main"
+          ]
+        },
+        {
+          "path": "env_from",
+          "values": [
+            "config"
+          ]
+        },
+        {
+          "path": "isolation",
+          "values": [
+            "isolated"
+          ]
+        },
+        {
+          "path": "fast_forward",
+          "values": [
+            "false"
+          ]
+        },
+        {
+          "path": "keep",
+          "values": [
+            "false"
+          ]
+        },
+        {
+          "path": "on_conflict",
+          "values": [
+            "abort"
+          ]
+        }
+      ],
+      "dry_run": true,
+      "code": "plan.replan",
+      "message": "the plan the facts give now"
+    }
+  ],
+  "warnings": [],
+  "error": {
+    "kind": "precondition",
+    "code": "plan.stale",
+    "message": "the facts changed since the preview",
+    "params": {
+      "expected": "<id>",
+      "found": "<id>"
+    }
+  }
+}

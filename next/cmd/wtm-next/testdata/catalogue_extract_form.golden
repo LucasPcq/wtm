@@ -1,0 +1,179 @@
+{
+  "fields": [
+    {
+      "kind": "select",
+      "path": "source",
+      "flag": "\u003csource\u003e",
+      "label": "Source worktree",
+      "help": "Which worktree to extract changes from",
+      "value": "",
+      "options": [],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false
+    },
+    {
+      "kind": "multi_select",
+      "path": "files",
+      "flag": "--files",
+      "label": "Files",
+      "help": "Files to extract, or a directory to take everything below it",
+      "picked": [],
+      "options": [],
+      "empty": "Select at least one file"
+    },
+    {
+      "kind": "select",
+      "path": "to",
+      "flag": "--to",
+      "label": "Target worktree",
+      "help": "Target worktree branch; created if it does not exist",
+      "value": "",
+      "options": [
+        {
+          "value": "",
+          "label": "+ Create a new worktree…",
+          "short": "new worktree"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false
+    },
+    {
+      "kind": "text",
+      "path": "to",
+      "flag": "--to",
+      "label": "Branch name",
+      "help": "Name for the new worktree branch",
+      "value": ""
+    },
+    {
+      "kind": "select",
+      "path": "from",
+      "flag": "--from",
+      "label": "Source branch",
+      "help": "Parent branch when creating the target worktree",
+      "value": "",
+      "options": [],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": true
+    },
+    {
+      "kind": "select",
+      "path": "env_from",
+      "flag": "--env-from",
+      "label": "Env strategy",
+      "help": "How the .env files of the new target are provisioned: config (config.toml's strategy), example (from its template), main (copied from the main checkout) or parent (from the worktree of the branch it starts from, --from); defaults to config.toml's strategy",
+      "value": "",
+      "options": [
+        {
+          "value": "config",
+          "label": "Use config default ()",
+          "short": "config default"
+        },
+        {
+          "value": "example",
+          "label": "example — copy .env.example → .env"
+        },
+        {
+          "value": "main",
+          "label": "main — copy .env from the main checkout"
+        },
+        {
+          "value": "parent",
+          "label": "parent — copy .env from source worktree"
+        }
+      ],
+      "rememberable": true,
+      "remember": false,
+      "refreshable": false
+    },
+    {
+      "kind": "select",
+      "path": "isolation",
+      "flag": "--isolation",
+      "label": "Isolation",
+      "help": "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated",
+      "value": "",
+      "options": [
+        {
+          "value": "isolated",
+          "label": "isolated — its own ports, compose project and namespaces"
+        },
+        {
+          "value": "verbatim",
+          "label": "verbatim — keep the copied .env, one of the two runs at a time"
+        }
+      ],
+      "rememberable": true,
+      "remember": false,
+      "refreshable": false
+    },
+    {
+      "kind": "confirm",
+      "path": "fast_forward",
+      "flag": "--ff",
+      "label": "Source update",
+      "help": "Fast-forward to origin first the branch a new worktree starts from, or the branch itself when it already exists locally, when it is behind; one that has diverged or holds uncommitted changes starts as it is",
+      "value": false,
+      "yes": {
+        "value": "true",
+        "label": "Fast-forward to origin",
+        "short": "fast-forward to origin"
+      },
+      "no": {
+        "value": "false",
+        "label": "Keep it as-is",
+        "short": "keep as-is"
+      },
+      "no_first": false,
+      "rememberable": true,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "keep",
+      "flag": "--keep",
+      "label": "Mode",
+      "help": "Copy instead of move (keep the changes in the source)",
+      "value": false,
+      "yes": {
+        "value": "true",
+        "label": "Copy — keep the files in ",
+        "short": "copy"
+      },
+      "no": {
+        "value": "false",
+        "label": "Move — remove the files from ",
+        "short": "move"
+      },
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "select",
+      "path": "on_conflict",
+      "flag": "--on-conflict",
+      "label": "On conflict",
+      "help": "On conflict: abort (default) or resolve (write conflict markers in the target)",
+      "value": "",
+      "options": [
+        {
+          "value": "abort",
+          "label": "Abort — leave both worktrees untouched"
+        },
+        {
+          "value": "resolve",
+          "label": "Resolve — write conflict markers in "
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false
+    }
+  ],
+  "problems": []
+}

@@ -279,11 +279,14 @@ type Answered struct {
 	Values []string `json:"values"`
 }
 
-// Answers are the answer of each field of the form, in order, then the fields whose answer is to be remembered: the inverse of Fold, which a surface or a test folds back into the request the form stands for.
+// Answers are the answer of each field of the form, in order, then, when a field is rememberable, the fields whose answer is to be remembered: the inverse of Fold, which a surface or a test folds back into the request the form stands for.
 func (f Form) Answers() []Answered {
 	answers := make([]Answered, 0, len(f.Fields)+1)
 	for _, field := range f.Fields {
 		answers = append(answers, Answered{Path: field.Spec().Path, Values: field.Answer()})
+	}
+	if len(f.Rememberable()) == 0 {
+		return answers
 	}
 
 	return append(answers, Answered{Path: PathRemember, Values: f.Remembering()})

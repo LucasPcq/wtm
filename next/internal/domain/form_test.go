@@ -130,6 +130,12 @@ func TestAFormFoldsIntoTheRequestItsFieldsAnswer(t *testing.T) {
 	assert.Equal(t, answers{"branches": {"feat/a"}, "isolation": {"verbatim"}, PathRemember: {"isolation"}}, req)
 }
 
+func TestAFormWithNothingToRememberAnswersNoRemember(t *testing.T) {
+	form := Form{Fields: []Field{ConfirmField{FieldSpec: FieldSpec{Path: "with_prs"}}}}
+
+	assert.Equal(t, []Answered{{Path: "with_prs", Values: form.Fields[0].Answer()}}, form.Answers())
+}
+
 func TestARequestAnswersEachPathOnceThenWhatItRemembersAndAsks(t *testing.T) {
 	form := Form{Fields: []Field{
 		SelectField{FieldSpec: FieldSpec{Path: "to"}},

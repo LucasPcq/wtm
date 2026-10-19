@@ -1,0 +1,90 @@
+{
+  "v": 2,
+  "command": "extract",
+  "ok": true,
+  "op": "<id>",
+  "plan": {
+    "source": "main",
+    "files": [
+      {
+        "path": "notes.txt",
+        "status": "untracked"
+      }
+    ],
+    "target": {
+      "branch": "feat/notes",
+      "path": "<root>/.trees/feat-notes",
+      "action": "create"
+    },
+    "from": "main",
+    "env_from": "example",
+    "keep": false,
+    "conflicts": [],
+    "on_conflict": "abort",
+    "recap": [
+      {
+        "key": "source",
+        "label": "Source",
+        "path": "source",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "files",
+        "label": "Files",
+        "path": "files",
+        "values": [
+          {
+            "value": "notes.txt",
+            "note": "untracked",
+            "text": "new notes.txt"
+          }
+        ]
+      },
+      {
+        "key": "target",
+        "label": "Target",
+        "path": "to",
+        "values": [
+          {
+            "value": "feat/notes",
+            "note": "new",
+            "params": {
+              "from": "main"
+            },
+            "text": "new worktree feat/notes from main"
+          }
+        ]
+      },
+      {
+        "key": "env_from",
+        "label": "Env",
+        "path": "env_from",
+        "values": [
+          {
+            "value": "example",
+            "text": "example"
+          }
+        ]
+      },
+      {
+        "key": "mode",
+        "label": "Mode",
+        "path": "keep",
+        "values": [
+          {
+            "value": "move",
+            "text": "move"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<id>",
+  "follow_ups": [],
+  "warnings": []
+}

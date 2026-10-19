@@ -1,0 +1,70 @@
+{
+  "v": 2,
+  "command": "create",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "feat/x",
+      "status": "done",
+      "detail": {
+        "path": "<root>/.trees/feat-x",
+        "metadata": {
+          "source_branch": "main",
+          "created_at": "<time>",
+          "env_strategy": "main",
+          "isolation": "isolated"
+        },
+        "existing_branch": false
+      }
+    }
+  ],
+  "plan": {
+    "branches": [
+      {
+        "branch": "feat/x",
+        "path": "<root>/.trees/feat-x",
+        "action": "create"
+      }
+    ],
+    "from": "main",
+    "env_from": "main",
+    "recap": [
+      {
+        "key": "branches",
+        "label": "Branches",
+        "path": "branches",
+        "values": [
+          {
+            "value": "feat/x",
+            "text": "feat/x"
+          }
+        ]
+      },
+      {
+        "key": "from",
+        "label": "From",
+        "path": "from",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "env_from",
+        "label": "Env",
+        "path": "env_from",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

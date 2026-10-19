@@ -1,0 +1,80 @@
+[
+  {
+    "type": "operation.started",
+    "command": "create",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "feat/x"
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/x",
+    "phase": "worktree"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/x",
+    "phase": "worktree",
+    "failed": false
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/x",
+    "phase": "env"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/x",
+    "phase": "env",
+    "failed": false
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/x",
+    "phase": "meta"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/x",
+    "phase": "meta",
+    "failed": false
+  },
+  {
+    "type": "worktree.created",
+    "worktree": {
+      "branch": "feat/x",
+      "path": "<root>/.trees/feat-x",
+      "parent": "main",
+      "ordinal": null,
+      "isolation": "isolated",
+      "is_main": false,
+      "created_at": "<time>"
+    }
+  },
+  {
+    "type": "worktree.provisioned",
+    "worktree": {
+      "branch": "feat/x",
+      "path": "<root>/.trees/feat-x",
+      "parent": "main",
+      "ordinal": null,
+      "isolation": "isolated",
+      "is_main": false,
+      "created_at": "<time>"
+    },
+    "ok": true
+  },
+  {
+    "type": "unit.finished",
+    "subject": "feat/x",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "create",
+    "surface": "api",
+    "ok": true
+  }
+]
