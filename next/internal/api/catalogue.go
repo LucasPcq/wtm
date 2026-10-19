@@ -37,12 +37,15 @@ type Command struct {
 	Name    string
 	Form    domain.Form
 	Execute func(ctx context.Context, call Call) Response
+	// spike: the form of the call's request as the repository stands (options, remembered answers, problems); nil for a command that asks nothing.
+	Questions func(ctx context.Context, call Call) (domain.Form, error)
 }
 
 // A Call is one execution of a command: the directory of the repository it runs on, its request as JSON, and its run options.
 type Call struct {
 	Dir     string
 	Request json.RawMessage
+	Answers []domain.Answered // spike: the request as the form's answers, folded as the CLI folds its flags; used instead of Request when set
 	Options domain.RunOptions
 }
 
@@ -70,7 +73,7 @@ func Bind[U, Req any, Out Outcome](name string, form domain.Form, open func(ctx 
 			return refused(domain.InvalidMessage("the directory of a " + name + " call must be absolute, not " + strconv.Quote(call.Dir)))
 		}
 
-		req, err := decoded[Req](call.Request)
+		req, err := requestOf[Req](call)
 		if err != nil {
 			return refused(domain.InvalidMessage("invalid " + name + " request: " + err.Error()))
 		}
@@ -88,6 +91,49 @@ func Bind[U, Req any, Out Outcome](name string, form domain.Form, open func(ctx 
 	}
 
 	return Command{Name: name, Form: form, Execute: execute}
+}
+
+// Ask returns command with its Questions: the use case opened on the call's directory, asked the call's request with questions, a method expression such as create.UseCase.Questions.
+func Ask[U, Req any, Q interface{ Form() domain.Form }](command Command, open func(ctx context.Context, dir string) (U, error), questions func(useCase U, ctx context.Context, req Req) (Q, error)) Command {
+	command.Questions = func(ctx context.Context, call Call) (domain.Form, error) {
+		req, err := requestOf[Req](call)
+		if err != nil {
+			return domain.Form{}, domain.InvalidMessage("invalid " + command.Name + " request: " + err.Error())
+		}
+
+		useCase, err := open(ctx, call.Dir)
+		if err != nil {
+			return domain.Form{}, err
+		}
+
+		asked, err := questions(useCase, ctx, req)
+		if err != nil {
+			return domain.Form{}, err
+		}
+		return asked.Form(), nil
+	}
+
+	return command
+}
+
+// requestOf is the call's request: its answers folded into a zero Req when it has some, else its JSON decoded strictly.
+func requestOf[Req any](call Call) (Req, error) {
+	if call.Answers == nil {
+		return decoded[Req](call.Request)
+	}
+
+	var req Req
+	for _, answer := range call.Answers {
+		answerable, ok := any(req).(domain.Answerable[Req])
+		if !ok {
+			return req, errors.New("this command takes no answers")
+		}
+		var err error
+		if req, err = answerable.Answer(answer.Path, answer.Values); err != nil {
+			return req, err
+		}
+	}
+	return req, nil
 }
 
 // decoded is the one JSON object of data as a Req, refusing a field Req does not have and anything after the object.

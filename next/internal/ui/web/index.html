@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>wtm spike</title>
+<style>
+:root { --bg:#fbfbfa; --fg:#1d1d1b; --muted:#77756f; --line:#e4e2dc; --card:#fff; --accent:#2f6f4f; --warn:#a15c07; --err:#b3261e; }
+@media (prefers-color-scheme: dark) { :root { --bg:#151514; --fg:#e8e6e1; --muted:#9a978f; --line:#2c2b28; --card:#1d1c1a; --accent:#6cc497; --warn:#e3a14b; --err:#f2827a; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.45 ui-sans-serif, system-ui, sans-serif; }
+header { display:flex; gap:16px; align-items:baseline; padding:16px 24px; border-bottom:1px solid var(--line); }
+header h1 { font-size:16px; margin:0; }
+header code { color:var(--muted); }
+nav button { background:none; border:0; color:var(--muted); font:inherit; cursor:pointer; padding:4px 8px; }
+nav button.on { color:var(--fg); font-weight:600; border-bottom:2px solid var(--accent); }
+main { padding:24px; max-width:1100px; }
+table { border-collapse:collapse; width:100%; background:var(--card); border:1px solid var(--line); }
+th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+th { color:var(--muted); font-weight:500; font-size:12px; }
+code, .mono { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12.5px; }
+.chip { display:inline-block; padding:0 6px; margin-right:4px; border:1px solid var(--line); border-radius:4px; font-size:11.5px; color:var(--muted); }
+.chip.warn { color:var(--warn); border-color:currentColor; }
+.chip.err { color:var(--err); border-color:currentColor; }
+.field { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:12px 14px; margin-bottom:10px; }
+.field.skip { opacity:.55; }
+.field label.title { font-weight:600; display:block; }
+.help { color:var(--muted); font-size:12.5px; margin:2px 0 8px; }
+input[type=text], select { width:100%; padding:6px 8px; font:inherit; background:var(--bg); color:var(--fg); border:1px solid var(--line); border-radius:4px; }
+.problem { color:var(--err); font-size:12.5px; margin-top:6px; }
+.row { display:flex; gap:8px; align-items:center; margin-top:12px; }
+button.act { font:inherit; padding:6px 14px; border-radius:4px; border:1px solid var(--accent); background:var(--accent); color:var(--bg); cursor:pointer; }
+button.act.ghost { background:none; color:var(--accent); }
+button.act:disabled { opacity:.4; cursor:default; }
+pre { background:var(--card); border:1px solid var(--line); padding:10px; overflow:auto; max-height:320px; }
+.warning { color:var(--warn); }
+.error { color:var(--err); }
+.muted { color:var(--muted); }
+</style>
+</head>
+<body>
+<header><h1>wtm</h1><code id="dir"></code><nav><button data-tab="list" class="on">Worktrees</button><button data-tab="create">Create</button></nav></header>
+<main>
+  <section id="list">
+    <div class="row" style="margin:0 0 12px"><label><input type="checkbox" id="prs"> Pull requests</label><button class="act ghost" id="refresh">Refresh</button><span id="list-status" class="muted"></span></div>
+    <div id="list-body"></div>
+  </section>
+  <section id="create" hidden>
+    <div id="form"></div>
+    <div class="row"><button class="act ghost" id="preview">Preview</button><button class="act" id="apply" disabled>Apply</button><span id="create-status" class="muted"></span></div>
+    <div id="plan"></div>
+    <pre id="events" hidden></pre>
+    <div id="result"></div>
+  </section>
+</main>
+<script>
+// Everything below renders what the server sends; it decides nothing about worktrees.
+const token = new URLSearchParams(location.hash.slice(1)).get("token");
+const headers = { "Content-Type": "application/json", "X-Wtm-Token": token };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+async function post(path, body) {
+  const res = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
+  return { status: res.status, json: await res.json() };
+}
+
+// ---- tabs
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b));
+  $("list").hidden = b.dataset.tab !== "list";
+  $("create").hidden = b.dataset.tab !== "create";
+  if (b.dataset.tab === "create" && !form) ask();
+});
+
+fetch("/api/info", { headers }).then((r) => r.json()).then((info) => $("dir").textContent = info.dir);
+
+// ---- list
+async function list() {
+  $("list-status").textContent = "reading…";
+  const answers = $("prs").checked ? [{ path: "with_prs", values: ["true"] }] : [];
+  const { json } = await post("/api/commands/list", { answers });
+  $("list-status").textContent = "";
+  if (json.error) { $("list-body").innerHTML = `<p class="error">${esc(json.error.message)}</p>`; return; }
+  const rows = (json.items || []).map((it) => {
+    const d = it.detail || {};
+    if (it.error) return `<tr><td>${esc(it.subject)}</td><td colspan="5" class="error">${esc(it.error.message)}</td></tr>`;
+    const chips = [d.main && "main", d.dirty && "dirty", d.locked && "locked", d.rebasing && "rebasing", d.missing && "missing"].filter(Boolean)
+      .map((c) => `<span class="chip ${c === "dirty" || c === "rebasing" ? "warn" : c === "missing" ? "err" : ""}">${c}</span>`).join("");
+    const origin = d.origin ? `${esc(d.origin.state)} <span class="muted">↑${d.origin.ahead} ↓${d.origin.behind}</span>` : `<span class="muted">no origin</span>`;
+    const pr = d.pr ? `<a href="${esc(d.pr.url)}" target="_blank">#${d.pr.number}</a>` : "";
+    return `<tr><td class="mono">${esc(d.branch || "(detached)")}</td><td>${chips}</td><td>${d.commits_ahead || 0}</td><td>${origin}</td><td>${esc((d.services || []).join(", "))}</td><td>${pr}</td><td class="mono muted">${esc(d.path)}</td></tr>`;
+  }).join("");
+  const warnings = (json.warnings || []).map((w) => `<p class="warning">⚠ ${esc(w.message)}</p>`).join("");
+  $("list-body").innerHTML = `<table><tr><th>Branch</th><th>State</th><th>Ahead</th><th>Origin</th><th>Services</th><th>PR</th><th>Path</th></tr>${rows}</table>${warnings}`;
+}
+$("refresh").onclick = list;
+$("prs").onchange = list;
+list();
+
+// ---- create: the form is whatever the use case's Questions returns for the answers so far
+let form = null;
+const answers = new Map(); // path -> values the user gave
+const remember = new Set();
+let fingerprint = "";
+
+function answerList() {
+  const list = [...answers].map(([path, values]) => ({ path, values }));
+  if (remember.size) list.push({ path: "remember", values: [...remember] });
+  return list;
+}
+
+async function ask() {
+  const { json } = await post("/api/commands/create/questions", { answers: answerList() });
+  if (json.error) { $("form").innerHTML = `<p class="error">${esc(json.error.message)}</p>`; return; }
+  form = json;
+  renderForm();
+}
+
+function setAnswer(path, values) {
+  answers.set(path, values);
+  fingerprint = ""; $("apply").disabled = true; $("plan").innerHTML = "";
+  ask();
+}
+
+function optionLabel(o) { return esc(o.label || o.value) + (o.badge ? ` · ${esc(o.badge)}` : ""); }
+
+function renderField(f) {
+  const problems = (form.problems || []).filter((p) => p.path === f.path || p.path.startsWith(f.path + "["))
+    .map((p) => `<div class="problem">${esc(p.message)}</div>`).join("");
+  const origin = f.origin ? `<span class="chip">${esc(f.origin)}</span>` : "";
+  const skip = f.skip ? `<div class="help">skipped: ${esc(f.skip)}</div>` : "";
+  let input = "";
+  switch (f.kind) {
+    case "text_list":
+      input = `<input type="text" data-path="${f.path}" data-kind="list" list="dl-${f.path}" value="${esc(f.entries.join(" "))}" placeholder="feat/a feat/b">
+        <datalist id="dl-${f.path}">${f.options.map((o) => `<option value="${esc(o.value)}">${optionLabel(o)}</option>`).join("")}</datalist>`;
+      break;
+    case "text":
+      input = `<input type="text" data-path="${f.path}" value="${esc(f.value)}">`;
+      break;
+    case "select": {
+      const opts = [...f.options].sort((a, b) => (b.value === f.pinned) - (a.value === f.pinned));
+      input = `<select data-path="${f.path}">${opts.map((o) => `<option value="${esc(o.value)}" ${o.value === f.value ? "selected" : ""}>${optionLabel(o)}</option>`).join("")}</select>`;
+      break;
+    }
+    case "multi_select":
+      input = f.options.map((o) => `<label><input type="checkbox" data-path="${f.path}" data-kind="multi" value="${esc(o.value)}" ${f.picked.includes(o.value) ? "checked" : ""}> ${optionLabel(o)}</label><br>`).join("");
+      break;
+    case "confirm":
+      input = `<label><input type="checkbox" data-path="${f.path}" data-kind="confirm" ${f.value ? "checked" : ""}> ${esc(f.yes?.label || "Yes")}</label>`;
+      break;
+  }
+  const rememberBox = f.rememberable ? `<div class="row" style="margin-top:6px"><label class="muted"><input type="checkbox" data-remember="${f.path}" ${f.remember || remember.has(f.path) ? "checked" : ""}> Always use this answer</label></div>` : "";
+  return `<div class="field ${f.skip ? "skip" : ""}"><label class="title">${esc(f.label)} ${origin}</label><div class="help">${esc(f.help)}</div>${skip}${input}${rememberBox}${problems}</div>`;
+}
+
+function renderForm() {
+  $("form").innerHTML = form.fields.map(renderField).join("");
+  $("form").querySelectorAll("[data-path]").forEach((el) => el.onchange = () => {
+    const path = el.dataset.path;
+    if (el.dataset.kind === "list") return setAnswer(path, el.value.split(/[\s,]+/).filter(Boolean));
+    if (el.dataset.kind === "confirm") return setAnswer(path, [String(el.checked)]);
+    if (el.dataset.kind === "multi") return setAnswer(path, [...$("form").querySelectorAll(`[data-path="${path}"]:checked`)].map((x) => x.value));
+    setAnswer(path, [el.value]);
+  });
+  $("form").querySelectorAll("[data-remember]").forEach((el) => el.onchange = () => {
+    el.checked ? remember.add(el.dataset.remember) : remember.delete(el.dataset.remember);
+    fingerprint = ""; $("apply").disabled = true; $("plan").innerHTML = "";
+    ask();
+  });
+}
+
+function renderPlan(env) {
+  const p = env.plan || {};
+  const rows = Object.entries(p).map(([k, v]) => `<tr><th>${esc(k)}</th><td class="mono">${esc(typeof v === "object" ? JSON.stringify(v) : v)}</td></tr>`).join("");
+  const warnings = (env.warnings || []).map((w) => `<p class="warning">⚠ ${esc(w.message)}</p>`).join("");
+  $("plan").innerHTML = `<h3>Plan <span class="muted mono">${esc(env.fingerprint)}</span></h3><table>${rows}</table>${warnings}`;
+}
+
+function renderError(e) {
+  const fields = (e.fields || []).map((f) => `<li>${esc(f.message)}</li>`).join("");
+  return `<p class="error">✗ ${esc(e.message)}</p>${fields ? `<ul class="error">${fields}</ul>` : ""}`;
+}
+
+$("preview").onclick = async () => {
+  $("result").innerHTML = ""; $("events").hidden = true;
+  const { json } = await post("/api/commands/create", { answers: answerList(), dry_run: true });
+  if (json.error) { $("plan").innerHTML = renderError(json.error); return; }
+  fingerprint = json.fingerprint;
+  renderPlan(json);
+  $("apply").disabled = false;
+};
+
+$("apply").onclick = async () => {
+  $("apply").disabled = true;
+  $("create-status").textContent = "applying…";
+  $("events").hidden = false; $("events").textContent = "";
+  const res = await fetch("/api/commands/create", { method: "POST", headers: { ...headers, Accept: "text/event-stream" }, body: JSON.stringify({ answers: answerList(), expect_fingerprint: fingerprint }) });
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let cut;
+    while ((cut = buffer.indexOf("\n\n")) >= 0) {
+      const chunk = buffer.slice(0, cut); buffer = buffer.slice(cut + 2);
+      const event = /^event: (.*)$/m.exec(chunk)?.[1];
+      const data = JSON.parse(/^data: (.*)$/m.exec(chunk)?.[1] || "null");
+      if (event === "progress") $("events").textContent += JSON.stringify(data) + "\n";
+      if (event === "done") showResult(data.envelope);
+    }
+  }
+  $("create-status").textContent = "";
+};
+
+function showResult(env) {
+  if (env.error) { $("result").innerHTML = renderError(env.error); return; }
+  const rows = (env.items || []).map((it) => `<tr><td class="mono">${esc(it.subject)}</td><td><span class="chip ${it.status === "failed" ? "err" : ""}">${esc(it.status)}</span>${esc(it.reason || "")}</td><td class="mono">${esc(it.detail?.path || it.error?.message || "")}</td></tr>`).join("");
+  const warnings = (env.warnings || []).map((w) => `<p class="warning">⚠ ${esc(w.message)}</p>`).join("");
+  $("result").innerHTML = `<h3>Result</h3><table>${rows}</table>${warnings}`;
+  answers.clear(); remember.clear(); fingerprint = ""; ask(); list();
+}
+</script>
+</body>
+</html>

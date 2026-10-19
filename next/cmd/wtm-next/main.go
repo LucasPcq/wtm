@@ -33,5 +33,5 @@ func main() {
 
 // commands are the command lines of every command wtm-next runs, on streams in env.
 func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
-	return []*cobra.Command{createcli.New(streams, env, openCreate), extractcli.New(streams, env, openExtract), listcli.New(streams, env, openList)}
+	return []*cobra.Command{createcli.New(streams, env, openCreate), extractcli.New(streams, env, openExtract), listcli.New(streams, env, openList), serve(env)}
 }
