@@ -343,18 +343,7 @@ func applyLine(argv []string, fingerprint string) string {
 
 // rerun is the follow-up that runs req again: the command, the request's answers, and its command line as cmd spells it.
 func (c *Command[R, Q, O]) rerun(cmd *cobra.Command, req R) domain.FollowUp {
-	var paths []string
-	for _, field := range c.schema().Fields {
-		paths = append(paths, field.Spec().Path)
-	}
-	var answers []domain.Answered
-	for _, path := range append(paths, domain.PathRemember, domain.PathAsk) {
-		if values := req.Values(path); values != nil {
-			answers = append(answers, domain.Answered{Path: path, Values: values})
-		}
-	}
-
-	return domain.FollowUp{Command: c.io.Command, Answers: answers, Argv: c.Argv(cmd.CommandPath(), req)}
+	return domain.FollowUp{Command: c.io.Command, Answers: domain.AnswersOf(c.schema(), req), Argv: c.Argv(cmd.CommandPath(), req)}
 }
 
 // Argv spells command and req word by word, unquoted: the positional field's words, each flag given sorted by name, then --ask.

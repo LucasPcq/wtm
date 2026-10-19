@@ -71,6 +71,24 @@ func TestThePullRequestsLandingLaterAreGivenToTheReadShown(t *testing.T) {
 	assert.Equal(t, "shown", p.read.Warnings[0].Message, "the read shown is kept, not replaced")
 }
 
+func TestAWorktreeShownOffersWhatItsRowShowsWhenThePullRequestsLand(t *testing.T) {
+	p := newPicker(t, world{}, list.Request{})
+	from := list.Outcome{Items: []list.Item{{Subject: "feat/b", Status: domain.StatusDone, Detail: &list.Detail{
+		Branch: "feat/b", Missing: true, PR: &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12"}, Actions: []domain.FollowUp{{Command: "clean", Code: "list.clean"}},
+	}}}}
+
+	merged := p.withPullRequests(from)
+
+	p.read = merged
+	shown := shownDetail(t, p, "feat/b")
+	assert.False(t, shown.Missing)
+	var codes []string
+	for _, action := range shown.Actions {
+		codes = append(codes, action.Code)
+	}
+	assert.Equal(t, []string{"list.go", "list.open_pr", "list.run_up", "list.run_down", "list.logs", "list.clean"}, codes)
+}
+
 func TestAPickSurvivesAReadThatNoLongerHasTheWorktree(t *testing.T) {
 	d := picking(t, world{}, list.Request{})
 	d.Keys("down", "down", "enter")

@@ -33,7 +33,7 @@ internal/
     form/              a command's form, generic over its schema: form.Command (its flags, its request, its launch, the conclusion of its run, its command line), form.Query (the same for a read, with its picker), the session and a step per field kind, the wizard that walks them to a recap and applies, or to the last step of a read's picker
     widget/            the inputs a step asks with: select list, multi-select, text field, text list, their styles
     formtest/          for a command's tests: the driver that plays its wizard key by key, golden files, the v2 envelope decoded
-  api/                 the catalogue of the commands, knowing none of them: each one's name, its schema (domain.Form), its questions as the repository stands and its execution, the answers by field (and an optional JSON request) in and a domain.Envelope out with the status of its kind, for a surface other than the command line
+  api/                 the catalogue of the commands, knowing none of them: each one's name, its schema (domain.Form), its questions as the repository stands and its execution, the answers by field in and a domain.Envelope out with the status of its kind, for a surface other than the command line
 ```
 No file format lives in `domain/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `domain/project`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
 

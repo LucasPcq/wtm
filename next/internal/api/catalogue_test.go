@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -14,8 +13,8 @@ import (
 func TestEachCallOpensTheUseCaseOnItsDirectory(t *testing.T) {
 	greet := greet(func(_ context.Context, dir string) (useCase, error) { return useCase{dir: dir}, nil })
 
-	first := greet.Execute(t.Context(), Call{Dir: "/a", Request: json.RawMessage(`{"name": "x"}`)})
-	second := greet.Execute(t.Context(), Call{Dir: "/b", Request: json.RawMessage(`{"name": "y"}`), Options: domain.RunOptions{Surface: "desktop"}})
+	first := greet.Execute(t.Context(), Call{Dir: "/a", Answers: named("x")})
+	second := greet.Execute(t.Context(), Call{Dir: "/b", Answers: named("y"), Options: domain.RunOptions{Surface: "desktop"}})
 
 	assert.Equal(t, Response{Status: http.StatusOK, Envelope: domain.Envelope{Command: "greet", Op: "/a:x:api"}}, first)
 	assert.Equal(t, "/b:y:desktop", second.Envelope.Op)
@@ -34,29 +33,11 @@ func TestARefusalHasTheStatusOfItsKind(t *testing.T) {
 		refusing := useCase{refusal: &domain.Error{Kind: kind, Code: "greet.refused"}}
 		greet := greet(func(context.Context, string) (useCase, error) { return refusing, nil })
 
-		got := greet.Execute(t.Context(), Call{Dir: "/repo", Request: json.RawMessage(`{}`)})
+		got := greet.Execute(t.Context(), Call{Dir: "/repo"})
 
 		assert.Equal(t, status, got.Status, kind)
 		assert.Equal(t, "greet.refused", got.Envelope.Err.Code, kind)
 	}
-}
-
-func TestARequestIsDecodedStrictly(t *testing.T) {
-	opened := false
-	greet := greet(func(context.Context, string) (useCase, error) { opened = true; return useCase{}, nil })
-
-	for request, message := range map[string]string{
-		`{"nmae": "x"}`:               `invalid greet request: json: unknown field "nmae"`,
-		`{"name": "x"}{"evil": 1}`:    "invalid greet request: unexpected data after the request",
-		`{"name": "x"}garbage`:        "invalid greet request: unexpected data after the request",
-		`{"name": "x"} {"name": "y"}`: "invalid greet request: unexpected data after the request",
-	} {
-		got := greet.Execute(t.Context(), Call{Dir: "/repo", Request: json.RawMessage(request)})
-
-		assert.Equal(t, http.StatusBadRequest, got.Status, request)
-		assert.Equal(t, message, got.Envelope.Err.Message, request)
-	}
-	assert.False(t, opened)
 }
 
 func TestADirectoryThatIsNotAbsoluteIsRefusedBeforeAnythingOpens(t *testing.T) {
@@ -64,23 +45,12 @@ func TestADirectoryThatIsNotAbsoluteIsRefusedBeforeAnythingOpens(t *testing.T) {
 	greet := greet(func(context.Context, string) (useCase, error) { opened = true; return useCase{}, nil })
 
 	for _, dir := range []string{"", ".", "repo/main"} {
-		got := greet.Execute(t.Context(), Call{Dir: dir, Request: json.RawMessage(`{"name": "x"}`)})
+		got := greet.Execute(t.Context(), Call{Dir: dir, Answers: named("x")})
 
 		assert.Equal(t, http.StatusBadRequest, got.Status, dir)
 		assert.Equal(t, domain.CodeInvalidRequest, got.Envelope.Err.Code, dir)
 	}
 	assert.False(t, opened)
-}
-
-func TestAnswersAreFoldedOverTheRequestAsTheCommandLineFoldsItsFlags(t *testing.T) {
-	greet := greet(func(_ context.Context, dir string) (useCase, error) { return useCase{dir: dir}, nil })
-
-	answered := greet.Execute(t.Context(), Call{Dir: "/a", Answers: []domain.Answered{{Path: "name", Values: []string{"x"}}}})
-	over := greet.Execute(t.Context(), Call{Dir: "/a", Request: json.RawMessage(`{"name": "y", "loud": true}`), Answers: []domain.Answered{{Path: "name", Values: []string{"x"}}}})
-
-	assert.Equal(t, http.StatusOK, answered.Status)
-	assert.Equal(t, "/a:x:api", answered.Envelope.Op)
-	assert.Equal(t, "/a:x:api", over.Envelope.Op)
 }
 
 func TestAnAnswerTheRequestRefusesIsRefusedByItsPath(t *testing.T) {
@@ -100,7 +70,7 @@ func TestAnAnswerTheRequestRefusesIsRefusedByItsPath(t *testing.T) {
 func TestTheQuestionsAreAskedOfTheRequestAnsweredOnTheCallsDirectory(t *testing.T) {
 	greet := greet(func(_ context.Context, dir string) (useCase, error) { return useCase{dir: dir}, nil })
 
-	asked, err := greet.Questions(t.Context(), Call{Dir: "/a", Answers: []domain.Answered{{Path: "name", Values: []string{"x"}}}})
+	asked, err := greet.Questions(t.Context(), Call{Dir: "/a", Answers: named("x")})
 
 	require.NoError(t, err)
 	assert.Equal(t, "/a:x", asked.Fields[0].Spec().Label)
@@ -112,11 +82,21 @@ func TestTheQuestionsOfAnInvalidCallAreRefusedBeforeAnythingOpens(t *testing.T) 
 	greet := greet(func(context.Context, string) (useCase, error) { opened = true; return useCase{}, nil })
 
 	_, relative := greet.Questions(t.Context(), Call{Dir: "repo"})
-	_, unknown := greet.Questions(t.Context(), Call{Dir: "/repo", Request: json.RawMessage(`{"nmae": "x"}`)})
+	_, unknown := greet.Questions(t.Context(), Call{Dir: "/repo", Answers: []domain.Answered{{Path: "nmae", Values: []string{"x"}}}})
 
 	assert.Equal(t, domain.KindInvalid, domain.AsError(domain.AsErrorParams{Err: relative}).Kind)
 	assert.Equal(t, domain.KindInvalid, domain.AsError(domain.AsErrorParams{Err: unknown}).Kind)
 	assert.False(t, opened)
+}
+
+func TestAStalePlanIsFollowedUpByItsRequestAsADryRun(t *testing.T) {
+	stale := useCase{refusal: &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodePlanStale}}
+	greet := greet(func(context.Context, string) (useCase, error) { return stale, nil })
+
+	got := greet.Execute(t.Context(), Call{Dir: "/repo", Answers: named("x")})
+
+	assert.Equal(t, http.StatusPreconditionFailed, got.Status)
+	assert.Equal(t, []domain.FollowUp{domain.Replan("greet", []domain.Answered{{Path: "name", Values: []string{"x"}}})}, got.Envelope.FollowUps)
 }
 
 func TestACommandIsFoundByItsName(t *testing.T) {

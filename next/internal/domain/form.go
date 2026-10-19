@@ -289,6 +289,32 @@ func (f Form) Answers() []Answered {
 	return append(answers, Answered{Path: PathRemember, Values: f.Remembering()})
 }
 
+// Valued is a command's request, which says its answer to the field at path, nil when it leaves the field to its default.
+type Valued interface {
+	Values(path string) []string
+}
+
+// AnswersOf are the answers req gives the fields of form, a path shared by two fields once, then the fields it asks to remember and whether it asks again: what Fold folds back into req.
+func AnswersOf(form Form, req Valued) []Answered {
+	paths := make([]string, 0, len(form.Fields)+2)
+	for _, field := range form.Fields {
+		paths = append(paths, field.Spec().Path)
+	}
+
+	var answers []Answered
+	seen := map[string]bool{}
+	for _, path := range append(paths, PathRemember, PathAsk) {
+		values := req.Values(path)
+		if seen[path] || values == nil {
+			continue
+		}
+		seen[path] = true
+		answers = append(answers, Answered{Path: path, Values: values})
+	}
+
+	return answers
+}
+
 // Fold is req with each of answers given in turn; it stops at the first one req refuses.
 func Fold[R Answerable[R]](req R, answers []Answered) (R, error) {
 	for _, answer := range answers {

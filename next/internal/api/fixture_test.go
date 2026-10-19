@@ -7,8 +7,7 @@ import (
 )
 
 type request struct {
-	Name string `json:"name"`
-	Loud bool   `json:"loud"`
+	Name string
 }
 
 func (r request) Answer(path string, values []string) (request, error) {
@@ -47,4 +46,11 @@ func (u useCase) Questions(_ context.Context, req request) (questions, error) {
 
 func (u useCase) Run(_ context.Context, req request, opts domain.RunOptions) (outcome, error) {
 	return outcome{op: u.dir + ":" + req.Name + ":" + opts.Surface}, u.refusal
+}
+
+func (r request) Values(path string) []string {
+	if path != "name" || r.Name == "" {
+		return nil
+	}
+	return []string{r.Name}
 }

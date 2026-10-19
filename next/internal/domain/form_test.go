@@ -130,6 +130,17 @@ func TestAFormFoldsIntoTheRequestItsFieldsAnswer(t *testing.T) {
 	assert.Equal(t, answers{"branches": {"feat/a"}, "isolation": {"verbatim"}, PathRemember: {"isolation"}}, req)
 }
 
+func TestARequestAnswersEachPathOnceThenWhatItRemembersAndAsks(t *testing.T) {
+	form := Form{Fields: []Field{
+		SelectField{FieldSpec: FieldSpec{Path: "to"}},
+		TextField{FieldSpec: FieldSpec{Path: "to"}},
+		TextField{FieldSpec: FieldSpec{Path: "from"}},
+	}}
+	req := answers{"to": {"feat/x"}, PathRemember: {"to"}, PathAsk: {"true"}}
+
+	assert.Equal(t, []Answered{{Path: "to", Values: []string{"feat/x"}}, {Path: PathRemember, Values: []string{"to"}}, {Path: PathAsk, Values: []string{"true"}}}, AnswersOf(form, req))
+}
+
 func TestAFoldStopsAtTheFirstAnswerRefused(t *testing.T) {
 	req, err := Fold(answers{}, []Answered{{Path: "from", Values: []string{"main"}}, {Path: "nope"}, {Path: "to", Values: []string{"x"}}})
 

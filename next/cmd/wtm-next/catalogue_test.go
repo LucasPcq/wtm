@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -20,7 +19,6 @@ func TestTheCatalogueListsEachCommandWithItsSchemaOutsideAnyRepository(t *testin
 	for _, command := range catalogue() {
 		names = append(names, command.Name)
 		assert.NotEmpty(t, command.Form.Fields, command.Name)
-		assert.NotNil(t, command.Questions, "%s asks no questions through the catalogue", command.Name)
 	}
 
 	assert.Equal(t, []string{"create", "extract", "list"}, names)
@@ -31,17 +29,18 @@ func TestCreateIsDrivenThroughTheCataloguePreviewedThenAppliedWithItsFingerprint
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv(stateDirEnv, "")
 	create := command(t, "create")
-	request := json.RawMessage(`{"branches": ["feat/x"]}`)
+	answers := []domain.Answered{{Path: "branches", Values: []string{"feat/x"}}}
 
-	preview := create.Execute(t.Context(), api.Call{Dir: main, Request: request, Options: domain.RunOptions{DryRun: true}})
-	stale := create.Execute(t.Context(), api.Call{Dir: main, Request: request, Options: domain.RunOptions{ExpectFingerprint: "000000000000000000000000"}})
-	applied := create.Execute(t.Context(), api.Call{Dir: main, Request: request, Options: domain.RunOptions{ExpectFingerprint: preview.Envelope.Fingerprint}})
+	preview := create.Execute(t.Context(), api.Call{Dir: main, Answers: answers, Options: domain.RunOptions{DryRun: true}})
+	stale := create.Execute(t.Context(), api.Call{Dir: main, Answers: answers, Options: domain.RunOptions{ExpectFingerprint: "000000000000000000000000"}})
+	applied := create.Execute(t.Context(), api.Call{Dir: main, Answers: answers, Options: domain.RunOptions{ExpectFingerprint: preview.Envelope.Fingerprint}})
 
 	require.Equal(t, http.StatusOK, preview.Status, preview.Envelope.Err)
 	assert.NotEmpty(t, preview.Envelope.Fingerprint)
 	assert.NotNil(t, preview.Envelope.Plan)
 	assert.Equal(t, http.StatusPreconditionFailed, stale.Status)
 	assert.Equal(t, domain.CodePlanStale, stale.Envelope.Err.Code)
+	assert.Equal(t, []domain.FollowUp{domain.Replan("create", []domain.Answered{{Path: "branches", Values: []string{"feat/x"}}})}, stale.Envelope.FollowUps)
 	require.Equal(t, http.StatusOK, applied.Status, applied.Envelope.Err)
 	require.Len(t, applied.Envelope.Items, 1)
 	assert.Equal(t, domain.StatusDone, applied.Envelope.Items[0].Status)
@@ -54,16 +53,21 @@ func TestExtractIsDrivenThroughTheCataloguePreviewedThenAppliedWithItsFingerprin
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv(stateDirEnv, "")
 	extract := command(t, "extract")
-	request := json.RawMessage(`{"source": "main", "files": ["notes.txt"], "to": "feat/notes"}`)
+	answers := []domain.Answered{{Path: "source", Values: []string{"main"}}, {Path: "files", Values: []string{"notes.txt"}}, {Path: "to", Values: []string{"feat/notes"}}}
 
-	preview := extract.Execute(t.Context(), api.Call{Dir: main, Request: request, Options: domain.RunOptions{DryRun: true}})
-	stale := extract.Execute(t.Context(), api.Call{Dir: main, Request: request, Options: domain.RunOptions{ExpectFingerprint: "000000000000000000000000"}})
-	applied := extract.Execute(t.Context(), api.Call{Dir: main, Request: request, Options: domain.RunOptions{ExpectFingerprint: preview.Envelope.Fingerprint}})
+	preview := extract.Execute(t.Context(), api.Call{Dir: main, Answers: answers, Options: domain.RunOptions{DryRun: true}})
+	stale := extract.Execute(t.Context(), api.Call{Dir: main, Answers: answers, Options: domain.RunOptions{ExpectFingerprint: "000000000000000000000000"}})
+	applied := extract.Execute(t.Context(), api.Call{Dir: main, Answers: answers, Options: domain.RunOptions{ExpectFingerprint: preview.Envelope.Fingerprint}})
 
 	require.Equal(t, http.StatusOK, preview.Status, preview.Envelope.Err)
 	assert.NotEmpty(t, preview.Envelope.Fingerprint)
 	assert.Equal(t, http.StatusPreconditionFailed, stale.Status)
 	assert.Equal(t, domain.CodePlanStale, stale.Envelope.Err.Code)
+	require.Len(t, stale.Envelope.FollowUps, 1)
+	replan := stale.Envelope.FollowUps[0]
+	assert.Equal(t, "extract", replan.Command)
+	assert.True(t, replan.DryRun)
+	assert.Contains(t, replan.Answers, domain.Answered{Path: "to", Values: []string{"feat/notes"}})
 	require.Equal(t, http.StatusOK, applied.Status, applied.Envelope.Err)
 	assert.Equal(t, domain.StatusDone, applied.Envelope.Items[0].Status)
 	assert.FileExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-notes", "notes.txt"))
@@ -96,7 +100,7 @@ func TestListIsReadThroughTheCatalogueWithNoOperation(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv(stateDirEnv, "")
 
-	read := command(t, "list").Execute(t.Context(), api.Call{Dir: main, Request: json.RawMessage(`{}`)})
+	read := command(t, "list").Execute(t.Context(), api.Call{Dir: main})
 
 	require.Equal(t, http.StatusOK, read.Status, read.Envelope.Err)
 	require.Len(t, read.Envelope.Items, 1)
@@ -115,17 +119,17 @@ func TestAnInvalidCallIsRefusedWithTheStatusOfItsKind(t *testing.T) {
 
 	for name, c := range map[string]struct {
 		Dir     string
-		Request string
+		Answers []domain.Answered
 		Status  int
 		Code    string
 	}{
-		"unknown_field":    {Dir: main, Request: `{"branches": ["feat/x"], "brnach": "x"}`, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
-		"wrong_field_type": {Dir: main, Request: `{"branches": "feat/x"}`, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
-		"no_branch":        {Dir: main, Request: `{}`, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
-		"no_repository":    {Dir: t.TempDir(), Request: `{"branches": ["feat/x"]}`, Status: http.StatusPreconditionFailed, Code: domain.CodeNotARepository},
+		"unknown_field":     {Dir: main, Answers: []domain.Answered{{Path: "branches", Values: []string{"feat/x"}}, {Path: "brnach", Values: []string{"x"}}}, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
+		"two_values_of_one": {Dir: main, Answers: []domain.Answered{{Path: "branches", Values: []string{"feat/x"}}, {Path: "from", Values: []string{"main", "dev"}}}, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
+		"no_branch":         {Dir: main, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
+		"no_repository":     {Dir: t.TempDir(), Answers: []domain.Answered{{Path: "branches", Values: []string{"feat/x"}}}, Status: http.StatusPreconditionFailed, Code: domain.CodeNotARepository},
 	} {
 		t.Run(name, func(t *testing.T) {
-			got := create.Execute(t.Context(), api.Call{Dir: c.Dir, Request: json.RawMessage(c.Request)})
+			got := create.Execute(t.Context(), api.Call{Dir: c.Dir, Answers: c.Answers})
 
 			assert.Equal(t, c.Status, got.Status)
 			require.NotNil(t, got.Envelope.Err)

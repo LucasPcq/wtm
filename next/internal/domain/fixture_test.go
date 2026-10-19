@@ -40,3 +40,5 @@ func (a answers) Answer(path string, values []string) (answers, error) {
 	next[path] = values
 	return next, nil
 }
+
+func (a answers) Values(path string) []string { return a[path] }

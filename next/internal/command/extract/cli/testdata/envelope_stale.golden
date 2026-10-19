@@ -24,12 +24,6 @@
           "values": [
             "feat/other"
           ]
-        },
-        {
-          "path": "to",
-          "values": [
-            "feat/other"
-          ]
         }
       ],
       "dry_run": true,

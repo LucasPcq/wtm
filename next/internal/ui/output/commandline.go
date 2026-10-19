@@ -12,7 +12,7 @@ const shellSpecial = " \t\n'\"$`\\|&;<>()*?[]{}~#!"
 // The notes of the next steps that replay a dry run: ApplyNote beside the command that applies the plan just shown, ReplanNote beside the dry run to run again when the facts changed.
 const (
 	ApplyNote  = "apply this plan"
-	ReplanNote = "the plan the facts give now"
+	ReplanNote = domain.ReplanNote
 )
 
 // Quoted returns each of words quoted for the shell.

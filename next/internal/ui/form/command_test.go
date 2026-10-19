@@ -2,6 +2,7 @@ package form_test
 
 import (
 	"cmp"
+	"encoding/json"
 	"testing"
 
 	"github.com/spf13/pflag"
@@ -113,19 +114,17 @@ func TestAnApplyIsDrawnByTheCommandAndEndsOnItsFailure(t *testing.T) {
 func TestAStalePlanInJSONFollowsUpWithItsReplan(t *testing.T) {
 	stale := &domain.Error{Kind: domain.KindConflict, Code: domain.CodePlanStale, Message: "stale"}
 
-	got, _ := concluded(t, uicli.OutputJSON, form.Ran[request, outcome]{Request: request{"branches": {"feat/a"}}}, stale)
+	got, _ := concluded(t, uicli.OutputJSON, form.Ran[request, outcome]{Request: request{"branches": {"feat/a"}, domain.PathRemember: {"mode"}, domain.PathAsk: {"true"}}}, stale)
 
-	assert.Contains(t, got, `"follow_ups": [
-    {
-      "command": "fake",
-      "answers": [
-        {
-          "path": "branches",
-          "values": [
-            "feat/a"
-          ]
-        }
-      ],
-      "dry_run": true,
-      "code": "plan.replan",`)
+	var doc struct {
+		FollowUps []domain.FollowUp `json:"follow_ups"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(got), &doc))
+	assert.Equal(t, []domain.FollowUp{{
+		Command: "fake",
+		Answers: []domain.Answered{{Path: "branches", Values: []string{"feat/a"}}, {Path: domain.PathRemember, Values: []string{"mode"}}, {Path: domain.PathAsk, Values: []string{"true"}}},
+		DryRun:  true,
+		Code:    domain.CodeReplan,
+		Message: output.ReplanNote,
+	}}, doc.FollowUps)
 }

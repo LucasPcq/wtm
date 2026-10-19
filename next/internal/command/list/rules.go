@@ -254,35 +254,26 @@ const PathWorktree = "worktree"
 // ParamNumber is the param of the action that opens a pull request: its number, beside its URL.
 const ParamNumber = "number"
 
-// commands name the wtm command each action runs, as its command line spells it after the program's name; opening a pull request runs none.
-var commands = map[Action]string{
-	ActionGo:      "go",
-	ActionRunUp:   "run up",
-	ActionRunDown: "run down",
-	ActionLogs:    "run logs",
-	ActionClean:   "clean",
+// byAction is what each action runs, the wtm command as its command line spells it after the program's name, none to open a pull request, and what it reads as in the picker and as the note of its follow-up.
+var byAction = map[Action]struct{ command, label string }{
+	ActionGo:      {"go", "Go to the worktree"},
+	ActionOpenPR:  {"", "Open the pull request"},
+	ActionRunUp:   {"run up", "Start the profile"},
+	ActionRunDown: {"run down", "Stop the profile"},
+	ActionLogs:    {"run logs", "View the logs"},
+	ActionClean:   {"clean", "Clean (delete the worktree)"},
 }
 
 // FollowUpOf is action on the worktree of detail as the follow-up that carries it out, with its code and its label: its wtm command and answers, or the URL of its pull request and its number; its Argv is left to the surface that spells it.
 func FollowUpOf(action Action, detail Detail) domain.FollowUp {
-	followUp := domain.FollowUp{Code: Name + "." + string(action), Message: Labels[action]}
+	followUp := domain.FollowUp{Code: Name + "." + string(action), Message: byAction[action].label}
 	if action == ActionOpenPR && detail.PR != nil {
 		followUp.URL, followUp.Params = detail.PR.URL, domain.Params{ParamNumber: strconv.Itoa(detail.PR.Number)}
 		return followUp
 	}
 
-	followUp.Command, followUp.Answers = commands[action], []domain.Answered{{Path: PathWorktree, Values: []string{cmp.Or(detail.Branch, detail.Path)}}}
+	followUp.Command, followUp.Answers = byAction[action].command, []domain.Answered{{Path: PathWorktree, Values: []string{cmp.Or(detail.Branch, detail.Path)}}}
 	return followUp
-}
-
-// Labels are what each action reads as in the picker, and as the note of its follow-up.
-var Labels = map[Action]string{
-	ActionGo:      "Go to the worktree",
-	ActionOpenPR:  "Open the pull request",
-	ActionRunUp:   "Start the profile",
-	ActionRunDown: "Stop the profile",
-	ActionLogs:    "View the logs",
-	ActionClean:   "Clean (delete the worktree)",
 }
 
 // Holding returns the subject of the item whose worktree holds the directory cwd, the deepest one, "" when none does.

@@ -62,14 +62,14 @@ func (u UseCase) Run(ctx context.Context, req Request, _ domain.RunOptions) (Out
 	items, warnings := List(facts)
 	for _, item := range items {
 		if item.Detail != nil {
-			item.Detail.Actions = u.actions(*item.Detail)
+			item.Detail.Actions = u.Actions(*item.Detail)
 		}
 	}
 	return Outcome{Items: items, Warnings: warnings}, nil
 }
 
-// actions are the follow-ups the worktree of detail offers, each with the command line that carries it out.
-func (u UseCase) actions(detail Detail) []domain.FollowUp {
+// Actions are the follow-ups the worktree of detail offers, each with the command line that carries it out.
+func (u UseCase) Actions(detail Detail) []domain.FollowUp {
 	actions := []domain.FollowUp{}
 	for _, action := range Offers(detail) {
 		followUp := FollowUpOf(action, detail)

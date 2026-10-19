@@ -85,6 +85,14 @@ const CodePlanStale = "plan.stale"
 // CodeReplan is the code of the follow-up of a stale plan: its dry run, run again on the facts as they are now.
 const CodeReplan = "plan.replan"
 
+// ReplanNote is the message of the follow-up of a stale plan.
+const ReplanNote = "the plan the facts give now"
+
+// Replan is the follow-up of a stale plan of command: its request, answers, run again as a dry run on the facts as they are now.
+func Replan(command string, answers []Answered) FollowUp {
+	return FollowUp{Command: command, Answers: answers, DryRun: true, Code: CodeReplan, Message: ReplanNote}
+}
+
 // RunOptions are how a surface runs an operation.
 type RunOptions struct {
 	DryRun            bool   // plan without taking locks, stop after the fingerprint
