@@ -1,6 +1,6 @@
 flowchart TD
   n0["main origin ↑1"]
-  n1["feat/a services PR #12 ↑2 origin ↑3 ! dirty"]
+  n1["feat/a services web PR #12 ↑2 origin ↑3 ! dirty"]
   n0 --> n1
   n2["feat/a-ui ↑1"]
   n1 --> n2

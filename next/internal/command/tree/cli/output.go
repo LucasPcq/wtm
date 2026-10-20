@@ -42,7 +42,7 @@ type badge struct {
 	tone tone
 }
 
-// badgesOf are what a node's row says of it, in their order: no worktree, the jobs up, its pull request, its commits past its parent, where it stands against origin, its state, locked, needs sync, cycle.
+// badgesOf are what a node's row says of it, in their order: no worktree, the jobs up by name, its pull request, its commits past its parent, where it stands against origin, its state, locked, needs sync, cycle.
 func badgesOf(item tree.Item) []badge {
 	d := item.Detail
 	var badges []badge
@@ -50,7 +50,7 @@ func badgesOf(item tree.Item) []badge {
 		badges = append(badges, badge{"(no worktree)", toneMuted})
 	}
 	if len(d.Services) > 0 {
-		badges = append(badges, badge{"services", toneSuccess})
+		badges = append(badges, badge{"services " + strings.Join(d.Services, ", "), toneSuccess})
 	}
 	if d.PR != nil {
 		badges = append(badges, prBadge(*d.PR))

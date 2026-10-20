@@ -148,7 +148,10 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 
 	// A count git cannot make leaves the node not counted rather than unreadable.
 	state.Ahead = u.count(ctx, worktree.Span{Branch: w.Branch(), Base: parent})
-	state.Behind = u.count(ctx, worktree.Span{Branch: parent, Base: w.Branch()})
+	// A root has no parent to fall behind: it is counted ahead of the base branch only.
+	if _, child := facts.Stack.Parent(w.Branch()); child {
+		state.Behind = u.count(ctx, worktree.Span{Branch: parent, Base: w.Branch()})
+	}
 	return state
 }
 

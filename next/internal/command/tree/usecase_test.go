@@ -97,7 +97,7 @@ func TestAheadAndBehindAreCountedAgainstTheParent(t *testing.T) {
 		"feat/a":  {ahead: count(2), behind: count(0)},
 		"feat/a1": {ahead: count(1), behind: count(0)},
 		"feat/b":  {ahead: count(1), behind: count(1), needsSync: true},
-		"loose":   {ahead: count(1), behind: count(0)},
+		"loose":   {ahead: count(1)},
 		"feat/x":  {},
 		"feat/o":  {},
 	}
@@ -110,6 +110,22 @@ func TestAheadAndBehindAreCountedAgainstTheParent(t *testing.T) {
 			assert.Equal(t, c.needsSync, detail.NeedsSync)
 		})
 	}
+}
+
+func TestARootBehindTheBaseBranchIsNotFlagged(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{
+		Worktrees: []worktree.Worktree{linked("loose")},
+		Commits:   commits(map[string][]string{"main": {"m1", "m2"}, "loose": {"l1"}}),
+	}})
+
+	read, err := w.usecase.Run(t.Context(), tree.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	loose := detailOf(t, read, "loose")
+	assert.Equal(t, count(1), loose.Ahead, "a root is counted ahead of the base branch")
+	assert.Nil(t, loose.Behind, "a root has no parent to fall behind")
+	assert.False(t, loose.NeedsSync)
+	assert.Empty(t, loose.Actions)
 }
 
 func TestARootIsNotCountedWhenTheBaseBranchIsMissing(t *testing.T) {

@@ -45,7 +45,7 @@ type Detail struct {
 	Virtual  bool     `json:"virtual"`
 	Parent   *string  `json:"parent"` // null for a root
 	Children []string `json:"children"`
-	// Ahead are the commits the branch has that its parent lacks, the base branch's for a root; Behind those of the parent it lacks. Both null when not counted: the main worktree, a parent that is not a local branch.
+	// Ahead are the commits the branch has that its parent lacks, the base branch's for a root; Behind those of the parent it lacks, null for a root, which has none. Both null when not counted: the main worktree, a member of a cycle, a parent that is not a local branch.
 	Ahead     *int             `json:"ahead"`
 	Behind    *int             `json:"behind"`
 	NeedsSync bool             `json:"needs_sync"` // its parent has commits it lacks: a rebase is due
