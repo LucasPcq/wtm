@@ -1,0 +1,13 @@
+
+  main                     origin ↑1
+  ├─ feat/a                services  ↑2  origin ↑3  ! dirty
+  │  └─ feat/a-ui          ↑1
+  │     └─ feat/a-ui-copy
+  ├─ feat/b                ↑1  ! locked  ! needs sync
+  ├─ rebasing              ! rebasing
+  └─ feat/gone             ✗ missing
+  y                        ! cycle
+  z                        ! cycle
+  feat/login               (no worktree)
+  └─ feat/x
+

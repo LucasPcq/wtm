@@ -1,0 +1,12 @@
+flowchart TD
+  n0["main origin ↑1"]
+  n1["end ! needs sync"]
+  n0 --> n1
+  n2["feat-a ! needs sync"]
+  n0 --> n2
+  n3["feat.a ! needs sync"]
+  n0 --> n3
+  n4["feat/a ↑2 origin ↑3"]
+  n0 --> n4
+  n5["say#quot;hi#quot; ! needs sync"]
+  n0 --> n5

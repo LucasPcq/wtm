@@ -1,0 +1,330 @@
+{
+  "v": 2,
+  "command": "tree",
+  "ok": true,
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "branch": "main",
+        "path": "/repo/main",
+        "main": true,
+        "virtual": false,
+        "parent": null,
+        "children": [
+          "feat/a",
+          "feat/b",
+          "rebasing",
+          "feat/gone"
+        ],
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": {
+          "ahead": 1,
+          "behind": 0,
+          "state": "ahead"
+        },
+        "pr": null,
+        "services": [],
+        "actions": []
+      }
+    },
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "branch": "feat/a",
+        "path": "/repo/.trees/feat-a",
+        "main": false,
+        "virtual": false,
+        "parent": "main",
+        "children": [
+          "feat/a-ui"
+        ],
+        "ahead": 2,
+        "behind": 0,
+        "needs_sync": false,
+        "dirty": true,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": {
+          "ahead": 3,
+          "behind": 0,
+          "state": "ahead"
+        },
+        "pr": {
+          "number": 12,
+          "url": "https://github.com/acme/acme/pull/12",
+          "state": "open"
+        },
+        "services": [
+          "web"
+        ],
+        "actions": []
+      }
+    },
+    {
+      "subject": "feat/a-ui",
+      "status": "done",
+      "detail": {
+        "branch": "feat/a-ui",
+        "path": "/repo/.trees/feat-a-ui",
+        "main": false,
+        "virtual": false,
+        "parent": "feat/a",
+        "children": [
+          "feat/a-ui-copy"
+        ],
+        "ahead": 1,
+        "behind": 0,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": []
+      }
+    },
+    {
+      "subject": "feat/a-ui-copy",
+      "status": "done",
+      "detail": {
+        "branch": "feat/a-ui-copy",
+        "path": "/repo/.trees/feat-a-ui-copy",
+        "main": false,
+        "virtual": false,
+        "parent": "feat/a-ui",
+        "children": [],
+        "ahead": 0,
+        "behind": 0,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": []
+      }
+    },
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "branch": "feat/b",
+        "path": "/repo/.trees/feat-b",
+        "main": false,
+        "virtual": false,
+        "parent": "main",
+        "children": [],
+        "ahead": 1,
+        "behind": 1,
+        "needs_sync": true,
+        "dirty": false,
+        "locked": true,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": {
+          "number": 9,
+          "url": "https://github.com/acme/acme/pull/9",
+          "state": "merged"
+        },
+        "services": [],
+        "actions": [
+          {
+            "command": "clean",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/b"
+                ]
+              }
+            ],
+            "code": "tree.clean",
+            "message": "Clean the worktree: its pull request is merged"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "rebasing",
+      "status": "done",
+      "detail": {
+        "branch": "rebasing",
+        "path": "/repo/.trees/rebasing",
+        "main": false,
+        "virtual": false,
+        "parent": "main",
+        "children": [],
+        "ahead": 0,
+        "behind": 0,
+        "needs_sync": false,
+        "dirty": true,
+        "locked": false,
+        "rebasing": true,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": [
+          {
+            "command": "go",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "rebasing"
+                ]
+              }
+            ],
+            "code": "tree.go",
+            "message": "Go to the worktree to finish its rebase"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/gone",
+      "status": "done",
+      "detail": {
+        "branch": "feat/gone",
+        "path": "/repo/.trees/gone",
+        "main": false,
+        "virtual": false,
+        "parent": "main",
+        "children": [],
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": true,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": []
+      }
+    },
+    {
+      "subject": "y",
+      "status": "done",
+      "detail": {
+        "branch": "y",
+        "path": "/repo/.trees/y",
+        "main": false,
+        "virtual": false,
+        "parent": null,
+        "children": [],
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": true,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": []
+      }
+    },
+    {
+      "subject": "z",
+      "status": "done",
+      "detail": {
+        "branch": "z",
+        "path": "/repo/.trees/z",
+        "main": false,
+        "virtual": false,
+        "parent": null,
+        "children": [],
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": true,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": []
+      }
+    },
+    {
+      "subject": "feat/login",
+      "status": "done",
+      "detail": {
+        "branch": "feat/login",
+        "path": null,
+        "main": false,
+        "virtual": true,
+        "parent": null,
+        "children": [
+          "feat/x"
+        ],
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": null,
+        "actions": []
+      }
+    },
+    {
+      "subject": "feat/x",
+      "status": "done",
+      "detail": {
+        "branch": "feat/x",
+        "path": "/repo/.trees/feat-x",
+        "main": false,
+        "virtual": false,
+        "parent": "feat/login",
+        "children": [],
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": []
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

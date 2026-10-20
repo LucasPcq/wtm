@@ -21,6 +21,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
+	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
@@ -41,6 +42,7 @@ type app struct {
 	Create  create.UseCase
 	Extract extract.UseCase
 	List    list.UseCase
+	Tree    tree.UseCase
 }
 
 // wire builds each adapter of the repository params locates once and injects it into every use case.
@@ -58,6 +60,8 @@ func wire(params wireParams) app {
 	}
 
 	meta := store.Meta{StateDir: params.StateDir}
+	jobs := daemon.Daemon{SocketPath: events.SocketPath()}.Jobs
+	gh := github.GitHub{Dir: params.MainPath}
 
 	provisions := provision.Service{
 		Git:        repo,
@@ -91,8 +95,15 @@ func wire(params wireParams) app {
 		List: list.UseCase{
 			Git:          repo,
 			Meta:         meta,
-			Jobs:         daemon.Daemon{SocketPath: events.SocketPath()}.Jobs,
-			PullRequests: github.GitHub{Dir: params.MainPath}.PullRequests,
+			Jobs:         jobs,
+			PullRequests: gh.PullRequests,
+			Repository:   facts,
+		},
+		Tree: tree.UseCase{
+			Git:          repo,
+			Meta:         meta,
+			Jobs:         jobs,
+			PullRequests: gh.PullRequestsOf,
 			Repository:   facts,
 		},
 	}
