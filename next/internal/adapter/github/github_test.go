@@ -1,7 +1,9 @@
 package github_test
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/github"
@@ -18,7 +20,7 @@ func TestPullRequestsAreTheOpenOnesGHLists(t *testing.T) {
 	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequests(t.Context())
 
 	require.NoError(t, err)
-	assert.Equal(t, worktree.PullRequests{Open: []worktree.PullRequest{{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a"}}}, prs, "a fork's pull request is not this repository's branch")
+	assert.Equal(t, worktree.PullRequests{Open: []worktree.PullRequest{{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a", State: worktree.PullRequestOpen}}}, prs, "a fork's pull request is not this repository's branch")
 }
 
 func TestPullRequestsPastTheCapSaySo(t *testing.T) {
@@ -50,4 +52,56 @@ func TestPullRequestsRefuseOutputThatIsNotTheirList(t *testing.T) {
 	_, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequests(t.Context())
 
 	require.ErrorIs(t, err, worktree.ErrPullRequestsUnavailable)
+}
+
+func TestTheNewestPullRequestOfEachBranchIsReadWhateverItsState(t *testing.T) {
+	gh := fakeGH(t, 0, `{"data": {"repository": {
+		"b0": {"nodes": [{"number": 14, "url": "u14", "state": "MERGED", "headRefName": "feat/a", "isCrossRepository": false}]},
+		"b1": {"nodes": [{"number": 21, "url": "u21", "state": "OPEN", "headRefName": "main", "isCrossRepository": true}, {"number": 20, "url": "u20", "state": "CLOSED", "headRefName": "main", "isCrossRepository": false}]},
+		"b2": {"nodes": [{"number": 30, "url": "u30", "state": "OPEN", "headRefName": "feat/fork", "isCrossRepository": true}]},
+		"b3": {"nodes": []}}}}`)
+
+	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequestsOf(t.Context(), []string{"feat/a", "main", "feat/fork", "feat/none"})
+
+	require.NoError(t, err)
+	assert.Equal(t, []worktree.PullRequest{
+		{Number: 14, URL: "u14", Branch: "feat/a", State: worktree.PullRequestMerged},
+		{Number: 20, URL: "u20", Branch: "main", State: worktree.PullRequestClosed},
+	}, prs, "a fork's pull request is not this repository's branch")
+}
+
+func TestThePullRequestsOfManyBranchesAreAskedAHundredAtATime(t *testing.T) {
+	gh, log := graphQLGH(t, "")
+
+	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequestsOf(t.Context(), branchesNamed(250))
+
+	require.NoError(t, err)
+	assert.Len(t, prs, 250)
+	calls, err := os.ReadFile(log)
+	require.NoError(t, err)
+	lines := strings.Split(strings.TrimSpace(string(calls)), "\n")
+	require.Len(t, lines, 3)
+	assert.Len(t, strings.Fields(lines[0]), 100)
+	assert.Len(t, strings.Fields(lines[2]), 50)
+}
+
+func TestAFailingQueryKeepsThePullRequestsFoundBeforeIt(t *testing.T) {
+	gh, _ := graphQLGH(t, "b150")
+
+	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequestsOf(t.Context(), branchesNamed(250))
+
+	require.ErrorIs(t, err, worktree.ErrPullRequestsUnavailable)
+	assert.ErrorContains(t, err, "gh api graphql")
+	assert.Len(t, prs, 100)
+}
+
+func TestThePullRequestsOfBranchesSayWhyGHCannotBeAsked(t *testing.T) {
+	signedOut := fakeGH(t, 1, "{}")
+	garbled := fakeGH(t, 0, "not json")
+
+	_, signedOutErr := github.GitHub{Dir: t.TempDir(), Binary: signedOut}.PullRequestsOf(t.Context(), []string{"feat/a"})
+	_, garbledErr := github.GitHub{Dir: t.TempDir(), Binary: garbled}.PullRequestsOf(t.Context(), []string{"feat/a"})
+
+	assert.EqualError(t, signedOutErr, "pull requests unavailable: run `gh auth login`")
+	assert.ErrorIs(t, garbledErr, worktree.ErrPullRequestsUnavailable)
 }

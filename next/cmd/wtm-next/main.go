@@ -10,6 +10,7 @@ import (
 	createcli "github.com/LucasPcq/wtm/next/internal/command/create/cli"
 	extractcli "github.com/LucasPcq/wtm/next/internal/command/extract/cli"
 	listcli "github.com/LucasPcq/wtm/next/internal/command/list/cli"
+	treecli "github.com/LucasPcq/wtm/next/internal/command/tree/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/spf13/cobra"
@@ -37,5 +38,6 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		createcli.New(streams, env, openCreate, commandLine),
 		extractcli.New(streams, env, openExtract, commandLine),
 		listcli.New(streams, env, openList, commandLine),
+		treecli.New(streams, env, openTree, commandLine),
 	}
 }

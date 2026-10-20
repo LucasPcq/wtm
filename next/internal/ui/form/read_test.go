@@ -111,3 +111,45 @@ func TestAPickKeepsTheFailureOfTheReadInItsExitCode(t *testing.T) {
 	assert.Equal(t, "fake.unreadable", failed.Err.Code)
 	assert.Contains(t, stdout.String(), "→ wtm go feat/x")
 }
+
+func TestAReadPrintsAFormatOfItsOwnUnframedEvenQuiet(t *testing.T) {
+	q, _ := fakeQuery()
+	q.Formats = map[string]func(io.Writer, read){"mermaid": func(w io.Writer, got read) {
+		_, _ = io.WriteString(w, "graph of "+got.Items[0].Subject+"\n")
+	}}
+	streams, _, stdout, stderr := output.Test()
+	run := &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine}
+
+	err := launched(t, q, run, "--output", "mermaid", "--quiet")
+
+	require.NoError(t, err)
+	assert.Equal(t, "graph of feat/x\n", stdout.String())
+	assert.Empty(t, stderr.String())
+	assert.Equal(t, "Output format: text, json or mermaid", queryCommand(q, &uicli.Run{}).Flags().Lookup("output").Usage)
+}
+
+func TestAFormatNoneOfTheReadsIsRefusedNamingThem(t *testing.T) {
+	q, _ := fakeQuery()
+	q.Formats = map[string]func(io.Writer, read){"mermaid": func(io.Writer, read) {}}
+	streams, _, _, stderr := output.Test()
+
+	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine}, "--output", "dot")
+
+	require.Error(t, err)
+	assert.Contains(t, stderr.String(), `invalid --output "dot": expected one of text, json, mermaid`)
+}
+
+func TestARefusalInAFormatOfTheReadsIsText(t *testing.T) {
+	q, _ := fakeQuery()
+	q.Formats = map[string]func(io.Writer, read){"mermaid": func(io.Writer, read) {}}
+	q.Open = func(context.Context, string) (form.Reader[request, read], error) {
+		return nil, &domain.Error{Kind: domain.KindPrecondition, Code: "fake.config_not_found", Message: "no wtm config"}
+	}
+	streams, _, stdout, stderr := output.Test()
+
+	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine}, "--output", "mermaid")
+
+	require.Error(t, err)
+	assert.Empty(t, stdout.String())
+	assert.Contains(t, stderr.String(), "no wtm config")
+}

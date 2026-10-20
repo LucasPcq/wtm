@@ -1,4 +1,4 @@
-// Package repository reads the facts of a repository a command decides from: its config, its run.toml and its snapshot.
+// Package repository reads the facts of a repository a command decides from: its config, its run.toml, its snapshot, and where each worktree stands on disk.
 package repository
 
 import (

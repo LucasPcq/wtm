@@ -42,11 +42,11 @@ func TestEachWorktreeIsReadTheMainOneFirstThenTheOldest(t *testing.T) {
 	a := detailOf(t, read, "feat/a")
 	assert.Equal(t, list.Detail{
 		Branch: "feat/a", Path: "/repo/.trees/feat/a", Dirty: true, CommitsAhead: 2, CreatedAt: a.CreatedAt,
-		Origin: &list.Origin{Ahead: 2, State: worktree.Ahead}, Services: []string{"web"}, Actions: a.Actions,
+		Origin: &worktree.Origin{Ahead: 2, State: worktree.Ahead}, Services: []string{"web"}, Actions: a.Actions,
 	}, a)
 	assert.Equal(t, created.Add(time.Hour), *a.CreatedAt)
 	assert.True(t, detailOf(t, read, "main").Main)
-	assert.Equal(t, &list.Origin{State: worktree.UpToDate}, detailOf(t, read, "main").Origin)
+	assert.Equal(t, &worktree.Origin{State: worktree.UpToDate}, detailOf(t, read, "main").Origin)
 	assert.Nil(t, detailOf(t, read, "feat/c").CreatedAt, "a worktree without a meta record has no creation date")
 	assert.Nil(t, detailOf(t, read, "feat/c").Origin)
 }
@@ -163,7 +163,7 @@ func TestARefreshReadsOriginFetchedFirst(t *testing.T) {
 	read, err := w.usecase.Run(t.Context(), list.Request{Fetch: true}, domain.RunOptions{})
 
 	require.NoError(t, err)
-	assert.Equal(t, &list.Origin{Behind: 1, State: worktree.Behind}, detailOf(t, read, "main").Origin)
+	assert.Equal(t, &worktree.Origin{Behind: 1, State: worktree.Behind}, detailOf(t, read, "main").Origin)
 }
 
 func TestARepositoryWithoutConfigIsRefusedWithListsCode(t *testing.T) {

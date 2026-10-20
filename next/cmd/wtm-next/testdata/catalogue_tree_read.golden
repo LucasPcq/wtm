@@ -1,0 +1,33 @@
+{
+  "v": 2,
+  "command": "tree",
+  "ok": true,
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "branch": "main",
+        "path": "<root>/main",
+        "main": true,
+        "virtual": false,
+        "parent": null,
+        "children": [],
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": []
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

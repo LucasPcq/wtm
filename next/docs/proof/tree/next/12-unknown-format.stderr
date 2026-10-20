@@ -1,0 +1,4 @@
+
+  ✗ invalid --output "dot": expected one of text, json, mermaid
+  → wtm tree --help
+

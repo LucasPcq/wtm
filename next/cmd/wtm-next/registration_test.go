@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/list"
+	"github.com/LucasPcq/wtm/next/internal/command/tree"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/spf13/cobra"
@@ -45,6 +47,9 @@ func TestNoCommandAFollowUpNamesHasMigrated(t *testing.T) {
 	named := []string{leftBehind("feat/a").Command}
 	for _, action := range list.Actions(list.Detail{Branch: "feat/a"}) {
 		named = append(named, action.Command)
+	}
+	for _, detail := range []tree.Detail{{Branch: "feat/a", Rebasing: true}, {Branch: "feat/a", PR: &tree.PR{State: worktree.PullRequestMerged}}, {Branch: "feat/a", NeedsSync: true}} {
+		named = append(named, tree.Actions(detail, "main")[0].Command)
 	}
 	for _, command := range named {
 		require.NotEmpty(t, command)

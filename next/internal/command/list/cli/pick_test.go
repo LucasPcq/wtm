@@ -55,7 +55,7 @@ func TestARefreshAndThePullRequestsLandingLaterKeepEachOthersReads(t *testing.T)
 
 			assert.True(t, p.withPRs)
 			assert.Equal(t, &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12"}, shownDetail(t, p, "feat/b").PR)
-			assert.Equal(t, &list.Origin{Behind: 1, State: worktree.Behind}, shownDetail(t, p, "main").Origin, "the fetched counts are kept")
+			assert.Equal(t, &worktree.Origin{Behind: 1, State: worktree.Behind}, shownDetail(t, p, "main").Origin, "the fetched counts are kept")
 		})
 	}
 }

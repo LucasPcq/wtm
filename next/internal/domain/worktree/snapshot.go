@@ -75,6 +75,24 @@ func (s Snapshot) Standing(name string) Divergence {
 	return s.AheadBehind(name).Divergence()
 }
 
+// An Origin is where a branch stands against origin's branch of the same name: the commits each has that the other lacks, and what they make of it.
+type Origin struct {
+	Ahead  int        `json:"ahead"`
+	Behind int        `json:"behind"`
+	State  Divergence `json:"state"`
+}
+
+// OriginOf returns where name stands against origin, nil when name is empty or origin has no such branch.
+func (s Snapshot) OriginOf(name string) *Origin {
+	standing := s.Standing(name)
+	if name == "" || standing == NoOrigin {
+		return nil
+	}
+
+	counts := s.AheadBehind(name)
+	return &Origin{Ahead: counts.Ahead, Behind: counts.Behind, State: standing}
+}
+
 // Live returns the branch of each worktree, "" for one on no branch.
 func (s Snapshot) Live() []string {
 	names := make([]string, 0, len(s.Worktrees))

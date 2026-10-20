@@ -1,0 +1,6 @@
+flowchart TD
+  n0["main ✗ unreadable"]
+  n1["feat/a ✗ unreadable"]
+  n0 --> n1
+  %% ✗ couldn't read /repo/main: git status failed
+  %% ✗ couldn't read /repo/.trees/feat-a: git status failed

@@ -10,7 +10,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
+	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 
 	"github.com/stretchr/testify/assert"
@@ -110,6 +112,9 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"left_behind": {followUp: leftBehind("feat/x"), argv: []string{"wtm", "clean", "feat/x", "--force"}},
 		"dry_run":     {followUp: dryRun, argv: []string{"wtm", "clean", "feat/x", "--force", "--dry-run"}},
 		"pr_url_only": {followUp: domain.FollowUp{URL: pr.URL}, argv: []string{"gh", "pr", "view", pr.URL, "--web"}},
+		"tree_go":     {followUp: tree.Actions(tree.Detail{Branch: "feat/a", Rebasing: true}, "main")[0], argv: []string{"wtm", "go", "feat/a"}},
+		"tree_clean":  {followUp: tree.Actions(tree.Detail{Branch: "feat/a", PR: &tree.PR{State: worktree.PullRequestMerged}}, "main")[0], argv: []string{"wtm", "clean", "feat/a"}},
+		"tree_sync":   {followUp: tree.Actions(tree.Detail{Branch: "feat/a", NeedsSync: true}, "main")[0], argv: []string{"wtm", "sync", "feat/a"}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -1,0 +1,31 @@
+
+  Draw the worktrees as the forest of their stacks, each under the branch it was
+  created from, with what a stacked-branch workflow needs: the commits a branch has
+  past its parent (↑N), where it stands against origin, uncommitted changes, the jobs
+  up in it, and "needs sync" when its parent has commits it lacks. A parent with no
+  worktree is a muted root. It never fetches and changes nothing.
+
+  --with-prs adds each branch's newest pull request, open, merged or closed.
+  --output json gives each node with what it needs next; --output mermaid a
+  flowchart to paste into a pull request.
+
+  Usage:
+    wtm-next tree [flags]
+
+  Examples:
+    wtm tree
+
+    # With each branch's pull request, open, merged or closed
+    wtm tree --with-prs
+
+    # A flowchart to paste into a pull request
+    wtm tree --output mermaid
+
+  Flags:
+    -h, --help            help for tree
+        --output string   Output format: text, json or mermaid (default "text")
+        --with-prs        Ask GitHub for each branch's newest pull request, open, merged or closed (needs gh)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

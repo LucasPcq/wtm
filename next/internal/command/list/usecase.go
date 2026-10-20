@@ -23,9 +23,6 @@ const CodeConfigNotFound = Name + repository.ConfigNotFound
 // CodeConfigInvalid refuses a repository whose config.toml does not parse or validate.
 const CodeConfigInvalid = Name + repository.ConfigInvalid
 
-// stateReaders bounds the worktrees read at once, each costing a few git commands.
-const stateReaders = 8
-
 // A UseCase lists the worktrees of one repository: the ports it reads them through and the service that reads the repository.
 type UseCase struct {
 	Git          Git
@@ -101,21 +98,12 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 
 // states reads what each worktree of facts holds, a few at once.
 func (u UseCase) states(ctx context.Context, facts Facts) map[string]State {
-	var mu sync.Mutex
-	states := make(map[string]State, len(facts.Worktrees))
-	readers := make(chan struct{}, stateReaders)
-	var wg sync.WaitGroup
-	for _, w := range facts.listed() {
-		readers <- struct{}{}
-		wg.Go(func() {
-			defer func() { <-readers }()
-			state := u.state(ctx, facts, w)
-			mu.Lock()
-			states[w.Path] = state
-			mu.Unlock()
-		})
+	worktrees := facts.listed()
+	read := repository.Each(worktrees, func(w worktree.Worktree) State { return u.state(ctx, facts, w) })
+	states := make(map[string]State, len(worktrees))
+	for i, w := range worktrees {
+		states[w.Path] = read[i]
 	}
-	wg.Wait()
 
 	return states
 }
@@ -127,19 +115,10 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 		state.Meta, _ = u.Meta.Load(branch)
 	}
 
-	// git never lists a locked worktree prunable, even with its directory gone: the disk is asked.
-	state.Missing = w.Prunable
-	if !state.Missing {
-		var location worktree.Location
-		location, state.Err = u.Git.Locate(ctx, w.Path)
-		state.Missing = state.Err == nil && !location.Exists
-	}
-	if state.Missing || state.Err != nil {
-		return state
-	}
-
-	state.Dirty, state.Err = u.Git.Dirty(ctx, w.Path)
-	if state.Err != nil || !facts.counted(w) {
+	var presence repository.Presence
+	presence, state.Err = repository.Present(ctx, u.Git, w)
+	state.Missing, state.Dirty = presence.Missing, presence.Dirty
+	if state.Missing || state.Err != nil || !facts.counted(w) {
 		return state
 	}
 

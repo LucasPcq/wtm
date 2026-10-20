@@ -1,0 +1,15 @@
+
+  main                     origin ↑1
+  ├─ feat/a                PR #12  ↑2  origin ↑3  ! dirty
+  │  └─ feat/a-ui          ↑1
+  │     └─ feat/a-ui-copy
+  ├─ feat/b                PR #9 merged  ↑1  ! locked  ! needs sync
+  ├─ rebasing              ! rebasing
+  └─ feat/gone             ✗ missing
+  y                        ! cycle
+  z                        ! cycle
+  feat/login               (no worktree)
+  └─ feat/x
+  ! the run daemon is not running: which jobs are up is unknown
+  ! pull requests unavailable: run `gh auth login`
+

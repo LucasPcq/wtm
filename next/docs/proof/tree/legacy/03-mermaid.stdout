@@ -1,0 +1,20 @@
+flowchart TD
+  main["main origin ↑1"]
+  feat_a["feat/a base ↑2 ⚠ dirty ⚠ needs sync"]
+  main --> feat_a
+  feat_a_ui["feat/a-ui base ↑4"]
+  feat_a --> feat_a_ui
+  feat_a_ui_form["feat/a-ui-form base ↑3 ⚠ needs sync"]
+  feat_a_ui --> feat_a_ui_form
+  feat_b["feat/b base ↑1 ! locked ⚠ needs sync"]
+  main --> feat_b
+  feat_r["feat/r base ↑1 ⚠ rebasing ⚠ needs sync"]
+  main --> feat_r
+  feat_gone["feat/gone"]
+  main --> feat_gone
+  cyc_1["cyc-1 ⚠ cycle"]
+  cyc_2["cyc-2 ⚠ cycle"]
+  [" ⚠ cycle"]
+  feat_login["feat/login (no worktree)"]
+  feat_login_ui["feat/login-ui"]
+  feat_login --> feat_login_ui

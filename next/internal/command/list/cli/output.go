@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/list"
-	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
@@ -16,9 +15,6 @@ const (
 	tagLocked   = "locked"
 	tagServices = "services"
 	labelBase   = "base"
-	labelOrigin = "origin"
-	glyphAhead  = "↑"
-	glyphBehind = "↓"
 )
 
 // drawList draws a row per worktree read, the one holding the view's directory marked active, then each worktree that could not be read and the warnings.
@@ -55,7 +51,7 @@ func shown(item list.Item, cwd string) string {
 
 // cellsOf are the cells of a worktree's row after its subject: its tags, its pull request, the jobs up, its commits past the base branch, where it stands against origin and its state.
 func cellsOf(d list.Detail, active bool, st *output.Styles) []string {
-	return []string{tags(d, active, st), pr(d, st), services(d, st), ahead(d, st), origin(d, st), state(d, st)}
+	return []string{tags(d, active, st), pr(d, st), services(d, st), ahead(d, st), st.Origin(d.Origin), state(d, st)}
 }
 
 func tags(d list.Detail, active bool, st *output.Styles) string {
@@ -90,26 +86,7 @@ func ahead(d list.Detail, st *output.Styles) string {
 	if d.CommitsAhead == 0 {
 		return ""
 	}
-	return st.Muted.Render(labelBase + " " + glyphAhead + strconv.Itoa(d.CommitsAhead))
-}
-
-// origin is where the branch stands against origin, nothing when up to date or not on origin.
-func origin(d list.Detail, st *output.Styles) string {
-	if d.Origin == nil {
-		return ""
-	}
-
-	ahead, behind := glyphAhead+strconv.Itoa(d.Origin.Ahead), glyphBehind+strconv.Itoa(d.Origin.Behind)
-	switch d.Origin.State {
-	case worktree.Ahead:
-		return st.Muted.Render(labelOrigin + " " + ahead)
-	case worktree.Behind:
-		return st.Warning.Render(labelOrigin + " " + behind)
-	case worktree.Diverged:
-		return st.Danger.Render(labelOrigin + " " + ahead + " " + behind)
-	case worktree.NoOrigin, worktree.UpToDate:
-	}
-	return ""
+	return st.Muted.Render(labelBase + " " + output.GlyphAhead + strconv.Itoa(d.CommitsAhead))
 }
 
 // state is the worktree's state, its glyph coloured: a gone directory, then a rebase in progress, ahead of uncommitted changes.

@@ -223,6 +223,26 @@ func (f *Fake) Count(_ context.Context, span worktree.Span) (int, error) {
 	return len(of) - sharedLength(of, base), nil
 }
 
+// AheadBehindOf counts the commits of the local branch span.Branch past the
+// history it shares with the local branch span.Base, and the reverse; it fails
+// when either is missing.
+func (f *Fake) AheadBehindOf(_ context.Context, span worktree.Span) (worktree.AheadBehind, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("AheadBehindOf", span.Branch); err != nil {
+		return worktree.AheadBehind{}, err
+	}
+
+	of, ofOK := f.historyOf(worktree.LocalBranch{Name: span.Branch})
+	base, baseOK := f.historyOf(worktree.LocalBranch{Name: span.Base})
+	if !ofOK || !baseOK {
+		return worktree.AheadBehind{}, fmt.Errorf("gittest: unknown branch %s or %s", span.Branch, span.Base)
+	}
+
+	shared := sharedLength(of, base)
+	return worktree.AheadBehind{Ahead: len(of) - shared, Behind: len(base) - shared}, nil
+}
+
 // Snapshot returns the worktrees, the branches and the divergence of each
 // local branch whose remote tip differs, as git.Repo.Snapshot does.
 func (f *Fake) Snapshot(ctx context.Context) (worktree.Snapshot, error) {

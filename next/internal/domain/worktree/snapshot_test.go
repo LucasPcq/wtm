@@ -113,3 +113,10 @@ func TestANewWorktreeStartsFromTheBranchItChecksOutOrTheLocalSource(t *testing.T
 	assert.Empty(t, snapshot.StartsFrom("feat/a", StartCreate, "origin/main"))
 	assert.Empty(t, snapshot.StartsFrom("feat/r", StartResume, "main"))
 }
+
+func TestAnOriginIsSaidOnlyOfABranchOriginHas(t *testing.T) {
+	assert.Equal(t, &Origin{Behind: 2, State: Behind}, snapshot.OriginOf("main"))
+	assert.Equal(t, &Origin{State: UpToDate}, snapshot.OriginOf("same"))
+	assert.Nil(t, snapshot.OriginOf("feat/x"))
+	assert.Nil(t, snapshot.OriginOf(""))
+}

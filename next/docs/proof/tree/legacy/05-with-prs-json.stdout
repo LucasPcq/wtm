@@ -1,0 +1,224 @@
+{
+  "roots": [
+    {
+      "branch": "main",
+      "path": "<SB>/acme",
+      "is_main": true,
+      "is_virtual": false,
+      "status": {
+        "commits_ahead": 0,
+        "is_dirty": false,
+        "is_locked": false,
+        "rebase_in_progress": false,
+        "needs_sync": false,
+        "in_cycle": false,
+        "origin_ahead": 1,
+        "origin_behind": 0,
+        "origin_state": 3
+      },
+      "children": [
+        {
+          "branch": "feat/a",
+          "path": "<SB>/acme.trees/feat-a",
+          "is_main": false,
+          "is_virtual": false,
+          "status": {
+            "commits_ahead": 2,
+            "is_dirty": true,
+            "is_locked": false,
+            "rebase_in_progress": false,
+            "needs_sync": true,
+            "in_cycle": false,
+            "origin_ahead": 0,
+            "origin_behind": 0,
+            "origin_state": 1
+          },
+          "children": [
+            {
+              "branch": "feat/a-ui",
+              "path": "<SB>/acme.trees/feat-a-ui",
+              "is_main": false,
+              "is_virtual": false,
+              "status": {
+                "commits_ahead": 4,
+                "is_dirty": false,
+                "is_locked": false,
+                "rebase_in_progress": false,
+                "needs_sync": false,
+                "in_cycle": false,
+                "origin_ahead": 0,
+                "origin_behind": 0,
+                "origin_state": 0
+              },
+              "children": [
+                {
+                  "branch": "feat/a-ui-form",
+                  "path": "<SB>/acme.trees/feat-a-ui-form",
+                  "is_main": false,
+                  "is_virtual": false,
+                  "status": {
+                    "commits_ahead": 3,
+                    "is_dirty": false,
+                    "is_locked": false,
+                    "rebase_in_progress": false,
+                    "needs_sync": true,
+                    "in_cycle": false,
+                    "origin_ahead": 0,
+                    "origin_behind": 0,
+                    "origin_state": 0
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "branch": "feat/b",
+          "path": "<SB>/acme.trees/feat-b",
+          "is_main": false,
+          "is_virtual": false,
+          "status": {
+            "commits_ahead": 1,
+            "is_dirty": false,
+            "is_locked": true,
+            "rebase_in_progress": false,
+            "needs_sync": true,
+            "in_cycle": false,
+            "origin_ahead": 0,
+            "origin_behind": 0,
+            "origin_state": 0
+          },
+          "children": []
+        },
+        {
+          "branch": "feat/r",
+          "path": "<SB>/acme.trees/feat-r",
+          "is_main": false,
+          "is_virtual": false,
+          "status": {
+            "commits_ahead": 1,
+            "is_dirty": true,
+            "is_locked": false,
+            "rebase_in_progress": true,
+            "needs_sync": true,
+            "in_cycle": false,
+            "origin_ahead": 0,
+            "origin_behind": 0,
+            "origin_state": 0
+          },
+          "children": []
+        },
+        {
+          "branch": "feat/gone",
+          "path": "<SB>/acme.trees/feat-gone",
+          "is_main": false,
+          "is_virtual": false,
+          "status": {
+            "commits_ahead": 0,
+            "is_dirty": false,
+            "is_locked": false,
+            "rebase_in_progress": false,
+            "needs_sync": false,
+            "in_cycle": false,
+            "origin_ahead": 0,
+            "origin_behind": 0,
+            "origin_state": 0
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "branch": "cyc-1",
+      "path": "<SB>/acme.trees/cyc-1",
+      "is_main": false,
+      "is_virtual": false,
+      "status": {
+        "commits_ahead": 0,
+        "is_dirty": false,
+        "is_locked": false,
+        "rebase_in_progress": false,
+        "needs_sync": false,
+        "in_cycle": true,
+        "origin_ahead": 0,
+        "origin_behind": 0,
+        "origin_state": 0
+      },
+      "children": []
+    },
+    {
+      "branch": "cyc-2",
+      "path": "<SB>/acme.trees/cyc-2",
+      "is_main": false,
+      "is_virtual": false,
+      "status": {
+        "commits_ahead": 0,
+        "is_dirty": false,
+        "is_locked": false,
+        "rebase_in_progress": false,
+        "needs_sync": false,
+        "in_cycle": true,
+        "origin_ahead": 0,
+        "origin_behind": 0,
+        "origin_state": 0
+      },
+      "children": []
+    },
+    {
+      "branch": "",
+      "path": "<SB>/acme.trees/detached",
+      "is_main": false,
+      "is_virtual": false,
+      "status": {
+        "commits_ahead": 0,
+        "is_dirty": false,
+        "is_locked": false,
+        "rebase_in_progress": false,
+        "needs_sync": false,
+        "in_cycle": true,
+        "origin_ahead": 0,
+        "origin_behind": 0,
+        "origin_state": 0
+      },
+      "children": []
+    },
+    {
+      "branch": "feat/login",
+      "path": "",
+      "is_main": false,
+      "is_virtual": true,
+      "status": {
+        "commits_ahead": 0,
+        "is_dirty": false,
+        "is_locked": false,
+        "rebase_in_progress": false,
+        "needs_sync": false,
+        "in_cycle": false,
+        "origin_ahead": 0,
+        "origin_behind": 0,
+        "origin_state": 0
+      },
+      "children": [
+        {
+          "branch": "feat/login-ui",
+          "path": "<SB>/acme.trees/feat-login-ui",
+          "is_main": false,
+          "is_virtual": false,
+          "status": {
+            "commits_ahead": 0,
+            "is_dirty": false,
+            "is_locked": false,
+            "rebase_in_progress": false,
+            "needs_sync": false,
+            "in_cycle": false,
+            "origin_ahead": 0,
+            "origin_behind": 0,
+            "origin_state": 0
+          },
+          "children": []
+        }
+      ]
+    }
+  ]
+}

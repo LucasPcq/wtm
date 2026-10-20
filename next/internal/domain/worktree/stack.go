@@ -14,11 +14,12 @@ type Stack struct {
 	roots    []string
 	steps    map[string]bool
 	cycles   map[string][]string
+	virtual  map[string]bool
 }
 
 // StackOf builds the stack of the live worktrees from records, the meta record of each branch, by their source branches; base is the base branch. It never fails: the main worktree is a root whatever its record says, and a main worktree on no branch is no node, its children then under a virtual root of the branch they name; the base branch keeps its recorded parent; a worktree with no record or no source branch is a root; and the members of a cycle are promoted to roots, the cycle recorded for Cascade to refuse. Siblings, and the roots after the main one, are ordered by creation time, then by name; the virtual roots come last, by name.
 func StackOf(worktrees []Worktree, records map[string]Meta, base string) Stack {
-	stack := Stack{parents: map[string]string{}, children: map[string][]string{}, steps: map[string]bool{}, cycles: map[string][]string{}}
+	stack := Stack{parents: map[string]string{}, children: map[string][]string{}, steps: map[string]bool{}, cycles: map[string][]string{}, virtual: map[string]bool{}}
 	created := map[string]time.Time{}
 	main := ""
 	for _, w := range worktrees {
@@ -53,7 +54,8 @@ func StackOf(worktrees []Worktree, records map[string]Meta, base string) Stack {
 	}
 	var virtual []string
 	for branch, parent := range stack.parents {
-		if _, live := created[parent]; !live && !slices.Contains(virtual, parent) {
+		if _, live := created[parent]; !live && !stack.virtual[parent] {
+			stack.virtual[parent] = true
 			virtual = append(virtual, parent)
 		}
 		stack.children[parent] = append(stack.children[parent], branch)
@@ -90,6 +92,17 @@ func (s Stack) Children(branch string) []string {
 func (s Stack) Parent(branch string) (string, bool) {
 	parent, ok := s.parents[branch]
 	return parent, ok
+}
+
+// Virtual reports whether branch is a virtual root: a parent with no live worktree, holding its children.
+func (s Stack) Virtual(branch string) bool {
+	return s.virtual[branch]
+}
+
+// InCycle reports whether branch's parents lead back to it: a member of a cycle, promoted to a root.
+func (s Stack) InCycle(branch string) bool {
+	_, loops := s.cycles[branch]
+	return loops
 }
 
 // Cascade returns roots and the branches under them to rebase, each parent before its children, level by level from the stack's roots whatever the order roots are given in: the main worktree, the base branch and virtual roots are never a step. A member of a cycle among roots refuses the cascade with a *CycleError (a cycle's members being roots, roots is the only way to reach one); a cycle out of reach does not, where the legacy sync refuses any cycle: whether it should is sync's migration to decide.

@@ -1,0 +1,351 @@
+{
+  "v": 2,
+  "command": "tree",
+  "ok": true,
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "branch": "main",
+        "path": "<SB>/acme",
+        "main": true,
+        "virtual": false,
+        "parent": null,
+        "children": [
+          "feat/a",
+          "feat/b",
+          "feat/r",
+          "feat/gone"
+        ],
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": {
+          "ahead": 1,
+          "behind": 0,
+          "state": "ahead"
+        },
+        "pr": null,
+        "services": [],
+        "actions": []
+      }
+    },
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "branch": "feat/a",
+        "path": "<SB>/acme.trees/feat-a",
+        "main": false,
+        "virtual": false,
+        "parent": "main",
+        "children": [
+          "feat/a-ui"
+        ],
+        "ahead": 2,
+        "behind": 1,
+        "needs_sync": true,
+        "dirty": true,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": {
+          "ahead": 0,
+          "behind": 0,
+          "state": "up-to-date"
+        },
+        "pr": null,
+        "services": [
+          "api",
+          "web"
+        ],
+        "actions": [
+          {
+            "command": "sync",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/a"
+                ]
+              }
+            ],
+            "code": "tree.sync",
+            "message": "Sync the worktree: its parent has commits it lacks"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/a-ui",
+      "status": "done",
+      "detail": {
+        "branch": "feat/a-ui",
+        "path": "<SB>/acme.trees/feat-a-ui",
+        "main": false,
+        "virtual": false,
+        "parent": "feat/a",
+        "children": [
+          "feat/a-ui-form"
+        ],
+        "ahead": 2,
+        "behind": 0,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": []
+      }
+    },
+    {
+      "subject": "feat/a-ui-form",
+      "status": "done",
+      "detail": {
+        "branch": "feat/a-ui-form",
+        "path": "<SB>/acme.trees/feat-a-ui-form",
+        "main": false,
+        "virtual": false,
+        "parent": "feat/a-ui",
+        "children": [],
+        "ahead": 0,
+        "behind": 1,
+        "needs_sync": true,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": [
+          {
+            "command": "sync",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/a-ui-form"
+                ]
+              }
+            ],
+            "code": "tree.sync",
+            "message": "Sync the worktree: its parent has commits it lacks"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "main": false,
+        "virtual": false,
+        "parent": "main",
+        "children": [],
+        "ahead": 1,
+        "behind": 1,
+        "needs_sync": true,
+        "dirty": false,
+        "locked": true,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": [
+          {
+            "command": "sync",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/b"
+                ]
+              }
+            ],
+            "code": "tree.sync",
+            "message": "Sync the worktree: its parent has commits it lacks"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/r",
+      "status": "done",
+      "detail": {
+        "branch": "feat/r",
+        "path": "<SB>/acme.trees/feat-r",
+        "main": false,
+        "virtual": false,
+        "parent": "main",
+        "children": [],
+        "ahead": 1,
+        "behind": 1,
+        "needs_sync": true,
+        "dirty": true,
+        "locked": false,
+        "rebasing": true,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": [
+          {
+            "command": "go",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/r"
+                ]
+              }
+            ],
+            "code": "tree.go",
+            "message": "Go to the worktree to finish its rebase"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/gone",
+      "status": "done",
+      "detail": {
+        "branch": "feat/gone",
+        "path": "<SB>/acme.trees/feat-gone",
+        "main": false,
+        "virtual": false,
+        "parent": "main",
+        "children": [],
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": true,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": []
+      }
+    },
+    {
+      "subject": "cyc-1",
+      "status": "done",
+      "detail": {
+        "branch": "cyc-1",
+        "path": "<SB>/acme.trees/cyc-1",
+        "main": false,
+        "virtual": false,
+        "parent": null,
+        "children": [],
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": true,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": []
+      }
+    },
+    {
+      "subject": "cyc-2",
+      "status": "done",
+      "detail": {
+        "branch": "cyc-2",
+        "path": "<SB>/acme.trees/cyc-2",
+        "main": false,
+        "virtual": false,
+        "parent": null,
+        "children": [],
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": true,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": []
+      }
+    },
+    {
+      "subject": "feat/login",
+      "status": "done",
+      "detail": {
+        "branch": "feat/login",
+        "path": null,
+        "main": false,
+        "virtual": true,
+        "parent": null,
+        "children": [
+          "feat/login-ui"
+        ],
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": null,
+        "actions": []
+      }
+    },
+    {
+      "subject": "feat/login-ui",
+      "status": "done",
+      "detail": {
+        "branch": "feat/login-ui",
+        "path": "<SB>/acme.trees/feat-login-ui",
+        "main": false,
+        "virtual": false,
+        "parent": "feat/login",
+        "children": [],
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": []
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

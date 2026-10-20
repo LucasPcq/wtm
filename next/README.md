@@ -8,7 +8,7 @@
 cmd/wtm-next/          the composition root: builds each adapter once (wire.go), opens the project on demand, registers each command's cobra command on the root
 internal/
   domain/              the contract every use case speaks: errors, warnings, events and their stream, outcomes (`Outcome`, `Result`, `Unit`, generic over a command's plan and detail; `Read`, a read's) and the envelope that reports them, operations and their locks, the vocabulary of a question and a form's schema, a follow-up (a command and its answers, or a link), a plan's recap (`recap.go`: `RecapRow`, `RecapValue`, the marks of an answer), and the JSON of each a surface receives — pure, stdlib only
-    worktree/          branches and worktrees as git lists them: names, refs, where a branch stands against origin, where a branch asked for a new worktree lands, a checkout, meta.json, identity, the stack of worktrees by the branch each was created from, a branch's pull request
+    worktree/          branches and worktrees as git lists them: names, refs, where a branch stands against origin, where a branch asked for a new worktree lands, a checkout, meta.json, identity, the stack of worktrees by the branch each was created from (`StackOf`, which `command/tree` reads), a branch's pull request and its state (open, merged, closed)
     project/           what a use case reads of config.toml, run.toml (isolation included) and the global settings
     dotenv/            .env files parsed and rendered byte for byte
     env/               a worktree's environment: where its .env files come from, what wtm writes into them, what its jobs and hooks run with, its hook chain
@@ -25,12 +25,12 @@ internal/
     operationtest/     the contract every mutating use case's Run passes (no lock nor event on a dry run, a stale plan refused before any event, events in order), for tests
     provision/         a new worktree made whole and a source fast-forwarded, shared by the commands that create one, with the questions each of them asks (questions.go: the fragment their forms embed, whose Answers are all Run takes), the fingerprint of a plan that provisions and the answers remembered
     repository/        the facts of the repository a command decides from (config, run.toml, snapshot), wired once, refusing a repository with no wtm config with the command's `<name>.config_not_found`, and one whose config.toml does not parse or validate with `<name>.config_invalid`
-  adapter/             what the ports reach out to: git, statefile, store, config, shell, oplock, events, proxyport, daemon (the run daemon's jobs, never starting it), github (gh)
+  adapter/             what the ports reach out to: git, statefile, store, config, shell, oplock, events, proxyport, daemon (the run daemon's jobs, never starting it), github (gh: the open pull requests, and the newest of each branch whatever its state)
     <name>test/        a stateful fake of an adapter, for tests
   ui/                  the presentation kit every command's cli shares, knowing no command
     cli/               the root: version, --quiet, help, signals, the exit code a command's failure sets
     output/            the streams (stdin, stdout, stderr, whether each is a terminal, a colour renderer each), frames and blocks, progress, failures, plans, the hook view, the v2 envelope writer
-    form/              a command's form, generic over its schema: form.Command (its flags, its request, its launch, the conclusion of its run, its command line), form.Query (the same for a read, with its picker), the session and a step per field kind, the wizard that walks them to a recap and applies, or to the last step of a read's picker
+    form/              a command's form, generic over its schema: form.Command (its flags, its request, its launch, the conclusion of its run, its command line), form.Query (the same for a read, with its picker and the machine formats it prints besides json, tree's mermaid), the session and a step per field kind, the wizard that walks them to a recap and applies, or to the last step of a read's picker
     widget/            the inputs a step asks with: select list, multi-select, text field, text list, their styles
     formtest/          for a command's tests: the driver that plays its wizard key by key, golden files, the v2 envelope decoded
   api/                 the catalogue of the commands, knowing none of them: each one's name, its schema (domain.Form), its questions as the repository stands and its execution, the answers by field in and a domain.Envelope out with the status of its kind, for a surface other than the command line
@@ -80,7 +80,7 @@ A use case or a service declares the ports it needs in its `port.go`, interface 
 
 A second command is its own `command/<name>/` (use case, ports, rules, questions, `cli/`) and one line in each list of `cmd/wtm-next`: its constructor in `main.go`'s `commands`, its opener in `project.go` (`opener(func(a app) <name>.UseCase { return a.<Name> })`), its binding in `catalogue.go` (`api.Bind(<name>.Name, open, UseCase.Questions, UseCase.Run)`), its adapters wired in `wire.go`. `registration_test.go` fails when a command of `main.go` is missing from the catalogue or from the wiring, and `contract_test.go` when it is not in the catalogue contract (`.claude/skills/go-architecture/references/contract.md`, "The catalogue contract").
 
-A read, `command/list`, walks the same hops with a `form.Query` in place of a `form.Command`, under the contract of a read (`.claude/skills/go-architecture/references/contract.md`, "A read").
+A read, `command/list` or `command/tree`, walks the same hops with a `form.Query` in place of a `form.Command`, under the contract of a read (`.claude/skills/go-architecture/references/contract.md`, "A read").
 
 Todo: the follow-up a read's picker ends on is printed by `form.Query`; once every command it names has migrated, it runs in this process instead (`api.Catalogue.Find(followUp.Command)` with its answers), and its command line is spelled from that command's schema rather than by `commandLine` (`cmd/wtm-next/wire.go`, handed to each command's `cli.New`).
 

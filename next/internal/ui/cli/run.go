@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"io"
+	"slices"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -10,23 +12,24 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// A Run is what a command prints its run with: its name, its streams, the environment of its process, how its follow-ups are spelled, the --output format and --quiet the user gave, the flags its failures are spelled with and the exit codes of its own codes.
+// A Run is what a command prints its run with: its name, its streams, the environment of its process, how its follow-ups are spelled, the --output format and --quiet the user gave, the formats it prints besides, the flags its failures are spelled with and the exit codes of its own codes.
 type Run struct {
 	Command     string // the name the envelope reports
 	Streams     *output.Streams
 	Env         Env
 	CommandLine output.CommandLine // given by the composition root, the one that knows every command
 	Output      string             // bound to the command's --output flag
+	Formats     []string           // the machine formats the command prints besides json, which --output accepts too
 	Quiet       bool               // read from --quiet by [Run.Begin]
 	Flags       output.Flags
 	Exits       map[string]int
 }
 
-// Begin reads --quiet and refuses an --output format other than text or json, printed as text, the one format sure to be understood, followed by the way to cmd's help; then it refuses an invalid $WTM_CORRELATION_ID, before any repository is looked up.
+// Begin reads --quiet and refuses an --output format other than text, json or one of Formats, printed as text, the one format sure to be understood, followed by the way to cmd's help; then it refuses an invalid $WTM_CORRELATION_ID, before any repository is looked up.
 func (r *Run) Begin(cmd *cobra.Command) error {
 	r.Quiet, _ = cmd.Flags().GetBool(FlagQuiet)
-	if r.Output != OutputText && r.Output != OutputJSON {
-		refused := domain.InvalidMessage(`invalid --output "` + r.Output + `": expected one of text, json`)
+	if !slices.Contains(r.outputs(), r.Output) {
+		refused := domain.InvalidMessage(`invalid --output "` + r.Output + `": expected one of ` + strings.Join(r.outputs(), ", "))
 		r.Output = OutputText
 		return r.FailWith(refused, []output.NextStep{HelpStep(cmd)})
 	}
@@ -36,6 +39,16 @@ func (r *Run) Begin(cmd *cobra.Command) error {
 	}
 
 	return nil
+}
+
+// OutputHelp is the usage of --output: the formats it accepts.
+func (r *Run) OutputHelp() string {
+	formats := r.outputs()
+	return "Output format: " + strings.Join(formats[:len(formats)-1], ", ") + " or " + formats[len(formats)-1]
+}
+
+func (r *Run) outputs() []string {
+	return append([]string{OutputText, OutputJSON}, r.Formats...)
 }
 
 // Human reports whether the output is for a person, not the JSON envelope.
@@ -58,9 +71,9 @@ func (r *Run) Progress(ctx context.Context) *output.Progress {
 	return output.NewProgress(ctx, output.ProgressParams{W: stderr, Human: r.Human(), Live: !r.Quiet && r.Streams.CanAnimate()})
 }
 
-// FailWith prints failure followed by next, or the envelope that carries it with --output json, and returns the failure that sets the exit code.
+// FailWith prints failure followed by next, or the envelope that carries it with --output json, and returns the failure that sets the exit code; a machine format of the command's own prints it as text.
 func (r *Run) FailWith(failure *domain.Error, next []output.NextStep) error {
-	if !r.Human() {
+	if r.Output == OutputJSON {
 		return r.Envelope(domain.Envelope{Command: r.Command, Err: failure})
 	}
 
