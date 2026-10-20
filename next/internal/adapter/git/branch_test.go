@@ -97,6 +97,22 @@ func TestTheFakeAndGitCountTheCommitsABranchHasThatItsBaseLacks(t *testing.T) {
 	}
 }
 
+func TestTheFakeAndGitCountBothWaysBetweenTwoBranchesAtOnce(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			ahead, aheadErr := impl.port.AheadBehindOf(t.Context(), worktree.Span{Branch: "unmerged", Base: "main"})
+			behind, behindErr := impl.port.AheadBehindOf(t.Context(), worktree.Span{Branch: "main", Base: "unmerged"})
+			_, missingErr := impl.port.AheadBehindOf(t.Context(), worktree.Span{Branch: "unmerged", Base: "nope"})
+
+			require.NoError(t, aheadErr)
+			assert.Equal(t, worktree.AheadBehind{Ahead: 1}, ahead)
+			require.NoError(t, behindErr)
+			assert.Equal(t, worktree.AheadBehind{Behind: 1}, behind)
+			require.Error(t, missingErr)
+		})
+	}
+}
+
 func TestTheFakeAndGitRefuseTheSameBranchChanges(t *testing.T) {
 	refusals := []struct {
 		name string
