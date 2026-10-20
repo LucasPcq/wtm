@@ -16,6 +16,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./list.sh "$wtm" "$next" list
 ./status.sh "$wtm" "$next" status
 ./tree.sh "$wtm" "$next" tree
+./events.sh "$wtm" "$next" events
 git diff --stat .
 ```
 
@@ -202,6 +203,44 @@ The reference is the legacy `wtm tree` of 0.30.1. `tree` is a read: the proof ch
   - **A worktree not read is said so**: a meta record that does not decode fails its node alone, `✗ unreadable` with its cause, rather than making it a root counted against the base branch (`TestARecordThatCannotBeReadFailsItsNodeAlone`); an interrupted read marks its nodes `✗ interrupted`, cancelled, exit 19, never 0 with null counts, and warns of nothing it could not ask (`TestACountInterruptedMakesItsNodeCancelled`, `TestAnInterruptedReadWarnsOfNothingItCouldNotAsk`); under `--output mermaid` the cause is a `%% ✗` comment (`TestAWorktreeNotReadIsDrawnSoInTextAndMermaid`).
   - **`clean` is never offered for the main worktree nor the base branch**, even with a merged pull request.
   - Not fixed, legacy being frozen: legacy's `using-wtm/references/stacks.md` documents list's `origin` object for tree, and the guide's badge table describes `base ↑N` against the base branch and `▶ N running`.
+
+# Proof: `wtm events` (legacy `surface/cli/events`) vs `wtm-next events`
+
+The reference is the legacy `wtm events` of 0.30.1. `events` is a stream: the proof starts it in the background, reads it to its ready line, makes a change from another process of the same binary (a `create`), then interrupts it with SIGINT, as Ctrl+C does.
+
+- `events.sh <wtm> <wtm-next> events`: two identical sandboxes (the `docs/demos` "acme" project with `feat/a`, a git repository with no wtm config, a plain directory), each side with its own HOME, so each binary starts and talks to its own daemon: legacy's run daemon, next's `wtm-next daemon`. `repos.json` is removed before the scenarios (`registry-before`) and recorded after them (`registry-after`). Times, op ids and sandbox paths are normalised (`<T>`, `<ID>`, `<SB>`).
+  1. the stream of the current repository, as text, with a `create feat/text` in another process, then SIGINT
+  2. the same, `--output json`, with `create feat/json`
+  3. `--all --output json` from a directory outside any repository, with `create feat/all`
+  4. `--output json` outside any repository, without `--all`: every repository all the same
+  5. `--repo <acme> -q` from outside any repository
+  6. `--output json | head -n1`, exit status of the stream
+  7. `--all --repo`
+  8. `--repo` naming no directory
+  9. `--repo` naming a directory in no repository
+  10. a repository with no wtm config
+  11. the same, `--output json`
+  12. `--output json`, its stdout a socket whose reader leaves after the first byte (`12-socket-reader-gone.stdout` says whether the stream ended within 3 seconds)
+- The differences, all approved by the owner:
+  - **The stream is v2** (`"v":2`): every field of an event flat beside the envelope (`command`, `surface`, `ok`, `code`, `subject`, `status` where v1 nested `operation` and `unit`), `op_id` on every line of an operation, and `operation.started`, `unit.finished` and `operation.finished` on the stream (2, 3), which legacy's create never published. A snapshot's worktrees carry no `jobs` until the run module migrates (legacy: `jobs`, `[]` or `null`). The schema is `next/internal/adapter/events/events.v2.json`, open to types it does not list; legacy's v1 refused them. A v1 line from a legacy publisher is not read: the two never share a bus (next has its own daemon).
+  - **next has its own bus**: `wtm-next events` starts the hidden `wtm-next daemon`, which hosts the event bus alone, on the socket and lock legacy's run daemon uses (`<UserConfigDir>/wtm/wtm.sock`, `wtm.lock`); the two cannot run at once on one machine, and a legacy `wtm ui` or `wtm events` does not see next's events. It idles out 30 seconds after its last subscriber and request. While it runs, `wtm-next list` cannot ask it for jobs it does not host: `list.jobs_unknown` (`run daemon: unknown action: list`), services `null`, until the run module joins it.
+  - **A refusal before the stream is next's envelope** on stdout with `--output json` (11) where legacy printed text on stderr and nothing on stdout; an invalid request names its field (`--repo`) in next's words (7, 8, 9). The exit codes are legacy's: 2, 2, 21, 12.
+  - **The text**: `✓ updated feat/text  ordinal=2` where legacy drew `~` (next's kit has no update glyph: a change made is `✓`); `no longer watching <root>` is a `!` warning. Operation and unit events show nothing to a person, as legacy (whose stream had none).
+  - **The registry**: every `wtm-next` command that opens a repository adds it to `repos.json` (`registry-after`), in legacy's format, unless `$WTM_STATE_DIR` moves its state; `repo.added` carries no `correlation_id` (legacy's did).
+- The legacy bugs fixed, each with its test:
+  - **A stdout whose reader left killed the stream with SIGPIPE** (exit 141) when a write came before its 250 ms check: a write now fails with EPIPE and the stream exits 0 (`ui/cli` `TestAWriteToAStdoutWhoseReaderLeftFailsRatherThanKillTheProcess`). In 6 both exit 0: here the check wins the race.
+  - **A reader gone was noticed on a pipe only**: a socket stdout (a Node child's stdio) kept legacy streaming forever, still running in 12; next ends at once (`ui/output` `TestTheReaderOfASocketLeavingIsNoticed`).
+  - **`-q` silenced the warnings too**: they stay on stderr, only the events are silenced (5; `TestQuietSilencesTheEventsButNotTheWarnings`).
+  - **A line the bus carried that could not be decoded was dropped silently**: a warning names it (`TestALineThatCannotBeReadIsDroppedWithAWarning`).
+  - **The v1 schema refused a type it did not list** (`TestALineOfATypeTheSchemaDoesNotListIsValidAgainstTheEnvelope`).
+  - **A stream never noticed its repository losing its wtm config**: it now ends with exit 12, checked every 30 seconds and on its own `repo.removed` (`TestAStreamEndsWhenItsRepositoryLosesItsConfig`, `TestAStreamEndsWhenItsRepositoryIsAnnouncedRemovedAndItsConfigIsGone`).
+  - **`--repo` with `$WTM_PROJECT_DIR` subscribed to one repository and read the other's metadata**: `--repo` wins (`TestTheRepositoryNamedByRepoWinsOverTheDirectory`).
+  - **An inherited `$GIT_DIR` redirected the per-repository stream's git calls**: the designated repository wins, and `--all` no longer unsets the process's variables (`cmd/wtm-next` `TestTheEventStreamOfASurfaceOpensOnTheCallsRepositoryWhateverGitDirSays`).
+  - **An interrupt before the stream starts exits 19**, now documented in `--help` (`TestAnInterruptBeforeTheStreamStartsIsAnInterruption`); after its first line, 0 (1, 2, 3).
+  - **A repository registered between the subscription and the first prune got a second snapshot** (`TestARepositoryAlreadySnapshottedIsNotSentAgainWhenItsJoiningArrives`).
+  - **The global stream relayed the events of a repository it had sent no snapshot of** (`TestTheGlobalStreamDropsTheEventsOfARepositoryItSentNoSnapshotOf`).
+  - **The first wait before subscribing again was 400 ms**, now 200 ms, doubling to 5 s (`TestTheFirstWaitBeforeSubscribingAgainIsTheShortestThenItDoublesUpToALimit`).
+  - **`--help` did not list what the stream carries**: it names every type (`events_help.golden`).
 
 # Deliberate differences from legacy
 
