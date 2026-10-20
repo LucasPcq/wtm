@@ -19,6 +19,11 @@ import (
 const (
 	lockName        = "wtm.lock"
 	subscriberQueue = 256
+	// writeTimeout bounds a write to a subscriber: one that stopped reading is cut off rather than holding the daemon.
+	writeTimeout = time.Second
+	// lockWait is how long a daemon starting waits for the lock: a client probing whether a daemon holds it takes it for an instant.
+	lockWait  = 250 * time.Millisecond
+	lockRetry = 10 * time.Millisecond
 
 	actionPublish   = "publish"
 	actionSubscribe = "subscribe"
@@ -58,6 +63,10 @@ type ServeParams struct {
 // another one holds it. Stopping ends every subscription.
 func Serve(ctx context.Context, params ServeParams) error {
 	lock, err := statefile.TryLock(lockPath(params.SocketPath), domain.LockExclusive)
+	for waited := time.Duration(0); errors.Is(err, statefile.ErrBusy) && waited < lockWait; waited += lockRetry {
+		time.Sleep(lockRetry)
+		lock, err = statefile.TryLock(lockPath(params.SocketPath), domain.LockExclusive)
+	}
 	if errors.Is(err, statefile.ErrBusy) {
 		return ErrDaemonRunning
 	}
@@ -196,7 +205,7 @@ func (d *daemon) subscribe(ctx context.Context, params subscription) {
 		case <-ctx.Done():
 			return
 		case delivered, open := <-sub:
-			if !open || params.Encoder.Encode(response{Status: statusEvent, Payload: delivered.payload}) != nil {
+			if !open || params.Conn.SetWriteDeadline(time.Now().Add(writeTimeout)) != nil || params.Encoder.Encode(response{Status: statusEvent, Payload: delivered.payload}) != nil {
 				return
 			}
 		}

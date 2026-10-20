@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,4 +57,34 @@ func TestASubscriptionEndsWithItsContext(t *testing.T) {
 	cancel()
 
 	assert.True(t, closed(lines))
+}
+
+func TestSubscribingWaitsForADaemonThatHoldsTheLockWithoutAnsweringToBeGone(t *testing.T) {
+	socket := filepath.Join(socketDir(t), "wtm.sock")
+	stopping, err := statefile.TryLock(lockPath(socket), domain.LockExclusive)
+	require.NoError(t, err)
+	var gone atomic.Bool
+	time.AfterFunc(300*time.Millisecond, func() {
+		gone.Store(true)
+		_ = stopping.Close()
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	var served <-chan error
+	t.Cleanup(func() {
+		cancel()
+		if served != nil {
+			<-served
+		}
+	})
+	startedAfterIt := false
+	bus := Bus{SocketPath: socket, Start: func() error {
+		startedAfterIt = gone.Load()
+		served = startServe(ctx, ServeParams{SocketPath: socket, Idle: time.Minute})
+		return nil
+	}}
+
+	_, err = bus.Subscribe(t.Context(), nil)
+
+	require.NoError(t, err)
+	assert.True(t, startedAfterIt, "a daemon was started while the stopping one still held the lock")
 }

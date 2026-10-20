@@ -5,8 +5,12 @@ import (
 	"encoding/json"
 	"net"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -109,4 +113,66 @@ func TestAnUnknownActionIsRefused(t *testing.T) {
 	require.NoError(t, json.NewDecoder(conn).Decode(&reply))
 
 	assert.Equal(t, response{Status: statusError, Message: "unknown action: list"}, reply)
+}
+
+func TestASubscriberLeavingLetsTheDaemonIdleOut(t *testing.T) {
+	socket := filepath.Join(socketDir(t), "wtm.sock")
+	served := startServe(t.Context(), ServeParams{SocketPath: socket, Idle: 100 * time.Millisecond})
+	require.Eventually(t, Bus{SocketPath: socket}.answers, 2*time.Second, 10*time.Millisecond)
+	ctx, leave := context.WithCancel(t.Context())
+	_, err := Bus{SocketPath: socket}.Subscribe(ctx, nil)
+	require.NoError(t, err)
+
+	leave()
+
+	select {
+	case err := <-served:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "the daemon outlived its last subscriber")
+	}
+}
+
+// A daemon once waited forever on a subscriber that stopped reading, holding its lock while every client waited for it to go.
+func TestASubscriberThatStoppedReadingDoesNotHoldTheDaemonStopping(t *testing.T) {
+	socket := filepath.Join(socketDir(t), "wtm.sock")
+	ctx, stop := context.WithCancel(t.Context())
+	served := startServe(ctx, ServeParams{SocketPath: socket, Idle: time.Minute})
+	require.Eventually(t, Bus{SocketPath: socket}.answers, 2*time.Second, 10*time.Millisecond)
+	stalled, err := net.Dial("unix", socket)
+	require.NoError(t, err)
+	defer stalled.Close()
+	require.NoError(t, json.NewEncoder(stalled).Encode(request{Action: actionSubscribe}))
+	var ack response
+	require.NoError(t, json.NewDecoder(stalled).Decode(&ack))
+	payload := `"` + strings.Repeat("x", 8192) + `"`
+	for range 64 {
+		publish(t, socket, "/a/.git", payload)
+	}
+
+	stop()
+
+	select {
+	case err := <-served:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "the daemon did not stop")
+	}
+}
+
+// A client probing whether a daemon holds the lock takes it for an instant: a daemon starting then once gave up.
+func TestADaemonStartingWaitsForALockHeldForAnInstant(t *testing.T) {
+	socket := filepath.Join(socketDir(t), "wtm.sock")
+	probe, err := statefile.TryLock(lockPath(socket), domain.LockExclusive)
+	require.NoError(t, err)
+	time.AfterFunc(50*time.Millisecond, func() { _ = probe.Close() })
+
+	ctx, stop := context.WithCancel(t.Context())
+	served := startServe(ctx, ServeParams{SocketPath: socket, Idle: time.Minute})
+	t.Cleanup(func() {
+		stop()
+		<-served
+	})
+
+	assert.Eventually(t, Bus{SocketPath: socket}.answers, 2*time.Second, 10*time.Millisecond)
 }
