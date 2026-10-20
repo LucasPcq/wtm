@@ -3,6 +3,8 @@ package form
 import (
 	"context"
 	"io"
+	"maps"
+	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
@@ -29,6 +31,8 @@ type Query[R Request[R], Q Questions, O ReadOutcome] struct {
 	Draw func(w io.Writer, read O, view output.View) // what was read, drawn from view
 	// Pick lets the user pick a follow-up of what was read, when the user can see and answer it: it returns the read with the follow-ups chosen. Nil only draws the read.
 	Pick func(ctx context.Context, read O, req R, run *uicli.Run) (O, error)
+	// Formats are the machine formats the read prints besides json, by the name --output gives them: each drawn unframed on stdout from what was read, never silenced by --quiet; a refusal is printed as text.
+	Formats map[string]func(w io.Writer, read O)
 
 	io *uicli.Run
 }
@@ -44,11 +48,12 @@ func (q *Query[R, Q, O]) Flags() output.Flags {
 	return flags
 }
 
-// Bind registers on cmd a flag per field of the schema, by its kind, then --output; run is where the command prints its read.
+// Bind registers on cmd a flag per field of the schema, by its kind, then --output, which takes Formats too; run is where the command prints its read.
 func (q *Query[R, Q, O]) Bind(cmd *cobra.Command, run *uicli.Run) {
 	q.io = run
+	run.Formats = slices.Sorted(maps.Keys(q.Formats))
 	bindFields(cmd, q.schema())
-	cmd.Flags().StringVar(&run.Output, "output", uicli.OutputText, uicli.OutputUsage)
+	cmd.Flags().StringVar(&run.Output, "output", uicli.OutputText, run.OutputHelp())
 }
 
 // Launch runs cmd: it refuses an invalid --output or correlation ID, builds the request from the flags and args, opens the use case on the project's directory and reads, then lets the user pick of the read when Pick is set and the user can see and answer it; it prints how the read ended and returns the failure that sets the exit code.
@@ -78,15 +83,20 @@ func (q *Query[R, Q, O]) interactive() bool {
 	return q.io.Streams.CanPrompt() && q.io.Streams.Out.IsTerminal() && q.io.Human() && !q.io.Quiet
 }
 
-// conclude prints how the read ended — the JSON envelope, a refusal, the follow-ups the user picked, or what Draw draws of the read — and returns the failure that sets the exit code.
+// conclude prints how the read ended — the JSON envelope, a refusal, the read in a format of Formats, the follow-ups the user picked, or what Draw draws of the read — and returns the failure that sets the exit code.
 func (q *Query[R, Q, O]) conclude(read O, err error) error {
 	failure := domain.AsError(domain.AsErrorParams{Err: err})
 	doc := read.Envelope(q.io.Command, failure)
 	switch {
-	case !q.io.Human():
+	case q.io.Output == uicli.OutputJSON:
 		return q.io.Envelope(doc)
 	case failure != nil:
 		return q.io.FailWith(failure, nil)
+	}
+
+	if draw, ok := q.Formats[q.io.Output]; ok {
+		draw(q.io.Streams.Out, read)
+		return q.io.Failed(read.Failure())
 	}
 
 	stdout, _ := q.io.Writers()
