@@ -1,6 +1,6 @@
 
   main                     origin ↑1
-  ├─ feat/a                services  ↑2  ! dirty  ! needs sync
+  ├─ feat/a                services api, web  ↑2  ! dirty  ! needs sync
   │  └─ feat/a-ui          ↑2
   │     └─ feat/a-ui-form  ! needs sync
   ├─ feat/b                ↑1  ! locked  ! needs sync
