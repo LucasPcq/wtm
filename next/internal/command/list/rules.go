@@ -59,11 +59,7 @@ type Detail struct {
 }
 
 // Origin is where a worktree's branch stands against origin's.
-type Origin struct {
-	Ahead  int                 `json:"ahead"`
-	Behind int                 `json:"behind"`
-	State  worktree.Divergence `json:"state"`
-}
+type Origin = worktree.Origin
 
 // PR is a worktree's open pull request.
 type PR struct {
@@ -124,23 +120,13 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Missing:      state.Missing,
 		CommitsAhead: state.Ahead,
 		CreatedAt:    createdAt(state.Meta.CreatedAt),
-		Origin:       f.origin(w.Branch()),
+		Origin:       f.OriginOf(w.Branch()),
 		PR:           f.pr(w.Branch()),
 		Services:     f.services(w.Path),
 	}
 	detail.Actions = Actions(detail)
 
 	return Item{Subject: subject, Status: domain.StatusDone, Detail: &detail}
-}
-
-func (f Facts) origin(branch string) *Origin {
-	standing := f.Standing(branch)
-	if branch == "" || standing == worktree.NoOrigin {
-		return nil
-	}
-
-	counts := f.AheadBehind(branch)
-	return &Origin{Ahead: counts.Ahead, Behind: counts.Behind, State: standing}
 }
 
 func (f Facts) pr(branch string) *PR {
@@ -159,15 +145,7 @@ func (f Facts) services(path string) []string {
 		return nil
 	}
 
-	names := []string{}
-	for _, job := range f.Jobs {
-		if job.Up && job.WorkDir == path {
-			names = append(names, job.Name)
-		}
-	}
-	slices.Sort(names)
-
-	return names
+	return run.UpIn(f.Jobs, path)
 }
 
 func (f Facts) warnings() []domain.Warning {
@@ -176,7 +154,7 @@ func (f Facts) warnings() []domain.Warning {
 		warnings = append(warnings, domain.Warning{Code: CodeBaseMissing, Message: "the base branch " + base + " does not exist: commits ahead of it are not counted", Params: domain.Params{"branch": base}})
 	}
 	if f.JobsErr != nil {
-		warnings = append(warnings, domain.Warning{Code: CodeJobsUnknown, Message: jobsUnknown(f.JobsErr)})
+		warnings = append(warnings, domain.Warning{Code: CodeJobsUnknown, Message: run.UnknownMessage(f.JobsErr)})
 	}
 	if f.PRsErr != nil {
 		warnings = append(warnings, domain.Warning{Code: CodePRsUnavailable, Message: f.PRsErr.Error()})
@@ -186,14 +164,6 @@ func (f Facts) warnings() []domain.Warning {
 	}
 
 	return warnings
-}
-
-func jobsUnknown(err error) string {
-	if errors.Is(err, run.ErrUnknown) {
-		return "the run daemon is not running: which jobs are up is unknown"
-	}
-
-	return "couldn't ask the run daemon which jobs are up: " + err.Error()
 }
 
 // counted reports whether the commits a worktree's branch has past the base branch are counted: not for the main worktree, a worktree on no branch, nor when the base branch does not exist.

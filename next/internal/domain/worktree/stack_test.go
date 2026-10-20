@@ -177,3 +177,14 @@ func TestACycleErrorNamesItsBranches(t *testing.T) {
 
 	assert.EqualError(t, err, "the parents of these worktrees form a cycle: a, b")
 }
+
+func TestAStackSaysWhichRootsAreVirtualAndWhichBranchesLoop(t *testing.T) {
+	stack := StackOf(live("a", "b", "x", "y"), map[string]Meta{"a": from("gone"), "b": from("a"), "x": from("y"), "y": from("x")}, "")
+
+	assert.True(t, stack.Virtual("gone"))
+	assert.False(t, stack.Virtual("a"))
+	assert.False(t, stack.Virtual("main"))
+	assert.True(t, stack.InCycle("x"))
+	assert.True(t, stack.InCycle("y"))
+	assert.False(t, stack.InCycle("b"))
+}
