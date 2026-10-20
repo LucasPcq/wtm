@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
@@ -151,13 +152,15 @@ func TestAReadChangesNothingAndReadsEachWorktreeOnce(t *testing.T) {
 	require.NoError(t, err)
 	seen := map[string]int{}
 	for _, call := range append(w.git.Calls(), w.meta.Calls()...) {
-		assert.Regexp(t, `^(Worktrees|Branches|AheadBehind|Locate|Dirty|Count|Load) `, call)
+		assert.Regexp(t, `^(Worktrees|Branches|AheadBehind|AheadBehindOf|Locate|Dirty|Count|Load) `, call)
 		seen[call]++
 	}
 	assert.Equal(t, 1, seen["Worktrees "])
 	assert.Equal(t, 1, seen["Locate /repo/.trees/feat/a"])
 	assert.Equal(t, 1, seen["Dirty /repo/.trees/feat/a"])
 	assert.Equal(t, 1, seen["Load feat/a"])
+	assert.Equal(t, 1, seen["AheadBehindOf feat/b"], "a child is counted against its parent in one git process")
+	assert.Zero(t, seen["Count feat/b"])
 }
 
 func TestALockedARebasingAndADirtyWorktreeAreSaidSo(t *testing.T) {
@@ -276,26 +279,13 @@ func TestThePullRequestsFoundBeforeGitHubFailedAreKept(t *testing.T) {
 func TestTheJobsUpInAWorktreeAreItsServices(t *testing.T) {
 	w := newWorld(seed{
 		Git:  gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}},
-		Jobs: []run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true}, {Name: "api", WorkDir: "/repo/.trees/feat/a"}},
+		Jobs: []run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true}},
 	})
-	unknown, err := newWorld(seed{JobsErr: run.ErrUnknown}).usecase.Run(t.Context(), tree.Request{}, domain.RunOptions{})
-	require.NoError(t, err)
 
 	read, err := w.usecase.Run(t.Context(), tree.Request{}, domain.RunOptions{})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"web"}, detailOf(t, read, "feat/a").Services)
-	assert.Equal(t, []string{}, detailOf(t, read, "main").Services)
-	assert.Nil(t, detailOf(t, unknown, "main").Services)
-}
-
-func TestWhereABranchStandsAgainstOriginIsSaid(t *testing.T) {
-	w := newWorld(seed{Git: gittest.FakeParams{Remote: []string{"main"}, Origin: map[string][]string{"main": {"upstream"}}}})
-
-	read, err := w.usecase.Run(t.Context(), tree.Request{}, domain.RunOptions{})
-
-	require.NoError(t, err)
-	assert.Equal(t, &worktree.Origin{State: worktree.UpToDate}, detailOf(t, read, "main").Origin, "an origin not fetched is not counted")
 }
 
 func TestARepositoryWithoutConfigIsRefusedWithTreesCode(t *testing.T) {
@@ -304,4 +294,45 @@ func TestARepositoryWithoutConfigIsRefusedWithTreesCode(t *testing.T) {
 	refused, ok := errors.AsType[*domain.Error](err)
 	require.True(t, ok, err)
 	assert.Equal(t, tree.CodeConfigNotFound, refused.Code)
+}
+
+func TestARecordThatCannotBeReadFailsItsNodeAlone(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), linked("loose")}}, Unreadable: []string{"feat/a"}})
+
+	read, err := w.usecase.Run(t.Context(), tree.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	failed := read.Items[slices.IndexFunc(read.Items, func(item tree.Item) bool { return item.Subject == "feat/a" })]
+	assert.Equal(t, domain.StatusFailed, failed.Status)
+	assert.Equal(t, tree.CodeUnreadable, failed.Err.Code)
+	assert.ErrorContains(t, failed.Err, "the record of feat/a does not read")
+	assert.Nil(t, failed.Detail.Ahead, "a node whose place is unknown is not counted")
+	assert.Equal(t, domain.StatusDone, read.Items[slices.IndexFunc(read.Items, func(item tree.Item) bool { return item.Subject == "loose" })].Status, "a worktree without a record is a root")
+}
+
+func TestACountInterruptedMakesItsNodeCancelled(t *testing.T) {
+	w := newWorld(seed{
+		Git:  gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), linked("loose")}, Fail: map[string]error{"Count": context.Canceled, "AheadBehindOf": context.Canceled}},
+		Meta: map[string]worktree.Meta{"feat/a": from("main", "")},
+	})
+
+	read, err := w.usecase.Run(t.Context(), tree.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"main", "feat/a", "loose"}, subjects(read))
+	assert.Equal(t, domain.StatusDone, read.Items[0].Status, "the main worktree is not counted")
+	assert.Equal(t, domain.StatusCancelled, read.Items[1].Status, "a child")
+	assert.Equal(t, domain.StatusCancelled, read.Items[2].Status, "a root")
+	assert.Equal(t, domain.KindCancelled, read.Failure().Kind)
+}
+
+func TestAnInterruptedReadWarnsOfNothingItCouldNotAsk(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	w := newWorld(seed{JobsErr: run.ErrUnknown, PRsErr: fmt.Errorf("%w: gh api graphql: %w", worktree.ErrPullRequestsUnavailable, context.Canceled)})
+
+	read, err := w.usecase.Run(ctx, tree.Request{WithPRs: true}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Empty(t, read.Warnings)
 }

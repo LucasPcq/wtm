@@ -1,0 +1,6 @@
+flowchart TD
+  n0["main ✗ interrupted"]
+  n1["feat/a ✗ interrupted"]
+  n0 --> n1
+  %% ✗ main interrupted
+  %% ✗ feat/a interrupted

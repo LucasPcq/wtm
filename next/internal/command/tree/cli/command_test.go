@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -63,7 +65,7 @@ func TestTheMermaidOfTreeIsAFlowchartUnframedEvenQuiet(t *testing.T) {
 }
 
 func TestMermaidGivesEachBranchItsOwnNode(t *testing.T) {
-	branches := []string{"feat/a", "feat-a", "feat.a", "end", `say"hi"`}
+	branches := []string{"feat/a", "feat-a", "feat.a", "end", `say"hi"`, "fix#quot;x", "tick`x", "a<b>"}
 	w := world{Meta: map[string]worktree.Meta{}}
 	for _, branch := range branches {
 		w.Worktrees = append(w.Worktrees, worktree.Worktree{Path: "/repo/.trees/" + worktree.PathSegment(branch) + "-" + branch, State: worktree.OnBranch{Branch: branch}})
@@ -74,6 +76,23 @@ func TestMermaidGivesEachBranchItsOwnNode(t *testing.T) {
 
 	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
 	formtest.Golden(t, "tree_mermaid_ids", got.Stdout)
+}
+
+func TestAWorktreeNotReadIsDrawnSoInTextAndMermaid(t *testing.T) {
+	cases := map[string]error{"unreadable": errors.New("git status failed"), "interrupted": context.Canceled}
+	for name, failure := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := world{Worktrees: []worktree.Worktree{{Path: "/repo/.trees/feat-a", State: worktree.OnBranch{Branch: "feat/a"}}}, Meta: map[string]worktree.Meta{"feat/a": {SourceBranch: "main"}}, Fail: map[string]error{"Dirty": failure}}
+
+			text := runTree(t, w)
+			mermaid := runTree(t, w, "--output", "mermaid")
+
+			assert.NotEqual(t, uicli.ExitOK, text.Code)
+			assert.Equal(t, text.Code, mermaid.Code)
+			formtest.Golden(t, "tree_"+name, text.Stdout)
+			formtest.Golden(t, "tree_mermaid_"+name, mermaid.Stdout)
+		})
+	}
 }
 
 func TestARefusalWithJSONIsTheEnvelopeOnStdout(t *testing.T) {

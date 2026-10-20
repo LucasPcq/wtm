@@ -1,12 +1,18 @@
 flowchart TD
-  n0["main origin ↑1"]
-  n1["end ! needs sync"]
+  n0["main"]
+  n1["a#lt;b#gt;"]
   n0 --> n1
-  n2["feat-a ! needs sync"]
+  n2["end"]
   n0 --> n2
-  n3["feat.a ! needs sync"]
+  n3["feat-a"]
   n0 --> n3
-  n4["feat/a ↑2 origin ↑3"]
+  n4["feat.a"]
   n0 --> n4
-  n5["say#quot;hi#quot; ! needs sync"]
+  n5["feat/a"]
   n0 --> n5
+  n6["fix#35;quot;x"]
+  n0 --> n6
+  n7["say#quot;hi#quot;"]
+  n0 --> n7
+  n8["tick#96;x"]
+  n0 --> n8

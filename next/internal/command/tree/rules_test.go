@@ -22,12 +22,12 @@ func TestANodeNeedsTheFirstActionThatApplies(t *testing.T) {
 		"needs_sync":           {detail: tree.Detail{Branch: "feat/a", NeedsSync: true, PR: &tree.PR{State: worktree.PullRequestOpen}}, command: "sync", code: "tree.sync"},
 		"closed_not_cleaned":   {detail: tree.Detail{Branch: "feat/a", PR: &tree.PR{State: worktree.PullRequestClosed}}},
 		"main_merged_not_gone": {detail: tree.Detail{Branch: "main", Main: true, PR: merged}},
-		"virtual":              {detail: tree.Detail{Branch: "gone", Virtual: true, NeedsSync: true}},
+		"base_merged_not_gone": {detail: tree.Detail{Branch: "develop", PR: merged}},
 		"nothing_due":          {detail: tree.Detail{Branch: "feat/a"}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			actions := tree.Actions(c.detail)
+			actions := tree.Actions(c.detail, "develop")
 
 			if c.command == "" {
 				assert.Equal(t, []domain.FollowUp{}, actions)

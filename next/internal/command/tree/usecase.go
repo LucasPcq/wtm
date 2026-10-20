@@ -3,6 +3,8 @@ package tree
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"slices"
 	"sync"
 
@@ -23,9 +25,6 @@ const CodeConfigNotFound = Name + repository.ConfigNotFound
 
 // CodeConfigInvalid refuses a repository whose config.toml does not parse or validate.
 const CodeConfigInvalid = Name + repository.ConfigInvalid
-
-// stateReaders bounds the worktrees read at once, each costing a few git commands.
-const stateReaders = 8
 
 // A UseCase reads the tree of one repository: the ports it reads it through and the service that reads the repository.
 type UseCase struct {
@@ -77,12 +76,17 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	}
 
 	// The stack comes first: a worktree is counted against its parent.
-	facts := Facts{Repository: repo, Records: map[string]worktree.Meta{}}
+	facts := Facts{Repository: repo}
+	records, unread := map[string]worktree.Meta{}, map[string]error{}
 	for _, w := range facts.nodes() {
-		// a worktree wtm did not create has no record: a root
-		facts.Records[w.Branch()], _ = u.Meta.Load(w.Branch())
+		record, err := u.Meta.Load(w.Branch())
+		// a worktree wtm did not create has no record: a root; one whose record does not read has no known place
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			unread[w.Branch()] = err
+		}
+		records[w.Branch()] = record
 	}
-	facts.Stack = worktree.StackOf(repo.Worktrees, facts.Records, repo.Config.Worktrees.BaseBranch)
+	facts.Stack = worktree.StackOf(repo.Worktrees, records, repo.Config.Worktrees.BaseBranch)
 
 	var (
 		wg           sync.WaitGroup
@@ -96,61 +100,45 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		branches := slices.DeleteFunc(repo.Live(), func(branch string) bool { return branch == "" })
 		wg.Go(func() { pullRequests, prsErr = u.PullRequests(ctx, branches) })
 	}
-	states := u.states(ctx, facts)
+	nodes := facts.nodes()
+	read := repository.Each(nodes, func(w worktree.Worktree) State {
+		if err := unread[w.Branch()]; err != nil {
+			return State{Err: err}
+		}
+		return u.state(ctx, facts, w)
+	})
 	wg.Wait()
 
-	facts.States, facts.Jobs, facts.JobsErr, facts.PullRequests, facts.PRsErr = states, jobs, jobsErr, pullRequests, prsErr
+	facts.States = make(map[string]State, len(nodes))
+	for i, w := range nodes {
+		facts.States[w.Branch()] = read[i]
+	}
+	facts.Jobs, facts.JobsErr, facts.PullRequests, facts.PRsErr = jobs, jobsErr, pullRequests, prsErr
+	facts.Interrupted = ctx.Err() != nil
 	return facts, nil
 }
 
-// states reads what each worktree of the tree holds, a few at once.
-func (u UseCase) states(ctx context.Context, facts Facts) map[string]State {
-	var mu sync.Mutex
-	nodes := facts.nodes()
-	states := make(map[string]State, len(nodes))
-	readers := make(chan struct{}, stateReaders)
-	var wg sync.WaitGroup
-	for _, w := range nodes {
-		readers <- struct{}{}
-		wg.Go(func() {
-			defer func() { <-readers }()
-			state := u.state(ctx, facts, w)
-			mu.Lock()
-			states[w.Branch()] = state
-			mu.Unlock()
-		})
-	}
-	wg.Wait()
-
-	return states
-}
-
-// state reads one worktree: whether its directory is gone, then, if it is there, its changes and the commits it and its parent each have that the other lacks.
+// state reads one worktree: whether its directory is gone, then, if it is there, its changes and the commits it has past its parent and those of its parent it lacks, or past the base branch for a root, which has no parent to fall behind.
 func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) State {
-	var state State
-
-	// git never lists a locked worktree prunable, even with its directory gone: the disk is asked.
-	state.Missing = w.Prunable
-	if !state.Missing {
-		var location worktree.Location
-		location, state.Err = u.Git.Locate(ctx, w.Path)
-		state.Missing = state.Err == nil && !location.Exists
-	}
-	if state.Missing || state.Err != nil {
+	presence, err := repository.Present(ctx, u.Git, w)
+	state := State{Missing: presence.Missing, Dirty: presence.Dirty, Err: err}
+	against, counted := facts.countedAgainst(w)
+	if state.Missing || state.Err != nil || !counted {
 		return state
 	}
 
-	state.Dirty, state.Err = u.Git.Dirty(ctx, w.Path)
-	parent, counted := facts.countedAgainst(w)
-	if state.Err != nil || !counted {
-		return state
-	}
-
-	// A count git cannot make leaves the node not counted rather than unreadable.
-	state.Ahead = u.count(ctx, worktree.Span{Branch: w.Branch(), Base: parent})
-	// A root has no parent to fall behind: it is counted ahead of the base branch only.
+	span := worktree.Span{Branch: w.Branch(), Base: against}
 	if _, child := facts.Stack.Parent(w.Branch()); child {
-		state.Behind = u.count(ctx, worktree.Span{Branch: parent, Base: w.Branch()})
+		counts, err := u.Git.AheadBehindOf(ctx, span)
+		if state.Err = interrupted(ctx, err); err == nil {
+			state.Ahead, state.Behind = &counts.Ahead, &counts.Behind
+		}
+		return state
+	}
+
+	ahead, err := u.Git.Count(ctx, span)
+	if state.Err = interrupted(ctx, err); err == nil {
+		state.Ahead = &ahead
 	}
 	return state
 }
@@ -158,11 +146,11 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 // ----------------------------------------------------------------------------
 // Helpers
 
-func (u UseCase) count(ctx context.Context, span worktree.Span) *int {
-	n, err := u.Git.Count(ctx, span)
-	if err != nil {
-		return nil
+// interrupted is err when it is the read's interruption, which cancels the node; a count git cannot make otherwise leaves the node not counted rather than unreadable.
+func interrupted(ctx context.Context, err error) error {
+	if err == nil || errors.Is(err, context.Canceled) {
+		return err
 	}
 
-	return &n
+	return ctx.Err()
 }

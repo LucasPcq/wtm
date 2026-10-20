@@ -49,7 +49,7 @@ func TestNoCommandAFollowUpNamesHasMigrated(t *testing.T) {
 		named = append(named, action.Command)
 	}
 	for _, detail := range []tree.Detail{{Branch: "feat/a", Rebasing: true}, {Branch: "feat/a", PR: &tree.PR{State: worktree.PullRequestMerged}}, {Branch: "feat/a", NeedsSync: true}} {
-		named = append(named, tree.Actions(detail)[0].Command)
+		named = append(named, tree.Actions(detail, "main")[0].Command)
 	}
 	for _, command := range named {
 		require.NotEmpty(t, command)

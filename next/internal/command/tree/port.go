@@ -12,6 +12,7 @@ type Git interface {
 	Locate(ctx context.Context, path string) (worktree.Location, error)
 	Dirty(ctx context.Context, path string) (bool, error)
 	Count(ctx context.Context, span worktree.Span) (int, error)
+	AheadBehindOf(ctx context.Context, span worktree.Span) (worktree.AheadBehind, error)
 }
 
 // Meta reads a worktree's meta record by its branch.

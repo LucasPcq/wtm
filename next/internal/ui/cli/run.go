@@ -43,10 +43,6 @@ func (r *Run) Begin(cmd *cobra.Command) error {
 
 // OutputHelp is the usage of --output: the formats it accepts.
 func (r *Run) OutputHelp() string {
-	if len(r.Formats) == 0 {
-		return OutputUsage
-	}
-
 	formats := r.outputs()
 	return "Output format: " + strings.Join(formats[:len(formats)-1], ", ") + " or " + formats[len(formats)-1]
 }

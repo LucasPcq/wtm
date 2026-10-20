@@ -20,8 +20,6 @@ const (
 	gutterPipe      = "│  "
 	gutterBlank     = "   "
 	badgeGap        = "  "
-	glyphAhead      = "↑"
-	glyphBehind     = "↓"
 )
 
 // A tone is how a badge is coloured: whole, or only its glyph.
@@ -34,12 +32,14 @@ const (
 	toneDanger                // the whole badge red
 	toneAttention             // a ! glyph, yellow, then its text
 	toneFailure               // a ✗ glyph, red, then its text
+	toneOrigin                // coloured as where it stands against origin
 )
 
-// A badge is one thing said of a node, after its branch.
+// A badge is one thing said of a node, after its branch; origin is the standing a toneOrigin badge says.
 type badge struct {
-	text string
-	tone tone
+	text   string
+	tone   tone
+	origin *worktree.Origin
 }
 
 // badgesOf are what a node's row says of it, in their order: no worktree, the jobs up by name, its pull request, its commits past its parent, where it stands against origin, its state, locked, needs sync, cycle.
@@ -47,38 +47,40 @@ func badgesOf(item tree.Item) []badge {
 	d := item.Detail
 	var badges []badge
 	if d.Virtual {
-		badges = append(badges, badge{"(no worktree)", toneMuted})
+		badges = append(badges, badge{text: "(no worktree)", tone: toneMuted})
 	}
 	if len(d.Services) > 0 {
-		badges = append(badges, badge{"services " + strings.Join(d.Services, ", "), toneSuccess})
+		badges = append(badges, badge{text: "services " + strings.Join(d.Services, ", "), tone: toneSuccess})
 	}
 	if d.PR != nil {
 		badges = append(badges, prBadge(*d.PR))
 	}
 	if d.Ahead != nil && *d.Ahead > 0 {
-		badges = append(badges, badge{glyphAhead + strconv.Itoa(*d.Ahead), toneMuted})
+		badges = append(badges, badge{text: output.GlyphAhead + strconv.Itoa(*d.Ahead), tone: toneMuted})
 	}
-	if origin, ok := originBadge(d.Origin); ok {
-		badges = append(badges, origin)
+	if origin := output.OriginBadge(d.Origin); origin != "" {
+		badges = append(badges, badge{text: origin, tone: toneOrigin, origin: d.Origin})
 	}
 	switch {
 	case item.Status == domain.StatusFailed:
-		badges = append(badges, badge{"unreadable", toneFailure})
+		badges = append(badges, badge{text: "unreadable", tone: toneFailure})
+	case item.Status == domain.StatusCancelled:
+		badges = append(badges, badge{text: "interrupted", tone: toneFailure})
 	case d.Missing:
-		badges = append(badges, badge{"missing", toneFailure})
+		badges = append(badges, badge{text: "missing", tone: toneFailure})
 	case d.Rebasing:
-		badges = append(badges, badge{"rebasing", toneAttention})
+		badges = append(badges, badge{text: "rebasing", tone: toneAttention})
 	case d.Dirty:
-		badges = append(badges, badge{"dirty", toneAttention})
+		badges = append(badges, badge{text: "dirty", tone: toneAttention})
 	}
 	if d.Locked {
-		badges = append(badges, badge{"locked", toneAttention})
+		badges = append(badges, badge{text: "locked", tone: toneAttention})
 	}
 	if d.NeedsSync {
-		badges = append(badges, badge{"needs sync", toneAttention})
+		badges = append(badges, badge{text: "needs sync", tone: toneAttention})
 	}
 	if d.Cycle {
-		badges = append(badges, badge{"cycle", toneAttention})
+		badges = append(badges, badge{text: "cycle", tone: toneAttention})
 	}
 
 	return badges
@@ -87,28 +89,9 @@ func badgesOf(item tree.Item) []badge {
 func prBadge(pr tree.PR) badge {
 	label := "PR #" + strconv.Itoa(pr.Number)
 	if pr.State == worktree.PullRequestOpen {
-		return badge{label, toneSuccess}
+		return badge{text: label, tone: toneSuccess}
 	}
-	return badge{label + " " + string(pr.State), toneMuted}
-}
-
-// originBadge is where the branch stands against origin, none when up to date or not on origin.
-func originBadge(origin *worktree.Origin) (badge, bool) {
-	if origin == nil {
-		return badge{}, false
-	}
-
-	ahead, behind := glyphAhead+strconv.Itoa(origin.Ahead), glyphBehind+strconv.Itoa(origin.Behind)
-	switch origin.State {
-	case worktree.Ahead:
-		return badge{"origin " + ahead, toneMuted}, true
-	case worktree.Behind:
-		return badge{"origin " + behind, toneWarning}, true
-	case worktree.Diverged:
-		return badge{"origin " + ahead + " " + behind, toneDanger}, true
-	case worktree.NoOrigin, worktree.UpToDate:
-	}
-	return badge{}, false
+	return badge{text: label + " " + string(pr.State), tone: toneMuted}
 }
 
 // plain is the badge as text, its glyph before it.
@@ -118,7 +101,7 @@ func (b badge) plain() string {
 		return output.GlyphAttention + " " + b.text
 	case toneFailure:
 		return output.GlyphFailure + " " + b.text
-	case toneMuted, toneSuccess, toneWarning, toneDanger:
+	case toneMuted, toneSuccess, toneWarning, toneDanger, toneOrigin:
 	}
 	return b.text
 }
@@ -137,6 +120,8 @@ func (b badge) styled(st *output.Styles) string {
 		return st.Warning.Render(output.GlyphAttention) + " " + b.text
 	case toneFailure:
 		return st.Danger.Render(output.GlyphFailure) + " " + b.text
+	case toneOrigin:
+		return st.Origin(b.origin)
 	}
 	return b.text
 }

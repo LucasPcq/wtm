@@ -13,16 +13,16 @@ import (
 // ----------------------------------------------------------------------------
 // The facts
 
-// Facts are what tree reads: the repository, the meta record of each branch, the stack they make, what each worktree holds, the run daemon's jobs and the pull requests, each with the error that kept it from being read; PullRequests is nil when GitHub was not asked.
+// Facts are what tree reads: the repository, the stack its meta records make, what each worktree holds, the run daemon's jobs and the pull requests, each with the error that kept it from being read, and whether the read was interrupted; PullRequests is nil when GitHub was not asked.
 type Facts struct {
 	worktree.Repository
-	Records      map[string]worktree.Meta // by branch
 	Stack        worktree.Stack
 	States       map[string]State // by branch
 	Jobs         []run.Job
 	JobsErr      error
 	PullRequests []worktree.PullRequest
 	PRsErr       error
+	Interrupted  bool
 }
 
 // A State is what one worktree holds: whether its directory is gone, whether it has uncommitted changes, the commits it has that its parent lacks and the reverse, nil when they are not counted, and the error that kept it from being read.
@@ -107,7 +107,7 @@ func (f Facts) item(branch string) Item {
 		return Item{Subject: branch, Status: domain.StatusDone, Detail: &detail}
 	}
 
-	w, _ := f.worktreeOf(branch)
+	w := f.worktreeOf(branch)
 	state := f.States[branch]
 	detail.Path, detail.Main, detail.Locked = &w.Path, w.Main, w.Locked
 	switch {
@@ -127,7 +127,7 @@ func (f Facts) item(branch string) Item {
 	detail.Origin = f.OriginOf(branch)
 	detail.PR = f.pr(branch)
 	detail.Services = f.services(w.Path)
-	detail.Actions = Actions(detail)
+	detail.Actions = Actions(detail, f.Config.Worktrees.BaseBranch)
 
 	return Item{Subject: branch, Status: domain.StatusDone, Detail: &detail}
 }
@@ -155,6 +155,10 @@ func (f Facts) warnings() []domain.Warning {
 	if base := f.Config.Worktrees.BaseBranch; base != "" && !f.Local(base) {
 		warnings = append(warnings, domain.Warning{Code: CodeBaseMissing, Message: "the base branch " + base + " does not exist: the roots are not counted against it", Params: domain.Params{"branch": base}})
 	}
+	// an interrupted read could not ask: the daemon and GitHub said nothing of themselves
+	if f.Interrupted {
+		return warnings
+	}
 	if f.JobsErr != nil {
 		warnings = append(warnings, domain.Warning{Code: CodeJobsUnknown, Message: run.UnknownMessage(f.JobsErr)})
 	}
@@ -181,36 +185,28 @@ func (f Facts) nodes() []worktree.Worktree {
 	return slices.DeleteFunc(slices.Clone(f.Worktrees), func(w worktree.Worktree) bool { return w.Branch() == "" })
 }
 
-func (f Facts) worktreeOf(branch string) (worktree.Worktree, bool) {
+// worktreeOf is the worktree on branch, a node of the tree.
+func (f Facts) worktreeOf(branch string) worktree.Worktree {
 	at := slices.IndexFunc(f.Worktrees, func(w worktree.Worktree) bool { return w.Branch() == branch })
-	if at < 0 {
-		return worktree.Worktree{}, false
-	}
-
-	return f.Worktrees[at], true
+	return f.Worktrees[at]
 }
 
 // ----------------------------------------------------------------------------
 // The actions
 
-// The commands an action runs, each answered by the worktree it acts on.
-const (
-	commandClean = "clean"
-	commandSync  = "sync"
-)
+// commandSync is the command that rebases a worktree onto its parent, answered by the worktree.
+const commandSync = "sync"
 
-// Actions is what the node of detail needs next, the first that applies: a rebase in progress is finished in its worktree, a branch whose pull request is merged is cleaned, one behind its parent is synced onto it; none otherwise, nor for a virtual root.
-func Actions(detail Detail) []domain.FollowUp {
-	var command, code, message string
+// Actions is what the worktree of detail needs next, the first that applies: a rebase in progress is finished in it, a branch whose pull request is merged is cleaned (never the main worktree nor the base branch), one behind its parent is synced onto it; none otherwise.
+func Actions(detail Detail, base string) []domain.FollowUp {
+	var command, message string
 	switch {
-	case detail.Virtual:
-		return []domain.FollowUp{}
 	case detail.Rebasing:
-		command, code, message = domain.CommandGo, "go", "Go to the worktree to finish its rebase"
-	case detail.PR != nil && detail.PR.State == worktree.PullRequestMerged && !detail.Main:
-		command, code, message = commandClean, "clean", "Clean the worktree: its pull request is merged"
+		command, message = domain.CommandGo, "Go to the worktree to finish its rebase"
+	case detail.PR != nil && detail.PR.State == worktree.PullRequestMerged && !detail.Main && detail.Branch != base:
+		command, message = domain.CommandClean, "Clean the worktree: its pull request is merged"
 	case detail.NeedsSync:
-		command, code, message = commandSync, "sync", "Sync the worktree: its parent has commits it lacks"
+		command, message = commandSync, "Sync the worktree: its parent has commits it lacks"
 	default:
 		return []domain.FollowUp{}
 	}
@@ -218,7 +214,7 @@ func Actions(detail Detail) []domain.FollowUp {
 	return []domain.FollowUp{{
 		Command: command,
 		Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{detail.Branch}}},
-		Code:    Name + "." + code,
+		Code:    Name + "." + command,
 		Message: message,
 	}}
 }

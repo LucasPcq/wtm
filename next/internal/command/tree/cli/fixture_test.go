@@ -28,13 +28,14 @@ func (configured) LoadRun() (project.Run, error) {
 	return project.Run{}, nil
 }
 
-// A world is a repository of every kind of node tree draws: a stack of three levels with a job up and commits ahead, a fan-out whose second branch lacks a commit of main and is locked, a parent with no worktree, a cycle, a rebasing worktree, one whose directory is gone and a detached one; Worktrees, when set, replaces them.
+// A world is a repository of every kind of node tree draws: a stack of three levels with a job up and commits ahead, a fan-out whose second branch lacks a commit of main and is locked, a parent with no worktree, a cycle, a rebasing worktree, one whose directory is gone and a detached one; Worktrees, when set, replaces them, on branches with no commit and no origin.
 type world struct {
 	ConfigErr error
 	PRsErr    error
 	JobsErr   error
 	Worktrees []worktree.Worktree
 	Meta      map[string]worktree.Meta
+	Fail      map[string]error // git's failures, by method
 }
 
 func (w world) env() uicli.Env {
@@ -43,6 +44,9 @@ func (w world) env() uicli.Env {
 
 func (w world) open(context.Context, string) (tree.UseCase, error) {
 	worktrees, meta := w.Worktrees, w.Meta
+	commits := map[worktree.Ref][]string{}
+	var remote []string
+	var origin map[string][]string
 	if worktrees == nil {
 		worktrees = []worktree.Worktree{
 			{Path: "/repo/.trees/feat-a", State: worktree.OnBranch{Branch: "feat/a"}},
@@ -67,21 +71,24 @@ func (w world) open(context.Context, string) (tree.UseCase, error) {
 			"rebasing":       {SourceBranch: "main", CreatedAt: "2026-10-08T00:00:00Z"},
 			"feat/gone":      {SourceBranch: "main", CreatedAt: "2026-10-09T00:00:00Z"},
 		}
-	}
-	git := gittest.NewFake(gittest.FakeParams{
-		Main: mainPath, Branch: "main", Remote: []string{"main", "feat/a"},
-		Worktrees: worktrees,
-		Gone:      []string{"/repo/.trees/gone"},
-		Dirty:     []string{"/repo/.trees/feat-a", "/repo/.trees/rebasing"},
-		Commits: map[worktree.Ref][]string{
+		commits = map[worktree.Ref][]string{
 			worktree.LocalBranch{Name: "main"}:           {"m1"},
 			worktree.LocalBranch{Name: "feat/a"}:         {"m1", "a1", "a2"},
 			worktree.LocalBranch{Name: "feat/a-ui"}:      {"m1", "a1", "a2", "u1"},
 			worktree.LocalBranch{Name: "feat/a-ui-copy"}: {"m1", "a1", "a2", "u1"},
 			worktree.LocalBranch{Name: "feat/b"}:         {"b1"},
 			worktree.LocalBranch{Name: "rebasing"}:       {"m1"},
-		},
-		Origin: map[string][]string{"main": {"m1", "upstream"}},
+		}
+		remote, origin = []string{"main", "feat/a"}, map[string][]string{"main": {"m1", "upstream"}}
+	}
+	git := gittest.NewFake(gittest.FakeParams{
+		Main: mainPath, Branch: "main", Remote: remote,
+		Worktrees: worktrees,
+		Gone:      []string{"/repo/.trees/gone"},
+		Dirty:     []string{"/repo/.trees/feat-a", "/repo/.trees/rebasing"},
+		Commits:   commits,
+		Origin:    origin,
+		Fail:      w.Fail,
 	})
 	store := storetest.NewFake(storetest.FakeParams{Meta: meta})
 	prs := []worktree.PullRequest{
