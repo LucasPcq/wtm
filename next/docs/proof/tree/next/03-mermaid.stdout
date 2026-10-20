@@ -1,0 +1,19 @@
+flowchart TD
+  n0["main origin ↑1"]
+  n1["feat/a ↑2 ! dirty ! needs sync"]
+  n0 --> n1
+  n2["feat/a-ui ↑2"]
+  n1 --> n2
+  n3["feat/a-ui-form ! needs sync"]
+  n2 --> n3
+  n4["feat/b ↑1 ! locked ! needs sync"]
+  n0 --> n4
+  n5["feat/r ↑1 ! rebasing ! needs sync"]
+  n0 --> n5
+  n6["feat/gone ✗ missing"]
+  n0 --> n6
+  n7["cyc-1 ! cycle"]
+  n8["cyc-2 ! cycle"]
+  n9["feat/login (no worktree)"]
+  n10["feat/login-ui"]
+  n9 --> n10

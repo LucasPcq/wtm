@@ -14,6 +14,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./tty.sh next "${sandboxes#* }" "$next" tty/next
 ./extract.sh "$wtm" "$next" extract
 ./list.sh "$wtm" "$next" list
+./tree.sh "$wtm" "$next" tree
 git diff --stat .
 ```
 
@@ -115,6 +116,39 @@ The reference is the legacy `wtm list` of 0.30.1. `list` is a read: the proof ch
   - **An argument is refused** (9): exit 2, where legacy listed and ignored it.
   - **`--fetch`**, which legacy lacks: the picker's refresh as a field of the request, so a surface other than the command line refreshes through the catalogue's answers alone (the owner's answers-only decision, LUC-355).
   - **The picker** (`tty-*`): opens only when stdin, stdout and stderr are terminals and `--quiet` is off (legacy: stdin alone, so `wtm list | cat` drew its wizard into the pipe); its rows badged as the table's, the worktrees not read and the warnings under its title instead of a box; it lists the worktrees that offer an action: `Go to the worktree`, `Open the pull request` (only for a worktree with one, where legacy offered it to every worktree), `Start the profile`, `Stop the profile`, `View the logs`, `Clean (delete the worktree)` (not for the main worktree; only this for a missing one; none for a missing one on no branch, which `wtm clean` cannot name; only Go for one on no branch); the action chosen ends the run on its command line, `→ wtm go feat/a   Go to the worktree`, where legacy ran it (Go printed the path); leaving it exits 19 (legacy 0). `r` fetches origin, as legacy's (`git fetch origin`), and reads every worktree again with its pull request.
+
+# Proof: `wtm tree` (legacy `surface/cli/wt`) vs `wtm-next tree`
+
+The reference is the legacy `wtm tree` of 0.30.1. `tree` is a read: the proof checks that neither binary changes anything on disk, and keeps both outputs side by side.
+
+- `tree.sh <wtm> <wtm-next> tree`: two identical sandboxes (the `docs/demos` "acme" project with a bare `origin`; a stack of three levels, `feat/a` two commits past main and pushed, with an untracked file, `feat/a-ui` on it, two commits past it, `feat/a-ui-form` on that, which lacks `feat/a-ui`'s last commit; a fan-out under main, `feat/b`, locked; `feat/r` mid-rebase on a conflict; main one commit ahead of what its children started from; `feat/login-ui` whose parent `feat/login` was cleaned; `cyc-1` and `cyc-2`, each recorded as the other's source; `feat/gone`, whose directory was deleted; a detached worktree; a git repository with no wtm config; a plain directory), the same scenarios run by each binary without a terminal; each records the exit code, stdout and stderr, and the state before and after it into `<side>/unchanged.diff`, empty for both sides. The sandbox's gh is not signed in, so `--with-prs` shows the pull requests unavailable.
+  1. the text
+  2. `--output json`
+  3. `--output mermaid`
+  4. `--with-prs`
+  5. `--with-prs --output json`
+  6. from inside `feat/a`
+  7. with `feat/a`'s profile up (`wtm run up feat/a -d`)
+  8. the same, `--output json`
+  9. `-q`
+  10. `-q --output mermaid`
+  11. an argument, `tree feat/a`
+  12. an unknown format, `--output dot`
+  13. a repository with no wtm config
+  14. the same, `--output json`
+  15. a directory outside any repository, `--output json`
+- The differences, each approved by the owner or a legacy bug fixed with its test:
+  - **The JSON is the v2 envelope of a read** (2, 5, 8): one item per node, depth first (roots main first, then by creation, the virtual ones by name; children by creation then name), its subject the branch, its detail `{branch, path, main, virtual, parent, children, ahead, behind, needs_sync, dirty, locked, rebasing, missing, cycle, origin, pr, services, actions}` where legacy nests `{roots[{branch, path, is_main, is_virtual, status{…}, children[…]}]}`; `path` and `parent` are `null` for a virtual root and a root, `origin` is `{ahead, behind, state}` with the state spelled (`"ahead"`, legacy `origin_state: 3`), `null` when origin has no such branch. A refusal is the envelope on stdout (14, 15) where legacy printed text on stderr.
+  - **Ahead and behind are counted against the parent** (bug fixed, `TestAheadAndBehindAreCountedAgainstTheParent`): `↑N` is the commits a branch has that its parent lacks, the base branch's for a root; `feat/a-ui` reads `↑2` where legacy said `base ↑4`, counting `feat/a`'s commits too, and `feat/a-ui-form` nothing where legacy said `base ↑3`. `behind`, the parent's commits the branch lacks, is what `needs sync` says. A parent that is not a local branch (a virtual root, `origin/x`) is not counted: `ahead`/`behind` `null`, no needs sync, as legacy. A member of a cycle is not counted either (it has no parent to sync onto). A root with no recorded parent (a worktree wtm did not create) is counted against the base branch, and says needs sync when the base branch moved past it, where legacy never did; `tree.base_missing` warns when the base branch does not exist. The label is `↑N` (legacy `base ↑N`: `base` names the base branch in `list`, one word one meaning).
+  - **Each node offers the action it needs, in the JSON** (`actions`, the text prints none): a rebase in progress `wtm go <branch>`, a merged pull request `wtm clean <branch>` (not for the main worktree), a parent with commits it lacks `wtm sync <branch>`, the first that applies; none otherwise, nor for a virtual root.
+  - **`--with-prs` reads the newest pull request of each branch in any state** (4, 5), `PR #N`, `PR #N merged`, `PR #N closed`, `pr: {number, url, state}`; gh missing, signed out or failing is a warning, ``! pull requests unavailable: run `gh auth login` `` (`tree.prs_unavailable`), exit 0, where legacy said nothing (bug fixed, `TestWhatCannotBeAskedIsAWarningNotAFailure`); a failing batch keeps the pull requests of the batches before it, where legacy dropped them all (`TestAFailingQueryKeepsThePullRequestsFoundBeforeIt`); a fork's pull request is no branch's, where legacy matched it by name (`TestTheNewestPullRequestOfEachBranchIsReadWhateverItsState`).
+  - **The jobs up are shown** (7, 8): `services` on the row, `services: ["api", "web"]` in the JSON, `null` with `tree.jobs_unknown` when the daemon cannot tell; legacy documented `▶ N running` and never filled it (`TestTheJobsUpInAWorktreeAreItsServices`). The word is list's. A read never starts the daemon.
+  - **The uniform text**: `! dirty`, `! rebasing`, `! needs sync`, `! cycle`, `! locked` (legacy `⚠`, missing from common monospace fonts), the glyph alone coloured; a worktree whose directory is gone is `✗ missing` where legacy drew it clean (bug fixed, `TestAWorktreeWhoseDirectoryIsGoneIsMissingNotClean`); a worktree that cannot be read keeps its place, `✗ unreadable`, its error under the tree (`TestAWorktreeThatCannotBeReadFailsAloneKeepingItsPlace`); the warnings under the tree. The layout is legacy's: two-space indent, `├─ ` / `└─ `, `│  ` gutter, badges aligned two columns after the widest branch.
+  - **A detached worktree is no node** (1, 3): it has no branch, so no place in a stack; legacy drew each as an empty root flagged `⚠ cycle`, and its Mermaid node `[" ⚠ cycle"]` had no id (bug fixed, `TestADetachedWorktreeIsNoNodeOfTheTree`).
+  - **`--output mermaid` gives each branch its own node** (3, 10): ids by place (`n0`, `n1`…) where legacy's `feat/a`, `feat-a` and `feat.a` all became `feat_a` and a branch `end` broke the chart; quotes and angle brackets in a label are entities; the warnings follow as `%%` comments (`TestMermaidGivesEachBranchItsOwnNode`). It is unframed and `-q` leaves it, as legacy.
+  - **An argument is refused** (11): exit 2, where legacy drew the tree and ignored it. An unknown format (12) is refused by both, exit 2; next adds the way to `--help`.
+  - **Each worktree is read once**: legacy listed the worktrees and read each meta record twice (`TestAReadChangesNothingAndReadsEachWorktreeOnce`).
+  - Not fixed, legacy being frozen: legacy's `using-wtm/references/stacks.md` documents list's `origin` object for tree, and the guide's badge table describes `base ↑N` against the base branch and `▶ N running`.
 
 # Deliberate differences from legacy
 

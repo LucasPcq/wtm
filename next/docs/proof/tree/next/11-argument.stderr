@@ -1,0 +1,4 @@
+
+  ✗ the request is invalid: unknown command "feat/a" for "wtm tree"
+  → wtm tree --help
+
