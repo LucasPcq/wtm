@@ -24,7 +24,7 @@ import (
 func TestTheAppIsWiredOntoTheRealAdapters(t *testing.T) {
 	main := configured(t)
 	root := filepath.Dir(main)
-	t.Setenv("HOME", t.TempDir())
+	ownConfigDir(t)
 
 	outcome, err := wire(wireParams{MainPath: main, StateDir: filepath.Join(main, ".git", "wtm"), CommonDir: filepath.Join(main, ".git")}).Create.Run(t.Context(), create.Request{Branches: []string{"feat/x"}}, domain.RunOptions{Report: func(domain.Event) {}})
 
@@ -44,7 +44,7 @@ func TestExtractIsWiredOntoTheRealAdapters(t *testing.T) {
 	require.NoError(t, os.MkdirAll(stateDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(stateDir, "config.toml"), []byte("[worktrees]\nbase_path = \"../.trees\"\nbase_branch = \"main\"\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(main, "notes.txt"), []byte("notes\n"), 0o644))
-	t.Setenv("HOME", t.TempDir())
+	ownConfigDir(t)
 
 	outcome, err := wire(wireParams{MainPath: main, StateDir: stateDir, CommonDir: filepath.Join(main, ".git")}).Extract.Run(t.Context(), extract.Request{Source: "main", Files: []string{"notes.txt"}, To: "feat/notes"}, domain.RunOptions{Report: func(domain.Event) {}})
 
@@ -67,7 +67,7 @@ func TestAnUndoLeftBehindIsRemovedByTheLegacyClean(t *testing.T) {
 
 func TestTwoExecutionsInOneProcessKeepTheirOwnRepositoryAndCorrelationID(t *testing.T) {
 	t.Setenv(cli.CorrelationIDEnv, "from-env")
-	t.Setenv("HOME", t.TempDir())
+	ownConfigDir(t)
 	t.Setenv(stateDirEnv, "")
 	var published []events.PublisherParams
 	creates := map[string]create.UseCase{}

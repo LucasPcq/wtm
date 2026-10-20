@@ -24,7 +24,7 @@ import (
 // Legacy followed an inherited $GIT_DIR in its git calls: the snapshot described the repository it pointed to.
 func TestTheEventStreamOfASurfaceOpensOnTheCallsRepositoryWhateverGitDirSays(t *testing.T) {
 	main, other := configured(t), configured(t)
-	t.Setenv("HOME", t.TempDir())
+	ownConfigDir(t)
 	t.Setenv(stateDirEnv, "")
 	t.Setenv("GIT_DIR", filepath.Join(other, ".git"))
 	t.Setenv("GIT_WORK_TREE", other)
@@ -52,7 +52,7 @@ func TestTheEventStreamOfASurfaceOpensOnTheCallsRepositoryWhateverGitDirSays(t *
 
 func TestAChangeInAnotherProcessReachesTheStream(t *testing.T) {
 	main := configured(t)
-	t.Setenv("HOME", t.TempDir())
+	ownConfigDir(t)
 	t.Setenv(stateDirEnv, "")
 	socket := servingBus(t)
 	stream := api.BindStream[events.Request, events.Questions](events.Name, watchEvents(eventStream(streamParams{Socket: socket, Registry: filepath.Join(t.TempDir(), "repos.json")})))
@@ -89,7 +89,7 @@ func TestAChangeInAnotherProcessReachesTheStream(t *testing.T) {
 
 func TestOpeningARepositoryRegistersItAmongThoseWtmKnows(t *testing.T) {
 	main := configured(t)
-	t.Setenv("HOME", t.TempDir())
+	ownConfigDir(t)
 	t.Setenv(stateDirEnv, "")
 
 	_, err := openList(t.Context(), main)
@@ -102,7 +102,7 @@ func TestOpeningARepositoryRegistersItAmongThoseWtmKnows(t *testing.T) {
 
 func TestARepositoryWhoseStateIsMovedElsewhereIsNotRegistered(t *testing.T) {
 	main := configured(t)
-	t.Setenv("HOME", t.TempDir())
+	ownConfigDir(t)
 	t.Setenv(stateDirEnv, t.TempDir())
 
 	_, err := openList(t.Context(), main)
@@ -129,7 +129,7 @@ func TestTheDaemonIsAHiddenCommand(t *testing.T) {
 // Opening a repository with no wtm config once registered it, which a global stream's prune dropped at once, announcing it anew.
 func TestOpeningARepositoryWithNoWtmConfigLeavesTheRegistryUnwritten(t *testing.T) {
 	uninitialized := gittest.InitRepo(t)
-	t.Setenv("HOME", t.TempDir())
+	ownConfigDir(t)
 	t.Setenv(stateDirEnv, "")
 
 	_, err := openList(t.Context(), uninitialized)
@@ -140,7 +140,7 @@ func TestOpeningARepositoryWithNoWtmConfigLeavesTheRegistryUnwritten(t *testing.
 
 func TestTheRegistryAnnouncesARepositoryItAddsAndOneItDrops(t *testing.T) {
 	main := configured(t)
-	t.Setenv("HOME", t.TempDir())
+	ownConfigDir(t)
 	socket := servingBus(t)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -170,7 +170,7 @@ func TestARegistryOffAddsNothing(t *testing.T) {
 
 func TestARelativeRepoOfASurfaceIsReadFromTheCallsDirectory(t *testing.T) {
 	main := configured(t)
-	t.Setenv("HOME", t.TempDir())
+	ownConfigDir(t)
 	t.Setenv(stateDirEnv, "")
 	stream := api.BindStream[events.Request, events.Questions](events.Name, watchEvents(eventStream(streamParams{Socket: servingBus(t), Registry: filepath.Join(t.TempDir(), "repos.json")})))
 

@@ -165,8 +165,7 @@ func keepsTheReadContract(t *testing.T, name string) {
 func drive(t *testing.T, name string) (string, api.Command, shapes) {
 	t.Helper()
 	main := configured(t)
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	ownConfigDir(t)
 	t.Setenv(stateDirEnv, "")
 	c := command(t, name)
 	shape := shapes{t: t, command: name, root: filepath.Dir(main)}
@@ -249,4 +248,11 @@ func withTS(t *testing.T, line string) string {
 	data, err := json.Marshal(fields)
 	require.NoError(t, err)
 	return string(data)
+}
+
+// ownConfigDir gives the test a home and a config directory of its own: on Linux, os.UserConfigDir reads $XDG_CONFIG_HOME before $HOME.
+func ownConfigDir(t *testing.T) {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 }
