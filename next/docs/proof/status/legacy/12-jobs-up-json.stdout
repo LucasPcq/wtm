@@ -1,0 +1,28 @@
+{
+  "branch": "feat/a",
+  "path": "<SB>/acme.trees/feat-a",
+  "main": false,
+  "isolation": "isolated",
+  "addressing": "names",
+  "offset": 10,
+  "run_config": true,
+  "env": {
+    "declared": 2,
+    "missing": []
+  },
+  "jobs": [
+    {
+      "name": "web",
+      "kind": "service",
+      "state": "running",
+      "url": "http://web.feat-a.acme.localhost:23462"
+    },
+    {
+      "name": "api",
+      "kind": "service",
+      "state": "running",
+      "url": "http://api.feat-a.acme.localhost:23462"
+    }
+  ],
+  "problems": []
+}

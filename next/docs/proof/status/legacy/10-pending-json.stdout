@@ -1,0 +1,34 @@
+{
+  "branch": "feat/old",
+  "path": "<SB>/acme.trees/feat-old",
+  "main": false,
+  "isolation": "isolated",
+  "addressing": "names",
+  "offset": 30,
+  "run_config": true,
+  "env": {
+    "declared": 2,
+    "missing": []
+  },
+  "jobs": [
+    {
+      "name": "web",
+      "kind": "service",
+      "state": "stopped",
+      "url": "http://web.feat-old.acme.localhost:23462"
+    },
+    {
+      "name": "api",
+      "kind": "service",
+      "state": "stopped",
+      "url": "http://api.feat-old.acme.localhost:23462"
+    }
+  ],
+  "problems": [
+    {
+      "code": "isolation_pending",
+      "message": "predates the isolation choice: run up and run start refuse it",
+      "fix": "wtm env feat/old --isolation isolated --yes"
+    }
+  ]
+}

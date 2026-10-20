@@ -127,18 +127,15 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 		return state
 	}
 
-	span := worktree.Span{Branch: w.Branch(), Base: against}
-	if _, child := facts.Stack.Parent(w.Branch()); child {
-		counts, err := u.Git.AheadBehindOf(ctx, span)
-		if state.Err = interrupted(ctx, err); err == nil {
-			state.Ahead, state.Behind = &counts.Ahead, &counts.Behind
-		}
+	counts, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: against})
+	if state.Err = interrupted(ctx, err); err != nil {
 		return state
 	}
 
-	ahead, err := u.Git.Count(ctx, span)
-	if state.Err = interrupted(ctx, err); err == nil {
-		state.Ahead = &ahead
+	// A root has no parent to fall behind: only what it has past the base is counted.
+	state.Ahead = &counts.Ahead
+	if _, child := facts.Stack.Parent(w.Branch()); child {
+		state.Behind = &counts.Behind
 	}
 	return state
 }

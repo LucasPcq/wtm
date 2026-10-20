@@ -1,0 +1,55 @@
+{
+  "fields": [
+    {
+      "kind": "select",
+      "path": "worktree",
+      "flag": "\u003cworktree\u003e",
+      "label": "Worktree",
+      "help": "The worktree to read, by its branch, its path or part of its branch",
+      "value": "",
+      "options": [],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false
+    },
+    {
+      "kind": "confirm",
+      "path": "all",
+      "flag": "--all",
+      "label": "All",
+      "help": "Read every worktree of the repository",
+      "value": false,
+      "yes": {
+        "value": "true",
+        "label": "Yes"
+      },
+      "no": {
+        "value": "false",
+        "label": "No"
+      },
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "with_prs",
+      "flag": "--with-prs",
+      "label": "Pull requests",
+      "help": "Ask GitHub for the worktree's open pull request, its checks and review (needs gh)",
+      "value": false,
+      "yes": {
+        "value": "true",
+        "label": "Yes"
+      },
+      "no": {
+        "value": "false",
+        "label": "No"
+      },
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    }
+  ],
+  "problems": []
+}

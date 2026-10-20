@@ -1,0 +1,51 @@
+{
+  "v": 2,
+  "command": "status",
+  "ok": true,
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "branch": "main",
+        "path": "<root>/main",
+        "main": true,
+        "locked": false,
+        "rebasing": false,
+        "created_at": null,
+        "parent": "",
+        "children": [],
+        "base": null,
+        "origin": null,
+        "changes": {
+          "staged": 0,
+          "modified": 0,
+          "untracked": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "files": []
+        },
+        "commits": [
+          {
+            "sha": "<id>",
+            "subject": "root",
+            "author": "Test",
+            "at": "<time>"
+          }
+        ],
+        "review": null,
+        "isolation": "isolated",
+        "run_toml": "absent",
+        "run": null,
+        "jobs": [],
+        "env": {
+          "declared": 0,
+          "files": []
+        },
+        "problems": []
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

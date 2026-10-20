@@ -1,0 +1,21 @@
+
+  ! feat/old — 1 problem
+
+  path         /repo/.trees/feat-old
+  isolation    not chosen
+  addressing   names
+  ports        —
+  env          2 files
+  base         main ↓1
+  origin       not on origin
+  changes      clean
+  last commit  root root
+  parent       main
+
+  JOBS
+  web  stopped
+  api  stopped
+
+  ! predates the isolation choice: run up and run start refuse it
+  → wtm env feat/old isolated
+

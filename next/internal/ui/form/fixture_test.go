@@ -119,6 +119,14 @@ func (r request) Answer(path string, values []string) (request, error) {
 
 func (r request) Values(path string) []string { return r[path] }
 
+// Skips rules the worktree out of a request that reads them all.
+func (r request) Skips(path string) string {
+	if path == "worktree" && len(r["all"]) > 0 {
+		return "--all reads every worktree"
+	}
+	return ""
+}
+
 // questions are a fake command's questions: the request as asked, its problems, and the answer remembered for mode.
 type questions struct {
 	req        request
@@ -186,16 +194,60 @@ func observed(t *testing.T, a *app, given request) *form.Session[request, questi
 // A read is what the fake read command found.
 type read = domain.Read[struct{}]
 
-// reader is a fake read use case that finds read.
+// reader is a fake read use case that finds read, asking nothing.
 type reader struct{ read read }
 
+func (r reader) Questions(_ context.Context, req request) (questions, error) {
+	return questions{req: req}, nil
+}
+
 func (r reader) Run(context.Context, request, domain.RunOptions) (read, error) { return r.read, nil }
+
+// subjects are the questions of a fake read about one worktree, its subject: a positional select on main, unless the request reads them all.
+type subjects struct{ req request }
+
+func (q subjects) Form() domain.Form {
+	field := domain.SelectField{FieldSpec: domain.FieldSpec{Path: "worktree", Flag: "<worktree>", Label: "Worktree", Help: "The worktree to read"}, Value: "main", Options: []domain.Option{{Value: "main"}, {Value: "feat/x", Label: "feat/x (detached)"}}}
+	if len(q.req["all"]) > 0 {
+		field.Skip = "--all reads every worktree"
+	}
+	return domain.Form{Fields: []domain.Field{field, domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "all", Flag: "--all", Label: "All", Help: "Every worktree"}}}}
+}
+
+// subjectReader is a fake read about one worktree, recording the request it read and counting its questions read.
+type subjectReader struct {
+	read  *request
+	asked *int
+}
+
+func (r subjectReader) Questions(_ context.Context, req request) (subjects, error) {
+	*r.asked++
+	return subjects{req: req}, nil
+}
+
+func (r subjectReader) Run(_ context.Context, req request, _ domain.RunOptions) (read, error) {
+	*r.read = req
+	return read{Items: []domain.Unit[struct{}]{{Subject: strings.Join(req["worktree"], ""), Status: domain.StatusDone}}}, nil
+}
+
+// subjectQuery is a read about one worktree, the request it read once launched, and how many times it read its questions.
+func subjectQuery() (*form.Query[request, subjects, read], *request, *int) {
+	got, asked := request{}, 0
+	return &form.Query[request, subjects, read]{
+		Open: func(context.Context, string) (form.Reader[request, subjects, read], error) {
+			return subjectReader{read: &got, asked: &asked}, nil
+		},
+		Draw: func(w io.Writer, got read, _ output.View) {
+			_, _ = io.WriteString(w, "read "+got.Items[0].Subject+"\n")
+		},
+	}, &got, &asked
+}
 
 // fakeQuery is a read command over the fake request, finding one subject, whose picker picks `wtm go feat/x` and counts its picks.
 func fakeQuery() (*form.Query[request, questions, read], *int) {
 	picked := 0
 	return &form.Query[request, questions, read]{
-		Open: func(context.Context, string) (form.Reader[request, read], error) {
+		Open: func(context.Context, string) (form.Reader[request, questions, read], error) {
 			return reader{read: read{Items: []domain.Unit[struct{}]{{Subject: "feat/x", Status: domain.StatusDone}}}}, nil
 		},
 		Draw: func(w io.Writer, got read, _ output.View) {

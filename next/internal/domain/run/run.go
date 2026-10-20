@@ -4,14 +4,36 @@ package run
 import (
 	"errors"
 	"slices"
+	"time"
+
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
-// A Job is one job the daemon knows: its name, the worktree it runs in, and whether it is up (running, detached or joined).
+// A Job is one job the daemon knows: its name, the worktree it runs in, whether it is up (running, detached or joined), its kind, its State (empty for a Claim, which runs no process), whether it is a Claim a worktree holds on a shared job another worktree runs, its url, the code its process exited with (-1 when a signal killed it), when the daemon started it, and the main checkout a shared job runs in.
 type Job struct {
-	Name    string
-	WorkDir string
-	Up      bool
+	Name      string
+	WorkDir   string
+	Up        bool
+	Kind      project.JobKind
+	State     State
+	Claim     bool
+	URL       string
+	ExitCode  *int
+	StartedAt time.Time
+	SharedDir string
 }
+
+// State is a job's state, as wtm's events report it.
+type State string
+
+// The states of a job.
+const (
+	Starting State = "starting"
+	Running  State = "running"
+	Crashed  State = "crashed"
+	Exited   State = "exited" // a task that ran to its end
+	Stopped  State = "stopped"
+)
 
 // ErrUnknown says whether a job is up cannot be told: no daemon answers, yet its index holds jobs it would run.
 var ErrUnknown = errors.New("the run daemon is not running: which jobs are up is unknown")

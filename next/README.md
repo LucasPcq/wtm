@@ -30,7 +30,7 @@ internal/
   ui/                  the presentation kit every command's cli shares, knowing no command
     cli/               the root: version, --quiet, help, signals, the exit code a command's failure sets
     output/            the streams (stdin, stdout, stderr, whether each is a terminal, a colour renderer each), frames and blocks, progress, failures, plans, the hook view, the v2 envelope writer
-    form/              a command's form, generic over its schema: form.Command (its flags, its request, its launch, the conclusion of its run, its command line), form.Query (the same for a read, with its picker and the machine formats it prints besides json, tree's mermaid), the session and a step per field kind, the wizard that walks them to a recap and applies, or to the last step of a read's picker
+    form/              a command's form, generic over its schema: form.Command (its flags, its request, its launch, the conclusion of its run, its command line), form.Query (the same for a read, with its subject asked first, its picker and the machine formats it prints besides json, tree's mermaid), the session and a step per field kind, the wizard that walks them to a recap and applies, or to the last step of a read's picker
     widget/            the inputs a step asks with: select list, multi-select, text field, text list, their styles
     formtest/          for a command's tests: the driver that plays its wizard key by key, golden files, the v2 envelope decoded
   api/                 the catalogue of the commands, knowing none of them: each one's name, its schema (domain.Form), its questions as the repository stands and its execution, the answers by field in and a domain.Envelope out with the status of its kind, for a surface other than the command line
@@ -80,7 +80,7 @@ A use case or a service declares the ports it needs in its `port.go`, interface 
 
 A second command is its own `command/<name>/` (use case, ports, rules, questions, `cli/`) and one line in each list of `cmd/wtm-next`: its constructor in `main.go`'s `commands`, its opener in `project.go` (`opener(func(a app) <name>.UseCase { return a.<Name> })`), its binding in `catalogue.go` (`api.Bind(<name>.Name, open, UseCase.Questions, UseCase.Run)`), its adapters wired in `wire.go`. `registration_test.go` fails when a command of `main.go` is missing from the catalogue or from the wiring, and `contract_test.go` when it is not in the catalogue contract (`.claude/skills/go-architecture/references/contract.md`, "The catalogue contract").
 
-A read, `command/list` or `command/tree`, walks the same hops with a `form.Query` in place of a `form.Command`, under the contract of a read (`.claude/skills/go-architecture/references/contract.md`, "A read").
+A read, `command/list`, `command/status` or `command/tree`, walks the same hops with a `form.Query` in place of a `form.Command`, under the contract of a read (`.claude/skills/go-architecture/references/contract.md`, "A read").
 
 Todo: the follow-up a read's picker ends on is printed by `form.Query`; once every command it names has migrated, it runs in this process instead (`api.Catalogue.Find(followUp.Command)` with its answers), and its command line is spelled from that command's schema rather than by `commandLine` (`cmd/wtm-next/wire.go`, handed to each command's `cli.New`).
 

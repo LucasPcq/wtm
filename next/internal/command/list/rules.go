@@ -4,10 +4,8 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"path/filepath"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -78,12 +76,12 @@ const (
 
 // List is each worktree of facts as an item, the main one first, then the others by creation, the oldest first and those with no record last, and the warnings of what could not be read.
 func List(facts Facts) ([]Item, []domain.Warning) {
-	worktrees := facts.listed()
+	worktrees := facts.Checkouts()
 	slices.SortStableFunc(worktrees, func(a, b worktree.Worktree) int {
 		if a.Main != b.Main {
 			return compareTrue(a.Main, b.Main)
 		}
-		return compareCreated(facts.States[a.Path].Meta.CreatedAt, facts.States[b.Path].Meta.CreatedAt)
+		return compareCreated(facts.States[a.Path].Meta, facts.States[b.Path].Meta)
 	})
 
 	items := make([]Item, 0, len(worktrees))
@@ -116,7 +114,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Rebasing:     rebasing,
 		Missing:      state.Missing,
 		CommitsAhead: state.Ahead,
-		CreatedAt:    createdAt(state.Meta.CreatedAt),
+		CreatedAt:    state.Meta.Created(),
 		Origin:       f.OriginOf(w.Branch()),
 		PR:           f.pr(w.Branch()),
 		Services:     f.services(w.Path),
@@ -127,12 +125,11 @@ func (f Facts) item(w worktree.Worktree) Item {
 }
 
 func (f Facts) pr(branch string) *PR {
-	at := slices.IndexFunc(f.PullRequests.Open, func(pr worktree.PullRequest) bool { return branch != "" && pr.Branch == branch })
-	if at < 0 {
+	found, ok := f.PullRequests.Of(branch)
+	if !ok {
 		return nil
 	}
 
-	found := f.PullRequests.Open[at]
 	return &PR{Number: found.Number, URL: found.URL}
 }
 
@@ -167,14 +164,6 @@ func (f Facts) warnings() []domain.Warning {
 func (f Facts) counted(w worktree.Worktree) bool {
 	base := f.Config.Worktrees.BaseBranch
 	return !w.Main && w.Branch() != "" && base != "" && f.Local(base)
-}
-
-// listed are the worktrees list reports: all but a bare repository's entry, which has no working tree.
-func (f Facts) listed() []worktree.Worktree {
-	return slices.DeleteFunc(slices.Clone(f.Worktrees), func(w worktree.Worktree) bool {
-		_, bare := w.State.(worktree.Bare)
-		return bare
-	})
 }
 
 // ----------------------------------------------------------------------------
@@ -278,33 +267,21 @@ func WithPullRequests(shown, from Outcome) Outcome {
 
 // Holding returns the subject of the item whose worktree holds the directory cwd, the deepest one, "" when none does.
 func Holding(items []Item, cwd string) string {
-	subject, deepest := "", 0
-	for _, item := range items {
-		if item.Detail == nil || !within(cwd, item.Detail.Path) || len(item.Detail.Path) <= deepest {
-			continue
+	at := worktree.Holding(items, cwd, func(item Item) string {
+		if item.Detail == nil {
+			return ""
 		}
-		subject, deepest = item.Subject, len(item.Detail.Path)
+		return item.Detail.Path
+	})
+	if at < 0 {
+		return ""
 	}
 
-	return subject
+	return items[at].Subject
 }
 
 // ----------------------------------------------------------------------------
 // Helpers
-
-func within(dir, root string) bool {
-	return dir == root || strings.HasPrefix(dir, root+string(filepath.Separator))
-}
-
-// createdAt is the time a meta record's created_at says, nil when it has none or it does not parse.
-func createdAt(recorded string) *time.Time {
-	at, err := time.Parse(time.RFC3339, recorded)
-	if err != nil {
-		return nil
-	}
-
-	return &at
-}
 
 // compareTrue orders true before false.
 func compareTrue(a, b bool) int {
@@ -317,9 +294,9 @@ func compareTrue(a, b bool) int {
 	return 1
 }
 
-// compareCreated orders two created_at records oldest first, one that does not parse last.
-func compareCreated(a, b string) int {
-	at, bt := createdAt(a), createdAt(b)
+// compareCreated orders two meta records by their created_at, oldest first, one that does not parse last.
+func compareCreated(a, b worktree.Meta) int {
+	at, bt := a.Created(), b.Created()
 	if at == nil || bt == nil {
 		return compareTrue(at != nil, bt != nil)
 	}

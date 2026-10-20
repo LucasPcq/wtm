@@ -16,6 +16,13 @@ func TestAnAbsentRunTomlIsAnEmptyRunConfig(t *testing.T) {
 	assert.Equal(t, project.Run{}, cfg)
 }
 
+func TestARunTomlWithNoJobIsStillDeclared(t *testing.T) {
+	cfg, err := Project{StateDir: stateWithRun(t, "addressing = \"ports\"\n")}.LoadRun()
+
+	require.NoError(t, err)
+	assert.Equal(t, project.Run{Declared: true, Addressing: project.AddressPorts}, cfg)
+}
+
 func TestATypoedSectionIsRefusedByName(t *testing.T) {
 	_, err := Project{StateDir: stateWithRun(t, "[[job]]\nname = \"dev\"\nkind = \"service\"\ncmd = \"pnpm dev\"\n\n[[profiles]]\nname = \"full\"\njobs = [\"dev\"]\n")}.LoadRun()
 
@@ -179,6 +186,7 @@ value = "{namespace}"
 
 	require.NoError(t, err)
 	assert.Equal(t, project.Run{
+		Declared:        true,
 		PortOffsetBlock: 20,
 		Jobs: []project.Job{
 			{

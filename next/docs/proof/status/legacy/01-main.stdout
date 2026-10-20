@@ -1,0 +1,13 @@
+
+  = main — nothing to fix
+
+  path        <SB>/acme (main)
+  isolation   isolated
+  addressing  names
+  ports       base
+  env         2 files
+
+  JOBS
+  web  stopped  http://web.main.acme.localhost:23462
+  api  stopped  http://api.main.acme.localhost:23462
+

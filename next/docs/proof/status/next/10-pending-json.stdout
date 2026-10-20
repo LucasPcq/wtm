@@ -1,0 +1,117 @@
+{
+  "v": 2,
+  "command": "status",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/old",
+      "status": "done",
+      "detail": {
+        "branch": "feat/old",
+        "path": "<SB>/acme.trees/feat-old",
+        "main": false,
+        "locked": false,
+        "rebasing": false,
+        "created_at": "<T>",
+        "parent": "main",
+        "children": [],
+        "base": {
+          "name": "main",
+          "ahead": 0,
+          "behind": 2
+        },
+        "origin": null,
+        "changes": {
+          "staged": 0,
+          "modified": 0,
+          "untracked": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "files": []
+        },
+        "commits": [
+          {
+            "sha": "<SHA>",
+            "subject": "chore: bootstrap acme",
+            "author": "Acme Dev",
+            "at": "<T>"
+          }
+        ],
+        "review": null,
+        "isolation": null,
+        "run_toml": "declared",
+        "run": {
+          "addressing": "names",
+          "offset": 30,
+          "ports": "not_chosen"
+        },
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23490
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23491
+          }
+        ],
+        "env": {
+          "declared": 2,
+          "files": [
+            {
+              "target": "apps/api/.env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            },
+            {
+              "target": "apps/web/.env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            }
+          ]
+        },
+        "problems": [
+          {
+            "code": "status.isolation_pending",
+            "message": "predates the isolation choice: run up and run start refuse it",
+            "fix": {
+              "command": "env",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/old"
+                  ]
+                },
+                {
+                  "path": "isolation",
+                  "values": [
+                    "isolated"
+                  ]
+                }
+              ],
+              "code": "status.isolation_pending",
+              "message": ""
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

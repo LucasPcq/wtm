@@ -2,6 +2,7 @@ package worktree
 
 import (
 	"path/filepath"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
@@ -17,6 +18,16 @@ type Meta struct {
 	Ordinal      int                 `json:"ordinal,omitempty"`
 	Namespaces   []string            `json:"namespaces,omitempty"`
 	Isolation    project.Isolation   `json:"isolation,omitempty"`
+}
+
+// Created returns the time the record's created_at says, nil when it has none or it does not parse.
+func (m Meta) Created() *time.Time {
+	at, err := time.Parse(time.RFC3339, m.CreatedAt)
+	if err != nil {
+		return nil
+	}
+
+	return &at
 }
 
 // MetaDirParams names the branch whose record MetaDir locates, in the project's state directory.

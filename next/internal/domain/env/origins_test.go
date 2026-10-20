@@ -184,7 +184,7 @@ func TestAddressingIsNamesUnlessPortsAreAskedFor(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, effectiveAddressing(tc.config))
+			assert.Equal(t, tc.want, EffectiveAddressing(tc.config))
 		})
 	}
 }

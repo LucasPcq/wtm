@@ -1,7 +1,8 @@
-// Package daemon asks the run daemon which jobs it runs, over its socket, without ever starting it.
+// Package daemon asks the run daemon which jobs it runs and how each stands, over its socket, without ever starting it.
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 )
 
@@ -54,7 +56,18 @@ func (d Daemon) Jobs(ctx context.Context) ([]run.Job, error) {
 
 	jobs := make([]run.Job, 0, len(answer.Jobs))
 	for _, job := range answer.Jobs {
-		jobs = append(jobs, run.Job{Name: job.Name, WorkDir: job.WorkDir, Up: up(job.Status)})
+		jobs = append(jobs, run.Job{
+			Name:      job.Name,
+			WorkDir:   job.WorkDir,
+			Up:        up(job.Status),
+			Kind:      project.JobKind(job.Kind),
+			State:     cmp.Or(run.State(job.State), stateOf(job.Status)),
+			Claim:     claim(job.Status),
+			URL:       job.URL,
+			ExitCode:  job.ExitCode,
+			StartedAt: job.StartedAt,
+			SharedDir: job.SharedDir,
+		})
 	}
 
 	return jobs, nil
@@ -88,6 +101,25 @@ func up(status string) bool {
 	return false
 }
 
+// claim reports whether a job of status is a claim a worktree holds on a shared job another runs: joined, or attached as older daemons say.
+func claim(status string) bool {
+	return status == "joined" || status == "attached"
+}
+
+// stateOf is the state of a job of status, for a daemon too old to say it: a detached service runs, a reaped one is stopped, a claim has none.
+func stateOf(status string) run.State {
+	switch status {
+	case "running", "detached":
+		return run.Running
+	case "crashed":
+		return run.Crashed
+	case "stopped", "reaped":
+		return run.Stopped
+	}
+
+	return ""
+}
+
 type request struct {
 	Action string `json:"action"`
 }
@@ -96,8 +128,14 @@ type response struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
 	Jobs    []struct {
-		Name    string `json:"name"`
-		Status  string `json:"status"`
-		WorkDir string `json:"work_dir"`
+		Name      string    `json:"name"`
+		Kind      string    `json:"kind"`
+		Status    string    `json:"status"`
+		State     string    `json:"state"`
+		WorkDir   string    `json:"work_dir"`
+		URL       string    `json:"url"`
+		ExitCode  *int      `json:"exit_code"`
+		StartedAt time.Time `json:"started_at"`
+		SharedDir string    `json:"shared_dir"`
 	} `json:"jobs"`
 }

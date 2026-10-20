@@ -58,7 +58,7 @@ func TestAReadChangesNothingAndTakesNoLock(t *testing.T) {
 
 	require.NoError(t, err)
 	for _, call := range append(w.git.Calls(), w.meta.Calls()...) {
-		assert.Regexp(t, `^(Worktrees|Branches|AheadBehind|Locate|Dirty|Count|Load) `, call)
+		assert.Regexp(t, `^(Worktrees|Branches|AheadBehind|Locate|Dirty|AheadBehindOf|Load) `, call)
 	}
 }
 
@@ -234,7 +234,7 @@ func TestTheEntryOfABareRepositoryIsNotAWorktree(t *testing.T) {
 }
 
 func TestABranchWithNothingToCountIsNotCountedNotUnreadable(t *testing.T) {
-	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/orphan")}, Dirty: []string{"/repo/.trees/feat/orphan"}, Fail: map[string]error{"Count": errors.New("bad revision")}}})
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/orphan")}, Dirty: []string{"/repo/.trees/feat/orphan"}, Fail: map[string]error{"AheadBehindOf": errors.New("bad revision")}}})
 
 	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
 

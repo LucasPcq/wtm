@@ -57,8 +57,8 @@ func (c *listCommand) run(cmd *cobra.Command, args []string) error {
 }
 
 // open opens the use case with open, kept for the picker.
-func (c *listCommand) open(open func(ctx context.Context, dir string) (list.UseCase, error)) func(ctx context.Context, dir string) (form.Reader[list.Request, list.Outcome], error) {
-	return func(ctx context.Context, dir string) (form.Reader[list.Request, list.Outcome], error) {
+func (c *listCommand) open(open func(ctx context.Context, dir string) (list.UseCase, error)) func(ctx context.Context, dir string) (form.Reader[list.Request, list.Questions, list.Outcome], error) {
+	return func(ctx context.Context, dir string) (form.Reader[list.Request, list.Questions, list.Outcome], error) {
 		app, err := open(ctx, dir)
 		c.app = app
 		return app, err

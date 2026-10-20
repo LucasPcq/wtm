@@ -9,7 +9,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
+	"github.com/LucasPcq/wtm/next/internal/ui/widget"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -19,15 +21,16 @@ type ReadOutcome interface {
 	Envelope(command string, err *domain.Error) domain.Envelope
 }
 
-// A Reader is what the form calls of a read command's use case: its run.
-type Reader[R, O any] interface {
+// A Reader is what the form calls of a read command's use case: the questions of a request, and its run.
+type Reader[R, Q, O any] interface {
+	Questions(ctx context.Context, req R) (Q, error)
 	Run(ctx context.Context, req R, opts domain.RunOptions) (O, error)
 }
 
 // A Query is what a read command's cli hands the form: the use case it opens, how it draws what it read, and what the user may pick of it on a terminal.
-// A read asks no question, has no plan and takes no lock: its flags are its schema's and --output, without --yes, --dry-run, --expect-fingerprint, --remember nor --ask.
+// A read has no plan and takes no lock: its flags are its schema's and --output, without --yes, --dry-run, --expect-fingerprint, --remember nor --ask. The one question it asks is its subject, a positional select left open, before it reads.
 type Query[R Request[R], Q Questions, O ReadOutcome] struct {
-	Open func(ctx context.Context, dir string) (Reader[R, O], error)
+	Open func(ctx context.Context, dir string) (Reader[R, Q, O], error)
 	Draw func(w io.Writer, read O, view output.View) // what was read, drawn from view
 	// Pick lets the user pick a follow-up of what was read, when the user can see and answer it: it returns the read with the follow-ups chosen. Nil only draws the read.
 	Pick func(ctx context.Context, read O, req R, run *uicli.Run) (O, error)
@@ -56,7 +59,7 @@ func (q *Query[R, Q, O]) Bind(cmd *cobra.Command, run *uicli.Run) {
 	cmd.Flags().StringVar(&run.Output, "output", uicli.OutputText, run.OutputHelp())
 }
 
-// Launch runs cmd: it refuses an invalid --output or correlation ID, builds the request from the flags and args, opens the use case on the project's directory and reads, then lets the user pick of the read when Pick is set and the user can see and answer it; it prints how the read ended and returns the failure that sets the exit code.
+// Launch runs cmd: it refuses an invalid --output or correlation ID, builds the request from the flags and args, opens the use case on the project's directory, asks the subject the request leaves open and reads, then lets the user pick of the read when Pick is set, each only when the user can see and answer it; it prints how the read ended and returns the failure that sets the exit code.
 func (q *Query[R, Q, O]) Launch(cmd *cobra.Command, args []string) error {
 	if err := q.io.Begin(cmd); err != nil {
 		return err
@@ -70,12 +73,62 @@ func (q *Query[R, Q, O]) Launch(cmd *cobra.Command, args []string) error {
 		return q.io.FailWith(domain.AsError(domain.AsErrorParams{Err: err}), nil)
 	}
 
+	req, err = q.ask(ctx, app, req)
+	if err != nil {
+		var none O
+		return q.conclude(none, err)
+	}
+
 	read, err := app.Run(ctx, req, domain.RunOptions{Surface: uicli.SurfaceCLI, CorrelationID: q.io.Env.CorrelationID})
 	if err == nil && q.Pick != nil && q.interactive() {
 		read, err = q.Pick(ctx, read, req, q.io)
 	}
 
 	return q.conclude(read, err)
+}
+
+// ask asks the subject of the read, the positional select its questions leave open, before the read: when the user can see and answer it, and the request neither answers it nor rules it out.
+func (q *Query[R, Q, O]) ask(ctx context.Context, app Reader[R, Q, O], req R) (R, error) {
+	// The schema says whether the request leaves a subject to ask before the questions are read.
+	if _, open := subjectOf(q.schema(), req); !open || !q.interactive() {
+		return req, nil
+	}
+
+	questions, err := app.Questions(ctx, req)
+	if err != nil {
+		return req, err
+	}
+	field, open := subjectOf(questions.Form(), req)
+	if !open {
+		return req, nil
+	}
+
+	subject := &Subject{Field: field}
+	if err := Walk(ctx, SubjectScript(subject), q.io.Streams.In, q.io.Streams.Err); err != nil {
+		return req, err
+	}
+	return req.Answer(field.Path, []string{subject.Picked()})
+}
+
+// A Skipper is a request that says why it leaves a field unasked, empty when it does not: what the field's Skip says once its questions are read.
+type Skipper interface {
+	Skips(path string) string
+}
+
+// subjectOf returns the positional select of form req leaves open, and reports whether there is one: neither answered nor ruled out, by the form or by req.
+func subjectOf(form domain.Form, req domain.Valued) (domain.SelectField, bool) {
+	skipper, skips := req.(Skipper)
+	for _, field := range form.Fields {
+		subject, ok := field.(domain.SelectField)
+		if skips && ok && skipper.Skips(subject.Path) != "" {
+			continue
+		}
+		if ok && positional(field) && subject.Skip == "" && req.Values(subject.Path) == nil {
+			return subject, true
+		}
+	}
+
+	return domain.SelectField{}, false
 }
 
 // interactive reports whether the user can see and answer a picker, and see what it ends on: stdout too is a terminal, since a read piped elsewhere is asked for its data, the output is for a human and --quiet does not silence it.
@@ -118,3 +171,52 @@ func (q *Query[R, Q, O]) nextSteps(followUps []domain.FollowUp) []output.NextSte
 
 	return steps
 }
+
+// ----------------------------------------------------------------------------
+// The subject
+
+// A Subject is the step that asks a read's subject, its Field, before the read: a select list of its options, the cursor on the field's value.
+type Subject struct {
+	Field  domain.SelectField
+	list   *widget.SelectList
+	picked string
+}
+
+// SubjectScript is the walk that asks s alone, with nothing to read: the subject's options are the questions read before it.
+func SubjectScript(s *Subject) Script {
+	return Script{
+		Steps:   []Step{s},
+		Observe: func(context.Context) (func(), error) { return func() {}, nil },
+		Label:   func(path string) string { return path },
+	}
+}
+
+// Label is the field's label.
+func (s *Subject) Label() string { return s.Field.Label }
+
+// Description is the field's help.
+func (s *Subject) Description() string { return s.Field.Help }
+
+// Standing is the subject picked, none until it is: the step is always asked.
+func (s *Subject) Standing() Standing { return Standing{Value: s.picked} }
+
+// Open builds the list of the field's options on its value.
+func (s *Subject) Open() tea.Cmd {
+	s.list = widget.NewSelectList(widget.SelectParams{Options: Options(s.Field.Options), Start: s.Field.Value})
+	return nil
+}
+
+// Widget is the select list.
+func (s *Subject) Widget() widget.Widget { return s.list }
+
+// Answer records the option selected.
+func (s *Subject) Answer() string {
+	s.picked = s.list.Value()
+	return shortOf(s.Field.Options, s.picked)
+}
+
+// Reset forgets the subject picked.
+func (s *Subject) Reset() { s.picked = "" }
+
+// Picked is the value of the option picked.
+func (s *Subject) Picked() string { return s.picked }

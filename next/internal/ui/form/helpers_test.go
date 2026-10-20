@@ -78,3 +78,14 @@ func launched(t *testing.T, q *form.Query[request, questions, read], run *uicli.
 	cmd.SetContext(t.Context())
 	return q.Launch(cmd, nil)
 }
+
+// launchedSubject launches q bound to run with args, as the command line would, its positional argument the subject.
+func launchedSubject(t *testing.T, q *form.Query[request, subjects, read], run *uicli.Run, args ...string) error {
+	t.Helper()
+	cmd := &cobra.Command{Use: "fake"}
+	q.Bind(cmd, run)
+	cmd.Flags().Bool(uicli.FlagQuiet, false, "")
+	require.NoError(t, cmd.ParseFlags(args))
+	cmd.SetContext(t.Context())
+	return q.Launch(cmd, cmd.Flags().Args())
+}

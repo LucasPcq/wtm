@@ -73,4 +73,4 @@ func mutations() []mutation {
 }
 
 // reads are the commands of the catalogue that change nothing.
-var reads = []string{"list", "tree"}
+var reads = []string{"list", "status", "tree"}

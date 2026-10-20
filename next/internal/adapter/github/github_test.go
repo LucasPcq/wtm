@@ -23,6 +23,20 @@ func TestPullRequestsAreTheOpenOnesGHLists(t *testing.T) {
 	assert.Equal(t, worktree.PullRequests{Open: []worktree.PullRequest{{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a", State: worktree.PullRequestOpen}}}, prs, "a fork's pull request is not this repository's branch")
 }
 
+func TestAPullRequestCountsItsChecksByOutcomeAndCarriesItsReview(t *testing.T) {
+	gh := fakeGH(t, 0, `[{"number": 12, "headRefName": "feat/a", "url": "u", "title": "Add a", "isDraft": true, "reviewDecision": "APPROVED",
+		"statusCheckRollup": [{"conclusion": "SUCCESS"}, {"conclusion": "NEUTRAL"}, {"conclusion": "SKIPPED"}, {"conclusion": "FAILURE"},
+			{"conclusion": "ACTION_REQUIRED"}, {"conclusion": "SOMETHING_NEW"}, {"state": "SUCCESS"}, {"state": "PENDING"}, {"state": "EXPECTED"}, {"state": "ERROR"}, {}]}]`)
+
+	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequests(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, []worktree.PullRequest{{
+		Number: 12, URL: "u", Branch: "feat/a", State: worktree.PullRequestOpen, Title: "Add a", Draft: true, Decision: "APPROVED",
+		Checks: worktree.Checks{Passed: 4, Failed: 3, Pending: 4},
+	}}, prs.Open, "an unknown conclusion fails closed, an action required is pending")
+}
+
 func TestPullRequestsPastTheCapSaySo(t *testing.T) {
 	gh := fakeGH(t, 0, listed(51))
 
