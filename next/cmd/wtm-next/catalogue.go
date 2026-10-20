@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
@@ -31,10 +32,13 @@ func streams() []api.Stream {
 	}
 }
 
-// watchEvents is the watch of the event stream over stream for a surface: the call's directory is named, never a fallback to every repository, and each line goes out as its JSON.
+// watchEvents is the watch of the event stream over stream for a surface: the call's directory is named, never a fallback to every repository, a relative repo is read from it, never from the server's own directory, and each line goes out as its JSON.
 func watchEvents(stream events.UseCase) func(ctx context.Context, dir string, req events.Request, send func(json.RawMessage) error) error {
 	return func(ctx context.Context, dir string, req events.Request, send func(json.RawMessage) error) error {
 		req.Dir, req.Named = dir, true
+		if req.Repo != "" && !filepath.IsAbs(req.Repo) {
+			req.Repo = filepath.Join(dir, req.Repo)
+		}
 		return stream.Watch(ctx, req, events.Out{Emit: func(received events.Received) error { return send(received.JSON) }})
 	}
 }

@@ -46,10 +46,14 @@ type entry struct {
 }
 
 // Add lists repo, keyed by its common directory, and reports whether it was
-// not listed yet. The common case, a repository already listed, reads the file
-// and nothing else. A file that does not parse is rebuilt from empty: every
+// not listed yet. A repository with no wtm config is not added, as Prune would
+// drop it. The common case, a repository already listed, reads the file and
+// nothing else. A file that does not parse is rebuilt from empty: every
 // repository joins it again the next time a command runs in it.
 func (r Registry) Add(ctx context.Context, repo domain.Repo) (bool, error) {
+	if gone(entry{CommonDir: repo.CommonDir}) {
+		return false, nil
+	}
 	if listed, err := r.read(); err == nil && listing(listed, repo.CommonDir) {
 		return false, nil
 	}

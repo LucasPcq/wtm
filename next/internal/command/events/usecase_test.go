@@ -13,6 +13,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestAStreamSubscribesBeforeItReadsItsSnapshot(t *testing.T) {
+	app := newRepo("/repo")
+	log := &callLog{}
+	app.Config.log = log
+	bus := newBus()
+	bus.log = log
+
+	r, _ := watching(t, useCase(bus, &fakeRegistry{}, opening(app)), events.Request{Dir: "/repo"})
+	r.nextType(t)
+
+	// the first read refuses a repository with no config before anything subscribes
+	assert.Equal(t, []string{"observe", "subscribe", "observe"}, log.all())
+}
+
 func TestAStreamOpensOnItsSnapshotThenReadyThenTheChangesOfItsRepository(t *testing.T) {
 	app := newRepo("/repo", "feat/a")
 	app.Meta["feat/a"] = worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T11:00:00Z", Ordinal: 1}
@@ -126,13 +140,43 @@ func TestAStreamEndsWhenItsRepositoryIsAnnouncedRemovedAndItsConfigIsGone(t *tes
 	assert.Equal(t, events.CodeConfigNotFound, codeOf(t, ended(t, done)))
 }
 
-func TestARepositoryWithNoConfigIsRefusedBeforeTheStream(t *testing.T) {
+func TestARepositoryWithNoConfigIsRefusedBeforeTheStreamAndNotRegistered(t *testing.T) {
 	app := newRepo("/repo")
 	app.Config.remove()
+	registry := &fakeRegistry{}
 
-	err := useCase(newBus(), &fakeRegistry{}, opening(app)).Watch(t.Context(), events.Request{Dir: "/repo"}, newReader().out())
+	err := useCase(newBus(), registry, opening(app)).Watch(t.Context(), events.Request{Dir: "/repo"}, newReader().out())
 
 	assert.Equal(t, events.CodeConfigNotFound, codeOf(t, err))
+	assert.Empty(t, registry.registers())
+}
+
+func TestAStreamRegistersTheRepositoryItWatches(t *testing.T) {
+	app := newRepo("/repo")
+	registry := &fakeRegistry{}
+
+	r, _ := watching(t, useCase(newBus(), registry, opening(app)), events.Request{Dir: "/repo"})
+	r.nextType(t)
+
+	assert.Equal(t, []domain.Repo{app.Repo}, registry.registers())
+}
+
+// A stream relays only the lines of its own version: a legacy daemon holding the socket would hand it v1 lines.
+func TestALineOfAnOlderSchemaIsDroppedWithAWarning(t *testing.T) {
+	app := newRepo("/repo")
+	bus := newBus()
+	r, _ := watching(t, useCase(bus, &fakeRegistry{}, opening(app)), events.Request{Dir: "/repo"})
+	sub := bus.subscribed(t)
+	r.nextType(t)
+	r.nextType(t)
+
+	sub.Lines <- []byte(`{"v":1,"type":"worktree.created","ts":"t","repo":{"root":"/repo","common_dir":"/repo/.git"}}`)
+	sub.Lines <- []byte(`{"v":1,"type":"job.started","ts":"t","repo":{"root":"/repo","common_dir":"/repo/.git"},"job":{"name":"web"}}`)
+	sub.Lines <- published(t, app.Repo, domain.RepoAdded{})
+
+	assert.ErrorContains(t, r.warning(t), "a line of the event stream v1 was dropped")
+	assert.ErrorContains(t, r.warning(t), "a line of the event stream v1 was dropped")
+	assert.Equal(t, "repo.added", r.nextType(t))
 }
 
 func TestARequestThatCannotBeWatchedIsRefused(t *testing.T) {
@@ -247,6 +291,23 @@ func TestARepositoryJoiningIsSentWithItsSnapshot(t *testing.T) {
 
 	assert.Equal(t, "repo.added", r.nextType(t))
 	assert.Contains(t, r.next(t), `"type":"snapshot","ts":"2026-10-16T12:00:00Z","repo":{"root":"/joining"`)
+}
+
+// A repository joining with no wtm config once looped: the stream's join registered it again, whose prune dropped it, announcing it anew.
+func TestARepositoryJoiningWithNoConfigIsOneLineAndIsNotRegistered(t *testing.T) {
+	uninitialized := newRepo("/bare")
+	uninitialized.Config.remove()
+	bus, registry := newBus(), &fakeRegistry{}
+	r, _ := watching(t, useCase(bus, registry, opening(uninitialized)), events.Request{All: true})
+	sub := bus.subscribed(t)
+	assert.Equal(t, "ready", r.nextType(t))
+
+	sub.Lines <- published(t, uninitialized.Repo, domain.RepoAdded{})
+
+	assert.Equal(t, "repo.added", r.nextType(t))
+	assert.ErrorContains(t, r.warning(t), "/bare: no wtm config found")
+	r.quiet(t)
+	assert.Empty(t, registry.registers())
 }
 
 // Legacy sent a second snapshot of a repository registered between its subscription and its first prune.

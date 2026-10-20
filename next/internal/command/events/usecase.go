@@ -117,10 +117,11 @@ func (u UseCase) scope(ctx context.Context, req Request) (Source, bool, error) {
 		return Source{}, false, err
 	}
 
-	// A repository with no wtm config is refused before the stream starts, as it ends one that loses it.
+	// A repository with no wtm config is refused before the stream starts, as it ends one that loses it; one that has it joins those wtm knows.
 	if _, err := source.Repository.Observe(ctx, Name); err != nil {
 		return Source{}, false, err
 	}
+	u.Registry.Register(ctx, source.Repo)
 	return source, false, nil
 }
 
@@ -344,7 +345,7 @@ type relayParams struct {
 	Route   func(ctx context.Context, received Received) error
 }
 
-// relay hands each line of the subscription to its route until the bus ends it or ctx is done. A line of a newer version ends the stream; one that cannot be decoded is dropped with a warning.
+// relay hands each line of the subscription to its route until the bus ends it or ctx is done. A line of a newer version ends the stream; one of an older version, or one that cannot be decoded, is dropped with a warning.
 func (s *stream) relay(ctx context.Context, params relayParams) error {
 	ticker := time.NewTicker(cmp.Or(s.Recheck, recheckEvery))
 	defer ticker.Stop()
@@ -367,6 +368,11 @@ func (s *stream) relay(ctx context.Context, params relayParams) error {
 			}
 			if err != nil && !errors.Is(err, domain.ErrUnknownEventType) {
 				s.warn(fmt.Errorf("an event the bus carried could not be read, and was dropped: %w", err))
+				continue
+			}
+			// Whichever daemon holds the socket is the bus: a legacy one relays v1 lines, never translated.
+			if line.V < domain.StreamVersion {
+				s.warn(fmt.Errorf("a line of the event stream v%d was dropped: this wtm reads v%d alone", line.V, domain.StreamVersion))
 				continue
 			}
 			if err := params.Route(ctx, Received{Line: line, JSON: data}); err != nil {

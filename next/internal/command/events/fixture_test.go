@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"slices"
 	"sync"
 	"time"
 
@@ -18,12 +19,34 @@ import (
 
 var fixedNow = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 
-// A fakeBus hands each subscription to the test, which feeds it lines and closes it as the bus would; the first subscriptions fail with fail, in turn.
+// A callLog records, in order, the calls the fakes that share it receive.
+type callLog struct {
+	mu    sync.Mutex
+	calls []string
+}
+
+func (l *callLog) add(call string) {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.calls = append(l.calls, call)
+}
+
+func (l *callLog) all() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return slices.Clone(l.calls)
+}
+
+// A fakeBus hands each subscription to the test, which feeds it lines and closes it as the bus would; the first subscriptions fail with fail, in turn. Each subscription is recorded in log, when there is one.
 type fakeBus struct {
 	mu            sync.Mutex
 	fail          []error
 	pending       []string // the lines each subscription holds as soon as it is made
 	subscriptions chan subscription
+	log           *callLog
 }
 
 // A subscription is one Subscribe: the repositories it asked for and the lines the test sends it.
@@ -45,6 +68,7 @@ func (b *fakeBus) Subscribe(_ context.Context, repos []string) (<-chan []byte, e
 		return nil, err
 	}
 
+	b.log.add("subscribe")
 	lines := make(chan []byte, 16)
 	for _, line := range b.pending {
 		lines <- []byte(line)
@@ -53,11 +77,24 @@ func (b *fakeBus) Subscribe(_ context.Context, repos []string) (<-chan []byte, e
 	return lines, nil
 }
 
-// A fakeRegistry lists repos and counts its prunes.
+// A fakeRegistry lists repos, and records what it was asked to register and how many times it pruned.
 type fakeRegistry struct {
-	mu     sync.Mutex
-	repos  []domain.Repo
-	prunes int
+	mu         sync.Mutex
+	repos      []domain.Repo
+	prunes     int
+	registered []domain.Repo
+}
+
+func (r *fakeRegistry) Register(_ context.Context, repo domain.Repo) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.registered = append(r.registered, repo)
+}
+
+func (r *fakeRegistry) registers() []domain.Repo {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.registered)
 }
 
 func (r *fakeRegistry) Prune(context.Context) ([]domain.Repo, error) {
@@ -73,14 +110,16 @@ func (r *fakeRegistry) pruned() int {
 	return r.prunes
 }
 
-// A config is a project's config.toml as repository.Service loads it, which a test can take away.
+// A config is a project's config.toml as repository.Service loads it, which a test can take away; each load is recorded in log, when there is one.
 type config struct {
 	mu   sync.Mutex
 	gone bool
 	err  error
+	log  *callLog
 }
 
 func (c *config) Load() (project.Config, project.Global, error) {
+	c.log.add("observe")
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.gone {

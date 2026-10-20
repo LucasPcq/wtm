@@ -227,18 +227,19 @@ func newOpID() string {
 // ----------------------------------------------------------------------------
 // The event stream
 
-// streamParams is where the event stream finds its bus, the socket of its daemon, which Start starts when none answers, and the registry of the repositories wtm knows.
+// streamParams is where the event stream finds its bus, the socket of its daemon, which Start starts when none answers, and the registry of the repositories wtm knows, which it never adds to when Off.
 type streamParams struct {
 	Socket   string
 	Start    func() error
 	Registry string
+	Off      bool
 }
 
 // eventStream is the events use case over the bus and the registry params name, opening each repository with openEvents.
 func eventStream(params streamParams) events.UseCase {
 	return events.UseCase{
 		Bus:      bus.Bus{SocketPath: params.Socket, Start: params.Start},
-		Registry: known{Registry: registry.Registry{Path: params.Registry}, Socket: params.Socket},
+		Registry: known{Registry: registry.Registry{Path: params.Registry}, Socket: params.Socket, Off: params.Off},
 		Open:     openEvents,
 		Now:      time.Now,
 	}
@@ -246,7 +247,7 @@ func eventStream(params streamParams) events.UseCase {
 
 // The process's own event stream: its bus at the socket every wtm-next talks to, started from this binary.
 func systemStream() events.UseCase {
-	return eventStream(streamParams{Socket: bus.SocketPath(), Start: startDaemon, Registry: registry.Path()})
+	return eventStream(streamParams{Socket: bus.SocketPath(), Start: startDaemon, Registry: registry.Path(), Off: os.Getenv(stateDirEnv) != ""})
 }
 
 // daemonCommand is the command line that runs the bus's daemon in a process of its own.
@@ -271,14 +272,21 @@ func startDaemon() error {
 	return shell.Detached(exe, []string{daemonCommand}, shell.Environ([]string{cli.CorrelationIDEnv}, nil))
 }
 
-// known is the registry of the repositories wtm knows, announcing on the bus at Socket each one it adds or drops.
+// known is the registry of the repositories wtm knows, announcing on the bus at Socket each one it adds or drops; Off keeps any repository from joining it (a state directory moved by $WTM_STATE_DIR: a sandbox or a test).
 type known struct {
 	registry.Registry
 	Socket string
+	Off    bool
 }
 
-// Register lists repo, announcing it when it was not listed yet, then drops the repositories no longer initialized; it never fails: a repository missing is listed again by the next command run in it.
+// Register lists repo, initialized, announcing it when it was not listed yet, then drops the repositories no longer initialized; it never fails nor holds its caller for long: a repository missing is listed again by the next command run in it.
 func (k known) Register(ctx context.Context, repo domain.Repo) {
+	if k.Off {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, registerTimeout)
+	defer cancel()
 	added, err := k.Add(ctx, repo)
 	if err != nil || !added {
 		return

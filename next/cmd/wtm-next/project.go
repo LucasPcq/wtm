@@ -56,7 +56,7 @@ func opener[U any](useCase func(app) U) func(ctx context.Context, dir string) (U
 	}
 }
 
-// openEvents opens the repository holding dir for the event stream, registered among those wtm knows; it refuses a dir that is not a directory with an error wrapping fs.ErrNotExist.
+// openEvents opens the repository holding dir for the event stream, without registering it: the stream registers the repository it watches once its config is read, never one a global stream joins; it refuses a dir that is not a directory with an error wrapping fs.ErrNotExist.
 func openEvents(ctx context.Context, dir string) (events.Source, error) {
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 		return events.Source{}, fmt.Errorf("%s: %w", dir, fs.ErrNotExist)
@@ -66,7 +66,6 @@ func openEvents(ctx context.Context, dir string) (events.Source, error) {
 		return events.Source{}, err
 	}
 
-	register(ctx, params)
 	repo := git.Repo{Dir: params.MainPath}
 	return events.Source{
 		Repo:       domain.Repo{Root: params.MainPath, CommonDir: bus.Resolved(params.CommonDir)},
@@ -75,15 +74,9 @@ func openEvents(ctx context.Context, dir string) (events.Source, error) {
 	}, nil
 }
 
-// register lists the repository params locates among those wtm knows, for a stream that follows all of them; it never fails nor holds a command for long. A state directory moved by $WTM_STATE_DIR keeps the repository out: a sandbox or a test, not a repository of the user's.
+// register lists the repository params locates among those wtm knows, for a stream that follows all of them, once initialized; it never fails nor holds a command for long. A state directory moved by $WTM_STATE_DIR keeps the repository out: a sandbox or a test, not a repository of the user's.
 func register(ctx context.Context, params wireParams) {
-	if os.Getenv(stateDirEnv) != "" {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, registerTimeout)
-	defer cancel()
-	known{Registry: registry.Registry{Path: registry.Path()}, Socket: bus.SocketPath()}.Register(ctx, domain.Repo{Root: params.MainPath, CommonDir: bus.Resolved(params.CommonDir)})
+	known{Registry: registry.Registry{Path: registry.Path()}, Socket: bus.SocketPath(), Off: os.Getenv(stateDirEnv) != ""}.Register(ctx, domain.Repo{Root: params.MainPath, CommonDir: bus.Resolved(params.CommonDir)})
 }
 
 // locate returns where the repository of dir, any of its worktrees or a folder in one, keeps its main worktree, its common dir and wtm's state.

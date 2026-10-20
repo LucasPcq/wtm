@@ -50,8 +50,10 @@ func (b *scriptedBus) Subscribe(ctx context.Context, _ []string) (<-chan []byte,
 	return ch, nil
 }
 
-// registered lists repos.
+// registered lists repos, and registers nothing.
 type registered []domain.Repo
+
+func (registered) Register(context.Context, domain.Repo) {}
 
 func (r registered) Prune(context.Context) ([]domain.Repo, error) {
 	return r, nil

@@ -15,14 +15,16 @@ type Bus interface {
 	Subscribe(ctx context.Context, repos []string) (<-chan []byte, error)
 }
 
-// Registry is the repositories wtm knows. Prune drops those no longer
-// initialized, announcing each on the bus as repo.removed, and returns the
-// others.
+// Registry is the repositories wtm knows. Register lists an initialized
+// repository, announcing it on the bus as repo.added when it was not listed,
+// best effort; Prune drops those no longer initialized, announcing each as
+// repo.removed, and returns the others.
 type Registry interface {
+	Register(ctx context.Context, repo domain.Repo)
 	Prune(ctx context.Context) ([]domain.Repo, error)
 }
 
-// Open opens the repository holding dir for the stream. It fails with an error
+// Open opens the repository holding dir for the stream, without registering it. It fails with an error
 // wrapping fs.ErrNotExist when dir is not a directory, and with a
 // [*domain.Error] of code [domain.CodeNotARepository] when dir is in no
 // repository.

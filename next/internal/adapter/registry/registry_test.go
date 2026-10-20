@@ -23,6 +23,17 @@ func TestARepositoryIsAddedOnceInTheFormatWtmShares(t *testing.T) {
 	assert.Equal(t, "[\n  {\n    \"common_dir\": \""+repo.CommonDir+"\",\n    \"root\": \""+repo.Root+"\",\n    \"added_at\": \"2026-10-16T12:00:00Z\"\n  }\n]\n", readFile(t, registry.Path))
 }
 
+func TestARepositoryWithNoWtmConfigIsNotAdded(t *testing.T) {
+	registry, repo := registryIn(t), initialized(t)
+	require.NoError(t, os.Remove(filepath.Join(repo.CommonDir, "wtm", "config.toml")))
+
+	added, err := registry.Add(t.Context(), repo)
+
+	require.NoError(t, err)
+	assert.False(t, added)
+	assert.NoFileExists(t, registry.Path)
+}
+
 func TestAnUnparsableRegistryIsRebuiltFromEmpty(t *testing.T) {
 	registry, repo := registryIn(t), initialized(t)
 	require.NoError(t, os.MkdirAll(filepath.Dir(registry.Path), 0o755))

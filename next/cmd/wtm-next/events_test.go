@@ -125,3 +125,58 @@ func TestTheDaemonIsAHiddenCommand(t *testing.T) {
 	assert.Equal(t, daemonCommand, daemon.Name())
 	assert.True(t, daemon.Hidden)
 }
+
+// Opening a repository with no wtm config once registered it, which a global stream's prune dropped at once, announcing it anew.
+func TestOpeningARepositoryWithNoWtmConfigLeavesTheRegistryUnwritten(t *testing.T) {
+	uninitialized := gittest.InitRepo(t)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv(stateDirEnv, "")
+
+	_, err := openList(t.Context(), uninitialized)
+	require.NoError(t, err)
+
+	assert.NoFileExists(t, registry.Path())
+}
+
+func TestTheRegistryAnnouncesARepositoryItAddsAndOneItDrops(t *testing.T) {
+	main := configured(t)
+	t.Setenv("HOME", t.TempDir())
+	socket := servingBus(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	lines, err := bus.Bus{SocketPath: socket}.Subscribe(ctx, nil)
+	require.NoError(t, err)
+	repos := known{Registry: registry.Registry{Path: filepath.Join(t.TempDir(), "repos.json")}, Socket: socket}
+	repo := domain.Repo{Root: main, CommonDir: bus.Resolved(filepath.Join(main, ".git"))}
+
+	repos.Register(t.Context(), repo)
+	require.NoError(t, os.Remove(filepath.Join(main, ".git", "wtm", "config.toml")))
+	kept, err := repos.Prune(t.Context())
+
+	require.NoError(t, err)
+	assert.Empty(t, kept)
+	assert.Contains(t, string(<-lines), `"type":"repo.added"`)
+	assert.Contains(t, string(<-lines), `"type":"repo.removed"`)
+}
+
+func TestARegistryOffAddsNothing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "repos.json")
+	main := configured(t)
+
+	known{Registry: registry.Registry{Path: path}, Off: true}.Register(t.Context(), domain.Repo{Root: main, CommonDir: filepath.Join(main, ".git")})
+
+	assert.NoFileExists(t, path)
+}
+
+func TestARelativeRepoOfASurfaceIsReadFromTheCallsDirectory(t *testing.T) {
+	main := configured(t)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv(stateDirEnv, "")
+	stream := api.BindStream[events.Request, events.Questions](events.Name, watchEvents(eventStream(streamParams{Socket: servingBus(t), Registry: filepath.Join(t.TempDir(), "repos.json")})))
+
+	lines, response := watchedLines(t, stream, api.Call{Dir: filepath.Dir(main), Answers: []domain.Answered{{Path: "repo", Values: []string{filepath.Base(main)}}}}, 1)
+
+	assert.Equal(t, http.StatusOK, response.Status, response.Envelope.Err)
+	require.NotEmpty(t, lines)
+	assert.Contains(t, lines[0], `"root":"`+gittest.Resolved(t, main)+`"`)
+}
