@@ -21,6 +21,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
+	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
@@ -42,6 +43,7 @@ type app struct {
 	Create  create.UseCase
 	Extract extract.UseCase
 	List    list.UseCase
+	Status  status.UseCase
 	Tree    tree.UseCase
 }
 
@@ -99,6 +101,14 @@ func wire(params wireParams) app {
 			PullRequests: gh.PullRequests,
 			Repository:   facts,
 		},
+		Status: status.UseCase{
+			Git:          repo,
+			Meta:         meta,
+			EnvFiles:     store.EnvFiles{},
+			Jobs:         jobs,
+			PullRequests: gh.PullRequests,
+			Repository:   facts,
+		},
 		Tree: tree.UseCase{
 			Git:          repo,
 			Meta:         meta,
@@ -112,6 +122,12 @@ func wire(params wireParams) app {
 // pathForce is the answer that lifts a legacy command's safety refusals, spelled --force.
 const pathForce = "force"
 
+// The answers the legacy commands a follow-up names take as flags of their own name: a switch alone when said true (run start's --detach), the others followed by their value (env's --from and --isolation, run start's --job).
+var (
+	switches = []string{pathForce, "detach"}
+	valued   = []string{"from", domain.PathIsolation, "job"}
+)
+
 // leftBehind is the repair of a branch an undo left behind, and of its worktree: clean, forced, in the legacy wtm until it migrates.
 func leftBehind(branch string) domain.FollowUp {
 	return domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: pathForce, Values: []string{"true"}}}}
@@ -123,7 +139,7 @@ func commandLine(followUp domain.FollowUp) []string {
 	return argv
 }
 
-// spelled is followUp's command line and what of it could not be spelled, which a test requires nothing of: an answer's path, or url for a follow-up with neither a command nor a pull request to open. The worktree is positional, force and a dry run are flags.
+// spelled is followUp's command line and what of it could not be spelled, which a test requires nothing of: an answer's path, or url for a follow-up with neither a command nor a pull request to open. The worktree is positional, the other answers and a dry run are flags.
 func spelled(followUp domain.FollowUp) (argv, unspelled []string) {
 	if followUp.Command == "" {
 		if argv = pullRequestLine(followUp); argv == nil {
@@ -137,8 +153,10 @@ func spelled(followUp domain.FollowUp) (argv, unspelled []string) {
 		switch {
 		case answer.Path == domain.PathWorktree:
 			worktree = answer.Values
-		case answer.Path == pathForce && slices.Equal(answer.Values, []string{"true"}):
-			flags = append(flags, "--"+pathForce)
+		case slices.Contains(switches, answer.Path) && slices.Equal(answer.Values, []string{"true"}):
+			flags = append(flags, "--"+answer.Path)
+		case slices.Contains(valued, answer.Path) && len(answer.Values) == 1:
+			flags = append(flags, "--"+answer.Path, answer.Values[0])
 		default:
 			unspelled = append(unspelled, answer.Path)
 		}

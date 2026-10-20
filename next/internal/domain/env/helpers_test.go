@@ -94,3 +94,8 @@ func applyWrites(writes Writes, files map[string]string) appliedWrites {
 	}
 	return appliedWrites{Files: out, Changed: changed, Plan: writes.Settled(read)}
 }
+
+// lines are the lines of a .env file holding content.
+func lines(content string) []dotenv.Line {
+	return dotenv.Parse([]byte(content))
+}

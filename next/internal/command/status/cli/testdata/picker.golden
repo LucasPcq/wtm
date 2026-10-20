@@ -1,0 +1,11 @@
+
+  Step 1/1 • Worktree
+
+  The worktree to read, by its branch, its path or part of its branch
+
+   main                                                                                       main
+   /repo/.trees/detached (detached)
+▌› feat/a                                                                                  current
+   feat/old
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel

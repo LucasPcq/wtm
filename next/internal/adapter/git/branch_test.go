@@ -81,15 +81,18 @@ func TestTheFakeAndGitAgreeOnTheTipsAndCountsOfTheirBranches(t *testing.T) {
 	}
 }
 
-func TestTheFakeAndGitCountTheCommitsABranchHasThatItsBaseLacks(t *testing.T) {
+func TestTheFakeAndGitCountBothWaysBetweenABranchAndItsBase(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {
-			unmerged, unmergedErr := impl.port.Count(t.Context(), worktree.Span{Branch: "unmerged", Base: "main"})
-			merged, mergedErr := impl.port.Count(t.Context(), worktree.Span{Branch: "feature", Base: "main"})
-			_, missingErr := impl.port.Count(t.Context(), worktree.Span{Branch: "unmerged", Base: "nope"})
+			ahead, aheadErr := impl.port.AheadBehindOf(t.Context(), worktree.Span{Branch: "unmerged", Base: "main"})
+			behind, behindErr := impl.port.AheadBehindOf(t.Context(), worktree.Span{Branch: "main", Base: "unmerged"})
+			merged, mergedErr := impl.port.AheadBehindOf(t.Context(), worktree.Span{Branch: "feature", Base: "main"})
+			_, missingErr := impl.port.AheadBehindOf(t.Context(), worktree.Span{Branch: "unmerged", Base: "nope"})
 
-			require.NoError(t, unmergedErr)
-			assert.Equal(t, 1, unmerged)
+			require.NoError(t, aheadErr)
+			assert.Equal(t, worktree.AheadBehind{Ahead: 1}, ahead)
+			require.NoError(t, behindErr)
+			assert.Equal(t, worktree.AheadBehind{Behind: 1}, behind)
 			require.NoError(t, mergedErr)
 			assert.Zero(t, merged)
 			require.Error(t, missingErr)
@@ -97,18 +100,20 @@ func TestTheFakeAndGitCountTheCommitsABranchHasThatItsBaseLacks(t *testing.T) {
 	}
 }
 
-func TestTheFakeAndGitCountBothWaysBetweenTwoBranchesAtOnce(t *testing.T) {
+func TestTheFakeAndGitListTheLastCommitsOfAWorktreeNewestFirst(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {
-			ahead, aheadErr := impl.port.AheadBehindOf(t.Context(), worktree.Span{Branch: "unmerged", Base: "main"})
-			behind, behindErr := impl.port.AheadBehindOf(t.Context(), worktree.Span{Branch: "main", Base: "unmerged"})
-			_, missingErr := impl.port.AheadBehindOf(t.Context(), worktree.Span{Branch: "unmerged", Base: "nope"})
+			commits, err := impl.port.Commits(t.Context(), impl.at("linked"), 5)
+			one, oneErr := impl.port.Commits(t.Context(), impl.at("linked"), 1)
 
-			require.NoError(t, aheadErr)
-			assert.Equal(t, worktree.AheadBehind{Ahead: 1}, ahead)
-			require.NoError(t, behindErr)
-			assert.Equal(t, worktree.AheadBehind{Behind: 1}, behind)
-			require.Error(t, missingErr)
+			require.NoError(t, err)
+			var subjects []string
+			for _, commit := range commits {
+				subjects = append(subjects, commit.Subject)
+			}
+			assert.Equal(t, []string{"linked work", gittest.Root}, subjects)
+			require.NoError(t, oneErr)
+			assert.Len(t, one, 1)
 		})
 	}
 }

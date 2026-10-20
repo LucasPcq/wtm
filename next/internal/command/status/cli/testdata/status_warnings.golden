@@ -1,0 +1,18 @@
+
+  ! feat/a — 1 problem
+
+  path         /repo/.trees/feat-a
+  isolation    isolated
+  run          run.toml does not read
+  env          2 files · 1 missing
+  base         main ↑2 ↓1
+  origin       ↑2
+  changes      1 staged · 1 modified · 1 untracked · +12 −3
+  last commit  Wire the session Wire the session
+  parent       main
+
+  ! web/.env is missing
+  → wtm env feat/a
+  ! run.toml does not read: its jobs and ports are not shown: invalid run config: unknown addressing "nope"
+  ! the run daemon is not running: which jobs are up is unknown
+

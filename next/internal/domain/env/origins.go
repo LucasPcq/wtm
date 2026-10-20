@@ -15,8 +15,8 @@ const (
 	proxyTLD            = "localhost"
 )
 
-// effectiveAddressing returns the addressing of cfg: by ports when it asks for them, by names otherwise.
-func effectiveAddressing(cfg project.Run) project.Addressing {
+// EffectiveAddressing returns the addressing of cfg: by ports when it asks for them, by names otherwise.
+func EffectiveAddressing(cfg project.Run) project.Addressing {
 	if cfg.Addressing == project.AddressPorts {
 		return project.AddressPorts
 	}

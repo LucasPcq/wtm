@@ -93,6 +93,14 @@ func (s Snapshot) OriginOf(name string) *Origin {
 	return &Origin{Ahead: counts.Ahead, Behind: counts.Behind, State: standing}
 }
 
+// Checkouts returns the worktrees that have a working tree: all but a bare repository's entry.
+func (s Snapshot) Checkouts() []Worktree {
+	return slices.DeleteFunc(slices.Clone(s.Worktrees), func(w Worktree) bool {
+		_, bare := w.State.(Bare)
+		return bare
+	})
+}
+
 // Live returns the branch of each worktree, "" for one on no branch.
 func (s Snapshot) Live() []string {
 	names := make([]string, 0, len(s.Worktrees))

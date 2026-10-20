@@ -98,7 +98,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 
 // states reads what each worktree of facts holds, a few at once.
 func (u UseCase) states(ctx context.Context, facts Facts) map[string]State {
-	worktrees := facts.listed()
+	worktrees := facts.Checkouts()
 	read := repository.Each(worktrees, func(w worktree.Worktree) State { return u.state(ctx, facts, w) })
 	states := make(map[string]State, len(worktrees))
 	for i, w := range worktrees {
@@ -123,6 +123,7 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 	}
 
 	// A branch with no commit yet, an orphan, has nothing to count: it is not counted rather than unreadable.
-	state.Ahead, _ = u.Git.Count(ctx, worktree.Span{Branch: w.Branch(), Base: facts.Config.Worktrees.BaseBranch})
+	gap, _ := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: facts.Config.Worktrees.BaseBranch})
+	state.Ahead = gap.Ahead
 	return state
 }

@@ -19,8 +19,8 @@ type port interface {
 	Locate(ctx context.Context, path string) (worktree.Location, error)
 	Branches(ctx context.Context) (worktree.Branches, error)
 	AheadBehind(ctx context.Context, name string) (worktree.AheadBehind, error)
-	Count(ctx context.Context, span worktree.Span) (int, error)
 	AheadBehindOf(ctx context.Context, span worktree.Span) (worktree.AheadBehind, error)
+	Commits(ctx context.Context, dir string, count int) ([]worktree.Commit, error)
 	Dirty(ctx context.Context, path string) (bool, error)
 	AddWorktree(ctx context.Context, addition worktree.Addition) error
 	RemoveWorktree(ctx context.Context, path string) error

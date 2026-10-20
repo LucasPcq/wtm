@@ -152,7 +152,7 @@ func TestAReadChangesNothingAndReadsEachWorktreeOnce(t *testing.T) {
 	require.NoError(t, err)
 	seen := map[string]int{}
 	for _, call := range append(w.git.Calls(), w.meta.Calls()...) {
-		assert.Regexp(t, `^(Worktrees|Branches|AheadBehind|AheadBehindOf|Locate|Dirty|Count|Load) `, call)
+		assert.Regexp(t, `^(Worktrees|Branches|AheadBehind|AheadBehindOf|Locate|Dirty|Load) `, call)
 		seen[call]++
 	}
 	assert.Equal(t, 1, seen["Worktrees "])
@@ -160,7 +160,6 @@ func TestAReadChangesNothingAndReadsEachWorktreeOnce(t *testing.T) {
 	assert.Equal(t, 1, seen["Dirty /repo/.trees/feat/a"])
 	assert.Equal(t, 1, seen["Load feat/a"])
 	assert.Equal(t, 1, seen["AheadBehindOf feat/b"], "a child is counted against its parent in one git process")
-	assert.Zero(t, seen["Count feat/b"])
 }
 
 func TestALockedARebasingAndADirtyWorktreeAreSaidSo(t *testing.T) {
@@ -312,7 +311,7 @@ func TestARecordThatCannotBeReadFailsItsNodeAlone(t *testing.T) {
 
 func TestACountInterruptedMakesItsNodeCancelled(t *testing.T) {
 	w := newWorld(seed{
-		Git:  gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), linked("loose")}, Fail: map[string]error{"Count": context.Canceled, "AheadBehindOf": context.Canceled}},
+		Git:  gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), linked("loose")}, Fail: map[string]error{"AheadBehindOf": context.Canceled}},
 		Meta: map[string]worktree.Meta{"feat/a": from("main", "")},
 	})
 

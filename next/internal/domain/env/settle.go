@@ -53,7 +53,7 @@ func Resolve(params ResolveParams) (Writes, error) {
 		return Writes{}, err
 	}
 	settled := settling{
-		Addressing: effectiveAddressing(kept),
+		Addressing: EffectiveAddressing(kept),
 		Jobs:       jobsByName(kept),
 		Slug:       worktree.Slug(params.Branch),
 		Project:    params.Project(),

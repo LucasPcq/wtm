@@ -2,8 +2,10 @@ package daemon_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 
 	"github.com/stretchr/testify/assert"
@@ -16,8 +18,27 @@ func TestJobsAreThoseTheDaemonLists(t *testing.T) {
 	jobs, err := daemon.Daemon{SocketPath: socket}.Jobs(t.Context())
 
 	require.NoError(t, err)
-	assert.Equal(t, []run.Job{{Name: "web", WorkDir: "/wt/a", Up: true}, {Name: "api", WorkDir: "/wt/a"}, {Name: "db", WorkDir: "/wt/b", Up: true}}, jobs)
+	assert.Equal(t, []run.Job{
+		{Name: "web", WorkDir: "/wt/a", Up: true, State: run.Running},
+		{Name: "api", WorkDir: "/wt/a", State: run.Stopped},
+		{Name: "db", WorkDir: "/wt/b", Up: true, Claim: true},
+	}, jobs)
 	assert.Equal(t, map[string]any{"action": "list"}, <-requests)
+}
+
+func TestAJobIsReadWithHowItStandsAndAStateTheDaemonSaysWins(t *testing.T) {
+	socket, _ := serve(t, `{"status": "ok", "jobs": [{"name": "api", "kind": "service", "status": "crashed", "state": "crashed", "work_dir": "/wt/a",
+		"url": "http://api.a.acme.localhost", "exit_code": 1, "started_at": "2026-10-16T12:00:00Z", "shared_dir": "/repo"},
+		{"name": "migrate", "kind": "task", "status": "stopped", "state": "exited", "work_dir": "/wt/a"}]}`)
+
+	jobs, err := daemon.Daemon{SocketPath: socket}.Jobs(t.Context())
+
+	require.NoError(t, err)
+	exit := 1
+	assert.Equal(t, []run.Job{
+		{Name: "api", WorkDir: "/wt/a", Kind: project.Service, State: run.Crashed, URL: "http://api.a.acme.localhost", ExitCode: &exit, StartedAt: time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC), SharedDir: "/repo"},
+		{Name: "migrate", WorkDir: "/wt/a", Kind: project.Task, State: run.Exited},
+	}, jobs)
 }
 
 func TestNoDaemonAnsweringIsNoJobUnlessItsIndexHoldsSome(t *testing.T) {

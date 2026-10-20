@@ -1,0 +1,16 @@
+
+  ! feat/old — 1 problem
+
+  path        <SB>/acme.trees/feat-old
+  isolation   not chosen
+  addressing  names
+  ports       —
+  env         2 files
+
+  JOBS
+  web  stopped  http://web.feat-old.acme.localhost:23462
+  api  stopped  http://api.feat-old.acme.localhost:23462
+
+  ! predates the isolation choice: run up and run start refuse it
+  → wtm env feat/old --isolation isolated --yes
+

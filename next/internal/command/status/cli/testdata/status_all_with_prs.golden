@@ -1,0 +1,19 @@
+
+  ! 4 worktrees · 2 need attention
+
+     WORKTREE            ISOLATION   PORTS         JOBS                   ENV        REVIEW
+     main                isolated    base          2 stopped              2 files    —
+     ../.trees/detached  isolated    not numbered  2 stopped              2 files    —
+  !  feat/a              isolated    +10           1 running · 1 crashed  1 missing  #12 · 1 pending · review required
+  !  feat/old            not chosen  —             2 stopped              2 files    —
+
+  feat/a
+  ! web/.env is missing
+  → wtm env feat/a
+  ! api crashed (exit 1)
+  → wtm run start feat/a api --detach
+
+  feat/old
+  ! predates the isolation choice: run up and run start refuse it
+  → wtm env feat/old isolated
+

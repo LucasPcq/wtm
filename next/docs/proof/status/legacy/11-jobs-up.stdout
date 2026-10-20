@@ -1,0 +1,13 @@
+
+  = feat/a — nothing to fix
+
+  path        <SB>/acme.trees/feat-a
+  isolation   isolated
+  addressing  names
+  ports       +10
+  env         2 files
+
+  JOBS
+  web  running  http://web.feat-a.acme.localhost:23462
+  api  running  http://api.feat-a.acme.localhost:23462
+

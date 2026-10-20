@@ -1,0 +1,12 @@
+{
+  "v": 2,
+  "command": "status",
+  "ok": false,
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "precondition",
+    "code": "status.config_not_found",
+    "message": "no wtm config found — run `wtm init` first"
+  }
+}

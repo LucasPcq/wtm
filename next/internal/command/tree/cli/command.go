@@ -45,7 +45,7 @@ func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, 
 	exits := map[string]int{tree.CodeConfigNotFound: uicli.ExitConfigNotFound, tree.CodeConfigInvalid: uicli.ExitError}
 	run := &uicli.Run{Command: tree.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: treeFlags, Exits: exits}
 	q := &query{
-		Open: func(ctx context.Context, dir string) (form.Reader[tree.Request, tree.Outcome], error) {
+		Open: func(ctx context.Context, dir string) (form.Reader[tree.Request, tree.Questions, tree.Outcome], error) {
 			return open(ctx, dir)
 		},
 		Draw:    drawTree,

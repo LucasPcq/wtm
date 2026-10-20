@@ -177,8 +177,8 @@ type shapes struct {
 	root    string // the directory the test's repository lives in
 }
 
-// varying are the values a run gives anew each time: hex ids (operations, fingerprints, commits) and times.
-var varying = regexp.MustCompile(`"[0-9a-f]{12,}"|"\d{4}-\d\d-\d\dT[^"]+"`)
+// varying are the values a run gives anew each time: hex ids (operations, fingerprints, commits, short commits) and times.
+var varying = regexp.MustCompile(`"[0-9a-f]{7,}"|"\d{4}-\d\d-\d\dT[^"]+"`)
 
 // golden compares v, as JSON, with the golden of part, its repository's directory and the values a run gives anew written as placeholders.
 func (s shapes) golden(part string, v any) {

@@ -1,4 +1,4 @@
-// Package github asks GitHub, through its CLI gh, for the pull requests of a repository: the open ones, or the newest of each branch whatever its state.
+// Package github asks GitHub, through its CLI gh, for the pull requests of a repository: the open ones with their checks and review, or the newest of each branch whatever its state.
 package github
 
 import (
@@ -48,7 +48,7 @@ func (g GitHub) PullRequests(ctx context.Context) (worktree.PullRequests, error)
 	}
 
 	// One more than the cap tells a listing that holds more.
-	out, err := g.run(ctx, binary, "gh pr list", "pr", "list", "--state", "open", "--json", "number,headRefName,url,isCrossRepository", "--limit", strconv.Itoa(listLimit+1))
+	out, err := g.run(ctx, binary, "gh pr list", "pr", "list", "--state", "open", "--json", "number,headRefName,url,isCrossRepository,title,isDraft,reviewDecision,statusCheckRollup", "--limit", strconv.Itoa(listLimit+1))
 	if err != nil {
 		return worktree.PullRequests{}, err
 	}
@@ -164,10 +164,14 @@ func parseNewest(out []byte) ([]worktree.PullRequest, error) {
 
 func parse(out []byte) (worktree.PullRequests, error) {
 	var listed []struct {
-		Number            int    `json:"number"`
-		HeadRefName       string `json:"headRefName"`
-		URL               string `json:"url"`
-		IsCrossRepository bool   `json:"isCrossRepository"`
+		Number            int        `json:"number"`
+		HeadRefName       string     `json:"headRefName"`
+		URL               string     `json:"url"`
+		IsCrossRepository bool       `json:"isCrossRepository"`
+		Title             string     `json:"title"`
+		IsDraft           bool       `json:"isDraft"`
+		ReviewDecision    string     `json:"reviewDecision"`
+		StatusCheckRollup []checkRun `json:"statusCheckRollup"`
 	}
 	if err := json.Unmarshal(out, &listed); err != nil {
 		return worktree.PullRequests{}, fmt.Errorf("%w: gh pr list: unexpected output: %w", worktree.ErrPullRequestsUnavailable, err)
@@ -176,9 +180,65 @@ func parse(out []byte) (worktree.PullRequests, error) {
 	prs := worktree.PullRequests{Capped: len(listed) > listLimit}
 	for _, pr := range listed[:min(len(listed), listLimit)] {
 		if !pr.IsCrossRepository {
-			prs.Open = append(prs.Open, worktree.PullRequest{Number: pr.Number, URL: pr.URL, Branch: pr.HeadRefName, State: worktree.PullRequestOpen})
+			prs.Open = append(prs.Open, worktree.PullRequest{
+				Number: pr.Number, URL: pr.URL, Branch: pr.HeadRefName, State: worktree.PullRequestOpen,
+				Title: pr.Title, Draft: pr.IsDraft, Checks: checksOf(pr.StatusCheckRollup), Decision: pr.ReviewDecision,
+			})
 		}
 	}
 
 	return prs, nil
+}
+
+// A checkRun is one entry of a pull request's status-check rollup: a check run, which ends with a Conclusion, or a status of the older Status API, which carries only a State.
+type checkRun struct {
+	Conclusion string `json:"conclusion"`
+	State      string `json:"state"`
+}
+
+// checksOf counts the rollup's entries by outcome.
+func checksOf(rollup []checkRun) worktree.Checks {
+	var checks worktree.Checks
+	for _, run := range rollup {
+		switch outcomeOf(run) {
+		case passed:
+			checks.Passed++
+		case failed:
+			checks.Failed++
+		case pending:
+			checks.Pending++
+		}
+	}
+	return checks
+}
+
+type outcome int
+
+const (
+	pending outcome = iota
+	passed
+	failed
+)
+
+// outcomeOf is the outcome of a rollup entry: by its conclusion once it ran, by its state for a status, pending while neither is set. A skipped or neutral check passes; one that needs authorisation to run (ACTION_REQUIRED) has not run, so it is pending, as is a status still EXPECTED; an unknown value fails closed, never passing silently.
+func outcomeOf(run checkRun) outcome {
+	switch {
+	case run.Conclusion != "":
+		switch run.Conclusion {
+		case "SUCCESS", "NEUTRAL", "SKIPPED":
+			return passed
+		case "ACTION_REQUIRED":
+			return pending
+		}
+		return failed
+	case run.State != "":
+		switch run.State {
+		case "SUCCESS":
+			return passed
+		case "PENDING", "EXPECTED":
+			return pending
+		}
+		return failed
+	}
+	return pending
 }

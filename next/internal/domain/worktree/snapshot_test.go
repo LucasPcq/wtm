@@ -120,3 +120,8 @@ func TestAnOriginIsSaidOnlyOfABranchOriginHas(t *testing.T) {
 	assert.Nil(t, snapshot.OriginOf("feat/x"))
 	assert.Nil(t, snapshot.OriginOf(""))
 }
+
+func TestTheCheckoutsAreEveryWorktreeButTheBareEntry(t *testing.T) {
+	bare := Snapshot{Worktrees: []Worktree{{Path: "/repo.git", State: Bare{}}, {Path: "/trees/a", State: OnBranch{Branch: "a"}}}}
+	assert.Equal(t, []Worktree{{Path: "/trees/a", State: OnBranch{Branch: "a"}}}, bare.Checkouts())
+}

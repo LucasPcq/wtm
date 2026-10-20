@@ -1,0 +1,7 @@
+$ <BIN> status; echo EXIT=$?
+
+┃  = Aborted.
+
+EXIT=19
+$
+

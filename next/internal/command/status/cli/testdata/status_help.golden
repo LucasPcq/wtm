@@ -1,0 +1,34 @@
+
+  Read one worktree's state in one document: where its branch stands against the
+  base branch and origin, its uncommitted work and last commits, how it runs
+  (isolation, addressing, port offset, every job run.toml declares with its state
+  and address), which declared .env files it lacks and how their keys stand, and each
+  problem found with the command that fixes it. With --with-prs, its pull request,
+  its checks and its review.
+
+  Without [worktree], a terminal opens the worktree picker on the one you are in;
+  anywhere else (no terminal, --output json, --quiet) it reads the one you are in.
+  It changes nothing, never starts the run daemon and prints no .env value.
+  It exits 0 whatever it finds: read `problems`.
+
+  Usage:
+    wtm-next status [worktree] [flags]
+
+  Examples:
+    # Pick a worktree, the cursor on the one you are in
+    wtm status
+
+    wtm status feat/login --output json
+
+    # Every worktree as a table, then each problem with its fix
+    wtm status --all
+
+  Flags:
+        --all             Read every worktree of the repository
+    -h, --help            help for status
+        --output string   Output format: text or json (default "text")
+        --with-prs        Ask GitHub for the worktree's open pull request, its checks and review (needs gh)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

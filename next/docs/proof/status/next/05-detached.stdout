@@ -1,0 +1,15 @@
+
+  = <SB>/acme.trees/detached — nothing to fix
+
+  path         <SB>/acme.trees/detached
+  isolation    isolated
+  addressing   names
+  ports        not numbered
+  env          2 files · 2 missing
+  changes      clean
+  last commit  <SHA> chore: rewrite the readme · Acme Dev · <AGE> ago
+
+  JOBS
+  web  stopped
+  api  stopped
+

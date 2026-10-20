@@ -1,0 +1,21 @@
+
+  ! feat/old — 1 problem
+
+  path         <SB>/acme.trees/feat-old
+  isolation    not chosen
+  addressing   names
+  ports        —
+  env          2 files
+  base         main ↓2
+  origin       not on origin
+  changes      clean
+  last commit  <SHA> chore: bootstrap acme · Acme Dev · <AGE> ago
+  parent       main
+
+  JOBS
+  web  stopped  port 23490
+  api  stopped  port 23491
+
+  ! predates the isolation choice: run up and run start refuse it
+  → wtm env feat/old --isolation isolated
+

@@ -11,7 +11,7 @@ import (
 type Git interface {
 	Locate(ctx context.Context, path string) (worktree.Location, error)
 	Dirty(ctx context.Context, path string) (bool, error)
-	Count(ctx context.Context, span worktree.Span) (int, error)
+	AheadBehindOf(ctx context.Context, span worktree.Span) (worktree.AheadBehind, error)
 	Fetch(ctx context.Context) error
 }
 

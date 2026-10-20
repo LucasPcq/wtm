@@ -2,7 +2,9 @@
 package worktree
 
 import (
+	"path/filepath"
 	"slices"
+	"strings"
 )
 
 // Worktree is one worktree as git lists it: its path, whether it is the main one, what it has checked out, whether it is locked, and whether its directory is gone (git calls it prunable).
@@ -59,6 +61,20 @@ func (w Worktree) Branch() string {
 	}
 
 	return ""
+}
+
+// Holding returns the index of the deepest of list whose path holds the directory dir, dir itself or one of its parents, -1 when none does; an empty path or dir holds nothing.
+func Holding[T any](list []T, dir string, path func(T) string) int {
+	found, deepest := -1, 0
+	for i, item := range list {
+		root := path(item)
+		holds := dir == root || strings.HasPrefix(dir, root+string(filepath.Separator))
+		if dir != "" && root != "" && holds && len(root) > deepest {
+			found, deepest = i, len(root)
+		}
+	}
+
+	return found
 }
 
 // Location is a path resolved through its symbolic links, and whether something is there.

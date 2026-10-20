@@ -1,0 +1,20 @@
+
+  ! 5 worktrees · 2 need attention
+
+     WORKTREE  ISOLATION   PORTS  JOBS       ENV
+     main      isolated    base   2 stopped  2 files
+     feat/a    isolated    +10    2 stopped  2 files
+  !  feat/b    isolated    +20    2 stopped  2 missing
+  !  feat/old  not chosen  —      2 stopped  2 files
+     feat/rb   isolated    +40    2 stopped  2 files
+
+  feat/b
+  ! apps/api/.env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand
+  → wtm config edit
+  ! apps/web/.env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand
+  → wtm config edit
+
+  feat/old
+  ! predates the isolation choice: run up and run start refuse it
+  → wtm env feat/old --isolation isolated --yes
+

@@ -1,0 +1,15 @@
+
+  ✗ 6 worktrees · 1 needs attention · 1 not read
+
+     WORKTREE                ISOLATION   PORTS         JOBS       ENV
+     main                    isolated    base          2 stopped  2 files
+     ../acme.trees/detached  isolated    not numbered  2 stopped  2 missing
+     feat/a                  isolated    +10           2 stopped  2 files
+  !  feat/old                not chosen  —             2 stopped  2 files
+     feat/rb                 isolated    +40           2 stopped  2 files
+
+  feat/old
+  ! predates the isolation choice: run up and run start refuse it
+  → wtm env feat/old --isolation isolated
+  ✗ couldn't read <SB>/acme.trees/feat-b: its directory is gone
+

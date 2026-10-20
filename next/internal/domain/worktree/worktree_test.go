@@ -33,3 +33,23 @@ func TestTheFreeOrdinalIsTheSmallestNoWorktreeHoldsAfterTheMainCheckout(t *testi
 	assert.Equal(t, 3, FreeOrdinal([]int{2, 1, 2}))
 	assert.Equal(t, 2, FreeOrdinal([]int{1, 3}))
 }
+
+func TestTheDeepestWorktreeHoldsADirectory(t *testing.T) {
+	paths := []string{"/repo", "/repo/.trees/a", "", "/repo/.trees/ab"}
+	path := func(p string) string { return p }
+	cases := map[string]struct {
+		dir  string
+		want int
+	}{
+		"main":      {dir: "/repo/src", want: 0},
+		"nested":    {dir: "/repo/.trees/a/src", want: 1},
+		"itself":    {dir: "/repo/.trees/ab", want: 3},
+		"elsewhere": {dir: "/elsewhere", want: -1},
+		"no_dir":    {dir: "", want: -1},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.want, Holding(paths, c.dir, path))
+		})
+	}
+}

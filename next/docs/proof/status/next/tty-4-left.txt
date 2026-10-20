@@ -1,0 +1,7 @@
+$ <BIN> status; echo EXIT=$?
+
+┃  ✗ interrupted
+
+EXIT=19
+$
+

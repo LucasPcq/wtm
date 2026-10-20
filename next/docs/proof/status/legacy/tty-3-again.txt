@@ -1,0 +1,15 @@
+$ <BIN> status; echo EXIT=$?
+
+  Step 1/1 • Select worktree
+
+  Which worktree to act on?
+
+   main
+
+▌▸ feat/a                                                                                  current
+   feat/b
+   feat/old
+   feat/rb
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

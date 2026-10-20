@@ -36,6 +36,7 @@ type Fake struct {
 	fail      map[string]error
 	calls     []string
 	changes   map[string][]worktree.Change
+	diffstats map[string]worktree.Diffstat
 	conflicts map[string]worktree.ConflictKind
 	moves     []worktree.Move
 }
@@ -57,6 +58,7 @@ type FakeParams struct {
 	Origin    map[string][]string              // commits after Root on origin's branch, not fetched yet
 	Fail      map[string]error                 // the error a method returns, by method name (fake only)
 	Changes   map[string][]worktree.Change     // the uncommitted changes Changes lists, by worktree (fake only)
+	Diffstats map[string]worktree.Diffstat     // what Diffstat measures, by worktree (fake only)
 	Conflicts map[string]worktree.ConflictKind // the paths a move conflicts on, by path (fake only)
 }
 
@@ -78,7 +80,12 @@ func NewFake(params FakeParams) *Fake {
 		dirty:     realPaths(params.Dirty),
 		fail:      params.Fail,
 		changes:   map[string][]worktree.Change{},
+		diffstats: map[string]worktree.Diffstat{},
 		conflicts: params.Conflicts,
+	}
+
+	for dir, stat := range params.Diffstats {
+		f.diffstats[realPath(dir)] = stat
 	}
 
 	for dir, changes := range params.Changes {
@@ -205,22 +212,40 @@ func (f *Fake) AheadBehind(_ context.Context, name string) (worktree.AheadBehind
 	return worktree.AheadBehind{Ahead: len(of) - shared, Behind: len(against) - shared}, nil
 }
 
-// Count counts the commits of the local branch span.Branch past the history it
-// shares with the local branch span.Base; it fails when either is missing.
-func (f *Fake) Count(_ context.Context, span worktree.Span) (int, error) {
+// Commits returns the last count commits of the branch of the worktree at dir,
+// the newest first, each named by its message: its subject and its sha.
+func (f *Fake) Commits(_ context.Context, dir string, count int) ([]worktree.Commit, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if err := f.enter("Count", span.Branch); err != nil {
-		return 0, err
+	if err := f.enter("Commits", dir); err != nil {
+		return nil, err
 	}
 
-	of, ofOK := f.historyOf(worktree.LocalBranch{Name: span.Branch})
-	base, baseOK := f.historyOf(worktree.LocalBranch{Name: span.Base})
-	if !ofOK || !baseOK {
-		return 0, fmt.Errorf("gittest: unknown branch %s or %s", span.Branch, span.Base)
+	at := f.worktreeAt(realPath(dir))
+	if at < 0 {
+		return nil, fmt.Errorf("gittest: %s is not a worktree", dir)
+	}
+	commits, ok := f.historyOf(worktree.LocalBranch{Name: f.worktrees[at].Branch()})
+	if !ok {
+		commits = history{Root}
 	}
 
-	return len(of) - sharedLength(of, base), nil
+	var log []worktree.Commit
+	for i := len(commits) - 1; i >= 0 && len(log) < count; i-- {
+		log = append(log, worktree.Commit{SHA: commits[i], Subject: commits[i]})
+	}
+	return log, nil
+}
+
+// Diffstat returns what the test seeded for the worktree at dir.
+func (f *Fake) Diffstat(_ context.Context, dir string) (worktree.Diffstat, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("Diffstat", dir); err != nil {
+		return worktree.Diffstat{}, err
+	}
+
+	return f.diffstats[realPath(dir)], nil
 }
 
 // AheadBehindOf counts the commits of the local branch span.Branch past the

@@ -5,9 +5,10 @@ import (
 	"strings"
 )
 
-// Run is the project's run.toml: its jobs and profiles, the .env keys it links to them, how jobs are addressed, and how worktrees are isolated from one another.
+// Run is the project's run.toml: whether the file exists, its jobs and profiles, the .env keys it links to them, how jobs are addressed, and how worktrees are isolated from one another.
 type Run struct {
-	PortOffsetBlock int // the distance between two worktrees' ports, 0 for the default
+	Declared        bool `json:",omitempty"` // omitted when false: provision.Fingerprinted clears it, so a fingerprint does not depend on it
+	PortOffsetBlock int  // the distance between two worktrees' ports, 0 for the default
 	Jobs            []Job
 	Profiles        []Profile
 	EnvPorts        []EnvPortLink
