@@ -17,7 +17,7 @@ func TestTheEnvResolvesTheWorkingAndProjectDirectories(t *testing.T) {
 	t.Setenv(projectDirEnv, link)
 	t.Setenv(CorrelationIDEnv, "corr-1")
 
-	assert.Equal(t, Env{Cwd: realPath(t, dir), ProjectDir: realPath(t, named), CorrelationID: "corr-1"}, ReadEnv())
+	assert.Equal(t, Env{Cwd: realPath(t, dir), ProjectDir: realPath(t, named), Named: true, CorrelationID: "corr-1"}, ReadEnv())
 }
 
 func TestWithoutAProjectDirTheProjectIsOpenedFromTheWorkingDirectoryAsGiven(t *testing.T) {
@@ -27,6 +27,7 @@ func TestWithoutAProjectDirTheProjectIsOpenedFromTheWorkingDirectoryAsGiven(t *t
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 	assert.Equal(t, cwd, ReadEnv().ProjectDir)
+	assert.False(t, ReadEnv().Named)
 }
 
 func TestAnUnreadablePathStaysEmpty(t *testing.T) {

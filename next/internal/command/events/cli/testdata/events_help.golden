@@ -1,0 +1,48 @@
+
+  Print the repository's worktrees, then every change made to them, whoever made it:
+  a command in another shell, an agent, an editor. The stream opens on a snapshot of
+  every worktree and a ready line, then carries one event per change: worktree.created,
+  worktree.updated, worktree.provisioned, operation.started, unit.finished and
+  operation.finished, and repo.added and repo.removed as repositories come and go.
+  A person reads the worktree and repository changes; with --output json each line is
+  one JSON object (JSON Lines), every event, the contract an integration reads.
+
+  If the event bus stops, the stream starts it again and opens on a fresh snapshot:
+  treat every event as an upsert keyed by branch, and every snapshot as a reset. It runs
+  until interrupted or until the reader of its output goes away, and exits 0 then.
+
+  With --all it follows every repository wtm was used in, whatever the current
+  directory or $GIT_DIR, as it does when run outside any repository without --repo:
+  a snapshot of each, one ready line, a new repository's snapshot right after its
+  repo.added.
+
+  It ends on a code no retry can change: 2 for --all with --repo or a --repo that is no
+  directory, 12 in a repository wtm was never initialized in or once it no longer is,
+  19 when interrupted before its first line, 20 on an event of a schema newer than its
+  own, 21 when --repo is not in a git repository.
+
+  Usage:
+    wtm-next events [flags]
+
+  Examples:
+    # Watch this repository's worktrees
+    wtm events
+
+    # The JSON Lines contract, filtered with jq
+    wtm events --output json | jq -c 'select(.type == "worktree.created")'
+
+    # Another repository than the current one
+    wtm events --repo ~/code/app --output json
+
+    # Every repository wtm knows, wherever it runs
+    wtm events --all --output json
+
+  Flags:
+        --all             Watch every repository wtm knows, whatever the current directory or $GIT_DIR
+    -h, --help            help for events
+        --output string   Output format: text or json (default "text")
+        --repo string     Watch the repository holding this path instead of the current one
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

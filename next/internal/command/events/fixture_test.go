@@ -1,0 +1,160 @@
+package events_test
+
+import (
+	"context"
+	"errors"
+	"io/fs"
+	"sync"
+	"time"
+
+	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
+	"github.com/LucasPcq/wtm/next/internal/command/events"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
+)
+
+var fixedNow = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
+
+// A fakeBus hands each subscription to the test, which feeds it lines and closes it as the bus would; the first subscriptions fail with fail, in turn.
+type fakeBus struct {
+	mu            sync.Mutex
+	fail          []error
+	pending       []string // the lines each subscription holds as soon as it is made
+	subscriptions chan subscription
+}
+
+// A subscription is one Subscribe: the repositories it asked for and the lines the test sends it.
+type subscription struct {
+	Repos []string
+	Lines chan []byte
+}
+
+func newBus(fail ...error) *fakeBus {
+	return &fakeBus{fail: fail, subscriptions: make(chan subscription, 16)}
+}
+
+func (b *fakeBus) Subscribe(_ context.Context, repos []string) (<-chan []byte, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if len(b.fail) > 0 {
+		err := b.fail[0]
+		b.fail = b.fail[1:]
+		return nil, err
+	}
+
+	lines := make(chan []byte, 16)
+	for _, line := range b.pending {
+		lines <- []byte(line)
+	}
+	b.subscriptions <- subscription{Repos: repos, Lines: lines}
+	return lines, nil
+}
+
+// A fakeRegistry lists repos and counts its prunes.
+type fakeRegistry struct {
+	mu     sync.Mutex
+	repos  []domain.Repo
+	prunes int
+}
+
+func (r *fakeRegistry) Prune(context.Context) ([]domain.Repo, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.prunes++
+	return r.repos, nil
+}
+
+func (r *fakeRegistry) pruned() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.prunes
+}
+
+// A config is a project's config.toml as repository.Service loads it, which a test can take away.
+type config struct {
+	mu   sync.Mutex
+	gone bool
+	err  error
+}
+
+func (c *config) Load() (project.Config, project.Global, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.gone {
+		return project.Config{}, project.Global{}, project.ErrConfigNotFound
+	}
+	return project.Config{Worktrees: project.Worktrees{BasePath: "../.trees", BaseBranch: "main"}}, project.Global{}, c.err
+}
+
+func (*config) LoadRun() (project.Run, error) {
+	return project.Run{}, nil
+}
+
+func (c *config) remove() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.gone = true
+}
+
+// A repo is a repository the stream can open: where it is, its git, its records and its config.
+type repo struct {
+	Repo   domain.Repo
+	Git    gittest.FakeParams
+	Meta   map[string]worktree.Meta
+	Config *config
+}
+
+// newRepo returns the repository at root, its main worktree on main and its linked worktrees on branches.
+func newRepo(root string, branches ...string) repo {
+	params := gittest.FakeParams{Main: root, Branch: "main"}
+	for _, branch := range branches {
+		params.Worktrees = append(params.Worktrees, worktree.Worktree{Path: root + "/.trees/" + branch, State: worktree.OnBranch{Branch: branch}})
+	}
+	return repo{Repo: domain.Repo{Root: root, CommonDir: root + "/.git"}, Git: params, Meta: map[string]worktree.Meta{}, Config: &config{}}
+}
+
+func (r repo) source() events.Source {
+	git := gittest.NewFake(r.Git)
+	return events.Source{Repo: r.Repo, Repository: repository.Service{Config: r.Config, Git: git, MainPath: r.Repo.Root}, Meta: storetest.NewFake(storetest.FakeParams{Meta: r.Meta})}
+}
+
+// opening opens the repositories repos by their root or any directory under it named in dirs; any other directory is in no repository, "/nowhere" no directory at all.
+func opening(repos ...repo) events.Open {
+	return func(_ context.Context, dir string) (events.Source, error) {
+		if dir == "/nowhere" {
+			return events.Source{}, fs.ErrNotExist
+		}
+		for _, r := range repos {
+			if dir == r.Repo.Root {
+				return r.source(), nil
+			}
+		}
+		return events.Source{}, &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodeNotARepository, Message: dir + " is not a git repository"}
+	}
+}
+
+// A reader collects what a stream sends, and can be made to fail.
+type reader struct {
+	lines    chan events.Received
+	warnings chan error
+	fail     error
+}
+
+func newReader() *reader {
+	return &reader{lines: make(chan events.Received, 64), warnings: make(chan error, 64)}
+}
+
+func (r *reader) out() events.Out {
+	return events.Out{
+		Emit: func(received events.Received) error {
+			r.lines <- received
+			return r.fail
+		},
+		Warn: func(err error) { r.warnings <- err },
+	}
+}
+
+var errBusGone = errors.New("connect to the event bus: no such file")

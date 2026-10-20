@@ -83,3 +83,14 @@ func TestAWriterThatIsNoStreamIsPlain(t *testing.T) {
 	assert.False(t, IsTerminal(&out))
 	assert.Same(t, plainStyles, StylesOf(&out))
 }
+
+func TestAPrintIsOneWriteThatReportsItsError(t *testing.T) {
+	broken := &Stream{Writer: failingWriter{}, width: func() int { return 0 }, styles: plainStyles}
+	streams, _, out, _ := Test()
+
+	require.NoError(t, streams.Out.Print(func(w io.Writer) { SuccessLine(w, "created") }))
+	err := broken.Print(func(w io.Writer) { SuccessLine(w, "created") })
+
+	assert.Equal(t, "  ✓ created\n", out.String())
+	assert.EqualError(t, err, "reader gone")
+}

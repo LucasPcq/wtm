@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 )
@@ -53,4 +54,22 @@ func (r request) Values(path string) []string {
 		return nil
 	}
 	return []string{r.Name}
+}
+
+// watched records what a stream's watch was given and sends lines, failing with refusal once sent.
+type watched struct {
+	dir     string
+	req     request
+	lines   []string
+	refusal error
+}
+
+func (w *watched) watch(_ context.Context, dir string, req request, send func(json.RawMessage) error) error {
+	w.dir, w.req = dir, req
+	for _, line := range w.lines {
+		if err := send(json.RawMessage(line)); err != nil {
+			return err
+		}
+	}
+	return w.refusal
 }

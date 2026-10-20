@@ -128,3 +128,11 @@ func terminalWidth(w io.Writer) int {
 
 	return max(cols-bars*accentBarWidth, 0)
 }
+
+// Print draws what draw writes onto s in one write, with s's styles, and returns that write's error: a line of a stream whose reader may leave.
+func (s *Stream) Print(draw func(io.Writer)) error {
+	var buf bytes.Buffer
+	draw(&Stream{Writer: &buf, terminal: s.terminal, width: s.width, styles: s.styles})
+	_, err := s.Write(buf.Bytes())
+	return err
+}

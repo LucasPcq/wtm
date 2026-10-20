@@ -2,6 +2,7 @@ package main
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -20,12 +21,16 @@ import (
 
 const commandPrefix = "github.com/LucasPcq/wtm/next/internal/command/"
 
-func TestEachRegisteredCommandIsInTheCatalogueAndWired(t *testing.T) {
+func TestEachRegisteredCommandIsInTheCatalogueOrItsStreamsAndWired(t *testing.T) {
 	registered := registeredCommands(t)
-	var listed []string
+	var listed, streamed []string
 	for _, command := range catalogue() {
 		// a command's folder spells its name without dashes: command/fastforward is fast-forward
 		listed = append(listed, strings.ReplaceAll(command.Name, "-", ""))
+	}
+	for _, stream := range streams() {
+		streamed = append(streamed, stream.Name)
+		assert.NotNil(t, stream.Watch, stream.Name)
 	}
 	// shortcut: a non-zero use case is taken as wired, not checked field by field; a test that runs each command would prove more
 	wired := map[string]bool{}
@@ -37,9 +42,13 @@ func TestEachRegisteredCommandIsInTheCatalogueAndWired(t *testing.T) {
 	}
 
 	require.NotEmpty(t, registered)
-	assert.ElementsMatch(t, registered, listed, "main.go registers a command catalogue.go does not list, or the reverse")
+	assert.Equal(t, streamsListed, streamed, "catalogue.go streams a command the list of streams does not name, or the reverse")
+	assert.ElementsMatch(t, registered, append(listed, streamed...), "main.go registers a command catalogue.go does not list, or the reverse")
 	for _, name := range registered {
-		assert.True(t, wired[name], "%s is registered in main.go but wire.go builds no %s.UseCase", name, name)
+		// a stream follows every repository: wire.go builds it once, not per repository in app
+		if !slices.Contains(streamsListed, name) {
+			assert.True(t, wired[name], "%s is registered in main.go but wire.go builds no %s.UseCase", name, name)
+		}
 	}
 }
 

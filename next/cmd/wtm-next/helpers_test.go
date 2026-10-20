@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"go/parser"
 	"go/token"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,7 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -193,4 +197,56 @@ func (s shapes) golden(part string, v any) {
 		return `"<id>"`
 	})
 	formtest.Golden(s.t, "catalogue_"+s.command+"_"+part, text+"\n")
+}
+
+// servingBus runs the event bus's daemon on a new socket until the test ends, and returns its socket, in a short directory: a unix socket path is limited to about 100 bytes.
+func servingBus(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "wtm-next")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	socket := filepath.Join(dir, "wtm.sock")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	served := make(chan error, 1)
+	go func() { served <- bus.Serve(ctx, bus.ServeParams{SocketPath: socket, Idle: time.Minute}) }()
+	t.Cleanup(func() {
+		cancel()
+		<-served
+	})
+	require.Eventually(t, func() bool {
+		conn, err := net.Dial("unix", socket)
+		if err == nil {
+			_ = conn.Close()
+		}
+		return err == nil
+	}, 2*time.Second, 10*time.Millisecond)
+	return socket
+}
+
+// watchedLines streams the event stream of stream from dir through the surface's watch until it sent count lines, and returns them with the response.
+func watchedLines(t *testing.T, stream api.Stream, call api.Call, count int) ([]string, api.Response) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	var lines []string
+	response := stream.Watch(ctx, call, func(line json.RawMessage) error {
+		lines = append(lines, string(line))
+		if len(lines) == count {
+			cancel()
+		}
+		return nil
+	})
+	return lines, response
+}
+
+// withTS is line with its time replaced by x.
+func withTS(t *testing.T, line string) string {
+	t.Helper()
+	var fields map[string]any
+	require.NoError(t, json.Unmarshal([]byte(line), &fields))
+	fields["ts"] = "x"
+	data, err := json.Marshal(fields)
+	require.NoError(t, err)
+	return string(data)
 }
