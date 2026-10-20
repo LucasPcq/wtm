@@ -34,10 +34,7 @@ func listen(t *testing.T) *fakeDaemon {
 func listenAnswering(t *testing.T, answer string) *fakeDaemon {
 	t.Helper()
 
-	// A short directory under the system's temp: a unix socket path is limited to about 100 bytes.
-	dir, err := os.MkdirTemp("", "wtm-ev")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	dir := socketDir(t)
 	commonDir, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
 

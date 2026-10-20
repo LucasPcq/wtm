@@ -42,7 +42,6 @@ type request struct {
 type response struct {
 	Status  string          `json:"status"`
 	Message string          `json:"message,omitempty"`
-	Repo    string          `json:"repo,omitempty"`
 	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
@@ -197,7 +196,7 @@ func (d *daemon) subscribe(ctx context.Context, params subscription) {
 		case <-ctx.Done():
 			return
 		case delivered, open := <-sub:
-			if !open || params.Encoder.Encode(response{Status: statusEvent, Repo: delivered.repo, Payload: delivered.payload}) != nil {
+			if !open || params.Encoder.Encode(response{Status: statusEvent, Payload: delivered.payload}) != nil {
 				return
 			}
 		}

@@ -301,7 +301,7 @@ func (s *stream) emitReady() error {
 // emitLine stamps line with the stream's version and time, and sends it.
 func (s *stream) emitLine(line domain.Line) error {
 	line.V = domain.StreamVersion
-	line.TS = s.now().UTC().Format(time.RFC3339Nano)
+	line.TS = s.Now().UTC().Format(time.RFC3339Nano)
 	data, err := domain.MarshalLine(line)
 	if err != nil {
 		return err
@@ -334,13 +334,6 @@ func (s *stream) interrupted(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (s *stream) now() time.Time {
-	if s.Now == nil {
-		return time.Now()
-	}
-	return s.Now()
-}
-
 // ----------------------------------------------------------------------------
 // The relay
 
@@ -367,34 +360,20 @@ func (s *stream) relay(ctx context.Context, params relayParams) error {
 			if !open {
 				return nil
 			}
-			received, err := decoded(data)
-			if errors.Is(err, errNewer) {
+			// A line of a type this wtm does not know is relayed, its event nil.
+			line, err := domain.UnmarshalLine(data)
+			if line.V > domain.StreamVersion {
 				return ended{&domain.Error{Kind: domain.KindPrecondition, Code: CodeSchemaNewer, Message: "the event stream speaks a newer schema than this wtm: upgrade wtm"}}
 			}
-			if err != nil {
-				s.warn(err)
+			if err != nil && !errors.Is(err, domain.ErrUnknownEventType) {
+				s.warn(fmt.Errorf("an event the bus carried could not be read, and was dropped: %w", err))
 				continue
 			}
-			if err := params.Route(ctx, received); err != nil {
+			if err := params.Route(ctx, Received{Line: line, JSON: data}); err != nil {
 				return err
 			}
 		}
 	}
-}
-
-var errNewer = errors.New("a line of a newer version")
-
-// decoded is the line data holds, refused when of a newer version or when it cannot be decoded; a line of a type this wtm does not know is kept, its event nil.
-func decoded(data []byte) (Received, error) {
-	line, err := domain.UnmarshalLine(data)
-	if line.V > domain.StreamVersion {
-		return Received{}, errNewer
-	}
-	if err != nil && !errors.Is(err, domain.ErrUnknownEventType) {
-		return Received{}, fmt.Errorf("an event the bus carried could not be read, and was dropped: %w", err)
-	}
-
-	return Received{Line: line, JSON: data}, nil
 }
 
 // ----------------------------------------------------------------------------
