@@ -1,24 +1,30 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
-	"github.com/LucasPcq/wtm/next/internal/adapter/events"
+	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	"github.com/LucasPcq/wtm/next/internal/adapter/github"
 	"github.com/LucasPcq/wtm/next/internal/adapter/oplock"
 	"github.com/LucasPcq/wtm/next/internal/adapter/proxyport"
+	"github.com/LucasPcq/wtm/next/internal/adapter/registry"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
@@ -27,6 +33,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
+	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
 
 const opIDBytes = 8
@@ -62,7 +69,7 @@ func wire(params wireParams) app {
 	}
 
 	meta := store.Meta{StateDir: params.StateDir}
-	jobs := daemon.Daemon{SocketPath: events.SocketPath()}.Jobs
+	jobs := daemon.Daemon{SocketPath: bus.SocketPath()}.Jobs
 	gh := github.GitHub{Dir: params.MainPath}
 
 	provisions := provision.Service{
@@ -194,16 +201,16 @@ func (l locker) Take(op domain.Operation) (operation.Hold, error) {
 	return l.Locks.Take(op)
 }
 
-// Open returns the report that publishes op's events on the events socket.
+// Open returns the report that publishes op's events on the event bus.
 func (p wireParams) Open(op domain.Operation) domain.Report {
-	return events.NewPublisher(p.publisherParams(op)).Publish
+	return bus.NewPublisher(p.publisherParams(op)).Publish
 }
 
-func (p wireParams) publisherParams(op domain.Operation) events.PublisherParams {
-	return events.PublisherParams{
+func (p wireParams) publisherParams(op domain.Operation) bus.PublisherParams {
+	return bus.PublisherParams{
 		Root:          p.MainPath,
 		CommonDir:     p.CommonDir,
-		SocketPath:    events.SocketPath(),
+		SocketPath:    bus.SocketPath(),
 		OpID:          op.ID,
 		CorrelationID: op.CorrelationID,
 		Now:           time.Now,
@@ -215,4 +222,89 @@ func newOpID() string {
 	raw := make([]byte, opIDBytes)
 	_, _ = rand.Read(raw)
 	return hex.EncodeToString(raw)
+}
+
+// ----------------------------------------------------------------------------
+// The event stream
+
+// streamParams is where the event stream finds its bus, the socket of its daemon, which Start starts when none answers, and the registry of the repositories wtm knows, which it never adds to when Off.
+type streamParams struct {
+	Socket   string
+	Start    func() error
+	Registry string
+	Off      bool
+}
+
+// eventStream is the events use case over the bus and the registry params name, opening each repository with openEvents.
+func eventStream(params streamParams) events.UseCase {
+	return events.UseCase{
+		Bus:      bus.Bus{SocketPath: params.Socket, Start: params.Start},
+		Registry: known{Registry: registry.Registry{Path: params.Registry}, Socket: params.Socket, Off: params.Off},
+		Open:     openEvents,
+		Now:      time.Now,
+	}
+}
+
+// The process's own event stream: its bus at the socket every wtm-next talks to, started from this binary.
+func systemStream() events.UseCase {
+	return eventStream(streamParams{Socket: bus.SocketPath(), Start: startDaemon, Registry: registry.Path(), Off: os.Getenv(stateDirEnv) != ""})
+}
+
+// daemonCommand is the command line that runs the bus's daemon in a process of its own.
+const daemonCommand = "daemon"
+
+// daemonIdle is how long the daemon waits with no subscriber and no request before it stops.
+const daemonIdle = 30 * time.Second
+
+// errDaemonInTest refuses to start a daemon from a test: the executable is the test binary, which would run the whole suite again as "daemon".
+var errDaemonInTest = errors.New("no event bus is started from a test")
+
+// startDaemon starts this binary's daemon in a session of its own, with this process's environment but its correlation ID, which belongs to the one command that started it.
+func startDaemon() error {
+	if testing.Testing() {
+		return errDaemonInTest
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+
+	return shell.Detached(exe, []string{daemonCommand}, shell.Environ([]string{cli.CorrelationIDEnv}, nil))
+}
+
+// known is the registry of the repositories wtm knows, announcing on the bus at Socket each one it adds or drops; Off keeps any repository from joining it (a state directory moved by $WTM_STATE_DIR: a sandbox or a test).
+type known struct {
+	registry.Registry
+	Socket string
+	Off    bool
+}
+
+// Register lists repo, initialized, announcing it when it was not listed yet, then drops the repositories no longer initialized; it never fails nor holds its caller for long: a repository missing is listed again by the next command run in it.
+func (k known) Register(ctx context.Context, repo domain.Repo) {
+	if k.Off {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, registerTimeout)
+	defer cancel()
+	added, err := k.Add(ctx, repo)
+	if err != nil || !added {
+		return
+	}
+
+	k.announce(domain.RepoAdded{}, repo)
+	_, _ = k.Prune(ctx)
+}
+
+// Prune drops the repositories no longer initialized, announcing each, and returns the others.
+func (k known) Prune(ctx context.Context) ([]domain.Repo, error) {
+	kept, dropped, err := k.Registry.Prune(ctx)
+	for _, repo := range dropped {
+		k.announce(domain.RepoRemoved{}, repo)
+	}
+	return kept, err
+}
+
+func (k known) announce(event domain.Event, repo domain.Repo) {
+	bus.NewPublisher(bus.PublisherParams{Root: repo.Root, CommonDir: repo.CommonDir, SocketPath: k.Socket}).Publish(event)
 }

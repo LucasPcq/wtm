@@ -1,4 +1,4 @@
-// Package events publishes the worktree and operation events of wtm-next to the run daemon, which relays them to wtm events and the dashboard.
+// Package events is wtm-next's event bus: the daemon that relays the events of every repository to the processes subscribed to it, the publisher every operation reports through, and the subscription a stream reads, all over one unix socket.
 package events
 
 import (
@@ -12,11 +12,9 @@ import (
 )
 
 const (
-	schemaVersion  = 1
 	publishTimeout = 250 * time.Millisecond
 	globalDirName  = "wtm"
 	socketName     = "wtm.sock"
-	actionPublish  = "publish"
 )
 
 // PublisherParams is what a [Publisher] stamps on every event: the repository
@@ -32,11 +30,11 @@ type PublisherParams struct {
 	Now           func() time.Time
 }
 
-// A Publisher sends an operation's events to the run daemon, best effort: an
-// event that cannot be delivered within a short timeout is dropped, never an
-// error, so a missing daemon never slows nor fails a command.
+// A Publisher sends events to the bus's daemon, best effort: an event that
+// cannot be delivered within a short timeout is dropped, never an error, so a
+// missing daemon never slows nor fails a command, and it never starts one.
 type Publisher struct {
-	repo          repo
+	repo          domain.Repo
 	socketPath    string
 	opID          string
 	correlationID string
@@ -46,18 +44,13 @@ type Publisher struct {
 // NewPublisher returns a Publisher for params, with the common directory
 // resolved through symbolic links since the daemon keys repositories by it.
 func NewPublisher(params PublisherParams) Publisher {
-	commonDir := params.CommonDir
-	if resolved, err := filepath.EvalSymlinks(commonDir); err == nil {
-		commonDir = resolved
-	}
-
 	now := params.Now
 	if now == nil {
 		now = time.Now
 	}
 
 	return Publisher{
-		repo:          repo{Root: params.Root, CommonDir: commonDir},
+		repo:          domain.Repo{Root: params.Root, CommonDir: Resolved(params.CommonDir)},
 		socketPath:    params.SocketPath,
 		opID:          params.OpID,
 		correlationID: params.CorrelationID,
@@ -65,7 +58,15 @@ func NewPublisher(params PublisherParams) Publisher {
 	}
 }
 
-// SocketPath returns the path of the socket wtm's daemon listens on, under
+// Resolved returns the common directory dir with its symbolic links resolved, the key the bus files a repository's events under, or dir when they cannot be.
+func Resolved(dir string) string {
+	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+		return resolved
+	}
+	return dir
+}
+
+// SocketPath returns the path of the socket the bus's daemon listens on, under
 // the user's config directory, or "" when that directory is unknown.
 func SocketPath() string {
 	dir, err := os.UserConfigDir()
@@ -76,33 +77,38 @@ func SocketPath() string {
 	return filepath.Join(dir, globalDirName, socketName)
 }
 
-// Publish sends event to the daemon stamped with the publisher's repository,
-// operation and time, if wtm publishes that kind of event; it returns once the
-// daemon replied or the timeout passed.
+// Publish sends event to the daemon as a line of the stream stamped with the
+// publisher's repository, operation and time, if the bus carries that kind of
+// event; it returns once the daemon replied or the timeout passed.
 func (p Publisher) Publish(event domain.Event) {
-	message, published := messageOf(event)
-	if !published || p.socketPath == "" {
+	if !published(event) || p.socketPath == "" {
 		return
 	}
 
-	message.V = schemaVersion
-	message.TS = p.now().UTC().Format(time.RFC3339Nano)
-	message.CorrelationID = p.correlationID
-	message.Repo = &p.repo
-	message.OpID = p.opID
-
-	payload, err := json.Marshal(message)
+	payload, err := domain.MarshalLine(domain.Line{
+		V:             domain.StreamVersion,
+		TS:            p.now().UTC().Format(time.RFC3339Nano),
+		Repo:          &p.repo,
+		CorrelationID: p.correlationID,
+		OpID:          p.opID,
+		Event:         event,
+	})
 	if err != nil {
 		return
 	}
 	p.send(payload)
 }
 
-// request is what the daemon reads on its socket: one JSON line.
-type request struct {
-	Action  string          `json:"action"`
-	Repo    string          `json:"repo,omitempty"`
-	Payload json.RawMessage `json:"payload,omitempty"`
+// published reports whether the bus carries event: units started, phases and
+// their output stay in the process, and a snapshot and ready are the stream's
+// own lines, never published.
+func published(event domain.Event) bool {
+	switch event.(type) {
+	case domain.WorktreeCreated, domain.WorktreeUpdated, domain.WorktreeProvisioned, domain.OperationStarted, domain.UnitFinished, domain.OperationFinished, domain.RepoAdded, domain.RepoRemoved:
+		return true
+	case domain.UnitStarted, domain.PhaseStarted, domain.PhaseFinished, domain.Output, domain.Snapshot, domain.Ready:
+	}
+	return false
 }
 
 // send delivers payload to the daemon and waits for its reply, giving up

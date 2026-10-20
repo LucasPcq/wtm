@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,15 +18,15 @@ func TestAWorktreeCreatedIsPublishedAsTheDaemonRelaysIt(t *testing.T) {
 
 	request := daemon.next(t)
 	assert.JSONEq(t, `{"action":"publish","repo":"`+daemon.commonDir+`","payload":{}}`, withoutPayload(t, request))
-	assert.JSONEq(t, `{"v":1,"type":"worktree.created","ts":"2026-10-16T12:00:00Z","correlation_id":"popup-1","repo":{"root":"/repo","common_dir":"`+daemon.commonDir+`"},"worktree":{"branch":"feat/a","path":"/repo/.trees/feat-a","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-16T11:00:00Z"},"op_id":"op-1"}`, payloadOf(t, request))
+	assert.JSONEq(t, `{"v":2,"type":"worktree.created","ts":"2026-10-16T12:00:00Z","correlation_id":"popup-1","repo":{"root":"/repo","common_dir":"`+daemon.commonDir+`"},"worktree":{"branch":"feat/a","path":"/repo/.trees/feat-a","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-16T11:00:00Z"},"op_id":"op-1"}`, payloadOf(t, request))
 }
 
-func TestAWorktreeNumberedIsAnUpdateOfItsOrdinal(t *testing.T) {
+func TestAWorktreeUpdatedNamesTheFieldsThatChanged(t *testing.T) {
 	daemon := listen(t)
 	numbered := identity()
 	numbered.Ordinal = new(3)
 
-	publisherOn(t, daemon).Publish(domain.WorktreeNumbered{Worktree: numbered})
+	publisherOn(t, daemon).Publish(domain.WorktreeUpdated{Worktree: numbered, Changed: []worktree.IdentityField{worktree.IdentityOrdinal}})
 
 	payload := decoded(t, payloadOf(t, daemon.next(t)))
 	assert.Equal(t, "worktree.updated", payload["type"])
@@ -60,9 +61,9 @@ func TestAnOperationIsAnnouncedStartedUnitByUnitAndFinished(t *testing.T) {
 	publisher.Publish(domain.UnitFinished{Subject: "feat/a", Status: domain.StatusDone})
 	publisher.Publish(domain.OperationFinished{Command: "create", Surface: "cli", Code: "lock.held"})
 
-	assert.JSONEq(t, `{"v":1,"type":"operation.started","ts":"2026-10-16T12:00:00Z","correlation_id":"popup-1","repo":{"root":"/repo","common_dir":"`+daemon.commonDir+`"},"op_id":"op-1","operation":{"command":"create","surface":"cli"}}`, payloadOf(t, daemon.next(t)))
-	assert.JSONEq(t, `{"v":1,"type":"unit.finished","ts":"2026-10-16T12:00:00Z","correlation_id":"popup-1","repo":{"root":"/repo","common_dir":"`+daemon.commonDir+`"},"op_id":"op-1","unit":{"subject":"feat/a","status":"done"}}`, payloadOf(t, daemon.next(t)))
-	assert.JSONEq(t, `{"v":1,"type":"operation.finished","ts":"2026-10-16T12:00:00Z","correlation_id":"popup-1","repo":{"root":"/repo","common_dir":"`+daemon.commonDir+`"},"ok":false,"op_id":"op-1","operation":{"command":"create","surface":"cli"},"code":"lock.held"}`, payloadOf(t, daemon.next(t)))
+	assert.JSONEq(t, `{"v":2,"type":"operation.started","ts":"2026-10-16T12:00:00Z","correlation_id":"popup-1","repo":{"root":"/repo","common_dir":"`+daemon.commonDir+`"},"op_id":"op-1","command":"create","surface":"cli"}`, payloadOf(t, daemon.next(t)))
+	assert.JSONEq(t, `{"v":2,"type":"unit.finished","ts":"2026-10-16T12:00:00Z","correlation_id":"popup-1","repo":{"root":"/repo","common_dir":"`+daemon.commonDir+`"},"op_id":"op-1","subject":"feat/a","status":"done"}`, payloadOf(t, daemon.next(t)))
+	assert.JSONEq(t, `{"v":2,"type":"operation.finished","ts":"2026-10-16T12:00:00Z","correlation_id":"popup-1","repo":{"root":"/repo","common_dir":"`+daemon.commonDir+`"},"op_id":"op-1","command":"create","surface":"cli","ok":false,"code":"lock.held"}`, payloadOf(t, daemon.next(t)))
 }
 
 func TestAnOperationThatEndedWellCarriesNoCode(t *testing.T) {
@@ -85,7 +86,7 @@ func TestAnUncorrelatedEventCarriesNoCorrelation(t *testing.T) {
 	assert.NotContains(t, decoded(t, payloadOf(t, daemon.next(t))), "correlation_id")
 }
 
-func TestProgressIsNeverPublished(t *testing.T) {
+func TestProgressAndTheStreamsOwnLinesAreNeverPublished(t *testing.T) {
 	daemon := listen(t)
 	publisher := publisherOn(t, daemon)
 
@@ -93,6 +94,8 @@ func TestProgressIsNeverPublished(t *testing.T) {
 	publisher.Publish(domain.PhaseStarted{Subject: "feat/a", Phase: "on_create"})
 	publisher.Publish(domain.Output{Subject: "feat/a", Line: "installing"})
 	publisher.Publish(domain.PhaseFinished{Subject: "feat/a", Phase: "on_create"})
+	publisher.Publish(domain.Snapshot{})
+	publisher.Publish(domain.Ready{})
 	publisher.Publish(domain.WorktreeCreated{Worktree: identity()})
 
 	assert.Equal(t, "worktree.created", decoded(t, payloadOf(t, daemon.next(t)))["type"])
@@ -138,4 +141,14 @@ func TestTheCommonDirIsResolvedThroughSymlinks(t *testing.T) {
 	publisher := NewPublisher(PublisherParams{Root: "/repo", CommonDir: link})
 
 	assert.Equal(t, resolved, publisher.repo.CommonDir)
+}
+
+func TestARepositoryJoiningIsAnnouncedWithItsEnvelopeAlone(t *testing.T) {
+	daemon := listen(t)
+	publisher := publisherOn(t, daemon)
+	publisher.opID, publisher.correlationID = "", ""
+
+	publisher.Publish(domain.RepoAdded{})
+
+	assert.JSONEq(t, `{"v":2,"type":"repo.added","ts":"2026-10-16T12:00:00Z","repo":{"root":"/repo","common_dir":"`+daemon.commonDir+`"}}`, payloadOf(t, daemon.next(t)))
 }

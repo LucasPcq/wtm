@@ -74,3 +74,13 @@ func finalScreen(raw string) []string {
 	}
 	return rows[:len(rows)-1]
 }
+
+// closesSoon reports whether gone closes within a second.
+func closesSoon(gone <-chan struct{}) bool {
+	select {
+	case <-gone:
+		return true
+	case <-time.After(time.Second):
+		return false
+	}
+}

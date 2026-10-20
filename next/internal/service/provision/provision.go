@@ -256,7 +256,7 @@ func (p *provisioning) complete(ctx context.Context, provisioned Provisioned) Ou
 		}
 
 		if !numbered && provisioned.Meta.Ordinal != 0 {
-			p.Report(domain.WorktreeNumbered{Worktree: p.identity(provisioned)})
+			p.Report(domain.WorktreeUpdated{Worktree: p.identity(provisioned), Changed: []worktree.IdentityField{worktree.IdentityOrdinal}})
 		}
 	}
 	return p.outcome(Outcome{Status: domain.StatusDone, Provisioned: provisioned})

@@ -24,7 +24,7 @@ func TestTheCatalogueListsEachCommandWithItsSchemaOutsideAnyRepository(t *testin
 
 func TestAnInvalidCallIsRefusedWithTheStatusOfItsKind(t *testing.T) {
 	main := configured(t)
-	t.Setenv("HOME", t.TempDir())
+	ownConfigDir(t)
 	create := command(t, "create")
 
 	for name, c := range map[string]struct {

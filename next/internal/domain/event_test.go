@@ -17,7 +17,7 @@ func TestEveryEventComesBackAsItWasEncoded(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, event, decoded)
-			assert.Regexp(t, `^\{"type":"`+EventType(event)+`",`, string(data))
+			assert.Regexp(t, `^\{"type":"`+EventType(event)+`"[,}]`, string(data))
 		})
 	}
 }
@@ -36,7 +36,15 @@ func TestEachTypeOfEventHasItsDecoder(t *testing.T) {
 }
 
 func TestAnUnknownEventTypeIsRefused(t *testing.T) {
-	_, err := UnmarshalEvent([]byte(`{"type": "worktree.updated"}`))
+	_, err := UnmarshalEvent([]byte(`{"type": "worktree.numbered"}`))
 
-	assert.EqualError(t, err, `unknown event type "worktree.updated"`)
+	require.ErrorIs(t, err, ErrUnknownEventType)
+	assert.EqualError(t, err, `unknown event type "worktree.numbered"`)
+}
+
+func TestASnapshotAlwaysCarriesItsWorktreesAsAnArray(t *testing.T) {
+	data, err := MarshalEvent(Snapshot{})
+
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"type":"snapshot","worktrees":[]}`, string(data))
 }

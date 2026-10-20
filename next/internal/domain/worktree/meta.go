@@ -62,3 +62,14 @@ type Identity struct {
 	Main      bool              `json:"is_main"`
 	CreatedAt string            `json:"created_at"`
 }
+
+// An IdentityField names a field of an [Identity] an update changed, as the events spell it.
+type IdentityField string
+
+// The fields of an identity an update may change.
+const (
+	IdentityIsolation IdentityField = "isolation"
+	IdentityOrdinal   IdentityField = "ordinal"
+	IdentityParent    IdentityField = "parent"
+	IdentityCreatedAt IdentityField = "created_at"
+)

@@ -42,7 +42,7 @@ func TestAWorktreeIsCreatedNumberedThenProvisionedInThatOrder(t *testing.T) {
 	numbered.Ordinal = new(1)
 	assert.Equal(t, []domain.Event{
 		domain.WorktreeCreated{Worktree: created},
-		domain.WorktreeNumbered{Worktree: numbered},
+		domain.WorktreeUpdated{Worktree: numbered, Changed: []worktree.IdentityField{worktree.IdentityOrdinal}},
 		domain.WorktreeProvisioned{Worktree: numbered, OK: true},
 	}, report.worktreeEvents())
 }
@@ -113,7 +113,7 @@ func TestTheNumberIsAnnouncedOnceItsPhaseHasFinished(t *testing.T) {
 	events := report.all()
 	finished := slices.Index(events, domain.Event(domain.PhaseFinished{Subject: branchName, Phase: "ordinal"}))
 	require.Positive(t, finished)
-	_, numbered := events[finished+1].(domain.WorktreeNumbered)
+	_, numbered := events[finished+1].(domain.WorktreeUpdated)
 	assert.True(t, numbered, events[finished+1])
 }
 

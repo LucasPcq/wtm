@@ -15,6 +15,7 @@ const (
 type Env struct {
 	Cwd           string // the working directory with its symbolic links resolved, from which paths are shown
 	ProjectDir    string // $WTM_PROJECT_DIR with its symbolic links resolved, else the working directory as the system gives it
+	Named         bool   // whether $WTM_PROJECT_DIR named ProjectDir
 	CorrelationID string // $WTM_CORRELATION_ID
 }
 
@@ -23,7 +24,7 @@ func ReadEnv() Env {
 	cwd, _ := os.Getwd()
 	env := Env{Cwd: resolved(cwd), ProjectDir: cwd, CorrelationID: os.Getenv(CorrelationIDEnv)}
 	if named := os.Getenv(projectDirEnv); named != "" {
-		env.ProjectDir = resolved(named)
+		env.ProjectDir, env.Named = resolved(named), true
 	}
 
 	return env

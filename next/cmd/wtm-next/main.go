@@ -6,8 +6,10 @@ package main
 import (
 	"os"
 
+	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	createcli "github.com/LucasPcq/wtm/next/internal/command/create/cli"
+	eventscli "github.com/LucasPcq/wtm/next/internal/command/events/cli"
 	extractcli "github.com/LucasPcq/wtm/next/internal/command/extract/cli"
 	listcli "github.com/LucasPcq/wtm/next/internal/command/list/cli"
 	statuscli "github.com/LucasPcq/wtm/next/internal/command/status/cli"
@@ -41,5 +43,20 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		listcli.New(streams, env, openList, commandLine),
 		statuscli.New(streams, env, openStatus, commandLine),
 		treecli.New(streams, env, openTree, commandLine),
+		eventscli.New(streams, env, systemStream()),
+		daemonCmd(),
+	}
+}
+
+// daemonCmd is the hidden command that runs the event bus's daemon: wtm events starts it when none answers, and it stops once idle.
+func daemonCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:    daemonCommand,
+		Short:  "Run the event bus every wtm-next process publishes to and wtm events reads",
+		Hidden: true,
+		Args:   cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return bus.Serve(cmd.Context(), bus.ServeParams{SocketPath: bus.SocketPath(), Idle: daemonIdle})
+		},
 	}
 }

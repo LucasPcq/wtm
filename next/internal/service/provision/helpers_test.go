@@ -69,7 +69,7 @@ func (r *recorder) worktreeEvents() []domain.Event {
 	var events []domain.Event
 	for _, event := range r.all() {
 		switch event.(type) {
-		case domain.WorktreeCreated, domain.WorktreeNumbered, domain.WorktreeProvisioned:
+		case domain.WorktreeCreated, domain.WorktreeUpdated, domain.WorktreeProvisioned:
 			events = append(events, event)
 		}
 	}

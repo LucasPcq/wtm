@@ -16,9 +16,9 @@ next/
     command/<name>/    one command: usecase.go, port.go, rules.go, questions.go, cli/
     service/<name>/    what use cases share with I/O: operation, provision, repository; <name>test kits
     domain/            the pure model and vocabulary; worktree/, project/, env/, dotenv/, run/ by subject
-    adapter/<name>/    git, store, config, shell, oplock, events, statefile, proxyport, daemon, github; <name>test fakes
+    adapter/<name>/    git, store, config, shell, oplock, events (the bus), registry, statefile, proxyport, daemon, github; <name>test fakes
     ui/                cli (root, exit codes, env), output (streams, frames, envelope), form (flags, wizard, conclusion), widget (a step's inputs), formtest (the cli tests' kit)
-    api/               the catalogue of commands for a surface other than the CLI
+    api/               the catalogue of commands, and its streams, for a surface other than the CLI
   docs/proof/          scripts that run wtm and wtm-next side by side, and their captures
 ```
 
@@ -67,7 +67,7 @@ Each rule names what enforces it: `[archlint]` (`tools/archlint`, rule `next` un
 | -- | -- |
 | adding or migrating a command | `references/new-command.md` |
 | adding a question, a flag or a field, or sharing one between commands | `references/questions.md` |
-| touching what a command promises: `--yes`/`--force`, dry run and fingerprint, JSON envelope, exit codes, locks, events | `references/contract.md` |
+| touching what a command promises: `--yes`/`--force`, dry run and fingerprint, JSON envelope, exit codes, locks, events, a read, a stream | `references/contract.md` |
 | adding a port, an adapter, a fake or a test kit | `references/ports-adapters.md` |
 | changing the wizard engine (`ui/form`) or a command's own step | `references/form.md` |
 | following a request hop by hop, or checking what a package may import | `next/README.md` |

@@ -1,6 +1,10 @@
 package output
 
-import "github.com/LucasPcq/wtm/next/internal/domain"
+import (
+	"errors"
+
+	"github.com/LucasPcq/wtm/next/internal/domain"
+)
 
 var flags = Flags{"branches": "<branches>", "from": "--from", "env_from": "--env-from"}
 
@@ -12,3 +16,8 @@ func invalid() *domain.Error {
 		{Path: "from", Code: "required", Template: "{path} is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)", Params: domain.Params{"because": "create.parent_required"}},
 	})
 }
+
+// failingWriter fails every write, as a stream whose reader left does.
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("reader gone") }

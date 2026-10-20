@@ -1,0 +1,6 @@
+  = 2 worktrees · /code/app
+  = watching for changes
+  ✓ created feat/b  /code/.trees/feat-b
+  ✓ updated feat/b  ordinal=2
+  ✓ provisioned feat/b
+  ✗ on_create failed for feat/b  make setup (exit 2)
