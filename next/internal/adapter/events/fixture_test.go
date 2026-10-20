@@ -3,6 +3,7 @@ package events
 import (
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
@@ -15,4 +16,23 @@ func identity() worktree.Identity {
 // fixedNow is the clock of a test's publisher.
 func fixedNow() time.Time {
 	return time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
+}
+
+// carried is one event of each type the stream carries, the operation's progress left out.
+func carried() []domain.Event {
+	numbered := identity()
+	numbered.Ordinal = new(2)
+	return []domain.Event{
+		domain.Snapshot{Worktrees: []worktree.Identity{identity()}},
+		domain.Ready{},
+		domain.RepoAdded{},
+		domain.RepoRemoved{},
+		domain.WorktreeCreated{Worktree: identity()},
+		domain.WorktreeUpdated{Worktree: numbered, Changed: []worktree.IdentityField{worktree.IdentityOrdinal}},
+		domain.WorktreeProvisioned{Worktree: numbered, OK: true},
+		domain.WorktreeProvisioned{Worktree: numbered, Hook: "make setup", ExitCode: new(2)},
+		domain.OperationStarted{Command: "create", Surface: "cli"},
+		domain.UnitFinished{Subject: "feat/a", Status: domain.StatusDone},
+		domain.OperationFinished{Command: "create", Surface: "cli", Code: "unit.phase_failed"},
+	}
 }

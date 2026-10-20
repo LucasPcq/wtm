@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -9,7 +10,7 @@ import (
 
 //go-sumtype:decl Event
 
-// Event is one step of an operation as it happens, reported to the progress view and to the processes listening on the events socket.
+// Event is what happens to a repository's worktrees as it happens: a step of an operation, reported to the progress view and to the processes listening on the event bus, or a line of the event stream itself (a snapshot, ready, a repository joining or leaving it).
 type Event interface{ event() }
 
 // UnitStarted reports that the work on one subject (a branch) begins.
@@ -48,9 +49,10 @@ type WorktreeCreated struct {
 	Worktree worktree.Identity `json:"worktree"`
 }
 
-// WorktreeNumbered reports that a worktree received its number (its ports and env values).
-type WorktreeNumbered struct {
-	Worktree worktree.Identity `json:"worktree"`
+// WorktreeUpdated reports that fields of a worktree's identity changed, Changed naming them: a worktree numbered changes its ordinal.
+type WorktreeUpdated struct {
+	Worktree worktree.Identity        `json:"worktree"`
+	Changed  []worktree.IdentityField `json:"changed"`
 }
 
 // WorktreeProvisioned reports that a worktree's provisioning ended: OK, or the hook that failed and its exit code.
@@ -75,21 +77,49 @@ type OperationFinished struct {
 	Code    string `json:"code,omitempty"`
 }
 
+// Snapshot is every worktree of a repository on a branch, as the stream opens on it: a reader resets what it knows of the repository from it.
+type Snapshot struct {
+	Worktrees []worktree.Identity `json:"worktrees"`
+}
+
+// MarshalJSON writes the snapshot with its worktrees always an array, empty included: a reader resets its state from it.
+func (s Snapshot) MarshalJSON() ([]byte, error) {
+	type plain Snapshot
+	if s.Worktrees == nil {
+		s.Worktrees = []worktree.Identity{}
+	}
+
+	return json.Marshal(plain(s))
+}
+
+// Ready reports that the stream sent its snapshots: every event after it is a change.
+type Ready struct{}
+
+// RepoAdded reports that a repository joined those wtm knows.
+type RepoAdded struct{}
+
+// RepoRemoved reports that a repository left those wtm knows: it is gone, or no longer initialized.
+type RepoRemoved struct{}
+
 func (UnitStarted) event()         {}
 func (PhaseStarted) event()        {}
 func (PhaseFinished) event()       {}
 func (Output) event()              {}
 func (UnitFinished) event()        {}
 func (WorktreeCreated) event()     {}
-func (WorktreeNumbered) event()    {}
+func (WorktreeUpdated) event()     {}
 func (WorktreeProvisioned) event() {}
 func (OperationStarted) event()    {}
 func (OperationFinished) event()   {}
+func (Snapshot) event()            {}
+func (Ready) event()               {}
+func (RepoAdded) event()           {}
+func (RepoRemoved) event()         {}
 
 // Report receives the events of an operation as they happen.
 type Report func(Event)
 
-// The type of each event on the wire, its "type": the events socket's name where it publishes the event, except WorktreeNumbered, which the socket's v1 calls worktree.updated.
+// The type of each event on the wire, its "type".
 const (
 	EventUnitStarted         = "unit.started"
 	EventPhaseStarted        = "phase.started"
@@ -97,10 +127,14 @@ const (
 	EventOutput              = "phase.output"
 	EventUnitFinished        = "unit.finished"
 	EventWorktreeCreated     = "worktree.created"
-	EventWorktreeNumbered    = "worktree.numbered"
+	EventWorktreeUpdated     = "worktree.updated"
 	EventWorktreeProvisioned = "worktree.provisioned"
 	EventOperationStarted    = "operation.started"
 	EventOperationFinished   = "operation.finished"
+	EventSnapshot            = "snapshot"
+	EventReady               = "ready"
+	EventRepoAdded           = "repo.added"
+	EventRepoRemoved         = "repo.removed"
 )
 
 // EventType returns the type of event on the wire.
@@ -118,14 +152,22 @@ func EventType(event Event) string {
 		return EventUnitFinished
 	case WorktreeCreated:
 		return EventWorktreeCreated
-	case WorktreeNumbered:
-		return EventWorktreeNumbered
+	case WorktreeUpdated:
+		return EventWorktreeUpdated
 	case WorktreeProvisioned:
 		return EventWorktreeProvisioned
 	case OperationStarted:
 		return EventOperationStarted
 	case OperationFinished:
 		return EventOperationFinished
+	case Snapshot:
+		return EventSnapshot
+	case Ready:
+		return EventReady
+	case RepoAdded:
+		return EventRepoAdded
+	case RepoRemoved:
+		return EventRepoRemoved
 	}
 	return ""
 }
@@ -142,13 +184,20 @@ var eventDecoders = map[string]func([]byte) (Event, error){
 	EventOutput:              decodeEvent[Output],
 	EventUnitFinished:        decodeEvent[UnitFinished],
 	EventWorktreeCreated:     decodeEvent[WorktreeCreated],
-	EventWorktreeNumbered:    decodeEvent[WorktreeNumbered],
+	EventWorktreeUpdated:     decodeEvent[WorktreeUpdated],
 	EventWorktreeProvisioned: decodeEvent[WorktreeProvisioned],
 	EventOperationStarted:    decodeEvent[OperationStarted],
 	EventOperationFinished:   decodeEvent[OperationFinished],
+	EventSnapshot:            decodeEvent[Snapshot],
+	EventReady:               decodeEvent[Ready],
+	EventRepoAdded:           decodeEvent[RepoAdded],
+	EventRepoRemoved:         decodeEvent[RepoRemoved],
 }
 
-// UnmarshalEvent returns the event data encodes, as [MarshalEvent] writes it; it refuses a type it does not know.
+// ErrUnknownEventType is the error of an event whose type this wtm does not know: a newer wtm's, which a reader ignores.
+var ErrUnknownEventType = errors.New("unknown event type")
+
+// UnmarshalEvent returns the event data encodes, as [MarshalEvent] writes it; it refuses a type it does not know with an error wrapping [ErrUnknownEventType].
 func UnmarshalEvent(data []byte) (Event, error) {
 	var head struct {
 		Type string `json:"type"`
@@ -159,7 +208,7 @@ func UnmarshalEvent(data []byte) (Event, error) {
 
 	decode, known := eventDecoders[head.Type]
 	if !known {
-		return nil, fmt.Errorf("unknown event type %q", head.Type)
+		return nil, fmt.Errorf("%w %q", ErrUnknownEventType, head.Type)
 	}
 	return decode(data)
 }

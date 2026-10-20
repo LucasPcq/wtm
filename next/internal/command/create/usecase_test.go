@@ -362,7 +362,7 @@ func TestAWorktreeIsCreatedUnderItsLocksAndAnnouncedFromStartToFinish(t *testing
 	assert.Equal(t, domain.OperationFinished{Command: "create", Surface: "tui", OK: true}, events[len(events)-1])
 	assert.Contains(t, events, domain.Event(domain.UnitFinished{Subject: branchName, Status: domain.StatusDone}))
 	assert.True(t, containsKind[domain.WorktreeCreated](events))
-	assert.True(t, containsKind[domain.WorktreeNumbered](events))
+	assert.True(t, containsKind[domain.WorktreeUpdated](events))
 	assert.True(t, containsKind[domain.WorktreeProvisioned](events))
 	assert.NoFileExists(t, filepath.Join(w.stateDir, "locks", "ops", "op-1.json"))
 }

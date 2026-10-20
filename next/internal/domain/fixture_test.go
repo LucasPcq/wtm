@@ -16,10 +16,14 @@ var everyEvent = []Event{
 	Output{Subject: "feat/x", Line: "set up <feat/x>"},
 	UnitFinished{Subject: "feat/x", Status: StatusDone},
 	WorktreeCreated{Worktree: identity},
-	WorktreeNumbered{Worktree: identity},
+	WorktreeUpdated{Worktree: identity, Changed: []worktree.IdentityField{worktree.IdentityOrdinal}},
 	WorktreeProvisioned{Worktree: identity, Hook: "make setup", ExitCode: new(3)},
 	OperationStarted{Command: "create", Surface: "cli"},
 	OperationFinished{Command: "create", Surface: "cli", Code: "unit.phase_failed"},
+	Snapshot{Worktrees: []worktree.Identity{identity}},
+	Ready{},
+	RepoAdded{},
+	RepoRemoved{},
 }
 
 // wrapper is an error that wraps inner, so a test sees whether AsError looks through wrapping.

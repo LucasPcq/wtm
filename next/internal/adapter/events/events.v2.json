@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/LucasPcq/wtm/schemas/events.v2.json",
+  "title": "wtm events v2",
+  "description": "One line of `wtm events --output json`, as every wtm process publishes it on the event bus. Consumers ignore unknown fields and unknown types: a type this schema does not list is valid against the envelope alone. `v` changes only on a breaking change.",
+  "type": "object",
+  "required": ["v", "type", "ts"],
+  "properties": {
+    "v": { "const": 2 },
+    "type": { "type": "string", "minLength": 1 },
+    "ts": { "type": "string", "format": "date-time" },
+    "repo": { "$ref": "#/$defs/repo" },
+    "correlation_id": { "type": "string", "maxLength": 256, "description": "WTM_CORRELATION_ID of the command that published the event, verbatim; absent when it had none." },
+    "op_id": { "type": "string", "minLength": 1, "description": "The operation the event belongs to; absent outside an operation." }
+  },
+  "$defs": {
+    "repo": {
+      "type": "object",
+      "required": ["root", "common_dir"],
+      "properties": {
+        "root": { "type": "string", "minLength": 1, "description": "The main worktree." },
+        "common_dir": { "type": "string", "minLength": 1, "description": "git rev-parse --git-common-dir, absolute, symbolic links resolved: the repository's key." }
+      }
+    },
+    "worktree": {
+      "type": "object",
+      "required": ["branch", "path", "parent", "ordinal", "isolation", "is_main", "created_at"],
+      "properties": {
+        "branch": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "parent": { "type": "string", "description": "The branch it was created from; empty for the main worktree and one wtm did not create." },
+        "ordinal": { "type": ["integer", "null"], "minimum": 0, "description": "0 for the main worktree; null until the worktree is first given one." },
+        "isolation": { "type": "string" },
+        "is_main": { "type": "boolean" },
+        "created_at": { "type": "string" }
+      }
+    },
+    "operation": {
+      "required": ["repo", "op_id", "command", "surface"],
+      "properties": {
+        "command": { "type": "string", "minLength": 1, "description": "The command, as its command line spells it after the program's name." },
+        "surface": { "type": "string", "minLength": 1, "description": "Where it was run from: cli, api." }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "snapshot" } } },
+      "then": {
+        "required": ["repo", "worktrees"],
+        "properties": { "worktrees": { "type": "array", "items": { "$ref": "#/$defs/worktree" }, "description": "Every worktree on a branch: a reset of what the reader knows of the repository." } }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "ready" } } },
+      "then": { "not": { "required": ["repo"] } }
+    },
+    {
+      "if": { "properties": { "type": { "enum": ["repo.added", "repo.removed"] } } },
+      "then": { "required": ["repo"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "worktree.created" } } },
+      "then": { "required": ["repo", "worktree"], "properties": { "worktree": { "$ref": "#/$defs/worktree" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "worktree.updated" } } },
+      "then": {
+        "required": ["repo", "worktree", "changed"],
+        "properties": {
+          "worktree": { "$ref": "#/$defs/worktree" },
+          "changed": { "type": "array", "minItems": 1, "items": { "enum": ["isolation", "ordinal", "parent", "created_at"] } }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "worktree.provisioned" } } },
+      "then": {
+        "required": ["repo", "worktree", "ok"],
+        "properties": {
+          "worktree": { "$ref": "#/$defs/worktree" },
+          "ok": { "type": "boolean", "description": "Whether every hook passed; true when there were none." },
+          "hook": { "type": "string", "minLength": 1, "description": "The failing hook's command; only when ok is false, and absent when provisioning failed before any hook ran." },
+          "exit_code": { "type": "integer", "minimum": 0, "description": "The failing hook's exit status; absent when it was killed by a signal." }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "operation.started" } } },
+      "then": { "$ref": "#/$defs/operation" }
+    },
+    {
+      "if": { "properties": { "type": { "const": "operation.finished" } } },
+      "then": {
+        "$ref": "#/$defs/operation",
+        "required": ["ok"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "code": { "type": "string", "minLength": 1, "description": "The code of the failure the operation ended on; absent when ok." }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "unit.finished" } } },
+      "then": {
+        "required": ["repo", "op_id", "subject", "status"],
+        "properties": {
+          "subject": { "type": "string", "minLength": 1, "description": "What the unit worked on: a branch." },
+          "status": { "enum": ["done", "failed", "skipped", "cancelled"] }
+        }
+      }
+    }
+  ]
+}
