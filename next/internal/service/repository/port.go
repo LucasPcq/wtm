@@ -17,3 +17,9 @@ type Config interface {
 type Snapshotter interface {
 	Snapshot(ctx context.Context) (worktree.Snapshot, error)
 }
+
+// Prober tells whether a worktree's directory is there and whether it holds uncommitted changes.
+type Prober interface {
+	Locate(ctx context.Context, path string) (worktree.Location, error)
+	Dirty(ctx context.Context, path string) (bool, error)
+}

@@ -114,7 +114,7 @@ const pathForce = "force"
 
 // leftBehind is the repair of a branch an undo left behind, and of its worktree: clean, forced, in the legacy wtm until it migrates.
 func leftBehind(branch string) domain.FollowUp {
-	return domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: pathForce, Values: []string{"true"}}}}
+	return domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: pathForce, Values: []string{"true"}}}}
 }
 
 // commandLine spells a follow-up as the legacy wtm runs it until its command migrates, a worktree on no branch entered with cd, and a pull request opened by gh.

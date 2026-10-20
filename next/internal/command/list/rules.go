@@ -42,24 +42,21 @@ type State struct {
 
 // A Detail is one worktree as list reports it.
 type Detail struct {
-	Branch       string     `json:"branch"`
-	Path         string     `json:"path"`
-	Main         bool       `json:"main"`
-	Dirty        bool       `json:"dirty"`
-	Locked       bool       `json:"locked"`
-	Rebasing     bool       `json:"rebasing"`
-	Missing      bool       `json:"missing"` // its directory is gone: git calls it prunable
-	CommitsAhead int        `json:"commits_ahead"`
-	CreatedAt    *time.Time `json:"created_at"` // from its meta record, null without one
-	Origin       *Origin    `json:"origin"`     // null when origin has no branch of that name
-	PR           *PR        `json:"pr"`         // null without one, or when GitHub was not asked
-	Services     []string   `json:"services"`   // the jobs up in it, null when that cannot be told
+	Branch       string           `json:"branch"`
+	Path         string           `json:"path"`
+	Main         bool             `json:"main"`
+	Dirty        bool             `json:"dirty"`
+	Locked       bool             `json:"locked"`
+	Rebasing     bool             `json:"rebasing"`
+	Missing      bool             `json:"missing"` // its directory is gone: git calls it prunable
+	CommitsAhead int              `json:"commits_ahead"`
+	CreatedAt    *time.Time       `json:"created_at"` // from its meta record, null without one
+	Origin       *worktree.Origin `json:"origin"`     // null when origin has no branch of that name
+	PR           *PR              `json:"pr"`         // null without one, or when GitHub was not asked
+	Services     []string         `json:"services"`   // the jobs up in it, null when that cannot be told
 	// Actions are what may be done next with it, as Offers lists them, each the command that does it and its answers.
 	Actions []domain.FollowUp `json:"actions"`
 }
-
-// Origin is where a worktree's branch stands against origin's.
-type Origin = worktree.Origin
 
 // PR is a worktree's open pull request.
 type PR struct {
@@ -229,7 +226,7 @@ var byAction = map[Action]struct{ command, label string }{
 	ActionRunUp:   {"run up", "Start the profile"},
 	ActionRunDown: {"run down", "Stop the profile"},
 	ActionLogs:    {"run logs", "View the logs"},
-	ActionClean:   {"clean", "Clean (delete the worktree)"},
+	ActionClean:   {domain.CommandClean, "Clean (delete the worktree)"},
 }
 
 // Actions are the follow-ups the worktree of detail offers, as Offers lists them.
