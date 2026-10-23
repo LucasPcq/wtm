@@ -7,13 +7,18 @@ import (
 // ----------------------------------------------------------------------------
 // The request
 
-// A Request is what the caller asks of the stream: the repository holding the path Repo, or every repository wtm knows with All, else the repository of Dir.
-// Dir is where the stream runs from and Named whether its caller named it: a directory the caller did not name ($WTM_PROJECT_DIR unset on the command line) in no repository watches every one instead. Neither is a field: the surface sets them.
+// A Request is what the caller asks of the stream: the repository holding the path Repo, read from where the caller stands when relative, or every repository wtm knows with All, else the repository of the directory the caller stands on.
+// A caller that stands nowhere, or on a directory it did not name ($WTM_PROJECT_DIR unset on the command line) in no repository, watches every one instead. Caller is no field: every surface sets it.
 type Request struct {
-	Repo  string `json:"repo"`
-	All   bool   `json:"all"`
-	Dir   string `json:"-"`
-	Named bool   `json:"-"`
+	Repo   string        `json:"repo"`
+	All    bool          `json:"all"`
+	Caller domain.Caller `json:"-"`
+}
+
+// From is the request asked by caller.
+func (r Request) From(caller domain.Caller) Request {
+	r.Caller = caller
+	return r
 }
 
 const (
@@ -65,6 +70,11 @@ func (r Request) Validate() error {
 	}
 
 	return domain.Invalid([]domain.FieldError{{Path: pathRepo, Code: CodeRepoWithAll, Template: "{path} watches one repository, all of them already: give one or the other", With: []string{pathAll}}})
+}
+
+// relativeFromNowhere is the problem of a relative --repo from a caller in no directory to read it from: a surface's call naming none, or a command line whose working directory is gone.
+func relativeFromNowhere(repo string) error {
+	return domain.Invalid([]domain.FieldError{{Path: pathRepo, Code: CodeNotADirectory, Template: "{path} {value} is relative, and the caller stands in no directory to read it from", Params: domain.Params{"value": repo}}})
 }
 
 // notADirectory is the problem of a --repo that names no directory.

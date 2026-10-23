@@ -90,13 +90,13 @@ func TestWithNoWorktreeNamedTheOneHoldingTheDirectoryIsReadElseTheMainOne(t *tes
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			got := read(t, w, status.Request{Cwd: c.cwd})
+			got := read(t, w, status.Request{Caller: domain.Caller{Cwd: c.cwd}})
 
 			require.Len(t, got.Items, 1)
 			assert.Equal(t, c.read, got.Items[0].Subject)
 		})
 	}
-	assert.True(t, only(t, read(t, w, status.Request{Cwd: "/repo/.trees/rebasing"})).Rebasing, "a worktree mid-rebase is read on its branch, never refused as detached")
+	assert.True(t, only(t, read(t, w, status.Request{Caller: domain.Caller{Cwd: "/repo/.trees/rebasing"}})).Rebasing, "a worktree mid-rebase is read on its branch, never refused as detached")
 }
 
 func TestAWorktreeIsNamedByItsBranchItsPathOrAPartOfItsBranch(t *testing.T) {
@@ -110,7 +110,7 @@ func TestAWorktreeIsNamedByItsBranchItsPathOrAPartOfItsBranch(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			got := read(t, w, status.Request{Worktree: c.named, Cwd: c.cwd})
+			got := read(t, w, status.Request{Worktree: c.named, Caller: domain.Caller{Cwd: c.cwd}})
 
 			require.Len(t, got.Items, 1)
 			assert.Equal(t, c.read, got.Items[0].Subject)
@@ -486,7 +486,7 @@ func TestAPathNamesTheDeepestWorktreeHoldingItAndABranchNameComesFirst(t *testin
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			got := read(t, w, status.Request{Worktree: c.named, Cwd: c.cwd})
+			got := read(t, w, status.Request{Worktree: c.named, Caller: domain.Caller{Cwd: c.cwd}})
 
 			require.Len(t, got.Items, 1)
 			assert.Equal(t, c.read, got.Items[0].Subject)

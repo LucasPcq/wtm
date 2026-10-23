@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/adapter/registrytest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/registry"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
@@ -50,13 +52,14 @@ func (b *scriptedBus) Subscribe(ctx context.Context, _ []string) (<-chan []byte,
 	return ch, nil
 }
 
-// registered lists repos, and registers nothing.
-type registered []domain.Repo
-
-func (registered) Register(context.Context, domain.Repo) {}
-
-func (r registered) Prune(context.Context) ([]domain.Repo, error) {
-	return r, nil
+// registered is the registry listing repos, every one initialized.
+func registered(repos []domain.Repo) registry.Service {
+	return registry.Service{
+		Store:       registrytest.NewFake(registrytest.FakeParams{Repos: repos}),
+		Announce:    func(domain.Event, domain.Repo) {},
+		Moved:       func() bool { return false },
+		Initialized: func(domain.Repo) bool { return true },
+	}
 }
 
 // config is a project's config.toml as repository.Service loads it, missing when absent.

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/adapter/registrytest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -77,37 +78,21 @@ func (b *fakeBus) Subscribe(_ context.Context, repos []string) (<-chan []byte, e
 	return lines, nil
 }
 
-// A fakeRegistry lists repos, and records what it was asked to register and how many times it pruned.
-type fakeRegistry struct {
-	mu         sync.Mutex
-	repos      []domain.Repo
-	prunes     int
-	registered []domain.Repo
+// A known is the registry of the repositories wtm knows, every one initialized: repos are those it lists first, store what it lists once the stream runs, inert when the state is moved.
+type known struct {
+	repos []domain.Repo
+	moved bool
+	store *registrytest.Fake
 }
 
-func (r *fakeRegistry) Register(_ context.Context, repo domain.Repo) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.registered = append(r.registered, repo)
+// registers returns the repositories the stream registered.
+func (k *known) registers() []domain.Repo {
+	return k.store.Repos()[len(k.repos):]
 }
 
-func (r *fakeRegistry) registers() []domain.Repo {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return slices.Clone(r.registered)
-}
-
-func (r *fakeRegistry) Prune(context.Context) ([]domain.Repo, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.prunes++
-	return r.repos, nil
-}
-
-func (r *fakeRegistry) pruned() int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.prunes
+// pruned returns how many times the stream pruned the registry.
+func (k *known) pruned() int {
+	return len(slices.DeleteFunc(k.store.Calls(), func(call string) bool { return call != "Prune" }))
 }
 
 // A config is a project's config.toml as repository.Service loads it, which a test can take away; each load is recorded in log, when there is one.

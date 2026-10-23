@@ -46,3 +46,11 @@ func (a answers) Answer(path string, values []string) (answers, error) {
 }
 
 func (a answers) Values(path string) []string { return a[path] }
+
+// A calledRequest records who asked it.
+type calledRequest struct{ caller Caller }
+
+func (r calledRequest) From(caller Caller) calledRequest {
+	r.caller = caller
+	return r
+}

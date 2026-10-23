@@ -43,6 +43,11 @@ func TestAMissingConfigIsNotFound(t *testing.T) {
 	assert.ErrorIs(t, err, project.ErrConfigNotFound)
 }
 
+func TestAProjectIsInitializedWhileItHoldsAConfigEvenAnInvalidOne(t *testing.T) {
+	assert.True(t, Project{StateDir: stateWithConfig(t, "[worktrees\n")}.Initialized())
+	assert.False(t, Project{StateDir: t.TempDir()}.Initialized())
+}
+
 func TestAConfigThatIsNotTOMLIsRefused(t *testing.T) {
 	_, _, err := loadState(t, stateWithConfig(t, "[worktrees\nthis is not valid toml !!!\n"))
 

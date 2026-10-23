@@ -112,3 +112,24 @@ func TestACommandIsFoundByItsName(t *testing.T) {
 	assert.Equal(t, "extract", found.Name)
 	assert.False(t, missing)
 }
+
+func TestACallIsAskedAndRunFromItsDirectory(t *testing.T) {
+	var asked, ran domain.Caller
+	command := Bind("greet", func(context.Context, string) (useCase, error) { return useCase{}, nil },
+		func(_ useCase, _ context.Context, req request) (questions, error) {
+			asked = req.Caller
+			return questions{}, nil
+		},
+		func(_ useCase, _ context.Context, req request, _ domain.RunOptions) (outcome, error) {
+			ran = req.Caller
+			return outcome{}, nil
+		})
+
+	_, err := command.Questions(t.Context(), Call{Dir: "/code/app/.trees/feat-a"})
+	command.Execute(t.Context(), Call{Dir: "/code/app/.trees/feat-a"})
+
+	require.NoError(t, err)
+	want := domain.Caller{Dir: "/code/app/.trees/feat-a", Named: true, Cwd: "/code/app/.trees/feat-a"}
+	assert.Equal(t, want, asked)
+	assert.Equal(t, want, ran)
+}

@@ -8,7 +8,13 @@ import (
 )
 
 type request struct {
-	Name string
+	Name   string
+	Caller domain.Caller
+}
+
+func (r request) From(caller domain.Caller) request {
+	r.Caller = caller
+	return r
 }
 
 func (r request) Answer(path string, values []string) (request, error) {
@@ -58,14 +64,14 @@ func (r request) Values(path string) []string {
 
 // watched records what a stream's watch was given and sends lines, failing with refusal once sent.
 type watched struct {
-	dir     string
+	watched bool
 	req     request
 	lines   []string
 	refusal error
 }
 
-func (w *watched) watch(_ context.Context, dir string, req request, send func(json.RawMessage) error) error {
-	w.dir, w.req = dir, req
+func (w *watched) watch(_ context.Context, req request, send func(json.RawMessage) error) error {
+	w.watched, w.req = true, req
 	for _, line := range w.lines {
 		if err := send(json.RawMessage(line)); err != nil {
 			return err

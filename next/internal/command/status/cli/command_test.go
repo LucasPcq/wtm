@@ -101,7 +101,7 @@ func TestOnATerminalTheWorktreeIsPickedFirstTheCursorOnTheOneYouAreIn(t *testing
 func TestThePickerOffersEveryWorktreeADetachedOneSaidSo(t *testing.T) {
 	app, err := world{}.open(t.Context(), mainPath)
 	require.NoError(t, err)
-	q, err := app.Questions(t.Context(), status.Request{Cwd: "/repo/.trees/feat-a"})
+	q, err := app.Questions(t.Context(), status.Request{Caller: domain.Caller{Cwd: "/repo/.trees/feat-a"}})
 	require.NoError(t, err)
 	field, ok := q.Form().Fields[0].(domain.SelectField)
 	require.True(t, ok)

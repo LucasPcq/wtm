@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -77,3 +78,17 @@ var reads = []string{"list", "status", "tree"}
 
 // streamsListed are the commands that stream rather than return: out of the catalogue's contract, each a stream of catalogue.go's streams.
 var streamsListed = []string{"events"}
+
+// firstLine keeps what a stream writes and stops it with stop once its first line is written.
+type firstLine struct {
+	bytes.Buffer
+	stop func()
+}
+
+func (f *firstLine) Write(p []byte) (int, error) {
+	n, err := f.Buffer.Write(p)
+	if bytes.ContainsRune(p, '\n') {
+		f.stop()
+	}
+	return n, err
+}

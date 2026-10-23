@@ -59,13 +59,13 @@ func (q *Query[R, Q, O]) Bind(cmd *cobra.Command, run *uicli.Run) {
 	cmd.Flags().StringVar(&run.Output, "output", uicli.OutputText, run.OutputHelp())
 }
 
-// Launch runs cmd: it refuses an invalid --output or correlation ID, builds the request from the flags and args, opens the use case on the project's directory, asks the subject the request leaves open and reads, then lets the user pick of the read when Pick is set, each only when the user can see and answer it; it prints how the read ended and returns the failure that sets the exit code.
+// Launch runs cmd: it refuses an invalid --output or correlation ID, builds the request from the flags and args, asked from where the command line stands, opens the use case on the project's directory, asks the subject the request leaves open and reads, then lets the user pick of the read when Pick is set, each only when the user can see and answer it; it prints how the read ended and returns the failure that sets the exit code.
 func (q *Query[R, Q, O]) Launch(cmd *cobra.Command, args []string) error {
 	if err := q.io.Begin(cmd); err != nil {
 		return err
 	}
 
-	req := folded[R](fieldAnswers(cmd, args, q.schema()))
+	req := domain.CalledBy(folded[R](fieldAnswers(cmd, args, q.schema())), q.io.Env.Caller())
 
 	ctx := cmd.Context()
 	app, err := q.Open(ctx, q.io.Env.ProjectDir)

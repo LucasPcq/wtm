@@ -11,7 +11,7 @@
         {
           "value": "main",
           "label": "",
-          "badge": "main"
+          "badge": "current"
         }
       ],
       "rememberable": false,
