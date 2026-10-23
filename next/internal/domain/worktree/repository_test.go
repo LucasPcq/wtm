@@ -66,3 +66,19 @@ func TestTheBaseBranchIsMissingOnlyWhenConfiguredWithNoLocalBranch(t *testing.T)
 	_, gone = Repository{}.MissingBase()
 	assert.False(t, gone, "no base branch configured is none missing")
 }
+
+func TestThePlannedIsolationIsNoneOnlyWhenRunTomlIsolatesNothing(t *testing.T) {
+	cases := map[string]struct {
+		repo Repository
+		want project.Isolation
+	}{
+		"isolates":   {repo: Repository{Run: project.Run{EnvPorts: []project.EnvPortLink{{}}}}, want: project.Verbatim},
+		"nothing":    {repo: Repository{}},
+		"unreadable": {repo: Repository{RunErr: errors.New("run.toml: line 3")}, want: project.Verbatim},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.want, c.repo.PlannedIsolation(project.Verbatim))
+		})
+	}
+}

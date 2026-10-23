@@ -1,0 +1,15 @@
+
+  ✓ extract: 1 done
+
+  Source      feat/login
+  Files       new apps/api/new.txt
+  Target      feat/other
+  Mode        move
+  feat/other  ../wt-feat-other
+
+  ! fast-forward ignored: feat/other already exists, so nothing is created
+  ! isolation verbatim ignored: feat/other already exists and stays isolated
+
+  → wtm go feat/other
+  → wtm env feat/other verbatim   switch it to verbatim
+

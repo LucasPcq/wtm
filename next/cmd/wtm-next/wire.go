@@ -73,17 +73,18 @@ func wire(params wireParams) app {
 	gh := github.GitHub{Dir: params.MainPath}
 
 	provisions := provision.Service{
-		Git:        repo,
-		Meta:       meta,
-		EnvFiles:   store.EnvFiles{},
-		Answers:    projectConfig,
-		StateDir:   params.StateDir,
-		RunHooks:   shell.RunHooks,
-		PublicPort: proxyport.Port{Plist: proxyport.PlistPath()}.Public,
-		Shield:     shell.Shield,
-		Now:        time.Now,
-		LeftBehind: leftBehind,
-		Settle:     settle,
+		Git:         repo,
+		Meta:        meta,
+		EnvFiles:    store.EnvFiles{},
+		Answers:     projectConfig,
+		StateDir:    params.StateDir,
+		RunHooks:    shell.RunHooks,
+		PublicPort:  proxyport.Port{Plist: proxyport.PlistPath()}.Public,
+		Shield:      shell.Shield,
+		Now:         time.Now,
+		LeftBehind:  leftBehind,
+		Settle:      settle,
+		ProxyStatus: proxyStatus,
 	}
 
 	return app{
@@ -159,6 +160,11 @@ func initialize() *domain.FollowUp {
 // settle settles a worktree's env ports, in the legacy wtm until env migrates.
 func settle(branch string) domain.FollowUp {
 	return domain.FollowUp{Command: domain.CommandEnv, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}}}
+}
+
+// proxyStatus reports what serves named addresses on this machine, in the legacy wtm until run proxy migrates.
+func proxyStatus() domain.FollowUp {
+	return domain.FollowUp{Command: "run proxy status"}
 }
 
 // commandLine spells a follow-up as the legacy wtm runs it until its command migrates, a worktree on no branch entered with cd, and a pull request opened by gh.

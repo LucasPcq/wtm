@@ -225,3 +225,22 @@ func TestRedactingLeavesThePlanItReadIntact(t *testing.T) {
 
 	assert.Equal(t, redactedPlanFixture(), plan)
 }
+
+func TestNamesNoProxyServesAreSaidOnlyOnceAPortIsWritten(t *testing.T) {
+	cases := map[string]struct {
+		plan Plan
+		want bool
+	}{
+		"rewritten":       {plan: Plan{Addressing: project.AddressNames, Entries: []Entry{{Status: StatusRewrite}}}, want: true},
+		"in_place":        {plan: Plan{Addressing: project.AddressNames, Entries: []Entry{{Status: StatusUnchanged}}}, want: true},
+		"left_alone":      {plan: Plan{Addressing: project.AddressNames, Entries: []Entry{{Status: StatusMissingKey}}}},
+		"proxy_serves":    {plan: Plan{Addressing: project.AddressNames, PublicPort: 80, Entries: []Entry{{Status: StatusRewrite}}}},
+		"ports_addressed": {plan: Plan{Addressing: project.AddressPorts, Entries: []Entry{{Status: StatusRewrite}}}},
+		"no_link":         {plan: Plan{Addressing: project.AddressNames}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.want, c.plan.NamesUnserved())
+		})
+	}
+}

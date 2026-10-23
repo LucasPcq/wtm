@@ -5,6 +5,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -482,6 +483,19 @@ func TestACreatedTargetGetsItsEnvByTheStrategyAsked(t *testing.T) {
 	}
 }
 
+func TestNamedAddressesNoProxyServesAreAWarningOfTheTarget(t *testing.T) {
+	w := withEnvFiles(t, envToml)
+	writeFile(t, filepath.Join(w.main, ".env.example"), "PORT=3000\n")
+	writeFile(t, filepath.Join(w.stateDir, "run.toml"), jobsToml+"\n[[env_port]]\nfile = \".env\"\nkey = \"PORT\"\njob = \"web\"\nport = \"PORT\"\n")
+
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split})
+
+	require.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
+	assert.Equal(t, []string{"provision.ports_not_named"}, codes(result.Items[0].Warnings))
+	require.NotNil(t, result.Items[0].Warnings[0].FollowUp)
+	assert.Equal(t, proxyStatusLine().Command, result.Items[0].Warnings[0].FollowUp.Command)
+}
+
 func TestTheEnvStrategyAskedToBeRememberedIsKeptOnceTheTargetIsCreated(t *testing.T) {
 	w := withEnvFiles(t, envToml)
 
@@ -529,4 +543,16 @@ func TestAnApplyReportsTheTargetAsItsOneItem(t *testing.T) {
 			assert.Equal(t, tc.status, result.Items[0].Status)
 		})
 	}
+}
+
+func TestARunTomlThatDoesNotParseKeepsTheIsolationRow(t *testing.T) {
+	w := newWorld(t, seed{Run: "bogus = [\n"})
+	w.change(t, source, "a.txt", "a\n")
+
+	planned, _ := w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split})
+
+	assert.Equal(t, project.Isolated, planned.Isolation)
+	at := slices.IndexFunc(planned.Recap, func(row domain.RecapRow) bool { return row.Key == domain.PathIsolation })
+	require.GreaterOrEqual(t, at, 0, planned.Recap)
+	assert.Equal(t, []domain.RecapValue{{Value: "isolated", Note: provision.NoteRunUnreadable, Text: "isolated (run.toml unreadable)"}}, planned.Recap[at].Values)
 }

@@ -1,0 +1,3 @@
+
+  ! --ff ignored: topic already exists, so nothing is created
+  ! --isolation verbatim ignored: topic already exists and stays isolated — switch it with `wtm env topic --isolation verbatim`

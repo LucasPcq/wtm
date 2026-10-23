@@ -1,0 +1,24 @@
+$ wtmx create feat/unparsable --from main --env-from example --ask; echo EXIT=$?
+
+  Step 7/7 • Confirm
+
+  ✓ Branches: feat/unparsable
+  ✓ Source branch: main · --from
+  ✓ Env strategy: example · --env-from
+  · Isolation — run.toml could not be read
+  · Source update — nothing to fast-forward: the source is not behind origin
+  · If not exists — set by its flag only
+
+  ┃  Review & confirm
+  ┃
+  ┃  Branches   feat/unparsable
+  ┃  From       main
+  ┃  Env        example
+  ┃  Isolation  isolated (run.toml unreadable)
+
+▌› Yes, create worktree
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

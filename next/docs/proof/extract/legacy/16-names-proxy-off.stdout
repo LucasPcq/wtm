@@ -1,0 +1,11 @@
+
+  ✓ Copied 1 file to feat/names
+
+    new  apps/web/ignored.txt
+
+  source  feat/login · files kept
+  env     3 ports settled (offset +80)
+  path    ../acme.trees/feat-names
+
+  → wtm go feat/names
+

@@ -1,0 +1,134 @@
+## branches
+feat/api
+feat/c
+feat/env-default
+feat/env-main
+feat/jnames
+feat/jny
+feat/json
+feat/local
+feat/login
+feat/misc
+feat/names
+main
+topic
+## acme status
+## feat-api status
+?? apps/api/new/deep/y.txt
+?? apps/api/new/x.txt
+   apps/api/new/deep/y.txt 9063a9f0e032
+   apps/api/new/x.txt 6fcf9dfbd479
+## feat-c status
+## feat-env-default status
+?? apps/api/env-b.txt
+   apps/api/env-b.txt 89e6c98d9288
+## feat-env-main status
+?? apps/api/env-a.txt
+   apps/api/env-a.txt 3f786850e387
+## feat-jnames status
+?? apps/web/ignored.txt
+   apps/web/ignored.txt 397d543883c5
+## feat-jny status
+?? apps/web/json.txt
+   apps/web/json.txt 3eedd8854d1e
+## feat-json status
+?? apps/web/login.ts
+   apps/web/login.ts 2baaedadd43f
+## feat-login status
+ M README.md
+?? apps/web/ignored.txt
+   apps/web/ignored.txt 397d543883c5
+   README.md 190b171b0321
+## feat-misc status
+D  apps/web/package.json
+R  scripts/dev.py -> scripts/serve.py
+   scripts/serve.py facb9fb29297
+## feat-names status
+?? apps/web/ignored.txt
+   apps/web/ignored.txt 397d543883c5
+## topic status
+ M README.md
+?? apps/web/ignored.txt
+?? apps/web/login.ts
+?? apps/web/same.txt
+   apps/web/ignored.txt 397d543883c5
+   apps/web/login.ts 2baaedadd43f
+   apps/web/same.txt 2c985b161217
+   README.md f7d677704592
+## .git/wtm/worktrees/feat%2Fapi/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 3,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fc/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 5,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fenv-default/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 7,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fenv-main/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "main",
+  "ordinal": 8,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fjnames/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 11,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fjny/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 9,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fjson/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 6,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Flogin/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 1,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fmisc/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 4,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fnames/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 10,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/topic/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 2,
+  "isolation": "isolated"
+}

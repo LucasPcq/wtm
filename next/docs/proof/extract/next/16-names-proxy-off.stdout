@@ -1,0 +1,16 @@
+
+  ✓ extract: 1 done
+
+  Source      feat/login
+  Files       new apps/web/ignored.txt
+  Target      new worktree feat/names from main
+  Env         example
+  Isolation   isolated
+  Mode        copy
+  feat/names  ../acme.trees/feat-names · 3 ports settled (offset +100)
+
+  ! feat/names  this project asks for named addresses: the run proxy is off on this machine, so ports were written instead
+
+  → wtm go feat/names
+  → wtm run proxy status   reports what serves names
+

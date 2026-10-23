@@ -2,7 +2,8 @@
 # Usage: tty.sh <side> <sandbox> <binary> <out dir>, side legacy or next
 # Drives the binary in tmux in that side's sandbox, as create.sh printed it and left it, then removes it:
 # the create form to its recap then applied (--ask, the sandbox remembering the env answer), Ctrl+C
-# once then twice during a hook, and the extract form from its source to a new target, applied. Each screen is captured once it shows what it waits for and
+# once then twice during a hook, the extract form from its source to a new target, applied, a branch
+# checked out elsewhere entered in the form, and the recap with a run.toml that does not parse. Each screen is captured once it shows what it waits for and
 # holds still, so a loaded machine slows the run without changing the screens.
 set -euo pipefail
 side=$1 root=$2 bin=$3 out=$4
@@ -99,4 +100,26 @@ tmux send-keys -t "$session" Enter
 capture extract-8-recap 'No, cancel'
 tmux send-keys -t "$session" Enter
 capture extract-9-outcome 'EXIT=0'
+# A branch checked out elsewhere, refused as it is entered, with the way into its worktree.
+start create --ask
+settle 'Step 1'
+tmux send-keys -t "$session" "feat/form" Tab
+capture checked-out-elsewhere 'checked out'
+tmux send-keys -t "$session" C-c
+settle 'EXIT='
+
+# The recap when run.toml does not parse: the isolation the worktree gets all the same.
+cp "$root/acme/.git/wtm/run.toml" "$root/run.toml"
+echo 'bogus = [' >>"$root/acme/.git/wtm/run.toml"
+start create feat/unparsable --from main --env-from example --ask
+for _ in 1 2 3 4 5 6; do
+  sleep 1
+  [[ $(screen) == *'No, cancel'* ]] && break
+  tmux send-keys -t "$session" Enter
+done
+capture run-unparsable-recap 'No, cancel'
+tmux send-keys -t "$session" C-c
+settle 'EXIT='
+cp "$root/run.toml" "$root/acme/.git/wtm/run.toml"
+
 sed -i '' -E -e "s#(/private)?$root#<SB>#g" -e 's#\(([0-9.]+m?s)\)#(<DUR>)#g' -e 's#wtm-next (create|extract)#wtm \1#g' "$out"/*

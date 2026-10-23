@@ -70,6 +70,40 @@ func TestATargetsWarningsComeBeforeTheRunsInThePlan(t *testing.T) {
 	formtest.Golden(t, "resolved_from_ignored", got.Stdout)
 }
 
+func TestAnIsolationAnExistingTargetIgnoresIsFollowedByTheSwitch(t *testing.T) {
+	words := []string{source, "--files", "apps/api/new.txt", "--to", other, "--isolation", "verbatim", "--ff"}
+	for name, extra := range map[string][]string{"isolation_ignored": nil, "isolation_ignored_dry_run": {"--dry-run"}} {
+		t.Run(name, func(t *testing.T) {
+			got := runExtract(t, newWorld(seed{}), append(words, extra...)...)
+
+			require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+			formtest.Golden(t, name, got.Stdout)
+		})
+	}
+	got := runExtract(t, newWorld(seed{}), append(words, "--output", "json")...)
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stdout)
+	assert.Contains(t, got.Stdout, `"follow_up": {
+        "command": "env",
+        "answers": [
+          {
+            "path": "worktree",
+            "values": [
+              "feat/other"
+            ]
+          },
+          {
+            "path": "isolation",
+            "values": [
+              "verbatim"
+            ]
+          }
+        ],
+        "code": "extract.switch_isolation",
+        "message": "switch it to verbatim"
+      }`)
+}
+
 func TestACleanSourceHasNothingToExtract(t *testing.T) {
 	got := runExtract(t, newWorld(seed{Clean: true}), source, "--yes")
 

@@ -101,17 +101,18 @@ func newWorld(t *testing.T, s seed) world {
 				Now: func() time.Time { return createdAt },
 			},
 			Provision: provision.Service{
-				Git:        repo,
-				Meta:       meta,
-				EnvFiles:   store.EnvFiles{},
-				StateDir:   stateDir,
-				Answers:    projectConfig,
-				RunHooks:   shell.RunHooks,
-				PublicPort: func(context.Context, int) int { return 0 },
-				Shield:     shell.Shield,
-				Now:        func() time.Time { return createdAt },
-				LeftBehind: cleanLine,
-				Settle:     settleLine,
+				Git:         repo,
+				Meta:        meta,
+				EnvFiles:    store.EnvFiles{},
+				StateDir:    stateDir,
+				Answers:     projectConfig,
+				RunHooks:    shell.RunHooks,
+				PublicPort:  func(context.Context, int) int { return 0 },
+				Shield:      shell.Shield,
+				Now:         func() time.Time { return createdAt },
+				LeftBehind:  cleanLine,
+				Settle:      settleLine,
+				ProxyStatus: proxyStatusLine,
 			},
 		},
 	}
@@ -205,4 +206,8 @@ func cleanLine(branch string) domain.FollowUp {
 
 func settleLine(branch string) domain.FollowUp {
 	return domain.FollowUp{Command: "env", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}}}
+}
+
+func proxyStatusLine() domain.FollowUp {
+	return domain.FollowUp{Command: "run proxy status"}
 }

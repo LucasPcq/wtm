@@ -55,15 +55,27 @@ The scripts take the binaries by any path and refuse one that is not executable.
   18. `--output json --dry-run` of `--if-not-exists` on the worktree 9 made (next only)
   19. `--output json --expect-fingerprint` with that fingerprint: applied, the worktree unchanged (next only)
   20. `--output json --expect-fingerprint` with a stale fingerprint, its `follow_ups` the `--dry-run` that plans again (next only)
+  21. a branch checked out in a worktree already, `feat/one`
+  22. the same, `--output json`
+  23. the run proxy off (`[proxy] enabled = false` in the global config) while run.toml asks for named addresses, its default
+  24. the same, `--output json`
+  25. `--dry-run` with a run.toml that does not parse (next only)
+  26. an absolute `base_path` in config.toml; then the worktrees 23, 24 and 26 made are removed, so `tty.sh` finds the sandbox as before
 - The states are identical for 1 to 15. The differences, all deliberate:
   - 3 is refused by both; next exits 2 (an invalid request, its field naming `--from`) where legacy exits 1. 12 likewise: next exits 2 where legacy exits 10.
   - 14 gives both the configured strategy, `main`.
   - 15 to 20: legacy has no dry run, fingerprint nor `--remember`, and refuses the flag (exit 2). Next plans 15 and 18 without applying them, applies 16 (`feat/dry`, `env_from` remembered as `main`) and 19 (nothing to change), and refuses 17 and 20 (exit 25).
+  - 21 and 22 are refused by both, next with exit 2 (legacy 10, and text on stderr for 22 where next prints the envelope). Next's message no longer spells a command line: the field error carries its follow-up, `→ wtm go feat/one   jump in` after the failure, `error.fields[].follow_up` (`{command: "go", answers: [{path: "worktree", …}], code: "create.jump_in"}`) in the JSON, and in the form under the step's error (`tty/next/checked-out-elsewhere.txt`).
+  - 23 and 24 write ports on both sides and say why: legacy's notice ("This project asks for named addresses … ports were written instead — `wtm run proxy status` reports what serves names", on stderr beside its JSON), next's warning of the worktree, `provision.ports_not_named`, its follow-up `→ wtm run proxy status   reports what serves names` (`follow_up` in the item's warning in JSON). Next says it only once a port was written: a project whose every link was left alone (its key missing from the `.env`) gets the ports-left-alone warning alone, where legacy said both.
+  - 25: with a run.toml that does not parse, next's recap keeps its Isolation row, `isolated (run.toml unreadable)`, the isolation the worktree records (run.toml's own cannot be read: the one given, else the remembered one, else the default), and the form skips the question saying `run.toml could not be read` (`tty/next/run-unparsable-recap.txt`); legacy's recap has no isolation line and its form says `run.toml declares nothing a worktree isolates` (`tty/legacy/run-unparsable-recap.txt`).
+  - 26, an approved deviation (#215): next refuses an absolute `base_path` (exit 1, `✗ invalid config.toml: base_path must be relative to the repository: <SB>/abs.trees`), where legacy says it created the worktree there and puts it under the main checkout instead, at the absolute path read as a relative one (`<SB>/acme/tmp/…/abs.trees/feat-abs`), an untracked directory of main.
 - `tty.sh <side> <sandbox> <binary> tty/<side>`, after `create.sh`: tmux at 100×40 in that side's sandbox, `tty/legacy/` and `tty/next/` hold the screens.
   - The form under `--ask`: branches, then source, env strategy (the remembered answer ticked), isolation and the recap, then apply and the outcome. Next asks one step more (`If not exists`, shown settled) and draws its recap as the plan. Both offer the same env rows, "Use config default (main)" first; each ticks the answer its sandbox remembers: `config` on legacy, `main` on next, which 16 remembered (`--env-from main --remember env_from`, which legacy refuses).
   - One Ctrl+C during a hook: both exit 19, next saying `Cancelling — finishing on_create of feat/slow; Ctrl+C again to stop now`.
   - Two Ctrl+C: the run dies by SIGINT, exit 130 for both.
   - The extract form (`extract-*`), on a change made in `feat/form`: source, files, a new target `feat/moved`, its source branch, isolation, mode and the recap, then apply and the outcome. Next has one step more, the new target's env strategy, settled by the answer the create form remembered (`✓ Env strategy: main · remembered`); legacy's extract never asks it. Both skip the source update (main is not behind) and next shows the conflict question settled; legacy's target list is sorted, since it follows git's order, which varies between runs.
+  - A branch checked out elsewhere entered in the form (`checked-out-elsewhere`): both refuse it at the step; next's error is followed by `→ wtm go feat/form   jump in` where legacy's message spells the command.
+  - The recap with a run.toml that does not parse (`run-unparsable-recap`): see create's 25.
   - Each screen is captured once it shows what it waits for and holds still.
 - `form.gif` and its still `form-recap.png` (the recap), and `apply-hooks.gif`, are recorded from `form.tape` and `hooks.tape` in a next sandbox (see How to run): the form through its recap and apply, and three branches whose hooks run, one failing.
 
@@ -71,7 +83,7 @@ The scripts take the binaries by any path and refuse one that is not executable.
 
 The reference is the legacy `wtm extract` of 0.30.1. Its output differs by design — next speaks the v2 envelope, plans before it acts and refuses earlier — so the proof compares what each leaves on disk.
 
-- `extract.sh <wtm> <wtm-next> extract`: two identical sandboxes (the `docs/demos` "acme" project with a bare `origin`, a `feat/login` worktree holding a modified `README.md`, an untracked `apps/api/new/` directory, an untracked `apps/web/login.ts`, a deleted `apps/web/package.json` and a renamed `scripts/serve.py`, and a `topic` worktree), the same eleven scenarios run by each binary; after each, the exit code, stdout, stderr and the state of every worktree (index, the bytes of each changed file, `meta.json`, branches). `extract/states.diff` holds the differences of state.
+- `extract.sh <wtm> <wtm-next> extract`: two identical sandboxes (the `docs/demos` "acme" project with a bare `origin`, a `feat/login` worktree holding a modified `README.md`, an untracked `apps/api/new/` directory, an untracked `apps/web/login.ts`, a deleted `apps/web/package.json` and a renamed `scripts/serve.py`, and a `topic` worktree), the same scenarios run by each binary; after each, the exit code, stdout, stderr and the state of every worktree (index, the bytes of each changed file, `meta.json`, branches). `extract/states.diff` holds the differences of state.
   1. a directory to a new branch
   2. one file copied (`--keep`) to an existing worktree
   3. a rename and a deletion to a new branch from `main`
@@ -85,6 +97,11 @@ The reference is the legacy `wtm extract` of 0.30.1. Its output differs by desig
   11. the same with `--env-from main`; `11-env-from-main.env` likewise
   12. an untracked file whose same bytes the target already holds
   13. `--output json` without `--yes`
+  14. `--isolation verbatim --ff` with an existing target, `topic`
+  15. the same, `--output json`
+  16. a new target with the run proxy off (`[proxy] enabled = false` in the global config) while run.toml asks for named addresses, its default
+  17. the same, `--output json`
+  18. `--dry-run` with a run.toml that does not parse (next only)
 - The states are identical for 1, 2, 3, 5, 6 and 8. The differences, all deliberate:
   - 4 is refused by both; next exits 2 (an invalid request, its field naming `--from`) where legacy exits 1.
   - 7 is refused by both with exit 15, but legacy leaves conflict markers in `feat/c`'s `README.md` while saying it changed nothing (its 3-way check passes a conflict on git 2.50); next finds the conflict at plan time, so `feat/c` stays untouched. 8 to 11 differ by that file too.
@@ -92,6 +109,9 @@ The reference is the legacy `wtm extract` of 0.30.1. Its output differs by desig
   - 11: next copies main's `.env` (`FROM=main`, `env_strategy: main` in its meta) where legacy has no `--env-from` and refuses the flag (exit 2). Next asks a new target its env strategy as create does, with its flag and its remembered answer — a deliberate departure from legacy, whose extract always follows `env.strategy`.
   - 12: both move the file; the states differ only by those of 7 and 11.
   - 13: legacy refuses `--output json` without `--yes` (exit 2); next runs it unattended and creates `feat/jny`.
+  - 14 and 15: next warns that the answers an existing target cannot take are ignored, worded by the question (`fast-forward ignored: …`, `isolation verbatim ignored: topic already exists and stays isolated`, as `from ignored` and `env strategy ignored`) rather than by a flag, the isolation's followed by the command that switches it, `→ wtm env topic --isolation verbatim   switch it to verbatim` (`follow_up`, `extract.switch_isolation`, in the JSON); legacy says the same on stderr, by its flags (`--ff ignored: …`, `--isolation verbatim ignored: … — switch it with \`wtm env topic --isolation verbatim\``), as bare strings in its JSON's `warnings`.
+  - 16 and 17: as create's 23 and 24, legacy's notice and next's `provision.ports_not_named` warning with its `wtm run proxy status` follow-up.
+  - 18: as create's 25, next's recap keeps `Isolation  isolated (run.toml unreadable)`; legacy has no dry run (exit 2).
 
 # Proof: `wtm list` (legacy `surface/cli/wt`) vs `wtm-next list`
 

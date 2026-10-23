@@ -147,6 +147,8 @@ func isolation(params QuestionsParams) domain.Choice[project.Isolation] {
 	switch {
 	case params.Exists != "":
 		question.Skip = params.Exists
+	case params.Repository.RunErr != nil:
+		question.Skip = "run.toml could not be read"
 	case !params.Repository.Run.IsolationApplies():
 		question.Skip = "run.toml declares nothing a worktree isolates"
 	}
@@ -155,16 +157,17 @@ func isolation(params QuestionsParams) domain.Choice[project.Isolation] {
 	case params.Given.Isolation != "":
 		question.Answer = domain.Answer[project.Isolation]{Value: params.Given.Isolation, Origin: domain.OriginRequest}
 	case params.Exists == "":
-		question.Answer = isolationAnswer(project.Isolation(params.Repository.Config.Remembered[project.RememberIsolation]), params.Repository.Run)
+		question.Answer = isolationAnswer(project.Isolation(params.Repository.Config.Remembered[project.RememberIsolation]), params.Repository)
 	}
 
 	return question
 }
 
-// isolationAnswer is the isolation a question the request leaves unanswered settles on: the remembered one (empty when none) while run.toml declares something a worktree isolates, else run.toml's, else isolated.
-func isolationAnswer(remembered project.Isolation, run project.Run) domain.Answer[project.Isolation] {
+// isolationAnswer is the isolation a question the request leaves unanswered settles on: the remembered one (empty when none) while run.toml declares something a worktree isolates or could not be read, else run.toml's, else isolated.
+func isolationAnswer(remembered project.Isolation, repo worktree.Repository) domain.Answer[project.Isolation] {
+	run := repo.Run
 	switch {
-	case remembered != "" && run.IsolationApplies():
+	case remembered != "" && (run.IsolationApplies() || repo.RunErr != nil):
 		return domain.Answer[project.Isolation]{Value: remembered, Origin: domain.OriginRemembered}
 	case run.Isolation != "":
 		return domain.Answer[project.Isolation]{Value: run.Isolation.Effective(), Origin: domain.OriginConfig}

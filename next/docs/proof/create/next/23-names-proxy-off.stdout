@@ -1,0 +1,14 @@
+
+  ✓ create: 1 done
+
+  Branches    feat/names
+  From        main
+  Env         main · remembered
+  Isolation   isolated
+  feat/names  ../acme.trees/feat-names · 3 ports settled (offset +140)
+
+  ! feat/names  this project asks for named addresses: the run proxy is off on this machine, so ports were written instead
+
+  → wtm go feat/names
+  → wtm run proxy status   reports what serves names
+

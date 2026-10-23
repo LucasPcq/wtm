@@ -11,7 +11,7 @@ var flags = Flags{"branches": "<branches>", "from": "--from", "env_from": "--env
 
 func invalid() *domain.Error {
 	return domain.Invalid([]domain.FieldError{
-		{Path: "branches[0]", Code: "create.checked_out_elsewhere", Template: "branch {branch} is checked out at {path} — run `wtm go {branch}` to jump in", Params: domain.Params{"branch": "feat/x", "path": "/p"}},
+		{Path: "branches[0]", Code: "create.checked_out_elsewhere", Template: "branch {branch} is checked out at {path}", Params: domain.Params{"branch": "feat/x", "path": "/p"}, FollowUp: &domain.FollowUp{Command: "go", Answers: []domain.Answered{{Path: "worktree", Values: []string{"feat/x"}}}, Code: "create.jump_in", Message: "jump in"}},
 		{Path: "branches[1]", Code: "distinct", Template: "{path}: {value} is given twice", Params: domain.Params{"value": "feat/x"}},
 		{Path: "env_from", Code: "one_of", Template: "{path} must be one of {accepted}, not {value}", Params: domain.Params{"value": "copy"}, Accepted: []string{"example", "main", "parent"}},
 		{Path: "from", Code: "required", Template: "{path} is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)", Params: domain.Params{"because": "create.parent_required"}},

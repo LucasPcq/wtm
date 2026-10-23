@@ -1,0 +1,9 @@
+
+  ✓ Created worktree feat/abs
+
+  from  main
+  env   main · 3 ports settled (offset +150)
+  path  <SB>/abs.trees/feat-abs
+
+  → wtm go feat/abs
+

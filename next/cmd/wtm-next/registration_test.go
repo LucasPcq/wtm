@@ -88,7 +88,7 @@ func TestEachRequestThatCarriesItsCallerTakesItFromEverySurface(t *testing.T) {
 func TestNoCommandAFollowUpNamesHasMigrated(t *testing.T) {
 	streams, _, _, _ := output.Test()
 	root := cli.NewRoot(version, streams, commands(streams, cli.Env{}))
-	named := []string{leftBehind("feat/a").Command, initialize().Command, settle("feat/a").Command}
+	named := []string{leftBehind("feat/a").Command, initialize().Command, settle("feat/a").Command, proxyStatus().Command}
 	for _, action := range list.Actions(list.Detail{Branch: "feat/a"}) {
 		named = append(named, action.Command)
 	}

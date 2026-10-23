@@ -161,7 +161,7 @@ func (l *TextList) View(size Size, st *Styles) string {
 	}
 
 	if l.err != nil {
-		b.WriteString("\n\n" + errorBanner(l.err.Error(), size.Width, st))
+		b.WriteString("\n\n" + errorBanner(l.err, size.Width, st))
 	}
 
 	return b.String()

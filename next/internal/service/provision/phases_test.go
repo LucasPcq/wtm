@@ -248,6 +248,35 @@ func TestALinkToAnEnvConfigTomlDoesNotDeclareIsNamedAndLeftOut(t *testing.T) {
 	assert.Equal(t, "PORT=3010\n", readFile(t, filepath.Join(w.path(branchName), ".env")))
 }
 
+func TestNamedAddressesNoProxyServesAreWrittenAsPortsAndSaid(t *testing.T) {
+	w := onDisk(t)
+	params := portLinked(w.params(&recorder{}))
+	params.Project.Run.Addressing = project.AddressNames
+
+	outcome := w.service.Run(t.Context(), params)
+
+	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
+	assert.Equal(t, []domain.Warning{{
+		Code:     "provision.ports_not_named",
+		Message:  "this project asks for named addresses: the run proxy is off on this machine, so ports were written instead",
+		Params:   domain.Params{"branch": branchName},
+		FollowUp: &domain.FollowUp{Command: "run proxy status", Code: "provision.proxy_status", Message: "reports what serves names"},
+	}}, outcome.Warnings)
+	assert.Equal(t, "PORT=3010\n", readFile(t, filepath.Join(w.path(branchName), ".env")))
+}
+
+func TestNamedAddressesAProxyServesAreNotSaid(t *testing.T) {
+	w := onDisk(t)
+	w.service.PublicPort = func(context.Context, int) int { return 80 }
+	params := portLinked(w.params(&recorder{}))
+	params.Project.Run.Addressing = project.AddressNames
+
+	outcome := w.service.Run(t.Context(), params)
+
+	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
+	assert.Empty(t, outcome.Warnings)
+}
+
 func TestAnOriginWithoutTheRunProxyIsAProxyToFixNotARunToml(t *testing.T) {
 	w := onDisk(t)
 	params := portLinked(w.params(&recorder{}))

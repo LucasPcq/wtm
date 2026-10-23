@@ -58,6 +58,28 @@ open(path, "w").write(text + '\n[wizard.remembered]\nenv_strategy = "config"\n')
 PY
 }
 
+global_config() {
+  find "$HOME" -name config.toml -path '*wtm*' | head -1
+}
+
+proxy_off() {
+  sed -i '' 's/^\[proxy\]$/[proxy]\nenabled = false # proof/' "$(global_config)"
+  grep -q '^enabled = false # proof$' "$(global_config)" || { echo "$0: no [proxy] table to switch off in $(global_config)" >&2; return 1; }
+}
+
+proxy_on() {
+  sed -i '' '/^enabled = false # proof$/d' "$(global_config)"
+}
+
+# forget <branch>: removes the worktree of branch, the branch and its record, so tty.sh finds the sandbox as before.
+forget() {
+  local path
+  path=$(git worktree list --porcelain | awk -v ref="branch refs/heads/$1" '/^worktree /{at=$2} $0==ref{print at}')
+  [[ -z $path ]] || git worktree remove --force "$path"
+  git branch -D -q "$1" 2>/dev/null || true
+  rm -rf ".git/wtm/worktrees/${1//\//%2F}"
+}
+
 scenario() {
   local name=$1
   shift
@@ -121,6 +143,25 @@ run_side() {
     fingerprint=$(grep -o '"fingerprint": "[0-9a-f]*"' "$dir/18-json-dry-run.stdout" | grep -o '[0-9a-f]\{24\}' || true)
     scenario 19-json-expect-fingerprint create feat/json --if-not-exists --output json --expect-fingerprint "${fingerprint:-none}"
     scenario 20-json-stale-fingerprint create feat/jstale --output json --expect-fingerprint 000000000000000000000000
+    scenario 21-checked-out-elsewhere create feat/one --yes
+    scenario 22-json-checked-out-elsewhere create feat/one --output json --yes
+    # the run proxy off on this machine: the project's names are written as ports
+    proxy_off
+    scenario 23-names-proxy-off create feat/names --yes
+    scenario 24-json-names-proxy-off create feat/jnames --output json --yes
+    proxy_on
+    cp .git/wtm/run.toml "$root/run.toml"
+    echo 'bogus = [' >>.git/wtm/run.toml
+    # next only: legacy has no dry run
+    scenario 25-run-unparsable-dry-run create feat/unparsable --dry-run
+    cp "$root/run.toml" .git/wtm/run.toml
+    cp .git/wtm/config.toml "$root/config.toml"
+    sed -i '' "s#^base_path = .*#base_path = \"$root/abs.trees\"#" .git/wtm/config.toml
+    scenario 26-absolute-base-path create feat/abs --yes
+    cp "$root/config.toml" .git/wtm/config.toml
+    # legacy put feat/abs under the main checkout, at the absolute path read as a relative one
+    for branch in feat/names feat/jnames feat/abs; do forget "$branch"; done
+    rm -rf "./${root#/}" && rmdir ./tmp 2>/dev/null || true
   )
   sed -i '' -E \
     -e "s#(/private)?$root#<SB>#g" \

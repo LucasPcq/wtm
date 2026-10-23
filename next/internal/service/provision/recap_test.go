@@ -32,3 +32,8 @@ func TestAMarkedFastForwardOfNoSourceKeepsItsRow(t *testing.T) {
 	assert.Equal(t, []domain.RecapRow{{Key: domain.PathFastForward, Label: "Fast-forward", Path: domain.PathFastForward, Mark: domain.MarkSaved, Values: []domain.RecapValue{{Note: NoteNone, Text: "keep as-is"}}}}, RecapRows(RecapParams{Marks: saved}))
 	assert.Empty(t, RecapRows(RecapParams{}))
 }
+
+func TestAnIsolationPlannedOverAnUnreadableRunTomlSaysSo(t *testing.T) {
+	assert.Equal(t, []domain.RecapValue{{Value: "isolated", Note: NoteRunUnreadable, Text: "isolated (run.toml unreadable)"}}, RecapRows(RecapParams{Isolation: project.Isolated, RunUnreadable: true})[0].Values)
+	assert.Equal(t, domain.RecapValues([]string{"isolated"}), RecapRows(RecapParams{Isolation: project.Isolated})[0].Values)
+}

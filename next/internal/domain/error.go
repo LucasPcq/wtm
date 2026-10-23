@@ -63,8 +63,9 @@ type FieldError struct {
 	Code     string // the problem, stable across versions
 	Template string // the message, with {path}, {accepted} and each param as placeholders
 	Params   Params
-	Accepted []string // the values the field accepts, when they are a closed set
-	With     []string // the other fields the problem involves
+	Accepted []string  // the values the field accepts, when they are a closed set
+	With     []string  // the other fields the problem involves
+	FollowUp *FollowUp // a command that gets past the problem, if any
 }
 
 // Message returns the field error's template with its placeholders filled; path is how the caller spells the field (a flag name on the command line), unless Params names a path itself.

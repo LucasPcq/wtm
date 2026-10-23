@@ -6,7 +6,7 @@ How a use case or a service reaches the world, what implements it, and what stan
 
 - **Declared by the consumer** in its `port.go` — a command (`command/extract/port.go`) or a service (`service/provision/port.go`) — with only the methods it calls. Two consumers of git declare two `Git` interfaces, both satisfied by `git.Repo`.
 - **One per outside thing:** `Git`, `Meta`, `EnvFiles`, `AnswerStore`, `Locker`, `Publisher`. Its doc comment states the contract a fake keeps too (`Meta.Load` "fails with an error wrapping fs.ErrNotExist when the branch has none").
-- **A single function is a function type** in `port.go` (`extract.Shield`), or a func field of a service (`provision.Service.RunHooks`, `Now`, `LeftBehind`, `Settle`); the wiring passes the adapter's function (`shell.Shield`, `time.Now`).
+- **A single function is a function type** in `port.go` (`extract.Shield`), or a func field of a service (`provision.Service.RunHooks`, `Now`, `LeftBehind`, `Settle`, `ProxyStatus`); the wiring passes the adapter's function (`shell.Shield`, `time.Now`).
 - **`port.go` declares nothing else** than interface and function types: the types a port takes and returns sit beside the code that owns them. `[archlint]` (`portfile`)
 - **A service is not a port:** a use case holds `repository.Service`, `operation.Service`, `provision.Service`, `registry.Service` as concrete fields; a test builds them over fakes.
 - **A port speaks the domain:** domain values in and out (`worktree.Snapshot`, `worktree.Move`), never a file format or an adapter's type.

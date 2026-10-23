@@ -1,0 +1,18 @@
+{
+  "files": [
+    {
+      "path": "apps/web/ignored.txt",
+      "status": "untracked"
+    }
+  ],
+  "target_path": "<SB>/acme.trees/topic",
+  "target_branch": "topic",
+  "source_branch": "feat/login",
+  "kept": true,
+  "conflicts": null,
+  "isolation": "isolated",
+  "warnings": [
+    "--ff ignored: topic already exists, so nothing is created",
+    "--isolation verbatim ignored: topic already exists and stays isolated — switch it with `wtm env topic --isolation verbatim`"
+  ]
+}

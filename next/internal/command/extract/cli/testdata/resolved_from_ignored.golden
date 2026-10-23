@@ -11,7 +11,7 @@
 
   ! feat/other  apps/api/a.txt left with conflict markers in feat/other; the other files were applied cleanly.
   ! feat/other  Nothing was removed from feat/login: to undo, discard the applied files in feat/other.
-  ! --from ignored: feat/other already exists, so nothing is created
+  ! from ignored: feat/other already exists, so nothing is created
 
   → wtm go feat/other   resolve the conflicts, then discard the same files in feat/login
 

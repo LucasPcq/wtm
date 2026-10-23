@@ -305,7 +305,7 @@ func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain
 	planned.settled = f.newWorktree(req).Answers()
 	planned.From = req.From
 	planned.EnvFrom = planned.settled.EnvFrom()
-	planned.Isolation = f.Run.PlannedIsolation(planned.settled.Isolation())
+	planned.Isolation = f.PlannedIsolation(planned.settled.Isolation())
 	planned.FastForward = f.fastForwarded(req)
 	planned.Remember = req.Remember
 	return planned, append(f.divergedWarnings(req), f.fallbackWarnings(planned)...), nil
@@ -363,27 +363,41 @@ func (f Facts) ignored(req Request, target Target) []domain.Warning {
 	var warnings []domain.Warning
 	params := domain.Params{"branch": target.Branch}
 	if req.From != "" {
-		warnings = append(warnings, domain.Warning{Code: "extract.from_ignored", Message: "--from ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
+		warnings = append(warnings, domain.Warning{Code: "extract.from_ignored", Message: "from ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
 	}
 
 	if req.EnvFrom != "" {
-		warnings = append(warnings, domain.Warning{Code: "extract.env_from_ignored", Message: "--env-from ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
+		warnings = append(warnings, domain.Warning{Code: "extract.env_from_ignored", Message: "env strategy ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
 	}
 
 	if req.FastForward != nil && *req.FastForward {
-		warnings = append(warnings, domain.Warning{Code: "extract.fast_forward_ignored", Message: "--ff ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
+		warnings = append(warnings, domain.Warning{Code: "extract.fast_forward_ignored", Message: "fast-forward ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
 	}
 
 	if current := f.recordedIsolation(target.Branch); req.Isolation != "" && req.Isolation.Effective() != current {
 		given := string(req.Isolation)
 		warnings = append(warnings, domain.Warning{
-			Code:    "extract.isolation_ignored",
-			Message: "--isolation " + given + " ignored: " + target.Branch + " already exists and stays " + string(current) + " — switch it with `wtm env " + target.Branch + " --isolation " + given + "`",
-			Params:  domain.Params{"branch": target.Branch, "isolation": given, "current": string(current)},
+			Code:     "extract.isolation_ignored",
+			Message:  "isolation " + given + " ignored: " + target.Branch + " already exists and stays " + string(current),
+			Params:   domain.Params{"branch": target.Branch, "isolation": given, "current": string(current)},
+			FollowUp: switchIsolation(target.Branch, req.Isolation),
 		})
 	}
 
 	return warnings
+}
+
+// CodeSwitchIsolation is the step that switches an existing target to the isolation the request gave.
+const CodeSwitchIsolation = Name + ".switch_isolation"
+
+// switchIsolation is the follow-up that switches branch's worktree to isolation, which an existing target ignores.
+func switchIsolation(branch string, isolation project.Isolation) *domain.FollowUp {
+	return &domain.FollowUp{
+		Command: domain.CommandEnv,
+		Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: domain.PathIsolation, Values: []string{string(isolation)}}},
+		Code:    CodeSwitchIsolation,
+		Message: "switch it to " + string(isolation),
+	}
 }
 
 // fastForwarded is the branch the apply fast-forwards: the one the target starts from, behind origin and asked to, unless the source's own, whose worktree holds the changes and so is never clean.
@@ -503,7 +517,7 @@ func (p Plan) recap(marks domain.Marks) []domain.RecapRow {
 	if p.Target.Action == ActionCheckOut {
 		rows = append(rows, domain.RecapRow{Key: "parent", Label: "Parent", Path: pathFrom, Values: domain.RecapValues([]string{p.From})})
 	}
-	rows = append(rows, provision.RecapRows(provision.RecapParams{EnvFrom: p.EnvFrom, FollowsConfig: p.settled.FollowsConfig(), Isolation: p.Isolation, FastForward: p.FastForward, Marks: marks})...)
+	rows = append(rows, provision.RecapRows(provision.RecapParams{EnvFrom: p.EnvFrom, FollowsConfig: p.settled.FollowsConfig(), Isolation: p.Isolation, RunUnreadable: p.facts.RunErr != nil, FastForward: p.FastForward, Marks: marks})...)
 
 	mode := "move"
 	if p.Keep {

@@ -1,0 +1,207 @@
+{
+  "v": 2,
+  "command": "extract",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/jnames",
+      "status": "done",
+      "warnings": [
+        {
+          "code": "provision.ports_not_named",
+          "params": {
+            "branch": "feat/jnames"
+          },
+          "message": "this project asks for named addresses: the run proxy is off on this machine, so ports were written instead",
+          "follow_up": {
+            "command": "run proxy status",
+            "code": "provision.proxy_status",
+            "message": "reports what serves names"
+          }
+        }
+      ],
+      "detail": {
+        "path": "<SB>/acme.trees/feat-jnames",
+        "files": [
+          {
+            "path": "apps/web/ignored.txt",
+            "status": "untracked"
+          }
+        ],
+        "kept": true,
+        "conflicts": [],
+        "isolation": "isolated",
+        "env_ports": {
+          "offset": 110,
+          "entries": [
+            {
+              "file": "apps/web/.env",
+              "key": "PORT",
+              "port": "PORT",
+              "base": 24200,
+              "resolved": 24310,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "web",
+                  "base": 24200,
+                  "resolved": 24310
+                }
+              ],
+              "addressing": "ports",
+              "status": "rewrite"
+            },
+            {
+              "file": "apps/web/.env",
+              "key": "API_URL",
+              "port": "PORT",
+              "base": 24201,
+              "resolved": 24311,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "api",
+                  "base": 24201,
+                  "resolved": 24311
+                }
+              ],
+              "addressing": "ports",
+              "status": "rewrite"
+            },
+            {
+              "file": "apps/api/.env",
+              "key": "PORT",
+              "port": "PORT",
+              "base": 24201,
+              "resolved": 24311,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "api",
+                  "base": 24201,
+                  "resolved": 24311
+                }
+              ],
+              "addressing": "ports",
+              "status": "rewrite"
+            }
+          ],
+          "addressing": "names",
+          "applied": true
+        },
+        "existing_branch": false
+      }
+    }
+  ],
+  "plan": {
+    "source": "feat/login",
+    "files": [
+      {
+        "path": "apps/web/ignored.txt",
+        "status": "untracked"
+      }
+    ],
+    "target": {
+      "branch": "feat/jnames",
+      "path": "<SB>/acme.trees/feat-jnames",
+      "action": "create"
+    },
+    "from": "main",
+    "env_from": "example",
+    "isolation": "isolated",
+    "creates": 1,
+    "keep": true,
+    "conflicts": [],
+    "on_conflict": "abort",
+    "recap": [
+      {
+        "key": "source",
+        "label": "Source",
+        "path": "source",
+        "values": [
+          {
+            "value": "feat/login",
+            "text": "feat/login"
+          }
+        ]
+      },
+      {
+        "key": "files",
+        "label": "Files",
+        "path": "files",
+        "values": [
+          {
+            "value": "apps/web/ignored.txt",
+            "note": "untracked",
+            "text": "new apps/web/ignored.txt"
+          }
+        ]
+      },
+      {
+        "key": "target",
+        "label": "Target",
+        "path": "to",
+        "values": [
+          {
+            "value": "feat/jnames",
+            "note": "new",
+            "params": {
+              "from": "main"
+            },
+            "text": "new worktree feat/jnames from main"
+          }
+        ]
+      },
+      {
+        "key": "env_from",
+        "label": "Env",
+        "path": "env_from",
+        "values": [
+          {
+            "value": "example",
+            "text": "example"
+          }
+        ]
+      },
+      {
+        "key": "isolation",
+        "label": "Isolation",
+        "path": "isolation",
+        "values": [
+          {
+            "value": "isolated",
+            "text": "isolated"
+          }
+        ]
+      },
+      {
+        "key": "mode",
+        "label": "Mode",
+        "path": "keep",
+        "values": [
+          {
+            "value": "copy",
+            "text": "copy"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "go",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/jnames"
+          ]
+        }
+      ],
+      "code": "extract.go",
+      "message": ""
+    }
+  ],
+  "warnings": []
+}

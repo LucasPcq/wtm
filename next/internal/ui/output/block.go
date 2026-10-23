@@ -95,19 +95,27 @@ type NextStep struct {
 
 // NextSteps writes steps to w, one per line, their notes aligned in one column.
 func NextSteps(w io.Writer, steps []NextStep) {
-	st := StylesOf(w)
+	for _, line := range NextStepLines(steps, StylesOf(w)) {
+		fmt.Fprintln(w, line)
+	}
+}
+
+// NextStepLines are steps as NextSteps writes them, drawn with st, one line each.
+func NextStepLines(steps []NextStep, st *Styles) []string {
 	width := 0
 	for _, step := range steps {
 		width = max(width, len(step.Command))
 	}
 
+	lines := make([]string, 0, len(steps))
 	for _, step := range steps {
 		line := st.bold.Render(step.Command)
 		if step.Note != "" {
 			line = st.bold.Render(fmt.Sprintf("%-*s", width, step.Command)) + st.Muted.Render(noteSeparator+step.Note)
 		}
-		fmt.Fprintf(w, "%s%s %s\n", Indent, st.primary.Render(glyphNext), line)
+		lines = append(lines, Indent+st.primary.Render(glyphNext)+" "+line)
 	}
+	return lines
 }
 
 // blockWidth returns the columns a line of a block may fill on w, or a fallback width when the terminal's is unknown.

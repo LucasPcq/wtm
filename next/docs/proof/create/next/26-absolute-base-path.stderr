@@ -1,0 +1,3 @@
+
+  ✗ invalid config.toml: base_path must be relative to the repository: <SB>/abs.trees
+

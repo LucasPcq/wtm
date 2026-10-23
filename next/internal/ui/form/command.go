@@ -328,7 +328,7 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 	case !ran.Outcome.Applied():
 		previewed, fingerprint := c.Preview(ran.Outcome), ran.Outcome.PlanFingerprint()
 		output.Frame(stdout, func(w io.Writer) {
-			output.DryRun(w, output.DryRunParams{Command: c.io.Command, Rows: previewed.Rows, Warnings: previewed.Warnings, Fingerprint: fingerprint, Apply: applyLine(argv, fingerprint)})
+			output.DryRun(w, output.DryRunParams{Command: c.io.Command, Rows: previewed.Rows, Warnings: previewed.Warnings, Fingerprint: fingerprint, Apply: applyLine(argv, fingerprint), CommandLine: c.io.CommandLine})
 		})
 		return nil
 	}

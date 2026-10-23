@@ -26,6 +26,15 @@ func (r Repository) NamesWorktrees() bool {
 	return r.RunErr != nil || len(r.Run.Jobs) > 0 || len(r.Run.Profiles) > 0
 }
 
+// PlannedIsolation is the isolation a plan shows for the isolation given: none when run.toml declares nothing a worktree isolates; the one given, which the worktree records all the same, when run.toml could not be read.
+func (r Repository) PlannedIsolation(given project.Isolation) project.Isolation {
+	if r.RunErr == nil && !r.Run.IsolationApplies() {
+		return ""
+	}
+
+	return given
+}
+
 // NamedLive returns the branches of the live worktrees a new worktree's name must not clash with: all of them when run.toml names worktrees, none otherwise.
 func (r Repository) NamedLive() []string {
 	if !r.NamesWorktrees() {

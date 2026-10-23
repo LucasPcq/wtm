@@ -180,7 +180,7 @@ func TestQuietPrintsOnlyTheOneFailureLine(t *testing.T) {
 
 	assert.Equal(t, uicli.ExitUsage, got.Code)
 	assert.Empty(t, got.Stdout)
-	assert.Equal(t, "\n  ✗ the request is invalid: branch feat/x is checked out at /elsewhere/feat-x — run `wtm go feat/x` to jump in\n\n", got.Stderr)
+	assert.Equal(t, "\n  ✗ the request is invalid: branch feat/x is checked out at /elsewhere/feat-x\n  → wtm go feat/x   jump in\n\n", got.Stderr)
 }
 
 func TestQuietLeavesTheJSONDocument(t *testing.T) {

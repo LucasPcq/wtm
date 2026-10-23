@@ -1,0 +1,38 @@
+{
+  "v": 2,
+  "command": "create",
+  "ok": false,
+  "op": "<OP>",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "branches[0]",
+        "code": "create.checked_out_elsewhere",
+        "params": {
+          "branch": "feat/one",
+          "path": "<SB>/acme.trees/feat-one"
+        },
+        "flag": "<branches>[0]",
+        "message": "branch feat/one is checked out at <SB>/acme.trees/feat-one",
+        "follow_up": {
+          "command": "go",
+          "answers": [
+            {
+              "path": "worktree",
+              "values": [
+                "feat/one"
+              ]
+            }
+          ],
+          "code": "create.jump_in",
+          "message": "jump in"
+        }
+      }
+    ]
+  }
+}

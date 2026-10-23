@@ -1,6 +1,7 @@
 package widget
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -41,14 +42,28 @@ func Wrap(value string, width int) string {
 	return ansi.Wrap(value, width, "")
 }
 
-// errorBanner draws message as a widget's error, wrapped to width under the failure glyph.
-func errorBanner(message string, width int, st *Styles) string {
+// A Problem is an error a widget shows followed by the steps that get past it.
+type Problem struct {
+	Message string
+	Next    []output.NextStep
+}
+
+// Error is the problem's message.
+func (p *Problem) Error() string {
+	return p.Message
+}
+
+// errorBanner draws err as a widget's error, wrapped to width under the failure glyph, then the steps of a *Problem.
+func errorBanner(err error, width int, st *Styles) string {
 	hang := output.Indent + "  "
-	lines := strings.Split(Wrap(message, width-len(hang)-1), "\n")
+	lines := strings.Split(Wrap(err.Error(), width-len(hang)-1), "\n")
 
 	for i := 1; i < len(lines); i++ {
 		lines[i] = hang + st.Danger.Render(lines[i])
 	}
 	lines[0] = output.Indent + st.Danger.Render(output.GlyphFailure) + " " + st.Danger.Render(lines[0])
+	if problem, ok := errors.AsType[*Problem](err); ok {
+		lines = append(lines, output.NextStepLines(problem.Next, st.Styles)...)
+	}
 	return strings.Join(lines, "\n")
 }

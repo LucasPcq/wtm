@@ -140,7 +140,7 @@ func TestAnInvalidRequestNamesEachFieldByItsPathAndItsFlag(t *testing.T) {
 		"v": 2, "command": "create", "ok": false, "op": "op-3",
 		"follow_ups": [], "warnings": [],
 		"error": {"kind": "invalid", "code": "request.invalid", "message": "the request is invalid", "fields": [
-			{"path": "branches[0]", "code": "create.checked_out_elsewhere", "params": {"branch": "feat/x", "path": "/p"}, "flag": "<branches>[0]", "message": "branch feat/x is checked out at /p — run `+"`wtm go feat/x`"+` to jump in"},
+			{"path": "branches[0]", "code": "create.checked_out_elsewhere", "params": {"branch": "feat/x", "path": "/p"}, "flag": "<branches>[0]", "message": "branch feat/x is checked out at /p", "follow_up": {"command": "go", "answers": [{"path": "worktree", "values": ["feat/x"]}], "code": "create.jump_in", "message": "jump in"}},
 			{"path": "branches[1]", "code": "distinct", "params": {"value": "feat/x"}, "flag": "<branches>[1]", "message": "<branches>[1]: feat/x is given twice"},
 			{"path": "env_from", "code": "one_of", "params": {"value": "copy"}, "accepted": ["example", "main", "parent"], "flag": "--env-from", "message": "--env-from must be one of example, main, parent, not copy"},
 			{"path": "from", "code": "required", "params": {"because": "create.parent_required"}, "flag": "--from", "message": "--from is required: a branch that already exists locally needs its parent named (it can't be inferred, and `+"`wtm sync`"+` needs it)"}

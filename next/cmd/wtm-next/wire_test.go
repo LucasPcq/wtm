@@ -143,6 +143,7 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"left_behind": {followUp: leftBehind("feat/x"), argv: []string{"wtm", "clean", "feat/x", "--force"}},
 		"init":        {followUp: *initialize(), argv: []string{"wtm", "init"}},
 		"settle":      {followUp: settle("feat/x"), argv: []string{"wtm", "env", "feat/x"}},
+		"proxy":       {followUp: proxyStatus(), argv: []string{"wtm", "run", "proxy", "status"}},
 		"dry_run":     {followUp: dryRun, argv: []string{"wtm", "clean", "feat/x", "--force", "--dry-run"}},
 		"pr_url_only": {followUp: domain.FollowUp{URL: pr.URL}, argv: []string{"gh", "pr", "view", pr.URL, "--web"}},
 		"merged":      {followUp: *fixes[0].Fix, argv: []string{"wtm", "clean", "feat/a"}},

@@ -1,0 +1,141 @@
+{
+  "v": 2,
+  "command": "extract",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "topic",
+      "status": "done",
+      "detail": {
+        "path": "<SB>/acme.trees/topic",
+        "files": [
+          {
+            "path": "apps/web/ignored.txt",
+            "status": "untracked"
+          }
+        ],
+        "kept": true,
+        "conflicts": [],
+        "isolation": "isolated",
+        "existing_branch": false
+      }
+    }
+  ],
+  "plan": {
+    "source": "feat/login",
+    "files": [
+      {
+        "path": "apps/web/ignored.txt",
+        "status": "untracked"
+      }
+    ],
+    "target": {
+      "branch": "topic",
+      "path": "<SB>/acme.trees/topic",
+      "action": "existing"
+    },
+    "keep": true,
+    "conflicts": [],
+    "on_conflict": "abort",
+    "recap": [
+      {
+        "key": "source",
+        "label": "Source",
+        "path": "source",
+        "values": [
+          {
+            "value": "feat/login",
+            "text": "feat/login"
+          }
+        ]
+      },
+      {
+        "key": "files",
+        "label": "Files",
+        "path": "files",
+        "values": [
+          {
+            "value": "apps/web/ignored.txt",
+            "note": "untracked",
+            "text": "new apps/web/ignored.txt"
+          }
+        ]
+      },
+      {
+        "key": "target",
+        "label": "Target",
+        "path": "to",
+        "values": [
+          {
+            "value": "topic",
+            "text": "topic"
+          }
+        ]
+      },
+      {
+        "key": "mode",
+        "label": "Mode",
+        "path": "keep",
+        "values": [
+          {
+            "value": "copy",
+            "text": "copy"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "go",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "topic"
+          ]
+        }
+      ],
+      "code": "extract.go",
+      "message": ""
+    }
+  ],
+  "warnings": [
+    {
+      "code": "extract.fast_forward_ignored",
+      "params": {
+        "branch": "topic"
+      },
+      "message": "fast-forward ignored: topic already exists, so nothing is created"
+    },
+    {
+      "code": "extract.isolation_ignored",
+      "params": {
+        "branch": "topic",
+        "current": "isolated",
+        "isolation": "verbatim"
+      },
+      "message": "isolation verbatim ignored: topic already exists and stays isolated",
+      "follow_up": {
+        "command": "env",
+        "answers": [
+          {
+            "path": "worktree",
+            "values": [
+              "topic"
+            ]
+          },
+          {
+            "path": "isolation",
+            "values": [
+              "verbatim"
+            ]
+          }
+        ],
+        "code": "extract.switch_isolation",
+        "message": "switch it to verbatim"
+      }
+    }
+  ]
+}

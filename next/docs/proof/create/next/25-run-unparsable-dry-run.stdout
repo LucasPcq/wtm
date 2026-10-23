@@ -1,0 +1,9 @@
+
+  create · dry run, nothing applied
+  Branches   feat/unparsable
+  From       main
+  Env        main · remembered
+  Isolation  isolated (run.toml unreadable)
+  fingerprint  <FP>
+  → wtm create feat/unparsable --expect-fingerprint <FP>   apply this plan
+

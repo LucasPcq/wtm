@@ -57,6 +57,12 @@ type Plan struct {
 	Applied    bool               `json:"applied"`
 }
 
+// NamesUnserved reports whether p wrote ports for a project that asks for named addresses no proxy serves: a port rewritten, or in place already, where a name would have been.
+func (p Plan) NamesUnserved() bool {
+	written := slices.ContainsFunc(p.Entries, func(entry Entry) bool { return entry.Status == StatusRewrite || entry.Status == StatusUnchanged })
+	return written && p.Addressing == project.AddressNames && p.PublicPort == 0
+}
+
 // Rewrites returns the entries whose value is rewritten.
 func (p Plan) Rewrites() []Entry {
 	var out []Entry

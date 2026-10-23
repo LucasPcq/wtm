@@ -99,13 +99,14 @@ type errorDoc struct {
 }
 
 type fieldDoc struct {
-	Path     string   `json:"path"`
-	Code     string   `json:"code"`
-	Params   Params   `json:"params,omitempty"`
-	Accepted []string `json:"accepted,omitempty"`
-	With     []string `json:"with,omitempty"`
-	Flag     string   `json:"flag"`
-	Message  string   `json:"message"`
+	Path     string    `json:"path"`
+	Code     string    `json:"code"`
+	Params   Params    `json:"params,omitempty"`
+	Accepted []string  `json:"accepted,omitempty"`
+	With     []string  `json:"with,omitempty"`
+	Flag     string    `json:"flag"`
+	Message  string    `json:"message"`
+	FollowUp *FollowUp `json:"follow_up,omitempty"`
 }
 
 func itemDocOf(item Item, spell Spell) itemDoc {
@@ -136,5 +137,5 @@ func fieldDocOf(field FieldError, spell Spell) fieldDoc {
 		flag = spell(field.Path)
 	}
 
-	return fieldDoc{Path: field.Path, Code: field.Code, Params: field.Params, Accepted: field.Accepted, With: field.With, Flag: flag, Message: field.Message(flag)}
+	return fieldDoc{Path: field.Path, Code: field.Code, Params: field.Params, Accepted: field.Accepted, With: field.With, Flag: flag, Message: field.Message(flag), FollowUp: field.FollowUp}
 }

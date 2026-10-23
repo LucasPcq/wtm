@@ -1,0 +1,174 @@
+{
+  "v": 2,
+  "command": "create",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/jnames",
+      "status": "done",
+      "warnings": [
+        {
+          "code": "provision.ports_not_named",
+          "params": {
+            "branch": "feat/jnames"
+          },
+          "message": "this project asks for named addresses: the run proxy is off on this machine, so ports were written instead",
+          "follow_up": {
+            "command": "run proxy status",
+            "code": "provision.proxy_status",
+            "message": "reports what serves names"
+          }
+        }
+      ],
+      "detail": {
+        "path": "<SB>/acme.trees/feat-jnames",
+        "metadata": {
+          "source_branch": "main",
+          "created_at": "<T>",
+          "env_strategy": "main",
+          "ordinal": 15,
+          "isolation": "isolated"
+        },
+        "existing_branch": false,
+        "env_ports": {
+          "offset": 150,
+          "entries": [
+            {
+              "file": "apps/web/.env",
+              "key": "PORT",
+              "port": "PORT",
+              "base": 24100,
+              "resolved": 24250,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "web",
+                  "base": 24100,
+                  "resolved": 24250
+                }
+              ],
+              "addressing": "ports",
+              "status": "rewrite"
+            },
+            {
+              "file": "apps/web/.env",
+              "key": "API_URL",
+              "port": "PORT",
+              "base": 24101,
+              "resolved": 24251,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "api",
+                  "base": 24101,
+                  "resolved": 24251
+                }
+              ],
+              "addressing": "ports",
+              "status": "rewrite"
+            },
+            {
+              "file": "apps/api/.env",
+              "key": "PORT",
+              "port": "PORT",
+              "base": 24101,
+              "resolved": 24251,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "api",
+                  "base": 24101,
+                  "resolved": 24251
+                }
+              ],
+              "addressing": "ports",
+              "status": "rewrite"
+            }
+          ],
+          "addressing": "names",
+          "applied": true
+        }
+      }
+    }
+  ],
+  "plan": {
+    "branches": [
+      {
+        "branch": "feat/jnames",
+        "path": "<SB>/acme.trees/feat-jnames",
+        "action": "create"
+      }
+    ],
+    "from": "main",
+    "env_from": "main",
+    "isolation": "isolated",
+    "creates": 1,
+    "recalled": [
+      "env_from"
+    ],
+    "recap": [
+      {
+        "key": "branches",
+        "label": "Branches",
+        "path": "branches",
+        "values": [
+          {
+            "value": "feat/jnames",
+            "text": "feat/jnames"
+          }
+        ]
+      },
+      {
+        "key": "from",
+        "label": "From",
+        "path": "from",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "env_from",
+        "label": "Env",
+        "path": "env_from",
+        "mark": "recalled",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "isolation",
+        "label": "Isolation",
+        "path": "isolation",
+        "values": [
+          {
+            "value": "isolated",
+            "text": "isolated"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "go",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/jnames"
+          ]
+        }
+      ],
+      "code": "create.go",
+      "message": ""
+    }
+  ],
+  "warnings": []
+}

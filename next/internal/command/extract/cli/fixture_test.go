@@ -162,17 +162,18 @@ func (w world) usecase() extract.UseCase {
 			Now:       func() time.Time { return createdAt },
 		},
 		Provision: provision.Service{
-			Git:        w.git,
-			Meta:       w.store,
-			EnvFiles:   w.store,
-			StateDir:   stateDir,
-			Answers:    w.store,
-			RunHooks:   runHooks,
-			PublicPort: func(context.Context, int) int { return 0 },
-			Shield:     shell.Shield,
-			Now:        func() time.Time { return createdAt },
-			LeftBehind: cleanLine,
-			Settle:     settleLine,
+			Git:         w.git,
+			Meta:        w.store,
+			EnvFiles:    w.store,
+			StateDir:    stateDir,
+			Answers:     w.store,
+			RunHooks:    runHooks,
+			PublicPort:  func(context.Context, int) int { return 0 },
+			Shield:      shell.Shield,
+			Now:         func() time.Time { return createdAt },
+			LeftBehind:  cleanLine,
+			Settle:      settleLine,
+			ProxyStatus: proxyStatusLine,
 		},
 	}
 }
@@ -262,4 +263,8 @@ func cleanLine(branch string) domain.FollowUp {
 
 func settleLine(branch string) domain.FollowUp {
 	return domain.FollowUp{Command: "env", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}}}
+}
+
+func proxyStatusLine() domain.FollowUp {
+	return domain.FollowUp{Command: "run proxy status"}
 }

@@ -158,8 +158,15 @@ func TestAnExistingTargetIgnoresTheCreationAnswersAndSaysSo(t *testing.T) {
 	planned, warnings := w.plan(t, req)
 
 	assert.Equal(t, []string{"extract.from_ignored", "extract.env_from_ignored", "extract.fast_forward_ignored", "extract.isolation_ignored"}, codes(warnings))
-	assert.Equal(t, "--env-from ignored: feat/other already exists, so nothing is created", warnings[1].Message)
-	assert.Equal(t, "--isolation verbatim ignored: feat/other already exists and stays isolated — switch it with `wtm env feat/other --isolation verbatim`", warnings[3].Message)
+	assert.Equal(t, "env strategy ignored: feat/other already exists, so nothing is created", warnings[1].Message)
+	assert.Equal(t, "fast-forward ignored: feat/other already exists, so nothing is created", warnings[2].Message)
+	assert.Equal(t, "isolation verbatim ignored: feat/other already exists and stays isolated", warnings[3].Message)
+	assert.Equal(t, &domain.FollowUp{
+		Command: domain.CommandEnv,
+		Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/other"}}, {Path: domain.PathIsolation, Values: []string{"verbatim"}}},
+		Code:    extract.CodeSwitchIsolation,
+		Message: "switch it to verbatim",
+	}, warnings[3].FollowUp)
 	assert.Empty(t, planned.From)
 	assert.Empty(t, planned.EnvFrom)
 	assert.Empty(t, planned.FastForward)
