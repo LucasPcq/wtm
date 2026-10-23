@@ -29,7 +29,7 @@ func newForm(open func(ctx context.Context, dir string) (extract.UseCase, error)
 
 // applyLabel names the apply of the plan previewed, which creates the target first when the plan says so.
 func applyLabel(previewed extract.Outcome) string {
-	if previewed.Plan.Creates {
+	if previewed.Plan.Creates > 0 {
 		return "Yes, create & extract"
 	}
 	return "Yes, extract"

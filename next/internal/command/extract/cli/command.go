@@ -56,7 +56,7 @@ type extractCommand struct {
 // New returns the extract command: its flags become an extract.Request, answered in the wizard when the user can see and answer it, else run unattended; it draws the outcome on streams, or the v2 JSON envelope with --output json, its follow-ups spelled by commandLine.
 func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (extract.UseCase, error), commandLine output.CommandLine) *cobra.Command {
 	// exits are the exit codes of extract's own codes, ahead of those of their kind.
-	exits := map[string]int{extract.CodeConfigNotFound: uicli.ExitConfigNotFound, extract.CodeConfigInvalid: uicli.ExitError, extract.CodeConflict: exitConflict}
+	exits := map[string]int{extract.CodeConflict: exitConflict}
 	c := &extractCommand{io: uicli.Run{Command: extract.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: extractFlags, Exits: exits}, form: newForm(open)}
 	cmd := &cobra.Command{Use: extract.Name + " [source]", Short: extractShort, Long: extractLong, Example: extractExample, Args: cobra.MaximumNArgs(1), RunE: c.run}
 	c.form.Bind(cmd, &c.io)

@@ -61,11 +61,11 @@ type eventsCommand struct {
 	started bool // a line was printed
 }
 
-// New returns the events command over app: its flags become an events.Request, watched from the project's directory, each line drawn on streams for a person or written as JSON with --output json.
-func New(streams *output.Streams, env uicli.Env, app events.UseCase) *cobra.Command {
+// New returns the events command over app: its flags become an events.Request, watched from the project's directory, each line drawn on streams for a person or written as JSON with --output json, a refusal's follow-up spelled by commandLine.
+func New(streams *output.Streams, env uicli.Env, app events.UseCase, commandLine output.CommandLine) *cobra.Command {
 	// exits are the exit codes of events' own codes, ahead of those of their kind.
-	exits := map[string]int{events.CodeConfigNotFound: uicli.ExitConfigNotFound, events.CodeConfigInvalid: uicli.ExitError, events.CodeSchemaNewer: uicli.ExitStreamNewer}
-	c := &eventsCommand{io: uicli.Run{Command: events.Name, Streams: streams, Env: env, Flags: eventsFlags, Exits: exits}, app: app}
+	exits := map[string]int{events.CodeSchemaNewer: uicli.ExitStreamNewer}
+	c := &eventsCommand{io: uicli.Run{Command: events.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: eventsFlags, Exits: exits}, app: app}
 	cmd := &cobra.Command{Use: events.Name, Short: eventsShort, Long: eventsLong, Example: eventsExample, Args: cobra.NoArgs, RunE: c.run}
 	stream{}.Bind(cmd, &c.io)
 
@@ -118,7 +118,7 @@ func (c *eventsCommand) fail(failure *domain.Error) error {
 	}
 
 	output.Frame(c.io.Streams.Err, func(w io.Writer) {
-		output.Failure(w, output.FailureParams{Err: failure, Flags: c.io.Flags})
+		output.Failure(w, output.FailureParams{Err: failure, Next: output.FollowUpSteps(failure, c.io.CommandLine), Flags: c.io.Flags})
 	})
 	return c.io.Failed(failure)
 }

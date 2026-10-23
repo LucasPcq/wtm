@@ -69,7 +69,7 @@ func openEvents(ctx context.Context, dir string) (events.Source, error) {
 	repo := git.Repo{Dir: params.MainPath}
 	return events.Source{
 		Repo:       domain.Repo{Root: params.MainPath, CommonDir: bus.Resolved(params.CommonDir)},
-		Repository: repository.Service{Config: config.Project{StateDir: params.StateDir, GlobalPath: config.GlobalPath()}, Git: repo, MainPath: params.MainPath},
+		Repository: repository.Service{Config: config.Project{StateDir: params.StateDir, GlobalPath: config.GlobalPath()}, Git: repo, MainPath: params.MainPath, Init: initialize()},
 		Meta:       store.Meta{StateDir: params.StateDir},
 	}, nil
 }

@@ -132,7 +132,7 @@ func TestWithoutConfigCreateExitsOnItsOwnCode(t *testing.T) {
 	got := runCreate(t, w, branchName)
 
 	assert.Equal(t, uicli.ExitConfigNotFound, got.Code)
-	assert.Contains(t, got.Stderr, "run `wtm init` first")
+	assert.Contains(t, got.Stderr, "→ wtm init")
 }
 
 func TestAnInvalidConfigIsReportedAsSuch(t *testing.T) {

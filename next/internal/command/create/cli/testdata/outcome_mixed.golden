@@ -14,6 +14,7 @@
     ── .env ────────────────────────
     DB  pg  no such key in this file
   ! feat/c  no template found for .env, skipping
+  ! feat/c  run.toml: line 3 — ports not settled
   ! couldn't fast-forward main: its worktree has uncommitted changes — it starts from your local branch
 
   ✗ feat/c  on_create failed: hook failed: exit status 3 · left incomplete
@@ -25,3 +26,4 @@
   → wtm go feat/c
   → wtm go feat/d
   → wtm clean feat/e --force   branch feat/e is left half-created at /trees/feat-e
+  → wtm env feat/c             settle the ports once run.toml is fixed

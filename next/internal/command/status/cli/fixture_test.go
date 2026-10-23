@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -111,7 +112,7 @@ func (w world) open(context.Context, string) (status.UseCase, error) {
 		PullRequests: func(context.Context) (worktree.PullRequests, error) {
 			return worktree.PullRequests{Open: []worktree.PullRequest{{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a", Title: "Add the login form", Draft: true, Checks: worktree.Checks{Passed: 3, Pending: 1}, Decision: "REVIEW_REQUIRED"}}}, w.PRsErr
 		},
-		Repository: repository.Service{Config: configured{err: w.ConfigErr, run: runConfig, runErr: w.RunErr}, Git: git, MainPath: mainPath},
+		Repository: repository.Service{Config: configured{err: w.ConfigErr, run: runConfig, runErr: w.RunErr}, Git: git, MainPath: mainPath, Init: &domain.FollowUp{Command: domain.CommandInit}},
 	}, nil
 }
 

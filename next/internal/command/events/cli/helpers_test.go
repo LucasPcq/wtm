@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
 	"github.com/spf13/cobra"
@@ -48,7 +49,7 @@ func runEvents(t *testing.T, r run, words ...string) printed {
 		Now:      func() time.Time { return fixedNow },
 		Recheck:  time.Hour,
 	}
-	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, uicli.Env{Cwd: r.Dir, ProjectDir: r.Dir}, useCase)})
+	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, uicli.Env{Cwd: r.Dir, ProjectDir: r.Dir}, useCase, formtest.CommandLine)})
 	code := uicli.Execute(ctx, root, append([]string{events.Name}, words...))
 	return printed{Stdout: stdout.String(), Stderr: stderr.String(), Code: code}
 }

@@ -56,7 +56,10 @@ func TestAPortItCouldNotShiftIsAWarningOfTheWorktree(t *testing.T) {
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	require.Len(t, outcome.Warnings, 1)
-	assert.Equal(t, domain.Warning{Code: env.CodePortsLeftAlone, Message: "Env ports left alone", Params: domain.Params{"count": "1"}}, outcome.Warnings[0])
+	assert.Equal(t, "provision.env_ports_left_alone", outcome.Warnings[0].Code)
+	assert.Equal(t, domain.Params{"count": "1"}, outcome.Warnings[0].Params)
+	require.Len(t, outcome.Warnings[0].Ports, 1)
+	assert.Equal(t, "DB", outcome.Warnings[0].Ports[0].Key)
 }
 
 func TestEachPhaseIsReportedUnderItsBranch(t *testing.T) {
@@ -399,4 +402,19 @@ func TestNothingToRememberWritesNothing(t *testing.T) {
 
 	assert.Empty(t, remembered)
 	assert.Empty(t, warnings)
+}
+
+func TestThePortsAWarningCarriesAreRedacted(t *testing.T) {
+	w := onDisk(t)
+	writeFile(t, filepath.Join(w.main, ".env"), mainEnv+"API=http://u:pw@api.staging.example.com:9999\n")
+	params := portLinked(w.params(&recorder{}))
+	params.Project.Run.EnvPorts = append(params.Project.Run.EnvPorts, project.EnvPortLink{File: ".env", Key: "API", Job: "web", Port: "http"})
+
+	outcome := w.service.Run(t.Context(), params)
+
+	require.Len(t, outcome.Warnings, 1)
+	require.Len(t, outcome.Warnings[0].Ports, 1)
+	left := outcome.Warnings[0].Ports[0]
+	assert.Equal(t, env.StatusNotFound, left.Status)
+	assert.Empty(t, left.CurrentValue+left.NewValue+left.ForeignHost, "a value of the .env left the worktree")
 }

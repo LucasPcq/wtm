@@ -55,9 +55,16 @@ func (o Outcome[P, D]) Failure() *Error {
 	return o.Result.Failure()
 }
 
-// Envelope is how the run of command ended for every surface, err being the run's refusal if any: the plan with its items once applied, else the plan and its fingerprint unless refused.
-func (o Outcome[P, D]) Envelope(command string, err *Error) Envelope {
-	doc := Envelope{Command: command, Op: o.Op, Err: err}
+// EnvelopeParams is what a run's envelope reports beside its outcome: the command that ran, its refusal if any, and its request as the answers of its fields, which the replan of a stale plan runs again.
+type EnvelopeParams struct {
+	Command string
+	Err     *Error
+	Answers []Answered
+}
+
+// Envelope is how the run ended for every surface: the plan with its items once applied, else the plan and its fingerprint unless refused, and a stale plan followed up by its replan.
+func (o Outcome[P, D]) Envelope(params EnvelopeParams) Envelope {
+	doc := Envelope{Command: params.Command, Op: o.Op, Err: params.Err}
 
 	switch {
 	case o.Result != nil:
@@ -69,6 +76,7 @@ func (o Outcome[P, D]) Envelope(command string, err *Error) Envelope {
 	case doc.Err == nil:
 		doc.Plan, doc.Fingerprint, doc.Warnings = &o.Plan, o.Fingerprint, o.Warnings
 	}
+	doc.FollowUps = append(doc.FollowUps, Replan(doc.Err, params.Command, params.Answers)...)
 
 	return doc
 }
@@ -124,9 +132,9 @@ func (r Read[D]) Failure() *Error {
 	return Result[D]{Items: r.Items}.Failure()
 }
 
-// Envelope is how the read of command ended for every surface, err being its refusal if any: its items, warnings and follow-ups, with no op, plan nor fingerprint.
-func (r Read[D]) Envelope(command string, err *Error) Envelope {
-	doc := Envelope{Command: command, Err: cmp.Or(err, r.Failure()), Warnings: r.Warnings, FollowUps: r.FollowUps}
+// Envelope is how the read ended for every surface: its items, warnings and follow-ups, with no op, plan nor fingerprint; a read has no plan to replan, so it reads no answers.
+func (r Read[D]) Envelope(params EnvelopeParams) Envelope {
+	doc := Envelope{Command: params.Command, Err: cmp.Or(params.Err, r.Failure()), Warnings: r.Warnings, FollowUps: r.FollowUps}
 	for _, unit := range r.Items {
 		doc.Items = append(doc.Items, unit.item())
 	}

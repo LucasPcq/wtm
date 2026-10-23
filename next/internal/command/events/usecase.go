@@ -22,10 +22,10 @@ import (
 const Name = "events"
 
 // CodeConfigNotFound refuses a repository with no wtm config, and ends the stream of one that loses it.
-const CodeConfigNotFound = Name + repository.ConfigNotFound
+const CodeConfigNotFound = Name + domain.ConfigNotFound
 
 // CodeConfigInvalid refuses a repository whose config.toml does not parse or validate.
-const CodeConfigInvalid = Name + repository.ConfigInvalid
+const CodeConfigInvalid = Name + domain.ConfigInvalid
 
 // CodeSchemaNewer ends the stream on a line of a version newer than this wtm reads.
 const CodeSchemaNewer = Name + ".schema_newer"

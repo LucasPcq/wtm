@@ -43,7 +43,7 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		listcli.New(streams, env, openList, commandLine),
 		statuscli.New(streams, env, openStatus, commandLine),
 		treecli.New(streams, env, openTree, commandLine),
-		eventscli.New(streams, env, systemStream()),
+		eventscli.New(streams, env, systemStream(), commandLine),
 		daemonCmd(),
 	}
 }

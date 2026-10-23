@@ -16,7 +16,9 @@ func TestEachCallOpensTheUseCaseOnItsDirectory(t *testing.T) {
 	first := greet.Execute(t.Context(), Call{Dir: "/a", Answers: named("x")})
 	second := greet.Execute(t.Context(), Call{Dir: "/b", Answers: named("y"), Options: domain.RunOptions{Surface: "desktop"}})
 
-	assert.Equal(t, Response{Status: http.StatusOK, Envelope: domain.Envelope{Command: "greet", Op: "/a:x:api"}}, first)
+	assert.Equal(t, http.StatusOK, first.Status)
+	assert.Equal(t, "greet", first.Envelope.Command)
+	assert.Equal(t, "/a:x:api", first.Envelope.Op)
 	assert.Equal(t, "/b:y:desktop", second.Envelope.Op)
 }
 

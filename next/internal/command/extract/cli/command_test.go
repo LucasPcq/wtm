@@ -141,7 +141,7 @@ func TestWithoutConfigExtractExitsOnItsOwnCode(t *testing.T) {
 	got := runExtract(t, newWorld(seed{NoConfig: true}), source, "--files", "old.txt", "--to", other)
 
 	assert.Equal(t, uicli.ExitConfigNotFound, got.Code)
-	assert.Contains(t, got.Stderr, "run `wtm init` first")
+	assert.Contains(t, got.Stderr, "→ wtm init")
 }
 
 func TestAnUnknownConflictModeIsAUsageErrorNamingItsFlag(t *testing.T) {

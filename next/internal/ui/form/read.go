@@ -18,7 +18,7 @@ import (
 // A ReadOutcome is how a read command's run ended, as [domain.Read] reports it: the failure it ended on and the envelope of the read.
 type ReadOutcome interface {
 	Failure() *domain.Error
-	Envelope(command string, err *domain.Error) domain.Envelope
+	Envelope(params domain.EnvelopeParams) domain.Envelope
 }
 
 // A Reader is what the form calls of a read command's use case: the questions of a request, and its run.
@@ -139,7 +139,7 @@ func (q *Query[R, Q, O]) interactive() bool {
 // conclude prints how the read ended — the JSON envelope, a refusal, the read in a format of Formats, the follow-ups the user picked, or what Draw draws of the read — and returns the failure that sets the exit code.
 func (q *Query[R, Q, O]) conclude(read O, err error) error {
 	failure := domain.AsError(domain.AsErrorParams{Err: err})
-	doc := read.Envelope(q.io.Command, failure)
+	doc := read.Envelope(domain.EnvelopeParams{Command: q.io.Command, Err: failure})
 	switch {
 	case q.io.Output == uicli.OutputJSON:
 		return q.io.Envelope(doc)

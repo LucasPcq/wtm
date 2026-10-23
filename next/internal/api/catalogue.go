@@ -50,9 +50,9 @@ type Response struct {
 	Envelope domain.Envelope
 }
 
-// An Outcome is what a command's run returns: it reports itself as the envelope of command, err being the run's refusal if any.
+// An Outcome is what a command's run returns: it reports itself as an envelope, a stale plan followed up by its replan.
 type Outcome interface {
-	Envelope(command string, err *domain.Error) domain.Envelope
+	Envelope(params domain.EnvelopeParams) domain.Envelope
 }
 
 // A Request is a command's request: it takes the answer of a field at a time and says the answer it gives each.
@@ -113,9 +113,7 @@ func Bind[U any, Req Request[Req], Q Form, Out Outcome](name string, open func(c
 		opts := call.Options
 		opts.Surface = cmp.Or(opts.Surface, surfaceAPI)
 		outcome, err := run(useCase, ctx, req, opts)
-		doc := outcome.Envelope(name, domain.AsError(domain.AsErrorParams{Err: err}))
-		doc.FollowUps = append(doc.FollowUps, domain.Replan(doc.Err, name, domain.AnswersOf(form, req))...)
-		return respond(doc)
+		return respond(outcome.Envelope(domain.EnvelopeParams{Command: name, Err: domain.AsError(domain.AsErrorParams{Err: err}), Answers: domain.AnswersOf(form, req)}))
 	}
 
 	return Command{Name: name, Form: form, Questions: ask, Execute: execute}

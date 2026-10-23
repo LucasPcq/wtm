@@ -261,18 +261,21 @@ type notSettled struct {
 }
 
 // notSettled is the warning that the worktree's ports were not settled, with
-// the command that settles them once the cause is fixed.
+// the follow-up that settles them once the cause is fixed.
 func (p *provisioning) notSettled(n notSettled) domain.Warning {
-	code, fix := "provision.ports_not_settled", "this"
+	code, fix := "provision.ports_not_settled", "what kept them"
 	if n.InRunToml {
 		code, fix = "provision.ports_not_settled_run", "run.toml"
 	}
 
 	branch, cause := p.Worktree.Branch, n.Cause.Error()
+	followUp := p.Service.Settle(branch)
+	followUp.Code, followUp.Message, followUp.Params = "provision.settle_ports", "settle the ports once "+fix+" is fixed", domain.Params{"branch": branch}
 	return domain.Warning{
-		Code:    code,
-		Message: cause + " — ports not settled — run `wtm env " + branch + "` once " + fix + " is fixed",
-		Params:  domain.Params{"branch": branch, "cause": cause},
+		Code:     code,
+		Message:  cause + " — ports not settled",
+		Params:   domain.Params{"branch": branch, "cause": cause},
+		FollowUp: &followUp,
 	}
 }
 

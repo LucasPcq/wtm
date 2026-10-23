@@ -13,7 +13,7 @@ internal/
     dotenv/            .env files parsed and rendered byte for byte
     env/               a worktree's environment: where its .env files come from, what wtm writes into them, what its jobs and hooks run with, its hook chain
     run/               what the run daemon says of the jobs it runs
-                       (env imports worktree, project and dotenv; worktree imports project; domain imports worktree)
+                       (env imports worktree, project and dotenv; worktree imports project; domain imports worktree and env)
   command/<name>/      one command, one vertical slice: its use case and its command line
     usecase.go         the story: Run (operation, plan, fingerprint, apply), Plan, Apply, Observe, Questions
     port.go            the driven ports it reaches the world through
@@ -24,7 +24,7 @@ internal/
     operation/         the operation every mutating use case goes through: its record, its locks, its plan under them and fingerprinted, its events
     operationtest/     the contract every mutating use case's Run passes (no lock nor event on a dry run, a stale plan refused before any event, events in order), for tests
     provision/         a new worktree made whole and a source fast-forwarded, shared by the commands that create one, with the questions each of them asks (questions.go: the fragment their forms embed, whose Answers are all Run takes), the fingerprint of a plan that provisions and the answers remembered
-    repository/        the facts of the repository a command decides from (config, run.toml, snapshot), wired once, refusing a repository with no wtm config with the command's `<name>.config_not_found`, and one whose config.toml does not parse or validate with `<name>.config_invalid`
+    repository/        the facts of the repository a command decides from (config, run.toml, snapshot), wired once, refusing a repository with no wtm config with the command's `<name>.config_not_found` (its follow-up, `init`, injected), and one whose config.toml does not parse or validate with `<name>.config_invalid`
   adapter/             what the ports reach out to: git, statefile, store, config, shell, oplock, events (the event bus: its daemon, its publisher, a subscription, the v2 schema), registry (repos.json), proxyport, daemon (the run daemon's jobs, never starting it), github (gh: the open pull requests, and the newest of each branch whatever its state)
     <name>test/        a stateful fake of an adapter, for tests
   ui/                  the presentation kit every command's cli shares, knowing no command

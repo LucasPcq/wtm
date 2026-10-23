@@ -21,10 +21,10 @@ import (
 const Name = "tree"
 
 // CodeConfigNotFound refuses a repository with no wtm config: `wtm init` has not run there.
-const CodeConfigNotFound = Name + repository.ConfigNotFound
+const CodeConfigNotFound = Name + domain.ConfigNotFound
 
 // CodeConfigInvalid refuses a repository whose config.toml does not parse or validate.
-const CodeConfigInvalid = Name + repository.ConfigInvalid
+const CodeConfigInvalid = Name + domain.ConfigInvalid
 
 // A UseCase reads the tree of one repository: the ports it reads it through and the service that reads the repository.
 type UseCase struct {

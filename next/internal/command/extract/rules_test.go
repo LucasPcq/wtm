@@ -37,7 +37,7 @@ func TestThePlanIsTheJSONOfWhatMovesWhere(t *testing.T) {
 		"target": {"branch": "feat/split", "path": "`+w.path(split)+`", "action": "create"},
 		"from": "main",
 		"env_from": "example",
-		"creates": true,
+		"creates": 1,
 		"keep": false,
 		"conflicts": [],
 		"on_conflict": "abort",

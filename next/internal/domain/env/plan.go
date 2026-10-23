@@ -255,6 +255,14 @@ func pairByKey(lines []dotenv.Line, key string) (dotenv.Line, bool) {
 // Redacted is a Plan with every value taken out of its entries, safe to print or send where a secret must not appear.
 type Redacted Plan
 
+// LeftAlone are the entries of a redacted plan it could not shift, as safe to print or send as the plan.
+type LeftAlone []Entry
+
+// LeftAlone returns the entries r could not shift, still redacted.
+func (r Redacted) LeftAlone() LeftAlone {
+	return LeftAlone(Plan(r).Anomalies())
+}
+
 // Redact returns plan without the current, new and foreign values of its entries; plan itself is left untouched.
 func Redact(plan Plan) Redacted {
 	entries := slices.Clone(plan.Entries)

@@ -35,3 +35,12 @@ func TestAUsageErrorOfTheRootIsInTheEnvelopeWhenJSONWasAsked(t *testing.T) {
 	assert.Empty(t, got.Stderr)
 	assert.Contains(t, got.Stdout, `"message": "the request is invalid: unknown command \"nope\" for \"wtm-next\""`)
 }
+
+func TestARefusalOffersItsWayOutUnderQuietToo(t *testing.T) {
+	loud := runIn(t, "refuse")
+	quiet := runIn(t, "refuse", "-q")
+
+	assert.Equal(t, ExitConfigNotFound, quiet.Code)
+	assert.Equal(t, "\n  ✗ no wtm config found\n  → wtm init\n\n", loud.Stderr)
+	assert.Equal(t, loud.Stderr, quiet.Stderr)
+}

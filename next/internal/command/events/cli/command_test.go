@@ -7,9 +7,11 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -104,4 +106,16 @@ func TestEventsTakesNoArgument(t *testing.T) {
 	got := runEvents(t, run{Dir: app.Root}, "feat/a")
 
 	assert.Equal(t, uicli.ExitUsage, got.Code)
+}
+
+func TestARefusalAfterTheFirstLineStillOffersItsWayOut(t *testing.T) {
+	streams, _, stdout, stderr := output.Test()
+	c := &eventsCommand{io: uicli.Run{Command: events.Name, Streams: streams, CommandLine: formtest.CommandLine, Flags: eventsFlags}, started: true}
+	lost := &domain.Error{Kind: domain.KindPrecondition, Code: events.CodeConfigNotFound, Message: "no wtm config found", FollowUp: &domain.FollowUp{Command: domain.CommandInit}}
+
+	err := c.fail(lost)
+
+	require.Error(t, err)
+	assert.Empty(t, stdout.String())
+	assert.Contains(t, stderr.String(), "→ wtm init")
 }

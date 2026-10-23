@@ -7,6 +7,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
@@ -65,6 +66,28 @@ func TestAnUndoLeftBehindIsRemovedByTheLegacyClean(t *testing.T) {
 	assert.Equal(t, []string{"wtm", "clean", "feat/x", "--force"}, commandLine(wire(wireParams{}).Create.Provision.LeftBehind("feat/x")))
 }
 
+func TestPortsLeftUnsettledAreSettledByTheLegacyEnv(t *testing.T) {
+	assert.Equal(t, []string{"wtm", "env", "feat/x"}, commandLine(wire(wireParams{}).Create.Provision.Settle("feat/x")))
+}
+
+func TestARepositoryWithNoWtmConfigIsFollowedUpByTheLegacyInit(t *testing.T) {
+	uninitialized := gittest.InitRepo(t)
+	ownConfigDir(t)
+	for _, command := range catalogue() {
+		t.Run(command.Name, func(t *testing.T) {
+			got := command.Execute(t.Context(), api.Call{Dir: uninitialized})
+
+			require.NotNil(t, got.Envelope.Err)
+			assert.Equal(t, command.Name+domain.ConfigNotFound, got.Envelope.Err.Code)
+			require.NotNil(t, got.Envelope.Err.FollowUp)
+			assert.Equal(t, []string{"wtm", "init"}, commandLine(*got.Envelope.Err.FollowUp))
+		})
+	}
+	source, err := openEvents(t.Context(), uninitialized)
+	require.NoError(t, err)
+	assert.Equal(t, initialize(), source.Repository.Init)
+}
+
 func TestTwoExecutionsInOneProcessKeepTheirOwnRepositoryAndCorrelationID(t *testing.T) {
 	t.Setenv(cli.CorrelationIDEnv, "from-env")
 	ownConfigDir(t)
@@ -118,6 +141,8 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"go_detached": {followUp: list.Actions(list.Detail{Path: "/repo/.trees/detached"})[0], argv: []string{"cd", "/repo/.trees/detached"}},
 		"enter":       {followUp: domain.Enter("feat/notes"), argv: []string{"wtm", "go", "feat/notes"}},
 		"left_behind": {followUp: leftBehind("feat/x"), argv: []string{"wtm", "clean", "feat/x", "--force"}},
+		"init":        {followUp: *initialize(), argv: []string{"wtm", "init"}},
+		"settle":      {followUp: settle("feat/x"), argv: []string{"wtm", "env", "feat/x"}},
 		"dry_run":     {followUp: dryRun, argv: []string{"wtm", "clean", "feat/x", "--force", "--dry-run"}},
 		"pr_url_only": {followUp: domain.FollowUp{URL: pr.URL}, argv: []string{"gh", "pr", "view", pr.URL, "--web"}},
 		"env":         {followUp: fixes[0].Fix, argv: []string{"wtm", "env", "feat/a"}},

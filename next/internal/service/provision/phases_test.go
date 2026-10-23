@@ -86,7 +86,8 @@ func TestANumberIsNeverGivenPastANeighbourWhoseRecordDoesNotRead(t *testing.T) {
 	recorded, _ := files.Meta(branchName)
 	assert.Zero(t, recorded.Ordinal)
 	require.Equal(t, []string{"provision.ports_not_settled"}, codes(outcome.Warnings))
-	assert.Equal(t, "cannot read a live worktree's ordinal: feat/a: storetest: the record of feat/a does not read — ports not settled — run `wtm env feat/x` once this is fixed", outcome.Warnings[0].Message)
+	assert.Equal(t, "cannot read a live worktree's ordinal: feat/a: storetest: the record of feat/a does not read — ports not settled", outcome.Warnings[0].Message)
+	assert.Equal(t, settled("what kept them"), outcome.Warnings[0].FollowUp)
 }
 
 func TestANumberThatCannotBeGivenLeavesThePortsAsCopiedAndSaysWhy(t *testing.T) {
@@ -98,9 +99,10 @@ func TestANumberThatCannotBeGivenLeavesThePortsAsCopiedAndSaysWhy(t *testing.T) 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Zero(t, outcome.Provisioned.Meta.Ordinal)
 	assert.Equal(t, []domain.Warning{{
-		Code:    "provision.ports_not_settled",
-		Message: "list worktrees: git worktree list: exit status 128 — ports not settled — run `wtm env feat/x` once this is fixed",
-		Params:  domain.Params{"branch": branchName, "cause": "list worktrees: git worktree list: exit status 128"},
+		Code:     "provision.ports_not_settled",
+		Message:  "list worktrees: git worktree list: exit status 128 — ports not settled",
+		Params:   domain.Params{"branch": branchName, "cause": "list worktrees: git worktree list: exit status 128"},
+		FollowUp: settled("what kept them"),
 	}}, outcome.Warnings)
 	assert.Len(t, report.worktreeEvents(), 2)
 }
@@ -177,9 +179,10 @@ func TestARunConfigThatDoesNotLoadLeavesTheEnvAsCopiedAndSaysWhy(t *testing.T) {
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{"worktree", "env", "meta", "ports"}, report.phases())
 	assert.Equal(t, []domain.Warning{{
-		Code:    "provision.ports_not_settled_run",
-		Message: "run.toml: line 3 — ports not settled — run `wtm env feat/x` once run.toml is fixed",
-		Params:  domain.Params{"branch": branchName, "cause": "run.toml: line 3"},
+		Code:     "provision.ports_not_settled_run",
+		Message:  "run.toml: line 3 — ports not settled",
+		Params:   domain.Params{"branch": branchName, "cause": "run.toml: line 3"},
+		FollowUp: settled("run.toml"),
 	}}, outcome.Warnings)
 	assert.Zero(t, outcome.Provisioned.Meta.Ordinal)
 	assert.Equal(t, mainEnv, readFile(t, filepath.Join(w.path(branchName), ".env")))
@@ -255,7 +258,8 @@ func TestAnOriginWithoutTheRunProxyIsAProxyToFixNotARunToml(t *testing.T) {
 	outcome := w.service.Run(t.Context(), params)
 
 	require.Equal(t, []string{"provision.ports_not_settled"}, codes(outcome.Warnings))
-	assert.Equal(t, "env API in .env: {origin} of job \"web\" is served by the run proxy, which serves no port: enable the proxy, or write the host yourself — ports not settled — run `wtm env feat/x` once this is fixed", outcome.Warnings[0].Message)
+	assert.Equal(t, "env API in .env: {origin} of job \"web\" is served by the run proxy, which serves no port: enable the proxy, or write the host yourself — ports not settled", outcome.Warnings[0].Message)
+	assert.Equal(t, settled("what kept them"), outcome.Warnings[0].FollowUp)
 }
 
 func TestAPortPassThatFailsNeverFailsTheWorktree(t *testing.T) {

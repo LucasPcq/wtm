@@ -33,7 +33,7 @@ type Outcome interface {
 	PlanFingerprint() string
 	Applied() bool
 	Failure() *domain.Error
-	Envelope(command string, err *domain.Error) domain.Envelope
+	Envelope(params domain.EnvelopeParams) domain.Envelope
 }
 
 // A UseCase is what the form calls of a command's use case: the questions of a request, and its run.
@@ -310,9 +310,7 @@ func (c *Command[R, Q, O]) Ask(ctx context.Context, params AskParams[R, Q, O]) (
 func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error) error {
 	failure := domain.AsError(domain.AsErrorParams{Err: err})
 	if !c.io.Human() {
-		doc := ran.Outcome.Envelope(c.io.Command, failure)
-		doc.FollowUps = append(doc.FollowUps, domain.Replan(doc.Err, c.io.Command, domain.AnswersOf(c.schema(), ran.Request))...)
-		return c.io.Envelope(doc)
+		return c.io.Envelope(ran.Outcome.Envelope(domain.EnvelopeParams{Command: c.io.Command, Err: failure, Answers: domain.AnswersOf(c.schema(), ran.Request)}))
 	}
 
 	argv := c.Argv(cmd.CommandPath(), ran.Request)
