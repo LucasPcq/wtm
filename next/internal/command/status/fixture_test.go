@@ -46,15 +46,16 @@ type seed struct {
 	ConfigErr  error
 	Jobs       []run.Job
 	JobsErr    error
-	PRs        worktree.PullRequests
+	PRs        []worktree.PullRequest
 	PRsErr     error
 }
 
-// A world is status's use case over the fakes a seed describes.
+// A world is status's use case over the fakes a seed describes, with the branches GitHub was asked of, once per ask.
 type world struct {
 	usecase status.UseCase
 	git     *gittest.Fake
 	store   *storetest.Fake
+	asked   *[][]string
 }
 
 func newWorld(s seed) world {
@@ -64,18 +65,23 @@ func newWorld(s seed) world {
 
 	git := gittest.NewFake(s.Git)
 	store := storetest.NewFake(storetest.FakeParams{Meta: s.Meta, Unreadable: s.Unreadable, Files: s.Files})
+	var asked [][]string
 	config := project.Config{Worktrees: project.Worktrees{BasePath: "../.trees", BaseBranch: "main"}, Env: project.Env{Strategy: s.Strategy, Files: s.EnvFiles}}
 	return world{
 		usecase: status.UseCase{
-			Git:          git,
-			Meta:         store,
-			EnvFiles:     store,
-			Jobs:         func(context.Context) ([]run.Job, error) { return s.Jobs, s.JobsErr },
-			PullRequests: func(context.Context) (worktree.PullRequests, error) { return s.PRs, s.PRsErr },
-			Repository:   repository.Service{Config: configured{config: config, err: s.ConfigErr, run: s.Run, runErr: s.RunErr}, Git: git, MainPath: mainPath},
+			Git:      git,
+			Meta:     store,
+			EnvFiles: store,
+			Jobs:     func(context.Context) ([]run.Job, error) { return s.Jobs, s.JobsErr },
+			PullRequests: func(_ context.Context, branches []string) ([]worktree.PullRequest, error) {
+				asked = append(asked, branches)
+				return s.PRs, s.PRsErr
+			},
+			Repository: repository.Service{Config: configured{config: config, err: s.ConfigErr, run: s.Run, runErr: s.RunErr}, Git: git, MainPath: mainPath},
 		},
 		git:   git,
 		store: store,
+		asked: &asked,
 	}
 }
 

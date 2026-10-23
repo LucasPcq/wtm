@@ -1,7 +1,8 @@
 
   List the worktrees of the repository: whether each holds uncommitted changes,
   is locked or mid-rebase, its commits past the base branch, where its branch stands
-  against origin, the jobs up in it, and with --with-prs its open pull request.
+  against origin, the jobs up in it, and with --with-prs its newest pull request,
+  open, merged or closed.
   It changes nothing.
 
   On a terminal it opens a picker: choose a worktree, then what to do with it, and the
@@ -22,7 +23,7 @@
         --fetch           Fetch origin first, as the picker's refresh (r) does
     -h, --help            help for list
         --output string   Output format: text or json (default "text")
-        --with-prs        Ask GitHub for each worktree's open pull request (needs gh)
+        --with-prs        Ask GitHub for each worktree's newest pull request, open, merged or closed (needs gh)
 
   Global Flags:
     -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document

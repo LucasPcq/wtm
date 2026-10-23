@@ -54,7 +54,7 @@ func TestARefreshAndThePullRequestsLandingLaterKeepEachOthersReads(t *testing.T)
 			}
 
 			assert.True(t, p.withPRs)
-			assert.Equal(t, &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12"}, shownDetail(t, p, "feat/b").PR)
+			assert.Equal(t, &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12", State: worktree.PullRequestOpen}, shownDetail(t, p, "feat/b").PR)
 			assert.Equal(t, &worktree.Origin{Behind: 1, State: worktree.Behind}, shownDetail(t, p, "main").Origin, "the fetched counts are kept")
 		})
 	}
@@ -75,7 +75,7 @@ func TestThePullRequestsLandingLaterAreGivenToTheReadShown(t *testing.T) {
 func TestAWorktreeShownOffersWhatItsRowShowsWhenThePullRequestsLand(t *testing.T) {
 	p := newPicker(t, world{}, list.Request{})
 	from := list.Outcome{Items: []list.Item{{Subject: "feat/b", Status: domain.StatusDone, Detail: &list.Detail{
-		Branch: "feat/b", Missing: true, PR: &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12"}, Actions: []domain.FollowUp{{Command: "clean", Code: "list.clean"}},
+		Branch: "feat/b", Missing: true, PR: &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12", State: worktree.PullRequestOpen}, Actions: []domain.FollowUp{{Command: "clean", Code: "list.clean"}},
 	}}}}
 
 	merged := list.WithPullRequests(p.read, from)

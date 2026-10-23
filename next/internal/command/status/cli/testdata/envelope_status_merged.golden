@@ -1,0 +1,187 @@
+{
+  "v": 2,
+  "command": "status",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "branch": "feat/a",
+        "path": "/repo/.trees/feat-a",
+        "main": false,
+        "locked": false,
+        "rebasing": false,
+        "created_at": "2026-10-16T12:00:00Z",
+        "parent": "main",
+        "children": [],
+        "base": {
+          "name": "main",
+          "ahead": 2,
+          "behind": 1
+        },
+        "origin": {
+          "ahead": 2,
+          "behind": 0,
+          "state": "ahead"
+        },
+        "changes": {
+          "staged": 1,
+          "modified": 1,
+          "untracked": 1,
+          "insertions": 12,
+          "deletions": 3,
+          "files": [
+            {
+              "path": "a.go",
+              "status": "modified"
+            },
+            {
+              "path": "b.go",
+              "status": "untracked"
+            }
+          ]
+        },
+        "commits": [
+          {
+            "sha": "Wire the session",
+            "subject": "Wire the session",
+            "author": "",
+            "at": "0001-01-01T00:00:00Z"
+          },
+          {
+            "sha": "Add the login form",
+            "subject": "Add the login form",
+            "author": "",
+            "at": "0001-01-01T00:00:00Z"
+          },
+          {
+            "sha": "root",
+            "subject": "root",
+            "author": "",
+            "at": "0001-01-01T00:00:00Z"
+          }
+        ],
+        "review": {
+          "number": 12,
+          "url": "https://github.com/acme/acme/pull/12",
+          "state": "merged"
+        },
+        "isolation": "isolated",
+        "run_toml": "declared",
+        "run": {
+          "addressing": "names",
+          "offset": 10,
+          "ports": "offset"
+        },
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "running",
+            "url": "http://web.feat-a.main.localhost:11080",
+            "port": 3010,
+            "started_at": "2026-10-16T13:00:00Z"
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "crashed",
+            "url": "",
+            "exit_code": 1
+          }
+        ],
+        "env": {
+          "declared": 2,
+          "files": [
+            {
+              "target": ".env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            },
+            {
+              "target": "web/.env",
+              "missing": true,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            }
+          ]
+        },
+        "problems": [
+          {
+            "code": "status.merged",
+            "message": "its pull request is merged",
+            "fix": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "status.merged",
+              "message": ""
+            }
+          },
+          {
+            "code": "status.env_missing",
+            "message": "web/.env is missing",
+            "fix": {
+              "command": "env",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "status.env_missing",
+              "message": ""
+            }
+          },
+          {
+            "code": "status.job_crashed",
+            "message": "api crashed (exit 1)",
+            "fix": {
+              "command": "run start",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                },
+                {
+                  "path": "job",
+                  "values": [
+                    "api"
+                  ]
+                },
+                {
+                  "path": "detach",
+                  "values": [
+                    "true"
+                  ]
+                }
+              ],
+              "code": "status.job_crashed",
+              "message": ""
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

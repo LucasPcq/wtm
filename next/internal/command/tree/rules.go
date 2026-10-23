@@ -13,7 +13,7 @@ import (
 // ----------------------------------------------------------------------------
 // The facts
 
-// Facts are what tree reads: the repository, the stack its meta records make, what each worktree holds, the run daemon's jobs and the pull requests, each with the error that kept it from being read, and whether the read was interrupted; PullRequests is nil when GitHub was not asked.
+// Facts are what tree reads: the repository, the stack its meta records make, what each worktree holds, the run daemon's jobs and the pull requests, each with the error that kept it from being read, the branches behind their merged pull request (repository.Behind), and whether the read was interrupted; PullRequests is nil when GitHub was not asked.
 type Facts struct {
 	worktree.Repository
 	Stack        worktree.Stack
@@ -22,6 +22,7 @@ type Facts struct {
 	JobsErr      error
 	PullRequests []worktree.PullRequest
 	PRsErr       error
+	Behind       map[string]bool // by branch
 	Interrupted  bool
 }
 
@@ -125,21 +126,14 @@ func (f Facts) item(branch string) Item {
 	detail.NeedsSync = state.Behind != nil && *state.Behind > 0
 	detail.Cycle = f.Stack.InCycle(branch)
 	detail.Origin = f.OriginOf(branch)
-	detail.PR = f.pr(branch)
+	pr, ok := worktree.PullRequestOf(f.PullRequests, branch)
+	if ok {
+		detail.PR = &PR{Number: pr.Number, URL: pr.URL, State: pr.State}
+	}
 	detail.Services = f.services(w.Path)
-	detail.Actions = Actions(detail, f.Config.Worktrees.BaseBranch)
+	detail.Actions = Actions(detail, f.Repository.Cleans(pr, w, f.Behind[branch]))
 
 	return Item{Subject: branch, Status: domain.StatusDone, Detail: &detail}
-}
-
-func (f Facts) pr(branch string) *PR {
-	at := slices.IndexFunc(f.PullRequests, func(pr worktree.PullRequest) bool { return pr.Branch == branch })
-	if at < 0 {
-		return nil
-	}
-
-	found := f.PullRequests[at]
-	return &PR{Number: found.Number, URL: found.URL, State: found.State}
 }
 
 func (f Facts) services(path string) []string {
@@ -197,13 +191,13 @@ func (f Facts) worktreeOf(branch string) worktree.Worktree {
 // commandSync is the command that rebases a worktree onto its parent, answered by the worktree.
 const commandSync = "sync"
 
-// Actions is what the worktree of detail needs next, the first that applies: a rebase in progress is finished in it, a branch whose pull request is merged is cleaned (never the main worktree nor the base branch), one behind its parent is synced onto it; none otherwise.
-func Actions(detail Detail, base string) []domain.FollowUp {
+// Actions is what the worktree of detail needs next, the first that applies: a rebase in progress is finished in it, one its merged pull request cleans (worktree.Repository.Cleans) is cleaned, one behind its parent is synced onto it; none otherwise.
+func Actions(detail Detail, cleans bool) []domain.FollowUp {
 	var command, message string
 	switch {
 	case detail.Rebasing:
 		command, message = domain.CommandGo, "Go to the worktree to finish its rebase"
-	case detail.PR != nil && detail.PR.State == worktree.PullRequestMerged && !detail.Main && detail.Branch != base:
+	case cleans:
 		command, message = domain.CommandClean, "Clean the worktree: its pull request is merged"
 	case detail.NeedsSync:
 		command, message = commandSync, "Sync the worktree: its parent has commits it lacks"

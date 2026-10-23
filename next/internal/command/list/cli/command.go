@@ -16,7 +16,8 @@ const (
 	listShort = "List all worktrees"
 	listLong  = "List the worktrees of the repository: whether each holds uncommitted changes,\n" +
 		"is locked or mid-rebase, its commits past the base branch, where its branch stands\n" +
-		"against origin, the jobs up in it, and with --with-prs its open pull request.\n" +
+		"against origin, the jobs up in it, and with --with-prs its newest pull request,\n" +
+		"open, merged or closed.\n" +
 		"It changes nothing.\n\n" +
 		"On a terminal it opens a picker: choose a worktree, then what to do with it, and the\n" +
 		"command that does it is printed (r refreshes from origin). Without a terminal, or\n" +

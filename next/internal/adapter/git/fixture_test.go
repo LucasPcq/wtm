@@ -20,6 +20,7 @@ type port interface {
 	Branches(ctx context.Context) (worktree.Branches, error)
 	AheadBehind(ctx context.Context, name string) (worktree.AheadBehind, error)
 	AheadBehindOf(ctx context.Context, span worktree.Span) (worktree.AheadBehind, error)
+	IsAncestor(ctx context.Context, ancestry worktree.Ancestry) (bool, error)
 	Commits(ctx context.Context, dir string, count int) ([]worktree.Commit, error)
 	Dirty(ctx context.Context, path string) (bool, error)
 	AddWorktree(ctx context.Context, addition worktree.Addition) error

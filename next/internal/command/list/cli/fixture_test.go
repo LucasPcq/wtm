@@ -65,7 +65,10 @@ func (w world) open(context.Context, string) (list.UseCase, error) {
 		Fail:    w.Fail,
 	})
 	meta := storetest.NewFake(storetest.FakeParams{Meta: map[string]worktree.Meta{"feat/a": {CreatedAt: createdAt}, "feat/b": {CreatedAt: createdAt}}})
-	prs := worktree.PullRequests{Open: []worktree.PullRequest{{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/b"}}}
+	prs := []worktree.PullRequest{
+		{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/b", State: worktree.PullRequestOpen},
+		{Number: 9, URL: "https://github.com/acme/acme/pull/9", Branch: "feat/a", State: worktree.PullRequestMerged},
+	}
 
 	return list.UseCase{
 		Git:  git,
@@ -73,7 +76,7 @@ func (w world) open(context.Context, string) (list.UseCase, error) {
 		Jobs: func(context.Context) ([]run.Job, error) {
 			return []run.Job{{Name: "web", WorkDir: "/repo/.trees/feat-a", Up: true}}, w.JobsErr
 		},
-		PullRequests: func(context.Context) (worktree.PullRequests, error) { return prs, w.PRsErr },
+		PullRequests: func(context.Context, []string) ([]worktree.PullRequest, error) { return prs, w.PRsErr },
 		Repository:   repository.Service{Config: configured{err: w.ConfigErr}, Git: git, MainPath: mainPath, Init: &domain.FollowUp{Command: domain.CommandInit}},
 	}, nil
 }

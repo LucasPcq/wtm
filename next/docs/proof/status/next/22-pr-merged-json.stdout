@@ -1,0 +1,132 @@
+{
+  "v": 2,
+  "command": "status",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "main": false,
+        "locked": false,
+        "rebasing": false,
+        "created_at": "<T>",
+        "parent": "main",
+        "children": [],
+        "base": {
+          "name": "main",
+          "ahead": 0,
+          "behind": 2
+        },
+        "origin": null,
+        "changes": {
+          "staged": 0,
+          "modified": 0,
+          "untracked": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "files": []
+        },
+        "commits": [
+          {
+            "sha": "<SHA>",
+            "subject": "chore: bootstrap acme",
+            "author": "Acme Dev",
+            "at": "<T>"
+          }
+        ],
+        "review": {
+          "number": 9,
+          "url": "https://github.com/acme/acme/pull/9",
+          "state": "merged"
+        },
+        "isolation": "isolated",
+        "run_toml": "declared",
+        "run": {
+          "addressing": "names",
+          "offset": 20,
+          "ports": "offset"
+        },
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23480
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23481
+          }
+        ],
+        "env": {
+          "declared": 2,
+          "files": [
+            {
+              "target": "apps/api/.env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            },
+            {
+              "target": "apps/web/.env",
+              "missing": true,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            }
+          ]
+        },
+        "problems": [
+          {
+            "code": "status.merged",
+            "message": "its pull request is merged",
+            "fix": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "status.merged",
+              "message": ""
+            }
+          },
+          {
+            "code": "status.env_missing",
+            "message": "apps/web/.env is missing",
+            "fix": {
+              "command": "env",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "status.env_missing",
+              "message": ""
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

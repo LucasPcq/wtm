@@ -268,6 +268,30 @@ func (f *Fake) AheadBehindOf(_ context.Context, span worktree.Span) (worktree.Ah
 	return worktree.AheadBehind{Ahead: len(of) - shared, Behind: len(base) - shared}, nil
 }
 
+// IsAncestor reports whether the commit ancestry.Ancestor is in the history of
+// ancestry.Descendant, as git.Repo.IsAncestor does over the local and fetched
+// branches; it fails when either commit is on none of them.
+func (f *Fake) IsAncestor(_ context.Context, ancestry worktree.Ancestry) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("IsAncestor", ancestry.Descendant); err != nil {
+		return false, err
+	}
+
+	var hasAncestor, hasDescendant, behind bool
+	for _, h := range slices.Concat(slices.Collect(maps.Values(f.local)), slices.Collect(maps.Values(f.remote))) {
+		at := slices.Index(h, ancestry.Descendant)
+		hasAncestor = hasAncestor || slices.Contains(h, ancestry.Ancestor)
+		hasDescendant = hasDescendant || at >= 0
+		behind = behind || at >= 0 && slices.Contains(h[:at+1], ancestry.Ancestor)
+	}
+	if !hasAncestor || !hasDescendant {
+		return false, fmt.Errorf("gittest: unknown commit %s or %s", ancestry.Ancestor, ancestry.Descendant)
+	}
+
+	return behind, nil
+}
+
 // Snapshot returns the worktrees, the branches and the divergence of each
 // local branch whose remote tip differs, as git.Repo.Snapshot does.
 func (f *Fake) Snapshot(ctx context.Context) (worktree.Snapshot, error) {

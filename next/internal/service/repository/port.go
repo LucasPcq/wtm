@@ -23,3 +23,8 @@ type Prober interface {
 	Locate(ctx context.Context, path string) (worktree.Location, error)
 	Dirty(ctx context.Context, path string) (bool, error)
 }
+
+// Ancestors tells whether a commit is another or one of its ancestors.
+type Ancestors interface {
+	IsAncestor(ctx context.Context, ancestry worktree.Ancestry) (bool, error)
+}

@@ -134,3 +134,14 @@ func TestAllWithPRsAddsAReviewColumn(t *testing.T) {
 	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
 	formtest.Golden(t, "status_all_with_prs", got.Stdout)
 }
+
+func TestAMergedPullRequestIsShortAndItsCleanComesFirst(t *testing.T) {
+	text := runStatus(t, world{Merged: true}, "feat/a", "--with-prs")
+	json := runStatus(t, world{Merged: true}, "feat/a", "--with-prs", "--output", "json")
+	all := runStatus(t, world{Merged: true}, "--all", "--with-prs")
+
+	require.Equal(t, uicli.ExitOK, text.Code, text.Stderr)
+	formtest.Golden(t, "status_merged", text.Stdout)
+	formtest.Golden(t, "envelope_status_merged", json.Stdout)
+	formtest.Golden(t, "status_all_merged", all.Stdout)
+}

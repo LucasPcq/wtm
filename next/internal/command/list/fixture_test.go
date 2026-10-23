@@ -39,16 +39,16 @@ type seed struct {
 	Base      string // the base branch, main when empty
 	Jobs      []run.Job
 	JobsErr   error
-	PRs       worktree.PullRequests
+	PRs       []worktree.PullRequest
 	PRsErr    error
 }
 
-// A world is list's use case over the fakes a seed describes, with how many times GitHub was asked.
+// A world is list's use case over the fakes a seed describes, with the branches GitHub was asked of, once per ask.
 type world struct {
 	usecase list.UseCase
 	git     *gittest.Fake
 	meta    *storetest.Fake
-	asked   *int
+	asked   *[][]string
 }
 
 func newWorld(s seed) world {
@@ -62,15 +62,15 @@ func newWorld(s seed) world {
 
 	git := gittest.NewFake(s.Git)
 	meta := storetest.NewFake(storetest.FakeParams{Meta: s.Meta})
-	asked := 0
+	var asked [][]string
 	config := project.Config{Worktrees: project.Worktrees{BasePath: "../.trees", BaseBranch: base}}
 	return world{
 		usecase: list.UseCase{
 			Git:  git,
 			Meta: meta,
 			Jobs: func(context.Context) ([]run.Job, error) { return s.Jobs, s.JobsErr },
-			PullRequests: func(context.Context) (worktree.PullRequests, error) {
-				asked++
+			PullRequests: func(_ context.Context, branches []string) ([]worktree.PullRequest, error) {
+				asked = append(asked, branches)
 				return s.PRs, s.PRsErr
 			},
 			Repository: repository.Service{Config: configured{config: config, err: s.ConfigErr}, Git: git, MainPath: mainPath},

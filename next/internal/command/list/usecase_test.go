@@ -110,17 +110,17 @@ func TestAWorktreeThatCannotBeReadFailsAlone(t *testing.T) {
 }
 
 func TestGitHubIsAskedOnlyWhenTheRequestAsks(t *testing.T) {
-	pr := worktree.PullRequest{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a"}
-	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}}, PRs: worktree.PullRequests{Open: []worktree.PullRequest{pr}}})
+	pr := worktree.PullRequest{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a", State: worktree.PullRequestMerged}
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), {Path: "/repo/.trees/detached", State: worktree.Detached{}}}}, PRs: []worktree.PullRequest{pr}})
 
 	without, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
 	require.NoError(t, err)
 	with, err := w.usecase.Run(t.Context(), list.Request{WithPRs: true}, domain.RunOptions{})
 	require.NoError(t, err)
 
-	assert.Equal(t, 1, *w.asked)
+	assert.Equal(t, [][]string{{"main", "", "feat/a"}}, *w.asked, "the live branches as they are: the adapter skips the empty one")
 	assert.Nil(t, detailOf(t, without, "feat/a").PR)
-	assert.Equal(t, &list.PR{Number: 12, URL: pr.URL}, detailOf(t, with, "feat/a").PR)
+	assert.Equal(t, &list.PR{Number: 12, URL: pr.URL, State: worktree.PullRequestMerged}, detailOf(t, with, "feat/a").PR, "the newest pull request, whatever its state")
 	assert.Nil(t, detailOf(t, with, "main").PR)
 }
 
@@ -131,7 +131,6 @@ func TestWhatCannotBeAskedIsAWarningNotAFailure(t *testing.T) {
 		message string
 	}{
 		"prs_unavailable": {seed: seed{PRsErr: fmt.Errorf("%w: run `gh auth login`", worktree.ErrPullRequestsUnavailable)}, codes: []string{list.CodePRsUnavailable}, message: "pull requests unavailable: run `gh auth login`"},
-		"prs_capped":      {seed: seed{PRs: worktree.PullRequests{Capped: true}}, codes: []string{list.CodePRsCapped}, message: "only the most recent open pull requests were listed: an older one is not shown"},
 		"daemon_unknown":  {seed: seed{JobsErr: run.ErrUnknown}, codes: []string{list.CodeJobsUnknown}, message: "the run daemon is not running: which jobs are up is unknown"},
 		"base_missing":    {seed: seed{Base: "develop"}, codes: []string{list.CodeBaseMissing}, message: "the base branch develop does not exist: commits ahead of it are not counted"},
 	}
@@ -145,6 +144,13 @@ func TestWhatCannotBeAskedIsAWarningNotAFailure(t *testing.T) {
 			assert.Nil(t, read.Failure())
 		})
 	}
+}
+
+func TestAnInterruptedReadDoesNotWarnGitHubIsUnavailable(t *testing.T) {
+	read, err := newWorld(seed{PRsErr: context.Canceled}).usecase.Run(t.Context(), list.Request{WithPRs: true}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.NotContains(t, codes(read), list.CodePRsUnavailable)
 }
 
 func TestJobsThatCannotBeToldAreNoServicesAtAll(t *testing.T) {

@@ -100,6 +100,28 @@ func TestTheFakeAndGitCountBothWaysBetweenABranchAndItsBase(t *testing.T) {
 	}
 }
 
+func TestTheFakeAndGitTellWhetherACommitIsAnotherOrOneOfItsAncestors(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			main, unmerged := tip(t, impl.port, worktree.LocalBranch{Name: "main"}), tip(t, impl.port, worktree.LocalBranch{Name: "unmerged"})
+			unknown := "1234567890123456789012345678901234567890"
+
+			behind, behindErr := impl.port.IsAncestor(t.Context(), worktree.Ancestry{Ancestor: main, Descendant: unmerged})
+			ahead, aheadErr := impl.port.IsAncestor(t.Context(), worktree.Ancestry{Ancestor: unmerged, Descendant: main})
+			same, sameErr := impl.port.IsAncestor(t.Context(), worktree.Ancestry{Ancestor: main, Descendant: main})
+			_, unknownErr := impl.port.IsAncestor(t.Context(), worktree.Ancestry{Ancestor: main, Descendant: unknown})
+
+			require.NoError(t, behindErr)
+			assert.True(t, behind)
+			require.NoError(t, aheadErr)
+			assert.False(t, ahead)
+			require.NoError(t, sameErr)
+			assert.True(t, same, "a commit is its own ancestor")
+			require.Error(t, unknownErr, "a head never fetched is no commit of the repository")
+		})
+	}
+}
+
 func TestTheFakeAndGitListTheLastCommitsOfAWorktreeNewestFirst(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {

@@ -15,7 +15,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
-	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 
 	"github.com/stretchr/testify/assert"
@@ -124,6 +123,7 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 	dryRun.DryRun = true
 	fixes := status.Problems(status.ProblemsParams{
 		Subject: "feat/a",
+		Merged:  true,
 		Missing: []status.Missing{{Target: ".env"}, {Target: ".env", From: status.FromExample}, {Target: ".env", From: status.FromMain}, {Target: ".env", From: status.FromNowhere}},
 		Pending: true,
 		Jobs:    []status.Job{{Name: "api", State: run.Crashed}, {Name: "db", State: run.Crashed, Owner: &status.Owner{Branch: "main"}}},
@@ -145,16 +145,17 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"settle":      {followUp: settle("feat/x"), argv: []string{"wtm", "env", "feat/x"}},
 		"dry_run":     {followUp: dryRun, argv: []string{"wtm", "clean", "feat/x", "--force", "--dry-run"}},
 		"pr_url_only": {followUp: domain.FollowUp{URL: pr.URL}, argv: []string{"gh", "pr", "view", pr.URL, "--web"}},
-		"env":         {followUp: fixes[0].Fix, argv: []string{"wtm", "env", "feat/a"}},
-		"env_example": {followUp: fixes[1].Fix, argv: []string{"wtm", "env", "feat/a", "--from", "example"}},
-		"env_main":    {followUp: fixes[2].Fix, argv: []string{"wtm", "env", "feat/a", "--from", "main"}},
-		"config_edit": {followUp: fixes[3].Fix, argv: []string{"wtm", "config", "edit"}},
-		"isolation":   {followUp: fixes[4].Fix, argv: []string{"wtm", "env", "feat/a", "--isolation", "isolated"}},
-		"run_start":   {followUp: fixes[5].Fix, argv: []string{"wtm", "run", "start", "feat/a", "--job", "api", "--detach"}},
-		"shared":      {followUp: fixes[6].Fix, argv: []string{"wtm", "run", "start", "main", "--job", "db", "--detach"}},
-		"tree_go":     {followUp: tree.Actions(tree.Detail{Branch: "feat/a", Rebasing: true}, "main")[0], argv: []string{"wtm", "go", "feat/a"}},
-		"tree_clean":  {followUp: tree.Actions(tree.Detail{Branch: "feat/a", PR: &tree.PR{State: worktree.PullRequestMerged}}, "main")[0], argv: []string{"wtm", "clean", "feat/a"}},
-		"tree_sync":   {followUp: tree.Actions(tree.Detail{Branch: "feat/a", NeedsSync: true}, "main")[0], argv: []string{"wtm", "sync", "feat/a"}},
+		"merged":      {followUp: fixes[0].Fix, argv: []string{"wtm", "clean", "feat/a"}},
+		"env":         {followUp: fixes[1].Fix, argv: []string{"wtm", "env", "feat/a"}},
+		"env_example": {followUp: fixes[2].Fix, argv: []string{"wtm", "env", "feat/a", "--from", "example"}},
+		"env_main":    {followUp: fixes[3].Fix, argv: []string{"wtm", "env", "feat/a", "--from", "main"}},
+		"config_edit": {followUp: fixes[4].Fix, argv: []string{"wtm", "config", "edit"}},
+		"isolation":   {followUp: fixes[5].Fix, argv: []string{"wtm", "env", "feat/a", "--isolation", "isolated"}},
+		"run_start":   {followUp: fixes[6].Fix, argv: []string{"wtm", "run", "start", "feat/a", "--job", "api", "--detach"}},
+		"shared":      {followUp: fixes[7].Fix, argv: []string{"wtm", "run", "start", "main", "--job", "db", "--detach"}},
+		"tree_go":     {followUp: tree.Actions(tree.Detail{Branch: "feat/a", Rebasing: true}, false)[0], argv: []string{"wtm", "go", "feat/a"}},
+		"tree_clean":  {followUp: tree.Actions(tree.Detail{Branch: "feat/a"}, true)[0], argv: []string{"wtm", "clean", "feat/a"}},
+		"tree_sync":   {followUp: tree.Actions(tree.Detail{Branch: "feat/a", NeedsSync: true}, false)[0], argv: []string{"wtm", "sync", "feat/a"}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
