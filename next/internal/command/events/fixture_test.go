@@ -78,9 +78,10 @@ func (b *fakeBus) Subscribe(_ context.Context, repos []string) (<-chan []byte, e
 	return lines, nil
 }
 
-// A known is the registry of the repositories wtm knows, every one initialized: repos are those it lists first, store what it lists once the stream runs.
+// A known is the registry of the repositories wtm knows, every one initialized: repos are those it lists first, store what it lists once the stream runs, inert when the state is moved.
 type known struct {
 	repos []domain.Repo
+	moved bool
 	store *registrytest.Fake
 }
 

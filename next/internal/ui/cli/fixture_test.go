@@ -24,10 +24,10 @@ func refusing(streams *output.Streams) *cobra.Command {
 	}}
 }
 
-// lost runs where its working directory could not be read.
-func lost(streams *output.Streams) *cobra.Command {
-	run := &Run{Command: "lost", Streams: streams, Output: OutputText}
-	return &cobra.Command{Use: "lost", RunE: func(cmd *cobra.Command, _ []string) error {
+// lost runs where its working directory could not be read, in env.
+func lost(streams *output.Streams, name string, env Env) *cobra.Command {
+	run := &Run{Command: name, Streams: streams, Env: env, Output: OutputText}
+	return &cobra.Command{Use: name, RunE: func(cmd *cobra.Command, _ []string) error {
 		return run.Begin(cmd)
 	}}
 }

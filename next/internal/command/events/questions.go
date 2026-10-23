@@ -72,9 +72,9 @@ func (r Request) Validate() error {
 	return domain.Invalid([]domain.FieldError{{Path: pathRepo, Code: CodeRepoWithAll, Template: "{path} watches one repository, all of them already: give one or the other", With: []string{pathAll}}})
 }
 
-// relativeFromNowhere is the problem of a relative --repo from a caller that stands nowhere: no directory to read it from.
+// relativeFromNowhere is the problem of a relative --repo from a caller in no directory to read it from: a surface's call naming none, or a command line whose working directory is gone.
 func relativeFromNowhere(repo string) error {
-	return domain.Invalid([]domain.FieldError{{Path: pathRepo, Code: CodeNotADirectory, Template: "{path} {value} is relative, and the call names no directory to read it from", Params: domain.Params{"value": repo}}})
+	return domain.Invalid([]domain.FieldError{{Path: pathRepo, Code: CodeNotADirectory, Template: "{path} {value} is relative, and the caller stands in no directory to read it from", Params: domain.Params{"value": repo}}})
 }
 
 // notADirectory is the problem of a --repo that names no directory.

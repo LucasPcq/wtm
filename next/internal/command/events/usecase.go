@@ -229,6 +229,9 @@ func (s *stream) everyRepository(ctx context.Context) error {
 			_, added := received.Line.Event.(domain.RepoAdded)
 			_, removed := received.Line.Event.(domain.RepoRemoved)
 			switch {
+			// the bus is shared whatever the state: a repository another process announces would be read with this one's moved state
+			case added && s.Registry.Inert():
+				return nil
 			case added && !watched[repo.CommonDir]:
 				if err := s.emit(received); err != nil {
 					return err

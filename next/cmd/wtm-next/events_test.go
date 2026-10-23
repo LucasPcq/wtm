@@ -221,7 +221,8 @@ func TestTheEveryRepositoryStreamListsNoRepositoryWhileTheStateIsMoved(t *testin
 	t.Setenv(stateDirEnv, "")
 	socket, registry := servingBus(t), filepath.Join(t.TempDir(), "repos.json")
 	knownRepos(registry, socket).Register(t.Context(), domain.Repo{Root: gittest.Resolved(t, main), CommonDir: bus.Resolved(filepath.Join(main, ".git"))})
-	require.FileExists(t, registry)
+	before, err := os.ReadFile(registry)
+	require.NoError(t, err)
 	moved := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(moved, "config.toml"), []byte("[worktrees]\nbase_path = \"../.trees\"\n"), 0o644))
 	t.Setenv(stateDirEnv, moved)
@@ -232,4 +233,7 @@ func TestTheEveryRepositoryStreamListsNoRepositoryWhileTheStateIsMoved(t *testin
 	assert.Equal(t, http.StatusOK, response.Status, response.Envelope.Err)
 	require.Len(t, lines, 1)
 	assert.JSONEq(t, `{"v":2,"type":"ready","ts":"x"}`, withTS(t, lines[0]))
+	after, err := os.ReadFile(registry)
+	require.NoError(t, err)
+	assert.Equal(t, string(before), string(after))
 }

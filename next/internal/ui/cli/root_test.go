@@ -52,3 +52,9 @@ func TestACommandLineThatCannotReadItsWorkingDirectoryIsRefused(t *testing.T) {
 	assert.Equal(t, ExitPrecondition, got.Code)
 	assert.Equal(t, "\n  ✗ the current directory cannot be read (removed?): cd into an existing directory\n\n", got.Stderr)
 }
+
+func TestACommandLineWhoseProjectIsNamedNeedsNoWorkingDirectory(t *testing.T) {
+	got := runIn(t, "named")
+
+	assert.Equal(t, ExitOK, got.Code, got.Stderr)
+}

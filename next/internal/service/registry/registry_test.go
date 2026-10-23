@@ -75,14 +75,20 @@ func TestAMovedStateDirectoryLeavesTheRegistryAloneAndListsNothing(t *testing.T)
 	assert.Empty(t, b.announcements())
 }
 
-func TestNoRepositoryIsAnnouncedOnceTheCallerIsGone(t *testing.T) {
-	store, b := registrytest.NewFake(registrytest.FakeParams{Repos: []domain.Repo{main, other}}), &bus{}
+func TestWhatTheStoreCommittedIsAnnouncedOnceTheCallerIsGone(t *testing.T) {
+	store, b := registrytest.NewFake(registrytest.FakeParams{Repos: []domain.Repo{other}}), &bus{}
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
+	s := service(store, initialized(main), b)
 
-	kept, err := service(store, initialized(), b).Prune(ctx)
+	s.Register(ctx, main)
+
+	assert.Equal(t, []string{"Add /code/app/.git"}, store.Calls(), "no prune once the caller is gone")
+	assert.Equal(t, []announced{{Event: domain.RepoAdded{}, Repo: main}}, b.announcements())
+
+	kept, err := s.Prune(ctx)
 
 	require.NoError(t, err)
-	assert.Empty(t, kept)
-	assert.Empty(t, b.announcements())
+	assert.Equal(t, []domain.Repo{main}, kept)
+	assert.Equal(t, []announced{{Event: domain.RepoAdded{}, Repo: main}, {Event: domain.RepoRemoved{}, Repo: other}}, b.announcements())
 }

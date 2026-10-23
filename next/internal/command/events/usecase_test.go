@@ -312,6 +312,19 @@ func TestARepositoryJoiningIsSentWithItsSnapshot(t *testing.T) {
 	assert.Contains(t, r.next(t), `"type":"snapshot","ts":"2026-10-16T12:00:00Z","repo":{"root":"/joining"`)
 }
 
+// $WTM_STATE_DIR moves the state, not the bus: a repository another process announces would be read with the moved state.
+func TestARepositoryJoiningIsIgnoredWhileTheStateIsMoved(t *testing.T) {
+	joining := newRepo("/joining")
+	bus := newBus()
+	r, _ := watching(t, useCase(bus, &known{moved: true}, opening(joining)), events.Request{All: true})
+	sub := bus.subscribed(t)
+	assert.Equal(t, "ready", r.nextType(t))
+
+	sub.Lines <- published(t, joining.Repo, domain.RepoAdded{})
+
+	r.quiet(t)
+}
+
 // A repository joining with no wtm config once looped: the stream's join registered it again, whose prune dropped it, announcing it anew.
 func TestARepositoryJoiningWithNoConfigIsOneLineAndIsNotRegistered(t *testing.T) {
 	uninitialized := newRepo("/bare")

@@ -21,7 +21,7 @@ type Env struct {
 	CorrelationID string // $WTM_CORRELATION_ID
 }
 
-// ReadEnv reads the process's Env. A working directory that cannot be read leaves Cwd empty: paths then show absolute, and opening the repository from it fails on its own.
+// ReadEnv reads the process's Env. A working directory that cannot be read leaves Cwd empty, and ProjectDir too unless $WTM_PROJECT_DIR names one: [Run.Begin] refuses the run then; with $WTM_PROJECT_DIR, paths show absolute.
 func ReadEnv() Env {
 	cwd, _ := os.Getwd()
 	env := Env{Cwd: resolved(cwd), ProjectDir: cwd, CorrelationID: os.Getenv(CorrelationIDEnv)}

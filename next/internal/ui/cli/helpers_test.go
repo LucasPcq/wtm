@@ -17,7 +17,7 @@ type printed struct {
 func runIn(t *testing.T, args ...string) printed {
 	t.Helper()
 	streams, _, stdout, stderr := output.Test()
-	root := NewRoot("1.2.3", streams, []*cobra.Command{probe(), refusing(streams), lost(streams)})
+	root := NewRoot("1.2.3", streams, []*cobra.Command{probe(), refusing(streams), lost(streams, "lost", Env{}), lost(streams, "named", Env{ProjectDir: "/code/app", Named: true})})
 	code := Execute(t.Context(), root, args)
 	return printed{Stdout: stdout.String(), Stderr: stderr.String(), Code: code}
 }

@@ -63,9 +63,15 @@ func TestEachRequestThatCarriesItsCallerTakesItFromEverySurface(t *testing.T) {
 		require.True(t, ok, app.Type().Field(i).Name)
 		requests = append(requests, run.Type.In(2))
 	}
-	watch, ok := reflect.TypeFor[events.UseCase]().MethodByName("Watch")
-	require.True(t, ok)
-	requests = append(requests, watch.Type.In(2))
+	// a stream is built once, out of app: each one of streamsListed by its use case
+	streamed := map[string]reflect.Type{events.Name: reflect.TypeFor[events.UseCase]()}
+	for _, name := range streamsListed {
+		useCase, ok := streamed[name]
+		require.True(t, ok, "stream %s has no use case here", name)
+		watch, ok := useCase.MethodByName("Watch")
+		require.True(t, ok, name)
+		requests = append(requests, watch.Type.In(2))
+	}
 
 	carrying := 0
 	for _, req := range requests {
