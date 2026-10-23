@@ -217,7 +217,7 @@ func (b *branchStep) Standing() form.Standing {
 func (b *branchStep) check(branch string) error {
 	label := b.Label()
 	if held := b.s.Questions().NewTarget(branch); len(held) > 0 {
-		return form.Problem(held[0], label)
+		return b.s.Problem(held[0], label)
 	}
 
 	questions, err := b.s.Check(domain.Answered{Path: extract.PathTo, Values: []string{branch}})
@@ -227,7 +227,7 @@ func (b *branchStep) check(branch string) error {
 
 	for _, found := range questions.Errors {
 		if found.Path == extract.PathTo {
-			return form.Problem(found, label)
+			return b.s.Problem(found, label)
 		}
 	}
 

@@ -1,3 +1,4 @@
 
-  ✗ cannot apply the selected changes: README.md was also modified in "topic" — resolve it there, extract to another worktree, or re-run with --on-conflict resolve
+  ✗ cannot apply the selected changes: README.md was also modified in "topic" — resolve it there, extract to another worktree, or extract with conflict markers
+  → wtm extract feat/login --ff=false --files README.md --keep=false --on-conflict resolve --to topic   write conflict markers in topic
 

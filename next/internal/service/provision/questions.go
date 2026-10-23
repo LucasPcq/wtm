@@ -355,7 +355,8 @@ func (q Questions) Recalled() []string {
 	origins := map[string]domain.Origin{domain.PathEnvFrom: q.EnvFrom.Origin, domain.PathIsolation: q.Isolation.Origin, domain.PathFastForward: q.FastForward.Origin}
 	var recalled []string
 	for _, field := range rememberable() {
-		if origins[field] == domain.OriginRemembered && !q.skipped(field) {
+		// by its origin, not its skip: a remembered isolation still settles a worktree whose run.toml could not be read
+		if origins[field] == domain.OriginRemembered {
 			recalled = append(recalled, field)
 		}
 	}

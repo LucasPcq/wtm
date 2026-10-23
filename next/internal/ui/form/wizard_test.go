@@ -125,6 +125,18 @@ func TestAPreviewThatFailsSaysWhyAndOffersOnlyToCancel(t *testing.T) {
 	assert.Equal(t, form.Cancelled, d.Wizard.Ending())
 }
 
+func TestAFieldAFailedPreviewRefusesIsFollowedByItsStep(t *testing.T) {
+	f := newFake()
+	f.previewErr = domain.Invalid([]domain.FieldError{{Path: "first", Code: "taken", Template: "{path} is taken", FollowUp: &domain.FollowUp{Command: "go", Message: "jump in"}}})
+	script := f.script()
+	script.CommandLine = formtest.CommandLine
+	d := open(t, script)
+
+	d.Keys("enter", "enter")
+
+	assert.Contains(t, d.Screen(), "FIRST is taken\n  ┃      → wtm go   jump in")
+}
+
 func TestAStaleRunAsksNothingAgainAndSaysWhy(t *testing.T) {
 	f := newFake()
 	d := open(t, f.script())

@@ -22,5 +22,5 @@
   ! web/.env is missing
   → wtm env feat/a
   ! api crashed (exit 1)
-  → wtm run start feat/a api --detach
+  → wtm run start feat/a --job api --detach
 

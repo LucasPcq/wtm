@@ -13,9 +13,9 @@
   ! web/.env is missing
   → wtm env feat/a
   ! api crashed (exit 1)
-  → wtm run start feat/a api --detach
+  → wtm run start feat/a --job api --detach
 
   feat/old
   ! predates the isolation choice: run up and run start refuse it
-  → wtm env feat/old isolated
+  → wtm env feat/old --isolation isolated
 

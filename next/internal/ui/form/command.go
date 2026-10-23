@@ -324,7 +324,8 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 	stdout, _ := c.io.Writers()
 	switch {
 	case failure != nil:
-		return c.io.FailWith(failure, replanStep(failure, argv))
+		shown, own := c.ownStep(cmd, failure)
+		return c.io.FailWith(shown, append(replanStep(failure, argv), own...))
 	case !ran.Outcome.Applied():
 		previewed, fingerprint := c.Preview(ran.Outcome), ran.Outcome.PlanFingerprint()
 		output.Frame(stdout, func(w io.Writer) {
@@ -343,6 +344,27 @@ func replanStep(failure *domain.Error, argv []string) []output.NextStep {
 		return nil
 	}
 	return []output.NextStep{{Command: output.Line(append(slices.Clone(argv), "--"+uicli.FlagDryRun)), Note: domain.ReplanNote}}
+}
+
+// ownStep is the next step of a failure whose follow-up names this command, spelled from its schema as the replan is, and the failure left to FailWith without it, since the command line handed to the cli spells the commands not migrated; a follow-up its request refuses is left to FailWith.
+func (c *Command[R, Q, O]) ownStep(cmd *cobra.Command, failure *domain.Error) (*domain.Error, []output.NextStep) {
+	if failure.FollowUp == nil || failure.FollowUp.Command != c.io.Command {
+		return failure, nil
+	}
+
+	var zero R
+	req, err := domain.Fold(zero, failure.FollowUp.Answers)
+	if err != nil {
+		return failure, nil
+	}
+
+	argv := c.Argv(cmd.CommandPath(), req)
+	if failure.FollowUp.DryRun {
+		argv = append(argv, "--"+uicli.FlagDryRun)
+	}
+	shown := *failure
+	shown.FollowUp = nil
+	return &shown, []output.NextStep{{Command: output.Line(argv), Note: failure.FollowUp.Message}}
 }
 
 // applyLine is argv, the command line of the request, held to the fingerprint of the plan it previewed.

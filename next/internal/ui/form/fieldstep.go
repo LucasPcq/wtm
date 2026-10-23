@@ -17,7 +17,7 @@ type sheet interface {
 	Field(at int) domain.Field
 	Standing(at int) Standing
 	Label(path string) string
-	Problem(found domain.FieldError) error
+	Problem(found domain.FieldError, label string) error
 	Answer(at int, answers ...domain.Answered)
 	Forget(at int)
 	remembering(at int, path string, on bool, answers ...domain.Answered)
@@ -286,13 +286,13 @@ func (s *textListStep) check(check widget.EntryCheck) error {
 
 	for _, found := range problems {
 		if found.Path == path {
-			return s.sheet.Problem(found)
+			return s.sheet.Problem(found, s.sheet.Label(found.Path))
 		}
 
 		index, entry := strings.CutPrefix(found.Path, path+"[")
 		at, err := strconv.Atoi(strings.TrimSuffix(index, "]"))
 		if entry && err == nil && at >= check.From {
-			return s.sheet.Problem(found)
+			return s.sheet.Problem(found, s.sheet.Label(found.Path))
 		}
 	}
 
@@ -350,7 +350,7 @@ func (s *TextStep) check(value string) error {
 	}
 
 	if found := domain.ProblemsOf(problems, s.path()); len(found) > 0 {
-		return s.sheet.Problem(found[0])
+		return s.sheet.Problem(found[0], s.sheet.Label(found[0].Path))
 	}
 
 	return nil

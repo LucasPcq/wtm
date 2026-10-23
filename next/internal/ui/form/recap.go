@@ -88,7 +88,7 @@ func (w *Wizard) recapBody() string {
 	return w.styles.Warning.Render(output.GlyphAttention) + " " + staleText + "\n\n" + plan
 }
 
-// failureText draws the preview's failure: its message, then each field it refuses under the label of the step that sets it.
+// failureText draws the preview's failure: its message, then each field it refuses under the label of the step that sets it, followed by the step that gets past it, if any.
 func (w *Wizard) failureText() string {
 	first := w.failure.Error()
 	if len(w.failure.Fields) > 0 {
@@ -98,6 +98,11 @@ func (w *Wizard) failureText() string {
 	lines := []string{w.styles.Danger.Render(output.GlyphFailure) + " " + first}
 	for _, found := range w.failure.Fields {
 		lines = append(lines, detailHang+found.Message(w.script.Label(found.Path)))
+		if found.FollowUp != nil && w.script.CommandLine != nil {
+			for _, line := range output.NextStepLines([]output.NextStep{output.FollowUpStep(*found.FollowUp, w.script.CommandLine)}, w.styles.Styles.Styles) {
+				lines = append(lines, output.Indent+line)
+			}
+		}
 	}
 	return strings.Join(lines, "\n")
 }

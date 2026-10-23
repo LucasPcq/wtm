@@ -290,7 +290,7 @@ func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain
 		planned.Creates = 1
 	}
 
-	if refused := refusedFor(planned.Target.Branch, req.OnConflict, conflicts); refused != nil {
+	if refused := refusedFor(req, planned.Target.Branch, conflicts); refused != nil {
 		return Plan{}, nil, refused
 	}
 
@@ -311,13 +311,21 @@ func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain
 	return planned, append(f.divergedWarnings(req), f.fallbackWarnings(planned)...), nil
 }
 
-// refusedFor is the refusal of the conflicts, nil when there are none or the request resolves them; a binary conflict cannot take conflict markers, so it is refused even then.
-func refusedFor(target string, onConflict OnConflict, conflicts []worktree.Conflict) *domain.Error {
-	if !worktree.Refuses(conflicts, onConflict == OnConflictResolve) {
+// CodeResolve is the step that extracts again, writing conflict markers in the target.
+const CodeResolve = Name + ".resolve"
+
+// refusedFor is the refusal of the conflicts, nil when there are none or req resolves them, followed by the same extract resolving them; a binary conflict cannot take conflict markers, so it is refused even then, with no follow-up.
+func refusedFor(req Request, target string, conflicts []worktree.Conflict) *domain.Error {
+	if !worktree.Refuses(conflicts, req.OnConflict == OnConflictResolve) {
 		return nil
 	}
 
-	return conflictRefusal(conflicts, target)
+	refusal := conflictRefusal(conflicts, target)
+	if !worktree.Refuses(conflicts, true) {
+		req.OnConflict = OnConflictResolve
+		refusal.FollowUp = &domain.FollowUp{Command: Name, Answers: domain.AnswersOf(Questions{}.Form(), req), Code: CodeResolve, Message: "write conflict markers in " + target}
+	}
+	return refusal
 }
 
 // conflictRefusal refuses the conflicts with CodeConflict, its message naming the binary files alone when there are any, else each file by how it conflicts.
@@ -345,7 +353,7 @@ func conflictRefusal(conflicts []worktree.Conflict, target string) *domain.Error
 		clauses = append(clauses, strings.Join(exists, ", ")+" "+plural(len(exists), "already exists", "already exist"))
 	}
 
-	refusal.Message = fmt.Sprintf("cannot apply the selected changes: %s in %q — resolve %s there, extract to another worktree, or re-run with --on-conflict resolve",
+	refusal.Message = fmt.Sprintf("cannot apply the selected changes: %s in %q — resolve %s there, extract to another worktree, or extract with conflict markers",
 		strings.Join(clauses, " and "), target, plural(len(all), "it", "them"))
 	return refusal
 }

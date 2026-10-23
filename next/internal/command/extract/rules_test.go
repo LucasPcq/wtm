@@ -131,6 +131,7 @@ func TestABinaryCollisionIsRefusedEvenUnderResolve(t *testing.T) {
 	failure := failureOf(t, err)
 	assert.Equal(t, extract.CodeConflict, failure.Code)
 	assert.Equal(t, `cannot apply the selected changes: logo.png already exists in "feat/other" and is binary — conflict markers cannot be written, remove it there or extract to another worktree`, failure.Message)
+	assert.Nil(t, failure.FollowUp)
 	assert.Equal(t, domain.Params{"target": other, "files": "logo.png"}, failure.Params)
 }
 
@@ -146,7 +147,7 @@ func TestAConflictRefusalNamesWhatWasModifiedAndWhatAlreadyExists(t *testing.T) 
 
 	failure := failureOf(t, err)
 	assert.Equal(t, domain.KindConflict, failure.Kind)
-	assert.Equal(t, `cannot apply the selected changes: a.go, b.go were also modified and new.txt already exists in "feat/other" — resolve them there, extract to another worktree, or re-run with --on-conflict resolve`, failure.Message)
+	assert.Equal(t, `cannot apply the selected changes: a.go, b.go were also modified and new.txt already exists in "feat/other" — resolve them there, extract to another worktree, or extract with conflict markers`, failure.Message)
 }
 
 func TestAnExistingTargetIgnoresTheCreationAnswersAndSaysSo(t *testing.T) {

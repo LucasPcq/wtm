@@ -65,6 +65,9 @@ func (s *Session[R, Q, O]) Script() Script {
 		Stale:   domain.PlanStale,
 		DryRun:  s.opts.DryRun,
 	}
+	if s.command.io != nil {
+		script.CommandLine = s.command.io.CommandLine
+	}
 	if s.command.ApplyLabel != nil {
 		script.ApplyLabel = func() string { return s.command.ApplyLabel(*s.preview) }
 	}
@@ -133,9 +136,9 @@ func (s *Session[R, Q, O]) Standing(at int) Standing {
 	return st
 }
 
-// Problem is found as a step shows it: under the label of its field, followed by the step that gets past it, if any.
-func (s *Session[R, Q, O]) Problem(found domain.FieldError) error {
-	err := Problem(found, s.Label(found.Path))
+// Problem is found as a step shows it: under label, followed by the step that gets past it, if any.
+func (s *Session[R, Q, O]) Problem(found domain.FieldError, label string) error {
+	err := Problem(found, label)
 	if found.FollowUp == nil {
 		return err
 	}

@@ -11,5 +11,5 @@
   ! isolation verbatim ignored: feat/other already exists and stays isolated
 
   → wtm go feat/other
-  → wtm env feat/other verbatim   switch it to verbatim
+  → wtm env feat/other --isolation verbatim   switch it to verbatim
 

@@ -118,7 +118,7 @@ func TestAConflictIsRefusedOnItsOwnExitCodeBeforeAnythingMoves(t *testing.T) {
 
 	assert.Equal(t, exitConflict, got.Code)
 	assert.Empty(t, got.Stdout)
-	assert.Equal(t, "\n  ✗ cannot apply the selected changes: apps/api/a.txt was also modified in \"feat/other\" — resolve it there, extract to another worktree, or re-run with --on-conflict resolve\n\n", got.Stderr)
+	assert.Equal(t, "\n  ✗ cannot apply the selected changes: apps/api/a.txt was also modified in \"feat/other\" — resolve it there, extract to another worktree, or extract with conflict markers\n  → wtm-next extract feat/login --ff=false --files apps/api --keep=false --on-conflict resolve --to feat/other   write conflict markers in feat/other\n\n", got.Stderr)
 	assert.Empty(t, w.git.Moves())
 }
 

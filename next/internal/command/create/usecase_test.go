@@ -721,6 +721,17 @@ func TestARunTomlThatDoesNotParseKeepsTheIsolationRow(t *testing.T) {
 	assert.Equal(t, []domain.RecapValue{{Value: "isolated", Note: provision.NoteRunUnreadable, Text: "isolated (run.toml unreadable)"}}, planned.Recap[at].Values)
 }
 
+func TestARememberedIsolationOverAnUnparsableRunTomlKeepsItsMark(t *testing.T) {
+	w := newWorld(t, seed{Run: "bogus = [\n", Config: projectToml + "\n[wizard.remembered]\nisolation = \"verbatim\"\n"})
+
+	planned, _ := w.plan(t, create.Request{Branches: []string{branchName}})
+
+	assert.Equal(t, []string{domain.PathIsolation}, planned.Recalled)
+	at := slices.IndexFunc(planned.Recap, func(row domain.RecapRow) bool { return row.Key == domain.PathIsolation })
+	require.GreaterOrEqual(t, at, 0, planned.Recap)
+	assert.Equal(t, domain.RecapRow{Key: domain.PathIsolation, Label: "Isolation", Path: domain.PathIsolation, Mark: domain.MarkRecalled, Values: []domain.RecapValue{{Value: "verbatim", Note: provision.NoteRunUnreadable, Text: "verbatim (run.toml unreadable)"}}}, planned.Recap[at])
+}
+
 func TestAWorktreeWithNoEnvFileStillRecapsItsStrategy(t *testing.T) {
 	w := newWorld(t, seed{NoEnv: true})
 
