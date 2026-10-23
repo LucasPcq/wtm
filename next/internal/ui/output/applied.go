@@ -8,8 +8,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 )
 
-// A Recapped plan carries what its preview and its outcome show of it: it embeds domain.Recapped.
-type Recapped interface {
+// A RecappedPlan carries what its preview and its outcome show of it: it embeds domain.Recapped.
+type RecappedPlan interface {
 	Recaps() domain.Recapped
 }
 
@@ -26,7 +26,7 @@ type AppliedParams struct {
 }
 
 // DrawApplied draws what the apply of a mutation did: the tally, the applied plan with a row per worktree that stands and the warnings of the items done then of the run, each item left unfinished followed by its own warnings, and the next steps, the result's then each item's: what repairs what its failure left behind, then what its warnings offer. An item's warning reads subject, then its message.
-func DrawApplied[P Recapped, D Worktree](w io.Writer, outcome domain.Outcome[P, D], params AppliedParams) {
+func DrawApplied[P RecappedPlan, D Worktree](w io.Writer, outcome domain.Outcome[P, D], params AppliedParams) {
 	items := outcome.Result.Items
 	tallied := make([]Tallied, 0, len(items))
 	for _, item := range items {

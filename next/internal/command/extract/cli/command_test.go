@@ -63,6 +63,13 @@ func TestAResolvedConflictNamesWhatToResolveAndHowToUndo(t *testing.T) {
 	formtest.Golden(t, "resolved", got.Stdout)
 }
 
+func TestATargetsWarningsComeBeforeTheRunsInThePlan(t *testing.T) {
+	got := runExtract(t, newWorld(seed{Conflicts: conflicting}), source, "--files", "apps/api", "--to", other, "--from", "main", "--on-conflict", "resolve")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	formtest.Golden(t, "resolved_from_ignored", got.Stdout)
+}
+
 func TestACleanSourceHasNothingToExtract(t *testing.T) {
 	got := runExtract(t, newWorld(seed{Clean: true}), source, "--yes")
 

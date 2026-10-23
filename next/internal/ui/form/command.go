@@ -67,7 +67,7 @@ type Preview struct {
 }
 
 // PreviewOf is what the recap and the dry run show of a mutation's plan previewed: its recap, the run's warnings and the fields the plan recalled.
-func PreviewOf[P output.Recapped, D any](previewed domain.Outcome[P, D]) Preview {
+func PreviewOf[P output.RecappedPlan, D any](previewed domain.Outcome[P, D]) Preview {
 	recapped := previewed.Plan.Recaps()
 	return Preview{Rows: output.RecapRows(recapped.Recap), Warnings: previewed.Warnings, Recalled: recapped.Recalled}
 }

@@ -31,7 +31,7 @@ func (f FastForwarded) Failed() bool {
 // FastForwardEachParams names the branches to fast-forward and how the command
 // that asks words the one it cannot move.
 type FastForwardEachParams struct {
-	Command  string            // the command whose codes the warnings carry: <command>.ff_dirty, .ff_busy, .ff_failed
+	Command  string            // the command whose codes the warnings carry: <command>.ff_dirty (worktree dirty), .ff_busy (mid-rebase or bisect), .ff_failed (git failed, its cause in params)
 	Subjects []string          // the local branches, in order
 	Snapshot worktree.Snapshot // where each subject is checked out
 	Fallback string            // what starts from a subject left behind, ending its warning: "it starts from your local branch"

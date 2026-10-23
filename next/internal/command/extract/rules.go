@@ -426,7 +426,7 @@ func (f Facts) fallbackWarnings(planned Plan) []domain.Warning {
 // ----------------------------------------------------------------------------
 // The plan
 
-// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the source and the files to take from it, the target, how a created target is made (its source, env strategy, isolation, fast-forward), whether the files are copied rather than moved, the conflicts and what to do with them, and the answers to remember; then the answers recalled and the recap, which the fingerprint leaves out since they change nothing the apply does.
+// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the source and the files to take from it, the target, how a created target is made (its source, env strategy, isolation, fast-forward), whether the files are copied rather than moved, the conflicts and what to do with them, and the answers to remember; then the answers recalled, the recap and the summary the tally adds, which the fingerprint leaves out since they change nothing the apply does.
 type Plan struct {
 	Source      string              `json:"source"`
 	Files       []worktree.Change   `json:"files"`

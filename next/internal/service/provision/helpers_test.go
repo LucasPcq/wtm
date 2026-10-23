@@ -109,6 +109,6 @@ func gitStateNames(t *testing.T, w world) []string {
 	return gittest.Names(gitState(t, w).Branches.Local)
 }
 
-func fastForwardEach(subject string, snapshot worktree.Snapshot) provision.FastForwardEachParams {
-	return provision.FastForwardEachParams{Command: "create", Subjects: []string{subject}, Snapshot: snapshot, Fallback: "it starts from your local branch"}
+func fastForwardEach(snapshot worktree.Snapshot, subjects ...string) provision.FastForwardEachParams {
+	return provision.FastForwardEachParams{Command: "create", Subjects: subjects, Snapshot: snapshot, Fallback: "it starts from your local branch"}
 }

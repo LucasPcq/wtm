@@ -9,8 +9,8 @@
   On conflict  resolve
   topic        ../acme.trees/topic
 
-  ! README.md left with conflict markers in topic.
-  ! Nothing was removed from feat/login: to undo, discard the applied files in topic.
+  ! topic  README.md left with conflict markers in topic.
+  ! topic  Nothing was removed from feat/login: to undo, discard the applied files in topic.
 
   → wtm go topic   resolve the conflicts, then discard the same files in feat/login
 
