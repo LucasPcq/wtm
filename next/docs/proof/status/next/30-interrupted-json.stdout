@@ -112,42 +112,16 @@
         "branch": "",
         "path": "<SB>/acme.trees/detached",
         "main": false,
-        "locked": false,
+        "locked": true,
         "rebasing": false,
-        "missing": false,
+        "missing": true,
         "created_at": null,
         "parent": "",
         "children": [],
         "base": null,
         "origin": null,
-        "changes": {
-          "staged": 0,
-          "modified": 0,
-          "untracked": 0,
-          "insertions": 0,
-          "deletions": 0,
-          "files": []
-        },
-        "commits": [
-          {
-            "sha": "<SHA>",
-            "subject": "chore: rewrite the readme",
-            "author": "Acme Dev",
-            "at": "<T>"
-          },
-          {
-            "sha": "<SHA>",
-            "subject": "chore: bump",
-            "author": "Acme Dev",
-            "at": "<T>"
-          },
-          {
-            "sha": "<SHA>",
-            "subject": "chore: bootstrap acme",
-            "author": "Acme Dev",
-            "at": "<T>"
-          }
-        ],
+        "changes": null,
+        "commits": null,
         "review": null,
         "isolation": "isolated",
         "run_toml": "declared",
@@ -172,28 +146,15 @@
         ],
         "env": {
           "declared": 2,
-          "files": [
-            {
-              "target": "apps/api/.env",
-              "missing": true,
-              "keys": {
-                "missing": 0,
-                "conflicting": 0,
-                "orphan": 0
-              }
-            },
-            {
-              "target": "apps/web/.env",
-              "missing": true,
-              "keys": {
-                "missing": 0,
-                "conflicting": 0,
-                "orphan": 0
-              }
-            }
-          ]
+          "files": null
         },
-        "problems": []
+        "problems": [
+          {
+            "code": "status.missing",
+            "message": "its directory is gone",
+            "fix": null
+          }
+        ]
       }
     },
     {

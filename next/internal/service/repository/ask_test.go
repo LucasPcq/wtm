@@ -80,3 +80,24 @@ func TestTheServicesOfAWorktreeAreUnknownWhenTheDaemonCannotTell(t *testing.T) {
 	assert.Equal(t, []string{"web"}, repository.Asked{Jobs: jobs}.Services("/a"))
 	assert.Nil(t, repository.Asked{Jobs: jobs, JobsErr: run.ErrUnknown}.Services("/a"))
 }
+
+func TestACountCutShortCancelsItsWorktreeAnyOtherFailureLeavesItNotCounted(t *testing.T) {
+	done, cancel := context.WithCancel(t.Context())
+	cancel()
+	failed := errors.New("bad revision")
+	cases := map[string]struct {
+		ctx  context.Context
+		err  error
+		want error
+	}{
+		"counted":     {ctx: t.Context()},
+		"cancelled":   {ctx: done, err: context.Canceled, want: context.Canceled},
+		"not_counted": {ctx: t.Context(), err: failed},
+		"git_killed":  {ctx: done, err: failed, want: context.Canceled},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.ErrorIs(t, repository.Interrupted(c.ctx, c.err), c.want)
+		})
+	}
+}

@@ -121,17 +121,17 @@ func TestAWorktreeThatCannotBeReadIsDrawnAsItsErrorAlone(t *testing.T) {
 	formtest.Golden(t, "status_unread", got.Stdout)
 }
 
-func TestAllCountsTheWorktreesNotReadAndNeverSaysNothingToFixThen(t *testing.T) {
+func TestAllCountsTheWorktreesNotReadAmongThoseReadAndNeverSaysNothingToFixThen(t *testing.T) {
 	got := runStatus(t, world{Broken: true, NoRun: true}, "--all")
 
 	assert.Equal(t, uicli.ExitError, got.Code)
-	formtest.Golden(t, "status_all_unread", got.Stdout)
+	formtest.Golden(t, "status_all_partly_unread", got.Stdout)
 }
 
 func TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleaned(t *testing.T) {
 	one := runStatus(t, world{Gone: true}, "feat/old")
 	all := runStatus(t, world{Gone: true, NoRun: true}, "--all")
-	json := runStatus(t, world{Gone: true, NoRun: true}, "feat/old", "--output", "json")
+	json := runStatus(t, world{Gone: true, NoRun: true}, "--all", "--output", "json")
 
 	require.Equal(t, uicli.ExitOK, one.Code, one.Stderr)
 	require.Equal(t, uicli.ExitOK, all.Code, all.Stderr)

@@ -100,7 +100,8 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 	}
 
 	counts, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: against})
-	if state.Err = repository.Interrupted(ctx, err); err != nil {
+	state.Err = repository.Interrupted(ctx, err)
+	if err != nil {
 		return state
 	}
 

@@ -337,6 +337,17 @@ func TestTheActiveWorktreeIsTheDeepestHoldingWhereTheCallerStands(t *testing.T) 
 	assert.Empty(t, activeIn(""), "a call that stands nowhere marks none")
 }
 
+func TestNoWorktreeIsActiveWhenTheOneTheCallerStandsInCannotBeRead(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}, Fail: map[string]error{"Dirty": errors.New("broken index")}}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{Caller: domain.Caller{Cwd: "/repo/.trees/feat/a/src"}}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	for _, item := range read.Items {
+		assert.False(t, item.Detail != nil && item.Detail.Active, "%s is not where the caller stands", item.Subject)
+	}
+}
+
 func TestARefreshFetchesOriginOnce(t *testing.T) {
 	w := newWorld(seed{Git: gittest.FakeParams{Remote: []string{"main"}, Worktrees: []worktree.Worktree{linked("feat/a")}, Origin: map[string][]string{"main": {"upstream"}, "feat/a": {"pushed"}}}})
 

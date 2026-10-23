@@ -231,10 +231,11 @@ run_side() {
     scenario 24-meta-unreadable "$root/acme" status feat/a
     scenario 25-meta-unreadable-json "$root/acme" status feat/a --output json
     cp "$root/meta.json" "$record"
-    # feat/b's directory gone, the worktree locked: git no longer calls it prunable
+    # feat/b's directory gone, the worktree locked: git no longer calls it prunable; then the detached worktree's too, which no clean can name
     git worktree lock "$trees/feat-b"
     scenario 26-locked-gone "$root/acme" status feat/b
-    scenario 27-locked-gone-json "$root/acme" status feat/b --output json
+    git worktree lock "$trees/detached" && rm -rf "$trees/detached"
+    scenario 27-locked-gone-json "$root/acme" status --all --output json
     # a repository with its main worktree alone
     mkdir "$root/solo"
     (cd "$root/solo" && git init -q -b main && git commit -q --allow-empty -m init && "$legacy" init --yes </dev/null >/dev/null 2>&1)

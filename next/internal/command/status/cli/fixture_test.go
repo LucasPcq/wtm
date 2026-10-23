@@ -52,7 +52,7 @@ type world struct {
 	JobsErr   error
 	PRsErr    error
 	Merged    bool // feat/a's pull request is merged
-	Gone      bool // feat/old's directory is gone
+	Gone      bool // the directories of feat/old and of the detached worktree are gone
 	Broken    bool // feat/a does not read: git cannot tell its changes
 	Alone     bool // the main worktree is the only one
 }
@@ -144,12 +144,12 @@ func (enters) Read(p []byte) (int, error) {
 // errInvalidRun is run.toml that does not read.
 var errInvalidRun = errors.New(`invalid run config: unknown addressing "nope"`)
 
-// gone is feat/old's directory, when it is gone.
+// gone are the directories of feat/old and of the detached worktree, when they are gone.
 func gone(on bool) []string {
 	if !on {
 		return nil
 	}
-	return []string{"/repo/.trees/feat-old"}
+	return []string{"/repo/.trees/feat-old", "/repo/.trees/detached"}
 }
 
 // broken is git that cannot tell the changes of the worktree at path.

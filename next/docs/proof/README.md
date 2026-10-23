@@ -156,7 +156,7 @@ The reference is the legacy `wtm status` of 0.30.1. `status` is a read: the proo
   24. `feat/a`'s meta record not decoding
   25. the same, `--output json`
   26. `feat/b` locked, its directory deleted
-  27. the same, `--output json`
+  27. `--all --output json` once the detached worktree, locked, has its directory deleted too: its `status.missing` has `fix: null`
   28. `--all` in a repository with its main worktree alone
   29. next only: `--all --with-prs` interrupted by SIGINT 2 seconds in, its gh a fake on the `PATH` that answers after 5 seconds
   30. the same, `--output json`

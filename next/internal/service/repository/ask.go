@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -65,4 +66,13 @@ func (a Asked) Warnings(command string) []domain.Warning {
 	}
 
 	return warnings
+}
+
+// Interrupted is err when it is the read's interruption, which cancels the worktree being read; any other error of a count git cannot make leaves it not counted rather than unreadable, nil unless ctx is done by then.
+func Interrupted(ctx context.Context, err error) error {
+	if err == nil || errors.Is(err, context.Canceled) {
+		return err
+	}
+
+	return ctx.Err()
 }

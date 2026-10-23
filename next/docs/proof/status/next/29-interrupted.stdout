@@ -1,13 +1,16 @@
 
-  ! 6 worktrees · 2 need attention
+  ! 6 worktrees · 3 need attention
 
      WORKTREE                ISOLATION   PORTS         JOBS       ENV
      main                    isolated    base          2 stopped  2 files
-     ../acme.trees/detached  isolated    not numbered  2 stopped  2 missing
+  !  ../acme.trees/detached  isolated    not numbered  2 stopped  —
      feat/a                  isolated    +10           2 stopped  2 files
   !  feat/b                  isolated    +20           2 stopped  —
   !  feat/old                not chosen  —             2 stopped  2 files
      feat/rb                 isolated    +40           2 stopped  2 files
+
+  ../acme.trees/detached
+  ! its directory is gone
 
   feat/b
   ! its directory is gone
