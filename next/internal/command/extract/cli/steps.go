@@ -68,7 +68,7 @@ func (f *filesStep) Standing() form.Standing {
 		return st
 	}
 
-	selected, missed := worktree.SelectChanges(f.s.Questions().Files.Options, files)
+	selected, missed := extract.SelectChanges(f.s.Questions().Files.Options, files)
 	if missed != "" {
 		st.Value = fileCount(len(files))
 		return st

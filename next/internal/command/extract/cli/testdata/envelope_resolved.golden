@@ -1,0 +1,176 @@
+{
+  "v": 2,
+  "command": "extract",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/other",
+      "status": "done",
+      "warnings": [
+        {
+          "code": "extract.conflict_markers",
+          "params": {
+            "files": "apps/api/a.txt",
+            "target": "feat/other"
+          },
+          "message": "apps/api/a.txt left with conflict markers in feat/other; the other files were applied cleanly."
+        },
+        {
+          "code": "extract.source_kept",
+          "params": {
+            "source": "feat/login",
+            "target": "feat/other"
+          },
+          "message": "Nothing was removed from feat/login: to undo, discard the applied files in feat/other."
+        }
+      ],
+      "detail": {
+        "path": "/repo/wt-feat-other",
+        "files": [
+          {
+            "path": "apps/api/a.txt",
+            "status": "modified"
+          },
+          {
+            "path": "apps/api/new.txt",
+            "status": "untracked"
+          }
+        ],
+        "kept": true,
+        "conflicts": [
+          "apps/api/a.txt"
+        ],
+        "isolation": "isolated",
+        "existing_branch": false
+      }
+    }
+  ],
+  "plan": {
+    "source": "feat/login",
+    "files": [
+      {
+        "path": "apps/api/a.txt",
+        "status": "modified"
+      },
+      {
+        "path": "apps/api/new.txt",
+        "status": "untracked"
+      }
+    ],
+    "target": {
+      "branch": "feat/other",
+      "path": "/repo/wt-feat-other",
+      "action": "existing"
+    },
+    "keep": false,
+    "conflicts": [
+      {
+        "path": "apps/api/a.txt",
+        "kind": "modified"
+      }
+    ],
+    "on_conflict": "resolve",
+    "summary": {
+      "code": "extract.with_conflicts",
+      "message": "with conflicts",
+      "params": {
+        "target": "feat/other"
+      }
+    },
+    "recap": [
+      {
+        "key": "source",
+        "label": "Source",
+        "path": "source",
+        "values": [
+          {
+            "value": "feat/login",
+            "text": "feat/login"
+          }
+        ]
+      },
+      {
+        "key": "files",
+        "label": "Files",
+        "path": "files",
+        "values": [
+          {
+            "value": "apps/api/a.txt",
+            "note": "modified",
+            "text": "mod apps/api/a.txt"
+          },
+          {
+            "value": "apps/api/new.txt",
+            "note": "untracked",
+            "text": "new apps/api/new.txt"
+          }
+        ]
+      },
+      {
+        "key": "target",
+        "label": "Target",
+        "path": "to",
+        "values": [
+          {
+            "value": "feat/other",
+            "text": "feat/other"
+          }
+        ]
+      },
+      {
+        "key": "mode",
+        "label": "Mode",
+        "path": "keep",
+        "values": [
+          {
+            "value": "move",
+            "text": "move"
+          }
+        ]
+      },
+      {
+        "key": "conflicts",
+        "label": "Conflicts",
+        "values": [
+          {
+            "value": "apps/api/a.txt",
+            "note": "modified",
+            "text": "apps/api/a.txt (modified)"
+          }
+        ]
+      },
+      {
+        "key": "on_conflict",
+        "label": "On conflict",
+        "path": "on_conflict",
+        "values": [
+          {
+            "value": "resolve",
+            "text": "resolve"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "go",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/other"
+          ]
+        }
+      ],
+      "code": "extract.resolve_then_discard",
+      "message": "resolve the conflicts, then discard the same files in feat/login",
+      "params": {
+        "source": "feat/login",
+        "target": "feat/other"
+      }
+    }
+  ],
+  "warnings": []
+}

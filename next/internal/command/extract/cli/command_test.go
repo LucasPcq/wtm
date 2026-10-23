@@ -277,6 +277,8 @@ func TestTheEnvelopeOfEachEndingIsByteForByte(t *testing.T) {
 		"conflict": {Seed: seed{Conflicts: conflicting}, Words: []string{source, "--files", "apps/api", "--to", other}, Code: exitConflict},
 		"stale":    {Words: []string{source, "--files", "old.txt", "--to", other, "--expect-fingerprint", fingerprint}, Code: uicli.ExitPrecondition},
 		"invalid":  {Words: []string{source, "--to", other}, Code: uicli.ExitUsage},
+		"nothing":  {Seed: seed{Clean: true}, Words: []string{source, "--yes"}, Code: uicli.ExitOK},
+		"resolved": {Seed: seed{Conflicts: conflicting}, Words: []string{source, "--files", "apps/api", "--to", other, "--on-conflict", "resolve"}, Code: uicli.ExitOK},
 	} {
 		t.Run(name, func(t *testing.T) {
 			got := runExtract(t, newWorld(c.Seed), append(c.Words, "--output", "json")...)

@@ -4,7 +4,6 @@ package create
 import (
 	"context"
 	"slices"
-	"strconv"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
@@ -22,9 +21,6 @@ const Name = "create"
 
 // CodeConfigNotFound refuses a repository with no wtm config: `wtm init` has not run there.
 const CodeConfigNotFound = Name + domain.ConfigNotFound
-
-// CodeGo is the step into a worktree an apply ends on.
-const CodeGo = Name + ".go"
 
 // CodeConfigInvalid refuses a repository whose config.toml does not parse or validate.
 const CodeConfigInvalid = Name + domain.ConfigInvalid
@@ -53,6 +49,11 @@ type Detail struct {
 	Metadata worktree.Meta `json:"metadata"`
 	worktree.Standing
 	EnvPorts env.Redacted `json:"env_ports,omitzero"`
+}
+
+// Worktree is where the worktree of the Detail is and the env ports it was given.
+func (d Detail) Worktree() (string, env.Redacted) {
+	return d.Path, d.EnvPorts
 }
 
 // ----------------------------------------------------------------------------
@@ -93,7 +94,7 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 	op.Finished(result.Failure())
 
 	outcome.Result = &result
-	outcome.Plan.Recap = plan.appliedRecap(result.Remembered)
+	outcome.Plan = plan.applied(result)
 	outcome.Warnings = op.Warnings(append(outcome.Warnings, result.Warnings...))
 	return outcome, nil
 }
@@ -124,10 +125,9 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 
 // Apply carries out the plan, reporting each step: it fast-forwards the sources asked, provisions each branch in turn, a failure stopping none of the others, and remembers the answers asked once a worktree is created; it ends on the step into each worktree that stands. Once ctx is cancelled, the branches not yet started are skipped.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
-	advanced, warnings := u.fastForward(ctx, plan, report)
+	advanced, warnings := u.Provision.FastForwardEach(ctx, provision.FastForwardEachParams{Command: Name, Subjects: plan.FastForward, Snapshot: plan.facts.Snapshot, Fallback: "it starts from your local branch"}, report)
 
 	items := make([]Item, 0, len(plan.Branches))
-	var next []domain.FollowUp
 	for _, planned := range plan.Branches {
 		item := u.item(ctx, plan, planned, report)
 		if item.Detail != nil && slices.Contains(advanced, item.Subject) {
@@ -137,16 +137,10 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 			item.Warnings = append([]domain.Warning{behindOrigin(item.Detail.Standing)}, item.Warnings...)
 		}
 		items = append(items, item)
-		// a worktree that stands can be entered, done or not
-		if item.Detail != nil {
-			enter := domain.Enter(item.Subject)
-			enter.Code = CodeGo
-			next = append(next, enter)
-		}
 	}
 
 	remembered, failed := u.remember(ctx, plan, items)
-	return Result{Items: items, Warnings: append(warnings, failed...), Remembered: remembered, FollowUps: next}
+	return Result{Items: items, Warnings: append(warnings, failed...), Remembered: remembered, FollowUps: next(items)}
 }
 
 // ----------------------------------------------------------------------------
@@ -196,52 +190,6 @@ func (u UseCase) locate(ctx context.Context, paths []string) (map[string]worktre
 
 // ----------------------------------------------------------------------------
 // The steps of Apply
-
-// fastForward fast-forwards each source the plan names and returns those it advanced; one that cannot be is a warning, its worktrees starting from the local branch.
-func (u UseCase) fastForward(ctx context.Context, plan Plan, report domain.Report) ([]string, []domain.Warning) {
-	advanced := slices.Clone(plan.FastForward)
-	var warnings []domain.Warning
-	for _, missed := range u.Provision.FastForwardEach(ctx, plan.FastForward, plan.facts.Snapshot, report) {
-		advanced = slices.DeleteFunc(advanced, func(subject string) bool { return subject == missed.Subject })
-		warnings = append(warnings, notAdvanced(missed))
-	}
-
-	return advanced, warnings
-}
-
-func notAdvanced(missed provision.Missed) domain.Warning {
-	subject := missed.Subject
-	switch {
-	case missed.Dirty:
-		return domain.Warning{
-			Code:    "create.ff_dirty",
-			Message: "couldn't fast-forward " + subject + ": its worktree has uncommitted changes — it starts from your local branch",
-			Params:  domain.Params{"branch": subject},
-		}
-	case missed.Busy:
-		return domain.Warning{
-			Code:    "create.ff_busy",
-			Message: "couldn't fast-forward " + subject + ": its worktree is in the middle of a rebase or a bisect — it starts from your local branch",
-			Params:  domain.Params{"branch": subject},
-		}
-	}
-
-	return domain.Warning{
-		Code:    "create.ff_failed",
-		Message: "couldn't fast-forward " + subject + ": " + missed.Err.Error() + " — it starts from your local branch",
-		Params:  domain.Params{"branch": subject, "cause": missed.Err.Error()},
-	}
-}
-
-// behindOrigin warns that a branch checked out behind origin starts its worktree from the local branch; a diverged one is the plan's create.source_diverged warning already.
-func behindOrigin(standing worktree.Standing) domain.Warning {
-	behind := strconv.Itoa(standing.OriginBehind)
-	return domain.Warning{
-		Code:    "create.behind_origin",
-		Message: behind + " commit(s) behind origin — the worktree starts from your local branch.",
-		Params:  domain.Params{"behind": behind},
-	}
-}
 
 // item provisions one planned branch between its unit events; a worktree already open is reported as it stands, and a branch reached after a cancel is skipped.
 func (u UseCase) item(ctx context.Context, plan Plan, planned BranchPlan, report domain.Report) Item {

@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/stretchr/testify/assert"
@@ -76,7 +77,7 @@ func TestAPreviewIsThePlansRowsAndItsWarnings(t *testing.T) {
 	outcome := twoCreated(trees)
 	outcome.Warnings = []domain.Warning{{Code: "create.ff_failed", Message: "couldn't fast-forward main"}}
 
-	previewed := preview(outcome)
+	previewed := form.PreviewOf(outcome)
 
 	assert.Equal(t, "Branches  feat/a, feat/b\nFrom      main\nEnv       example", strings.Join(output.PlanLines(output.PlanParams{Rows: previewed.Rows}), "\n"))
 	assert.Equal(t, outcome.Warnings, previewed.Warnings)

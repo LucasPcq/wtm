@@ -177,3 +177,40 @@ func TestAnIsolationTheTargetAlreadyHasIsNotWarnedAbout(t *testing.T) {
 
 	assert.Empty(t, warnings)
 }
+
+func TestARequestedPathSelectsTheChangeItNamesFirst(t *testing.T) {
+	available := []worktree.Change{{Path: "api"}, {Path: "api/a.go"}, {Path: "web/b.go"}}
+
+	selected, unmatched := extract.SelectChanges(available, []string{"api"})
+
+	assert.Equal(t, []worktree.Change{{Path: "api"}}, selected)
+	assert.Empty(t, unmatched)
+}
+
+func TestARequestedDirectorySelectsEveryChangeUnderItWithOrWithoutItsSlash(t *testing.T) {
+	available := []worktree.Change{{Path: "api/a.go"}, {Path: "apix.go"}, {Path: "api/new/b.go"}, {Path: "web/c.go"}}
+
+	bare, _ := extract.SelectChanges(available, []string{"api"})
+	slashed, _ := extract.SelectChanges(available, []string{"api/"})
+
+	assert.Equal(t, []worktree.Change{{Path: "api/a.go"}, {Path: "api/new/b.go"}}, bare)
+	assert.Equal(t, bare, slashed)
+}
+
+func TestASelectionKeepsEachChangeOnceInTheOrderItWasAskedFor(t *testing.T) {
+	available := []worktree.Change{{Path: "api/a.go"}, {Path: "web/c.go"}, {Path: "api/b.go"}}
+
+	selected, unmatched := extract.SelectChanges(available, []string{"web/c.go", "api/b.go", "api"})
+
+	assert.Equal(t, []worktree.Change{{Path: "web/c.go"}, {Path: "api/b.go"}, {Path: "api/a.go"}}, selected)
+	assert.Empty(t, unmatched)
+}
+
+func TestASelectionNamesThePathThatMatchedNothing(t *testing.T) {
+	available := []worktree.Change{{Path: "DOC.md", OrigPath: "README.md", Status: worktree.ChangeRenamed}}
+
+	selected, unmatched := extract.SelectChanges(available, []string{"DOC.md", "README.md"})
+
+	assert.Nil(t, selected)
+	assert.Equal(t, "README.md", unmatched)
+}

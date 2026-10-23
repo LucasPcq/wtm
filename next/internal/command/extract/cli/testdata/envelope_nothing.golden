@@ -1,0 +1,22 @@
+{
+  "v": 2,
+  "command": "extract",
+  "ok": true,
+  "op": "op-1",
+  "plan": {
+    "source": "feat/login",
+    "files": [],
+    "keep": false,
+    "conflicts": [],
+    "summary": {
+      "code": "extract.nothing",
+      "message": "no uncommitted changes in feat/login",
+      "params": {
+        "source": "feat/login"
+      }
+    }
+  },
+  "fingerprint": "3f58253a9fc60ab810a36021",
+  "follow_ups": [],
+  "warnings": []
+}

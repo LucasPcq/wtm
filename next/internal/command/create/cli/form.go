@@ -18,7 +18,7 @@ func newForm(open func(ctx context.Context, dir string) (create.UseCase, error))
 	return &createForm{
 		YesUsage:   yesUsage,
 		Open:       form.Opener[create.Request, create.Questions, create.Outcome](open),
-		Preview:    preview,
+		Preview:    form.PreviewOf[create.Plan, create.Detail],
 		Draw:       drawOutcome,
 		ApplyLabel: applyLabel,
 	}

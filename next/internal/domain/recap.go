@@ -2,6 +2,17 @@ package domain
 
 import "slices"
 
+// Recapped is what a plan shows beside what it does: the fields answered from memory, as the request was resolved, and its recap, the plan as every surface shows it, its answers marked as the run left them. A plan embeds it; its fingerprint leaves it out, since it changes nothing the apply does.
+type Recapped struct {
+	Recalled []string   `json:"recalled,omitempty"`
+	Recap    []RecapRow `json:"recap,omitempty"`
+}
+
+// Recaps returns r, so a surface reads it from any plan that embeds it.
+func (r Recapped) Recaps() Recapped {
+	return r
+}
+
 // A RecapRow is one line of a plan's recap, as every surface shows it: what it shows under a stable Key, its label, the field whose answer it shows if one does, the mark of that answer, and its values, in order.
 type RecapRow struct {
 	Key    string       `json:"key"`

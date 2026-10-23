@@ -20,7 +20,7 @@ func newForm(open func(ctx context.Context, dir string) (extract.UseCase, error)
 	return &extractForm{
 		YesUsage:   yesUsage,
 		Open:       form.Opener[extract.Request, extract.Questions, extract.Outcome](open),
-		Preview:    preview,
+		Preview:    form.PreviewOf[extract.Plan, extract.Detail],
 		Draw:       drawOutcome,
 		ApplyLabel: applyLabel,
 		Special:    special,

@@ -462,7 +462,7 @@ func (f Facts) fileProblems(req Request) []domain.FieldError {
 		return []domain.FieldError{domain.Required(PathFiles)}
 	}
 
-	if _, missed := worktree.SelectChanges(f.Changes[req.Source], req.Files); missed != "" {
+	if _, missed := SelectChanges(f.Changes[req.Source], req.Files); missed != "" {
 		return []domain.FieldError{{Path: PathFiles, Code: "extract.not_a_change", Template: "{path}: {value} is not an uncommitted change", Params: domain.Params{"value": missed}}}
 	}
 

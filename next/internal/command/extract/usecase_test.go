@@ -113,6 +113,19 @@ func TestResolveWritesConflictMarkersInTheTargetAndKeepsTheSource(t *testing.T) 
 	}}, result.FollowUps, "the step left is a follow-up, never a warning the cli picks out")
 }
 
+func TestAnApplyLeavingConflictsSaysSoInThePlansSummary(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "source\n")
+	w.change(t, other, "a.txt", "target\n")
+	req := moving("a.txt")
+	req.OnConflict = extract.OnConflictResolve
+
+	outcome, err := w.usecase.Run(t.Context(), req, domain.RunOptions{Report: (&recorder{}).add})
+
+	require.NoError(t, err)
+	assert.Equal(t, extract.Summary{Code: extract.CodeWithConflicts, Message: "with conflicts", Params: domain.Params{"target": other}}, outcome.Plan.Summary)
+}
+
 func TestAConflictUnderAbortIsRefusedAtPlanTimeAndNothingIsCreatedOrMoved(t *testing.T) {
 	w := newWorld(t, seed{})
 	writeFile(t, filepath.Join(w.main, "a.txt"), "main\n")
@@ -139,7 +152,7 @@ func TestASourceWithNothingToExtractIsAPlanWithNoFilesAndNoRun(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, outcome.Plan.Nothing())
 	assert.Nil(t, outcome.Result)
-	assert.JSONEq(t, `{"source":"feat/login","files":[],"keep":false,"conflicts":[]}`, jsonOf(t, outcome.Plan))
+	assert.JSONEq(t, `{"source":"feat/login","files":[],"keep":false,"conflicts":[],"summary":{"code":"extract.nothing","message":"no uncommitted changes in feat/login","params":{"source":"feat/login"}}}`, jsonOf(t, outcome.Plan))
 	assert.Empty(t, w.published.all())
 }
 

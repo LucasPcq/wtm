@@ -9,6 +9,8 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/stretchr/testify/require"
 )
 
@@ -105,4 +107,8 @@ func readFile(t *testing.T, path string) string {
 func gitStateNames(t *testing.T, w world) []string {
 	t.Helper()
 	return gittest.Names(gitState(t, w).Branches.Local)
+}
+
+func fastForwardEach(subject string, snapshot worktree.Snapshot) provision.FastForwardEachParams {
+	return provision.FastForwardEachParams{Command: "create", Subjects: []string{subject}, Snapshot: snapshot, Fallback: "it starts from your local branch"}
 }

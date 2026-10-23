@@ -10,7 +10,7 @@
 | -- | -- |
 | `YesUsage` | the usage of `--yes`, saying what an unattended run requires |
 | `Open` | `form.Opener[R, Q, O](open)`: the project's use case as a `form.UseCase[R, Q, O]` (its `Questions` and `Run`) |
-| `Preview(previewed) form.Preview` | the plan not yet applied: `Rows` (`output.PlanRow`, each answer with its mark), `Warnings`, `Recalled` (the fields answered from memory, which the recap's hint names). The recap and the dry run both draw it. |
+| `Preview(previewed) form.Preview` | `form.PreviewOf` for a plan embedding `domain.Recapped`; the plan not yet applied: `Rows` (`output.PlanRow`, each answer with its mark), `Warnings`, `Recalled` (the fields answered from memory, which the recap's hint names). The recap and the dry run both draw it. |
 | `Draw(w, applied, view)` | the outcome of an apply, drawn from `output.View`: paths shown from `view.Cwd`, follow-ups spelled by `view.CommandLine` (`output.FollowUpStep`); `form.Query.Draw` takes the same view |
 | `ApplyLabel(previewed)` | the recap's option that applies, nil for "Yes, apply" |
 | `Special(session, at, field)` | the command's own step for a field, nil for the step of its kind |

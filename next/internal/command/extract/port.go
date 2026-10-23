@@ -6,7 +6,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-// Git is the repository as extract reads and changes it: its snapshot, what lies at a path, a worktree's uncommitted changes, the conflicts they would meet in a target, and the move itself.
+// Git is the repository as extract reads and changes it: what lies at a path, a worktree's uncommitted changes, the conflicts they would meet in a target, and the move itself.
 type Git interface {
 	Locate(ctx context.Context, path string) (worktree.Location, error)
 	Changes(ctx context.Context, dir string) ([]worktree.Change, error)

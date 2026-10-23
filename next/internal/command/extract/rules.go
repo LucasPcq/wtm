@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -55,8 +56,48 @@ func (f Facts) nothing(source string) bool {
 }
 
 func (f Facts) selected(req Request) []worktree.Change {
-	selected, _ := worktree.SelectChanges(f.Changes[req.Source], req.Files)
+	selected, _ := SelectChanges(f.Changes[req.Source], req.Files)
 	return selected
+}
+
+// SelectChanges returns the changes of available that paths name, each once, in the order of paths; a path names the change at that path, else every change under it as a directory. When a path names none, it returns that path as the second result.
+func SelectChanges(available []worktree.Change, paths []string) ([]worktree.Change, string) {
+	seen := map[string]bool{}
+	var selected []worktree.Change
+	for _, path := range paths {
+		matches := matching(available, path)
+		if len(matches) == 0 {
+			return nil, path
+		}
+
+		for _, change := range matches {
+			if !seen[change.Path] {
+				seen[change.Path] = true
+				selected = append(selected, change)
+			}
+		}
+	}
+
+	return selected, ""
+}
+
+// matching returns the change at path if there is one, else the changes under path as a directory.
+func matching(available []worktree.Change, path string) []worktree.Change {
+	for _, change := range available {
+		if change.Path == path {
+			return []worktree.Change{change}
+		}
+	}
+
+	prefix := strings.TrimSuffix(path, "/") + "/"
+	var under []worktree.Change
+	for _, change := range available {
+		if strings.HasPrefix(change.Path, prefix) {
+			under = append(under, change)
+		}
+	}
+
+	return under
 }
 
 // parent is the branch the source's meta record names as its parent, "" when none.
@@ -69,7 +110,7 @@ func (f Facts) recordedIsolation(name string) project.Isolation {
 }
 
 // ----------------------------------------------------------------------------
-// The target
+// The decision of the target
 
 // An Action is how the target gets its worktree.
 type Action string
@@ -236,6 +277,7 @@ func (f Facts) conflictCheck(req Request) worktree.ConflictCheck {
 func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain.Warning, error) {
 	planned := Plan{Source: req.Source, Files: []worktree.Change{}, Conflicts: []worktree.Conflict{}, facts: f}
 	if f.nothing(req.Source) {
+		planned.Summary = Summary{Code: CodeNothing, Message: "no uncommitted changes in " + req.Source, Params: domain.Params{"source": req.Source}}
 		return planned, nil, nil
 	}
 
@@ -398,10 +440,10 @@ type Plan struct {
 	Conflicts   []worktree.Conflict `json:"conflicts"`
 	OnConflict  OnConflict          `json:"on_conflict,omitempty"`
 	Remember    []string            `json:"remember,omitempty"`
-	Recalled    []string            `json:"recalled,omitempty"` // the fields answered from memory, as the request was resolved
-	Recap       []domain.RecapRow   `json:"recap,omitempty"`    // the plan as every surface shows it, its answers marked as the run left them
-	facts       Facts
-	settled     provision.Answers // as resolved, handed to provisioning even where the plan shows none, and remembered
+	Summary     Summary             `json:"summary,omitzero"` // what the tally adds: nothing to extract, or conflicts left in the target; out of the fingerprint, which the files and conflicts cover
+	domain.Recapped
+	facts   Facts
+	settled provision.Answers // as resolved, handed to provisioning even where the plan shows none, and remembered
 }
 
 // Nothing reports whether the plan has no file to extract: the source holds no uncommitted change.
@@ -416,7 +458,7 @@ func (p Plan) Locks() []domain.Lock {
 
 // Fingerprinted is what the plan's fingerprint covers: the plan with what the apply reads of the project to provision a created target.
 func (p Plan) Fingerprinted() any {
-	p.Recalled, p.Recap, p.Creates = nil, nil, 0
+	p.Recapped, p.Creates, p.Summary = domain.Recapped{}, 0, Summary{}
 	return provision.Fingerprinted(p, p.facts.Repository, p.settled)
 }
 
@@ -440,22 +482,11 @@ func (p Plan) move() worktree.Move {
 // ----------------------------------------------------------------------------
 // The recap
 
-// CodeGo is the step into the target an extract ends on; CodeResolveThenDiscard the same step after an extract with conflicts: resolve them in the target, then discard the same files in the source.
-const (
-	CodeGo                 = Name + ".go"
-	CodeResolveThenDiscard = Name + ".resolve_then_discard"
-)
-
 // NoteNew notes a target of the recap to create, from the source of its params; the others are worktree's notes.
 const NoteNew = "new"
 
 func (p Plan) previewRecap() []domain.RecapRow {
 	return p.recap(domain.Marks{Recalled: p.Recalled, Remembered: p.Remember, Mark: domain.MarkRemember})
-}
-
-// appliedRecap is the recap of the plan once applied, the fields remembered by the apply marked saved; Run sets it as the applied plan's Recap.
-func (p Plan) appliedRecap(remembered []string) []domain.RecapRow {
-	return p.recap(domain.Marks{Recalled: p.Recalled, Remembered: remembered, Mark: domain.MarkSaved})
 }
 
 // recap is the plan row by row, none when there is nothing to extract: the source, its files, the target and how it gets its worktree, the parent of a branch checked out, the answers of a created target, the mode, then the conflicts and what to do with them.
@@ -527,4 +558,96 @@ func recappedConflicts(conflicts []worktree.Conflict) []domain.RecapValue {
 	}
 
 	return values
+}
+
+// ----------------------------------------------------------------------------
+// The outcome
+
+// CodeGo is the step into the target an extract ends on; CodeResolveThenDiscard the same step after an extract with conflicts: resolve them in the target, then discard the same files in the source.
+const (
+	CodeGo                 = Name + ".go"
+	CodeResolveThenDiscard = Name + ".resolve_then_discard"
+)
+
+// A Summary qualifies an outcome beside its tally, as a surface shows it: CodeNothing when the source holds no uncommitted change, CodeWithConflicts when the target was left with conflict markers.
+type Summary struct {
+	Code    string        `json:"code"`
+	Message string        `json:"message"`
+	Params  domain.Params `json:"params,omitempty"`
+}
+
+// The codes of a Summary.
+const (
+	CodeNothing       = Name + ".nothing"
+	CodeWithConflicts = Name + ".with_conflicts"
+)
+
+// applied is the plan once applied, as Run reports it: its recap with the fields the apply remembered marked saved, and its summary when the target holds conflicts.
+func (p Plan) applied(result Result) Plan {
+	p.Recap = p.recap(domain.Marks{Recalled: p.Recalled, Remembered: result.Remembered, Mark: domain.MarkSaved})
+	for _, item := range result.Items {
+		if item.Detail != nil && len(item.Detail.Conflicts) > 0 {
+			p.Summary = Summary{Code: CodeWithConflicts, Message: "with conflicts", Params: domain.Params{"target": item.Subject}}
+		}
+	}
+
+	return p
+}
+
+// aftermath warns of what the target is left with: the files it holds with conflict markers, how to undo them and what to do next, or, for a target left unfinished, that it received nothing; a half move says for itself where the files are.
+func (p Plan) aftermath(item Item) []domain.Warning {
+	target := item.Subject
+	params := domain.Params{"source": p.Source, "target": target}
+	switch {
+	case item.Detail != nil && len(item.Detail.Conflicts) > 0:
+		conflicts := strings.Join(item.Detail.Conflicts, ", ")
+		markers := conflicts + " left with conflict markers in " + target
+		if len(item.Detail.Files) > len(item.Detail.Conflicts) {
+			markers += "; the other files were applied cleanly"
+		}
+		return []domain.Warning{
+			{Code: "extract.conflict_markers", Message: markers + ".", Params: domain.Params{"files": conflicts, "target": target}},
+			{Code: "extract.source_kept", Message: "Nothing was removed from " + p.Source + ": to undo, discard the applied files in " + target + ".", Params: params},
+		}
+	case item.Status == domain.StatusDone, item.Err != nil && item.Err.Code == CodeHalfMoved:
+		return nil
+	case p.Keep:
+		return []domain.Warning{{Code: "extract.untouched", Message: "nothing was copied to " + target, Params: params}}
+	}
+
+	return []domain.Warning{{Code: "extract.untouched", Message: "nothing was moved: the files are still in " + p.Source, Params: params}}
+}
+
+// next is the step into the target once it exists, after resolving its conflicts when it holds some.
+func (p Plan) next(item Item) []domain.FollowUp {
+	if item.Detail == nil {
+		return nil
+	}
+
+	goTo := domain.Enter(item.Subject)
+	goTo.Code = CodeGo
+	if len(item.Detail.Conflicts) > 0 {
+		goTo.Code, goTo.Message = CodeResolveThenDiscard, "resolve the conflicts, then discard the same files in "+p.Source
+		goTo.Params = domain.Params{"source": p.Source, "target": item.Subject}
+	}
+	return []domain.FollowUp{goTo}
+}
+
+// failure turns the error a move failed on into extract's: a conflict found at the last moment is refused with CodeConflict, changes left in both worktrees fail with CodeHalfMoved.
+func (p Plan) failure(err error) *domain.Error {
+	if refused, ok := errors.AsType[*worktree.ConflictRefusal](err); ok {
+		return conflictRefusal(refused.Conflicts, p.Target.Branch)
+	}
+
+	if half, ok := errors.AsType[*worktree.HalfMoved](err); ok {
+		return &domain.Error{
+			Kind:    domain.KindInternal,
+			Code:    CodeHalfMoved,
+			Message: fmt.Sprintf("the changes are in %q but %q still holds them", p.Target.Branch, p.Source),
+			Params:  domain.Params{"target": p.Target.Branch, "source": p.Source},
+			Cause:   half.Cause,
+		}
+	}
+
+	return domain.AsError(domain.AsErrorParams{Err: err, Code: "extract.move_failed", Message: "move failed"})
 }

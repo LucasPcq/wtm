@@ -47,46 +47,6 @@ func (c Change) Label() string {
 	return c.OrigPath + " → " + c.Path
 }
 
-// SelectChanges returns the changes of available that paths name, each once, in the order of paths; a path names the change at that path, else every change under it as a directory. When a path names none, it returns that path as the second result.
-func SelectChanges(available []Change, paths []string) ([]Change, string) {
-	seen := map[string]bool{}
-	var selected []Change
-	for _, path := range paths {
-		matches := matching(available, path)
-		if len(matches) == 0 {
-			return nil, path
-		}
-
-		for _, change := range matches {
-			if !seen[change.Path] {
-				seen[change.Path] = true
-				selected = append(selected, change)
-			}
-		}
-	}
-
-	return selected, ""
-}
-
-// matching returns the change at path if there is one, else the changes under path as a directory.
-func matching(available []Change, path string) []Change {
-	for _, change := range available {
-		if change.Path == path {
-			return []Change{change}
-		}
-	}
-
-	prefix := strings.TrimSuffix(path, "/") + "/"
-	var under []Change
-	for _, change := range available {
-		if strings.HasPrefix(change.Path, prefix) {
-			under = append(under, change)
-		}
-	}
-
-	return under
-}
-
 // ConflictKind is why a change cannot land in its target as it is.
 type ConflictKind string
 
