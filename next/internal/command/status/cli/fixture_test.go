@@ -53,7 +53,7 @@ type world struct {
 	PRsErr    error
 	Merged    bool // feat/a's pull request is merged
 	Gone      bool // feat/old's directory is gone
-	Broken    bool // no worktree reads: git cannot tell their changes
+	Broken    bool // feat/a does not read: git cannot tell its changes
 	Alone     bool // the main worktree is the only one
 }
 
@@ -71,14 +71,9 @@ func (w world) open(context.Context, string) (status.UseCase, error) {
 	if w.Alone {
 		worktrees = nil
 	}
-	var fail map[string]error
-	if w.Broken {
-		fail = map[string]error{"Changes": errors.New("broken index")}
-	}
 	git := gittest.NewFake(gittest.FakeParams{
 		Main: mainPath, Branch: "main", Remote: []string{"main", "feat/a"},
 		Worktrees: worktrees,
-		Fail:      fail,
 		Commits: map[worktree.Ref][]string{
 			worktree.LocalBranch{Name: "feat/a"}: {"Add the login form", "Wire the session"},
 			worktree.LocalBranch{Name: "main"}:   {"Bump"},
@@ -111,8 +106,13 @@ func (w world) open(context.Context, string) (status.UseCase, error) {
 		runConfig = project.Run{}
 	}
 
+	var statusGit status.Git = git
+	if w.Broken {
+		statusGit = broken{Git: git, path: "/repo/.trees/feat-a"}
+	}
+
 	return status.UseCase{
-		Git:      git,
+		Git:      statusGit,
 		Meta:     store,
 		EnvFiles: store,
 		Jobs: func(context.Context) ([]run.Job, error) {
@@ -150,4 +150,17 @@ func gone(on bool) []string {
 		return nil
 	}
 	return []string{"/repo/.trees/feat-old"}
+}
+
+// broken is git that cannot tell the changes of the worktree at path.
+type broken struct {
+	status.Git
+	path string
+}
+
+func (b broken) Changes(ctx context.Context, dir string) ([]worktree.Change, error) {
+	if dir == b.path {
+		return nil, errors.New("broken index")
+	}
+	return b.Git.Changes(ctx, dir)
 }

@@ -93,7 +93,7 @@ func TestNoCommandAFollowUpNamesHasMigrated(t *testing.T) {
 		named = append(named, action.Command)
 	}
 	named = append(named, tree.Actions(tree.Detail{Branch: "feat/a", Rebasing: true}, false)[0].Command, tree.Actions(tree.Detail{Branch: "feat/a"}, true)[0].Command, tree.Actions(tree.Detail{Branch: "feat/a", NeedsSync: true}, false)[0].Command)
-	fixes := status.Problems(status.ProblemsParams{Subject: "feat/a", Merged: true, Missing: []status.Missing{{Target: ".env"}, {Target: ".env", From: status.FromNowhere}}, Jobs: []status.Job{{Name: "api", State: run.Crashed}}})
+	fixes := status.Problems(status.ProblemsParams{Branch: "feat/a", Merged: true, Missing: []status.Missing{{Target: ".env"}, {Target: ".env", From: status.FromNowhere}}, Jobs: []status.Job{{Name: "api", State: run.Crashed}}})
 	for _, problem := range fixes {
 		named = append(named, problem.Fix.Command)
 	}

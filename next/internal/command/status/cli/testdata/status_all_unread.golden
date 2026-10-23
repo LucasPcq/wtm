@@ -1,7 +1,9 @@
 
-  ✗ 4 worktrees · 4 not read
-  ✗ couldn't read /repo/main: broken index
-  ✗ couldn't read /repo/.trees/detached: broken index
+  ✗ 4 worktrees · 1 not read
+
+  WORKTREE            ENV
+  main                2 files
+  ../.trees/detached  2 files
+  feat/old            2 files
   ✗ couldn't read /repo/.trees/feat-a: broken index
-  ✗ couldn't read /repo/.trees/feat-old: broken index
 

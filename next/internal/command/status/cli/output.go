@@ -114,7 +114,9 @@ func drawJobs(w io.Writer, jobs []status.Job) {
 func drawProblems(w io.Writer, problems []status.Problem, view output.View) {
 	for _, problem := range problems {
 		output.WarningLine(w, problem.Message)
-		output.NextSteps(w, []output.NextStep{output.FollowUpStep(problem.Fix, view.CommandLine)})
+		if problem.Fix != nil {
+			output.NextSteps(w, []output.NextStep{output.FollowUpStep(*problem.Fix, view.CommandLine)})
+		}
 	}
 }
 

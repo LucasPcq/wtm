@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
 // ----------------------------------------------------------------------------
@@ -17,7 +17,7 @@ import (
 // Facts are what list reads: the repository, why fetching origin failed when it was asked to, the meta record of each live branch (and the error of a record that exists but does not read), what each worktree holds, and what the run daemon and GitHub said.
 type Facts struct {
 	worktree.Repository
-	run.Asked
+	repository.Asked
 	FetchErr   error
 	Records    map[string]worktree.Meta // by branch
 	RecordErrs map[string]error         // by branch

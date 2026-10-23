@@ -12,7 +12,7 @@ import (
 func TestProblemsComeMergedThenEnvThenIsolationThenCrashedJobs(t *testing.T) {
 	signal, exit := -1, 3
 	problems := status.Problems(status.ProblemsParams{
-		Subject: "feat/a",
+		Branch:  "feat/a",
 		Merged:  true,
 		Missing: []status.Missing{{Target: ".env"}},
 		Pending: true,
@@ -39,5 +39,5 @@ func TestProblemsComeMergedThenEnvThenIsolationThenCrashedJobs(t *testing.T) {
 }
 
 func TestNothingToFixIsNoProblemNotNull(t *testing.T) {
-	assert.Equal(t, []status.Problem{}, status.Problems(status.ProblemsParams{Subject: "main"}))
+	assert.Equal(t, []status.Problem{}, status.Problems(status.ProblemsParams{Branch: "main"}))
 }

@@ -58,7 +58,7 @@ func TestAWorktreeIsReadWholeGitAndIsolation(t *testing.T) {
 		Run:       &status.Run{Addressing: project.AddressNames, Offset: &offset, Ports: status.PortsOffset},
 		Jobs:      []status.Job{{Name: "web", State: run.Crashed, URL: "http://web.feat-a.main.localhost:11080", Port: &port, ExitCode: &exit}},
 		Env:       status.Env{Files: []status.EnvFile{}},
-		Problems: []status.Problem{{Code: status.CodeJobCrashed, Message: "web crashed (exit 1)", Fix: domain.FollowUp{
+		Problems: []status.Problem{{Code: status.CodeJobCrashed, Message: "web crashed (exit 1)", Fix: &domain.FollowUp{
 			Command: "run start", Code: status.CodeJobCrashed,
 			Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "job", Values: []string{"web"}}, {Path: "detach", Values: []string{"true"}}},
 		}}},
@@ -169,7 +169,8 @@ func TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleanedLockedOrNot(t *
 	locked.Locked = true
 	prunable := linked("feat/prunable")
 	prunable.Prunable = true
-	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{locked, prunable}, Gone: []string{locked.Path, prunable.Path}}})
+	detached := worktree.Worktree{Path: "/repo/.trees/detached", State: worktree.Detached{}, Locked: true}
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{locked, prunable, detached}, Gone: []string{locked.Path, prunable.Path, detached.Path}}})
 
 	got := read(t, w, status.Request{All: true})
 
@@ -178,11 +179,16 @@ func TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleanedLockedOrNot(t *
 		d := detailOf(t, got, branch)
 		assert.True(t, d.Missing, branch)
 		assert.Equal(t, []string{status.CodeMissing}, problemCodes(d.Problems), branch)
-		assert.Equal(t, domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}}, Code: status.CodeMissing}, d.Problems[0].Fix)
+		assert.Equal(t, &domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}}, Code: status.CodeMissing}, d.Problems[0].Fix)
 		assert.Nil(t, d.Changes, branch)
 		assert.Nil(t, d.Commits, branch)
 		assert.Nil(t, d.Env.Files, branch)
 	}
+	gone := detailOf(t, got, detached.Path)
+	assert.True(t, gone.Missing)
+	require.Len(t, gone.Problems, 1, "a gone worktree on no branch is a problem too")
+	assert.Equal(t, status.CodeMissing, gone.Problems[0].Code)
+	assert.Nil(t, gone.Problems[0].Fix, "clean takes a branch: no command fixes it")
 	assert.NotContains(t, w.git.Calls(), "Changes "+locked.Path, "nothing of a gone directory is read")
 }
 
@@ -319,7 +325,7 @@ func TestAnInterruptedReadWarnsOfNothingItCouldNotAsk(t *testing.T) {
 
 func TestTheReviewIsTheNewestPullRequestAndAMergedOneAsksToCleanFirst(t *testing.T) {
 	const url = "https://github.com/acme/acme/pull/12"
-	clean := domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}
+	clean := &domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}
 	cases := map[string]struct {
 		pr       []worktree.PullRequest
 		review   *status.Review
@@ -417,7 +423,7 @@ func TestAMergedPullRequestAsksToCleanABranchBehindItsHeadButNotOneMovedOnOrApar
 			assert.Equal(t, worktree.PullRequestMerged, a.Review.State)
 			assert.Equal(t, c.problems, problemCodes(a.Problems))
 			if c.problems != nil {
-				assert.Equal(t, domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}, a.Problems[0].Fix)
+				assert.Equal(t, &domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}, a.Problems[0].Fix)
 			}
 		})
 	}
@@ -451,7 +457,7 @@ func TestAMissingEnvFileIsRebuiltFromWhereItCanBe(t *testing.T) {
 		strategy project.EnvStrategy
 		files    map[string]string
 		message  string
-		fix      domain.FollowUp
+		fix      *domain.FollowUp
 	}{
 		"from_its_source": {
 			strategy: project.EnvMain, files: map[string]string{mainPath + "/.env": "A=1\n"},
@@ -467,7 +473,7 @@ func TestAMissingEnvFileIsRebuiltFromWhereItCanBe(t *testing.T) {
 		},
 		"nowhere": {
 			strategy: project.EnvExample,
-			message:  ".env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand", fix: domain.FollowUp{Command: "config edit", Code: status.CodeEnvMissing},
+			message:  ".env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand", fix: &domain.FollowUp{Command: "config edit", Code: status.CodeEnvMissing},
 		},
 	}
 	for name, c := range cases {

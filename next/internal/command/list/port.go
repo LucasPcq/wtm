@@ -15,9 +15,9 @@ type Git interface {
 	Fetch(ctx context.Context) error
 }
 
-// Meta reads a worktree's meta record by its branch; a missing record is an error wrapping fs.ErrNotExist.
+// Meta reads a worktree's meta record by its branch, as repository.Records reads it.
 type Meta interface {
-	Load(branch string) (worktree.Meta, error)
+	repository.Meta
 }
 
 // Jobs lists the jobs the run daemon runs; it fails with run.ErrUnknown when it cannot tell which are up.

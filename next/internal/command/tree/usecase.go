@@ -3,7 +3,6 @@ package tree
 
 import (
 	"context"
-	"errors"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -101,7 +100,7 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 	}
 
 	counts, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: against})
-	if state.Err = interrupted(ctx, err); err != nil {
+	if state.Err = repository.Interrupted(ctx, err); err != nil {
 		return state
 	}
 
@@ -111,16 +110,4 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 		state.Behind = &counts.Behind
 	}
 	return state
-}
-
-// ----------------------------------------------------------------------------
-// Helpers
-
-// interrupted is err when it is the read's interruption, which cancels the node; a count git cannot make otherwise leaves the node not counted rather than unreadable.
-func interrupted(ctx context.Context, err error) error {
-	if err == nil || errors.Is(err, context.Canceled) {
-		return err
-	}
-
-	return ctx.Err()
 }

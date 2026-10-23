@@ -306,6 +306,17 @@ func TestAReadCancelledReportsItsWorktreesInterrupted(t *testing.T) {
 	assert.Equal(t, domain.KindCancelled, read.Failure().Kind)
 }
 
+func TestACountInterruptedMakesItsWorktreeCancelled(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}, Fail: map[string]error{"AheadBehindOf": context.Canceled}}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusDone, read.Items[0].Status, "the main worktree is not counted")
+	assert.Equal(t, domain.StatusCancelled, read.Items[1].Status)
+	assert.Equal(t, domain.KindCancelled, read.Failure().Kind)
+}
+
 func TestARefreshFetchesOriginOnce(t *testing.T) {
 	w := newWorld(seed{Git: gittest.FakeParams{Remote: []string{"main"}, Worktrees: []worktree.Worktree{linked("feat/a")}, Origin: map[string][]string{"main": {"upstream"}, "feat/a": {"pushed"}}}})
 

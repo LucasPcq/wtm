@@ -100,7 +100,11 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 	}
 
 	// A branch with no commit yet, an orphan, has nothing to count: it is not counted rather than unreadable.
-	gap, _ := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: facts.Config.Worktrees.BaseBranch})
+	gap, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: facts.Config.Worktrees.BaseBranch})
+	if state.Err = repository.Interrupted(ctx, err); err != nil {
+		return state
+	}
+
 	state.Ahead = gap.Ahead
 	return state
 }

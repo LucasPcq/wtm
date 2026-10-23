@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -39,6 +40,15 @@ func Gone(ctx context.Context, git Locator, w worktree.Worktree) (bool, error) {
 	}
 
 	return !location.Exists, nil
+}
+
+// Interrupted is err when it is the read's interruption, which cancels the worktree being read; any other error of a count git cannot make leaves it not counted rather than unreadable, nil unless ctx is done by then.
+func Interrupted(ctx context.Context, err error) error {
+	if err == nil || errors.Is(err, context.Canceled) {
+		return err
+	}
+
+	return ctx.Err()
 }
 
 // Each returns what read reads of each of worktrees, in their order, a few read at once.

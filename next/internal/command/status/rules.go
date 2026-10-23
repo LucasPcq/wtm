@@ -13,6 +13,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
 // ----------------------------------------------------------------------------
@@ -21,7 +22,7 @@ import (
 // Facts are what status reads: the repository, the worktrees the request reads (Targets), the meta record of each live branch (and the error of a record that exists but does not read), what each worktree read holds, what the run daemon and GitHub said, and the branches behind their merged pull request (repository.Behind).
 type Facts struct {
 	worktree.Repository
-	run.Asked
+	repository.Asked
 	Targets    []worktree.Worktree
 	Records    map[string]worktree.Meta // by branch
 	RecordErrs map[string]error         // by branch
@@ -174,9 +175,9 @@ type EnvFile struct {
 
 // A Problem is something to fix in a worktree, and the command that fixes it.
 type Problem struct {
-	Code    string          `json:"code"`
-	Message string          `json:"message"`
-	Fix     domain.FollowUp `json:"fix"`
+	Code    string           `json:"code"`
+	Message string           `json:"message"`
+	Fix     *domain.FollowUp `json:"fix"` // null when no command fixes it
 }
 
 // The codes of status's problems, warnings and failures.
@@ -320,11 +321,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Jobs:      f.jobs(w, offset),
 		Env:       f.envOf(w, state),
 	}
-	// Every fix names a branch: a worktree on none has its facts read and nothing to fix.
-	detail.Problems = []Problem{}
-	if branch != "" {
-		detail.Problems = Problems(ProblemsParams{Subject: subject, Gone: state.Missing, Merged: f.Repository.Cleans(pr, w, f.Behind[branch]), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
-	}
+	detail.Problems = Problems(ProblemsParams{Branch: branch, Gone: state.Missing, Merged: f.Repository.Cleans(pr, w, f.Behind[branch]), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
 
 	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
 	if len(state.Unread) > 0 {
@@ -644,9 +641,9 @@ type Missing struct {
 	From   Rebuild
 }
 
-// ProblemsParams are what a worktree has to fix: the worktree, as a fix names it, whether its directory is gone, whether its merged pull request leaves it to be cleaned, the .env files it lacks, whether it has yet to choose its isolation, and its jobs.
+// ProblemsParams are what a worktree has to fix: its branch, which every fix names, empty on none; whether its directory is gone, whether its merged pull request leaves it to be cleaned, the .env files it lacks, whether it has yet to choose its isolation, and its jobs.
 type ProblemsParams struct {
-	Subject string
+	Branch  string
 	Gone    bool
 	Merged  bool
 	Missing []Missing
@@ -664,31 +661,38 @@ const (
 	pathDetach        = "detach"
 )
 
-// Problems are the problems of params, each with its fix: a gone directory alone, since only cleaning the worktree fixes it; else a merged pull request first, since cleaning the worktree makes every other fix moot, then each missing .env file, then a pending isolation, then each crashed job, whose fix starts it again in the worktree that runs it, a shared job's owner.
+// Problems are the problems of params, each with its fix: a gone directory alone, since only cleaning the worktree fixes it, with no fix on no branch, which clean cannot name; nothing else on no branch, since every fix names a branch; else a merged pull request first, since cleaning the worktree makes every other fix moot, then each missing .env file, then a pending isolation, then each crashed job, whose fix starts it again in the worktree that runs it, a shared job's owner.
 func Problems(params ProblemsParams) []Problem {
 	if params.Gone {
-		return []Problem{{Code: CodeMissing, Message: "its directory is gone", Fix: fix(CodeMissing, domain.CommandClean, params.Subject)}}
+		gone := Problem{Code: CodeMissing, Message: "its directory is gone"}
+		if params.Branch != "" {
+			gone.Fix = fix(CodeMissing, domain.CommandClean, params.Branch)
+		}
+		return []Problem{gone}
 	}
 
 	problems := []Problem{}
+	if params.Branch == "" {
+		return problems
+	}
 	if params.Merged {
-		problems = append(problems, Problem{Code: CodeMerged, Message: "its pull request is merged", Fix: fix(CodeMerged, domain.CommandClean, params.Subject)})
+		problems = append(problems, Problem{Code: CodeMerged, Message: "its pull request is merged", Fix: fix(CodeMerged, domain.CommandClean, params.Branch)})
 	}
 	for _, missing := range params.Missing {
-		problems = append(problems, missingProblem(params.Subject, missing))
+		problems = append(problems, missingProblem(params.Branch, missing))
 	}
 	if params.Pending {
 		problems = append(problems, Problem{
 			Code:    CodeIsolationPending,
 			Message: "predates the isolation choice: run up and run start refuse it",
-			Fix:     fix(CodeIsolationPending, commandEnv, params.Subject, domain.Answered{Path: domain.PathIsolation, Values: []string{string(project.Isolated)}}),
+			Fix:     fix(CodeIsolationPending, commandEnv, params.Branch, domain.Answered{Path: domain.PathIsolation, Values: []string{string(project.Isolated)}}),
 		})
 	}
 	for _, job := range params.Jobs {
 		if job.State != run.Crashed {
 			continue
 		}
-		owner := params.Subject
+		owner := params.Branch
 		if job.Owner != nil {
 			owner = cmp.Or(job.Owner.Branch, job.Owner.Path)
 		}
@@ -711,15 +715,15 @@ func missingProblem(subject string, missing Missing) Problem {
 		problem.Fix = fix(CodeEnvMissing, commandEnv, subject, domain.Answered{Path: pathFrom, Values: []string{string(missing.From)}})
 	case FromNowhere:
 		problem.Message = missing.Target + " is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand"
-		problem.Fix = domain.FollowUp{Command: commandConfigEdit, Code: CodeEnvMissing}
+		problem.Fix = &domain.FollowUp{Command: commandConfigEdit, Code: CodeEnvMissing}
 	}
 
 	return problem
 }
 
 // fix is the follow-up that runs command on the worktree subject with answers.
-func fix(code, command, subject string, answers ...domain.Answered) domain.FollowUp {
-	return domain.FollowUp{Command: command, Answers: append([]domain.Answered{{Path: domain.PathWorktree, Values: []string{subject}}}, answers...), Code: code}
+func fix(code, command, subject string, answers ...domain.Answered) *domain.FollowUp {
+	return &domain.FollowUp{Command: command, Answers: append([]domain.Answered{{Path: domain.PathWorktree, Values: []string{subject}}}, answers...), Code: code}
 }
 
 func crashed(job Job) string {
