@@ -37,11 +37,16 @@ type Command struct {
 	Execute   func(ctx context.Context, call Call) Response
 }
 
-// A Call is one execution of a command: the directory of the repository it runs on, its request as the answer of each field by its path, folded as the command line folds its flags, and its run options.
+// A Call is one execution of a command: the directory of the repository it runs on, which is also where its caller stands (a relative path it answers is read from it), its request as the answer of each field by its path, folded as the command line folds its flags, and its run options.
 type Call struct {
 	Dir     string
 	Answers []domain.Answered
 	Options domain.RunOptions
+}
+
+// standing is where the call's caller stands: in the directory it names, named, or nowhere when it names none.
+func (c Call) standing() domain.Standing {
+	return domain.Standing{Dir: c.Dir, Named: c.Dir != "", Cwd: c.Dir}
 }
 
 // A Response is how an execution ended: its status, from the kind of its failure, and its envelope.
@@ -86,6 +91,7 @@ func Bind[U any, Req Request[Req], Q Form, Out Outcome](name string, open func(c
 		if err != nil {
 			return useCase, req, err
 		}
+		req = domain.StandFrom(req, call.standing())
 
 		useCase, err = open(ctx, call.Dir)
 		return useCase, req, err

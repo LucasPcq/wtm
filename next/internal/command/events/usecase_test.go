@@ -20,7 +20,7 @@ func TestAStreamSubscribesBeforeItReadsItsSnapshot(t *testing.T) {
 	bus := newBus()
 	bus.log = log
 
-	r, _ := watching(t, useCase(bus, &fakeRegistry{}, opening(app)), events.Request{Dir: "/repo"})
+	r, _ := watching(t, useCase(bus, &known{}, opening(app)), events.Request{At: domain.Standing{Dir: "/repo"}})
 	r.nextType(t)
 
 	// the first read refuses a repository with no config before anything subscribes
@@ -35,7 +35,7 @@ func TestAStreamOpensOnItsSnapshotThenReadyThenTheChangesOfItsRepository(t *test
 	// published while the snapshot is read: it waits in the subscription made first
 	bus.pending = []string{string(created)}
 
-	r, _ := watching(t, useCase(bus, &fakeRegistry{}, opening(app)), events.Request{Dir: "/repo"})
+	r, _ := watching(t, useCase(bus, &known{}, opening(app)), events.Request{At: domain.Standing{Dir: "/repo"}})
 
 	assert.Equal(t, `{"v":2,"type":"snapshot","ts":"2026-10-16T12:00:00Z","repo":{"root":"/repo","common_dir":"/repo/.git"},"worktrees":[{"branch":"main","path":"/repo","parent":"","ordinal":0,"isolation":"isolated","is_main":true,"created_at":""},{"branch":"feat/a","path":"/repo/.trees/feat/a","parent":"main","ordinal":1,"isolation":"isolated","is_main":false,"created_at":"2026-10-16T11:00:00Z"}]}`, r.next(t))
 	assert.Equal(t, `{"v":2,"type":"ready","ts":"2026-10-16T12:00:00Z"}`, r.next(t))
@@ -45,7 +45,7 @@ func TestAStreamOpensOnItsSnapshotThenReadyThenTheChangesOfItsRepository(t *test
 
 func TestWhenTheBusGoesAwayTheStreamOpensAgainOnAFreshSnapshot(t *testing.T) {
 	bus := newBus()
-	r, _ := watching(t, useCase(bus, &fakeRegistry{}, opening(newRepo("/repo"))), events.Request{Dir: "/repo"})
+	r, _ := watching(t, useCase(bus, &known{}, opening(newRepo("/repo"))), events.Request{At: domain.Standing{Dir: "/repo"}})
 	first := bus.subscribed(t)
 	r.nextType(t)
 	r.nextType(t)
@@ -60,7 +60,7 @@ func TestWhenTheBusGoesAwayTheStreamOpensAgainOnAFreshSnapshot(t *testing.T) {
 func TestABusOutOfReachIsAWarningAndTriedAgain(t *testing.T) {
 	bus := newBus(errBusGone)
 
-	r, _ := watching(t, useCase(bus, &fakeRegistry{}, opening(newRepo("/repo"))), events.Request{Dir: "/repo"})
+	r, _ := watching(t, useCase(bus, &known{}, opening(newRepo("/repo"))), events.Request{At: domain.Standing{Dir: "/repo"}})
 
 	assert.ErrorIs(t, r.warning(t), errBusGone)
 	assert.Equal(t, "snapshot", r.nextType(t))
@@ -68,7 +68,7 @@ func TestABusOutOfReachIsAWarningAndTriedAgain(t *testing.T) {
 
 func TestALineOfANewerSchemaEndsTheStream(t *testing.T) {
 	bus := newBus()
-	r, done := watching(t, useCase(bus, &fakeRegistry{}, opening(newRepo("/repo"))), events.Request{Dir: "/repo"})
+	r, done := watching(t, useCase(bus, &known{}, opening(newRepo("/repo"))), events.Request{At: domain.Standing{Dir: "/repo"}})
 	sub := bus.subscribed(t)
 	r.nextType(t)
 	r.nextType(t)
@@ -84,7 +84,7 @@ func TestALineOfANewerSchemaEndsTheStream(t *testing.T) {
 func TestALineThatCannotBeReadIsDroppedWithAWarning(t *testing.T) {
 	app := newRepo("/repo")
 	bus := newBus()
-	r, _ := watching(t, useCase(bus, &fakeRegistry{}, opening(app)), events.Request{Dir: "/repo"})
+	r, _ := watching(t, useCase(bus, &known{}, opening(app)), events.Request{At: domain.Standing{Dir: "/repo"}})
 	sub := bus.subscribed(t)
 	r.nextType(t)
 	r.nextType(t)
@@ -98,7 +98,7 @@ func TestALineThatCannotBeReadIsDroppedWithAWarning(t *testing.T) {
 
 func TestALineOfATypeThisWtmDoesNotKnowIsRelayedAsItCame(t *testing.T) {
 	bus := newBus()
-	r, _ := watching(t, useCase(bus, &fakeRegistry{}, opening(newRepo("/repo"))), events.Request{Dir: "/repo"})
+	r, _ := watching(t, useCase(bus, &known{}, opening(newRepo("/repo"))), events.Request{At: domain.Standing{Dir: "/repo"}})
 	sub := bus.subscribed(t)
 	r.nextType(t)
 	r.nextType(t)
@@ -114,9 +114,9 @@ func TestALineOfATypeThisWtmDoesNotKnowIsRelayedAsItCame(t *testing.T) {
 // Legacy never noticed its repository going away and streamed on forever.
 func TestAStreamEndsWhenItsRepositoryLosesItsConfig(t *testing.T) {
 	app := newRepo("/repo")
-	u := useCase(newBus(), &fakeRegistry{}, opening(app))
+	u := useCase(newBus(), &known{}, opening(app))
 	u.Recheck = 20 * time.Millisecond
-	r, done := watching(t, u, events.Request{Dir: "/repo"})
+	r, done := watching(t, u, events.Request{At: domain.Standing{Dir: "/repo"}})
 	r.nextType(t)
 	r.nextType(t)
 
@@ -128,7 +128,7 @@ func TestAStreamEndsWhenItsRepositoryLosesItsConfig(t *testing.T) {
 func TestAStreamEndsWhenItsRepositoryIsAnnouncedRemovedAndItsConfigIsGone(t *testing.T) {
 	app := newRepo("/repo")
 	bus := newBus()
-	r, done := watching(t, useCase(bus, &fakeRegistry{}, opening(app)), events.Request{Dir: "/repo"})
+	r, done := watching(t, useCase(bus, &known{}, opening(app)), events.Request{At: domain.Standing{Dir: "/repo"}})
 	sub := bus.subscribed(t)
 	r.nextType(t)
 	r.nextType(t)
@@ -143,29 +143,29 @@ func TestAStreamEndsWhenItsRepositoryIsAnnouncedRemovedAndItsConfigIsGone(t *tes
 func TestARepositoryWithNoConfigIsRefusedBeforeTheStreamAndNotRegistered(t *testing.T) {
 	app := newRepo("/repo")
 	app.Config.remove()
-	registry := &fakeRegistry{}
+	k := &known{}
 
-	err := useCase(newBus(), registry, opening(app)).Watch(t.Context(), events.Request{Dir: "/repo"}, newReader().out())
+	err := useCase(newBus(), k, opening(app)).Watch(t.Context(), events.Request{At: domain.Standing{Dir: "/repo"}}, newReader().out())
 
 	assert.Equal(t, events.CodeConfigNotFound, codeOf(t, err))
-	assert.Empty(t, registry.registers())
+	assert.Empty(t, k.registers())
 }
 
 func TestAStreamRegistersTheRepositoryItWatches(t *testing.T) {
 	app := newRepo("/repo")
-	registry := &fakeRegistry{}
+	k := &known{}
 
-	r, _ := watching(t, useCase(newBus(), registry, opening(app)), events.Request{Dir: "/repo"})
+	r, _ := watching(t, useCase(newBus(), k, opening(app)), events.Request{At: domain.Standing{Dir: "/repo"}})
 	r.nextType(t)
 
-	assert.Equal(t, []domain.Repo{app.Repo}, registry.registers())
+	assert.Equal(t, []domain.Repo{app.Repo}, k.registers())
 }
 
 // A stream relays only the lines of its own version: a legacy daemon holding the socket would hand it v1 lines.
 func TestALineOfAnOlderSchemaIsDroppedWithAWarning(t *testing.T) {
 	app := newRepo("/repo")
 	bus := newBus()
-	r, _ := watching(t, useCase(bus, &fakeRegistry{}, opening(app)), events.Request{Dir: "/repo"})
+	r, _ := watching(t, useCase(bus, &known{}, opening(app)), events.Request{At: domain.Standing{Dir: "/repo"}})
 	sub := bus.subscribed(t)
 	r.nextType(t)
 	r.nextType(t)
@@ -184,13 +184,14 @@ func TestARequestThatCannotBeWatchedIsRefused(t *testing.T) {
 		Request events.Request
 		Code    string
 	}{
-		"repo_with_all":       {Request: events.Request{Repo: "/repo", All: true}, Code: domain.CodeInvalidRequest},
-		"repo_not_directory":  {Request: events.Request{Repo: "/nowhere"}, Code: domain.CodeInvalidRequest},
-		"repo_not_repository": {Request: events.Request{Repo: "/tmp"}, Code: domain.CodeNotARepository},
-		"named_dir_outside":   {Request: events.Request{Dir: "/tmp", Named: true}, Code: domain.CodeNotARepository},
+		"repo_with_all":         {Request: events.Request{Repo: "/repo", All: true}, Code: domain.CodeInvalidRequest},
+		"repo_not_directory":    {Request: events.Request{Repo: "/nowhere"}, Code: domain.CodeInvalidRequest},
+		"repo_not_repository":   {Request: events.Request{Repo: "/tmp"}, Code: domain.CodeNotARepository},
+		"named_dir_outside":     {Request: events.Request{At: domain.Standing{Dir: "/tmp", Named: true}}, Code: domain.CodeNotARepository},
+		"relative_from_nowhere": {Request: events.Request{Repo: "repo"}, Code: domain.CodeInvalidRequest},
 	} {
 		t.Run(name, func(t *testing.T) {
-			err := useCase(newBus(), &fakeRegistry{}, opening(newRepo("/repo"))).Watch(t.Context(), c.Request, newReader().out())
+			err := useCase(newBus(), &known{}, opening(newRepo("/repo"))).Watch(t.Context(), c.Request, newReader().out())
 
 			assert.Equal(t, c.Code, codeOf(t, err))
 		})
@@ -198,7 +199,7 @@ func TestARequestThatCannotBeWatchedIsRefused(t *testing.T) {
 }
 
 func TestTheFieldsOfARefusedRequestNameWhatToChange(t *testing.T) {
-	u := useCase(newBus(), &fakeRegistry{}, opening(newRepo("/repo")))
+	u := useCase(newBus(), &known{}, opening(newRepo("/repo")))
 
 	both := u.Watch(t.Context(), events.Request{Repo: "/repo", All: true}, newReader().out())
 	nowhere := u.Watch(t.Context(), events.Request{Repo: "/nowhere"}, newReader().out())
@@ -215,23 +216,41 @@ func TestTheRepositoryNamedByRepoWinsOverTheDirectory(t *testing.T) {
 	named, current := newRepo("/named"), newRepo("/current")
 	bus := newBus()
 
-	r, _ := watching(t, useCase(bus, &fakeRegistry{}, opening(named, current)), events.Request{Repo: "/named", Dir: "/current", Named: true})
+	r, _ := watching(t, useCase(bus, &known{}, opening(named, current)), events.Request{Repo: "/named", At: domain.Standing{Dir: "/current", Named: true}})
 
 	assert.Equal(t, []string{"/named/.git"}, bus.subscribed(t).Repos)
 	assert.Contains(t, r.next(t), `"root":"/named"`)
 }
 
+// The command line read a relative --repo from its working directory, the API from the call's directory: the use case reads it from where the caller stands, whatever directory it runs on ($WTM_PROJECT_DIR).
+func TestARelativeRepoIsReadFromWhereTheCallerStands(t *testing.T) {
+	bus := newBus()
+
+	r, _ := watching(t, useCase(bus, &known{}, opening(newRepo("/code/app"), newRepo("/elsewhere/app"))), events.Request{Repo: "app", At: domain.Standing{Dir: "/elsewhere", Named: true, Cwd: "/code"}})
+
+	assert.Equal(t, []string{"/code/app/.git"}, bus.subscribed(t).Repos)
+	assert.Contains(t, r.next(t), `"root":"/code/app"`)
+}
+
+func TestACallerStandingNowhereWatchesEveryRepository(t *testing.T) {
+	bus := newBus()
+
+	watching(t, useCase(bus, &known{}, opening()), events.Request{})
+
+	assert.Empty(t, bus.subscribed(t).Repos)
+}
+
 func TestAnUnnamedDirectoryInNoRepositoryWatchesEveryRepository(t *testing.T) {
 	bus := newBus()
 
-	watching(t, useCase(bus, &fakeRegistry{}, opening()), events.Request{Dir: "/tmp"})
+	watching(t, useCase(bus, &known{}, opening()), events.Request{At: domain.Standing{Dir: "/tmp"}})
 
 	assert.Empty(t, bus.subscribed(t).Repos)
 }
 
 func TestAnInterruptBeforeTheStreamStartsIsAnInterruption(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
-	done := watchingWith(t, watchingParams{UseCase: useCase(newBus(errBusGone, errBusGone, errBusGone), &fakeRegistry{}, opening(newRepo("/repo"))), Request: events.Request{Dir: "/repo"}, Reader: newReader(), Context: ctx})
+	done := watchingWith(t, watchingParams{UseCase: useCase(newBus(errBusGone, errBusGone, errBusGone), &known{}, opening(newRepo("/repo"))), Request: events.Request{At: domain.Standing{Dir: "/repo"}}, Reader: newReader(), Context: ctx})
 
 	cancel()
 
@@ -241,7 +260,7 @@ func TestAnInterruptBeforeTheStreamStartsIsAnInterruption(t *testing.T) {
 func TestAnInterruptOnceTheStreamStartedEndsItWell(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	r := newReader()
-	done := watchingWith(t, watchingParams{UseCase: useCase(newBus(), &fakeRegistry{}, opening(newRepo("/repo"))), Request: events.Request{Dir: "/repo"}, Reader: r, Context: ctx})
+	done := watchingWith(t, watchingParams{UseCase: useCase(newBus(), &known{}, opening(newRepo("/repo"))), Request: events.Request{At: domain.Standing{Dir: "/repo"}}, Reader: r, Context: ctx})
 	r.nextType(t)
 
 	cancel()
@@ -253,7 +272,7 @@ func TestAReaderThatFailsEndsTheStreamWithItsError(t *testing.T) {
 	r := newReader()
 	r.fail = errors.New("broken pipe")
 
-	done := watchingWith(t, watchingParams{UseCase: useCase(newBus(), &fakeRegistry{}, opening(newRepo("/repo"))), Request: events.Request{Dir: "/repo"}, Reader: r})
+	done := watchingWith(t, watchingParams{UseCase: useCase(newBus(), &known{}, opening(newRepo("/repo"))), Request: events.Request{At: domain.Standing{Dir: "/repo"}}, Reader: r})
 
 	assert.EqualError(t, ended(t, done), "broken pipe")
 }
@@ -262,7 +281,7 @@ func TestTheGlobalStreamOpensOnASnapshotOfEachRepositoryThenOneReady(t *testing.
 	a, b := newRepo("/a"), newRepo("/b")
 	bus := newBus()
 
-	r, _ := watching(t, useCase(bus, &fakeRegistry{repos: []domain.Repo{a.Repo, b.Repo}}, opening(a, b)), events.Request{All: true})
+	r, _ := watching(t, useCase(bus, &known{repos: []domain.Repo{a.Repo, b.Repo}}, opening(a, b)), events.Request{All: true})
 
 	assert.Contains(t, r.next(t), `"root":"/a"`)
 	assert.Contains(t, r.next(t), `"root":"/b"`)
@@ -273,7 +292,7 @@ func TestARepositoryTheGlobalStreamCannotReadIsSkippedWithAWarning(t *testing.T)
 	a, broken := newRepo("/a"), newRepo("/broken")
 	broken.Config.err = errors.New("permission denied")
 
-	r, _ := watching(t, useCase(newBus(), &fakeRegistry{repos: []domain.Repo{broken.Repo, a.Repo}}, opening(a, broken)), events.Request{All: true})
+	r, _ := watching(t, useCase(newBus(), &known{repos: []domain.Repo{broken.Repo, a.Repo}}, opening(a, broken)), events.Request{All: true})
 
 	assert.EqualError(t, r.warning(t), "/broken: permission denied")
 	assert.Contains(t, r.next(t), `"root":"/a"`)
@@ -283,7 +302,7 @@ func TestARepositoryTheGlobalStreamCannotReadIsSkippedWithAWarning(t *testing.T)
 func TestARepositoryJoiningIsSentWithItsSnapshot(t *testing.T) {
 	joining := newRepo("/joining")
 	bus := newBus()
-	r, _ := watching(t, useCase(bus, &fakeRegistry{}, opening(joining)), events.Request{All: true})
+	r, _ := watching(t, useCase(bus, &known{}, opening(joining)), events.Request{All: true})
 	sub := bus.subscribed(t)
 	assert.Equal(t, "ready", r.nextType(t))
 
@@ -297,8 +316,8 @@ func TestARepositoryJoiningIsSentWithItsSnapshot(t *testing.T) {
 func TestARepositoryJoiningWithNoConfigIsOneLineAndIsNotRegistered(t *testing.T) {
 	uninitialized := newRepo("/bare")
 	uninitialized.Config.remove()
-	bus, registry := newBus(), &fakeRegistry{}
-	r, _ := watching(t, useCase(bus, registry, opening(uninitialized)), events.Request{All: true})
+	bus, k := newBus(), &known{}
+	r, _ := watching(t, useCase(bus, k, opening(uninitialized)), events.Request{All: true})
 	sub := bus.subscribed(t)
 	assert.Equal(t, "ready", r.nextType(t))
 
@@ -307,14 +326,14 @@ func TestARepositoryJoiningWithNoConfigIsOneLineAndIsNotRegistered(t *testing.T)
 	assert.Equal(t, "repo.added", r.nextType(t))
 	assert.ErrorContains(t, r.warning(t), "/bare: no wtm config found")
 	r.quiet(t)
-	assert.Empty(t, registry.registers())
+	assert.Empty(t, k.registers())
 }
 
 // Legacy sent a second snapshot of a repository registered between its subscription and its first prune.
 func TestARepositoryAlreadySnapshottedIsNotSentAgainWhenItsJoiningArrives(t *testing.T) {
 	a := newRepo("/a")
 	bus := newBus()
-	r, _ := watching(t, useCase(bus, &fakeRegistry{repos: []domain.Repo{a.Repo}}, opening(a)), events.Request{All: true})
+	r, _ := watching(t, useCase(bus, &known{repos: []domain.Repo{a.Repo}}, opening(a)), events.Request{All: true})
 	sub := bus.subscribed(t)
 	r.nextType(t)
 	r.nextType(t)
@@ -328,7 +347,7 @@ func TestARepositoryAlreadySnapshottedIsNotSentAgainWhenItsJoiningArrives(t *tes
 func TestTheGlobalStreamDropsTheEventsOfARepositoryItSentNoSnapshotOf(t *testing.T) {
 	a, unknown := newRepo("/a"), newRepo("/unknown")
 	bus := newBus()
-	r, _ := watching(t, useCase(bus, &fakeRegistry{repos: []domain.Repo{a.Repo}}, opening(a, unknown)), events.Request{All: true})
+	r, _ := watching(t, useCase(bus, &known{repos: []domain.Repo{a.Repo}}, opening(a, unknown)), events.Request{All: true})
 	sub := bus.subscribed(t)
 	r.nextType(t)
 	r.nextType(t)
@@ -343,7 +362,7 @@ func TestTheGlobalStreamDropsTheEventsOfARepositoryItSentNoSnapshotOf(t *testing
 func TestARepositoryThatLeftTheGlobalStreamHasItsEventsDropped(t *testing.T) {
 	a := newRepo("/a")
 	bus := newBus()
-	r, _ := watching(t, useCase(bus, &fakeRegistry{repos: []domain.Repo{a.Repo}}, opening(a)), events.Request{All: true})
+	r, _ := watching(t, useCase(bus, &known{repos: []domain.Repo{a.Repo}}, opening(a)), events.Request{All: true})
 	sub := bus.subscribed(t)
 	r.nextType(t)
 	r.nextType(t)
@@ -356,11 +375,11 @@ func TestARepositoryThatLeftTheGlobalStreamHasItsEventsDropped(t *testing.T) {
 }
 
 func TestTheGlobalStreamPrunesTheRegistryAsItRuns(t *testing.T) {
-	registry := &fakeRegistry{}
-	u := useCase(newBus(), registry, opening())
+	k := &known{}
+	u := useCase(newBus(), k, opening())
 	u.Recheck = 20 * time.Millisecond
 
 	watching(t, u, events.Request{All: true})
 
-	assert.Eventually(t, func() bool { return registry.pruned() >= 3 }, 2*time.Second, 10*time.Millisecond)
+	assert.Eventually(t, func() bool { return k.pruned() >= 3 }, 2*time.Second, 10*time.Millisecond)
 }

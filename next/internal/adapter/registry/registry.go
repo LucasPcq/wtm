@@ -17,8 +17,6 @@ import (
 const (
 	globalDirName = "wtm"
 	fileName      = "repos.json"
-	stateDirName  = "wtm"
-	configName    = "config.toml"
 )
 
 // A Registry is the file at Path listing the repositories wtm knows, a JSON
@@ -46,14 +44,10 @@ type entry struct {
 }
 
 // Add lists repo, keyed by its common directory, and reports whether it was
-// not listed yet. A repository with no wtm config is not added, as Prune would
-// drop it. The common case, a repository already listed, reads the file and
-// nothing else. A file that does not parse is rebuilt from empty: every
+// not listed yet. The common case, a repository already listed, reads the file
+// and nothing else. A file that does not parse is rebuilt from empty: every
 // repository joins it again the next time a command runs in it.
 func (r Registry) Add(ctx context.Context, repo domain.Repo) (bool, error) {
-	if gone(entry{CommonDir: repo.CommonDir}) {
-		return false, nil
-	}
 	if listed, err := r.read(); err == nil && listing(listed, repo.CommonDir) {
 		return false, nil
 	}
@@ -74,10 +68,11 @@ func (r Registry) Add(ctx context.Context, repo domain.Repo) (bool, error) {
 	return added && err == nil, err
 }
 
-// Prune drops the repositories no longer initialized, their wtm config gone
-// with them or on its own, and returns those it keeps and those it dropped. When
-// every one is still initialized it reads the file and nothing else.
-func (r Registry) Prune(ctx context.Context) (kept, dropped []domain.Repo, err error) {
+// Prune drops the repositories keep refuses and returns those it keeps and
+// those it dropped. When keep takes every one it reads the file and nothing
+// else.
+func (r Registry) Prune(ctx context.Context, keep func(domain.Repo) bool) (kept, dropped []domain.Repo, err error) {
+	gone := func(e entry) bool { return !keep(repoOf(e)) }
 	if listed, err := r.read(); err == nil && !slices.ContainsFunc(listed, gone) {
 		return repos(listed), nil, nil
 	}
@@ -148,12 +143,6 @@ func written(entries []entry) (statefile.Change, error) {
 
 func listing(entries []entry, commonDir string) bool {
 	return slices.ContainsFunc(entries, func(e entry) bool { return e.CommonDir == commonDir })
-}
-
-// gone reports whether the repository of e is no longer initialized: its wtm config is missing.
-func gone(e entry) bool {
-	_, err := os.Stat(filepath.Join(e.CommonDir, stateDirName, configName))
-	return err != nil
 }
 
 func repos(entries []entry) []domain.Repo {

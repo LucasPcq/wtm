@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -20,7 +19,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/github"
 	"github.com/LucasPcq/wtm/next/internal/adapter/oplock"
 	"github.com/LucasPcq/wtm/next/internal/adapter/proxyport"
-	"github.com/LucasPcq/wtm/next/internal/adapter/registry"
+	reposjson "github.com/LucasPcq/wtm/next/internal/adapter/registry"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
@@ -32,6 +31,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
+	"github.com/LucasPcq/wtm/next/internal/service/registry"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
@@ -59,7 +59,7 @@ func wire(params wireParams) app {
 	repo := git.Repo{Dir: params.MainPath}
 	projectConfig := config.Project{StateDir: params.StateDir, GlobalPath: config.GlobalPath()}
 
-	facts := repository.Service{Config: projectConfig, Git: repo, MainPath: params.MainPath, Init: initialize()}
+	facts := params.facts()
 
 	operations := operation.Service{
 		Locker:    locker{oplock.Locks{StateDir: params.StateDir}},
@@ -125,6 +125,16 @@ func wire(params wireParams) app {
 			Repository:   facts,
 		},
 	}
+}
+
+// facts reads the repository params locates, as every use case decides from it.
+func (p wireParams) facts() repository.Service {
+	return repository.Service{Config: config.Project{StateDir: p.StateDir, GlobalPath: config.GlobalPath()}, Git: git.Repo{Dir: p.MainPath}, MainPath: p.MainPath, Init: initialize()}
+}
+
+// repo is how the event bus and the registry name the repository params locates.
+func (p wireParams) repo() domain.Repo {
+	return domain.Repo{Root: p.MainPath, CommonDir: bus.Resolved(p.CommonDir)}
 }
 
 // pathForce is the answer that lifts a legacy command's safety refusals, spelled --force.
@@ -238,19 +248,18 @@ func newOpID() string {
 // ----------------------------------------------------------------------------
 // The event stream
 
-// streamParams is where the event stream finds its bus, the socket of its daemon, which Start starts when none answers, and the registry of the repositories wtm knows, which it never adds to when Off.
+// streamParams is where the event stream finds its bus, the socket of its daemon, which Start starts when none answers, and the registry of the repositories wtm knows.
 type streamParams struct {
 	Socket   string
 	Start    func() error
 	Registry string
-	Off      bool
 }
 
 // eventStream is the events use case over the bus and the registry params name, opening each repository with openEvents.
 func eventStream(params streamParams) events.UseCase {
 	return events.UseCase{
 		Bus:      bus.Bus{SocketPath: params.Socket, Start: params.Start},
-		Registry: known{Registry: registry.Registry{Path: params.Registry}, Socket: params.Socket, Off: params.Off},
+		Registry: knownRepos(params.Registry, params.Socket),
 		Open:     openEvents,
 		Now:      time.Now,
 	}
@@ -258,7 +267,19 @@ func eventStream(params streamParams) events.UseCase {
 
 // The process's own event stream: its bus at the socket every wtm-next talks to, started from this binary.
 func systemStream() events.UseCase {
-	return eventStream(streamParams{Socket: bus.SocketPath(), Start: startDaemon, Registry: registry.Path(), Off: os.Getenv(stateDirEnv) != ""})
+	return eventStream(streamParams{Socket: bus.SocketPath(), Start: startDaemon, Registry: reposjson.Path()})
+}
+
+// knownRepos is the registry of the repositories wtm knows, in the file at path, announcing on the bus at socket each one that joins or leaves it.
+func knownRepos(path, socket string) registry.Service {
+	return registry.Service{
+		Store: reposjson.Registry{Path: path},
+		Announce: func(event domain.Event, repo domain.Repo) {
+			bus.NewPublisher(bus.PublisherParams{Root: repo.Root, CommonDir: repo.CommonDir, SocketPath: socket}).Publish(event)
+		},
+		StateDir:    stateDir,
+		Initialized: func(dir string) bool { return config.Project{StateDir: dir}.Initialized() },
+	}
 }
 
 // daemonCommand is the command line that runs the bus's daemon in a process of its own.
@@ -281,41 +302,4 @@ func startDaemon() error {
 	}
 
 	return shell.Detached(exe, []string{daemonCommand}, shell.Environ([]string{cli.CorrelationIDEnv}, nil))
-}
-
-// known is the registry of the repositories wtm knows, announcing on the bus at Socket each one it adds or drops; Off keeps any repository from joining it (a state directory moved by $WTM_STATE_DIR: a sandbox or a test).
-type known struct {
-	registry.Registry
-	Socket string
-	Off    bool
-}
-
-// Register lists repo, initialized, announcing it when it was not listed yet, then drops the repositories no longer initialized; it never fails nor holds its caller for long: a repository missing is listed again by the next command run in it.
-func (k known) Register(ctx context.Context, repo domain.Repo) {
-	if k.Off {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, registerTimeout)
-	defer cancel()
-	added, err := k.Add(ctx, repo)
-	if err != nil || !added {
-		return
-	}
-
-	k.announce(domain.RepoAdded{}, repo)
-	_, _ = k.Prune(ctx)
-}
-
-// Prune drops the repositories no longer initialized, announcing each, and returns the others.
-func (k known) Prune(ctx context.Context) ([]domain.Repo, error) {
-	kept, dropped, err := k.Registry.Prune(ctx)
-	for _, repo := range dropped {
-		k.announce(domain.RepoRemoved{}, repo)
-	}
-	return kept, err
-}
-
-func (k known) announce(event domain.Event, repo domain.Repo) {
-	bus.NewPublisher(bus.PublisherParams{Root: repo.Root, CommonDir: repo.CommonDir, SocketPath: k.Socket}).Publish(event)
 }

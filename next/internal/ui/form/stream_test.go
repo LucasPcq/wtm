@@ -24,7 +24,7 @@ func TestAStreamBindsItsFieldsAndOutputAndReadsItsRequestFromThem(t *testing.T) 
 	assert.Equal(t, map[string]string{
 		"from": "string", "mode": "string", "ff": "bool", "keep": "bool", "files": "stringSlice", "name": "string", "output": "string",
 	}, types)
-	assert.Equal(t, request{"name": {"x"}, "ff": {"true"}}, stream.Request(cmd, nil))
+	assert.Equal(t, request{"name": {"x"}, "ff": {"true"}}, stream.Request(cmd, nil, uicli.Env{}))
 	assert.Equal(t, uicli.OutputJSON, run.Output)
 	assert.Equal(t, "--name", stream.Flags().Spell("name"))
 }

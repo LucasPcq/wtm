@@ -3,6 +3,8 @@ package cli
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
 // The environment variables a command line run reads.
@@ -28,6 +30,11 @@ func ReadEnv() Env {
 	}
 
 	return env
+}
+
+// Standing is where the run's caller stands: on ProjectDir, named by $WTM_PROJECT_DIR or not, in Cwd.
+func (e Env) Standing() domain.Standing {
+	return domain.Standing{Dir: e.ProjectDir, Named: e.Named, Cwd: e.Cwd}
 }
 
 // resolved returns path with its symbolic links resolved, or as it is when they cannot be; "" stays "".

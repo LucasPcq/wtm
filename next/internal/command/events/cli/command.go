@@ -79,8 +79,7 @@ func (c *eventsCommand) run(cmd *cobra.Command, args []string) error {
 	}
 	uicli.FailOnBrokenPipe()
 
-	req := stream{}.Request(cmd, args)
-	req.Dir, req.Named = c.io.Env.ProjectDir, c.io.Env.Named
+	req := stream{}.Request(cmd, args, c.io.Env)
 
 	// The reader leaving ends the stream as an interrupt would: wtm events | head -n 2 returns as soon as head does.
 	ctx, cancel := context.WithCancel(cmd.Context())

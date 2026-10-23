@@ -56,6 +56,12 @@ type Project struct {
 	GlobalPath string
 }
 
+// Initialized reports whether the project holds a config.toml, readable or not: wtm was initialized in it.
+func (p Project) Initialized() bool {
+	_, err := os.Stat(filepath.Join(p.StateDir, configFileName))
+	return err == nil
+}
+
 // Load returns the project's config.toml with its defaults applied, and the
 // global config. A missing config.toml is project.ErrConfigNotFound, wrapped;
 // a missing global config is an empty one. An unknown key, a malformed hook or

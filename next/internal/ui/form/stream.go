@@ -28,7 +28,7 @@ func (s Stream[R, Q]) Bind(cmd *cobra.Command, run *uicli.Run) {
 	cmd.Flags().StringVar(&run.Output, "output", uicli.OutputText, uicli.OutputUsage)
 }
 
-// Request returns the request cmd's flags and args give.
-func (s Stream[R, Q]) Request(cmd *cobra.Command, args []string) R {
-	return folded[R](fieldAnswers(cmd, args, s.schema()))
+// Request returns the request cmd's flags and args give, asked from where env stands.
+func (s Stream[R, Q]) Request(cmd *cobra.Command, args []string, env uicli.Env) R {
+	return domain.StandFrom(folded[R](fieldAnswers(cmd, args, s.schema())), env.Standing())
 }

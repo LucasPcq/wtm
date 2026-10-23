@@ -7,14 +7,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/registrytest"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/service/registry"
 	"github.com/stretchr/testify/require"
 )
 
-// useCase is the stream over bus, registry and the repositories open opens, its clock fixed and its checks every recheck.
-func useCase(bus *fakeBus, registry *fakeRegistry, open events.Open) events.UseCase {
-	return events.UseCase{Bus: bus, Registry: registry, Open: open, Now: func() time.Time { return fixedNow }, Recheck: time.Hour}
+// useCase is the stream over bus, the registry k and the repositories open opens, its clock fixed and its checks every recheck.
+func useCase(bus *fakeBus, k *known, open events.Open) events.UseCase {
+	k.store = registrytest.NewFake(registrytest.FakeParams{Repos: k.repos})
+	repos := registry.Service{
+		Store:       k.store,
+		Announce:    func(domain.Event, domain.Repo) {},
+		StateDir:    func(commonDir string) (string, bool) { return commonDir, false },
+		Initialized: func(string) bool { return true },
+	}
+	return events.UseCase{Bus: bus, Registry: repos, Open: open, Now: func() time.Time { return fixedNow }, Recheck: time.Hour}
 }
 
 // watching runs u.Watch with req in the background until the test ends, and returns the reader it streams to and the channel its error arrives on.

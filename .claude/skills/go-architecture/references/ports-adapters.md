@@ -8,12 +8,12 @@ How a use case or a service reaches the world, what implements it, and what stan
 - **One per outside thing:** `Git`, `Meta`, `EnvFiles`, `AnswerStore`, `Locker`, `Publisher`. Its doc comment states the contract a fake keeps too (`Meta.Load` "fails with an error wrapping fs.ErrNotExist when the branch has none").
 - **A single function is a function type** in `port.go` (`extract.Shield`), or a func field of a service (`provision.Service.RunHooks`, `Now`, `LeftBehind`, `Settle`); the wiring passes the adapter's function (`shell.Shield`, `time.Now`).
 - **`port.go` declares nothing else** than interface and function types: the types a port takes and returns sit beside the code that owns them. `[archlint]` (`portfile`)
-- **A service is not a port:** a use case holds `repository.Service`, `operation.Service`, `provision.Service` as concrete fields; a test builds them over fakes.
+- **A service is not a port:** a use case holds `repository.Service`, `operation.Service`, `provision.Service`, `registry.Service` as concrete fields; a test builds them over fakes.
 - **A port speaks the domain:** domain values in and out (`worktree.Snapshot`, `worktree.Move`), never a file format or an adapter's type.
 
 ## Adapters
 
-- **One package per outside thing:** `git`, `store` (meta.json, the managed .env files), `config` (config.toml, run.toml, global settings: their shapes, strict decode, JSON schema), `shell` (child processes, hooks, the shield), `oplock`, `events` (the event bus: its daemon, its publisher, a subscription that starts the daemon through an injected `Start`, the v2 schema), `registry` (`repos.json`, the repositories wtm knows), `proxyport`, `daemon` (the run daemon's jobs, read over its socket, never starting it), `github` (gh: the newest pull request of each branch in any state, with its checks and review, one GraphQL query per 100 branches, a fork's left out), and `statefile` (locked atomic writes).
+- **One package per outside thing:** `git`, `store` (meta.json, the managed .env files), `config` (config.toml, run.toml, global settings: their shapes, strict decode, JSON schema), `shell` (child processes, hooks, the shield), `oplock`, `events` (the event bus: its daemon, its publisher, a subscription that starts the daemon through an injected `Start`, the v2 schema), `registry` (`repos.json`, the repositories wtm knows, with no notion of which is initialized: `service/registry` decides), `proxyport`, `daemon` (the run daemon's jobs, read over its socket, never starting it), `github` (gh: the newest pull request of each branch in any state, with its checks and review, one GraphQL query per 100 branches, a fork's left out), and `statefile` (locked atomic writes).
 - **It exports a concrete type** (`git.Repo{Dir}`, `store.Meta{StateDir}`) whose methods satisfy every consumer's port; the compiler checks the fit in `wire.go`.
 - **It imports `domain/*`, the stdlib, third parties, `adapter/statefile` and `adapter/shell`** (the one way to start a child, in its own process group) — never a service, a command, `ui/*` or another adapter. `[archlint]`
 - **The file format lives in the adapter:** `adapter/config` owns every key of `config.toml` and `run.toml` and maps them onto `domain/project`. A state file is written through `statefile.Update` (lock, read, decide a change, atomic rename), carries `schema` and refuses a newer one (exit 22).
@@ -25,7 +25,7 @@ How a use case or a service reaches the world, what implements it, and what stan
 
 ## Fakes: `adapter/<name>test`
 
-The in-memory twin of an adapter, for its consumers' tests: `gittest.Fake`, `storetest.Fake`.
+The in-memory twin of an adapter, for its consumers' tests: `gittest.Fake`, `storetest.Fake`, `registrytest.Fake`.
 
 - **It keeps the adapter's contract**, not only its signatures: the same refusals and results (a write that changes nothing reports no change, a newer schema is refused, a failed add drops the branch it created).
 - **One shape:** seeded by `NewFake(FakeParams{…})`; any method made to fail through `FakeParams.Fail` (by method name); `Calls()` and readers (`Meta`, `File`, `Config`, `Moves`) give back what happened; safe for concurrent use.

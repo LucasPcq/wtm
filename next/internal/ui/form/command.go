@@ -181,7 +181,7 @@ func accepting(options []domain.Option) []string {
 	return accepted
 }
 
-// request is the request cmd's flags and args give: each flag the user set answers its field, and the arguments the positional field.
+// request is the request cmd's flags and args give, asked from where the command line stands: each flag the user set answers its field, and the arguments the positional field.
 func (c *Command[R, Q, O]) request(cmd *cobra.Command, args []string) R {
 	answers := fieldAnswers(cmd, args, c.schema())
 
@@ -194,7 +194,7 @@ func (c *Command[R, Q, O]) request(cmd *cobra.Command, args []string) R {
 		answers = append(answers, domain.Answered{Path: domain.PathAsk, Values: []string{strconv.FormatBool(ask)}})
 	}
 
-	return folded[R](answers)
+	return domain.StandFrom(folded[R](answers), c.io.Env.Standing())
 }
 
 // folded is the request answers give; a flag holds a value of its field's own type, which the request always takes.

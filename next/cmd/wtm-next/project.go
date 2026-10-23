@@ -1,19 +1,16 @@
 package main
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"time"
 
-	"github.com/LucasPcq/wtm/next/internal/adapter/config"
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
-	"github.com/LucasPcq/wtm/next/internal/adapter/registry"
+	reposjson "github.com/LucasPcq/wtm/next/internal/adapter/registry"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
@@ -22,15 +19,11 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
 const (
 	stateDirEnv  = "WTM_STATE_DIR" // moves the state directory out of the repository's common dir
 	stateDirName = "wtm"
-
-	// registerTimeout bounds the registration of a repository, so a command never waits on it.
-	registerTimeout = 250 * time.Millisecond
 )
 
 // The openers of the use cases, each wired on the repository of the directory it is given.
@@ -66,17 +59,12 @@ func openEvents(ctx context.Context, dir string) (events.Source, error) {
 		return events.Source{}, err
 	}
 
-	repo := git.Repo{Dir: params.MainPath}
-	return events.Source{
-		Repo:       domain.Repo{Root: params.MainPath, CommonDir: bus.Resolved(params.CommonDir)},
-		Repository: repository.Service{Config: config.Project{StateDir: params.StateDir, GlobalPath: config.GlobalPath()}, Git: repo, MainPath: params.MainPath, Init: initialize()},
-		Meta:       store.Meta{StateDir: params.StateDir},
-	}, nil
+	return events.Source{Repo: params.repo(), Repository: params.facts(), Meta: store.Meta{StateDir: params.StateDir}}, nil
 }
 
-// register lists the repository params locates among those wtm knows, for a stream that follows all of them, once initialized; it never fails nor holds a command for long. A state directory moved by $WTM_STATE_DIR keeps the repository out: a sandbox or a test, not a repository of the user's.
+// register lists the repository params locates among those wtm knows, for a stream that follows all of them, once initialized; it never fails nor holds a command for long.
 func register(ctx context.Context, params wireParams) {
-	known{Registry: registry.Registry{Path: registry.Path()}, Socket: bus.SocketPath(), Off: os.Getenv(stateDirEnv) != ""}.Register(ctx, domain.Repo{Root: params.MainPath, CommonDir: bus.Resolved(params.CommonDir)})
+	knownRepos(reposjson.Path(), bus.SocketPath()).Register(ctx, params.repo())
 }
 
 // locate returns where the repository of dir, any of its worktrees or a folder in one, keeps its main worktree, its common dir and wtm's state.
@@ -92,8 +80,17 @@ func locate(ctx context.Context, dir string) (wireParams, error) {
 		return wireParams{}, notARepository(root, err)
 	}
 
-	// shortcut: WTM_STATE_DIR is process-wide (one state dir for every repository a process opens); move it into the execution context when a process serves several repositories with it set.
-	return wireParams{MainPath: root, StateDir: cmp.Or(os.Getenv(stateDirEnv), filepath.Join(commonDir, stateDirName)), CommonDir: commonDir}, nil
+	state, _ := stateDir(commonDir)
+	return wireParams{MainPath: root, StateDir: state, CommonDir: commonDir}, nil
+}
+
+// stateDir is where the repository of commonDir keeps wtm's state, and whether $WTM_STATE_DIR moved it out of the repository: a sandbox or a test, whose repositories the registry never lists.
+// shortcut: WTM_STATE_DIR is process-wide (one state dir for every repository a process opens); move it into the execution context when a process serves several repositories with it set.
+func stateDir(commonDir string) (dir string, moved bool) {
+	if dir := os.Getenv(stateDirEnv); dir != "" {
+		return dir, true
+	}
+	return filepath.Join(commonDir, stateDirName), false
 }
 
 // notARepository turns git's refusal to run outside a repository into the precondition failure that names dir; any other err is returned as is.

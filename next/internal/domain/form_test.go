@@ -161,3 +161,10 @@ func TestAFoldStopsAtTheFirstAnswerRefused(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, answers{"from": {"main"}}, req)
 }
+
+func TestARequestThatReadsWhereItsCallerStandsIsAskedFromThere(t *testing.T) {
+	at := Standing{Dir: "/code/app", Named: true, Cwd: "/code"}
+
+	assert.Equal(t, standing{at: at}, StandFrom(standing{}, at))
+	assert.Equal(t, "as is", StandFrom("as is", at))
+}

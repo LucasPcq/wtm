@@ -21,8 +21,7 @@ func TestAStreamSendsEachLineOfItsRequestWatchedFromTheCallsDirectory(t *testing
 	})
 
 	assert.Equal(t, http.StatusOK, got.Status)
-	assert.Equal(t, "/repo", w.dir)
-	assert.Equal(t, request{Name: "x"}, w.req)
+	assert.Equal(t, request{Name: "x", At: domain.Standing{Dir: "/repo", Named: true, Cwd: "/repo"}}, w.req)
 	assert.Equal(t, w.lines, sent)
 	assert.Equal(t, "events", stream.Name)
 	assert.NotEmpty(t, stream.Form.Fields)
@@ -49,7 +48,17 @@ func TestAStreamRefusesARelativeDirectoryOrAnUnknownAnswerBeforeWatching(t *test
 			got := BindStream[request, questions]("events", w.watch).Watch(t.Context(), call, func(json.RawMessage) error { return nil })
 
 			assert.Equal(t, http.StatusBadRequest, got.Status)
-			assert.Empty(t, w.dir, "watched")
+			assert.False(t, w.watched)
 		})
 	}
+}
+
+func TestAStreamOfACallNamingNoDirectoryStandsNowhere(t *testing.T) {
+	w := &watched{}
+
+	got := BindStream[request, questions]("events", w.watch).Watch(t.Context(), Call{}, func(json.RawMessage) error { return nil })
+
+	assert.Equal(t, http.StatusOK, got.Status)
+	assert.True(t, w.watched)
+	assert.Equal(t, domain.Standing{}, w.req.At)
 }

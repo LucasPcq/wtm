@@ -6,17 +6,21 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/registry"
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
+	eventscli "github.com/LucasPcq/wtm/next/internal/command/events/cli"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -100,10 +104,13 @@ func TestOpeningARepositoryRegistersItAmongThoseWtmKnows(t *testing.T) {
 	assert.Contains(t, string(data), `"common_dir": "`+filepath.Join(gittest.Resolved(t, main), ".git")+`"`)
 }
 
+// Legacy never registers a repository while $WTM_STATE_DIR is set: the registry could not tell where any repository keeps its state.
 func TestARepositoryWhoseStateIsMovedElsewhereIsNotRegistered(t *testing.T) {
 	main := configured(t)
 	ownConfigDir(t)
-	t.Setenv(stateDirEnv, t.TempDir())
+	moved := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(moved, "config.toml"), nil, 0o644))
+	t.Setenv(stateDirEnv, moved)
 
 	_, err := openList(t.Context(), main)
 	require.NoError(t, err)
@@ -146,7 +153,7 @@ func TestTheRegistryAnnouncesARepositoryItAddsAndOneItDrops(t *testing.T) {
 	defer cancel()
 	lines, err := bus.Bus{SocketPath: socket}.Subscribe(ctx, nil)
 	require.NoError(t, err)
-	repos := known{Registry: registry.Registry{Path: filepath.Join(t.TempDir(), "repos.json")}, Socket: socket}
+	repos := knownRepos(filepath.Join(t.TempDir(), "repos.json"), socket)
 	repo := domain.Repo{Root: main, CommonDir: bus.Resolved(filepath.Join(main, ".git"))}
 
 	repos.Register(t.Context(), repo)
@@ -157,15 +164,6 @@ func TestTheRegistryAnnouncesARepositoryItAddsAndOneItDrops(t *testing.T) {
 	assert.Empty(t, kept)
 	assert.Contains(t, string(<-lines), `"type":"repo.added"`)
 	assert.Contains(t, string(<-lines), `"type":"repo.removed"`)
-}
-
-func TestARegistryOffAddsNothing(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "repos.json")
-	main := configured(t)
-
-	known{Registry: registry.Registry{Path: path}, Off: true}.Register(t.Context(), domain.Repo{Root: main, CommonDir: filepath.Join(main, ".git")})
-
-	assert.NoFileExists(t, path)
 }
 
 func TestARelativeRepoOfASurfaceIsReadFromTheCallsDirectory(t *testing.T) {
@@ -179,4 +177,39 @@ func TestARelativeRepoOfASurfaceIsReadFromTheCallsDirectory(t *testing.T) {
 	assert.Equal(t, http.StatusOK, response.Status, response.Envelope.Err)
 	require.NotEmpty(t, lines)
 	assert.Contains(t, lines[0], `"root":"`+gittest.Resolved(t, main)+`"`)
+}
+
+// The command line read a relative --repo from its working directory, never from $WTM_PROJECT_DIR, as legacy did and as a surface reads it from its call's directory.
+func TestARelativeRepoOnTheCommandLineIsReadFromTheWorkingDirectory(t *testing.T) {
+	main, elsewhere := configured(t), configured(t)
+	ownConfigDir(t)
+	t.Setenv(stateDirEnv, "")
+	streams, _, stdout, _ := output.Test()
+	env := cli.Env{Cwd: filepath.Dir(gittest.Resolved(t, main)), ProjectDir: elsewhere, Named: true}
+	root := cli.NewRoot(version, streams, []*cobra.Command{eventscli.New(streams, env, eventStream(streamParams{Socket: servingBus(t), Registry: filepath.Join(t.TempDir(), "repos.json")}), commandLine)})
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+
+	code := cli.Execute(ctx, root, []string{"events", "--repo", filepath.Base(main), "--output", "json"})
+
+	assert.Equal(t, 0, code)
+	first, _, _ := strings.Cut(stdout.String(), "\n")
+	assert.Contains(t, first, `"root":"`+gittest.Resolved(t, main)+`"`)
+}
+
+func TestTheEveryRepositoryStreamOfASurfaceIsACallNamingNoDirectory(t *testing.T) {
+	main := configured(t)
+	ownConfigDir(t)
+	t.Setenv(stateDirEnv, "")
+	socket, registry := servingBus(t), filepath.Join(t.TempDir(), "repos.json")
+	knownRepos(registry, socket).Register(t.Context(), domain.Repo{Root: gittest.Resolved(t, main), CommonDir: bus.Resolved(filepath.Join(main, ".git"))})
+	stream := api.BindStream[events.Request, events.Questions](events.Name, watchEvents(eventStream(streamParams{Socket: socket, Registry: registry})))
+
+	lines, response := watchedLines(t, stream, api.Call{}, 2)
+
+	assert.Equal(t, http.StatusOK, response.Status, response.Envelope.Err)
+	require.Len(t, lines, 2)
+	assert.Contains(t, lines[0], `"type":"snapshot"`)
+	assert.Contains(t, lines[0], `"root":"`+gittest.Resolved(t, main)+`"`)
+	assert.JSONEq(t, `{"v":2,"type":"ready","ts":"x"}`, withTS(t, lines[1]))
 }

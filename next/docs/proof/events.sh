@@ -91,6 +91,29 @@ except subprocess.TimeoutExpired:
 ' "$bin" "$@" >"$dir_out/$name.stdout")
 }
 
+# lifecycle <name>: streams every repository from outside any, initializes the repository late (acme's config copied in) and runs list in it, which registers it, then de-initializes it and registers later, whose registration prunes late; then interrupts the stream.
+lifecycle() {
+  local name=$1 code=0
+  (cd "$root/plain" && exec "$bin" events --all --output json </dev/null >"$dir_out/$name.stdout" 2>"$dir_out/$name.stderr") &
+  local pid=$!
+  wait_for "$dir_out/$name.stdout" '"type":"ready"'
+  local r
+  for r in late later; do
+    git init -q "$root/$r"
+    git -C "$root/$r" -c user.name=x -c user.email=x@x commit -q --allow-empty -m init
+    mkdir -p "$root/$r/.git/wtm" && cp "$root/acme/.git/wtm/config.toml" "$root/$r/.git/wtm/"
+  done
+  (cd "$root/late" && "$bin" list </dev/null >/dev/null 2>&1)
+  wait_for "$dir_out/$name.stdout" 'repo.added'
+  rm "$root/late/.git/wtm/config.toml"
+  (cd "$root/later" && "$bin" list </dev/null >/dev/null 2>&1)
+  wait_for "$dir_out/$name.stdout" 'repo.removed'
+  sleep 0.5 # later's snapshot follows its repo.added
+  kill -INT "$pid"
+  wait "$pid" || code=$?
+  echo "$code" >"$dir_out/$name.exit"
+}
+
 registry() {
   if [[ -f $global/repos.json ]]; then cat "$global/repos.json"; else echo "(no repos.json)"; fi
 }
@@ -119,6 +142,8 @@ run_side() {
     scenario 09-repo-not-a-repository "$root/acme" events --repo "$root/plain"
     scenario 10-no-config "$root/bare" events
     scenario 11-no-config-json "$root/bare" events --output json
+    lifecycle 13-all-repository-joins-and-leaves
+    (export WTM_PROJECT_DIR=$root/plain && stream 14-relative-repo-project-dir-elsewhere "$root" "" events --repo acme --output json)
     registry >"$dir_out/registry-after"
     if [[ $side == legacy ]]; then
       "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true

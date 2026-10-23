@@ -46,3 +46,11 @@ func (a answers) Answer(path string, values []string) (answers, error) {
 }
 
 func (a answers) Values(path string) []string { return a[path] }
+
+// A standing records where it was asked from.
+type standing struct{ at Standing }
+
+func (s standing) From(at Standing) standing {
+	s.at = at
+	return s
+}

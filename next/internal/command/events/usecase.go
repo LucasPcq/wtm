@@ -8,10 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"path/filepath"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/registry"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
@@ -36,7 +38,7 @@ const recheckEvery = 30 * time.Second
 // A UseCase streams the events of the repositories wtm knows: the bus it subscribes to, the registry of those repositories, how it opens one, its clock, and how often it checks what it watches is still there (Recheck, 30 seconds when zero).
 type UseCase struct {
 	Bus      Bus
-	Registry Registry
+	Registry registry.Service
 	Open     Open
 	Now      func() time.Time
 	Recheck  time.Duration
@@ -97,21 +99,28 @@ func (u UseCase) Watch(ctx context.Context, req Request, out Out) error {
 	}
 }
 
-// scope returns the repository req watches, or reports that it watches every one: --all, or no --repo from an unnamed directory in no repository.
+// scope returns the repository req watches, or reports that it watches every one: --all, or no --repo from nowhere or from an unnamed directory in no repository. A relative --repo is read from where the caller stands; from nowhere it names no directory.
 func (u UseCase) scope(ctx context.Context, req Request) (Source, bool, error) {
 	if err := req.Validate(); err != nil {
 		return Source{}, false, err
 	}
-	if req.All {
+	if req.All || req.Repo == "" && req.At.Dir == "" {
 		return Source{}, true, nil
 	}
 
-	dir := cmp.Or(req.Repo, req.Dir)
-	source, err := u.Open(ctx, dir)
+	repo := req.Repo
+	if repo != "" && !filepath.IsAbs(repo) {
+		if req.At.Cwd == "" {
+			return Source{}, false, notADirectory(req.Repo)
+		}
+		repo = filepath.Join(req.At.Cwd, repo)
+	}
+
+	source, err := u.Open(ctx, cmp.Or(repo, req.At.Dir))
 	switch {
 	case req.Repo != "" && errors.Is(err, fs.ErrNotExist):
 		return Source{}, false, notADirectory(req.Repo)
-	case req.Repo == "" && !req.Named && notARepository(err):
+	case req.Repo == "" && !req.At.Named && notARepository(err):
 		return Source{}, true, nil
 	case err != nil:
 		return Source{}, false, err
