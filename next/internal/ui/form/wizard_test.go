@@ -298,13 +298,8 @@ func TestAReadThatFailsAfterAnAnswerEndsTheRun(t *testing.T) {
 	f := newFake()
 	failed := errors.New("repository gone")
 	script := f.script()
-	var reads atomic.Int32 // Observe runs in a cmd, on a goroutine of Bubble Tea's own
-	script.Observe = func(context.Context) (func(), error) {
-		if reads.Add(1) > 1 {
-			return func() {}, failed
-		}
-		return func() {}, nil
-	}
+	var reads atomic.Int32
+	script.Observe = failingAfterFirst(&reads, failed)
 	ios, _, _, _ := output.Test()
 
 	err := form.Run(t.Context(), script, enters{}, ios.Err)
@@ -312,6 +307,19 @@ func TestAReadThatFailsAfterAnAnswerEndsTheRun(t *testing.T) {
 	assert.ErrorIs(t, err, failed)
 	assert.EqualValues(t, 2, reads.Load())
 	assert.Zero(t, f.applied.Load())
+}
+
+func TestAKeyTypedBeforeAFailedReadQuitsIsNotAnswered(t *testing.T) {
+	f := newFake()
+	script := f.script()
+	var reads atomic.Int32
+	script.Observe = failingAfterFirst(&reads, errors.New("repository gone"))
+	d := open(t, script)
+
+	d.Keys("enter", "enter")
+
+	assert.EqualValues(t, 2, reads.Load())
+	assert.Equal(t, form.Failed, d.Wizard.Ending())
 }
 
 func TestTheRecapNamesItsApplyAsTheScriptSays(t *testing.T) {

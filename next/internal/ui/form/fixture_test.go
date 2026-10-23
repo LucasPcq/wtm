@@ -25,6 +25,16 @@ import (
 
 var errStale = errors.New("stale")
 
+// failingAfterFirst is an Observe whose first read succeeds and every later one fails with err, counted in reads: Observe runs in a cmd, on a goroutine of Bubble Tea's own.
+func failingAfterFirst(reads *atomic.Int32, err error) func(context.Context) (func(), error) {
+	return func(context.Context) (func(), error) {
+		if reads.Add(1) > 1 {
+			return func() {}, err
+		}
+		return func() {}, nil
+	}
+}
+
 type fakeStep struct {
 	label    string
 	standing form.Standing
