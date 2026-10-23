@@ -298,13 +298,8 @@ func TestAReadThatFailsAfterAnAnswerEndsTheRun(t *testing.T) {
 	f := newFake()
 	failed := errors.New("repository gone")
 	script := f.script()
-	var reads atomic.Int32 // Observe runs in a cmd, on a goroutine of Bubble Tea's own
-	script.Observe = func(context.Context) (func(), error) {
-		if reads.Add(1) > 1 {
-			return func() {}, failed
-		}
-		return func() {}, nil
-	}
+	var reads atomic.Int32
+	script.Observe = failingAfterFirst(&reads, failed)
 	ios, _, _, _ := output.Test()
 
 	err := form.Run(t.Context(), script, enters{}, ios.Err)
@@ -312,6 +307,41 @@ func TestAReadThatFailsAfterAnAnswerEndsTheRun(t *testing.T) {
 	assert.ErrorIs(t, err, failed)
 	assert.EqualValues(t, 2, reads.Load())
 	assert.Zero(t, f.applied.Load())
+}
+
+func TestAKeyTypedBeforeAFailedReadQuitsIsNotAnswered(t *testing.T) {
+	f := newFake()
+	script := f.script()
+	var reads atomic.Int32
+	script.Observe = failingAfterFirst(&reads, errors.New("repository gone"))
+	d := open(t, script)
+
+	d.Keys("enter", "enter")
+
+	assert.EqualValues(t, 2, reads.Load())
+	assert.Equal(t, form.Failed, d.Wizard.Ending())
+}
+
+func TestAReadThatLandsAfterACancelLeavesTheWizardCancelled(t *testing.T) {
+	cases := map[string]func(*form.Script){
+		"dry_run": func(s *form.Script) { s.DryRun = true },
+		"walk":    func(s *form.Script) { s.Preview = nil },
+		"recap":   func(*form.Script) {},
+	}
+	for name, edit := range cases {
+		t.Run(name, func(t *testing.T) {
+			script := newFake().script()
+			edit(&script)
+			d := open(t, script)
+			d.Keys("enter")
+
+			d.Keys("ctrl+c")
+			d.Send(form.ReadLanded())
+
+			assert.Equal(t, form.Cancelled, d.Wizard.Ending())
+			assert.Equal(t, 1, d.Wizard.Current(), "the wizard moved on after the cancel")
+		})
+	}
 }
 
 func TestTheRecapNamesItsApplyAsTheScriptSays(t *testing.T) {

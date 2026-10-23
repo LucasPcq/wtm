@@ -5,6 +5,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -37,3 +38,8 @@ func (s *Session[R, Q, O]) Outcome() O {
 }
 
 var ReplanStep = replanStep
+
+// ReadLanded is the message of a read that found nothing to report, landing before the wizard moves to the next step.
+func ReadLanded() tea.Msg {
+	return observedMsg{apply: func() {}, then: thenNext}
+}

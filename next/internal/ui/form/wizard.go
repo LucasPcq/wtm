@@ -53,6 +53,7 @@ const (
 	Asking    Ending = iota // the wizard has not ended
 	Finished                // every step is settled, and the recap confirmed unless on a dry run
 	Cancelled               // the user left: ctrl+c, esc on the first step asked, or "No, cancel" at the recap
+	Failed                  // a read of the repository failed: its error ends the run
 )
 
 // A Wizard is the Bubble Tea model of a command's form: it walks a [Script]'s steps to a recap of the plan, then quits with its [Ending].
@@ -271,12 +272,15 @@ func (w *Wizard) landed(m laterMsg) {
 	}
 }
 
-// observed installs what a read found, ends the wizard if the read failed, else moves on as m says and replays the keys typed meanwhile.
+// observed installs what a read found and, unless the wizard ended meanwhile, ends it if the read failed, else moves on as m says and replays the keys typed meanwhile.
 func (w *Wizard) observed(m observedMsg) tea.Cmd {
 	w.loading, w.reading = "", false
 	m.apply()
+	if w.ending != Asking {
+		return nil
+	}
 	if m.err != nil {
-		w.err = m.err
+		w.err, w.ending = m.err, Failed
 		return tea.Quit
 	}
 

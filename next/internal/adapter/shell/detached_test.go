@@ -14,7 +14,7 @@ import (
 func TestADetachedChildRunsInASessionOfItsOwnWithTheEnvironmentGiven(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "out")
 
-	require.NoError(t, Detached("sh", []string{"-c", `echo "$WTM_SEEN $(ps -o pgid= -p $$ | tr -d ' ') $$" > "$OUT"`}, []string{"WTM_SEEN=yes", "OUT=" + out, "PATH=" + os.Getenv("PATH")}))
+	require.NoError(t, Detached("sh", []string{"-c", `echo "$WTM_SEEN $(ps -o pgid= -p $$ | tr -d ' ') $$" > "$OUT.part" && mv "$OUT.part" "$OUT"`}, []string{"WTM_SEEN=yes", "OUT=" + out, "PATH=" + os.Getenv("PATH")}))
 
 	require.Eventually(t, func() bool { _, err := os.Stat(out); return err == nil }, 5*time.Second, 20*time.Millisecond)
 	data, err := os.ReadFile(out)
