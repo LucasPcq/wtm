@@ -41,9 +41,7 @@ var treeFlags = (&query{}).Flags()
 
 // New returns the tree command: its flags become a tree.Request, read and drawn on streams, as the v2 JSON envelope with --output json or a Mermaid flowchart with --output mermaid, its follow-ups spelled by commandLine.
 func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (tree.UseCase, error), commandLine output.CommandLine) *cobra.Command {
-	// exits are the exit codes of tree's own codes, ahead of those of their kind.
-	exits := map[string]int{tree.CodeConfigNotFound: uicli.ExitConfigNotFound, tree.CodeConfigInvalid: uicli.ExitError}
-	run := &uicli.Run{Command: tree.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: treeFlags, Exits: exits}
+	run := &uicli.Run{Command: tree.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: treeFlags}
 	q := &query{
 		Open: func(ctx context.Context, dir string) (form.Reader[tree.Request, tree.Questions, tree.Outcome], error) {
 			return open(ctx, dir)

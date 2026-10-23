@@ -29,6 +29,7 @@ type Service struct {
 	Shield     func(ctx context.Context) (context.Context, func())  // a context the first cancel does not reach, and its release
 	Now        func() time.Time
 	LeftBehind func(branch string) domain.FollowUp // the command, with its answers, that removes a branch an undo left behind, and its worktree
+	Settle     func(branch string) domain.FollowUp // the command, with its answers, that settles a worktree's env ports once what kept them is fixed
 }
 
 // ----------------------------------------------------------------------------

@@ -29,6 +29,12 @@ const (
 	CodeNotARepository = "git.not_a_repository"
 )
 
+// The suffixes of the codes every command refuses a repository's config with, after its name: <command>.config_not_found when the repository has no wtm config, <command>.config_invalid when its config.toml does not parse or validate. Each surface reads the refusal from the suffix (the CLI exits 12 and 1).
+const (
+	ConfigNotFound = ".config_not_found"
+	ConfigInvalid  = ".config_invalid"
+)
+
 // Params holds the named values a message or a code carries, for the JSON envelope and for templates.
 type Params map[string]string
 

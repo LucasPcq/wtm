@@ -71,12 +71,13 @@ func (r *Run) Progress(ctx context.Context) *output.Progress {
 	return output.NewProgress(ctx, output.ProgressParams{W: stderr, Human: r.Human(), Live: !r.Quiet && r.Streams.CanAnimate()})
 }
 
-// FailWith prints failure followed by next, or the envelope that carries it with --output json, and returns the failure that sets the exit code; a machine format of the command's own prints it as text.
+// FailWith prints failure followed by next and by its follow-up, or the envelope that carries it with --output json, and returns the failure that sets the exit code; a machine format of the command's own prints it as text.
 func (r *Run) FailWith(failure *domain.Error, next []output.NextStep) error {
 	if r.Output == OutputJSON {
 		return r.Envelope(domain.Envelope{Command: r.Command, Err: failure})
 	}
 
+	next = append(next, output.FollowUpSteps(failure, r.CommandLine)...)
 	_, stderr := r.Writers()
 	output.Frame(stderr, func(w io.Writer) {
 		output.Failure(w, output.FailureParams{Err: failure, Next: next, Flags: r.Flags})

@@ -22,9 +22,8 @@ func SettlementNote(plan env.Redacted) string {
 	return strings.Join(parts, Dot)
 }
 
-// AnomalyLines returns the ports plan could not shift, as a table per .env file: each key, its port and why; nil when there are none.
-func AnomalyLines(plan env.Redacted) []string {
-	entries := env.Plan(plan).Anomalies()
+// AnomalyLines returns entries, ports a plan could not shift, as a table per .env file: each key, its port and why; nil when there are none.
+func AnomalyLines(entries []env.Entry) []string {
 	if len(entries) == 0 {
 		return nil
 	}
@@ -86,16 +85,27 @@ func pad(s string, width int) string {
 	return s + strings.Repeat(" ", max(0, width-len([]rune(s))))
 }
 
-// WarningMessages are the messages of an item's warnings, the ports left alone followed by their table, drawn from ports, the item's env ports.
-func WarningMessages(warnings []domain.Warning, ports env.Redacted) []string {
+// WarningMessages are the messages of an item's warnings, each followed by the table of the ports it is about.
+func WarningMessages(warnings []domain.Warning) []string {
 	messages := Messages(warnings)
 	for i, warned := range warnings {
-		if lines := AnomalyLines(ports); warned.Code == env.CodePortsLeftAlone && len(lines) > 0 {
+		if lines := AnomalyLines(warned.Ports); len(lines) > 0 {
 			messages[i] += "\n" + strings.Join(lines, "\n")
 		}
 	}
 
 	return messages
+}
+
+// WarningSteps returns the next step of each of warnings that offers one, its follow-up spelled by spell.
+func WarningSteps(warnings []domain.Warning, spell CommandLine) []NextStep {
+	var steps []NextStep
+	for _, warned := range warnings {
+		if warned.FollowUp != nil {
+			steps = append(steps, FollowUpStep(*warned.FollowUp, spell))
+		}
+	}
+	return steps
 }
 
 func changedOwned(owned []env.OwnedEntry) int {

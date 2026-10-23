@@ -37,7 +37,7 @@
     },
     "from": "main",
     "env_from": "example",
-    "creates": true,
+    "creates": 1,
     "keep": false,
     "conflicts": [],
     "on_conflict": "abort",

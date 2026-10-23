@@ -5,7 +5,6 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
@@ -37,7 +36,7 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, view output.View) {
 	output.Tally(w, tally)
 
 	rows := output.RecapRows(outcome.Plan.Recap)
-	targetWarnings := output.WarningMessages(item.Warnings, envPortsOf(item))
+	targetWarnings := output.WarningMessages(item.Warnings)
 	warnings := output.Messages(outcome.Warnings)
 	if finished {
 		warnings = append(warnings, targetWarnings...)
@@ -63,18 +62,11 @@ func drawOutcome(w io.Writer, outcome extract.Outcome, view output.View) {
 	}
 
 	next = append(next, output.FollowUpSteps(item.Err, view.CommandLine)...)
+	next = append(next, output.WarningSteps(item.Warnings, view.CommandLine)...)
 	if len(next) > 0 {
 		output.Blank(w)
 		output.NextSteps(w, next)
 	}
-}
-
-func envPortsOf(item extract.Item) env.Redacted {
-	if item.Detail == nil {
-		return env.Redacted{}
-	}
-
-	return item.Detail.EnvPorts
 }
 
 // targetOf is the one item of an applied outcome, the target's; false when the outcome holds none.

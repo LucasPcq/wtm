@@ -30,12 +30,14 @@ func TestTheRepositoryObservedIsTheConfigTheSnapshotAndTheRunWithItsError(t *tes
 func TestARepositoryWithoutConfigIsNotObservedFurther(t *testing.T) {
 	loadRun := 0
 
-	_, err := repository.Service{Config: configured{err: project.ErrConfigNotFound, loadRun: &loadRun}, Git: gittest.NewFake(gittest.FakeParams{Main: "/repo/main", Branch: "main"})}.Observe(t.Context(), "greet")
+	_, err := repository.Service{Config: configured{err: project.ErrConfigNotFound, loadRun: &loadRun}, Git: gittest.NewFake(gittest.FakeParams{Main: "/repo/main", Branch: "main"}), Init: &domain.FollowUp{Command: "setup"}}.Observe(t.Context(), "greet")
 
 	refused, ok := errors.AsType[*domain.Error](err)
 	require.True(t, ok, err)
 	assert.Equal(t, domain.KindPrecondition, refused.Kind)
 	assert.Equal(t, "greet.config_not_found", refused.Code)
+	assert.Equal(t, "no wtm config found", refused.Message)
+	assert.Equal(t, &domain.FollowUp{Command: "setup", Code: "repository.init", Message: "set wtm up in this repository"}, refused.FollowUp)
 	assert.ErrorIs(t, err, project.ErrConfigNotFound)
 	assert.Zero(t, loadRun)
 }

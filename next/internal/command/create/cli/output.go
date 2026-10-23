@@ -6,7 +6,6 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
@@ -50,7 +49,7 @@ func drawOutcome(w io.Writer, outcome create.Outcome, view output.View) {
 	}
 
 	for _, item := range items {
-		for _, message := range output.WarningMessages(item.Warnings, envPortsOf(item)) {
+		for _, message := range output.WarningMessages(item.Warnings) {
 			anomalies = append(anomalies, item.Subject+"  "+message)
 		}
 	}
@@ -81,19 +80,12 @@ func drawOutcome(w io.Writer, outcome create.Outcome, view output.View) {
 
 	for _, item := range items {
 		next = append(next, output.FollowUpSteps(item.Err, view.CommandLine)...)
+		next = append(next, output.WarningSteps(item.Warnings, view.CommandLine)...)
 	}
 	if len(next) > 0 {
 		output.Blank(w)
 		output.NextSteps(w, next)
 	}
-}
-
-func envPortsOf(item create.Item) env.Redacted {
-	if item.Detail == nil {
-		return env.Redacted{}
-	}
-
-	return item.Detail.EnvPorts
 }
 
 // headline is the tally of the items by status.

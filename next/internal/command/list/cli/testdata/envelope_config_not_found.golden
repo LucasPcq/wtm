@@ -7,6 +7,6 @@
   "error": {
     "kind": "precondition",
     "code": "list.config_not_found",
-    "message": "no wtm config found — run `wtm init` first"
+    "message": "no wtm config found"
   }
 }

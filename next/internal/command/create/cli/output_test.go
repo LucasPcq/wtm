@@ -114,7 +114,8 @@ func TestAFailedRunIsNotOkAndNamesItsFirstFailure(t *testing.T) {
 	assert.JSONEq(t, `{"subject": "remote-only", "status": "skipped", "reason": "interrupted", "detail": {}}`, jsonOf(t, items[4]))
 	assert.JSONEq(t, `{"subject": "feat/c", "status": "failed", "reason": "incomplete",
 		"error": {"kind": "internal", "code": "unit.phase_failed", "message": "on_create failed: hook failed: exit status 3", "params": {"phase": "on_create"}},
-		"warnings": [{"code": "provision.env_no_template", "params": {"target": ".env"}, "message": "no template found for .env, skipping"}],
+		"warnings": [{"code": "provision.env_no_template", "params": {"target": ".env"}, "message": "no template found for .env, skipping"},
+			{"code": "provision.ports_not_settled_run", "message": "run.toml: line 3 — ports not settled", "follow_up": {"command": "env", "answers": [{"path": "worktree", "values": ["feat/c"]}], "code": "provision.settle_ports", "message": "settle the ports once run.toml is fixed"}}],
 		"detail": {"path": "/trees/feat-c", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "isolation": "isolated"}, "existing_branch": false}}`, jsonOf(t, items[2]))
 }
 

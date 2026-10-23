@@ -42,9 +42,7 @@ var statusFlags = (&query{}).Flags()
 
 // New returns the status command: its argument and flags become a status.Request, the worktree picked first when none is named and the user can see and answer the picker; it draws what it read on streams, or the v2 JSON envelope with --output json, the fixes spelled by commandLine.
 func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (status.UseCase, error), commandLine output.CommandLine) *cobra.Command {
-	// exits are the exit codes of status's own codes, ahead of those of their kind.
-	exits := map[string]int{status.CodeConfigNotFound: uicli.ExitConfigNotFound, status.CodeConfigInvalid: uicli.ExitError}
-	run := &uicli.Run{Command: status.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: statusFlags, Exits: exits}
+	run := &uicli.Run{Command: status.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: statusFlags}
 	q := &query{Open: standing(open, env.Cwd), Draw: drawStatus}
 	cmd := &cobra.Command{Use: status.Name + " [worktree]", Short: statusShort, Long: statusLong, Example: statusExample, Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		return q.Launch(cmd, args)

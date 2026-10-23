@@ -25,7 +25,7 @@ func TestARepositoryWithoutConfigIsAPrecondition(t *testing.T) {
 	require.True(t, ok, err)
 	assert.Equal(t, domain.KindPrecondition, failure.Kind)
 	assert.Equal(t, create.CodeConfigNotFound, failure.Code)
-	assert.Equal(t, "no wtm config found — run `wtm init` first", failure.Message)
+	assert.Equal(t, "no wtm config found", failure.Message)
 }
 
 func TestTheFactsCountOnlyTheBranchesThatDifferFromOrigin(t *testing.T) {

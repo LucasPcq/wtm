@@ -136,7 +136,7 @@ func (w world) usecase() create.UseCase {
 	return create.UseCase{
 		Git:        w.git,
 		Meta:       w.store,
-		Repository: repository.Service{Config: stored{Fake: w.store, err: w.seed.ConfigErr}, Git: w.git, MainPath: mainPath},
+		Repository: repository.Service{Config: stored{Fake: w.store, err: w.seed.ConfigErr}, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}},
 		Operations: operation.Service{
 			Locker:    locker{err: w.seed.Locks, seen: w.seen},
 			Publisher: locker{},
@@ -257,7 +257,7 @@ func mixed(trees string) create.Outcome {
 		Result: entered(&create.Result{Items: []create.Item{
 			{Subject: "feature", Status: domain.StatusDone, Warnings: []domain.Warning{
 				{Code: "create.behind_origin", Message: "2 commit(s) behind origin — the worktree starts from your local branch.", Params: domain.Params{"behind": "2"}},
-				{Code: "provision.env_ports_left_alone", Message: "Env ports left alone", Params: domain.Params{"count": "1"}},
+				{Code: "provision.env_ports_left_alone", Message: "Env ports left alone", Params: domain.Params{"count": "1"}, Ports: []env.Entry{{File: ".env", Key: "DB", Port: "pg", Base: 5432, Status: env.StatusMissingKey}}},
 			}, Detail: &create.Detail{
 				Path: filepath.Join(trees, "feature"), Metadata: meta,
 				Standing: worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2},
@@ -267,7 +267,7 @@ func mixed(trees string) create.Outcome {
 				}},
 			}},
 			{Subject: "linked", Status: domain.StatusDone, Reason: domain.ReasonUnchanged, Detail: &create.Detail{Path: "/repo/main/elsewhere/linked", Metadata: worktree.Meta{SourceBranch: "main"}}},
-			{Subject: "feat/c", Status: domain.StatusFailed, Reason: domain.ReasonIncomplete, Err: hook, Warnings: []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping", Params: domain.Params{"target": ".env"}}}, Detail: &create.Detail{Path: filepath.Join(trees, "feat-c"), Metadata: meta}},
+			{Subject: "feat/c", Status: domain.StatusFailed, Reason: domain.ReasonIncomplete, Err: hook, Warnings: []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping", Params: domain.Params{"target": ".env"}}, {Code: "provision.ports_not_settled_run", Message: "run.toml: line 3 — ports not settled", FollowUp: &domain.FollowUp{Command: "env", Answers: []domain.Answered{{Path: "worktree", Values: []string{"feat/c"}}}, Code: "provision.settle_ports", Message: "settle the ports once run.toml is fixed"}}}, Detail: &create.Detail{Path: filepath.Join(trees, "feat-c"), Metadata: meta}},
 			{Subject: "feat/d", Status: domain.StatusCancelled, Reason: domain.ReasonIncomplete, Err: &domain.Error{Kind: domain.KindCancelled, Code: "unit.interrupted", Message: "interrupted", Params: domain.Params{"phase": "on_create"}}, Detail: &create.Detail{Path: filepath.Join(trees, "feat-d"), Metadata: meta}},
 			{Subject: "remote-only", Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted},
 		}}),

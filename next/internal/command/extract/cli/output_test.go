@@ -34,15 +34,15 @@ func TestATargetLeftIncompleteStandsAndSaysWhy(t *testing.T) {
 }
 
 func TestTheWarningsOfAnUnfinishedTargetFollowItsLine(t *testing.T) {
-	ports := env.Redacted{Entries: []env.Entry{
+	ports := []env.Entry{
 		{File: ".env", Key: "DB", Port: "pg", Status: env.StatusMissingKey},
 		{File: "api/.env", Key: "API", Port: "http", Base: 3000, Status: env.StatusNotFound},
-	}}
+	}
 	outcome := unfinished(extract.Item{
 		Subject: "feat/x", Status: domain.StatusFailed, Reason: domain.ReasonIncomplete,
 		Err:      &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed: hook failed: exit status 3"},
-		Detail:   &extract.Detail{Path: "/repo.trees/feat-x", EnvPorts: ports},
-		Warnings: []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping"}, {Code: env.CodePortsLeftAlone, Message: "Env ports left alone"}, untouched("nothing was moved: the files are still in feat/login")},
+		Detail:   &extract.Detail{Path: "/repo.trees/feat-x", EnvPorts: env.Redacted{Entries: ports}},
+		Warnings: []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping"}, {Code: "provision.env_ports_left_alone", Message: "Env ports left alone", Ports: ports}, untouched("nothing was moved: the files are still in feat/login")},
 	})
 	outcome.Warnings = []domain.Warning{{Code: "extract.ff_dirty", Message: "couldn't fast-forward main: its worktree has uncommitted changes — the target starts from your local branch"}}
 

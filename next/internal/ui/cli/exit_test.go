@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -22,8 +23,37 @@ func TestEachKindExitsOnItsCode(t *testing.T) {
 }
 
 func TestACodeWithAnExitOfItsOwnExitsOnIt(t *testing.T) {
-	assert.Equal(t, ExitConfigNotFound, exitCode(&Failed{Err: &domain.Error{Kind: domain.KindPrecondition, Code: codeConfigNotFound}, Exits: map[string]int{codeConfigNotFound: ExitConfigNotFound}}, false))
+	assert.Equal(t, 15, exitCode(&Failed{Err: &domain.Error{Kind: domain.KindConflict, Code: codeConflict}, Exits: map[string]int{codeConflict: 15}}, false))
 	assert.Equal(t, ExitNotGitRepo, exitCode(&Failed{Err: &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodeNotARepository}}, false))
+}
+
+func TestEveryCommandsConfigRefusalExitsOnItsSuffix(t *testing.T) {
+	for _, command := range []string{"create", "extract", "list", "status", "tree", "events", "run up"} {
+		t.Run(strings.ReplaceAll(command, " ", "_"), func(t *testing.T) {
+			notFound := &domain.Error{Kind: domain.KindPrecondition, Code: command + domain.ConfigNotFound}
+			invalid := &domain.Error{Kind: domain.KindPrecondition, Code: command + domain.ConfigInvalid}
+
+			assert.Equal(t, ExitConfigNotFound, exitCode(&Failed{Err: notFound}, false))
+			assert.Equal(t, ExitError, exitCode(&Failed{Err: invalid}, false))
+		})
+	}
+}
+
+func TestTheExitCodesKeepWtmsValues(t *testing.T) {
+	// wtm's values (internal/domain/constants.go), which a script written for wtm branches on; 23 to 25 are wtm-next's own.
+	legacy := map[string][2]int{
+		"ok":               {ExitOK, 0},
+		"error":            {ExitError, 1},
+		"usage":            {ExitUsage, 2},
+		"config_not_found": {ExitConfigNotFound, 12},
+		"cancelled":        {ExitCancelled, 19},
+		"stream_newer":     {ExitStreamNewer, 20},
+		"not_git_repo":     {ExitNotGitRepo, 21},
+		"state_newer":      {ExitStateSchemaNewer, 22},
+	}
+	for name, pair := range legacy {
+		assert.Equal(t, pair[1], pair[0], name)
+	}
 }
 
 func TestAStateFileOfANewerSchemaExitsOnItsCodeWhereverItSurfaced(t *testing.T) {

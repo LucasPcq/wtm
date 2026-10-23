@@ -21,13 +21,13 @@ import (
 const Name = "create"
 
 // CodeConfigNotFound refuses a repository with no wtm config: `wtm init` has not run there.
-const CodeConfigNotFound = Name + repository.ConfigNotFound
+const CodeConfigNotFound = Name + domain.ConfigNotFound
 
 // CodeGo is the step into a worktree an apply ends on.
 const CodeGo = Name + ".go"
 
 // CodeConfigInvalid refuses a repository whose config.toml does not parse or validate.
-const CodeConfigInvalid = Name + repository.ConfigInvalid
+const CodeConfigInvalid = Name + domain.ConfigInvalid
 
 // A UseCase creates worktrees in one repository: the ports it reaches the repository through and the services it shares with the other commands.
 type UseCase struct {

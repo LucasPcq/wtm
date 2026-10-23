@@ -59,7 +59,7 @@ func wire(params wireParams) app {
 	repo := git.Repo{Dir: params.MainPath}
 	projectConfig := config.Project{StateDir: params.StateDir, GlobalPath: config.GlobalPath()}
 
-	facts := repository.Service{Config: projectConfig, Git: repo, MainPath: params.MainPath}
+	facts := repository.Service{Config: projectConfig, Git: repo, MainPath: params.MainPath, Init: initialize()}
 
 	operations := operation.Service{
 		Locker:    locker{oplock.Locks{StateDir: params.StateDir}},
@@ -83,6 +83,7 @@ func wire(params wireParams) app {
 		Shield:     shell.Shield,
 		Now:        time.Now,
 		LeftBehind: leftBehind,
+		Settle:     settle,
 	}
 
 	return app{
@@ -138,6 +139,16 @@ var (
 // leftBehind is the repair of a branch an undo left behind, and of its worktree: clean, forced, in the legacy wtm until it migrates.
 func leftBehind(branch string) domain.FollowUp {
 	return domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: pathForce, Values: []string{"true"}}}}
+}
+
+// initialize sets wtm up in a repository that has no config, in the legacy wtm until init migrates.
+func initialize() *domain.FollowUp {
+	return &domain.FollowUp{Command: "init"}
+}
+
+// settle settles a worktree's env ports, in the legacy wtm until env migrates.
+func settle(branch string) domain.FollowUp {
+	return domain.FollowUp{Command: "env", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}}}
 }
 
 // commandLine spells a follow-up as the legacy wtm runs it until its command migrates, a worktree on no branch entered with cd, and a pull request opened by gh.

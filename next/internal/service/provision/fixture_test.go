@@ -94,6 +94,7 @@ func service(git provision.Git, meta provision.Meta, env provision.EnvFiles, sta
 		Shield:     shell.Shield,
 		Now:        func() time.Time { return createdAt },
 		LeftBehind: removeLine,
+		Settle:     settleLine,
 	}
 }
 
@@ -213,6 +214,17 @@ func (u upstream) snapshotOf() worktree.Snapshot {
 
 func removeLine(branch string) domain.FollowUp {
 	return domain.FollowUp{Command: "remove", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}}}
+}
+
+func settleLine(branch string) domain.FollowUp {
+	return domain.FollowUp{Command: "settle", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}}}
+}
+
+// settled is the follow-up of a warning that the ports of branchName were not settled, once fix is fixed.
+func settled(fix string) *domain.FollowUp {
+	followUp := settleLine(branchName)
+	followUp.Code, followUp.Message, followUp.Params = "provision.settle_ports", "settle the ports once "+fix+" is fixed", domain.Params{"branch": branchName}
+	return &followUp
 }
 
 // answered are the answers to the questions of a new worktree the request gives.

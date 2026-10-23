@@ -152,7 +152,7 @@ func (w world) usecase() extract.UseCase {
 	}
 	return extract.UseCase{
 		Git:        w.git,
-		Repository: repository.Service{Config: stored{Fake: w.store, isolates: w.seed.Isolates}, Git: w.git, MainPath: mainPath},
+		Repository: repository.Service{Config: stored{Fake: w.store, isolates: w.seed.Isolates}, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}},
 		Meta:       w.store,
 		Shield:     shell.Shield,
 		Operations: operation.Service{
