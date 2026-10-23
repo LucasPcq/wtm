@@ -7,6 +7,11 @@
   "error": {
     "kind": "precondition",
     "code": "status.config_not_found",
-    "message": "no wtm config found"
+    "message": "no wtm config found",
+    "follow_up": {
+      "command": "init",
+      "code": "repository.init",
+      "message": "set wtm up in this repository"
+    }
   }
 }

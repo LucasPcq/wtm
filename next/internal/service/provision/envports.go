@@ -12,7 +12,7 @@ const codePortsLeftAlone = "provision.env_ports_left_alone"
 
 // portsLeftAlone warns of the ports plan could not shift, counting and carrying them; none when there are none.
 func portsLeftAlone(plan env.Redacted) []domain.Warning {
-	anomalies := env.Plan(plan).Anomalies()
+	anomalies := plan.LeftAlone()
 	if len(anomalies) == 0 {
 		return nil
 	}

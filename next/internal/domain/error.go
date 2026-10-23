@@ -84,10 +84,12 @@ type FollowUp struct {
 	Params  Params     `json:"params,omitempty"`
 }
 
-// The vocabulary a follow-up names a command with, for the commands not yet migrated whose follow-ups several commands give: go enters a worktree, clean removes it, each answered by PathWorktree.
+// The vocabulary a follow-up names a command with, for the commands not yet migrated whose follow-ups several commands give: go enters a worktree, clean removes it, env settles its .env files, each answered by PathWorktree; init sets wtm up in a repository.
 const (
 	CommandGo    = "go"
 	CommandClean = "clean"
+	CommandEnv   = "env"
+	CommandInit  = "init"
 	PathWorktree = "worktree" // the worktree a follow-up acts on: its branch or, on no branch, its path
 )
 

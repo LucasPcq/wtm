@@ -27,7 +27,7 @@ type Service struct {
 func (s Service) Observe(ctx context.Context, command string) (worktree.Repository, error) {
 	config, global, err := s.Config.Load()
 	if errors.Is(err, project.ErrConfigNotFound) {
-		return worktree.Repository{}, &domain.Error{Kind: domain.KindPrecondition, Code: command + domain.ConfigNotFound, Message: "no wtm config found", FollowUp: s.init(), Cause: err}
+		return worktree.Repository{}, &domain.Error{Kind: domain.KindPrecondition, Code: command + domain.ConfigNotFound, Message: "no wtm config found", FollowUp: s.initFollowUp(), Cause: err}
 	}
 	if invalid, ok := errors.AsType[*project.InvalidConfigError](err); ok {
 		return worktree.Repository{}, &domain.Error{Kind: domain.KindPrecondition, Code: command + domain.ConfigInvalid, Message: "invalid config.toml: " + invalid.Reason.Error(), Cause: err}
@@ -46,7 +46,7 @@ func (s Service) Observe(ctx context.Context, command string) (worktree.Reposito
 	return repo, nil
 }
 
-func (s Service) init() *domain.FollowUp {
+func (s Service) initFollowUp() *domain.FollowUp {
 	if s.Init == nil {
 		return nil
 	}

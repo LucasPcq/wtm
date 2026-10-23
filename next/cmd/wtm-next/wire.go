@@ -143,12 +143,12 @@ func leftBehind(branch string) domain.FollowUp {
 
 // initialize sets wtm up in a repository that has no config, in the legacy wtm until init migrates.
 func initialize() *domain.FollowUp {
-	return &domain.FollowUp{Command: "init"}
+	return &domain.FollowUp{Command: domain.CommandInit}
 }
 
 // settle settles a worktree's env ports, in the legacy wtm until env migrates.
 func settle(branch string) domain.FollowUp {
-	return domain.FollowUp{Command: "env", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}}}
+	return domain.FollowUp{Command: domain.CommandEnv, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}}}
 }
 
 // commandLine spells a follow-up as the legacy wtm runs it until its command migrates, a worktree on no branch entered with cd, and a pull request opened by gh.

@@ -172,6 +172,7 @@ func (w world) usecase() extract.UseCase {
 			Shield:     shell.Shield,
 			Now:        func() time.Time { return createdAt },
 			LeftBehind: cleanLine,
+			Settle:     settleLine,
 		},
 	}
 }
@@ -257,4 +258,8 @@ func settled() extract.Request {
 
 func cleanLine(branch string) domain.FollowUp {
 	return domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}, {Path: "force", Values: []string{"true"}}}}
+}
+
+func settleLine(branch string) domain.FollowUp {
+	return domain.FollowUp{Command: "env", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}}}
 }

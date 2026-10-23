@@ -154,6 +154,7 @@ func (w world) usecase() create.UseCase {
 			Shield:     shell.Shield,
 			Now:        func() time.Time { return createdAt },
 			LeftBehind: cleanLine,
+			Settle:     settleLine,
 		},
 	}
 }
@@ -257,7 +258,7 @@ func mixed(trees string) create.Outcome {
 		Result: entered(&create.Result{Items: []create.Item{
 			{Subject: "feature", Status: domain.StatusDone, Warnings: []domain.Warning{
 				{Code: "create.behind_origin", Message: "2 commit(s) behind origin — the worktree starts from your local branch.", Params: domain.Params{"behind": "2"}},
-				{Code: "provision.env_ports_left_alone", Message: "Env ports left alone", Params: domain.Params{"count": "1"}, Ports: []env.Entry{{File: ".env", Key: "DB", Port: "pg", Base: 5432, Status: env.StatusMissingKey}}},
+				{Code: "provision.env_ports_left_alone", Message: "Env ports left alone", Params: domain.Params{"count": "1"}, Ports: env.LeftAlone{{File: ".env", Key: "DB", Port: "pg", Base: 5432, Status: env.StatusMissingKey}}},
 			}, Detail: &create.Detail{
 				Path: filepath.Join(trees, "feature"), Metadata: meta,
 				Standing: worktree.Standing{ExistingBranch: true, OriginState: "behind", OriginBehind: 2},
@@ -336,6 +337,7 @@ func newApp(s seed) create.UseCase {
 			Shield:     shell.Shield,
 			Now:        func() time.Time { return createdAt },
 			LeftBehind: cleanLine,
+			Settle:     settleLine,
 		},
 	}
 }
@@ -397,6 +399,10 @@ func (enters) Read(p []byte) (int, error) {
 
 func cleanLine(branch string) domain.FollowUp {
 	return domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}, {Path: "force", Values: []string{"true"}}}}
+}
+
+func settleLine(branch string) domain.FollowUp {
+	return domain.FollowUp{Command: "env", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}}}
 }
 
 func armedUntilCancelled(ctx context.Context, _ env.HookChain) error {

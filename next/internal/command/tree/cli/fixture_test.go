@@ -6,6 +6,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -103,6 +104,6 @@ func (w world) open(context.Context, string) (tree.UseCase, error) {
 			return []run.Job{{Name: "web", WorkDir: "/repo/.trees/feat-a", Up: true}}, w.JobsErr
 		},
 		PullRequests: func(context.Context, []string) ([]worktree.PullRequest, error) { return prs, w.PRsErr },
-		Repository:   repository.Service{Config: configured{err: w.ConfigErr}, Git: git, MainPath: mainPath},
+		Repository:   repository.Service{Config: configured{err: w.ConfigErr}, Git: git, MainPath: mainPath, Init: &domain.FollowUp{Command: domain.CommandInit}},
 	}, nil
 }

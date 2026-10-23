@@ -111,6 +111,7 @@ func newWorld(t *testing.T, s seed) world {
 				Shield:     shell.Shield,
 				Now:        func() time.Time { return createdAt },
 				LeftBehind: cleanLine,
+				Settle:     settleLine,
 			},
 		},
 	}
@@ -200,4 +201,8 @@ func (a answering) Remember(context.Context, map[string]string) (domain.Written,
 
 func cleanLine(branch string) domain.FollowUp {
 	return domain.FollowUp{Command: "clean", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}, {Path: "force", Values: []string{"true"}}}}
+}
+
+func settleLine(branch string) domain.FollowUp {
+	return domain.FollowUp{Command: "env", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}}}
 }

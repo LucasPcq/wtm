@@ -26,24 +26,24 @@ func TestTheAnomalyLinesNameEachRefusalGroupedByFile(t *testing.T) {
 		"",
 		"── api/.env ──────────────────────────────────────",
 		"ELSEWHERE  DB_PORT   no 5432 to shift in the value",
-	}, AnomalyLines(env.Plan(plan).Anomalies()))
+	}, AnomalyLines(plan.LeftAlone()))
 }
 
 func TestAnAnomalyLineNeverNamesAForeignHost(t *testing.T) {
 	plan := env.Redact(env.Plan{Entries: []env.Entry{{File: ".env", Key: "API", Port: "P", Status: env.StatusForeignHost, ForeignHost: "u:pw@api.staging.example.com"}}})
 
-	joined := strings.Join(AnomalyLines(env.Plan(plan).Anomalies()), "\n")
+	joined := strings.Join(AnomalyLines(plan.LeftAlone()), "\n")
 
 	assert.Contains(t, joined, "points at another host, which no job here serves")
 	assert.NotContains(t, joined, "staging")
 }
 
 func TestAPlanWithNoRefusalHasNoAnomalyLine(t *testing.T) {
-	assert.Empty(t, AnomalyLines(env.Plan{Entries: []env.Entry{{File: ".env", Key: "PORT", Status: env.StatusRewrite}}}.Anomalies()))
+	assert.Empty(t, AnomalyLines(env.Redacted{Entries: []env.Entry{{File: ".env", Key: "PORT", Status: env.StatusRewrite}}}.LeftAlone()))
 }
 
 func TestAWarningAboutPortsCarriesTheirTable(t *testing.T) {
-	ports := []env.Entry{{File: ".env", Key: "DB", Port: "pg", Status: env.StatusMissingKey}}
+	ports := env.LeftAlone{{File: ".env", Key: "DB", Port: "pg", Status: env.StatusMissingKey}}
 	warnings := []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping"}, {Code: "provision.env_ports_left_alone", Message: "Env ports left alone", Ports: ports}}
 
 	assert.Equal(t, []string{"no template found for .env, skipping", "Env ports left alone\n── .env ────────────────────────\nDB  pg  no such key in this file"}, WarningMessages(warnings))

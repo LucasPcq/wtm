@@ -263,7 +263,7 @@ type notSettled struct {
 // notSettled is the warning that the worktree's ports were not settled, with
 // the follow-up that settles them once the cause is fixed.
 func (p *provisioning) notSettled(n notSettled) domain.Warning {
-	code, fix := "provision.ports_not_settled", "this"
+	code, fix := "provision.ports_not_settled", "what kept them"
 	if n.InRunToml {
 		code, fix = "provision.ports_not_settled_run", "run.toml"
 	}

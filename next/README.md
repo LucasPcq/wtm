@@ -13,7 +13,7 @@ internal/
     dotenv/            .env files parsed and rendered byte for byte
     env/               a worktree's environment: where its .env files come from, what wtm writes into them, what its jobs and hooks run with, its hook chain
     run/               what the run daemon says of the jobs it runs
-                       (env imports worktree, project and dotenv; worktree imports project; domain imports worktree)
+                       (env imports worktree, project and dotenv; worktree imports project; domain imports worktree and env)
   command/<name>/      one command, one vertical slice: its use case and its command line
     usecase.go         the story: Run (operation, plan, fingerprint, apply), Plan, Apply, Observe, Questions
     port.go            the driven ports it reaches the world through

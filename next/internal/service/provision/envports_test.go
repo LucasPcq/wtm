@@ -15,6 +15,6 @@ func TestThePortsLeftAloneAreOneWarningCountingAndCarryingThem(t *testing.T) {
 		{File: ".env", Key: "PORT", Status: env.StatusRewrite},
 	}}
 
-	assert.Equal(t, []domain.Warning{{Code: codePortsLeftAlone, Message: "Env ports left alone", Params: domain.Params{"count": "1"}, Ports: plan.Entries[:1]}}, portsLeftAlone(plan))
+	assert.Equal(t, []domain.Warning{{Code: codePortsLeftAlone, Message: "Env ports left alone", Params: domain.Params{"count": "1"}, Ports: env.LeftAlone(plan.Entries[:1])}}, portsLeftAlone(plan))
 	assert.Empty(t, portsLeftAlone(env.Redacted{}))
 }

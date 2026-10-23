@@ -22,8 +22,8 @@ func SettlementNote(plan env.Redacted) string {
 	return strings.Join(parts, Dot)
 }
 
-// AnomalyLines returns entries, ports a plan could not shift, as a table per .env file: each key, its port and why; nil when there are none.
-func AnomalyLines(entries []env.Entry) []string {
+// AnomalyLines returns entries, the ports a plan could not shift, as a table per .env file: each key, its port and why; nil when there are none.
+func AnomalyLines(entries env.LeftAlone) []string {
 	if len(entries) == 0 {
 		return nil
 	}

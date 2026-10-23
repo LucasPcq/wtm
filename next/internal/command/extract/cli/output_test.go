@@ -34,7 +34,7 @@ func TestATargetLeftIncompleteStandsAndSaysWhy(t *testing.T) {
 }
 
 func TestTheWarningsOfAnUnfinishedTargetFollowItsLine(t *testing.T) {
-	ports := []env.Entry{
+	ports := env.LeftAlone{
 		{File: ".env", Key: "DB", Port: "pg", Status: env.StatusMissingKey},
 		{File: "api/.env", Key: "API", Port: "http", Base: 3000, Status: env.StatusNotFound},
 	}

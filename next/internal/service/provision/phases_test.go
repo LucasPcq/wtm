@@ -87,7 +87,7 @@ func TestANumberIsNeverGivenPastANeighbourWhoseRecordDoesNotRead(t *testing.T) {
 	assert.Zero(t, recorded.Ordinal)
 	require.Equal(t, []string{"provision.ports_not_settled"}, codes(outcome.Warnings))
 	assert.Equal(t, "cannot read a live worktree's ordinal: feat/a: storetest: the record of feat/a does not read — ports not settled", outcome.Warnings[0].Message)
-	assert.Equal(t, settled("this"), outcome.Warnings[0].FollowUp)
+	assert.Equal(t, settled("what kept them"), outcome.Warnings[0].FollowUp)
 }
 
 func TestANumberThatCannotBeGivenLeavesThePortsAsCopiedAndSaysWhy(t *testing.T) {
@@ -102,7 +102,7 @@ func TestANumberThatCannotBeGivenLeavesThePortsAsCopiedAndSaysWhy(t *testing.T) 
 		Code:     "provision.ports_not_settled",
 		Message:  "list worktrees: git worktree list: exit status 128 — ports not settled",
 		Params:   domain.Params{"branch": branchName, "cause": "list worktrees: git worktree list: exit status 128"},
-		FollowUp: settled("this"),
+		FollowUp: settled("what kept them"),
 	}}, outcome.Warnings)
 	assert.Len(t, report.worktreeEvents(), 2)
 }
@@ -259,7 +259,7 @@ func TestAnOriginWithoutTheRunProxyIsAProxyToFixNotARunToml(t *testing.T) {
 
 	require.Equal(t, []string{"provision.ports_not_settled"}, codes(outcome.Warnings))
 	assert.Equal(t, "env API in .env: {origin} of job \"web\" is served by the run proxy, which serves no port: enable the proxy, or write the host yourself — ports not settled", outcome.Warnings[0].Message)
-	assert.Equal(t, settled("this"), outcome.Warnings[0].FollowUp)
+	assert.Equal(t, settled("what kept them"), outcome.Warnings[0].FollowUp)
 }
 
 func TestAPortPassThatFailsNeverFailsTheWorktree(t *testing.T) {
