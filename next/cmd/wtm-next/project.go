@@ -84,7 +84,7 @@ func locate(ctx context.Context, dir string) (wireParams, error) {
 	return wireParams{MainPath: root, StateDir: state, CommonDir: commonDir}, nil
 }
 
-// stateDir is where the repository of commonDir keeps wtm's state, and whether $WTM_STATE_DIR moved it out of the repository: a sandbox or a test, whose repositories the registry never lists.
+// stateDir is where the repository of commonDir keeps wtm's state, and whether $WTM_STATE_DIR moved it out of the repository: a sandbox or a test, for which the registry is left alone.
 // shortcut: WTM_STATE_DIR is process-wide (one state dir for every repository a process opens); move it into the execution context when a process serves several repositories with it set.
 func stateDir(commonDir string) (dir string, moved bool) {
 	if dir := os.Getenv(stateDirEnv); dir != "" {

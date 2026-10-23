@@ -11,7 +11,7 @@ import (
 // registerTimeout bounds the registration of a repository, so a command never waits on it.
 const registerTimeout = 250 * time.Millisecond
 
-// Service is the registry over its Store, announcing what joins and leaves it with Announce: a repository is listed while its state directory holds a wtm config. A state directory moved out of the repositories keeps the registry as it is: none joins it, none leaves it.
+// Service is the registry over its Store, announcing what joins and leaves it with Announce: a repository is listed while its state directory holds a wtm config. The registry is left alone while the state directory is moved ($WTM_STATE_DIR): none joins it, none leaves it.
 type Service struct {
 	Store       Store
 	Announce    Announce
