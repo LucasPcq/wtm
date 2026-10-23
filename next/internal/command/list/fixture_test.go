@@ -39,7 +39,7 @@ type seed struct {
 	Base      string // the base branch, main when empty
 	Jobs      []run.Job
 	JobsErr   error
-	PRs       worktree.PullRequests
+	PRs       []worktree.PullRequest
 	PRsErr    error
 }
 
@@ -69,7 +69,7 @@ func newWorld(s seed) world {
 			Git:  git,
 			Meta: meta,
 			Jobs: func(context.Context) ([]run.Job, error) { return s.Jobs, s.JobsErr },
-			PullRequests: func(context.Context) (worktree.PullRequests, error) {
+			PullRequests: func(context.Context, []string) ([]worktree.PullRequest, error) {
 				asked++
 				return s.PRs, s.PRsErr
 			},

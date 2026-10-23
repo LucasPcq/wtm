@@ -10,7 +10,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
-	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/spf13/cobra"
@@ -59,10 +58,8 @@ func TestNoCommandAFollowUpNamesHasMigrated(t *testing.T) {
 	for _, action := range list.Actions(list.Detail{Branch: "feat/a"}) {
 		named = append(named, action.Command)
 	}
-	for _, detail := range []tree.Detail{{Branch: "feat/a", Rebasing: true}, {Branch: "feat/a", PR: &tree.PR{State: worktree.PullRequestMerged}}, {Branch: "feat/a", NeedsSync: true}} {
-		named = append(named, tree.Actions(detail, "main")[0].Command)
-	}
-	fixes := status.Problems(status.ProblemsParams{Subject: "feat/a", Missing: []status.Missing{{Target: ".env"}, {Target: ".env", From: status.FromNowhere}}, Jobs: []status.Job{{Name: "api", State: run.Crashed}}})
+	named = append(named, tree.Actions(tree.Detail{Branch: "feat/a", Rebasing: true}, false)[0].Command, tree.Actions(tree.Detail{Branch: "feat/a"}, true)[0].Command, tree.Actions(tree.Detail{Branch: "feat/a", NeedsSync: true}, false)[0].Command)
+	fixes := status.Problems(status.ProblemsParams{Subject: "feat/a", Merged: true, Missing: []status.Missing{{Target: ".env"}, {Target: ".env", From: status.FromNowhere}}, Jobs: []status.Job{{Name: "api", State: run.Crashed}}})
 	for _, problem := range fixes {
 		named = append(named, problem.Fix.Command)
 	}

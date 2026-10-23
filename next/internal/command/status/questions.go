@@ -110,7 +110,7 @@ func (q Questions) Form() domain.Form {
 	return domain.Form{Problems: q.problems, Fields: []domain.Field{
 		worktree,
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: pathAll, Flag: "--all", Label: "All", Help: "Read every worktree of the repository"}},
-		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: pathWithPRs, Flag: "--with-prs", Label: "Pull requests", Help: "Ask GitHub for the worktree's open pull request, its checks and review (needs gh)"}},
+		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: pathWithPRs, Flag: "--with-prs", Label: "Pull requests", Help: "Ask GitHub for the worktree's newest pull request, open, merged or closed, and an open one's checks and review (needs gh)"}},
 	}}
 }
 

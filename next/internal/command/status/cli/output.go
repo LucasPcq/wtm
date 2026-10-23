@@ -206,10 +206,13 @@ func headlineAll(w io.Writer, worktrees, troubled, unread int) {
 	}
 }
 
-// reviewCell is a pull request in a cell: its number, then its failed checks, else its pending ones, and its review decision.
+// reviewCell is a pull request in a cell: its number, then its state when it is no longer open, else its failed checks, else its pending ones, and its review decision.
 func reviewCell(r *status.Review) string {
 	if r == nil {
 		return none
+	}
+	if r.Progress == nil {
+		return "#" + strconv.Itoa(r.Number) + " " + string(r.State)
 	}
 
 	parts := []string{"#" + strconv.Itoa(r.Number)}
@@ -403,6 +406,9 @@ func lastCommit(commits []worktree.Commit) string {
 func review(r *status.Review) string {
 	if r == nil {
 		return ""
+	}
+	if r.Progress == nil {
+		return "#" + strconv.Itoa(r.Number) + " " + string(r.State)
 	}
 
 	parts := []string{"#" + strconv.Itoa(r.Number) + " " + r.Title}

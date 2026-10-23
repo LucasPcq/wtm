@@ -16,13 +16,13 @@ import (
 // ----------------------------------------------------------------------------
 // The facts
 
-// Facts are what list reads: the repository, what each worktree holds, the run daemon's jobs and the open pull requests, each with the error that kept it from being read; PullRequests is zero when GitHub was not asked.
+// Facts are what list reads: the repository, what each worktree holds, the run daemon's jobs and the newest pull request of each branch, each with the error that kept it from being read; PullRequests is nil when GitHub was not asked.
 type Facts struct {
 	worktree.Repository
 	States       map[string]State // by worktree path
 	Jobs         []run.Job
 	JobsErr      error
-	PullRequests worktree.PullRequests
+	PullRequests []worktree.PullRequest
 	PRsErr       error
 }
 
@@ -56,16 +56,16 @@ type Detail struct {
 	Actions []domain.FollowUp `json:"actions"`
 }
 
-// PR is a worktree's open pull request.
+// PR is a worktree's newest pull request.
 type PR struct {
-	Number int    `json:"number"`
-	URL    string `json:"url"`
+	Number int                       `json:"number"`
+	URL    string                    `json:"url"`
+	State  worktree.PullRequestState `json:"state"`
 }
 
 // The codes of list's warnings and failures.
 const (
 	CodePRsUnavailable = Name + ".prs_unavailable"
-	CodePRsCapped      = Name + ".prs_capped"
 	CodeJobsUnknown    = Name + ".jobs_unknown"
 	CodeBaseMissing    = Name + ".base_missing"
 	CodeUnreadable     = Name + ".unreadable"
@@ -125,12 +125,12 @@ func (f Facts) item(w worktree.Worktree) Item {
 }
 
 func (f Facts) pr(branch string) *PR {
-	found, ok := f.PullRequests.Of(branch)
+	found, ok := worktree.PullRequestOf(f.PullRequests, branch)
 	if !ok {
 		return nil
 	}
 
-	return &PR{Number: found.Number, URL: found.URL}
+	return &PR{Number: found.Number, URL: found.URL, State: found.State}
 }
 
 // services are the jobs up in the worktree at path, by name, none when the daemon could not tell.
@@ -152,9 +152,6 @@ func (f Facts) warnings() []domain.Warning {
 	}
 	if f.PRsErr != nil {
 		warnings = append(warnings, domain.Warning{Code: CodePRsUnavailable, Message: f.PRsErr.Error()})
-	}
-	if f.PullRequests.Capped {
-		warnings = append(warnings, domain.Warning{Code: CodePRsCapped, Message: "only the most recent open pull requests were listed: an older one is not shown"})
 	}
 
 	return warnings
@@ -257,7 +254,7 @@ func WithPullRequests(shown, from Outcome) Outcome {
 
 	merged.Warnings = slices.Clone(shown.Warnings)
 	for _, warning := range from.Warnings {
-		if warning.Code == CodePRsUnavailable || warning.Code == CodePRsCapped {
+		if warning.Code == CodePRsUnavailable {
 			merged.Warnings = append(merged.Warnings, warning)
 		}
 	}

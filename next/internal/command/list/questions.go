@@ -59,7 +59,7 @@ type Questions struct{}
 func (Questions) Form() domain.Form {
 	return domain.Form{Fields: []domain.Field{
 		domain.ConfirmField{
-			FieldSpec: domain.FieldSpec{Path: pathWithPRs, Flag: "--with-prs", Label: "Pull requests", Help: "Ask GitHub for each worktree's open pull request (needs gh)"},
+			FieldSpec: domain.FieldSpec{Path: pathWithPRs, Flag: "--with-prs", Label: "Pull requests", Help: "Ask GitHub for each worktree's newest pull request, open, merged or closed (needs gh)"},
 		},
 		domain.ConfirmField{
 			FieldSpec: domain.FieldSpec{Path: pathFetch, Flag: "--fetch", Label: "Fetch", Help: "Fetch origin first, as the picker's refresh (r) does"},

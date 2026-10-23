@@ -123,7 +123,7 @@ type Observed struct {
 	WithPRs    bool
 }
 
-// Observe reads what status reports of the repository: the record of each live branch, what each target holds, the jobs the daemon knows and, when asked, the open pull requests. The worktrees, the daemon and GitHub are read at once.
+// Observe reads what status reports of the repository: the record of each live branch, what each target holds, the jobs the daemon knows and, when asked, the newest pull request of each target's branch. The worktrees, the daemon and GitHub are read at once.
 func (u UseCase) Observe(ctx context.Context, observed Observed) Facts {
 	facts := Facts{Repository: observed.Repository}
 	facts.Records, facts.RecordErrs = u.records(observed.Repository)
@@ -131,13 +131,19 @@ func (u UseCase) Observe(ctx context.Context, observed Observed) Facts {
 	var (
 		wg           sync.WaitGroup
 		jobs         []run.Job
-		pullRequests worktree.PullRequests
+		pullRequests []worktree.PullRequest
 		jobsErr      error
 		prsErr       error
 	)
 	wg.Go(func() { jobs, jobsErr = u.Jobs(ctx) })
 	if observed.WithPRs {
-		wg.Go(func() { pullRequests, prsErr = u.PullRequests(ctx) })
+		branches := make([]string, 0, len(observed.Targets))
+		for _, w := range observed.Targets {
+			if branch := w.Branch(); branch != "" {
+				branches = append(branches, branch)
+			}
+		}
+		wg.Go(func() { pullRequests, prsErr = u.PullRequests(ctx, branches) })
 	}
 	read := repository.Each(observed.Targets, func(w worktree.Worktree) State { return u.state(ctx, facts, w) })
 	wg.Wait()

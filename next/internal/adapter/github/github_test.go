@@ -13,59 +13,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPullRequestsAreTheOpenOnesGHLists(t *testing.T) {
-	gh := fakeGH(t, 0, `[{"number": 12, "headRefName": "feat/a", "url": "https://github.com/acme/acme/pull/12"},
-		{"number": 13, "headRefName": "main", "url": "https://github.com/acme/acme/pull/13", "isCrossRepository": true}]`)
+func TestAPullRequestCountsTheChecksOfItsLastCommitByOutcomeAndCarriesItsReview(t *testing.T) {
+	gh := fakeGH(t, 0, `{"data": {"repository": {"b0": {"nodes": [{"number": 12, "url": "u", "state": "OPEN", "headRefName": "feat/a",
+		"title": "Add a", "isDraft": true, "reviewDecision": "APPROVED",
+		"commits": {"nodes": [{"commit": {"statusCheckRollup": {"contexts": {
+			"checkRunCountsByState": [{"state": "SUCCESS", "count": 2}, {"state": "NEUTRAL", "count": 1}, {"state": "SKIPPED", "count": 1}, {"state": "FAILURE", "count": 1},
+				{"state": "ACTION_REQUIRED", "count": 1}, {"state": "IN_PROGRESS", "count": 1}, {"state": "QUEUED", "count": 1}, {"state": "SOMETHING_NEW", "count": 1}],
+			"statusContextCountsByState": [{"state": "SUCCESS", "count": 1}, {"state": "PENDING", "count": 1}, {"state": "EXPECTED", "count": 1}, {"state": "ERROR", "count": 1}]
+		}}}}]}}]}}}}`)
 
-	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequests(t.Context())
-
-	require.NoError(t, err)
-	assert.Equal(t, worktree.PullRequests{Open: []worktree.PullRequest{{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a", State: worktree.PullRequestOpen}}}, prs, "a fork's pull request is not this repository's branch")
-}
-
-func TestAPullRequestCountsItsChecksByOutcomeAndCarriesItsReview(t *testing.T) {
-	gh := fakeGH(t, 0, `[{"number": 12, "headRefName": "feat/a", "url": "u", "title": "Add a", "isDraft": true, "reviewDecision": "APPROVED",
-		"statusCheckRollup": [{"conclusion": "SUCCESS"}, {"conclusion": "NEUTRAL"}, {"conclusion": "SKIPPED"}, {"conclusion": "FAILURE"},
-			{"conclusion": "ACTION_REQUIRED"}, {"conclusion": "SOMETHING_NEW"}, {"state": "SUCCESS"}, {"state": "PENDING"}, {"state": "EXPECTED"}, {"state": "ERROR"}, {}]}]`)
-
-	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequests(t.Context())
+	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequestsOf(t.Context(), []string{"feat/a"})
 
 	require.NoError(t, err)
 	assert.Equal(t, []worktree.PullRequest{{
 		Number: 12, URL: "u", Branch: "feat/a", State: worktree.PullRequestOpen, Title: "Add a", Draft: true, Decision: "APPROVED",
-		Checks: worktree.Checks{Passed: 4, Failed: 3, Pending: 4},
-	}}, prs.Open, "an unknown conclusion fails closed, an action required is pending")
+		Checks: worktree.Checks{Passed: 5, Failed: 3, Pending: 5},
+	}}, prs, "an unknown state fails closed, an action required is pending")
 }
 
-func TestPullRequestsPastTheCapSaySo(t *testing.T) {
-	gh := fakeGH(t, 0, listed(51))
+func TestAPullRequestWithoutChecksCountsNone(t *testing.T) {
+	gh := fakeGH(t, 0, `{"data": {"repository": {"b0": {"nodes": [{"number": 12, "url": "u", "state": "OPEN", "headRefName": "feat/a",
+		"commits": {"nodes": [{"commit": {"statusCheckRollup": null}}]}}]}}}}`)
 
-	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequests(t.Context())
+	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequestsOf(t.Context(), []string{"feat/a"})
 
 	require.NoError(t, err)
-	assert.True(t, prs.Capped)
-	assert.Len(t, prs.Open, 50)
-}
-
-func TestPullRequestsSayWhyGHCannotBeAsked(t *testing.T) {
-	missing := filepath.Join(t.TempDir(), "gh")
-	signedOut := fakeGH(t, 1, "[]")
-
-	_, missingErr := github.GitHub{Dir: t.TempDir(), Binary: missing}.PullRequests(t.Context())
-	_, signedOutErr := github.GitHub{Dir: t.TempDir(), Binary: signedOut}.PullRequests(t.Context())
-
-	require.ErrorIs(t, missingErr, worktree.ErrPullRequestsUnavailable)
-	assert.EqualError(t, missingErr, "pull requests unavailable: install gh, GitHub's CLI")
-	require.ErrorIs(t, signedOutErr, worktree.ErrPullRequestsUnavailable)
-	assert.EqualError(t, signedOutErr, "pull requests unavailable: run `gh auth login`")
-}
-
-func TestPullRequestsRefuseOutputThatIsNotTheirList(t *testing.T) {
-	gh := fakeGH(t, 0, "not json")
-
-	_, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequests(t.Context())
-
-	require.ErrorIs(t, err, worktree.ErrPullRequestsUnavailable)
+	assert.Equal(t, worktree.Checks{}, prs[0].Checks)
 }
 
 func TestTheNewestPullRequestOfEachBranchIsReadWhateverItsState(t *testing.T) {
@@ -110,12 +83,16 @@ func TestAFailingQueryKeepsThePullRequestsFoundBeforeIt(t *testing.T) {
 }
 
 func TestThePullRequestsOfBranchesSayWhyGHCannotBeAsked(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "gh")
 	signedOut := fakeGH(t, 1, "{}")
 	garbled := fakeGH(t, 0, "not json")
 
+	_, missingErr := github.GitHub{Dir: t.TempDir(), Binary: missing}.PullRequestsOf(t.Context(), []string{"feat/a"})
 	_, signedOutErr := github.GitHub{Dir: t.TempDir(), Binary: signedOut}.PullRequestsOf(t.Context(), []string{"feat/a"})
 	_, garbledErr := github.GitHub{Dir: t.TempDir(), Binary: garbled}.PullRequestsOf(t.Context(), []string{"feat/a"})
 
+	require.ErrorIs(t, missingErr, worktree.ErrPullRequestsUnavailable)
+	assert.EqualError(t, missingErr, "pull requests unavailable: install gh, GitHub's CLI")
 	assert.EqualError(t, signedOutErr, "pull requests unavailable: run `gh auth login`")
 	assert.ErrorIs(t, garbledErr, worktree.ErrPullRequestsUnavailable)
 }

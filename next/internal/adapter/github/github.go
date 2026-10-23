@@ -1,4 +1,4 @@
-// Package github asks GitHub, through its CLI gh, for the pull requests of a repository: the open ones with their checks and review, or the newest of each branch whatever its state.
+// Package github asks GitHub, through its CLI gh, for the newest pull request of each branch of a repository, whatever its state, with its checks and review.
 package github
 
 import (
@@ -18,8 +18,6 @@ import (
 
 const (
 	cli = "gh"
-	// shortcut: the 50 open pull requests gh lists first, as wtm's list asks, saying when there are more; query by branch when that matters.
-	listLimit = 50
 	// prsPerQuery bounds the branches one GraphQL query asks of, far below the API's node limit.
 	prsPerQuery = 100
 	// newestPerBranch is how many pull requests of a branch are asked, newest first: a few, since the newest may be a fork's.
@@ -37,27 +35,10 @@ func ViewCommand(number int) []string {
 	return []string{cli, "pr", "view", strconv.Itoa(number), "--web"}
 }
 
-// PullRequests returns the open pull requests of the repository, the most
-// recent first and capped, a pull request from a fork left out since its branch
-// is not this repository's. Every failure wraps worktree.ErrPullRequestsUnavailable
-// with what to do about it.
-func (g GitHub) PullRequests(ctx context.Context) (worktree.PullRequests, error) {
-	binary, err := g.signedIn(ctx)
-	if err != nil {
-		return worktree.PullRequests{}, err
-	}
-
-	// One more than the cap tells a listing that holds more.
-	out, err := g.run(ctx, binary, "gh pr list", "pr", "list", "--state", "open", "--json", "number,headRefName,url,isCrossRepository,title,isDraft,reviewDecision,statusCheckRollup", "--limit", strconv.Itoa(listLimit+1))
-	if err != nil {
-		return worktree.PullRequests{}, err
-	}
-
-	return parse(out)
-}
-
 // PullRequestsOf returns the newest pull request of each of branches, whatever
-// its state, one from a fork left out; a branch without one is absent. It asks
+// its state, with its title, whether it is a draft, its review decision and the
+// checks of its last commit counted; one from a fork is left out, and a branch
+// without one is absent. It asks
 // one GraphQL query per prsPerQuery branches, so a repository with many pull
 // requests costs no more. Every failure wraps worktree.ErrPullRequestsUnavailable;
 // a query that fails keeps the pull requests the queries before it found.
@@ -112,6 +93,10 @@ func (g GitHub) run(ctx context.Context, binary, what string, args ...string) ([
 	return out, nil
 }
 
+// prFields are the fields read of each pull request: the last commit's check runs and statuses come counted by state, which costs one context node.
+const prFields = "number url state headRefName isCrossRepository title isDraft reviewDecision " +
+	"commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 1) { checkRunCountsByState { state count } statusContextCountsByState { state count } } } } } }"
+
 // newestOf is gh's arguments of the GraphQL query for the newest pull requests of branches, one aliased field per branch, each name a variable never spliced into the query; gh fills {owner} and {repo} from the repository it runs in.
 func newestOf(branches []string) []string {
 	variables := []string{"$owner: String!", "$name: String!"}
@@ -120,7 +105,7 @@ func newestOf(branches []string) []string {
 	for i, branch := range branches {
 		alias := "b" + strconv.Itoa(i)
 		variables = append(variables, "$"+alias+": String!")
-		fields = append(fields, alias+": pullRequests(headRefName: $"+alias+", first: "+strconv.Itoa(newestPerBranch)+", orderBy: {field: CREATED_AT, direction: DESC}) { nodes { number url state headRefName isCrossRepository } }")
+		fields = append(fields, alias+": pullRequests(headRefName: $"+alias+", first: "+strconv.Itoa(newestPerBranch)+", orderBy: {field: CREATED_AT, direction: DESC}) { nodes { "+prFields+" } }")
 		args = append(args, "-f", alias+"="+branch)
 	}
 	query := "query(" + strings.Join(variables, ", ") + ") { repository(owner: $owner, name: $name) { " + strings.Join(fields, " ") + " } }"
@@ -128,15 +113,38 @@ func newestOf(branches []string) []string {
 	return append(args, "-f", "query="+query)
 }
 
+// A count is how many of a commit's check runs, or statuses, are in a state.
+type count struct {
+	State string `json:"state"`
+	Count int    `json:"count"`
+}
+
+// A node is a pull request as newestOf reads it.
+type node struct {
+	Number            int    `json:"number"`
+	URL               string `json:"url"`
+	State             string `json:"state"`
+	HeadRefName       string `json:"headRefName"`
+	IsCrossRepository bool   `json:"isCrossRepository"`
+	Title             string `json:"title"`
+	IsDraft           bool   `json:"isDraft"`
+	ReviewDecision    string `json:"reviewDecision"`
+	Commits           struct {
+		Nodes []struct {
+			Commit struct {
+				StatusCheckRollup *struct {
+					Contexts struct {
+						CheckRuns []count `json:"checkRunCountsByState"`
+						Statuses  []count `json:"statusContextCountsByState"`
+					} `json:"contexts"`
+				} `json:"statusCheckRollup"`
+			} `json:"commit"`
+		} `json:"nodes"`
+	} `json:"commits"`
+}
+
 // parseNewest reads the answer of newestOf: per branch, its newest pull request that is not a fork's, its state lowercased.
 func parseNewest(out []byte) ([]worktree.PullRequest, error) {
-	type node struct {
-		Number            int    `json:"number"`
-		URL               string `json:"url"`
-		State             string `json:"state"`
-		HeadRefName       string `json:"headRefName"`
-		IsCrossRepository bool   `json:"isCrossRepository"`
-	}
 	var answer struct {
 		Data struct {
 			Repository map[string]struct {
@@ -156,57 +164,28 @@ func parseNewest(out []byte) ([]worktree.PullRequest, error) {
 			continue
 		}
 		pr := nodes[at]
-		prs = append(prs, worktree.PullRequest{Number: pr.Number, URL: pr.URL, Branch: pr.HeadRefName, State: worktree.PullRequestState(strings.ToLower(pr.State))})
+		prs = append(prs, worktree.PullRequest{
+			Number: pr.Number, URL: pr.URL, Branch: pr.HeadRefName, State: worktree.PullRequestState(strings.ToLower(pr.State)),
+			Title: pr.Title, Draft: pr.IsDraft, Checks: checksOf(pr), Decision: pr.ReviewDecision,
+		})
 	}
 
 	return prs, nil
 }
 
-func parse(out []byte) (worktree.PullRequests, error) {
-	var listed []struct {
-		Number            int        `json:"number"`
-		HeadRefName       string     `json:"headRefName"`
-		URL               string     `json:"url"`
-		IsCrossRepository bool       `json:"isCrossRepository"`
-		Title             string     `json:"title"`
-		IsDraft           bool       `json:"isDraft"`
-		ReviewDecision    string     `json:"reviewDecision"`
-		StatusCheckRollup []checkRun `json:"statusCheckRollup"`
-	}
-	if err := json.Unmarshal(out, &listed); err != nil {
-		return worktree.PullRequests{}, fmt.Errorf("%w: gh pr list: unexpected output: %w", worktree.ErrPullRequestsUnavailable, err)
-	}
-
-	prs := worktree.PullRequests{Capped: len(listed) > listLimit}
-	for _, pr := range listed[:min(len(listed), listLimit)] {
-		if !pr.IsCrossRepository {
-			prs.Open = append(prs.Open, worktree.PullRequest{
-				Number: pr.Number, URL: pr.URL, Branch: pr.HeadRefName, State: worktree.PullRequestOpen,
-				Title: pr.Title, Draft: pr.IsDraft, Checks: checksOf(pr.StatusCheckRollup), Decision: pr.ReviewDecision,
-			})
-		}
-	}
-
-	return prs, nil
-}
-
-// A checkRun is one entry of a pull request's status-check rollup: a check run, which ends with a Conclusion, or a status of the older Status API, which carries only a State.
-type checkRun struct {
-	Conclusion string `json:"conclusion"`
-	State      string `json:"state"`
-}
-
-// checksOf counts the rollup's entries by outcome.
-func checksOf(rollup []checkRun) worktree.Checks {
+// checksOf counts the check runs and statuses of pr's last commit by outcome.
+func checksOf(pr node) worktree.Checks {
 	var checks worktree.Checks
-	for _, run := range rollup {
-		switch outcomeOf(run) {
-		case passed:
-			checks.Passed++
-		case failed:
-			checks.Failed++
-		case pending:
-			checks.Pending++
+	for _, commit := range pr.Commits.Nodes {
+		rollup := commit.Commit.StatusCheckRollup
+		if rollup == nil {
+			continue
+		}
+		for _, c := range rollup.Contexts.CheckRuns {
+			add(&checks, checkRunOutcome(c.State), c.Count)
+		}
+		for _, c := range rollup.Contexts.Statuses {
+			add(&checks, statusOutcome(c.State), c.Count)
 		}
 	}
 	return checks
@@ -220,25 +199,36 @@ const (
 	failed
 )
 
-// outcomeOf is the outcome of a rollup entry: by its conclusion once it ran, by its state for a status, pending while neither is set. A skipped or neutral check passes; one that needs authorisation to run (ACTION_REQUIRED) has not run, so it is pending, as is a status still EXPECTED; an unknown value fails closed, never passing silently.
-func outcomeOf(run checkRun) outcome {
-	switch {
-	case run.Conclusion != "":
-		switch run.Conclusion {
-		case "SUCCESS", "NEUTRAL", "SKIPPED":
-			return passed
-		case "ACTION_REQUIRED":
-			return pending
-		}
-		return failed
-	case run.State != "":
-		switch run.State {
-		case "SUCCESS":
-			return passed
-		case "PENDING", "EXPECTED":
-			return pending
-		}
-		return failed
+// add counts n checks of outcome o in checks.
+func add(checks *worktree.Checks, o outcome, n int) {
+	switch o {
+	case passed:
+		checks.Passed += n
+	case failed:
+		checks.Failed += n
+	case pending:
+		checks.Pending += n
 	}
-	return pending
+}
+
+// checkRunOutcome is the outcome of a check run in state, GitHub's CheckRunState, its conclusion once it ran: a skipped or neutral one passes; one still to run (queued, waiting, in progress) is pending, as is one that needs authorisation to run (ACTION_REQUIRED); an unknown state fails closed, never passing silently.
+func checkRunOutcome(state string) outcome {
+	switch state {
+	case "SUCCESS", "NEUTRAL", "SKIPPED":
+		return passed
+	case "ACTION_REQUIRED", "QUEUED", "IN_PROGRESS", "PENDING", "WAITING", "REQUESTED":
+		return pending
+	}
+	return failed
+}
+
+// statusOutcome is the outcome of a status of the older Status API in state, GitHub's StatusState: pending while it is PENDING or still EXPECTED; an unknown state fails closed.
+func statusOutcome(state string) outcome {
+	switch state {
+	case "SUCCESS":
+		return passed
+	case "PENDING", "EXPECTED":
+		return pending
+	}
+	return failed
 }

@@ -65,8 +65,8 @@
         "review": {
           "number": 12,
           "url": "https://github.com/acme/acme/pull/12",
+          "state": "open",
           "title": "Add the login form",
-          "state": "draft",
           "draft": true,
           "checks": {
             "passed": 3,

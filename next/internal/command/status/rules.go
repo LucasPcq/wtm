@@ -20,7 +20,7 @@ import (
 // ----------------------------------------------------------------------------
 // The facts
 
-// Facts are what status reads: the repository, the meta record of each live branch (and the error of a record that exists but does not read), what each worktree read holds, the run daemon's jobs and the open pull requests, each with the error that kept it from being read; PullRequests is zero when GitHub was not asked.
+// Facts are what status reads: the repository, the meta record of each live branch (and the error of a record that exists but does not read), what each worktree read holds, the run daemon's jobs and the newest pull request of each branch read, each with the error that kept it from being read; PullRequests is nil when GitHub was not asked.
 type Facts struct {
 	worktree.Repository
 	Records      map[string]worktree.Meta // by branch
@@ -28,7 +28,7 @@ type Facts struct {
 	States       map[string]State         // by worktree path
 	Jobs         []run.Job
 	JobsErr      error
-	PullRequests worktree.PullRequests
+	PullRequests []worktree.PullRequest
 	PRsErr       error
 }
 
@@ -95,12 +95,17 @@ type Changes struct {
 	Files      []worktree.Change `json:"files"`
 }
 
-// Review is a worktree's open pull request and where its review stands: its state, open or draft, its checks counted and GitHub's review decision.
+// Review is a worktree's newest pull request: its number, its page and its state, open, merged or closed; and, for an open one only, where its review stands.
 type Review struct {
-	Number   int             `json:"number"`
-	URL      string          `json:"url"`
+	Number int                       `json:"number"`
+	URL    string                    `json:"url"`
+	State  worktree.PullRequestState `json:"state"`
+	*Progress
+}
+
+// Progress is where an open pull request's review stands: its title, whether it is a draft, its checks counted and GitHub's review decision.
+type Progress struct {
 	Title    string          `json:"title"`
-	State    string          `json:"state"`
 	Draft    bool            `json:"draft"`
 	Checks   worktree.Checks `json:"checks"`
 	Decision string          `json:"decision"`
@@ -177,12 +182,12 @@ type Problem struct {
 
 // The codes of status's problems, warnings and failures.
 const (
+	CodeMerged           = Name + ".merged"
 	CodeEnvMissing       = Name + ".env_missing"
 	CodeIsolationPending = Name + ".isolation_pending"
 	CodeJobCrashed       = Name + ".job_crashed"
 	CodeJobsUnknown      = Name + ".jobs_unknown"
 	CodePRsUnavailable   = Name + ".prs_unavailable"
-	CodePRsCapped        = Name + ".prs_capped"
 	CodeRunInvalid       = Name + ".run_invalid"
 	CodeBaseMissing      = Name + ".base_missing"
 	CodeMetaUnreadable   = Name + ".meta_unreadable"
@@ -295,6 +300,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 	parent, _ := stack.Parent(branch)
 	pending := recordErr == nil && f.pending(w)
 	offset := f.offset(w)
+	pr, hasPR := worktree.PullRequestOf(f.PullRequests, branch)
 
 	detail := Detail{
 		Branch:    branch,
@@ -309,7 +315,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Origin:    f.OriginOf(branch),
 		Changes:   changesOf(state),
 		Commits:   orEmpty(state.Commits),
-		Review:    f.review(branch),
+		Review:    reviewOf(pr, hasPR),
 		Isolation: isolationOf(record, pending || recordErr != nil),
 		RunToml:   f.runToml(),
 		Run:       f.runOf(w, portsParams{record: record, pending: pending, unread: recordErr != nil, offset: offset}),
@@ -319,7 +325,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 	// Every fix names a branch: a worktree on none has its facts read and nothing to fix.
 	detail.Problems = []Problem{}
 	if branch != "" {
-		detail.Problems = Problems(ProblemsParams{Subject: subject, Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
+		detail.Problems = Problems(ProblemsParams{Subject: subject, Merged: hasPR && pr.Cleans(w, f.Config.Worktrees.BaseBranch), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
 	}
 
 	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail}
@@ -351,17 +357,16 @@ func changesOf(state State) Changes {
 	return changes
 }
 
-func (f Facts) review(branch string) *Review {
-	pr, ok := f.PullRequests.Of(branch)
+func reviewOf(pr worktree.PullRequest, ok bool) *Review {
 	if !ok {
 		return nil
 	}
 
-	state := "open"
-	if pr.Draft {
-		state = "draft"
+	review := &Review{Number: pr.Number, URL: pr.URL, State: pr.State}
+	if pr.State == worktree.PullRequestOpen {
+		review.Progress = &Progress{Title: pr.Title, Draft: pr.Draft, Checks: pr.Checks, Decision: pr.Decision}
 	}
-	return &Review{Number: pr.Number, URL: pr.URL, Title: pr.Title, State: state, Draft: pr.Draft, Checks: pr.Checks, Decision: pr.Decision}
+	return review
 }
 
 // pending reports whether w has yet to choose its isolation, which run up and run start then refuse: a worktree on a branch other than the main one, whose record holds no choice, while run.toml declares something a worktree isolates.
@@ -619,9 +624,10 @@ type Missing struct {
 	From   Rebuild
 }
 
-// ProblemsParams are what a worktree has to fix: the worktree, as a fix names it, the .env files it lacks, whether it has yet to choose its isolation, and its jobs.
+// ProblemsParams are what a worktree has to fix: the worktree, as a fix names it, whether its merged pull request leaves it to be cleaned, the .env files it lacks, whether it has yet to choose its isolation, and its jobs.
 type ProblemsParams struct {
 	Subject string
+	Merged  bool
 	Missing []Missing
 	Pending bool
 	Jobs    []Job
@@ -637,9 +643,12 @@ const (
 	pathDetach        = "detach"
 )
 
-// Problems are the problems of params, each with its fix: each missing .env file, then a pending isolation, then each crashed job, whose fix starts it again in the worktree that runs it, a shared job's owner.
+// Problems are the problems of params, each with its fix: a merged pull request first, since cleaning the worktree makes every other fix moot, then each missing .env file, then a pending isolation, then each crashed job, whose fix starts it again in the worktree that runs it, a shared job's owner.
 func Problems(params ProblemsParams) []Problem {
 	problems := []Problem{}
+	if params.Merged {
+		problems = append(problems, Problem{Code: CodeMerged, Message: "its pull request is merged", Fix: fix(CodeMerged, domain.CommandClean, params.Subject)})
+	}
 	for _, missing := range params.Missing {
 		problems = append(problems, missingProblem(params.Subject, missing))
 	}
@@ -715,9 +724,6 @@ func (f Facts) warnings() []domain.Warning {
 	}
 	if f.PRsErr != nil {
 		warnings = append(warnings, domain.Warning{Code: CodePRsUnavailable, Message: f.PRsErr.Error()})
-	}
-	if f.PullRequests.Capped {
-		warnings = append(warnings, domain.Warning{Code: CodePRsCapped, Message: "only the most recent open pull requests were listed: an older one is not shown"})
 	}
 
 	return warnings

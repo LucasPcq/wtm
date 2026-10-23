@@ -19,8 +19,9 @@ const (
 		"base branch and origin, its uncommitted work and last commits, how it runs\n" +
 		"(isolation, addressing, port offset, every job run.toml declares with its state\n" +
 		"and address), which declared .env files it lacks and how their keys stand, and each\n" +
-		"problem found with the command that fixes it. With --with-prs, its pull request,\n" +
-		"its checks and its review.\n\n" +
+		"problem found with the command that fixes it. With --with-prs, its newest pull\n" +
+		"request, open, merged or closed, an open one's checks and review; a merged one\n" +
+		"is a problem, its fix to clean the worktree.\n\n" +
 		"Without [worktree], a terminal opens the worktree picker on the one you are in;\n" +
 		"anywhere else (no terminal, --output json, --quiet) it reads the one you are in.\n" +
 		"It changes nothing, never starts the run daemon and prints no .env value.\n" +

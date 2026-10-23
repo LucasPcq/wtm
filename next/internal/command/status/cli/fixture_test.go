@@ -51,6 +51,7 @@ type world struct {
 	RunErr    error
 	JobsErr   error
 	PRsErr    error
+	Merged    bool // feat/a's pull request is merged
 	Gone      bool // feat/old's directory is gone
 }
 
@@ -109,8 +110,12 @@ func (w world) open(context.Context, string) (status.UseCase, error) {
 				{Name: "api", Kind: project.Service, WorkDir: "/repo/.trees/feat-a", State: run.Crashed, ExitCode: &exit},
 			}, w.JobsErr
 		},
-		PullRequests: func(context.Context) (worktree.PullRequests, error) {
-			return worktree.PullRequests{Open: []worktree.PullRequest{{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a", Title: "Add the login form", Draft: true, Checks: worktree.Checks{Passed: 3, Pending: 1}, Decision: "REVIEW_REQUIRED"}}}, w.PRsErr
+		PullRequests: func(context.Context, []string) ([]worktree.PullRequest, error) {
+			pr := worktree.PullRequest{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a", State: worktree.PullRequestOpen, Title: "Add the login form", Draft: true, Checks: worktree.Checks{Passed: 3, Pending: 1}, Decision: "REVIEW_REQUIRED"}
+			if w.Merged {
+				pr.State = worktree.PullRequestMerged
+			}
+			return []worktree.PullRequest{pr}, w.PRsErr
 		},
 		Repository: repository.Service{Config: configured{err: w.ConfigErr, run: runConfig, runErr: w.RunErr}, Git: git, MainPath: mainPath, Init: &domain.FollowUp{Command: domain.CommandInit}},
 	}, nil

@@ -4,7 +4,7 @@
   Select a worktree
 
 ▌› main                                                                    main  • active  ✓ clean
-   feat/a                                                    services  base ↑2  origin ↑2  ! dirty
+   feat/a                                      PR #9 merged  services  base ↑2  origin ↑2  ! dirty
    feat/b                                                                ! locked  PR #12  ✓ clean
    ../.trees/detached                                                                      ✓ clean
    feat/gone                                                                             ✗ missing

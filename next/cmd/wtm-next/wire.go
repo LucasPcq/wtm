@@ -106,7 +106,7 @@ func wire(params wireParams) app {
 			Git:          repo,
 			Meta:         meta,
 			Jobs:         jobs,
-			PullRequests: gh.PullRequests,
+			PullRequests: gh.PullRequestsOf,
 			Repository:   facts,
 		},
 		Status: status.UseCase{
@@ -114,7 +114,7 @@ func wire(params wireParams) app {
 			Meta:         meta,
 			EnvFiles:     store.EnvFiles{},
 			Jobs:         jobs,
-			PullRequests: gh.PullRequests,
+			PullRequests: gh.PullRequestsOf,
 			Repository:   facts,
 		},
 		Tree: tree.UseCase{

@@ -46,7 +46,7 @@ type seed struct {
 	ConfigErr  error
 	Jobs       []run.Job
 	JobsErr    error
-	PRs        worktree.PullRequests
+	PRs        []worktree.PullRequest
 	PRsErr     error
 }
 
@@ -71,7 +71,7 @@ func newWorld(s seed) world {
 			Meta:         store,
 			EnvFiles:     store,
 			Jobs:         func(context.Context) ([]run.Job, error) { return s.Jobs, s.JobsErr },
-			PullRequests: func(context.Context) (worktree.PullRequests, error) { return s.PRs, s.PRsErr },
+			PullRequests: func(context.Context, []string) ([]worktree.PullRequest, error) { return s.PRs, s.PRsErr },
 			Repository:   repository.Service{Config: configured{config: config, err: s.ConfigErr, run: s.Run, runErr: s.RunErr}, Git: git, MainPath: mainPath},
 		},
 		git:   git,

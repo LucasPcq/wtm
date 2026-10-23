@@ -3,6 +3,7 @@ package list
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -70,7 +71,7 @@ func (u UseCase) Questions(context.Context, Request) (Questions, error) {
 // ----------------------------------------------------------------------------
 // Observe
 
-// Observe reads what list reports: the repository, what each worktree holds, the jobs up and, when req asks for them, the open pull requests. The worktrees, the daemon and GitHub are read at once.
+// Observe reads what list reports: the repository, what each worktree holds, the jobs up and, when req asks for them, the newest pull request of each branch. The worktrees, the daemon and GitHub are read at once.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	repo, err := u.Repository.Observe(ctx, Name)
 	if err != nil {
@@ -81,13 +82,14 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	var (
 		wg           sync.WaitGroup
 		jobs         []run.Job
-		pullRequests worktree.PullRequests
+		pullRequests []worktree.PullRequest
 		jobsErr      error
 		prsErr       error
 	)
 	wg.Go(func() { jobs, jobsErr = u.Jobs(ctx) })
 	if req.WithPRs {
-		wg.Go(func() { pullRequests, prsErr = u.PullRequests(ctx) })
+		branches := slices.DeleteFunc(repo.Live(), func(branch string) bool { return branch == "" })
+		wg.Go(func() { pullRequests, prsErr = u.PullRequests(ctx, branches) })
 	}
 	states := u.states(ctx, facts)
 	wg.Wait()

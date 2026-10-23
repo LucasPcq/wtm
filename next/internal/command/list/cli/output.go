@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/list"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
@@ -72,7 +73,11 @@ func pr(d list.Detail, st *output.Styles) string {
 	if d.PR == nil {
 		return ""
 	}
-	return st.Success.Render("PR #" + strconv.Itoa(d.PR.Number))
+	label := "PR #" + strconv.Itoa(d.PR.Number)
+	if d.PR.State == worktree.PullRequestOpen {
+		return st.Success.Render(label)
+	}
+	return st.Muted.Render(label + " " + string(d.PR.State))
 }
 
 func services(d list.Detail, st *output.Styles) string {

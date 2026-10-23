@@ -5,7 +5,7 @@
       "path": "with_prs",
       "flag": "--with-prs",
       "label": "Pull requests",
-      "help": "Ask GitHub for each worktree's open pull request (needs gh)",
+      "help": "Ask GitHub for each worktree's newest pull request, open, merged or closed (needs gh)",
       "value": false,
       "yes": {
         "value": "true",

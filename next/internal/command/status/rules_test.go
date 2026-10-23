@@ -9,10 +9,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestProblemsComeEnvThenIsolationThenCrashedJobs(t *testing.T) {
+func TestProblemsComeMergedThenEnvThenIsolationThenCrashedJobs(t *testing.T) {
 	signal, exit := -1, 3
 	problems := status.Problems(status.ProblemsParams{
 		Subject: "feat/a",
+		Merged:  true,
 		Missing: []status.Missing{{Target: ".env"}},
 		Pending: true,
 		Jobs: []status.Job{
@@ -28,6 +29,7 @@ func TestProblemsComeEnvThenIsolationThenCrashedJobs(t *testing.T) {
 		messages = append(messages, problem.Message)
 	}
 	assert.Equal(t, []string{
+		"its pull request is merged",
 		".env is missing",
 		"predates the isolation choice: run up and run start refuse it",
 		"api crashed (exit 3)",

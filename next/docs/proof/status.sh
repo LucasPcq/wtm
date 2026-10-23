@@ -81,6 +81,32 @@ state() {
   shasum .git/wtm/run.toml .git/wtm/config.toml
 }
 
+# fake_gh <dir>: writes in dir a gh, signed in, whose GraphQL answer gives feat/a an open pull request and feat/b a merged one, each under the alias (b0, b1…) its branch was asked by.
+fake_gh() {
+  mkdir -p "$1"
+  cat >"$1/gh" <<'SH'
+#!/bin/sh
+[ "$1" = auth ] && exit 0
+printf '{"data":{"repository":{'
+sep=""
+for arg in "$@"; do
+  case "$arg" in
+    b[0-9]*=*)
+      alias=${arg%%=*}
+      case "${arg#*=}" in
+        feat/a) node='{"number":12,"url":"https://github.com/acme/acme/pull/12","state":"OPEN","headRefName":"feat/a","isCrossRepository":false,"title":"Add the login form","isDraft":false,"reviewDecision":"REVIEW_REQUIRED","commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"checkRunCountsByState":[{"state":"SUCCESS","count":2},{"state":"IN_PROGRESS","count":1}],"statusContextCountsByState":[]}}}}]}}' ;;
+        feat/b) node='{"number":9,"url":"https://github.com/acme/acme/pull/9","state":"MERGED","headRefName":"feat/b","isCrossRepository":false,"title":"Add the api","isDraft":false,"reviewDecision":"APPROVED","commits":{"nodes":[]}}' ;;
+        *) node="" ;;
+      esac
+      printf '%s"%s":{"nodes":[%s]}' "$sep" "$alias" "$node"
+      sep=",";;
+  esac
+done
+printf '}}}\n'
+SH
+  chmod +x "$1/gh"
+}
+
 # scenario <name> <dir> <args…>: runs the binary with args in dir, without a terminal.
 scenario() {
   local name=$1 dir=$2
@@ -167,6 +193,13 @@ run_side() {
     scenario 17-malformed-run "$root/acme" status feat/a
     cp "$root/run.toml" .git/wtm/run.toml
     scenario 18-dot-from-subdirectory "$trees/feat-a/apps" status .
+    # legacy's status reads no pull request: only next is asked, of a fake gh
+    if [[ $side == next ]]; then
+      fake_gh "$root/bin"
+      PATH=$root/bin:$PATH scenario 21-pr-merged "$root/acme" status feat/b --with-prs
+      PATH=$root/bin:$PATH scenario 22-pr-merged-json "$root/acme" status feat/b --with-prs --output json
+      PATH=$root/bin:$PATH scenario 23-all-prs "$root/acme" status --all --with-prs
+    fi
     tty
     rm -rf "$trees/feat-b"
     scenario 19-gone "$root/acme" status feat/b

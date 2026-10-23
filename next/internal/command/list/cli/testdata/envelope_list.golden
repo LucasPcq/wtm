@@ -97,7 +97,11 @@
           "behind": 0,
           "state": "ahead"
         },
-        "pr": null,
+        "pr": {
+          "number": 9,
+          "url": "https://github.com/acme/acme/pull/9",
+          "state": "merged"
+        },
         "services": [
           "web"
         ],
@@ -114,6 +118,14 @@
             ],
             "code": "list.go",
             "message": "Go to the worktree"
+          },
+          {
+            "url": "https://github.com/acme/acme/pull/9",
+            "code": "list.open_pr",
+            "message": "Open the pull request",
+            "params": {
+              "number": "9"
+            }
           },
           {
             "command": "run up",
@@ -186,7 +198,8 @@
         "origin": null,
         "pr": {
           "number": 12,
-          "url": "https://github.com/acme/acme/pull/12"
+          "url": "https://github.com/acme/acme/pull/12",
+          "state": "open"
         },
         "services": [],
         "actions": [

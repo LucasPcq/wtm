@@ -1,0 +1,26 @@
+
+  ! feat/a — 3 problems
+
+  path         /repo/.trees/feat-a
+  isolation    isolated
+  addressing   names
+  ports        +10
+  env          2 files · 1 missing
+  base         main ↑2 ↓1
+  origin       ↑2
+  changes      1 staged · 1 modified · 1 untracked · +12 −3
+  last commit  Wire the session Wire the session
+  parent       main
+  review       #12 merged
+
+  JOBS
+  web  running  http://web.feat-a.main.localhost:11080  up 1h
+  api  crashed
+
+  ! its pull request is merged
+  → wtm clean feat/a
+  ! web/.env is missing
+  → wtm env feat/a
+  ! api crashed (exit 1)
+  → wtm run start feat/a api --detach
+

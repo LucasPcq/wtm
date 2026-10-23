@@ -37,7 +37,7 @@ func TestAWorktreeIsReadWholeGitAndIsolation(t *testing.T) {
 		},
 		Run:  isolating(),
 		Jobs: []run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true, State: run.Crashed, ExitCode: &exit, URL: "http://web.feat-a.main.localhost:11080"}},
-		PRs:  worktree.PullRequests{Open: []worktree.PullRequest{{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a", Title: "Add a", Checks: worktree.Checks{Passed: 2, Failed: 1}, Decision: "APPROVED"}}},
+		PRs:  []worktree.PullRequest{{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a", State: worktree.PullRequestOpen, Title: "Add a", Checks: worktree.Checks{Passed: 2, Failed: 1}, Decision: "APPROVED"}},
 	})
 
 	got := read(t, w, status.Request{Worktree: "feat/a", WithPRs: true})
@@ -52,7 +52,7 @@ func TestAWorktreeIsReadWholeGitAndIsolation(t *testing.T) {
 		Origin:    &worktree.Origin{Ahead: 2, State: worktree.Ahead},
 		Changes:   status.Changes{Staged: 1, Modified: 1, Untracked: 1, Insertions: 12, Deletions: 3, Files: []worktree.Change{{Path: "a.go", Status: worktree.ChangeModified}, {Path: "new.go", Status: worktree.ChangeUntracked}}},
 		Commits:   []worktree.Commit{{SHA: "two", Subject: "two"}, {SHA: "one", Subject: "one"}, {SHA: gittest.Root, Subject: gittest.Root}},
-		Review:    &status.Review{Number: 12, URL: "https://github.com/acme/acme/pull/12", Title: "Add a", State: "open", Checks: worktree.Checks{Passed: 2, Failed: 1}, Decision: "APPROVED"},
+		Review:    &status.Review{Number: 12, URL: "https://github.com/acme/acme/pull/12", State: worktree.PullRequestOpen, Progress: &status.Progress{Title: "Add a", Checks: worktree.Checks{Passed: 2, Failed: 1}, Decision: "APPROVED"}},
 		Isolation: &isolated,
 		RunToml:   status.RunTomlDeclared,
 		Run:       &status.Run{Addressing: project.AddressNames, Offset: &offset, Ports: status.PortsOffset},
@@ -263,7 +263,6 @@ func TestWhatCannotBeAskedIsNullAndAWarning(t *testing.T) {
 	w := newWorld(seed{
 		JobsErr: run.ErrUnknown,
 		PRsErr:  errors.Join(worktree.ErrPullRequestsUnavailable, errors.New("run `gh auth login`")),
-		PRs:     worktree.PullRequests{Capped: true},
 	})
 
 	got := read(t, w, status.Request{WithPRs: true})
@@ -271,7 +270,93 @@ func TestWhatCannotBeAskedIsNullAndAWarning(t *testing.T) {
 	main := only(t, got)
 	assert.Nil(t, main.Jobs)
 	assert.Nil(t, main.Review)
-	assert.Equal(t, []string{status.CodeJobsUnknown, status.CodePRsUnavailable, status.CodePRsCapped}, codes(got.Warnings))
+	assert.Equal(t, []string{status.CodeJobsUnknown, status.CodePRsUnavailable}, codes(got.Warnings))
+}
+
+func TestTheReviewIsTheNewestPullRequestAndAMergedOneAsksToCleanFirst(t *testing.T) {
+	const url = "https://github.com/acme/acme/pull/12"
+	clean := domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}
+	cases := map[string]struct {
+		pr       []worktree.PullRequest
+		review   *status.Review
+		problems []status.Problem
+	}{
+		"open": {
+			pr:       []worktree.PullRequest{{Number: 12, URL: url, Branch: "feat/a", State: worktree.PullRequestOpen, Title: "Add a", Draft: true, Checks: worktree.Checks{Pending: 1}, Decision: "REVIEW_REQUIRED"}},
+			review:   &status.Review{Number: 12, URL: url, State: worktree.PullRequestOpen, Progress: &status.Progress{Title: "Add a", Draft: true, Checks: worktree.Checks{Pending: 1}, Decision: "REVIEW_REQUIRED"}},
+			problems: []status.Problem{{Code: status.CodeEnvMissing, Message: ".env is missing", Fix: fixOf("env", domain.Answered{Path: domain.PathWorktree, Values: []string{"feat/a"}})}},
+		},
+		"merged": {
+			pr:     []worktree.PullRequest{{Number: 12, URL: url, Branch: "feat/a", State: worktree.PullRequestMerged, Title: "Add a"}},
+			review: &status.Review{Number: 12, URL: url, State: worktree.PullRequestMerged},
+			problems: []status.Problem{
+				{Code: status.CodeMerged, Message: "its pull request is merged", Fix: clean},
+				{Code: status.CodeEnvMissing, Message: ".env is missing", Fix: fixOf("env", domain.Answered{Path: domain.PathWorktree, Values: []string{"feat/a"}})},
+			},
+		},
+		"closed": {
+			pr:       []worktree.PullRequest{{Number: 12, URL: url, Branch: "feat/a", State: worktree.PullRequestClosed}},
+			review:   &status.Review{Number: 12, URL: url, State: worktree.PullRequestClosed},
+			problems: []status.Problem{{Code: status.CodeEnvMissing, Message: ".env is missing", Fix: fixOf("env", domain.Answered{Path: domain.PathWorktree, Values: []string{"feat/a"}})}},
+		},
+		"none": {
+			problems: []status.Problem{{Code: status.CodeEnvMissing, Message: ".env is missing", Fix: fixOf("env", domain.Answered{Path: domain.PathWorktree, Values: []string{"feat/a"}})}},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(seed{
+				Git:      gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}},
+				EnvFiles: []project.EnvFile{{Target: ".env"}},
+				Strategy: project.EnvMain,
+				Files:    map[string]string{mainPath + "/.env": "A=1\n"},
+				PRs:      c.pr,
+			})
+
+			a := only(t, read(t, w, status.Request{Worktree: "feat/a", WithPRs: true}))
+
+			assert.Equal(t, c.review, a.Review)
+			assert.Equal(t, c.problems, a.Problems)
+		})
+	}
+}
+
+func TestAMergedPullRequestOfTheMainWorktreeOrTheBaseBranchIsNoProblem(t *testing.T) {
+	merged := func(branch string) worktree.PullRequest {
+		return worktree.PullRequest{Number: 1, Branch: branch, State: worktree.PullRequestMerged}
+	}
+	cases := map[string]struct {
+		git     gittest.FakeParams
+		subject string
+	}{
+		"main_worktree": {git: gittest.FakeParams{Main: mainPath, Branch: "trunk"}, subject: "trunk"},
+		"base_branch":   {git: gittest.FakeParams{Main: mainPath, Branch: "trunk", Worktrees: []worktree.Worktree{linked("main")}}, subject: "main"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(seed{Git: c.git, PRs: []worktree.PullRequest{merged("trunk"), merged("main")}})
+
+			got := read(t, w, status.Request{Worktree: c.subject, WithPRs: true})
+
+			assert.Equal(t, worktree.PullRequestMerged, only(t, got).Review.State)
+			assert.Empty(t, only(t, got).Problems)
+		})
+	}
+}
+
+func TestGitHubIsAskedOfTheBranchesReadAndWhatItFoundBeforeFailingIsKept(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), {Path: "/repo/.trees/detached", State: worktree.Detached{}}}}})
+	var asked []string
+	w.usecase.PullRequests = func(_ context.Context, branches []string) ([]worktree.PullRequest, error) {
+		asked = branches
+		return []worktree.PullRequest{{Number: 12, Branch: "feat/a", State: worktree.PullRequestClosed}}, errors.Join(worktree.ErrPullRequestsUnavailable, errors.New("boom"))
+	}
+
+	got := read(t, w, status.Request{All: true, WithPRs: true})
+
+	assert.Equal(t, []string{"main", "feat/a"}, asked, "a worktree on no branch is not asked of")
+	assert.Equal(t, 12, detailOf(t, got, "feat/a").Review.Number)
+	assert.Equal(t, []string{status.CodePRsUnavailable}, codes(got.Warnings))
 }
 
 func TestAMissingEnvFileIsRebuiltFromWhereItCanBe(t *testing.T) {

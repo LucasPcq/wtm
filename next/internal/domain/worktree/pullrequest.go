@@ -34,20 +34,19 @@ const (
 	PullRequestClosed PullRequestState = "closed"
 )
 
-// PullRequests are the open pull requests the forge listed, and whether it listed only the most recent of more: Capped.
-type PullRequests struct {
-	Open   []PullRequest
-	Capped bool
-}
-
-// Of returns the open pull request of branch, and reports whether it has one; a worktree on no branch has none.
-func (p PullRequests) Of(branch string) (PullRequest, bool) {
-	at := slices.IndexFunc(p.Open, func(pr PullRequest) bool { return branch != "" && pr.Branch == branch })
+// PullRequestOf returns the pull request of branch among prs, and reports whether it has one; a worktree on no branch has none.
+func PullRequestOf(prs []PullRequest, branch string) (PullRequest, bool) {
+	at := slices.IndexFunc(prs, func(pr PullRequest) bool { return branch != "" && pr.Branch == branch })
 	if at < 0 {
 		return PullRequest{}, false
 	}
 
-	return p.Open[at], true
+	return prs[at], true
+}
+
+// Cleans reports whether pr, once merged, leaves the worktree w to be cleaned: never the main worktree nor one on the base branch, which outlive any pull request.
+func (pr PullRequest) Cleans(w Worktree, base string) bool {
+	return pr.State == PullRequestMerged && !w.Main && w.Branch() != base
 }
 
 // ErrPullRequestsUnavailable is why the pull requests could not be listed, wrapped with what to do about it.
