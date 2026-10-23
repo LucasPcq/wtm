@@ -140,7 +140,7 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	}
 
 	remembered, failed := u.remember(ctx, plan, items)
-	return Result{Items: items, Warnings: append(warnings, failed...), Remembered: remembered, FollowUps: next(items)}
+	return Result{Items: items, Warnings: append(warnings, failed...), Remembered: remembered, FollowUps: plan.next(items)}
 }
 
 // ----------------------------------------------------------------------------
@@ -230,11 +230,4 @@ func (u UseCase) remember(ctx context.Context, plan Plan, items []Item) ([]strin
 	}
 
 	return u.Provision.Remember(ctx, Name, plan.settled, plan.Remember)
-}
-
-// ----------------------------------------------------------------------------
-// Helpers
-
-func created(item Item) bool {
-	return item.Status == domain.StatusDone && item.Reason != domain.ReasonUnchanged
 }

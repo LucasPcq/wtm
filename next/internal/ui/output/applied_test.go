@@ -20,7 +20,7 @@ func TestAnAppliedOutcomeDrawsEachItemsWarningsBesideItsSubjectThenTheRuns(t *te
 	}
 
 	got := rendered(func(w *bytes.Buffer) {
-		DrawApplied(w, outcome, AppliedParams{Command: "create", View: View{Cwd: "/trees"}})
+		DrawApplied(w, outcome, AppliedParams{Command: "create", Unchanged: "already open", View: View{Cwd: "/trees"}})
 	})
 
 	assert.Equal(t, `  ! create: 1 done · 1 unchanged · 1 skipped

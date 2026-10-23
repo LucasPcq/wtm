@@ -8,5 +8,5 @@ import (
 )
 
 func drawOutcome(w io.Writer, outcome create.Outcome, view output.View) {
-	output.DrawApplied(w, outcome, output.AppliedParams{Command: create.Name, View: view})
+	output.DrawApplied(w, outcome, output.AppliedParams{Command: create.Name, Unchanged: "already open", View: view})
 }

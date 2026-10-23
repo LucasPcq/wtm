@@ -13,16 +13,17 @@ type RecappedPlan interface {
 	Recaps() domain.Recapped
 }
 
-// A Worktree is the detail of an item whose worktree stands: where it is and the env ports it was given.
+// A Worktree is the detail of an item whose worktree stands: where it is and the env ports it was given. DrawApplied reads a non-nil detail as a worktree that stands, drawing its row and its ports; a command whose items describe a worktree gone (clean, prune) needs a drawing of its own.
 type Worktree interface {
 	Worktree() (path string, ports env.Redacted)
 }
 
-// AppliedParams is what DrawApplied draws an outcome as, beyond the outcome itself: the command it counts for, the note its tally adds, and the view it draws from.
+// AppliedParams is what DrawApplied draws an outcome as, beyond the outcome itself: the command it counts for, the note its tally adds, the note of the row of an item done without a change (create's "already open"), and the view it draws from.
 type AppliedParams struct {
-	Command string
-	Note    string
-	View    View
+	Command   string
+	Note      string
+	Unchanged string
+	View      View
 }
 
 // DrawApplied draws what the apply of a mutation did: the tally, the applied plan with a row per worktree that stands and the warnings of the items done then of the run, each item left unfinished followed by its own warnings, and the next steps, the result's then each item's: what repairs what its failure left behind, then what its warnings offer. An item's warning reads subject, then its message.
@@ -41,7 +42,7 @@ func DrawApplied[P RecappedPlan, D Worktree](w io.Writer, outcome domain.Outcome
 	}
 	for _, item := range items {
 		if item.Detail != nil {
-			rows = append(rows, worktreeRow(w, item, params.View))
+			rows = append(rows, worktreeRow(w, item, params))
 		}
 		if item.Status == domain.StatusDone {
 			warnings = append(warnings, itemWarnings(item)...)
@@ -76,15 +77,15 @@ func DrawApplied[P RecappedPlan, D Worktree](w io.Writer, outcome domain.Outcome
 	}
 }
 
-// worktreeRow is the row of an item's worktree: its path, then muted, already open or how its env ports were settled, if worth saying.
-func worktreeRow[D Worktree](w io.Writer, item domain.Unit[D], view View) PlanRow {
+// worktreeRow is the row of an item's worktree: its path, then muted, the note of an item unchanged or how its env ports were settled, if worth saying.
+func worktreeRow[D Worktree](w io.Writer, item domain.Unit[D], params AppliedParams) PlanRow {
 	path, ports := (*item.Detail).Worktree()
 	note := SettlementNote(ports)
 	if item.Reason == domain.ReasonUnchanged {
-		note = "already open"
+		note = params.Unchanged
 	}
 
-	return PlanRow{Label: item.Subject, Values: []string{ShownPath(Shown{Cwd: view.Cwd, Path: path}) + MutedNote(note, StylesOf(w))}}
+	return PlanRow{Label: item.Subject, Values: []string{ShownPath(Shown{Cwd: params.View.Cwd, Path: path}) + MutedNote(note, StylesOf(w))}}
 }
 
 func drawUnfinished[D Worktree](w io.Writer, items []domain.Unit[D]) {

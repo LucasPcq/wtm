@@ -569,7 +569,7 @@ const (
 	CodeResolveThenDiscard = Name + ".resolve_then_discard"
 )
 
-// A Summary qualifies an outcome beside its tally, as a surface shows it: CodeNothing when the source holds no uncommitted change, CodeWithConflicts when the target was left with conflict markers.
+// A Summary qualifies an outcome beside its tally, as a surface shows it: CodeNothing when the source holds no uncommitted change, CodeWithConflicts when the target was left with conflict markers. Its Message is a note that follows the tally ("with conflicts"), not a sentence of its own.
 type Summary struct {
 	Code    string        `json:"code"`
 	Message string        `json:"message"`

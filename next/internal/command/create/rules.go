@@ -390,7 +390,7 @@ func (p Plan) applied(result Result) Plan {
 }
 
 // next is the step into each worktree that stands, done or not.
-func next(items []Item) []domain.FollowUp {
+func (Plan) next(items []Item) []domain.FollowUp {
 	var steps []domain.FollowUp
 	for _, item := range items {
 		if item.Detail == nil {
@@ -402,6 +402,11 @@ func next(items []Item) []domain.FollowUp {
 	}
 
 	return steps
+}
+
+// created reports whether the item's worktree was created by the apply, not found open already.
+func created(item Item) bool {
+	return item.Status == domain.StatusDone && item.Reason != domain.ReasonUnchanged
 }
 
 // behindOrigin warns that a branch checked out behind origin starts its worktree from the local branch; a diverged one is the plan's create.source_diverged warning already.
