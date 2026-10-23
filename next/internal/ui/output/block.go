@@ -3,6 +3,7 @@ package output
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -100,8 +101,9 @@ func NextSteps(w io.Writer, steps []NextStep) {
 	}
 }
 
-// NextStepLines are steps as NextSteps writes them, drawn with st, one line each.
+// NextStepLines are steps as NextSteps writes them, drawn with st, one line each; a step with no command, one that could not be spelled, is left out.
 func NextStepLines(steps []NextStep, st *Styles) []string {
+	steps = slices.DeleteFunc(slices.Clone(steps), func(step NextStep) bool { return step.Command == "" })
 	width := 0
 	for _, step := range steps {
 		width = max(width, len(step.Command))

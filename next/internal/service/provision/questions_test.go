@@ -139,6 +139,8 @@ func TestAnIsolationGivenOverAnUnreadableRunTomlIsRememberedWhenAsked(t *testing
 
 	assert.True(t, questions.Remembers("isolation"))
 	assert.Equal(t, []string{"isolation"}, questions.Given().Remember)
+	existing := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation"}}, Repository: repo, Exists: "exists"})
+	assert.False(t, existing.Remembers("isolation"), "a worktree not created remembers nothing")
 }
 
 func TestARememberedIsolationHoldsWhenRunTomlIsNotRead(t *testing.T) {

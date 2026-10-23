@@ -85,6 +85,7 @@ type Questions struct {
 	Many        bool
 	Remember    []string
 	Ask         bool
+	runUnread   bool // the isolation is skipped only because run.toml could not be read, and settles the worktree all the same
 }
 
 // QuestionsParams is what the questions of a new worktree settle from: the request's answers, the repository (its remembered answers, which Given.Ask sets aside for the run while the form still shows them, its env strategy, its run.toml), why nothing is asked (Exists: the worktree is not created), the branches behind origin the fast-forward would update (none: it is not asked) and whether several worktrees are created.
@@ -101,7 +102,6 @@ const (
 	isolationHelp   = "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated"
 	fastForwardHelp = "Fast-forward to origin first the branch a new worktree starts from, or the branch itself when it already exists locally, when it is behind; one that has diverged or holds uncommitted changes starts as it is"
 	notBehind       = "nothing to fast-forward: the source is not behind origin"
-	runUnreadable   = "run.toml could not be read" // the isolation skipped all the same settles the worktree
 )
 
 // NewQuestions builds the questions of a new worktree: a field given keeps its value, an empty one takes its remembered answer, its configured value or its default; none is answered by default when the worktree is not created.
@@ -120,6 +120,7 @@ func NewQuestions(params QuestionsParams) Questions {
 		Many:        params.Many,
 		Remember:    params.Given.Remember,
 		Ask:         params.Given.Ask,
+		runUnread:   params.Exists == "" && params.Repository.RunErr != nil,
 	}
 	questions.EnvFrom.Remembered = project.EnvStrategy(recalled[project.RememberEnvStrategy])
 	questions.Isolation.Remembered = project.Isolation(recalled[project.RememberIsolation])
@@ -149,7 +150,7 @@ func isolation(params QuestionsParams) domain.Choice[project.Isolation] {
 	case params.Exists != "":
 		question.Skip = params.Exists
 	case params.Repository.RunErr != nil:
-		question.Skip = runUnreadable
+		question.Skip = "run.toml could not be read"
 	case !params.Repository.Run.IsolationApplies():
 		question.Skip = "run.toml declares nothing a worktree isolates"
 	}
@@ -277,7 +278,7 @@ func (q Questions) envOptions() []domain.Option {
 
 // Remembers reports whether the answer to the field at path is to be remembered: asked to be, and its question not skipped, unless the isolation is skipped only because run.toml could not be read, which settles the worktree all the same.
 func (q Questions) Remembers(path string) bool {
-	settles := !q.skipped(path) || path == domain.PathIsolation && q.Isolation.Skip == runUnreadable
+	settles := !q.skipped(path) || path == domain.PathIsolation && q.runUnread
 	return slices.Contains(q.Remember, path) && settles
 }
 

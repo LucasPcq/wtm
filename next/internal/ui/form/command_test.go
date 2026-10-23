@@ -136,6 +136,17 @@ func TestAFollowUpNamingTheCommandItselfIsSpelledFromItsSchemaQuietOrNot(t *test
 	assert.Equal(t, []output.NextStep{resolve}, quiet)
 }
 
+func TestAFollowUpItsCommandCannotFoldIsNoStepAndAForeignOneIsNeverFolded(t *testing.T) {
+	unfoldable := &domain.Error{Kind: domain.KindConflict, Code: "fake.conflict", Message: "conflict", FollowUp: &domain.FollowUp{Command: "fake", Answers: []domain.Answered{{Path: "nope", Values: []string{"x"}}}, Message: "resolve"}}
+	foreign := &domain.Error{Kind: domain.KindConflict, Code: "fake.held", Message: "held", FollowUp: &domain.FollowUp{Command: "go", Answers: []domain.Answered{{Path: "nope", Values: []string{"x"}}}}}
+
+	unfolded, _ := refused(t, false, form.Ran[request, outcome]{}, unfoldable)
+	spelled, _ := refused(t, false, form.Ran[request, outcome]{}, foreign)
+
+	assert.NotContains(t, unfolded, "→")
+	assert.Contains(t, spelled, "→ wtm go --nope x")
+}
+
 func TestAStalePlanInJSONFollowsUpWithItsReplan(t *testing.T) {
 	stale := &domain.Error{Kind: domain.KindConflict, Code: domain.CodePlanStale, Message: "stale"}
 
