@@ -1,4 +1,4 @@
-// Package github asks GitHub, through its CLI gh, for the newest pull request of each branch of a repository, whatever its state, with its checks and review.
+// Package github asks GitHub, through its CLI gh, for the pull request of each branch of a repository, its open one else its newest whatever its state, with its head commit, its checks and its review.
 package github
 
 import (
@@ -35,14 +35,21 @@ func ViewCommand(number int) []string {
 	return []string{cli, "pr", "view", strconv.Itoa(number), "--web"}
 }
 
-// PullRequestsOf returns the newest pull request of each of branches, whatever
-// its state, with its title, whether it is a draft, its review decision and the
-// checks of its last commit counted; one from a fork is left out, and a branch
-// without one is absent. It asks
-// one GraphQL query per prsPerQuery branches, so a repository with many pull
-// requests costs no more. Every failure wraps worktree.ErrPullRequestsUnavailable;
-// a query that fails keeps the pull requests the queries before it found.
+// PullRequestsOf returns the pull request of each of branches, its open one
+// else its newest whatever its state, with the commit its head stands at, its
+// title, whether it is a draft, its review decision and the checks of its last
+// commit counted; one from a fork is left out, and a branch without one is
+// absent. An empty branch, a worktree on none, is not asked of: with no branch
+// left, gh is not run. It asks one GraphQL query per prsPerQuery branches, so a
+// repository with many pull requests costs no more. Every failure wraps
+// worktree.ErrPullRequestsUnavailable; a query that fails keeps the pull
+// requests the queries before it found.
 func (g GitHub) PullRequestsOf(ctx context.Context, branches []string) ([]worktree.PullRequest, error) {
+	branches = slices.DeleteFunc(slices.Clone(branches), func(branch string) bool { return branch == "" })
+	if len(branches) == 0 {
+		return nil, nil
+	}
+
 	binary, err := g.signedIn(ctx)
 	if err != nil {
 		return nil, err
@@ -94,7 +101,7 @@ func (g GitHub) run(ctx context.Context, binary, what string, args ...string) ([
 }
 
 // prFields are the fields read of each pull request: the last commit's check runs and statuses come counted by state, which costs one context node.
-const prFields = "number url state headRefName isCrossRepository title isDraft reviewDecision " +
+const prFields = "number url state headRefName headRefOid isCrossRepository title isDraft reviewDecision " +
 	"commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 1) { checkRunCountsByState { state count } statusContextCountsByState { state count } } } } } }"
 
 // newestOf is gh's arguments of the GraphQL query for the newest pull requests of branches, one aliased field per branch, each name a variable never spliced into the query; gh fills {owner} and {repo} from the repository it runs in.
@@ -125,6 +132,7 @@ type node struct {
 	URL               string `json:"url"`
 	State             string `json:"state"`
 	HeadRefName       string `json:"headRefName"`
+	HeadRefOid        string `json:"headRefOid"`
 	IsCrossRepository bool   `json:"isCrossRepository"`
 	Title             string `json:"title"`
 	IsDraft           bool   `json:"isDraft"`
@@ -143,7 +151,7 @@ type node struct {
 	} `json:"commits"`
 }
 
-// parseNewest reads the answer of newestOf: per branch, its newest pull request that is not a fork's, its state lowercased.
+// parseNewest reads the answer of newestOf: per branch, among its newest pull requests that are not a fork's, the open one, else the newest; its state lowercased.
 func parseNewest(out []byte) ([]worktree.PullRequest, error) {
 	var answer struct {
 		Data struct {
@@ -159,13 +167,16 @@ func parseNewest(out []byte) ([]worktree.PullRequest, error) {
 	var prs []worktree.PullRequest
 	for _, alias := range slices.Sorted(maps.Keys(answer.Data.Repository)) {
 		nodes := answer.Data.Repository[alias].Nodes
-		at := slices.IndexFunc(nodes, func(pr node) bool { return !pr.IsCrossRepository })
+		at := slices.IndexFunc(nodes, func(pr node) bool { return !pr.IsCrossRepository && pr.State == "OPEN" })
+		if at < 0 {
+			at = slices.IndexFunc(nodes, func(pr node) bool { return !pr.IsCrossRepository })
+		}
 		if at < 0 {
 			continue
 		}
 		pr := nodes[at]
 		prs = append(prs, worktree.PullRequest{
-			Number: pr.Number, URL: pr.URL, Branch: pr.HeadRefName, State: worktree.PullRequestState(strings.ToLower(pr.State)),
+			Number: pr.Number, URL: pr.URL, Branch: pr.HeadRefName, Head: pr.HeadRefOid, State: worktree.PullRequestState(strings.ToLower(pr.State)),
 			Title: pr.Title, Draft: pr.IsDraft, Checks: checksOf(pr), Decision: pr.ReviewDecision,
 		})
 	}
@@ -211,12 +222,12 @@ func add(checks *worktree.Checks, o outcome, n int) {
 	}
 }
 
-// checkRunOutcome is the outcome of a check run in state, GitHub's CheckRunState, its conclusion once it ran: a skipped or neutral one passes; one still to run (queued, waiting, in progress) is pending, as is one that needs authorisation to run (ACTION_REQUIRED); an unknown state fails closed, never passing silently.
+// checkRunOutcome is the outcome of a check run in state, GitHub's CheckRunState, its conclusion once it ran: a skipped or neutral one passes; one still to run (queued, waiting, pending, in progress) is pending, as is one that needs authorisation to run (ACTION_REQUIRED); an unknown state fails closed, never passing silently.
 func checkRunOutcome(state string) outcome {
 	switch state {
 	case "SUCCESS", "NEUTRAL", "SKIPPED":
 		return passed
-	case "ACTION_REQUIRED", "QUEUED", "IN_PROGRESS", "PENDING", "WAITING", "REQUESTED":
+	case "ACTION_REQUIRED", "QUEUED", "IN_PROGRESS", "PENDING", "WAITING":
 		return pending
 	}
 	return failed

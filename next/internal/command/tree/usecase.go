@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"io/fs"
-	"slices"
 	"sync"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -97,8 +96,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	)
 	wg.Go(func() { jobs, jobsErr = u.Jobs(ctx) })
 	if req.WithPRs {
-		branches := slices.DeleteFunc(repo.Live(), func(branch string) bool { return branch == "" })
-		wg.Go(func() { pullRequests, prsErr = u.PullRequests(ctx, branches) })
+		wg.Go(func() { pullRequests, prsErr = u.PullRequests(ctx, repo.Live()) })
 	}
 	nodes := facts.nodes()
 	read := repository.Each(nodes, func(w worktree.Worktree) State {

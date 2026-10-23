@@ -111,7 +111,7 @@ func (w world) open(context.Context, string) (status.UseCase, error) {
 			}, w.JobsErr
 		},
 		PullRequests: func(context.Context, []string) ([]worktree.PullRequest, error) {
-			pr := worktree.PullRequest{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a", State: worktree.PullRequestOpen, Title: "Add the login form", Draft: true, Checks: worktree.Checks{Passed: 3, Pending: 1}, Decision: "REVIEW_REQUIRED"}
+			pr := worktree.PullRequest{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a", Head: "Wire the session", State: worktree.PullRequestOpen, Title: "Add the login form", Draft: true, Checks: worktree.Checks{Passed: 3, Pending: 1}, Decision: "REVIEW_REQUIRED"}
 			if w.Merged {
 				pr.State = worktree.PullRequestMerged
 			}

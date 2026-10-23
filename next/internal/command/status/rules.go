@@ -325,7 +325,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 	// Every fix names a branch: a worktree on none has its facts read and nothing to fix.
 	detail.Problems = []Problem{}
 	if branch != "" {
-		detail.Problems = Problems(ProblemsParams{Subject: subject, Merged: hasPR && pr.Cleans(w, f.Config.Worktrees.BaseBranch), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
+		detail.Problems = Problems(ProblemsParams{Subject: subject, Merged: f.Repository.Cleans(pr, w), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
 	}
 
 	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail}

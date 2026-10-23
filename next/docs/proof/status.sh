@@ -81,28 +81,17 @@ state() {
   shasum .git/wtm/run.toml .git/wtm/config.toml
 }
 
-# fake_gh <dir>: writes in dir a gh, signed in, whose GraphQL answer gives feat/a an open pull request and feat/b a merged one, each under the alias (b0, b1…) its branch was asked by.
+# fake_gh <dir> <head>: writes in dir a gh, signed in, whose GraphQL answer is fixed: an open pull request on feat/a and one merged at head on feat/b. The aliases need not match the branches asked: the adapter reads each branch from headRefName.
 fake_gh() {
   mkdir -p "$1"
-  cat >"$1/gh" <<'SH'
+  cat >"$1/gh" <<SH
 #!/bin/sh
-[ "$1" = auth ] && exit 0
-printf '{"data":{"repository":{'
-sep=""
-for arg in "$@"; do
-  case "$arg" in
-    b[0-9]*=*)
-      alias=${arg%%=*}
-      case "${arg#*=}" in
-        feat/a) node='{"number":12,"url":"https://github.com/acme/acme/pull/12","state":"OPEN","headRefName":"feat/a","isCrossRepository":false,"title":"Add the login form","isDraft":false,"reviewDecision":"REVIEW_REQUIRED","commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"checkRunCountsByState":[{"state":"SUCCESS","count":2},{"state":"IN_PROGRESS","count":1}],"statusContextCountsByState":[]}}}}]}}' ;;
-        feat/b) node='{"number":9,"url":"https://github.com/acme/acme/pull/9","state":"MERGED","headRefName":"feat/b","isCrossRepository":false,"title":"Add the api","isDraft":false,"reviewDecision":"APPROVED","commits":{"nodes":[]}}' ;;
-        *) node="" ;;
-      esac
-      printf '%s"%s":{"nodes":[%s]}' "$sep" "$alias" "$node"
-      sep=",";;
-  esac
-done
-printf '}}}\n'
+[ "\$1" = auth ] && exit 0
+cat <<'JSON'
+{"data":{"repository":{
+"b0":{"nodes":[{"number":12,"url":"https://github.com/acme/acme/pull/12","state":"OPEN","headRefName":"feat/a","headRefOid":"0","isCrossRepository":false,"title":"Add the login form","isDraft":false,"reviewDecision":"REVIEW_REQUIRED","commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"checkRunCountsByState":[{"state":"SUCCESS","count":2},{"state":"IN_PROGRESS","count":1}],"statusContextCountsByState":[]}}}}]}}]},
+"b1":{"nodes":[{"number":9,"url":"https://github.com/acme/acme/pull/9","state":"MERGED","headRefName":"feat/b","headRefOid":"$2","isCrossRepository":false,"title":"Add the api","isDraft":false,"reviewDecision":"APPROVED","commits":{"nodes":[]}}]}}}}
+JSON
 SH
   chmod +x "$1/gh"
 }
@@ -195,7 +184,8 @@ run_side() {
     scenario 18-dot-from-subdirectory "$trees/feat-a/apps" status .
     # legacy's status reads no pull request: only next is asked, of a fake gh
     if [[ $side == next ]]; then
-      fake_gh "$root/bin"
+      # merged at feat/b's tip, so its worktree is the one the pull request merged
+      fake_gh "$root/bin" "$(git rev-parse feat/b)"
       PATH=$root/bin:$PATH scenario 21-pr-merged "$root/acme" status feat/b --with-prs
       PATH=$root/bin:$PATH scenario 22-pr-merged-json "$root/acme" status feat/b --with-prs --output json
       PATH=$root/bin:$PATH scenario 23-all-prs "$root/acme" status --all --with-prs

@@ -5,22 +5,20 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestANodeNeedsTheFirstActionThatApplies(t *testing.T) {
-	merged := &tree.PR{Number: 12, State: worktree.PullRequestMerged}
 	cases := map[string]struct {
 		detail  tree.Detail
 		cleans  bool
 		command string
 		code    string
 	}{
-		"rebasing_first":     {detail: tree.Detail{Branch: "feat/a", Rebasing: true, PR: merged, NeedsSync: true}, cleans: true, command: "go", code: "tree.go"},
-		"merged_before_sync": {detail: tree.Detail{Branch: "feat/a", PR: merged, NeedsSync: true}, cleans: true, command: "clean", code: "tree.clean"},
-		"needs_sync":         {detail: tree.Detail{Branch: "feat/a", NeedsSync: true, PR: &tree.PR{State: worktree.PullRequestOpen}}, command: "sync", code: "tree.sync"},
+		"rebasing_first":     {detail: tree.Detail{Branch: "feat/a", Rebasing: true, NeedsSync: true}, cleans: true, command: "go", code: "tree.go"},
+		"merged_before_sync": {detail: tree.Detail{Branch: "feat/a", NeedsSync: true}, cleans: true, command: "clean", code: "tree.clean"},
+		"needs_sync":         {detail: tree.Detail{Branch: "feat/a", NeedsSync: true}, command: "sync", code: "tree.sync"},
 		"nothing_due":        {detail: tree.Detail{Branch: "feat/a"}},
 	}
 	for name, c := range cases {

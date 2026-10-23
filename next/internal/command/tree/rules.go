@@ -130,7 +130,7 @@ func (f Facts) item(branch string) Item {
 		detail.PR = &PR{Number: pr.Number, URL: pr.URL, State: pr.State}
 	}
 	detail.Services = f.services(w.Path)
-	detail.Actions = Actions(detail, ok && pr.Cleans(w, f.Config.Worktrees.BaseBranch))
+	detail.Actions = Actions(detail, f.Repository.Cleans(pr, w))
 
 	return Item{Subject: branch, Status: domain.StatusDone, Detail: &detail}
 }
@@ -190,7 +190,7 @@ func (f Facts) worktreeOf(branch string) worktree.Worktree {
 // commandSync is the command that rebases a worktree onto its parent, answered by the worktree.
 const commandSync = "sync"
 
-// Actions is what the worktree of detail needs next, the first that applies: a rebase in progress is finished in it, one its merged pull request cleans (worktree.PullRequest.Cleans) is cleaned, one behind its parent is synced onto it; none otherwise.
+// Actions is what the worktree of detail needs next, the first that applies: a rebase in progress is finished in it, one its merged pull request cleans (worktree.Repository.Cleans) is cleaned, one behind its parent is synced onto it; none otherwise.
 func Actions(detail Detail, cleans bool) []domain.FollowUp {
 	var command, message string
 	switch {

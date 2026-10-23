@@ -5,11 +5,12 @@ import (
 	"slices"
 )
 
-// A PullRequest is a pull request of the repository: its number, its page, the branch it would merge, whether it is open, merged or closed, its title, whether it is a draft, its checks counted and its review decision as GitHub spells it (APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED, empty when none is required).
+// A PullRequest is a pull request of the repository: its number, its page, the branch it would merge and the commit its head last stood at, whether it is open, merged or closed, its title, whether it is a draft, its checks counted and its review decision as GitHub spells it (APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED, empty when none is required).
 type PullRequest struct {
 	Number   int
 	URL      string
 	Branch   string
+	Head     string
 	State    PullRequestState
 	Title    string
 	Draft    bool
@@ -44,9 +45,15 @@ func PullRequestOf(prs []PullRequest, branch string) (PullRequest, bool) {
 	return prs[at], true
 }
 
-// Cleans reports whether pr, once merged, leaves the worktree w to be cleaned: never the main worktree nor one on the base branch, which outlive any pull request.
-func (pr PullRequest) Cleans(w Worktree, base string) bool {
-	return pr.State == PullRequestMerged && !w.Main && w.Branch() != base
+// Cleans reports whether pr, once merged, leaves the worktree w to be cleaned: only while w's branch still stands at the commit pr merged, so a branch name reused or moved on since is not taken for merged; never the main worktree nor one on the base branch, which outlive any pull request.
+func (r Repository) Cleans(pr PullRequest, w Worktree) bool {
+	branch := w.Branch()
+	at := slices.IndexFunc(r.Branches.Local, func(b Branch) bool { return b.Name == branch })
+	if pr.State != PullRequestMerged || w.Main || branch == r.Config.Worktrees.BaseBranch || at < 0 {
+		return false
+	}
+
+	return pr.Head != "" && r.Branches.Local[at].Tip == pr.Head
 }
 
 // ErrPullRequestsUnavailable is why the pull requests could not be listed, wrapped with what to do about it.

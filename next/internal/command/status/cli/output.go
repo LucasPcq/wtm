@@ -212,7 +212,7 @@ func reviewCell(r *status.Review) string {
 		return none
 	}
 	if r.Progress == nil {
-		return "#" + strconv.Itoa(r.Number) + " " + string(r.State)
+		return closedReview(r)
 	}
 
 	parts := []string{"#" + strconv.Itoa(r.Number)}
@@ -403,12 +403,17 @@ func lastCommit(commits []worktree.Commit) string {
 	return line
 }
 
+// closedReview is a pull request no longer open: its number and its state.
+func closedReview(r *status.Review) string {
+	return "#" + strconv.Itoa(r.Number) + " " + string(r.State)
+}
+
 func review(r *status.Review) string {
 	if r == nil {
 		return ""
 	}
 	if r.Progress == nil {
-		return "#" + strconv.Itoa(r.Number) + " " + string(r.State)
+		return closedReview(r)
 	}
 
 	parts := []string{"#" + strconv.Itoa(r.Number) + " " + r.Title}

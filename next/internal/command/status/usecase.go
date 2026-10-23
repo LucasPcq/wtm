@@ -139,9 +139,7 @@ func (u UseCase) Observe(ctx context.Context, observed Observed) Facts {
 	if observed.WithPRs {
 		branches := make([]string, 0, len(observed.Targets))
 		for _, w := range observed.Targets {
-			if branch := w.Branch(); branch != "" {
-				branches = append(branches, branch)
-			}
+			branches = append(branches, w.Branch())
 		}
 		wg.Go(func() { pullRequests, prsErr = u.PullRequests(ctx, branches) })
 	}

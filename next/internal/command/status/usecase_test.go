@@ -287,7 +287,7 @@ func TestTheReviewIsTheNewestPullRequestAndAMergedOneAsksToCleanFirst(t *testing
 			problems: []status.Problem{{Code: status.CodeEnvMissing, Message: ".env is missing", Fix: fixOf("env", domain.Answered{Path: domain.PathWorktree, Values: []string{"feat/a"}})}},
 		},
 		"merged": {
-			pr:     []worktree.PullRequest{{Number: 12, URL: url, Branch: "feat/a", State: worktree.PullRequestMerged, Title: "Add a"}},
+			pr:     []worktree.PullRequest{{Number: 12, URL: url, Branch: "feat/a", Head: gittest.Root, State: worktree.PullRequestMerged, Title: "Add a"}},
 			review: &status.Review{Number: 12, URL: url, State: worktree.PullRequestMerged},
 			problems: []status.Problem{
 				{Code: status.CodeMerged, Message: "its pull request is merged", Fix: clean},
@@ -323,7 +323,7 @@ func TestTheReviewIsTheNewestPullRequestAndAMergedOneAsksToCleanFirst(t *testing
 
 func TestAMergedPullRequestOfTheMainWorktreeOrTheBaseBranchIsNoProblem(t *testing.T) {
 	merged := func(branch string) worktree.PullRequest {
-		return worktree.PullRequest{Number: 1, Branch: branch, State: worktree.PullRequestMerged}
+		return worktree.PullRequest{Number: 1, Branch: branch, Head: gittest.Root, State: worktree.PullRequestMerged}
 	}
 	cases := map[string]struct {
 		git     gittest.FakeParams
@@ -344,17 +344,36 @@ func TestAMergedPullRequestOfTheMainWorktreeOrTheBaseBranchIsNoProblem(t *testin
 	}
 }
 
-func TestGitHubIsAskedOfTheBranchesReadAndWhatItFoundBeforeFailingIsKept(t *testing.T) {
-	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), {Path: "/repo/.trees/detached", State: worktree.Detached{}}}}})
-	var asked []string
-	w.usecase.PullRequests = func(_ context.Context, branches []string) ([]worktree.PullRequest, error) {
-		asked = branches
-		return []worktree.PullRequest{{Number: 12, Branch: "feat/a", State: worktree.PullRequestClosed}}, errors.Join(worktree.ErrPullRequestsUnavailable, errors.New("boom"))
-	}
+func TestAMergedPullRequestWhoseBranchMovedOnIsNoProblem(t *testing.T) {
+	w := newWorld(seed{
+		Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}},
+		PRs: []worktree.PullRequest{{Number: 12, Branch: "feat/a", Head: "a commit before the branch moved on", State: worktree.PullRequestMerged}},
+	})
+
+	a := only(t, read(t, w, status.Request{Worktree: "feat/a", WithPRs: true}))
+
+	assert.Equal(t, worktree.PullRequestMerged, a.Review.State)
+	assert.Empty(t, a.Problems, "a branch name reused, or moved on since the merge, is not cleaned")
+}
+
+func TestGitHubIsAskedOfTheBranchesReadOnly(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), linked("feat/b"), {Path: "/repo/.trees/detached", State: worktree.Detached{}}}}})
+
+	read(t, w, status.Request{Worktree: "feat/a", WithPRs: true})
+	read(t, w, status.Request{All: true, WithPRs: true})
+
+	assert.Equal(t, [][]string{{"feat/a"}, {"main", "", "feat/a", "feat/b"}}, *w.asked)
+}
+
+func TestWhatGitHubFoundBeforeFailingIsKept(t *testing.T) {
+	w := newWorld(seed{
+		Git:    gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}},
+		PRs:    []worktree.PullRequest{{Number: 12, Branch: "feat/a", State: worktree.PullRequestClosed}},
+		PRsErr: errors.Join(worktree.ErrPullRequestsUnavailable, errors.New("boom")),
+	})
 
 	got := read(t, w, status.Request{All: true, WithPRs: true})
 
-	assert.Equal(t, []string{"main", "feat/a"}, asked, "a worktree on no branch is not asked of")
 	assert.Equal(t, 12, detailOf(t, got, "feat/a").Review.Number)
 	assert.Equal(t, []string{status.CodePRsUnavailable}, codes(got.Warnings))
 }

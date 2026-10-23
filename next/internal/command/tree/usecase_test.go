@@ -239,10 +239,31 @@ func TestGitHubIsAskedOnlyWhenTheRequestAsksOfTheBranchesOfTheTree(t *testing.T)
 	with, err := w.usecase.Run(t.Context(), tree.Request{WithPRs: true}, domain.RunOptions{})
 	require.NoError(t, err)
 
-	assert.Equal(t, [][]string{{"main", "feat/a"}}, *w.asked)
+	assert.Equal(t, [][]string{{"main", "", "feat/a"}}, *w.asked, "the branches of the worktrees as they are: the adapter skips the empty one")
 	assert.Nil(t, detailOf(t, without, "feat/a").PR)
 	assert.Equal(t, &tree.PR{Number: 12, URL: merged.URL, State: worktree.PullRequestMerged}, detailOf(t, with, "feat/a").PR)
 	assert.Nil(t, detailOf(t, with, "main").PR)
+}
+
+func TestAMergedPullRequestCleansItsWorktreeOnlyAtItsCommitAndNeverTheMainOneNorTheBase(t *testing.T) {
+	merged := func(branch, head string) worktree.PullRequest {
+		return worktree.PullRequest{Number: 1, Branch: branch, Head: head, State: worktree.PullRequestMerged}
+	}
+	w := newWorld(seed{
+		Base: "develop",
+		Git:  gittest.FakeParams{Worktrees: []worktree.Worktree{linked("develop"), linked("feat/a"), linked("feat/moved")}},
+		PRs:  []worktree.PullRequest{merged("main", gittest.Root), merged("develop", gittest.Root), merged("feat/a", gittest.Root), merged("feat/moved", "an older commit")},
+	})
+
+	got, err := w.usecase.Run(t.Context(), tree.Request{WithPRs: true}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	actions := detailOf(t, got, "feat/a").Actions
+	require.Len(t, actions, 1)
+	assert.Equal(t, domain.CommandClean, actions[0].Command)
+	for _, branch := range []string{"main", "develop", "feat/moved"} {
+		assert.Empty(t, detailOf(t, got, branch).Actions, branch)
+	}
 }
 
 func TestWhatCannotBeAskedIsAWarningNotAFailure(t *testing.T) {

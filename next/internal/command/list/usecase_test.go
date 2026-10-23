@@ -111,14 +111,14 @@ func TestAWorktreeThatCannotBeReadFailsAlone(t *testing.T) {
 
 func TestGitHubIsAskedOnlyWhenTheRequestAsks(t *testing.T) {
 	pr := worktree.PullRequest{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a", State: worktree.PullRequestMerged}
-	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}}, PRs: []worktree.PullRequest{pr}})
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), {Path: "/repo/.trees/detached", State: worktree.Detached{}}}}, PRs: []worktree.PullRequest{pr}})
 
 	without, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
 	require.NoError(t, err)
 	with, err := w.usecase.Run(t.Context(), list.Request{WithPRs: true}, domain.RunOptions{})
 	require.NoError(t, err)
 
-	assert.Equal(t, 1, *w.asked)
+	assert.Equal(t, [][]string{{"main", "", "feat/a"}}, *w.asked, "the live branches as they are: the adapter skips the empty one")
 	assert.Nil(t, detailOf(t, without, "feat/a").PR)
 	assert.Equal(t, &list.PR{Number: 12, URL: pr.URL, State: worktree.PullRequestMerged}, detailOf(t, with, "feat/a").PR, "the newest pull request, whatever its state")
 	assert.Nil(t, detailOf(t, with, "main").PR)
