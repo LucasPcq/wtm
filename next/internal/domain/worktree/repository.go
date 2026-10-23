@@ -43,3 +43,15 @@ func (r Repository) SourceLabel(name string) string {
 
 	return name + " (default)"
 }
+
+// MissingBase returns the configured base branch, and reports whether it is missing: configured, yet no local branch of that name.
+func (r Repository) MissingBase() (string, bool) {
+	base := r.Config.Worktrees.BaseBranch
+	return base, base != "" && !r.Local(base)
+}
+
+// CountedAgainstBase reports whether the commits of the worktree w are counted against the base branch: not for the main worktree, one on no branch, nor when the base branch is not configured or missing.
+func (r Repository) CountedAgainstBase(w Worktree) bool {
+	base := r.Config.Worktrees.BaseBranch
+	return !w.Main && w.Branch() != "" && base != "" && r.Local(base)
+}

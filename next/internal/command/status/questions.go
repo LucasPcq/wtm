@@ -1,7 +1,6 @@
 package status
 
 import (
-	"cmp"
 	"errors"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -98,7 +97,7 @@ func NewQuestions(facts worktree.Repository, req Request, located string) Questi
 		q.problems = failure.Fields
 	}
 	if !req.All && len(targets) == 1 {
-		q.read = subjectOf(targets[0])
+		q.read = targets[0].Name()
 	}
 
 	return q
@@ -122,7 +121,7 @@ func (q Questions) Form() domain.Form {
 
 // optionOf is w as the picker offers it: by its branch, or by its path on no branch, which its label says; badged main, or current when the caller stands in it.
 func optionOf(w worktree.Worktree, current bool) domain.Option {
-	option := domain.Option{Value: subjectOf(w)}
+	option := domain.Option{Value: w.Name()}
 	if w.Branch() == "" {
 		option.Label = w.Path + " (detached)"
 	}
@@ -134,9 +133,4 @@ func optionOf(w worktree.Worktree, current bool) domain.Option {
 	}
 
 	return option
-}
-
-// subjectOf names w as a read's subject: its branch, else its path.
-func subjectOf(w worktree.Worktree) string {
-	return cmp.Or(w.Branch(), w.Path)
 }

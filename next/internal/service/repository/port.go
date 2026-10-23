@@ -18,10 +18,20 @@ type Snapshotter interface {
 	Snapshot(ctx context.Context) (worktree.Snapshot, error)
 }
 
+// Locator resolves a path to where it really is, and tells whether something is there.
+type Locator interface {
+	Locate(ctx context.Context, path string) (worktree.Location, error)
+}
+
 // Prober tells whether a worktree's directory is there and whether it holds uncommitted changes.
 type Prober interface {
-	Locate(ctx context.Context, path string) (worktree.Location, error)
+	Locator
 	Dirty(ctx context.Context, path string) (bool, error)
+}
+
+// Meta reads a worktree's meta record by its branch; a missing record is an error wrapping fs.ErrNotExist.
+type Meta interface {
+	Load(branch string) (worktree.Meta, error)
 }
 
 // Ancestors tells whether a commit is another or one of its ancestors.

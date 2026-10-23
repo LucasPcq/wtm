@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -146,11 +147,39 @@ func TestWhatCannotBeAskedIsAWarningNotAFailure(t *testing.T) {
 	}
 }
 
-func TestAnInterruptedReadDoesNotWarnGitHubIsUnavailable(t *testing.T) {
-	read, err := newWorld(seed{PRsErr: context.Canceled}).usecase.Run(t.Context(), list.Request{WithPRs: true}, domain.RunOptions{})
+func TestAnInterruptedReadWarnsOfNothingItCouldNotAsk(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	w := newWorld(seed{JobsErr: run.ErrUnknown, PRsErr: context.Canceled, Git: gittest.FakeParams{Fail: map[string]error{"Fetch": context.Canceled}}})
+
+	read, err := w.usecase.Run(ctx, list.Request{WithPRs: true, Fetch: true}, domain.RunOptions{})
 
 	require.NoError(t, err)
-	assert.NotContains(t, codes(read), list.CodePRsUnavailable)
+	assert.Empty(t, read.Warnings)
+}
+
+func TestARecordThatDoesNotReadKeepsItsWorktreeAndIsAWarning(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}}, Unreadable: []string{"feat/a"}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Nil(t, read.Failure())
+	item := read.Items[slices.IndexFunc(read.Items, func(item list.Item) bool { return item.Subject == "feat/a" })]
+	assert.Equal(t, domain.StatusDone, item.Status)
+	require.Len(t, item.Warnings, 1)
+	assert.Equal(t, list.CodeMetaUnreadable, item.Warnings[0].Code)
+	assert.Nil(t, item.Detail.CreatedAt)
+}
+
+func TestARefreshThatCannotFetchIsAWarning(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Fail: map[string]error{"Fetch": errors.New("could not read from remote repository")}}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{Fetch: true}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{list.CodeFetchFailed}, codes(read))
+	assert.Contains(t, read.Warnings[0].Message, "could not read from remote repository")
 }
 
 func TestJobsThatCannotBeToldAreNoServicesAtAll(t *testing.T) {

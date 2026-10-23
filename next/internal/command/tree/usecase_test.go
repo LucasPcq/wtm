@@ -329,18 +329,20 @@ func TestARepositoryWithoutConfigIsRefusedWithTreesCode(t *testing.T) {
 	assert.Equal(t, tree.CodeConfigNotFound, refused.Code)
 }
 
-func TestARecordThatCannotBeReadFailsItsNodeAlone(t *testing.T) {
-	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), linked("loose")}}, Unreadable: []string{"feat/a"}})
+func TestARecordThatDoesNotReadKeepsItsNodeAsARootAndIsAWarning(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), linked("loose")}, Dirty: []string{"/repo/.trees/feat/a"}}, Unreadable: []string{"feat/a"}})
 
 	read, err := w.usecase.Run(t.Context(), tree.Request{}, domain.RunOptions{})
 
 	require.NoError(t, err)
-	failed := read.Items[slices.IndexFunc(read.Items, func(item tree.Item) bool { return item.Subject == "feat/a" })]
-	assert.Equal(t, domain.StatusFailed, failed.Status)
-	assert.Equal(t, tree.CodeUnreadable, failed.Err.Code)
-	assert.ErrorContains(t, failed.Err, "the record of feat/a does not read")
-	assert.Nil(t, failed.Detail.Ahead, "a node whose place is unknown is not counted")
-	assert.Equal(t, domain.StatusDone, read.Items[slices.IndexFunc(read.Items, func(item tree.Item) bool { return item.Subject == "loose" })].Status, "a worktree without a record is a root")
+	assert.Nil(t, read.Failure())
+	node := read.Items[slices.IndexFunc(read.Items, func(item tree.Item) bool { return item.Subject == "feat/a" })]
+	assert.Equal(t, domain.StatusDone, node.Status)
+	require.Len(t, node.Warnings, 1)
+	assert.Equal(t, tree.CodeMetaUnreadable, node.Warnings[0].Code)
+	assert.Contains(t, node.Warnings[0].Message, "the record of feat/a does not read")
+	assert.Nil(t, node.Detail.Parent, "a node whose parent is unknown stands as a root")
+	assert.True(t, node.Detail.Dirty, "its worktree is read")
 }
 
 func TestACountInterruptedMakesItsNodeCancelled(t *testing.T) {

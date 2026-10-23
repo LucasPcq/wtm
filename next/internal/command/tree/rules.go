@@ -1,8 +1,6 @@
 package tree
 
 import (
-	"context"
-	"errors"
 	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -11,19 +9,17 @@ import (
 )
 
 // ----------------------------------------------------------------------------
-// The facts
+// Facts
 
-// Facts are what tree reads: the repository, the stack its meta records make, what each worktree holds, the run daemon's jobs and the pull requests, each with the error that kept it from being read, the branches behind their merged pull request (repository.Behind), and whether the read was interrupted; PullRequests is nil when GitHub was not asked.
+// Facts are what tree reads: the repository, the meta record of each live branch (and the error of a record that exists but does not read), the stack they make, what each worktree holds, what the run daemon and GitHub said, and the branches behind their merged pull request (repository.Behind).
 type Facts struct {
 	worktree.Repository
-	Stack        worktree.Stack
-	States       map[string]State // by branch
-	Jobs         []run.Job
-	JobsErr      error
-	PullRequests []worktree.PullRequest
-	PRsErr       error
-	Behind       map[string]bool // by branch
-	Interrupted  bool
+	run.Asked
+	Records    map[string]worktree.Meta // by branch
+	RecordErrs map[string]error         // by branch
+	Stack      worktree.Stack
+	States     map[string]State // by branch
+	Behind     map[string]bool  // by branch
 }
 
 // A State is what one worktree holds: whether its directory is gone, whether it has uncommitted changes, the commits it has that its parent lacks and the reverse, nil when they are not counted, and the error that kept it from being read.
@@ -71,14 +67,15 @@ type PR struct {
 
 // The codes of tree's warnings and failures.
 const (
-	CodePRsUnavailable = Name + ".prs_unavailable"
-	CodeJobsUnknown    = Name + ".jobs_unknown"
+	CodePRsUnavailable = Name + domain.PRsUnavailable
+	CodeJobsUnknown    = Name + domain.JobsUnknown
 	CodeBaseMissing    = Name + ".base_missing"
-	CodeUnreadable     = Name + ".unreadable"
+	CodeMetaUnreadable = Name + domain.MetaUnreadable
+	CodeUnreadable     = Name + domain.Unreadable
 )
 
 // ----------------------------------------------------------------------------
-// The tree
+// Tree
 
 // Tree is each node of the stack of facts as an item, depth first: the roots as the stack orders them (the main worktree, the others by creation, the virtual ones by name), each followed by its children by creation; and the warnings of what could not be read.
 func Tree(facts Facts) ([]Item, []domain.Warning) {
@@ -111,13 +108,10 @@ func (f Facts) item(branch string) Item {
 	w := f.worktreeOf(branch)
 	state := f.States[branch]
 	detail.Path, detail.Main, detail.Locked = &w.Path, w.Main, w.Locked
-	switch {
-	case errors.Is(state.Err, context.Canceled):
-		return Item{Subject: branch, Status: domain.StatusCancelled, Reason: domain.ReasonInterrupted, Detail: &detail}
-	case state.Err != nil:
-		return Item{Subject: branch, Status: domain.StatusFailed, Detail: &detail, Err: &domain.Error{
-			Kind: domain.KindInternal, Code: CodeUnreadable, Message: "couldn't read " + w.Path, Params: domain.Params{"path": w.Path}, Cause: state.Err,
-		}}
+	if state.Err != nil {
+		item := domain.Unread[Detail](domain.UnreadParams{Command: Name, Subject: branch, Path: w.Path, Err: state.Err})
+		item.Detail = &detail
+		return item
 	}
 
 	_, detail.Rebasing = w.State.(worktree.Rebasing)
@@ -130,37 +124,23 @@ func (f Facts) item(branch string) Item {
 	if ok {
 		detail.PR = &PR{Number: pr.Number, URL: pr.URL, State: pr.State}
 	}
-	detail.Services = f.services(w.Path)
+	detail.Services = f.Services(w.Path)
 	detail.Actions = Actions(detail, f.Repository.Cleans(pr, w, f.Behind[branch]))
 
-	return Item{Subject: branch, Status: domain.StatusDone, Detail: &detail}
-}
-
-func (f Facts) services(path string) []string {
-	if f.JobsErr != nil {
-		return nil
+	item := Item{Subject: branch, Status: domain.StatusDone, Detail: &detail}
+	if err := f.RecordErrs[branch]; err != nil {
+		item.Warnings = []domain.Warning{{Code: CodeMetaUnreadable, Message: "couldn't read the record of " + branch + ": its parent is not known, so it stands as a root: " + err.Error(), Params: domain.Params{"branch": branch}}}
 	}
-
-	return run.UpIn(f.Jobs, path)
+	return item
 }
 
 func (f Facts) warnings() []domain.Warning {
 	var warnings []domain.Warning
-	if base := f.Config.Worktrees.BaseBranch; base != "" && !f.Local(base) {
+	if base, missing := f.MissingBase(); missing {
 		warnings = append(warnings, domain.Warning{Code: CodeBaseMissing, Message: "the base branch " + base + " does not exist: the roots are not counted against it", Params: domain.Params{"branch": base}})
 	}
-	// an interrupted read could not ask: the daemon and GitHub said nothing of themselves
-	if f.Interrupted {
-		return warnings
-	}
-	if f.JobsErr != nil {
-		warnings = append(warnings, domain.Warning{Code: CodeJobsUnknown, Message: run.UnknownMessage(f.JobsErr)})
-	}
-	if f.PRsErr != nil {
-		warnings = append(warnings, domain.Warning{Code: CodePRsUnavailable, Message: f.PRsErr.Error()})
-	}
 
-	return warnings
+	return append(warnings, f.Asked.Warnings(Name)...)
 }
 
 // countedAgainst returns the branch the commits of the worktree w are counted against, its parent or, for a root, the base branch, and reports whether they are counted: not for the main worktree nor a member of a cycle, which has no parent to sync onto, and only when both are local branches, which git can count.

@@ -31,7 +31,7 @@ type Reader[R, Q, O any] interface {
 // A read has no plan and takes no lock: its flags are its schema's and --output, without --yes, --dry-run, --expect-fingerprint, --remember nor --ask. The one question it asks is its subject, a positional select left open, before it reads.
 type Query[R Request[R], Q Questions, O ReadOutcome] struct {
 	Open func(ctx context.Context, dir string) (Reader[R, Q, O], error)
-	Draw func(w io.Writer, read O, view output.View) // what was read, drawn from view
+	Draw func(w io.Writer, read O, req R, view output.View) // what was read for req, drawn from view
 	// Pick lets the user pick a follow-up of what was read, when the user can see and answer it: it returns the read with the follow-ups chosen. Nil only draws the read.
 	Pick func(ctx context.Context, read O, req R, run *uicli.Run) (O, error)
 	// Formats are the machine formats the read prints besides json, by the name --output gives them: each drawn unframed on stdout from what was read, never silenced by --quiet; a refusal is printed as text.
@@ -76,7 +76,7 @@ func (q *Query[R, Q, O]) Launch(cmd *cobra.Command, args []string) error {
 	req, err = q.ask(ctx, app, req)
 	if err != nil {
 		var none O
-		return q.conclude(none, err)
+		return q.conclude(none, req, err)
 	}
 
 	read, err := app.Run(ctx, req, domain.RunOptions{Surface: uicli.SurfaceCLI, CorrelationID: q.io.Env.CorrelationID})
@@ -84,7 +84,7 @@ func (q *Query[R, Q, O]) Launch(cmd *cobra.Command, args []string) error {
 		read, err = q.Pick(ctx, read, req, q.io)
 	}
 
-	return q.conclude(read, err)
+	return q.conclude(read, req, err)
 }
 
 // ask asks the subject of the read, the positional select its questions leave open, before the read: when the user can see and answer it, and the request neither answers it nor rules it out.
@@ -137,7 +137,7 @@ func (q *Query[R, Q, O]) interactive() bool {
 }
 
 // conclude prints how the read ended — the JSON envelope, a refusal, the read in a format of Formats, the follow-ups the user picked, or what Draw draws of the read — and returns the failure that sets the exit code.
-func (q *Query[R, Q, O]) conclude(read O, err error) error {
+func (q *Query[R, Q, O]) conclude(read O, req R, err error) error {
 	failure := domain.AsError(domain.AsErrorParams{Err: err})
 	doc := read.Envelope(domain.EnvelopeParams{Command: q.io.Command, Err: failure})
 	switch {
@@ -159,7 +159,7 @@ func (q *Query[R, Q, O]) conclude(read O, err error) error {
 		return q.io.Failed(read.Failure())
 	}
 
-	output.Frame(stdout, func(w io.Writer) { q.Draw(w, read, q.io.View()) })
+	output.Frame(stdout, func(w io.Writer) { q.Draw(w, read, req, q.io.View()) })
 	return q.io.Failed(read.Failure())
 }
 

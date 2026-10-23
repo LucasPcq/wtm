@@ -43,3 +43,20 @@ func TestTheBaseBranchReadsAsTheDefaultSource(t *testing.T) {
 	assert.Empty(t, repo.SourceLabel("feat/a"))
 	assert.Empty(t, Repository{}.SourceLabel(""))
 }
+
+func TestOnlyABranchOfALinkedWorktreeIsCountedAgainstAnExistingBase(t *testing.T) {
+	repo := Repository{Config: project.Config{Worktrees: project.Worktrees{BaseBranch: "main"}}, Snapshot: Snapshot{Branches: Branches{Local: []Branch{{Name: "main"}}}}}
+	missing := Repository{Config: project.Config{Worktrees: project.Worktrees{BaseBranch: "trunk"}}}
+
+	assert.True(t, repo.CountedAgainstBase(Worktree{State: OnBranch{Branch: "feat/a"}}))
+	assert.False(t, repo.CountedAgainstBase(Worktree{Main: true, State: OnBranch{Branch: "main"}}))
+	assert.False(t, repo.CountedAgainstBase(Worktree{State: Detached{}}))
+	assert.False(t, missing.CountedAgainstBase(Worktree{State: OnBranch{Branch: "feat/a"}}))
+	base, gone := missing.MissingBase()
+	assert.Equal(t, "trunk", base)
+	assert.True(t, gone)
+	_, gone = repo.MissingBase()
+	assert.False(t, gone)
+	_, gone = Repository{}.MissingBase()
+	assert.False(t, gone, "no base branch configured is none missing")
+}

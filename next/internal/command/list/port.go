@@ -5,17 +5,17 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
 // Git is the repository as list reads it, a worktree at a time, and refreshes it from origin.
 type Git interface {
-	Locate(ctx context.Context, path string) (worktree.Location, error)
-	Dirty(ctx context.Context, path string) (bool, error)
+	repository.Prober
 	AheadBehindOf(ctx context.Context, span worktree.Span) (worktree.AheadBehind, error)
 	Fetch(ctx context.Context) error
 }
 
-// Meta reads a worktree's meta record by its branch.
+// Meta reads a worktree's meta record by its branch; a missing record is an error wrapping fs.ErrNotExist.
 type Meta interface {
 	Load(branch string) (worktree.Meta, error)
 }

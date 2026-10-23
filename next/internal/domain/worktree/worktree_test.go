@@ -53,3 +53,8 @@ func TestTheDeepestWorktreeHoldsADirectory(t *testing.T) {
 		})
 	}
 }
+
+func TestAWorktreeIsNamedByItsBranchElseItsPath(t *testing.T) {
+	assert.Equal(t, "feat/a", Worktree{Path: "/w/a", State: Rebasing{Branch: "feat/a"}}.Name())
+	assert.Equal(t, "/w/d", Worktree{Path: "/w/d", State: Detached{}}.Name())
+}

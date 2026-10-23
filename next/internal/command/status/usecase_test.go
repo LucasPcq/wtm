@@ -159,10 +159,29 @@ func TestAllReadsEveryWorktreeAndOneThatCannotBeReadFailsAlone(t *testing.T) {
 		subjects, statuses = append(subjects, item.Subject), append(statuses, item.Status)
 	}
 	assert.Equal(t, []string{"main", "/repo/.trees/detached", "feat/a", "feat/gone"}, subjects, "the main worktree first, then as git lists them; one on no branch named by its path")
-	assert.Equal(t, []domain.Status{domain.StatusDone, domain.StatusDone, domain.StatusFailed, domain.StatusFailed}, statuses)
+	assert.Equal(t, []domain.Status{domain.StatusDone, domain.StatusDone, domain.StatusFailed, domain.StatusDone}, statuses)
 	assert.Equal(t, status.CodeUnreadable, got.Items[2].Err.Code)
 	assert.ErrorIs(t, got.Items[2].Err, broken)
-	assert.Equal(t, status.CodeUnreadable, got.Items[3].Err.Code, "a worktree whose directory is gone cannot be read")
+}
+
+func TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleanedLockedOrNot(t *testing.T) {
+	locked := linked("feat/locked")
+	locked.Locked = true
+	prunable := linked("feat/prunable")
+	prunable.Prunable = true
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{locked, prunable}, Gone: []string{locked.Path, prunable.Path}}})
+
+	got := read(t, w, status.Request{All: true})
+
+	assert.Nil(t, got.Failure(), "a gone directory is found, not a read that failed")
+	for _, branch := range []string{"feat/locked", "feat/prunable"} {
+		d := detailOf(t, got, branch)
+		assert.True(t, d.Missing, branch)
+		assert.Equal(t, []string{status.CodeMissing}, problemCodes(d.Problems), branch)
+		assert.Equal(t, domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}}, Code: status.CodeMissing}, d.Problems[0].Fix)
+		assert.Empty(t, d.Commits, branch)
+	}
+	assert.NotContains(t, w.git.Calls(), "Changes "+locked.Path, "nothing of a gone directory is read")
 }
 
 func TestAWorktreeThatHasNotChosenItsIsolationHasNoneAndIsToldHowToChoose(t *testing.T) {
@@ -273,12 +292,15 @@ func TestWhatCannotBeAskedIsNullAndAWarning(t *testing.T) {
 	assert.Equal(t, []string{status.CodeJobsUnknown, status.CodePRsUnavailable}, codes(got.Warnings))
 }
 
-func TestAnInterruptedReadDoesNotWarnGitHubIsUnavailable(t *testing.T) {
-	w := newWorld(seed{PRsErr: context.Canceled})
+func TestAnInterruptedReadWarnsOfNothingItCouldNotAsk(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	w := newWorld(seed{JobsErr: run.ErrUnknown, PRsErr: context.Canceled})
 
-	got := read(t, w, status.Request{WithPRs: true})
+	got, err := w.usecase.Run(ctx, status.Request{WithPRs: true}, domain.RunOptions{})
 
-	assert.NotContains(t, codes(got.Warnings), status.CodePRsUnavailable)
+	require.NoError(t, err)
+	assert.Empty(t, got.Warnings)
 }
 
 func TestTheReviewIsTheNewestPullRequestAndAMergedOneAsksToCleanFirst(t *testing.T) {

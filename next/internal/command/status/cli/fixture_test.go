@@ -53,6 +53,8 @@ type world struct {
 	PRsErr    error
 	Merged    bool // feat/a's pull request is merged
 	Gone      bool // feat/old's directory is gone
+	Broken    bool // no worktree reads: git cannot tell their changes
+	Alone     bool // the main worktree is the only one
 }
 
 func (w world) env() uicli.Env {
@@ -61,13 +63,22 @@ func (w world) env() uicli.Env {
 }
 
 func (w world) open(context.Context, string) (status.UseCase, error) {
+	worktrees := []worktree.Worktree{
+		{Path: "/repo/.trees/feat-a", State: worktree.OnBranch{Branch: "feat/a"}},
+		{Path: "/repo/.trees/feat-old", State: worktree.OnBranch{Branch: "feat/old"}},
+		{Path: "/repo/.trees/detached", State: worktree.Detached{}},
+	}
+	if w.Alone {
+		worktrees = nil
+	}
+	var fail map[string]error
+	if w.Broken {
+		fail = map[string]error{"Changes": errors.New("broken index")}
+	}
 	git := gittest.NewFake(gittest.FakeParams{
 		Main: mainPath, Branch: "main", Remote: []string{"main", "feat/a"},
-		Worktrees: []worktree.Worktree{
-			{Path: "/repo/.trees/feat-a", State: worktree.OnBranch{Branch: "feat/a"}},
-			{Path: "/repo/.trees/feat-old", State: worktree.OnBranch{Branch: "feat/old"}},
-			{Path: "/repo/.trees/detached", State: worktree.Detached{}},
-		},
+		Worktrees: worktrees,
+		Fail:      fail,
 		Commits: map[worktree.Ref][]string{
 			worktree.LocalBranch{Name: "feat/a"}: {"Add the login form", "Wire the session"},
 			worktree.LocalBranch{Name: "main"}:   {"Bump"},

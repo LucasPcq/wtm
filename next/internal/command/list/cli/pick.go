@@ -136,7 +136,7 @@ func (s *worktreeStep) build() *widget.SelectList {
 	var options []widget.Option
 	for _, item := range s.p.read.Items {
 		if item.Detail != nil && len(item.Detail.Actions) > 0 {
-			options = append(options, widget.Option{Label: shown(item, s.p.cwd), Value: item.Subject, Badge: badge(cellsOf(*item.Detail, item.Subject == active, plain))})
+			options = append(options, widget.Option{Label: shown(*item.Detail, s.p.cwd), Value: item.Subject, Badge: badge(cellsOf(*item.Detail, item.Subject == active, plain))})
 		}
 	}
 	return widget.NewSelectList(widget.SelectParams{Options: options, Start: s.p.worktree})

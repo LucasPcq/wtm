@@ -31,16 +31,17 @@ func (configured) LoadRun() (project.Run, error) {
 	return project.Run{}, nil
 }
 
-// A seed is a repository to list: its git, its meta records, its config's error, the daemon's jobs and GitHub's pull requests, each with the error reading it.
+// A seed is a repository to list: its git, its meta records (and those that do not read), its config's error, the daemon's jobs and GitHub's pull requests, each with the error reading it.
 type seed struct {
-	Git       gittest.FakeParams
-	Meta      map[string]worktree.Meta
-	ConfigErr error
-	Base      string // the base branch, main when empty
-	Jobs      []run.Job
-	JobsErr   error
-	PRs       []worktree.PullRequest
-	PRsErr    error
+	Git        gittest.FakeParams
+	Meta       map[string]worktree.Meta
+	Unreadable []string
+	ConfigErr  error
+	Base       string // the base branch, main when empty
+	Jobs       []run.Job
+	JobsErr    error
+	PRs        []worktree.PullRequest
+	PRsErr     error
 }
 
 // A world is list's use case over the fakes a seed describes, with the branches GitHub was asked of, once per ask.
@@ -61,7 +62,7 @@ func newWorld(s seed) world {
 	}
 
 	git := gittest.NewFake(s.Git)
-	meta := storetest.NewFake(storetest.FakeParams{Meta: s.Meta})
+	meta := storetest.NewFake(storetest.FakeParams{Meta: s.Meta, Unreadable: s.Unreadable})
 	var asked [][]string
 	config := project.Config{Worktrees: project.Worktrees{BasePath: "../.trees", BaseBranch: base}}
 	return world{

@@ -115,17 +115,34 @@ func TestThePickerOffersEveryWorktreeADetachedOneSaidSo(t *testing.T) {
 }
 
 func TestAWorktreeThatCannotBeReadIsDrawnAsItsErrorAlone(t *testing.T) {
-	got := runStatus(t, world{Gone: true}, "feat/old")
+	got := runStatus(t, world{Broken: true}, "feat/a")
 
 	assert.Equal(t, uicli.ExitError, got.Code)
 	formtest.Golden(t, "status_unread", got.Stdout)
 }
 
 func TestAllCountsTheWorktreesNotReadAndNeverSaysNothingToFixThen(t *testing.T) {
-	got := runStatus(t, world{Gone: true, NoRun: true}, "--all")
+	got := runStatus(t, world{Broken: true, NoRun: true}, "--all")
 
 	assert.Equal(t, uicli.ExitError, got.Code)
 	formtest.Golden(t, "status_all_unread", got.Stdout)
+}
+
+func TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleaned(t *testing.T) {
+	one := runStatus(t, world{Gone: true}, "feat/old")
+	all := runStatus(t, world{Gone: true, NoRun: true}, "--all")
+
+	require.Equal(t, uicli.ExitOK, one.Code, one.Stderr)
+	require.Equal(t, uicli.ExitOK, all.Code, all.Stderr)
+	formtest.Golden(t, "status_gone", one.Stdout)
+	formtest.Golden(t, "status_all_gone", all.Stdout)
+}
+
+func TestAllDrawsTheTableEvenOfOneWorktree(t *testing.T) {
+	got := runStatus(t, world{Alone: true, NoRun: true}, "--all")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	formtest.Golden(t, "status_all_one", got.Stdout)
 }
 
 func TestAllWithPRsAddsAReviewColumn(t *testing.T) {

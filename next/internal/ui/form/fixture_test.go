@@ -247,7 +247,7 @@ func subjectQuery() (*form.Query[request, subjects, read], *request, *int) {
 		Open: func(context.Context, string) (form.Reader[request, subjects, read], error) {
 			return subjectReader{read: &got, asked: &asked}, nil
 		},
-		Draw: func(w io.Writer, got read, _ output.View) {
+		Draw: func(w io.Writer, got read, _ request, _ output.View) {
 			_, _ = io.WriteString(w, "read "+got.Items[0].Subject+"\n")
 		},
 	}, &got, &asked
@@ -260,7 +260,7 @@ func fakeQuery() (*form.Query[request, questions, read], *int) {
 		Open: func(context.Context, string) (form.Reader[request, questions, read], error) {
 			return reader{read: read{Items: []domain.Unit[struct{}]{{Subject: "feat/x", Status: domain.StatusDone}}}}, nil
 		},
-		Draw: func(w io.Writer, got read, _ output.View) {
+		Draw: func(w io.Writer, got read, _ request, _ output.View) {
 			_, _ = io.WriteString(w, "read "+strconv.Itoa(len(got.Items))+"\n")
 		},
 		Pick: func(_ context.Context, got read, _ request, _ *uicli.Run) (read, error) {
