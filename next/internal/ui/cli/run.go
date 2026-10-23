@@ -106,5 +106,10 @@ func (r *Run) Failed(failure *domain.Error) error {
 		return nil
 	}
 
-	return &Failed{Err: failure, Quiet: r.Quiet && r.Human(), Flags: r.Flags, Exits: r.Exits}
+	quiet := r.Quiet && r.Human()
+	var next []output.NextStep
+	if quiet {
+		next = output.FollowUpSteps(failure, r.CommandLine)
+	}
+	return &Failed{Err: failure, Quiet: quiet, Next: next, Flags: r.Flags, Exits: r.Exits}
 }

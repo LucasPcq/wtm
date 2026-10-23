@@ -27,7 +27,7 @@ var exitByCode = map[string]int{
 	domain.CodeNotARepository: ExitNotGitRepo,
 }
 
-// exitBySuffix maps the codes every command declares after its name.
+// exitBySuffix maps the preconditions every command declares after its name.
 var exitBySuffix = map[string]int{
 	domain.ConfigNotFound: ExitConfigNotFound,
 	domain.ConfigInvalid:  ExitError,
@@ -55,7 +55,7 @@ func exitCode(failed *Failed, signalled bool) int {
 		return code
 	}
 	for suffix, code := range exitBySuffix {
-		if strings.HasSuffix(failure.Code, suffix) {
+		if failure.Kind == domain.KindPrecondition && strings.HasSuffix(failure.Code, suffix) {
 			return code
 		}
 	}

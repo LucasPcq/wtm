@@ -118,7 +118,7 @@ func (c *eventsCommand) fail(failure *domain.Error) error {
 	}
 
 	output.Frame(c.io.Streams.Err, func(w io.Writer) {
-		output.Failure(w, output.FailureParams{Err: failure, Flags: c.io.Flags})
+		output.Failure(w, output.FailureParams{Err: failure, Next: output.FollowUpSteps(failure, c.io.CommandLine), Flags: c.io.Flags})
 	})
 	return c.io.Failed(failure)
 }

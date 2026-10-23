@@ -38,11 +38,12 @@ func TestTheWarningsOfAnUnfinishedTargetFollowItsLine(t *testing.T) {
 		{File: ".env", Key: "DB", Port: "pg", Status: env.StatusMissingKey},
 		{File: "api/.env", Key: "API", Port: "http", Base: 3000, Status: env.StatusNotFound},
 	}
+	settle := domain.Warning{Code: "provision.ports_not_settled_run", Message: "run.toml: line 3 — ports not settled", FollowUp: &domain.FollowUp{Command: domain.CommandEnv, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/x"}}}, Code: "provision.settle_ports", Message: "settle the ports once run.toml is fixed"}}
 	outcome := unfinished(extract.Item{
 		Subject: "feat/x", Status: domain.StatusFailed, Reason: domain.ReasonIncomplete,
 		Err:      &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed: hook failed: exit status 3"},
 		Detail:   &extract.Detail{Path: "/repo.trees/feat-x", EnvPorts: env.Redacted{Entries: ports}},
-		Warnings: []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping"}, {Code: "provision.env_ports_left_alone", Message: "Env ports left alone", Ports: ports}, untouched("nothing was moved: the files are still in feat/login")},
+		Warnings: []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping"}, {Code: "provision.env_ports_left_alone", Message: "Env ports left alone", Ports: ports}, settle, untouched("nothing was moved: the files are still in feat/login")},
 	})
 	outcome.Warnings = []domain.Warning{{Code: "extract.ff_dirty", Message: "couldn't fast-forward main: its worktree has uncommitted changes — the target starts from your local branch"}}
 

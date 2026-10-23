@@ -65,3 +65,7 @@ func TestAStateFileOfANewerSchemaExitsOnItsCodeWhereverItSurfaced(t *testing.T) 
 func TestAFailureAfterAnInterruptIsTheInterrupt(t *testing.T) {
 	assert.Equal(t, ExitCancelled, exitCode(&Failed{Err: &domain.Error{Kind: domain.KindInternal}}, true))
 }
+
+func TestOnlyAPreconditionExitsOnTheSuffixOfAConfigRefusal(t *testing.T) {
+	assert.Equal(t, ExitRefused, exitCode(&Failed{Err: &domain.Error{Kind: domain.KindRefused, Code: "sync.remote_config_not_found"}}, false))
+}

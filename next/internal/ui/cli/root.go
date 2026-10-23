@@ -86,7 +86,7 @@ func Execute(ctx context.Context, root *cobra.Command, args []string) int {
 	if failure, ok := errors.AsType[*Failed](err); ok {
 		if failure.Quiet {
 			output.Frame(stderr, func(w io.Writer) {
-				output.QuietFailure(w, output.FailureParams{Err: failure.Err, Flags: failure.Flags})
+				output.QuietFailure(w, output.FailureParams{Err: failure.Err, Next: failure.Next, Flags: failure.Flags})
 			})
 		}
 		return exitCode(failure, ctx.Err() != nil)
@@ -135,6 +135,8 @@ type Failed struct {
 	Err *domain.Error
 	// Quiet reports whether the command printed nothing under --quiet, leaving the root to print the failure's one line.
 	Quiet bool
+	// Next is the way out of Err, its follow-up spelled, which --quiet still prints.
+	Next []output.NextStep
 	// Flags spells each field path of Err as the flag that sets it.
 	Flags output.Flags
 	// Exits maps the command's own error codes to their exit codes, ahead of those every command shares.

@@ -12,6 +12,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
@@ -401,4 +402,19 @@ func TestNothingToRememberWritesNothing(t *testing.T) {
 
 	assert.Empty(t, remembered)
 	assert.Empty(t, warnings)
+}
+
+func TestThePortsAWarningCarriesAreRedacted(t *testing.T) {
+	w := onDisk(t)
+	writeFile(t, filepath.Join(w.main, ".env"), mainEnv+"API=http://u:pw@api.staging.example.com:9999\n")
+	params := portLinked(w.params(&recorder{}))
+	params.Project.Run.EnvPorts = append(params.Project.Run.EnvPorts, project.EnvPortLink{File: ".env", Key: "API", Job: "web", Port: "http"})
+
+	outcome := w.service.Run(t.Context(), params)
+
+	require.Len(t, outcome.Warnings, 1)
+	require.Len(t, outcome.Warnings[0].Ports, 1)
+	left := outcome.Warnings[0].Ports[0]
+	assert.Equal(t, env.StatusNotFound, left.Status)
+	assert.Empty(t, left.CurrentValue+left.NewValue+left.ForeignHost, "a value of the .env left the worktree")
 }

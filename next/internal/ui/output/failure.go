@@ -23,9 +23,10 @@ func Failure(w io.Writer, params FailureParams) {
 	NextSteps(w, params.Next)
 }
 
-// QuietFailure writes the failure of params to w on one line, its fields joined after the error, as --quiet prints it.
+// QuietFailure writes the failure of params to w on one line, its fields joined after the error, then its next steps, the way out of it, as --quiet prints it.
 func QuietFailure(w io.Writer, params FailureParams) {
 	ErrorLine(w, failureLine(params))
+	NextSteps(w, params.Next)
 }
 
 func failureLine(params FailureParams) string {

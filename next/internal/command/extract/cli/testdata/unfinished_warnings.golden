@@ -15,6 +15,8 @@
     DB   pg    no such key in this file
     ── api/.env ────────────────────────────
     API  http  no 3000 to shift in the value
+  ! run.toml: line 3 — ports not settled
   ! nothing was moved: the files are still in feat/login
 
   → wtm go feat/x
+  → wtm env feat/x   settle the ports once run.toml is fixed
