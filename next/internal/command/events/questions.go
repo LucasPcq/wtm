@@ -72,6 +72,11 @@ func (r Request) Validate() error {
 	return domain.Invalid([]domain.FieldError{{Path: pathRepo, Code: CodeRepoWithAll, Template: "{path} watches one repository, all of them already: give one or the other", With: []string{pathAll}}})
 }
 
+// relativeFromNowhere is the problem of a relative --repo from a caller that stands nowhere: no directory to read it from.
+func relativeFromNowhere(repo string) error {
+	return domain.Invalid([]domain.FieldError{{Path: pathRepo, Code: CodeNotADirectory, Template: "{path} {value} is relative, and the call names no directory to read it from", Params: domain.Params{"value": repo}}})
+}
+
 // notADirectory is the problem of a --repo that names no directory.
 func notADirectory(repo string) error {
 	return domain.Invalid([]domain.FieldError{{Path: pathRepo, Code: CodeNotADirectory, Template: "{path} {value} is not a directory", Params: domain.Params{"value": repo}}})

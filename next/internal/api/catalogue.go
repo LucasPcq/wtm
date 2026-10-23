@@ -44,9 +44,17 @@ type Call struct {
 	Options domain.RunOptions
 }
 
-// standing is where the call's caller stands: in the directory it names, named, or nowhere when it names none.
+// standing is where the call's caller stands: in the directory it names, named, or nowhere when it names none. Cwd is that directory with its symbolic links resolved, as git spells the worktrees it lists and the command line its working directory.
 func (c Call) standing() domain.Standing {
-	return domain.Standing{Dir: c.Dir, Named: c.Dir != "", Cwd: c.Dir}
+	if c.Dir == "" {
+		return domain.Standing{}
+	}
+
+	cwd := c.Dir
+	if resolved, err := filepath.EvalSymlinks(c.Dir); err == nil {
+		cwd = resolved
+	}
+	return domain.Standing{Dir: c.Dir, Named: true, Cwd: cwd}
 }
 
 // A Response is how an execution ended: its status, from the kind of its failure, and its envelope.

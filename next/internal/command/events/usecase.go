@@ -111,7 +111,7 @@ func (u UseCase) scope(ctx context.Context, req Request) (Source, bool, error) {
 	repo := req.Repo
 	if repo != "" && !filepath.IsAbs(repo) {
 		if req.At.Cwd == "" {
-			return Source{}, false, notADirectory(req.Repo)
+			return Source{}, false, relativeFromNowhere(req.Repo)
 		}
 		repo = filepath.Join(req.At.Cwd, repo)
 	}

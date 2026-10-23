@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -184,17 +183,18 @@ func TestARelativeRepoOnTheCommandLineIsReadFromTheWorkingDirectory(t *testing.T
 	main, elsewhere := configured(t), configured(t)
 	ownConfigDir(t)
 	t.Setenv(stateDirEnv, "")
-	streams, _, stdout, _ := output.Test()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	streams, _, _, _ := output.Test()
+	stdout := &firstLine{stop: cancel}
+	streams.Out.Writer = stdout
 	env := cli.Env{Cwd: filepath.Dir(gittest.Resolved(t, main)), ProjectDir: elsewhere, Named: true}
 	root := cli.NewRoot(version, streams, []*cobra.Command{eventscli.New(streams, env, eventStream(streamParams{Socket: servingBus(t), Registry: filepath.Join(t.TempDir(), "repos.json")}), commandLine)})
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
-	defer cancel()
 
 	code := cli.Execute(ctx, root, []string{"events", "--repo", filepath.Base(main), "--output", "json"})
 
 	assert.Equal(t, 0, code)
-	first, _, _ := strings.Cut(stdout.String(), "\n")
-	assert.Contains(t, first, `"root":"`+gittest.Resolved(t, main)+`"`)
+	assert.Contains(t, stdout.String(), `"root":"`+gittest.Resolved(t, main)+`"`)
 }
 
 func TestTheEveryRepositoryStreamOfASurfaceIsACallNamingNoDirectory(t *testing.T) {

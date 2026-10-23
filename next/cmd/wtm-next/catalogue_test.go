@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -59,10 +60,17 @@ func TestStatusOfASurfaceReadsTheWorktreeOfTheCallsDirectory(t *testing.T) {
 	ownConfigDir(t)
 	linked := filepath.Join(filepath.Dir(main), ".trees", "feat-a")
 	gittest.Git(t, main, "worktree", "add", "-q", "-b", "feat/a", linked)
+	// git lists a worktree by its real path: a call through a link stands in it all the same
+	link := filepath.Join(t.TempDir(), "feat-a")
+	require.NoError(t, os.Symlink(linked, link))
 
-	got := command(t, "status").Execute(t.Context(), api.Call{Dir: linked})
+	for name, dir := range map[string]string{"direct": linked, "symlinked": link} {
+		t.Run(name, func(t *testing.T) {
+			got := command(t, "status").Execute(t.Context(), api.Call{Dir: dir})
 
-	assert.Equal(t, http.StatusOK, got.Status, got.Envelope.Err)
-	require.Len(t, got.Envelope.Items, 1)
-	assert.Equal(t, "feat/a", got.Envelope.Items[0].Subject)
+			assert.Equal(t, http.StatusOK, got.Status, got.Envelope.Err)
+			require.Len(t, got.Envelope.Items, 1)
+			assert.Equal(t, "feat/a", got.Envelope.Items[0].Subject)
+		})
+	}
 }
