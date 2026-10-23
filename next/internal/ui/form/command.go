@@ -194,7 +194,7 @@ func (c *Command[R, Q, O]) request(cmd *cobra.Command, args []string) R {
 		answers = append(answers, domain.Answered{Path: domain.PathAsk, Values: []string{strconv.FormatBool(ask)}})
 	}
 
-	return domain.StandFrom(folded[R](answers), c.io.Env.Standing())
+	return domain.CalledBy(folded[R](answers), c.io.Env.Caller())
 }
 
 // folded is the request answers give; a flag holds a value of its field's own type, which the request always takes.

@@ -44,3 +44,11 @@ func TestARefusalOffersItsWayOutUnderQuietToo(t *testing.T) {
 	assert.Equal(t, "\n  ✗ no wtm config found\n  → wtm init\n\n", loud.Stderr)
 	assert.Equal(t, loud.Stderr, quiet.Stderr)
 }
+
+// Through the event stream, a working directory removed under the command line widened it to every repository.
+func TestACommandLineThatCannotReadItsWorkingDirectoryIsRefused(t *testing.T) {
+	got := runIn(t, "lost")
+
+	assert.Equal(t, ExitPrecondition, got.Code)
+	assert.Equal(t, "\n  ✗ the current directory cannot be read (removed?): cd into an existing directory\n\n", got.Stderr)
+}

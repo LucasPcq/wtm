@@ -46,7 +46,7 @@ func TestAReadPicksOnlyWhenStdinStdoutAndStderrAreTerminals(t *testing.T) {
 			streams.Err.SetTerminal(true)
 			streams.Out.SetTerminal(c.Out)
 
-			err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine}, c.Args...)
+			err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, Env: uicli.Env{Cwd: "/repo"}, CommandLine: formtest.CommandLine}, c.Args...)
 
 			require.NoError(t, err)
 			assert.Equal(t, c.Picks, *picked > 0)
@@ -69,7 +69,7 @@ func TestAReadRefusedWithJSONIsItsEnvelopeOnStdout(t *testing.T) {
 	}
 	streams, _, stdout, stderr := output.Test()
 
-	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine}, "--output", "json")
+	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, Env: uicli.Env{Cwd: "/repo"}, CommandLine: formtest.CommandLine}, "--output", "json")
 
 	require.Error(t, err)
 	assert.Empty(t, stderr.String())
@@ -87,7 +87,7 @@ func TestAReadThatFailedOnASubjectDrawsItAndFails(t *testing.T) {
 	}
 	streams, _, stdout, _ := output.Test()
 
-	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine})
+	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, Env: uicli.Env{Cwd: "/repo"}, CommandLine: formtest.CommandLine})
 
 	failed, ok := errors.AsType[*uicli.Failed](err)
 	require.True(t, ok, err)
@@ -105,7 +105,7 @@ func TestAPickKeepsTheFailureOfTheReadInItsExitCode(t *testing.T) {
 	streams.Err.SetTerminal(true)
 	streams.Out.SetTerminal(true)
 
-	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine})
+	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, Env: uicli.Env{Cwd: "/repo"}, CommandLine: formtest.CommandLine})
 
 	failed, ok := errors.AsType[*uicli.Failed](err)
 	require.True(t, ok, err)
@@ -119,7 +119,7 @@ func TestAReadPrintsAFormatOfItsOwnUnframedEvenQuiet(t *testing.T) {
 		_, _ = io.WriteString(w, "graph of "+got.Items[0].Subject+"\n")
 	}}
 	streams, _, stdout, stderr := output.Test()
-	run := &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine}
+	run := &uicli.Run{Command: "fake", Streams: streams, Env: uicli.Env{Cwd: "/repo"}, CommandLine: formtest.CommandLine}
 
 	err := launched(t, q, run, "--output", "mermaid", "--quiet")
 
@@ -134,7 +134,7 @@ func TestAFormatNoneOfTheReadsIsRefusedNamingThem(t *testing.T) {
 	q.Formats = map[string]func(io.Writer, read){"mermaid": func(io.Writer, read) {}}
 	streams, _, _, stderr := output.Test()
 
-	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine}, "--output", "dot")
+	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, Env: uicli.Env{Cwd: "/repo"}, CommandLine: formtest.CommandLine}, "--output", "dot")
 
 	require.Error(t, err)
 	assert.Contains(t, stderr.String(), `invalid --output "dot": expected one of text, json, mermaid`)
@@ -148,7 +148,7 @@ func TestARefusalInAFormatOfTheReadsIsText(t *testing.T) {
 	}
 	streams, _, stdout, stderr := output.Test()
 
-	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine}, "--output", "mermaid")
+	err := launched(t, q, &uicli.Run{Command: "fake", Streams: streams, Env: uicli.Env{Cwd: "/repo"}, CommandLine: formtest.CommandLine}, "--output", "mermaid")
 
 	require.Error(t, err)
 	assert.Empty(t, stdout.String())
@@ -176,7 +176,7 @@ func TestAReadAsksTheSubjectItsRequestLeavesOpenBeforeReading(t *testing.T) {
 			streams.Err.SetTerminal(c.Terminal)
 			streams.Out.SetTerminal(c.Terminal)
 
-			err := launchedSubject(t, q, &uicli.Run{Command: "fake", Streams: streams, CommandLine: formtest.CommandLine}, c.Args...)
+			err := launchedSubject(t, q, &uicli.Run{Command: "fake", Streams: streams, Env: uicli.Env{Cwd: "/repo"}, CommandLine: formtest.CommandLine}, c.Args...)
 
 			require.NoError(t, err)
 			assert.Equal(t, c.Read, strings.Join((*got)["worktree"], ""))

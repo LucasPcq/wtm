@@ -277,8 +277,8 @@ func knownRepos(path, socket string) registry.Service {
 		Announce: func(event domain.Event, repo domain.Repo) {
 			bus.NewPublisher(bus.PublisherParams{Root: repo.Root, CommonDir: repo.CommonDir, SocketPath: socket}).Publish(event)
 		},
-		StateDir:    stateDir,
-		Initialized: func(dir string) bool { return config.Project{StateDir: dir}.Initialized() },
+		Moved:       func() bool { return movedState() != "" },
+		Initialized: func(repo domain.Repo) bool { return config.Project{StateDir: stateDir(repo.CommonDir)}.Initialized() },
 	}
 }
 

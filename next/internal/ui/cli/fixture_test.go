@@ -15,12 +15,20 @@ func probe() *cobra.Command {
 
 // refusing refuses as a repository with no wtm config does, wtm init its follow-up.
 func refusing(streams *output.Streams) *cobra.Command {
-	run := &Run{Command: "refuse", Streams: streams, Output: OutputText, CommandLine: func(followUp domain.FollowUp) []string { return []string{"wtm", followUp.Command} }}
+	run := &Run{Command: "refuse", Streams: streams, Env: Env{Cwd: "/work"}, Output: OutputText, CommandLine: func(followUp domain.FollowUp) []string { return []string{"wtm", followUp.Command} }}
 	return &cobra.Command{Use: "refuse", RunE: func(cmd *cobra.Command, _ []string) error {
 		if err := run.Begin(cmd); err != nil {
 			return err
 		}
 		return run.FailWith(&domain.Error{Kind: domain.KindPrecondition, Code: "refuse" + domain.ConfigNotFound, Message: "no wtm config found", FollowUp: &domain.FollowUp{Command: domain.CommandInit}}, nil)
+	}}
+}
+
+// lost runs where its working directory could not be read.
+func lost(streams *output.Streams) *cobra.Command {
+	run := &Run{Command: "lost", Streams: streams, Output: OutputText}
+	return &cobra.Command{Use: "lost", RunE: func(cmd *cobra.Command, _ []string) error {
+		return run.Begin(cmd)
 	}}
 }
 

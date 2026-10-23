@@ -145,8 +145,9 @@ func listing(entries []entry, commonDir string) bool {
 	return slices.ContainsFunc(entries, func(e entry) bool { return e.CommonDir == commonDir })
 }
 
+// repos are the repositories of entries, nil for none.
 func repos(entries []entry) []domain.Repo {
-	list := make([]domain.Repo, 0, len(entries))
+	var list []domain.Repo
 	for _, e := range entries {
 		list = append(list, repoOf(e))
 	}

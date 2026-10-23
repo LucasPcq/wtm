@@ -11,17 +11,17 @@ import (
 // ----------------------------------------------------------------------------
 // The request
 
-// A Request is what the caller asks of status: the worktree to read (its branch, its path read from where the caller stands, or part of its branch), or every worktree, and whether to ask GitHub for pull requests. At is where the caller stands, whose worktree is read when none is named; it is no field of the form: every surface sets it.
+// A Request is what the caller asks of status: the worktree to read (its branch, its path read from where the caller stands, or part of its branch), or every worktree, and whether to ask GitHub for pull requests. Caller is where the caller stands, whose worktree is read when none is named; it is no field of the form: every surface sets it.
 type Request struct {
-	Worktree string          `json:"worktree"`
-	All      bool            `json:"all"`
-	WithPRs  bool            `json:"with_prs"`
-	At       domain.Standing `json:"-"`
+	Worktree string        `json:"worktree"`
+	All      bool          `json:"all"`
+	WithPRs  bool          `json:"with_prs"`
+	Caller   domain.Caller `json:"-"`
 }
 
-// From is the request asked from at.
-func (r Request) From(at domain.Standing) Request {
-	r.At = at
+// From is the request asked by caller.
+func (r Request) From(caller domain.Caller) Request {
+	r.Caller = caller
 	return r
 }
 
@@ -88,7 +88,7 @@ type Questions struct {
 func NewQuestions(facts worktree.Repository, req Request, located string) Questions {
 	q := Questions{skip: req.Skips(domain.PathWorktree)}
 	worktrees := listed(facts.Snapshot)
-	current := worktree.Holding(worktrees, req.At.Cwd, pathOf)
+	current := worktree.Holding(worktrees, req.Caller.Cwd, pathOf)
 	for i, w := range worktrees {
 		q.worktrees = append(q.worktrees, optionOf(w, i == current))
 	}

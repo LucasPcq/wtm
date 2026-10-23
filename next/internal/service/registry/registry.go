@@ -11,25 +11,24 @@ import (
 // registerTimeout bounds the registration of a repository, so a command never waits on it.
 const registerTimeout = 250 * time.Millisecond
 
-// Service is the registry over its Store, announcing what joins and leaves it with Announce: a repository is listed while its state directory holds a wtm config. The registry is left alone while the state directory is moved ($WTM_STATE_DIR): none joins it, none leaves it.
+// Service is the registry over its Store, announcing what joins and leaves it with Announce: a repository is listed while it is Initialized. The registry is left alone while the state directory is moved (Moved): none joins it, none leaves it, and it lists none, since a repository read with a moved state would be read with another's config and records.
 type Service struct {
 	Store       Store
 	Announce    Announce
-	StateDir    StateDir
+	Moved       Moved
 	Initialized Initialized
 }
 
 // Register lists repo once initialized, announcing it as repo.added when it was not listed yet, then drops the repositories no longer initialized. It never fails nor holds its caller for long: a repository missing is listed again by the next command run in it.
 func (s Service) Register(ctx context.Context, repo domain.Repo) {
-	dir, moved := s.StateDir(repo.CommonDir)
-	if moved || !s.Initialized(dir) {
+	if s.Moved() || !s.Initialized(repo) {
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, registerTimeout)
 	defer cancel()
 	added, err := s.Store.Add(ctx, repo)
-	if err != nil || !added {
+	if err != nil || !added || ctx.Err() != nil {
 		return
 	}
 
@@ -37,13 +36,17 @@ func (s Service) Register(ctx context.Context, repo domain.Repo) {
 	_, _ = s.Prune(ctx)
 }
 
-// Prune drops the repositories no longer initialized, announcing each as repo.removed, and returns the others.
+// Prune drops the repositories no longer initialized, announcing each as repo.removed until ctx is done, and returns the others; none while the state directory is moved.
 func (s Service) Prune(ctx context.Context) ([]domain.Repo, error) {
-	kept, dropped, err := s.Store.Prune(ctx, func(repo domain.Repo) bool {
-		dir, moved := s.StateDir(repo.CommonDir)
-		return moved || s.Initialized(dir)
-	})
+	if s.Moved() {
+		return nil, nil
+	}
+
+	kept, dropped, err := s.Store.Prune(ctx, s.Initialized)
 	for _, repo := range dropped {
+		if ctx.Err() != nil {
+			break
+		}
 		s.Announce(domain.RepoRemoved{}, repo)
 	}
 	return kept, err

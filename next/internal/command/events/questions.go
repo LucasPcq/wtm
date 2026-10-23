@@ -8,16 +8,16 @@ import (
 // The request
 
 // A Request is what the caller asks of the stream: the repository holding the path Repo, read from where the caller stands when relative, or every repository wtm knows with All, else the repository of the directory the caller stands on.
-// A caller that stands nowhere, or on a directory it did not name ($WTM_PROJECT_DIR unset on the command line) in no repository, watches every one instead. At is no field: every surface sets it.
+// A caller that stands nowhere, or on a directory it did not name ($WTM_PROJECT_DIR unset on the command line) in no repository, watches every one instead. Caller is no field: every surface sets it.
 type Request struct {
-	Repo string          `json:"repo"`
-	All  bool            `json:"all"`
-	At   domain.Standing `json:"-"`
+	Repo   string        `json:"repo"`
+	All    bool          `json:"all"`
+	Caller domain.Caller `json:"-"`
 }
 
-// From is the request asked from at.
-func (r Request) From(at domain.Standing) Request {
-	r.At = at
+// From is the request asked by caller.
+func (r Request) From(caller domain.Caller) Request {
+	r.Caller = caller
 	return r
 }
 

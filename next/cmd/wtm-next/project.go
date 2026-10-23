@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -80,17 +81,18 @@ func locate(ctx context.Context, dir string) (wireParams, error) {
 		return wireParams{}, notARepository(root, err)
 	}
 
-	state, _ := stateDir(commonDir)
-	return wireParams{MainPath: root, StateDir: state, CommonDir: commonDir}, nil
+	return wireParams{MainPath: root, StateDir: stateDir(commonDir), CommonDir: commonDir}, nil
 }
 
-// stateDir is where the repository of commonDir keeps wtm's state, and whether $WTM_STATE_DIR moved it out of the repository: a sandbox or a test, for which the registry is left alone.
+// stateDir is where the repository of commonDir keeps wtm's state: in its common dir, unless $WTM_STATE_DIR moves it.
+func stateDir(commonDir string) string {
+	return cmp.Or(movedState(), filepath.Join(commonDir, stateDirName))
+}
+
+// movedState is where $WTM_STATE_DIR moves wtm's state, "" when it does not: a sandbox or a test, for which the registry is left alone. It is the one reader of $WTM_STATE_DIR.
 // shortcut: WTM_STATE_DIR is process-wide (one state dir for every repository a process opens); move it into the execution context when a process serves several repositories with it set.
-func stateDir(commonDir string) (dir string, moved bool) {
-	if dir := os.Getenv(stateDirEnv); dir != "" {
-		return dir, true
-	}
-	return filepath.Join(commonDir, stateDirName), false
+func movedState() string {
+	return os.Getenv(stateDirEnv)
 }
 
 // notARepository turns git's refusal to run outside a repository into the precondition failure that names dir; any other err is returned as is.

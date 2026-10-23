@@ -36,17 +36,12 @@ func (b *bus) announce(event domain.Event, repo domain.Repo) {
 	b.seen = append(b.seen, announced{Event: event, Repo: repo})
 }
 
-// A disk says which state directories hold a wtm config, and whether the state was moved out of the repositories to moved.
+// A disk says which repositories hold a wtm config, by their common directory, and whether the state was moved out of the repositories.
 type disk struct {
 	configs map[string]bool
-	moved   string
+	moved   bool
 }
 
-func (d disk) stateDir(commonDir string) (string, bool) {
-	if d.moved != "" {
-		return d.moved, true
-	}
-	return commonDir + "/wtm", false
-}
+func (d disk) isMoved() bool { return d.moved }
 
-func (d disk) initialized(dir string) bool { return d.configs[dir] }
+func (d disk) initialized(repo domain.Repo) bool { return d.configs[repo.CommonDir] }

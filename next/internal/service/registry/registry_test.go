@@ -1,6 +1,7 @@
 package registry_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -58,18 +59,30 @@ func TestARegistrationTheStoreRefusesIsDroppedSilently(t *testing.T) {
 	assert.Empty(t, b.announcements())
 }
 
-func TestAMovedStateDirectoryLeavesTheRegistryAsItIs(t *testing.T) {
+func TestAMovedStateDirectoryLeavesTheRegistryAloneAndListsNothing(t *testing.T) {
 	store, b := registrytest.NewFake(registrytest.FakeParams{Repos: []domain.Repo{other}}), &bus{}
-	moved := initialized(main)
-	moved.moved = "/sandbox/state"
-	moved.configs["/sandbox/state"] = true
+	moved := initialized(main, other)
+	moved.moved = true
 	s := service(store, moved, b)
 
 	s.Register(t.Context(), main)
 	kept, err := s.Prune(t.Context())
 
 	require.NoError(t, err)
-	assert.Equal(t, []domain.Repo{other}, kept)
+	assert.Empty(t, kept)
 	assert.Equal(t, []domain.Repo{other}, store.Repos())
+	assert.Empty(t, store.Calls())
+	assert.Empty(t, b.announcements())
+}
+
+func TestNoRepositoryIsAnnouncedOnceTheCallerIsGone(t *testing.T) {
+	store, b := registrytest.NewFake(registrytest.FakeParams{Repos: []domain.Repo{main, other}}), &bus{}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	kept, err := service(store, initialized(), b).Prune(ctx)
+
+	require.NoError(t, err)
+	assert.Empty(t, kept)
 	assert.Empty(t, b.announcements())
 }

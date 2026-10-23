@@ -6,9 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -49,6 +51,32 @@ func TestEachRegisteredCommandIsInTheCatalogueOrItsStreamsAndWired(t *testing.T)
 			assert.True(t, wired[name], "%s is registered in main.go but wire.go builds no %s.UseCase", name, name)
 		}
 	}
+}
+
+// A request that carries where its caller stands and forgot From would be asked from nowhere by every surface, silently.
+func TestEachRequestThatCarriesItsCallerTakesItFromEverySurface(t *testing.T) {
+	callerType := reflect.TypeFor[domain.Caller]()
+	var requests []reflect.Type
+	app := reflect.ValueOf(wire(wireParams{MainPath: t.TempDir()}))
+	for i := range app.NumField() {
+		run, ok := app.Field(i).Type().MethodByName("Run")
+		require.True(t, ok, app.Type().Field(i).Name)
+		requests = append(requests, run.Type.In(2))
+	}
+	watch, ok := reflect.TypeFor[events.UseCase]().MethodByName("Watch")
+	require.True(t, ok)
+	requests = append(requests, watch.Type.In(2))
+
+	carrying := 0
+	for _, req := range requests {
+		if !slices.ContainsFunc(reflect.VisibleFields(req), func(f reflect.StructField) bool { return f.Type == callerType }) {
+			continue
+		}
+		carrying++
+		from, ok := req.MethodByName("From")
+		assert.True(t, ok && from.Type.NumIn() == 2 && from.Type.In(1) == callerType && from.Type.NumOut() == 1 && from.Type.Out(0) == req, "%s carries a domain.Caller but is no domain.ReadsCaller", req)
+	}
+	assert.Positive(t, carrying, "status and events carry their caller")
 }
 
 func TestNoCommandAFollowUpNamesHasMigrated(t *testing.T) {

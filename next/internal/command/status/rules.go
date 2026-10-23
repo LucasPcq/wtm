@@ -202,7 +202,7 @@ const (
 // ----------------------------------------------------------------------------
 // The worktrees read
 
-// Targets are the worktrees req reads of snapshot: every one with All, the main first; else the one it names, by its branch, by a path (located, resolved and existing, "" when the name is none) in it, or by a part of its branch found in no other; else the deepest holding req.At.Cwd, where the caller stands; else the main one. It refuses All with a worktree named, a name that matches no worktree or several, and a repository with no worktree to read.
+// Targets are the worktrees req reads of snapshot: every one with All, the main first; else the one it names, by its branch, by a path (located, resolved and existing, "" when the name is none) in it, or by a part of its branch found in no other; else the deepest holding req.Caller.Cwd, where the caller stands; else the main one. It refuses All with a worktree named, a name that matches no worktree or several, and a repository with no worktree to read.
 func Targets(snapshot worktree.Snapshot, req Request, located string) ([]worktree.Worktree, error) {
 	worktrees := listed(snapshot)
 	switch {
@@ -222,7 +222,7 @@ func Targets(snapshot worktree.Snapshot, req Request, located string) ([]worktre
 		return []worktree.Worktree{named}, nil
 	}
 
-	if at := worktree.Holding(worktrees, req.At.Cwd, pathOf); at >= 0 {
+	if at := worktree.Holding(worktrees, req.Caller.Cwd, pathOf); at >= 0 {
 		return []worktree.Worktree{worktrees[at]}, nil
 	}
 	return worktrees[:1], nil

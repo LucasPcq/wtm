@@ -296,26 +296,6 @@ func (f Form) Answers() []Answered {
 	return append(answers, Answered{Path: PathRemember, Values: f.Remembering()})
 }
 
-// Standing is where the caller of a command stands. Dir is the directory the command runs on: $WTM_PROJECT_DIR on the command line, else its working directory; a surface's call's directory, "" when the call names none. Named says whether the caller chose Dir rather than merely ran from it. Cwd is the directory the caller is in: a relative path it gives is read from it, and the worktree it stands in is found by it.
-type Standing struct {
-	Dir   string
-	Named bool
-	Cwd   string
-}
-
-// Standable is a command's request that reads where its caller stands; no field of its form says it, every surface sets it.
-type Standable[R any] interface {
-	From(at Standing) R
-}
-
-// StandFrom is req asked from at, when req reads where its caller stands; req as it is otherwise.
-func StandFrom[R any](req R, at Standing) R {
-	if standable, ok := any(req).(Standable[R]); ok {
-		return standable.From(at)
-	}
-	return req
-}
-
 // Valued is a command's request, which says its answer to the field at path, nil when it leaves the field to its default.
 type Valued interface {
 	Values(path string) []string

@@ -15,8 +15,8 @@ type Store interface {
 // Announce publishes event about repo on the event bus, best effort.
 type Announce func(event domain.Event, repo domain.Repo)
 
-// StateDir returns where the repository of commonDir keeps wtm's state, and whether it was moved out of that repository ($WTM_STATE_DIR), which leaves the registry unable to tell where any repository keeps its own.
-type StateDir func(commonDir string) (dir string, moved bool)
+// Moved reports whether wtm's state was moved out of the repositories ($WTM_STATE_DIR): where any repository keeps its own is then unknown.
+type Moved func() bool
 
-// Initialized reports whether the state directory dir holds a wtm config.
-type Initialized func(dir string) bool
+// Initialized reports whether repo's state directory holds a wtm config.
+type Initialized func(repo domain.Repo) bool

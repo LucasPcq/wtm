@@ -104,23 +104,23 @@ func (u UseCase) scope(ctx context.Context, req Request) (Source, bool, error) {
 	if err := req.Validate(); err != nil {
 		return Source{}, false, err
 	}
-	if req.All || req.Repo == "" && req.At.Dir == "" {
+	if req.All || req.Repo == "" && req.Caller.Dir == "" {
 		return Source{}, true, nil
 	}
 
 	repo := req.Repo
 	if repo != "" && !filepath.IsAbs(repo) {
-		if req.At.Cwd == "" {
+		if req.Caller.Cwd == "" {
 			return Source{}, false, relativeFromNowhere(req.Repo)
 		}
-		repo = filepath.Join(req.At.Cwd, repo)
+		repo = filepath.Join(req.Caller.Cwd, repo)
 	}
 
-	source, err := u.Open(ctx, cmp.Or(repo, req.At.Dir))
+	source, err := u.Open(ctx, cmp.Or(repo, req.Caller.Dir))
 	switch {
 	case req.Repo != "" && errors.Is(err, fs.ErrNotExist):
 		return Source{}, false, notADirectory(req.Repo)
-	case req.Repo == "" && !req.At.Named && notARepository(err):
+	case req.Repo == "" && !req.Caller.Named && notARepository(err):
 		return Source{}, true, nil
 	case err != nil:
 		return Source{}, false, err

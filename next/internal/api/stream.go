@@ -31,7 +31,7 @@ func BindStream[Req Request[Req], Q Form](name string, watch func(ctx context.Co
 		var req Req
 		req, err := domain.Fold(req, call.Answers)
 		if err == nil {
-			err = watch(ctx, domain.StandFrom(req, call.standing()), send)
+			err = watch(ctx, domain.CalledBy(req, call.caller()), send)
 		}
 		if err == nil || ctx.Err() != nil {
 			return Response{Status: http.StatusOK, Envelope: domain.Envelope{Command: name}}

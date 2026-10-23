@@ -57,8 +57,8 @@ func registered(repos []domain.Repo) registry.Service {
 	return registry.Service{
 		Store:       registrytest.NewFake(registrytest.FakeParams{Repos: repos}),
 		Announce:    func(domain.Event, domain.Repo) {},
-		StateDir:    func(commonDir string) (string, bool) { return commonDir, false },
-		Initialized: func(string) bool { return true },
+		Moved:       func() bool { return false },
+		Initialized: func(domain.Repo) bool { return true },
 	}
 }
 

@@ -65,7 +65,7 @@ func (q *Query[R, Q, O]) Launch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	req := domain.StandFrom(folded[R](fieldAnswers(cmd, args, q.schema())), q.io.Env.Standing())
+	req := domain.CalledBy(folded[R](fieldAnswers(cmd, args, q.schema())), q.io.Env.Caller())
 
 	ctx := cmd.Context()
 	app, err := q.Open(ctx, q.io.Env.ProjectDir)

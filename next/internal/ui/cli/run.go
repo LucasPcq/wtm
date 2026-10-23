@@ -25,7 +25,10 @@ type Run struct {
 	Exits       map[string]int
 }
 
-// Begin reads --quiet and refuses an --output format other than text, json or one of Formats, printed as text, the one format sure to be understood, followed by the way to cmd's help; then it refuses an invalid $WTM_CORRELATION_ID, before any repository is looked up.
+// CodeNoWorkingDirectory refuses a command line whose working directory cannot be read (removed under it): it cannot tell where its caller stands.
+const CodeNoWorkingDirectory = "cli.no_working_directory"
+
+// Begin reads --quiet and refuses an --output format other than text, json or one of Formats, printed as text, the one format sure to be understood, followed by the way to cmd's help; then it refuses an invalid $WTM_CORRELATION_ID and a working directory it cannot read, before any repository is looked up.
 func (r *Run) Begin(cmd *cobra.Command) error {
 	r.Quiet, _ = cmd.Flags().GetBool(FlagQuiet)
 	if !slices.Contains(r.outputs(), r.Output) {
@@ -36,6 +39,9 @@ func (r *Run) Begin(cmd *cobra.Command) error {
 
 	if err := domain.CorrelationProblem(r.Env.CorrelationID); err != nil {
 		return r.FailWith(domain.InvalidMessage("$"+CorrelationIDEnv+" "+err.Error()+": invalid correlation id"), nil)
+	}
+	if r.Env.Cwd == "" {
+		return r.FailWith(&domain.Error{Kind: domain.KindPrecondition, Code: CodeNoWorkingDirectory, Message: "the current directory cannot be read (removed?): cd into an existing directory"}, nil)
 	}
 
 	return nil

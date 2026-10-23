@@ -20,8 +20,8 @@ func useCase(bus *fakeBus, k *known, open events.Open) events.UseCase {
 	repos := registry.Service{
 		Store:       k.store,
 		Announce:    func(domain.Event, domain.Repo) {},
-		StateDir:    func(commonDir string) (string, bool) { return commonDir, false },
-		Initialized: func(string) bool { return true },
+		Moved:       func() bool { return false },
+		Initialized: func(domain.Repo) bool { return true },
 	}
 	return events.UseCase{Bus: bus, Registry: repos, Open: open, Now: func() time.Time { return fixedNow }, Recheck: time.Hour}
 }

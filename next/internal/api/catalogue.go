@@ -37,24 +37,24 @@ type Command struct {
 	Execute   func(ctx context.Context, call Call) Response
 }
 
-// A Call is one execution of a command: the directory of the repository it runs on, which is also where its caller stands (a relative path it answers is read from it), its request as the answer of each field by its path, folded as the command line folds its flags, and its run options.
+// A Call is one execution of a command: the directory of the repository it runs on, which is also where its caller stands (a relative path it answers is read from it, the worktree it stands in found by it, once api resolves its symbolic links with filepath.EvalSymlinks: the one place a surface's directory is resolved), its request as the answer of each field by its path, folded as the command line folds its flags, and its run options.
 type Call struct {
 	Dir     string
 	Answers []domain.Answered
 	Options domain.RunOptions
 }
 
-// standing is where the call's caller stands: in the directory it names, named, or nowhere when it names none. Cwd is that directory with its symbolic links resolved, as git spells the worktrees it lists and the command line its working directory.
-func (c Call) standing() domain.Standing {
+// caller is where the call's caller stands: in the directory it names, named, or nowhere when it names none. Cwd is that directory with its symbolic links resolved, as git spells the worktrees it lists and the command line its working directory.
+func (c Call) caller() domain.Caller {
 	if c.Dir == "" {
-		return domain.Standing{}
+		return domain.Caller{}
 	}
 
 	cwd := c.Dir
 	if resolved, err := filepath.EvalSymlinks(c.Dir); err == nil {
 		cwd = resolved
 	}
-	return domain.Standing{Dir: c.Dir, Named: true, Cwd: cwd}
+	return domain.Caller{Dir: c.Dir, Named: true, Cwd: cwd}
 }
 
 // A Response is how an execution ended: its status, from the kind of its failure, and its envelope.
@@ -99,7 +99,7 @@ func Bind[U any, Req Request[Req], Q Form, Out Outcome](name string, open func(c
 		if err != nil {
 			return useCase, req, err
 		}
-		req = domain.StandFrom(req, call.standing())
+		req = domain.CalledBy(req, call.caller())
 
 		useCase, err = open(ctx, call.Dir)
 		return useCase, req, err

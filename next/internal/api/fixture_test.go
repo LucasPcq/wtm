@@ -8,12 +8,12 @@ import (
 )
 
 type request struct {
-	Name string
-	At   domain.Standing
+	Name   string
+	Caller domain.Caller
 }
 
-func (r request) From(at domain.Standing) request {
-	r.At = at
+func (r request) From(caller domain.Caller) request {
+	r.Caller = caller
 	return r
 }
 

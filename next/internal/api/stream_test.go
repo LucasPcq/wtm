@@ -21,7 +21,7 @@ func TestAStreamSendsEachLineOfItsRequestWatchedFromTheCallsDirectory(t *testing
 	})
 
 	assert.Equal(t, http.StatusOK, got.Status)
-	assert.Equal(t, request{Name: "x", At: domain.Standing{Dir: "/repo", Named: true, Cwd: "/repo"}}, w.req)
+	assert.Equal(t, request{Name: "x", Caller: domain.Caller{Dir: "/repo", Named: true, Cwd: "/repo"}}, w.req)
 	assert.Equal(t, w.lines, sent)
 	assert.Equal(t, "events", stream.Name)
 	assert.NotEmpty(t, stream.Form.Fields)
@@ -60,5 +60,5 @@ func TestAStreamOfACallNamingNoDirectoryStandsNowhere(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, got.Status)
 	assert.True(t, w.watched)
-	assert.Equal(t, domain.Standing{}, w.req.At)
+	assert.Equal(t, domain.Caller{}, w.req.Caller)
 }

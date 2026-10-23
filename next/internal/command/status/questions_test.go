@@ -13,7 +13,7 @@ import (
 )
 
 func TestTheRequestReadsBackItsAnswersButNotWhereItStands(t *testing.T) {
-	req := status.Request{Worktree: "feat/a", WithPRs: true, At: domain.Standing{Cwd: "/repo/main"}}
+	req := status.Request{Worktree: "feat/a", WithPRs: true, Caller: domain.Caller{Cwd: "/repo/main"}}
 
 	folded, err := domain.Fold(status.Request{}, domain.AnswersOf(status.Questions{}.Form(), req))
 
@@ -24,7 +24,7 @@ func TestTheRequestReadsBackItsAnswersButNotWhereItStands(t *testing.T) {
 func TestThePickerOffersEveryWorktreeOnTheOneTheRequestReads(t *testing.T) {
 	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), {Path: "/repo/.trees/detached", State: worktree.Detached{}}}}})
 
-	q, err := w.usecase.Questions(t.Context(), status.Request{At: domain.Standing{Cwd: "/repo/.trees/feat/a"}})
+	q, err := w.usecase.Questions(t.Context(), status.Request{Caller: domain.Caller{Cwd: "/repo/.trees/feat/a"}})
 
 	require.NoError(t, err)
 	field, ok := q.Form().Fields[0].(domain.SelectField)

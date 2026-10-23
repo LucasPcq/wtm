@@ -103,8 +103,8 @@ func (u UseCase) located(ctx context.Context, req Request) (string, error) {
 	}
 
 	path := req.Worktree
-	if !filepath.IsAbs(path) && req.At.Cwd != "" {
-		path = filepath.Join(req.At.Cwd, path)
+	if !filepath.IsAbs(path) && req.Caller.Cwd != "" {
+		path = filepath.Join(req.Caller.Cwd, path)
 	}
 	location, err := u.Git.Locate(ctx, path)
 	if err != nil || !location.Exists {

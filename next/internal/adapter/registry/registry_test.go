@@ -71,14 +71,24 @@ func TestAnUnparsableRegistryIsRebuiltFromEmpty(t *testing.T) {
 	assert.Equal(t, []domain.Repo{stays}, kept)
 }
 
-func TestPruningWhatIsNotThereKeepsNothingAndWritesNothing(t *testing.T) {
+func TestPruningAnEmptyRegistryKeepsAndDropsNil(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			kept, dropped, err := impl.port.Prune(t.Context(), keepAll)
+
+			require.NoError(t, err)
+			assert.Nil(t, kept)
+			assert.Nil(t, dropped)
+		})
+	}
+}
+
+func TestPruningWhatIsNotThereWritesNothing(t *testing.T) {
 	registry := registryIn(t)
 
-	kept, dropped, err := registry.Prune(t.Context(), keepAll)
+	_, _, err := registry.Prune(t.Context(), keepAll)
 
 	require.NoError(t, err)
-	assert.Empty(t, kept)
-	assert.Empty(t, dropped)
 	assert.NoFileExists(t, registry.Path)
 }
 

@@ -213,3 +213,23 @@ func TestTheEveryRepositoryStreamOfASurfaceIsACallNamingNoDirectory(t *testing.T
 	assert.Contains(t, lines[0], `"root":"`+gittest.Resolved(t, main)+`"`)
 	assert.JSONEq(t, `{"v":2,"type":"ready","ts":"x"}`, withTS(t, lines[1]))
 }
+
+// A repository read with a moved state would be read with the sandbox's config and records: the stream of every repository lists none while the state is moved.
+func TestTheEveryRepositoryStreamListsNoRepositoryWhileTheStateIsMoved(t *testing.T) {
+	main := configured(t)
+	ownConfigDir(t)
+	t.Setenv(stateDirEnv, "")
+	socket, registry := servingBus(t), filepath.Join(t.TempDir(), "repos.json")
+	knownRepos(registry, socket).Register(t.Context(), domain.Repo{Root: gittest.Resolved(t, main), CommonDir: bus.Resolved(filepath.Join(main, ".git"))})
+	require.FileExists(t, registry)
+	moved := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(moved, "config.toml"), []byte("[worktrees]\nbase_path = \"../.trees\"\n"), 0o644))
+	t.Setenv(stateDirEnv, moved)
+	stream := api.BindStream[events.Request, events.Questions](events.Name, watchEvents(eventStream(streamParams{Socket: socket, Registry: registry})))
+
+	lines, response := watchedLines(t, stream, api.Call{}, 1)
+
+	assert.Equal(t, http.StatusOK, response.Status, response.Envelope.Err)
+	require.Len(t, lines, 1)
+	assert.JSONEq(t, `{"v":2,"type":"ready","ts":"x"}`, withTS(t, lines[0]))
+}
