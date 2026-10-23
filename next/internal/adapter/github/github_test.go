@@ -104,14 +104,14 @@ func TestThePullRequestsOfManyBranchesAreAskedAHundredAtATime(t *testing.T) {
 	assert.Len(t, strings.Fields(lines[2]), 50)
 }
 
-func TestAFailingQueryKeepsThePullRequestsFoundBeforeIt(t *testing.T) {
+func TestAFailingQueryKeepsThePullRequestsTheOthersFound(t *testing.T) {
 	gh, _ := graphQLGH(t, "b150")
 
 	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequestsOf(t.Context(), branchesNamed(250))
 
 	require.ErrorIs(t, err, worktree.ErrPullRequestsUnavailable)
 	assert.ErrorContains(t, err, "gh api graphql")
-	assert.Len(t, prs, 100)
+	assert.Len(t, prs, 150)
 }
 
 func TestAQueryGitHubResolvesInPartKeepsWhatItResolved(t *testing.T) {
@@ -124,6 +124,26 @@ func TestAQueryGitHubResolvesInPartKeepsWhatItResolved(t *testing.T) {
 	require.ErrorIs(t, err, worktree.ErrPullRequestsUnavailable)
 	assert.ErrorContains(t, err, "Resource not accessible by integration")
 	assert.Equal(t, []worktree.PullRequest{{Number: 9, URL: "u", Branch: "feat/a", Head: "abc123", State: worktree.PullRequestMerged}}, prs)
+}
+
+func TestANodeGitHubNulledIsNoPullRequest(t *testing.T) {
+	gh := partialGH(t, `{"data": {"repository": {"b0": {"nodes": [null, {"number": 7, "url": "u", "state": "CLOSED", "headRefName": "feat/a", "isCrossRepository": false}]}}},
+		"errors": [{"type": "FORBIDDEN", "path": ["repository", "b0", "nodes", 0, "commits"], "message": "Resource not accessible by integration"}]}`)
+
+	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequestsOf(t.Context(), []string{"feat/a"})
+
+	require.ErrorIs(t, err, worktree.ErrPullRequestsUnavailable)
+	assert.Equal(t, []worktree.PullRequest{{Number: 7, URL: "u", Branch: "feat/a", State: worktree.PullRequestClosed}}, prs)
+}
+
+func TestAFailureInEveryQueryKeepsWhatEachResolved(t *testing.T) {
+	gh := partialGH(t, `{"data": {"repository": {"b0": {"nodes": [{"number": 1, "url": "u", "state": "MERGED", "headRefName": "feat/a", "isCrossRepository": false}]}}},
+		"errors": [{"type": "FORBIDDEN", "message": "Resource not accessible by integration"}]}`)
+
+	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequestsOf(t.Context(), branchesNamed(150))
+
+	require.ErrorIs(t, err, worktree.ErrPullRequestsUnavailable)
+	assert.Len(t, prs, 2)
 }
 
 func TestAnInterruptedReadIsTheContextsErrorNotGitHubUnavailable(t *testing.T) {

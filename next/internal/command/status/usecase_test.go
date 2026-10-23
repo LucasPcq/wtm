@@ -273,6 +273,14 @@ func TestWhatCannotBeAskedIsNullAndAWarning(t *testing.T) {
 	assert.Equal(t, []string{status.CodeJobsUnknown, status.CodePRsUnavailable}, codes(got.Warnings))
 }
 
+func TestAnInterruptedReadDoesNotWarnGitHubIsUnavailable(t *testing.T) {
+	w := newWorld(seed{PRsErr: context.Canceled})
+
+	got := read(t, w, status.Request{WithPRs: true})
+
+	assert.NotContains(t, codes(got.Warnings), status.CodePRsUnavailable)
+}
+
 func TestTheReviewIsTheNewestPullRequestAndAMergedOneAsksToCleanFirst(t *testing.T) {
 	const url = "https://github.com/acme/acme/pull/12"
 	clean := domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}

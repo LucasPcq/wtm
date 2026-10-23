@@ -150,7 +150,8 @@ func (f Facts) warnings() []domain.Warning {
 	if f.JobsErr != nil {
 		warnings = append(warnings, domain.Warning{Code: CodeJobsUnknown, Message: run.UnknownMessage(f.JobsErr)})
 	}
-	if f.PRsErr != nil {
+	// an interrupted read could not ask: GitHub said nothing of itself
+	if f.PRsErr != nil && !errors.Is(f.PRsErr, context.Canceled) {
 		warnings = append(warnings, domain.Warning{Code: CodePRsUnavailable, Message: f.PRsErr.Error()})
 	}
 

@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"os/exec"
@@ -44,8 +45,8 @@ func ViewCommand(number int) []string {
 // left, gh is not run. It asks one GraphQL query per prsPerQuery branches, so a
 // repository with many pull requests costs no more. Every failure wraps
 // worktree.ErrPullRequestsUnavailable but an interrupted read, which is the
-// context's error; a query that fails keeps the pull requests it and the
-// queries before it found.
+// context's error; every query is asked, one that fails keeping the pull
+// requests it found, and its failure joined to the others.
 func (g GitHub) PullRequestsOf(ctx context.Context, branches []string) ([]worktree.PullRequest, error) {
 	branches = slices.DeleteFunc(slices.Clone(branches), func(branch string) bool { return branch == "" })
 	if len(branches) == 0 {
@@ -58,16 +59,20 @@ func (g GitHub) PullRequestsOf(ctx context.Context, branches []string) ([]worktr
 	}
 
 	var found []worktree.PullRequest
+	var errs []error
 	for batch := range slices.Chunk(branches, prsPerQuery) {
 		out, err := g.run(ctx, binary, "gh api graphql", newestOf(batch)...)
+		if ctx.Err() != nil {
+			return found, ctx.Err()
+		}
 		prs, parseErr := parseNewest(out)
 		found = append(found, prs...)
 		if err := cmp.Or(err, parseErr); err != nil {
-			return found, err
+			errs = append(errs, err)
 		}
 	}
 
-	return found, nil
+	return found, errors.Join(errs...)
 }
 
 // signedIn returns the path of gh once it is found and signed in.
@@ -164,7 +169,7 @@ func parseNewest(out []byte) ([]worktree.PullRequest, error) {
 	var answer struct {
 		Data struct {
 			Repository map[string]struct {
-				Nodes []node `json:"nodes"`
+				Nodes []*node `json:"nodes"`
 			} `json:"repository"`
 		} `json:"data"`
 	}
@@ -174,10 +179,11 @@ func parseNewest(out []byte) ([]worktree.PullRequest, error) {
 
 	var prs []worktree.PullRequest
 	for _, alias := range slices.Sorted(maps.Keys(answer.Data.Repository)) {
-		nodes := answer.Data.Repository[alias].Nodes
-		at := slices.IndexFunc(nodes, func(pr node) bool { return !pr.IsCrossRepository && pr.State == "OPEN" })
+		// GraphQL nulls a whole node when one of its fields fails.
+		nodes := slices.DeleteFunc(answer.Data.Repository[alias].Nodes, func(pr *node) bool { return pr == nil })
+		at := slices.IndexFunc(nodes, func(pr *node) bool { return !pr.IsCrossRepository && pr.State == "OPEN" })
 		if at < 0 {
-			at = slices.IndexFunc(nodes, func(pr node) bool { return !pr.IsCrossRepository })
+			at = slices.IndexFunc(nodes, func(pr *node) bool { return !pr.IsCrossRepository })
 		}
 		if at < 0 {
 			continue
@@ -185,7 +191,7 @@ func parseNewest(out []byte) ([]worktree.PullRequest, error) {
 		pr := nodes[at]
 		prs = append(prs, worktree.PullRequest{
 			Number: pr.Number, URL: pr.URL, Branch: pr.HeadRefName, Head: pr.HeadRefOid, State: worktree.PullRequestState(strings.ToLower(pr.State)),
-			Title: pr.Title, Draft: pr.IsDraft, Checks: checksOf(pr), Decision: pr.ReviewDecision,
+			Title: pr.Title, Draft: pr.IsDraft, Checks: checksOf(*pr), Decision: pr.ReviewDecision,
 		})
 	}
 

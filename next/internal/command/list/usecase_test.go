@@ -146,6 +146,13 @@ func TestWhatCannotBeAskedIsAWarningNotAFailure(t *testing.T) {
 	}
 }
 
+func TestAnInterruptedReadDoesNotWarnGitHubIsUnavailable(t *testing.T) {
+	read, err := newWorld(seed{PRsErr: context.Canceled}).usecase.Run(t.Context(), list.Request{WithPRs: true}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.NotContains(t, codes(read), list.CodePRsUnavailable)
+}
+
 func TestJobsThatCannotBeToldAreNoServicesAtAll(t *testing.T) {
 	unknown, err := newWorld(seed{JobsErr: run.ErrUnknown}).usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
 	require.NoError(t, err)
