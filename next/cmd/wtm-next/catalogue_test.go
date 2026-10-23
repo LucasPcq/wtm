@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 
@@ -50,4 +51,18 @@ func TestAnInvalidCallIsRefusedWithTheStatusOfItsKind(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A surface's status read the main worktree whatever its call's directory: the worktree the caller stood in was set by the command line alone.
+func TestStatusOfASurfaceReadsTheWorktreeOfTheCallsDirectory(t *testing.T) {
+	main := configured(t)
+	ownConfigDir(t)
+	linked := filepath.Join(filepath.Dir(main), ".trees", "feat-a")
+	gittest.Git(t, main, "worktree", "add", "-q", "-b", "feat/a", linked)
+
+	got := command(t, "status").Execute(t.Context(), api.Call{Dir: linked})
+
+	assert.Equal(t, http.StatusOK, got.Status, got.Envelope.Err)
+	require.Len(t, got.Envelope.Items, 1)
+	assert.Equal(t, "feat/a", got.Envelope.Items[0].Subject)
 }

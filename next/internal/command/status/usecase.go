@@ -96,15 +96,15 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 	return NewQuestions(repo, req, located), nil
 }
 
-// located is the path the worktree req names stands for, resolved through its symbolic links from req.Cwd; "" when it names none, or nothing exists there.
+// located is the path the worktree req names stands for, resolved through its symbolic links from where the caller stands; "" when it names none, or nothing exists there.
 func (u UseCase) located(ctx context.Context, req Request) (string, error) {
 	if req.Worktree == "" {
 		return "", nil
 	}
 
 	path := req.Worktree
-	if !filepath.IsAbs(path) && req.Cwd != "" {
-		path = filepath.Join(req.Cwd, path)
+	if !filepath.IsAbs(path) && req.At.Cwd != "" {
+		path = filepath.Join(req.At.Cwd, path)
 	}
 	location, err := u.Git.Locate(ctx, path)
 	if err != nil || !location.Exists {

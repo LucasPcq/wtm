@@ -5,7 +5,6 @@ import (
 	"context"
 
 	"github.com/LucasPcq/wtm/next/internal/command/status"
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -44,35 +43,16 @@ var statusFlags = (&query{}).Flags()
 // New returns the status command: its argument and flags become a status.Request, the worktree picked first when none is named and the user can see and answer the picker; it draws what it read on streams, or the v2 JSON envelope with --output json, the fixes spelled by commandLine.
 func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (status.UseCase, error), commandLine output.CommandLine) *cobra.Command {
 	run := &uicli.Run{Command: status.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: statusFlags}
-	q := &query{Open: standing(open, env.Cwd), Draw: drawStatus}
+	q := &query{
+		Open: func(ctx context.Context, dir string) (form.Reader[status.Request, status.Questions, status.Outcome], error) {
+			return open(ctx, dir)
+		},
+		Draw: drawStatus,
+	}
 	cmd := &cobra.Command{Use: status.Name + " [worktree]", Short: statusShort, Long: statusLong, Example: statusExample, Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		return q.Launch(cmd, args)
 	}}
 	q.Bind(cmd, run)
 
 	return cmd
-}
-
-// standing opens the use case with open, its requests read from cwd, where the command line stands.
-func standing(open func(ctx context.Context, dir string) (status.UseCase, error), cwd string) func(ctx context.Context, dir string) (form.Reader[status.Request, status.Questions, status.Outcome], error) {
-	return func(ctx context.Context, dir string) (form.Reader[status.Request, status.Questions, status.Outcome], error) {
-		app, err := open(ctx, dir)
-		return here{app: app, cwd: cwd}, err
-	}
-}
-
-// here is the use case asked from the directory cwd: the worktree it reads when none is named.
-type here struct {
-	app status.UseCase
-	cwd string
-}
-
-func (h here) Questions(ctx context.Context, req status.Request) (status.Questions, error) {
-	req.Cwd = h.cwd
-	return h.app.Questions(ctx, req)
-}
-
-func (h here) Run(ctx context.Context, req status.Request, opts domain.RunOptions) (status.Outcome, error) {
-	req.Cwd = h.cwd
-	return h.app.Run(ctx, req, opts)
 }
