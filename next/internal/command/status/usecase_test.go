@@ -344,16 +344,39 @@ func TestAMergedPullRequestOfTheMainWorktreeOrTheBaseBranchIsNoProblem(t *testin
 	}
 }
 
-func TestAMergedPullRequestWhoseBranchMovedOnIsNoProblem(t *testing.T) {
-	w := newWorld(seed{
-		Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}},
-		PRs: []worktree.PullRequest{{Number: 12, Branch: "feat/a", Head: "a commit before the branch moved on", State: worktree.PullRequestMerged}},
-	})
+func TestAMergedPullRequestAsksToCleanABranchBehindItsHeadButNotOneMovedOnOrApart(t *testing.T) {
+	clean := []string{status.CodeMerged}
+	cases := map[string]struct {
+		head     string
+		problems []string
+	}{
+		"behind":       {head: "a2", problems: clean},
+		"moved_on":     {head: gittest.Root},
+		"never_pulled": {head: "a commit never fetched"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(seed{
+				Git: gittest.FakeParams{
+					Remote:    []string{"feat/a"},
+					Worktrees: []worktree.Worktree{linked("feat/a")},
+					Commits: map[worktree.Ref][]string{
+						worktree.LocalBranch{Name: "feat/a"}:  {"a1"},
+						worktree.RemoteBranch{Name: "feat/a"}: {"a1", "a2"},
+					},
+				},
+				PRs: []worktree.PullRequest{{Number: 12, Branch: "feat/a", Head: c.head, State: worktree.PullRequestMerged}},
+			})
 
-	a := only(t, read(t, w, status.Request{Worktree: "feat/a", WithPRs: true}))
+			a := only(t, read(t, w, status.Request{Worktree: "feat/a", WithPRs: true}))
 
-	assert.Equal(t, worktree.PullRequestMerged, a.Review.State)
-	assert.Empty(t, a.Problems, "a branch name reused, or moved on since the merge, is not cleaned")
+			assert.Equal(t, worktree.PullRequestMerged, a.Review.State)
+			assert.Equal(t, c.problems, problemCodes(a.Problems))
+			if c.problems != nil {
+				assert.Equal(t, domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}, a.Problems[0].Fix)
+			}
+		})
+	}
 }
 
 func TestGitHubIsAskedOfTheBranchesReadOnly(t *testing.T) {

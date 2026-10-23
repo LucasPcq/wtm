@@ -41,6 +41,16 @@ func (s Snapshot) Ref(from string) Ref {
 	return LocalBranch{Name: from}
 }
 
+// Tip returns the commit the local branch name stands at, "" when there is no such branch.
+func (s Snapshot) Tip(name string) string {
+	at := slices.IndexFunc(s.Branches.Local, func(b Branch) bool { return b.Name == name })
+	if at < 0 {
+		return ""
+	}
+
+	return s.Branches.Local[at].Tip
+}
+
 // CheckedOutAt returns the path of the worktree name is checked out in, or "" when none is.
 func (s Snapshot) CheckedOutAt(name string) string {
 	at := slices.IndexFunc(s.Worktrees, func(w Worktree) bool { return w.Branch() == name })

@@ -65,6 +65,12 @@ func (ab AheadBehind) String() string {
 	return strconv.Itoa(ab.Ahead) + " ahead, " + strconv.Itoa(ab.Behind) + " behind"
 }
 
+// An Ancestry asks whether the commit Ancestor is the commit Descendant or one of its ancestors.
+type Ancestry struct {
+	Ancestor   string
+	Descendant string
+}
+
 // A Span is the commits Branch has that Base lacks.
 type Span struct {
 	Branch string

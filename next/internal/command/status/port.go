@@ -8,13 +8,14 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-// Git is the repository as status reads one worktree of it: its uncommitted changes and how much they weigh, its last commits, and how its branch stands against the base branch; and a path resolved to where it really is.
+// Git is the repository as status reads one worktree of it: its uncommitted changes and how much they weigh, its last commits, and how its branch stands against the base branch; whether a commit is behind another; and a path resolved to where it really is.
 type Git interface {
 	Locate(ctx context.Context, path string) (worktree.Location, error)
 	Changes(ctx context.Context, dir string) ([]worktree.Change, error)
 	Diffstat(ctx context.Context, dir string) (worktree.Diffstat, error)
 	Commits(ctx context.Context, dir string, count int) ([]worktree.Commit, error)
 	AheadBehindOf(ctx context.Context, span worktree.Span) (worktree.AheadBehind, error)
+	IsAncestor(ctx context.Context, ancestry worktree.Ancestry) (bool, error)
 }
 
 // Meta reads a worktree's meta record by its branch; a missing record is an error wrapping os.ErrNotExist.

@@ -13,7 +13,7 @@ import (
 // ----------------------------------------------------------------------------
 // The facts
 
-// Facts are what tree reads: the repository, the stack its meta records make, what each worktree holds, the run daemon's jobs and the pull requests, each with the error that kept it from being read, and whether the read was interrupted; PullRequests is nil when GitHub was not asked.
+// Facts are what tree reads: the repository, the stack its meta records make, what each worktree holds, the run daemon's jobs and the pull requests, each with the error that kept it from being read, the branches behind their merged pull request (repository.Behind), and whether the read was interrupted; PullRequests is nil when GitHub was not asked.
 type Facts struct {
 	worktree.Repository
 	Stack        worktree.Stack
@@ -22,6 +22,7 @@ type Facts struct {
 	JobsErr      error
 	PullRequests []worktree.PullRequest
 	PRsErr       error
+	Behind       map[string]bool // by branch
 	Interrupted  bool
 }
 
@@ -130,7 +131,7 @@ func (f Facts) item(branch string) Item {
 		detail.PR = &PR{Number: pr.Number, URL: pr.URL, State: pr.State}
 	}
 	detail.Services = f.services(w.Path)
-	detail.Actions = Actions(detail, f.Repository.Cleans(pr, w))
+	detail.Actions = Actions(detail, f.Repository.Cleans(pr, w, f.Behind[branch]))
 
 	return Item{Subject: branch, Status: domain.StatusDone, Detail: &detail}
 }

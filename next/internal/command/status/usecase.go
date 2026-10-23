@@ -152,6 +152,7 @@ func (u UseCase) Observe(ctx context.Context, observed Observed) Facts {
 	}
 
 	facts.States, facts.Jobs, facts.JobsErr, facts.PullRequests, facts.PRsErr = states, jobs, jobsErr, pullRequests, prsErr
+	facts.Behind = repository.Behind(ctx, u.Git, observed.Repository, pullRequests, observed.Targets)
 	return facts
 }
 

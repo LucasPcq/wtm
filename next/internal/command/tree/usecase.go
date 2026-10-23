@@ -112,6 +112,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		facts.States[w.Branch()] = read[i]
 	}
 	facts.Jobs, facts.JobsErr, facts.PullRequests, facts.PRsErr = jobs, jobsErr, pullRequests, prsErr
+	facts.Behind = repository.Behind(ctx, u.Git, repo, pullRequests, nodes)
 	facts.Interrupted = ctx.Err() != nil
 	return facts, nil
 }

@@ -7,11 +7,12 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-// Git is the repository as tree reads it, a worktree at a time.
+// Git is the repository as tree reads it, a worktree at a time, and whether a commit is behind another.
 type Git interface {
 	Locate(ctx context.Context, path string) (worktree.Location, error)
 	Dirty(ctx context.Context, path string) (bool, error)
 	AheadBehindOf(ctx context.Context, span worktree.Span) (worktree.AheadBehind, error)
+	IsAncestor(ctx context.Context, ancestry worktree.Ancestry) (bool, error)
 }
 
 // Meta reads a worktree's meta record by its branch.

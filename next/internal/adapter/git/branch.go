@@ -85,6 +85,20 @@ func (r Repo) AheadBehindOf(ctx context.Context, span worktree.Span) (worktree.A
 	return parseAheadBehind(string(out))
 }
 
+// IsAncestor reports whether the commit ancestry.Ancestor is ancestry.Descendant or one of its ancestors; it fails when either is no commit of the repository, one never fetched included.
+func (r Repo) IsAncestor(ctx context.Context, ancestry worktree.Ancestry) (bool, error) {
+	_, err := r.git(ctx, "merge-base", "--is-ancestor", "--end-of-options", ancestry.Ancestor, ancestry.Descendant)
+	// git exits 1 for a commit that is not an ancestor, 128 for one it does not know.
+	if failed, ok := errors.AsType[*Error](err); ok && failed.Exit == 1 {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
 // parseAheadBehind reads the two counts of git rev-list --left-right --count.
 func parseAheadBehind(out string) (worktree.AheadBehind, error) {
 	fields := strings.Fields(out)

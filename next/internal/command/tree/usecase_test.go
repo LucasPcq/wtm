@@ -245,23 +245,36 @@ func TestGitHubIsAskedOnlyWhenTheRequestAsksOfTheBranchesOfTheTree(t *testing.T)
 	assert.Nil(t, detailOf(t, with, "main").PR)
 }
 
-func TestAMergedPullRequestCleansItsWorktreeOnlyAtItsCommitAndNeverTheMainOneNorTheBase(t *testing.T) {
+func TestAMergedPullRequestCleansItsWorktreeAtOrBehindItsCommitAndNeverTheMainOneNorTheBase(t *testing.T) {
 	merged := func(branch, head string) worktree.PullRequest {
 		return worktree.PullRequest{Number: 1, Branch: branch, Head: head, State: worktree.PullRequestMerged}
 	}
 	w := newWorld(seed{
 		Base: "develop",
-		Git:  gittest.FakeParams{Worktrees: []worktree.Worktree{linked("develop"), linked("feat/a"), linked("feat/moved")}},
-		PRs:  []worktree.PullRequest{merged("main", gittest.Root), merged("develop", gittest.Root), merged("feat/a", gittest.Root), merged("feat/moved", "an older commit")},
+		Git: gittest.FakeParams{
+			Remote:    []string{"feat/behind"},
+			Worktrees: []worktree.Worktree{linked("develop"), linked("feat/a"), linked("feat/behind"), linked("feat/moved"), linked("feat/unknown")},
+			Commits: map[worktree.Ref][]string{
+				worktree.LocalBranch{Name: "feat/behind"}:  {"b1"},
+				worktree.RemoteBranch{Name: "feat/behind"}: {"b1", "b2"},
+				worktree.LocalBranch{Name: "feat/moved"}:   {"m1"},
+			},
+		},
+		PRs: []worktree.PullRequest{
+			merged("main", gittest.Root), merged("develop", gittest.Root), merged("feat/a", gittest.Root),
+			merged("feat/behind", "b2"), merged("feat/moved", gittest.Root), merged("feat/unknown", "never fetched"),
+		},
 	})
 
 	got, err := w.usecase.Run(t.Context(), tree.Request{WithPRs: true}, domain.RunOptions{})
 
 	require.NoError(t, err)
-	actions := detailOf(t, got, "feat/a").Actions
-	require.Len(t, actions, 1)
-	assert.Equal(t, domain.CommandClean, actions[0].Command)
-	for _, branch := range []string{"main", "develop", "feat/moved"} {
+	for _, branch := range []string{"feat/a", "feat/behind"} {
+		actions := detailOf(t, got, branch).Actions
+		require.Len(t, actions, 1, branch)
+		assert.Equal(t, domain.CommandClean, actions[0].Command, branch)
+	}
+	for _, branch := range []string{"main", "develop", "feat/moved", "feat/unknown"} {
 		assert.Empty(t, detailOf(t, got, branch).Actions, branch)
 	}
 }

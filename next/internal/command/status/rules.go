@@ -20,7 +20,7 @@ import (
 // ----------------------------------------------------------------------------
 // The facts
 
-// Facts are what status reads: the repository, the meta record of each live branch (and the error of a record that exists but does not read), what each worktree read holds, the run daemon's jobs and the newest pull request of each branch read, each with the error that kept it from being read; PullRequests is nil when GitHub was not asked.
+// Facts are what status reads: the repository, the meta record of each live branch (and the error of a record that exists but does not read), what each worktree read holds, the run daemon's jobs and the pull request of each branch read, each with the error that kept it from being read, and the branches behind their merged pull request (repository.Behind); PullRequests is nil when GitHub was not asked.
 type Facts struct {
 	worktree.Repository
 	Records      map[string]worktree.Meta // by branch
@@ -30,6 +30,7 @@ type Facts struct {
 	JobsErr      error
 	PullRequests []worktree.PullRequest
 	PRsErr       error
+	Behind       map[string]bool // by branch
 }
 
 // A State is what one worktree holds: its uncommitted changes and how much they weigh, its last commits, how its branch stands against the base branch (nil when it is not counted), its declared .env files as read, what of these could not be read and why, and the error that kept the worktree from being read.
@@ -325,7 +326,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 	// Every fix names a branch: a worktree on none has its facts read and nothing to fix.
 	detail.Problems = []Problem{}
 	if branch != "" {
-		detail.Problems = Problems(ProblemsParams{Subject: subject, Merged: f.Repository.Cleans(pr, w), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
+		detail.Problems = Problems(ProblemsParams{Subject: subject, Merged: f.Repository.Cleans(pr, w, f.Behind[branch]), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
 	}
 
 	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail}
