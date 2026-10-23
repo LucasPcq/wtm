@@ -35,18 +35,6 @@
           ]
         },
         {
-          "path": "fast_forward",
-          "values": [
-            "false"
-          ]
-        },
-        {
-          "path": "keep",
-          "values": [
-            "false"
-          ]
-        },
-        {
           "path": "on_conflict",
           "values": [
             "resolve"

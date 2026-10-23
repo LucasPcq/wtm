@@ -273,8 +273,16 @@ func (f Facts) conflictCheck(req Request) worktree.ConflictCheck {
 // ----------------------------------------------------------------------------
 // Decide
 
-// Decide turns the facts, the request Resolve settled on them and the conflicts the changes would meet into the plan and its warnings. A source with nothing to extract is a plan with no files. Resolve refuses a target the facts rule out, so Decide refuses only conflicts, with CodeConflict, unless the request resolves them, and binary ones always; it panics on a request not resolved on these facts, a bug of the caller.
-func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain.Warning, error) {
+// DecideParams is what Decide decides from beside the facts: the request as given, the request Resolve settled on the facts, and the conflicts its changes would meet.
+type DecideParams struct {
+	Given     Request
+	Resolved  Request
+	Conflicts []worktree.Conflict
+}
+
+// Decide turns the facts and params into the plan and its warnings. A source with nothing to extract is a plan with no files. Resolve refuses a target the facts rule out, so Decide refuses only conflicts, with CodeConflict, unless the request resolves them, and binary ones always, a refusal followed by the request as given resolving them; it panics on a request not resolved on these facts, a bug of the caller.
+func Decide(f Facts, params DecideParams) (Plan, []domain.Warning, error) {
+	req := params.Resolved
 	planned := Plan{Source: req.Source, Files: []worktree.Change{}, Conflicts: []worktree.Conflict{}, facts: f}
 	if f.nothing(req.Source) {
 		planned.Summary = Summary{Code: CodeNothing, Message: "no uncommitted changes in " + req.Source, Params: domain.Params{"source": req.Source}}
@@ -290,13 +298,13 @@ func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain
 		planned.Creates = 1
 	}
 
-	if refused := refusedFor(req, planned.Target.Branch, conflicts); refused != nil {
+	if refused := refusedFor(params.Given, planned.Target.Branch, params.Conflicts); refused != nil {
 		return Plan{}, nil, refused
 	}
 
 	planned.Files = f.selected(req)
 	planned.Keep = req.Keep != nil && *req.Keep
-	planned.Conflicts = append(planned.Conflicts, conflicts...)
+	planned.Conflicts = append(planned.Conflicts, params.Conflicts...)
 	planned.OnConflict = req.OnConflict
 	if !planned.Target.creates() {
 		return planned, f.ignored(req, planned.Target), nil
@@ -314,16 +322,16 @@ func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain
 // CodeResolve is the step that extracts again, writing conflict markers in the target.
 const CodeResolve = Name + ".resolve"
 
-// refusedFor is the refusal of the conflicts, nil when there are none or req resolves them, followed by the same extract resolving them; a binary conflict cannot take conflict markers, so it is refused even then, with no follow-up.
-func refusedFor(req Request, target string, conflicts []worktree.Conflict) *domain.Error {
-	if !worktree.Refuses(conflicts, req.OnConflict == OnConflictResolve) {
+// refusedFor is the refusal of the conflicts, nil when there are none or given resolves them, followed by given resolving them, the answers the user did not give left to their defaults; a binary conflict cannot take conflict markers, so it is refused even then, with no follow-up.
+func refusedFor(given Request, target string, conflicts []worktree.Conflict) *domain.Error {
+	if !worktree.Refuses(conflicts, given.OnConflict == OnConflictResolve) {
 		return nil
 	}
 
 	refusal := conflictRefusal(conflicts, target)
 	if !worktree.Refuses(conflicts, true) {
-		req.OnConflict = OnConflictResolve
-		refusal.FollowUp = &domain.FollowUp{Command: Name, Answers: domain.AnswersOf(Questions{}.Form(), req), Code: CodeResolve, Message: "write conflict markers in " + target}
+		given.OnConflict = OnConflictResolve
+		refusal.FollowUp = &domain.FollowUp{Command: Name, Answers: domain.AnswersOf(Questions{}.Form(), given), Code: CodeResolve, Message: "write conflict markers in " + target}
 	}
 	return refusal
 }

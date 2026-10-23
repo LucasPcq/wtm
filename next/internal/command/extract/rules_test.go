@@ -113,7 +113,7 @@ func TestConflictsUnderResolveArePlanned(t *testing.T) {
 	w.change(t, source, "a.txt", "a\n")
 	conflicts := []worktree.Conflict{{Path: "a.txt", Kind: worktree.ConflictExists}}
 
-	planned, _, err := extract.Decide(w.facts(t, moving("a.txt")), extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictResolve}, conflicts)
+	planned, _, err := extract.Decide(w.facts(t, moving("a.txt")), extract.DecideParams{Given: extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictResolve}, Resolved: extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictResolve}, Conflicts: conflicts})
 
 	require.NoError(t, err)
 	assert.Equal(t, conflicts, planned.Conflicts)
@@ -123,10 +123,10 @@ func TestABinaryCollisionIsRefusedEvenUnderResolve(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.change(t, source, "a.txt", "a\n")
 
-	_, _, err := extract.Decide(w.facts(t, moving("a.txt")), extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictResolve}, []worktree.Conflict{
+	_, _, err := extract.Decide(w.facts(t, moving("a.txt")), extract.DecideParams{Given: extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictResolve}, Resolved: extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictResolve}, Conflicts: []worktree.Conflict{
 		{Path: "a.go", Kind: worktree.ConflictModified},
 		{Path: "logo.png", Kind: worktree.ConflictBinary},
-	})
+	}})
 
 	failure := failureOf(t, err)
 	assert.Equal(t, extract.CodeConflict, failure.Code)
@@ -139,11 +139,11 @@ func TestAConflictRefusalNamesWhatWasModifiedAndWhatAlreadyExists(t *testing.T) 
 	w := newWorld(t, seed{})
 	w.change(t, source, "a.txt", "a\n")
 
-	_, _, err := extract.Decide(w.facts(t, moving("a.txt")), extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictAbort}, []worktree.Conflict{
+	_, _, err := extract.Decide(w.facts(t, moving("a.txt")), extract.DecideParams{Given: extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictAbort}, Resolved: extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictAbort}, Conflicts: []worktree.Conflict{
 		{Path: "a.go", Kind: worktree.ConflictModified},
 		{Path: "b.go", Kind: worktree.ConflictModified},
 		{Path: "new.txt", Kind: worktree.ConflictExists},
-	})
+	}})
 
 	failure := failureOf(t, err)
 	assert.Equal(t, domain.KindConflict, failure.Kind)
