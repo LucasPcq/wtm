@@ -173,6 +173,18 @@ func TestARecordThatDoesNotReadKeepsItsWorktreeAndIsAWarning(t *testing.T) {
 	assert.Nil(t, item.Detail.CreatedAt)
 }
 
+func TestARecordThatDoesNotReadIsAWarningOnAWorktreeNotReadToo(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}, Fail: map[string]error{"Dirty": errors.New("broken index")}}, Unreadable: []string{"feat/a"}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	item := read.Items[slices.IndexFunc(read.Items, func(item list.Item) bool { return item.Subject == "feat/a" })]
+	assert.Equal(t, domain.StatusFailed, item.Status)
+	require.Len(t, item.Warnings, 1)
+	assert.Equal(t, list.CodeMetaUnreadable, item.Warnings[0].Code)
+}
+
 func TestARefreshThatCannotFetchIsAWarning(t *testing.T) {
 	w := newWorld(seed{Git: gittest.FakeParams{Fail: map[string]error{"Fetch": errors.New("could not read from remote repository")}}})
 

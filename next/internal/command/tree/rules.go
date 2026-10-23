@@ -130,7 +130,7 @@ func (f Facts) item(branch string) Item {
 	return Item{Subject: branch, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
 }
 
-// recordWarnings are the warning of the record of branch when it exists but does not read, none otherwise.
+// recordWarnings are the warnings of the record of branch when it exists but does not read, none otherwise.
 func (f Facts) recordWarnings(branch string) []domain.Warning {
 	err := f.RecordErrs[branch]
 	if err == nil {

@@ -345,6 +345,18 @@ func TestARecordThatDoesNotReadKeepsItsNodeAsARootAndIsAWarning(t *testing.T) {
 	assert.True(t, node.Detail.Dirty, "its worktree is read")
 }
 
+func TestARecordThatDoesNotReadIsAWarningOnANodeNotReadToo(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}, Fail: map[string]error{"Dirty": errors.New("broken index")}}, Unreadable: []string{"feat/a"}})
+
+	read, err := w.usecase.Run(t.Context(), tree.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	node := read.Items[slices.IndexFunc(read.Items, func(item tree.Item) bool { return item.Subject == "feat/a" })]
+	assert.Equal(t, domain.StatusFailed, node.Status)
+	require.Len(t, node.Warnings, 1)
+	assert.Equal(t, tree.CodeMetaUnreadable, node.Warnings[0].Code)
+}
+
 func TestACountInterruptedMakesItsNodeCancelled(t *testing.T) {
 	w := newWorld(seed{
 		Git:  gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), linked("loose")}, Fail: map[string]error{"AheadBehindOf": context.Canceled}},

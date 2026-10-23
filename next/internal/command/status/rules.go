@@ -333,7 +333,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 	return item
 }
 
-// recordWarnings are the warning of the record of branch when it exists but does not read, none otherwise.
+// recordWarnings are the warnings of the record of branch when it exists but does not read, none otherwise.
 func (f Facts) recordWarnings(branch string) []domain.Warning {
 	err := f.RecordErrs[branch]
 	if err == nil {

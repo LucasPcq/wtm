@@ -244,6 +244,17 @@ func TestOnlyAnUnnumberedWorktreeHasNoOffsetAndARecordThatDoesNotReadIsAWarning(
 	assert.Equal(t, status.PortsUnknown, d.Run.Ports)
 }
 
+func TestARecordThatDoesNotReadIsAWarningOnAWorktreeNotReadToo(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}}, Unreadable: []string{"feat/a"}})
+	w.usecase.Git = failingChanges{Git: w.usecase.Git, path: "/repo/.trees/feat/a", err: errors.New("broken index")}
+
+	got := read(t, w, status.Request{Worktree: "feat/a"})
+
+	require.Len(t, got.Items, 1)
+	assert.Equal(t, domain.StatusFailed, got.Items[0].Status)
+	assert.Equal(t, []string{status.CodeMetaUnreadable}, codes(got.Items[0].Warnings))
+}
+
 func TestASharedJobAWorktreeHoldsReadsAsItsOwnersInstanceOnce(t *testing.T) {
 	exit := 2
 	w := newWorld(seed{
