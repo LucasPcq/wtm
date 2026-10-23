@@ -272,10 +272,13 @@ func (w *Wizard) landed(m laterMsg) {
 	}
 }
 
-// observed installs what a read found, ends the wizard if the read failed, else moves on as m says and replays the keys typed meanwhile.
+// observed installs what a read found and, unless the wizard ended meanwhile, ends it if the read failed, else moves on as m says and replays the keys typed meanwhile.
 func (w *Wizard) observed(m observedMsg) tea.Cmd {
 	w.loading, w.reading = "", false
 	m.apply()
+	if w.ending != Asking {
+		return nil
+	}
 	if m.err != nil {
 		w.err, w.ending = m.err, Failed
 		return tea.Quit

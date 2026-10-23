@@ -322,6 +322,28 @@ func TestAKeyTypedBeforeAFailedReadQuitsIsNotAnswered(t *testing.T) {
 	assert.Equal(t, form.Failed, d.Wizard.Ending())
 }
 
+func TestAReadThatLandsAfterACancelLeavesTheWizardCancelled(t *testing.T) {
+	cases := map[string]func(*form.Script){
+		"dry_run": func(s *form.Script) { s.DryRun = true },
+		"walk":    func(s *form.Script) { s.Preview = nil },
+		"recap":   func(*form.Script) {},
+	}
+	for name, edit := range cases {
+		t.Run(name, func(t *testing.T) {
+			script := newFake().script()
+			edit(&script)
+			d := open(t, script)
+			d.Keys("enter")
+
+			d.Keys("ctrl+c")
+			d.Send(form.ReadLanded())
+
+			assert.Equal(t, form.Cancelled, d.Wizard.Ending())
+			assert.Equal(t, 1, d.Wizard.Current(), "the wizard moved on after the cancel")
+		})
+	}
+}
+
 func TestTheRecapNamesItsApplyAsTheScriptSays(t *testing.T) {
 	f := newFake()
 	script := f.script()
