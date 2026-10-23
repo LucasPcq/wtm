@@ -1,0 +1,455 @@
+{
+  "v": 2,
+  "command": "list",
+  "ok": false,
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "branch": "main",
+        "path": "<SB>/acme",
+        "main": true,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "active": true,
+        "missing": false,
+        "commits_ahead": 0,
+        "created_at": null,
+        "origin": {
+          "ahead": 0,
+          "behind": 0,
+          "state": "up-to-date"
+        },
+        "pr": null,
+        "services": [],
+        "actions": [
+          {
+            "command": "go",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "main"
+                ]
+              }
+            ],
+            "code": "list.go",
+            "message": "Go to the worktree"
+          },
+          {
+            "command": "run up",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "main"
+                ]
+              }
+            ],
+            "code": "list.run_up",
+            "message": "Start the profile"
+          },
+          {
+            "command": "run down",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "main"
+                ]
+              }
+            ],
+            "code": "list.run_down",
+            "message": "Stop the profile"
+          },
+          {
+            "command": "run logs",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "main"
+                ]
+              }
+            ],
+            "code": "list.logs",
+            "message": "View the logs"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "branch": "feat/a",
+        "path": "<SB>/acme.trees/feat-a",
+        "main": false,
+        "dirty": true,
+        "locked": false,
+        "rebasing": false,
+        "active": false,
+        "missing": false,
+        "commits_ahead": 2,
+        "created_at": "<T>",
+        "origin": {
+          "ahead": 1,
+          "behind": 0,
+          "state": "ahead"
+        },
+        "pr": null,
+        "services": [],
+        "actions": [
+          {
+            "command": "go",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/a"
+                ]
+              }
+            ],
+            "code": "list.go",
+            "message": "Go to the worktree"
+          },
+          {
+            "command": "run up",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/a"
+                ]
+              }
+            ],
+            "code": "list.run_up",
+            "message": "Start the profile"
+          },
+          {
+            "command": "run down",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/a"
+                ]
+              }
+            ],
+            "code": "list.run_down",
+            "message": "Stop the profile"
+          },
+          {
+            "command": "run logs",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/a"
+                ]
+              }
+            ],
+            "code": "list.logs",
+            "message": "View the logs"
+          },
+          {
+            "command": "clean",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/a"
+                ]
+              }
+            ],
+            "code": "list.clean",
+            "message": "Clean (delete the worktree)"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "main": false,
+        "dirty": false,
+        "locked": true,
+        "rebasing": false,
+        "active": false,
+        "missing": false,
+        "commits_ahead": 0,
+        "created_at": "<T>",
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": [
+          {
+            "command": "go",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/b"
+                ]
+              }
+            ],
+            "code": "list.go",
+            "message": "Go to the worktree"
+          },
+          {
+            "command": "run up",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/b"
+                ]
+              }
+            ],
+            "code": "list.run_up",
+            "message": "Start the profile"
+          },
+          {
+            "command": "run down",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/b"
+                ]
+              }
+            ],
+            "code": "list.run_down",
+            "message": "Stop the profile"
+          },
+          {
+            "command": "run logs",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/b"
+                ]
+              }
+            ],
+            "code": "list.logs",
+            "message": "View the logs"
+          },
+          {
+            "command": "clean",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/b"
+                ]
+              }
+            ],
+            "code": "list.clean",
+            "message": "Clean (delete the worktree)"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/gone",
+      "status": "done",
+      "detail": {
+        "branch": "feat/gone",
+        "path": "<SB>/acme.trees/feat-gone",
+        "main": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "active": false,
+        "missing": true,
+        "commits_ahead": 0,
+        "created_at": "<T>",
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": [
+          {
+            "command": "clean",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/gone"
+                ]
+              }
+            ],
+            "code": "list.clean",
+            "message": "Clean (delete the worktree)"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "<SB>/acme.trees/detached",
+      "status": "done",
+      "detail": {
+        "branch": "",
+        "path": "<SB>/acme.trees/detached",
+        "main": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "active": false,
+        "missing": false,
+        "commits_ahead": 0,
+        "created_at": null,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": [
+          {
+            "command": "go",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "<SB>/acme.trees/detached"
+                ]
+              }
+            ],
+            "code": "list.go",
+            "message": "Go to the worktree"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "locked-gone",
+      "status": "done",
+      "detail": {
+        "branch": "locked-gone",
+        "path": "<SB>/acme.trees/locked-gone",
+        "main": false,
+        "dirty": false,
+        "locked": true,
+        "rebasing": false,
+        "active": false,
+        "missing": true,
+        "commits_ahead": 0,
+        "created_at": null,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": [
+          {
+            "command": "clean",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "locked-gone"
+                ]
+              }
+            ],
+            "code": "list.clean",
+            "message": "Clean (delete the worktree)"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "orphan",
+      "status": "done",
+      "detail": {
+        "branch": "orphan",
+        "path": "<SB>/acme.trees/orphan",
+        "main": false,
+        "dirty": false,
+        "locked": false,
+        "rebasing": false,
+        "active": false,
+        "missing": false,
+        "commits_ahead": 0,
+        "created_at": null,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": [
+          {
+            "command": "go",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "orphan"
+                ]
+              }
+            ],
+            "code": "list.go",
+            "message": "Go to the worktree"
+          },
+          {
+            "command": "run up",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "orphan"
+                ]
+              }
+            ],
+            "code": "list.run_up",
+            "message": "Start the profile"
+          },
+          {
+            "command": "run down",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "orphan"
+                ]
+              }
+            ],
+            "code": "list.run_down",
+            "message": "Stop the profile"
+          },
+          {
+            "command": "run logs",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "orphan"
+                ]
+              }
+            ],
+            "code": "list.logs",
+            "message": "View the logs"
+          },
+          {
+            "command": "clean",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "orphan"
+                ]
+              }
+            ],
+            "code": "list.clean",
+            "message": "Clean (delete the worktree)"
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "cancelled",
+    "code": "unit.interrupted",
+    "message": "interrupted"
+  }
+}

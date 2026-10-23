@@ -47,9 +47,10 @@ func newPicker(t *testing.T, w world, req list.Request) *picker {
 	t.Helper()
 	app, err := w.open(t.Context(), mainPath)
 	require.NoError(t, err)
+	req.Caller = w.env().Caller()
 	read, err := app.Run(t.Context(), req, domain.RunOptions{})
 	require.NoError(t, err)
-	return &picker{app: app, read: read, cwd: w.env().Cwd, withPRs: req.WithPRs}
+	return &picker{app: app, read: read, caller: req.Caller, withPRs: req.WithPRs}
 }
 
 // shownDetail is the detail of subject in the read p shows.

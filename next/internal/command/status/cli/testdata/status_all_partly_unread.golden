@@ -1,0 +1,9 @@
+
+  ✗ 4 worktrees · 1 not read
+
+  WORKTREE            ENV
+  main                2 files
+  ../.trees/detached  2 files
+  feat/old            2 files
+  ✗ couldn't read /repo/.trees/feat-a: broken index
+

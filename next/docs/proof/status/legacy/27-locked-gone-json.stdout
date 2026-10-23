@@ -1,0 +1,162 @@
+[
+  {
+    "branch": "main",
+    "path": "<SB>/acme",
+    "main": true,
+    "isolation": "isolated",
+    "addressing": "names",
+    "offset": 0,
+    "run_config": true,
+    "env": {
+      "declared": 2,
+      "missing": []
+    },
+    "jobs": [
+      {
+        "name": "web",
+        "kind": "service",
+        "state": "stopped",
+        "url": "http://web.main.acme.localhost:23462"
+      },
+      {
+        "name": "api",
+        "kind": "service",
+        "state": "stopped",
+        "url": "http://api.main.acme.localhost:23462"
+      }
+    ],
+    "problems": []
+  },
+  {
+    "branch": "feat/a",
+    "path": "<SB>/acme.trees/feat-a",
+    "main": false,
+    "isolation": "isolated",
+    "addressing": "names",
+    "offset": 10,
+    "run_config": true,
+    "env": {
+      "declared": 2,
+      "missing": []
+    },
+    "jobs": [
+      {
+        "name": "web",
+        "kind": "service",
+        "state": "stopped",
+        "url": "http://web.feat-a.acme.localhost:23462"
+      },
+      {
+        "name": "api",
+        "kind": "service",
+        "state": "stopped",
+        "url": "http://api.feat-a.acme.localhost:23462"
+      }
+    ],
+    "problems": []
+  },
+  {
+    "branch": "feat/b",
+    "path": "<SB>/acme.trees/feat-b",
+    "main": false,
+    "isolation": "isolated",
+    "addressing": "names",
+    "offset": 20,
+    "run_config": true,
+    "env": {
+      "declared": 2,
+      "missing": [
+        "apps/api/.env",
+        "apps/web/.env"
+      ]
+    },
+    "jobs": [
+      {
+        "name": "web",
+        "kind": "service",
+        "state": "stopped",
+        "url": "http://web.feat-b.acme.localhost:23462"
+      },
+      {
+        "name": "api",
+        "kind": "service",
+        "state": "stopped",
+        "url": "http://api.feat-b.acme.localhost:23462"
+      }
+    ],
+    "problems": [
+      {
+        "code": "env_missing",
+        "message": "apps/api/.env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand",
+        "fix": "wtm config edit"
+      },
+      {
+        "code": "env_missing",
+        "message": "apps/web/.env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand",
+        "fix": "wtm config edit"
+      }
+    ]
+  },
+  {
+    "branch": "feat/old",
+    "path": "<SB>/acme.trees/feat-old",
+    "main": false,
+    "isolation": "isolated",
+    "addressing": "names",
+    "offset": 30,
+    "run_config": true,
+    "env": {
+      "declared": 2,
+      "missing": []
+    },
+    "jobs": [
+      {
+        "name": "web",
+        "kind": "service",
+        "state": "stopped",
+        "url": "http://web.feat-old.acme.localhost:23462"
+      },
+      {
+        "name": "api",
+        "kind": "service",
+        "state": "stopped",
+        "url": "http://api.feat-old.acme.localhost:23462"
+      }
+    ],
+    "problems": [
+      {
+        "code": "isolation_pending",
+        "message": "predates the isolation choice: run up and run start refuse it",
+        "fix": "wtm env feat/old --isolation isolated --yes"
+      }
+    ]
+  },
+  {
+    "branch": "feat/rb",
+    "path": "<SB>/acme.trees/feat-rb",
+    "main": false,
+    "isolation": "isolated",
+    "addressing": "names",
+    "offset": 40,
+    "run_config": true,
+    "env": {
+      "declared": 2,
+      "missing": []
+    },
+    "jobs": [
+      {
+        "name": "web",
+        "kind": "service",
+        "state": "stopped",
+        "url": "http://web.feat-rb.acme.localhost:23462"
+      },
+      {
+        "name": "api",
+        "kind": "service",
+        "state": "stopped",
+        "url": "http://api.feat-rb.acme.localhost:23462"
+      }
+    ],
+    "problems": []
+  }
+]

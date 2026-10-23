@@ -62,6 +62,14 @@ type Shown struct {
 	Path string
 }
 
+// ShownWorktree names a worktree as a read shows it: its branch, else the path of at as ShownPath shows it.
+func ShownWorktree(branch string, at Shown) string {
+	if branch != "" {
+		return branch
+	}
+	return ShownPath(at)
+}
+
 // ShownPath returns the path of s relative to its working directory, or the path as it is when it has none or the two share no root.
 func ShownPath(s Shown) string {
 	relative, err := filepath.Rel(s.Cwd, s.Path)

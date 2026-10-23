@@ -82,7 +82,7 @@ func TestAReadThatFailedOnASubjectDrawsItAndFails(t *testing.T) {
 	q.Open = func(context.Context, string) (form.Reader[request, questions, read], error) {
 		return reader{read: read{Items: []domain.Unit[struct{}]{{Subject: "a", Status: domain.StatusFailed, Err: &domain.Error{Kind: domain.KindInternal, Code: "fake.unreadable", Message: "couldn't read a"}}}}}, nil
 	}
-	q.Draw = func(w io.Writer, got read, _ output.View) {
+	q.Draw = func(w io.Writer, got read, _ request, _ output.View) {
 		_, _ = io.WriteString(w, "drew "+got.Items[0].Subject+"\n")
 	}
 	streams, _, stdout, _ := output.Test()

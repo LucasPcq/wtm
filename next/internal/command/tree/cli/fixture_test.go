@@ -31,12 +31,13 @@ func (configured) LoadRun() (project.Run, error) {
 
 // A world is a repository of every kind of node tree draws: a stack of three levels with a job up and commits ahead, a fan-out whose second branch lacks a commit of main and is locked, a parent with no worktree, a cycle, a rebasing worktree, one whose directory is gone and a detached one; Worktrees, when set, replaces them, on branches with no commit and no origin.
 type world struct {
-	ConfigErr error
-	PRsErr    error
-	JobsErr   error
-	Worktrees []worktree.Worktree
-	Meta      map[string]worktree.Meta
-	Fail      map[string]error // git's failures, by method
+	ConfigErr  error
+	PRsErr     error
+	JobsErr    error
+	Worktrees  []worktree.Worktree
+	Meta       map[string]worktree.Meta
+	Unreadable []string         // the branches whose record does not read
+	Fail       map[string]error // git's failures, by method
 }
 
 func (w world) env() uicli.Env {
@@ -91,7 +92,7 @@ func (w world) open(context.Context, string) (tree.UseCase, error) {
 		Origin:    origin,
 		Fail:      w.Fail,
 	})
-	store := storetest.NewFake(storetest.FakeParams{Meta: meta})
+	store := storetest.NewFake(storetest.FakeParams{Meta: meta, Unreadable: w.Unreadable})
 	prs := []worktree.PullRequest{
 		{Number: 12, URL: "https://github.com/acme/acme/pull/12", Branch: "feat/a", State: worktree.PullRequestOpen},
 		{Number: 9, URL: "https://github.com/acme/acme/pull/9", Branch: "feat/b", Head: "b1", State: worktree.PullRequestMerged},

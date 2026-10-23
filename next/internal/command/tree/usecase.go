@@ -3,12 +3,8 @@ package tree
 
 import (
 	"context"
-	"errors"
-	"io/fs"
-	"sync"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
@@ -53,7 +49,7 @@ func (u UseCase) Run(ctx context.Context, req Request, _ domain.RunOptions) (Out
 
 	// 2. Report each node, parents before their children, with what it needs next.
 	items, warnings := Tree(facts)
-	return Outcome{Items: items, Warnings: warnings}, nil
+	return Outcome{Items: items, Warnings: warnings, Interrupted: facts.Interrupted}, nil
 }
 
 // ----------------------------------------------------------------------------
@@ -74,45 +70,22 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, err
 	}
 
-	// The stack comes first: a worktree is counted against its parent.
+	// The stack comes first: a worktree is counted against its parent. One whose record does not read has no known parent: a root.
 	facts := Facts{Repository: repo}
-	records, unread := map[string]worktree.Meta{}, map[string]error{}
-	for _, w := range facts.nodes() {
-		record, err := u.Meta.Load(w.Branch())
-		// a worktree wtm did not create has no record: a root; one whose record does not read has no known place
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			unread[w.Branch()] = err
-		}
-		records[w.Branch()] = record
-	}
-	facts.Stack = worktree.StackOf(repo.Worktrees, records, repo.Config.Worktrees.BaseBranch)
+	facts.Records, facts.RecordErrs = repository.Records(u.Meta, repo.Live())
+	facts.Stack = worktree.StackOf(repo.Worktrees, facts.Records, repo.Config.Worktrees.BaseBranch)
 
-	var (
-		wg           sync.WaitGroup
-		jobs         []run.Job
-		pullRequests []worktree.PullRequest
-		jobsErr      error
-		prsErr       error
-	)
-	wg.Go(func() { jobs, jobsErr = u.Jobs(ctx) })
-	if req.WithPRs {
-		wg.Go(func() { pullRequests, prsErr = u.PullRequests(ctx, repo.Live()) })
-	}
 	nodes := facts.nodes()
-	read := repository.Each(nodes, func(w worktree.Worktree) State {
-		if err := unread[w.Branch()]; err != nil {
-			return State{Err: err}
-		}
-		return u.state(ctx, facts, w)
+	var read []State
+	facts.Asked = repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, PullRequests: u.PullRequests, Branches: repo.Live(), WithPRs: req.WithPRs}, func() {
+		read = repository.Each(nodes, func(w worktree.Worktree) State { return u.state(ctx, facts, w) })
 	})
-	wg.Wait()
 
 	facts.States = make(map[string]State, len(nodes))
 	for i, w := range nodes {
 		facts.States[w.Branch()] = read[i]
 	}
-	facts.Jobs, facts.JobsErr, facts.PullRequests, facts.PRsErr = jobs, jobsErr, pullRequests, prsErr
-	facts.Behind = repository.Behind(ctx, u.Git, repo, pullRequests, nodes)
+	facts.Behind = repository.Behind(ctx, u.Git, repo, facts.PullRequests, nodes)
 	facts.Interrupted = ctx.Err() != nil
 	return facts, nil
 }
@@ -127,7 +100,8 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 	}
 
 	counts, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: against})
-	if state.Err = interrupted(ctx, err); err != nil {
+	state.Err = repository.Interrupted(ctx, err)
+	if err != nil {
 		return state
 	}
 
@@ -137,16 +111,4 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 		state.Behind = &counts.Behind
 	}
 	return state
-}
-
-// ----------------------------------------------------------------------------
-// Helpers
-
-// interrupted is err when it is the read's interruption, which cancels the node; a count git cannot make otherwise leaves the node not counted rather than unreadable.
-func interrupted(ctx context.Context, err error) error {
-	if err == nil || errors.Is(err, context.Canceled) {
-		return err
-	}
-
-	return ctx.Err()
 }

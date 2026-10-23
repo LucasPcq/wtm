@@ -57,8 +57,8 @@ func problemCodes(problems []status.Problem) []string {
 }
 
 // fixOf is the fix of a missing .env file that runs command with answers.
-func fixOf(command string, answers ...domain.Answered) domain.FollowUp {
-	return domain.FollowUp{Command: command, Answers: answers, Code: status.CodeEnvMissing}
+func fixOf(command string, answers ...domain.Answered) *domain.FollowUp {
+	return &domain.FollowUp{Command: command, Answers: answers, Code: status.CodeEnvMissing}
 }
 
 // fieldCodes are the codes of problems, in order.

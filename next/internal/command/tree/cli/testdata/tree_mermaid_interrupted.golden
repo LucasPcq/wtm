@@ -4,3 +4,4 @@ flowchart TD
   n0 --> n1
   %% ✗ main interrupted
   %% ✗ feat/a interrupted
+  %% ✗ interrupted

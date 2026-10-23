@@ -25,7 +25,7 @@ const (
 
 // pick asks the user a worktree of read, then what to do with it, and returns read with the command line that does it as its follow-up. The pull requests load once the worktrees are shown, and r reads everything again after fetching origin.
 func (c *listCommand) pick(ctx context.Context, read list.Outcome, req list.Request, run *uicli.Run) (list.Outcome, error) {
-	p := &picker{app: c.app, read: read, cwd: run.Env.Cwd, withPRs: req.WithPRs}
+	p := &picker{app: c.app, read: read, caller: req.Caller, withPRs: req.WithPRs}
 	if err := form.Walk(ctx, p.script(), run.Streams.In, run.Streams.Err); err != nil {
 		return p.read, err
 	}
@@ -33,11 +33,11 @@ func (c *listCommand) pick(ctx context.Context, read list.Outcome, req list.Requ
 	return p.chosen(), nil
 }
 
-// A picker is the walk of the picker: the read shown and whether it holds the pull requests, changed on the event loop only, and the worktree and the action picked so far.
+// A picker is the walk of the picker: the read shown and whether it holds the pull requests, changed on the event loop only, where the caller stands, which every read again keeps, and the worktree and the action picked so far.
 type picker struct {
 	app      list.UseCase
 	read     list.Outcome
-	cwd      string
+	caller   domain.Caller
 	withPRs  bool
 	worktree string
 	picked   list.Detail     // the worktree picked, as it was read then
@@ -67,7 +67,7 @@ func (p *picker) observe(context.Context) (func(), error) {
 
 // refresh reads every worktree again, with its pull request, once origin is fetched.
 func (p *picker) refresh(ctx context.Context) (func(), error) {
-	read, err := p.app.Run(ctx, list.Request{WithPRs: true, Fetch: true}, domain.RunOptions{Surface: uicli.SurfaceTUI})
+	read, err := p.app.Run(ctx, list.Request{WithPRs: true, Fetch: true, Caller: p.caller}, domain.RunOptions{Surface: uicli.SurfaceTUI})
 	return func() {
 		if err == nil {
 			p.read, p.withPRs = read, true
@@ -77,7 +77,7 @@ func (p *picker) refresh(ctx context.Context) (func(), error) {
 
 // later reads the pull requests and gives each worktree shown its own, unless a refresh brought them first: the read shown keeps what a refresh read since.
 func (p *picker) later(ctx context.Context) (func(), error) {
-	read, err := p.app.Run(ctx, list.Request{WithPRs: true}, domain.RunOptions{Surface: uicli.SurfaceTUI})
+	read, err := p.app.Run(ctx, list.Request{WithPRs: true, Caller: p.caller}, domain.RunOptions{Surface: uicli.SurfaceTUI})
 	return func() {
 		if err == nil && !p.withPRs {
 			p.read = list.WithPullRequests(p.read, read)
@@ -132,11 +132,10 @@ func (s *worktreeStep) Open() tea.Cmd {
 
 func (s *worktreeStep) build() *widget.SelectList {
 	plain := output.StylesOf(io.Discard)
-	active := list.Holding(s.p.read.Items, s.p.cwd)
 	var options []widget.Option
 	for _, item := range s.p.read.Items {
 		if item.Detail != nil && len(item.Detail.Actions) > 0 {
-			options = append(options, widget.Option{Label: shown(item, s.p.cwd), Value: item.Subject, Badge: badge(cellsOf(*item.Detail, item.Subject == active, plain))})
+			options = append(options, widget.Option{Label: shown(*item.Detail, s.p.caller.Cwd), Value: item.Subject, Badge: badge(cellsOf(*item.Detail, plain))})
 		}
 	}
 	return widget.NewSelectList(widget.SelectParams{Options: options, Start: s.p.worktree})

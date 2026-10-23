@@ -1,0 +1,550 @@
+{
+  "v": 2,
+  "command": "status",
+  "ok": true,
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "branch": "main",
+        "path": "<SB>/acme",
+        "main": true,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "created_at": null,
+        "parent": "",
+        "children": [
+          "feat/a",
+          "feat/b",
+          "feat/old",
+          "feat/rb"
+        ],
+        "base": null,
+        "origin": {
+          "ahead": 2,
+          "behind": 0,
+          "state": "ahead"
+        },
+        "changes": {
+          "staged": 0,
+          "modified": 0,
+          "untracked": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "files": []
+        },
+        "commits": [
+          {
+            "sha": "<SHA>",
+            "subject": "chore: rewrite the readme",
+            "author": "Acme Dev",
+            "at": "<T>"
+          },
+          {
+            "sha": "<SHA>",
+            "subject": "chore: bump",
+            "author": "Acme Dev",
+            "at": "<T>"
+          },
+          {
+            "sha": "<SHA>",
+            "subject": "chore: bootstrap acme",
+            "author": "Acme Dev",
+            "at": "<T>"
+          }
+        ],
+        "review": null,
+        "isolation": "isolated",
+        "run_toml": "declared",
+        "run": {
+          "addressing": "names",
+          "offset": 0,
+          "ports": "base"
+        },
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23460
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23461
+          }
+        ],
+        "env": {
+          "declared": 2,
+          "files": [
+            {
+              "target": "apps/api/.env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            },
+            {
+              "target": "apps/web/.env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            }
+          ]
+        },
+        "problems": []
+      }
+    },
+    {
+      "subject": "<SB>/acme.trees/detached",
+      "status": "done",
+      "detail": {
+        "branch": "",
+        "path": "<SB>/acme.trees/detached",
+        "main": false,
+        "locked": true,
+        "rebasing": false,
+        "missing": true,
+        "created_at": null,
+        "parent": "",
+        "children": [],
+        "base": null,
+        "origin": null,
+        "changes": null,
+        "commits": null,
+        "review": null,
+        "isolation": "isolated",
+        "run_toml": "declared",
+        "run": {
+          "addressing": "names",
+          "offset": null,
+          "ports": "not_numbered"
+        },
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "stopped",
+            "url": ""
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "stopped",
+            "url": ""
+          }
+        ],
+        "env": {
+          "declared": 2,
+          "files": null
+        },
+        "problems": [
+          {
+            "code": "status.missing",
+            "message": "its directory is gone",
+            "fix": null
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "branch": "feat/a",
+        "path": "<SB>/acme.trees/feat-a",
+        "main": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "created_at": "<T>",
+        "parent": "main",
+        "children": [],
+        "base": {
+          "name": "main",
+          "ahead": 2,
+          "behind": 2
+        },
+        "origin": {
+          "ahead": 1,
+          "behind": 0,
+          "state": "ahead"
+        },
+        "changes": {
+          "staged": 1,
+          "modified": 1,
+          "untracked": 0,
+          "insertions": 3,
+          "deletions": 0,
+          "files": [
+            {
+              "path": "README.md",
+              "status": "modified"
+            },
+            {
+              "path": "notes.txt",
+              "status": "modified"
+            }
+          ]
+        },
+        "commits": [
+          {
+            "sha": "<SHA>",
+            "subject": "feat: wire the session",
+            "author": "Acme Dev",
+            "at": "<T>"
+          },
+          {
+            "sha": "<SHA>",
+            "subject": "feat: add the login form",
+            "author": "Acme Dev",
+            "at": "<T>"
+          },
+          {
+            "sha": "<SHA>",
+            "subject": "chore: bootstrap acme",
+            "author": "Acme Dev",
+            "at": "<T>"
+          }
+        ],
+        "review": null,
+        "isolation": "isolated",
+        "run_toml": "declared",
+        "run": {
+          "addressing": "names",
+          "offset": 10,
+          "ports": "offset"
+        },
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23470
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23471
+          }
+        ],
+        "env": {
+          "declared": 2,
+          "files": [
+            {
+              "target": "apps/api/.env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            },
+            {
+              "target": "apps/web/.env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            }
+          ]
+        },
+        "problems": []
+      }
+    },
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "main": false,
+        "locked": true,
+        "rebasing": false,
+        "missing": true,
+        "created_at": "<T>",
+        "parent": "main",
+        "children": [],
+        "base": null,
+        "origin": null,
+        "changes": null,
+        "commits": null,
+        "review": null,
+        "isolation": "isolated",
+        "run_toml": "declared",
+        "run": {
+          "addressing": "names",
+          "offset": 20,
+          "ports": "offset"
+        },
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23480
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23481
+          }
+        ],
+        "env": {
+          "declared": 2,
+          "files": null
+        },
+        "problems": [
+          {
+            "code": "status.missing",
+            "message": "its directory is gone",
+            "fix": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "status.missing",
+              "message": ""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/old",
+      "status": "done",
+      "detail": {
+        "branch": "feat/old",
+        "path": "<SB>/acme.trees/feat-old",
+        "main": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "created_at": "<T>",
+        "parent": "main",
+        "children": [],
+        "base": {
+          "name": "main",
+          "ahead": 0,
+          "behind": 2
+        },
+        "origin": null,
+        "changes": {
+          "staged": 0,
+          "modified": 0,
+          "untracked": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "files": []
+        },
+        "commits": [
+          {
+            "sha": "<SHA>",
+            "subject": "chore: bootstrap acme",
+            "author": "Acme Dev",
+            "at": "<T>"
+          }
+        ],
+        "review": null,
+        "isolation": null,
+        "run_toml": "declared",
+        "run": {
+          "addressing": "names",
+          "offset": 30,
+          "ports": "not_chosen"
+        },
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23490
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23491
+          }
+        ],
+        "env": {
+          "declared": 2,
+          "files": [
+            {
+              "target": "apps/api/.env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            },
+            {
+              "target": "apps/web/.env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            }
+          ]
+        },
+        "problems": [
+          {
+            "code": "status.isolation_pending",
+            "message": "predates the isolation choice: run up and run start refuse it",
+            "fix": {
+              "command": "env",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/old"
+                  ]
+                },
+                {
+                  "path": "isolation",
+                  "values": [
+                    "isolated"
+                  ]
+                }
+              ],
+              "code": "status.isolation_pending",
+              "message": ""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/rb",
+      "status": "done",
+      "detail": {
+        "branch": "feat/rb",
+        "path": "<SB>/acme.trees/feat-rb",
+        "main": false,
+        "locked": false,
+        "rebasing": true,
+        "missing": false,
+        "created_at": "<T>",
+        "parent": "main",
+        "children": [],
+        "base": {
+          "name": "main",
+          "ahead": 1,
+          "behind": 2
+        },
+        "origin": null,
+        "changes": {
+          "staged": 1,
+          "modified": 2,
+          "untracked": 0,
+          "insertions": 4,
+          "deletions": 0,
+          "files": [
+            {
+              "path": "README.md",
+              "status": "modified"
+            }
+          ]
+        },
+        "commits": [
+          {
+            "sha": "<SHA>",
+            "subject": "chore: rewrite the readme",
+            "author": "Acme Dev",
+            "at": "<T>"
+          },
+          {
+            "sha": "<SHA>",
+            "subject": "chore: bump",
+            "author": "Acme Dev",
+            "at": "<T>"
+          },
+          {
+            "sha": "<SHA>",
+            "subject": "chore: bootstrap acme",
+            "author": "Acme Dev",
+            "at": "<T>"
+          }
+        ],
+        "review": null,
+        "isolation": "isolated",
+        "run_toml": "declared",
+        "run": {
+          "addressing": "names",
+          "offset": 40,
+          "ports": "offset"
+        },
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23500
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23501
+          }
+        ],
+        "env": {
+          "declared": 2,
+          "files": [
+            {
+              "target": "apps/api/.env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            },
+            {
+              "target": "apps/web/.env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            }
+          ]
+        },
+        "problems": []
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

@@ -2,8 +2,6 @@ package status
 
 import (
 	"cmp"
-	"context"
-	"errors"
 	"slices"
 	"strconv"
 	"strings"
@@ -15,26 +13,26 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
 // ----------------------------------------------------------------------------
-// The facts
+// Facts
 
-// Facts are what status reads: the repository, the meta record of each live branch (and the error of a record that exists but does not read), what each worktree read holds, the run daemon's jobs and the pull request of each branch read, each with the error that kept it from being read, and the branches behind their merged pull request (repository.Behind); PullRequests is nil when GitHub was not asked.
+// Facts are what status reads: the repository, the worktrees the request reads (Targets), the meta record of each live branch (and the error of a record that exists but does not read), what each worktree read holds, what the run daemon and GitHub said, and the branches behind their merged pull request (repository.Behind).
 type Facts struct {
 	worktree.Repository
-	Records      map[string]worktree.Meta // by branch
-	RecordErrs   map[string]error         // by branch
-	States       map[string]State         // by worktree path
-	Jobs         []run.Job
-	JobsErr      error
-	PullRequests []worktree.PullRequest
-	PRsErr       error
-	Behind       map[string]bool // by branch
+	repository.Asked
+	Targets    []worktree.Worktree
+	Records    map[string]worktree.Meta // by branch
+	RecordErrs map[string]error         // by branch
+	States     map[string]State         // by worktree path
+	Behind     map[string]bool          // by branch
 }
 
-// A State is what one worktree holds: its uncommitted changes and how much they weigh, its last commits, how its branch stands against the base branch (nil when it is not counted), its declared .env files as read, what of these could not be read and why, and the error that kept the worktree from being read.
+// A State is what one worktree holds: whether its directory is gone, which leaves nothing else to read, its uncommitted changes and how much they weigh, its last commits, how its branch stands against the base branch (nil when it is not counted), its declared .env files as read, what of these could not be read and why, and the error that kept the worktree from being read.
 type State struct {
+	Missing  bool
 	Changes  []worktree.Change
 	Diffstat worktree.Diffstat
 	Commits  []worktree.Commit
@@ -56,22 +54,23 @@ type EnvRead struct {
 // ----------------------------------------------------------------------------
 // The detail
 
-// A Detail is one worktree as status reports it: where it is and what it is on, its place in the stack, where its branch stands, its uncommitted work and last commits, its pull request when asked, then how it runs (its isolation, run.toml's addressing and its port offset, its jobs) and its .env files, and the problems found, each with the command that fixes it.
+// A Detail is one worktree as status reports it: where it is and what it is on, whether its directory is gone, its place in the stack, where its branch stands, its uncommitted work and last commits, its pull request when asked, then how it runs (its isolation, run.toml's addressing and its port offset, its jobs) and its .env files, and the problems found, each with the command that fixes it.
 type Detail struct {
 	Branch    string             `json:"branch"`
 	Path      string             `json:"path"`
 	Main      bool               `json:"main"`
 	Locked    bool               `json:"locked"`
 	Rebasing  bool               `json:"rebasing"`
+	Missing   bool               `json:"missing"`    // its directory is gone: nothing of it is read
 	CreatedAt *time.Time         `json:"created_at"` // from its meta record, null without one
 	Parent    string             `json:"parent"`     // the branch it was created from, empty for a root
 	Children  []string           `json:"children"`   // the branches created from it
 	Base      *Base              `json:"base"`       // null for the main worktree, on no branch, or when the base branch does not exist
 	Origin    *worktree.Origin   `json:"origin"`     // null when origin has no branch of that name
-	Changes   Changes            `json:"changes"`
-	Commits   []worktree.Commit  `json:"commits"`
-	Review    *Review            `json:"review"`    // null without a pull request, or when GitHub was not asked
-	Isolation *project.Isolation `json:"isolation"` // null while the worktree has not chosen, or when its record does not read
+	Changes   *Changes           `json:"changes"`    // null when its directory is gone
+	Commits   []worktree.Commit  `json:"commits"`    // null when its directory is gone
+	Review    *Review            `json:"review"`     // null without a pull request, or when GitHub was not asked
+	Isolation *project.Isolation `json:"isolation"`  // null while the worktree has not chosen, or when its record does not read
 	RunToml   RunToml            `json:"run_toml"`
 	Run       *Run               `json:"run"`  // null without a run.toml that reads
 	Jobs      []Job              `json:"jobs"` // null when the run daemon cannot tell
@@ -164,7 +163,7 @@ type Owner struct {
 // Env is a worktree's .env files: how many the project declares, and each one, whether it is missing and how its keys stand against its sources. It never carries a value.
 type Env struct {
 	Declared int       `json:"declared"`
-	Files    []EnvFile `json:"files"`
+	Files    []EnvFile `json:"files"` // null when its directory is gone
 }
 
 // EnvFile is one declared .env file of a worktree.
@@ -176,25 +175,26 @@ type EnvFile struct {
 
 // A Problem is something to fix in a worktree, and the command that fixes it.
 type Problem struct {
-	Code    string          `json:"code"`
-	Message string          `json:"message"`
-	Fix     domain.FollowUp `json:"fix"`
+	Code    string           `json:"code"`
+	Message string           `json:"message"`
+	Fix     *domain.FollowUp `json:"fix"` // null when no command fixes it
 }
 
 // The codes of status's problems, warnings and failures.
 const (
+	CodeMissing          = Name + ".missing"
 	CodeMerged           = Name + ".merged"
 	CodeEnvMissing       = Name + ".env_missing"
 	CodeIsolationPending = Name + ".isolation_pending"
 	CodeJobCrashed       = Name + ".job_crashed"
-	CodeJobsUnknown      = Name + ".jobs_unknown"
-	CodePRsUnavailable   = Name + ".prs_unavailable"
+	CodeJobsUnknown      = Name + domain.JobsUnknown
+	CodePRsUnavailable   = Name + domain.PRsUnavailable
 	CodeRunInvalid       = Name + ".run_invalid"
 	CodeBaseMissing      = Name + ".base_missing"
-	CodeMetaUnreadable   = Name + ".meta_unreadable"
+	CodeMetaUnreadable   = Name + domain.MetaUnreadable
 	CodePartial          = Name + ".partial"
 	CodeNoWorktree       = Name + ".no_worktree"
-	CodeUnreadable       = Name + ".unreadable"
+	CodeUnreadable       = Name + domain.Unreadable
 	CodeAmbiguous        = Name + ".ambiguous"
 	CodeAllWithWorktree  = Name + ".all_with_worktree"
 )
@@ -270,12 +270,12 @@ func listed(snapshot worktree.Snapshot) []worktree.Worktree {
 }
 
 // ----------------------------------------------------------------------------
-// The report
+// Report
 
-// Report is each worktree of targets as an item, in order, and the warnings of what could not be read.
-func Report(facts Facts, targets []worktree.Worktree) ([]Item, []domain.Warning) {
-	items := make([]Item, 0, len(targets))
-	for _, w := range targets {
+// Report is each worktree the facts read as an item, in order, and the warnings of what could not be read.
+func Report(facts Facts) ([]Item, []domain.Warning) {
+	items := make([]Item, 0, len(facts.Targets))
+	for _, w := range facts.Targets {
 		items = append(items, facts.item(w))
 	}
 
@@ -284,14 +284,11 @@ func Report(facts Facts, targets []worktree.Worktree) ([]Item, []domain.Warning)
 
 func (f Facts) item(w worktree.Worktree) Item {
 	state := f.States[w.Path]
-	subject := subjectOf(w)
-	if errors.Is(state.Err, context.Canceled) {
-		return Item{Subject: subject, Status: domain.StatusCancelled, Reason: domain.ReasonInterrupted}
-	}
+	subject := w.Name()
 	if state.Err != nil {
-		return Item{Subject: subject, Status: domain.StatusFailed, Err: &domain.Error{
-			Kind: domain.KindInternal, Code: CodeUnreadable, Message: "couldn't read " + w.Path, Params: domain.Params{"path": w.Path}, Cause: state.Err,
-		}}
+		item := domain.Unread[Detail](domain.UnreadParams{Command: Name, Subject: subject, Path: w.Path, Err: state.Err})
+		item.Warnings = f.recordWarnings(w.Branch())
+		return item
 	}
 
 	branch := w.Branch()
@@ -309,13 +306,14 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Main:      w.Main,
 		Locked:    w.Locked,
 		Rebasing:  rebasing,
+		Missing:   state.Missing,
 		CreatedAt: record.Created(),
 		Parent:    parent,
 		Children:  orEmpty(stack.Children(branch)),
 		Base:      f.base(state),
 		Origin:    f.OriginOf(branch),
 		Changes:   changesOf(state),
-		Commits:   orEmpty(state.Commits),
+		Commits:   commitsOf(state),
 		Review:    reviewOf(pr, hasPR),
 		Isolation: isolationOf(record, pending || recordErr != nil),
 		RunToml:   f.runToml(),
@@ -323,20 +321,23 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Jobs:      f.jobs(w, offset),
 		Env:       f.envOf(w, state),
 	}
-	// Every fix names a branch: a worktree on none has its facts read and nothing to fix.
-	detail.Problems = []Problem{}
-	if branch != "" {
-		detail.Problems = Problems(ProblemsParams{Subject: subject, Merged: f.Repository.Cleans(pr, w, f.Behind[branch]), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
-	}
+	detail.Problems = Problems(ProblemsParams{Branch: branch, Gone: state.Missing, Merged: f.Repository.Cleans(pr, w, f.Behind[branch]), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
 
-	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail}
-	if recordErr != nil {
-		item.Warnings = append(item.Warnings, domain.Warning{Code: CodeMetaUnreadable, Message: "couldn't read the record of " + branch + ": its isolation, parent, env strategy and port offset are not known: " + recordErr.Error(), Params: domain.Params{"branch": branch}})
-	}
+	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
 	if len(state.Unread) > 0 {
 		item.Warnings = append(item.Warnings, domain.Warning{Code: CodePartial, Message: "couldn't read all of " + subject + ": " + strings.Join(state.Unread, "; "), Params: domain.Params{"path": w.Path}})
 	}
 	return item
+}
+
+// recordWarnings are the warnings of the record of branch when it exists but does not read, none otherwise.
+func (f Facts) recordWarnings(branch string) []domain.Warning {
+	err := f.RecordErrs[branch]
+	if err == nil {
+		return nil
+	}
+
+	return []domain.Warning{{Code: CodeMetaUnreadable, Message: "couldn't read the record of " + branch + ": its isolation, parent, env strategy and port offset are not known: " + err.Error(), Params: domain.Params{"branch": branch}}}
 }
 
 func (f Facts) base(state State) *Base {
@@ -347,8 +348,12 @@ func (f Facts) base(state State) *Base {
 	return &Base{Name: f.Config.Worktrees.BaseBranch, Ahead: state.Base.Ahead, Behind: state.Base.Behind}
 }
 
-func changesOf(state State) Changes {
-	changes := Changes{Staged: state.Diffstat.Staged, Modified: state.Diffstat.Unstaged, Insertions: state.Diffstat.Insertions, Deletions: state.Diffstat.Deletions, Files: orEmpty(state.Changes)}
+func changesOf(state State) *Changes {
+	if state.Missing {
+		return nil
+	}
+
+	changes := &Changes{Staged: state.Diffstat.Staged, Modified: state.Diffstat.Unstaged, Insertions: state.Diffstat.Insertions, Deletions: state.Diffstat.Deletions, Files: orEmpty(state.Changes)}
 	for _, change := range state.Changes {
 		if change.Status == worktree.ChangeUntracked {
 			changes.Untracked++
@@ -356,6 +361,13 @@ func changesOf(state State) Changes {
 	}
 
 	return changes
+}
+
+func commitsOf(state State) []worktree.Commit {
+	if state.Missing {
+		return nil
+	}
+	return orEmpty(state.Commits)
 }
 
 func reviewOf(pr worktree.PullRequest, ok bool) *Review {
@@ -544,6 +556,10 @@ func portOf(job project.Job, offset *int) *int {
 // The .env files
 
 func (f Facts) envOf(w worktree.Worktree, state State) Env {
+	if state.Missing {
+		return Env{Declared: len(f.Config.Env.Files)}
+	}
+
 	strategy := f.strategy(w)
 	files := []EnvFile{}
 	for _, read := range state.Env {
@@ -625,9 +641,10 @@ type Missing struct {
 	From   Rebuild
 }
 
-// ProblemsParams are what a worktree has to fix: the worktree, as a fix names it, whether its merged pull request leaves it to be cleaned, the .env files it lacks, whether it has yet to choose its isolation, and its jobs.
+// ProblemsParams are what a worktree has to fix: its branch, which every fix names, empty on none; whether its directory is gone, whether its merged pull request leaves it to be cleaned, the .env files it lacks, whether it has yet to choose its isolation, and its jobs.
 type ProblemsParams struct {
-	Subject string
+	Branch  string
+	Gone    bool
 	Merged  bool
 	Missing []Missing
 	Pending bool
@@ -644,27 +661,38 @@ const (
 	pathDetach        = "detach"
 )
 
-// Problems are the problems of params, each with its fix: a merged pull request first, since cleaning the worktree makes every other fix moot, then each missing .env file, then a pending isolation, then each crashed job, whose fix starts it again in the worktree that runs it, a shared job's owner.
+// Problems are the problems of params, each with its fix: a gone directory alone, since only cleaning the worktree fixes it, with no fix on no branch, which clean cannot name; nothing else on no branch, since every fix names a branch; else a merged pull request first, since cleaning the worktree makes every other fix moot, then each missing .env file, then a pending isolation, then each crashed job, whose fix starts it again in the worktree that runs it, a shared job's owner.
 func Problems(params ProblemsParams) []Problem {
+	if params.Gone {
+		gone := Problem{Code: CodeMissing, Message: "its directory is gone"}
+		if params.Branch != "" {
+			gone.Fix = fix(CodeMissing, domain.CommandClean, params.Branch)
+		}
+		return []Problem{gone}
+	}
+
 	problems := []Problem{}
+	if params.Branch == "" {
+		return problems
+	}
 	if params.Merged {
-		problems = append(problems, Problem{Code: CodeMerged, Message: "its pull request is merged", Fix: fix(CodeMerged, domain.CommandClean, params.Subject)})
+		problems = append(problems, Problem{Code: CodeMerged, Message: "its pull request is merged", Fix: fix(CodeMerged, domain.CommandClean, params.Branch)})
 	}
 	for _, missing := range params.Missing {
-		problems = append(problems, missingProblem(params.Subject, missing))
+		problems = append(problems, missingProblem(params.Branch, missing))
 	}
 	if params.Pending {
 		problems = append(problems, Problem{
 			Code:    CodeIsolationPending,
 			Message: "predates the isolation choice: run up and run start refuse it",
-			Fix:     fix(CodeIsolationPending, commandEnv, params.Subject, domain.Answered{Path: domain.PathIsolation, Values: []string{string(project.Isolated)}}),
+			Fix:     fix(CodeIsolationPending, commandEnv, params.Branch, domain.Answered{Path: domain.PathIsolation, Values: []string{string(project.Isolated)}}),
 		})
 	}
 	for _, job := range params.Jobs {
 		if job.State != run.Crashed {
 			continue
 		}
-		owner := params.Subject
+		owner := params.Branch
 		if job.Owner != nil {
 			owner = cmp.Or(job.Owner.Branch, job.Owner.Path)
 		}
@@ -687,15 +715,15 @@ func missingProblem(subject string, missing Missing) Problem {
 		problem.Fix = fix(CodeEnvMissing, commandEnv, subject, domain.Answered{Path: pathFrom, Values: []string{string(missing.From)}})
 	case FromNowhere:
 		problem.Message = missing.Target + " is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand"
-		problem.Fix = domain.FollowUp{Command: commandConfigEdit, Code: CodeEnvMissing}
+		problem.Fix = &domain.FollowUp{Command: commandConfigEdit, Code: CodeEnvMissing}
 	}
 
 	return problem
 }
 
 // fix is the follow-up that runs command on the worktree subject with answers.
-func fix(code, command, subject string, answers ...domain.Answered) domain.FollowUp {
-	return domain.FollowUp{Command: command, Answers: append([]domain.Answered{{Path: domain.PathWorktree, Values: []string{subject}}}, answers...), Code: code}
+func fix(code, command, subject string, answers ...domain.Answered) *domain.FollowUp {
+	return &domain.FollowUp{Command: command, Answers: append([]domain.Answered{{Path: domain.PathWorktree, Values: []string{subject}}}, answers...), Code: code}
 }
 
 func crashed(job Job) string {
@@ -714,21 +742,14 @@ func crashed(job Job) string {
 
 func (f Facts) warnings() []domain.Warning {
 	var warnings []domain.Warning
-	if base := f.Config.Worktrees.BaseBranch; base != "" && !f.Local(base) {
+	if base, missing := f.MissingBase(); missing {
 		warnings = append(warnings, domain.Warning{Code: CodeBaseMissing, Message: "the base branch " + base + " does not exist: where a branch stands against it is not shown", Params: domain.Params{"branch": base}})
 	}
 	if f.RunErr != nil {
 		warnings = append(warnings, domain.Warning{Code: CodeRunInvalid, Message: "run.toml does not read: its jobs and ports are not shown: " + f.RunErr.Error()})
 	}
-	if f.JobsErr != nil {
-		warnings = append(warnings, domain.Warning{Code: CodeJobsUnknown, Message: run.UnknownMessage(f.JobsErr)})
-	}
-	// an interrupted read could not ask: GitHub said nothing of itself
-	if f.PRsErr != nil && !errors.Is(f.PRsErr, context.Canceled) {
-		warnings = append(warnings, domain.Warning{Code: CodePRsUnavailable, Message: f.PRsErr.Error()})
-	}
 
-	return warnings
+	return append(warnings, f.Asked.Warnings(Name)...)
 }
 
 // ----------------------------------------------------------------------------

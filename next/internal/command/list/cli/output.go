@@ -18,49 +18,37 @@ const (
 	labelBase   = "base"
 )
 
-// drawList draws a row per worktree read, the one holding the view's directory marked active, then each worktree that could not be read and the warnings.
-func drawList(w io.Writer, read list.Outcome, view output.View) {
+// drawList draws a row per worktree read, the one the caller stands in marked active, then each worktree that could not be read and the warnings.
+func drawList(w io.Writer, read list.Outcome, _ list.Request, view output.View) {
 	cwd := view.Cwd
 	st := output.StylesOf(w)
-	active := list.Holding(read.Items, cwd)
 
 	var rows [][]string
 	for _, item := range read.Items {
 		if item.Detail != nil {
-			rows = append(rows, append([]string{shown(item, cwd)}, cellsOf(*item.Detail, item.Subject == active, st)...))
+			rows = append(rows, append([]string{shown(*item.Detail, cwd)}, cellsOf(*item.Detail, st)...))
 		}
 	}
 	output.Columns(w, rows)
-
-	for _, item := range read.Items {
-		if item.Err != nil {
-			output.ErrorLine(w, item.Err.Error())
-		}
-	}
-	for _, warning := range read.Warnings {
-		output.WarningLine(w, warning.Message)
-	}
+	output.ReadEnd(w, read)
 }
 
 // shown is how a row names its worktree: its branch, else its path from cwd.
-func shown(item list.Item, cwd string) string {
-	if item.Detail.Branch != "" {
-		return item.Subject
-	}
-	return output.ShownPath(output.Shown{Cwd: cwd, Path: item.Detail.Path})
+func shown(d list.Detail, cwd string) string {
+	return output.ShownWorktree(d.Branch, output.Shown{Cwd: cwd, Path: d.Path})
 }
 
 // cellsOf are the cells of a worktree's row after its subject: its tags, its pull request, the jobs up, its commits past the base branch, where it stands against origin and its state.
-func cellsOf(d list.Detail, active bool, st *output.Styles) []string {
-	return []string{tags(d, active, st), pr(d, st), services(d, st), ahead(d, st), st.Origin(d.Origin), state(d, st)}
+func cellsOf(d list.Detail, st *output.Styles) []string {
+	return []string{tags(d, st), pr(d, st), services(d, st), ahead(d, st), st.Origin(d.Origin), state(d, st)}
 }
 
-func tags(d list.Detail, active bool, st *output.Styles) string {
+func tags(d list.Detail, st *output.Styles) string {
 	var tags []string
 	if d.Main {
 		tags = append(tags, st.Muted.Render(tagMain))
 	}
-	if active {
+	if d.Active {
 		tags = append(tags, st.Success.Render(tagActive))
 	}
 	if d.Locked {

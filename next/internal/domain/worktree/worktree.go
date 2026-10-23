@@ -2,6 +2,7 @@
 package worktree
 
 import (
+	"cmp"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -133,4 +134,9 @@ func FreeOrdinal(taken []int) int {
 	}
 
 	return candidate
+}
+
+// Name returns how the worktree is named: its branch, else its path.
+func (w Worktree) Name() string {
+	return cmp.Or(w.Branch(), w.Path)
 }

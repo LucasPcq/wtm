@@ -25,16 +25,3 @@ func TestAWorktreeOffersWhatItsStateAllows(t *testing.T) {
 		})
 	}
 }
-
-func TestTheActiveWorktreeIsTheDeepestHoldingTheDirectory(t *testing.T) {
-	items := []list.Item{
-		{Subject: "main", Detail: &list.Detail{Path: "/repo/main"}},
-		{Subject: "feat/a", Detail: &list.Detail{Path: "/repo/main/.trees/a"}},
-		{Subject: "feat/ab", Detail: &list.Detail{Path: "/repo/main/.trees/ab"}},
-		{Subject: "broken"},
-	}
-
-	assert.Equal(t, "feat/a", list.Holding(items, "/repo/main/.trees/a/src"))
-	assert.Equal(t, "main", list.Holding(items, "/repo/main"))
-	assert.Empty(t, list.Holding(items, "/elsewhere"))
-}

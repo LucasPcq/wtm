@@ -65,6 +65,37 @@ state() {
   return 0
 }
 
+# slow_gh <dir>: writes in dir a gh, signed in, that answers no pull request after 5 seconds; its sleep holds no pipe, so killing gh ends it.
+slow_gh() {
+  mkdir -p "$1"
+  cat >"$1/gh" <<'SH'
+#!/bin/sh
+[ "$1" = auth ] && exit 0
+sleep 5 >/dev/null 2>&1 </dev/null
+echo '{"data":{"repository":{}}}'
+SH
+  chmod +x "$1/gh"
+}
+
+# interrupt <name> <dir> <args…>: runs the binary with args in dir, without a terminal, its gh slow_gh's, and sends it SIGINT 2 seconds in, while gh answers, as Ctrl+C does.
+interrupt() {
+  local name=$1 dir=$2
+  shift 2
+  local code=0 pid
+  state >"$dir_out/.before"
+  set -m # in its own process group, the binary takes SIGINT as a terminal's Ctrl+C
+  (cd "$dir" && PATH=$root/slow:$PATH exec "$bin" "$@" </dev/null >"$dir_out/$name.stdout" 2>"$dir_out/$name.stderr") &
+  pid=$!
+  set +m
+  sleep 2
+  kill -INT "$pid" 2>/dev/null || true
+  wait "$pid" || code=$?
+  echo "$code" >"$dir_out/$name.exit"
+  state >"$dir_out/.after"
+  diff -u --label "$name before" --label "$name after" "$dir_out/.before" "$dir_out/.after" >>"$dir_out/unchanged.diff" || true
+  rm -f "$dir_out/.before" "$dir_out/.after"
+}
+
 # scenario <name> <dir> <args…>: runs the binary with args in dir, without a terminal.
 scenario() {
   local name=$1 dir=$2
@@ -152,6 +183,21 @@ run_side() {
     scenario 11-no-config-json "$root/bare" list --output json
     scenario 12-not-a-repository "$root/plain" list --output json
     tty
+    # a meta record that does not decode: feat/a listed all the same, a warning on its item
+    local record=.git/wtm/worktrees/feat%2Fa/meta.json
+    cp "$record" "$root/meta.json" && echo '{' >"$record"
+    scenario 13-meta-unreadable "$root/acme" list
+    scenario 14-meta-unreadable-json "$root/acme" list --output json
+    cp "$root/meta.json" "$record"
+    # origin out of reach: next warns and lists the refs last fetched; legacy has no --fetch
+    git remote set-url origin "$root/nowhere.git"
+    scenario 15-fetch-unreachable "$root/acme" list --fetch
+    scenario 16-fetch-unreachable-json "$root/acme" list --fetch --output json
+    git remote set-url origin "$root/origin.git"
+    # SIGINT while gh answers
+    slow_gh "$root/slow"
+    interrupt 17-interrupted "$root/acme" list --with-prs
+    interrupt 18-interrupted-json "$root/acme" list --with-prs --output json
     "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
   )
   sed -i '' -E \

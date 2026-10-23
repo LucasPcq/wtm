@@ -19,3 +19,8 @@ func TestAPathIsShownRelativeToWhereItRuns(t *testing.T) {
 	assert.Equal(t, "../.trees/feat-x", ShownPath(Shown{Cwd: "/repo/main", Path: "/repo/.trees/feat-x"}))
 	assert.Equal(t, "/repo/.trees/feat-x", ShownPath(Shown{Path: "/repo/.trees/feat-x"}))
 }
+
+func TestAWorktreeIsShownByItsBranchElseItsPathFromWhereItRuns(t *testing.T) {
+	assert.Equal(t, "feat/a", ShownWorktree("feat/a", Shown{Cwd: "/repo", Path: "/repo/.trees/a"}))
+	assert.Equal(t, ".trees/d", ShownWorktree("", Shown{Cwd: "/repo", Path: "/repo/.trees/d"}))
+}

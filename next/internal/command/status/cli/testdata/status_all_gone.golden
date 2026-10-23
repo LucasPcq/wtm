@@ -1,0 +1,20 @@
+
+  ! 4 worktrees · 3 need attention
+
+     WORKTREE            ENV
+     main                2 files
+  !  ../.trees/detached  —
+  !  feat/a              1 missing
+  !  feat/old            —
+
+  ../.trees/detached
+  ! its directory is gone
+
+  feat/a
+  ! web/.env is missing
+  → wtm env feat/a
+
+  feat/old
+  ! its directory is gone
+  → wtm clean feat/old
+

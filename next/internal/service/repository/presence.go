@@ -18,20 +18,27 @@ type Presence struct {
 
 // Present reads the presence of the worktree w through git: missing when git calls it prunable or its directory is gone, else whether it is dirty. It fails with what kept git from telling.
 func Present(ctx context.Context, git Prober, w worktree.Worktree) (Presence, error) {
-	// git never lists a locked worktree prunable, even with its directory gone: the disk is asked.
-	if w.Prunable {
-		return Presence{Missing: true}, nil
-	}
-	location, err := git.Locate(ctx, w.Path)
-	if err != nil {
-		return Presence{}, err
-	}
-	if !location.Exists {
-		return Presence{Missing: true}, nil
+	gone, err := Gone(ctx, git, w)
+	if err != nil || gone {
+		return Presence{Missing: gone}, err
 	}
 
 	dirty, err := git.Dirty(ctx, w.Path)
 	return Presence{Dirty: dirty}, err
+}
+
+// Gone reports whether the directory of the worktree w is gone: git calls it prunable, or nothing is there. It fails with what kept git from telling.
+func Gone(ctx context.Context, git Locator, w worktree.Worktree) (bool, error) {
+	// git never lists a locked worktree prunable, even with its directory gone: the disk is asked.
+	if w.Prunable {
+		return true, nil
+	}
+	location, err := git.Locate(ctx, w.Path)
+	if err != nil {
+		return false, err
+	}
+
+	return !location.Exists, nil
 }
 
 // Each returns what read reads of each of worktrees, in their order, a few read at once.

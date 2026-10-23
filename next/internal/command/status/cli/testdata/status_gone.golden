@@ -1,0 +1,18 @@
+
+  ! feat/old — 1 problem
+
+  path        /repo/.trees/feat-old
+  state       missing
+  isolation   not chosen
+  addressing  names
+  ports       —
+  origin      not on origin
+  parent      main
+
+  JOBS
+  web  stopped
+  api  stopped
+
+  ! its directory is gone
+  → wtm clean feat/old
+

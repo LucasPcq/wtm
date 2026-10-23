@@ -2,6 +2,8 @@ package domain
 
 import (
 	"cmp"
+	"context"
+	"errors"
 	"slices"
 )
 
@@ -112,6 +114,25 @@ type Unit[D any] struct {
 	Detail   *D
 }
 
+// UnreadParams are a subject a read could not read: the command reading it, the subject, the path it read, and why it could not.
+type UnreadParams struct {
+	Command string
+	Subject string
+	Path    string
+	Err     error
+}
+
+// Unread is the unit of a subject a read could not read: cancelled once the read is interrupted, else failed with the command's <command>.unreadable.
+func Unread[D any](params UnreadParams) Unit[D] {
+	if errors.Is(params.Err, context.Canceled) {
+		return Unit[D]{Subject: params.Subject, Status: StatusCancelled, Reason: ReasonInterrupted}
+	}
+
+	return Unit[D]{Subject: params.Subject, Status: StatusFailed, Err: &Error{
+		Kind: KindInternal, Code: params.Command + Unreadable, Message: "couldn't read " + params.Path, Params: Params{"path": params.Path}, Cause: params.Err,
+	}}
+}
+
 func (u Unit[D]) item() Item {
 	return Item{Subject: u.Subject, Status: u.Status, Reason: u.Reason, Err: u.Err, Warnings: u.Warnings, Detail: DetailOf(u.Detail)}
 }
@@ -120,16 +141,22 @@ func (u Unit[D]) interrupted() bool {
 	return u.Status == StatusCancelled || u.Reason == ReasonInterrupted
 }
 
-// A Read is what a read command found: one Unit per subject, in order, its warnings, and the follow-ups the caller chose of it. A read runs no operation: it has no plan, fingerprint, lock nor event.
+// A Read is what a read command found: one Unit per subject, in order, its warnings, the follow-ups the caller chose of it, and whether it was interrupted, its subjects read or not. A read runs no operation: it has no plan, fingerprint, lock nor event.
 type Read[D any] struct {
-	Items     []Unit[D]
-	Warnings  []Warning
-	FollowUps []FollowUp
+	Items       []Unit[D]
+	Warnings    []Warning
+	FollowUps   []FollowUp
+	Interrupted bool
 }
 
-// Failure is the error the read ends on: the first subject it failed to read, else nil.
+// Failure is the error the read ends on: its interruption, else the first subject it failed to read, else nil.
 func (r Read[D]) Failure() *Error {
-	return Result[D]{Items: r.Items}.Failure()
+	failure := Result[D]{Items: r.Items}.Failure()
+	if r.Interrupted && (failure == nil || failure.Kind != KindCancelled) {
+		return &Error{Kind: KindCancelled, Code: CodeInterrupted, Message: "interrupted"}
+	}
+
+	return failure
 }
 
 // Envelope is how the read ended for every surface: its items, warnings and follow-ups, with no op, plan nor fingerprint; a read has no plan to replan, so it reads no answers.

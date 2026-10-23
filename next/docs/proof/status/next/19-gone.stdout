@@ -1,3 +1,18 @@
 
-  ✗ couldn't read <SB>/acme.trees/feat-b: its directory is gone
+  ! feat/b — 1 problem
+
+  path        <SB>/acme.trees/feat-b
+  state       missing
+  isolation   isolated
+  addressing  names
+  ports       +20
+  origin      not on origin
+  parent      main
+
+  JOBS
+  web  stopped  port 23480
+  api  stopped  port 23481
+
+  ! its directory is gone
+  → wtm clean feat/b
 

@@ -12,6 +12,7 @@
         "main": false,
         "locked": false,
         "rebasing": false,
+        "missing": false,
         "created_at": "<T>",
         "parent": "main",
         "children": [],

@@ -1,0 +1,10 @@
+
+  main                    main  • active                      ✓ clean
+  feat/b                  ! locked                            ✓ clean
+  feat/gone                                                   ✗ missing
+  ../acme.trees/detached                                      ✓ clean
+  feat/a                                  base ↑2  origin ↑1  ! dirty
+  locked-gone             ! locked                            ✗ missing
+  orphan                                                      ✓ clean
+  ! couldn't read the record of feat/a: when it was created is not known: unexpected end of JSON input
+

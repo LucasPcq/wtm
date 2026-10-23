@@ -1,0 +1,18 @@
+
+  = feat/a — nothing to fix
+
+  path         <SB>/acme.trees/feat-a
+  isolation    unknown
+  addressing   names
+  ports        unknown
+  env          2 files
+  base         main ↑2 ↓2
+  origin       ↑1
+  changes      1 staged · 1 modified · +3 −0
+  last commit  <SHA> feat: wire the session · Acme Dev · <AGE> ago
+
+  JOBS
+  web  stopped
+  api  stopped
+  ! couldn't read the record of feat/a: its isolation, parent, env strategy and port offset are not known: unexpected end of JSON input
+

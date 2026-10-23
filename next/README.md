@@ -17,14 +17,14 @@ internal/
   command/<name>/      one command, one vertical slice: its use case and its command line
     usecase.go         the story: Run (operation, plan, fingerprint, apply), Plan, Apply, Observe, Questions
     port.go            the driven ports it reaches the world through
-    rules.go           pure: facts → plan
+    rules.go           pure: facts → plan (a read: facts → its Detail of each item)
     questions.go       its form model, its schema (Questions.Form, Request.Answer and Request.Values: what the flags, --help, the command line and the wizard read) and its validation
     cli/               its driving adapter: the cobra command over form.Command, what its recap and dry run show of a plan (Preview) and how it draws an apply (Draw), the steps it asks its own way
   service/             what the use cases call
     operation/         the operation every mutating use case goes through: its record, its locks, its plan under them and fingerprinted, its events
     operationtest/     the contract every mutating use case's Run passes (no lock nor event on a dry run, a stale plan refused before any event, events in order), for tests
     provision/         a new worktree made whole and a source fast-forwarded, shared by the commands that create one, with the questions each of them asks (questions.go: the fragment their forms embed, whose Answers are all Run takes), the fingerprint of a plan that provisions and the answers remembered
-    repository/        the facts of the repository a command decides from (config, run.toml, snapshot), wired once, refusing a repository with no wtm config with the command's `<name>.config_not_found` (its follow-up, `init`, injected), and one whose config.toml does not parse or validate with `<name>.config_invalid`
+    repository/        the facts of the repository a command decides from (config, run.toml, snapshot), and what the reads share (the meta records, whether a worktree's directory is gone, the run daemon and the forge asked while the worktrees are read: Records, Gone, Present, Ask, Each), wired once, refusing a repository with no wtm config with the command's `<name>.config_not_found` (its follow-up, `init`, injected), and one whose config.toml does not parse or validate with `<name>.config_invalid`
     registry/          the repositories wtm knows, for a stream of every one: a repository joins once its state directory holds a wtm config and leaves once it no longer does, each announced on the bus (`repo.added`, `repo.removed`); the registry is left alone while the state directory is moved (`$WTM_STATE_DIR`): none joins, none leaves, it lists none and a stream joins none another process announces
   adapter/             what the ports reach out to: git, statefile, store, config, shell, oplock, events (the event bus: its daemon, its publisher, a subscription, the v2 schema), registry (repos.json), proxyport, daemon (the run daemon's jobs, never starting it), github (gh: the newest pull request of each branch whatever its state, with its checks and review)
     <name>test/        a stateful fake of an adapter, for tests (`gittest`, `storetest`, `registrytest`)

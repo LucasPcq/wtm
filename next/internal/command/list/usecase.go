@@ -3,10 +3,8 @@ package list
 
 import (
 	"context"
-	"sync"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
@@ -43,20 +41,15 @@ type Item = domain.Unit[Detail]
 
 // Run reads every worktree of the repository, its pull request when the request asks for them, after fetching origin when it asks to; a read, it takes no lock and runs no operation. An error returned is a refusal of the repository.
 func (u UseCase) Run(ctx context.Context, req Request, _ domain.RunOptions) (Outcome, error) {
-	// 1. A refresh fetches origin first, best effort: an origin out of reach leaves the counts of the refs already fetched.
-	if req.Fetch {
-		_ = u.Git.Fetch(ctx)
-	}
-
-	// 2. Read the repository and each worktree.
+	// 1. Read the repository and each worktree, origin fetched first when the request asks to.
 	facts, err := u.Observe(ctx, req)
 	if err != nil {
 		return Outcome{}, err
 	}
 
-	// 3. Report each worktree, the main one first, with what it offers.
-	items, warnings := List(facts)
-	return Outcome{Items: items, Warnings: warnings}, nil
+	// 2. Report each worktree, the main one first, with what it offers.
+	items, warnings := List(facts, req.Caller)
+	return Outcome{Items: items, Warnings: warnings, Interrupted: facts.Interrupted}, nil
 }
 
 // ----------------------------------------------------------------------------
@@ -70,60 +63,49 @@ func (u UseCase) Questions(context.Context, Request) (Questions, error) {
 // ----------------------------------------------------------------------------
 // Observe
 
-// Observe reads what list reports: the repository, what each worktree holds, the jobs up and, when req asks for them, the newest pull request of each branch. The worktrees, the daemon and GitHub are read at once.
+// Observe reads what list reports: the repository, after fetching origin when req asks to, the meta records, what each worktree holds, the jobs up and, when req asks for them, the newest pull request of each branch. The worktrees, the daemon and GitHub are read at once.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
+	// A refresh fetches origin first, best effort: an origin out of reach leaves the counts of the refs already fetched, and a warning.
+	var fetchErr error
+	if req.Fetch {
+		fetchErr = u.Git.Fetch(ctx)
+	}
+
 	repo, err := u.Repository.Observe(ctx, Name)
 	if err != nil {
 		return Facts{}, err
 	}
 
-	facts := Facts{Repository: repo}
-	var (
-		wg           sync.WaitGroup
-		jobs         []run.Job
-		pullRequests []worktree.PullRequest
-		jobsErr      error
-		prsErr       error
-	)
-	wg.Go(func() { jobs, jobsErr = u.Jobs(ctx) })
-	if req.WithPRs {
-		wg.Go(func() { pullRequests, prsErr = u.PullRequests(ctx, repo.Live()) })
-	}
-	states := u.states(ctx, facts)
-	wg.Wait()
+	facts := Facts{Repository: repo, FetchErr: fetchErr}
+	facts.Records, facts.RecordErrs = repository.Records(u.Meta, repo.Live())
+	worktrees := facts.Checkouts()
+	var read []State
+	facts.Asked = repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, PullRequests: u.PullRequests, Branches: repo.Live(), WithPRs: req.WithPRs}, func() {
+		read = repository.Each(worktrees, func(w worktree.Worktree) State { return u.state(ctx, facts, w) })
+	})
 
-	facts.States, facts.Jobs, facts.JobsErr, facts.PullRequests, facts.PRsErr = states, jobs, jobsErr, pullRequests, prsErr
+	facts.States = make(map[string]State, len(worktrees))
+	for i, w := range worktrees {
+		facts.States[w.Path] = read[i]
+	}
 	return facts, nil
 }
 
-// states reads what each worktree of facts holds, a few at once.
-func (u UseCase) states(ctx context.Context, facts Facts) map[string]State {
-	worktrees := facts.Checkouts()
-	read := repository.Each(worktrees, func(w worktree.Worktree) State { return u.state(ctx, facts, w) })
-	states := make(map[string]State, len(worktrees))
-	for i, w := range worktrees {
-		states[w.Path] = read[i]
-	}
-
-	return states
-}
-
-// state reads one worktree: its meta record, which a worktree wtm did not create lacks, whether its directory is gone, then, if it is there, its changes and the commits its branch has past the base branch.
+// state reads one worktree: whether its directory is gone, then, if it is there, its changes and the commits its branch has past the base branch.
 func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) State {
-	var state State
-	if branch := w.Branch(); branch != "" {
-		state.Meta, _ = u.Meta.Load(branch)
-	}
-
-	var presence repository.Presence
-	presence, state.Err = repository.Present(ctx, u.Git, w)
-	state.Missing, state.Dirty = presence.Missing, presence.Dirty
-	if state.Missing || state.Err != nil || !facts.counted(w) {
+	presence, err := repository.Present(ctx, u.Git, w)
+	state := State{Missing: presence.Missing, Dirty: presence.Dirty, Err: err}
+	if state.Missing || state.Err != nil || !facts.CountedAgainstBase(w) {
 		return state
 	}
 
 	// A branch with no commit yet, an orphan, has nothing to count: it is not counted rather than unreadable.
-	gap, _ := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: facts.Config.Worktrees.BaseBranch})
+	gap, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: facts.Config.Worktrees.BaseBranch})
+	state.Err = repository.Interrupted(ctx, err)
+	if err != nil {
+		return state
+	}
+
 	state.Ahead = gap.Ahead
 	return state
 }

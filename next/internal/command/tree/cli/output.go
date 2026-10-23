@@ -167,7 +167,7 @@ func rowsOf(read tree.Outcome) []row {
 }
 
 // drawTree draws the forest read, a row per node with its badges aligned after the widest branch, then each worktree that could not be read and the warnings.
-func drawTree(w io.Writer, read tree.Outcome, _ output.View) {
+func drawTree(w io.Writer, read tree.Outcome, _ tree.Request, _ output.View) {
 	st := output.StylesOf(w)
 	rows := rowsOf(read)
 	if len(rows) == 0 {
@@ -193,13 +193,5 @@ func drawTree(w io.Writer, read tree.Outcome, _ output.View) {
 		}
 		fmt.Fprintln(w, output.Indent+line)
 	}
-
-	for _, item := range read.Items {
-		if item.Err != nil {
-			output.ErrorLine(w, item.Err.Error())
-		}
-	}
-	for _, warning := range read.Warnings {
-		output.WarningLine(w, warning.Message)
-	}
+	output.ReadEnd(w, read)
 }

@@ -1,7 +1,9 @@
 package domain
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,4 +50,24 @@ func TestAStalePlanIsFollowedUpByItsReplanInTheEnvelope(t *testing.T) {
 
 	assert.Equal(t, []FollowUp{{Command: "create", Answers: answers, DryRun: true, Code: CodeReplan, Message: ReplanNote}}, doc.FollowUps)
 	assert.Empty(t, refused.FollowUps)
+}
+
+func TestAReadInterruptedEndsSoEvenWithEverySubjectRead(t *testing.T) {
+	read := Read[struct{}]{Items: []Unit[struct{}]{{Subject: "a", Status: StatusDone}}, Interrupted: true}
+
+	assert.Equal(t, KindCancelled, read.Failure().Kind)
+	assert.Nil(t, Read[struct{}]{Items: read.Items}.Failure())
+}
+
+func TestASubjectNotReadFailsUnderItsCommandsCodeUnlessTheReadWasInterrupted(t *testing.T) {
+	broken := errors.New("broken index")
+
+	failed := Unread[struct{}](UnreadParams{Command: "list", Subject: "feat/a", Path: "/w/a", Err: broken})
+	cancelled := Unread[struct{}](UnreadParams{Command: "list", Subject: "feat/a", Path: "/w/a", Err: context.Canceled})
+
+	assert.Equal(t, StatusFailed, failed.Status)
+	assert.Equal(t, "list.unreadable", failed.Err.Code)
+	assert.Equal(t, "couldn't read /w/a", failed.Err.Message)
+	assert.ErrorIs(t, failed.Err, broken)
+	assert.Equal(t, Unit[struct{}]{Subject: "feat/a", Status: StatusCancelled, Reason: ReasonInterrupted}, cancelled)
 }

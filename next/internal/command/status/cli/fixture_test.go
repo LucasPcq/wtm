@@ -52,7 +52,9 @@ type world struct {
 	JobsErr   error
 	PRsErr    error
 	Merged    bool // feat/a's pull request is merged
-	Gone      bool // feat/old's directory is gone
+	Gone      bool // the directories of feat/old and of the detached worktree are gone
+	Broken    bool // feat/a does not read: git cannot tell its changes
+	Alone     bool // the main worktree is the only one
 }
 
 func (w world) env() uicli.Env {
@@ -61,13 +63,17 @@ func (w world) env() uicli.Env {
 }
 
 func (w world) open(context.Context, string) (status.UseCase, error) {
+	worktrees := []worktree.Worktree{
+		{Path: "/repo/.trees/feat-a", State: worktree.OnBranch{Branch: "feat/a"}},
+		{Path: "/repo/.trees/feat-old", State: worktree.OnBranch{Branch: "feat/old"}},
+		{Path: "/repo/.trees/detached", State: worktree.Detached{}},
+	}
+	if w.Alone {
+		worktrees = nil
+	}
 	git := gittest.NewFake(gittest.FakeParams{
 		Main: mainPath, Branch: "main", Remote: []string{"main", "feat/a"},
-		Worktrees: []worktree.Worktree{
-			{Path: "/repo/.trees/feat-a", State: worktree.OnBranch{Branch: "feat/a"}},
-			{Path: "/repo/.trees/feat-old", State: worktree.OnBranch{Branch: "feat/old"}},
-			{Path: "/repo/.trees/detached", State: worktree.Detached{}},
-		},
+		Worktrees: worktrees,
 		Commits: map[worktree.Ref][]string{
 			worktree.LocalBranch{Name: "feat/a"}: {"Add the login form", "Wire the session"},
 			worktree.LocalBranch{Name: "main"}:   {"Bump"},
@@ -100,8 +106,13 @@ func (w world) open(context.Context, string) (status.UseCase, error) {
 		runConfig = project.Run{}
 	}
 
+	var statusGit status.Git = git
+	if w.Broken {
+		statusGit = broken{Git: git, path: "/repo/.trees/feat-a"}
+	}
+
 	return status.UseCase{
-		Git:      git,
+		Git:      statusGit,
 		Meta:     store,
 		EnvFiles: store,
 		Jobs: func(context.Context) ([]run.Job, error) {
@@ -133,10 +144,23 @@ func (enters) Read(p []byte) (int, error) {
 // errInvalidRun is run.toml that does not read.
 var errInvalidRun = errors.New(`invalid run config: unknown addressing "nope"`)
 
-// gone is feat/old's directory, when it is gone.
+// gone are the directories of feat/old and of the detached worktree, when they are gone.
 func gone(on bool) []string {
 	if !on {
 		return nil
 	}
-	return []string{"/repo/.trees/feat-old"}
+	return []string{"/repo/.trees/feat-old", "/repo/.trees/detached"}
+}
+
+// broken is git that cannot tell the changes of the worktree at path.
+type broken struct {
+	status.Git
+	path string
+}
+
+func (b broken) Changes(ctx context.Context, dir string) ([]worktree.Change, error) {
+	if dir == b.path {
+		return nil, errors.New("broken index")
+	}
+	return b.Git.Changes(ctx, dir)
 }

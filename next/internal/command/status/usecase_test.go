@@ -50,7 +50,7 @@ func TestAWorktreeIsReadWholeGitAndIsolation(t *testing.T) {
 		Parent: "main", Children: []string{"feat/b"},
 		Base:      &status.Base{Name: "main", Ahead: 2, Behind: 1},
 		Origin:    &worktree.Origin{Ahead: 2, State: worktree.Ahead},
-		Changes:   status.Changes{Staged: 1, Modified: 1, Untracked: 1, Insertions: 12, Deletions: 3, Files: []worktree.Change{{Path: "a.go", Status: worktree.ChangeModified}, {Path: "new.go", Status: worktree.ChangeUntracked}}},
+		Changes:   &status.Changes{Staged: 1, Modified: 1, Untracked: 1, Insertions: 12, Deletions: 3, Files: []worktree.Change{{Path: "a.go", Status: worktree.ChangeModified}, {Path: "new.go", Status: worktree.ChangeUntracked}}},
 		Commits:   []worktree.Commit{{SHA: "two", Subject: "two"}, {SHA: "one", Subject: "one"}, {SHA: gittest.Root, Subject: gittest.Root}},
 		Review:    &status.Review{Number: 12, URL: "https://github.com/acme/acme/pull/12", State: worktree.PullRequestOpen, Progress: &status.Progress{Title: "Add a", Checks: worktree.Checks{Passed: 2, Failed: 1}, Decision: "APPROVED"}},
 		Isolation: &isolated,
@@ -58,7 +58,7 @@ func TestAWorktreeIsReadWholeGitAndIsolation(t *testing.T) {
 		Run:       &status.Run{Addressing: project.AddressNames, Offset: &offset, Ports: status.PortsOffset},
 		Jobs:      []status.Job{{Name: "web", State: run.Crashed, URL: "http://web.feat-a.main.localhost:11080", Port: &port, ExitCode: &exit}},
 		Env:       status.Env{Files: []status.EnvFile{}},
-		Problems: []status.Problem{{Code: status.CodeJobCrashed, Message: "web crashed (exit 1)", Fix: domain.FollowUp{
+		Problems: []status.Problem{{Code: status.CodeJobCrashed, Message: "web crashed (exit 1)", Fix: &domain.FollowUp{
 			Command: "run start", Code: status.CodeJobCrashed,
 			Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "job", Values: []string{"web"}}, {Path: "detach", Values: []string{"true"}}},
 		}}},
@@ -159,10 +159,37 @@ func TestAllReadsEveryWorktreeAndOneThatCannotBeReadFailsAlone(t *testing.T) {
 		subjects, statuses = append(subjects, item.Subject), append(statuses, item.Status)
 	}
 	assert.Equal(t, []string{"main", "/repo/.trees/detached", "feat/a", "feat/gone"}, subjects, "the main worktree first, then as git lists them; one on no branch named by its path")
-	assert.Equal(t, []domain.Status{domain.StatusDone, domain.StatusDone, domain.StatusFailed, domain.StatusFailed}, statuses)
+	assert.Equal(t, []domain.Status{domain.StatusDone, domain.StatusDone, domain.StatusFailed, domain.StatusDone}, statuses)
 	assert.Equal(t, status.CodeUnreadable, got.Items[2].Err.Code)
 	assert.ErrorIs(t, got.Items[2].Err, broken)
-	assert.Equal(t, status.CodeUnreadable, got.Items[3].Err.Code, "a worktree whose directory is gone cannot be read")
+}
+
+func TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleanedLockedOrNot(t *testing.T) {
+	locked := linked("feat/locked")
+	locked.Locked = true
+	prunable := linked("feat/prunable")
+	prunable.Prunable = true
+	detached := worktree.Worktree{Path: "/repo/.trees/detached", State: worktree.Detached{}, Locked: true}
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{locked, prunable, detached}, Gone: []string{locked.Path, prunable.Path, detached.Path}}})
+
+	got := read(t, w, status.Request{All: true})
+
+	assert.Nil(t, got.Failure(), "a gone directory is found, not a read that failed")
+	for _, branch := range []string{"feat/locked", "feat/prunable"} {
+		d := detailOf(t, got, branch)
+		assert.True(t, d.Missing, branch)
+		assert.Equal(t, []string{status.CodeMissing}, problemCodes(d.Problems), branch)
+		assert.Equal(t, &domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}}, Code: status.CodeMissing}, d.Problems[0].Fix)
+		assert.Nil(t, d.Changes, branch)
+		assert.Nil(t, d.Commits, branch)
+		assert.Nil(t, d.Env.Files, branch)
+	}
+	gone := detailOf(t, got, detached.Path)
+	assert.True(t, gone.Missing)
+	require.Len(t, gone.Problems, 1, "a gone worktree on no branch is a problem too")
+	assert.Equal(t, status.CodeMissing, gone.Problems[0].Code)
+	assert.Nil(t, gone.Problems[0].Fix, "clean takes a branch: no command fixes it")
+	assert.NotContains(t, w.git.Calls(), "Changes "+locked.Path, "nothing of a gone directory is read")
 }
 
 func TestAWorktreeThatHasNotChosenItsIsolationHasNoneAndIsToldHowToChoose(t *testing.T) {
@@ -223,6 +250,17 @@ func TestOnlyAnUnnumberedWorktreeHasNoOffsetAndARecordThatDoesNotReadIsAWarning(
 	assert.Equal(t, status.PortsUnknown, d.Run.Ports)
 }
 
+func TestARecordThatDoesNotReadIsAWarningOnAWorktreeNotReadToo(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}}, Unreadable: []string{"feat/a"}})
+	w.usecase.Git = failingChanges{Git: w.usecase.Git, path: "/repo/.trees/feat/a", err: errors.New("broken index")}
+
+	got := read(t, w, status.Request{Worktree: "feat/a"})
+
+	require.Len(t, got.Items, 1)
+	assert.Equal(t, domain.StatusFailed, got.Items[0].Status)
+	assert.Equal(t, []string{status.CodeMetaUnreadable}, codes(got.Items[0].Warnings))
+}
+
 func TestASharedJobAWorktreeHoldsReadsAsItsOwnersInstanceOnce(t *testing.T) {
 	exit := 2
 	w := newWorld(seed{
@@ -273,17 +311,21 @@ func TestWhatCannotBeAskedIsNullAndAWarning(t *testing.T) {
 	assert.Equal(t, []string{status.CodeJobsUnknown, status.CodePRsUnavailable}, codes(got.Warnings))
 }
 
-func TestAnInterruptedReadDoesNotWarnGitHubIsUnavailable(t *testing.T) {
-	w := newWorld(seed{PRsErr: context.Canceled})
+func TestAnInterruptedReadWarnsOfNothingItCouldNotAsk(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	w := newWorld(seed{JobsErr: run.ErrUnknown, PRsErr: context.Canceled})
 
-	got := read(t, w, status.Request{WithPRs: true})
+	got, err := w.usecase.Run(ctx, status.Request{WithPRs: true}, domain.RunOptions{})
 
-	assert.NotContains(t, codes(got.Warnings), status.CodePRsUnavailable)
+	require.NoError(t, err)
+	assert.Empty(t, got.Warnings)
+	assert.Equal(t, domain.KindCancelled, got.Failure().Kind, "every worktree read, the read still ends interrupted")
 }
 
 func TestTheReviewIsTheNewestPullRequestAndAMergedOneAsksToCleanFirst(t *testing.T) {
 	const url = "https://github.com/acme/acme/pull/12"
-	clean := domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}
+	clean := &domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}
 	cases := map[string]struct {
 		pr       []worktree.PullRequest
 		review   *status.Review
@@ -381,7 +423,7 @@ func TestAMergedPullRequestAsksToCleanABranchBehindItsHeadButNotOneMovedOnOrApar
 			assert.Equal(t, worktree.PullRequestMerged, a.Review.State)
 			assert.Equal(t, c.problems, problemCodes(a.Problems))
 			if c.problems != nil {
-				assert.Equal(t, domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}, a.Problems[0].Fix)
+				assert.Equal(t, &domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}, a.Problems[0].Fix)
 			}
 		})
 	}
@@ -415,7 +457,7 @@ func TestAMissingEnvFileIsRebuiltFromWhereItCanBe(t *testing.T) {
 		strategy project.EnvStrategy
 		files    map[string]string
 		message  string
-		fix      domain.FollowUp
+		fix      *domain.FollowUp
 	}{
 		"from_its_source": {
 			strategy: project.EnvMain, files: map[string]string{mainPath + "/.env": "A=1\n"},
@@ -431,7 +473,7 @@ func TestAMissingEnvFileIsRebuiltFromWhereItCanBe(t *testing.T) {
 		},
 		"nowhere": {
 			strategy: project.EnvExample,
-			message:  ".env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand", fix: domain.FollowUp{Command: "config edit", Code: status.CodeEnvMissing},
+			message:  ".env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand", fix: &domain.FollowUp{Command: "config edit", Code: status.CodeEnvMissing},
 		},
 	}
 	for name, c := range cases {

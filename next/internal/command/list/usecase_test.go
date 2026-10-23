@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -146,11 +147,52 @@ func TestWhatCannotBeAskedIsAWarningNotAFailure(t *testing.T) {
 	}
 }
 
-func TestAnInterruptedReadDoesNotWarnGitHubIsUnavailable(t *testing.T) {
-	read, err := newWorld(seed{PRsErr: context.Canceled}).usecase.Run(t.Context(), list.Request{WithPRs: true}, domain.RunOptions{})
+func TestAnInterruptedReadWarnsOfNothingItCouldNotAsk(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	w := newWorld(seed{JobsErr: run.ErrUnknown, PRsErr: context.Canceled, Git: gittest.FakeParams{Fail: map[string]error{"Fetch": context.Canceled}}})
+
+	read, err := w.usecase.Run(ctx, list.Request{WithPRs: true, Fetch: true}, domain.RunOptions{})
 
 	require.NoError(t, err)
-	assert.NotContains(t, codes(read), list.CodePRsUnavailable)
+	assert.Empty(t, read.Warnings)
+	assert.Equal(t, domain.KindCancelled, read.Failure().Kind, "every worktree read, the read still ends interrupted")
+}
+
+func TestARecordThatDoesNotReadKeepsItsWorktreeAndIsAWarning(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}}, Unreadable: []string{"feat/a"}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Nil(t, read.Failure())
+	item := read.Items[slices.IndexFunc(read.Items, func(item list.Item) bool { return item.Subject == "feat/a" })]
+	assert.Equal(t, domain.StatusDone, item.Status)
+	require.Len(t, item.Warnings, 1)
+	assert.Equal(t, list.CodeMetaUnreadable, item.Warnings[0].Code)
+	assert.Nil(t, item.Detail.CreatedAt)
+}
+
+func TestARecordThatDoesNotReadIsAWarningOnAWorktreeNotReadToo(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}, Fail: map[string]error{"Dirty": errors.New("broken index")}}, Unreadable: []string{"feat/a"}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	item := read.Items[slices.IndexFunc(read.Items, func(item list.Item) bool { return item.Subject == "feat/a" })]
+	assert.Equal(t, domain.StatusFailed, item.Status)
+	require.Len(t, item.Warnings, 1)
+	assert.Equal(t, list.CodeMetaUnreadable, item.Warnings[0].Code)
+}
+
+func TestARefreshThatCannotFetchIsAWarning(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Fail: map[string]error{"Fetch": errors.New("could not read from remote repository")}}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{Fetch: true}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{list.CodeFetchFailed}, codes(read))
+	assert.Contains(t, read.Warnings[0].Message, "could not read from remote repository")
 }
 
 func TestJobsThatCannotBeToldAreNoServicesAtAll(t *testing.T) {
@@ -262,6 +304,48 @@ func TestAReadCancelledReportsItsWorktreesInterrupted(t *testing.T) {
 		assert.Equal(t, domain.ReasonInterrupted, item.Reason, item.Subject)
 	}
 	assert.Equal(t, domain.KindCancelled, read.Failure().Kind)
+}
+
+func TestACountInterruptedMakesItsWorktreeCancelled(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}, Fail: map[string]error{"AheadBehindOf": context.Canceled}}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusDone, read.Items[0].Status, "the main worktree is not counted")
+	assert.Equal(t, domain.StatusCancelled, read.Items[1].Status)
+	assert.Equal(t, domain.KindCancelled, read.Failure().Kind)
+}
+
+func TestTheActiveWorktreeIsTheDeepestHoldingWhereTheCallerStands(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), linked("feat/ab")}}})
+	activeIn := func(cwd string) []string {
+		read, err := w.usecase.Run(t.Context(), list.Request{Caller: domain.Caller{Cwd: cwd}}, domain.RunOptions{})
+		require.NoError(t, err)
+		var active []string
+		for _, item := range read.Items {
+			if item.Detail.Active {
+				active = append(active, item.Subject)
+			}
+		}
+		return active
+	}
+
+	assert.Equal(t, []string{"feat/a"}, activeIn("/repo/.trees/feat/a/src"))
+	assert.Equal(t, []string{"main"}, activeIn(mainPath))
+	assert.Empty(t, activeIn("/elsewhere"))
+	assert.Empty(t, activeIn(""), "a call that stands nowhere marks none")
+}
+
+func TestNoWorktreeIsActiveWhenTheOneTheCallerStandsInCannotBeRead(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}, Fail: map[string]error{"Dirty": errors.New("broken index")}}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{Caller: domain.Caller{Cwd: "/repo/.trees/feat/a/src"}}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	for _, item := range read.Items {
+		assert.False(t, item.Detail != nil && item.Detail.Active, "%s is not where the caller stands", item.Subject)
+	}
 }
 
 func TestARefreshFetchesOriginOnce(t *testing.T) {

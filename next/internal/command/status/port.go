@@ -6,11 +6,12 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
 // Git is the repository as status reads one worktree of it: its uncommitted changes and how much they weigh, its last commits, and how its branch stands against the base branch; whether a commit is behind another; and a path resolved to where it really is.
 type Git interface {
-	Locate(ctx context.Context, path string) (worktree.Location, error)
+	repository.Locator
 	Changes(ctx context.Context, dir string) ([]worktree.Change, error)
 	Diffstat(ctx context.Context, dir string) (worktree.Diffstat, error)
 	Commits(ctx context.Context, dir string, count int) ([]worktree.Commit, error)
@@ -18,9 +19,9 @@ type Git interface {
 	IsAncestor(ctx context.Context, ancestry worktree.Ancestry) (bool, error)
 }
 
-// Meta reads a worktree's meta record by its branch; a missing record is an error wrapping os.ErrNotExist.
+// Meta reads a worktree's meta record by its branch, as repository.Records reads it.
 type Meta interface {
-	Load(branch string) (worktree.Meta, error)
+	repository.Meta
 }
 
 // EnvFiles reads a .env file, none when it does not exist.

@@ -12,6 +12,7 @@
         "main": false,
         "locked": false,
         "rebasing": false,
+        "missing": false,
         "created_at": "2026-10-16T12:00:00Z",
         "parent": "main",
         "children": [],

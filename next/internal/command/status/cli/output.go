@@ -22,26 +22,15 @@ const (
 // now is the clock ages are drawn against.
 var now = time.Now
 
-// drawStatus draws what was read: one worktree's state, or the error that kept it from being read, or with --all the table of them all; then each worktree that could not be read and the warnings.
-func drawStatus(w io.Writer, read status.Outcome, view output.View) {
+// drawStatus draws what was read: with --all the table of every worktree, however many; else the one worktree's state, or the error that kept it from being read; then each worktree that could not be read and the warnings.
+func drawStatus(w io.Writer, read status.Outcome, req status.Request, view output.View) {
 	switch {
+	case req.All:
+		drawAll(w, read.Items, view)
 	case len(read.Items) == 1 && read.Items[0].Detail != nil:
 		drawOne(w, *read.Items[0].Detail, view)
-	case len(read.Items) != 1:
-		drawAll(w, read.Items, view)
 	}
-
-	for _, item := range read.Items {
-		if item.Err != nil {
-			output.ErrorLine(w, item.Err.Error())
-		}
-		for _, warning := range item.Warnings {
-			output.WarningLine(w, warning.Message)
-		}
-	}
-	for _, warning := range read.Warnings {
-		output.WarningLine(w, warning.Message)
-	}
+	output.ReadEnd(w, read)
 }
 
 // ----------------------------------------------------------------------------
@@ -68,11 +57,15 @@ func drawOne(w io.Writer, d status.Detail, view output.View) {
 		field("addressing", string(d.Run.Addressing))
 		field("ports", ports(d))
 	}
-	field("env", envFiles(d.Env))
+	if !d.Missing {
+		field("env", envFiles(d.Env))
+	}
 	field("base", base(d.Base))
 	field("origin", origin(d))
-	field("changes", changes(d.Changes))
-	field("last commit", lastCommit(d.Commits))
+	if d.Changes != nil {
+		field("changes", changes(*d.Changes))
+		field("last commit", lastCommit(d.Commits))
+	}
 	field("parent", d.Parent)
 	field("children", strings.Join(d.Children, ", "))
 	field("review", review(d.Review))
@@ -121,7 +114,9 @@ func drawJobs(w io.Writer, jobs []status.Job) {
 func drawProblems(w io.Writer, problems []status.Problem, view output.View) {
 	for _, problem := range problems {
 		output.WarningLine(w, problem.Message)
-		output.NextSteps(w, []output.NextStep{output.FollowUpStep(problem.Fix, view.CommandLine)})
+		if problem.Fix != nil {
+			output.NextSteps(w, []output.NextStep{output.FollowUpStep(*problem.Fix, view.CommandLine)})
+		}
 	}
 }
 
@@ -168,7 +163,7 @@ func drawAll(w io.Writer, items []status.Item, view output.View) {
 		if withRun {
 			cells = append(cells, isolation(d), cmp.Or(ports(d), none), jobsCell(d.Jobs))
 		}
-		cells = append(cells, envCell(d.Env))
+		cells = append(cells, envCell(d))
 		if withReview {
 			cells = append(cells, reviewCell(d.Review))
 		}
@@ -243,12 +238,16 @@ func jobsCell(jobs []status.Job) string {
 	return cmp.Or(strings.Join(parts, output.Dot), none)
 }
 
-func envCell(env status.Env) string {
-	missing := missingFiles(env)
+// envCell is how the worktree's .env files stand: none read when its directory is gone.
+func envCell(d status.Detail) string {
+	if d.Missing {
+		return none
+	}
+	missing := missingFiles(d.Env)
 	if missing > 0 {
 		return strconv.Itoa(missing) + " missing"
 	}
-	return counted(env.Declared, "file", "files")
+	return counted(d.Env.Declared, "file", "files")
 }
 
 // ----------------------------------------------------------------------------
@@ -256,15 +255,15 @@ func envCell(env status.Env) string {
 
 // subject names a worktree as the headline does: its branch, else its path from cwd.
 func subject(d status.Detail, cwd string) string {
-	if d.Branch != "" {
-		return d.Branch
-	}
-	return output.ShownPath(output.Shown{Cwd: cwd, Path: d.Path})
+	return output.ShownWorktree(d.Branch, output.Shown{Cwd: cwd, Path: d.Path})
 }
 
 // worktreeState is what the worktree is in the middle of, or held by, if anything.
 func worktreeState(d status.Detail) string {
 	var states []string
+	if d.Missing {
+		states = append(states, "missing")
+	}
 	if d.Rebasing {
 		states = append(states, "rebasing")
 	}

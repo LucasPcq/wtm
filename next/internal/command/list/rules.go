@@ -2,36 +2,33 @@ package list
 
 import (
 	"cmp"
-	"context"
-	"errors"
 	"slices"
 	"strconv"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
 // ----------------------------------------------------------------------------
-// The facts
+// Facts
 
-// Facts are what list reads: the repository, what each worktree holds, the run daemon's jobs and the newest pull request of each branch, each with the error that kept it from being read; PullRequests is nil when GitHub was not asked.
+// Facts are what list reads: the repository, why fetching origin failed when it was asked to, the meta record of each live branch (and the error of a record that exists but does not read), what each worktree holds, and what the run daemon and GitHub said.
 type Facts struct {
 	worktree.Repository
-	States       map[string]State // by worktree path
-	Jobs         []run.Job
-	JobsErr      error
-	PullRequests []worktree.PullRequest
-	PRsErr       error
+	repository.Asked
+	FetchErr   error
+	Records    map[string]worktree.Meta // by branch
+	RecordErrs map[string]error         // by branch
+	States     map[string]State         // by worktree path
 }
 
-// A State is what one worktree holds: whether its directory is gone, whether it has uncommitted changes, the commits its branch has that the base branch lacks, its meta record, and the error that kept it from being read.
+// A State is what one worktree holds: whether its directory is gone, whether it has uncommitted changes, the commits its branch has that the base branch lacks, and the error that kept it from being read.
 type State struct {
 	Missing bool
 	Dirty   bool
 	Ahead   int
-	Meta    worktree.Meta
 	Err     error
 }
 
@@ -46,6 +43,7 @@ type Detail struct {
 	Dirty        bool             `json:"dirty"`
 	Locked       bool             `json:"locked"`
 	Rebasing     bool             `json:"rebasing"`
+	Active       bool             `json:"active"`  // the caller stands in it, the deepest worktree holding its directory
 	Missing      bool             `json:"missing"` // its directory is gone: git calls it prunable
 	CommitsAhead int              `json:"commits_ahead"`
 	CreatedAt    *time.Time       `json:"created_at"` // from its meta record, null without one
@@ -65,43 +63,42 @@ type PR struct {
 
 // The codes of list's warnings and failures.
 const (
-	CodePRsUnavailable = Name + ".prs_unavailable"
-	CodeJobsUnknown    = Name + ".jobs_unknown"
+	CodePRsUnavailable = Name + domain.PRsUnavailable
+	CodeJobsUnknown    = Name + domain.JobsUnknown
 	CodeBaseMissing    = Name + ".base_missing"
-	CodeUnreadable     = Name + ".unreadable"
+	CodeFetchFailed    = Name + ".fetch_failed"
+	CodeMetaUnreadable = Name + domain.MetaUnreadable
+	CodeUnreadable     = Name + domain.Unreadable
 )
 
 // ----------------------------------------------------------------------------
-// The listing
+// List
 
-// List is each worktree of facts as an item, the main one first, then the others by creation, the oldest first and those with no record last, and the warnings of what could not be read.
-func List(facts Facts) ([]Item, []domain.Warning) {
+// List is each worktree of facts as an item, the main one first, then the others by creation, the oldest first and those with no record last, the one caller stands in active; and the warnings of what could not be read.
+func List(facts Facts, caller domain.Caller) ([]Item, []domain.Warning) {
 	worktrees := facts.Checkouts()
 	slices.SortStableFunc(worktrees, func(a, b worktree.Worktree) int {
 		if a.Main != b.Main {
 			return compareTrue(a.Main, b.Main)
 		}
-		return compareCreated(facts.States[a.Path].Meta, facts.States[b.Path].Meta)
+		return compareCreated(facts.Records[a.Branch()], facts.Records[b.Branch()])
 	})
 
+	active := worktree.Holding(worktrees, caller.Cwd, func(w worktree.Worktree) string { return w.Path })
 	items := make([]Item, 0, len(worktrees))
-	for _, w := range worktrees {
-		items = append(items, facts.item(w))
+	for i, w := range worktrees {
+		items = append(items, facts.item(w, i == active))
 	}
 
 	return items, facts.warnings()
 }
 
-func (f Facts) item(w worktree.Worktree) Item {
+func (f Facts) item(w worktree.Worktree, active bool) Item {
 	state := f.States[w.Path]
-	subject := cmp.Or(w.Branch(), w.Path)
-	if errors.Is(state.Err, context.Canceled) {
-		return Item{Subject: subject, Status: domain.StatusCancelled, Reason: domain.ReasonInterrupted}
-	}
 	if state.Err != nil {
-		return Item{Subject: subject, Status: domain.StatusFailed, Err: &domain.Error{
-			Kind: domain.KindInternal, Code: CodeUnreadable, Message: "couldn't read " + w.Path, Params: domain.Params{"path": w.Path}, Cause: state.Err,
-		}}
+		item := domain.Unread[Detail](domain.UnreadParams{Command: Name, Subject: w.Name(), Path: w.Path, Err: state.Err})
+		item.Warnings = f.recordWarnings(w.Branch())
+		return item
 	}
 
 	_, rebasing := w.State.(worktree.Rebasing)
@@ -112,16 +109,27 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Dirty:        state.Dirty,
 		Locked:       w.Locked,
 		Rebasing:     rebasing,
+		Active:       active,
 		Missing:      state.Missing,
 		CommitsAhead: state.Ahead,
-		CreatedAt:    state.Meta.Created(),
+		CreatedAt:    f.Records[w.Branch()].Created(),
 		Origin:       f.OriginOf(w.Branch()),
 		PR:           f.pr(w.Branch()),
-		Services:     f.services(w.Path),
+		Services:     f.Services(w.Path),
 	}
 	detail.Actions = Actions(detail)
 
-	return Item{Subject: subject, Status: domain.StatusDone, Detail: &detail}
+	return Item{Subject: w.Name(), Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(w.Branch())}
+}
+
+// recordWarnings are the warnings of the record of branch when it exists but does not read, none otherwise.
+func (f Facts) recordWarnings(branch string) []domain.Warning {
+	err := f.RecordErrs[branch]
+	if err == nil {
+		return nil
+	}
+
+	return []domain.Warning{{Code: CodeMetaUnreadable, Message: "couldn't read the record of " + branch + ": when it was created is not known: " + err.Error(), Params: domain.Params{"branch": branch}}}
 }
 
 func (f Facts) pr(branch string) *PR {
@@ -133,35 +141,16 @@ func (f Facts) pr(branch string) *PR {
 	return &PR{Number: found.Number, URL: found.URL, State: found.State}
 }
 
-// services are the jobs up in the worktree at path, by name, none when the daemon could not tell.
-func (f Facts) services(path string) []string {
-	if f.JobsErr != nil {
-		return nil
-	}
-
-	return run.UpIn(f.Jobs, path)
-}
-
 func (f Facts) warnings() []domain.Warning {
 	var warnings []domain.Warning
-	if base := f.Config.Worktrees.BaseBranch; base != "" && !f.Local(base) {
+	if base, missing := f.MissingBase(); missing {
 		warnings = append(warnings, domain.Warning{Code: CodeBaseMissing, Message: "the base branch " + base + " does not exist: commits ahead of it are not counted", Params: domain.Params{"branch": base}})
 	}
-	if f.JobsErr != nil {
-		warnings = append(warnings, domain.Warning{Code: CodeJobsUnknown, Message: run.UnknownMessage(f.JobsErr)})
-	}
-	// an interrupted read could not ask: GitHub said nothing of itself
-	if f.PRsErr != nil && !errors.Is(f.PRsErr, context.Canceled) {
-		warnings = append(warnings, domain.Warning{Code: CodePRsUnavailable, Message: f.PRsErr.Error()})
+	if f.FetchErr != nil && !f.Interrupted {
+		warnings = append(warnings, domain.Warning{Code: CodeFetchFailed, Message: "couldn't fetch origin: where each branch stands against it is as last fetched: " + f.FetchErr.Error()})
 	}
 
-	return warnings
-}
-
-// counted reports whether the commits a worktree's branch has past the base branch are counted: not for the main worktree, a worktree on no branch, nor when the base branch does not exist.
-func (f Facts) counted(w worktree.Worktree) bool {
-	base := f.Config.Worktrees.BaseBranch
-	return !w.Main && w.Branch() != "" && base != "" && f.Local(base)
+	return append(warnings, f.Asked.Warnings(Name)...)
 }
 
 // ----------------------------------------------------------------------------
@@ -241,6 +230,7 @@ func followUpOf(action Action, detail Detail) domain.FollowUp {
 // WithPullRequests is shown with the pull request of each worktree as from read it, what each offers then, and the warnings of asking GitHub: what a read that did not ask for them becomes once they land.
 func WithPullRequests(shown, from Outcome) Outcome {
 	merged := shown
+	merged.Interrupted = shown.Interrupted || from.Interrupted
 	merged.Items = slices.Clone(shown.Items)
 	for i, item := range merged.Items {
 		at := slices.IndexFunc(from.Items, func(other Item) bool { return other.Subject == item.Subject && other.Detail != nil })
@@ -261,21 +251,6 @@ func WithPullRequests(shown, from Outcome) Outcome {
 	}
 
 	return merged
-}
-
-// Holding returns the subject of the item whose worktree holds the directory cwd, the deepest one, "" when none does.
-func Holding(items []Item, cwd string) string {
-	at := worktree.Holding(items, cwd, func(item Item) string {
-		if item.Detail == nil {
-			return ""
-		}
-		return item.Detail.Path
-	})
-	if at < 0 {
-		return ""
-	}
-
-	return items[at].Subject
 }
 
 // ----------------------------------------------------------------------------

@@ -35,6 +35,14 @@ const (
 	ConfigInvalid  = ".config_invalid"
 )
 
+// The suffixes of the codes every read says what it could not read with, after its name: <command>.unreadable fails a subject it could not read, <command>.meta_unreadable warns of a meta record that exists but does not read, <command>.jobs_unknown of a run daemon that could not tell which jobs are up, <command>.prs_unavailable of a forge that could not be asked.
+const (
+	Unreadable     = ".unreadable"
+	MetaUnreadable = ".meta_unreadable"
+	JobsUnknown    = ".jobs_unknown"
+	PRsUnavailable = ".prs_unavailable"
+)
+
 // Params holds the named values a message or a code carries, for the JSON envelope and for templates.
 type Params map[string]string
 

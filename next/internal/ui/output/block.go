@@ -5,6 +5,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/LucasPcq/wtm/next/internal/domain"
+
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -123,4 +125,22 @@ func truncate(value string, width int) string {
 
 func expandTabs(line string) string {
 	return strings.ReplaceAll(line, "\t", strings.Repeat(" ", tabWidth))
+}
+
+// ReadEnd closes the drawing of a read: each subject not read as an error line, each warning of a subject, each warning of the read, then its interruption, which every subject read would otherwise leave unsaid.
+func ReadEnd[D any](w io.Writer, read domain.Read[D]) {
+	for _, item := range read.Items {
+		if item.Err != nil {
+			ErrorLine(w, item.Err.Error())
+		}
+		for _, warning := range item.Warnings {
+			WarningLine(w, warning.Message)
+		}
+	}
+	for _, warning := range read.Warnings {
+		WarningLine(w, warning.Message)
+	}
+	if failure := read.Failure(); failure != nil && failure.Kind == domain.KindCancelled {
+		ErrorLine(w, failure.Message)
+	}
 }

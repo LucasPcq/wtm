@@ -1,0 +1,14 @@
+
+  main                     origin ↑1
+  ├─ feat/a                ↑2  ! dirty  ! needs sync
+  │  └─ feat/a-ui          ↑2
+  │     └─ feat/a-ui-form  ! needs sync
+  ├─ feat/b                ↑1  ! locked  ! needs sync
+  ├─ feat/r                ↑1  ! rebasing  ! needs sync
+  └─ feat/gone             ✗ missing  ! locked
+  cyc-1                    ! cycle
+  cyc-2                    ! cycle
+  feat/login               (no worktree)
+  └─ feat/login-ui
+  ✗ interrupted
+

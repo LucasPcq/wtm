@@ -1,0 +1,283 @@
+{
+  "v": 2,
+  "command": "status",
+  "ok": true,
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "branch": "main",
+        "path": "/repo/main",
+        "main": true,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "created_at": null,
+        "parent": "",
+        "children": [
+          "feat/a",
+          "feat/old"
+        ],
+        "base": null,
+        "origin": {
+          "ahead": 1,
+          "behind": 0,
+          "state": "ahead"
+        },
+        "changes": {
+          "staged": 0,
+          "modified": 0,
+          "untracked": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "files": []
+        },
+        "commits": [
+          {
+            "sha": "Bump",
+            "subject": "Bump",
+            "author": "",
+            "at": "0001-01-01T00:00:00Z"
+          },
+          {
+            "sha": "root",
+            "subject": "root",
+            "author": "",
+            "at": "0001-01-01T00:00:00Z"
+          }
+        ],
+        "review": null,
+        "isolation": "isolated",
+        "run_toml": "absent",
+        "run": null,
+        "jobs": [],
+        "env": {
+          "declared": 2,
+          "files": [
+            {
+              "target": ".env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            },
+            {
+              "target": "web/.env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            }
+          ]
+        },
+        "problems": []
+      }
+    },
+    {
+      "subject": "/repo/.trees/detached",
+      "status": "done",
+      "detail": {
+        "branch": "",
+        "path": "/repo/.trees/detached",
+        "main": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": true,
+        "created_at": null,
+        "parent": "",
+        "children": [],
+        "base": null,
+        "origin": null,
+        "changes": null,
+        "commits": null,
+        "review": null,
+        "isolation": "isolated",
+        "run_toml": "absent",
+        "run": null,
+        "jobs": [],
+        "env": {
+          "declared": 2,
+          "files": null
+        },
+        "problems": [
+          {
+            "code": "status.missing",
+            "message": "its directory is gone",
+            "fix": null
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "branch": "feat/a",
+        "path": "/repo/.trees/feat-a",
+        "main": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "created_at": "2026-10-16T12:00:00Z",
+        "parent": "main",
+        "children": [],
+        "base": {
+          "name": "main",
+          "ahead": 2,
+          "behind": 1
+        },
+        "origin": {
+          "ahead": 2,
+          "behind": 0,
+          "state": "ahead"
+        },
+        "changes": {
+          "staged": 1,
+          "modified": 1,
+          "untracked": 1,
+          "insertions": 12,
+          "deletions": 3,
+          "files": [
+            {
+              "path": "a.go",
+              "status": "modified"
+            },
+            {
+              "path": "b.go",
+              "status": "untracked"
+            }
+          ]
+        },
+        "commits": [
+          {
+            "sha": "Wire the session",
+            "subject": "Wire the session",
+            "author": "",
+            "at": "0001-01-01T00:00:00Z"
+          },
+          {
+            "sha": "Add the login form",
+            "subject": "Add the login form",
+            "author": "",
+            "at": "0001-01-01T00:00:00Z"
+          },
+          {
+            "sha": "root",
+            "subject": "root",
+            "author": "",
+            "at": "0001-01-01T00:00:00Z"
+          }
+        ],
+        "review": null,
+        "isolation": "isolated",
+        "run_toml": "absent",
+        "run": null,
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "running",
+            "url": "http://web.feat-a.main.localhost:11080",
+            "started_at": "2026-10-16T13:00:00Z"
+          }
+        ],
+        "env": {
+          "declared": 2,
+          "files": [
+            {
+              "target": ".env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            },
+            {
+              "target": "web/.env",
+              "missing": true,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            }
+          ]
+        },
+        "problems": [
+          {
+            "code": "status.env_missing",
+            "message": "web/.env is missing",
+            "fix": {
+              "command": "env",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "status.env_missing",
+              "message": ""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/old",
+      "status": "done",
+      "detail": {
+        "branch": "feat/old",
+        "path": "/repo/.trees/feat-old",
+        "main": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": true,
+        "created_at": "2026-10-16T12:00:00Z",
+        "parent": "main",
+        "children": [],
+        "base": null,
+        "origin": null,
+        "changes": null,
+        "commits": null,
+        "review": null,
+        "isolation": "isolated",
+        "run_toml": "absent",
+        "run": null,
+        "jobs": [],
+        "env": {
+          "declared": 2,
+          "files": null
+        },
+        "problems": [
+          {
+            "code": "status.missing",
+            "message": "its directory is gone",
+            "fix": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/old"
+                  ]
+                }
+              ],
+              "code": "status.missing",
+              "message": ""
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}
