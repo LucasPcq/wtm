@@ -1,0 +1,126 @@
+{
+  "v": 2,
+  "command": "status",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "warnings": [
+        {
+          "code": "status.meta_unreadable",
+          "params": {
+            "branch": "feat/a"
+          },
+          "message": "couldn't read the record of feat/a: its isolation, parent, env strategy and port offset are not known: unexpected end of JSON input"
+        }
+      ],
+      "detail": {
+        "branch": "feat/a",
+        "path": "<SB>/acme.trees/feat-a",
+        "main": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": false,
+        "created_at": null,
+        "parent": "",
+        "children": [],
+        "base": {
+          "name": "main",
+          "ahead": 2,
+          "behind": 2
+        },
+        "origin": {
+          "ahead": 1,
+          "behind": 0,
+          "state": "ahead"
+        },
+        "changes": {
+          "staged": 1,
+          "modified": 1,
+          "untracked": 0,
+          "insertions": 3,
+          "deletions": 0,
+          "files": [
+            {
+              "path": "README.md",
+              "status": "modified"
+            },
+            {
+              "path": "notes.txt",
+              "status": "modified"
+            }
+          ]
+        },
+        "commits": [
+          {
+            "sha": "<SHA>",
+            "subject": "feat: wire the session",
+            "author": "Acme Dev",
+            "at": "<T>"
+          },
+          {
+            "sha": "<SHA>",
+            "subject": "feat: add the login form",
+            "author": "Acme Dev",
+            "at": "<T>"
+          },
+          {
+            "sha": "<SHA>",
+            "subject": "chore: bootstrap acme",
+            "author": "Acme Dev",
+            "at": "<T>"
+          }
+        ],
+        "review": null,
+        "isolation": null,
+        "run_toml": "declared",
+        "run": {
+          "addressing": "names",
+          "offset": null,
+          "ports": "unknown"
+        },
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "stopped",
+            "url": ""
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "stopped",
+            "url": ""
+          }
+        ],
+        "env": {
+          "declared": 2,
+          "files": [
+            {
+              "target": "apps/api/.env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            },
+            {
+              "target": "apps/web/.env",
+              "missing": false,
+              "keys": {
+                "missing": 0,
+                "conflicting": 0,
+                "orphan": 0
+              }
+            }
+          ]
+        },
+        "problems": []
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

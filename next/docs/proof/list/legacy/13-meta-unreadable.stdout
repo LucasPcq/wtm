@@ -1,0 +1,9 @@
+
+  main         (parent)  ● active                            ✓ clean
+  locked-gone  ! locked                                    ✓ clean
+  feat/b       ! locked                                    ✓ clean
+  feat/gone                                                ✓ clean
+  feat/a                               base ↑2    origin ↑1    ⚠ dirty
+                                                           ✓ clean
+  orphan                                                   ✓ clean
+

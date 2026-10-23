@@ -1,0 +1,14 @@
+
+  main               origin ↑1
+  ├─ feat/a          ↑2  ! dirty  ! needs sync
+  ├─ feat/b          ↑1  ! locked  ! needs sync
+  ├─ feat/r          ↑1  ! rebasing  ! needs sync
+  └─ feat/gone       ✗ missing
+  feat/a-ui          ↑4
+  └─ feat/a-ui-form  ! needs sync
+  cyc-1              ! cycle
+  cyc-2              ! cycle
+  feat/login         (no worktree)
+  └─ feat/login-ui
+  ! couldn't read the record of feat/a-ui: its parent is not known, so it stands as a root: unexpected end of JSON input
+

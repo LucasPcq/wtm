@@ -105,6 +105,37 @@ state() {
   return 0
 }
 
+# slow_gh <dir>: writes in dir a gh, signed in, that answers no pull request after 5 seconds; its sleep holds no pipe, so killing gh ends it.
+slow_gh() {
+  mkdir -p "$1"
+  cat >"$1/gh" <<'SH'
+#!/bin/sh
+[ "$1" = auth ] && exit 0
+sleep 5 >/dev/null 2>&1 </dev/null
+echo '{"data":{"repository":{}}}'
+SH
+  chmod +x "$1/gh"
+}
+
+# interrupt <name> <dir> <args…>: runs the binary with args in dir, without a terminal, its gh slow_gh's, and sends it SIGINT 2 seconds in, while gh answers, as Ctrl+C does.
+interrupt() {
+  local name=$1 dir=$2
+  shift 2
+  local code=0 pid
+  state >"$dir_out/.before"
+  set -m # in its own process group, the binary takes SIGINT as a terminal's Ctrl+C
+  (cd "$dir" && PATH=$root/slow:$PATH exec "$bin" "$@" </dev/null >"$dir_out/$name.stdout" 2>"$dir_out/$name.stderr") &
+  pid=$!
+  set +m
+  sleep 2
+  kill -INT "$pid" 2>/dev/null || true
+  wait "$pid" || code=$?
+  echo "$code" >"$dir_out/$name.exit"
+  state >"$dir_out/.after"
+  diff -u --label "$name before" --label "$name after" "$dir_out/.before" "$dir_out/.after" >>"$dir_out/unchanged.diff" || true
+  rm -f "$dir_out/.before" "$dir_out/.after"
+}
+
 # scenario <name> <dir> <args…>: runs the binary with args in dir, without a terminal.
 scenario() {
   local name=$1 dir=$2
@@ -146,6 +177,19 @@ run_side() {
     scenario 13-no-config "$root/bare" tree
     scenario 14-no-config-json "$root/bare" tree --output json
     scenario 15-not-a-repository "$root/plain" tree --output json
+    # a meta record that does not decode: feat/a-ui drawn as a root, feat/a-ui-form still under it
+    local record=.git/wtm/worktrees/feat%2Fa-ui/meta.json
+    cp "$record" "$root/meta.json" && echo '{' >"$record"
+    scenario 16-meta-unreadable "$root/acme" tree
+    scenario 17-meta-unreadable-json "$root/acme" tree --output json
+    cp "$root/meta.json" "$record"
+    # feat/gone locked: missing all the same
+    git worktree lock "$root/acme.trees/feat-gone"
+    scenario 18-locked-gone "$root/acme" tree
+    # SIGINT while gh answers
+    slow_gh "$root/slow"
+    interrupt 19-interrupted "$root/acme" tree --with-prs
+    interrupt 20-interrupted-json "$root/acme" tree --with-prs --output json
     "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
   )
   sed -i '' -E \

@@ -1,0 +1,16 @@
+
+  ! feat/a — 1 problem
+
+  path        <SB>/acme.trees/feat-a
+  isolation   not chosen
+  addressing  names
+  ports       —
+  env         2 files
+
+  JOBS
+  web  stopped
+  api  stopped
+
+  ! predates the isolation choice: run up and run start refuse it
+  → wtm env feat/a --isolation isolated --yes
+

@@ -1,0 +1,40 @@
+{
+  "branch": "feat/b",
+  "path": "<SB>/acme.trees/feat-b",
+  "main": false,
+  "isolation": "isolated",
+  "addressing": "names",
+  "offset": null,
+  "run_config": true,
+  "env": {
+    "declared": 2,
+    "missing": [
+      "apps/api/.env",
+      "apps/web/.env"
+    ]
+  },
+  "jobs": [
+    {
+      "name": "web",
+      "kind": "service",
+      "state": "stopped"
+    },
+    {
+      "name": "api",
+      "kind": "service",
+      "state": "stopped"
+    }
+  ],
+  "problems": [
+    {
+      "code": "env_missing",
+      "message": "apps/api/.env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand",
+      "fix": "wtm config edit"
+    },
+    {
+      "code": "env_missing",
+      "message": "apps/web/.env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand",
+      "fix": "wtm config edit"
+    }
+  ]
+}

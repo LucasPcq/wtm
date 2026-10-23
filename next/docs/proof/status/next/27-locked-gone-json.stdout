@@ -1,0 +1,82 @@
+{
+  "v": 2,
+  "command": "status",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "main": false,
+        "locked": true,
+        "rebasing": false,
+        "missing": true,
+        "created_at": "<T>",
+        "parent": "main",
+        "children": [],
+        "base": null,
+        "origin": null,
+        "changes": {
+          "staged": 0,
+          "modified": 0,
+          "untracked": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "files": []
+        },
+        "commits": [],
+        "review": null,
+        "isolation": "isolated",
+        "run_toml": "declared",
+        "run": {
+          "addressing": "names",
+          "offset": 20,
+          "ports": "offset"
+        },
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23480
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "stopped",
+            "url": "",
+            "port": 23481
+          }
+        ],
+        "env": {
+          "declared": 2,
+          "files": []
+        },
+        "problems": [
+          {
+            "code": "status.missing",
+            "message": "its directory is gone",
+            "fix": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "status.missing",
+              "message": ""
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

@@ -1,4 +1,5 @@
-$ <BIN> status; echo EXIT=$?
+$ <BIN> status; echo EXIT=
+$?
 
 ┃  ✗ interrupted
 

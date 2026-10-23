@@ -96,6 +96,37 @@ SH
   chmod +x "$1/gh"
 }
 
+# slow_gh <dir>: writes in dir a gh, signed in, that answers no pull request after 5 seconds; its sleep holds no pipe, so killing gh ends it.
+slow_gh() {
+  mkdir -p "$1"
+  cat >"$1/gh" <<'SH'
+#!/bin/sh
+[ "$1" = auth ] && exit 0
+sleep 5 >/dev/null 2>&1 </dev/null
+echo '{"data":{"repository":{}}}'
+SH
+  chmod +x "$1/gh"
+}
+
+# interrupt <name> <dir> <args…>: runs the binary with args in dir, without a terminal, its gh slow_gh's, and sends it SIGINT 2 seconds in, while gh answers, as Ctrl+C does.
+interrupt() {
+  local name=$1 dir=$2
+  shift 2
+  local code=0 pid
+  state >"$dir_out/.before"
+  set -m # in its own process group, the binary takes SIGINT as a terminal's Ctrl+C
+  (cd "$dir" && PATH=$root/slow:$PATH exec "$bin" "$@" </dev/null >"$dir_out/$name.stdout" 2>"$dir_out/$name.stderr") &
+  pid=$!
+  set +m
+  sleep 2
+  kill -INT "$pid" 2>/dev/null || true
+  wait "$pid" || code=$?
+  echo "$code" >"$dir_out/$name.exit"
+  state >"$dir_out/.after"
+  diff -u --label "$name before" --label "$name after" "$dir_out/.before" "$dir_out/.after" >>"$dir_out/unchanged.diff" || true
+  rm -f "$dir_out/.before" "$dir_out/.after"
+}
+
 # scenario <name> <dir> <args…>: runs the binary with args in dir, without a terminal.
 scenario() {
   local name=$1 dir=$2
@@ -194,6 +225,26 @@ run_side() {
     rm -rf "$trees/feat-b"
     scenario 19-gone "$root/acme" status feat/b
     scenario 20-all-gone "$root/acme" status --all
+    # a meta record that does not decode: feat/a read all the same, a warning on its item
+    local record=.git/wtm/worktrees/feat%2Fa/meta.json
+    cp "$record" "$root/meta.json" && echo '{' >"$record"
+    scenario 24-meta-unreadable "$root/acme" status feat/a
+    scenario 25-meta-unreadable-json "$root/acme" status feat/a --output json
+    cp "$root/meta.json" "$record"
+    # feat/b's directory gone, the worktree locked: git no longer calls it prunable
+    git worktree lock "$trees/feat-b"
+    scenario 26-locked-gone "$root/acme" status feat/b
+    scenario 27-locked-gone-json "$root/acme" status feat/b --output json
+    # a repository with its main worktree alone
+    mkdir "$root/solo"
+    (cd "$root/solo" && git init -q -b main && git commit -q --allow-empty -m init && "$legacy" init --yes </dev/null >/dev/null 2>&1)
+    scenario 28-all-one-worktree "$root/solo" status --all
+    # SIGINT while gh answers; legacy's status reads no pull request
+    if [[ $side == next ]]; then
+      slow_gh "$root/slow"
+      interrupt 29-interrupted "$root/acme" status --all --with-prs
+      interrupt 30-interrupted-json "$root/acme" status --all --with-prs --output json
+    fi
   )
   sed -i '' -E \
     -e "s#(/private)?$root#<SB>#g" \

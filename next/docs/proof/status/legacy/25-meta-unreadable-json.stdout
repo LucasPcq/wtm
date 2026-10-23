@@ -1,0 +1,32 @@
+{
+  "branch": "feat/a",
+  "path": "<SB>/acme.trees/feat-a",
+  "main": false,
+  "isolation": "isolated",
+  "addressing": "names",
+  "offset": null,
+  "run_config": true,
+  "env": {
+    "declared": 2,
+    "missing": []
+  },
+  "jobs": [
+    {
+      "name": "web",
+      "kind": "service",
+      "state": "stopped"
+    },
+    {
+      "name": "api",
+      "kind": "service",
+      "state": "stopped"
+    }
+  ],
+  "problems": [
+    {
+      "code": "isolation_pending",
+      "message": "predates the isolation choice: run up and run start refuse it",
+      "fix": "wtm env feat/a --isolation isolated --yes"
+    }
+  ]
+}

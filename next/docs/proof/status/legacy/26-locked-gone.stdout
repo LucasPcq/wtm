@@ -1,0 +1,18 @@
+
+  ! feat/b — 2 problems
+
+  path        <SB>/acme.trees/feat-b
+  isolation   isolated
+  addressing  names
+  ports       not numbered
+  env         2 files · 2 missing
+
+  JOBS
+  web  stopped
+  api  stopped
+
+  ! apps/api/.env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand
+  → wtm config edit
+  ! apps/web/.env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand
+  → wtm config edit
+

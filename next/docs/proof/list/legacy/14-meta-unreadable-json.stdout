@@ -1,0 +1,101 @@
+[
+  {
+    "branch": "main",
+    "path": "<SB>/acme",
+    "is_parent": true,
+    "is_dirty": false,
+    "is_locked": false,
+    "rebase_in_progress": false,
+    "commits_ahead": 0,
+    "created_at": "<T>",
+    "origin": {
+      "ahead": 0,
+      "behind": 0,
+      "state": "up-to-date"
+    },
+    "pr": null,
+    "services": []
+  },
+  {
+    "branch": "locked-gone",
+    "path": "<SB>/acme.trees/locked-gone",
+    "is_parent": false,
+    "is_dirty": false,
+    "is_locked": true,
+    "rebase_in_progress": false,
+    "commits_ahead": 0,
+    "created_at": "<T>",
+    "origin": null,
+    "pr": null,
+    "services": []
+  },
+  {
+    "branch": "feat/b",
+    "path": "<SB>/acme.trees/feat-b",
+    "is_parent": false,
+    "is_dirty": false,
+    "is_locked": true,
+    "rebase_in_progress": false,
+    "commits_ahead": 0,
+    "created_at": "<T>",
+    "origin": null,
+    "pr": null,
+    "services": []
+  },
+  {
+    "branch": "feat/gone",
+    "path": "<SB>/acme.trees/feat-gone",
+    "is_parent": false,
+    "is_dirty": false,
+    "is_locked": false,
+    "rebase_in_progress": false,
+    "commits_ahead": 0,
+    "created_at": "<T>",
+    "origin": null,
+    "pr": null,
+    "services": []
+  },
+  {
+    "branch": "feat/a",
+    "path": "<SB>/acme.trees/feat-a",
+    "is_parent": false,
+    "is_dirty": true,
+    "is_locked": false,
+    "rebase_in_progress": false,
+    "commits_ahead": 2,
+    "created_at": "<T>",
+    "origin": {
+      "ahead": 1,
+      "behind": 0,
+      "state": "ahead"
+    },
+    "pr": null,
+    "services": []
+  },
+  {
+    "branch": "",
+    "path": "<SB>/acme.trees/detached",
+    "is_parent": false,
+    "is_dirty": false,
+    "is_locked": false,
+    "rebase_in_progress": false,
+    "commits_ahead": 0,
+    "created_at": "<T>",
+    "origin": null,
+    "pr": null,
+    "services": []
+  },
+  {
+    "branch": "orphan",
+    "path": "<SB>/acme.trees/orphan",
+    "is_parent": false,
+    "is_dirty": false,
+    "is_locked": false,
+    "rebase_in_progress": false,
+    "commits_ahead": 0,
+    "created_at": "<T>",
+    "origin": null,
+    "pr": null,
+    "services": []
+  }
+]
