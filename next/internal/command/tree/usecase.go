@@ -50,7 +50,7 @@ func (u UseCase) Run(ctx context.Context, req Request, _ domain.RunOptions) (Out
 
 	// 2. Report each node, parents before their children, with what it needs next.
 	items, warnings := Tree(facts)
-	return Outcome{Items: items, Warnings: warnings}, nil
+	return Outcome{Items: items, Warnings: warnings, Interrupted: facts.Interrupted}, nil
 }
 
 // ----------------------------------------------------------------------------
@@ -87,6 +87,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		facts.States[w.Branch()] = read[i]
 	}
 	facts.Behind = repository.Behind(ctx, u.Git, repo, facts.PullRequests, nodes)
+	facts.Interrupted = ctx.Err() != nil
 	return facts, nil
 }
 

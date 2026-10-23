@@ -110,7 +110,7 @@ func (f Facts) item(branch string) Item {
 	detail.Path, detail.Main, detail.Locked = &w.Path, w.Main, w.Locked
 	if state.Err != nil {
 		item := domain.Unread[Detail](domain.UnreadParams{Command: Name, Subject: branch, Path: w.Path, Err: state.Err})
-		item.Detail = &detail
+		item.Detail, item.Warnings = &detail, f.recordWarnings(branch)
 		return item
 	}
 
@@ -127,11 +127,17 @@ func (f Facts) item(branch string) Item {
 	detail.Services = f.Services(w.Path)
 	detail.Actions = Actions(detail, f.Repository.Cleans(pr, w, f.Behind[branch]))
 
-	item := Item{Subject: branch, Status: domain.StatusDone, Detail: &detail}
-	if err := f.RecordErrs[branch]; err != nil {
-		item.Warnings = []domain.Warning{{Code: CodeMetaUnreadable, Message: "couldn't read the record of " + branch + ": its parent is not known, so it stands as a root: " + err.Error(), Params: domain.Params{"branch": branch}}}
+	return Item{Subject: branch, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
+}
+
+// recordWarnings are the warning of the record of branch when it exists but does not read, none otherwise.
+func (f Facts) recordWarnings(branch string) []domain.Warning {
+	err := f.RecordErrs[branch]
+	if err == nil {
+		return nil
 	}
-	return item
+
+	return []domain.Warning{{Code: CodeMetaUnreadable, Message: "couldn't read the record of " + branch + ": its parent is not known, so it stands as a root: " + err.Error(), Params: domain.Params{"branch": branch}}}
 }
 
 func (f Facts) warnings() []domain.Warning {

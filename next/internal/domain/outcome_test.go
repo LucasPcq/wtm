@@ -52,6 +52,13 @@ func TestAStalePlanIsFollowedUpByItsReplanInTheEnvelope(t *testing.T) {
 	assert.Empty(t, refused.FollowUps)
 }
 
+func TestAReadInterruptedEndsSoEvenWithEverySubjectRead(t *testing.T) {
+	read := Read[struct{}]{Items: []Unit[struct{}]{{Subject: "a", Status: StatusDone}}, Interrupted: true}
+
+	assert.Equal(t, KindCancelled, read.Failure().Kind)
+	assert.Nil(t, Read[struct{}]{Items: read.Items}.Failure())
+}
+
 func TestASubjectNotReadFailsUnderItsCommandsCodeUnlessTheReadWasInterrupted(t *testing.T) {
 	broken := errors.New("broken index")
 

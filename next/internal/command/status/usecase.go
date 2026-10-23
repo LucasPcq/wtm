@@ -58,7 +58,7 @@ func (u UseCase) Run(ctx context.Context, req Request, _ domain.RunOptions) (Out
 
 	// 2. Report each worktree, with the problems found and their fixes.
 	items, warnings := Report(facts)
-	return Outcome{Items: items, Warnings: warnings}, nil
+	return Outcome{Items: items, Warnings: warnings, Interrupted: facts.Interrupted}, nil
 }
 
 // ----------------------------------------------------------------------------
@@ -104,6 +104,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		facts.States[w.Path] = read[i]
 	}
 	facts.Behind = repository.Behind(ctx, u.Git, repo, facts.PullRequests, targets)
+	facts.Interrupted = ctx.Err() != nil
 	return facts, nil
 }
 

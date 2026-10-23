@@ -63,7 +63,7 @@ func drawOne(w io.Writer, d status.Detail, view output.View) {
 	field("base", base(d.Base))
 	field("origin", origin(d))
 	if !d.Missing {
-		field("changes", changes(d.Changes))
+		field("changes", changes(*d.Changes))
 		field("last commit", lastCommit(d.Commits))
 	}
 	field("parent", d.Parent)

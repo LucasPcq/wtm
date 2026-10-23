@@ -50,7 +50,7 @@ func TestAWorktreeIsReadWholeGitAndIsolation(t *testing.T) {
 		Parent: "main", Children: []string{"feat/b"},
 		Base:      &status.Base{Name: "main", Ahead: 2, Behind: 1},
 		Origin:    &worktree.Origin{Ahead: 2, State: worktree.Ahead},
-		Changes:   status.Changes{Staged: 1, Modified: 1, Untracked: 1, Insertions: 12, Deletions: 3, Files: []worktree.Change{{Path: "a.go", Status: worktree.ChangeModified}, {Path: "new.go", Status: worktree.ChangeUntracked}}},
+		Changes:   &status.Changes{Staged: 1, Modified: 1, Untracked: 1, Insertions: 12, Deletions: 3, Files: []worktree.Change{{Path: "a.go", Status: worktree.ChangeModified}, {Path: "new.go", Status: worktree.ChangeUntracked}}},
 		Commits:   []worktree.Commit{{SHA: "two", Subject: "two"}, {SHA: "one", Subject: "one"}, {SHA: gittest.Root, Subject: gittest.Root}},
 		Review:    &status.Review{Number: 12, URL: "https://github.com/acme/acme/pull/12", State: worktree.PullRequestOpen, Progress: &status.Progress{Title: "Add a", Checks: worktree.Checks{Passed: 2, Failed: 1}, Decision: "APPROVED"}},
 		Isolation: &isolated,
@@ -179,7 +179,9 @@ func TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleanedLockedOrNot(t *
 		assert.True(t, d.Missing, branch)
 		assert.Equal(t, []string{status.CodeMissing}, problemCodes(d.Problems), branch)
 		assert.Equal(t, domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}}, Code: status.CodeMissing}, d.Problems[0].Fix)
-		assert.Empty(t, d.Commits, branch)
+		assert.Nil(t, d.Changes, branch)
+		assert.Nil(t, d.Commits, branch)
+		assert.Nil(t, d.Env.Files, branch)
 	}
 	assert.NotContains(t, w.git.Calls(), "Changes "+locked.Path, "nothing of a gone directory is read")
 }
@@ -301,6 +303,7 @@ func TestAnInterruptedReadWarnsOfNothingItCouldNotAsk(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, got.Warnings)
+	assert.Equal(t, domain.KindCancelled, got.Failure().Kind, "every worktree read, the read still ends interrupted")
 }
 
 func TestTheReviewIsTheNewestPullRequestAndAMergedOneAsksToCleanFirst(t *testing.T) {

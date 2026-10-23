@@ -35,16 +35,23 @@ func TestAReadAsksTheDaemonAndTheForgeOfItsBranchesBesideReadingTheWorktrees(t *
 	assert.False(t, got.Interrupted)
 }
 
-func TestTheForgeIsAskedOnlyWithPRsAndAReadDoneWithItsContextIsInterrupted(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
+func TestTheForgeIsAskedOnlyWithPRs(t *testing.T) {
 	params := repository.AskParams{
 		Jobs:         func(context.Context) ([]run.Job, error) { return nil, nil },
 		PullRequests: func(context.Context, []string) ([]worktree.PullRequest, error) { panic("the forge was asked") },
 	}
 
-	got := repository.Ask(ctx, params, func() {})
+	got := repository.Ask(t.Context(), params, func() {})
 
 	assert.Nil(t, got.PullRequests)
+	assert.False(t, got.Interrupted)
+}
+
+func TestAReadWhoseContextIsDoneByItsEndIsInterrupted(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	params := repository.AskParams{Jobs: func(context.Context) ([]run.Job, error) { return nil, nil }}
+
+	got := repository.Ask(ctx, params, cancel)
+
 	assert.True(t, got.Interrupted)
 }

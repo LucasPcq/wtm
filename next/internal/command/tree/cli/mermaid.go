@@ -39,6 +39,9 @@ func drawMermaid(w io.Writer, read tree.Outcome) {
 		case item.Status == domain.StatusCancelled:
 			fmt.Fprintln(w, "  %% "+output.GlyphFailure+" "+item.Subject+" interrupted")
 		}
+		for _, warning := range item.Warnings {
+			fmt.Fprintln(w, "  %% "+output.GlyphAttention+" "+oneLine(warning.Message))
+		}
 	}
 	for _, warning := range read.Warnings {
 		fmt.Fprintln(w, "  %% "+output.GlyphAttention+" "+oneLine(warning.Message))

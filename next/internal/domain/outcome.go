@@ -141,16 +141,22 @@ func (u Unit[D]) interrupted() bool {
 	return u.Status == StatusCancelled || u.Reason == ReasonInterrupted
 }
 
-// A Read is what a read command found: one Unit per subject, in order, its warnings, and the follow-ups the caller chose of it. A read runs no operation: it has no plan, fingerprint, lock nor event.
+// A Read is what a read command found: one Unit per subject, in order, its warnings, the follow-ups the caller chose of it, and whether it was interrupted, its subjects read or not. A read runs no operation: it has no plan, fingerprint, lock nor event.
 type Read[D any] struct {
-	Items     []Unit[D]
-	Warnings  []Warning
-	FollowUps []FollowUp
+	Items       []Unit[D]
+	Warnings    []Warning
+	FollowUps   []FollowUp
+	Interrupted bool
 }
 
-// Failure is the error the read ends on: the first subject it failed to read, else nil.
+// Failure is the error the read ends on: its interruption, else the first subject it failed to read, else nil.
 func (r Read[D]) Failure() *Error {
-	return Result[D]{Items: r.Items}.Failure()
+	failure := Result[D]{Items: r.Items}.Failure()
+	if r.Interrupted && (failure == nil || failure.Kind != KindCancelled) {
+		return &Error{Kind: KindCancelled, Code: CodeInterrupted, Message: "interrupted"}
+	}
+
+	return failure
 }
 
 // Envelope is how the read ended for every surface: its items, warnings and follow-ups, with no op, plan nor fingerprint; a read has no plan to replan, so it reads no answers.

@@ -156,6 +156,7 @@ func TestAnInterruptedReadWarnsOfNothingItCouldNotAsk(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, read.Warnings)
+	assert.Equal(t, domain.KindCancelled, read.Failure().Kind, "every worktree read, the read still ends interrupted")
 }
 
 func TestARecordThatDoesNotReadKeepsItsWorktreeAndIsAWarning(t *testing.T) {

@@ -131,11 +131,13 @@ func TestAllCountsTheWorktreesNotReadAndNeverSaysNothingToFixThen(t *testing.T) 
 func TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleaned(t *testing.T) {
 	one := runStatus(t, world{Gone: true}, "feat/old")
 	all := runStatus(t, world{Gone: true, NoRun: true}, "--all")
+	json := runStatus(t, world{Gone: true, NoRun: true}, "feat/old", "--output", "json")
 
 	require.Equal(t, uicli.ExitOK, one.Code, one.Stderr)
 	require.Equal(t, uicli.ExitOK, all.Code, all.Stderr)
 	formtest.Golden(t, "status_gone", one.Stdout)
 	formtest.Golden(t, "status_all_gone", all.Stdout)
+	formtest.Golden(t, "envelope_status_gone", json.Stdout)
 }
 
 func TestAllDrawsTheTableEvenOfOneWorktree(t *testing.T) {

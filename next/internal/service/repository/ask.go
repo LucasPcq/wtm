@@ -16,15 +16,15 @@ type AskParams struct {
 	WithPRs      bool
 }
 
-// Ask asks what params names while read reads the worktrees, all three at once, and returns what was said once they are done; the read is interrupted when ctx is done by then.
-func Ask(ctx context.Context, params AskParams, read func()) run.Asked {
+// Ask asks what params names while readWorktrees runs, all three at once, and returns what was said once they are done; the read is interrupted when ctx is done by then.
+func Ask(ctx context.Context, params AskParams, readWorktrees func()) run.Asked {
 	var asked run.Asked
 	var wg sync.WaitGroup
 	wg.Go(func() { asked.Jobs, asked.JobsErr = params.Jobs(ctx) })
 	if params.WithPRs {
 		wg.Go(func() { asked.PullRequests, asked.PRsErr = params.PullRequests(ctx, params.Branches) })
 	}
-	read()
+	readWorktrees()
 	wg.Wait()
 
 	asked.Interrupted = ctx.Err() != nil

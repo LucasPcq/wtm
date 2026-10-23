@@ -18,7 +18,7 @@ type Git interface {
 	IsAncestor(ctx context.Context, ancestry worktree.Ancestry) (bool, error)
 }
 
-// Meta reads a worktree's meta record by its branch; a missing record is an error wrapping os.ErrNotExist.
+// Meta reads a worktree's meta record by its branch; a missing record is an error wrapping fs.ErrNotExist.
 type Meta interface {
 	Load(branch string) (worktree.Meta, error)
 }

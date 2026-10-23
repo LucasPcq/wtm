@@ -52,6 +52,12 @@ func TestOnlyABranchOfALinkedWorktreeIsCountedAgainstAnExistingBase(t *testing.T
 	assert.False(t, repo.CountedAgainstBase(Worktree{Main: true, State: OnBranch{Branch: "main"}}))
 	assert.False(t, repo.CountedAgainstBase(Worktree{State: Detached{}}))
 	assert.False(t, missing.CountedAgainstBase(Worktree{State: OnBranch{Branch: "feat/a"}}))
+}
+
+func TestTheBaseBranchIsMissingOnlyWhenConfiguredWithNoLocalBranch(t *testing.T) {
+	repo := Repository{Config: project.Config{Worktrees: project.Worktrees{BaseBranch: "main"}}, Snapshot: Snapshot{Branches: Branches{Local: []Branch{{Name: "main"}}}}}
+	missing := Repository{Config: project.Config{Worktrees: project.Worktrees{BaseBranch: "trunk"}}}
+
 	base, gone := missing.MissingBase()
 	assert.Equal(t, "trunk", base)
 	assert.True(t, gone)

@@ -94,7 +94,9 @@ func List(facts Facts) ([]Item, []domain.Warning) {
 func (f Facts) item(w worktree.Worktree) Item {
 	state := f.States[w.Path]
 	if state.Err != nil {
-		return domain.Unread[Detail](domain.UnreadParams{Command: Name, Subject: w.Name(), Path: w.Path, Err: state.Err})
+		item := domain.Unread[Detail](domain.UnreadParams{Command: Name, Subject: w.Name(), Path: w.Path, Err: state.Err})
+		item.Warnings = f.recordWarnings(w.Branch())
+		return item
 	}
 
 	_, rebasing := w.State.(worktree.Rebasing)
@@ -114,11 +116,17 @@ func (f Facts) item(w worktree.Worktree) Item {
 	}
 	detail.Actions = Actions(detail)
 
-	item := Item{Subject: w.Name(), Status: domain.StatusDone, Detail: &detail}
-	if err := f.RecordErrs[w.Branch()]; err != nil {
-		item.Warnings = []domain.Warning{{Code: CodeMetaUnreadable, Message: "couldn't read the record of " + w.Branch() + ": when it was created is not known: " + err.Error(), Params: domain.Params{"branch": w.Branch()}}}
+	return Item{Subject: w.Name(), Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(w.Branch())}
+}
+
+// recordWarnings are the warning of the record of branch when it exists but does not read, none otherwise.
+func (f Facts) recordWarnings(branch string) []domain.Warning {
+	err := f.RecordErrs[branch]
+	if err == nil {
+		return nil
 	}
-	return item
+
+	return []domain.Warning{{Code: CodeMetaUnreadable, Message: "couldn't read the record of " + branch + ": when it was created is not known: " + err.Error(), Params: domain.Params{"branch": branch}}}
 }
 
 func (f Facts) pr(branch string) *PR {
@@ -219,6 +227,7 @@ func followUpOf(action Action, detail Detail) domain.FollowUp {
 // WithPullRequests is shown with the pull request of each worktree as from read it, what each offers then, and the warnings of asking GitHub: what a read that did not ask for them becomes once they land.
 func WithPullRequests(shown, from Outcome) Outcome {
 	merged := shown
+	merged.Interrupted = shown.Interrupted || from.Interrupted
 	merged.Items = slices.Clone(shown.Items)
 	for i, item := range merged.Items {
 		at := slices.IndexFunc(from.Items, func(other Item) bool { return other.Subject == item.Subject && other.Detail != nil })

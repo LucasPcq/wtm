@@ -1,0 +1,56 @@
+{
+  "v": 2,
+  "command": "status",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/old",
+      "status": "done",
+      "detail": {
+        "branch": "feat/old",
+        "path": "/repo/.trees/feat-old",
+        "main": false,
+        "locked": false,
+        "rebasing": false,
+        "missing": true,
+        "created_at": "2026-10-16T12:00:00Z",
+        "parent": "main",
+        "children": [],
+        "base": null,
+        "origin": null,
+        "changes": null,
+        "commits": null,
+        "review": null,
+        "isolation": "isolated",
+        "run_toml": "absent",
+        "run": null,
+        "jobs": [],
+        "env": {
+          "declared": 2,
+          "files": null
+        },
+        "problems": [
+          {
+            "code": "status.missing",
+            "message": "its directory is gone",
+            "fix": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/old"
+                  ]
+                }
+              ],
+              "code": "status.missing",
+              "message": ""
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

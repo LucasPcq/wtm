@@ -66,10 +66,10 @@ type Detail struct {
 	Children  []string           `json:"children"`   // the branches created from it
 	Base      *Base              `json:"base"`       // null for the main worktree, on no branch, or when the base branch does not exist
 	Origin    *worktree.Origin   `json:"origin"`     // null when origin has no branch of that name
-	Changes   Changes            `json:"changes"`
-	Commits   []worktree.Commit  `json:"commits"`
-	Review    *Review            `json:"review"`    // null without a pull request, or when GitHub was not asked
-	Isolation *project.Isolation `json:"isolation"` // null while the worktree has not chosen, or when its record does not read
+	Changes   *Changes           `json:"changes"`    // null when its directory is gone
+	Commits   []worktree.Commit  `json:"commits"`    // null when its directory is gone
+	Review    *Review            `json:"review"`     // null without a pull request, or when GitHub was not asked
+	Isolation *project.Isolation `json:"isolation"`  // null while the worktree has not chosen, or when its record does not read
 	RunToml   RunToml            `json:"run_toml"`
 	Run       *Run               `json:"run"`  // null without a run.toml that reads
 	Jobs      []Job              `json:"jobs"` // null when the run daemon cannot tell
@@ -162,7 +162,7 @@ type Owner struct {
 // Env is a worktree's .env files: how many the project declares, and each one, whether it is missing and how its keys stand against its sources. It never carries a value.
 type Env struct {
 	Declared int       `json:"declared"`
-	Files    []EnvFile `json:"files"`
+	Files    []EnvFile `json:"files"` // null when its directory is gone
 }
 
 // EnvFile is one declared .env file of a worktree.
@@ -285,7 +285,9 @@ func (f Facts) item(w worktree.Worktree) Item {
 	state := f.States[w.Path]
 	subject := w.Name()
 	if state.Err != nil {
-		return domain.Unread[Detail](domain.UnreadParams{Command: Name, Subject: subject, Path: w.Path, Err: state.Err})
+		item := domain.Unread[Detail](domain.UnreadParams{Command: Name, Subject: subject, Path: w.Path, Err: state.Err})
+		item.Warnings = f.recordWarnings(w.Branch())
+		return item
 	}
 
 	branch := w.Branch()
@@ -310,7 +312,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Base:      f.base(state),
 		Origin:    f.OriginOf(branch),
 		Changes:   changesOf(state),
-		Commits:   orEmpty(state.Commits),
+		Commits:   commitsOf(state),
 		Review:    reviewOf(pr, hasPR),
 		Isolation: isolationOf(record, pending || recordErr != nil),
 		RunToml:   f.runToml(),
@@ -324,14 +326,21 @@ func (f Facts) item(w worktree.Worktree) Item {
 		detail.Problems = Problems(ProblemsParams{Subject: subject, Gone: state.Missing, Merged: f.Repository.Cleans(pr, w, f.Behind[branch]), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
 	}
 
-	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail}
-	if recordErr != nil {
-		item.Warnings = append(item.Warnings, domain.Warning{Code: CodeMetaUnreadable, Message: "couldn't read the record of " + branch + ": its isolation, parent, env strategy and port offset are not known: " + recordErr.Error(), Params: domain.Params{"branch": branch}})
-	}
+	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
 	if len(state.Unread) > 0 {
 		item.Warnings = append(item.Warnings, domain.Warning{Code: CodePartial, Message: "couldn't read all of " + subject + ": " + strings.Join(state.Unread, "; "), Params: domain.Params{"path": w.Path}})
 	}
 	return item
+}
+
+// recordWarnings are the warning of the record of branch when it exists but does not read, none otherwise.
+func (f Facts) recordWarnings(branch string) []domain.Warning {
+	err := f.RecordErrs[branch]
+	if err == nil {
+		return nil
+	}
+
+	return []domain.Warning{{Code: CodeMetaUnreadable, Message: "couldn't read the record of " + branch + ": its isolation, parent, env strategy and port offset are not known: " + err.Error(), Params: domain.Params{"branch": branch}}}
 }
 
 func (f Facts) base(state State) *Base {
@@ -342,8 +351,12 @@ func (f Facts) base(state State) *Base {
 	return &Base{Name: f.Config.Worktrees.BaseBranch, Ahead: state.Base.Ahead, Behind: state.Base.Behind}
 }
 
-func changesOf(state State) Changes {
-	changes := Changes{Staged: state.Diffstat.Staged, Modified: state.Diffstat.Unstaged, Insertions: state.Diffstat.Insertions, Deletions: state.Diffstat.Deletions, Files: orEmpty(state.Changes)}
+func changesOf(state State) *Changes {
+	if state.Missing {
+		return nil
+	}
+
+	changes := &Changes{Staged: state.Diffstat.Staged, Modified: state.Diffstat.Unstaged, Insertions: state.Diffstat.Insertions, Deletions: state.Diffstat.Deletions, Files: orEmpty(state.Changes)}
 	for _, change := range state.Changes {
 		if change.Status == worktree.ChangeUntracked {
 			changes.Untracked++
@@ -351,6 +364,13 @@ func changesOf(state State) Changes {
 	}
 
 	return changes
+}
+
+func commitsOf(state State) []worktree.Commit {
+	if state.Missing {
+		return nil
+	}
+	return orEmpty(state.Commits)
 }
 
 func reviewOf(pr worktree.PullRequest, ok bool) *Review {
@@ -539,6 +559,10 @@ func portOf(job project.Job, offset *int) *int {
 // The .env files
 
 func (f Facts) envOf(w worktree.Worktree, state State) Env {
+	if state.Missing {
+		return Env{Declared: len(f.Config.Env.Files)}
+	}
+
 	strategy := f.strategy(w)
 	files := []EnvFile{}
 	for _, read := range state.Env {

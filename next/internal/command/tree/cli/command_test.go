@@ -78,6 +78,18 @@ func TestMermaidGivesEachBranchItsOwnNode(t *testing.T) {
 	formtest.Golden(t, "tree_mermaid_ids", got.Stdout)
 }
 
+func TestARecordThatDoesNotReadIsAWarningInTextAndMermaid(t *testing.T) {
+	w := world{Worktrees: []worktree.Worktree{{Path: "/repo/.trees/feat-a", State: worktree.OnBranch{Branch: "feat/a"}}}, Unreadable: []string{"feat/a"}}
+
+	text := runTree(t, w)
+	mermaid := runTree(t, w, "--output", "mermaid")
+
+	require.Equal(t, uicli.ExitOK, text.Code, text.Stderr)
+	assert.Equal(t, uicli.ExitOK, mermaid.Code)
+	formtest.Golden(t, "tree_meta_unreadable", text.Stdout)
+	formtest.Golden(t, "tree_mermaid_meta_unreadable", mermaid.Stdout)
+}
+
 func TestAWorktreeNotReadIsDrawnSoInTextAndMermaid(t *testing.T) {
 	cases := map[string]error{"unreadable": errors.New("git status failed"), "interrupted": context.Canceled}
 	for name, failure := range cases {
