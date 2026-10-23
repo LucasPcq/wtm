@@ -8,6 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
+	"github.com/LucasPcq/wtm/next/internal/ui/widget"
 )
 
 // A Session is a command's form as the wizard walks it: the request as given and as answered so far, the questions observed last, the plan previewed and the outcome of the apply.
@@ -63,6 +64,9 @@ func (s *Session[R, Q, O]) Script() Script {
 		Apply:   s.apply,
 		Stale:   domain.PlanStale,
 		DryRun:  s.opts.DryRun,
+	}
+	if s.command.io != nil {
+		script.CommandLine = s.command.io.CommandLine
 	}
 	if s.command.ApplyLabel != nil {
 		script.ApplyLabel = func() string { return s.command.ApplyLabel(*s.preview) }
@@ -130,6 +134,16 @@ func (s *Session[R, Q, O]) Standing(at int) Standing {
 	}
 
 	return st
+}
+
+// Problem is found as a step shows it: under label, followed by the step that gets past it, if any.
+func (s *Session[R, Q, O]) Problem(found domain.FieldError, label string) error {
+	err := Problem(found, label)
+	if found.FollowUp == nil {
+		return err
+	}
+
+	return &widget.Problem{Message: err.Error(), Next: []output.NextStep{output.FollowUpStep(*found.FollowUp, s.command.io.CommandLine)}}
 }
 
 // Label spells a field path with the label of the first field that answers it, keeping an entry's index: branches[1] reads Branches[1].

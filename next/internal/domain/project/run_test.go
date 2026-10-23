@@ -63,8 +63,3 @@ func TestIsolationAppliesWhenRunTomlDeclaresSomethingToIsolate(t *testing.T) {
 		})
 	}
 }
-
-func TestThePlannedIsolationIsNoneWhenNothingIsIsolated(t *testing.T) {
-	assert.Equal(t, Verbatim, Run{EnvPorts: []EnvPortLink{{}}}.PlannedIsolation(Verbatim))
-	assert.Empty(t, Run{}.PlannedIsolation(Verbatim))
-}

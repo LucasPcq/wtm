@@ -136,8 +136,9 @@ func (e entry) placed(placement worktree.Placement) decision {
 	case worktree.CheckedOutElsewhere:
 		return refusal{
 			Code:     "create.checked_out_elsewhere",
-			Template: "branch {branch} is checked out at {path} — run `wtm go {branch}` to jump in",
+			Template: "branch {branch} is checked out at {path}",
 			Params:   domain.Params{"branch": e.name, "path": p.Path},
+			FollowUp: jumpIn(e.name),
 		}
 	case worktree.PathTaken:
 		return refusal{Code: "create.path_exists", Template: "worktree path already exists: {path}", Params: domain.Params{"path": e.path}}
@@ -148,6 +149,16 @@ func (e entry) placed(placement worktree.Placement) decision {
 	}
 
 	return nil
+}
+
+// CodeJumpIn is the step into the worktree of a branch checked out elsewhere, which create refuses.
+const CodeJumpIn = Name + ".jump_in"
+
+// jumpIn is the step into the worktree of branch, checked out elsewhere, that a create of it is refused for.
+func jumpIn(branch string) *domain.FollowUp {
+	enter := domain.Enter(branch)
+	enter.Code, enter.Message = CodeJumpIn, "jump in"
+	return &enter
 }
 
 func (e entry) clashed(clash worktree.Clash) refusal {
@@ -203,7 +214,7 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning) {
 		Branches:    branches,
 		From:        req.From,
 		EnvFrom:     answers.EnvFrom(),
-		Isolation:   f.Run.PlannedIsolation(answers.Isolation()),
+		Isolation:   f.PlannedIsolation(answers.Isolation()),
 		FastForward: f.fastForwarded(req),
 		Remember:    req.Remember,
 		facts:       f,
@@ -355,7 +366,7 @@ func (p Plan) recap(marks domain.Marks) []domain.RecapRow {
 	}
 
 	rows := []domain.RecapRow{{Key: pathBranches, Label: "Branches", Path: pathBranches, Values: recappedBranches(p.Branches)}, source}
-	return append(rows, provision.RecapRows(provision.RecapParams{EnvFrom: p.EnvFrom, FollowsConfig: p.settled.FollowsConfig(), Isolation: p.Isolation, FastForward: p.FastForward, Marks: marks})...)
+	return append(rows, provision.RecapRows(provision.RecapParams{EnvFrom: p.EnvFrom, FollowsConfig: p.settled.FollowsConfig(), Isolation: p.Isolation, RunUnreadable: p.facts.RunErr != nil, FastForward: p.FastForward, Marks: marks})...)
 }
 
 func recappedBranches(branches []BranchPlan) []domain.RecapValue {

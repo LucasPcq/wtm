@@ -17,5 +17,5 @@
   api  stopped
 
   ! predates the isolation choice: run up and run start refuse it
-  → wtm env feat/old isolated
+  → wtm env feat/old --isolation isolated
 

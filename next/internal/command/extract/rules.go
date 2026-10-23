@@ -273,8 +273,16 @@ func (f Facts) conflictCheck(req Request) worktree.ConflictCheck {
 // ----------------------------------------------------------------------------
 // Decide
 
-// Decide turns the facts, the request Resolve settled on them and the conflicts the changes would meet into the plan and its warnings. A source with nothing to extract is a plan with no files. Resolve refuses a target the facts rule out, so Decide refuses only conflicts, with CodeConflict, unless the request resolves them, and binary ones always; it panics on a request not resolved on these facts, a bug of the caller.
-func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain.Warning, error) {
+// DecideParams is what Decide decides from beside the facts: the request as given, the request Resolve settled on the facts, and the conflicts its changes would meet.
+type DecideParams struct {
+	Given     Request
+	Resolved  Request
+	Conflicts []worktree.Conflict
+}
+
+// Decide turns the facts and params into the plan and its warnings. A source with nothing to extract is a plan with no files. Resolve refuses a target the facts rule out, so Decide refuses only conflicts, with CodeConflict, unless the request resolves them, and binary ones always, a refusal followed by the request as given resolving them; it panics on a request not resolved on these facts, a bug of the caller.
+func Decide(f Facts, params DecideParams) (Plan, []domain.Warning, error) {
+	req := params.Resolved
 	planned := Plan{Source: req.Source, Files: []worktree.Change{}, Conflicts: []worktree.Conflict{}, facts: f}
 	if f.nothing(req.Source) {
 		planned.Summary = Summary{Code: CodeNothing, Message: "no uncommitted changes in " + req.Source, Params: domain.Params{"source": req.Source}}
@@ -290,13 +298,13 @@ func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain
 		planned.Creates = 1
 	}
 
-	if refused := refusedFor(planned.Target.Branch, req.OnConflict, conflicts); refused != nil {
+	if refused := refusedFor(params, planned.Target.Branch); refused != nil {
 		return Plan{}, nil, refused
 	}
 
 	planned.Files = f.selected(req)
 	planned.Keep = req.Keep != nil && *req.Keep
-	planned.Conflicts = append(planned.Conflicts, conflicts...)
+	planned.Conflicts = append(planned.Conflicts, params.Conflicts...)
 	planned.OnConflict = req.OnConflict
 	if !planned.Target.creates() {
 		return planned, f.ignored(req, planned.Target), nil
@@ -305,19 +313,28 @@ func Decide(f Facts, req Request, conflicts []worktree.Conflict) (Plan, []domain
 	planned.settled = f.newWorktree(req).Answers()
 	planned.From = req.From
 	planned.EnvFrom = planned.settled.EnvFrom()
-	planned.Isolation = f.Run.PlannedIsolation(planned.settled.Isolation())
+	planned.Isolation = f.PlannedIsolation(planned.settled.Isolation())
 	planned.FastForward = f.fastForwarded(req)
 	planned.Remember = req.Remember
 	return planned, append(f.divergedWarnings(req), f.fallbackWarnings(planned)...), nil
 }
 
-// refusedFor is the refusal of the conflicts, nil when there are none or the request resolves them; a binary conflict cannot take conflict markers, so it is refused even then.
-func refusedFor(target string, onConflict OnConflict, conflicts []worktree.Conflict) *domain.Error {
-	if !worktree.Refuses(conflicts, onConflict == OnConflictResolve) {
+// CodeResolve is the step that extracts again, writing conflict markers in the target.
+const CodeResolve = Name + ".resolve"
+
+// refusedFor is the refusal of the conflicts, nil when there are none or the resolved request resolves them, followed by the request as given resolving them, the answers the user did not give left to their defaults; a binary conflict cannot take conflict markers, so it is refused even then, with no follow-up.
+func refusedFor(params DecideParams, target string) *domain.Error {
+	if !worktree.Refuses(params.Conflicts, params.Resolved.OnConflict == OnConflictResolve) {
 		return nil
 	}
 
-	return conflictRefusal(conflicts, target)
+	refusal := conflictRefusal(params.Conflicts, target)
+	if !worktree.Refuses(params.Conflicts, true) {
+		given := params.Given
+		given.OnConflict = OnConflictResolve
+		refusal.FollowUp = &domain.FollowUp{Command: Name, Answers: domain.AnswersOf(Questions{}.Form(), given), Code: CodeResolve, Message: "write conflict markers in " + target}
+	}
+	return refusal
 }
 
 // conflictRefusal refuses the conflicts with CodeConflict, its message naming the binary files alone when there are any, else each file by how it conflicts.
@@ -345,7 +362,7 @@ func conflictRefusal(conflicts []worktree.Conflict, target string) *domain.Error
 		clauses = append(clauses, strings.Join(exists, ", ")+" "+plural(len(exists), "already exists", "already exist"))
 	}
 
-	refusal.Message = fmt.Sprintf("cannot apply the selected changes: %s in %q — resolve %s there, extract to another worktree, or re-run with --on-conflict resolve",
+	refusal.Message = fmt.Sprintf("cannot apply the selected changes: %s in %q — resolve %s there, extract to another worktree, or extract with conflict markers",
 		strings.Join(clauses, " and "), target, plural(len(all), "it", "them"))
 	return refusal
 }
@@ -363,27 +380,41 @@ func (f Facts) ignored(req Request, target Target) []domain.Warning {
 	var warnings []domain.Warning
 	params := domain.Params{"branch": target.Branch}
 	if req.From != "" {
-		warnings = append(warnings, domain.Warning{Code: "extract.from_ignored", Message: "--from ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
+		warnings = append(warnings, domain.Warning{Code: "extract.from_ignored", Message: "from ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
 	}
 
 	if req.EnvFrom != "" {
-		warnings = append(warnings, domain.Warning{Code: "extract.env_from_ignored", Message: "--env-from ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
+		warnings = append(warnings, domain.Warning{Code: "extract.env_from_ignored", Message: "env strategy ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
 	}
 
 	if req.FastForward != nil && *req.FastForward {
-		warnings = append(warnings, domain.Warning{Code: "extract.fast_forward_ignored", Message: "--ff ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
+		warnings = append(warnings, domain.Warning{Code: "extract.fast_forward_ignored", Message: "fast-forward ignored: " + target.Branch + " already exists, so nothing is created", Params: params})
 	}
 
 	if current := f.recordedIsolation(target.Branch); req.Isolation != "" && req.Isolation.Effective() != current {
 		given := string(req.Isolation)
 		warnings = append(warnings, domain.Warning{
-			Code:    "extract.isolation_ignored",
-			Message: "--isolation " + given + " ignored: " + target.Branch + " already exists and stays " + string(current) + " — switch it with `wtm env " + target.Branch + " --isolation " + given + "`",
-			Params:  domain.Params{"branch": target.Branch, "isolation": given, "current": string(current)},
+			Code:     "extract.isolation_ignored",
+			Message:  "isolation " + given + " ignored: " + target.Branch + " already exists and stays " + string(current),
+			Params:   domain.Params{"branch": target.Branch, "isolation": given, "current": string(current)},
+			FollowUp: switchIsolation(target.Branch, req.Isolation),
 		})
 	}
 
 	return warnings
+}
+
+// CodeSwitchIsolation is the step that switches an existing target to the isolation the request gave.
+const CodeSwitchIsolation = Name + ".switch_isolation"
+
+// switchIsolation is the follow-up that switches branch's worktree to isolation, which an existing target ignores.
+func switchIsolation(branch string, isolation project.Isolation) *domain.FollowUp {
+	return &domain.FollowUp{
+		Command: domain.CommandEnv,
+		Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: domain.PathIsolation, Values: []string{string(isolation)}}},
+		Code:    CodeSwitchIsolation,
+		Message: "switch it to " + string(isolation),
+	}
 }
 
 // fastForwarded is the branch the apply fast-forwards: the one the target starts from, behind origin and asked to, unless the source's own, whose worktree holds the changes and so is never clean.
@@ -503,7 +534,7 @@ func (p Plan) recap(marks domain.Marks) []domain.RecapRow {
 	if p.Target.Action == ActionCheckOut {
 		rows = append(rows, domain.RecapRow{Key: "parent", Label: "Parent", Path: pathFrom, Values: domain.RecapValues([]string{p.From})})
 	}
-	rows = append(rows, provision.RecapRows(provision.RecapParams{EnvFrom: p.EnvFrom, FollowsConfig: p.settled.FollowsConfig(), Isolation: p.Isolation, FastForward: p.FastForward, Marks: marks})...)
+	rows = append(rows, provision.RecapRows(provision.RecapParams{EnvFrom: p.EnvFrom, FollowsConfig: p.settled.FollowsConfig(), Isolation: p.Isolation, RunUnreadable: p.facts.RunErr != nil, FastForward: p.FastForward, Marks: marks})...)
 
 	mode := "move"
 	if p.Keep {

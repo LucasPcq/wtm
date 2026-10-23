@@ -32,7 +32,7 @@ internal/
     cli/               the root: version, --quiet, help, signals, the exit code a command's failure sets
     output/            the streams (stdin, stdout, stderr, whether each is a terminal, a colour renderer each), frames and blocks, progress, failures, plans, the hook view, the v2 envelope writer
     form/              a command's form, generic over its schema: form.Command (its flags, its request, its launch, the conclusion of its run, its command line), form.Query (the same for a read, with its subject asked first, its picker and the machine formats it prints besides json, tree's mermaid), form.Stream (a stream's flags and request), the session and a step per field kind, the wizard that walks them to a recap and applies, or to the last step of a read's picker
-    widget/            the inputs a step asks with: select list, multi-select, text field, text list, their styles
+    widget/            the inputs a step asks with: select list, multi-select, text field, text list, their styles, and the problem an input shows with the steps that get past it
     formtest/          for a command's tests: the driver that plays its wizard key by key, golden files, the v2 envelope decoded
   api/                 the catalogue of the commands and its streams (`api.Stream`, a command that sends lines until stopped), knowing none of them: each one's name, its schema (domain.Form), its questions as the repository stands and its execution, the answers by field in and a domain.Envelope out with the status of its kind, for a surface other than the command line
 ```

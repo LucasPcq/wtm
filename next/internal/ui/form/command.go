@@ -104,9 +104,10 @@ func (c *Command[R, Q, O]) Flags() output.Flags {
 // ----------------------------------------------------------------------------
 // The flags
 
-// Bind registers on cmd a flag per field of the schema, by its kind, with its usage and the values it accepts, then the flags every command shares: --remember when a field is rememberable, --ask, --yes, --output, --dry-run and --expect-fingerprint; run is where the command prints its run.
+// Bind registers on cmd a flag per field of the schema, by its kind, with its usage and the values it accepts, then the flags every command shares: --remember when a field is rememberable, --ask, --yes, --output, --dry-run and --expect-fingerprint; run is where the command prints its run, its follow-ups spelled by [Command.spell] over the command line it was handed.
 func (c *Command[R, Q, O]) Bind(cmd *cobra.Command, run *uicli.Run) {
 	c.io = run
+	run.CommandLine = c.spell(cmd, run.CommandLine)
 	usages := bindFields(cmd, c.schema())
 
 	flags := cmd.Flags()
@@ -324,11 +325,11 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 	stdout, _ := c.io.Writers()
 	switch {
 	case failure != nil:
-		return c.io.FailWith(failure, replanStep(failure, argv))
+		return c.io.FailWith(c.replanned(failure, ran.Request), nil)
 	case !ran.Outcome.Applied():
 		previewed, fingerprint := c.Preview(ran.Outcome), ran.Outcome.PlanFingerprint()
 		output.Frame(stdout, func(w io.Writer) {
-			output.DryRun(w, output.DryRunParams{Command: c.io.Command, Rows: previewed.Rows, Warnings: previewed.Warnings, Fingerprint: fingerprint, Apply: applyLine(argv, fingerprint)})
+			output.DryRun(w, output.DryRunParams{Command: c.io.Command, Rows: previewed.Rows, Warnings: previewed.Warnings, Fingerprint: fingerprint, Apply: applyLine(argv, fingerprint), CommandLine: c.io.CommandLine})
 		})
 		return nil
 	}
@@ -337,12 +338,37 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 	return c.io.Failed(ran.Outcome.Failure())
 }
 
-// replanStep is the next step of a stale plan: argv, the command line of the request, run again with --dry-run; none for any other failure.
-func replanStep(failure *domain.Error, argv []string) []output.NextStep {
-	if !domain.PlanStale(failure) {
-		return nil
+// replanned is failure followed by the request run again as a dry run when it is a stale plan, as the envelope's follow_ups give it; failure itself otherwise.
+func (c *Command[R, Q, O]) replanned(failure *domain.Error, req R) *domain.Error {
+	replan := domain.Replan(failure, c.io.Command, domain.AnswersOf(c.schema(), req))
+	if len(replan) == 0 || failure.FollowUp != nil {
+		return failure
 	}
-	return []output.NextStep{{Command: output.Line(append(slices.Clone(argv), "--"+uicli.FlagDryRun)), Note: domain.ReplanNote}}
+
+	followed := *failure
+	followed.FollowUp = &replan[0]
+	return &followed
+}
+
+// spell is the command line of a follow-up: the injected one, which spells the commands not migrated, unless the follow-up names this command, whose request it folds and spells from the schema (Argv), with --dry-run when it asks for one; none when its request refuses the answers, never the injected line.
+func (c *Command[R, Q, O]) spell(cmd *cobra.Command, injected output.CommandLine) output.CommandLine {
+	return func(followUp domain.FollowUp) []string {
+		if followUp.Command == "" || followUp.Command != c.io.Command {
+			return injected(followUp)
+		}
+
+		var zero R
+		req, err := domain.Fold(zero, followUp.Answers)
+		if err != nil {
+			return nil
+		}
+
+		argv := c.Argv(cmd.CommandPath(), req)
+		if followUp.DryRun {
+			argv = append(argv, "--"+uicli.FlagDryRun)
+		}
+		return argv
+	}
 }
 
 // applyLine is argv, the command line of the request, held to the fingerprint of the plan it previewed.

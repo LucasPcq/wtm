@@ -26,7 +26,7 @@ type AppliedParams struct {
 	View      View
 }
 
-// DrawApplied draws what the apply of a mutation did: the tally, the applied plan with a row per worktree that stands and the warnings of the items done then of the run, each item left unfinished followed by its own warnings, and the next steps, the result's then each item's: what repairs what its failure left behind, then what its warnings offer. An item's warning reads subject, then its message.
+// DrawApplied draws what the apply of a mutation did: the tally, the applied plan with a row per worktree that stands and the warnings of the items done then of the run, each item left unfinished followed by its own warnings, and the next steps, the result's, then each item's (what repairs what its failure left behind, then what its warnings offer), then what the run's warnings offer. An item's warning reads subject, then its message.
 func DrawApplied[P RecappedPlan, D Worktree](w io.Writer, outcome domain.Outcome[P, D], params AppliedParams) {
 	items := outcome.Result.Items
 	tallied := make([]Tallied, 0, len(items))
@@ -71,6 +71,8 @@ func DrawApplied[P RecappedPlan, D Worktree](w io.Writer, outcome domain.Outcome
 		next = append(next, FollowUpSteps(item.Err, params.View.CommandLine)...)
 		next = append(next, WarningSteps(item.Warnings, params.View.CommandLine)...)
 	}
+	next = append(next, WarningSteps(outcome.Warnings, params.View.CommandLine)...)
+	next = distinct(next)
 	if len(next) > 0 {
 		Blank(w)
 		NextSteps(w, next)
@@ -108,4 +110,15 @@ func itemWarnings[D Worktree](item domain.Unit[D]) []string {
 	}
 
 	return messages
+}
+
+// distinct is steps each once, in order: a warning every item raises (the proxy off) offers its step once.
+func distinct(steps []NextStep) []NextStep {
+	var kept []NextStep
+	for _, step := range steps {
+		if !slices.Contains(kept, step) {
+			kept = append(kept, step)
+		}
+	}
+	return kept
 }

@@ -1,3 +1,4 @@
 
-  ✗ the request is invalid: branch feat/one is checked out at <SB>/acme.trees/feat-one — run `wtm go feat/one` to jump in
+  ✗ the request is invalid: branch feat/one is checked out at <SB>/acme.trees/feat-one
+  → wtm go feat/one   jump in
 

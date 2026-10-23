@@ -1,0 +1,13 @@
+$ wtmx create --ask; echo EXIT=$?
+
+  Step 1/6 • Branches
+
+  Names of the new worktree branches, one at a time
+
+❯ feat/form
+
+  ✗ Worktree already exists: feat/form is checked out at <SB>/acme.trees/feat-form
+    — run `wtm go feat/form` to jump in
+
+  tab add another • backspace remove last • enter confirm • esc cancel
+

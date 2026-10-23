@@ -1,0 +1,75 @@
+{
+  "files": [
+    {
+      "path": "apps/web/ignored.txt",
+      "status": "untracked"
+    }
+  ],
+  "target_path": "<SB>/acme.trees/feat-jnames",
+  "target_branch": "feat/jnames",
+  "source_branch": "feat/login",
+  "kept": true,
+  "conflicts": null,
+  "isolation": "isolated",
+  "env_ports": {
+    "offset": 90,
+    "entries": [
+      {
+        "file": "apps/web/.env",
+        "key": "PORT",
+        "port": "PORT",
+        "base": 24200,
+        "resolved": 24290,
+        "moves": [
+          {
+            "port": "PORT",
+            "job": "web",
+            "base": 24200,
+            "resolved": 24290
+          }
+        ],
+        "addressing": "ports",
+        "status": "rewrite"
+      },
+      {
+        "file": "apps/web/.env",
+        "key": "API_URL",
+        "port": "PORT",
+        "base": 24201,
+        "resolved": 24291,
+        "moves": [
+          {
+            "port": "PORT",
+            "job": "api",
+            "base": 24201,
+            "resolved": 24291
+          }
+        ],
+        "addressing": "ports",
+        "status": "rewrite"
+      },
+      {
+        "file": "apps/api/.env",
+        "key": "PORT",
+        "port": "PORT",
+        "base": 24201,
+        "resolved": 24291,
+        "moves": [
+          {
+            "port": "PORT",
+            "job": "api",
+            "base": 24201,
+            "resolved": 24291
+          }
+        ],
+        "addressing": "ports",
+        "status": "rewrite"
+      }
+    ],
+    "addressing": "names",
+    "applied": true
+  },
+  "origins": {
+    "isolation": "default"
+  }
+}

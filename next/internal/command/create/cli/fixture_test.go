@@ -144,17 +144,18 @@ func (w world) usecase() create.UseCase {
 			Now:       func() time.Time { return createdAt },
 		},
 		Provision: provision.Service{
-			Git:        w.git,
-			Meta:       w.store,
-			EnvFiles:   w.store,
-			StateDir:   stateDir,
-			Answers:    w.store,
-			RunHooks:   runHooks,
-			PublicPort: func(context.Context, int) int { return 0 },
-			Shield:     shell.Shield,
-			Now:        func() time.Time { return createdAt },
-			LeftBehind: cleanLine,
-			Settle:     settleLine,
+			Git:         w.git,
+			Meta:        w.store,
+			EnvFiles:    w.store,
+			StateDir:    stateDir,
+			Answers:     w.store,
+			RunHooks:    runHooks,
+			PublicPort:  func(context.Context, int) int { return 0 },
+			Shield:      shell.Shield,
+			Now:         func() time.Time { return createdAt },
+			LeftBehind:  cleanLine,
+			Settle:      settleLine,
+			ProxyStatus: proxyStatusLine,
 		},
 	}
 }
@@ -289,7 +290,7 @@ func entered(result *create.Result) *create.Result {
 
 func invalid() *domain.Error {
 	return domain.Invalid([]domain.FieldError{
-		{Path: "branches[0]", Code: "create.checked_out_elsewhere", Template: "branch {branch} is checked out at {path} — run `wtm go {branch}` to jump in", Params: domain.Params{"branch": "feat/x", "path": "/p"}},
+		{Path: "branches[0]", Code: "create.checked_out_elsewhere", Template: "branch {branch} is checked out at {path}", Params: domain.Params{"branch": "feat/x", "path": "/p"}, FollowUp: &domain.FollowUp{Command: "go", Answers: []domain.Answered{{Path: "worktree", Values: []string{"feat/x"}}}, Code: "create.jump_in", Message: "jump in"}},
 		{Path: "branches[1]", Code: "distinct", Template: "{path}: {value} is given twice", Params: domain.Params{"value": "feat/x"}},
 		{Path: "env_from", Code: "one_of", Template: "{path} must be one of {accepted}, not {value}", Params: domain.Params{"value": "copy"}, Accepted: []string{"example", "main", "parent"}},
 		{Path: "from", Code: "required", Template: "{path} is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)", Params: domain.Params{"because": "create.parent_required"}},
@@ -327,17 +328,18 @@ func newApp(s seed) create.UseCase {
 			Now:       func() time.Time { return createdAt },
 		},
 		Provision: provision.Service{
-			Git:        git,
-			Meta:       store,
-			EnvFiles:   store,
-			StateDir:   mainPath + "/.git/wtm",
-			Answers:    store,
-			RunHooks:   func(context.Context, env.HookChain) error { return nil },
-			PublicPort: func(context.Context, int) int { return 0 },
-			Shield:     shell.Shield,
-			Now:        func() time.Time { return createdAt },
-			LeftBehind: cleanLine,
-			Settle:     settleLine,
+			Git:         git,
+			Meta:        store,
+			EnvFiles:    store,
+			StateDir:    mainPath + "/.git/wtm",
+			Answers:     store,
+			RunHooks:    func(context.Context, env.HookChain) error { return nil },
+			PublicPort:  func(context.Context, int) int { return 0 },
+			Shield:      shell.Shield,
+			Now:         func() time.Time { return createdAt },
+			LeftBehind:  cleanLine,
+			Settle:      settleLine,
+			ProxyStatus: proxyStatusLine,
 		},
 	}
 }
@@ -403,6 +405,10 @@ func cleanLine(branch string) domain.FollowUp {
 
 func settleLine(branch string) domain.FollowUp {
 	return domain.FollowUp{Command: "env", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}}}
+}
+
+func proxyStatusLine() domain.FollowUp {
+	return domain.FollowUp{Command: "run proxy status"}
 }
 
 func armedUntilCancelled(ctx context.Context, _ env.HookChain) error {

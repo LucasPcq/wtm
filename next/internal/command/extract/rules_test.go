@@ -113,24 +113,37 @@ func TestConflictsUnderResolveArePlanned(t *testing.T) {
 	w.change(t, source, "a.txt", "a\n")
 	conflicts := []worktree.Conflict{{Path: "a.txt", Kind: worktree.ConflictExists}}
 
-	planned, _, err := extract.Decide(w.facts(t, moving("a.txt")), extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictResolve}, conflicts)
+	planned, _, err := extract.Decide(w.facts(t, moving("a.txt")), extract.DecideParams{Given: extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictResolve}, Resolved: extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictResolve}, Conflicts: conflicts})
 
 	require.NoError(t, err)
 	assert.Equal(t, conflicts, planned.Conflicts)
+}
+
+func TestTheRequestAsResolvedDecidesTheConflictsNotAsGiven(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+	given := extract.Request{Source: source, Files: []string{"a.txt"}, To: other}
+	resolved := given
+	resolved.OnConflict = extract.OnConflictResolve
+
+	_, _, err := extract.Decide(w.facts(t, moving("a.txt")), extract.DecideParams{Given: given, Resolved: resolved, Conflicts: []worktree.Conflict{{Path: "a.txt", Kind: worktree.ConflictExists}}})
+
+	require.NoError(t, err)
 }
 
 func TestABinaryCollisionIsRefusedEvenUnderResolve(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.change(t, source, "a.txt", "a\n")
 
-	_, _, err := extract.Decide(w.facts(t, moving("a.txt")), extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictResolve}, []worktree.Conflict{
+	_, _, err := extract.Decide(w.facts(t, moving("a.txt")), extract.DecideParams{Given: extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictResolve}, Resolved: extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictResolve}, Conflicts: []worktree.Conflict{
 		{Path: "a.go", Kind: worktree.ConflictModified},
 		{Path: "logo.png", Kind: worktree.ConflictBinary},
-	})
+	}})
 
 	failure := failureOf(t, err)
 	assert.Equal(t, extract.CodeConflict, failure.Code)
 	assert.Equal(t, `cannot apply the selected changes: logo.png already exists in "feat/other" and is binary — conflict markers cannot be written, remove it there or extract to another worktree`, failure.Message)
+	assert.Nil(t, failure.FollowUp)
 	assert.Equal(t, domain.Params{"target": other, "files": "logo.png"}, failure.Params)
 }
 
@@ -138,15 +151,15 @@ func TestAConflictRefusalNamesWhatWasModifiedAndWhatAlreadyExists(t *testing.T) 
 	w := newWorld(t, seed{})
 	w.change(t, source, "a.txt", "a\n")
 
-	_, _, err := extract.Decide(w.facts(t, moving("a.txt")), extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictAbort}, []worktree.Conflict{
+	_, _, err := extract.Decide(w.facts(t, moving("a.txt")), extract.DecideParams{Given: extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictAbort}, Resolved: extract.Request{Source: source, Files: []string{"a.txt"}, To: other, OnConflict: extract.OnConflictAbort}, Conflicts: []worktree.Conflict{
 		{Path: "a.go", Kind: worktree.ConflictModified},
 		{Path: "b.go", Kind: worktree.ConflictModified},
 		{Path: "new.txt", Kind: worktree.ConflictExists},
-	})
+	}})
 
 	failure := failureOf(t, err)
 	assert.Equal(t, domain.KindConflict, failure.Kind)
-	assert.Equal(t, `cannot apply the selected changes: a.go, b.go were also modified and new.txt already exists in "feat/other" — resolve them there, extract to another worktree, or re-run with --on-conflict resolve`, failure.Message)
+	assert.Equal(t, `cannot apply the selected changes: a.go, b.go were also modified and new.txt already exists in "feat/other" — resolve them there, extract to another worktree, or extract with conflict markers`, failure.Message)
 }
 
 func TestAnExistingTargetIgnoresTheCreationAnswersAndSaysSo(t *testing.T) {
@@ -158,8 +171,15 @@ func TestAnExistingTargetIgnoresTheCreationAnswersAndSaysSo(t *testing.T) {
 	planned, warnings := w.plan(t, req)
 
 	assert.Equal(t, []string{"extract.from_ignored", "extract.env_from_ignored", "extract.fast_forward_ignored", "extract.isolation_ignored"}, codes(warnings))
-	assert.Equal(t, "--env-from ignored: feat/other already exists, so nothing is created", warnings[1].Message)
-	assert.Equal(t, "--isolation verbatim ignored: feat/other already exists and stays isolated — switch it with `wtm env feat/other --isolation verbatim`", warnings[3].Message)
+	assert.Equal(t, "env strategy ignored: feat/other already exists, so nothing is created", warnings[1].Message)
+	assert.Equal(t, "fast-forward ignored: feat/other already exists, so nothing is created", warnings[2].Message)
+	assert.Equal(t, "isolation verbatim ignored: feat/other already exists and stays isolated", warnings[3].Message)
+	assert.Equal(t, &domain.FollowUp{
+		Command: domain.CommandEnv,
+		Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/other"}}, {Path: domain.PathIsolation, Values: []string{"verbatim"}}},
+		Code:    extract.CodeSwitchIsolation,
+		Message: "switch it to verbatim",
+	}, warnings[3].FollowUp)
 	assert.Empty(t, planned.From)
 	assert.Empty(t, planned.EnvFrom)
 	assert.Empty(t, planned.FastForward)

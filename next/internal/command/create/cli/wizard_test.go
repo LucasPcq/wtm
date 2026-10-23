@@ -58,7 +58,7 @@ func TestAnEntryIsCheckedAsItIsAdded(t *testing.T) {
 	assert.Contains(t, d.Screen(), `✗ "bad..name" is not a valid branch name: it cannot hold .. or end with .`)
 
 	d.Keys("backspace", "backspace", "backspace", "backspace", "backspace", "backspace", "backspace", "backspace", "backspace", "feat/x", "tab")
-	assert.Contains(t, d.Screen(), "✗ Branch feat/x is checked out at /elsewhere/feat-x — run `wtm go feat/x` to jump in")
+	assert.Contains(t, d.Screen(), "✗ Branch feat/x is checked out at /elsewhere/feat-x\n  → wtm go feat/x   jump in\n")
 
 	d.Keys("enter")
 	assert.Equal(t, stepBranches, d.Wizard.Current())

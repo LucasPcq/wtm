@@ -48,12 +48,22 @@ func FollowUpStep(followUp domain.FollowUp, spell CommandLine) NextStep {
 	return NextStep{Command: Line(spell(followUp)), Note: followUp.Message}
 }
 
-// FollowUpSteps returns the next step that repairs what err left behind, its follow-up spelled by spell; none when err is nil or has no follow-up.
+// FollowUpSteps returns the next step that repairs what err left behind, then the one that gets past each of its fields' problems, each follow-up spelled by spell; none when err is nil or has no follow-up.
 func FollowUpSteps(err *domain.Error, spell CommandLine) []NextStep {
-	if err == nil || err.FollowUp == nil {
+	if err == nil {
 		return nil
 	}
-	return []NextStep{FollowUpStep(*err.FollowUp, spell)}
+
+	var steps []NextStep
+	if err.FollowUp != nil {
+		steps = append(steps, FollowUpStep(*err.FollowUp, spell))
+	}
+	for _, field := range err.Fields {
+		if field.FollowUp != nil {
+			steps = append(steps, FollowUpStep(*field.FollowUp, spell))
+		}
+	}
+	return steps
 }
 
 // Shown is a path to show and the directory the command runs in.

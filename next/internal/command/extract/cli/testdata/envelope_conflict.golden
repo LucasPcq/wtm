@@ -8,10 +8,41 @@
   "error": {
     "kind": "conflict",
     "code": "extract.conflict",
-    "message": "cannot apply the selected changes: apps/api/a.txt was also modified in \"feat/other\" — resolve it there, extract to another worktree, or re-run with --on-conflict resolve",
+    "message": "cannot apply the selected changes: apps/api/a.txt was also modified in \"feat/other\" — resolve it there, extract to another worktree, or extract with conflict markers",
     "params": {
       "files": "apps/api/a.txt",
       "target": "feat/other"
+    },
+    "follow_up": {
+      "command": "extract",
+      "answers": [
+        {
+          "path": "source",
+          "values": [
+            "feat/login"
+          ]
+        },
+        {
+          "path": "files",
+          "values": [
+            "apps/api"
+          ]
+        },
+        {
+          "path": "to",
+          "values": [
+            "feat/other"
+          ]
+        },
+        {
+          "path": "on_conflict",
+          "values": [
+            "resolve"
+          ]
+        }
+      ],
+      "code": "extract.resolve",
+      "message": "write conflict markers in feat/other"
     }
   }
 }

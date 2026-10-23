@@ -135,7 +135,7 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 		return Plan{}, nil, err
 	}
 
-	planned, warnings, err := Decide(facts, resolved, conflicts)
+	planned, warnings, err := Decide(facts, DecideParams{Given: req, Resolved: resolved, Conflicts: conflicts})
 	planned.Recalled = questions.Recalled()
 	planned.Recap = planned.previewRecap()
 	return planned, warnings, err

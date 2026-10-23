@@ -1,0 +1,8 @@
+  ! This project asks for named addresses
+    The run proxy is off on this machine, so ports were written instead — `wtm run proxy status` reports what serves names
+
+  → case feat/jnames in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) echo set up feat/jnames;; esac
+
+set up feat/jnames
+
+  ✓ case feat/jnames in feat/bad*) echo failing; exit 3;; feat/slow*) trap "sleep 2" INT; sleep 30;; *) echo set up feat/jnames;; esac (<DUR>)

@@ -27,7 +27,20 @@
           "path": "<SB>/acme.trees/feat-one"
         },
         "flag": "<branches>[1]",
-        "message": "branch feat/one is checked out at <SB>/acme.trees/feat-one — run `wtm go feat/one` to jump in"
+        "message": "branch feat/one is checked out at <SB>/acme.trees/feat-one",
+        "follow_up": {
+          "command": "go",
+          "answers": [
+            {
+              "path": "worktree",
+              "values": [
+                "feat/one"
+              ]
+            }
+          ],
+          "code": "create.jump_in",
+          "message": "jump in"
+        }
       }
     ]
   }

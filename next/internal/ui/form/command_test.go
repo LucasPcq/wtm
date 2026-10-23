@@ -111,11 +111,40 @@ func TestAnApplyIsDrawnByTheCommandAndEndsOnItsFailure(t *testing.T) {
 	assert.Equal(t, failed, refused.Err)
 }
 
-func TestAStalePlanIsFollowedByTheDryRunThatPlansAgain(t *testing.T) {
-	stale := &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodePlanStale}
+func TestAStalePlanIsFollowedByTheDryRunThatPlansAgainQuietOrNot(t *testing.T) {
+	stale := &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodePlanStale, Message: "stale"}
+	ran := form.Ran[request, outcome]{Request: request{"branches": {"it's"}}}
+	replan := output.NextStep{Command: `fake 'it'\''s' --dry-run`, Note: domain.ReplanNote}
 
-	assert.Equal(t, []output.NextStep{{Command: `wtm-next create 'it'\''s' --dry-run`, Note: domain.ReplanNote}}, form.ReplanStep(stale, []string{"wtm-next", "create", "it's"}))
-	assert.Empty(t, form.ReplanStep(&domain.Error{Kind: domain.KindConflict, Code: "lock.held"}, []string{"wtm-next", "create", "feat/x"}))
+	printed, _ := refused(t, false, ran, stale)
+	_, quiet := refused(t, true, ran, stale)
+	_, held := refused(t, true, ran, &domain.Error{Kind: domain.KindConflict, Code: "lock.held", Message: "held"})
+
+	assert.Contains(t, printed, "→ "+replan.Command+"   "+replan.Note)
+	assert.Equal(t, []output.NextStep{replan}, quiet)
+	assert.Empty(t, held)
+}
+
+func TestAFollowUpNamingTheCommandItselfIsSpelledFromItsSchemaQuietOrNot(t *testing.T) {
+	conflict := &domain.Error{Kind: domain.KindConflict, Code: "fake.conflict", Message: "conflict", FollowUp: &domain.FollowUp{Command: "fake", Answers: []domain.Answered{{Path: "branches", Values: []string{"feat/a"}}, {Path: "mode", Values: []string{"resolve"}}}, Message: "resolve"}}
+	resolve := output.NextStep{Command: "fake feat/a --mode resolve", Note: "resolve"}
+
+	printed, _ := refused(t, false, form.Ran[request, outcome]{}, conflict)
+	_, quiet := refused(t, true, form.Ran[request, outcome]{}, conflict)
+
+	assert.Contains(t, printed, "→ "+resolve.Command+"   "+resolve.Note)
+	assert.Equal(t, []output.NextStep{resolve}, quiet)
+}
+
+func TestAFollowUpItsCommandCannotFoldIsNoStepAndAForeignOneIsNeverFolded(t *testing.T) {
+	unfoldable := &domain.Error{Kind: domain.KindConflict, Code: "fake.conflict", Message: "conflict", FollowUp: &domain.FollowUp{Command: "fake", Answers: []domain.Answered{{Path: "nope", Values: []string{"x"}}}, Message: "resolve"}}
+	foreign := &domain.Error{Kind: domain.KindConflict, Code: "fake.held", Message: "held", FollowUp: &domain.FollowUp{Command: "go", Answers: []domain.Answered{{Path: "nope", Values: []string{"x"}}}}}
+
+	unfolded, _ := refused(t, false, form.Ran[request, outcome]{}, unfoldable)
+	spelled, _ := refused(t, false, form.Ran[request, outcome]{}, foreign)
+
+	assert.NotContains(t, unfolded, "→")
+	assert.Contains(t, spelled, "→ wtm go --nope x")
 }
 
 func TestAStalePlanInJSONFollowsUpWithItsReplan(t *testing.T) {

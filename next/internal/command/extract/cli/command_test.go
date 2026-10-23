@@ -70,6 +70,40 @@ func TestATargetsWarningsComeBeforeTheRunsInThePlan(t *testing.T) {
 	formtest.Golden(t, "resolved_from_ignored", got.Stdout)
 }
 
+func TestAnIsolationAnExistingTargetIgnoresIsFollowedByTheSwitch(t *testing.T) {
+	words := []string{source, "--files", "apps/api/new.txt", "--to", other, "--isolation", "verbatim", "--ff"}
+	for name, extra := range map[string][]string{"isolation_ignored": nil, "isolation_ignored_dry_run": {"--dry-run"}} {
+		t.Run(name, func(t *testing.T) {
+			got := runExtract(t, newWorld(seed{}), append(words, extra...)...)
+
+			require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+			formtest.Golden(t, name, got.Stdout)
+		})
+	}
+	got := runExtract(t, newWorld(seed{}), append(words, "--output", "json")...)
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stdout)
+	assert.Contains(t, got.Stdout, `"follow_up": {
+        "command": "env",
+        "answers": [
+          {
+            "path": "worktree",
+            "values": [
+              "feat/other"
+            ]
+          },
+          {
+            "path": "isolation",
+            "values": [
+              "verbatim"
+            ]
+          }
+        ],
+        "code": "extract.switch_isolation",
+        "message": "switch it to verbatim"
+      }`)
+}
+
 func TestACleanSourceHasNothingToExtract(t *testing.T) {
 	got := runExtract(t, newWorld(seed{Clean: true}), source, "--yes")
 
@@ -84,8 +118,15 @@ func TestAConflictIsRefusedOnItsOwnExitCodeBeforeAnythingMoves(t *testing.T) {
 
 	assert.Equal(t, exitConflict, got.Code)
 	assert.Empty(t, got.Stdout)
-	assert.Equal(t, "\n  ✗ cannot apply the selected changes: apps/api/a.txt was also modified in \"feat/other\" — resolve it there, extract to another worktree, or re-run with --on-conflict resolve\n\n", got.Stderr)
+	assert.Equal(t, "\n  ✗ cannot apply the selected changes: apps/api/a.txt was also modified in \"feat/other\" — resolve it there, extract to another worktree, or extract with conflict markers\n  → wtm-next extract feat/login --files apps/api --on-conflict resolve --to feat/other   write conflict markers in feat/other\n\n", got.Stderr)
 	assert.Empty(t, w.git.Moves())
+}
+
+func TestQuietKeepsTheResolveAConflictIsFollowedBy(t *testing.T) {
+	got := runExtract(t, newWorld(seed{Conflicts: conflicting}), source, "--files", "apps/api", "--to", other, "-q")
+
+	assert.Equal(t, exitConflict, got.Code)
+	assert.Contains(t, got.Stderr, "\n  → wtm-next extract feat/login --files apps/api --on-conflict resolve --to feat/other   write conflict markers in feat/other\n")
 }
 
 func TestAConflictRefusedInJSONIsTheEnvelopesError(t *testing.T) {

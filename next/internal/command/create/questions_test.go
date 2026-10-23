@@ -224,13 +224,14 @@ func TestEachEntryIsRefusedForWhatStandsInItsWay(t *testing.T) {
 
 	assert.Equal(t, map[string]string{
 		"branches[0]": `"bad..name" is not a valid branch name: it cannot hold .. or end with .`,
-		"branches[1]": "branch linked is checked out at " + linkedPath(w.root, "linked") + " — run `wtm go linked` to jump in",
+		"branches[1]": "branch linked is checked out at " + linkedPath(w.root, "linked"),
 		"branches[2]": "worktree path already exists: " + w.path("plain"),
 		"branches[4]": "branch feat/x would share its name with feat.x (feat-x) — pick another name",
 		"branches[5]": "<branches[5]>: linked is given twice",
 	}, messages(t, err))
 	fields := fieldsOf(t, err)
 	assert.Equal(t, domain.Params{"branch": "linked", "path": linkedPath(w.root, "linked")}, fields[1].Params)
+	assert.Equal(t, &domain.FollowUp{Command: domain.CommandGo, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"linked"}}}, Code: create.CodeJumpIn, Message: "jump in"}, fields[1].FollowUp)
 	assert.Equal(t, domain.Params{"path": w.path("plain")}, fields[2].Params)
 	assert.Equal(t, domain.Params{"branch": branchName, "other": "feat.x", "name": "feat-x"}, fields[3].Params)
 	assert.Equal(t, domain.FieldError{Path: "branches[5]", Code: "distinct", Template: "{path}: {value} is given twice", Params: domain.Params{"value": "linked"}}, fields[4])

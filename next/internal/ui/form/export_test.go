@@ -37,8 +37,6 @@ func (s *Session[R, Q, O]) Outcome() O {
 	return s.outcome
 }
 
-var ReplanStep = replanStep
-
 // ReadLanded is the message of a read that found nothing to report, landing before the wizard moves to the next step.
 func ReadLanded() tea.Msg {
 	return observedMsg{apply: func() {}, then: thenNext}

@@ -85,6 +85,7 @@ type Questions struct {
 	Many        bool
 	Remember    []string
 	Ask         bool
+	runUnread   bool // the isolation is skipped only because run.toml could not be read, and settles the worktree all the same
 }
 
 // QuestionsParams is what the questions of a new worktree settle from: the request's answers, the repository (its remembered answers, which Given.Ask sets aside for the run while the form still shows them, its env strategy, its run.toml), why nothing is asked (Exists: the worktree is not created), the branches behind origin the fast-forward would update (none: it is not asked) and whether several worktrees are created.
@@ -119,6 +120,7 @@ func NewQuestions(params QuestionsParams) Questions {
 		Many:        params.Many,
 		Remember:    params.Given.Remember,
 		Ask:         params.Given.Ask,
+		runUnread:   params.Exists == "" && params.Repository.RunErr != nil,
 	}
 	questions.EnvFrom.Remembered = project.EnvStrategy(recalled[project.RememberEnvStrategy])
 	questions.Isolation.Remembered = project.Isolation(recalled[project.RememberIsolation])
@@ -147,6 +149,8 @@ func isolation(params QuestionsParams) domain.Choice[project.Isolation] {
 	switch {
 	case params.Exists != "":
 		question.Skip = params.Exists
+	case params.Repository.RunErr != nil:
+		question.Skip = "run.toml could not be read"
 	case !params.Repository.Run.IsolationApplies():
 		question.Skip = "run.toml declares nothing a worktree isolates"
 	}
@@ -155,16 +159,17 @@ func isolation(params QuestionsParams) domain.Choice[project.Isolation] {
 	case params.Given.Isolation != "":
 		question.Answer = domain.Answer[project.Isolation]{Value: params.Given.Isolation, Origin: domain.OriginRequest}
 	case params.Exists == "":
-		question.Answer = isolationAnswer(project.Isolation(params.Repository.Config.Remembered[project.RememberIsolation]), params.Repository.Run)
+		question.Answer = isolationAnswer(project.Isolation(params.Repository.Config.Remembered[project.RememberIsolation]), params.Repository)
 	}
 
 	return question
 }
 
-// isolationAnswer is the isolation a question the request leaves unanswered settles on: the remembered one (empty when none) while run.toml declares something a worktree isolates, else run.toml's, else isolated.
-func isolationAnswer(remembered project.Isolation, run project.Run) domain.Answer[project.Isolation] {
+// isolationAnswer is the isolation a question the request leaves unanswered settles on: the remembered one (empty when none) while run.toml declares something a worktree isolates or could not be read, else run.toml's, else isolated.
+func isolationAnswer(remembered project.Isolation, repo worktree.Repository) domain.Answer[project.Isolation] {
+	run := repo.Run
 	switch {
-	case remembered != "" && run.IsolationApplies():
+	case remembered != "" && (run.IsolationApplies() || repo.RunErr != nil):
 		return domain.Answer[project.Isolation]{Value: remembered, Origin: domain.OriginRemembered}
 	case run.Isolation != "":
 		return domain.Answer[project.Isolation]{Value: run.Isolation.Effective(), Origin: domain.OriginConfig}
@@ -271,9 +276,10 @@ func (q Questions) envOptions() []domain.Option {
 	}
 }
 
-// Remembers reports whether the answer to the field at path is to be remembered: asked to be, and its question not skipped.
+// Remembers reports whether the answer to the field at path is to be remembered: asked to be, and its question not skipped, unless the isolation is skipped only because run.toml could not be read, which settles the worktree all the same.
 func (q Questions) Remembers(path string) bool {
-	return slices.Contains(q.Remember, path) && !q.skipped(path)
+	settles := !q.skipped(path) || path == domain.PathIsolation && q.runUnread
+	return slices.Contains(q.Remember, path) && settles
 }
 
 func (q Questions) skipped(path string) bool {
@@ -352,7 +358,8 @@ func (q Questions) Recalled() []string {
 	origins := map[string]domain.Origin{domain.PathEnvFrom: q.EnvFrom.Origin, domain.PathIsolation: q.Isolation.Origin, domain.PathFastForward: q.FastForward.Origin}
 	var recalled []string
 	for _, field := range rememberable() {
-		if origins[field] == domain.OriginRemembered && !q.skipped(field) {
+		// by its origin, not its skip: a remembered isolation still settles a worktree whose run.toml could not be read
+		if origins[field] == domain.OriginRemembered {
 			recalled = append(recalled, field)
 		}
 	}

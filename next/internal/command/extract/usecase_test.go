@@ -5,6 +5,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -138,7 +139,13 @@ func TestAConflictUnderAbortIsRefusedAtPlanTimeAndNothingIsCreatedOrMoved(t *tes
 	failure := failureOf(t, err)
 	assert.Equal(t, domain.KindConflict, failure.Kind)
 	assert.Equal(t, extract.CodeConflict, failure.Code)
-	assert.Equal(t, `cannot apply the selected changes: a.txt already exists in "feat/split" — resolve it there, extract to another worktree, or re-run with --on-conflict resolve`, failure.Message)
+	assert.Equal(t, `cannot apply the selected changes: a.txt already exists in "feat/split" — resolve it there, extract to another worktree, or extract with conflict markers`, failure.Message)
+	require.NotNil(t, failure.FollowUp)
+	assert.Equal(t, extract.CodeResolve, failure.FollowUp.Code)
+	assert.Equal(t, []domain.Answered{{Path: "source", Values: []string{source}}, {Path: "files", Values: []string{"a.txt"}}, {Path: "to", Values: []string{split}}, {Path: "on_conflict", Values: []string{"resolve"}}}, failure.FollowUp.Answers, "only what was given, and the resolve")
+	again, err := domain.Fold(extract.Request{}, failure.FollowUp.Answers)
+	require.NoError(t, err)
+	assert.Equal(t, extract.OnConflictResolve, again.OnConflict)
 	assert.NoDirExists(t, w.path(split))
 	assert.Equal(t, "source\n", readFile(t, filepath.Join(w.at(source), "a.txt")))
 	assert.Empty(t, w.published.all())
@@ -482,6 +489,19 @@ func TestACreatedTargetGetsItsEnvByTheStrategyAsked(t *testing.T) {
 	}
 }
 
+func TestNamedAddressesNoProxyServesAreAWarningOfTheTarget(t *testing.T) {
+	w := withEnvFiles(t, envToml)
+	writeFile(t, filepath.Join(w.main, ".env.example"), "PORT=3000\n")
+	writeFile(t, filepath.Join(w.stateDir, "run.toml"), jobsToml+"\n[[env_port]]\nfile = \".env\"\nkey = \"PORT\"\njob = \"web\"\nport = \"PORT\"\n")
+
+	result, _ := w.apply(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split})
+
+	require.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)
+	assert.Equal(t, []string{"provision.ports_not_named"}, codes(result.Items[0].Warnings))
+	require.NotNil(t, result.Items[0].Warnings[0].FollowUp)
+	assert.Equal(t, proxyStatusLine().Command, result.Items[0].Warnings[0].FollowUp.Command)
+}
+
 func TestTheEnvStrategyAskedToBeRememberedIsKeptOnceTheTargetIsCreated(t *testing.T) {
 	w := withEnvFiles(t, envToml)
 
@@ -529,4 +549,16 @@ func TestAnApplyReportsTheTargetAsItsOneItem(t *testing.T) {
 			assert.Equal(t, tc.status, result.Items[0].Status)
 		})
 	}
+}
+
+func TestARunTomlThatDoesNotParseKeepsTheIsolationRow(t *testing.T) {
+	w := newWorld(t, seed{Run: "bogus = [\n"})
+	w.change(t, source, "a.txt", "a\n")
+
+	planned, _ := w.plan(t, extract.Request{Source: source, Files: []string{"a.txt"}, To: split})
+
+	assert.Equal(t, project.Isolated, planned.Isolation)
+	at := slices.IndexFunc(planned.Recap, func(row domain.RecapRow) bool { return row.Key == domain.PathIsolation })
+	require.GreaterOrEqual(t, at, 0, planned.Recap)
+	assert.Equal(t, []domain.RecapValue{{Value: "isolated", Note: provision.NoteRunUnreadable, Text: "isolated (run.toml unreadable)"}}, planned.Recap[at].Values)
 }

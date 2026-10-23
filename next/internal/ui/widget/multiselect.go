@@ -194,7 +194,7 @@ func (m *MultiSelect) View(size Size, st *Styles) string {
 	}
 
 	if m.err != nil {
-		b.WriteString("\n\n" + errorBanner(m.err.Error(), size.Width, st))
+		b.WriteString("\n\n" + errorBanner(m.err, size.Width, st))
 	}
 
 	return b.String()

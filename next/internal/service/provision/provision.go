@@ -24,12 +24,13 @@ type Service struct {
 	Answers  AnswerStore
 	StateDir string // wtm's state, where each worktree's hook log goes
 
-	RunHooks   func(ctx context.Context, chain env.HookChain) error // runs the on_create hooks, failing with an *env.HookFailure
-	PublicPort func(ctx context.Context, configured int) int        // the port a named URL announces, given the proxy's configured one; 0 with no proxy
-	Shield     func(ctx context.Context) (context.Context, func())  // a context the first cancel does not reach, and its release
-	Now        func() time.Time
-	LeftBehind func(branch string) domain.FollowUp // the command, with its answers, that removes a branch an undo left behind, and its worktree
-	Settle     func(branch string) domain.FollowUp // the command, with its answers, that settles a worktree's env ports once what kept them is fixed
+	RunHooks    func(ctx context.Context, chain env.HookChain) error // runs the on_create hooks, failing with an *env.HookFailure
+	PublicPort  func(ctx context.Context, configured int) int        // the port a named URL announces, given the proxy's configured one; 0 with no proxy
+	Shield      func(ctx context.Context) (context.Context, func())  // a context the first cancel does not reach, and its release
+	Now         func() time.Time
+	LeftBehind  func(branch string) domain.FollowUp // the command, with its answers, that removes a branch an undo left behind, and its worktree
+	Settle      func(branch string) domain.FollowUp // the command, with its answers, that settles a worktree's env ports once what kept them is fixed
+	ProxyStatus func() domain.FollowUp              // the command that reports what serves named addresses on this machine
 }
 
 // ----------------------------------------------------------------------------

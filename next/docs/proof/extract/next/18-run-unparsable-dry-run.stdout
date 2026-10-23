@@ -1,0 +1,11 @@
+
+  extract · dry run, nothing applied
+  Source     feat/login
+  Files      new apps/web/ignored.txt
+  Target     new worktree feat/unparsable from main
+  Env        example
+  Isolation  isolated (run.toml unreadable)
+  Mode       copy
+  fingerprint  <FP>
+  → wtm extract feat/login --files apps/web/ignored.txt --keep --to feat/unparsable --expect-fingerprint <FP>   apply this plan
+

@@ -97,7 +97,7 @@ func (t *Text) View(size Size, st *Styles) string {
 	if t.err == nil {
 		return t.input.View()
 	}
-	return t.input.View() + "\n\n" + errorBanner(t.err.Error(), size.Width, st)
+	return t.input.View() + "\n\n" + errorBanner(t.err, size.Width, st)
 }
 
 // Help adds no key: the field has no rows to navigate.

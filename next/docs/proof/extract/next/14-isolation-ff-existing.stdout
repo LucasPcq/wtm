@@ -1,0 +1,15 @@
+
+  ✓ extract: 1 done
+
+  Source  feat/login
+  Files   new apps/web/ignored.txt
+  Target  topic
+  Mode    copy
+  topic   ../acme.trees/topic
+
+  ! fast-forward ignored: topic already exists, so nothing is created
+  ! isolation verbatim ignored: topic already exists and stays isolated
+
+  → wtm go topic
+  → wtm env topic --isolation verbatim   switch it to verbatim
+

@@ -111,6 +111,19 @@ run_side() {
     scenario 12-identical-in-target extract feat/login --files apps/web/same.txt --to topic --yes
     echo "j" >"$root/acme.trees/feat-login/apps/web/json.txt"
     scenario 13-json-without-yes extract feat/login --files apps/web/json.txt --to feat/jny --output json
+    echo "i" >"$root/acme.trees/feat-login/apps/web/ignored.txt"
+    scenario 14-isolation-ff-existing extract feat/login --files apps/web/ignored.txt --to topic --keep --isolation verbatim --ff --yes
+    scenario 15-json-isolation-ff-existing extract feat/login --files apps/web/ignored.txt --to topic --keep --isolation verbatim --ff --output json --yes
+    # the run proxy off on this machine: the project's names are written as ports
+    global=$(find "$HOME" -name config.toml -path '*wtm*' | head -1)
+    sed -i '' 's/^\[proxy\]$/[proxy]\nenabled = false # proof/' "$global"
+    grep -q '^enabled = false # proof$' "$global" || { echo "$0: no [proxy] table to switch off in $global" >&2; exit 1; }
+    scenario 16-names-proxy-off extract feat/login --files apps/web/ignored.txt --to feat/names --keep --yes
+    scenario 17-json-names-proxy-off extract feat/login --files apps/web/ignored.txt --to feat/jnames --keep --output json --yes
+    sed -i '' '/^enabled = false # proof$/d' "$global"
+    echo 'bogus = [' >>.git/wtm/run.toml
+    # next only: legacy has no dry run
+    scenario 18-run-unparsable-dry-run extract feat/login --files apps/web/ignored.txt --to feat/unparsable --keep --dry-run
   )
   sed -i '' -E \
     -e "s#(/private)?$root#<SB>#g" \

@@ -61,7 +61,9 @@ type driver struct {
 
 func open(t *testing.T, params sessionParams) *driver {
 	t.Helper()
-	s := newForm(nil).Session(t.Context(), params.App, params.Request, params.Options)
+	bound := newForm(nil)
+	bound.Bind(&cobra.Command{}, &uicli.Run{CommandLine: formtest.CommandLine})
+	s := bound.Session(t.Context(), params.App, params.Request, params.Options)
 	return start(t, s, form.New(t.Context(), s.Script()))
 }
 

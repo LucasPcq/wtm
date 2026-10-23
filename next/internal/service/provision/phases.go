@@ -198,6 +198,9 @@ func (p *provisioning) settle(ctx context.Context, provisioned *Provisioned) err
 	}
 
 	provisioned.EnvPorts = env.Redact(plan)
+	if plan.NamesUnserved() {
+		p.warn(p.namesUnserved())
+	}
 	return nil
 }
 
@@ -275,6 +278,20 @@ func (p *provisioning) notSettled(n notSettled) domain.Warning {
 		Code:     code,
 		Message:  cause + " — ports not settled",
 		Params:   domain.Params{"branch": branch, "cause": cause},
+		FollowUp: &followUp,
+	}
+}
+
+// namesUnserved is the warning that the project asks for named addresses the
+// proxy, off on this machine, cannot serve, with the follow-up that says what
+// serves them.
+func (p *provisioning) namesUnserved() domain.Warning {
+	followUp := p.Service.ProxyStatus()
+	followUp.Code, followUp.Message = "provision.proxy_status", "reports what serves names"
+	return domain.Warning{
+		Code:     "provision.ports_not_named",
+		Message:  "this project asks for named addresses: the run proxy is off on this machine, so ports were written instead",
+		Params:   domain.Params{"branch": p.Worktree.Branch},
 		FollowUp: &followUp,
 	}
 }

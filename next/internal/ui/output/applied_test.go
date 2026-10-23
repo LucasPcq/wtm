@@ -2,6 +2,7 @@ package output
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -43,4 +44,22 @@ func TestAnAppliedOutcomeWithNoItemDrawsItsTallyAndTheRunsWarnings(t *testing.T)
 	got := rendered(func(w *bytes.Buffer) { DrawApplied(w, outcome, AppliedParams{Command: "extract", Note: "noted"}) })
 
 	assert.Equal(t, "  = extract: nothing to do · noted\n\n  ! of the run\n", got)
+}
+
+func TestAStepTheWarningsOfEveryItemOfferIsDrawnOnceAfterTheItemsThenTheRuns(t *testing.T) {
+	proxy := domain.Warning{Code: "proxy", Message: "proxy off", FollowUp: &domain.FollowUp{Command: "run proxy status", Message: "says why"}}
+	outcome := domain.Outcome[recappedPlan, worktreeDetail]{
+		Warnings: []domain.Warning{{Code: "run", Message: "of the run", FollowUp: &domain.FollowUp{Command: "env feat/a"}}},
+		Result: &domain.Result[worktreeDetail]{Items: []domain.Unit[worktreeDetail]{
+			{Subject: "feat/a", Status: domain.StatusDone, Warnings: []domain.Warning{proxy}},
+			{Subject: "feat/b", Status: domain.StatusDone, Warnings: []domain.Warning{proxy}},
+		}},
+	}
+
+	got := rendered(func(w *bytes.Buffer) {
+		DrawApplied(w, outcome, AppliedParams{Command: "create", View: View{CommandLine: func(f domain.FollowUp) []string { return append([]string{"wtm"}, strings.Fields(f.Command)...) }}})
+	})
+
+	assert.Contains(t, got, "  → wtm run proxy status   says why\n  → wtm env feat/a\n")
+	assert.Equal(t, 1, strings.Count(got, "run proxy status"))
 }

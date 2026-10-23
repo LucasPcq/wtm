@@ -201,16 +201,17 @@ func DrawPlan(w io.Writer, params PlanParams) {
 	}
 }
 
-// DryRunParams is a dry run to draw: the command, the rows of its plan, its warnings, its fingerprint and the line that applies exactly that plan.
+// DryRunParams is a dry run to draw: the command, the rows of its plan, its warnings, its fingerprint, the line that applies exactly that plan, and how a warning's follow-up is spelled.
 type DryRunParams struct {
 	Command     string
 	Rows        []PlanRow
 	Warnings    []domain.Warning
 	Fingerprint string
 	Apply       string
+	CommandLine CommandLine
 }
 
-// DryRun writes the dry run params describes to w: its title, its plan and warnings, its fingerprint and the line that applies it.
+// DryRun writes the dry run params describes to w: its title, its plan and warnings, its fingerprint, the line that applies it, then what its warnings offer.
 func DryRun(w io.Writer, params DryRunParams) {
 	SectionTitle(w, params.Command+Dot+"dry run, nothing applied")
 	warnings := Messages(params.Warnings)
@@ -221,4 +222,6 @@ func DryRun(w io.Writer, params DryRunParams) {
 
 	InfoLine(w, Info{Label: "fingerprint", Value: params.Fingerprint})
 	NextSteps(w, []NextStep{{Command: params.Apply, Note: ApplyNote}})
+	// a block of their own: aligned on the apply line, their notes would run past the screen
+	NextSteps(w, WarningSteps(params.Warnings, params.CommandLine))
 }

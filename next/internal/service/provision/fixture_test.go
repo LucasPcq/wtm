@@ -85,16 +85,17 @@ func inMemory(t *testing.T, seed seeds) (world, *storetest.Fake) {
 
 func service(git provision.Git, meta provision.Meta, env provision.EnvFiles, stateDir string) provision.Service {
 	return provision.Service{
-		Git:        git,
-		Meta:       meta,
-		EnvFiles:   env,
-		StateDir:   stateDir,
-		RunHooks:   shell.RunHooks,
-		PublicPort: func(context.Context, int) int { return 0 },
-		Shield:     shell.Shield,
-		Now:        func() time.Time { return createdAt },
-		LeftBehind: removeLine,
-		Settle:     settleLine,
+		Git:         git,
+		Meta:        meta,
+		EnvFiles:    env,
+		StateDir:    stateDir,
+		RunHooks:    shell.RunHooks,
+		PublicPort:  func(context.Context, int) int { return 0 },
+		Shield:      shell.Shield,
+		Now:         func() time.Time { return createdAt },
+		LeftBehind:  removeLine,
+		Settle:      settleLine,
+		ProxyStatus: proxyStatusLine,
 	}
 }
 
@@ -127,11 +128,12 @@ func (w world) path(name string) string {
 	return filepath.Join(w.root, filepath.Base(name))
 }
 
-// portLinked adds a run.toml whose web job's port is linked into .env.
+// portLinked adds a run.toml, addressing jobs by their ports, whose web job's port is linked into .env.
 func portLinked(params provision.Params) provision.Params {
 	params.Project.Run = project.Run{
-		Jobs:     []project.Job{{Name: "web", Kind: project.Service, Cmd: "npm start", Ports: map[string]int{"http": 3000}}},
-		EnvPorts: []project.EnvPortLink{{File: ".env", Key: "PORT", Job: "web", Port: "http"}},
+		Addressing: project.AddressPorts,
+		Jobs:       []project.Job{{Name: "web", Kind: project.Service, Cmd: "npm start", Ports: map[string]int{"http": 3000}}},
+		EnvPorts:   []project.EnvPortLink{{File: ".env", Key: "PORT", Job: "web", Port: "http"}},
 	}
 	return params
 }
@@ -218,6 +220,10 @@ func removeLine(branch string) domain.FollowUp {
 
 func settleLine(branch string) domain.FollowUp {
 	return domain.FollowUp{Command: "settle", Answers: []domain.Answered{{Path: "worktree", Values: []string{branch}}}}
+}
+
+func proxyStatusLine() domain.FollowUp {
+	return domain.FollowUp{Command: "run proxy status"}
 }
 
 // settled is the follow-up of a warning that the ports of branchName were not settled, once fix is fixed.
