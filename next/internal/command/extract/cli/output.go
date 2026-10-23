@@ -4,76 +4,13 @@ import (
 	"io"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
-	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
-// preview is what the recap and the dry run show of the plan previewed.
-func preview(previewed extract.Outcome) form.Preview {
-	plan := previewed.Plan
-	return form.Preview{Rows: output.RecapRows(plan.Recap), Warnings: previewed.Warnings, Recalled: plan.Recalled}
-}
-
 func drawNothing(w io.Writer, plan extract.Plan) {
-	output.Tally(w, output.TallyParams{Command: extract.Name, Note: "no uncommitted changes in " + plan.Source})
+	output.Tally(w, output.TallyParams{Command: extract.Name, Note: plan.Summary.Message})
 }
 
-// drawOutcome draws what the apply did: the tally, the plan with the target when it stands and the warnings, the target left unfinished followed by its own warnings, and the next steps.
 func drawOutcome(w io.Writer, outcome extract.Outcome, view output.View) {
-	item, ok := targetOf(outcome)
-	if !ok {
-		return
-	}
-	detail := item.Detail
-	conflicted := detail != nil && len(detail.Conflicts) > 0
-	finished := item.Status == domain.StatusDone
-
-	tally := output.TallyParams{Command: extract.Name, Items: []output.Tallied{{Status: item.Status, Reason: item.Reason}}}
-	if conflicted {
-		tally.Note = "with conflicts"
-	}
-	output.Tally(w, tally)
-
-	rows := output.RecapRows(outcome.Plan.Recap)
-	targetWarnings := output.WarningMessages(item.Warnings)
-	warnings := output.Messages(outcome.Warnings)
-	if finished {
-		warnings = append(warnings, targetWarnings...)
-	}
-	var next []output.NextStep
-	if detail != nil {
-		path := output.ShownPath(output.Shown{Cwd: view.Cwd, Path: detail.Path})
-		rows = append(rows, output.PlanRow{Label: item.Subject, Values: []string{path + output.MutedNote(output.SettlementNote(detail.EnvPorts), output.StylesOf(w))}})
-	}
-	for _, followUp := range outcome.Result.FollowUps {
-		next = append(next, output.FollowUpStep(followUp, view.CommandLine))
-	}
-
-	output.Blank(w)
-	output.DrawPlan(w, output.PlanParams{Rows: rows, Warnings: warnings})
-
-	if !finished {
-		output.Blank(w)
-		output.UnfinishedLine(w, output.Unfinished{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err})
-		for _, text := range targetWarnings {
-			output.WarningLine(w, text)
-		}
-	}
-
-	next = append(next, output.FollowUpSteps(item.Err, view.CommandLine)...)
-	next = append(next, output.WarningSteps(item.Warnings, view.CommandLine)...)
-	if len(next) > 0 {
-		output.Blank(w)
-		output.NextSteps(w, next)
-	}
-}
-
-// targetOf is the one item of an applied outcome, the target's; false when the outcome holds none.
-func targetOf(outcome extract.Outcome) (extract.Item, bool) {
-	if outcome.Result == nil || len(outcome.Result.Items) == 0 {
-		return extract.Item{}, false
-	}
-
-	return outcome.Result.Items[0], true
+	output.DrawApplied(w, outcome, output.AppliedParams{Command: extract.Name, Note: outcome.Plan.Summary.Message, View: view})
 }

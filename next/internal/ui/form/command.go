@@ -66,6 +66,12 @@ type Preview struct {
 	Recalled []string
 }
 
+// PreviewOf is what the recap and the dry run show of a mutation's plan previewed: its recap, the run's warnings and the fields the plan recalled.
+func PreviewOf[P output.RecappedPlan, D any](previewed domain.Outcome[P, D]) Preview {
+	recapped := previewed.Plan.Recaps()
+	return Preview{Rows: output.RecapRows(recapped.Recap), Warnings: previewed.Warnings, Recalled: recapped.Recalled}
+}
+
 // text is the preview as the recap draws it, in width columns.
 func (p Preview) text(width int, st *output.Styles) string {
 	return strings.Join(output.PlanLines(output.PlanParams{Rows: p.Rows, Warnings: output.Messages(p.Warnings), Hint: output.RecalledHintOf(p.Recalled), Width: width, Styles: st}), "\n")

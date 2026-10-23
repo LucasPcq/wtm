@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 )
 
 var flags = Flags{"branches": "<branches>", "from": "--from", "env_from": "--env-from"}
@@ -21,3 +22,13 @@ func invalid() *domain.Error {
 type failingWriter struct{}
 
 func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("reader gone") }
+
+// recappedPlan is a plan as DrawApplied reads it.
+type recappedPlan struct{ domain.Recapped }
+
+// worktreeDetail is the detail of an item's worktree.
+type worktreeDetail struct{ path string }
+
+func (d worktreeDetail) Worktree() (string, env.Redacted) {
+	return d.path, env.Redacted{}
+}

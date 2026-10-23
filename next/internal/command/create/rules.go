@@ -34,7 +34,7 @@ func (f Facts) pathsOf(branches []string) []string {
 }
 
 // ----------------------------------------------------------------------------
-// Each branch's decision
+// The decision of each branch
 
 //go-sumtype:decl decision
 
@@ -286,11 +286,10 @@ type Plan struct {
 	Isolation   project.Isolation   `json:"isolation,omitempty"`
 	FastForward []string            `json:"fast_forward,omitempty"`
 	Remember    []string            `json:"remember,omitempty"`
-	Creates     int                 `json:"creates,omitempty"`  // the worktrees the apply opens, one already open aside; out of the fingerprint, which the actions cover
-	Recalled    []string            `json:"recalled,omitempty"` // the fields answered from memory, as the request was resolved
-	Recap       []domain.RecapRow   `json:"recap,omitempty"`    // the plan as every surface shows it, its answers marked as the run left them
-	facts       Facts
-	settled     provision.Answers // as resolved, handed to provisioning even where the plan shows none, and remembered
+	Creates     int                 `json:"creates,omitempty"` // the worktrees the apply opens, one already open aside; out of the fingerprint, which the actions cover
+	domain.Recapped
+	facts   Facts
+	settled provision.Answers // as resolved, handed to provisioning even where the plan shows none, and remembered
 }
 
 // A BranchPlan is what becomes of one branch: the path of its worktree, how it gets there, and the remote branch it resumes.
@@ -313,7 +312,7 @@ func (p Plan) Locks() []domain.Lock {
 
 // Fingerprinted is what the plan's fingerprint covers: the plan with what the apply reads of the project to provision each worktree.
 func (p Plan) Fingerprinted() any {
-	p.Recalled, p.Recap, p.Creates = nil, nil, 0
+	p.Recapped, p.Creates = domain.Recapped{}, 0
 	return provision.Fingerprinted(p, p.facts.Repository, p.settled)
 }
 
@@ -343,11 +342,6 @@ func (b BranchPlan) placement() worktree.Placed {
 
 // NoteAlreadyOpen notes a branch of the recap whose worktree is open already; the others are worktree's notes.
 const NoteAlreadyOpen = "already_open"
-
-// appliedRecap is the recap of the plan once applied, the fields remembered by the apply marked saved; Run sets it as the applied plan's Recap.
-func (p Plan) appliedRecap(remembered []string) []domain.RecapRow {
-	return p.recap(domain.Marks{Recalled: p.Recalled, Remembered: remembered, Mark: domain.MarkSaved})
-}
 
 func (p Plan) previewRecap() []domain.RecapRow {
 	return p.recap(domain.Marks{Recalled: p.Recalled, Remembered: p.Remember, Mark: domain.MarkRemember})
@@ -381,4 +375,46 @@ func recappedBranches(branches []BranchPlan) []domain.RecapValue {
 	}
 
 	return values
+}
+
+// ----------------------------------------------------------------------------
+// The outcome
+
+// CodeGo is the step into a worktree an apply ends on.
+const CodeGo = Name + ".go"
+
+// applied is the plan once applied, as Run reports it: its recap with the fields the apply remembered marked saved.
+func (p Plan) applied(result Result) Plan {
+	p.Recap = p.recap(domain.Marks{Recalled: p.Recalled, Remembered: result.Remembered, Mark: domain.MarkSaved})
+	return p
+}
+
+// next is the step into each worktree that stands, done or not.
+func (Plan) next(items []Item) []domain.FollowUp {
+	var steps []domain.FollowUp
+	for _, item := range items {
+		if item.Detail == nil {
+			continue
+		}
+		enter := domain.Enter(item.Subject)
+		enter.Code = CodeGo
+		steps = append(steps, enter)
+	}
+
+	return steps
+}
+
+// created reports whether the item's worktree was created by the apply, not found open already.
+func created(item Item) bool {
+	return item.Status == domain.StatusDone && item.Reason != domain.ReasonUnchanged
+}
+
+// behindOrigin warns that a branch checked out behind origin starts its worktree from the local branch; a diverged one is the plan's create.source_diverged warning already.
+func behindOrigin(standing worktree.Standing) domain.Warning {
+	behind := strconv.Itoa(standing.OriginBehind)
+	return domain.Warning{
+		Code:    "create.behind_origin",
+		Message: behind + " commit(s) behind origin — the worktree starts from your local branch.",
+		Params:  domain.Params{"behind": behind},
+	}
 }

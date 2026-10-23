@@ -63,6 +63,13 @@ func TestAResolvedConflictNamesWhatToResolveAndHowToUndo(t *testing.T) {
 	formtest.Golden(t, "resolved", got.Stdout)
 }
 
+func TestATargetsWarningsComeBeforeTheRunsInThePlan(t *testing.T) {
+	got := runExtract(t, newWorld(seed{Conflicts: conflicting}), source, "--files", "apps/api", "--to", other, "--from", "main", "--on-conflict", "resolve")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	formtest.Golden(t, "resolved_from_ignored", got.Stdout)
+}
+
 func TestACleanSourceHasNothingToExtract(t *testing.T) {
 	got := runExtract(t, newWorld(seed{Clean: true}), source, "--yes")
 
@@ -277,6 +284,8 @@ func TestTheEnvelopeOfEachEndingIsByteForByte(t *testing.T) {
 		"conflict": {Seed: seed{Conflicts: conflicting}, Words: []string{source, "--files", "apps/api", "--to", other}, Code: exitConflict},
 		"stale":    {Words: []string{source, "--files", "old.txt", "--to", other, "--expect-fingerprint", fingerprint}, Code: uicli.ExitPrecondition},
 		"invalid":  {Words: []string{source, "--to", other}, Code: uicli.ExitUsage},
+		"nothing":  {Seed: seed{Clean: true}, Words: []string{source, "--yes"}, Code: uicli.ExitOK},
+		"resolved": {Seed: seed{Conflicts: conflicting}, Words: []string{source, "--files", "apps/api", "--to", other, "--on-conflict", "resolve"}, Code: uicli.ExitOK},
 	} {
 		t.Run(name, func(t *testing.T) {
 			got := runExtract(t, newWorld(c.Seed), append(c.Words, "--output", "json")...)

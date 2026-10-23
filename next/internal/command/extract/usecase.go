@@ -4,10 +4,8 @@ package extract
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/fs"
 	"slices"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
@@ -62,6 +60,11 @@ type Detail struct {
 	worktree.Standing
 }
 
+// Worktree is where the worktree of the Detail is and the env ports it was given.
+func (d Detail) Worktree() (string, env.Redacted) {
+	return d.Path, d.EnvPorts
+}
+
 // ----------------------------------------------------------------------------
 // Run
 
@@ -105,7 +108,7 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 	op.Finished(result.Failure())
 
 	outcome.Result = &result
-	outcome.Plan.Recap = plan.appliedRecap(result.Remembered)
+	outcome.Plan = plan.applied(result)
 	outcome.Warnings = op.Warnings(append(outcome.Warnings, result.Warnings...))
 	return outcome, nil
 }
@@ -143,7 +146,7 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 
 // Apply carries out the plan, reporting each step: it fast-forwards the source asked, makes the target when it does not exist, moves or copies the changes into it, and remembers the answers asked once the changes reached a target it created. Once ctx is cancelled, what is not yet started is skipped.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
-	advanced, warnings := u.fastForward(ctx, plan, report)
+	advanced, warnings := u.Provision.FastForwardEach(ctx, provision.FastForwardEachParams{Command: Name, Subjects: plan.FastForward, Snapshot: plan.facts.Snapshot, Fallback: "the target starts from your local branch"}, report)
 	if ctx.Err() != nil {
 		skipped := Item{Subject: plan.Target.Branch, Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted}
 		skipped.Warnings = plan.aftermath(skipped)
@@ -256,42 +259,6 @@ func (u UseCase) locate(ctx context.Context, path string) (worktree.Location, er
 // ----------------------------------------------------------------------------
 // The steps of Apply
 
-// fastForward fast-forwards the source the plan names and returns it once advanced; one that cannot be is a warning, the target starting from the local branch.
-func (u UseCase) fastForward(ctx context.Context, plan Plan, report domain.Report) ([]string, []domain.Warning) {
-	advanced := slices.Clone(plan.FastForward)
-	var warnings []domain.Warning
-	for _, missed := range u.Provision.FastForwardEach(ctx, plan.FastForward, plan.facts.Snapshot, report) {
-		advanced = slices.DeleteFunc(advanced, func(subject string) bool { return subject == missed.Subject })
-		warnings = append(warnings, notAdvanced(missed))
-	}
-
-	return advanced, warnings
-}
-
-func notAdvanced(missed provision.Missed) domain.Warning {
-	subject := missed.Subject
-	switch {
-	case missed.Dirty:
-		return domain.Warning{
-			Code:    "extract.ff_dirty",
-			Message: "couldn't fast-forward " + subject + ": its worktree has uncommitted changes — the target starts from your local branch",
-			Params:  domain.Params{"branch": subject},
-		}
-	case missed.Busy:
-		return domain.Warning{
-			Code:    "extract.ff_busy",
-			Message: "couldn't fast-forward " + subject + ": its worktree is in the middle of a rebase or a bisect — the target starts from your local branch",
-			Params:  domain.Params{"branch": subject},
-		}
-	}
-
-	return domain.Warning{
-		Code:    "extract.ff_failed",
-		Message: "couldn't fast-forward " + subject + ": " + missed.Err.Error() + " — the target starts from your local branch",
-		Params:  domain.Params{"branch": subject, "cause": missed.Err.Error()},
-	}
-}
-
 // target makes the target worktree whole when the plan creates it, or takes the existing one as it stands.
 func (u UseCase) target(ctx context.Context, plan Plan, report domain.Report) Item {
 	if !plan.Target.creates() {
@@ -331,64 +298,6 @@ func (u UseCase) move(ctx context.Context, plan Plan, item Item, report domain.R
 	item.Detail.Files, item.Detail.Kept = plan.Files, moved.Kept
 	item.Detail.Conflicts = append(item.Detail.Conflicts, moved.Merged...)
 	return item
-}
-
-// aftermath warns of what the target is left with: the files it holds with conflict markers, how to undo them and what to do next, or, for a target left unfinished, that it received nothing; a half move says for itself where the files are.
-func (p Plan) aftermath(item Item) []domain.Warning {
-	target := item.Subject
-	params := domain.Params{"source": p.Source, "target": target}
-	switch {
-	case item.Detail != nil && len(item.Detail.Conflicts) > 0:
-		conflicts := strings.Join(item.Detail.Conflicts, ", ")
-		markers := conflicts + " left with conflict markers in " + target
-		if len(item.Detail.Files) > len(item.Detail.Conflicts) {
-			markers += "; the other files were applied cleanly"
-		}
-		return []domain.Warning{
-			{Code: "extract.conflict_markers", Message: markers + ".", Params: domain.Params{"files": conflicts, "target": target}},
-			{Code: "extract.source_kept", Message: "Nothing was removed from " + p.Source + ": to undo, discard the applied files in " + target + ".", Params: params},
-		}
-	case item.Status == domain.StatusDone, item.Err != nil && item.Err.Code == CodeHalfMoved:
-		return nil
-	case p.Keep:
-		return []domain.Warning{{Code: "extract.untouched", Message: "nothing was copied to " + target, Params: params}}
-	}
-
-	return []domain.Warning{{Code: "extract.untouched", Message: "nothing was moved: the files are still in " + p.Source, Params: params}}
-}
-
-// next is the step into the target once it exists, after resolving its conflicts when it holds some.
-func (p Plan) next(item Item) []domain.FollowUp {
-	if item.Detail == nil {
-		return nil
-	}
-
-	goTo := domain.Enter(item.Subject)
-	goTo.Code = CodeGo
-	if len(item.Detail.Conflicts) > 0 {
-		goTo.Code, goTo.Message = CodeResolveThenDiscard, "resolve the conflicts, then discard the same files in "+p.Source
-		goTo.Params = domain.Params{"source": p.Source, "target": item.Subject}
-	}
-	return []domain.FollowUp{goTo}
-}
-
-// failure turns the error a move failed on into extract's: a conflict found at the last moment is refused with CodeConflict, changes left in both worktrees fail with CodeHalfMoved.
-func (p Plan) failure(err error) *domain.Error {
-	if refused, ok := errors.AsType[*worktree.ConflictRefusal](err); ok {
-		return conflictRefusal(refused.Conflicts, p.Target.Branch)
-	}
-
-	if half, ok := errors.AsType[*worktree.HalfMoved](err); ok {
-		return &domain.Error{
-			Kind:    domain.KindInternal,
-			Code:    CodeHalfMoved,
-			Message: fmt.Sprintf("the changes are in %q but %q still holds them", p.Target.Branch, p.Source),
-			Params:  domain.Params{"target": p.Target.Branch, "source": p.Source},
-			Cause:   half.Cause,
-		}
-	}
-
-	return domain.AsError(domain.AsErrorParams{Err: err, Code: "extract.move_failed", Message: "move failed"})
 }
 
 // ----------------------------------------------------------------------------

@@ -71,29 +71,52 @@ func TestAFastForwardThatFailsCarriesItsCause(t *testing.T) {
 	}
 }
 
-func TestEachSubjectIsFastForwardedBetweenItsPhaseEventsAndOnlyThoseLeftBehindAreReturned(t *testing.T) {
+func TestEachSubjectIsFastForwardedBetweenItsPhaseEventsAndThoseLeftBehindAreWarnedOf(t *testing.T) {
 	cases := map[string]struct {
-		seed   upstreamSeed
-		missed []provision.Missed
+		seed     upstreamSeed
+		advanced []string
+		warnings []domain.Warning
 	}{
-		"moved":      {upstreamSeed{}, nil},
-		"left_dirty": {upstreamSeed{Linked: true, Dirty: true}, []provision.Missed{{Subject: existing, FastForwarded: provision.FastForwarded{Dirty: true}}}},
-		"left_busy":  {upstreamSeed{Linked: true, Rebasing: true}, []provision.Missed{{Subject: existing, FastForwarded: provision.FastForwarded{Busy: true}}}},
+		"moved": {upstreamSeed{}, []string{existing}, nil},
+		"left_dirty": {upstreamSeed{Linked: true, Dirty: true}, nil, []domain.Warning{{
+			Code:    "create.ff_dirty",
+			Message: "couldn't fast-forward " + existing + ": its worktree has uncommitted changes — it starts from your local branch",
+			Params:  domain.Params{"branch": existing},
+		}}},
+		"left_busy": {upstreamSeed{Linked: true, Rebasing: true}, nil, []domain.Warning{{
+			Code:    "create.ff_busy",
+			Message: "couldn't fast-forward " + existing + ": its worktree is in the middle of a rebase or a bisect — it starts from your local branch",
+			Params:  domain.Params{"branch": existing},
+		}}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			u := behindOrigin(t, c.seed)
 			report := &recorder{}
 
-			missed := u.service.FastForwardEach(t.Context(), []string{existing}, u.snapshotOf(), report.add)
+			advanced, warnings := u.service.FastForwardEach(t.Context(), fastForwardEach(u.snapshotOf(), existing), report.add)
 
-			assert.Equal(t, c.missed, missed)
+			assert.Equal(t, c.advanced, advanced)
+			assert.Equal(t, c.warnings, warnings)
 			assert.Equal(t, []domain.Event{
 				domain.PhaseStarted{Subject: existing, Phase: "fast_forward"},
-				domain.PhaseFinished{Subject: existing, Phase: "fast_forward", Failed: c.missed != nil},
+				domain.PhaseFinished{Subject: existing, Phase: "fast_forward", Failed: c.warnings != nil},
 			}, report.all())
 		})
 	}
+}
+
+func TestASubjectThatFailsToFastForwardIsWarnedOfWithItsCause(t *testing.T) {
+	u := behindOrigin(t, upstreamSeed{})
+	gittest.Git(t, u.main, "remote", "set-url", "origin", u.main+"/gone")
+
+	advanced, warnings := u.service.FastForwardEach(t.Context(), fastForwardEach(u.snapshotOf(), existing), (&recorder{}).add)
+
+	assert.Empty(t, advanced)
+	require.Len(t, warnings, 1)
+	assert.Equal(t, "create.ff_failed", warnings[0].Code)
+	assert.NotEmpty(t, warnings[0].Params["cause"])
+	assert.Equal(t, "couldn't fast-forward "+existing+": "+warnings[0].Params["cause"]+" — it starts from your local branch", warnings[0].Message)
 }
 
 func TestNoSubjectIsFastForwardedOnceCancelled(t *testing.T) {
@@ -103,9 +126,36 @@ func TestNoSubjectIsFastForwardedOnceCancelled(t *testing.T) {
 	cancel()
 	report := &recorder{}
 
-	missed := u.service.FastForwardEach(ctx, []string{existing}, worktree.Snapshot{}, report.add)
+	advanced, warnings := u.service.FastForwardEach(ctx, fastForwardEach(worktree.Snapshot{}, existing), report.add)
 
-	assert.Empty(t, missed)
+	assert.Empty(t, advanced)
+	assert.Empty(t, warnings)
 	assert.Empty(t, report.all())
 	assert.Equal(t, before, gittest.Output(t, u.main, "rev-parse", existing))
+}
+
+func TestEachSubjectIsFastForwardedInTurnAFailureStoppingNone(t *testing.T) {
+	u := behindOrigin(t, upstreamSeed{})
+
+	advanced, warnings := u.service.FastForwardEach(t.Context(), fastForwardEach(worktree.Snapshot{}, "gone", existing), (&recorder{}).add)
+
+	assert.Equal(t, []string{existing}, advanced)
+	assert.Equal(t, []string{"create.ff_failed"}, codes(warnings))
+	assert.Equal(t, "gone", warnings[0].Params["branch"])
+}
+
+func TestASubjectNotStartedOnceCancelledIsNeitherAdvancedNorWarnedOf(t *testing.T) {
+	u := behindOrigin(t, upstreamSeed{})
+	ctx, cancel := context.WithCancel(t.Context())
+	report := &recorder{on: func(event domain.Event) {
+		if _, finished := event.(domain.PhaseFinished); finished {
+			cancel()
+		}
+	}}
+
+	advanced, warnings := u.service.FastForwardEach(ctx, fastForwardEach(worktree.Snapshot{}, existing, "later"), report.add)
+
+	assert.Equal(t, []string{existing}, advanced)
+	assert.Empty(t, warnings)
+	assert.Len(t, report.all(), 2)
 }

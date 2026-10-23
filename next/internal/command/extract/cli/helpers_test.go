@@ -83,10 +83,10 @@ func unfinished(item extract.Item) extract.Outcome {
 		Files:  []worktree.Change{{Path: "README.md", Status: worktree.ChangeModified}},
 		Target: extract.Target{Branch: item.Subject, Action: extract.ActionCreate},
 		From:   "main",
-		Recap: []domain.RecapRow{
+		Recapped: domain.Recapped{Recap: []domain.RecapRow{
 			recapRow("Source", "feat/login"), recapRow("Files", "mod README.md"),
 			recapRow("Target", "new worktree "+item.Subject+" from main"), recapRow("Mode", "move"),
-		},
+		}},
 	}
 	result := &extract.Result{Items: []extract.Item{item}}
 	if item.Detail != nil {
