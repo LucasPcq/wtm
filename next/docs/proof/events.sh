@@ -143,7 +143,7 @@ run_side() {
     scenario 10-no-config "$root/bare" events
     scenario 11-no-config-json "$root/bare" events --output json
     lifecycle 13-all-repository-joins-and-leaves
-    (export WTM_PROJECT_DIR=$root/plain && stream 14-relative-repo-project-dir-elsewhere "$root" "" events --repo acme --output json)
+    (export WTM_PROJECT_DIR=$root/plain && stream 14-relative-repo-project-dir-elsewhere "$root" "" events --repo acme --output json) || true # legacy ends on an error before any ready line; its exit code is still recorded
     registry >"$dir_out/registry-after"
     if [[ $side == legacy ]]; then
       "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true

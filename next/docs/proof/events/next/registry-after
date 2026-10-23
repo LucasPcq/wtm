@@ -3,5 +3,10 @@
     "common_dir": "<SB>/acme/.git",
     "root": "<SB>/acme",
     "added_at":"<T>"
+  },
+  {
+    "common_dir": "<SB>/later/.git",
+    "root": "<SB>/later",
+    "added_at":"<T>"
   }
 ]
