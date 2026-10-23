@@ -122,6 +122,13 @@ func TestAConflictIsRefusedOnItsOwnExitCodeBeforeAnythingMoves(t *testing.T) {
 	assert.Empty(t, w.git.Moves())
 }
 
+func TestQuietKeepsTheResolveAConflictIsFollowedBy(t *testing.T) {
+	got := runExtract(t, newWorld(seed{Conflicts: conflicting}), source, "--files", "apps/api", "--to", other, "-q")
+
+	assert.Equal(t, exitConflict, got.Code)
+	assert.Contains(t, got.Stderr, "\n  → wtm-next extract feat/login --files apps/api --on-conflict resolve --to feat/other   write conflict markers in feat/other\n")
+}
+
 func TestAConflictRefusedInJSONIsTheEnvelopesError(t *testing.T) {
 	got := runExtract(t, newWorld(seed{Conflicts: conflicting}), source, "--files", "apps/api", "--to", other, "--output", "json")
 

@@ -131,6 +131,16 @@ func TestTheIsolationIsSkippedWithWhyRunTomlIsNotRead(t *testing.T) {
 	assert.Equal(t, domain.Answer[project.Isolation]{Value: project.Isolated, Origin: domain.OriginDefault}, questions.Isolation.Answer)
 }
 
+func TestAnIsolationGivenOverAnUnreadableRunTomlIsRememberedWhenAsked(t *testing.T) {
+	repo := repository(nil)
+	repo.RunErr = errors.New("run.toml: line 3")
+
+	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation"}}, Repository: repo})
+
+	assert.True(t, questions.Remembers("isolation"))
+	assert.Equal(t, []string{"isolation"}, questions.Given().Remember)
+}
+
 func TestARememberedIsolationHoldsWhenRunTomlIsNotRead(t *testing.T) {
 	repo := repository(map[string]string{project.RememberIsolation: string(project.Verbatim)})
 	repo.RunErr = errors.New("run.toml: line 3")

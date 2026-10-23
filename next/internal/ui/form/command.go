@@ -104,9 +104,10 @@ func (c *Command[R, Q, O]) Flags() output.Flags {
 // ----------------------------------------------------------------------------
 // The flags
 
-// Bind registers on cmd a flag per field of the schema, by its kind, with its usage and the values it accepts, then the flags every command shares: --remember when a field is rememberable, --ask, --yes, --output, --dry-run and --expect-fingerprint; run is where the command prints its run.
+// Bind registers on cmd a flag per field of the schema, by its kind, with its usage and the values it accepts, then the flags every command shares: --remember when a field is rememberable, --ask, --yes, --output, --dry-run and --expect-fingerprint; run is where the command prints its run, its follow-ups spelled by [Command.spell] over the command line it was handed.
 func (c *Command[R, Q, O]) Bind(cmd *cobra.Command, run *uicli.Run) {
 	c.io = run
+	run.CommandLine = c.spell(cmd, run.CommandLine)
 	usages := bindFields(cmd, c.schema())
 
 	flags := cmd.Flags()
@@ -324,8 +325,7 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 	stdout, _ := c.io.Writers()
 	switch {
 	case failure != nil:
-		shown, own := c.ownStep(cmd, failure)
-		return c.io.FailWith(shown, append(replanStep(failure, argv), own...))
+		return c.io.FailWith(c.replanned(failure, ran.Request), nil)
 	case !ran.Outcome.Applied():
 		previewed, fingerprint := c.Preview(ran.Outcome), ran.Outcome.PlanFingerprint()
 		output.Frame(stdout, func(w io.Writer) {
@@ -338,33 +338,33 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 	return c.io.Failed(ran.Outcome.Failure())
 }
 
-// replanStep is the next step of a stale plan: argv, the command line of the request, run again with --dry-run; none for any other failure.
-func replanStep(failure *domain.Error, argv []string) []output.NextStep {
-	if !domain.PlanStale(failure) {
-		return nil
+// replanned is failure followed by the request run again as a dry run when it is a stale plan, as the envelope's follow_ups give it; failure itself otherwise.
+func (c *Command[R, Q, O]) replanned(failure *domain.Error, req R) *domain.Error {
+	replan := domain.Replan(failure, c.io.Command, domain.AnswersOf(c.schema(), req))
+	if len(replan) == 0 || failure.FollowUp != nil {
+		return failure
 	}
-	return []output.NextStep{{Command: output.Line(append(slices.Clone(argv), "--"+uicli.FlagDryRun)), Note: domain.ReplanNote}}
+
+	followed := *failure
+	followed.FollowUp = &replan[0]
+	return &followed
 }
 
-// ownStep is the next step of a failure whose follow-up names this command, spelled from its schema as the replan is, and the failure left to FailWith without it, since the command line handed to the cli spells the commands not migrated; a follow-up its request refuses is left to FailWith.
-func (c *Command[R, Q, O]) ownStep(cmd *cobra.Command, failure *domain.Error) (*domain.Error, []output.NextStep) {
-	if failure.FollowUp == nil || failure.FollowUp.Command != c.io.Command {
-		return failure, nil
-	}
+// spell is the command line of a follow-up: the injected one, which spells the commands not migrated, unless the follow-up names this command, whose request it folds and spells from the schema (Argv), with --dry-run when it asks for one.
+func (c *Command[R, Q, O]) spell(cmd *cobra.Command, injected output.CommandLine) output.CommandLine {
+	return func(followUp domain.FollowUp) []string {
+		var zero R
+		req, err := domain.Fold(zero, followUp.Answers)
+		if followUp.Command == "" || followUp.Command != c.io.Command || err != nil {
+			return injected(followUp)
+		}
 
-	var zero R
-	req, err := domain.Fold(zero, failure.FollowUp.Answers)
-	if err != nil {
-		return failure, nil
+		argv := c.Argv(cmd.CommandPath(), req)
+		if followUp.DryRun {
+			argv = append(argv, "--"+uicli.FlagDryRun)
+		}
+		return argv
 	}
-
-	argv := c.Argv(cmd.CommandPath(), req)
-	if failure.FollowUp.DryRun {
-		argv = append(argv, "--"+uicli.FlagDryRun)
-	}
-	shown := *failure
-	shown.FollowUp = nil
-	return &shown, []output.NextStep{{Command: output.Line(argv), Note: failure.FollowUp.Message}}
 }
 
 // applyLine is argv, the command line of the request, held to the fingerprint of the plan it previewed.

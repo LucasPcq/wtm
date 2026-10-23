@@ -119,6 +119,18 @@ func TestConflictsUnderResolveArePlanned(t *testing.T) {
 	assert.Equal(t, conflicts, planned.Conflicts)
 }
 
+func TestTheRequestAsResolvedDecidesTheConflictsNotAsGiven(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.change(t, source, "a.txt", "a\n")
+	given := extract.Request{Source: source, Files: []string{"a.txt"}, To: other}
+	resolved := given
+	resolved.OnConflict = extract.OnConflictResolve
+
+	_, _, err := extract.Decide(w.facts(t, moving("a.txt")), extract.DecideParams{Given: given, Resolved: resolved, Conflicts: []worktree.Conflict{{Path: "a.txt", Kind: worktree.ConflictExists}}})
+
+	require.NoError(t, err)
+}
+
 func TestABinaryCollisionIsRefusedEvenUnderResolve(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.change(t, source, "a.txt", "a\n")

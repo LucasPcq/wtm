@@ -732,6 +732,15 @@ func TestARememberedIsolationOverAnUnparsableRunTomlKeepsItsMark(t *testing.T) {
 	assert.Equal(t, domain.RecapRow{Key: domain.PathIsolation, Label: "Isolation", Path: domain.PathIsolation, Mark: domain.MarkRecalled, Values: []domain.RecapValue{{Value: "verbatim", Note: provision.NoteRunUnreadable, Text: "verbatim (run.toml unreadable)"}}}, planned.Recap[at])
 }
 
+func TestAnIsolationGivenOverAnUnparsableRunTomlIsRememberedWhenAsked(t *testing.T) {
+	w := newWorld(t, seed{Run: "bogus = [\n"})
+
+	result, _ := w.apply(t, create.Request{Branches: []string{branchName}, Given: provision.Given{Isolation: project.Verbatim, Remember: []string{"isolation"}}})
+
+	assert.Equal(t, []string{"isolation"}, result.Remembered)
+	assert.Contains(t, readFile(t, filepath.Join(w.stateDir, "config.toml")), `isolation = "verbatim"`)
+}
+
 func TestAWorktreeWithNoEnvFileStillRecapsItsStrategy(t *testing.T) {
 	w := newWorld(t, seed{NoEnv: true})
 

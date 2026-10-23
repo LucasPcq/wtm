@@ -62,6 +62,19 @@ func concluded(t *testing.T, format string, ran form.Ran[request, outcome], err 
 	return stdout.String(), failure
 }
 
+// refused is how a text run of ran ending on err is refused, quiet or not: what it prints on stderr, and the next steps the quiet line keeps.
+func refused(t *testing.T, quiet bool, ran form.Ran[request, outcome], err error) (string, []output.NextStep) {
+	t.Helper()
+	streams, _, _, stderr := output.Test()
+	command, cmd := fakeCommand(), &cobra.Command{Use: "fake"}
+	run := &uicli.Run{Command: "fake", Streams: streams, Output: uicli.OutputText, Quiet: quiet, CommandLine: formtest.CommandLine}
+	command.Bind(cmd, run)
+
+	var failed *uicli.Failed
+	require.ErrorAs(t, command.Conclude(cmd, ran, err), &failed)
+	return stderr.String(), failed.Next
+}
+
 // queryCommand is a cobra command q is bound to, printing with run.
 func queryCommand(q *form.Query[request, questions, read], run *uicli.Run) *cobra.Command {
 	cmd := &cobra.Command{Use: "fake"}

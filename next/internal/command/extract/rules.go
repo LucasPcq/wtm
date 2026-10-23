@@ -298,7 +298,7 @@ func Decide(f Facts, params DecideParams) (Plan, []domain.Warning, error) {
 		planned.Creates = 1
 	}
 
-	if refused := refusedFor(params.Given, planned.Target.Branch, params.Conflicts); refused != nil {
+	if refused := refusedFor(params, planned.Target.Branch); refused != nil {
 		return Plan{}, nil, refused
 	}
 
@@ -322,14 +322,15 @@ func Decide(f Facts, params DecideParams) (Plan, []domain.Warning, error) {
 // CodeResolve is the step that extracts again, writing conflict markers in the target.
 const CodeResolve = Name + ".resolve"
 
-// refusedFor is the refusal of the conflicts, nil when there are none or given resolves them, followed by given resolving them, the answers the user did not give left to their defaults; a binary conflict cannot take conflict markers, so it is refused even then, with no follow-up.
-func refusedFor(given Request, target string, conflicts []worktree.Conflict) *domain.Error {
-	if !worktree.Refuses(conflicts, given.OnConflict == OnConflictResolve) {
+// refusedFor is the refusal of the conflicts, nil when there are none or the resolved request resolves them, followed by the request as given resolving them, the answers the user did not give left to their defaults; a binary conflict cannot take conflict markers, so it is refused even then, with no follow-up.
+func refusedFor(params DecideParams, target string) *domain.Error {
+	if !worktree.Refuses(params.Conflicts, params.Resolved.OnConflict == OnConflictResolve) {
 		return nil
 	}
 
-	refusal := conflictRefusal(conflicts, target)
-	if !worktree.Refuses(conflicts, true) {
+	refusal := conflictRefusal(params.Conflicts, target)
+	if !worktree.Refuses(params.Conflicts, true) {
+		given := params.Given
 		given.OnConflict = OnConflictResolve
 		refusal.FollowUp = &domain.FollowUp{Command: Name, Answers: domain.AnswersOf(Questions{}.Form(), given), Code: CodeResolve, Message: "write conflict markers in " + target}
 	}

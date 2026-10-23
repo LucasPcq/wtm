@@ -101,6 +101,7 @@ const (
 	isolationHelp   = "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated"
 	fastForwardHelp = "Fast-forward to origin first the branch a new worktree starts from, or the branch itself when it already exists locally, when it is behind; one that has diverged or holds uncommitted changes starts as it is"
 	notBehind       = "nothing to fast-forward: the source is not behind origin"
+	runUnreadable   = "run.toml could not be read" // the isolation skipped all the same settles the worktree
 )
 
 // NewQuestions builds the questions of a new worktree: a field given keeps its value, an empty one takes its remembered answer, its configured value or its default; none is answered by default when the worktree is not created.
@@ -148,7 +149,7 @@ func isolation(params QuestionsParams) domain.Choice[project.Isolation] {
 	case params.Exists != "":
 		question.Skip = params.Exists
 	case params.Repository.RunErr != nil:
-		question.Skip = "run.toml could not be read"
+		question.Skip = runUnreadable
 	case !params.Repository.Run.IsolationApplies():
 		question.Skip = "run.toml declares nothing a worktree isolates"
 	}
@@ -274,9 +275,10 @@ func (q Questions) envOptions() []domain.Option {
 	}
 }
 
-// Remembers reports whether the answer to the field at path is to be remembered: asked to be, and its question not skipped.
+// Remembers reports whether the answer to the field at path is to be remembered: asked to be, and its question not skipped, unless the isolation is skipped only because run.toml could not be read, which settles the worktree all the same.
 func (q Questions) Remembers(path string) bool {
-	return slices.Contains(q.Remember, path) && !q.skipped(path)
+	settles := !q.skipped(path) || path == domain.PathIsolation && q.Isolation.Skip == runUnreadable
+	return slices.Contains(q.Remember, path) && settles
 }
 
 func (q Questions) skipped(path string) bool {
