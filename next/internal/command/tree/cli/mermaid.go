@@ -46,6 +46,9 @@ func drawMermaid(w io.Writer, read tree.Outcome) {
 	for _, warning := range read.Warnings {
 		fmt.Fprintln(w, "  %% "+output.GlyphAttention+" "+oneLine(warning.Message))
 	}
+	if failure := read.Failure(); failure != nil && failure.Kind == domain.KindCancelled {
+		fmt.Fprintln(w, "  %% "+output.GlyphFailure+" "+failure.Message)
+	}
 }
 
 func oneLine(text string) string {

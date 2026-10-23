@@ -23,3 +23,11 @@ func TestAReadEndsOnEachSubjectNotReadItsWarningsThenTheReadsWarnings(t *testing
 
 	assert.Equal(t, "  ✗ couldn't read /a\n  ! couldn't read the record of b\n  ! the base branch main does not exist\n", out.String())
 }
+
+func TestAReadInterruptedEndsOnItsInterruptionEvenWithEverySubjectRead(t *testing.T) {
+	var out bytes.Buffer
+
+	ReadEnd(&out, domain.Read[struct{}]{Items: []domain.Unit[struct{}]{{Subject: "a", Status: domain.StatusDone}}, Interrupted: true})
+
+	assert.Equal(t, "  ✗ interrupted\n", out.String())
+}
