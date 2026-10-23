@@ -317,6 +317,26 @@ func TestACountInterruptedMakesItsWorktreeCancelled(t *testing.T) {
 	assert.Equal(t, domain.KindCancelled, read.Failure().Kind)
 }
 
+func TestTheActiveWorktreeIsTheDeepestHoldingWhereTheCallerStands(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), linked("feat/ab")}}})
+	activeIn := func(cwd string) []string {
+		read, err := w.usecase.Run(t.Context(), list.Request{Caller: domain.Caller{Cwd: cwd}}, domain.RunOptions{})
+		require.NoError(t, err)
+		var active []string
+		for _, item := range read.Items {
+			if item.Detail.Active {
+				active = append(active, item.Subject)
+			}
+		}
+		return active
+	}
+
+	assert.Equal(t, []string{"feat/a"}, activeIn("/repo/.trees/feat/a/src"))
+	assert.Equal(t, []string{"main"}, activeIn(mainPath))
+	assert.Empty(t, activeIn("/elsewhere"))
+	assert.Empty(t, activeIn(""), "a call that stands nowhere marks none")
+}
+
 func TestARefreshFetchesOriginOnce(t *testing.T) {
 	w := newWorld(seed{Git: gittest.FakeParams{Remote: []string{"main"}, Worktrees: []worktree.Worktree{linked("feat/a")}, Origin: map[string][]string{"main": {"upstream"}, "feat/a": {"pushed"}}}})
 

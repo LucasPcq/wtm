@@ -48,7 +48,7 @@ func (u UseCase) Run(ctx context.Context, req Request, _ domain.RunOptions) (Out
 	}
 
 	// 2. Report each worktree, the main one first, with what it offers.
-	items, warnings := List(facts)
+	items, warnings := List(facts, req.Caller)
 	return Outcome{Items: items, Warnings: warnings, Interrupted: facts.Interrupted}, nil
 }
 

@@ -43,6 +43,7 @@ type Detail struct {
 	Dirty        bool             `json:"dirty"`
 	Locked       bool             `json:"locked"`
 	Rebasing     bool             `json:"rebasing"`
+	Active       bool             `json:"active"`  // the caller stands in it, the deepest worktree holding its directory
 	Missing      bool             `json:"missing"` // its directory is gone: git calls it prunable
 	CommitsAhead int              `json:"commits_ahead"`
 	CreatedAt    *time.Time       `json:"created_at"` // from its meta record, null without one
@@ -73,8 +74,8 @@ const (
 // ----------------------------------------------------------------------------
 // List
 
-// List is each worktree of facts as an item, the main one first, then the others by creation, the oldest first and those with no record last, and the warnings of what could not be read.
-func List(facts Facts) ([]Item, []domain.Warning) {
+// List is each worktree of facts as an item, the main one first, then the others by creation, the oldest first and those with no record last, the one caller stands in active; and the warnings of what could not be read.
+func List(facts Facts, caller domain.Caller) ([]Item, []domain.Warning) {
 	worktrees := facts.Checkouts()
 	slices.SortStableFunc(worktrees, func(a, b worktree.Worktree) int {
 		if a.Main != b.Main {
@@ -83,15 +84,16 @@ func List(facts Facts) ([]Item, []domain.Warning) {
 		return compareCreated(facts.Records[a.Branch()], facts.Records[b.Branch()])
 	})
 
+	active := worktree.Holding(worktrees, caller.Cwd, func(w worktree.Worktree) string { return w.Path })
 	items := make([]Item, 0, len(worktrees))
-	for _, w := range worktrees {
-		items = append(items, facts.item(w))
+	for i, w := range worktrees {
+		items = append(items, facts.item(w, i == active))
 	}
 
 	return items, facts.warnings()
 }
 
-func (f Facts) item(w worktree.Worktree) Item {
+func (f Facts) item(w worktree.Worktree, active bool) Item {
 	state := f.States[w.Path]
 	if state.Err != nil {
 		item := domain.Unread[Detail](domain.UnreadParams{Command: Name, Subject: w.Name(), Path: w.Path, Err: state.Err})
@@ -107,6 +109,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Dirty:        state.Dirty,
 		Locked:       w.Locked,
 		Rebasing:     rebasing,
+		Active:       active,
 		Missing:      state.Missing,
 		CommitsAhead: state.Ahead,
 		CreatedAt:    f.Records[w.Branch()].Created(),
@@ -248,21 +251,6 @@ func WithPullRequests(shown, from Outcome) Outcome {
 	}
 
 	return merged
-}
-
-// Holding returns the subject of the item whose worktree holds the directory cwd, the deepest one, "" when none does.
-func Holding(items []Item, cwd string) string {
-	at := worktree.Holding(items, cwd, func(item Item) string {
-		if item.Detail == nil {
-			return ""
-		}
-		return item.Detail.Path
-	})
-	if at < 0 {
-		return ""
-	}
-
-	return items[at].Subject
 }
 
 // ----------------------------------------------------------------------------

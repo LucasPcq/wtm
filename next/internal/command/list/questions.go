@@ -7,10 +7,17 @@ import (
 // ----------------------------------------------------------------------------
 // The request
 
-// A Request is what the caller asks of list: whether to ask GitHub for each worktree's pull request, and whether to fetch origin first, as the picker's refresh does.
+// A Request is what the caller asks of list: whether to ask GitHub for each worktree's pull request, and whether to fetch origin first, as the picker's refresh does. Caller is where the caller stands, whose worktree is the active one; it is no field of the form: every surface sets it.
 type Request struct {
-	WithPRs bool `json:"with_prs"`
-	Fetch   bool `json:"fetch"`
+	WithPRs bool          `json:"with_prs"`
+	Fetch   bool          `json:"fetch"`
+	Caller  domain.Caller `json:"-"`
+}
+
+// From is the request asked by caller.
+func (r Request) From(caller domain.Caller) Request {
+	r.Caller = caller
+	return r
 }
 
 const (
