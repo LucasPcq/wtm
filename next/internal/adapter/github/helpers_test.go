@@ -18,6 +18,15 @@ func fakeGH(t *testing.T, authExit int, answer string) string {
 	return path
 }
 
+// partialGH writes a gh that answers auth status and prints answer then fails, as gh api graphql does when part of a query cannot be resolved, and returns its path.
+func partialGH(t *testing.T, answer string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "gh")
+	script := "#!/bin/sh\nif [ \"$1\" = auth ]; then exit 0; fi\ncat <<'JSON'\n" + answer + "\nJSON\necho 'gh: Resource not accessible by integration' >&2\nexit 1\n"
+	require.NoError(t, os.WriteFile(path, []byte(script), 0o755))
+	return path
+}
+
 // graphQLGH writes a gh that answers each GraphQL query with a merged pull request numbered 1 for each branch it asks of, its URL the branch's name, appends each call's branches to the log it returns, and fails the call that asks of failing.
 func graphQLGH(t *testing.T, failing string) (string, string) {
 	t.Helper()

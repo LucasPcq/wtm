@@ -21,6 +21,7 @@ const (
 	// prsPerQuery bounds the branches one GraphQL query asks of, far below the API's node limit.
 	prsPerQuery = 100
 	// newestPerBranch is how many pull requests of a branch are asked, newest first: a few, since the newest may be a fork's.
+	// shortcut: an open pull request older than its branch's 5 newest is missed, the newest of them read instead; ask open ones apart when that matters.
 	newestPerBranch = 5
 )
 
@@ -42,8 +43,9 @@ func ViewCommand(number int) []string {
 // absent. An empty branch, a worktree on none, is not asked of: with no branch
 // left, gh is not run. It asks one GraphQL query per prsPerQuery branches, so a
 // repository with many pull requests costs no more. Every failure wraps
-// worktree.ErrPullRequestsUnavailable; a query that fails keeps the pull
-// requests the queries before it found.
+// worktree.ErrPullRequestsUnavailable but an interrupted read, which is the
+// context's error; a query that fails keeps the pull requests it and the
+// queries before it found.
 func (g GitHub) PullRequestsOf(ctx context.Context, branches []string) ([]worktree.PullRequest, error) {
 	branches = slices.DeleteFunc(slices.Clone(branches), func(branch string) bool { return branch == "" })
 	if len(branches) == 0 {
@@ -58,14 +60,11 @@ func (g GitHub) PullRequestsOf(ctx context.Context, branches []string) ([]worktr
 	var found []worktree.PullRequest
 	for batch := range slices.Chunk(branches, prsPerQuery) {
 		out, err := g.run(ctx, binary, "gh api graphql", newestOf(batch)...)
-		if err != nil {
-			return found, err
-		}
-		prs, err := parseNewest(out)
-		if err != nil {
-			return found, err
-		}
+		prs, parseErr := parseNewest(out)
 		found = append(found, prs...)
+		if err := cmp.Or(err, parseErr); err != nil {
+			return found, err
+		}
 	}
 
 	return found, nil
@@ -80,21 +79,30 @@ func (g GitHub) signedIn(ctx context.Context) (string, error) {
 	}
 
 	if err := shell.Command(ctx, binary, "auth", "status").Run(); err != nil {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
 		return "", fmt.Errorf("%w: run `gh auth login`", worktree.ErrPullRequestsUnavailable)
 	}
 
 	return binary, nil
 }
 
-// run runs binary with args in the repository and returns its output; what names the command in its failure.
+// run runs binary with args in the repository and returns its output, kept when
+// it fails: gh api graphql prints the data it resolved beside the errors of what
+// it could not, a field the token may not read. What names the command in its
+// failure.
 func (g GitHub) run(ctx context.Context, binary, what string, args ...string) ([]byte, error) {
 	cmd := shell.Command(ctx, binary, args...)
 	cmd.Dir = g.Dir
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s: %w: %s", worktree.ErrPullRequestsUnavailable, what, err, strings.TrimSpace(stderr.String()))
+		return out, fmt.Errorf("%w: %s: %w: %s", worktree.ErrPullRequestsUnavailable, what, err, strings.TrimSpace(stderr.String()))
 	}
 
 	return out, nil

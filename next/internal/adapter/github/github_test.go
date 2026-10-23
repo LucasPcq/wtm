@@ -1,6 +1,7 @@
 package github_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -111,6 +112,29 @@ func TestAFailingQueryKeepsThePullRequestsFoundBeforeIt(t *testing.T) {
 	require.ErrorIs(t, err, worktree.ErrPullRequestsUnavailable)
 	assert.ErrorContains(t, err, "gh api graphql")
 	assert.Len(t, prs, 100)
+}
+
+func TestAQueryGitHubResolvesInPartKeepsWhatItResolved(t *testing.T) {
+	gh := partialGH(t, `{"data": {"repository": {"b0": {"nodes": [{"number": 9, "url": "u", "state": "MERGED", "headRefName": "feat/a", "headRefOid": "abc123",
+		"isCrossRepository": false, "commits": {"nodes": [{"commit": {"statusCheckRollup": null}}]}}]}}},
+		"errors": [{"type": "FORBIDDEN", "path": ["repository", "b0", "nodes", 0, "commits"], "message": "Resource not accessible by integration"}]}`)
+
+	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequestsOf(t.Context(), []string{"feat/a"})
+
+	require.ErrorIs(t, err, worktree.ErrPullRequestsUnavailable)
+	assert.ErrorContains(t, err, "Resource not accessible by integration")
+	assert.Equal(t, []worktree.PullRequest{{Number: 9, URL: "u", Branch: "feat/a", Head: "abc123", State: worktree.PullRequestMerged}}, prs)
+}
+
+func TestAnInterruptedReadIsTheContextsErrorNotGitHubUnavailable(t *testing.T) {
+	gh, _ := graphQLGH(t, "")
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequestsOf(ctx, []string{"feat/a"})
+
+	require.ErrorIs(t, err, context.Canceled)
+	assert.NotErrorIs(t, err, worktree.ErrPullRequestsUnavailable)
 }
 
 func TestThePullRequestsOfBranchesSayWhyGHCannotBeAsked(t *testing.T) {
