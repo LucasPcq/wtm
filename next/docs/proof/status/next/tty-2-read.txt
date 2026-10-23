@@ -1,5 +1,4 @@
-$ <BIN> status; echo EXIT=
-$?
+$ <BIN> status; echo EXIT=$?
 
 ┃  = feat/a — nothing to fix
 ┃

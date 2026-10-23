@@ -1,7 +1,7 @@
 {
   "v": 2,
   "command": "status",
-  "ok": true,
+  "ok": false,
   "items": [
     {
       "subject": "main",
@@ -16,9 +16,10 @@
         "created_at": null,
         "parent": "",
         "children": [
+          "feat/a",
           "feat/b",
-          "feat/rb",
-          "feat/old"
+          "feat/old",
+          "feat/rb"
         ],
         "base": null,
         "origin": {
@@ -198,15 +199,6 @@
     {
       "subject": "feat/a",
       "status": "done",
-      "warnings": [
-        {
-          "code": "status.meta_unreadable",
-          "params": {
-            "branch": "feat/a"
-          },
-          "message": "couldn't read the record of feat/a: its isolation, parent, env strategy and port offset are not known: unexpected end of JSON input"
-        }
-      ],
       "detail": {
         "branch": "feat/a",
         "path": "<SB>/acme.trees/feat-a",
@@ -214,8 +206,8 @@
         "locked": false,
         "rebasing": false,
         "missing": false,
-        "created_at": null,
-        "parent": "",
+        "created_at": "<T>",
+        "parent": "main",
         "children": [],
         "base": {
           "name": "main",
@@ -265,25 +257,27 @@
           }
         ],
         "review": null,
-        "isolation": null,
+        "isolation": "isolated",
         "run_toml": "declared",
         "run": {
           "addressing": "names",
-          "offset": null,
-          "ports": "unknown"
+          "offset": 10,
+          "ports": "offset"
         },
         "jobs": [
           {
             "name": "web",
             "kind": "service",
             "state": "stopped",
-            "url": ""
+            "url": "",
+            "port": 23470
           },
           {
             "name": "api",
             "kind": "service",
             "state": "stopped",
-            "url": ""
+            "url": "",
+            "port": 23471
           }
         ],
         "env": {
@@ -327,15 +321,8 @@
         "children": [],
         "base": null,
         "origin": null,
-        "changes": {
-          "staged": 0,
-          "modified": 0,
-          "untracked": 0,
-          "insertions": 0,
-          "deletions": 0,
-          "files": []
-        },
-        "commits": [],
+        "changes": null,
+        "commits": null,
         "review": null,
         "isolation": "isolated",
         "run_toml": "declared",
@@ -362,7 +349,7 @@
         ],
         "env": {
           "declared": 2,
-          "files": []
+          "files": null
         },
         "problems": [
           {
@@ -551,7 +538,7 @@
         "run_toml": "declared",
         "run": {
           "addressing": "names",
-          "offset": 10,
+          "offset": 40,
           "ports": "offset"
         },
         "jobs": [
@@ -560,14 +547,14 @@
             "kind": "service",
             "state": "stopped",
             "url": "",
-            "port": 23470
+            "port": 23500
           },
           {
             "name": "api",
             "kind": "service",
             "state": "stopped",
             "url": "",
-            "port": 23471
+            "port": 23501
           }
         ],
         "env": {
@@ -598,5 +585,10 @@
     }
   ],
   "follow_ups": [],
-  "warnings": []
+  "warnings": [],
+  "error": {
+    "kind": "cancelled",
+    "code": "unit.interrupted",
+    "message": "interrupted"
+  }
 }

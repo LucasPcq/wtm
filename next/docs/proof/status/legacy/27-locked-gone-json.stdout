@@ -4,7 +4,7 @@
   "main": false,
   "isolation": "isolated",
   "addressing": "names",
-  "offset": null,
+  "offset": 20,
   "run_config": true,
   "env": {
     "declared": 2,
@@ -17,12 +17,14 @@
     {
       "name": "web",
       "kind": "service",
-      "state": "stopped"
+      "state": "stopped",
+      "url": "http://web.feat-b.acme.localhost:23462"
     },
     {
       "name": "api",
       "kind": "service",
-      "state": "stopped"
+      "state": "stopped",
+      "url": "http://api.feat-b.acme.localhost:23462"
     }
   ],
   "problems": [

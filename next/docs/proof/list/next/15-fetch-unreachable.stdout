@@ -1,12 +1,11 @@
 
   main                    main  • active                      ✓ clean
+  feat/a                                  base ↑2  origin ↑1  ! dirty
   feat/b                  ! locked                            ✓ clean
   feat/gone                                                   ✗ missing
   ../acme.trees/detached                                      ✓ clean
-  feat/a                                  base ↑2  origin ↑1  ! dirty
   locked-gone             ! locked                            ✗ missing
   orphan                                                      ✓ clean
-  ! couldn't read the record of feat/a: when it was created is not known: unexpected end of JSON input
   ! couldn't fetch origin: where each branch stands against it is as last fetched: git -C <SB>/acme fetch --quiet origin: fatal: '<SB>/nowhere.git' does not appear to be a git repository
     fatal: Could not read from remote repository.
     Please make sure you have the correct access rights

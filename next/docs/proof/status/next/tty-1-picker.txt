@@ -1,5 +1,4 @@
-$ <BIN> status; echo EXIT=
-$?
+$ <BIN> status; echo EXIT=$?
 
   Step 1/1 • Worktree
 

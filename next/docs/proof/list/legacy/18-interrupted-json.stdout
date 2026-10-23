@@ -30,15 +30,19 @@
     "services": []
   },
   {
-    "branch": "feat/gone",
-    "path": "<SB>/acme.trees/feat-gone",
+    "branch": "feat/a",
+    "path": "<SB>/acme.trees/feat-a",
     "is_parent": false,
-    "is_dirty": false,
+    "is_dirty": true,
     "is_locked": false,
     "rebase_in_progress": false,
-    "commits_ahead": 0,
+    "commits_ahead": 2,
     "created_at": "<T>",
-    "origin": null,
+    "origin": {
+      "ahead": 1,
+      "behind": 0,
+      "state": "ahead"
+    },
     "pr": null,
     "services": []
   },
@@ -56,19 +60,15 @@
     "services": []
   },
   {
-    "branch": "feat/a",
-    "path": "<SB>/acme.trees/feat-a",
+    "branch": "feat/gone",
+    "path": "<SB>/acme.trees/feat-gone",
     "is_parent": false,
-    "is_dirty": true,
+    "is_dirty": false,
     "is_locked": false,
     "rebase_in_progress": false,
-    "commits_ahead": 2,
+    "commits_ahead": 0,
     "created_at": "<T>",
-    "origin": {
-      "ahead": 1,
-      "behind": 0,
-      "state": "ahead"
-    },
+    "origin": null,
     "pr": null,
     "services": []
   },

@@ -1,7 +1,7 @@
 {
   "v": 2,
   "command": "tree",
-  "ok": true,
+  "ok": false,
   "items": [
     {
       "subject": "main",
@@ -15,6 +15,7 @@
         "children": [
           "feat/a",
           "feat/b",
+          "feat/r",
           "feat/gone"
         ],
         "ahead": null,
@@ -45,7 +46,7 @@
         "virtual": false,
         "parent": "main",
         "children": [
-          "feat/r"
+          "feat/a-ui"
         ],
         "ahead": 2,
         "behind": 1,
@@ -80,128 +81,19 @@
       }
     },
     {
-      "subject": "feat/r",
-      "status": "done",
-      "detail": {
-        "branch": "feat/r",
-        "path": "<SB>/acme.trees/feat-r",
-        "main": false,
-        "virtual": false,
-        "parent": "feat/a",
-        "children": [],
-        "ahead": 1,
-        "behind": 2,
-        "needs_sync": true,
-        "dirty": true,
-        "locked": false,
-        "rebasing": true,
-        "missing": false,
-        "cycle": false,
-        "origin": null,
-        "pr": null,
-        "services": [],
-        "actions": [
-          {
-            "command": "go",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/r"
-                ]
-              }
-            ],
-            "code": "tree.go",
-            "message": "Go to the worktree to finish its rebase"
-          }
-        ]
-      }
-    },
-    {
-      "subject": "feat/b",
-      "status": "done",
-      "detail": {
-        "branch": "feat/b",
-        "path": "<SB>/acme.trees/feat-b",
-        "main": false,
-        "virtual": false,
-        "parent": "main",
-        "children": [],
-        "ahead": 1,
-        "behind": 1,
-        "needs_sync": true,
-        "dirty": false,
-        "locked": true,
-        "rebasing": false,
-        "missing": false,
-        "cycle": false,
-        "origin": null,
-        "pr": null,
-        "services": [],
-        "actions": [
-          {
-            "command": "sync",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/b"
-                ]
-              }
-            ],
-            "code": "tree.sync",
-            "message": "Sync the worktree: its parent has commits it lacks"
-          }
-        ]
-      }
-    },
-    {
-      "subject": "feat/gone",
-      "status": "done",
-      "detail": {
-        "branch": "feat/gone",
-        "path": "<SB>/acme.trees/feat-gone",
-        "main": false,
-        "virtual": false,
-        "parent": "main",
-        "children": [],
-        "ahead": null,
-        "behind": null,
-        "needs_sync": false,
-        "dirty": false,
-        "locked": true,
-        "rebasing": false,
-        "missing": true,
-        "cycle": false,
-        "origin": null,
-        "pr": null,
-        "services": [],
-        "actions": []
-      }
-    },
-    {
       "subject": "feat/a-ui",
       "status": "done",
-      "warnings": [
-        {
-          "code": "tree.meta_unreadable",
-          "params": {
-            "branch": "feat/a-ui"
-          },
-          "message": "couldn't read the record of feat/a-ui: its parent is not known, so it stands as a root: unexpected end of JSON input"
-        }
-      ],
       "detail": {
         "branch": "feat/a-ui",
         "path": "<SB>/acme.trees/feat-a-ui",
         "main": false,
         "virtual": false,
-        "parent": null,
+        "parent": "feat/a",
         "children": [
           "feat/a-ui-form"
         ],
-        "ahead": 4,
-        "behind": null,
+        "ahead": 2,
+        "behind": 0,
         "needs_sync": false,
         "dirty": false,
         "locked": false,
@@ -250,6 +142,106 @@
             "message": "Sync the worktree: its parent has commits it lacks"
           }
         ]
+      }
+    },
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "main": false,
+        "virtual": false,
+        "parent": "main",
+        "children": [],
+        "ahead": 1,
+        "behind": 1,
+        "needs_sync": true,
+        "dirty": false,
+        "locked": true,
+        "rebasing": false,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": [
+          {
+            "command": "sync",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/b"
+                ]
+              }
+            ],
+            "code": "tree.sync",
+            "message": "Sync the worktree: its parent has commits it lacks"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/r",
+      "status": "done",
+      "detail": {
+        "branch": "feat/r",
+        "path": "<SB>/acme.trees/feat-r",
+        "main": false,
+        "virtual": false,
+        "parent": "main",
+        "children": [],
+        "ahead": 1,
+        "behind": 1,
+        "needs_sync": true,
+        "dirty": true,
+        "locked": false,
+        "rebasing": true,
+        "missing": false,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": [
+          {
+            "command": "go",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/r"
+                ]
+              }
+            ],
+            "code": "tree.go",
+            "message": "Go to the worktree to finish its rebase"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/gone",
+      "status": "done",
+      "detail": {
+        "branch": "feat/gone",
+        "path": "<SB>/acme.trees/feat-gone",
+        "main": false,
+        "virtual": false,
+        "parent": "main",
+        "children": [],
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "dirty": false,
+        "locked": true,
+        "rebasing": false,
+        "missing": true,
+        "cycle": false,
+        "origin": null,
+        "pr": null,
+        "services": [],
+        "actions": []
       }
     },
     {
@@ -352,5 +344,10 @@
     }
   ],
   "follow_ups": [],
-  "warnings": []
+  "warnings": [],
+  "error": {
+    "kind": "cancelled",
+    "code": "unit.interrupted",
+    "message": "interrupted"
+  }
 }

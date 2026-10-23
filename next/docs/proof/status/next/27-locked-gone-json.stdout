@@ -18,15 +18,8 @@
         "children": [],
         "base": null,
         "origin": null,
-        "changes": {
-          "staged": 0,
-          "modified": 0,
-          "untracked": 0,
-          "insertions": 0,
-          "deletions": 0,
-          "files": []
-        },
-        "commits": [],
+        "changes": null,
+        "commits": null,
         "review": null,
         "isolation": "isolated",
         "run_toml": "declared",
@@ -53,7 +46,7 @@
         ],
         "env": {
           "declared": 2,
-          "files": []
+          "files": null
         },
         "problems": [
           {
