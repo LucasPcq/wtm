@@ -29,7 +29,7 @@ var errNoDir = errors.New("the user's config directory is unknown: no web server
 // ErrRunning is the error of [Files.Lock] when another process holds the lock: a server already serves.
 var ErrRunning = errors.New("a web server already runs on this machine")
 
-// A Record is what a running server says of itself: its process, the port it listens on at 127.0.0.1, the version of its binary and the token every request to it carries.
+// A Record is what a running server says of itself: its process, which a person is told to stop when it cannot be asked to and which wtm never signals, the port it listens on at 127.0.0.1, the version of its binary and the token every request to it carries.
 type Record struct {
 	PID     int    `json:"pid"`
 	Port    int    `json:"port"`

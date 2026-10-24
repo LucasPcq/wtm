@@ -431,3 +431,15 @@ func TestServeRefusesAnIdleThatIsNotPositive(t *testing.T) {
 
 	assert.Error(t, New(Params{Token: token}).Serve(t.Context(), listener))
 }
+
+// A stop accepted while a call was still being read let that call start an operation the stopping server then waited for, its lock held and its listener closed.
+func TestAnOperationIsRefusedOnceTheServerIsAskedToStop(t *testing.T) {
+	server := serving(t, Params{})
+
+	stop := do(t, server, req{method: http.MethodPost, path: "/api/stop"})
+	run := do(t, server, req{method: http.MethodPost, path: repoPath("/commands/greet"), body: `{}`})
+
+	assert.Equal(t, http.StatusAccepted, stop.StatusCode)
+	assert.Equal(t, http.StatusServiceUnavailable, run.StatusCode)
+	assert.Equal(t, CodeStopping, decoded[envelope](t, run).Error.Code)
+}

@@ -146,11 +146,11 @@ type Change struct {
 	Fields []worktree.PolledField
 }
 
-// Changes returns what changed from before to now: reset when a worktree went away, the reader then reset from a fresh snapshot; else each worktree whose head, checkout or jobs changed, by branch, a worktree new to the poll having every field changed. Jobs unknown before or now are not compared; they are taken as they were.
-func Changes(before, now Polled) (changes []Change, reset bool) {
-	for branch := range before {
+// Changes returns what changed from before to now: each worktree whose head, checkout or jobs changed, by branch, a worktree new to the poll having every field changed, and the branches of the worktrees that went away, for which a reader resets from a fresh snapshot. Jobs unknown before or now are not compared; they are taken as they were.
+func Changes(before, now Polled) (changes []Change, gone []string) {
+	for _, branch := range slices.Sorted(maps.Keys(before)) {
 		if _, kept := now[branch]; !kept {
-			return nil, true
+			gone = append(gone, branch)
 		}
 	}
 
@@ -163,7 +163,7 @@ func Changes(before, now Polled) (changes []Change, reset bool) {
 			changes = append(changes, Change{Branch: branch, Fields: fields})
 		}
 	}
-	return changes, false
+	return changes, gone
 }
 
 func polledFields(was, now Poll) []worktree.PolledField {

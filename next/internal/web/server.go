@@ -307,7 +307,10 @@ func (s *Server) execute(w http.ResponseWriter, r *http.Request) {
 	id := newID()
 	ctx, cancel := context.WithCancel(context.WithoutCancel(r.Context()))
 	defer cancel()
-	s.track(id, running{repo: RepoID(repo), cancel: cancel})
+	if !s.track(id, running{repo: RepoID(repo), cancel: cancel}) {
+		writeError(w, http.StatusServiceUnavailable, &domain.Error{Kind: domain.KindConflict, Code: CodeStopping, Message: "the server is stopping: run wtm-next ui again"})
+		return
+	}
 	defer s.untrack(id)
 
 	w.Header().Set(HeaderOperation, id)
@@ -349,10 +352,17 @@ func (s *Server) cancel(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func (s *Server) track(id string, op running) {
+// track counts op among those running, and reports false once the server was asked to stop: under the mutex stopAsked checks, so no operation starts after a stop it let through.
+func (s *Server) track(id string, op running) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	select {
+	case <-s.asked:
+		return false
+	default:
+	}
 	s.running[id] = op
+	return true
 }
 
 func (s *Server) untrack(id string) {

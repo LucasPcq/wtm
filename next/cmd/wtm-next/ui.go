@@ -169,7 +169,11 @@ func ensureServer(ctx context.Context, idle time.Duration) (webserver.Record, er
 			return last, nil
 		}
 		if answered {
-			if busy := askStop(ctx, last); len(busy) > 0 {
+			busy, err := askStop(ctx, last)
+			if err != nil {
+				return webserver.Record{}, fmt.Errorf("the web server of wtm %s (pid %d) cannot be asked to stop: stop that process, then run wtm-next ui again: %w", running, last.PID, err)
+			}
+			if len(busy) > 0 {
 				return webserver.Record{}, fmt.Errorf("the web server of wtm %s is finishing operation %s: run wtm-next ui again once it ends", running, strings.Join(busy, ", "))
 			}
 			if err := until(ctx, func() bool { return free(files) }); err != nil {
@@ -216,20 +220,28 @@ func askVersion(ctx context.Context, record webserver.Record) (string, bool) {
 	return answer.Version, true
 }
 
-// askStop asks the server record names to stop, as its idle stop does, and returns the operations it refuses to stop for.
-func askStop(ctx context.Context, record webserver.Record) []string {
+// askStop asks the server record names to stop, as its idle stop does, and returns the operations it refuses to stop for; it fails when the server cannot be asked, one older than POST /api/stop among them.
+func askStop(ctx context.Context, record webserver.Record) ([]string, error) {
 	ctx, cancel := context.WithTimeout(ctx, webAsk)
 	defer cancel()
 	response, err := ask(ctx, askParams{Record: record, Method: http.MethodPost, Path: "/api/stop"})
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	defer response.Body.Close()
-	var busy web.Busy
-	if response.StatusCode != http.StatusConflict || json.NewDecoder(response.Body).Decode(&busy) != nil {
-		return nil
+
+	switch response.StatusCode {
+	case http.StatusAccepted:
+		return nil, nil
+	case http.StatusConflict:
+		var busy web.Busy
+		if err := json.NewDecoder(response.Body).Decode(&busy); err != nil {
+			return nil, err
+		}
+		return busy.Operations, nil
+	default:
+		return nil, fmt.Errorf("it answers %s", response.Status)
 	}
-	return busy.Operations
 }
 
 type askParams struct {

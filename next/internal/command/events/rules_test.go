@@ -81,7 +81,7 @@ func TestChangesNameWhatMovedInEachWorktree(t *testing.T) {
 	for name, c := range map[string]struct {
 		now     events.Polled
 		changes []events.Change
-		reset   bool
+		gone    []string
 	}{
 		"nothing": {now: before},
 		"head_and_jobs": {
@@ -97,13 +97,13 @@ func TestChangesNameWhatMovedInEachWorktree(t *testing.T) {
 			now:     events.Polled{"feat/a": before["feat/a"], "feat/b": before["feat/b"], "feat/c": {}},
 			changes: []events.Change{{Branch: "feat/c", Fields: []worktree.PolledField{worktree.PolledHead, worktree.PolledCheckout, worktree.PolledJobs}}},
 		},
-		"went_away": {now: events.Polled{"feat/a": before["feat/a"]}, reset: true},
+		"went_away": {now: events.Polled{"feat/a": before["feat/a"]}, gone: []string{"feat/b"}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			changes, reset := events.Changes(before, c.now)
+			changes, gone := events.Changes(before, c.now)
 
 			assert.Equal(t, c.changes, changes)
-			assert.Equal(t, c.reset, reset)
+			assert.Equal(t, c.gone, gone)
 		})
 	}
 }

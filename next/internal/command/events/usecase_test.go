@@ -497,3 +497,57 @@ func TestWhatAnOperationOfWtmChangedIsNeverSentAsPolled(t *testing.T) {
 	assert.Equal(t, "operation.finished", r.nextType(t))
 	r.quiet(t)
 }
+
+// The pause of the poll during an operation of wtm covered the whole repository: a commit in another worktree, made from a terminal meanwhile, was never sent.
+func TestWhatAnOperationDidNotNameIsSentOnceItFinishes(t *testing.T) {
+	app := newRepo("/repo", "feat/a")
+	app.Git.Local = []string{"feat/ahead"}
+	app.Git.Commits = map[worktree.Ref][]string{worktree.LocalBranch{Name: "feat/ahead"}: {"c1"}}
+	app, git := app.living()
+	bus := newBus()
+	u := useCase(bus, &known{}, opening(app))
+	u.Recheck = 10 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	sub := bus.subscribed(t)
+	r.nextType(t)
+	r.nextType(t)
+
+	sub.Lines <- published(t, app.Repo, domain.OperationStarted{Command: "create", Surface: "cli"})
+	assert.Equal(t, "operation.started", r.nextType(t))
+	require.NoError(t, git.AddWorktree(t.Context(), worktree.Addition{Path: "/repo/.trees/feat/b", Checkout: worktree.NewBranch{Name: "feat/b", From: worktree.LocalBranch{Name: "main"}}}))
+	require.NoError(t, git.MergeFFOnly(t.Context(), worktree.Merge{Path: "/repo/.trees/feat/a", Onto: worktree.LocalBranch{Name: "feat/ahead"}}))
+	sub.Lines <- published(t, app.Repo, domain.WorktreeCreated{Worktree: worktree.Identity{Branch: "feat/b", Path: "/repo/.trees/feat/b"}})
+	sub.Lines <- published(t, app.Repo, domain.OperationFinished{Command: "create", Surface: "cli", OK: true})
+
+	assert.Equal(t, "worktree.created", r.nextType(t))
+	assert.Equal(t, "operation.finished", r.nextType(t))
+	changed := r.next(t)
+	assert.Contains(t, changed, `"type":"worktree.changed"`)
+	assert.Contains(t, changed, `"branch":"feat/a"`)
+	assert.Contains(t, changed, `"changed":["head"]`)
+	r.quiet(t)
+}
+
+// An operation whose process died never says it finished: past its limit, the poll runs again.
+func TestAnOperationThatNeverFinishesHoldsThePollBackTenMinutesAtMost(t *testing.T) {
+	app := newRepo("/repo", "feat/a")
+	app.Git.Local = []string{"feat/ahead"}
+	app.Git.Commits = map[worktree.Ref][]string{worktree.LocalBranch{Name: "feat/ahead"}: {"c1"}}
+	app, git := app.living()
+	bus := newBus()
+	u := useCase(bus, &known{}, opening(app))
+	clock := &ticking{now: fixedNow}
+	u.Now, u.Recheck = clock.Now, 10*time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	sub := bus.subscribed(t)
+	r.nextType(t)
+	r.nextType(t)
+	sub.Lines <- published(t, app.Repo, domain.OperationStarted{Command: "create", Surface: "cli"})
+	assert.Equal(t, "operation.started", r.nextType(t))
+
+	require.NoError(t, git.MergeFFOnly(t.Context(), worktree.Merge{Path: "/repo/.trees/feat/a", Onto: worktree.LocalBranch{Name: "feat/ahead"}}))
+	r.quiet(t)
+	clock.advance(11 * time.Minute)
+
+	assert.Contains(t, r.next(t), `"type":"worktree.changed"`)
+}

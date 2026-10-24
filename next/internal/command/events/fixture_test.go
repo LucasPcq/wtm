@@ -201,3 +201,21 @@ func (m *machine) set(jobs []run.Job, err error) {
 	defer m.mu.Unlock()
 	m.jobs, m.err = jobs, err
 }
+
+// A ticking is a clock a test moves forward.
+type ticking struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+func (c *ticking) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+func (c *ticking) advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
+}

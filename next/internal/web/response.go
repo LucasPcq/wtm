@@ -20,6 +20,7 @@ const (
 	CodeCommandUnknown    = "web.command_unknown"
 	CodeOperationUnknown  = "web.operation_unknown"
 	CodeSchemaUnavailable = "web.schema_unavailable"
+	CodeStopping          = "web.stopping"
 )
 
 // statusClientClosed is the status of an operation its caller cancelled: nginx's 499, which net/http does not name.

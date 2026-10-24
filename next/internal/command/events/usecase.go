@@ -200,8 +200,7 @@ func (s *stream) oneRepository(ctx context.Context, source Source) error {
 			if _, removed := received.Line.Event.(domain.RepoRemoved); removed {
 				return s.stillThere(ctx, source)
 			}
-			s.announced(ctx, watched, received.Line)
-			return nil
+			return s.announced(ctx, watched, received.Line)
 		},
 	})
 }
@@ -271,8 +270,7 @@ func (s *stream) everyRepository(ctx context.Context) error {
 			if err := s.emit(received); err != nil {
 				return err
 			}
-			s.announced(ctx, watched[repo.CommonDir], received.Line)
-			return nil
+			return s.announced(ctx, watched[repo.CommonDir], received.Line)
 		},
 	})
 }
@@ -282,11 +280,12 @@ type joinParams struct {
 	Watched map[string]*watch
 }
 
-// A watch is a repository the stream sent a snapshot of: how it reads it, what its last poll read, and the operations of wtm the bus says run on it, by their op id, with when each started.
+// A watch is a repository the stream sent a snapshot of: how it reads it, what its last poll read, the operations of wtm the bus says run on it, by their op id, with when each started, and the branches their events named, whose changes are theirs.
 type watch struct {
 	source     Source
 	polled     Polled
 	operations map[string]time.Time
+	named      map[string]bool
 }
 
 // operationLimit is how long an operation the bus said started holds the poll back without saying it finished: its process may have died.
@@ -340,19 +339,26 @@ type pollParams struct {
 	Known bool
 }
 
-// poll reads the worktrees and branch tips of the repository watched again, never while an operation of wtm runs on it, and sends what changed since the last read: a worktree.changed per worktree that moved, named as a full read names it, a fresh snapshot when one went away. It returns the error that kept it from reading, or the reader's.
+// poll reads the worktrees and branch tips of the repository watched again, never while an operation of wtm runs on it, and sends what changed since the last read. It returns the error that kept it from reading, or the reader's.
 func (s *stream) poll(ctx context.Context, params pollParams) error {
-	watched := params.Watch
-	if watched.busy(s.Now()) {
+	if params.Watch.busy(s.Now()) {
 		return nil
 	}
 	now, err := s.read(ctx, params)
 	if err != nil {
 		return err
 	}
-	changes, reset := Changes(watched.polled, now)
-	watched.polled = now
-	if len(changes) == 0 && !reset {
+	return s.send(ctx, params.Watch, now)
+}
+
+// send sends what changed in the repository watched from its last read to now, but for the branches the operations of wtm named: a worktree.changed per worktree that moved, named as a full read names it, a fresh snapshot when one went away. Now is its last read once sent, and the branches named are forgotten; a read that fails keeps both for the next poll.
+func (s *stream) send(ctx context.Context, watched *watch, now Polled) error {
+	changes, gone := Changes(watched.polled, now)
+	theirs := func(branch string) bool { return watched.named[branch] }
+	changes = slices.DeleteFunc(changes, func(change Change) bool { return theirs(change.Branch) })
+	gone = slices.DeleteFunc(gone, theirs)
+	if len(changes) == 0 && len(gone) == 0 {
+		watched.polled, watched.named = now, nil
 		return nil
 	}
 
@@ -362,8 +368,11 @@ func (s *stream) poll(ctx context.Context, params pollParams) error {
 	}
 	repo := &watched.source.Repo
 	identities := Identities(facts)
-	if reset {
-		return s.emitLine(domain.Line{Repo: repo, Event: domain.Snapshot{Worktrees: identities}})
+	if len(gone) > 0 {
+		changes = nil
+		if err := s.emitLine(domain.Line{Repo: repo, Event: domain.Snapshot{Worktrees: identities}}); err != nil {
+			return err
+		}
 	}
 	for _, change := range changes {
 		i := slices.IndexFunc(identities, func(identity worktree.Identity) bool { return identity.Branch == change.Branch })
@@ -374,6 +383,7 @@ func (s *stream) poll(ctx context.Context, params pollParams) error {
 			return err
 		}
 	}
+	watched.polled, watched.named = now, nil
 	return nil
 }
 
@@ -392,24 +402,57 @@ func (s *stream) read(ctx context.Context, params pollParams) (Polled, error) {
 	return Carried(params.Watch.polled, PollOf(worktree.Snapshot{Worktrees: worktrees, Branches: branches}, params.Jobs, params.Known)), nil
 }
 
-// announced follows a line the bus carried for the repository watched: an operation of wtm holds the poll back from its start to its finish, and what a line announces is read as the poll's own, so that the poll never sends it again.
-func (s *stream) announced(ctx context.Context, watched *watch, line domain.Line) {
-	if _, started := line.Event.(domain.OperationStarted); started {
+// announced follows a line the bus carried for the repository watched: an operation of wtm holds the poll back from its start to its finish, the branches its events name are its own, and once the last one running finished, what the others changed meanwhile is sent.
+func (s *stream) announced(ctx context.Context, watched *watch, line domain.Line) error {
+	_, started := line.Event.(domain.OperationStarted)
+	_, finished := line.Event.(domain.OperationFinished)
+	switch {
+	case started:
 		if watched.operations == nil {
 			watched.operations = map[string]time.Time{}
 		}
 		watched.operations[line.OpID] = s.Now()
-	}
-	if _, finished := line.Event.(domain.OperationFinished); finished {
+	case finished:
 		delete(watched.operations, line.OpID)
 	}
 	if watched.busy(s.Now()) {
-		return
+		if branch := namedBy(line.Event); branch != "" {
+			if watched.named == nil {
+				watched.named = map[string]bool{}
+			}
+			watched.named[branch] = true
+		}
+		return nil
+	}
+	if !finished {
+		return nil
 	}
 
 	jobs, known := s.jobs(ctx)
-	if now, err := s.read(ctx, pollParams{Watch: watched, Jobs: jobs, Known: known}); err == nil {
-		watched.polled = now
+	now, err := s.read(ctx, pollParams{Watch: watched, Jobs: jobs, Known: known})
+	if err != nil {
+		return nil
+	}
+	err = s.send(ctx, watched, now)
+	if _, ending := errors.AsType[ended](err); ending {
+		return err
+	}
+	return nil
+}
+
+// namedBy is the branch an event of an operation names, "" for one that names none.
+func namedBy(event domain.Event) string {
+	switch e := event.(type) {
+	case domain.WorktreeCreated:
+		return e.Worktree.Branch
+	case domain.WorktreeUpdated:
+		return e.Worktree.Branch
+	case domain.WorktreeProvisioned:
+		return e.Worktree.Branch
+	case domain.UnitFinished:
+		return e.Subject
+	default:
+		return ""
 	}
 }
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -59,9 +60,10 @@ func TestUIAsksAServerOfAnotherVersionToStopThenStartsItsOwn(t *testing.T) {
 	_, err := ensureServer(t.Context(), time.Hour)
 
 	assert.ErrorIs(t, err, errServerInTest)
+	// the server lets go of its lock a moment before it is done: wait for it rather than look once
 	select {
 	case <-stopped:
-	default:
+	case <-time.After(5 * time.Second):
 		t.Fatal("the server of another version still runs")
 	}
 }
@@ -135,4 +137,29 @@ func TestAnIdleThatIsNotPositiveIsRefused(t *testing.T) {
 	assert.Error(t, positive(0))
 	assert.Error(t, positive(-time.Second))
 	assert.NoError(t, positive(time.Second))
+}
+
+// A server older than POST /api/stop answers it 404: ui took that for a stop, waited 10 s, then said it did not stop.
+func TestUISaysWhatToDoWithAServerThatCannotBeAskedToStop(t *testing.T) {
+	ownConfigDir(t)
+	files := webserver.Files{Dir: webserver.Dir()}
+	release, err := files.Lock()
+	require.NoError(t, err)
+	t.Cleanup(release)
+	old := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/stop" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"version":"0.0.0"}`))
+	}))
+	t.Cleanup(old.Close)
+	require.NoError(t, files.Write(t.Context(), webserver.Record{PID: os.Getpid(), Port: old.Listener.Addr().(*net.TCPAddr).Port, Version: "0.0.0", Token: "old"}))
+
+	started := time.Now()
+	_, err = ensureServer(t.Context(), time.Hour)
+
+	require.Error(t, err)
+	assert.Less(t, time.Since(started), webStart, "ui waited for a server it could not ask to stop")
+	assert.Contains(t, err.Error(), fmt.Sprintf("the web server of wtm 0.0.0 (pid %d) cannot be asked to stop", os.Getpid()))
 }
