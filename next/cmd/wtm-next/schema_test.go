@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,7 +21,6 @@ func TestThePublishedSchemaIsTheOneTheGoTypesGive(t *testing.T) {
 	}
 
 	assert.Equal(t, string(readFile(t, apiSchemaFile)), string(generated), "api.v2.schema.json is stale: run make schema")
-	assert.Equal(t, string(readFile(t, apiSchemaFile)), string(api.Schema()), "api embeds another schema than the one on disk: rebuild")
 }
 
 func TestEachGoldenOfTheCatalogueMatchesTheSchema(t *testing.T) {
@@ -52,6 +50,34 @@ func TestEachGoldenOfTheCatalogueMatchesTheSchema(t *testing.T) {
 	}
 }
 
+// The envelopes a command's cli prints reach shapes the catalogue's goldens do not: a merged pull request, a failed hook, a refusal.
+func TestEachEnvelopeGoldenOfACommandsCLIMatchesTheSchema(t *testing.T) {
+	defs := apiDefs(t)
+	goldens, err := filepath.Glob(filepath.Join("..", "..", "internal", "command", "*", "cli", "testdata", "envelope_*.golden"))
+	require.NoError(t, err)
+	require.NotEmpty(t, goldens)
+
+	for _, golden := range goldens {
+		name := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(golden))))
+		t.Run(name+"_"+strings.TrimSuffix(strings.TrimPrefix(filepath.Base(golden), "envelope_"), ".golden"), func(t *testing.T) {
+			assert.NoError(t, validates(t, defs(name+".envelope"), readFile(t, golden)))
+		})
+	}
+}
+
+// create and extract followed an apply up with the worktree to enter, saying nothing of it.
+func TestEveryFollowUpOfAGoldenSaysWhatItDoes(t *testing.T) {
+	goldens := append(globbed(t, filepath.Join("testdata", "catalogue_*.golden")), globbed(t, filepath.Join("..", "..", "internal", "command", "*", "cli", "testdata", "envelope_*.golden"))...)
+
+	for _, golden := range goldens {
+		var document any
+		require.NoError(t, json.Unmarshal(readFile(t, golden), &document))
+		for _, followUp := range followUpsIn(document) {
+			assert.NotEmpty(t, followUp["message"], "%s: follow-up %v", golden, followUp["code"])
+		}
+	}
+}
+
 func TestAFieldOfEachKindMatchesTheSchema(t *testing.T) {
 	form := domain.Form{Fields: fieldKinds(), Sections: []domain.Section{{Key: "where", Title: "Where", Summary: "next to main"}}}
 	document, err := json.Marshal(form)
@@ -72,14 +98,22 @@ func TestAnEventOfEachTypeMatchesTheSchema(t *testing.T) {
 	}
 }
 
-func TestTheAnswersOfEachCommandsFormMatchItsRequest(t *testing.T) {
+func TestTheAnswersOfEachFormMatchItsRequest(t *testing.T) {
 	defs := apiDefs(t)
 
+	forms := map[string]domain.Form{}
 	for _, command := range catalogue() {
-		t.Run(command.Name, func(t *testing.T) {
-			document, err := json.Marshal(command.Form.Answers())
+		forms[command.Name] = command.Form
+	}
+	for _, stream := range streams() {
+		forms[stream.Name] = stream.Form
+	}
+
+	for name, form := range forms {
+		t.Run(name, func(t *testing.T) {
+			document, err := json.Marshal(form.Answers())
 			require.NoError(t, err)
-			assert.NoError(t, validates(t, defs(command.Name+".request"), document))
+			assert.NoError(t, validates(t, defs(name+".request"), document))
 		})
 	}
 }

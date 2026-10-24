@@ -6,5 +6,5 @@
   feat/a    .trees/feat-a · already open
   feat/b    .trees/feat-b · already open
 
-  → wtm go feat/a
-  → wtm go feat/b
+  → wtm go feat/a   jump in
+  → wtm go feat/b   jump in

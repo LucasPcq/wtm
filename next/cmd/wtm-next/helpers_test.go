@@ -273,7 +273,7 @@ const (
 	eventSchemaFile = "../../internal/adapter/events/events.v2.json"
 )
 
-// generatedSchema is api.v2.schema.json as the Go types of the catalogue give it: the fragments written by hand beside a MarshalJSON (domain/*.schema.json) as they are, domain.Field as the union of its kinds, the events as the event stream's schema has them, then each command's request, from its form, and its envelope, with its plan and its detail reflected.
+// generatedSchema is api.v2.schema.json as the Go types of the catalogue give it: the fragments written by hand beside a MarshalJSON (domain/*.schema.json) as they are, domain.Field as the union of its kinds, the events as the event stream's schema has them, then each command's request, from its form, and its envelope, with its plan and its detail reflected, and each stream's request and the envelope it ends on.
 func generatedSchema(t *testing.T) []byte {
 	t.Helper()
 	s := schemaWriter{t: t, defs: map[string]any{}, types: map[string]reflect.Type{}}
@@ -289,6 +289,9 @@ func generatedSchema(t *testing.T) []byte {
 	}
 	for _, command := range catalogue() {
 		s.command(command)
+	}
+	for _, stream := range streams() {
+		s.stream(stream)
 	}
 
 	var buf bytes.Buffer
@@ -371,6 +374,15 @@ func (s *schemaWriter) command(c api.Command) {
 			"plan":    plan,
 			"items":   map[string]any{"items": map[string]any{"properties": map[string]any{"detail": detail}}},
 		},
+	}
+}
+
+// stream defines the request of st, the answer of each field of its form by its path, and the envelope it ends on, with no plan nor item: its lines are domain.Line.
+func (s *schemaWriter) stream(st api.Stream) {
+	s.defs[st.Name+".request"] = requestSchema(st.Form)
+	s.defs[st.Name+".envelope"] = map[string]any{
+		"allOf":      []any{ref("domain.Envelope")},
+		"properties": map[string]any{"command": map[string]any{"const": st.Name}, "plan": false, "items": false},
 	}
 }
 
@@ -457,10 +469,6 @@ func (s *schemaWriter) of(t reflect.Type) map[string]any {
 		return map[string]any{"type": "boolean"}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return map[string]any{"type": "integer"}
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return map[string]any{"type": "integer", "minimum": 0}
-	case reflect.Float32, reflect.Float64:
-		return map[string]any{"type": "number"}
 	default:
 		s.t.Fatalf("%s: a kind the schema cannot describe", t)
 		return nil
@@ -500,30 +508,31 @@ func (s *schemaWriter) fields(t reflect.Type, properties map[string]any, require
 	s.t.Helper()
 	for field := range t.Fields() {
 		tag := field.Tag.Get("json")
-		name, options, _ := strings.Cut(tag, ",")
-		embedded := field.Type
-		if embedded.Kind() == reflect.Pointer {
-			embedded = embedded.Elem()
-		}
+		tagName, options, _ := strings.Cut(tag, ",")
+		name := cmp.Or(tagName, field.Name)
 		switch {
 		case tag == "-":
 			continue
-		case field.Anonymous && name == "" && embedded.Kind() == reflect.Struct:
-			s.fields(embedded, properties, required)
+		case field.Anonymous && tagName == "" && field.Type.Kind() == reflect.Struct:
+			s.fields(field.Type, properties, required)
+			continue
+		case field.Anonymous && tagName == "" && field.Type.Kind() == reflect.Pointer && field.Type.Elem().Kind() == reflect.Struct:
+			// encoding/json writes none of a nil embedded pointer's fields: each is optional
+			s.fields(field.Type.Elem(), properties, new([]string))
 			continue
 		case !field.IsExported():
 			continue
 		}
 
 		schema := s.of(field.Type)
-		optional := slices.Contains(strings.Split(options, ","), "omitempty") || slices.Contains(strings.Split(options, ","), "omitzero")
+		optional := slices.ContainsFunc(strings.Split(options, ","), func(option string) bool { return option == "omitempty" || option == "omitzero" })
 		if !optional {
-			*required = append(*required, cmp.Or(name, field.Name))
+			*required = append(*required, name)
 			if nilable(field.Type) {
 				schema = map[string]any{"anyOf": []any{schema, map[string]any{"type": "null"}}}
 			}
 		}
-		properties[cmp.Or(name, field.Name)] = schema
+		properties[name] = schema
 	}
 }
 
@@ -585,4 +594,39 @@ func readFile(t *testing.T, path string) []byte {
 // updating reports whether the test runs with -update, which rewrites what it compares with.
 func updating() bool {
 	return flag.Lookup("update").Value.String() == "true"
+}
+
+// globbed are the files pattern matches, at least one.
+func globbed(t *testing.T, pattern string) []string {
+	t.Helper()
+	files, err := filepath.Glob(pattern)
+	require.NoError(t, err)
+	require.NotEmpty(t, files, pattern)
+	return files
+}
+
+// followUpsIn are the follow-ups a JSON document holds at any depth: each value of a follow_up, each entry of a follow_ups.
+func followUpsIn(document any) []map[string]any {
+	var found []map[string]any
+	switch value := document.(type) {
+	case map[string]any:
+		for key, nested := range value {
+			if followUp, ok := nested.(map[string]any); ok && key == "follow_up" {
+				found = append(found, followUp)
+			}
+			if list, ok := nested.([]any); ok && key == "follow_ups" {
+				for _, entry := range list {
+					if followUp, ok := entry.(map[string]any); ok {
+						found = append(found, followUp)
+					}
+				}
+			}
+			found = append(found, followUpsIn(nested)...)
+		}
+	case []any:
+		for _, nested := range value {
+			found = append(found, followUpsIn(nested)...)
+		}
+	}
+	return found
 }

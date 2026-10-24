@@ -1242,6 +1242,72 @@
       ],
       "type": "object"
     },
+    "events.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "events"
+        },
+        "items": false,
+        "plan": false
+      }
+    },
+    "events.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "repo"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "all"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
     "extract.Detail": {
       "additionalProperties": false,
       "properties": {
@@ -2330,11 +2396,7 @@
       "required": [
         "number",
         "url",
-        "state",
-        "title",
-        "draft",
-        "checks",
-        "decision"
+        "state"
       ],
       "type": "object"
     },

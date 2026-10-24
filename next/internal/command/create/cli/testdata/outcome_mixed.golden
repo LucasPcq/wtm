@@ -21,9 +21,9 @@
   ! feat/d  interrupted · left incomplete
   ! remote-only  interrupted
 
-  → wtm go feature
-  → wtm go linked
-  → wtm go feat/c
-  → wtm go feat/d
+  → wtm go feature             jump in
+  → wtm go linked              jump in
+  → wtm go feat/c              jump in
+  → wtm go feat/d              jump in
   → wtm clean feat/e --force   branch feat/e is left half-created at /trees/feat-e
   → wtm env feat/c             settle the ports once run.toml is fixed

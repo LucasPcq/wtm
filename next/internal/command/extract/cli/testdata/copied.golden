@@ -8,5 +8,5 @@
   Mode        copy
   feat/split  ../.trees/feat-split
 
-  → wtm go feat/split
+  → wtm go feat/split   jump in
 

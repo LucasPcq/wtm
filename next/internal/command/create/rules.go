@@ -157,7 +157,7 @@ const CodeJumpIn = Name + ".jump_in"
 // jumpIn is the step into the worktree of branch, checked out elsewhere, that a create of it is refused for.
 func jumpIn(branch string) *domain.FollowUp {
 	enter := domain.Enter(branch)
-	enter.Code, enter.Message = CodeJumpIn, "jump in"
+	enter.Code = CodeJumpIn
 	return &enter
 }
 

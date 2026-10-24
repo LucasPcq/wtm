@@ -102,9 +102,9 @@ const (
 	PathWorktree = "worktree" // the worktree a follow-up acts on: its branch or, on no branch, its path
 )
 
-// Enter is the follow-up that enters worktree, by its branch or, on no branch, its path.
+// Enter is the follow-up that enters worktree, by its branch or, on no branch, its path; its caller gives it a code.
 func Enter(worktree string) FollowUp {
-	return FollowUp{Command: CommandGo, Answers: []Answered{{Path: PathWorktree, Values: []string{worktree}}}}
+	return FollowUp{Command: CommandGo, Answers: []Answered{{Path: PathWorktree, Values: []string{worktree}}}, Message: "jump in"}
 }
 
 // Error returns the message, followed by the cause's when there is one.
