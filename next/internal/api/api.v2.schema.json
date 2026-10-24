@@ -1,5 +1,15 @@
 {
   "$defs": {
+    "api.CommandName": {
+      "description": "The name of a command of the catalogue, the {name} of its routes.",
+      "enum": [
+        "create",
+        "extract",
+        "list",
+        "status",
+        "tree"
+      ]
+    },
     "create.BranchPlan": {
       "additionalProperties": false,
       "properties": {
@@ -2766,6 +2776,185 @@
       },
       "type": "array"
     },
+    "web.Busy": {
+      "additionalProperties": false,
+      "description": "POST /api/stop refused, 409: the correlation IDs of the operations still running.",
+      "properties": {
+        "operations": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "operations"
+      ],
+      "type": "object"
+    },
+    "web.Call": {
+      "additionalProperties": false,
+      "description": "The body of POST /api/repos/{repo}/commands/{name} and of its /questions: the answer of each field by its path, and, to run it, whether it plans only and the fingerprint its apply is held to.",
+      "properties": {
+        "answers": {
+          "items": {
+            "$ref": "#/$defs/domain.Answered"
+          },
+          "type": "array"
+        },
+        "dry_run": {
+          "type": "boolean"
+        },
+        "expect_fingerprint": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "answers"
+      ],
+      "type": "object"
+    },
+    "web.Command": {
+      "additionalProperties": false,
+      "description": "A command of the catalogue as GET /api/repos/{repo}/commands lists it: its name and its form outside any repository.",
+      "properties": {
+        "form": {
+          "$ref": "#/$defs/domain.Form"
+        },
+        "name": {
+          "$ref": "#/$defs/api.CommandName"
+        }
+      },
+      "required": [
+        "name",
+        "form"
+      ],
+      "type": "object"
+    },
+    "web.CommandLine": {
+      "additionalProperties": false,
+      "description": "POST /api/command-line: a follow-up as the command line runs it.",
+      "properties": {
+        "argv": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "argv"
+      ],
+      "type": "object"
+    },
+    "web.Commands": {
+      "description": "GET /api/repos/{repo}/commands: the catalogue.",
+      "items": {
+        "$ref": "#/$defs/web.Command"
+      },
+      "type": "array"
+    },
+    "web.Refusal": {
+      "additionalProperties": false,
+      "description": "The body of a request the server refuses itself, before any command runs: a v2 envelope of no command, its error one of the server's codes.",
+      "properties": {
+        "command": {
+          "const": ""
+        },
+        "error": {
+          "$ref": "#/$defs/domain.Error",
+          "description": "Its code is the server's own (web.token_invalid, web.host_refused, web.origin_refused, web.not_found, web.method_not_allowed, web.repo_unknown, web.command_unknown, web.operation_unknown, web.schema_unavailable, web.stopping), request.invalid for a body that does not decode, or the code of what failed while the repositories were read."
+        },
+        "follow_ups": {
+          "maxItems": 0,
+          "type": "array"
+        },
+        "ok": {
+          "const": false
+        },
+        "v": {
+          "const": 2
+        },
+        "warnings": {
+          "maxItems": 0,
+          "type": "array"
+        }
+      },
+      "required": [
+        "v",
+        "command",
+        "ok",
+        "follow_ups",
+        "warnings",
+        "error"
+      ],
+      "type": "object"
+    },
+    "web.Repo": {
+      "additionalProperties": false,
+      "description": "A repository wtm knows, as GET /api/repos lists it: its id, the {repo} of a route, and where it is.",
+      "properties": {
+        "common_dir": {
+          "description": "git rev-parse --git-common-dir, absolute: the repository's key.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "id": {
+          "description": "A digest of its common directory.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "root": {
+          "description": "The main worktree.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "root",
+        "common_dir"
+      ],
+      "type": "object"
+    },
+    "web.Repos": {
+      "description": "GET /api/repos: the repositories wtm knows, those no longer initialized left out.",
+      "items": {
+        "$ref": "#/$defs/web.Repo"
+      },
+      "type": "array"
+    },
+    "web.Version": {
+      "additionalProperties": false,
+      "description": "GET /api/version: the version of the binary that serves.",
+      "properties": {
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "type": "object"
+    },
+    "web.Warning": {
+      "additionalProperties": false,
+      "description": "The data of an event named warning on an event stream: what kept a line or a repository from it for a while.",
+      "properties": {
+        "message": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "type": "object"
+    },
     "worktree.Change": {
       "additionalProperties": false,
       "properties": {
@@ -2904,6 +3093,6 @@
   },
   "$id": "https://wtm.sh/schemas/api.v2.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "What the catalogue of wtm's commands sends a surface other than the command line: the v2 envelope, the form of a request and its fields, the events of an operation, and each command's request, plan, detail and envelope under $defs. Generated from the Go types by make schema: never edit it by hand.",
+  "description": "What the catalogue of wtm's commands sends a surface other than the command line: the v2 envelope, the form of a request and its fields, the events of an operation, and each command's request, plan, detail and envelope under $defs; and what the web server's own routes answer (web.*). Generated from the Go types by make schema: never edit it by hand.",
   "title": "wtm api v2"
 }

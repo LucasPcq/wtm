@@ -1,0 +1,97 @@
+{
+  "$comment": "The shapes the web server's own routes write and read (server.go, response.go), beside the catalogue's; the generator of api.v2.schema.json copies these $defs as they are. Change them with the Go that writes them.",
+  "$defs": {
+    "web.Version": {
+      "description": "GET /api/version: the version of the binary that serves.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version"],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "web.Repo": {
+      "description": "A repository wtm knows, as GET /api/repos lists it: its id, the {repo} of a route, and where it is.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "root", "common_dir"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "description": "A digest of its common directory." },
+        "root": { "type": "string", "minLength": 1, "description": "The main worktree." },
+        "common_dir": { "type": "string", "minLength": 1, "description": "git rev-parse --git-common-dir, absolute: the repository's key." }
+      }
+    },
+    "web.Repos": {
+      "description": "GET /api/repos: the repositories wtm knows, those no longer initialized left out.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/web.Repo" }
+    },
+    "web.Command": {
+      "description": "A command of the catalogue as GET /api/repos/{repo}/commands lists it: its name and its form outside any repository.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "form"],
+      "properties": {
+        "name": { "$ref": "#/$defs/api.CommandName" },
+        "form": { "$ref": "#/$defs/domain.Form" }
+      }
+    },
+    "web.Commands": {
+      "description": "GET /api/repos/{repo}/commands: the catalogue.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/web.Command" }
+    },
+    "web.Call": {
+      "description": "The body of POST /api/repos/{repo}/commands/{name} and of its /questions: the answer of each field by its path, and, to run it, whether it plans only and the fingerprint its apply is held to.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["answers"],
+      "properties": {
+        "answers": { "type": "array", "items": { "$ref": "#/$defs/domain.Answered" } },
+        "dry_run": { "type": "boolean" },
+        "expect_fingerprint": { "type": "string" }
+      }
+    },
+    "web.Warning": {
+      "description": "The data of an event named warning on an event stream: what kept a line or a repository from it for a while.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message"],
+      "properties": {
+        "message": { "type": "string", "minLength": 1 }
+      }
+    },
+    "web.Busy": {
+      "description": "POST /api/stop refused, 409: the correlation IDs of the operations still running.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operations"],
+      "properties": {
+        "operations": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+      }
+    },
+    "web.CommandLine": {
+      "description": "POST /api/command-line: a follow-up as the command line runs it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv"],
+      "properties": {
+        "argv": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      }
+    },
+    "web.Refusal": {
+      "description": "The body of a request the server refuses itself, before any command runs: a v2 envelope of no command, its error one of the server's codes.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "command", "ok", "follow_ups", "warnings", "error"],
+      "properties": {
+        "v": { "const": 2 },
+        "command": { "const": "" },
+        "ok": { "const": false },
+        "follow_ups": { "type": "array", "maxItems": 0 },
+        "warnings": { "type": "array", "maxItems": 0 },
+        "error": { "$ref": "#/$defs/domain.Error", "description": "Its code is the server's own (web.token_invalid, web.host_refused, web.origin_refused, web.not_found, web.method_not_allowed, web.repo_unknown, web.command_unknown, web.operation_unknown, web.schema_unavailable, web.stopping), request.invalid for a body that does not decode, or the code of what failed while the repositories were read." }
+      }
+    }
+  }
+}

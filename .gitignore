@@ -31,3 +31,6 @@ vendor/
 
 # Documents de travail (specs et plans de session) — locaux, jamais versionnés
 docs/superpowers/
+
+# The web front, built by make ui and embedded by next/internal/web
+!next/internal/web/dist/

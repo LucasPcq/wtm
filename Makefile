@@ -2,13 +2,24 @@ BINARY      := wtm
 BINARY_NEXT := wtm-next
 BUILD_DIR   := bin
 
-.PHONY: build next schema test test-next vet fmt lint lint-next next-lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
+.PHONY: build next ui ui-dev schema test test-next vet fmt lint lint-next next-lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
 
 next:
 	go build -ldflags "-X main.version=$$(git describe --tags --always --dirty)" -o $(BUILD_DIR)/$(BINARY_NEXT) ./next/cmd/wtm-next
+
+# ui rebuilds the web front (next/web) into next/internal/web/dist, which the binary
+# embeds and git keeps: it is the only writer of that directory. The CI rebuilds it
+# from the lockfile and fails when the result differs from the commit.
+ui:
+	cd next/web && npm ci && npm test && npm run build
+
+# ui-dev serves the front from Vite with /api proxied to the server of `wtm-next ui`
+# (WTM_API=http://127.0.0.1:<port> when it listens elsewhere than 4777).
+ui-dev:
+	cd next/web && npm ci && npm run dev
 
 # schema regenerates next/internal/api/api.v2.schema.json, the schema the catalogue
 # publishes, from its Go types; make test-next fails while it is stale.
@@ -22,6 +33,7 @@ test:
 # that leaves the frozen internal/ alone; lint and test stay the full gates.
 test-next:
 	go test ./next/... ./tools/... -race -count=1
+	go test -tags noui ./next/internal/web -race -count=1
 
 vet:
 	go vet ./...

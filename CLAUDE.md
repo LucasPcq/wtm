@@ -14,6 +14,7 @@ Mandatory coding standards for `wtm`. How Go is written follows the `go-style` s
 | [`docs/dev/cli.md`](docs/dev/cli.md) | touching `internal/surface/cli` itself: the root (signals, `--quiet`, exit code), flag wiring |
 | [`docs/dev/output.md`](docs/dev/output.md) | adding a command or changing what one prints (frame, glyphs, block helpers, `--quiet`, JSON contract, hook view) |
 | [`docs/dev/lint.md`](docs/dev/lint.md) | adding an `archlint` rule or an exception, or when `make lint` fails and the reason is unclear |
+| [`docs/dev/web-front.md`](docs/dev/web-front.md) | touching the web front (`next/web`), `make ui`, its committed build or its Pencil design |
 | [`docs/dev/identity.md`](docs/dev/identity.md) | touching the landing, the docs theme, the README pitch, the social preview or any launch material (positioning, voice, colours, type, logo, layout) |
 | [`docs/dev/changelog.md`](docs/dev/changelog.md) | writing a `CHANGELOG.md` entry |
 | [`docs/dev/run-addressing.md`](docs/dev/run-addressing.md), [`docs/dev/shared-services.md`](docs/dev/shared-services.md) | touching the run proxy / addressing, or `scope = "shared"` jobs |

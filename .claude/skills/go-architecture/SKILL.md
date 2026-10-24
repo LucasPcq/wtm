@@ -19,7 +19,8 @@ next/
     adapter/<name>/    git, store, config, shell, oplock, events (the bus), registry, webserver, statefile, proxyport, daemon, github; <name>test fakes
     ui/                cli (root, exit codes, env), output (streams, frames, envelope), form (flags, wizard, conclusion), widget (a step's inputs), formtest (the cli tests' kit)
     api/               the catalogue of commands, and its streams, for a surface other than the CLI
-    web/               the local HTTP server over api (wtm-next ui): routes, guard, SSE, HTTP statuses
+    web/               the local HTTP server over api (wtm-next ui): routes, guard, SSE, HTTP statuses, the embedded front
+  web/                 the web front (React + Vite), no Go file; `make ui` builds it into internal/web/dist
   docs/proof/          scripts that run wtm and wtm-next side by side, and their captures
 ```
 
