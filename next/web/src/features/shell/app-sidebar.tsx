@@ -34,8 +34,10 @@ const soon: { group: string; items: { label: string; icon: LucideIcon }[] }[] = 
 export function AppSidebar(props: { repo: string | undefined }) {
   return (
     <Sidebar>
-      <SidebarHeader className="gap-6 px-4 pt-5 pb-1">
-        <VersionedLogo />
+      <SidebarHeader className="gap-6 pt-5">
+        <div className="px-2">
+          <VersionedLogo />
+        </div>
         <RepoPicker current={props.repo} />
       </SidebarHeader>
       <SidebarContent>
