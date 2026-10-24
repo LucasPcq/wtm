@@ -451,7 +451,7 @@ func TestAKnownRouteAskedWithAnotherMethodIsRefusedWithTheMethodsItAnswers(t *te
 	unknown := do(t, server, req{method: http.MethodGet, path: "/api/nothing"})
 
 	assert.Equal(t, http.StatusMethodNotAllowed, wrong.StatusCode)
-	assert.Equal(t, "GET", wrong.Header.Get("Allow"))
+	assert.Equal(t, "GET, HEAD", wrong.Header.Get("Allow"))
 	assert.Equal(t, CodeMethodNotAllowed, decoded[envelope](t, wrong).Error.Code)
 	assert.Equal(t, http.StatusNotFound, unknown.StatusCode)
 	assert.Equal(t, CodeNotFound, decoded[envelope](t, unknown).Error.Code)

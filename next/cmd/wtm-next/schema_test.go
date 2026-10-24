@@ -143,6 +143,7 @@ func TestEachResponseOfTheWebServerMatchesTheSchema(t *testing.T) {
 		}},
 		"no_token":     {def: "web.Refusal", response: func() *http.Response { return get(t, server, "/api/version", true) }},
 		"repo_unknown": {def: "web.Refusal", response: func() *http.Response { return post(t, server, "/api/repos/nope/commands/list", `{}`) }},
+		"wrong_method": {def: "web.Refusal", response: func() *http.Response { return post(t, server, "/api/version", ``) }},
 		"not_a_call":   {def: "web.Refusal", response: func() *http.Response { return post(t, server, "/api/repos/"+repo+"/commands/list", `[`) }},
 	} {
 		t.Run(name, func(t *testing.T) {

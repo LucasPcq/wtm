@@ -26,3 +26,6 @@ dist-ssr
 # Generated from api.v2.schema.json by `npm run types`
 src/api/types.gen.ts
 src/routeTree.gen.ts
+
+# tsr generate's scratch
+.tanstack/

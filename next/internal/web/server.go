@@ -214,6 +214,10 @@ func (s *Server) noRoute(w http.ResponseWriter, r *http.Request) {
 		// a route of the path is a pattern of that method; "/api/" is this one, "" a redirect of an unclean path
 		if _, pattern := s.mux.Handler(&http.Request{Method: method, URL: r.URL, Host: r.Host}); strings.HasPrefix(pattern, method+" ") {
 			allowed = append(allowed, method)
+			// a GET route answers HEAD too, as Go's own 405 says
+			if method == http.MethodGet {
+				allowed = append(allowed, http.MethodHead)
+			}
 		}
 	}
 	if len(allowed) == 0 {
