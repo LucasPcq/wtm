@@ -28,7 +28,7 @@ How a use case or a service reaches the world, what implements it, and what stan
 The in-memory twin of an adapter, for its consumers' tests: `gittest.Fake`, `storetest.Fake` (meta.json, the .env files), `configtest.Fake` (config.toml, run.toml, the answers remembered), `registrytest.Fake`.
 
 - **It keeps the adapter's contract**, not only its signatures: the same refusals and results (a write that changes nothing reports no change, a newer schema is refused, a failed add drops the branch it created).
-- **One shape:** seeded by `NewFake(FakeParams{…})`; any method made to fail through `FakeParams.Fail` (by method name); `Calls()` and readers (`Meta`, `File`, `Config`, `Moves`) give back what happened; safe for concurrent use.
+- **One shape:** seeded by `NewFake(FakeParams{…})`; any method made to fail through `FakeParams.Fail` (by method name); `Calls()` and readers (`Meta`, `File`, `Moves`) give back what happened; safe for concurrent use.
 - **Parity:** the adapter's tests run each case against the adapter and the fake (`adapter/git/fixture_test.go`: the `port` both implement, `implementations(t)`), and `gittest.Build` builds the real repository from the same `FakeParams` as `NewFake` (`adapter/config`: `onDisk` renders each seed's config.toml as the fake holds it; run.toml and the global config stay out of its parity). A method added to the adapter is added to the fake and to the parity test.
 - **Placement:** beside its adapter, importing what the adapter may plus the adapter; imported from `_test.go` files only. A name ending in `test` under `adapter/`, `service/` or `ui/` is reserved for the kit of the package beside it. `[archlint]`
 

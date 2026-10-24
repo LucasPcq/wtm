@@ -46,11 +46,18 @@ type FakeParams struct {
 func NewFake(params FakeParams) *Fake {
 	fake := &Fake{run: params.Run, schema: params.Schema, unreadable: params.Unreadable, fail: params.Fail}
 	if params.Config != nil {
-		config := *params.Config
-		config.Remembered = maps.Clone(config.Remembered)
+		config := copied(*params.Config)
 		fake.config = &config
 	}
 	return fake
+}
+
+// copied is config with its own slices and map, as each config.Project.Load returns a config of its own.
+func copied(config project.Config) project.Config {
+	config.Env.Files = slices.Clone(config.Env.Files)
+	config.OnCreate = slices.Clone(config.OnCreate)
+	config.Remembered = maps.Clone(config.Remembered)
+	return config
 }
 
 // Calls returns the name of every method called so far, in order.
@@ -84,7 +91,7 @@ func (f *Fake) Load() (project.Config, project.Global, error) {
 	if f.unreadable {
 		return project.Config{}, project.Global{}, &project.InvalidConfigError{Reason: errors.New("configtest: config.toml does not parse")}
 	}
-	return *f.config, project.Global{}, nil
+	return copied(*f.config), project.Global{}, nil
 }
 
 // LoadRun returns run.toml as config.Project.LoadRun does.
