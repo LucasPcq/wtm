@@ -1,9 +1,9 @@
 $ api $U/api/version
-{"version":"v0.30.1-35-gab7c7f88-dirty"}
+{"version":"v0.30.1-36-ga68febad-dirty"}
 $ api $U/api/repos | jq .
 [
   {
-    "id": "79259ade88bd",
+    "id": "d311c124e2ca",
     "root": "<SB>/A",
     "common_dir": "<SB>/A/.git"
   }
@@ -30,7 +30,7 @@ $ api -X POST $C -d '{"answers":[{"path":"branches","values":["feat/x"]}],"dry_r
   "v": 2,
   "command": "create",
   "ok": true,
-  "op": "f737a957dc4a0fbd",
+  "op": "b5845567b138d1ca",
   "plan": {
     "branches": [
       {
@@ -78,63 +78,63 @@ $ api -X POST $C -d '{"answers":[{"path":"branches","values":["feat/x"]}],"dry_r
       }
     ]
   },
-  "fingerprint": "75073f7bc91fd6aaf8bd5763",
+  "fingerprint": "a3c7c87ee6cec89557cf4a48",
   "follow_ups": [],
   "warnings": []
 }
 
-# apply with expect_fingerprint=75073f7bc91fd6aaf8bd5763, as a stream
-$ api -N -D - -X POST -H 'Accept: text/event-stream' $C -d '{"answers":[{"path":"branches","values":["feat/x"]}],"expect_fingerprint":"75073f7bc91fd6aaf8bd5763"}'
+# apply with expect_fingerprint=a3c7c87ee6cec89557cf4a48, as a stream
+$ api -N -D - -X POST -H 'Accept: text/event-stream' $C -d '{"answers":[{"path":"branches","values":["feat/x"]}],"expect_fingerprint":"a3c7c87ee6cec89557cf4a48"}'
 HTTP/1.1 200 OK
 Cache-Control: no-cache
 Content-Type: text/event-stream
-X-Wtm-Operation: ab917f8d548807a4
+X-Wtm-Operation: 38d9086fea112a04
 Date: <T>
 Transfer-Encoding: chunked
 
-data: {"v":2,"type":"operation.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"ab917f8d548807a4","command":"create","surface":"web"}
+data: {"v":2,"type":"operation.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"38d9086fea112a04","command":"create","surface":"web"}
 
-data: {"v":2,"type":"unit.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"ab917f8d548807a4","subject":"feat/x"}
+data: {"v":2,"type":"unit.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"38d9086fea112a04","subject":"feat/x"}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"ab917f8d548807a4","subject":"feat/x","phase":"worktree"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"38d9086fea112a04","subject":"feat/x","phase":"worktree"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"ab917f8d548807a4","subject":"feat/x","phase":"worktree","failed":false}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"38d9086fea112a04","subject":"feat/x","phase":"worktree","failed":false}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"ab917f8d548807a4","subject":"feat/x","phase":"env"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"38d9086fea112a04","subject":"feat/x","phase":"env"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"ab917f8d548807a4","subject":"feat/x","phase":"env","failed":false}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"38d9086fea112a04","subject":"feat/x","phase":"env","failed":false}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"ab917f8d548807a4","subject":"feat/x","phase":"meta"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"38d9086fea112a04","subject":"feat/x","phase":"meta"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"ab917f8d548807a4","subject":"feat/x","phase":"meta","failed":false}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"38d9086fea112a04","subject":"feat/x","phase":"meta","failed":false}
 
-data: {"v":2,"type":"worktree.created","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"ab917f8d548807a4","worktree":{"branch":"feat/x","path":"<SB>/.trees/feat-x","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:07:56Z"}}
+data: {"v":2,"type":"worktree.created","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"38d9086fea112a04","worktree":{"branch":"feat/x","path":"<SB>/.trees/feat-x","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:31Z"}}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"ab917f8d548807a4","subject":"feat/x","phase":"on_create","log":"<SB>/A/.git/wtm/hooks/on_create-feat%2Fx.log"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"38d9086fea112a04","subject":"feat/x","phase":"on_create","log":"<SB>/A/.git/wtm/hooks/on_create-feat%2Fx.log"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"ab917f8d548807a4","subject":"feat/x","phase":"on_create","failed":false}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"38d9086fea112a04","subject":"feat/x","phase":"on_create","failed":false}
 
-data: {"v":2,"type":"worktree.provisioned","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"ab917f8d548807a4","worktree":{"branch":"feat/x","path":"<SB>/.trees/feat-x","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:07:56Z"},"ok":true}
+data: {"v":2,"type":"worktree.provisioned","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"38d9086fea112a04","worktree":{"branch":"feat/x","path":"<SB>/.trees/feat-x","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:31Z"},"ok":true}
 
-data: {"v":2,"type":"unit.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"ab917f8d548807a4","subject":"feat/x","status":"done"}
+data: {"v":2,"type":"unit.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"38d9086fea112a04","subject":"feat/x","status":"done"}
 
-data: {"v":2,"type":"operation.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"ab917f8d548807a4","command":"create","surface":"web","ok":true}
+data: {"v":2,"type":"operation.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"38d9086fea112a04","command":"create","surface":"web","ok":true}
 
 event: envelope
-data: {"v":2,"command":"create","ok":true,"op":"45039375707a1047","items":[{"subject":"feat/x","status":"done","detail":{"path":"<SB>/.trees/feat-x","metadata":{"source_branch":"main","created_at":"2026-10-24T21:07:56Z","env_strategy":"example","isolation":"isolated"},"existing_branch":false}}],"plan":{"branches":[{"branch":"feat/x","path":"<SB>/.trees/feat-x","action":"create"}],"from":"main","env_from":"example","creates":1,"recap":[{"key":"branches","label":"Branches","path":"branches","values":[{"value":"feat/x","text":"feat/x"}]},{"key":"from","label":"From","path":"from","values":[{"value":"main","text":"main"}]},{"key":"env_from","label":"Env","path":"env_from","values":[{"value":"example","text":"example"}]}]},"follow_ups":[{"command":"go","answers":[{"path":"worktree","values":["feat/x"]}],"code":"create.go","message":"jump in"}],"warnings":[]}
+data: {"v":2,"command":"create","ok":true,"op":"56a9d96150f59a8e","items":[{"subject":"feat/x","status":"done","detail":{"path":"<SB>/.trees/feat-x","metadata":{"source_branch":"main","created_at":"2026-10-24T21:17:31Z","env_strategy":"example","isolation":"isolated"},"existing_branch":false}}],"plan":{"branches":[{"branch":"feat/x","path":"<SB>/.trees/feat-x","action":"create"}],"from":"main","env_from":"example","creates":1,"recap":[{"key":"branches","label":"Branches","path":"branches","values":[{"value":"feat/x","text":"feat/x"}]},{"key":"from","label":"From","path":"from","values":[{"value":"main","text":"main"}]},{"key":"env_from","label":"Env","path":"env_from","values":[{"value":"example","text":"example"}]}]},"follow_ups":[{"command":"go","answers":[{"path":"worktree","values":["feat/x"]}],"code":"create.go","message":"jump in"}],"warnings":[]}
 
 
 # a stale fingerprint: feat/w planned as a new branch from main, then the branch made behind its back
 $ api -X POST $C -d '{"answers":[{"path":"branches","values":["feat/w"]},{"path":"from","values":["main"]}],"dry_run":true}' | jq -c '{fingerprint, plan: .plan.branches}'
-{"fingerprint":"ec85e196e88884e39e8677ee","plan":[{"branch":"feat/w","path":"<SB>/.trees/feat-w","action":"create"}]}
+{"fingerprint":"e9ec96541db4701a5e32d178","plan":[{"branch":"feat/w","path":"<SB>/.trees/feat-w","action":"create"}]}
 
 $ git -C $SB/A branch feat/w
 
-$ api -i -X POST $C -d '{"answers":[{"path":"branches","values":["feat/w"]},{"path":"from","values":["main"]}],"expect_fingerprint":"ec85e196e88884e39e8677ee"}'
+$ api -i -X POST $C -d '{"answers":[{"path":"branches","values":["feat/w"]},{"path":"from","values":["main"]}],"expect_fingerprint":"e9ec96541db4701a5e32d178"}'
 HTTP/1.1 412 Precondition Failed
 Content-Type: application/json
-X-Wtm-Operation: 0ac62b4ae7c4f346
+X-Wtm-Operation: 0546654f9fbf3813
 Date: <T>
 Content-Length: 457
 
-{"v":2,"command":"create","ok":false,"op":"b4742db7f107aa9d","follow_ups":[{"command":"create","answers":[{"path":"branches","values":["feat/w"]},{"path":"from","values":["main"]}],"dry_run":true,"code":"plan.replan","message":"the plan the facts give now"}],"warnings":[],"error":{"kind":"precondition","code":"plan.stale","message":"the facts changed since the preview","params":{"expected":"ec85e196e88884e39e8677ee","found":"4ab429045c286ecb0a6553a8"}}}
+{"v":2,"command":"create","ok":false,"op":"adeea9c2f7d70d06","follow_ups":[{"command":"create","answers":[{"path":"branches","values":["feat/w"]},{"path":"from","values":["main"]}],"dry_run":true,"code":"plan.replan","message":"the plan the facts give now"}],"warnings":[],"error":{"kind":"precondition","code":"plan.stale","message":"the facts changed since the preview","params":{"expected":"e9ec96541db4701a5e32d178","found":"0f118f025de2b3c377c658e7"}}}

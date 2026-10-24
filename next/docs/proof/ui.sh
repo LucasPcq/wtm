@@ -21,10 +21,10 @@ SB=$(mktemp -d /tmp/wtmuiXXXXX)
 export HOME=$SB/home PATH=$SB/bin:$PATH
 G=$HOME/Library/Application\ Support/wtm
 mkdir -p "$HOME" "$SB/bin" && cp "$next" "$SB/bin/wtm-next"
-bg=()
 # the sandbox, its server and every background curl never outlive the run
 # never a pid read from web.json: a stale one may be anyone's; the server runs from $SB, which pkill matches
-trap 'kill ${bg[@]+"${bg[@]}"} 2>/dev/null || true; pkill -f -- "$SB" || true; rm -rf "$SB"' EXIT
+# only the jobs still running: a pid wait already reaped may be another process's by now
+trap 'kill $(jobs -p) 2>/dev/null || true; pkill -f -- "$SB" || true; rm -rf "$SB"' EXIT
 
 # A create hook that sleeps on slow/* branches gives an operation long enough to cancel.
 for r in A B; do
@@ -94,13 +94,11 @@ section 03-cancel
 op() {
   curl -s -H "X-Wtm-Token: $TOKEN" -N -D "$out/.$2.h" -X POST -H 'Accept: text/event-stream' "$C" -d "$(answers "$1")" >"$out/.$2.body" &
   OPPID=$!
-  bg+=("$OPPID")
   wait_for "$out/.$2.h" '^X-Wtm-Operation'
   OP=$(tr -d '\r' <"$out/.$2.h" | awk '/^X-Wtm-Operation/ {print $2}')
 }
 curl -s -H "X-Wtm-Token: $TOKEN" -N "$U/api/events?repo=$A" >"$out/.bus" &
 BUS=$!
-bg+=("$BUS")
 note 'a create of slow/a (its hook sleeps 20s) as a stream; DELETE its operation while the hook runs'
 op slow/a cancel
 sleep 2
@@ -136,7 +134,6 @@ section 05-events
 note "the stream of A; a commit in A's feat/x worktree, then a create from the command line"
 curl -s -H "X-Wtm-Token: $TOKEN" -N "$U/api/events?repo=$A" >"$out/.events" &
 EV=$!
-bg+=("$EV")
 sleep 1
 show 'git -C $SB/.trees/feat-x -c user.name=x -c user.email=x@x commit -q --allow-empty -m x; date +%T'
 wait_for "$out/.events" '"worktree.changed"' 10 || true
@@ -156,8 +153,7 @@ show 'api -i $U/api/schema | head -5'
 show 'curl -s -i $U/'
 
 section 07-idle
-show 'kill ${bg[@]} 2>/dev/null; jobs -r | wc -l'
-bg=()
+show 'kill $(jobs -p) 2>/dev/null; jobs -r | wc -l'
 show 'kill -0 $PID1 && echo "server $PID1 running"; date +%T'
 sleep 46
 show 'date +%T; kill -0 $PID1 2>/dev/null || echo "server $PID1 gone"'

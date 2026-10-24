@@ -351,12 +351,11 @@ func (s *stream) poll(ctx context.Context, params pollParams) error {
 	return s.send(ctx, params.Watch, now)
 }
 
-// send sends what changed in the repository watched from its last read to now, but for the branches the operations of wtm named: a worktree.changed per worktree that moved, named as a full read names it, a fresh snapshot when one went away. Now is its last read once sent, and the branches named are forgotten; a read that fails keeps both for the next poll.
+// send sends what changed in the repository watched from its last read to now, but for the changes of the branches the operations of wtm named: a worktree.changed per worktree that moved, named as a full read names it, a fresh snapshot when one went away. Now is its last read once sent, and the branches named are forgotten; a read that fails keeps both for the next poll.
 func (s *stream) send(ctx context.Context, watched *watch, now Polled) error {
 	changes, gone := Changes(watched.polled, now)
-	theirs := func(branch string) bool { return watched.named[branch] }
-	changes = slices.DeleteFunc(changes, func(change Change) bool { return theirs(change.Branch) })
-	gone = slices.DeleteFunc(gone, theirs)
+	// no event of an operation reports a removal: a worktree gone was removed by someone else, whoever named it
+	changes = slices.DeleteFunc(changes, func(change Change) bool { return watched.named[change.Branch] })
 	if len(changes) == 0 && len(gone) == 0 {
 		watched.polled, watched.named = now, nil
 		return nil

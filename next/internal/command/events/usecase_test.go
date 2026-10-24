@@ -551,3 +551,25 @@ func TestAnOperationThatNeverFinishesHoldsThePollBackTenMinutesAtMost(t *testing
 
 	assert.Contains(t, r.next(t), `"type":"worktree.changed"`)
 }
+
+// No event of an operation reports a removal: a worktree it named that went away meanwhile was removed by someone else, and its removal was never sent.
+func TestAWorktreeRemovedDuringAnOperationThatNamedItIsSent(t *testing.T) {
+	app, git := newRepo("/repo", "feat/a").living()
+	bus := newBus()
+	u := useCase(bus, &known{}, opening(app))
+	u.Recheck = 10 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	sub := bus.subscribed(t)
+	r.nextType(t)
+	r.nextType(t)
+
+	sub.Lines <- published(t, app.Repo, domain.OperationStarted{Command: "extract", Surface: "cli"})
+	sub.Lines <- published(t, app.Repo, domain.WorktreeUpdated{Worktree: worktree.Identity{Branch: "feat/a", Path: "/repo/.trees/feat/a"}, Changed: []worktree.IdentityField{worktree.IdentityOrdinal}})
+	assert.Equal(t, "operation.started", r.nextType(t))
+	assert.Equal(t, "worktree.updated", r.nextType(t))
+	require.NoError(t, git.RemoveWorktree(t.Context(), "/repo/.trees/feat/a"))
+	sub.Lines <- published(t, app.Repo, domain.OperationFinished{Command: "extract", Surface: "cli", OK: true})
+
+	assert.Equal(t, "operation.finished", r.nextType(t))
+	assert.Equal(t, "snapshot", r.nextType(t))
+}
