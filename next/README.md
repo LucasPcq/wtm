@@ -44,7 +44,7 @@ A use case reads in one place. `command/<name>/usecase.go` tells the whole reque
 
 ## The published schema
 
-`internal/api/api.v2.schema.json` is the JSON Schema of everything the catalogue sends a surface: the v2 envelope, the form and its fields, the events (a `$ref` to `adapter/events/events.v2.json`), each command's request, plan, detail and envelope, and each stream's request and envelope. It is generated from the Go types, never edited by hand: `make schema` rewrites it, `make test-next` fails while it is stale and validates against it each `catalogue_*` golden of `cmd/wtm-next` and each `envelope_*` golden of a command's `cli`. `api.Schema()` returns it for a server; the site publishes it, with `events.v2.json`, on `wtm.sh/schemas/`. How it is built: `.claude/skills/go-architecture/references/contract.md`, "The published schema".
+`internal/api/api.v2.schema.json` is the JSON Schema of everything the catalogue sends a surface: the v2 envelope, the form and its fields, the events (a `$ref` to `adapter/events/events.v2.json`), each command's request, plan, detail and envelope, each stream's request and envelope, and what the web server's own routes answer and read (`web.*`, written beside the server in `internal/web/web.schema.json`). It is generated from the Go types, never edited by hand: `make schema` rewrites it, `make test-next` fails while it is stale and validates against it each `catalogue_*` golden of `cmd/wtm-next` and each `envelope_*` golden of a command's `cli`, and the web server's real responses. `api.Schema()` returns it for a server; the site publishes it, with `events.v2.json`, on `wtm.sh/schemas/`. How it is built: `.claude/skills/go-architecture/references/contract.md`, "The published schema".
 
 ## Import rules
 

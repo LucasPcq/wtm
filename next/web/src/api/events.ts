@@ -1,8 +1,7 @@
 import { queryOptions, experimental_streamedQuery as streamedQuery, type QueryClient } from '@tanstack/react-query'
 import { EventSourceParserStream } from 'eventsource-parser/stream'
 import { HttpError, request } from './fetch'
-import type { Repo } from './queries'
-import type { WtmEventsV2 } from './types.gen'
+import type { WebRepos, WebWarning, WtmEventsV2 } from './types.gen'
 
 // Live is what the event stream says of itself: what kept a line or a repository from it for a while (the bus
 // lost, a repository skipped), until the next line.
@@ -40,7 +39,7 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
   for (;;) {
     const { value, done } = await reader.read()
     if (done) return
-    if (value.event === 'warning') yield { warning: (JSON.parse(value.data) as { message: string }).message }
+    if (value.event === 'warning') yield { warning: (JSON.parse(value.data) as WebWarning).message }
     else if (!value.event) yield invalidate(client, JSON.parse(value.data) as WtmEventsV2)
   }
 }
@@ -48,7 +47,7 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
 function invalidate(client: QueryClient, line: WtmEventsV2): Live {
   if (line.type === 'repo.added' || line.type === 'repo.removed') void client.invalidateQueries({ queryKey: ['repos'] })
   else if (line.type.startsWith('worktree.') || line.type === 'operation.finished') {
-    const id = client.getQueryData<Repo[]>(['repos'])?.find((repo) => repo.common_dir === line.repo?.common_dir)?.id
+    const id = client.getQueryData<WebRepos>(['repos'])?.find((repo) => repo.common_dir === line.repo?.common_dir)?.id
     void client.invalidateQueries({ queryKey: id ? ['repo', id] : ['repo'] })
   }
   return {}

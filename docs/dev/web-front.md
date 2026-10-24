@@ -11,7 +11,7 @@
 | Routing | TanStack Router, file-based (`src/routes/`, `routeTree.gen.ts` generated): a repository's screens live under `/r/$repo/…`, `$repo` being the id the server gives it (`web.RepoID`) |
 | Server state | TanStack Query: every read, mutation and stream goes through its cache (`src/api/queries.ts`) |
 | Forms | TanStack Form over the form a command's questions return (`src/form/`) |
-| Types | generated from `next/internal/api/api.v2.schema.json` by json-schema-to-typescript into `src/api/types.gen.ts` (`npm run types`, run before `dev` and `build`) |
+| Types | generated from `next/internal/api/api.v2.schema.json` by json-schema-to-typescript into `src/api/types.gen.ts` (`npm run types`, run before `dev` and `build`): the catalogue's shapes and the server's own (`WebRepo`, `WebVersion`, `WebCall`, `WebRefusal`…); the front types nothing by hand |
 | Event stream | `eventsource-parser` (`EventSourceParserStream`) inside TanStack Query's `streamedQuery` |
 | Lint and tests | oxlint (part of `npm run build`, warnings fail it), Vitest over `src/**/*.test.ts` (`npm test`): the non-trivial logic (the token, the event stream, the questions-backed validator), no component test yet |
 

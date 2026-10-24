@@ -279,8 +279,8 @@ const (
 func generatedSchema(t *testing.T) []byte {
 	t.Helper()
 	s := schemaWriter{t: t, defs: map[string]any{}, types: map[string]reflect.Type{}}
-	for _, fragment := range []string{"envelope.schema.json", "form.schema.json"} {
-		s.fragment(filepath.Join("..", "..", "internal", "domain", fragment))
+	for _, fragment := range []string{filepath.Join("domain", "envelope.schema.json"), filepath.Join("domain", "form.schema.json"), filepath.Join("web", "web.schema.json")} {
+		s.fragment(filepath.Join("..", "..", "internal", fragment))
 	}
 	s.fieldUnion()
 	s.defs["domain.Event"] = map[string]any{"$ref": "events.v2.json#/$defs/event"}
@@ -304,7 +304,7 @@ func generatedSchema(t *testing.T) []byte {
 		"$schema":     "https://json-schema.org/draft/2020-12/schema",
 		"$id":         apiSchemaID,
 		"title":       "wtm api v2",
-		"description": "What the catalogue of wtm's commands sends a surface other than the command line: the v2 envelope, the form of a request and its fields, the events of an operation, and each command's request, plan, detail and envelope under $defs. Generated from the Go types by make schema: never edit it by hand.",
+		"description": "What the catalogue of wtm's commands sends a surface other than the command line: the v2 envelope, the form of a request and its fields, the events of an operation, and each command's request, plan, detail and envelope under $defs; and what the web server's own routes answer (web.*). Generated from the Go types by make schema: never edit it by hand.",
 		"$defs":       s.defs,
 	}))
 	return buf.Bytes()
@@ -668,6 +668,20 @@ func registered(t *testing.T, main string) string {
 	require.NoError(t, err)
 	register(t.Context(), params)
 	return web.RepoID(params.repo())
+}
+
+// get asks path of the server of record, with its token unless without.
+func get(t *testing.T, record webserver.Record, path string, without bool) *http.Response {
+	t.Helper()
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://127.0.0.1:"+strconv.Itoa(record.Port)+path, nil)
+	require.NoError(t, err)
+	if !without {
+		request.Header.Set(web.HeaderToken, record.Token)
+	}
+	response, err := http.DefaultClient.Do(request)
+	require.NoError(t, err)
+	t.Cleanup(func() { response.Body.Close() })
+	return response
 }
 
 // post sends body to path on the server of record, with its token.
