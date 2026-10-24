@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -20,9 +19,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 )
-
-//go:embed page.html
-var page []byte
 
 // Params are what a server serves and the functions it is given in place of the world it cannot reach: the catalogue and the event stream, the repositories wtm knows, the version of the binary, the token every request carries, the kill of a forced cancel, the command line of a follow-up and the published schema.
 type Params struct {
@@ -72,7 +68,7 @@ func New(params Params) *Server {
 	s := &Server{params: params, stopping: stopping, stop: stop, running: map[string]running{}, idleSince: time.Now(), asked: make(chan struct{})}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", s.page)
+	mux.HandleFunc("/", s.page)
 	mux.HandleFunc("GET /api/version", s.version)
 	mux.HandleFunc("GET /api/repos", s.repos)
 	mux.HandleFunc("GET /api/repos/{repo}/commands", s.commands)
@@ -208,11 +204,6 @@ func (s *Server) repoOf(w http.ResponseWriter, r *http.Request, id string) (doma
 
 // ----------------------------------------------------------------------------
 // Routes
-
-func (s *Server) page(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write(page)
-}
 
 func (s *Server) version(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"version": s.params.Version})

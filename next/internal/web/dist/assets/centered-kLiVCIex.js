@@ -1,0 +1,1 @@
+import{V as e}from"./dist-bOMjVxOm.js";var t=e();function n(e){return(0,t.jsx)(`div`,{className:`flex flex-1 items-center justify-center p-8`,children:e.children})}export{n as t};
