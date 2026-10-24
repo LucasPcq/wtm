@@ -1,16 +1,16 @@
 $ cd $SB/A && wtm-next ui --no-open --idle 40s
-http://127.0.0.1:4777/#repo=5a1d9fbc9976&token=<TOKEN>
+http://127.0.0.1:4777/#repo=79259ade88bd&token=<TOKEN>
 
 $ ls -l "$G"
 total 16
--rw-r--r--@ 1 lucaspicque  wheel  151 Oct 24 22:33 repos.json
--rw-r--r--@ 1 lucaspicque  wheel    0 Oct 24 22:33 repos.json.lock
--rw-------@ 1 lucaspicque  wheel  139 Oct 24 22:33 web.json
--rw-r--r--@ 1 lucaspicque  wheel    0 Oct 24 22:33 web.json.lock
--rw-r--r--@ 1 lucaspicque  wheel    0 Oct 24 22:33 web.lock
+-rw-r--r--@ 1 lucaspicque  wheel  151 Oct 24 23:07 repos.json
+-rw-r--r--@ 1 lucaspicque  wheel    0 Oct 24 23:07 repos.json.lock
+-rw-------@ 1 lucaspicque  wheel  139 Oct 24 23:07 web.json
+-rw-r--r--@ 1 lucaspicque  wheel    0 Oct 24 23:07 web.json.lock
+-rw-r--r--@ 1 lucaspicque  wheel    0 Oct 24 23:07 web.lock
 
 $ cat "$G/web.json"
-{"pid":92996,"port":4777,"version":"v0.30.1-31-g6583ad02-dirty","token":"<TOKEN>"}
+{"pid":60858,"port":4777,"version":"v0.30.1-35-gab7c7f88-dirty","token":"<TOKEN>"}
 $ ps -o pid=,command= -p $PID1
-92996 <SB>/bin/wtm-next ui serve --idle 40s
+60858 <SB>/bin/wtm-next ui serve --idle 40s
 

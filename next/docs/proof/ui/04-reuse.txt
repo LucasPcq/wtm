@@ -1,13 +1,13 @@
 $ cat "$G/web.json" | jq -c "{pid, port}"
-{"pid":92996,"port":4777}
+{"pid":60858,"port":4777}
 
 $ cd $SB/B && wtm-next ui --no-open
-http://127.0.0.1:4777/#repo=b9c54eadbfc9&token=<TOKEN>
+http://127.0.0.1:4777/#repo=6398ea8e4e57&token=<TOKEN>
 
 $ cat "$G/web.json" | jq -c "{pid, port}"
-{"pid":92996,"port":4777}
+{"pid":60858,"port":4777}
 
 $ api $U/api/repos | jq -c ".[] | {id, root}"
-{"id":"5a1d9fbc9976","root":"<SB>/A"}
-{"id":"b9c54eadbfc9","root":"<SB>/B"}
+{"id":"79259ade88bd","root":"<SB>/A"}
+{"id":"6398ea8e4e57","root":"<SB>/B"}
 

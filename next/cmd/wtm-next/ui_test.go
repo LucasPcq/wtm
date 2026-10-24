@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/webserver"
+	"github.com/LucasPcq/wtm/next/internal/api"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -103,8 +104,10 @@ func TestThePageCarriesTheTokenAndTheRepoInItsFragment(t *testing.T) {
 	assert.Equal(t, "http://127.0.0.1:4777/#token=abc", pageURL(record, ""))
 }
 
-func TestTheServerServesTheEventStreamOfStreams(t *testing.T) {
+func TestTheServerServesTheEventStreamOfStreamsAndThePublishedSchema(t *testing.T) {
 	assert.Equal(t, "events", eventsStream().Name)
+	require.NotNil(t, webParams("t", time.Minute).Schema)
+	assert.Equal(t, api.Schema(), webParams("t", time.Minute).Schema())
 	assert.Equal(t, version, webParams("t", time.Minute).Version)
 }
 

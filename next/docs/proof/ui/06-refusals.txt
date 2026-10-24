@@ -26,13 +26,13 @@ Date: <T>
 Content-Length: 179
 
 {"v":2,"command":"","ok":false,"follow_ups":[],"warnings":[],"error":{"kind":"refused","code":"web.host_refused","message":"the server answers the loopback at its own port only"}}
-$ api -i $U/api/schema
-HTTP/1.1 404 Not Found
-Content-Type: application/json
+$ api -i $U/api/schema | head -5
+HTTP/1.1 200 OK
+Content-Type: application/schema+json
 Date: <T>
-Content-Length: 176
+Transfer-Encoding: chunked
 
-{"v":2,"command":"","ok":false,"follow_ups":[],"warnings":[],"error":{"kind":"invalid","code":"web.schema_unavailable","message":"this wtm publishes no schema of its API yet"}}
+
 $ curl -s -i $U/
 HTTP/1.1 200 OK
 Content-Type: text/html; charset=utf-8

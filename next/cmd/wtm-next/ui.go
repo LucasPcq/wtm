@@ -143,6 +143,7 @@ func webParams(token string, idle time.Duration) web.Params {
 		Token:       token,
 		Kill:        shell.KillCancelled,
 		CommandLine: commandLine,
+		Schema:      api.Schema,
 		Idle:        idle,
 	}
 }

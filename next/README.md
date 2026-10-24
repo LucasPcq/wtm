@@ -121,7 +121,7 @@ Go's doc-comment conventions, as the `go-style` skill states them ([`comments.md
 | `POST /api/repos/{repo}/commands/{name}` | `{"answers", "dry_run", "expect_fingerprint"}` → the v2 envelope, the status of its error's kind (400 invalid, 403 refused, 409 conflict, 412 precondition, 499 cancelled, 500 internal); with `Accept: text/event-stream`, each event as a line of the event stream (`domain.Line`: `v`, `type`, `ts`, `repo`, `correlation_id`), then the envelope as the event named `envelope` |
 | `DELETE /api/repos/{repo}/operations/{id}` | cancels the operation, as a first Ctrl+C; `?force=true` then kills as a second; 202 |
 | `GET /api/events` | the event stream of every repository, `?repo={repo}` of one: its lines, `warning` events (the bus lost and joined again, a repository skipped), and `envelope` when it ends on a failure; a refusal before any line keeps its status |
-| `GET /api/schema` | the published schema of the API; 404 `web.schema_unavailable` while none is |
+| `GET /api/schema` | the published schema of the API, `api.v2.schema.json` (`api.Schema`); a server given none answers 404 `web.schema_unavailable` |
 | `POST /api/stop` | stops the server as its idle stop does, 202; while operations run it refuses, 409 `{"operations": [ids]}`; once it accepted, a command is refused 503 `web.stopping` |
 | `POST /api/command-line` | a follow-up → `{"argv"}`, as the command line runs it, for one the catalogue cannot run |
 

@@ -23,7 +23,8 @@ G=$HOME/Library/Application\ Support/wtm
 mkdir -p "$HOME" "$SB/bin" && cp "$next" "$SB/bin/wtm-next"
 bg=()
 # the sandbox, its server and every background curl never outlive the run
-trap 'kill ${bg[@]+"${bg[@]}"} 2>/dev/null || true; [[ -f $G/web.json ]] && kill "$(jq -r .pid "$G/web.json")" 2>/dev/null || true; pkill -f -- "$SB" || true; rm -rf "$SB"' EXIT
+# never a pid read from web.json: a stale one may be anyone's; the server runs from $SB, which pkill matches
+trap 'kill ${bg[@]+"${bg[@]}"} 2>/dev/null || true; pkill -f -- "$SB" || true; rm -rf "$SB"' EXIT
 
 # A create hook that sleeps on slow/* branches gives an operation long enough to cancel.
 for r in A B; do
@@ -151,7 +152,7 @@ show 'curl -s -i $U/api/version'
 show 'curl -s -i -H "X-Wtm-Token: wrong" $U/api/version'
 show 'api -i -H "Origin: http://evil.example" $U/api/version'
 show 'api -i -H "Host: evil.example:$PORT" $U/api/version'
-show 'api -i $U/api/schema'
+show 'api -i $U/api/schema | head -5'
 show 'curl -s -i $U/'
 
 section 07-idle
@@ -166,7 +167,7 @@ show 'cat "$G/web.json" | jq -c "{pid, port}"'
 show 'kill -0 $(jq -r .pid "$G/web.json") && echo "new server $(jq -r .pid "$G/web.json") running"'
 
 section 08-cleanup
-show 'kill $(jq -r .pid "$G/web.json"); sleep 1; pgrep -f -- "$SB" || echo "no process left in the sandbox"'
+show 'curl -s -o /dev/null -w "stop %{http_code}\n" -X POST -H "X-Wtm-Token: $(jq -r .token "$G/web.json")" "http://127.0.0.1:$(jq -r .port "$G/web.json")/api/stop"; sleep 1; pgrep -f -- "$SB" || echo "no process left in the sandbox"'
 
 rm -f "$out"/.[a-z]*
 sed -i '' -E \
