@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -17,9 +18,8 @@ func TestTheRepositoryObservedIsTheConfigTheSnapshotAndTheRunWithItsError(t *tes
 	git := gittest.NewFake(gittest.FakeParams{Main: "/repo/main", Branch: "main"})
 	config := project.Config{Worktrees: project.Worktrees{BasePath: "../.trees"}}
 	runErr := errors.New("bad run.toml")
-	loadRun := 0
 
-	repo, err := repository.Service{Config: configured{config: config, runErr: runErr, loadRun: &loadRun}, Git: git, MainPath: "/repo/main"}.Observe(t.Context(), "greet")
+	repo, err := repository.Service{Config: configtest.NewFake(configtest.FakeParams{Config: &config, Fail: map[string]error{"LoadRun": runErr}}), Git: git, MainPath: "/repo/main"}.Observe(t.Context(), "greet")
 
 	require.NoError(t, err)
 	snapshot, err := git.Snapshot(t.Context())
@@ -28,9 +28,9 @@ func TestTheRepositoryObservedIsTheConfigTheSnapshotAndTheRunWithItsError(t *tes
 }
 
 func TestARepositoryWithoutConfigIsNotObservedFurther(t *testing.T) {
-	loadRun := 0
+	config := configtest.NewFake(configtest.FakeParams{})
 
-	_, err := repository.Service{Config: configured{err: project.ErrConfigNotFound, loadRun: &loadRun}, Git: gittest.NewFake(gittest.FakeParams{Main: "/repo/main", Branch: "main"}), Init: &domain.FollowUp{Command: "setup"}}.Observe(t.Context(), "greet")
+	_, err := repository.Service{Config: config, Git: gittest.NewFake(gittest.FakeParams{Main: "/repo/main", Branch: "main"}), Init: &domain.FollowUp{Command: "setup"}}.Observe(t.Context(), "greet")
 
 	refused, ok := errors.AsType[*domain.Error](err)
 	require.True(t, ok, err)
@@ -39,14 +39,14 @@ func TestARepositoryWithoutConfigIsNotObservedFurther(t *testing.T) {
 	assert.Equal(t, "no wtm config found", refused.Message)
 	assert.Equal(t, &domain.FollowUp{Command: "setup", Code: "repository.init", Message: "set wtm up in this repository"}, refused.FollowUp)
 	assert.ErrorIs(t, err, project.ErrConfigNotFound)
-	assert.Zero(t, loadRun)
+	assert.NotContains(t, config.Calls(), "LoadRun")
 }
 
 func TestARepositoryWithAnInvalidConfigIsRefusedSayingWhy(t *testing.T) {
-	loadRun := 0
 	reason := errors.New("base_path must be relative to the repository: /tmp/trees")
+	config := configtest.NewFake(configtest.FakeParams{Fail: map[string]error{"Load": &project.InvalidConfigError{Reason: reason}}})
 
-	_, err := repository.Service{Config: configured{err: &project.InvalidConfigError{Reason: reason}, loadRun: &loadRun}, Git: gittest.NewFake(gittest.FakeParams{Main: "/repo/main", Branch: "main"})}.Observe(t.Context(), "greet")
+	_, err := repository.Service{Config: config, Git: gittest.NewFake(gittest.FakeParams{Main: "/repo/main", Branch: "main"})}.Observe(t.Context(), "greet")
 
 	refused, ok := errors.AsType[*domain.Error](err)
 	require.True(t, ok, err)
@@ -54,5 +54,5 @@ func TestARepositoryWithAnInvalidConfigIsRefusedSayingWhy(t *testing.T) {
 	assert.Equal(t, "greet.config_invalid", refused.Code)
 	assert.Equal(t, "invalid config.toml: base_path must be relative to the repository: /tmp/trees", refused.Text())
 	assert.ErrorIs(t, err, reason)
-	assert.Zero(t, loadRun)
+	assert.NotContains(t, config.Calls(), "LoadRun")
 }

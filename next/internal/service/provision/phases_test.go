@@ -14,6 +14,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -320,7 +321,7 @@ func TestOnCreateRunsInTheNewWorktreeAndKeepsItsLog(t *testing.T) {
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{w.path(branchName), "from main on feat/x"}, report.lines())
 	assert.Equal(t, env.HookLogPath(env.HookLogPathParams{StateDir: w.stateDir, Branch: branchName}), report.logOf("on_create"))
-	assert.Contains(t, report.all(), domain.Output{Subject: branchName, Line: "from main on feat/x"})
+	assert.Contains(t, report.All(), domain.Output{Subject: branchName, Line: "from main on feat/x"})
 }
 
 func TestAHookThatFailsLeavesTheWorktreeIncomplete(t *testing.T) {
@@ -346,11 +347,11 @@ func TestAHookInterruptedLeavesTheWorktreeCancelledAndIncomplete(t *testing.T) {
 	w := onDisk(t)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	report := &recorder{on: func(event domain.Event) {
+	report := &recorder{Recorder: operationtest.Recorder{On: func(event domain.Event) {
 		if output, ok := event.(domain.Output); ok && output.Line == "started" {
 			cancel()
 		}
-	}}
+	}}}
 
 	outcome := w.service.Run(ctx, hooked(w.params(report), "echo started; sleep 5", "echo never"))
 

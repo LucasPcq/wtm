@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/registrytest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
@@ -62,22 +63,16 @@ func registered(repos []domain.Repo) registry.Service {
 	}
 }
 
-// config is a project's config.toml as repository.Service loads it, missing when absent.
-type config struct{ absent bool }
-
-func (c config) Load() (project.Config, project.Global, error) {
-	if c.absent {
-		return project.Config{}, project.Global{}, project.ErrConfigNotFound
-	}
-	return project.Config{Worktrees: project.Worktrees{BasePath: "../.trees", BaseBranch: "main"}}, project.Global{}, nil
-}
-
-func (config) LoadRun() (project.Run, error) {
-	return project.Run{}, nil
-}
-
 // app is the repository /code/app, its main worktree on main and feat/a beside it, numbered 1.
 var app = domain.Repo{Root: "/code/app", CommonDir: "/code/app/.git"}
+
+// configOf is app's config.toml, none when absent.
+func configOf(absent bool) *configtest.Fake {
+	if absent {
+		return configtest.NewFake(configtest.FakeParams{})
+	}
+	return configtest.NewFake(configtest.FakeParams{Config: &project.Config{Worktrees: project.Worktrees{BasePath: "../.trees", BaseBranch: "main"}}})
+}
 
 // opening opens app, initialized unless absent; /nowhere is no directory, any other directory in no repository.
 func opening(absent bool) events.Open {
@@ -88,7 +83,7 @@ func opening(absent bool) events.Open {
 		case app.Root:
 			git := gittest.NewFake(gittest.FakeParams{Main: app.Root, Branch: "main", Worktrees: []worktree.Worktree{{Path: "/code/.trees/feat-a", State: worktree.OnBranch{Branch: "feat/a"}}}})
 			meta := storetest.NewFake(storetest.FakeParams{Meta: map[string]worktree.Meta{"feat/a": {SourceBranch: "main", CreatedAt: "2026-10-16T11:00:00Z", Ordinal: 1}}})
-			return events.Source{Repo: app, Repository: repository.Service{Config: config{absent: absent}, Git: git, MainPath: app.Root, Init: &domain.FollowUp{Command: domain.CommandInit}}, Meta: meta}, nil
+			return events.Source{Repo: app, Repository: repository.Service{Config: configOf(absent), Git: git, MainPath: app.Root, Init: &domain.FollowUp{Command: domain.CommandInit}}, Meta: meta}, nil
 		}
 		return events.Source{}, &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodeNotARepository, Message: dir + " is not a git repository"}
 	}

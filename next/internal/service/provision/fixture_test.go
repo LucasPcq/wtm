@@ -13,6 +13,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
@@ -111,7 +112,7 @@ func (w world) params(report *recorder) provision.Params {
 			Source:   "main",
 			Answers:  answered(provision.Given{EnvFrom: project.EnvMain}),
 		},
-		Report: report.add,
+		Report: report.Add,
 	}
 }
 
@@ -241,4 +242,50 @@ func answered(given provision.Given) provision.Answers {
 // repository is a repository remembering remembered, its env strategy example.
 func repository(remembered map[string]string) worktree.Repository {
 	return worktree.Repository{Config: project.Config{Env: project.Env{Strategy: project.EnvExample}, Remembered: remembered}}
+}
+
+// recorder records the events a run reports, as operationtest.Recorder does,
+// and reads back those a test checks.
+type recorder struct {
+	operationtest.Recorder
+}
+
+func (r *recorder) lines() []string {
+	var lines []string
+	for _, event := range r.All() {
+		if output, ok := event.(domain.Output); ok {
+			lines = append(lines, output.Line)
+		}
+	}
+	return lines
+}
+
+func (r *recorder) phases() []string {
+	var phases []string
+	for _, event := range r.All() {
+		if started, ok := event.(domain.PhaseStarted); ok {
+			phases = append(phases, started.Phase)
+		}
+	}
+	return phases
+}
+
+func (r *recorder) logOf(phase string) string {
+	for _, event := range r.All() {
+		if started, ok := event.(domain.PhaseStarted); ok && started.Phase == phase {
+			return started.Log
+		}
+	}
+	return ""
+}
+
+func (r *recorder) worktreeEvents() []domain.Event {
+	var events []domain.Event
+	for _, event := range r.All() {
+		switch event.(type) {
+		case domain.WorktreeCreated, domain.WorktreeUpdated, domain.WorktreeProvisioned:
+			events = append(events, event)
+		}
+	}
+	return events
 }

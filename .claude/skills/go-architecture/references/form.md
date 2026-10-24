@@ -46,5 +46,7 @@ A step is Bubble Tea code: it lays out from the size `tea.WindowSizeMsg` gave, n
   - `Driver`: `formtest.Start(w, tea.WindowSizeMsg{…})` plays a wizard in the test's goroutine; `Keys`, `Send`, `Run`, `Screen`; `Key` and `Plain` for one key and an unstyled screen.
   - `Golden(t, name, got)` compares with `testdata/<name>.golden`; it registers `-update`, so a package that imports it declares no `-update` of its own.
   - `Envelope[P]` and `Decoded[P](t, stdout)` read the v2 JSON envelope, `P` being the command's plan.
+  - `Run(ctx, command, args...)` runs a command line on a root over test streams and returns what it `Printed` (stdout, stderr, the exit code); `command` builds the command over the streams, and may set them up first (a terminal, `Enters` as stdin).
+  - `Enters`, a terminal on which the user keeps pressing enter; `Previewing[R, Q, P, D]`, a use case whose previews get fingerprints of their own and whose applies end on the errors a test lists.
 - **A command's `cli` tests** embed `*formtest.Driver` in their own driver (`command/create/cli/helpers_test.go`) and keep goldens in `cli/testdata/`: `--help`, the dry run, each outcome, each refusal, each envelope, the wizard's screens.
 - **`ui/form`'s own tests** are in `package form_test`; `export_test.go` holds exports only.

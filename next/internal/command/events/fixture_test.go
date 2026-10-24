@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/registrytest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
@@ -95,32 +96,20 @@ func (k *known) pruned() int {
 	return len(slices.DeleteFunc(k.store.Calls(), func(call string) bool { return call != "Prune" }))
 }
 
-// A config is a project's config.toml as repository.Service loads it, which a test can take away; each load is recorded in log, when there is one.
+// A config is a project's config.toml as repository.Service loads it, which a test can take away (Remove); each load is recorded in log, when there is one.
 type config struct {
-	mu   sync.Mutex
-	gone bool
-	err  error
-	log  *callLog
+	*configtest.Fake
+	log *callLog
+}
+
+// newConfig is config.toml with the trees beside the repository, each call failing as fail says.
+func newConfig(fail map[string]error) *config {
+	return &config{Fake: configtest.NewFake(configtest.FakeParams{Config: &project.Config{Worktrees: project.Worktrees{BasePath: "../.trees", BaseBranch: "main"}}, Fail: fail})}
 }
 
 func (c *config) Load() (project.Config, project.Global, error) {
 	c.log.add("observe")
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.gone {
-		return project.Config{}, project.Global{}, project.ErrConfigNotFound
-	}
-	return project.Config{Worktrees: project.Worktrees{BasePath: "../.trees", BaseBranch: "main"}}, project.Global{}, c.err
-}
-
-func (*config) LoadRun() (project.Run, error) {
-	return project.Run{}, nil
-}
-
-func (c *config) remove() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.gone = true
+	return c.Fake.Load()
 }
 
 // A repo is a repository the stream can open: where it is, its git, its records and its config.
@@ -137,7 +126,7 @@ func newRepo(root string, branches ...string) repo {
 	for _, branch := range branches {
 		params.Worktrees = append(params.Worktrees, worktree.Worktree{Path: root + "/.trees/" + branch, State: worktree.OnBranch{Branch: branch}})
 	}
-	return repo{Repo: domain.Repo{Root: root, CommonDir: root + "/.git"}, Git: params, Meta: map[string]worktree.Meta{}, Config: &config{}}
+	return repo{Repo: domain.Repo{Root: root, CommonDir: root + "/.git"}, Git: params, Meta: map[string]worktree.Meta{}, Config: newConfig(nil)}
 }
 
 func (r repo) source() events.Source {

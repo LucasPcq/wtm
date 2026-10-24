@@ -1,4 +1,4 @@
-// Package formtest tests a command's form: a driver that plays its wizard key by key, golden files, and the v2 envelope decoded.
+// Package formtest tests a command's form and its command line: a driver that plays its wizard key by key, golden files, the v2 envelope decoded, a run of the command line, a terminal that keeps pressing enter and a use case whose previews and applies a test scripts.
 // It registers the test flag -update, which rewrites the golden files: a test package that imports it uses that flag and declares none of its own.
 package formtest
 

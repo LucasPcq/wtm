@@ -9,20 +9,21 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
+	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
 func TestTheRecapAppliesThePlanItPreviewedAndPreviewsAgainWhenItTurnedStale(t *testing.T) {
 	stale := &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodePlanStale}
-	app := &previewing{useCase: newWorld(seed{}).usecase(), errs: []error{stale, nil}}
+	app := &previewing{UseCase: newWorld(seed{}).usecase(), Errs: []error{stale, nil}}
 	streams, _, _, _ := output.Test()
 	req := settled()
 	req.Keep = new(false)
 
-	_, err := newForm(nil).Ask(t.Context(), form.AskParams[extract.Request, extract.Questions, extract.Outcome]{App: app, Request: req, In: enters{}, Out: streams.Err})
+	_, err := newForm(nil).Ask(t.Context(), form.AskParams[extract.Request, extract.Questions, extract.Outcome]{App: app, Request: req, In: formtest.Enters{}, Out: streams.Err})
 
 	require.NoError(t, err)
-	assert.Equal(t, []string{"preview-1", "preview-2"}, app.held)
+	assert.Equal(t, []string{"preview-1", "preview-2"}, app.Held)
 }
 
 func TestADryRunWithNothingToAskDrawsNothing(t *testing.T) {
@@ -39,13 +40,13 @@ func TestADryRunWithNothingToAskDrawsNothing(t *testing.T) {
 }
 
 func TestTheRecapRunsThePreviewAndTheApplyWithTheCorrelationID(t *testing.T) {
-	app := &previewing{useCase: newWorld(seed{}).usecase(), errs: []error{nil}}
+	app := &previewing{UseCase: newWorld(seed{}).usecase(), Errs: []error{nil}}
 	streams, _, _, _ := output.Test()
 	req := settled()
 	req.Keep = new(false)
 
-	_, err := newForm(nil).Ask(t.Context(), form.AskParams[extract.Request, extract.Questions, extract.Outcome]{App: app, Request: req, Options: domain.RunOptions{CorrelationID: "corr-1"}, In: enters{}, Out: streams.Err})
+	_, err := newForm(nil).Ask(t.Context(), form.AskParams[extract.Request, extract.Questions, extract.Outcome]{App: app, Request: req, Options: domain.RunOptions{CorrelationID: "corr-1"}, In: formtest.Enters{}, Out: streams.Err})
 
 	require.NoError(t, err)
-	assert.Equal(t, []string{"corr-1", "corr-1"}, app.ids)
+	assert.Equal(t, []string{"corr-1", "corr-1"}, app.IDs)
 }

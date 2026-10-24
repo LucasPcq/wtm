@@ -17,12 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type printed struct {
-	Stdout string
-	Stderr string
-	Code   int
-}
-
 // A run is wtm events run from Dir over a bus that carries Lines, after failing Fail, then is interrupted unless the stream Ends by itself, on the repositories Registered, app missing its config when Absent.
 type run struct {
 	Dir        string
@@ -33,11 +27,10 @@ type run struct {
 	Absent     bool
 }
 
-func runEvents(t *testing.T, r run, words ...string) printed {
+func runEvents(t *testing.T, r run, words ...string) formtest.Printed {
 	t.Helper()
 	ctx, stop := context.WithCancel(t.Context())
 	defer stop()
-	streams, _, stdout, stderr := output.Test()
 	bus := &scriptedBus{fail: r.Fail, lines: r.Lines, stop: stop}
 	if r.Ends {
 		bus.stop = nil
@@ -49,9 +42,9 @@ func runEvents(t *testing.T, r run, words ...string) printed {
 		Now:      func() time.Time { return fixedNow },
 		Recheck:  time.Hour,
 	}
-	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, uicli.Env{Cwd: r.Dir, ProjectDir: r.Dir}, useCase, formtest.CommandLine)})
-	code := uicli.Execute(ctx, root, append([]string{events.Name}, words...))
-	return printed{Stdout: stdout.String(), Stderr: stderr.String(), Code: code}
+	return formtest.Run(ctx, func(streams *output.Streams) *cobra.Command {
+		return New(streams, uicli.Env{Cwd: r.Dir, ProjectDir: r.Dir}, useCase, formtest.CommandLine)
+	}, append([]string{events.Name}, words...)...)
 }
 
 // line is the line a publisher of repo writes for event.

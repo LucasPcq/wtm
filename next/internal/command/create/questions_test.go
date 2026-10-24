@@ -124,7 +124,7 @@ func TestTheSourcePickerListsEveryBranchButThoseBeingCreated(t *testing.T) {
 	questions := w.questions(t, create.Request{Branches: []string{existing}})
 
 	assert.Equal(t, "main", questions.From.Pinned)
-	assert.Equal(t, []string{"main", "origin/" + remote}, values(questions.From.Options))
+	assert.Equal(t, []string{"main", "origin/" + remote}, valuesOf(questions.From.Options))
 	assert.Equal(t, "1 ahead, 1 behind", questions.From.Options[0].Badge)
 }
 

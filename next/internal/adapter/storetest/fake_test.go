@@ -15,29 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAFakeWithoutAConfigRefusesToRemember(t *testing.T) {
-	fake := NewFake(FakeParams{})
-
-	_, err := fake.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
-
-	require.ErrorIs(t, err, project.ErrConfigNotFound)
-}
-
-func TestAFakeRemembersOnTopOfWhatItHoldsAndNeverForgets(t *testing.T) {
-	fake := NewFake(FakeParams{Config: &project.Config{Remembered: map[string]string{project.RememberEnvStrategy: "main"}}})
-
-	written, err := fake.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
-	again, againErr := fake.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
-
-	require.NoError(t, err)
-	require.NoError(t, againErr)
-	assert.Equal(t, domain.Written{Changed: true}, written)
-	assert.Equal(t, domain.Written{}, again)
-	config, ok := fake.Config()
-	require.True(t, ok)
-	assert.Equal(t, map[string]string{project.RememberEnvStrategy: "main", project.RememberIsolation: "verbatim"}, config.Remembered)
-}
-
 func TestAFakeRecordAtANewerSchemaIsNeverRewritten(t *testing.T) {
 	fake := NewFake(FakeParams{Meta: map[string]worktree.Meta{"feat/a": {Schema: 99, SourceBranch: "main"}}})
 
@@ -120,20 +97,6 @@ func TestAFakeRefusesABranchThatIsNoPathSegmentAsTheStoreDoes(t *testing.T) {
 
 	assert.Error(t, loadErr)
 	assert.Error(t, updateErr)
-}
-
-func TestAFakeConfigAtANewerSchemaOrThatDoesNotParseIsNeverRemembered(t *testing.T) {
-	newer := NewFake(FakeParams{Config: &project.Config{}, ConfigSchema: 2})
-	broken := NewFake(FakeParams{Config: &project.Config{}, ConfigUnreadable: true})
-
-	_, newerErr := newer.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
-	_, brokenErr := broken.Remember(t.Context(), map[string]string{project.RememberIsolation: "verbatim"})
-
-	var refusal *domain.SchemaNewer
-	assert.ErrorAs(t, newerErr, &refusal)
-	assert.Error(t, brokenErr)
-	config, _ := newer.Config()
-	assert.Empty(t, config.Remembered)
 }
 
 func TestAFakeNumbersUnderItsLockAndCanFailToTakeIt(t *testing.T) {

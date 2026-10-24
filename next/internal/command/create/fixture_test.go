@@ -15,6 +15,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
+	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 
@@ -51,7 +52,7 @@ type world struct {
 	trees     string
 	repo      git.Repo
 	meta      store.Meta
-	published *recorder
+	published *operationtest.Recorder
 	usecase   create.UseCase
 }
 
@@ -77,7 +78,7 @@ func newWorld(t *testing.T, s seed) world {
 	}
 	meta := store.Meta{StateDir: stateDir}
 	projectConfig := config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}
-	published := &recorder{}
+	published := &operationtest.Recorder{}
 	ids := 0
 	return world{
 		root:      root,

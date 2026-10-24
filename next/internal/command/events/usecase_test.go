@@ -120,7 +120,7 @@ func TestAStreamEndsWhenItsRepositoryLosesItsConfig(t *testing.T) {
 	r.nextType(t)
 	r.nextType(t)
 
-	app.Config.remove()
+	app.Config.Remove()
 
 	assert.Equal(t, events.CodeConfigNotFound, codeOf(t, ended(t, done)))
 }
@@ -133,7 +133,7 @@ func TestAStreamEndsWhenItsRepositoryIsAnnouncedRemovedAndItsConfigIsGone(t *tes
 	r.nextType(t)
 	r.nextType(t)
 
-	app.Config.remove()
+	app.Config.Remove()
 	sub.Lines <- published(t, app.Repo, domain.RepoRemoved{})
 
 	assert.Equal(t, "repo.removed", r.nextType(t))
@@ -142,7 +142,7 @@ func TestAStreamEndsWhenItsRepositoryIsAnnouncedRemovedAndItsConfigIsGone(t *tes
 
 func TestARepositoryWithNoConfigIsRefusedBeforeTheStreamAndNotRegistered(t *testing.T) {
 	app := newRepo("/repo")
-	app.Config.remove()
+	app.Config.Remove()
 	k := &known{}
 
 	err := useCase(newBus(), k, opening(app)).Watch(t.Context(), events.Request{Caller: domain.Caller{Dir: "/repo"}}, newReader().out())
@@ -290,7 +290,7 @@ func TestTheGlobalStreamOpensOnASnapshotOfEachRepositoryThenOneReady(t *testing.
 
 func TestARepositoryTheGlobalStreamCannotReadIsSkippedWithAWarning(t *testing.T) {
 	a, broken := newRepo("/a"), newRepo("/broken")
-	broken.Config.err = errors.New("permission denied")
+	broken.Config = newConfig(map[string]error{"Load": errors.New("permission denied")})
 
 	r, _ := watching(t, useCase(newBus(), &known{repos: []domain.Repo{broken.Repo, a.Repo}}, opening(a, broken)), events.Request{All: true})
 
@@ -328,7 +328,7 @@ func TestARepositoryJoiningIsIgnoredWhileTheStateIsMoved(t *testing.T) {
 // A repository joining with no wtm config once looped: the stream's join registered it again, whose prune dropped it, announcing it anew.
 func TestARepositoryJoiningWithNoConfigIsOneLineAndIsNotRegistered(t *testing.T) {
 	uninitialized := newRepo("/bare")
-	uninitialized.Config.remove()
+	uninitialized.Config.Remove()
 	bus, k := newBus(), &known{}
 	r, _ := watching(t, useCase(bus, k, opening(uninitialized)), events.Request{All: true})
 	sub := bus.subscribed(t)

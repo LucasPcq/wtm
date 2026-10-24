@@ -9,37 +9,16 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type recorder struct {
-	mu     sync.Mutex
-	events []domain.Event
-}
-
-func (r *recorder) add(event domain.Event) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.events = append(r.events, event)
-}
-
-func (r *recorder) Open(domain.Operation) domain.Report {
-	return r.add
-}
-
-func (r *recorder) all() []domain.Event {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return slices.Clone(r.events)
-}
 
 func (w world) facts(t *testing.T, branches ...string) create.Facts {
 	t.Helper()
@@ -71,17 +50,17 @@ func shown(planned create.Plan) create.Plan {
 	return create.Plan{Branches: planned.Branches, From: planned.From, EnvFrom: planned.EnvFrom, Isolation: planned.Isolation, FastForward: planned.FastForward, Remember: planned.Remember}
 }
 
-func (w world) apply(t *testing.T, req create.Request) (create.Result, *recorder) {
+func (w world) apply(t *testing.T, req create.Request) (create.Result, *operationtest.Recorder) {
 	t.Helper()
 	return w.applyIn(t.Context(), t, req)
 }
 
-func (w world) applyIn(ctx context.Context, t *testing.T, req create.Request) (create.Result, *recorder) {
+func (w world) applyIn(ctx context.Context, t *testing.T, req create.Request) (create.Result, *operationtest.Recorder) {
 	t.Helper()
 	planned, _, err := w.usecase.Plan(t.Context(), req)
 	require.NoError(t, err)
-	report := &recorder{}
-	return w.usecase.Apply(ctx, planned, report.add), report
+	report := &operationtest.Recorder{}
+	return w.usecase.Apply(ctx, planned, report.Add), report
 }
 
 func problems(err error) map[string]string {
@@ -108,14 +87,6 @@ func codes(warnings []domain.Warning) []string {
 	found := make([]string, 0, len(warnings))
 	for _, warning := range warnings {
 		found = append(found, warning.Code)
-	}
-	return found
-}
-
-func values(options []domain.Option) []string {
-	found := make([]string, 0, len(options))
-	for _, option := range options {
-		found = append(found, option.Value)
 	}
 	return found
 }

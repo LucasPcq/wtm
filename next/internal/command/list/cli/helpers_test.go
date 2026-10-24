@@ -5,7 +5,6 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -15,18 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type printed struct {
-	Stdout string
-	Stderr string
-	Code   int
-}
-
-func runList(t *testing.T, w world, words ...string) printed {
+func runList(t *testing.T, w world, words ...string) formtest.Printed {
 	t.Helper()
-	streams, _, stdout, stderr := output.Test()
-	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.env(), w.open, formtest.CommandLine)})
-	code := uicli.Execute(t.Context(), root, append([]string{list.Name}, words...))
-	return printed{Stdout: stdout.String(), Stderr: stderr.String(), Code: code}
+	return formtest.Run(t.Context(), func(streams *output.Streams) *cobra.Command {
+		return New(streams, w.env(), w.open, formtest.CommandLine)
+	}, append([]string{list.Name}, words...)...)
 }
 
 // A driver plays the picker over what req reads of w.

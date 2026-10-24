@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
@@ -16,20 +17,6 @@ import (
 const mainPath = "/repo/main"
 
 var created = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
-
-// configured is a project's config as repository.Service loads it, or the error loading it.
-type configured struct {
-	config project.Config
-	err    error
-}
-
-func (c configured) Load() (project.Config, project.Global, error) {
-	return c.config, project.Global{}, c.err
-}
-
-func (configured) LoadRun() (project.Run, error) {
-	return project.Run{}, nil
-}
 
 // A seed is a repository to list: its git, its meta records (and those that do not read), its config's error, the daemon's jobs and GitHub's pull requests, each with the error reading it.
 type seed struct {
@@ -74,7 +61,7 @@ func newWorld(s seed) world {
 				asked = append(asked, branches)
 				return s.PRs, s.PRsErr
 			},
-			Repository: repository.Service{Config: configured{config: config, err: s.ConfigErr}, Git: git, MainPath: mainPath},
+			Repository: repository.Service{Config: configtest.NewFake(configtest.FakeParams{Config: &config, Fail: map[string]error{"Load": s.ConfigErr}}), Git: git, MainPath: mainPath},
 		},
 		git:   git,
 		meta:  meta,

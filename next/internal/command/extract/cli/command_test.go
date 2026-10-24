@@ -310,8 +310,8 @@ func TestTheCommandOpensTheProjectDirAndRunsWithTheCorrelationID(t *testing.T) {
 
 	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
 	assert.Equal(t, []string{"/named"}, w.seen.dirs)
-	require.Len(t, w.seen.ops, 1)
-	assert.Equal(t, "corr-1", w.seen.ops[0].CorrelationID)
+	require.Len(t, w.locks.Taken(), 1)
+	assert.Equal(t, "corr-1", w.locks.Taken()[0].CorrelationID)
 }
 
 func TestTheEnvelopeOfEachEndingIsByteForByte(t *testing.T) {

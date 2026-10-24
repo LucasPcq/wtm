@@ -1,4 +1,4 @@
-// Package operationtest is the contract every mutating use case's Run keeps with its operation: a dry run takes no lock and publishes nothing, a stale plan is refused before any event, the events of an apply arrive in order, each unit started finished, and the operation records the correlation ID of its own options.
+// Package operationtest is the contract every mutating use case's Run keeps with its operation (a dry run takes no lock and publishes nothing, a stale plan is refused before any event, the events of an apply arrive in order, each unit started finished, and the operation records the correlation ID of its own options), and the in-memory Locker, Publisher and event recorder of an operations service the commands' tests share.
 package operationtest
 
 import (
@@ -34,93 +34,93 @@ type Ran struct {
 // Contract checks the contract on the Subject that subject returns, a new one for each check, wired to the operations service it is given.
 func Contract(t *testing.T, subject func(t *testing.T, ops operation.Service) Subject) {
 	t.Run("dry_run_no_lock_no_event", func(t *testing.T) {
-		rec := &recorder{}
-		run := subject(t, rec.service()).Run
-		reported := &events{}
+		rec := &Locks{}
+		run := subject(t, service(rec)).Run
+		reported := &Recorder{}
 
-		ran, err := run(t.Context(), domain.RunOptions{DryRun: true, Report: reported.add})
+		ran, err := run(t.Context(), domain.RunOptions{DryRun: true, Report: reported.Add})
 
 		require.NoError(t, err)
 		assert.NotEmpty(t, ran.Fingerprint)
-		assert.Empty(t, rec.holds)
-		assert.Empty(t, rec.published.list)
-		assert.Empty(t, reported.list)
+		assert.Empty(t, rec.Taken())
+		assert.Empty(t, rec.Published.All())
+		assert.Empty(t, reported.All())
 	})
 
 	t.Run("stale_plan_refused_before_events", func(t *testing.T) {
-		rec := &recorder{}
-		s := subject(t, rec.service())
+		rec := &Locks{}
+		s := subject(t, service(rec))
 		preview, err := s.Run(t.Context(), domain.RunOptions{DryRun: true})
 		require.NoError(t, err)
 		s.Stale(t)
-		reported := &events{}
+		reported := &Recorder{}
 
-		_, err = s.Run(t.Context(), domain.RunOptions{ExpectFingerprint: preview.Fingerprint, Report: reported.add})
+		_, err = s.Run(t.Context(), domain.RunOptions{ExpectFingerprint: preview.Fingerprint, Report: reported.Add})
 
 		assert.True(t, domain.PlanStale(err), "Run with a stale fingerprint = %v, want %s", err, domain.CodePlanStale)
-		assert.Empty(t, rec.published.list)
-		assert.Empty(t, reported.list)
-		assert.True(t, rec.released(), "a lock is still held")
+		assert.Empty(t, rec.Published.All())
+		assert.Empty(t, reported.All())
+		assert.True(t, rec.Released(), "a lock is still held")
 	})
 
 	t.Run("events_in_order", func(t *testing.T) {
-		rec := &recorder{}
-		run := subject(t, rec.service()).Run
-		reported := &events{}
+		rec := &Locks{}
+		run := subject(t, service(rec)).Run
+		reported := &Recorder{}
 
-		_, err := run(t.Context(), domain.RunOptions{Surface: "cli", Report: reported.add})
+		_, err := run(t.Context(), domain.RunOptions{Surface: "cli", Report: reported.Add})
 
 		require.NoError(t, err)
-		inOrder(t, rec, reported.list, true)
+		inOrder(t, rec, reported.All(), true)
 	})
 
 	t.Run("correlation_id_recorded", func(t *testing.T) {
-		rec := &recorder{}
-		run := subject(t, rec.service()).Run
+		rec := &Locks{}
+		run := subject(t, service(rec)).Run
 
 		_, err := run(t.Context(), domain.RunOptions{CorrelationID: "corr-1"})
 
 		require.NoError(t, err)
-		require.NotEmpty(t, rec.taken, "the run took no lock")
-		require.NotEmpty(t, rec.opened, "the run published no event")
-		for _, op := range append(rec.taken, rec.opened...) {
+		require.NotEmpty(t, rec.Taken(), "the run took no lock")
+		require.NotEmpty(t, rec.Opened(), "the run published no event")
+		for _, op := range append(rec.Taken(), rec.Opened()...) {
 			assert.Equal(t, "corr-1", op.CorrelationID, "operation %s", op.ID)
 		}
 	})
 
 	t.Run("invalid_correlation_id_refused", func(t *testing.T) {
-		rec := &recorder{}
-		run := subject(t, rec.service()).Run
-		reported := &events{}
+		rec := &Locks{}
+		run := subject(t, service(rec)).Run
+		reported := &Recorder{}
 
-		ran, err := run(t.Context(), domain.RunOptions{CorrelationID: "bad\x01id", Report: reported.add})
+		ran, err := run(t.Context(), domain.RunOptions{CorrelationID: "bad\x01id", Report: reported.Add})
 
 		refused, ok := errors.AsType[*domain.Error](err)
 		require.True(t, ok, "Run with an invalid correlation ID = %v, want a *domain.Error", err)
 		assert.Equal(t, domain.KindInvalid, refused.Kind)
 		assert.NotEmpty(t, ran.Op, "the refusal still names its operation")
-		assert.Empty(t, rec.taken)
-		assert.Empty(t, rec.published.list)
-		assert.Empty(t, reported.list)
+		assert.Empty(t, rec.Taken())
+		assert.Empty(t, rec.Published.All())
+		assert.Empty(t, reported.All())
 	})
 
 	t.Run("failed_apply_finishes_units", func(t *testing.T) {
-		rec := &recorder{}
-		s := subject(t, rec.service())
+		rec := &Locks{}
+		s := subject(t, service(rec))
 		s.Fail(t)
-		reported := &events{}
+		reported := &Recorder{}
 
-		_, err := s.Run(t.Context(), domain.RunOptions{Surface: "cli", Report: reported.add})
+		_, err := s.Run(t.Context(), domain.RunOptions{Surface: "cli", Report: reported.Add})
 
 		require.NoError(t, err, "a failure during the apply is in the outcome, not a refusal")
-		inOrder(t, rec, reported.list, false)
+		inOrder(t, rec, reported.All(), false)
 	})
 }
 
 // inOrder checks the events of an apply: published as reported, opened by OperationStarted, closed by OperationFinished OK or not, with every unit and phase started finished in between, and the locks released.
-func inOrder(t *testing.T, rec *recorder, reported []domain.Event, wantOK bool) {
+func inOrder(t *testing.T, rec *Locks, reported []domain.Event, wantOK bool) {
 	t.Helper()
-	published := rec.published.list
+	published := rec.Published.All()
 	require.NotEmpty(t, published, "the run published no event")
 	assert.IsType(t, domain.OperationStarted{}, published[0])
 	finished, ok := published[len(published)-1].(domain.OperationFinished)
@@ -129,7 +129,7 @@ func inOrder(t *testing.T, rec *recorder, reported []domain.Event, wantOK bool) 
 	assert.Equal(t, published, reported)
 	assert.True(t, slices.ContainsFunc(published, func(e domain.Event) bool { _, ok := e.(domain.UnitStarted); return ok }), "no unit started: nothing to check the order of")
 	assert.Empty(t, unfinished(published))
-	assert.True(t, rec.released(), "a lock is still held")
+	assert.True(t, rec.Released(), "a lock is still held")
 }
 
 // unfinished names the units and phases started in events and not finished after.
@@ -159,52 +159,12 @@ func finish(open []string, name string) []string {
 	return open
 }
 
-// ----------------------------------------------------------------------------
-// Fakes
-
-// recorder is the Locker and the Publisher of an operations service, recording the operations it locked and published for, the holds it gave and what was published.
-type recorder struct {
-	taken     []domain.Operation
-	opened    []domain.Operation
-	holds     []*hold
-	published events
-}
-
-func (r *recorder) service() operation.Service {
+// service is the operations service over locks.
+func service(locks *Locks) operation.Service {
 	return operation.Service{
-		Locker:    r,
-		Publisher: r,
-		NewOpID:   func() string { return fmt.Sprintf("op-%d", len(r.holds)+1) },
+		Locker:    locks,
+		Publisher: locks,
+		NewOpID:   func() string { return fmt.Sprintf("op-%d", locks.held()+1) },
 		Now:       func() time.Time { return time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC) },
 	}
 }
-
-func (r *recorder) Take(op domain.Operation) (operation.Hold, error) {
-	r.taken = append(r.taken, op)
-	h := &hold{}
-	r.holds = append(r.holds, h)
-	return h, nil
-}
-
-// Open publishes every event of op through the one report it returns: the record op carries is what stamps each of them.
-func (r *recorder) Open(op domain.Operation) domain.Report {
-	r.opened = append(r.opened, op)
-	return r.published.add
-}
-
-func (r *recorder) released() bool {
-	return !slices.ContainsFunc(r.holds, func(h *hold) bool { return !h.released })
-}
-
-// hold never grows: the contract does not check planning again under new locks, PlanUnderLocks's own tests do.
-type hold struct{ released bool }
-
-func (h *hold) Grow([]domain.Lock) (bool, error) { return false, nil }
-
-func (h *hold) Protected() bool { return true }
-
-func (h *hold) Release() { h.released = true }
-
-type events struct{ list []domain.Event }
-
-func (e *events) add(event domain.Event) { e.list = append(e.list, event) }

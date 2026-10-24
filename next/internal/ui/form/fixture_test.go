@@ -11,7 +11,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
@@ -97,15 +96,6 @@ type refreshingStep struct {
 
 func (s *refreshingStep) Refreshable() bool { return true }
 func (s *refreshingStep) Refreshed()        { s.refreshed++ }
-
-// enters is a terminal on which the user keeps pressing enter.
-type enters struct{}
-
-func (enters) Read(p []byte) (int, error) {
-	time.Sleep(time.Millisecond)
-	p[0] = '\r'
-	return 1, nil
-}
 
 // A request is a fake command's request: the values of each path given.
 type request map[string][]string

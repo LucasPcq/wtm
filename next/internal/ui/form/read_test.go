@@ -171,7 +171,7 @@ func TestAReadAsksTheSubjectItsRequestLeavesOpenBeforeReading(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			q, got, asked := subjectQuery()
 			streams, _, _, _ := output.Test()
-			streams.In = enters{}
+			streams.In = formtest.Enters{}
 			streams.SetStdinTerminal(c.Terminal)
 			streams.Err.SetTerminal(c.Terminal)
 			streams.Out.SetTerminal(c.Terminal)

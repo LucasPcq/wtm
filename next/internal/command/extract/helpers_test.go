@@ -8,36 +8,15 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
-	"sync"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/stretchr/testify/require"
 )
-
-type recorder struct {
-	mu     sync.Mutex
-	events []domain.Event
-}
-
-func (r *recorder) add(event domain.Event) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.events = append(r.events, event)
-}
-
-func (r *recorder) Open(domain.Operation) domain.Report {
-	return r.add
-}
-
-func (r *recorder) all() []domain.Event {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return slices.Clone(r.events)
-}
 
 // at is where the seeded worktree of name lives; path is where a new one would be created.
 func (w world) at(name string) string {
@@ -81,16 +60,16 @@ func (w world) plan(t *testing.T, req extract.Request) (extract.Plan, []domain.W
 	return planned, warnings
 }
 
-func (w world) apply(t *testing.T, req extract.Request) (extract.Result, *recorder) {
+func (w world) apply(t *testing.T, req extract.Request) (extract.Result, *operationtest.Recorder) {
 	t.Helper()
 	return w.applyIn(t.Context(), t, req)
 }
 
-func (w world) applyIn(ctx context.Context, t *testing.T, req extract.Request) (extract.Result, *recorder) {
+func (w world) applyIn(ctx context.Context, t *testing.T, req extract.Request) (extract.Result, *operationtest.Recorder) {
 	t.Helper()
 	planned, _ := w.plan(t, req)
-	report := &recorder{}
-	return w.usecase.Apply(ctx, planned, report.add), report
+	report := &operationtest.Recorder{}
+	return w.usecase.Apply(ctx, planned, report.Add), report
 }
 
 // moving asks to move files from the source worktree to the other one.
