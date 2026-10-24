@@ -59,7 +59,7 @@ func TestAWorktreeIsReadWholeGitAndIsolation(t *testing.T) {
 		Jobs:      []status.Job{{Name: "web", State: run.Crashed, URL: "http://web.feat-a.main.localhost:11080", Port: &port, ExitCode: &exit}},
 		Env:       status.Env{Files: []status.EnvFile{}},
 		Problems: []status.Problem{{Code: status.CodeJobCrashed, Message: "web crashed (exit 1)", Fix: &domain.FollowUp{
-			Command: "run start", Code: status.CodeJobCrashed,
+			Command: "run start", Code: status.CodeJobCrashed, Message: "start it again",
 			Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "job", Values: []string{"web"}}, {Path: "detach", Values: []string{"true"}}},
 		}}},
 	}, a)
@@ -179,7 +179,7 @@ func TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleanedLockedOrNot(t *
 		d := detailOf(t, got, branch)
 		assert.True(t, d.Missing, branch)
 		assert.Equal(t, []string{status.CodeMissing}, problemCodes(d.Problems), branch)
-		assert.Equal(t, &domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}}, Code: status.CodeMissing}, d.Problems[0].Fix)
+		assert.Equal(t, &domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}}, Code: status.CodeMissing, Message: "remove what is left of it"}, d.Problems[0].Fix)
 		assert.Nil(t, d.Changes, branch)
 		assert.Nil(t, d.Commits, branch)
 		assert.Nil(t, d.Env.Files, branch)
@@ -325,7 +325,7 @@ func TestAnInterruptedReadWarnsOfNothingItCouldNotAsk(t *testing.T) {
 
 func TestTheReviewIsTheNewestPullRequestAndAMergedOneAsksToCleanFirst(t *testing.T) {
 	const url = "https://github.com/acme/acme/pull/12"
-	clean := &domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}
+	clean := &domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Message: "clean it up", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}
 	cases := map[string]struct {
 		pr       []worktree.PullRequest
 		review   *status.Review
@@ -423,7 +423,7 @@ func TestAMergedPullRequestAsksToCleanABranchBehindItsHeadButNotOneMovedOnOrApar
 			assert.Equal(t, worktree.PullRequestMerged, a.Review.State)
 			assert.Equal(t, c.problems, problemCodes(a.Problems))
 			if c.problems != nil {
-				assert.Equal(t, &domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}, a.Problems[0].Fix)
+				assert.Equal(t, &domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Message: "clean it up", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}, a.Problems[0].Fix)
 			}
 		})
 	}
@@ -473,7 +473,7 @@ func TestAMissingEnvFileIsRebuiltFromWhereItCanBe(t *testing.T) {
 		},
 		"nowhere": {
 			strategy: project.EnvExample,
-			message:  ".env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand", fix: &domain.FollowUp{Command: "config edit", Code: status.CodeEnvMissing},
+			message:  ".env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand", fix: &domain.FollowUp{Command: "config edit", Code: status.CodeEnvMissing, Message: "declare where it comes from"},
 		},
 	}
 	for name, c := range cases {

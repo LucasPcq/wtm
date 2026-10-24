@@ -14,5 +14,5 @@
   api  stopped
 
   ! its directory is gone
-  → wtm clean feat/old
+  → wtm clean feat/old   remove what is left of it
 

@@ -12,7 +12,7 @@
   parent       main
 
   ! web/.env is missing
-  → wtm env feat/a
+  → wtm env feat/a   rebuild it
   ! run.toml does not read: its jobs and ports are not shown: invalid run config: unknown addressing "nope"
   ! the run daemon is not running: which jobs are up is unknown
 

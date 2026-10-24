@@ -18,7 +18,7 @@
   api  crashed
 
   ! web/.env is missing
-  → wtm env feat/a
+  → wtm env feat/a   rebuild it
   ! api crashed (exit 1)
-  → wtm run start feat/a --job api --detach
+  → wtm run start feat/a --job api --detach   start it again
 

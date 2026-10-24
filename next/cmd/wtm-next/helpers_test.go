@@ -605,16 +605,16 @@ func globbed(t *testing.T, pattern string) []string {
 	return files
 }
 
-// followUpsIn are the follow-ups a JSON document holds at any depth: each value of a follow_up, each entry of a follow_ups.
+// followUpsIn are the follow-ups a JSON document holds at any depth: each value of a follow_up or of a fix (a problem's), each entry of a follow_ups or of actions (a worktree's).
 func followUpsIn(document any) []map[string]any {
 	var found []map[string]any
 	switch value := document.(type) {
 	case map[string]any:
 		for key, nested := range value {
-			if followUp, ok := nested.(map[string]any); ok && key == "follow_up" {
+			if followUp, ok := nested.(map[string]any); ok && (key == "follow_up" || key == "fix") {
 				found = append(found, followUp)
 			}
-			if list, ok := nested.([]any); ok && key == "follow_ups" {
+			if list, ok := nested.([]any); ok && (key == "follow_ups" || key == "actions") {
 				for _, entry := range list {
 					if followUp, ok := entry.(map[string]any); ok {
 						found = append(found, followUp)

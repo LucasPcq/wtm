@@ -9,5 +9,5 @@
 
   feat/a
   ! web/.env is missing
-  → wtm env feat/a
+  → wtm env feat/a   rebuild it
 

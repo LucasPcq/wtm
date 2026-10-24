@@ -130,7 +130,7 @@
                 }
               ],
               "code": "status.merged",
-              "message": ""
+              "message": "clean it up"
             }
           },
           {
@@ -147,7 +147,7 @@
                 }
               ],
               "code": "status.env_missing",
-              "message": ""
+              "message": "rebuild it"
             }
           },
           {
@@ -176,7 +176,7 @@
                 }
               ],
               "code": "status.job_crashed",
-              "message": ""
+              "message": "start it again"
             }
           }
         ]

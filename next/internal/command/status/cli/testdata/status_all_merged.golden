@@ -9,13 +9,13 @@
 
   feat/a
   ! its pull request is merged
-  → wtm clean feat/a
+  → wtm clean feat/a   clean it up
   ! web/.env is missing
-  → wtm env feat/a
+  → wtm env feat/a   rebuild it
   ! api crashed (exit 1)
-  → wtm run start feat/a --job api --detach
+  → wtm run start feat/a --job api --detach   start it again
 
   feat/old
   ! predates the isolation choice: run up and run start refuse it
-  → wtm env feat/old --isolation isolated
+  → wtm env feat/old --isolation isolated   isolate it
 
