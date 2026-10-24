@@ -1,0 +1,23 @@
+$ kill ${bg[@]} 2>/dev/null; jobs -r | wc -l
+       0
+
+$ kill -0 $PID1 && echo "server $PID1 running"; date +%T
+server 92996 running
+22:34:11
+
+$ date +%T; kill -0 $PID1 2>/dev/null || echo "server $PID1 gone"
+22:34:57
+server 92996 gone
+
+$ cat "$G/web.json" 2>&1 | jq -c "{pid, port}"
+{"pid":92996,"port":4777}
+
+$ cd $SB/A && wtm-next ui --no-open
+http://127.0.0.1:4777/#repo=5a1d9fbc9976&token=<TOKEN>
+
+$ cat "$G/web.json" | jq -c "{pid, port}"
+{"pid":96946,"port":4777}
+
+$ kill -0 $(jq -r .pid "$G/web.json") && echo "new server $(jq -r .pid "$G/web.json") running"
+new server 96946 running
+

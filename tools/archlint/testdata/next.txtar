@@ -291,3 +291,23 @@ import (
 )
 
 var _ context.Context
+-- github.com/LucasPcq/wtm/next/internal/web/web.go --
+// Package web serves the catalogue.
+package web
+
+import (
+	"net/http"
+
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/web must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — the web server speaks to the core through the catalogue alone`
+	_ "github.com/LucasPcq/wtm/next/internal/api"
+	_ "github.com/LucasPcq/wtm/next/internal/command/create" // want `next/internal/web must not import "github.com/LucasPcq/wtm/next/internal/command/create" — the web server speaks to the core through the catalogue alone`
+	_ "github.com/LucasPcq/wtm/next/internal/domain"
+	_ "github.com/LucasPcq/wtm/next/internal/service/operation" // want `next/internal/web must not import "github.com/LucasPcq/wtm/next/internal/service/operation" — the web server speaks to the core through the catalogue alone`
+	_ "github.com/LucasPcq/wtm/next/internal/ui/output" // want `next/internal/web must not import "github.com/LucasPcq/wtm/next/internal/ui/output" — the web server speaks to the core through the catalogue alone`
+	_ "github.com/spf13/cobra" // want `next/internal/web must not import "github.com/spf13/cobra" — the web server speaks to the core through the catalogue alone`
+)
+
+var _ http.Handler
+-- github.com/LucasPcq/wtm/next/internal/web/sub/sub.go --
+// Package sub is a stray package under web.
+package sub // want `next/internal/web/sub is in no row of next/'s import table`

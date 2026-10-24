@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"net/http"
 	"reflect"
 	"testing"
 
@@ -17,30 +16,21 @@ func TestEachCallOpensTheUseCaseOnItsDirectory(t *testing.T) {
 	first := greet.Execute(t.Context(), Call{Dir: "/a", Answers: named("x")})
 	second := greet.Execute(t.Context(), Call{Dir: "/b", Answers: named("y"), Options: domain.RunOptions{Surface: "desktop"}})
 
-	assert.Equal(t, http.StatusOK, first.Status)
+	assert.Nil(t, first.Envelope.Err)
 	assert.Equal(t, "greet", first.Envelope.Command)
 	assert.Equal(t, "/a:x:api", first.Envelope.Op)
 	assert.Equal(t, "/b:y:desktop", second.Envelope.Op)
 }
 
-func TestARefusalHasTheStatusOfItsKind(t *testing.T) {
-	for kind, status := range map[domain.Kind]int{
-		domain.KindInvalid:      http.StatusBadRequest,
-		domain.KindRefused:      http.StatusForbidden,
-		domain.KindConflict:     http.StatusConflict,
-		domain.KindPrecondition: http.StatusPreconditionFailed,
-		domain.KindCancelled:    statusClientClosed,
-		domain.KindInternal:     http.StatusInternalServerError,
-		"unheard of":            http.StatusInternalServerError,
-	} {
-		refusing := useCase{refusal: &domain.Error{Kind: kind, Code: "greet.refused"}}
-		greet := greet(func(context.Context, string) (useCase, error) { return refusing, nil })
+func TestARefusalIsReportedInTheEnvelope(t *testing.T) {
+	refusing := useCase{refusal: &domain.Error{Kind: domain.KindConflict, Code: "greet.refused"}}
+	greet := greet(func(context.Context, string) (useCase, error) { return refusing, nil })
 
-		got := greet.Execute(t.Context(), Call{Dir: "/repo"})
+	got := greet.Execute(t.Context(), Call{Dir: "/repo"})
 
-		assert.Equal(t, status, got.Status, kind)
-		assert.Equal(t, "greet.refused", got.Envelope.Err.Code, kind)
-	}
+	require.NotNil(t, got.Envelope.Err)
+	assert.Equal(t, domain.KindConflict, got.Envelope.Err.Kind)
+	assert.Equal(t, "greet.refused", got.Envelope.Err.Code)
 }
 
 func TestADirectoryThatIsNotAbsoluteIsRefusedBeforeAnythingOpens(t *testing.T) {
@@ -50,7 +40,7 @@ func TestADirectoryThatIsNotAbsoluteIsRefusedBeforeAnythingOpens(t *testing.T) {
 	for _, dir := range []string{"", ".", "repo/main"} {
 		got := greet.Execute(t.Context(), Call{Dir: dir, Answers: named("x")})
 
-		assert.Equal(t, http.StatusBadRequest, got.Status, dir)
+		require.NotNil(t, got.Envelope.Err, dir)
 		assert.Equal(t, domain.CodeInvalidRequest, got.Envelope.Err.Code, dir)
 	}
 	assert.False(t, opened)
@@ -62,8 +52,8 @@ func TestAnAnswerTheRequestRefusesIsRefusedByItsPath(t *testing.T) {
 
 	got := greet.Execute(t.Context(), Call{Dir: "/repo", Answers: []domain.Answered{{Path: "nmae", Values: []string{"x"}}}})
 
-	assert.Equal(t, http.StatusBadRequest, got.Status)
 	require.NotNil(t, got.Envelope.Err)
+	assert.Equal(t, domain.KindInvalid, got.Envelope.Err.Kind)
 	require.Len(t, got.Envelope.Err.Fields, 1)
 	assert.Equal(t, "nmae", got.Envelope.Err.Fields[0].Path)
 	assert.Equal(t, domain.CodeUnknown, got.Envelope.Err.Fields[0].Code)
@@ -98,7 +88,6 @@ func TestAStalePlanIsFollowedUpByItsRequestAsADryRun(t *testing.T) {
 
 	got := greet.Execute(t.Context(), Call{Dir: "/repo", Answers: named("x")})
 
-	assert.Equal(t, http.StatusPreconditionFailed, got.Status)
 	assert.Equal(t, domain.Replan(got.Envelope.Err, "greet", named("x")), got.Envelope.FollowUps)
 	assert.Len(t, got.Envelope.FollowUps, 1)
 }

@@ -45,6 +45,7 @@ func TestTheSchemaRefusesWhatTheContractForbids(t *testing.T) {
 		"snapshot_no_list": `{"v":2,"type":"snapshot","ts":"2026-10-16T12:00:00Z","repo":{"root":"/repo","common_dir":"/repo/.git"}}`,
 		"updated_nothing":  `{"v":2,"type":"worktree.updated","ts":"2026-10-16T12:00:00Z","repo":{"root":"/repo","common_dir":"/repo/.git"},"worktree":{"branch":"a","path":"/a","parent":"","ordinal":null,"isolation":"isolated","is_main":false,"created_at":""},"changed":[]}`,
 		"unknown_change":   `{"v":2,"type":"worktree.updated","ts":"2026-10-16T12:00:00Z","repo":{"root":"/repo","common_dir":"/repo/.git"},"worktree":{"branch":"a","path":"/a","parent":"","ordinal":null,"isolation":"isolated","is_main":false,"created_at":""},"changed":["path"]}`,
+		"changed_nothing":  `{"v":2,"type":"worktree.changed","ts":"2026-10-16T12:00:00Z","repo":{"root":"/repo","common_dir":"/repo/.git"},"worktree":{"branch":"a","path":"/a","parent":"","ordinal":null,"isolation":"isolated","is_main":false,"created_at":""},"changed":[]}`,
 		"created_no_repo":  `{"v":2,"type":"worktree.created","ts":"2026-10-16T12:00:00Z","worktree":{"branch":"a","path":"/a","parent":"","ordinal":null,"isolation":"isolated","is_main":false,"created_at":""}}`,
 	} {
 		t.Run(name, func(t *testing.T) {

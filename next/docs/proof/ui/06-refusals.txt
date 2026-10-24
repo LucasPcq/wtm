@@ -1,0 +1,64 @@
+$ curl -s -i $U/api/version
+HTTP/1.1 401 Unauthorized
+Content-Type: application/json
+Date: <T>
+Content-Length: 216
+
+{"v":2,"command":"","ok":false,"follow_ups":[],"warnings":[],"error":{"kind":"refused","code":"web.token_invalid","message":"the request carries no token of this server, or another one: open the page wtm ui prints"}}
+$ curl -s -i -H "X-Wtm-Token: wrong" $U/api/version
+HTTP/1.1 401 Unauthorized
+Content-Type: application/json
+Date: <T>
+Content-Length: 216
+
+{"v":2,"command":"","ok":false,"follow_ups":[],"warnings":[],"error":{"kind":"refused","code":"web.token_invalid","message":"the request carries no token of this server, or another one: open the page wtm ui prints"}}
+$ api -i -H "Origin: http://evil.example" $U/api/version
+HTTP/1.1 403 Forbidden
+Content-Type: application/json
+Date: <T>
+Content-Length: 177
+
+{"v":2,"command":"","ok":false,"follow_ups":[],"warnings":[],"error":{"kind":"refused","code":"web.origin_refused","message":"a page of another origin may not call the server"}}
+$ api -i -H "Host: evil.example:$PORT" $U/api/version
+HTTP/1.1 403 Forbidden
+Content-Type: application/json
+Date: <T>
+Content-Length: 179
+
+{"v":2,"command":"","ok":false,"follow_ups":[],"warnings":[],"error":{"kind":"refused","code":"web.host_refused","message":"the server answers the loopback at its own port only"}}
+$ api -i $U/api/schema
+HTTP/1.1 404 Not Found
+Content-Type: application/json
+Date: <T>
+Content-Length: 176
+
+{"v":2,"command":"","ok":false,"follow_ups":[],"warnings":[],"error":{"kind":"invalid","code":"web.schema_unavailable","message":"this wtm publishes no schema of its API yet"}}
+$ curl -s -i $U/
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+Date: <T>
+Content-Length: 699
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>wtm</title>
+<style>
+  :root { color-scheme: dark light; font-family: ui-monospace, Menlo, monospace; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+  main { max-width: 36rem; }
+  h1 { font-size: 1.25rem; margin: 0 0 .5rem; }
+  p { margin: .25rem 0; opacity: .8; line-height: 1.5; }
+</style>
+</head>
+<body>
+<main>
+  <h1>wtm</h1>
+  <p>The server runs, but this binary carries no web interface yet.</p>
+  <p>Its API answers under <code>/api</code>, with the token of this page's address.</p>
+</main>
+</body>
+</html>
+

@@ -1,0 +1,3 @@
+$ kill $(jq -r .pid "$G/web.json"); sleep 1; pgrep -f -- "$SB" || echo "no process left in the sandbox"
+no process left in the sandbox
+

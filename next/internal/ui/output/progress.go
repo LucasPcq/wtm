@@ -115,7 +115,7 @@ func (p *Progress) Report(event domain.Event) {
 	case domain.UnitFinished:
 		p.unit, p.status = "", ""
 		p.erase()
-	case domain.Output, domain.WorktreeCreated, domain.WorktreeUpdated, domain.WorktreeProvisioned, domain.OperationStarted, domain.OperationFinished, domain.Snapshot, domain.Ready, domain.RepoAdded, domain.RepoRemoved:
+	case domain.Output, domain.WorktreeCreated, domain.WorktreeUpdated, domain.WorktreeChanged, domain.WorktreeProvisioned, domain.OperationStarted, domain.OperationFinished, domain.Snapshot, domain.Ready, domain.RepoAdded, domain.RepoRemoved:
 	}
 }
 

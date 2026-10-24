@@ -36,6 +36,8 @@ func drawLine(w io.Writer, received events.Received) {
 		output.SuccessLine(w, prefix+"created "+e.Worktree.Branch+"  "+e.Worktree.Path)
 	case domain.WorktreeUpdated:
 		output.SuccessLine(w, prefix+"updated "+e.Worktree.Branch+"  "+changed(e))
+	case domain.WorktreeChanged:
+		output.SuccessLine(w, prefix+"changed "+e.Worktree.Branch+"  "+polled(e.Changed))
 	case domain.WorktreeProvisioned:
 		drawProvisioned(w, e, prefix)
 	case domain.RepoAdded:
@@ -74,6 +76,15 @@ func root(line domain.Line) string {
 		return ""
 	}
 	return line.Repo.Root
+}
+
+// polled is each field of the worktree a poll found changed.
+func polled(fields []worktree.PolledField) string {
+	names := make([]string, 0, len(fields))
+	for _, field := range fields {
+		names = append(names, string(field))
+	}
+	return strings.Join(names, changedSep)
 }
 
 // changed is each field of the worktree an update changed, with its new value.

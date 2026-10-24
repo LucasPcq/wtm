@@ -65,6 +65,7 @@ func changes(t *testing.T) []string {
 		line(t, app, domain.OperationStarted{Command: "create", Surface: "cli"}),
 		line(t, app, domain.WorktreeCreated{Worktree: feat}),
 		line(t, app, domain.WorktreeUpdated{Worktree: numbered, Changed: []worktree.IdentityField{worktree.IdentityOrdinal}}),
+		line(t, app, domain.WorktreeChanged{Worktree: numbered, Changed: []worktree.PolledField{worktree.PolledHead, worktree.PolledJobs}}),
 		line(t, app, domain.WorktreeProvisioned{Worktree: numbered, OK: true}),
 		line(t, app, domain.WorktreeProvisioned{Worktree: numbered, Hook: "make setup", ExitCode: new(2)}),
 		line(t, app, domain.UnitFinished{Subject: "feat/b", Status: domain.StatusDone}),

@@ -3,8 +3,12 @@ package events
 import (
 	"context"
 
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
+
+// Jobs lists the jobs the run daemon knows, never starting it; it fails with run.ErrUnknown when it cannot tell which are up.
+type Jobs func(ctx context.Context) ([]run.Job, error)
 
 // Bus is the event bus. Subscribe starts its daemon when none answers, then
 // returns the lines published for repos, by their common directory, every

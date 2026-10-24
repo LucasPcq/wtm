@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
@@ -31,9 +30,9 @@ func streams() []api.Stream {
 	}
 }
 
-// watchEvents is the watch of the event stream over stream for a surface: each line goes out as its JSON.
-func watchEvents(stream events.UseCase) func(ctx context.Context, req events.Request, send func(json.RawMessage) error) error {
-	return func(ctx context.Context, req events.Request, send func(json.RawMessage) error) error {
-		return stream.Watch(ctx, req, events.Out{Emit: func(received events.Received) error { return send(received.JSON) }})
+// watchEvents is the watch of the event stream over stream for a surface: each line goes out as its JSON, each warning as it is.
+func watchEvents(stream events.UseCase) func(ctx context.Context, req events.Request, sink api.Sink) error {
+	return func(ctx context.Context, req events.Request, sink api.Sink) error {
+		return stream.Watch(ctx, req, events.Out{Emit: func(received events.Received) error { return sink.Send(received.JSON) }, Warn: sink.Warn})
 	}
 }

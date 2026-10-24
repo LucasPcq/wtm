@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -24,7 +23,7 @@ func TestTheCatalogueListsEachCommandWithItsSchemaOutsideAnyRepository(t *testin
 	assert.Equal(t, []string{"create", "extract", "list", "status", "tree"}, names)
 }
 
-func TestAnInvalidCallIsRefusedWithTheStatusOfItsKind(t *testing.T) {
+func TestAnInvalidCallIsRefusedWithItsKind(t *testing.T) {
 	main := configured(t)
 	ownConfigDir(t)
 	create := command(t, "create")
@@ -32,19 +31,19 @@ func TestAnInvalidCallIsRefusedWithTheStatusOfItsKind(t *testing.T) {
 	for name, c := range map[string]struct {
 		Dir     string
 		Answers []domain.Answered
-		Status  int
+		Kind    domain.Kind
 		Code    string
 	}{
-		"unknown_field":     {Dir: main, Answers: []domain.Answered{{Path: "branches", Values: []string{"feat/x"}}, {Path: "brnach", Values: []string{"x"}}}, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
-		"two_values_of_one": {Dir: main, Answers: []domain.Answered{{Path: "branches", Values: []string{"feat/x"}}, {Path: "from", Values: []string{"main", "dev"}}}, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
-		"no_branch":         {Dir: main, Status: http.StatusBadRequest, Code: domain.CodeInvalidRequest},
-		"no_repository":     {Dir: t.TempDir(), Answers: []domain.Answered{{Path: "branches", Values: []string{"feat/x"}}}, Status: http.StatusPreconditionFailed, Code: domain.CodeNotARepository},
+		"unknown_field":     {Dir: main, Answers: []domain.Answered{{Path: "branches", Values: []string{"feat/x"}}, {Path: "brnach", Values: []string{"x"}}}, Kind: domain.KindInvalid, Code: domain.CodeInvalidRequest},
+		"two_values_of_one": {Dir: main, Answers: []domain.Answered{{Path: "branches", Values: []string{"feat/x"}}, {Path: "from", Values: []string{"main", "dev"}}}, Kind: domain.KindInvalid, Code: domain.CodeInvalidRequest},
+		"no_branch":         {Dir: main, Kind: domain.KindInvalid, Code: domain.CodeInvalidRequest},
+		"no_repository":     {Dir: t.TempDir(), Answers: []domain.Answered{{Path: "branches", Values: []string{"feat/x"}}}, Kind: domain.KindPrecondition, Code: domain.CodeNotARepository},
 	} {
 		t.Run(name, func(t *testing.T) {
 			got := create.Execute(t.Context(), api.Call{Dir: c.Dir, Answers: c.Answers})
 
-			assert.Equal(t, c.Status, got.Status)
 			require.NotNil(t, got.Envelope.Err)
+			assert.Equal(t, c.Kind, got.Envelope.Err.Kind)
 			assert.Equal(t, c.Code, got.Envelope.Err.Code)
 			assert.Equal(t, "create", got.Envelope.Command)
 			if c.Dir == main {
@@ -68,7 +67,7 @@ func TestStatusOfASurfaceReadsTheWorktreeOfTheCallsDirectory(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			got := command(t, "status").Execute(t.Context(), api.Call{Dir: dir})
 
-			assert.Equal(t, http.StatusOK, got.Status, got.Envelope.Err)
+			assert.Nil(t, got.Envelope.Err)
 			require.Len(t, got.Envelope.Items, 1)
 			assert.Equal(t, "feat/a", got.Envelope.Items[0].Subject)
 		})

@@ -16,9 +16,10 @@ next/
     command/<name>/    one command: usecase.go, port.go, rules.go, questions.go, cli/
     service/<name>/    what use cases share with I/O: operation, provision, repository, registry; <name>test kits
     domain/            the pure model and vocabulary; worktree/, project/, env/, dotenv/, run/ by subject
-    adapter/<name>/    git, store, config, shell, oplock, events (the bus), registry, statefile, proxyport, daemon, github; <name>test fakes
+    adapter/<name>/    git, store, config, shell, oplock, events (the bus), registry, webserver, statefile, proxyport, daemon, github; <name>test fakes
     ui/                cli (root, exit codes, env), output (streams, frames, envelope), form (flags, wizard, conclusion), widget (a step's inputs), formtest (the cli tests' kit)
     api/               the catalogue of commands, and its streams, for a surface other than the CLI
+    web/               the local HTTP server over api (wtm-next ui): routes, guard, SSE, HTTP statuses
   docs/proof/          scripts that run wtm and wtm-next side by side, and their captures
 ```
 
@@ -38,6 +39,7 @@ next/
 | talks to git, a file, a process, a socket | `adapter/<name>/`, behind a port |
 | is an in-memory stand-in for an adapter, for tests | `adapter/<name>test/` |
 | checks a promise every use case keeps, for tests | `service/<name>test/` (`operationtest.Contract`) |
+| serves the catalogue over HTTP: a route, the guard, server-sent events, the status of an error's kind | `web/`, given what it cannot reach as functions in `web.Params` |
 | chooses which adapter backs which port | `cmd/wtm-next/wire.go` |
 | names another command (a follow-up) | a `domain.FollowUp` of that command's name and answers; its command line is spelled by a function `cmd/wtm-next` injects, the only package that knows every command |
 

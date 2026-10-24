@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -395,4 +396,81 @@ func TestTheGlobalStreamPrunesTheRegistryAsItRuns(t *testing.T) {
 	watching(t, u, events.Request{All: true})
 
 	assert.Eventually(t, func() bool { return k.pruned() >= 3 }, 2*time.Second, 10*time.Millisecond)
+}
+
+// The legacy dashboard saw a commit made from a terminal: the stream polls what no operation of wtm announces.
+func TestACommitFromATerminalIsSentAsTheWorktreeChanged(t *testing.T) {
+	app := newRepo("/repo", "feat/a")
+	app.Git.Local = []string{"feat/ahead"}
+	app.Git.Commits = map[worktree.Ref][]string{worktree.LocalBranch{Name: "feat/ahead"}: {"c1"}}
+	app, git := app.living()
+	u := useCase(newBus(), &known{}, opening(app))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+	r.quiet(t)
+
+	require.NoError(t, git.MergeFFOnly(t.Context(), worktree.Merge{Path: "/repo/.trees/feat/a", Onto: worktree.LocalBranch{Name: "feat/ahead"}}))
+
+	assert.Equal(t, `{"v":2,"type":"worktree.changed","ts":"2026-10-16T12:00:00Z","repo":{"root":"/repo","common_dir":"/repo/.git"},"worktree":{"branch":"feat/a","path":"/repo/.trees/feat/a","parent":"","ordinal":null,"isolation":"isolated","is_main":false,"created_at":""},"changed":["head"]}`, r.next(t))
+	r.quiet(t)
+}
+
+func TestAJobThatStartsOrStopsIsSentAsTheWorktreeChanged(t *testing.T) {
+	jobs := &machine{}
+	u := useCase(newBus(), &known{}, opening(newRepo("/repo", "feat/a")))
+	u.Jobs, u.Recheck = jobs.Jobs, 20*time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+
+	jobs.set([]run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true, State: run.Running}}, nil)
+
+	assert.Contains(t, r.next(t), `"branch":"feat/a"`)
+	r.quiet(t)
+}
+
+// A run daemon that stops answering for a while says nothing about the jobs: nothing changed until it answers again.
+func TestJobsTheDaemonCannotTellChangeNothing(t *testing.T) {
+	jobs := &machine{jobs: []run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true, State: run.Running}}}
+	u := useCase(newBus(), &known{}, opening(newRepo("/repo", "feat/a")))
+	u.Jobs, u.Recheck = jobs.Jobs, 20*time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+
+	jobs.set(nil, run.ErrUnknown)
+	r.quiet(t)
+	jobs.set([]run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true, State: run.Running}}, nil)
+
+	r.quiet(t)
+}
+
+func TestAWorktreeRemovedFromATerminalResetsTheStreamOnAFreshSnapshot(t *testing.T) {
+	app, git := newRepo("/repo", "feat/a").living()
+	u := useCase(newBus(), &known{}, opening(app))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+
+	require.NoError(t, git.RemoveWorktree(t.Context(), "/repo/.trees/feat/a"))
+
+	snapshot := r.next(t)
+	assert.Contains(t, snapshot, `"type":"snapshot"`)
+	assert.NotContains(t, snapshot, "feat/a")
+}
+
+func TestTheGlobalStreamPollsEachRepositoryItWatches(t *testing.T) {
+	a, git := newRepo("/a").living()
+	u := useCase(newBus(), &known{repos: []domain.Repo{a.Repo}}, opening(a))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{All: true})
+	r.nextType(t)
+	r.nextType(t)
+
+	require.NoError(t, git.AddWorktree(t.Context(), worktree.Addition{Path: "/a/.trees/feat/b", Checkout: worktree.NewBranch{Name: "feat/b", From: worktree.LocalBranch{Name: "main"}}}))
+
+	assert.Contains(t, r.next(t), `"type":"worktree.changed","ts":"2026-10-16T12:00:00Z","repo":{"root":"/a","common_dir":"/a/.git"},"worktree":{"branch":"feat/b"`)
 }

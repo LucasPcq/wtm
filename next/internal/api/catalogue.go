@@ -4,7 +4,6 @@ package api
 import (
 	"cmp"
 	"context"
-	"net/http"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -60,9 +59,8 @@ func (c Call) caller() domain.Caller {
 	return domain.Caller{Dir: c.Dir, Named: true, Cwd: cwd}
 }
 
-// A Response is how an execution ended: its status, from the kind of its failure, and its envelope.
+// A Response is how an execution ended: its envelope, whose error's kind a surface maps onto its own status.
 type Response struct {
-	Status   int
 	Envelope domain.Envelope
 }
 
@@ -129,38 +127,14 @@ func Bind[U any, Req Request[Req], Q Form, Out Outcome](name string, open func(c
 	execute := func(ctx context.Context, call Call) Response {
 		useCase, req, err := prepare(ctx, call)
 		if err != nil {
-			return respond(domain.Envelope{Command: name, Err: domain.AsError(domain.AsErrorParams{Err: err})})
+			return Response{Envelope: domain.Envelope{Command: name, Err: domain.AsError(domain.AsErrorParams{Err: err})}}
 		}
 
 		opts := call.Options
 		opts.Surface = cmp.Or(opts.Surface, surfaceAPI)
 		outcome, err := run(useCase, ctx, req, opts)
-		return respond(outcome.Envelope(domain.EnvelopeParams{Command: name, Err: domain.AsError(domain.AsErrorParams{Err: err}), Answers: domain.AnswersOf(form, req)}))
+		return Response{Envelope: outcome.Envelope(domain.EnvelopeParams{Command: name, Err: domain.AsError(domain.AsErrorParams{Err: err}), Answers: domain.AnswersOf(form, req)})}
 	}
 
 	return Command{Name: name, Form: form, Plan: plan, Detail: detail, Questions: ask, Execute: execute}
-}
-
-// statusClientClosed is the status of an operation its caller cancelled: nginx's 499, which net/http does not name.
-const statusClientClosed = 499
-
-var statusByKind = map[domain.Kind]int{
-	domain.KindInvalid:      http.StatusBadRequest,
-	domain.KindRefused:      http.StatusForbidden,
-	domain.KindConflict:     http.StatusConflict,
-	domain.KindPrecondition: http.StatusPreconditionFailed,
-	domain.KindCancelled:    statusClientClosed,
-	domain.KindInternal:     http.StatusInternalServerError,
-}
-
-func respond(doc domain.Envelope) Response {
-	if doc.Err == nil {
-		return Response{Status: http.StatusOK, Envelope: doc}
-	}
-
-	status, known := statusByKind[doc.Err.Kind]
-	if !known {
-		status = http.StatusInternalServerError
-	}
-	return Response{Status: status, Envelope: doc}
 }
