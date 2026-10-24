@@ -83,7 +83,7 @@ func opening(absent bool) events.Open {
 		case app.Root:
 			git := gittest.NewFake(gittest.FakeParams{Main: app.Root, Branch: "main", Worktrees: []worktree.Worktree{{Path: "/code/.trees/feat-a", State: worktree.OnBranch{Branch: "feat/a"}}}})
 			meta := storetest.NewFake(storetest.FakeParams{Meta: map[string]worktree.Meta{"feat/a": {SourceBranch: "main", CreatedAt: "2026-10-16T11:00:00Z", Ordinal: 1}}})
-			return events.Source{Repo: app, Repository: repository.Service{Config: configOf(absent), Git: git, MainPath: app.Root, Init: &domain.FollowUp{Command: domain.CommandInit}}, Meta: meta}, nil
+			return events.Source{Repo: app, Repository: repository.Service{Config: configOf(absent), Git: git, MainPath: app.Root, Init: &domain.FollowUp{Command: domain.CommandInit}}, Meta: meta, Git: git}, nil
 		}
 		return events.Source{}, &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodeNotARepository, Message: dir + " is not a git repository"}
 	}

@@ -63,6 +63,16 @@ type Identity struct {
 	CreatedAt string            `json:"created_at"`
 }
 
+// A PolledField names what the event stream polls of a worktree and found changed.
+type PolledField string
+
+// The fields of a worktree the event stream polls: its branch's tip, what it has checked out (a branch, a rebase, a bisect), and its jobs and their states.
+const (
+	PolledHead     PolledField = "head"
+	PolledCheckout PolledField = "checkout"
+	PolledJobs     PolledField = "jobs"
+)
+
 // An IdentityField names a field of an [Identity] an update changed, as the events spell it.
 type IdentityField string
 

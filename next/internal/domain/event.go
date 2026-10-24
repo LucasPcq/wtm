@@ -55,6 +55,12 @@ type WorktreeUpdated struct {
 	Changed  []worktree.IdentityField `json:"changed"`
 }
 
+// WorktreeChanged reports that what a worktree holds changed with no operation of wtm, as the event stream polls it (a commit or a checkout from a terminal, a job that started or stopped): Changed names what. A worktree the stream had not seen is one, every field changed.
+type WorktreeChanged struct {
+	Worktree worktree.Identity      `json:"worktree"`
+	Changed  []worktree.PolledField `json:"changed"`
+}
+
 // WorktreeProvisioned reports that a worktree's provisioning ended: OK, or the hook that failed and its exit code.
 type WorktreeProvisioned struct {
 	Worktree worktree.Identity `json:"worktree"`
@@ -108,6 +114,7 @@ func (Output) event()              {}
 func (UnitFinished) event()        {}
 func (WorktreeCreated) event()     {}
 func (WorktreeUpdated) event()     {}
+func (WorktreeChanged) event()     {}
 func (WorktreeProvisioned) event() {}
 func (OperationStarted) event()    {}
 func (OperationFinished) event()   {}
@@ -128,6 +135,7 @@ const (
 	EventUnitFinished        = "unit.finished"
 	EventWorktreeCreated     = "worktree.created"
 	EventWorktreeUpdated     = "worktree.updated"
+	EventWorktreeChanged     = "worktree.changed"
 	EventWorktreeProvisioned = "worktree.provisioned"
 	EventOperationStarted    = "operation.started"
 	EventOperationFinished   = "operation.finished"
@@ -154,6 +162,8 @@ func EventType(event Event) string {
 		return EventWorktreeCreated
 	case WorktreeUpdated:
 		return EventWorktreeUpdated
+	case WorktreeChanged:
+		return EventWorktreeChanged
 	case WorktreeProvisioned:
 		return EventWorktreeProvisioned
 	case OperationStarted:
@@ -185,6 +195,7 @@ var eventDecoders = map[string]func([]byte) (Event, error){
 	EventUnitFinished:        decodeEvent[UnitFinished],
 	EventWorktreeCreated:     decodeEvent[WorktreeCreated],
 	EventWorktreeUpdated:     decodeEvent[WorktreeUpdated],
+	EventWorktreeChanged:     decodeEvent[WorktreeChanged],
 	EventWorktreeProvisioned: decodeEvent[WorktreeProvisioned],
 	EventOperationStarted:    decodeEvent[OperationStarted],
 	EventOperationFinished:   decodeEvent[OperationFinished],

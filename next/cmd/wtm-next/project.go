@@ -60,7 +60,7 @@ func openEvents(ctx context.Context, dir string) (events.Source, error) {
 		return events.Source{}, err
 	}
 
-	return events.Source{Repo: params.repo(), Repository: params.facts(), Meta: store.Meta{StateDir: params.StateDir}}, nil
+	return events.Source{Repo: params.repo(), Repository: params.facts(), Meta: store.Meta{StateDir: params.StateDir}, Git: git.Repo{Dir: params.MainPath}}, nil
 }
 
 // register lists the repository params locates among those wtm knows, for a stream that follows all of them, once initialized; it never fails nor holds a command for long.

@@ -95,6 +95,16 @@
         "changed": { "type": "array", "minItems": 1, "items": { "enum": ["isolation", "ordinal", "parent", "created_at"] } }
       }
     },
+    "worktree.changed": {
+      "description": "What a worktree holds changed with no operation of wtm, as the stream polls it, changed naming what; never published on the bus. A worktree the stream had not seen yet is one, every field changed.",
+      "type": "object",
+      "required": ["type", "worktree", "changed"],
+      "properties": {
+        "type": { "const": "worktree.changed" },
+        "worktree": { "$ref": "#/$defs/worktree" },
+        "changed": { "type": "array", "minItems": 1, "items": { "enum": ["head", "checkout", "jobs"] } }
+      }
+    },
     "worktree.provisioned": {
       "description": "A worktree's provisioning ended.",
       "type": "object",
@@ -151,6 +161,7 @@
         { "$ref": "#/$defs/unit.finished" },
         { "$ref": "#/$defs/worktree.created" },
         { "$ref": "#/$defs/worktree.updated" },
+        { "$ref": "#/$defs/worktree.changed" },
         { "$ref": "#/$defs/worktree.provisioned" },
         { "$ref": "#/$defs/operation.started" },
         { "$ref": "#/$defs/operation.finished" },
@@ -169,6 +180,7 @@
     { "if": { "properties": { "type": { "const": "unit.finished" } } }, "then": { "$ref": "#/$defs/unit.finished", "required": ["repo", "op_id"] } },
     { "if": { "properties": { "type": { "const": "worktree.created" } } }, "then": { "$ref": "#/$defs/worktree.created", "required": ["repo"] } },
     { "if": { "properties": { "type": { "const": "worktree.updated" } } }, "then": { "$ref": "#/$defs/worktree.updated", "required": ["repo"] } },
+    { "if": { "properties": { "type": { "const": "worktree.changed" } } }, "then": { "$ref": "#/$defs/worktree.changed", "required": ["repo"] } },
     { "if": { "properties": { "type": { "const": "worktree.provisioned" } } }, "then": { "$ref": "#/$defs/worktree.provisioned", "required": ["repo"] } },
     { "if": { "properties": { "type": { "const": "operation.started" } } }, "then": { "$ref": "#/$defs/operation.started", "required": ["repo", "op_id"] } },
     { "if": { "properties": { "type": { "const": "operation.finished" } } }, "then": { "$ref": "#/$defs/operation.finished", "required": ["repo", "op_id"] } },

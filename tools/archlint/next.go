@@ -34,6 +34,7 @@ const (
 	nextCLI         nextLayer = "command/cli"
 	nextUI          nextLayer = "ui"
 	nextAPI         nextLayer = "api"
+	nextWeb         nextLayer = "web"
 	nextCmd         nextLayer = "cmd"
 )
 
@@ -63,6 +64,7 @@ var nextWhy = map[nextLayer]string{
 	nextUITest:      "a ui test kit reaches domain/*, ui/*, its own packages, the stdlib and third parties, never a command, a service or an adapter",
 	nextUI:          "ui/ is the presentation kit every command's cli shares and knows no command: domain/*, ui/*, the stdlib and third parties, never a command, a service or an adapter",
 	nextAPI:         "the catalogue knows no command: domain/* and the stdlib only",
+	nextWeb:         "the web server speaks to the core through the catalogue alone: api, domain/* and the stdlib, never a command, a service, an adapter or ui/*",
 	nextCmd:         "the composition root wires what is under next/, never a fake",
 }
 
@@ -83,7 +85,7 @@ func runNext(pass *analysis.Pass, testsOf testFiles) (any, error) {
 	}
 	from, ok := nextPackageOf(rel)
 	if !ok {
-		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under domain/, service/, command/ (its cli/ beside it), adapter/, ui/, api/ or cmd/wtm-next (next/README.md)", rel)
+		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under domain/, service/, command/ (its cli/ beside it), adapter/, ui/, api/, web/ or cmd/wtm-next (next/README.md)", rel)
 		return nil, nil
 	}
 	if sibling := strings.TrimSuffix(from.unit, testSuffix); slices.Contains(nextKits, from.layer) && !siblingExists(pass, rel, sibling) {
@@ -203,6 +205,8 @@ func nextPackageOf(rel string) (nextPackage, bool) {
 		return nextPackage{}, false
 	case parts[1] == "api" && !nested:
 		return nextPackage{layer: nextAPI}, true
+	case parts[1] == "web" && !nested:
+		return nextPackage{layer: nextWeb}, true
 	case parts[1] == "domain":
 		return nextPackage{layer: nextDomain}, true
 	case parts[1] == "service" && nested:
@@ -280,6 +284,8 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 		return stdlib || in(nextDomain)
 	case nextService, nextAPI:
 		return stdlib || in(nextDomain)
+	case nextWeb:
+		return stdlib || in(nextDomain, nextAPI)
 	case nextCommand:
 		return stdlib || in(nextDomain, nextService) || in(nextCommand) && to.pkg.unit == from.unit
 	case nextServiceTest:

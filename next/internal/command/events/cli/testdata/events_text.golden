@@ -2,5 +2,6 @@
   = watching for changes
   ✓ created feat/b  /code/.trees/feat-b
   ✓ updated feat/b  ordinal=2
+  ✓ changed feat/b  head, jobs
   ✓ provisioned feat/b
   ✗ on_create failed for feat/b  make setup (exit 2)

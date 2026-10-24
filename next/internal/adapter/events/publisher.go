@@ -100,13 +100,13 @@ func (p Publisher) Publish(event domain.Event) {
 }
 
 // published reports whether the bus carries event: units started, phases and
-// their output stay in the process, and a snapshot and ready are the stream's
-// own lines, never published.
+// their output stay in the process, and a snapshot, ready and a worktree the
+// stream polled changed are the stream's own lines, never published.
 func published(event domain.Event) bool {
 	switch event.(type) {
 	case domain.WorktreeCreated, domain.WorktreeUpdated, domain.WorktreeProvisioned, domain.OperationStarted, domain.UnitFinished, domain.OperationFinished, domain.RepoAdded, domain.RepoRemoved:
 		return true
-	case domain.UnitStarted, domain.PhaseStarted, domain.PhaseFinished, domain.Output, domain.Snapshot, domain.Ready:
+	case domain.UnitStarted, domain.PhaseStarted, domain.PhaseFinished, domain.Output, domain.Snapshot, domain.Ready, domain.WorktreeChanged:
 	}
 	return false
 }

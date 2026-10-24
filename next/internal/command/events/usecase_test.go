@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -395,4 +396,180 @@ func TestTheGlobalStreamPrunesTheRegistryAsItRuns(t *testing.T) {
 	watching(t, u, events.Request{All: true})
 
 	assert.Eventually(t, func() bool { return k.pruned() >= 3 }, 2*time.Second, 10*time.Millisecond)
+}
+
+// The legacy dashboard saw a commit made from a terminal: the stream polls what no operation of wtm announces.
+func TestACommitFromATerminalIsSentAsTheWorktreeChanged(t *testing.T) {
+	app := newRepo("/repo", "feat/a")
+	app.Git.Local = []string{"feat/ahead"}
+	app.Git.Commits = map[worktree.Ref][]string{worktree.LocalBranch{Name: "feat/ahead"}: {"c1"}}
+	app, git := app.living()
+	u := useCase(newBus(), &known{}, opening(app))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+	r.quiet(t)
+
+	require.NoError(t, git.MergeFFOnly(t.Context(), worktree.Merge{Path: "/repo/.trees/feat/a", Onto: worktree.LocalBranch{Name: "feat/ahead"}}))
+
+	assert.Equal(t, `{"v":2,"type":"worktree.changed","ts":"2026-10-16T12:00:00Z","repo":{"root":"/repo","common_dir":"/repo/.git"},"worktree":{"branch":"feat/a","path":"/repo/.trees/feat/a","parent":"","ordinal":null,"isolation":"isolated","is_main":false,"created_at":""},"changed":["head"]}`, r.next(t))
+	r.quiet(t)
+}
+
+func TestAJobThatStartsOrStopsIsSentAsTheWorktreeChanged(t *testing.T) {
+	jobs := &machine{}
+	u := useCase(newBus(), &known{}, opening(newRepo("/repo", "feat/a")))
+	u.Jobs, u.Recheck = jobs.Jobs, 20*time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+
+	jobs.set([]run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true, State: run.Running}}, nil)
+
+	assert.Contains(t, r.next(t), `"branch":"feat/a"`)
+	r.quiet(t)
+}
+
+// A run daemon that stops answering for a while says nothing about the jobs: nothing changed until it answers again.
+func TestJobsTheDaemonCannotTellChangeNothing(t *testing.T) {
+	jobs := &machine{jobs: []run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true, State: run.Running}}}
+	u := useCase(newBus(), &known{}, opening(newRepo("/repo", "feat/a")))
+	u.Jobs, u.Recheck = jobs.Jobs, 20*time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+
+	jobs.set(nil, run.ErrUnknown)
+	r.quiet(t)
+	jobs.set([]run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true, State: run.Running}}, nil)
+
+	r.quiet(t)
+}
+
+func TestAWorktreeRemovedFromATerminalResetsTheStreamOnAFreshSnapshot(t *testing.T) {
+	app, git := newRepo("/repo", "feat/a").living()
+	u := useCase(newBus(), &known{}, opening(app))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+
+	require.NoError(t, git.RemoveWorktree(t.Context(), "/repo/.trees/feat/a"))
+
+	snapshot := r.next(t)
+	assert.Contains(t, snapshot, `"type":"snapshot"`)
+	assert.NotContains(t, snapshot, "feat/a")
+}
+
+func TestTheGlobalStreamPollsEachRepositoryItWatches(t *testing.T) {
+	a, git := newRepo("/a").living()
+	u := useCase(newBus(), &known{repos: []domain.Repo{a.Repo}}, opening(a))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{All: true})
+	r.nextType(t)
+	r.nextType(t)
+
+	require.NoError(t, git.AddWorktree(t.Context(), worktree.Addition{Path: "/a/.trees/feat/b", Checkout: worktree.NewBranch{Name: "feat/b", From: worktree.LocalBranch{Name: "main"}}}))
+
+	assert.Contains(t, r.next(t), `"type":"worktree.changed","ts":"2026-10-16T12:00:00Z","repo":{"root":"/a","common_dir":"/a/.git"},"worktree":{"branch":"feat/b"`)
+}
+
+// The poll sent worktree.changed after wtm's own operations: a create was followed by a changed of its worktree, every field.
+func TestWhatAnOperationOfWtmChangedIsNeverSentAsPolled(t *testing.T) {
+	app, git := newRepo("/repo").living()
+	bus := newBus()
+	u := useCase(bus, &known{}, opening(app))
+	u.Recheck = 10 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	sub := bus.subscribed(t)
+	r.nextType(t)
+	r.nextType(t)
+
+	sub.Lines <- published(t, app.Repo, domain.OperationStarted{Command: "create", Surface: "cli"})
+	assert.Equal(t, "operation.started", r.nextType(t))
+	require.NoError(t, git.AddWorktree(t.Context(), worktree.Addition{Path: "/repo/.trees/feat/b", Checkout: worktree.NewBranch{Name: "feat/b", From: worktree.LocalBranch{Name: "main"}}}))
+	time.Sleep(50 * time.Millisecond)
+	sub.Lines <- published(t, app.Repo, domain.WorktreeCreated{Worktree: worktree.Identity{Branch: "feat/b", Path: "/repo/.trees/feat/b"}})
+	sub.Lines <- published(t, app.Repo, domain.OperationFinished{Command: "create", Surface: "cli", OK: true})
+
+	assert.Equal(t, "worktree.created", r.nextType(t))
+	assert.Equal(t, "operation.finished", r.nextType(t))
+	r.quiet(t)
+}
+
+// The pause of the poll during an operation of wtm covered the whole repository: a commit in another worktree, made from a terminal meanwhile, was never sent.
+func TestWhatAnOperationDidNotNameIsSentOnceItFinishes(t *testing.T) {
+	app := newRepo("/repo", "feat/a")
+	app.Git.Local = []string{"feat/ahead"}
+	app.Git.Commits = map[worktree.Ref][]string{worktree.LocalBranch{Name: "feat/ahead"}: {"c1"}}
+	app, git := app.living()
+	bus := newBus()
+	u := useCase(bus, &known{}, opening(app))
+	u.Recheck = 10 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	sub := bus.subscribed(t)
+	r.nextType(t)
+	r.nextType(t)
+
+	sub.Lines <- published(t, app.Repo, domain.OperationStarted{Command: "create", Surface: "cli"})
+	assert.Equal(t, "operation.started", r.nextType(t))
+	require.NoError(t, git.AddWorktree(t.Context(), worktree.Addition{Path: "/repo/.trees/feat/b", Checkout: worktree.NewBranch{Name: "feat/b", From: worktree.LocalBranch{Name: "main"}}}))
+	require.NoError(t, git.MergeFFOnly(t.Context(), worktree.Merge{Path: "/repo/.trees/feat/a", Onto: worktree.LocalBranch{Name: "feat/ahead"}}))
+	sub.Lines <- published(t, app.Repo, domain.WorktreeCreated{Worktree: worktree.Identity{Branch: "feat/b", Path: "/repo/.trees/feat/b"}})
+	sub.Lines <- published(t, app.Repo, domain.OperationFinished{Command: "create", Surface: "cli", OK: true})
+
+	assert.Equal(t, "worktree.created", r.nextType(t))
+	assert.Equal(t, "operation.finished", r.nextType(t))
+	changed := r.next(t)
+	assert.Contains(t, changed, `"type":"worktree.changed"`)
+	assert.Contains(t, changed, `"branch":"feat/a"`)
+	assert.Contains(t, changed, `"changed":["head"]`)
+	r.quiet(t)
+}
+
+// An operation whose process died never says it finished: past its limit, the poll runs again.
+func TestAnOperationThatNeverFinishesHoldsThePollBackTenMinutesAtMost(t *testing.T) {
+	app := newRepo("/repo", "feat/a")
+	app.Git.Local = []string{"feat/ahead"}
+	app.Git.Commits = map[worktree.Ref][]string{worktree.LocalBranch{Name: "feat/ahead"}: {"c1"}}
+	app, git := app.living()
+	bus := newBus()
+	u := useCase(bus, &known{}, opening(app))
+	clock := &ticking{now: fixedNow}
+	u.Now, u.Recheck = clock.Now, 10*time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	sub := bus.subscribed(t)
+	r.nextType(t)
+	r.nextType(t)
+	sub.Lines <- published(t, app.Repo, domain.OperationStarted{Command: "create", Surface: "cli"})
+	assert.Equal(t, "operation.started", r.nextType(t))
+
+	require.NoError(t, git.MergeFFOnly(t.Context(), worktree.Merge{Path: "/repo/.trees/feat/a", Onto: worktree.LocalBranch{Name: "feat/ahead"}}))
+	r.quiet(t)
+	clock.advance(11 * time.Minute)
+
+	assert.Contains(t, r.next(t), `"type":"worktree.changed"`)
+}
+
+// No event of an operation reports a removal: a worktree it named that went away meanwhile was removed by someone else, and its removal was never sent.
+func TestAWorktreeRemovedDuringAnOperationThatNamedItIsSent(t *testing.T) {
+	app, git := newRepo("/repo", "feat/a").living()
+	bus := newBus()
+	u := useCase(bus, &known{}, opening(app))
+	u.Recheck = 10 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	sub := bus.subscribed(t)
+	r.nextType(t)
+	r.nextType(t)
+
+	sub.Lines <- published(t, app.Repo, domain.OperationStarted{Command: "extract", Surface: "cli"})
+	sub.Lines <- published(t, app.Repo, domain.WorktreeUpdated{Worktree: worktree.Identity{Branch: "feat/a", Path: "/repo/.trees/feat/a"}, Changed: []worktree.IdentityField{worktree.IdentityOrdinal}})
+	assert.Equal(t, "operation.started", r.nextType(t))
+	assert.Equal(t, "worktree.updated", r.nextType(t))
+	require.NoError(t, git.RemoveWorktree(t.Context(), "/repo/.trees/feat/a"))
+	sub.Lines <- published(t, app.Repo, domain.OperationFinished{Command: "extract", Surface: "cli", OK: true})
+
+	assert.Equal(t, "operation.finished", r.nextType(t))
+	assert.Equal(t, "snapshot", r.nextType(t))
 }

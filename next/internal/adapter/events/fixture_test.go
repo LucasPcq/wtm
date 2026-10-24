@@ -29,6 +29,7 @@ func carried() []domain.Event {
 		domain.RepoRemoved{},
 		domain.WorktreeCreated{Worktree: identity()},
 		domain.WorktreeUpdated{Worktree: numbered, Changed: []worktree.IdentityField{worktree.IdentityOrdinal}},
+		domain.WorktreeChanged{Worktree: numbered, Changed: []worktree.PolledField{worktree.PolledHead, worktree.PolledJobs}},
 		domain.WorktreeProvisioned{Worktree: numbered, OK: true},
 		domain.WorktreeProvisioned{Worktree: numbered, Hook: "make setup", ExitCode: new(2)},
 		domain.OperationStarted{Command: "create", Surface: "cli"},

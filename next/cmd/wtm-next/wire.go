@@ -261,12 +261,13 @@ type streamParams struct {
 	Registry string
 }
 
-// eventStream is the events use case over the bus and the registry params name, opening each repository with openEvents.
+// eventStream is the events use case over the bus and the registry params name, opening each repository with openEvents and asking the run daemon at the bus's socket for the jobs it polls.
 func eventStream(params streamParams) events.UseCase {
 	return events.UseCase{
 		Bus:      bus.Bus{SocketPath: params.Socket, Start: params.Start},
 		Registry: knownRepos(params.Registry, params.Socket),
 		Open:     openEvents,
+		Jobs:     daemon.Daemon{SocketPath: params.Socket}.Jobs,
 		Now:      time.Now,
 	}
 }

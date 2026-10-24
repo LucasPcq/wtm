@@ -24,9 +24,11 @@ import (
 
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/adapter/webserver"
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
+	"github.com/LucasPcq/wtm/next/internal/web"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -105,7 +107,7 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 	answers := asked.Answers()
 
 	preview := c.Execute(t.Context(), api.Call{Dir: main, Answers: answers, Options: domain.RunOptions{DryRun: true}})
-	require.Equal(t, http.StatusOK, preview.Status, preview.Envelope.Err)
+	require.Nil(t, preview.Envelope.Err)
 	require.NotEmpty(t, preview.Envelope.Fingerprint)
 	assert.NotNil(t, preview.Envelope.Plan)
 	assert.Empty(t, preview.Envelope.Items, "a dry run applies nothing")
@@ -113,8 +115,8 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 
 	m.stale(t, main)
 	stale := c.Execute(t.Context(), api.Call{Dir: main, Answers: answers, Options: domain.RunOptions{ExpectFingerprint: preview.Envelope.Fingerprint}})
-	assert.Equal(t, http.StatusPreconditionFailed, stale.Status)
 	require.NotNil(t, stale.Envelope.Err)
+	assert.Equal(t, domain.KindPrecondition, stale.Envelope.Err.Kind)
 	assert.Equal(t, domain.CodePlanStale, stale.Envelope.Err.Code)
 	require.Len(t, stale.Envelope.FollowUps, 1, "a stale plan is followed up by its replan")
 	replan := stale.Envelope.FollowUps[0]
@@ -125,7 +127,7 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 	shape.golden("stale", stale.Envelope)
 
 	replanned := c.Execute(t.Context(), api.Call{Dir: main, Answers: replan.Answers, Options: domain.RunOptions{DryRun: replan.DryRun}})
-	require.Equal(t, http.StatusOK, replanned.Status, replanned.Envelope.Err)
+	require.Nil(t, replanned.Envelope.Err)
 	assert.NotEqual(t, preview.Envelope.Fingerprint, replanned.Envelope.Fingerprint)
 
 	var events []json.RawMessage
@@ -135,7 +137,7 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 		events = append(events, data)
 	}
 	applied := c.Execute(t.Context(), api.Call{Dir: main, Answers: replan.Answers, Options: domain.RunOptions{ExpectFingerprint: replanned.Envelope.Fingerprint, Report: report}})
-	require.Equal(t, http.StatusOK, applied.Status, applied.Envelope.Err)
+	require.Nil(t, applied.Envelope.Err)
 	shape.golden("applied", applied.Envelope)
 	for _, followUp := range applied.Envelope.FollowUps {
 		argv, unspelled := spelled(followUp)
@@ -161,7 +163,7 @@ func keepsTheReadContract(t *testing.T, name string) {
 	read := c.Execute(t.Context(), api.Call{Dir: main, Answers: asked.Answers()})
 	shape.golden("read", read.Envelope)
 
-	require.Equal(t, http.StatusOK, read.Status, read.Envelope.Err)
+	require.Nil(t, read.Envelope.Err)
 	require.NotEmpty(t, read.Envelope.Items)
 	assert.Empty(t, read.Envelope.Op)
 	assert.Empty(t, read.Envelope.Fingerprint)
@@ -237,13 +239,13 @@ func watchedLines(t *testing.T, stream api.Stream, call api.Call, count int) ([]
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	var lines []string
-	response := stream.Watch(ctx, call, func(line json.RawMessage) error {
+	response := stream.Watch(ctx, call, api.Sink{Send: func(line json.RawMessage) error {
 		lines = append(lines, string(line))
 		if len(lines) == count {
 			cancel()
 		}
 		return nil
-	})
+	}})
 	return lines, response
 }
 
@@ -629,4 +631,53 @@ func followUpsIn(document any) []map[string]any {
 		}
 	}
 	return found
+}
+
+// webServing serves this binary's web server of version as ui serve does, holding the lock, in the config directory of the test, and returns its record and a channel closed once it stopped and let go of the lock.
+func webServing(t *testing.T, version string) (webserver.Record, <-chan struct{}) {
+	t.Helper()
+	files := webserver.Files{Dir: webserver.Dir()}
+	release, err := files.Lock()
+	require.NoError(t, err)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	// the test's own pid: whatever signalled a record's pid would end this test, never another process
+	record := webserver.Record{PID: os.Getpid(), Port: listener.Addr().(*net.TCPAddr).Port, Version: version, Token: "token-" + version}
+	require.NoError(t, files.Write(t.Context(), record))
+
+	params := webParams(record.Token, time.Hour)
+	params.Version = version
+	ctx, stop := context.WithCancel(context.WithoutCancel(t.Context()))
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		defer release()
+		assert.NoError(t, web.New(params).Serve(ctx, listener))
+	}()
+	t.Cleanup(func() {
+		stop()
+		<-stopped
+	})
+	return record, stopped
+}
+
+// registered registers the repository of main among those wtm knows, and returns its id in the server's routes.
+func registered(t *testing.T, main string) string {
+	t.Helper()
+	params, err := locate(t.Context(), main)
+	require.NoError(t, err)
+	register(t.Context(), params)
+	return web.RepoID(params.repo())
+}
+
+// post sends body to path on the server of record, with its token.
+func post(t *testing.T, record webserver.Record, path, body string) *http.Response {
+	t.Helper()
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "http://127.0.0.1:"+strconv.Itoa(record.Port)+path, strings.NewReader(body))
+	require.NoError(t, err)
+	request.Header.Set(web.HeaderToken, record.Token)
+	response, err := http.DefaultClient.Do(request)
+	require.NoError(t, err)
+	t.Cleanup(func() { response.Body.Close() })
+	return response
 }

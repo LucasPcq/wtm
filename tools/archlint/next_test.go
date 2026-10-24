@@ -14,6 +14,8 @@ func TestANextPackageImportsOnlyWhatItsRowAllows(t *testing.T) {
 		nextPrefix+"internal/adapter/store",
 		nextPrefix+"internal/ui/output",
 		nextPrefix+"internal/api",
+		nextPrefix+"internal/web",
+		nextPrefix+"internal/web/sub",
 		nextPrefix+"internal/ui/cli",
 		nextPrefix+"internal/command/create/cli",
 		nextPrefix+"internal/command/clean",

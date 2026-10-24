@@ -1,0 +1,4 @@
+$ curl -s -o /dev/null -w "stop %{http_code}\n" -X POST -H "X-Wtm-Token: $(jq -r .token "$G/web.json")" "http://127.0.0.1:$(jq -r .port "$G/web.json")/api/stop"; sleep 1; pgrep -f -- "$SB" || echo "no process left in the sandbox"
+stop 202
+no process left in the sandbox
+

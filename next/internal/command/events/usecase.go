@@ -1,4 +1,4 @@
-// Package events streams the changes of a repository's worktrees, or of every repository wtm knows, as they happen: a snapshot, ready, then each change another process publishes on the event bus. A stream, it changes nothing and never ends on its own.
+// Package events streams the changes of a repository's worktrees, or of every repository wtm knows, as they happen: a snapshot, ready, then each change another process publishes on the event bus and each one a poll finds made with no operation of wtm (a commit from a terminal, a job started). A stream, it changes nothing and never ends on its own.
 package events
 
 import (
@@ -8,10 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/registry"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
@@ -32,23 +36,25 @@ const CodeConfigInvalid = Name + domain.ConfigInvalid
 // CodeSchemaNewer ends the stream on a line of a version newer than this wtm reads.
 const CodeSchemaNewer = Name + ".schema_newer"
 
-// recheckEvery is how often a stream checks that what it watches is still initialized, when the use case says nothing.
-const recheckEvery = 30 * time.Second
+// recheckEvery is how often a stream polls what it watches, when the use case says nothing: the legacy dashboard polled its jobs every 3 seconds and git every 20.
+const recheckEvery = 5 * time.Second
 
-// A UseCase streams the events of the repositories wtm knows: the bus it subscribes to, the registry of those repositories, how it opens one, its clock, and how often it checks what it watches is still there (Recheck, 30 seconds when zero).
+// A UseCase streams the events of the repositories wtm knows: the bus it subscribes to, the registry of those repositories, how it opens one, the jobs of the run daemon, its clock, and how often it polls what it watches (Recheck, 5 seconds when zero): whether it is still there, and what changed in it with no operation of wtm. Jobs may be nil: the jobs are then never polled.
 type UseCase struct {
 	Bus      Bus
 	Registry registry.Service
 	Open     Open
+	Jobs     Jobs
 	Now      func() time.Time
 	Recheck  time.Duration
 }
 
-// A Source is one repository a stream watches: how the events name it, the service that reads its worktrees, and their meta records.
+// A Source is one repository a stream watches: how the events name it, the service that reads its worktrees, their meta records, and its git as a poll reads it.
 type Source struct {
 	Repo       domain.Repo
 	Repository repository.Service
 	Meta       Meta
+	Git        Git
 }
 
 // A Received is one line of the stream: decoded, and as the JSON a reader receives, and whether the stream watches every repository, a person then told which one each line is about. A line relayed from the bus keeps the bytes it was published with, so that a newer publisher's fields reach the reader; its Event is nil when this wtm does not know its type.
@@ -67,7 +73,7 @@ type Out struct {
 // ----------------------------------------------------------------------------
 // Watch
 
-// Watch streams the events req asks for to out until ctx is done: a snapshot of each repository watched, ready, then every change published on the bus. When the bus goes away it subscribes again, after a backoff, and opens on fresh snapshots: nothing is replayed, so a reader takes every event as an upsert keyed by branch and every snapshot as a reset.
+// Watch streams the events req asks for to out until ctx is done: a snapshot of each repository watched, ready, then every change published on the bus, and every Recheck what a poll found changed with no operation of wtm: a worktree.changed per worktree whose head, checkout or jobs moved, a fresh snapshot when a worktree went away. When the bus goes away it subscribes again, after a backoff, and opens on fresh snapshots: nothing is replayed, so a reader takes every event as an upsert keyed by branch and every snapshot as a reset.
 // It returns nil once ctx is done after the stream started, ctx's error when it is done before; otherwise the refusal of req, or what ended the stream: a line of a newer version, a repository watched that lost its wtm config, or Emit's error.
 func (u UseCase) Watch(ctx context.Context, req Request, out Out) error {
 	// 1. Settle what the stream watches, refusing what no retry can change.
@@ -161,7 +167,8 @@ func (s *stream) oneRepository(ctx context.Context, source Source) error {
 		return err
 	}
 
-	if err := s.snapshot(ctx, source); err != nil {
+	watched := &watch{source: source}
+	if err := s.snapshot(ctx, watched); err != nil {
 		return lost(err)
 	}
 	if err := s.emitReady(); err != nil {
@@ -171,7 +178,16 @@ func (s *stream) oneRepository(ctx context.Context, source Source) error {
 	return s.relay(ctx, relayParams{
 		Lines: lines,
 		Recheck: func(ctx context.Context) error {
-			return s.stillThere(ctx, source)
+			// only a lost config is worth the full read that names it; any other failure waits for the next poll
+			if _, _, err := source.Repository.Config.Load(); errors.Is(err, project.ErrConfigNotFound) {
+				return s.stillThere(ctx, source)
+			}
+			jobs, known := s.jobs(ctx)
+			err := s.poll(ctx, pollParams{Watch: watched, Jobs: jobs, Known: known})
+			if _, ending := errors.AsType[ended](err); ending {
+				return err
+			}
+			return nil
 		},
 		Route: func(ctx context.Context, received Received) error {
 			// The bus filters by repository already: a line of another one is a newer daemon's mistake.
@@ -184,7 +200,7 @@ func (s *stream) oneRepository(ctx context.Context, source Source) error {
 			if _, removed := received.Line.Event.(domain.RepoRemoved); removed {
 				return s.stillThere(ctx, source)
 			}
-			return nil
+			return s.announced(ctx, watched, received.Line)
 		},
 	})
 }
@@ -202,7 +218,7 @@ func (s *stream) everyRepository(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	watched := map[string]bool{}
+	watched := map[string]*watch{}
 	for _, repo := range repos {
 		if err := s.join(ctx, joinParams{Repo: repo, Watched: watched}); err != nil {
 			return err
@@ -214,9 +230,16 @@ func (s *stream) everyRepository(ctx context.Context) error {
 
 	return s.relay(ctx, relayParams{
 		Lines: lines,
-		// A repository that goes away is announced by the prune, and its repo.removed reaches this stream like any line.
+		// A repository that goes away is announced by the prune, and its repo.removed reaches this stream like any line; one the poll cannot read waits for it.
 		Recheck: func(ctx context.Context) error {
 			_, _ = s.Registry.Prune(ctx)
+			jobs, known := s.jobs(ctx)
+			for _, commonDir := range slices.Sorted(maps.Keys(watched)) {
+				err := s.poll(ctx, pollParams{Watch: watched[commonDir], Jobs: jobs, Known: known})
+				if _, ending := errors.AsType[ended](err); ending {
+					return err
+				}
+			}
 			return nil
 		},
 		Route: func(ctx context.Context, received Received) error {
@@ -232,32 +255,59 @@ func (s *stream) everyRepository(ctx context.Context) error {
 			// the bus is shared whatever the state: a repository another process announces would be read with this one's moved state
 			case added && s.Registry.Inert():
 				return nil
-			case added && !watched[repo.CommonDir]:
+			case added && watched[repo.CommonDir] == nil:
 				if err := s.emit(received); err != nil {
 					return err
 				}
 				return s.join(ctx, joinParams{Repo: *repo, Watched: watched})
-			case added || !watched[repo.CommonDir]:
+			case added || watched[repo.CommonDir] == nil:
 				return nil
 			case removed:
 				delete(watched, repo.CommonDir)
+				return s.emit(received)
 			}
 
-			return s.emit(received)
+			if err := s.emit(received); err != nil {
+				return err
+			}
+			return s.announced(ctx, watched[repo.CommonDir], received.Line)
 		},
 	})
 }
 
 type joinParams struct {
 	Repo    domain.Repo
-	Watched map[string]bool
+	Watched map[string]*watch
+}
+
+// A watch is a repository the stream sent a snapshot of: how it reads it, what its last poll read, the operations of wtm the bus says run on it, by their op id, with when each started, and the branches their events named, whose changes are theirs.
+type watch struct {
+	source     Source
+	polled     Polled
+	operations map[string]time.Time
+	named      map[string]bool
+}
+
+// operationLimit is how long an operation the bus said started holds the poll back without saying it finished: its process may have died.
+const operationLimit = 10 * time.Minute
+
+// busy reports whether an operation of wtm runs on the repository watched at now: what it changes is its own events', never the poll's.
+func (w *watch) busy(now time.Time) bool {
+	for id, started := range w.operations {
+		if now.Sub(started) < operationLimit {
+			return true
+		}
+		delete(w.operations, id)
+	}
+	return false
 }
 
 // join sends the snapshot of params.Repo and counts it among those watched. A repository it cannot read is skipped with a warning rather than ending the stream: one broken repository must not blind the reader to every other.
 func (s *stream) join(ctx context.Context, params joinParams) error {
 	source, err := s.Open(ctx, params.Repo.Root)
+	watched := &watch{source: source}
 	if err == nil {
-		err = s.snapshot(ctx, source)
+		err = s.snapshot(ctx, watched)
 	}
 	if ending, ok := errors.AsType[ended](err); ok {
 		return ending
@@ -267,18 +317,151 @@ func (s *stream) join(ctx context.Context, params joinParams) error {
 		return nil
 	}
 
-	params.Watched[source.Repo.CommonDir] = true
+	params.Watched[source.Repo.CommonDir] = watched
 	return nil
 }
 
-// snapshot sends every worktree of source on a branch.
-func (s *stream) snapshot(ctx context.Context, source Source) error {
-	facts, err := s.observe(ctx, source)
+// snapshot sends every worktree on a branch of the repository watched, and keeps what it read for the next poll.
+func (s *stream) snapshot(ctx context.Context, watched *watch) error {
+	facts, err := s.observe(ctx, watched.source)
 	if err != nil {
 		return err
 	}
 
-	return s.emitLine(domain.Line{Repo: &source.Repo, Event: domain.Snapshot{Worktrees: Identities(facts)}})
+	jobs, known := s.jobs(ctx)
+	watched.polled = PollOf(facts.Snapshot, jobs, known)
+	return s.emitLine(domain.Line{Repo: &watched.source.Repo, Event: domain.Snapshot{Worktrees: Identities(facts)}})
+}
+
+type pollParams struct {
+	Watch *watch
+	Jobs  []run.Job
+	Known bool
+}
+
+// poll reads the worktrees and branch tips of the repository watched again, never while an operation of wtm runs on it, and sends what changed since the last read. It returns the error that kept it from reading, or the reader's.
+func (s *stream) poll(ctx context.Context, params pollParams) error {
+	if params.Watch.busy(s.Now()) {
+		return nil
+	}
+	now, err := s.read(ctx, params)
+	if err != nil {
+		return err
+	}
+	return s.send(ctx, params.Watch, now)
+}
+
+// send sends what changed in the repository watched from its last read to now, but for the changes of the branches the operations of wtm named: a worktree.changed per worktree that moved, named as a full read names it, a fresh snapshot when one went away. Now is its last read once sent, and the branches named are forgotten; a read that fails keeps both for the next poll.
+func (s *stream) send(ctx context.Context, watched *watch, now Polled) error {
+	changes, gone := Changes(watched.polled, now)
+	// no event of an operation reports a removal: a worktree gone was removed by someone else, whoever named it
+	changes = slices.DeleteFunc(changes, func(change Change) bool { return watched.named[change.Branch] })
+	if len(changes) == 0 && len(gone) == 0 {
+		watched.polled, watched.named = now, nil
+		return nil
+	}
+
+	facts, err := s.observe(ctx, watched.source)
+	if err != nil {
+		return err
+	}
+	repo := &watched.source.Repo
+	identities := Identities(facts)
+	if len(gone) > 0 {
+		changes = nil
+		if err := s.emitLine(domain.Line{Repo: repo, Event: domain.Snapshot{Worktrees: identities}}); err != nil {
+			return err
+		}
+	}
+	for _, change := range changes {
+		i := slices.IndexFunc(identities, func(identity worktree.Identity) bool { return identity.Branch == change.Branch })
+		if i < 0 {
+			continue
+		}
+		if err := s.emitLine(domain.Line{Repo: repo, Event: domain.WorktreeChanged{Worktree: identities[i], Changed: change.Fields}}); err != nil {
+			return err
+		}
+	}
+	watched.polled, watched.named = now, nil
+	return nil
+}
+
+// read is what a poll reads of the repository params watches, the jobs it does not know taken from its last read.
+func (s *stream) read(ctx context.Context, params pollParams) (Polled, error) {
+	git := params.Watch.source.Git
+	worktrees, err := git.Worktrees(ctx)
+	if err != nil {
+		return nil, err
+	}
+	branches, err := git.Branches(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return Carried(params.Watch.polled, PollOf(worktree.Snapshot{Worktrees: worktrees, Branches: branches}, params.Jobs, params.Known)), nil
+}
+
+// announced follows a line the bus carried for the repository watched: an operation of wtm holds the poll back from its start to its finish, the branches its events name are its own, and once the last one running finished, what the others changed meanwhile is sent.
+func (s *stream) announced(ctx context.Context, watched *watch, line domain.Line) error {
+	_, started := line.Event.(domain.OperationStarted)
+	_, finished := line.Event.(domain.OperationFinished)
+	switch {
+	case started:
+		if watched.operations == nil {
+			watched.operations = map[string]time.Time{}
+		}
+		watched.operations[line.OpID] = s.Now()
+	case finished:
+		delete(watched.operations, line.OpID)
+	}
+	if watched.busy(s.Now()) {
+		if branch := namedBy(line.Event); branch != "" {
+			if watched.named == nil {
+				watched.named = map[string]bool{}
+			}
+			watched.named[branch] = true
+		}
+		return nil
+	}
+	if !finished {
+		return nil
+	}
+
+	jobs, known := s.jobs(ctx)
+	now, err := s.read(ctx, pollParams{Watch: watched, Jobs: jobs, Known: known})
+	if err != nil {
+		return nil
+	}
+	err = s.send(ctx, watched, now)
+	if _, ending := errors.AsType[ended](err); ending {
+		return err
+	}
+	return nil
+}
+
+// namedBy is the branch an event of an operation names, "" for one that names none.
+func namedBy(event domain.Event) string {
+	switch e := event.(type) {
+	case domain.WorktreeCreated:
+		return e.Worktree.Branch
+	case domain.WorktreeUpdated:
+		return e.Worktree.Branch
+	case domain.WorktreeProvisioned:
+		return e.Worktree.Branch
+	case domain.UnitFinished:
+		return e.Subject
+	default:
+		return ""
+	}
+}
+
+// jobs are the jobs of the run daemon, and whether it could tell them.
+func (s *stream) jobs(ctx context.Context) ([]run.Job, bool) {
+	if s.Jobs == nil {
+		return nil, false
+	}
+	jobs, err := s.Jobs(ctx)
+	return jobs, err == nil
 }
 
 // stillThere ends the stream of source once its repository has no wtm config any more; any other failure to read it waits for the next check.

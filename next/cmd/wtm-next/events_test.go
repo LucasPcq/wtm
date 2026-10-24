@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,7 +34,7 @@ func TestTheEventStreamOfASurfaceOpensOnTheCallsRepositoryWhateverGitDirSays(t *
 
 	lines, response := watchedLines(t, stream, api.Call{Dir: main}, 2)
 
-	assert.Equal(t, http.StatusOK, response.Status, response.Envelope.Err)
+	assert.Nil(t, response.Envelope.Err)
 	require.Len(t, lines, 2)
 	var snapshot struct {
 		Type      string      `json:"type"`
@@ -70,7 +69,7 @@ func TestAChangeInAnotherProcessReachesTheStream(t *testing.T) {
 	defer cancel()
 	ready := make(chan struct{})
 	go func() {
-		done <- stream.Watch(ctx, api.Call{Dir: main}, func(line json.RawMessage) error {
+		done <- stream.Watch(ctx, api.Call{Dir: main}, api.Sink{Send: func(line json.RawMessage) error {
 			lines = append(lines, string(line))
 			switch len(lines) {
 			case 2:
@@ -79,7 +78,7 @@ func TestAChangeInAnotherProcessReachesTheStream(t *testing.T) {
 				cancel()
 			}
 			return nil
-		})
+		}})
 	}()
 	<-ready
 	bus.NewPublisher(publisher).Publish(domain.OperationStarted{Command: "create", Surface: "cli"})
@@ -173,7 +172,7 @@ func TestARelativeRepoOfASurfaceIsReadFromTheCallsDirectory(t *testing.T) {
 
 	lines, response := watchedLines(t, stream, api.Call{Dir: filepath.Dir(main), Answers: []domain.Answered{{Path: "repo", Values: []string{filepath.Base(main)}}}}, 1)
 
-	assert.Equal(t, http.StatusOK, response.Status, response.Envelope.Err)
+	assert.Nil(t, response.Envelope.Err)
 	require.NotEmpty(t, lines)
 	assert.Contains(t, lines[0], `"root":"`+gittest.Resolved(t, main)+`"`)
 }
@@ -207,7 +206,7 @@ func TestTheEveryRepositoryStreamOfASurfaceIsACallNamingNoDirectory(t *testing.T
 
 	lines, response := watchedLines(t, stream, api.Call{}, 2)
 
-	assert.Equal(t, http.StatusOK, response.Status, response.Envelope.Err)
+	assert.Nil(t, response.Envelope.Err)
 	require.Len(t, lines, 2)
 	assert.Contains(t, lines[0], `"type":"snapshot"`)
 	assert.Contains(t, lines[0], `"root":"`+gittest.Resolved(t, main)+`"`)
@@ -230,7 +229,7 @@ func TestTheEveryRepositoryStreamListsNoRepositoryWhileTheStateIsMoved(t *testin
 
 	lines, response := watchedLines(t, stream, api.Call{}, 1)
 
-	assert.Equal(t, http.StatusOK, response.Status, response.Envelope.Err)
+	assert.Nil(t, response.Envelope.Err)
 	require.Len(t, lines, 1)
 	assert.JSONEq(t, `{"v":2,"type":"ready","ts":"x"}`, withTS(t, lines[0]))
 	after, err := os.ReadFile(registry)

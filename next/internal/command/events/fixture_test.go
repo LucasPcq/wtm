@@ -15,6 +15,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
@@ -118,6 +119,13 @@ type repo struct {
 	Git    gittest.FakeParams
 	Meta   map[string]worktree.Meta
 	Config *config
+	live   *gittest.Fake // the git every open of it shares, when a test changes it while the stream runs
+}
+
+// living is r with one git every open shares, and that git, which a test changes as a terminal would.
+func (r repo) living() (repo, *gittest.Fake) {
+	r.live = gittest.NewFake(r.Git)
+	return r, r.live
 }
 
 // newRepo returns the repository at root, its main worktree on main and its linked worktrees on branches.
@@ -130,8 +138,11 @@ func newRepo(root string, branches ...string) repo {
 }
 
 func (r repo) source() events.Source {
-	git := gittest.NewFake(r.Git)
-	return events.Source{Repo: r.Repo, Repository: repository.Service{Config: r.Config, Git: git, MainPath: r.Repo.Root}, Meta: storetest.NewFake(storetest.FakeParams{Meta: r.Meta})}
+	git := r.live
+	if git == nil {
+		git = gittest.NewFake(r.Git)
+	}
+	return events.Source{Repo: r.Repo, Repository: repository.Service{Config: r.Config, Git: git, MainPath: r.Repo.Root}, Meta: storetest.NewFake(storetest.FakeParams{Meta: r.Meta}), Git: git}
 }
 
 // opening opens the repositories repos by their root or any directory under it named in dirs; any other directory is in no repository, "/nowhere" no directory at all.
@@ -171,3 +182,40 @@ func (r *reader) out() events.Out {
 }
 
 var errBusGone = errors.New("connect to the event bus: no such file")
+
+// A machine is the jobs the run daemon runs, which a test changes, or err when it cannot tell.
+type machine struct {
+	mu   sync.Mutex
+	jobs []run.Job
+	err  error
+}
+
+func (m *machine) Jobs(context.Context) ([]run.Job, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.jobs), m.err
+}
+
+func (m *machine) set(jobs []run.Job, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.jobs, m.err = jobs, err
+}
+
+// A ticking is a clock a test moves forward.
+type ticking struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+func (c *ticking) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+func (c *ticking) advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
+}

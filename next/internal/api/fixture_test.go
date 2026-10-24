@@ -72,18 +72,22 @@ func (r request) Values(path string) []string {
 	return []string{r.Name}
 }
 
-// watched records what a stream's watch was given and sends lines, failing with refusal once sent.
+// watched records what a stream's watch was given, warns its warnings and sends lines, failing with refusal once sent.
 type watched struct {
-	watched bool
-	req     request
-	lines   []string
-	refusal error
+	watched  bool
+	req      request
+	lines    []string
+	warnings []error
+	refusal  error
 }
 
-func (w *watched) watch(_ context.Context, req request, send func(json.RawMessage) error) error {
+func (w *watched) watch(_ context.Context, req request, sink Sink) error {
 	w.watched, w.req = true, req
+	for _, err := range w.warnings {
+		sink.Warn(err)
+	}
 	for _, line := range w.lines {
-		if err := send(json.RawMessage(line)); err != nil {
+		if err := sink.Send(json.RawMessage(line)); err != nil {
 			return err
 		}
 	}

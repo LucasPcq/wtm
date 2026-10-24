@@ -1,11 +1,11 @@
 # next/ — wtm as use-case slices
 
-`wtm-next` (`make next` → `bin/wtm-next`) is wtm rebuilt as plain functions: a pure domain, one package per use case behind an in-process API, adapters behind the small interfaces each use case declares, a command line per command over a shared presentation kit. It works on the same repositories and state files as `wtm`: same state directory, `meta.json`, `config.toml` keys, operation locks and `repos.json`; its event bus is its own (`wtm-next daemon`, schema v2), on the socket legacy's run daemon used. Nothing here imports `github.com/LucasPcq/wtm/internal/…`.
+`wtm-next` (`make next` → `bin/wtm-next`) is wtm rebuilt as plain functions: a pure domain, one package per use case behind an in-process API, adapters behind the small interfaces each use case declares, a command line per command over a shared presentation kit, and a local web server over the same API (`wtm-next ui`). It works on the same repositories and state files as `wtm`: same state directory, `meta.json`, `config.toml` keys, operation locks and `repos.json`; its event bus is its own (`wtm-next daemon`, schema v2), on the socket legacy's run daemon used. Nothing here imports `github.com/LucasPcq/wtm/internal/…`.
 
 ## Layout
 
 ```
-cmd/wtm-next/          the composition root: builds each adapter once (wire.go), opens the project on demand, registers each command's cobra command on the root
+cmd/wtm-next/          the composition root: builds each adapter once (wire.go), opens the project on demand, registers each command's cobra command on the root, and `ui`, which starts or reuses the web server (ui.go)
 internal/
   domain/              the contract every use case speaks: errors, warnings, events and their stream, outcomes (`Outcome`, `Result`, `Unit`, generic over a command's plan and detail; `Read`, a read's) and the envelope that reports them, operations and their locks, the vocabulary of a question and a form's schema, a follow-up (a command and its answers, or a link), a plan's recap (`recap.go`: `RecapRow`, `RecapValue`, the marks of an answer), and the JSON of each a surface receives, and the line of the event stream (`stream.go`: `Line`, `MarshalLine`, `StreamVersion`) — pure, stdlib only
     worktree/          branches and worktrees as git lists them: names, refs, where a branch stands against origin, where a branch asked for a new worktree lands, a checkout, meta.json, identity, the stack of worktrees by the branch each was created from (`StackOf`, which `command/tree` reads), a branch's pull request and its state (open, merged, closed)
@@ -26,7 +26,7 @@ internal/
     provision/         a new worktree made whole and a source fast-forwarded, shared by the commands that create one, with the questions each of them asks (questions.go: the fragment their forms embed, whose Answers are all Run takes), the fingerprint of a plan that provisions and the answers remembered
     repository/        the facts of the repository a command decides from (config, run.toml, snapshot), and what the reads share (the meta records, whether a worktree's directory is gone, the run daemon and the forge asked while the worktrees are read: Records, Gone, Present, Ask, Each), wired once, refusing a repository with no wtm config with the command's `<name>.config_not_found` (its follow-up, `init`, injected), and one whose config.toml does not parse or validate with `<name>.config_invalid`
     registry/          the repositories wtm knows, for a stream of every one: a repository joins once its state directory holds a wtm config and leaves once it no longer does, each announced on the bus (`repo.added`, `repo.removed`); the registry is left alone while the state directory is moved (`$WTM_STATE_DIR`): none joins, none leaves, it lists none and a stream joins none another process announces
-  adapter/             what the ports reach out to: git, statefile, store, config, shell, oplock, events (the event bus: its daemon, its publisher, a subscription, the v2 schema), registry (repos.json), proxyport, daemon (the run daemon's jobs, never starting it), github (gh: the newest pull request of each branch whatever its state, with its checks and review)
+  adapter/             what the ports reach out to: git, statefile, store, config, shell, oplock, events (the event bus: its daemon, its publisher, a subscription, the v2 schema), registry (repos.json), webserver (web.json and the lock of the one web server of the machine), proxyport, daemon (the run daemon's jobs, never starting it), github (gh: the newest pull request of each branch whatever its state, with its checks and review)
     <name>test/        a stateful fake of an adapter, for tests (`gittest`, `storetest`, `configtest`, `registrytest`)
   ui/                  the presentation kit every command's cli shares, knowing no command
     cli/               the root: version, --quiet, help, signals, the exit code a command's failure sets
@@ -34,7 +34,8 @@ internal/
     form/              a command's form, generic over its schema: form.Command (its flags, its request, its launch, the conclusion of its run, its command line), form.Query (the same for a read, with its subject asked first, its picker and the machine formats it prints besides json, tree's mermaid), form.Stream (a stream's flags and request), the session and a step per field kind, the wizard that walks them to a recap and applies, or to the last step of a read's picker
     widget/            the inputs a step asks with: select list, multi-select, text field, text list, their styles, and the problem an input shows with the steps that get past it
     formtest/          for a command's tests: the driver that plays its wizard key by key, golden files, the v2 envelope decoded, a run of its command line (`Run`, `Printed`), a terminal that keeps pressing enter (`Enters`), a use case whose previews and applies a test scripts (`Previewing`)
-  api/                 the catalogue of the commands and its streams (`api.Stream`, a command that sends lines until stopped), knowing none of them: each one's name, its schema (domain.Form), the Go types of its plan and its detail, its questions as the repository stands and its execution, the answers by field in and a domain.Envelope out with the status of its kind, for a surface other than the command line; and the schema it publishes (`api.v2.schema.json`, `api.Schema()`)
+  api/                 the catalogue of the commands and its streams (`api.Stream`, a command that sends lines until stopped), knowing none of them: each one's name, its schema (domain.Form), the Go types of its plan and its detail, its questions as the repository stands and its execution, the answers by field in and a domain.Envelope out, for a surface other than the command line, which maps the kind of its error onto a status of its own; and the schema it publishes (`api.v2.schema.json`, `api.Schema()`)
+  web/                 the local HTTP server over the catalogue (`wtm-next ui`): the routes of each repository wtm knows, the guard of every request, an operation's progress and the event stream as server-sent events, the status of each kind of error, the page; what it cannot reach (the repositories, the token, the kill, a follow-up's command line, the schema) it is given by `cmd/wtm-next` in `web.Params`
 ```
 No file format lives in `domain/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `domain/project`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
 
@@ -60,6 +61,7 @@ A use case reads in one place. `command/<name>/usecase.go` tells the whole reque
 | `ui/<name>` | `domain/*`, `ui/*`, stdlib, third party — never `command/*`, `service/*`, `adapter/*` |
 | `ui/<name>test` | what `ui/<name>` may, `ui/<name>` included; imported from a `_test.go` only |
 | `api` | `domain/*`, stdlib — never `command/*`, `service/*`, `adapter/*`, `ui/*`, third party |
+| `web` | `api`, `domain/*`, stdlib — never `command/*`, `service/*`, `adapter/*`, `ui/*`, third party |
 | any test | never `github.com/LucasPcq/wtm/internal/…`; it sits beside the package it tests, never in a directory of tests alone |
 | `cmd/wtm-next` | anything under `next/` except a fake |
 
@@ -100,7 +102,31 @@ Go's doc-comment conventions, as the `go-style` skill states them ([`comments.md
 - **Every child process runs in its own process group**, git included, and wtm signals the whole group itself: SIGINT, then SIGTERM, then SIGKILL, bounded by `exec.Cmd.WaitDelay`. The terminal's Ctrl+C therefore never reaches a child directly: `git worktree add` would otherwise undo itself on SIGINT while wtm records the worktree, and a hook would receive SIGINT twice.
 - **The first Ctrl+C** cancels the operation: the worktree being added finishes its add, env copy and meta record (a shielded section), its hooks are stopped, and the later worktrees are skipped as interrupted. In human mode it prints `Cancelling — finishing <step> of <branch>; Ctrl+C again to stop now` on stderr. The command exits 19.
 - **The second Ctrl+C** stops at once: the running children's groups are killed and the command exits 130.
-- **A detached caller** (an HTTP or desktop adapter, later) passes the use case its own operation context, never a request's: a client that disconnects does not cancel the operation, an explicit cancel acts as the first Ctrl+C and a forced one as the second.
+- **A detached caller** (the web server, a desktop shell later) passes the use case its own operation context, never a request's: a client that disconnects does not cancel the operation, an explicit cancel acts as the first Ctrl+C and a forced one as the second. The forced one kills the children of every operation of the process already cancelled (`shell.KillCancelled`): it is process-wide, never one operation's, and never touches an operation nobody cancelled.
+
+## The web server
+
+`wtm-next ui` (`cmd/wtm-next/ui.go`) opens the web interface on the repository of the current directory: it reuses the server of this machine when one of its version answers, asks one of another version to stop (`POST /api/stop`, then it waits for its lock; one finishing an operation refuses, and ui names the operation rather than wait; one too old to be asked, ui names its pid for the user to stop, never signalling it) and starts one when none answers (`wtm-next ui serve`, detached, hidden), then prints the page's address, `http://127.0.0.1:<port>/#repo=<id>&token=<token>`, and opens it unless `--no-open`, through `web.html` (mode 0600), a page that redirects to it, so that the token never shows in the browser's command line. Until the front exists the page is a fallback that says so.
+
+- **One per machine.** The server holds `web.lock` while it serves and writes `web.json` (its pid, port, version and token, mode 0600) beside `repos.json` (`adapter/webserver`). `web.json` is trusted only while `web.lock` is held: once its server stopped, the port it names may be anyone's, which never gets its token; no process is ever signalled by the pid it records. It listens on 127.0.0.1, on port 4777 when free so the page keeps its origin, else on one the system picks. It is no part of the run daemon nor the event bus. It stops after 30 minutes with no request in flight (an open event stream is one, a running operation too): new requests are refused, the event streams end, the operations running finish.
+- **The guard.** A `Host` other than `127.0.0.1` or `localhost` at the server's own port is refused (DNS rebinding); under `/api`, an `Origin` other than the page's is refused and the token of this start is required in `X-Wtm-Token` (401 otherwise). No CORS header is ever written. The token travels in the fragment of the page's address, which the browser never sends.
+- **The routes.** `{repo}` is the id of a repository, a digest of its common directory (`web.RepoID`), resolved against the registry.
+
+| Route | Answers |
+| -- | -- |
+| `GET /api/version` | `{"version"}` of the binary |
+| `GET /api/repos` | the repositories wtm knows: `[{id, root, common_dir}]`, those no longer initialized pruned |
+| `GET /api/repos/{repo}/commands` | the catalogue: `[{name, form}]`, each form outside any repository |
+| `POST /api/repos/{repo}/commands/{name}/questions` | `{"answers": [{path, values}]}` → the form as the repository stands |
+| `POST /api/repos/{repo}/commands/{name}` | `{"answers", "dry_run", "expect_fingerprint"}` → the v2 envelope, the status of its error's kind (400 invalid, 403 refused, 409 conflict, 412 precondition, 499 cancelled, 500 internal); with `Accept: text/event-stream`, each event as a line of the event stream (`domain.Line`: `v`, `type`, `ts`, `repo`, `correlation_id`), then the envelope as the event named `envelope` |
+| `DELETE /api/repos/{repo}/operations/{id}` | cancels the operation, as a first Ctrl+C; `?force=true` then kills as a second; 202 |
+| `GET /api/events` | the event stream of every repository, `?repo={repo}` of one: its lines, `warning` events (the bus lost and joined again, a repository skipped), and `envelope` when it ends on a failure; a refusal before any line keeps its status |
+| `GET /api/schema` | the published schema of the API, `api.v2.schema.json` (`api.Schema`); a server given none answers 404 `web.schema_unavailable` |
+| `POST /api/stop` | stops the server as its idle stop does, 202; while operations run it refuses, 409 `{"operations": [ids]}`; once it accepted, a command is refused 503 `web.stopping` |
+| `POST /api/command-line` | a follow-up → `{"argv"}`, as the command line runs it, for one the catalogue cannot run |
+
+- **A browser's stream.** `EventSource` cannot send a header: a page reads `/api/events` and a command's progress with `fetch` and a streamed body, the token in `X-Wtm-Token`, never in a query string.
+- **An operation's id.** The server makes the correlation ID of each POST of a command and answers it in `X-Wtm-Operation`, written before any event on a stream, so an operation can be cancelled while it plans; it is the `{id}` of `DELETE` and the `correlation_id` of its events, on the progress stream and on the bus. The operation's own `op` arrives with its envelope. A client that leaves loses the envelope: the bus keeps `operation.finished` (`ok`, `code`) under its correlation ID, and the reader reads `list` again.
 
 ## The branch
 
