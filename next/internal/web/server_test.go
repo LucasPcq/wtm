@@ -443,3 +443,16 @@ func TestAnOperationIsRefusedOnceTheServerIsAskedToStop(t *testing.T) {
 	assert.Equal(t, http.StatusServiceUnavailable, run.StatusCode)
 	assert.Equal(t, CodeStopping, decoded[envelope](t, run).Error.Code)
 }
+
+func TestAKnownRouteAskedWithAnotherMethodIsRefusedWithTheMethodsItAnswers(t *testing.T) {
+	server := serving(t, Params{})
+
+	wrong := do(t, server, req{method: http.MethodPost, path: "/api/version"})
+	unknown := do(t, server, req{method: http.MethodGet, path: "/api/nothing"})
+
+	assert.Equal(t, http.StatusMethodNotAllowed, wrong.StatusCode)
+	assert.Equal(t, "GET, HEAD", wrong.Header.Get("Allow"))
+	assert.Equal(t, CodeMethodNotAllowed, decoded[envelope](t, wrong).Error.Code)
+	assert.Equal(t, http.StatusNotFound, unknown.StatusCode)
+	assert.Equal(t, CodeNotFound, decoded[envelope](t, unknown).Error.Code)
+}

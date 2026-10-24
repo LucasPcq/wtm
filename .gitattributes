@@ -1,0 +1,2 @@
+# Built by make ui from next/web: reviewed through its sources, never by hand
+next/internal/web/dist/** linguist-generated=true -diff

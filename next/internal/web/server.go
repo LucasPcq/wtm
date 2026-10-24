@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -14,15 +13,13 @@ import (
 	"net"
 	"net/http"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 )
-
-//go:embed page.html
-var page []byte
 
 // Params are what a server serves and the functions it is given in place of the world it cannot reach: the catalogue and the event stream, the repositories wtm knows, the version of the binary, the token every request carries, the kill of a forced cancel, the command line of a follow-up and the published schema.
 type Params struct {
@@ -72,7 +69,7 @@ func New(params Params) *Server {
 	s := &Server{params: params, stopping: stopping, stop: stop, running: map[string]running{}, idleSince: time.Now(), asked: make(chan struct{})}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", s.page)
+	mux.HandleFunc("/", s.page)
 	mux.HandleFunc("GET /api/version", s.version)
 	mux.HandleFunc("GET /api/repos", s.repos)
 	mux.HandleFunc("GET /api/repos/{repo}/commands", s.commands)
@@ -83,9 +80,7 @@ func New(params Params) *Server {
 	mux.HandleFunc("GET /api/schema", s.schema)
 	mux.HandleFunc("POST /api/stop", s.stopAsked)
 	mux.HandleFunc("POST /api/command-line", s.commandLine)
-	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
-		writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeNotFound, Message: "no such route"})
-	})
+	mux.HandleFunc("/api/", s.noRoute)
 	s.mux = mux
 	return s
 }
@@ -209,9 +204,28 @@ func (s *Server) repoOf(w http.ResponseWriter, r *http.Request, id string) (doma
 // ----------------------------------------------------------------------------
 // Routes
 
-func (s *Server) page(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write(page)
+// apiMethods are the methods the routes under /api answer.
+var apiMethods = []string{http.MethodGet, http.MethodPost, http.MethodDelete}
+
+// noRoute answers a request no route under /api takes: 405 with the methods its path answers when it has a route, 404 otherwise.
+func (s *Server) noRoute(w http.ResponseWriter, r *http.Request) {
+	var allowed []string
+	for _, method := range apiMethods {
+		// a route of the path is a pattern of that method; "/api/" is this one, "" a redirect of an unclean path
+		if _, pattern := s.mux.Handler(&http.Request{Method: method, URL: r.URL, Host: r.Host}); strings.HasPrefix(pattern, method+" ") {
+			allowed = append(allowed, method)
+			// a GET route answers HEAD too, as Go's own 405 says
+			if method == http.MethodGet {
+				allowed = append(allowed, http.MethodHead)
+			}
+		}
+	}
+	if len(allowed) == 0 {
+		writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeNotFound, Message: "no such route"})
+		return
+	}
+	w.Header().Set("Allow", strings.Join(allowed, ", "))
+	writeError(w, http.StatusMethodNotAllowed, &domain.Error{Kind: domain.KindRefused, Code: CodeMethodNotAllowed, Message: "this route answers " + strings.Join(allowed, ", ")})
 }
 
 func (s *Server) version(w http.ResponseWriter, _ *http.Request) {

@@ -16,6 +16,7 @@ const (
 	CodeHostRefused       = "web.host_refused"
 	CodeOriginRefused     = "web.origin_refused"
 	CodeNotFound          = "web.not_found"
+	CodeMethodNotAllowed  = "web.method_not_allowed"
 	CodeRepoUnknown       = "web.repo_unknown"
 	CodeCommandUnknown    = "web.command_unknown"
 	CodeOperationUnknown  = "web.operation_unknown"

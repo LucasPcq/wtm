@@ -2,12 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -116,6 +119,45 @@ func TestTheAnswersOfEachFormMatchItsRequest(t *testing.T) {
 			assert.NoError(t, validates(t, defs(name+".request"), document))
 		})
 	}
+}
+
+func TestEachResponseOfTheWebServerMatchesTheSchema(t *testing.T) {
+	defs := apiDefs(t)
+	main := configured(t)
+	ownConfigDir(t)
+	server, _ := webServing(t, version)
+	repo := registered(t, main)
+
+	for name, c := range map[string]struct {
+		def      string
+		response func() *http.Response
+	}{
+		"version":  {def: "web.Version", response: func() *http.Response { return get(t, server, "/api/version", false) }},
+		"repos":    {def: "web.Repos", response: func() *http.Response { return get(t, server, "/api/repos", false) }},
+		"commands": {def: "web.Commands", response: func() *http.Response { return get(t, server, "/api/repos/"+repo+"/commands", false) }},
+		"command_line": {def: "web.CommandLine", response: func() *http.Response {
+			return post(t, server, "/api/command-line", `{"command":"list","code":"x","message":"List them"}`)
+		}},
+		"unspellable": {def: "web.CommandLine", response: func() *http.Response {
+			return post(t, server, "/api/command-line", `{"code":"x","message":"Nothing to run"}`)
+		}},
+		"no_token":     {def: "web.Refusal", response: func() *http.Response { return get(t, server, "/api/version", true) }},
+		"repo_unknown": {def: "web.Refusal", response: func() *http.Response { return post(t, server, "/api/repos/nope/commands/list", `{}`) }},
+		"wrong_method": {def: "web.Refusal", response: func() *http.Response { return post(t, server, "/api/version", ``) }},
+		"not_a_call":   {def: "web.Refusal", response: func() *http.Response { return post(t, server, "/api/repos/"+repo+"/commands/list", `[`) }},
+	} {
+		t.Run(name, func(t *testing.T) {
+			body, err := io.ReadAll(c.response().Body)
+			require.NoError(t, err)
+			assert.NoError(t, validates(t, defs(c.def), body), string(body))
+		})
+	}
+
+	busy, err := json.Marshal(web.Busy{Operations: []string{"op-1"}})
+	require.NoError(t, err)
+	assert.NoError(t, validates(t, defs("web.Busy"), busy))
+	assert.NoError(t, validates(t, defs("web.Call"), []byte(`{"answers":[{"path":"branches","values":["feat/a"]}],"dry_run":true,"expect_fingerprint":"f"}`)))
+	assert.NoError(t, validates(t, defs("web.Call"), []byte(`{}`)))
 }
 
 func TestTheSchemaRefusesWhatNoCommandSends(t *testing.T) {

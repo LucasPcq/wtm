@@ -1,0 +1,31 @@
+import { useQuery } from '@tanstack/react-query'
+import { Unplug } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { connectionOf, eventsQuery } from '@/api/queries/events'
+import { Centered } from '@/components/centered'
+import { StatePage } from '@/components/state-page'
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { AppSidebar } from './app-sidebar'
+
+// Shell is the frame of every screen: the sidebar, and the screen beside it, unless the server restarted.
+export function Shell(props: { repo: string | undefined; children: ReactNode }) {
+  const connection = connectionOf(useQuery(eventsQuery))
+
+  return (
+    <SidebarProvider>
+      <AppSidebar repo={props.repo} />
+      <SidebarInset>
+        {connection === 'disconnected' ? (
+          <Centered>
+            <StatePage icon={<Unplug />} title="The server restarted" command="wtm-next ui">
+              It runs under a new session now. Run this in a repository to open it again; this tab picks the new session
+              up on its own.
+            </StatePage>
+          </Centered>
+        ) : (
+          props.children
+        )}
+      </SidebarInset>
+    </SidebarProvider>
+  )
+}
