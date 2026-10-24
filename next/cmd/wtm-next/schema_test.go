@@ -138,6 +138,9 @@ func TestEachResponseOfTheWebServerMatchesTheSchema(t *testing.T) {
 		"command_line": {def: "web.CommandLine", response: func() *http.Response {
 			return post(t, server, "/api/command-line", `{"command":"list","code":"x","message":"List them"}`)
 		}},
+		"unspellable": {def: "web.CommandLine", response: func() *http.Response {
+			return post(t, server, "/api/command-line", `{"code":"x","message":"Nothing to run"}`)
+		}},
 		"no_token":     {def: "web.Refusal", response: func() *http.Response { return get(t, server, "/api/version", true) }},
 		"repo_unknown": {def: "web.Refusal", response: func() *http.Response { return post(t, server, "/api/repos/nope/commands/list", `{}`) }},
 		"not_a_call":   {def: "web.Refusal", response: func() *http.Response { return post(t, server, "/api/repos/"+repo+"/commands/list", `[`) }},
@@ -153,6 +156,7 @@ func TestEachResponseOfTheWebServerMatchesTheSchema(t *testing.T) {
 	require.NoError(t, err)
 	assert.NoError(t, validates(t, defs("web.Busy"), busy))
 	assert.NoError(t, validates(t, defs("web.Call"), []byte(`{"answers":[{"path":"branches","values":["feat/a"]}],"dry_run":true,"expect_fingerprint":"f"}`)))
+	assert.NoError(t, validates(t, defs("web.Call"), []byte(`{}`)))
 }
 
 func TestTheSchemaRefusesWhatNoCommandSends(t *testing.T) {

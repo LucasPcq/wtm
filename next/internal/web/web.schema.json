@@ -42,10 +42,9 @@
       "items": { "$ref": "#/$defs/web.Command" }
     },
     "web.Call": {
-      "description": "The body of POST /api/repos/{repo}/commands/{name} and of its /questions: the answer of each field by its path, and, to run it, whether it plans only and the fingerprint its apply is held to.",
+      "description": "The body of POST /api/repos/{repo}/commands/{name} and of its /questions: the answer of each field by its path, none leaving every field to its default, and, to run it, whether it plans only and the fingerprint its apply is held to.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["answers"],
       "properties": {
         "answers": { "type": "array", "items": { "$ref": "#/$defs/domain.Answered" } },
         "dry_run": { "type": "boolean" },
@@ -71,12 +70,12 @@
       }
     },
     "web.CommandLine": {
-      "description": "POST /api/command-line: a follow-up as the command line runs it.",
+      "description": "POST /api/command-line: a follow-up as the command line runs it, empty when it cannot be spelled (no command and no pull request to open).",
       "type": "object",
       "additionalProperties": false,
       "required": ["argv"],
       "properties": {
-        "argv": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        "argv": { "type": "array", "items": { "type": "string" } }
       }
     },
     "web.Refusal": {

@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -79,9 +80,7 @@ func New(params Params) *Server {
 	mux.HandleFunc("GET /api/schema", s.schema)
 	mux.HandleFunc("POST /api/stop", s.stopAsked)
 	mux.HandleFunc("POST /api/command-line", s.commandLine)
-	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
-		writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeNotFound, Message: "no such route"})
-	})
+	mux.HandleFunc("/api/", s.noRoute)
 	s.mux = mux
 	return s
 }
@@ -204,6 +203,26 @@ func (s *Server) repoOf(w http.ResponseWriter, r *http.Request, id string) (doma
 
 // ----------------------------------------------------------------------------
 // Routes
+
+// apiMethods are the methods the routes under /api answer.
+var apiMethods = []string{http.MethodGet, http.MethodPost, http.MethodDelete}
+
+// noRoute answers a request no route under /api takes: 405 with the methods its path answers when it has a route, 404 otherwise.
+func (s *Server) noRoute(w http.ResponseWriter, r *http.Request) {
+	var allowed []string
+	for _, method := range apiMethods {
+		// a route of the path is a pattern of that method; "/api/" is this one, "" a redirect of an unclean path
+		if _, pattern := s.mux.Handler(&http.Request{Method: method, URL: r.URL, Host: r.Host}); strings.HasPrefix(pattern, method+" ") {
+			allowed = append(allowed, method)
+		}
+	}
+	if len(allowed) == 0 {
+		writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeNotFound, Message: "no such route"})
+		return
+	}
+	w.Header().Set("Allow", strings.Join(allowed, ", "))
+	writeError(w, http.StatusMethodNotAllowed, &domain.Error{Kind: domain.KindRefused, Code: CodeMethodNotAllowed, Message: "this route answers " + strings.Join(allowed, ", ")})
+}
 
 func (s *Server) version(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"version": s.params.Version})

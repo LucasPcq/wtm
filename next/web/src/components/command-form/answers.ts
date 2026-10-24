@@ -43,12 +43,15 @@ const lines = (text: string) =>
     .map((line) => line.trim())
     .filter(Boolean)
 
-// problemsByKey files each problem of the core under the key of its field, and a problem no field holds under ''.
+// problemsByKey files each problem of the core under the key of its field, one of a field's value (branches[1])
+// under that field, and a problem no field holds under ''.
 export function problemsByKey(fields: DomainField[], problems: DomainFieldError[]): Record<string, string> {
   const paths = new Set(fields.map((field) => field.path))
+  const fieldOf = (path: string) => [path, path.replace(/\[\d+\]$/, '')].find((candidate) => paths.has(candidate))
   const filed: Record<string, string> = {}
   for (const problem of problems) {
-    const key = paths.has(problem.path) ? keyOf(problem.path) : ''
+    const field = fieldOf(problem.path)
+    const key = field === undefined ? '' : keyOf(field)
     filed[key] = filed[key] ? `${filed[key]}\n${problem.message}` : problem.message
   }
   return filed

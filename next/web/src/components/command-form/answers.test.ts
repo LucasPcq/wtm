@@ -72,6 +72,17 @@ test('a problem goes under its field, one of no field under the form', () => {
   })
 })
 
+// create refuses one branch of several as branches[N]: the problem showed above the form, not under the field.
+test('a problem of one value of a field goes under that field', () => {
+  const branches: DomainField = { ...base, kind: 'text_list', path: 'branches', entries: [], options: [] }
+  expect(
+    problemsByKey([branches, remember], [problem('branches[1]', 'exists already'), problem('remember[0]', 'unknown')]),
+  ).toEqual({
+    branches: 'exists already',
+    'remember%5B0%5D': 'unknown',
+  })
+})
+
 test('the validator asks the core with the changed answers and files what it says', async () => {
   const asked: DomainAnswered[][] = []
   const ask = async (answers: DomainAnswered[]) => {
