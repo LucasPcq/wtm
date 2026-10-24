@@ -54,3 +54,30 @@ func TestNoRecordIsNotExist(t *testing.T) {
 
 	assert.ErrorIs(t, err, fs.ErrNotExist)
 }
+
+func TestThePageThatOpensTheServerRedirectsToItsAddressAndIsKeptFromOtherUsers(t *testing.T) {
+	files := Files{Dir: t.TempDir()}
+
+	path, err := files.Launch(t.Context(), "http://127.0.0.1:4777/#repo=abc&token=secret")
+
+	require.NoError(t, err)
+	page, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Contains(t, string(page), `content="0;url=http://127.0.0.1:4777/#repo=abc&amp;token=secret"`)
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, recordPerm, info.Mode().Perm())
+}
+
+func TestNoFileIsKeptWithoutADirectory(t *testing.T) {
+	files := Files{}
+
+	_, lock := files.Lock()
+	write := files.Write(t.Context(), Record{})
+	_, read := files.Read()
+	_, launch := files.Launch(t.Context(), "http://127.0.0.1:1/")
+
+	for _, err := range []error{lock, write, read, launch} {
+		assert.ErrorIs(t, err, errNoDir)
+	}
+}

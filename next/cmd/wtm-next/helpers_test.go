@@ -633,22 +633,32 @@ func followUpsIn(document any) []map[string]any {
 	return found
 }
 
-// webServing serves this binary's web server, as ui serve does, in the config directory of the test, and returns its record.
-func webServing(t *testing.T) webserver.Record {
+// webServing serves this binary's web server of version as ui serve does, holding the lock, in the config directory of the test, and returns its record and a channel closed once it stopped and let go of the lock.
+func webServing(t *testing.T, version string) (webserver.Record, <-chan struct{}) {
 	t.Helper()
+	files := webserver.Files{Dir: webserver.Dir()}
+	release, err := files.Lock()
+	require.NoError(t, err)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	record := webserver.Record{PID: os.Getpid(), Port: listener.Addr().(*net.TCPAddr).Port, Version: version, Token: "token"}
-	require.NoError(t, webserver.Files{Dir: webserver.Dir()}.Write(t.Context(), record))
+	// the test's own pid: whatever signalled a record's pid would end this test, never another process
+	record := webserver.Record{PID: os.Getpid(), Port: listener.Addr().(*net.TCPAddr).Port, Version: version, Token: "token-" + version}
+	require.NoError(t, files.Write(t.Context(), record))
 
+	params := webParams(record.Token, time.Hour)
+	params.Version = version
 	ctx, stop := context.WithCancel(context.WithoutCancel(t.Context()))
-	served := make(chan error, 1)
-	go func() { served <- web.New(webParams(record.Token, time.Hour)).Serve(ctx, listener) }()
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		defer release()
+		assert.NoError(t, web.New(params).Serve(ctx, listener))
+	}()
 	t.Cleanup(func() {
 		stop()
-		require.NoError(t, <-served)
+		<-stopped
 	})
-	return record
+	return record, stopped
 }
 
 // registered registers the repository of main among those wtm knows, and returns its id in the server's routes.

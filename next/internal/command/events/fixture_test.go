@@ -142,7 +142,7 @@ func (r repo) source() events.Source {
 	if git == nil {
 		git = gittest.NewFake(r.Git)
 	}
-	return events.Source{Repo: r.Repo, Repository: repository.Service{Config: r.Config, Git: git, MainPath: r.Repo.Root}, Meta: storetest.NewFake(storetest.FakeParams{Meta: r.Meta})}
+	return events.Source{Repo: r.Repo, Repository: repository.Service{Config: r.Config, Git: git, MainPath: r.Repo.Root}, Meta: storetest.NewFake(storetest.FakeParams{Meta: r.Meta}), Git: git}
 }
 
 // opening opens the repositories repos by their root or any directory under it named in dirs; any other directory is in no repository, "/nowhere" no directory at all.

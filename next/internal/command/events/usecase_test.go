@@ -474,3 +474,26 @@ func TestTheGlobalStreamPollsEachRepositoryItWatches(t *testing.T) {
 
 	assert.Contains(t, r.next(t), `"type":"worktree.changed","ts":"2026-10-16T12:00:00Z","repo":{"root":"/a","common_dir":"/a/.git"},"worktree":{"branch":"feat/b"`)
 }
+
+// The poll sent worktree.changed after wtm's own operations: a create was followed by a changed of its worktree, every field.
+func TestWhatAnOperationOfWtmChangedIsNeverSentAsPolled(t *testing.T) {
+	app, git := newRepo("/repo").living()
+	bus := newBus()
+	u := useCase(bus, &known{}, opening(app))
+	u.Recheck = 10 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	sub := bus.subscribed(t)
+	r.nextType(t)
+	r.nextType(t)
+
+	sub.Lines <- published(t, app.Repo, domain.OperationStarted{Command: "create", Surface: "cli"})
+	assert.Equal(t, "operation.started", r.nextType(t))
+	require.NoError(t, git.AddWorktree(t.Context(), worktree.Addition{Path: "/repo/.trees/feat/b", Checkout: worktree.NewBranch{Name: "feat/b", From: worktree.LocalBranch{Name: "main"}}}))
+	time.Sleep(50 * time.Millisecond)
+	sub.Lines <- published(t, app.Repo, domain.WorktreeCreated{Worktree: worktree.Identity{Branch: "feat/b", Path: "/repo/.trees/feat/b"}})
+	sub.Lines <- published(t, app.Repo, domain.OperationFinished{Command: "create", Surface: "cli", OK: true})
+
+	assert.Equal(t, "worktree.created", r.nextType(t))
+	assert.Equal(t, "operation.finished", r.nextType(t))
+	r.quiet(t)
+}

@@ -30,7 +30,8 @@ func (s *Server) guard(w http.ResponseWriter, r *http.Request) bool {
 		writeError(w, http.StatusForbidden, &domain.Error{Kind: domain.KindRefused, Code: CodeOriginRefused, Message: "a page of another origin may not call the server"})
 		return false
 	}
-	if subtle.ConstantTimeCompare([]byte(r.Header.Get(HeaderToken)), []byte(s.params.Token)) != 1 {
+	// two empty strings compare equal: a server given no token would let every request through
+	if s.params.Token == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get(HeaderToken)), []byte(s.params.Token)) != 1 {
 		writeError(w, http.StatusUnauthorized, &domain.Error{Kind: domain.KindRefused, Code: CodeTokenInvalid, Message: "the request carries no token of this server, or another one: open the page wtm ui prints"})
 		return false
 	}

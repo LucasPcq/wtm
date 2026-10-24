@@ -6,7 +6,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
@@ -82,9 +81,8 @@ func (f Facts) claim(w worktree.Worktree) int {
 // A Polled is what a poll reads of a repository: each worktree on a branch, by its branch.
 type Polled map[string]Poll
 
-// A Poll is what a poll reads of one worktree: its identity, its branch's tip, what it has checked out, and each of its jobs with its state, sorted; Jobs is nil when the run daemon could not tell.
+// A Poll is what a poll reads of one worktree: its branch's tip, what it has checked out, and each of its jobs with its state, sorted; Jobs is nil when the run daemon could not tell.
 type Poll struct {
-	Identity worktree.Identity
 	Head     string
 	Checkout string
 	Jobs     []string
@@ -97,24 +95,20 @@ const (
 	checkoutBisecting = "bisecting"
 )
 
-// PollOf is what a poll reads of facts, the jobs of the machine being jobs, or unknown when known is false.
-func PollOf(facts Facts, jobs []run.Job, known bool) Polled {
+// PollOf is what a poll reads of the worktrees and branches of snapshot, the jobs of the machine being jobs, or unknown when known is false.
+func PollOf(snapshot worktree.Snapshot, jobs []run.Job, known bool) Polled {
 	tips := map[string]string{}
-	for _, branch := range facts.Branches.Local {
+	for _, branch := range snapshot.Branches.Local {
 		tips[branch.Name] = branch.Tip
 	}
 
-	identities := Identities(facts)
 	polled := Polled{}
-	for _, w := range facts.Worktrees {
+	for _, w := range snapshot.Worktrees {
 		branch := w.Branch()
 		if branch == "" {
 			continue
 		}
 		poll := Poll{Head: tips[branch], Checkout: checkoutOf(w.State)}
-		if i := slices.IndexFunc(identities, func(identity worktree.Identity) bool { return identity.Branch == branch }); i >= 0 {
-			poll.Identity = identities[i]
-		}
 		if known {
 			poll.Jobs = jobsIn(jobs, w.Path)
 		}
@@ -146,8 +140,14 @@ func jobsIn(jobs []run.Job, dir string) []string {
 	return in
 }
 
+// A Change is what a poll found moved in the worktree of Branch.
+type Change struct {
+	Branch string
+	Fields []worktree.PolledField
+}
+
 // Changes returns what changed from before to now: reset when a worktree went away, the reader then reset from a fresh snapshot; else each worktree whose head, checkout or jobs changed, by branch, a worktree new to the poll having every field changed. Jobs unknown before or now are not compared; they are taken as they were.
-func Changes(before, now Polled) (changed []domain.WorktreeChanged, reset bool) {
+func Changes(before, now Polled) (changes []Change, reset bool) {
 	for branch := range before {
 		if _, kept := now[branch]; !kept {
 			return nil, true
@@ -155,16 +155,15 @@ func Changes(before, now Polled) (changed []domain.WorktreeChanged, reset bool) 
 	}
 
 	for _, branch := range slices.Sorted(maps.Keys(now)) {
-		poll := now[branch]
 		fields := []worktree.PolledField{worktree.PolledHead, worktree.PolledCheckout, worktree.PolledJobs}
 		if was, seen := before[branch]; seen {
-			fields = polledFields(was, poll)
+			fields = polledFields(was, now[branch])
 		}
 		if len(fields) > 0 {
-			changed = append(changed, domain.WorktreeChanged{Worktree: poll.Identity, Changed: fields})
+			changes = append(changes, Change{Branch: branch, Fields: fields})
 		}
 	}
-	return changed, false
+	return changes, false
 }
 
 func polledFields(was, now Poll) []worktree.PolledField {

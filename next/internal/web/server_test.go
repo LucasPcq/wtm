@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -339,4 +340,94 @@ func TestServeWaitsForTheOperationsRunningWhenItStops(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, <-answered)
 	assert.NoError(t, <-served)
+}
+
+func TestServeStopsWhenAClientAsksIt(t *testing.T) {
+	server := New(Params{Idle: time.Hour, Token: token})
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	done := make(chan error, 1)
+	go func() { done <- server.Serve(t.Context(), listener) }()
+
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "http://"+listener.Addr().String()+"/api/stop", nil)
+	require.NoError(t, err)
+	request.Header.Set(HeaderToken, token)
+	response, err := http.DefaultClient.Do(request)
+	require.NoError(t, err)
+	response.Body.Close()
+
+	assert.Equal(t, http.StatusAccepted, response.StatusCode)
+	select {
+	case err := <-done:
+		assert.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the server did not stop once asked")
+	}
+}
+
+// A server that stopped while an operation ran kept its lock until the operation ended, its listener closed: no server answered, and ui said nothing true about why.
+func TestStopIsRefusedWhileAnOperationRuns(t *testing.T) {
+	started, release := make(chan string, 1), make(chan struct{})
+	server := New(Params{Catalogue: api.Catalogue{greet(useCase{started: started, release: release})}, Events: (&stream{}).bind(), Repos: func(context.Context) ([]domain.Repo, error) { return []domain.Repo{repo}, nil }, Token: token, Kill: func() {}, Idle: time.Hour})
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	served := make(chan error, 1)
+	go func() { served <- server.Serve(t.Context(), listener) }()
+	base := "http://" + listener.Addr().String()
+	running := make(chan struct{})
+	go func() {
+		defer close(running)
+		request, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, base+repoPath("/commands/greet"), strings.NewReader(`{}`))
+		request.Header.Set(HeaderToken, token)
+		if response, err := http.DefaultClient.Do(request); err == nil {
+			response.Body.Close()
+		}
+	}()
+	id := <-started
+
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodPost, base+"/api/stop", nil)
+	require.NoError(t, err)
+	request.Header.Set(HeaderToken, token)
+	response, err := http.DefaultClient.Do(request)
+	require.NoError(t, err)
+	refused := decoded[struct {
+		Operations []string `json:"operations"`
+	}](t, response)
+	response.Body.Close()
+
+	assert.Equal(t, http.StatusConflict, response.StatusCode)
+	assert.Equal(t, []string{id}, refused.Operations)
+	close(release)
+	<-running
+	select {
+	case err := <-served:
+		t.Fatalf("the server stopped while refusing to: %v", err)
+	default:
+	}
+}
+
+// ConstantTimeCompare of two empty strings is 1: a server given no token let every request through.
+func TestAServerWithNoTokenRefusesEveryRequest(t *testing.T) {
+	server := httptest.NewServer(New(Params{Idle: time.Hour}))
+	t.Cleanup(server.Close)
+
+	response := do(t, server, req{method: http.MethodGet, path: "/api/version", noToken: true})
+
+	assert.Equal(t, http.StatusUnauthorized, response.StatusCode)
+}
+
+func TestABodyPastItsLimitIsRefused(t *testing.T) {
+	big := `{"answers":[{"path":"name","values":["` + strings.Repeat("x", maxBody) + `"]}]}`
+
+	response := do(t, serving(t, Params{}), req{method: http.MethodPost, path: repoPath("/commands/greet"), body: big})
+
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+}
+
+func TestServeRefusesAnIdleThatIsNotPositive(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { listener.Close() })
+
+	assert.Error(t, New(Params{Token: token}).Serve(t.Context(), listener))
 }

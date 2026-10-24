@@ -13,7 +13,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
-	"syscall"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,6 +23,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/webserver"
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/web"
 	"github.com/spf13/cobra"
@@ -49,7 +50,7 @@ const (
 // errServerInTest refuses to start a server from a test: the executable is the test binary.
 var errServerInTest = errors.New("no web server is started from a test")
 
-// uiCmd opens the web interface on the repository of the directory it runs in: it reuses the server of this machine when one of this version answers, stops one of another version, starts one when none answers, then prints the page's address and opens it.
+// uiCmd opens the web interface on the repository of the directory it runs in: it reuses the server of this machine when one of this version answers, asks one of another version to stop, starts one when none answers, then prints the page's address and opens it through a page only its user reads, so that the token never shows in the browser's command line.
 func uiCmd(env cli.Env) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   uiCommand,
@@ -62,6 +63,9 @@ func uiCmd(env cli.Env) *cobra.Command {
 	_ = cmd.Flags().MarkHidden(flagIdle)
 
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
+		if err := positive(*idle); err != nil {
+			return err
+		}
 		record, err := ensureServer(cmd.Context(), *idle)
 		if err != nil {
 			return err
@@ -72,22 +76,29 @@ func uiCmd(env cli.Env) *cobra.Command {
 		if *noOpen {
 			return nil
 		}
-		return shell.Detached(browser(), []string{page}, os.Environ())
+		launch, err := webserver.Files{Dir: webserver.Dir()}.Launch(cmd.Context(), page)
+		if err != nil {
+			return err
+		}
+		return shell.Detached(browser(), []string{launch}, os.Environ())
 	}
 	cmd.AddCommand(serveCmd())
 	return cmd
 }
 
-// serveCmd is the hidden command that runs the web server in a process of its own: ui starts it detached. A second one finds the lock held and leaves at once.
+// serveCmd is the hidden command that runs the web server in a process of its own: ui starts it detached. A second one finds the lock held and leaves at once, saying so.
 func serveCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: serveCommand, Short: "Run the web server ui opens", Hidden: true, Args: cobra.NoArgs}
 	idle := cmd.Flags().Duration(flagIdle, webIdle, "how long the server waits without a client before it stops")
 
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
+		if err := positive(*idle); err != nil {
+			return err
+		}
 		files := webserver.Files{Dir: webserver.Dir()}
 		release, err := files.Lock()
 		if errors.Is(err, webserver.ErrRunning) {
-			return nil
+			return fmt.Errorf("a process holds web.lock in %s: %w", files.Dir, err)
 		}
 		if err != nil {
 			return err
@@ -114,6 +125,14 @@ func serveCmd() *cobra.Command {
 	return cmd
 }
 
+// positive refuses an --idle that would stop a server before its first request.
+func positive(idle time.Duration) error {
+	if idle <= 0 {
+		return domain.InvalidMessage("--" + flagIdle + " must be a positive duration, not " + idle.String())
+	}
+	return nil
+}
+
 // webParams are what the server of this process serves, with token, stopping after idle.
 func webParams(token string, idle time.Duration) web.Params {
 	return web.Params{
@@ -138,17 +157,21 @@ func eventsStream() api.Stream {
 	panic("streams() lists no " + events.Name)
 }
 
-// ensureServer returns the record of a server of this version that answers: the one running, else one it starts, after stopping one of another version.
+// ensureServer returns the record of a server of this version that answers: the one running, else one it starts, after asking one of another version to stop.
+// A record is its server's only while that server holds the lock: a record left by a server that stopped names a port anything may listen on now, which must never get its token. No process is ever signalled by a pid read from the record.
 func ensureServer(ctx context.Context, idle time.Duration) (webserver.Record, error) {
 	files := webserver.Files{Dir: webserver.Dir()}
-	if record, err := files.Read(); err == nil {
-		running, answered := askVersion(ctx, record)
+	last, _ := files.Read()
+	// shortcut: free takes the lock for an instant, so a server another ui starts at that instant leaves at once; that ui then times out. Ask the lock without taking it if that bites.
+	if !free(files) {
+		running, answered := askVersion(ctx, last)
 		if answered && running == version {
-			return record, nil
+			return last, nil
 		}
 		if answered {
-			// the record's process is the server that answered with its token: it is ours to stop
-			_ = syscall.Kill(record.PID, syscall.SIGTERM)
+			if busy := askStop(ctx, last); len(busy) > 0 {
+				return webserver.Record{}, fmt.Errorf("the web server of wtm %s is finishing operation %s: run wtm-next ui again once it ends", running, strings.Join(busy, ", "))
+			}
 			if err := until(ctx, func() bool { return free(files) }); err != nil {
 				return webserver.Record{}, fmt.Errorf("the web server of wtm %s did not stop: %w", running, err)
 			}
@@ -160,10 +183,14 @@ func ensureServer(ctx context.Context, idle time.Duration) (webserver.Record, er
 	}
 	var started webserver.Record
 	err := until(ctx, func() bool {
+		// the server started writes its record once it holds the lock, with a token of its own
 		record, err := files.Read()
+		if err != nil || record.Token == last.Token {
+			return false
+		}
 		running, answered := askVersion(ctx, record)
 		started = record
-		return err == nil && answered && running == version
+		return answered && running == version
 	})
 	if err != nil {
 		return webserver.Record{}, fmt.Errorf("the web server did not answer once started: %w", err)
@@ -175,13 +202,7 @@ func ensureServer(ctx context.Context, idle time.Duration) (webserver.Record, er
 func askVersion(ctx context.Context, record webserver.Record) (string, bool) {
 	ctx, cancel := context.WithTimeout(ctx, webAsk)
 	defer cancel()
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+net.JoinHostPort("127.0.0.1", strconv.Itoa(record.Port))+"/api/version", nil)
-	if err != nil {
-		return "", false
-	}
-	request.Header.Set(web.HeaderToken, record.Token)
-
-	response, err := http.DefaultClient.Do(request)
+	response, err := ask(ctx, askParams{Record: record, Method: http.MethodGet, Path: "/api/version"})
 	if err != nil {
 		return "", false
 	}
@@ -193,6 +214,38 @@ func askVersion(ctx context.Context, record webserver.Record) (string, bool) {
 		return "", false
 	}
 	return answer.Version, true
+}
+
+// askStop asks the server record names to stop, as its idle stop does, and returns the operations it refuses to stop for.
+func askStop(ctx context.Context, record webserver.Record) []string {
+	ctx, cancel := context.WithTimeout(ctx, webAsk)
+	defer cancel()
+	response, err := ask(ctx, askParams{Record: record, Method: http.MethodPost, Path: "/api/stop"})
+	if err != nil {
+		return nil
+	}
+	defer response.Body.Close()
+	var busy web.Busy
+	if response.StatusCode != http.StatusConflict || json.NewDecoder(response.Body).Decode(&busy) != nil {
+		return nil
+	}
+	return busy.Operations
+}
+
+type askParams struct {
+	Record webserver.Record
+	Method string
+	Path   string
+}
+
+// ask sends a request to the server params.Record names, with its token.
+func ask(ctx context.Context, params askParams) (*http.Response, error) {
+	request, err := http.NewRequestWithContext(ctx, params.Method, "http://"+net.JoinHostPort("127.0.0.1", strconv.Itoa(params.Record.Port))+params.Path, nil)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set(web.HeaderToken, params.Record.Token)
+	return http.DefaultClient.Do(request)
 }
 
 // free reports whether no server holds the lock.

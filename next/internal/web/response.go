@@ -67,9 +67,12 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_, _ = w.Write(data)
 }
 
-// decode reads r's body as JSON into v, an empty body leaving v as it is.
-func decode(r *http.Request, v any) error {
-	decoder := json.NewDecoder(r.Body)
+// maxBody bounds the body of a request: a call's answers are a few kilobytes.
+const maxBody = 1 << 20
+
+// decode reads r's body as JSON into v, an empty body leaving v as it is, and refuses one past maxBody.
+func decode(w http.ResponseWriter, r *http.Request, v any) error {
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(v); err != nil && !errors.Is(err, io.EOF) {
 		return err

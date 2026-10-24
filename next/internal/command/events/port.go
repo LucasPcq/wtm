@@ -24,6 +24,12 @@ type Bus interface {
 // repository.
 type Open func(ctx context.Context, dir string) (Source, error)
 
+// Git is what a poll reads of a repository, lighter than a snapshot: its worktrees and the tips of its branches.
+type Git interface {
+	Worktrees(ctx context.Context) ([]worktree.Worktree, error)
+	Branches(ctx context.Context) (worktree.Branches, error)
+}
+
 // Meta reads a worktree's meta record by its branch.
 type Meta interface {
 	Load(branch string) (worktree.Meta, error)

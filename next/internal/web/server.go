@@ -9,8 +9,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"maps"
 	"net"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 
@@ -47,6 +50,9 @@ type Server struct {
 	// stopping is done once the server stops: the event streams end with it, the operations never do.
 	stopping context.Context
 	stop     context.CancelFunc
+	// asked is closed once a client asks the server to stop (POST /api/stop).
+	asked     chan struct{}
+	askedOnce sync.Once
 
 	mu        sync.Mutex
 	running   map[string]running // by correlation id
@@ -63,7 +69,7 @@ type running struct {
 // New returns the server of params.
 func New(params Params) *Server {
 	stopping, stop := context.WithCancel(context.Background())
-	s := &Server{params: params, stopping: stopping, stop: stop, running: map[string]running{}, idleSince: time.Now()}
+	s := &Server{params: params, stopping: stopping, stop: stop, running: map[string]running{}, idleSince: time.Now(), asked: make(chan struct{})}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.page)
@@ -75,6 +81,7 @@ func New(params Params) *Server {
 	mux.HandleFunc("DELETE /api/repos/{repo}/operations/{id}", s.cancel)
 	mux.HandleFunc("GET /api/events", s.events)
 	mux.HandleFunc("GET /api/schema", s.schema)
+	mux.HandleFunc("POST /api/stop", s.stopAsked)
 	mux.HandleFunc("POST /api/command-line", s.commandLine)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeNotFound, Message: "no such route"})
@@ -94,8 +101,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
-// Serve serves on listener until ctx is done or the server stays Idle with no request in flight. It then stops taking requests, ends the event streams and waits for the operations still running, which finish whatever happens.
+// Serve serves on listener until ctx is done, a client asks it to stop, or the server stays Idle with no request in flight. It then stops taking requests, ends the event streams and waits for the operations still running, which finish whatever happens.
 func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
+	if s.params.Idle <= 0 {
+		return fmt.Errorf("a server that stops once idle %s would stop before its first request", s.params.Idle)
+	}
 	server := &http.Server{Handler: s, ReadHeaderTimeout: readHeaderTimeout}
 	served := make(chan error, 1)
 	go func() { served <- server.Serve(listener) }()
@@ -106,6 +116,8 @@ wait:
 	for {
 		select {
 		case <-ctx.Done():
+			break wait
+		case <-s.asked:
 			break wait
 		case err := <-served:
 			s.stop()
@@ -272,7 +284,7 @@ func (s *Server) call(w http.ResponseWriter, r *http.Request) (domain.Repo, api.
 	}
 
 	var call body
-	if err := decode(r, &call); err != nil {
+	if err := decode(w, r, &call); err != nil {
 		writeError(w, http.StatusBadRequest, domain.InvalidMessage("the body of the request is not a call: "+err.Error()))
 		return domain.Repo{}, api.Command{}, body{}, false
 	}
@@ -390,6 +402,27 @@ type warning struct {
 	Message string `json:"message"`
 }
 
+// stopAsked stops the server as its idle stop does, once the request is answered: wtm-next ui asks a server of another version to stop rather than signal a process it read from a file. While operations run it refuses, 409 with their ids: a server stopping would keep its lock until they end, with no listener left to answer.
+func (s *Server) stopAsked(w http.ResponseWriter, _ *http.Request) {
+	s.mu.Lock()
+	ids := slices.Sorted(maps.Keys(s.running))
+	if len(ids) == 0 {
+		s.askedOnce.Do(func() { close(s.asked) })
+	}
+	s.mu.Unlock()
+
+	if len(ids) > 0 {
+		writeJSON(w, http.StatusConflict, Busy{Operations: ids})
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+// Busy is the refusal of a stop while operations run: their correlation IDs.
+type Busy struct {
+	Operations []string `json:"operations"`
+}
+
 func (s *Server) schema(w http.ResponseWriter, _ *http.Request) {
 	if s.params.Schema == nil {
 		writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeSchemaUnavailable, Message: "this wtm publishes no schema of its API yet"})
@@ -403,7 +436,7 @@ func (s *Server) schema(w http.ResponseWriter, _ *http.Request) {
 // commandLine spells the follow-up the body carries as the command line runs it: {"argv": […]}, empty when it cannot.
 func (s *Server) commandLine(w http.ResponseWriter, r *http.Request) {
 	var followUp domain.FollowUp
-	if err := decode(r, &followUp); err != nil {
+	if err := decode(w, r, &followUp); err != nil {
 		writeError(w, http.StatusBadRequest, domain.InvalidMessage("the body of the request is not a follow-up: "+err.Error()))
 		return
 	}

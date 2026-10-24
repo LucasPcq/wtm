@@ -1,10 +1,11 @@
-// Package webserver keeps the record of the one web server of this machine: the lock its instance holds while it serves, and web.json, where it listens, its version and its token, readable by its user alone.
+// Package webserver keeps the record of the one web server of this machine: the lock its instance holds while it serves, web.json, where it listens, its version and its token, and the page that opens it, both readable by their user alone.
 package webserver
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
+	"html"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -17,9 +18,13 @@ const (
 	globalDirName = "wtm"
 	recordName    = "web.json"
 	lockName      = "web.lock"
+	launchName    = "web.html"
 	// recordPerm keeps the token from the other users of the machine.
 	recordPerm os.FileMode = 0o600
 )
+
+// errNoDir refuses to keep the server's files when the user's config directory is unknown, rather than in the working directory.
+var errNoDir = errors.New("the user's config directory is unknown: no web server can be recorded")
 
 // ErrRunning is the error of [Files.Lock] when another process holds the lock: a server already serves.
 var ErrRunning = errors.New("a web server already runs on this machine")
@@ -49,7 +54,11 @@ func Dir() string {
 
 // Lock takes the lock of the one server of the machine, without waiting, and returns its release; it fails with [ErrRunning] while another process holds it.
 func (f Files) Lock() (func(), error) {
-	file, err := statefile.TryLock(filepath.Join(f.Dir, lockName), domain.LockExclusive)
+	path, err := f.path(lockName)
+	if err != nil {
+		return nil, err
+	}
+	file, err := statefile.TryLock(path, domain.LockExclusive)
 	if errors.Is(err, statefile.ErrBusy) {
 		return nil, ErrRunning
 	}
@@ -69,8 +78,39 @@ func (f Files) Write(ctx context.Context, record Record) error {
 	if err != nil {
 		return err
 	}
+	_, err = f.write(ctx, recordName, data)
+	return err
+}
 
-	path := filepath.Join(f.Dir, recordName)
+// Read returns the record of the last server started; it fails with an error wrapping fs.ErrNotExist when none was.
+func (f Files) Read() (Record, error) {
+	path, err := f.path(recordName)
+	if err != nil {
+		return Record{}, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Record{}, err
+	}
+
+	var record Record
+	err = json.Unmarshal(data, &record)
+	return record, err
+}
+
+// Launch writes the page that sends the browser to address, readable by its user alone, and returns its path: a browser opened on it never carries the token of address in its command line, which any user of the machine may read.
+func (f Files) Launch(ctx context.Context, address string) (string, error) {
+	escaped := html.EscapeString(address)
+	page := `<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=` + escaped + `"><title>wtm</title><a href="` + escaped + `">Open wtm</a>` + "\n"
+	return f.write(ctx, launchName, []byte(page))
+}
+
+// write replaces the file name with data, readable by its user alone, and returns its path.
+func (f Files) write(ctx context.Context, name string, data []byte) (string, error) {
+	path, err := f.path(name)
+	if err != nil {
+		return "", err
+	}
 	_, err = statefile.Update(ctx, statefile.UpdateParams{
 		Path: path,
 		Perm: recordPerm,
@@ -79,20 +119,15 @@ func (f Files) Write(ctx context.Context, record Record) error {
 		},
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
-	// a record left by an older wtm with wider permissions keeps them through an update
-	return os.Chmod(path, recordPerm)
+	// a file left by an older wtm with wider permissions keeps them through an update
+	return path, os.Chmod(path, recordPerm)
 }
 
-// Read returns the record of the last server started; it fails with an error wrapping fs.ErrNotExist when none was.
-func (f Files) Read() (Record, error) {
-	data, err := os.ReadFile(filepath.Join(f.Dir, recordName))
-	if err != nil {
-		return Record{}, err
+func (f Files) path(name string) (string, error) {
+	if f.Dir == "" {
+		return "", errNoDir
 	}
-
-	var record Record
-	err = json.Unmarshal(data, &record)
-	return record, err
+	return filepath.Join(f.Dir, name), nil
 }
