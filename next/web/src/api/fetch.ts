@@ -21,6 +21,10 @@ export function request(path: string, init: RequestInit = {}): Promise<Response>
 export async function json<T>(path: string, body?: unknown): Promise<T> {
   const response = await request(path, body === undefined ? {} : { method: 'POST', body: JSON.stringify(body) })
   const read: unknown = await response.json().catch(() => undefined)
-  if (!response.ok) throw new HttpError(response.status, (read as WebRefusal | DomainEnvelope | undefined)?.error?.message ?? response.statusText)
+  if (!response.ok)
+    throw new HttpError(
+      response.status,
+      (read as WebRefusal | DomainEnvelope | undefined)?.error?.message ?? response.statusText,
+    )
   return read as T
 }

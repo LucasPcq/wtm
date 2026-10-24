@@ -7,9 +7,13 @@ export function StatePage(props: { icon?: ReactNode; title: string; children: Re
   return (
     <Empty className="gap-6">
       <EmptyHeader className="max-w-md gap-6">
-        {props.icon ? <EmptyMedia variant="icon" className="mb-0 size-12 rounded-[10px] [&_svg:not([class*='size-'])]:size-6">
+        {props.icon ? (
+          <EmptyMedia variant="icon" className="mb-0 size-12 rounded-[10px] [&_svg:not([class*='size-'])]:size-6">
             {props.icon}
-          </EmptyMedia> : <Logo />}
+          </EmptyMedia>
+        ) : (
+          <Logo />
+        )}
         <div className="flex flex-col items-center gap-2">
           <EmptyTitle className="text-lg font-semibold">{props.title}</EmptyTitle>
           <EmptyDescription>{props.children}</EmptyDescription>

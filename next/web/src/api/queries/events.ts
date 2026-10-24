@@ -1,7 +1,7 @@
 import { queryOptions, experimental_streamedQuery as streamedQuery, type QueryClient } from '@tanstack/react-query'
 import { EventSourceParserStream } from 'eventsource-parser/stream'
-import { HttpError, request } from './fetch'
-import type { WebRepos, WebWarning, WtmEventsV2 } from './types.gen'
+import { HttpError, request } from '../fetch'
+import type { WebRepos, WebWarning, WtmEventsV2 } from '../types.gen'
 
 // Live is what the event stream says of itself: what kept a line or a repository from it for a while (the bus
 // lost, a repository skipped), until the next line.
@@ -11,7 +11,7 @@ export const reconnectEvery = 2000
 
 // eventsQuery holds the event stream of every repository open. Each line invalidates what it changed; the stream
 // ending or failing is retried every reconnectEvery, until the server refuses the token: it restarted under a new
-// one, which a token change brings (main.tsx invalidates every query then).
+// one, which a token change brings (main.tsx reloads the page then).
 export const eventsQuery = queryOptions({
   queryKey: ['events'],
   queryFn: streamedQuery<Live, Live>({
@@ -32,10 +32,14 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
   const response = await request('/api/events', { signal })
   if (!response.ok || !response.body) throw new HttpError(response.status, 'the event stream was refused')
   // back after a break: the lines in between are lost, so everything is read again
-  if (client.getQueryData(eventsQuery.queryKey)) client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'events' })
+  if (client.getQueryData(eventsQuery.queryKey))
+    client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'events' })
   yield {}
 
-  const reader = response.body.pipeThrough(new TextDecoderStream()).pipeThrough(new EventSourceParserStream()).getReader()
+  const reader = response.body
+    .pipeThrough(new TextDecoderStream())
+    .pipeThrough(new EventSourceParserStream())
+    .getReader()
   for (;;) {
     const { value, done } = await reader.read()
     if (done) return

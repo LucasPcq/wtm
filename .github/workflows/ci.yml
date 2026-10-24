@@ -40,6 +40,9 @@ jobs:
       - name: Test
         run: make test
 
+      - name: Test the server built without the front
+        run: go test -tags noui ./next/internal/web -race -count=1
+
   ui:
     runs-on: ubuntu-latest
     steps:

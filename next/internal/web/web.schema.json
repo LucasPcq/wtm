@@ -32,7 +32,7 @@
       "additionalProperties": false,
       "required": ["name", "form"],
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
+        "name": { "$ref": "#/$defs/api.CommandName" },
         "form": { "$ref": "#/$defs/domain.Form" }
       }
     },
@@ -90,7 +90,7 @@
         "ok": { "const": false },
         "follow_ups": { "type": "array", "maxItems": 0 },
         "warnings": { "type": "array", "maxItems": 0 },
-        "error": { "$ref": "#/$defs/domain.Error", "description": "Its code is the server's own (web.token_invalid, web.host_refused, web.origin_refused, web.not_found, web.repo_unknown, web.command_unknown, web.operation_unknown, web.schema_unavailable, web.stopping), request.invalid for a body that does not decode, or the code of what failed while the repositories were read." }
+        "error": { "$ref": "#/$defs/domain.Error", "description": "Its code is the server's own (web.token_invalid, web.host_refused, web.origin_refused, web.not_found, web.method_not_allowed, web.repo_unknown, web.command_unknown, web.operation_unknown, web.schema_unavailable, web.stopping), request.invalid for a body that does not decode, or the code of what failed while the repositories were read." }
       }
     }
   }

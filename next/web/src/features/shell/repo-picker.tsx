@@ -2,12 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { Check, ChevronsUpDown } from 'lucide-react'
 import { useState } from 'react'
-import { reposQuery } from '@/api/queries'
+import { reposQuery } from '@/api/queries/repos'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { repoName } from '@/lib/repo'
 
-export function RepoPicker(props: { current?: string }) {
+export function RepoPicker(props: { current: string | undefined }) {
   const repos = useQuery(reposQuery)
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -24,7 +24,9 @@ export function RepoPicker(props: { current?: string }) {
             {current ? repoName(current.root).slice(0, 1) : '?'}
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-sm font-medium">{current ? repoName(current.root) : 'Choose a repository'}</span>
+            <span className="truncate text-sm font-medium">
+              {current ? repoName(current.root) : 'Choose a repository'}
+            </span>
             <span className="truncate text-xs text-muted-foreground">
               {current ? current.root : `${repos.data?.length ?? 0} known`}
             </span>

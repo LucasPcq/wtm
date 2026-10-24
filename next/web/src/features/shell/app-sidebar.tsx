@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Activity, FileKey, GitBranch, Layers, Settings, SlidersHorizontal, type LucideIcon } from 'lucide-react'
-import { readQuery } from '@/api/queries'
+import { readQuery } from '@/api/queries/commands'
 import {
   Sidebar,
   SidebarContent,
@@ -14,7 +14,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { ConnectionFooter } from './connection-footer'
-import { VersionedLogo } from './logo'
+import { VersionedLogo } from '@/components/logo'
 import { RepoPicker } from './repo-picker'
 
 // The screens that are not built yet show where they will be, muted and out of reach.
@@ -31,7 +31,7 @@ const soon: { group: string; items: { label: string; icon: LucideIcon }[] }[] = 
   { group: 'Project', items: [{ label: 'Settings', icon: Settings }] },
 ]
 
-export function AppSidebar(props: { repo?: string }) {
+export function AppSidebar(props: { repo: string | undefined }) {
   return (
     <Sidebar>
       <SidebarHeader className="gap-6 px-4 pt-5 pb-1">

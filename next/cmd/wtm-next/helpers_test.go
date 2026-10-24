@@ -289,9 +289,12 @@ func generatedSchema(t *testing.T) []byte {
 	for _, named := range []reflect.Type{reflect.TypeFor[domain.Warning](), reflect.TypeFor[domain.FollowUp](), reflect.TypeFor[domain.Section]()} {
 		s.of(named)
 	}
+	var names []string
 	for _, command := range catalogue() {
 		s.command(command)
+		names = append(names, command.Name)
 	}
+	s.defs["api.CommandName"] = map[string]any{"description": "The name of a command of the catalogue, the {name} of its routes.", "enum": names}
 	for _, stream := range streams() {
 		s.stream(stream)
 	}

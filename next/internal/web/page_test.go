@@ -44,4 +44,5 @@ func TestThePageAnswersGetOnly(t *testing.T) {
 
 	assert.Equal(t, http.StatusMethodNotAllowed, response.StatusCode)
 	assert.Equal(t, "GET, HEAD", response.Header.Get("Allow"))
+	assert.Equal(t, CodeMethodNotAllowed, decoded[envelope](t, response).Error.Code)
 }

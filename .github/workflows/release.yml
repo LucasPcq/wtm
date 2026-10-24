@@ -22,10 +22,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # A release is built from the commit as it stands, its committed web front included.
-      - name: Refuse a dirty tree
-        run: test -z "$(git status --porcelain)" || { git status --porcelain; exit 1; }
-
       - name: Run tests
         run: go test ./... -race -count=1
 

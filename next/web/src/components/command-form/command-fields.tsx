@@ -4,22 +4,28 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/c
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { keyOf } from './answers'
+import { keyOf, valueOf } from './answers'
 import type { CommandForm } from './use-command-form'
 
 // CommandFields draws each field of a command's form with the input of its kind.
 export function CommandFields(props: { form: CommandForm; fields: DomainField[] }) {
   return (
     <FieldGroup>
-      {props.fields.map((field, index) => (
-        <props.form.Field key={field.path} name={keyOf(index)}>
+      {props.fields.map((field) => (
+        <props.form.Field key={field.path} name={keyOf(field.path)} defaultValue={valueOf(field)}>
           {(input) => {
             const errors = input.state.meta.errors.filter(Boolean).map((message) => ({ message: String(message) }))
             const set = (values: string[]) => input.handleChange(values)
             return (
               <Field data-invalid={errors.length > 0}>
                 {field.kind !== 'confirm' && <FieldLabel htmlFor={input.name}>{field.label}</FieldLabel>}
-                <FieldInput field={field} id={input.name} values={input.state.value} onChange={set} invalid={errors.length > 0} />
+                <FieldInput
+                  field={field}
+                  id={input.name}
+                  values={input.state.value ?? valueOf(field)}
+                  onChange={set}
+                  invalid={errors.length > 0}
+                />
                 {field.help && <FieldDescription>{field.help}</FieldDescription>}
                 <FieldError errors={errors} />
               </Field>
@@ -31,7 +37,13 @@ export function CommandFields(props: { form: CommandForm; fields: DomainField[] 
   )
 }
 
-type InputProps = { field: DomainField; id: string; values: string[]; onChange: (values: string[]) => void; invalid: boolean }
+type InputProps = {
+  field: DomainField
+  id: string
+  values: string[]
+  onChange: (values: string[]) => void
+  invalid: boolean
+}
 
 function FieldInput({ field, id, values, onChange, invalid }: InputProps) {
   switch (field.kind) {
@@ -67,15 +79,17 @@ function FieldInput({ field, id, values, onChange, invalid }: InputProps) {
         </div>
       )
     case 'text':
-      return <Input id={id} aria-invalid={invalid} value={values[0] ?? ''} onChange={(e) => onChange(e.target.value ? [e.target.value] : [])} />
-    case 'text_list':
       return (
-        <Textarea
+        <Input
           id={id}
           aria-invalid={invalid}
-          value={values.join('\n')}
-          onChange={(e) => onChange(e.target.value.split('\n').filter(Boolean))}
+          value={values[0] ?? ''}
+          onChange={(e) => onChange(e.target.value ? [e.target.value] : [])}
         />
+      )
+    case 'text_list':
+      return (
+        <Textarea id={id} aria-invalid={invalid} value={values[0] ?? ''} onChange={(e) => onChange([e.target.value])} />
       )
     case 'confirm':
       return (

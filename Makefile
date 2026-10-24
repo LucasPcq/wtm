@@ -19,7 +19,7 @@ ui:
 # ui-dev serves the front from Vite with /api proxied to the server of `wtm-next ui`
 # (WTM_API=http://127.0.0.1:<port> when it listens elsewhere than 4777).
 ui-dev:
-	cd next/web && npm install && npm run dev
+	cd next/web && npm ci && npm run dev
 
 # schema regenerates next/internal/api/api.v2.schema.json, the schema the catalogue
 # publishes, from its Go types; make test-next fails while it is stale.

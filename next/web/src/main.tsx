@@ -13,11 +13,16 @@ if (repo && location.pathname === '/') history.replaceState(null, '', `/r/${enco
 const queryClient = new QueryClient({
   defaultOptions: {
     // a refusal does not change by asking again; a server gone for a moment may answer
-    queries: { retry: (count, error) => !(error instanceof HttpError && error.status < 500) && count < 2, refetchOnWindowFocus: false },
+    queries: {
+      retry: (count, error) => !(error instanceof HttpError && error.status < 500) && count < 2,
+      refetchOnWindowFocus: false,
+    },
   },
 })
-// a new token, from a tab a restarted server opened: everything is asked again with it, the event stream included
-onTokenChange(() => void queryClient.invalidateQueries())
+// a new token comes from a restarted server, maybe of another version: its page, not this one's code, reads it
+onTokenChange(() => location.reload())
+// an address pasted into this tab changes its fragment only: reading it again keeps its token out of the address bar
+addEventListener('hashchange', () => location.reload())
 
 const router = createRouter({ routeTree, context: { queryClient }, defaultPreload: 'intent' })
 

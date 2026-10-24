@@ -17,7 +17,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	// registered for every method: "GET /" would collide with "/api/" in the mux
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
-		writeError(w, http.StatusMethodNotAllowed, &domain.Error{Kind: domain.KindInvalid, Code: CodeNotFound, Message: "the page answers GET only"})
+		writeError(w, http.StatusMethodNotAllowed, &domain.Error{Kind: domain.KindRefused, Code: CodeMethodNotAllowed, Message: "the page answers GET only"})
 		return
 	}
 

@@ -1,9 +1,9 @@
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, expect, test, vi } from 'vitest'
 import { connectionOf, eventsQuery, reconnectEvery } from './events'
-import { HttpError } from './fetch'
+import { HttpError } from '../fetch'
 
-vi.mock('./token', () => ({ token: () => 't' }))
+vi.mock('../token', () => ({ token: () => 't' }))
 afterEach(() => vi.unstubAllGlobals())
 
 function serve(status: number, body = '') {
@@ -22,7 +22,11 @@ test('a line of a repository invalidates what it answers, and a warning shows un
   client.setQueryData(['repos'], [repo])
   client.setQueryData(['repo', 'r1', 'list', []], { ok: true })
   client.setQueryData(['repo', 'r2', 'list', []], { ok: true })
-  serve(200, 'event: warning\ndata: {"message":"the bus was lost"}\n\n' + 'data: {"v":2,"type":"worktree.created","repo":{"root":"/acme","common_dir":"/acme/.git"}}\n\n')
+  serve(
+    200,
+    'event: warning\ndata: {"message":"the bus was lost"}\n\n' +
+      'data: {"v":2,"type":"worktree.created","repo":{"root":"/acme","common_dir":"/acme/.git"}}\n\n',
+  )
 
   const seen: unknown[] = []
   client.getQueryCache().subscribe(() => seen.push(client.getQueryData(eventsQuery.queryKey)))
@@ -52,6 +56,10 @@ test('the connection reads the query of the stream', () => {
   expect(connectionOf({ status: 'pending', fetchStatus: 'fetching', error: null })).toBe('connecting')
   expect(connectionOf({ status: 'success', fetchStatus: 'fetching', error: null })).toBe('live')
   expect(connectionOf({ status: 'success', fetchStatus: 'idle', error: null })).toBe('reconnecting')
-  expect(connectionOf({ status: 'error', fetchStatus: 'idle', error: new TypeError('Failed to fetch') })).toBe('reconnecting')
-  expect(connectionOf({ status: 'error', fetchStatus: 'idle', error: new HttpError(401, 'refused') })).toBe('disconnected')
+  expect(connectionOf({ status: 'error', fetchStatus: 'idle', error: new TypeError('Failed to fetch') })).toBe(
+    'reconnecting',
+  )
+  expect(connectionOf({ status: 'error', fetchStatus: 'idle', error: new HttpError(401, 'refused') })).toBe(
+    'disconnected',
+  )
 })
