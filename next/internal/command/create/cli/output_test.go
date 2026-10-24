@@ -92,7 +92,7 @@ func TestAnAppliedRunWritesEachItemWithItsDetail(t *testing.T) {
 
 	assert.JSONEq(t, `{
 		"v": 2, "command": "create", "ok": true, "op": "op-1",
-		"plan": {"branches": [{"branch": "feat/a", "path": "/trees/feat-a", "action": "create"}, {"branch": "feat/b", "path": "/trees/feat-b", "action": "create"}], "from": "main", "env_from": "example"},
+		"plan": {"branches": [{"branch": "feat/a", "path": "/trees/feat-a", "action": "create"}, {"branch": "feat/b", "path": "/trees/feat-b", "action": "create"}], "from": "main", "env_from": "example", "creates": 0},
 		"items": [
 			{"subject": "feat/a", "status": "done", "detail": {"path": "/trees/feat-a", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "isolation": "isolated"}, "existing_branch": false}},
 			{"subject": "feat/b", "status": "done", "detail": {"path": "/trees/feat-b", "metadata": {"source_branch": "main", "created_at": "2026-10-16T12:00:00Z", "env_strategy": "example", "ordinal": 2, "isolation": "isolated"}, "existing_branch": true, "origin_state": "behind", "origin_behind": 2}}
@@ -128,7 +128,7 @@ func TestADryRunWritesThePlanAndItsFingerprintInsteadOfItems(t *testing.T) {
 
 	assert.JSONEq(t, `{
 		"v": 2, "command": "create", "ok": true, "op": "op-1",
-		"plan": {"branches": [{"branch": "feat/a", "path": "/trees/feat-a", "action": "create"}, {"branch": "feat/b", "path": "/trees/feat-b", "action": "create"}], "from": "main", "env_from": "example"},
+		"plan": {"branches": [{"branch": "feat/a", "path": "/trees/feat-a", "action": "create"}, {"branch": "feat/b", "path": "/trees/feat-b", "action": "create"}], "from": "main", "env_from": "example", "creates": 0},
 		"fingerprint": "0123456789abcdef01234567",
 		"follow_ups": [],
 		"warnings": [{"code": "create.env_parent_fallback", "message": "from main"}]

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 )
@@ -34,11 +35,20 @@ func (q questions) Form() domain.Form {
 	return domain.Form{Fields: []domain.Field{domain.TextField{FieldSpec: domain.FieldSpec{Path: "name", Label: q.asked}}}}
 }
 
-// outcome reports the request it ran with as its op, so a test sees what the use case was given.
+// outcome reports the request it ran with as its op, so a test sees what the use case was given; its plan is a plan and its detail a detail.
 type outcome struct{ op string }
 
+type (
+	plan   struct{ Steps int }
+	detail struct{ Path string }
+)
+
 func (o outcome) Envelope(params domain.EnvelopeParams) domain.Envelope {
-	return domain.Outcome[struct{}, struct{}]{Op: o.op}.Envelope(params)
+	return domain.Outcome[plan, detail]{Op: o.op}.Envelope(params)
+}
+
+func (o outcome) Types() (reflect.Type, reflect.Type) {
+	return domain.Outcome[plan, detail]{}.Types()
 }
 
 // useCase refuses with refusal, if any, and records the directory it was opened on.

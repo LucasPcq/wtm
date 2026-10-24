@@ -1,113 +1,664 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/LucasPcq/wtm/schemas/events.v2.json",
+  "$id": "https://wtm.sh/schemas/events.v2.json",
   "title": "wtm events v2",
   "description": "One line of `wtm events --output json`, as every wtm process publishes it on the event bus. Consumers ignore unknown fields and unknown types: a type this schema does not list is valid against the envelope alone. `v` changes only on a breaking change.",
   "type": "object",
-  "required": ["v", "type", "ts"],
+  "required": [
+    "v",
+    "type",
+    "ts"
+  ],
   "properties": {
-    "v": { "const": 2 },
-    "type": { "type": "string", "minLength": 1 },
-    "ts": { "type": "string", "format": "date-time" },
-    "repo": { "$ref": "#/$defs/repo" },
-    "correlation_id": { "type": "string", "maxLength": 256, "description": "WTM_CORRELATION_ID of the command that published the event, verbatim; absent when it had none." },
-    "op_id": { "type": "string", "minLength": 1, "description": "The operation the event belongs to; absent outside an operation." }
+    "v": {
+      "const": 2
+    },
+    "type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "repo": {
+      "$ref": "#/$defs/repo"
+    },
+    "correlation_id": {
+      "type": "string",
+      "maxLength": 256,
+      "description": "WTM_CORRELATION_ID of the command that published the event, verbatim; absent when it had none."
+    },
+    "op_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The operation the event belongs to; absent outside an operation."
+    }
   },
   "$defs": {
     "repo": {
       "type": "object",
-      "required": ["root", "common_dir"],
+      "required": [
+        "root",
+        "common_dir"
+      ],
       "properties": {
-        "root": { "type": "string", "minLength": 1, "description": "The main worktree." },
-        "common_dir": { "type": "string", "minLength": 1, "description": "git rev-parse --git-common-dir, absolute, symbolic links resolved: the repository's key." }
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The main worktree."
+        },
+        "common_dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "git rev-parse --git-common-dir, absolute, symbolic links resolved: the repository's key."
+        }
       }
     },
     "worktree": {
       "type": "object",
-      "required": ["branch", "path", "parent", "ordinal", "isolation", "is_main", "created_at"],
+      "required": [
+        "branch",
+        "path",
+        "parent",
+        "ordinal",
+        "isolation",
+        "is_main",
+        "created_at"
+      ],
       "properties": {
-        "branch": { "type": "string", "minLength": 1 },
-        "path": { "type": "string", "minLength": 1 },
-        "parent": { "type": "string", "description": "The branch it was created from; empty for the main worktree and one wtm did not create." },
-        "ordinal": { "type": ["integer", "null"], "minimum": 0, "description": "0 for the main worktree; null until the worktree is first given one." },
-        "isolation": { "type": "string" },
-        "is_main": { "type": "boolean" },
-        "created_at": { "type": "string" }
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent": {
+          "type": "string",
+          "description": "The branch it was created from; empty for the main worktree and one wtm did not create."
+        },
+        "ordinal": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "0 for the main worktree; null until the worktree is first given one."
+        },
+        "isolation": {
+          "type": "string"
+        },
+        "is_main": {
+          "type": "boolean"
+        },
+        "created_at": {
+          "type": "string"
+        }
       }
     },
-    "operation": {
-      "required": ["repo", "op_id", "command", "surface"],
+    "unit.started": {
+      "description": "The work on one subject of an operation begins.",
+      "type": "object",
+      "required": [
+        "type",
+        "subject"
+      ],
       "properties": {
-        "command": { "type": "string", "minLength": 1, "description": "The command, as its command line spells it after the program's name." },
-        "surface": { "type": "string", "minLength": 1, "description": "Where it was run from: cli, api." }
+        "type": {
+          "const": "unit.started"
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the unit works on: a branch."
+        }
       }
+    },
+    "phase.started": {
+      "description": "A phase of a subject's work begins.",
+      "type": "object",
+      "required": [
+        "type",
+        "subject",
+        "phase"
+      ],
+      "properties": {
+        "type": {
+          "const": "phase.started"
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the unit works on: a branch."
+        },
+        "phase": {
+          "type": "string",
+          "minLength": 1
+        },
+        "log": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The file the phase's output goes to; absent when it has none."
+        }
+      }
+    },
+    "phase.finished": {
+      "description": "A phase of a subject's work ended.",
+      "type": "object",
+      "required": [
+        "type",
+        "subject",
+        "phase",
+        "failed"
+      ],
+      "properties": {
+        "type": {
+          "const": "phase.finished"
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the unit works on: a branch."
+        },
+        "phase": {
+          "type": "string",
+          "minLength": 1
+        },
+        "failed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "phase.output": {
+      "description": "One line a phase printed: a hook's output.",
+      "type": "object",
+      "required": [
+        "type",
+        "subject",
+        "line"
+      ],
+      "properties": {
+        "type": {
+          "const": "phase.output"
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the unit works on: a branch."
+        },
+        "line": {
+          "type": "string"
+        }
+      }
+    },
+    "unit.finished": {
+      "description": "The work on one subject of an operation ended.",
+      "type": "object",
+      "required": [
+        "type",
+        "subject",
+        "status"
+      ],
+      "properties": {
+        "type": {
+          "const": "unit.finished"
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the unit works on: a branch."
+        },
+        "status": {
+          "enum": [
+            "done",
+            "failed",
+            "skipped",
+            "cancelled"
+          ]
+        }
+      }
+    },
+    "worktree.created": {
+      "description": "A worktree was added.",
+      "type": "object",
+      "required": [
+        "type",
+        "worktree"
+      ],
+      "properties": {
+        "type": {
+          "const": "worktree.created"
+        },
+        "worktree": {
+          "$ref": "#/$defs/worktree"
+        }
+      }
+    },
+    "worktree.updated": {
+      "description": "Fields of a worktree's identity changed, changed naming them.",
+      "type": "object",
+      "required": [
+        "type",
+        "worktree",
+        "changed"
+      ],
+      "properties": {
+        "type": {
+          "const": "worktree.updated"
+        },
+        "worktree": {
+          "$ref": "#/$defs/worktree"
+        },
+        "changed": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "isolation",
+              "ordinal",
+              "parent",
+              "created_at"
+            ]
+          }
+        }
+      }
+    },
+    "worktree.provisioned": {
+      "description": "A worktree's provisioning ended.",
+      "type": "object",
+      "required": [
+        "type",
+        "worktree",
+        "ok"
+      ],
+      "properties": {
+        "type": {
+          "const": "worktree.provisioned"
+        },
+        "worktree": {
+          "$ref": "#/$defs/worktree"
+        },
+        "ok": {
+          "type": "boolean",
+          "description": "Whether every hook passed; true when there were none."
+        },
+        "hook": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The failing hook's command; only when ok is false, and absent when provisioning failed before any hook ran."
+        },
+        "exit_code": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The failing hook's exit status; absent when it was killed by a signal."
+        }
+      }
+    },
+    "operation.started": {
+      "description": "An operation began.",
+      "type": "object",
+      "required": [
+        "type",
+        "command",
+        "surface"
+      ],
+      "properties": {
+        "type": {
+          "const": "operation.started"
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The command, as its command line spells it after the program's name."
+        },
+        "surface": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where it was run from: cli, api."
+        }
+      }
+    },
+    "operation.finished": {
+      "description": "An operation ended.",
+      "type": "object",
+      "required": [
+        "type",
+        "command",
+        "surface",
+        "ok"
+      ],
+      "properties": {
+        "type": {
+          "const": "operation.finished"
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The command, as its command line spells it after the program's name."
+        },
+        "surface": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where it was run from: cli, api."
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The code of the failure the operation ended on; absent when ok."
+        }
+      }
+    },
+    "snapshot": {
+      "description": "Every worktree of a repository on a branch, as the stream opens on it.",
+      "type": "object",
+      "required": [
+        "type",
+        "worktrees"
+      ],
+      "properties": {
+        "type": {
+          "const": "snapshot"
+        },
+        "worktrees": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/worktree"
+          },
+          "description": "Every worktree on a branch: a reset of what the reader knows of the repository."
+        }
+      }
+    },
+    "ready": {
+      "description": "The stream sent its snapshots: every event after it is a change.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "ready"
+        }
+      }
+    },
+    "repo.added": {
+      "description": "A repository joined those wtm knows.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "repo.added"
+        }
+      }
+    },
+    "repo.removed": {
+      "description": "A repository left those wtm knows: it is gone, or no longer initialized.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "repo.removed"
+        }
+      }
+    },
+    "event": {
+      "description": "One event of every type this schema lists, its type first: what an operation reports as it runs, without the line the stream stamps on it.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/unit.started"
+        },
+        {
+          "$ref": "#/$defs/phase.started"
+        },
+        {
+          "$ref": "#/$defs/phase.finished"
+        },
+        {
+          "$ref": "#/$defs/phase.output"
+        },
+        {
+          "$ref": "#/$defs/unit.finished"
+        },
+        {
+          "$ref": "#/$defs/worktree.created"
+        },
+        {
+          "$ref": "#/$defs/worktree.updated"
+        },
+        {
+          "$ref": "#/$defs/worktree.provisioned"
+        },
+        {
+          "$ref": "#/$defs/operation.started"
+        },
+        {
+          "$ref": "#/$defs/operation.finished"
+        },
+        {
+          "$ref": "#/$defs/snapshot"
+        },
+        {
+          "$ref": "#/$defs/ready"
+        },
+        {
+          "$ref": "#/$defs/repo.added"
+        },
+        {
+          "$ref": "#/$defs/repo.removed"
+        }
+      ]
     }
   },
   "allOf": [
     {
-      "if": { "properties": { "type": { "const": "snapshot" } } },
+      "if": {
+        "properties": {
+          "type": {
+            "const": "unit.started"
+          }
+        }
+      },
       "then": {
-        "required": ["repo", "worktrees"],
-        "properties": { "worktrees": { "type": "array", "items": { "$ref": "#/$defs/worktree" }, "description": "Every worktree on a branch: a reset of what the reader knows of the repository." } }
+        "$ref": "#/$defs/unit.started"
       }
     },
     {
-      "if": { "properties": { "type": { "const": "ready" } } },
-      "then": { "not": { "required": ["repo"] } }
-    },
-    {
-      "if": { "properties": { "type": { "enum": ["repo.added", "repo.removed"] } } },
-      "then": { "required": ["repo"] }
-    },
-    {
-      "if": { "properties": { "type": { "const": "worktree.created" } } },
-      "then": { "required": ["repo", "worktree"], "properties": { "worktree": { "$ref": "#/$defs/worktree" } } }
-    },
-    {
-      "if": { "properties": { "type": { "const": "worktree.updated" } } },
-      "then": {
-        "required": ["repo", "worktree", "changed"],
+      "if": {
         "properties": {
-          "worktree": { "$ref": "#/$defs/worktree" },
-          "changed": { "type": "array", "minItems": 1, "items": { "enum": ["isolation", "ordinal", "parent", "created_at"] } }
+          "type": {
+            "const": "phase.started"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/phase.started"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "phase.finished"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/phase.finished"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "phase.output"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/phase.output"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "unit.finished"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/unit.finished",
+        "required": [
+          "repo",
+          "op_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "worktree.created"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/worktree.created",
+        "required": [
+          "repo"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "worktree.updated"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/worktree.updated",
+        "required": [
+          "repo"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "worktree.provisioned"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/worktree.provisioned",
+        "required": [
+          "repo"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "operation.started"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/operation.started",
+        "required": [
+          "repo",
+          "op_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "operation.finished"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/operation.finished",
+        "required": [
+          "repo",
+          "op_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "snapshot"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/snapshot",
+        "required": [
+          "repo"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ready"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/ready",
+        "not": {
+          "required": [
+            "repo"
+          ]
         }
       }
     },
     {
-      "if": { "properties": { "type": { "const": "worktree.provisioned" } } },
-      "then": {
-        "required": ["repo", "worktree", "ok"],
+      "if": {
         "properties": {
-          "worktree": { "$ref": "#/$defs/worktree" },
-          "ok": { "type": "boolean", "description": "Whether every hook passed; true when there were none." },
-          "hook": { "type": "string", "minLength": 1, "description": "The failing hook's command; only when ok is false, and absent when provisioning failed before any hook ran." },
-          "exit_code": { "type": "integer", "minimum": 0, "description": "The failing hook's exit status; absent when it was killed by a signal." }
+          "type": {
+            "const": "repo.added"
+          }
         }
+      },
+      "then": {
+        "$ref": "#/$defs/repo.added",
+        "required": [
+          "repo"
+        ]
       }
     },
     {
-      "if": { "properties": { "type": { "const": "operation.started" } } },
-      "then": { "$ref": "#/$defs/operation" }
-    },
-    {
-      "if": { "properties": { "type": { "const": "operation.finished" } } },
-      "then": {
-        "$ref": "#/$defs/operation",
-        "required": ["ok"],
+      "if": {
         "properties": {
-          "ok": { "type": "boolean" },
-          "code": { "type": "string", "minLength": 1, "description": "The code of the failure the operation ended on; absent when ok." }
+          "type": {
+            "const": "repo.removed"
+          }
         }
-      }
-    },
-    {
-      "if": { "properties": { "type": { "const": "unit.finished" } } },
+      },
       "then": {
-        "required": ["repo", "op_id", "subject", "status"],
-        "properties": {
-          "subject": { "type": "string", "minLength": 1, "description": "What the unit worked on: a branch." },
-          "status": { "enum": ["done", "failed", "skipped", "cancelled"] }
-        }
+        "$ref": "#/$defs/repo.removed",
+        "required": [
+          "repo"
+        ]
       }
     }
   ]

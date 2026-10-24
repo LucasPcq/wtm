@@ -8,7 +8,7 @@
   ! fast-forward ignored: feat/other already exists, so nothing is created
   ! isolation verbatim ignored: feat/other already exists and stays isolated
 
-  fingerprint  08e34dc5ffabd6aa0ed286ac
-  → wtm-next extract feat/login --ff --files apps/api/new.txt --isolation verbatim --to feat/other --expect-fingerprint 08e34dc5ffabd6aa0ed286ac   apply this plan
+  fingerprint  802027d68d9cbdfc354300a5
+  → wtm-next extract feat/login --ff --files apps/api/new.txt --isolation verbatim --to feat/other --expect-fingerprint 802027d68d9cbdfc354300a5   apply this plan
   → wtm env feat/other --isolation verbatim   switch it to verbatim
 

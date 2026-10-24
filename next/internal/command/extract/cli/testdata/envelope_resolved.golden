@@ -63,6 +63,7 @@
       "path": "/repo/wt-feat-other",
       "action": "existing"
     },
+    "creates": 0,
     "keep": false,
     "conflicts": [
       {

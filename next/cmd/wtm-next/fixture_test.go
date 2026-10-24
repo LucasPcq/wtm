@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -91,4 +92,30 @@ func (f *firstLine) Write(p []byte) (int, error) {
 		f.stop()
 	}
 	return n, err
+}
+
+// fieldKinds is one field of each kind a form holds.
+func fieldKinds() []domain.Field {
+	return []domain.Field{domain.SelectField{}, domain.MultiSelectField{}, domain.TextField{}, domain.TextListField{}, domain.ConfirmField{}}
+}
+
+// eventsOfEachType is one event of each type an operation reports or the event stream carries.
+func eventsOfEachType() []domain.Event {
+	identity := worktree.Identity{Branch: "feat/a", Path: "/repo/.trees/feat-a", Parent: "main", Isolation: "isolated", CreatedAt: "2026-10-24T12:00:00Z"}
+	return []domain.Event{
+		domain.UnitStarted{Subject: "feat/a"},
+		domain.PhaseStarted{Subject: "feat/a", Phase: "hooks", Log: "/repo/.git/wtm/logs/feat-a.log"},
+		domain.PhaseFinished{Subject: "feat/a", Phase: "hooks", Failed: true},
+		domain.Output{Subject: "feat/a", Line: "installing"},
+		domain.UnitFinished{Subject: "feat/a", Status: domain.StatusDone},
+		domain.WorktreeCreated{Worktree: identity},
+		domain.WorktreeUpdated{Worktree: identity, Changed: []worktree.IdentityField{worktree.IdentityOrdinal}},
+		domain.WorktreeProvisioned{Worktree: identity, Hook: "make setup", ExitCode: new(2)},
+		domain.OperationStarted{Command: "create", Surface: "api"},
+		domain.OperationFinished{Command: "create", Surface: "api", Code: "unit.phase_failed"},
+		domain.Snapshot{},
+		domain.Ready{},
+		domain.RepoAdded{},
+		domain.RepoRemoved{},
+	}
 }

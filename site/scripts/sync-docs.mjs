@@ -137,6 +137,9 @@ mkdirSync(join(SITE, 'public/schemas'), { recursive: true });
 for (const f of readdirSync(join(REPO, 'internal/schemas')).filter((f) => f.endsWith('.json'))) {
   cpSync(join(REPO, 'internal/schemas', f), join(SITE, 'public/schemas', f));
 }
+for (const f of ['next/internal/api/api.v2.schema.json', 'next/internal/adapter/events/events.v2.json']) {
+  cpSync(join(REPO, f), join(SITE, 'public/schemas', f.split('/').pop()));
+}
 
 const home = readFileSync(join(SITE, 'src/docs-home.mdx'), 'utf8').replaceAll('__BASE__', BASE);
 writeFileSync(join(CONTENT, 'docs.mdx'), home);

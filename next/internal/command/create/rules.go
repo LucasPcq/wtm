@@ -297,7 +297,7 @@ type Plan struct {
 	Isolation   project.Isolation   `json:"isolation,omitempty"`
 	FastForward []string            `json:"fast_forward,omitempty"`
 	Remember    []string            `json:"remember,omitempty"`
-	Creates     int                 `json:"creates,omitempty"` // the worktrees the apply opens, one already open aside; out of the fingerprint, which the actions cover
+	Creates     int                 `json:"creates"` // the worktrees the apply opens, one already open aside; out of the fingerprint, which the actions cover
 	domain.Recapped
 	facts   Facts
 	settled provision.Answers // as resolved, handed to provisioning even where the plan shows none, and remembered

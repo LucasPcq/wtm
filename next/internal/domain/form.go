@@ -7,13 +7,21 @@ import (
 	"strings"
 )
 
-// Form is a command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, the request's flags and its --help spelled from them, and the request's problems, each naming a field, an entry of one, or a field the form does not list (remember[0]).
+// Form is a command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, the request's flags and its --help spelled from them, the sections a surface groups its fields in, and the request's problems, each naming a field, an entry of one, or a field the form does not list (remember[0]).
 type Form struct {
 	Fields   []Field
+	Sections []Section
 	Problems []FieldError
 }
 
-// MarshalJSON is the form as a surface receives it: each field with its "kind" (select, multi_select, text, text_list, confirm) first, then what that kind carries, and the request's problems.
+// A Section is a part of a form a surface shows as one, in the order the form lists its sections: the fields whose spec names its Key, its Title, and Summary, the part as one line once its fields are answered, empty until then.
+type Section struct {
+	Key     string `json:"key"`
+	Title   string `json:"title"`
+	Summary string `json:"summary,omitempty"`
+}
+
+// MarshalJSON is the form as a surface receives it: each field with its "kind" (select, multi_select, text, text_list, confirm) first, then what that kind carries, its sections and the request's problems.
 func (f Form) MarshalJSON() ([]byte, error) {
 	fields := make([]json.RawMessage, 0, len(f.Fields))
 	for _, field := range f.Fields {
@@ -27,8 +35,9 @@ func (f Form) MarshalJSON() ([]byte, error) {
 
 	return encoded(struct {
 		Fields   []json.RawMessage `json:"fields"`
+		Sections []Section         `json:"sections"`
 		Problems []FieldError      `json:"problems"`
-	}{fields, orEmpty(f.Problems)})
+	}{fields, orEmpty(f.Sections), orEmpty(f.Problems)})
 }
 
 // fieldKind returns the kind of field and the field with each of its lists an array, never null, so a surface iterates them as they are.
@@ -87,12 +96,13 @@ type Field interface {
 
 // FieldSpec is what a field of every kind has.
 type FieldSpec struct {
-	Path   string `json:"path"`             // the request field it answers, as a field error names it
-	Flag   string `json:"flag"`             // the argument or flag that sets it: <branches>, --from
-	Label  string `json:"label"`            // its name in a wizard's breadcrumb, trail and problems
-	Help   string `json:"help"`             // what its answer decides: a wizard's description and its flag's usage
-	Origin Origin `json:"origin,omitempty"` // where its answer came from, empty when the field does not say
-	Skip   string `json:"skip,omitempty"`   // why it is not asked, empty when it is
+	Path    string `json:"path"`              // the request field it answers, as a field error names it
+	Flag    string `json:"flag"`              // the argument or flag that sets it: <branches>, --from
+	Label   string `json:"label"`             // its name in a wizard's breadcrumb, trail and problems
+	Help    string `json:"help"`              // what its answer decides: a wizard's description and its flag's usage
+	Origin  Origin `json:"origin,omitempty"`  // where its answer came from, empty when the field does not say
+	Skip    string `json:"skip,omitempty"`    // why it is not asked, empty when it is
+	Section string `json:"section,omitempty"` // the key of the section it is shown in, empty when the form has none
 }
 
 // Spec is the spec itself, so each kind of field has it by embedding.
@@ -281,6 +291,13 @@ type Answerable[R any] interface {
 type Answered struct {
 	Path   string   `json:"path"`
 	Values []string `json:"values"`
+}
+
+// MarshalJSON writes the answer with its values always an array, none included, as a surface types them.
+func (a Answered) MarshalJSON() ([]byte, error) {
+	type plain Answered
+	a.Values = orEmpty(a.Values)
+	return encoded(plain(a))
 }
 
 // Answers are the answer of each field of the form, in order, then, when a field is rememberable, the fields whose answer is to be remembered: the inverse of Fold, which a surface or a test folds back into the request the form stands for.

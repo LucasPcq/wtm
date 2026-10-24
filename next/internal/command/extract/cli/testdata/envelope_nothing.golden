@@ -6,6 +6,7 @@
   "plan": {
     "source": "feat/login",
     "files": [],
+    "creates": 0,
     "keep": false,
     "conflicts": [],
     "summary": {
@@ -16,7 +17,7 @@
       }
     }
   },
-  "fingerprint": "3f58253a9fc60ab810a36021",
+  "fingerprint": "89c60f69d1eed71e280b9e9b",
   "follow_ups": [],
   "warnings": []
 }

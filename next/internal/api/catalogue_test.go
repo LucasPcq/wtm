@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -100,6 +101,13 @@ func TestAStalePlanIsFollowedUpByItsRequestAsADryRun(t *testing.T) {
 	assert.Equal(t, http.StatusPreconditionFailed, got.Status)
 	assert.Equal(t, domain.Replan(got.Envelope.Err, "greet", named("x")), got.Envelope.FollowUps)
 	assert.Len(t, got.Envelope.FollowUps, 1)
+}
+
+func TestACommandKeepsTheTypesOfItsPlanAndItsDetail(t *testing.T) {
+	command := greet(func(context.Context, string) (useCase, error) { return useCase{}, nil })
+
+	assert.Equal(t, reflect.TypeFor[plan](), command.Plan)
+	assert.Equal(t, reflect.TypeFor[detail](), command.Detail)
 }
 
 func TestACommandIsFoundByItsName(t *testing.T) {

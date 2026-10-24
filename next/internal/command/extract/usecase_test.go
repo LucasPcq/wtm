@@ -160,7 +160,7 @@ func TestASourceWithNothingToExtractIsAPlanWithNoFilesAndNoRun(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, outcome.Plan.Nothing())
 	assert.Nil(t, outcome.Result)
-	assert.JSONEq(t, `{"source":"feat/login","files":[],"keep":false,"conflicts":[],"summary":{"code":"extract.nothing","message":"no uncommitted changes in feat/login","params":{"source":"feat/login"}}}`, jsonOf(t, outcome.Plan))
+	assert.JSONEq(t, `{"source":"feat/login","files":[],"creates":0,"keep":false,"conflicts":[],"summary":{"code":"extract.nothing","message":"no uncommitted changes in feat/login","params":{"source":"feat/login"}}}`, jsonOf(t, outcome.Plan))
 	assert.Empty(t, w.published.All())
 }
 
