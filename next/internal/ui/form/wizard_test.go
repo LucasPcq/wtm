@@ -286,7 +286,7 @@ func TestAStalePlanAsksAgainAndAppliesUnderThePreviewOfTheNewForm(t *testing.T) 
 	}
 	ios, _, _, _ := output.Test()
 
-	err := form.Run(t.Context(), script, enters{}, ios.Err)
+	err := form.Run(t.Context(), script, formtest.Enters{}, ios.Err)
 
 	require.NoError(t, err)
 	mu.Lock()
@@ -300,7 +300,7 @@ func TestAFailedApplyEndsTheRunWithoutAskingAgain(t *testing.T) {
 	f.applyErr = failed
 	ios, _, _, _ := output.Test()
 
-	err := form.Run(t.Context(), f.script(), enters{}, ios.Err)
+	err := form.Run(t.Context(), f.script(), formtest.Enters{}, ios.Err)
 
 	assert.ErrorIs(t, err, failed)
 	assert.EqualValues(t, 1, f.applied.Load())
@@ -314,7 +314,7 @@ func TestAReadThatFailsAfterAnAnswerEndsTheRun(t *testing.T) {
 	script.Observe = failingAfterFirst(&reads, failed)
 	ios, _, _, _ := output.Test()
 
-	err := form.Run(t.Context(), script, enters{}, ios.Err)
+	err := form.Run(t.Context(), script, formtest.Enters{}, ios.Err)
 
 	assert.ErrorIs(t, err, failed)
 	assert.EqualValues(t, 2, reads.Load())

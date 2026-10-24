@@ -3,6 +3,7 @@ package status_test
 import (
 	"context"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
@@ -16,22 +17,6 @@ const (
 	mainPath  = "/repo/main"
 	createdAt = "2026-10-16T12:00:00Z"
 )
-
-// configured is a project's config and run.toml as repository.Service loads them, each with the error loading it.
-type configured struct {
-	config project.Config
-	err    error
-	run    project.Run
-	runErr error
-}
-
-func (c configured) Load() (project.Config, project.Global, error) {
-	return c.config, project.Global{}, c.err
-}
-
-func (c configured) LoadRun() (project.Run, error) {
-	return c.run, c.runErr
-}
 
 // A seed is a repository to read: its git, its meta records (and those that do not read), its .env files by path, its declared .env files and env strategy, its run.toml, the daemon's jobs and GitHub's pull requests, each with the error reading it.
 type seed struct {
@@ -77,7 +62,7 @@ func newWorld(s seed) world {
 				asked = append(asked, branches)
 				return s.PRs, s.PRsErr
 			},
-			Repository: repository.Service{Config: configured{config: config, err: s.ConfigErr, run: s.Run, runErr: s.RunErr}, Git: git, MainPath: mainPath},
+			Repository: repository.Service{Config: configtest.NewFake(configtest.FakeParams{Config: &config, Run: s.Run, Fail: map[string]error{"Load": s.ConfigErr, "LoadRun": s.RunErr}}), Git: git, MainPath: mainPath},
 		},
 		git:   git,
 		store: store,

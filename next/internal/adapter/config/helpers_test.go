@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -59,4 +60,23 @@ func loadWithGlobal(t *testing.T, global string) (project.Global, error) {
 func golden(t *testing.T, name string) string {
 	t.Helper()
 	return readFile(t, filepath.Join("testdata", name))
+}
+
+// onDisk is the project whose state directory holds what s seeds, with no
+// global config.
+func onDisk(t *testing.T, s seed) Project {
+	t.Helper()
+	stateDir := t.TempDir()
+	if s.Config != nil {
+		data, err := render(savedProject{Config: *s.Config})
+		require.NoError(t, err)
+		if s.Unreadable {
+			data = []byte("[worktrees\n")
+		}
+		if s.Schema != 0 {
+			data = append([]byte(fmt.Sprintf("schema = %d\n", s.Schema)), data...)
+		}
+		writeFile(t, filepath.Join(stateDir, "config.toml"), string(data))
+	}
+	return Project{StateDir: stateDir, GlobalPath: filepath.Join(t.TempDir(), "config.toml")}
 }

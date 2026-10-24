@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
@@ -15,19 +16,6 @@ import (
 )
 
 const mainPath = "/repo/main"
-
-// configured is a project's config as repository.Service loads it, or the error loading it.
-type configured struct {
-	err error
-}
-
-func (c configured) Load() (project.Config, project.Global, error) {
-	return project.Config{Worktrees: project.Worktrees{BasePath: "../.trees", BaseBranch: "main"}}, project.Global{}, c.err
-}
-
-func (configured) LoadRun() (project.Run, error) {
-	return project.Run{}, nil
-}
 
 // A world is a repository of every kind of node tree draws: a stack of three levels with a job up and commits ahead, a fan-out whose second branch lacks a commit of main and is locked, a parent with no worktree, a cycle, a rebasing worktree, one whose directory is gone and a detached one; Worktrees, when set, replaces them, on branches with no commit and no origin.
 type world struct {
@@ -105,6 +93,6 @@ func (w world) open(context.Context, string) (tree.UseCase, error) {
 			return []run.Job{{Name: "web", WorkDir: "/repo/.trees/feat-a", Up: true}}, w.JobsErr
 		},
 		PullRequests: func(context.Context, []string) ([]worktree.PullRequest, error) { return prs, w.PRsErr },
-		Repository:   repository.Service{Config: configured{err: w.ConfigErr}, Git: git, MainPath: mainPath, Init: &domain.FollowUp{Command: domain.CommandInit}},
+		Repository:   repository.Service{Config: configtest.NewFake(configtest.FakeParams{Config: &project.Config{Worktrees: project.Worktrees{BasePath: "../.trees", BaseBranch: "main"}}, Fail: map[string]error{"Load": w.ConfigErr}}), Git: git, MainPath: mainPath, Init: &domain.FollowUp{Command: domain.CommandInit}},
 	}, nil
 }

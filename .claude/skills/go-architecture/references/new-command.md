@@ -67,7 +67,7 @@ No conclusion, envelope or dry-run drawing in a command's `cli/`: they are `form
 | File | Checks |
 | -- | -- |
 | `rules_test.go`, `questions_test.go` | the pure decisions and the form, table-driven from facts in `fixture_test.go`; the round trip of `Form`, `Answer`, `Values` |
-| `usecase_test.go` | `Run` over the fakes (`gittest`, `storetest`): what changed, the events, the locks, cancellation |
+| `usecase_test.go` | `Run` over the real adapters or their fakes, its events in an `operationtest.Recorder`: what changed, the events, the locks, cancellation |
 | `contract_test.go` | `operationtest.Contract` over `Run`, with a request that applies, a `Stale` and a `Fail` |
 | `cli/*_test.go` | the goldens, the wizard screen by screen, the exit codes, the envelope, through `ui/formtest` (`form.md`, "Tests") |
 | `cmd/wtm-next` | one end-to-end test wiring the real adapters; the catalogue contract (`contract_test.go`) and its shape goldens |

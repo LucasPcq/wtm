@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
@@ -24,24 +25,6 @@ const (
 
 // clock is the time a test draws ages against: an hour after the jobs started.
 var clock = time.Date(2026, 10, 16, 14, 0, 0, 0, time.UTC)
-
-// configured is a project's config and run.toml as repository.Service loads them.
-type configured struct {
-	err    error
-	run    project.Run
-	runErr error
-}
-
-func (c configured) Load() (project.Config, project.Global, error) {
-	return project.Config{
-		Worktrees: project.Worktrees{BasePath: "../.trees", BaseBranch: "main"},
-		Env:       project.Env{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env"}, {Target: "web/.env"}}},
-	}, project.Global{}, c.err
-}
-
-func (c configured) LoadRun() (project.Run, error) {
-	return c.run, c.runErr
-}
 
 // A world is a repository of every kind of worktree status draws: feat/a ahead of main and origin with uncommitted work, its web job up and its api crashed, missing a .env; feat/old, created before the isolation choice; a detached one; Cwd is where the command runs.
 type world struct {
@@ -128,17 +111,15 @@ func (w world) open(context.Context, string) (status.UseCase, error) {
 			}
 			return []worktree.PullRequest{pr}, w.PRsErr
 		},
-		Repository: repository.Service{Config: configured{err: w.ConfigErr, run: runConfig, runErr: w.RunErr}, Git: git, MainPath: mainPath, Init: &domain.FollowUp{Command: domain.CommandInit}},
+		Repository: repository.Service{Config: configtest.NewFake(configtest.FakeParams{
+			Config: &project.Config{
+				Worktrees: project.Worktrees{BasePath: "../.trees", BaseBranch: "main"},
+				Env:       project.Env{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env"}, {Target: "web/.env"}}},
+			},
+			Run:  runConfig,
+			Fail: map[string]error{"Load": w.ConfigErr, "LoadRun": w.RunErr},
+		}), Git: git, MainPath: mainPath, Init: &domain.FollowUp{Command: domain.CommandInit}},
 	}, nil
-}
-
-// enters is a terminal on which the user keeps pressing enter.
-type enters struct{}
-
-func (enters) Read(p []byte) (int, error) {
-	time.Sleep(time.Millisecond)
-	p[0] = '\r'
-	return 1, nil
 }
 
 // errInvalidRun is run.toml that does not read.

@@ -8,7 +8,7 @@ import (
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 
-	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
+	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -127,7 +127,7 @@ func TestARefusedIsolationIsAUsageError(t *testing.T) {
 
 func TestWithoutConfigCreateExitsOnItsOwnCode(t *testing.T) {
 	w := newWorld(seed{})
-	w.store = storetest.NewFake(storetest.FakeParams{})
+	w.config = configtest.NewFake(configtest.FakeParams{})
 
 	got := runCreate(t, w, branchName)
 
@@ -292,8 +292,8 @@ func TestTheCommandOpensTheProjectDirAndRunsWithTheCorrelationID(t *testing.T) {
 
 	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
 	assert.Equal(t, []string{"/named"}, w.seen.dirs)
-	require.Len(t, w.seen.ops, 1)
-	assert.Equal(t, "corr-1", w.seen.ops[0].CorrelationID)
+	require.Len(t, w.locks.Taken(), 1)
+	assert.Equal(t, "corr-1", w.locks.Taken()[0].CorrelationID)
 	assert.Contains(t, got.Stdout, "../repo/.trees/feat-a", "paths are shown from Env.Cwd")
 }
 

@@ -10,11 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,7 +77,7 @@ func TestEachPhaseIsReportedUnderItsBranch(t *testing.T) {
 		domain.PhaseFinished{Subject: branchName, Phase: "env"},
 		domain.PhaseStarted{Subject: branchName, Phase: "meta"},
 		domain.PhaseFinished{Subject: branchName, Phase: "meta"},
-	}, report.all()[:6])
+	}, report.All()[:6])
 }
 
 func TestAnInterruptBeforeTheStartCreatesNothing(t *testing.T) {
@@ -89,7 +91,7 @@ func TestAnInterruptBeforeTheStartCreatesNothing(t *testing.T) {
 	assert.Equal(t, domain.StatusCancelled, outcome.Status)
 	assert.Equal(t, domain.ReasonInterrupted, outcome.Reason)
 	assert.Equal(t, domain.CodeInterrupted, outcome.Err.Code)
-	assert.Empty(t, report.all())
+	assert.Empty(t, report.All())
 	assert.Empty(t, files.Calls())
 }
 
@@ -113,7 +115,7 @@ func TestTheNumberIsAnnouncedOnceItsPhaseHasFinished(t *testing.T) {
 
 	w.service.Run(t.Context(), portLinked(w.params(report)))
 
-	events := report.all()
+	events := report.All()
 	finished := slices.Index(events, domain.Event(domain.PhaseFinished{Subject: branchName, Phase: "ordinal"}))
 	require.Positive(t, finished)
 	_, numbered := events[finished+1].(domain.WorktreeUpdated)
@@ -124,11 +126,11 @@ func TestAnInterruptDuringTheAddFinishesItsEnvAndRecordThenStops(t *testing.T) {
 	w := onDisk(t)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	report := &recorder{on: func(event domain.Event) {
+	report := &recorder{Recorder: operationtest.Recorder{On: func(event domain.Event) {
 		if started, ok := event.(domain.PhaseStarted); ok && started.Phase == "worktree" {
 			cancel()
 		}
-	}}
+	}}}
 
 	outcome := w.service.Run(ctx, hooked(portLinked(w.params(report)), "echo never"))
 
@@ -376,7 +378,7 @@ func TestTheFingerprintCoversTheEnvFilesButNotTheConfiguredStrategy(t *testing.T
 }
 
 func TestARememberThatFailsIsTheCommandsWarning(t *testing.T) {
-	service := provision.Service{Answers: storetest.NewFake(storetest.FakeParams{Fail: map[string]error{"Remember": errors.New("read-only file system")}})}
+	service := provision.Service{Answers: configtest.NewFake(configtest.FakeParams{Fail: map[string]error{"Remember": errors.New("read-only file system")}})}
 
 	remembered, warnings := service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), []string{domain.PathEnvFrom})
 
@@ -387,7 +389,7 @@ func TestARememberThatFailsIsTheCommandsWarning(t *testing.T) {
 }
 
 func TestARememberReturnsTheFieldsItWrote(t *testing.T) {
-	service := provision.Service{Answers: storetest.NewFake(storetest.FakeParams{Config: &project.Config{}})}
+	service := provision.Service{Answers: configtest.NewFake(configtest.FakeParams{Config: &project.Config{}})}
 
 	remembered, warnings := service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), []string{domain.PathEnvFrom, "keep"})
 
@@ -396,7 +398,7 @@ func TestARememberReturnsTheFieldsItWrote(t *testing.T) {
 }
 
 func TestNothingToRememberWritesNothing(t *testing.T) {
-	service := provision.Service{Answers: storetest.NewFake(storetest.FakeParams{Fail: map[string]error{"Remember": errors.New("read-only file system")}})}
+	service := provision.Service{Answers: configtest.NewFake(configtest.FakeParams{Fail: map[string]error{"Remember": errors.New("read-only file system")}})}
 
 	remembered, warnings := service.Remember(t.Context(), "greet", answered(provision.Given{EnvFrom: project.EnvMain}), nil)
 

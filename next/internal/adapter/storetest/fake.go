@@ -1,4 +1,4 @@
-// Package storetest is a stateful fake of the store and of the answers config.toml remembers, in memory.
+// Package storetest is a stateful fake of the store, in memory.
 package storetest
 
 import (
@@ -15,52 +15,41 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
-	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
 const metaSchema = 1
 
-// A Fake stands in for store.Meta, store.EnvFiles and the remembering half of
-// config.Project, in memory: the meta.json records by branch, the files by
-// path, and config.toml's remembered answers. It keeps their contracts (a
-// write that changes nothing reports no change, a newer schema is refused, a
-// record that does not read is rewritten) and records every call. A test seeds
-// it with [NewFake], makes a method fail through FakeParams.Fail, and reads
-// back what was written with Meta, File, Config and Calls. It is safe for
-// concurrent use.
+// A Fake stands in for store.Meta and store.EnvFiles, in memory: the meta.json
+// records by branch and the files by path. It keeps their contracts (a write
+// that changes nothing reports no change, a newer schema is refused, a record
+// that does not read is rewritten) and records every call. A test seeds it with
+// [NewFake], makes a method fail through FakeParams.Fail, and reads back what
+// was written with Meta, File and Calls. It is safe for concurrent use.
 type Fake struct {
-	mu               sync.Mutex
-	meta             map[string]worktree.Meta
-	unreadable       map[string]bool
-	config           *project.Config
-	configSchema     int
-	configUnreadable bool
-	files            map[string]string
-	fail             map[string]error
-	calls            []string
+	mu         sync.Mutex
+	meta       map[string]worktree.Meta
+	unreadable map[string]bool
+	files      map[string]string
+	fail       map[string]error
+	calls      []string
 }
 
 // FakeParams is what a [Fake] starts with.
 type FakeParams struct {
-	Meta             map[string]worktree.Meta // the records by branch
-	Unreadable       []string                 // branches whose record exists but does not decode
-	Config           *project.Config          // config.toml, nil when there is none
-	ConfigSchema     int                      // the schema config.toml carries, to simulate a newer wtm
-	ConfigUnreadable bool                     // config.toml exists but does not parse
-	Files            map[string]string        // the content of the files by path
-	Fail             map[string]error         // the error a method returns, by method name
+	Meta       map[string]worktree.Meta // the records by branch
+	Unreadable []string                 // branches whose record exists but does not decode
+	Files      map[string]string        // the content of the files by path
+	Fail       map[string]error         // the error a method returns, by method name
 }
 
 // NewFake returns a Fake holding copies of what params seeds.
 func NewFake(params FakeParams) *Fake {
 	fake := &Fake{
-		meta:             maps.Clone(params.Meta),
-		unreadable:       map[string]bool{},
-		files:            maps.Clone(params.Files),
-		fail:             params.Fail,
-		configSchema:     params.ConfigSchema,
-		configUnreadable: params.ConfigUnreadable,
+		meta:       maps.Clone(params.Meta),
+		unreadable: map[string]bool{},
+		files:      maps.Clone(params.Files),
+		fail:       params.Fail,
 	}
 
 	for _, branch := range params.Unreadable {
@@ -73,12 +62,6 @@ func NewFake(params FakeParams) *Fake {
 	if fake.files == nil {
 		fake.files = map[string]string{}
 	}
-
-	if params.Config != nil {
-		config := *params.Config
-		config.Remembered = maps.Clone(config.Remembered)
-		fake.config = &config
-	}
 	return fake
 }
 
@@ -88,16 +71,6 @@ func (f *Fake) Calls() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return slices.Clone(f.calls)
-}
-
-// Config returns config.toml as it now stands and reports whether there is one.
-func (f *Fake) Config() (project.Config, bool) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.config == nil {
-		return project.Config{}, false
-	}
-	return *f.config, true
 }
 
 // File returns the content of the file at path and reports whether it exists.
@@ -241,41 +214,6 @@ func (f *Fake) LockOrdinals(_ context.Context, do func() error) (bool, error) {
 	}
 
 	return true, do()
-}
-
-// Remember merges answers over config.toml's remembered answers as
-// config.Project.Remember does: project.ErrConfigNotFound without a config.toml, an
-// error when it does not parse or carries a newer schema, no change when every
-// answer is already remembered.
-func (f *Fake) Remember(_ context.Context, answers map[string]string) (domain.Written, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if err := f.enter("Remember", ""); err != nil {
-		return domain.Written{}, err
-	}
-
-	if len(answers) == 0 {
-		return domain.Written{}, nil
-	}
-	if f.config == nil {
-		return domain.Written{}, project.ErrConfigNotFound
-	}
-	if f.configUnreadable {
-		return domain.Written{}, fmt.Errorf("storetest: config.toml does not parse")
-	}
-	if err := statefile.Refusal(statefile.Schema{Path: "config.toml", Found: f.configSchema, Supported: 1}); err != nil {
-		return domain.Written{}, err
-	}
-
-	remembered := map[string]string{}
-	maps.Copy(remembered, f.config.Remembered)
-	maps.Copy(remembered, answers)
-	if maps.Equal(remembered, f.config.Remembered) {
-		return domain.Written{}, nil
-	}
-
-	f.config.Remembered = remembered
-	return domain.Written{Changed: true}, nil
 }
 
 // Read returns the lines of the file at path, none when it does not exist.

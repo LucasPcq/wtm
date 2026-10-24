@@ -22,27 +22,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type printed struct {
-	Stdout string
-	Stderr string
-	Code   int
-}
-
-func runIn(t *testing.T, w world, args ...string) printed {
+func runIn(t *testing.T, w world, args ...string) formtest.Printed {
 	t.Helper()
 	return runOn(t, w, func(*output.Streams) {}, args...)
 }
 
-func runOn(t *testing.T, w world, setUp func(*output.Streams), args ...string) printed {
+func runOn(t *testing.T, w world, setUp func(*output.Streams), args ...string) formtest.Printed {
 	t.Helper()
-	streams, _, stdout, stderr := output.Test()
-	setUp(streams)
-	root := uicli.NewRoot("1.2.3", streams, []*cobra.Command{New(streams, w.env(), w.open, formtest.CommandLine)})
-	code := uicli.Execute(t.Context(), root, args)
-	return printed{Stdout: stdout.String(), Stderr: stderr.String(), Code: code}
+	return formtest.Run(t.Context(), func(streams *output.Streams) *cobra.Command {
+		setUp(streams)
+		return New(streams, w.env(), w.open, formtest.CommandLine)
+	}, args...)
 }
 
-func runCreate(t *testing.T, w world, words ...string) printed {
+func runCreate(t *testing.T, w world, words ...string) formtest.Printed {
 	t.Helper()
 	return runIn(t, w, append([]string{"create"}, words...)...)
 }

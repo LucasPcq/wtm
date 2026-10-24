@@ -3,8 +3,6 @@ package provision_test
 import (
 	"os"
 	"path/filepath"
-	"slices"
-	"sync"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
@@ -13,70 +11,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/stretchr/testify/require"
 )
-
-// recorder records the events a run reports, safe across goroutines; on, when
-// set, is called with each one as it arrives.
-type recorder struct {
-	mu     sync.Mutex
-	events []domain.Event
-	on     func(domain.Event)
-}
-
-func (r *recorder) add(event domain.Event) {
-	r.mu.Lock()
-	r.events = append(r.events, event)
-	on := r.on
-	r.mu.Unlock()
-	if on != nil {
-		on(event)
-	}
-}
-
-func (r *recorder) all() []domain.Event {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return slices.Clone(r.events)
-}
-
-func (r *recorder) lines() []string {
-	var lines []string
-	for _, event := range r.all() {
-		if output, ok := event.(domain.Output); ok {
-			lines = append(lines, output.Line)
-		}
-	}
-	return lines
-}
-
-func (r *recorder) phases() []string {
-	var phases []string
-	for _, event := range r.all() {
-		if started, ok := event.(domain.PhaseStarted); ok {
-			phases = append(phases, started.Phase)
-		}
-	}
-	return phases
-}
-
-func (r *recorder) logOf(phase string) string {
-	for _, event := range r.all() {
-		if started, ok := event.(domain.PhaseStarted); ok && started.Phase == phase {
-			return started.Log
-		}
-	}
-	return ""
-}
-
-func (r *recorder) worktreeEvents() []domain.Event {
-	var events []domain.Event
-	for _, event := range r.all() {
-		switch event.(type) {
-		case domain.WorktreeCreated, domain.WorktreeUpdated, domain.WorktreeProvisioned:
-			events = append(events, event)
-		}
-	}
-	return events
-}
 
 func codes(warnings []domain.Warning) []string {
 	found := make([]string, 0, len(warnings))

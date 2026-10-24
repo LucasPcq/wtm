@@ -3,12 +3,13 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
+	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
@@ -18,6 +19,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
+	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
@@ -82,16 +84,17 @@ type seed struct {
 }
 
 type world struct {
-	git   *gittest.Fake
-	store *storetest.Fake
-	seed  seed
-	seen  *seen
+	git    *gittest.Fake
+	store  *storetest.Fake
+	config *configtest.Fake
+	locks  *operationtest.Locks
+	seed   seed
+	seen   *seen
 }
 
-// seen is what the use case was given: the directory it was opened from and the operations it locked.
+// seen is what the use case was given: the directory it was opened from.
 type seen struct {
 	dirs []string
-	ops  []domain.Operation
 }
 
 func (w world) env() uicli.Env {
@@ -116,6 +119,10 @@ func newWorld(s seed) world {
 	if s.NoConfig {
 		config = nil
 	}
+	var run project.Run
+	if s.Isolates {
+		run = project.Run{Declared: true, EnvPorts: []project.EnvPortLink{{}}}
+	}
 	commits := map[worktree.Ref][]string{}
 	if s.Behind {
 		commits[worktree.RemoteBranch{Name: "main"}] = []string{"upstream main"}
@@ -134,9 +141,11 @@ func newWorld(s seed) world {
 			Conflicts: s.Conflicts,
 			Fail:      s.GitFails,
 		}),
-		store: storetest.NewFake(storetest.FakeParams{Config: config, Fail: s.StoreFails}),
-		seed:  s,
-		seen:  &seen{},
+		store:  storetest.NewFake(storetest.FakeParams{Fail: s.StoreFails}),
+		config: configtest.NewFake(configtest.FakeParams{Config: config, Run: run}),
+		locks:  &operationtest.Locks{},
+		seed:   s,
+		seen:   &seen{},
 	}
 }
 
@@ -152,12 +161,12 @@ func (w world) usecase() extract.UseCase {
 	}
 	return extract.UseCase{
 		Git:        w.git,
-		Repository: repository.Service{Config: stored{Fake: w.store, isolates: w.seed.Isolates}, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}},
+		Repository: repository.Service{Config: w.config, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}},
 		Meta:       w.store,
 		Shield:     shell.Shield,
 		Operations: operation.Service{
-			Locker:    locker{seen: w.seen},
-			Publisher: locker{},
+			Locker:    w.locks,
+			Publisher: w.locks,
 			NewOpID:   func() string { return "op-1" },
 			Now:       func() time.Time { return createdAt },
 		},
@@ -166,7 +175,7 @@ func (w world) usecase() extract.UseCase {
 			Meta:        w.store,
 			EnvFiles:    w.store,
 			StateDir:    stateDir,
-			Answers:     w.store,
+			Answers:     w.config,
 			RunHooks:    runHooks,
 			PublicPort:  func(context.Context, int) int { return 0 },
 			Shield:      shell.Shield,
@@ -178,79 +187,12 @@ func (w world) usecase() extract.UseCase {
 	}
 }
 
-type stored struct {
-	*storetest.Fake
-	isolates bool
-}
-
-func (s stored) Load() (project.Config, project.Global, error) {
-	config, found := s.Config()
-	if !found {
-		return project.Config{}, project.Global{}, project.ErrConfigNotFound
-	}
-	return config, project.Global{}, nil
-}
-
-func (s stored) LoadRun() (project.Run, error) {
-	if s.isolates {
-		return project.Run{EnvPorts: []project.EnvPortLink{{}}}, nil
-	}
-	return project.Run{}, nil
-}
-
-type locker struct{ seen *seen }
-
-func (l locker) Take(op domain.Operation) (operation.Hold, error) {
-	if l.seen != nil {
-		l.seen.ops = append(l.seen.ops, op)
-	}
-	return held{}, nil
-}
-
-func (locker) Open(domain.Operation) domain.Report { return func(domain.Event) {} }
-
-type held struct{}
-
-func (held) Grow([]domain.Lock) (bool, error) { return false, nil }
-func (held) Protected() bool                  { return true }
-func (held) Release()                         {}
-
 func hookFails(context.Context, env.HookChain) error {
 	return errors.New("hook failed: exit status 3")
 }
 
-// previewing is a use case whose every preview has a fingerprint of its own and whose applies end on errs in turn; it records the fingerprint each apply was held to.
-type previewing struct {
-	useCase
-	previews int
-	errs     []error
-	held     []string
-	ids      []string // the correlation ID of each run, previews included
-}
-
-func (p *previewing) Run(ctx context.Context, req extract.Request, opts domain.RunOptions) (extract.Outcome, error) {
-	p.ids = append(p.ids, opts.CorrelationID)
-	if opts.DryRun {
-		p.previews++
-		outcome, err := p.useCase.Run(ctx, req, opts)
-		outcome.Fingerprint = fmt.Sprintf("preview-%d", p.previews)
-		return outcome, err
-	}
-
-	p.held = append(p.held, opts.ExpectFingerprint)
-	err := p.errs[0]
-	p.errs = p.errs[1:]
-	return extract.Outcome{}, err
-}
-
-// enters is a terminal on which the user keeps pressing enter.
-type enters struct{}
-
-func (enters) Read(p []byte) (int, error) {
-	time.Sleep(time.Millisecond)
-	p[0] = '\r'
-	return 1, nil
-}
+// previewing is a use case whose every preview has a fingerprint of its own and whose applies end on errs in turn.
+type previewing = formtest.Previewing[extract.Request, extract.Questions, extract.Plan, extract.Detail]
 
 // settled asks to move two files from the source to the other worktree: every step but the mode is given.
 func settled() extract.Request {
