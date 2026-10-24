@@ -2,13 +2,18 @@ BINARY      := wtm
 BINARY_NEXT := wtm-next
 BUILD_DIR   := bin
 
-.PHONY: build next test test-next vet fmt lint lint-next next-lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
+.PHONY: build next schema test test-next vet fmt lint lint-next next-lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
 
 next:
 	go build -ldflags "-X main.version=$$(git describe --tags --always --dirty)" -o $(BUILD_DIR)/$(BINARY_NEXT) ./next/cmd/wtm-next
+
+# schema regenerates next/internal/api/api.v2.schema.json, the schema the catalogue
+# publishes, from its Go types; make test-next fails while it is stale.
+schema:
+	go test ./next/cmd/wtm-next -run '^TestThePublishedSchemaIsTheOneTheGoTypesGive$$' -count=1 -update
 
 test:
 	go test ./... -race -count=1

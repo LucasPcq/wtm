@@ -466,7 +466,7 @@ type Plan struct {
 	EnvFrom     project.EnvStrategy `json:"env_from,omitempty"`
 	Isolation   project.Isolation   `json:"isolation,omitempty"`
 	FastForward []string            `json:"fast_forward,omitempty"`
-	Creates     int                 `json:"creates,omitempty"` // the worktrees the apply creates, 1 when it creates the target first, as create counts them; left out of the fingerprint, which the target's action covers
+	Creates     int                 `json:"creates"` // the worktrees the apply creates, 1 when it creates the target first, as create counts them; left out of the fingerprint, which the target's action covers
 	Keep        bool                `json:"keep"`
 	Conflicts   []worktree.Conflict `json:"conflicts"`
 	OnConflict  OnConflict          `json:"on_conflict,omitempty"`

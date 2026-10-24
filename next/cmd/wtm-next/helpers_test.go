@@ -1,15 +1,22 @@
 package main
 
 import (
+	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
+	"flag"
 	"go/parser"
 	"go/token"
+	"maps"
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
+	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -20,6 +27,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -255,4 +263,370 @@ func ownConfigDir(t *testing.T) {
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+}
+
+// The schema the catalogue publishes, which api embeds, and the event stream's, which it refers to.
+const (
+	apiSchemaID     = "https://wtm.sh/schemas/api.v2.schema.json"
+	eventsSchemaID  = "https://wtm.sh/schemas/events.v2.json"
+	apiSchemaFile   = "../../internal/api/api.v2.schema.json"
+	eventSchemaFile = "../../internal/adapter/events/events.v2.json"
+)
+
+// generatedSchema is api.v2.schema.json as the Go types of the catalogue give it: the fragments written by hand beside a MarshalJSON (domain/*.schema.json) as they are, domain.Field as the union of its kinds, the events as the event stream's schema has them, then each command's request, from its form, and its envelope, with its plan and its detail reflected, and each stream's request and the envelope it ends on.
+func generatedSchema(t *testing.T) []byte {
+	t.Helper()
+	s := schemaWriter{t: t, defs: map[string]any{}, types: map[string]reflect.Type{}}
+	for _, fragment := range []string{"envelope.schema.json", "form.schema.json"} {
+		s.fragment(filepath.Join("..", "..", "internal", "domain", fragment))
+	}
+	s.fieldUnion()
+	s.defs["domain.Event"] = map[string]any{"$ref": "events.v2.json#/$defs/event"}
+	s.defs["domain.Line"] = map[string]any{"$ref": "events.v2.json"}
+	// the types the fragments name
+	for _, named := range []reflect.Type{reflect.TypeFor[domain.Warning](), reflect.TypeFor[domain.FollowUp](), reflect.TypeFor[domain.Section]()} {
+		s.of(named)
+	}
+	for _, command := range catalogue() {
+		s.command(command)
+	}
+	for _, stream := range streams() {
+		s.stream(stream)
+	}
+
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "  ")
+	require.NoError(t, encoder.Encode(map[string]any{
+		"$schema":     "https://json-schema.org/draft/2020-12/schema",
+		"$id":         apiSchemaID,
+		"title":       "wtm api v2",
+		"description": "What the catalogue of wtm's commands sends a surface other than the command line: the v2 envelope, the form of a request and its fields, the events of an operation, and each command's request, plan, detail and envelope under $defs. Generated from the Go types by make schema: never edit it by hand.",
+		"$defs":       s.defs,
+	}))
+	return buf.Bytes()
+}
+
+// schemaWriter gathers the $defs of the published schema: each named struct once, under its package and its name.
+type schemaWriter struct {
+	t     *testing.T
+	defs  map[string]any
+	types map[string]reflect.Type
+}
+
+func (s *schemaWriter) fragment(path string) {
+	s.t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(s.t, err)
+	var doc struct {
+		Defs map[string]any `json:"$defs"`
+	}
+	require.NoError(s.t, json.Unmarshal(data, &doc))
+	maps.Copy(s.defs, doc.Defs)
+}
+
+// fieldUnion defines domain.Field as one of its kinds, each discriminated by the kind Form.MarshalJSON writes it with.
+func (s *schemaWriter) fieldUnion() {
+	s.t.Helper()
+	var variants []any
+	for _, field := range fieldKinds() {
+		data, err := json.Marshal(domain.Form{Fields: []domain.Field{field}})
+		require.NoError(s.t, err)
+		var form struct {
+			Fields []map[string]json.RawMessage `json:"fields"`
+		}
+		require.NoError(s.t, json.Unmarshal(data, &form))
+		require.Len(s.t, form.Fields, 1)
+		written := form.Fields[0]
+
+		kind, name := reflect.TypeOf(field), defName(reflect.TypeOf(field))
+		properties, required := map[string]any{"kind": map[string]any{"const": json.RawMessage(written["kind"])}}, []string{"kind"}
+		s.fields(kind, properties, &required)
+		// MarshalJSON writes a list it leaves empty as [], never null
+		for key, value := range written {
+			nullable, _ := properties[key].(map[string]any)
+			if alternatives, ok := nullable["anyOf"].([]any); ok && strings.HasPrefix(string(value), "[") {
+				properties[key] = alternatives[0]
+			}
+		}
+		s.types[name] = kind
+		s.defs[name] = map[string]any{"type": "object", "additionalProperties": false, "required": required, "properties": properties}
+		variants = append(variants, ref(name))
+	}
+	s.defs["domain.Field"] = map[string]any{"description": "One field of a form, of the kind its kind names.", "oneOf": variants}
+}
+
+// command defines the request of c, the answer of each field of its form by its path, and its envelope, with its plan (none for a read) and its detail.
+func (s *schemaWriter) command(c api.Command) {
+	s.t.Helper()
+	plan := any(false)
+	if c.Plan != nil {
+		plan = s.of(c.Plan)
+	}
+	detail := map[string]any{"anyOf": []any{s.of(c.Detail), map[string]any{"type": "object", "maxProperties": 0}}}
+
+	s.defs[c.Name+".request"] = requestSchema(c.Form)
+	s.defs[c.Name+".envelope"] = map[string]any{
+		"allOf": []any{ref("domain.Envelope")},
+		"properties": map[string]any{
+			"command": map[string]any{"const": c.Name},
+			"plan":    plan,
+			"items":   map[string]any{"items": map[string]any{"properties": map[string]any{"detail": detail}}},
+		},
+	}
+}
+
+// stream defines the request of st, the answer of each field of its form by its path, and the envelope it ends on, with no plan nor item: its lines are domain.Line.
+func (s *schemaWriter) stream(st api.Stream) {
+	s.defs[st.Name+".request"] = requestSchema(st.Form)
+	s.defs[st.Name+".envelope"] = map[string]any{
+		"allOf":      []any{ref("domain.Envelope")},
+		"properties": map[string]any{"command": map[string]any{"const": st.Name}, "plan": false, "items": false},
+	}
+}
+
+// requestSchema is the request a surface sends for form: the answer of each of its fields by its path, one value for a field that takes one, then the fields to remember and whether to ask again when a field is rememberable.
+func requestSchema(form domain.Form) map[string]any {
+	var answers []any
+	seen := map[string]bool{}
+	for _, field := range form.Fields {
+		path := field.Spec().Path
+		if !seen[path] {
+			seen[path] = true
+			answers = append(answers, answerSchema(path, valuesSchema(field)))
+		}
+	}
+	if rememberable := form.Rememberable(); len(rememberable) > 0 {
+		answers = append(answers,
+			answerSchema(domain.PathRemember, map[string]any{"type": "array", "items": map[string]any{"enum": rememberable}}),
+			answerSchema(domain.PathAsk, oneValue(map[string]any{"enum": []string{"true", "false"}})))
+	}
+
+	return map[string]any{"type": "array", "items": map[string]any{"oneOf": answers}}
+}
+
+func answerSchema(path string, values map[string]any) map[string]any {
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"path", "values"},
+		"properties":           map[string]any{"path": map[string]any{"const": path}, "values": values},
+	}
+}
+
+func valuesSchema(field domain.Field) map[string]any {
+	switch field.(type) {
+	case domain.SelectField, domain.TextField:
+		return oneValue(map[string]any{"type": "string"})
+	case domain.ConfirmField:
+		return oneValue(map[string]any{"enum": []string{"true", "false"}})
+	case domain.MultiSelectField, domain.TextListField:
+	}
+	return map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
+}
+
+func oneValue(value map[string]any) map[string]any {
+	return map[string]any{"type": "array", "items": value, "minItems": 1, "maxItems": 1}
+}
+
+var marshaler = reflect.TypeFor[json.Marshaler]()
+
+// of is the schema of a value of type t as encoding/json writes it: a reference to its definition for a named struct, defined on first sight, or to the fragment written by hand beside its MarshalJSON.
+func (s *schemaWriter) of(t reflect.Type) map[string]any {
+	s.t.Helper()
+	if t.Kind() == reflect.Pointer {
+		return s.of(t.Elem())
+	}
+	if t == reflect.TypeFor[time.Time]() {
+		return map[string]any{"type": "string", "format": "date-time"}
+	}
+	if t.Implements(marshaler) || reflect.PointerTo(t).Implements(marshaler) {
+		name := defName(t)
+		if _, written := s.defs[name]; !written {
+			s.t.Fatalf("%s writes its own JSON: its schema is a fragment written by hand beside its MarshalJSON, and there is none", t)
+		}
+		return ref(name)
+	}
+
+	switch t.Kind() {
+	case reflect.Interface:
+		if t == reflect.TypeFor[domain.Field]() {
+			return ref("domain.Field")
+		}
+		require.Equal(s.t, reflect.TypeFor[any](), t, "an interface the schema cannot describe")
+		return map[string]any{}
+	case reflect.Struct:
+		return s.named(t)
+	case reflect.Slice, reflect.Array:
+		return map[string]any{"type": "array", "items": s.of(t.Elem())}
+	case reflect.Map:
+		require.Equal(s.t, reflect.String, t.Key().Kind(), "%s: JSON keys are strings", t)
+		return map[string]any{"type": "object", "additionalProperties": s.of(t.Elem())}
+	case reflect.String:
+		return map[string]any{"type": "string"}
+	case reflect.Bool:
+		return map[string]any{"type": "boolean"}
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return map[string]any{"type": "integer"}
+	default:
+		s.t.Fatalf("%s: a kind the schema cannot describe", t)
+		return nil
+	}
+}
+
+func (s *schemaWriter) named(t reflect.Type) map[string]any {
+	s.t.Helper()
+	if t.Name() == "" {
+		return s.object(t)
+	}
+
+	name := defName(t)
+	if known, seen := s.types[name]; seen {
+		require.Equal(s.t, known, t, "two types are defined as %s", name)
+		return ref(name)
+	}
+	s.types[name] = t
+	s.defs[name] = s.object(t)
+	return ref(name)
+}
+
+// object is a struct as encoding/json writes it, closed: each field by its name, an embedded struct's promoted, a field without omitempty required, and null when its nil is.
+func (s *schemaWriter) object(t reflect.Type) map[string]any {
+	s.t.Helper()
+	properties, required := map[string]any{}, []string{}
+	s.fields(t, properties, &required)
+
+	object := map[string]any{"type": "object", "additionalProperties": false, "properties": properties}
+	if len(required) > 0 {
+		object["required"] = required
+	}
+	return object
+}
+
+func (s *schemaWriter) fields(t reflect.Type, properties map[string]any, required *[]string) {
+	s.t.Helper()
+	for field := range t.Fields() {
+		tag := field.Tag.Get("json")
+		tagName, options, _ := strings.Cut(tag, ",")
+		name := cmp.Or(tagName, field.Name)
+		switch {
+		case tag == "-":
+			continue
+		case field.Anonymous && tagName == "" && field.Type.Kind() == reflect.Struct:
+			s.fields(field.Type, properties, required)
+			continue
+		case field.Anonymous && tagName == "" && field.Type.Kind() == reflect.Pointer && field.Type.Elem().Kind() == reflect.Struct:
+			// encoding/json writes none of a nil embedded pointer's fields: each is optional
+			s.fields(field.Type.Elem(), properties, new([]string))
+			continue
+		case !field.IsExported():
+			continue
+		}
+
+		schema := s.of(field.Type)
+		optional := slices.ContainsFunc(strings.Split(options, ","), func(option string) bool { return option == "omitempty" || option == "omitzero" })
+		if !optional {
+			*required = append(*required, name)
+			if nilable(field.Type) {
+				schema = map[string]any{"anyOf": []any{schema, map[string]any{"type": "null"}}}
+			}
+		}
+		properties[name] = schema
+	}
+}
+
+// nilable reports whether encoding/json writes a nil value of t as null.
+func nilable(t reflect.Type) bool {
+	switch t.Kind() {
+	case reflect.Pointer, reflect.Slice, reflect.Map, reflect.Interface:
+		return true
+	default:
+		return false
+	}
+}
+
+// defName names t's definition by its package and its name: create.Plan, domain.Warning.
+func defName(t reflect.Type) string {
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	return path.Base(t.PkgPath()) + "." + t.Name()
+}
+
+func ref(name string) map[string]any {
+	return map[string]any{"$ref": "#/$defs/" + name}
+}
+
+// apiDefs compiles the definitions of the published schema, as api embeds it, by their name.
+func apiDefs(t *testing.T) func(name string) *jsonschema.Schema {
+	t.Helper()
+	compiler := jsonschema.NewCompiler()
+	for id, data := range map[string][]byte{apiSchemaID: api.Schema(), eventsSchemaID: readFile(t, eventSchemaFile)} {
+		doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(data))
+		require.NoError(t, err)
+		require.NoError(t, compiler.AddResource(id, doc))
+	}
+
+	return func(name string) *jsonschema.Schema {
+		t.Helper()
+		schema, err := compiler.Compile(apiSchemaID + "#/$defs/" + name)
+		require.NoError(t, err, name)
+		return schema
+	}
+}
+
+// validates returns the error of document against schema, nil when it is valid.
+func validates(t *testing.T, schema *jsonschema.Schema, document []byte) error {
+	t.Helper()
+	value, err := jsonschema.UnmarshalJSON(bytes.NewReader(document))
+	require.NoError(t, err)
+	return schema.Validate(value)
+}
+
+func readFile(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return data
+}
+
+// updating reports whether the test runs with -update, which rewrites what it compares with.
+func updating() bool {
+	return flag.Lookup("update").Value.String() == "true"
+}
+
+// globbed are the files pattern matches, at least one.
+func globbed(t *testing.T, pattern string) []string {
+	t.Helper()
+	files, err := filepath.Glob(pattern)
+	require.NoError(t, err)
+	require.NotEmpty(t, files, pattern)
+	return files
+}
+
+// followUpsIn are the follow-ups a JSON document holds at any depth: each value of a follow_up or of a fix (a problem's), each entry of a follow_ups or of actions (a worktree's).
+func followUpsIn(document any) []map[string]any {
+	var found []map[string]any
+	switch value := document.(type) {
+	case map[string]any:
+		for key, nested := range value {
+			if followUp, ok := nested.(map[string]any); ok && (key == "follow_up" || key == "fix") {
+				found = append(found, followUp)
+			}
+			if list, ok := nested.([]any); ok && (key == "follow_ups" || key == "actions") {
+				for _, entry := range list {
+					if followUp, ok := entry.(map[string]any); ok {
+						found = append(found, followUp)
+					}
+				}
+			}
+			found = append(found, followUpsIn(nested)...)
+		}
+	case []any:
+		for _, nested := range value {
+			found = append(found, followUpsIn(nested)...)
+		}
+	}
+	return found
 }

@@ -1,0 +1,70 @@
+{
+  "$comment": "The shapes Envelope.JSON and the MarshalJSON of *Error and FieldError write by hand (envelope.go), which reflection on their Go types would get wrong; the generator of api.v2.schema.json copies these $defs as they are. Change them with envelope.go.",
+  "$defs": {
+    "domain.Envelope": {
+      "description": "How a command's run ended: its operation, its items once applied, the plan and its fingerprint on a dry run, the commands to run next, its warnings and its failure.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "command", "ok", "follow_ups", "warnings"],
+      "properties": {
+        "v": { "const": 2 },
+        "command": { "type": "string", "minLength": 1 },
+        "ok": { "type": "boolean", "description": "Whether the command succeeded: false exactly when error is present." },
+        "op": { "type": "string", "minLength": 1, "description": "The operation's id; absent for a read, and for a request refused before its operation began." },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/domain.Item" }, "description": "The outcome of each subject, once applied or read." },
+        "plan": { "description": "The plan, on a dry run and once applied; absent for a read and a refusal. Each command's envelope says its shape." },
+        "fingerprint": { "type": "string", "minLength": 1, "description": "The fingerprint of a dry run's plan, which its apply is held to." },
+        "follow_ups": { "type": "array", "items": { "$ref": "#/$defs/domain.FollowUp" } },
+        "warnings": { "type": "array", "items": { "$ref": "#/$defs/domain.Warning" } },
+        "error": { "$ref": "#/$defs/domain.Error" }
+      },
+      "if": { "properties": { "ok": { "const": false } } },
+      "then": { "required": ["error"] },
+      "else": { "not": { "required": ["error"] } }
+    },
+    "domain.Item": {
+      "description": "The outcome of one subject of an operation or a read: a worktree for instance.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject", "status", "detail"],
+      "properties": {
+        "subject": { "type": "string" },
+        "status": { "enum": ["done", "failed", "skipped", "cancelled"] },
+        "reason": { "enum": ["unchanged", "incomplete", "interrupted", "not_reached"], "description": "What qualifies the status; absent when nothing does." },
+        "error": { "$ref": "#/$defs/domain.Error" },
+        "warnings": { "type": "array", "items": { "$ref": "#/$defs/domain.Warning" } },
+        "detail": { "type": "object", "description": "What the command reports of the subject, {} when nothing. Each command's envelope says its shape." }
+      }
+    },
+    "domain.Error": {
+      "description": "A failure: its kind, what the caller can do about it, its stable code, its message, and the problems of each field of an invalid request.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "code", "message"],
+      "properties": {
+        "kind": { "enum": ["invalid", "conflict", "precondition", "refused", "cancelled", "internal"] },
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string" },
+        "params": { "type": "object", "additionalProperties": { "type": "string" } },
+        "follow_up": { "$ref": "#/$defs/domain.FollowUp" },
+        "fields": { "type": "array", "items": { "$ref": "#/$defs/domain.FieldError" } }
+      }
+    },
+    "domain.FieldError": {
+      "description": "One problem with one field of a request, named by its path, and by its flag on the command line.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "code", "flag", "message"],
+      "properties": {
+        "path": { "type": "string", "description": "The field, as the request names it: from, remember[0]." },
+        "code": { "type": "string", "minLength": 1 },
+        "params": { "type": "object", "additionalProperties": { "type": "string" } },
+        "accepted": { "type": "array", "items": { "type": "string" }, "description": "The values the field accepts, when they are a closed set." },
+        "with": { "type": "array", "items": { "type": "string" }, "description": "The other fields the problem involves." },
+        "flag": { "type": "string", "description": "How the surface spells the field: its flag on the command line, its path elsewhere." },
+        "message": { "type": "string" },
+        "follow_up": { "$ref": "#/$defs/domain.FollowUp" }
+      }
+    }
+  }
+}

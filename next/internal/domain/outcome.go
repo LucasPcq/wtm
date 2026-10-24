@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"reflect"
 	"slices"
 )
 
@@ -41,6 +42,11 @@ type Outcome[P, D any] struct {
 // PlanFingerprint is the fingerprint of the plan the run previewed or applied, the one a preview's apply is held to.
 func (o Outcome[P, D]) PlanFingerprint() string {
 	return o.Fingerprint
+}
+
+// Types are the Go types of the plan and of each item's detail its envelope carries, which a published schema describes.
+func (Outcome[P, D]) Types() (plan, detail reflect.Type) {
+	return reflect.TypeFor[P](), reflect.TypeFor[D]()
 }
 
 // Applied reports whether the run holds the Result of an apply.
@@ -157,6 +163,11 @@ func (r Read[D]) Failure() *Error {
 	}
 
 	return failure
+}
+
+// Types are the Go type of each item's detail its envelope carries, which a published schema describes; a read has no plan.
+func (Read[D]) Types() (plan, detail reflect.Type) {
+	return nil, reflect.TypeFor[D]()
 }
 
 // Envelope is how the read ended for every surface: its items, warnings and follow-ups, with no op, plan nor fingerprint; a read has no plan to replan, so it reads no answers.

@@ -10,6 +10,6 @@
   ! fast-forward ignored: feat/other already exists, so nothing is created
   ! isolation verbatim ignored: feat/other already exists and stays isolated
 
-  → wtm go feat/other
+  → wtm go feat/other                         jump in
   → wtm env feat/other --isolation verbatim   switch it to verbatim
 

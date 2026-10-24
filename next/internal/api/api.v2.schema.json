@@ -1,0 +1,2909 @@
+{
+  "$defs": {
+    "create.BranchPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "upstream": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch",
+        "path",
+        "action"
+      ],
+      "type": "object"
+    },
+    "create.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "env_ports": {
+          "$ref": "#/$defs/env.Redacted"
+        },
+        "existing_branch": {
+          "type": "boolean"
+        },
+        "metadata": {
+          "$ref": "#/$defs/worktree.Meta"
+        },
+        "origin_ahead": {
+          "type": "integer"
+        },
+        "origin_behind": {
+          "type": "integer"
+        },
+        "origin_state": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "upstream": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "metadata",
+        "existing_branch"
+      ],
+      "type": "object"
+    },
+    "create.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "branches": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/create.BranchPlan"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "creates": {
+          "type": "integer"
+        },
+        "env_from": {
+          "type": "string"
+        },
+        "fast_forward": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "from": {
+          "type": "string"
+        },
+        "isolation": {
+          "type": "string"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "remember": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "branches",
+        "env_from",
+        "creates"
+      ],
+      "type": "object"
+    },
+    "create.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "create"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/create.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/create.Plan"
+        }
+      }
+    },
+    "create.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "branches"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "from"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "env_from"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "isolation"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "fast_forward"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "if_not_exists"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "remember"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "env_from",
+                    "isolation",
+                    "fast_forward"
+                  ]
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "ask"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "domain.Answered": {
+      "additionalProperties": false,
+      "description": "The answer to the field at path: its values, as many as the field takes, an array even when it takes none.",
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "path",
+        "values"
+      ],
+      "type": "object"
+    },
+    "domain.ConfirmField": {
+      "additionalProperties": false,
+      "properties": {
+        "flag": {
+          "type": "string"
+        },
+        "help": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "confirm"
+        },
+        "label": {
+          "type": "string"
+        },
+        "no": {
+          "$ref": "#/$defs/domain.Option"
+        },
+        "no_first": {
+          "type": "boolean"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "remember": {
+          "type": "boolean"
+        },
+        "rememberable": {
+          "type": "boolean"
+        },
+        "remembered": {
+          "type": "boolean"
+        },
+        "section": {
+          "type": "string"
+        },
+        "skip": {
+          "type": "string"
+        },
+        "value": {
+          "type": "boolean"
+        },
+        "yes": {
+          "$ref": "#/$defs/domain.Option"
+        }
+      },
+      "required": [
+        "kind",
+        "path",
+        "flag",
+        "label",
+        "help",
+        "value",
+        "yes",
+        "no",
+        "no_first",
+        "rememberable",
+        "remember"
+      ],
+      "type": "object"
+    },
+    "domain.Envelope": {
+      "additionalProperties": false,
+      "description": "How a command's run ended: its operation, its items once applied, the plan and its fingerprint on a dry run, the commands to run next, its warnings and its failure.",
+      "else": {
+        "not": {
+          "required": [
+            "error"
+          ]
+        }
+      },
+      "if": {
+        "properties": {
+          "ok": {
+            "const": false
+          }
+        }
+      },
+      "properties": {
+        "command": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "error": {
+          "$ref": "#/$defs/domain.Error"
+        },
+        "fingerprint": {
+          "description": "The fingerprint of a dry run's plan, which its apply is held to.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "follow_ups": {
+          "items": {
+            "$ref": "#/$defs/domain.FollowUp"
+          },
+          "type": "array"
+        },
+        "items": {
+          "description": "The outcome of each subject, once applied or read.",
+          "items": {
+            "$ref": "#/$defs/domain.Item"
+          },
+          "type": "array"
+        },
+        "ok": {
+          "description": "Whether the command succeeded: false exactly when error is present.",
+          "type": "boolean"
+        },
+        "op": {
+          "description": "The operation's id; absent for a read, and for a request refused before its operation began.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "plan": {
+          "description": "The plan, on a dry run and once applied; absent for a read and a refusal. Each command's envelope says its shape."
+        },
+        "v": {
+          "const": 2
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/domain.Warning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "v",
+        "command",
+        "ok",
+        "follow_ups",
+        "warnings"
+      ],
+      "then": {
+        "required": [
+          "error"
+        ]
+      },
+      "type": "object"
+    },
+    "domain.Error": {
+      "additionalProperties": false,
+      "description": "A failure: its kind, what the caller can do about it, its stable code, its message, and the problems of each field of an invalid request.",
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/domain.FieldError"
+          },
+          "type": "array"
+        },
+        "follow_up": {
+          "$ref": "#/$defs/domain.FollowUp"
+        },
+        "kind": {
+          "enum": [
+            "invalid",
+            "conflict",
+            "precondition",
+            "refused",
+            "cancelled",
+            "internal"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "kind",
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "domain.Event": {
+      "$ref": "events.v2.json#/$defs/event"
+    },
+    "domain.Field": {
+      "description": "One field of a form, of the kind its kind names.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/domain.SelectField"
+        },
+        {
+          "$ref": "#/$defs/domain.MultiSelectField"
+        },
+        {
+          "$ref": "#/$defs/domain.TextField"
+        },
+        {
+          "$ref": "#/$defs/domain.TextListField"
+        },
+        {
+          "$ref": "#/$defs/domain.ConfirmField"
+        }
+      ]
+    },
+    "domain.FieldError": {
+      "additionalProperties": false,
+      "description": "One problem with one field of a request, named by its path, and by its flag on the command line.",
+      "properties": {
+        "accepted": {
+          "description": "The values the field accepts, when they are a closed set.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "code": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "flag": {
+          "description": "How the surface spells the field: its flag on the command line, its path elsewhere.",
+          "type": "string"
+        },
+        "follow_up": {
+          "$ref": "#/$defs/domain.FollowUp"
+        },
+        "message": {
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "path": {
+          "description": "The field, as the request names it: from, remember[0].",
+          "type": "string"
+        },
+        "with": {
+          "description": "The other fields the problem involves.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "path",
+        "code",
+        "flag",
+        "message"
+      ],
+      "type": "object"
+    },
+    "domain.FollowUp": {
+      "additionalProperties": false,
+      "properties": {
+        "answers": {
+          "items": {
+            "$ref": "#/$defs/domain.Answered"
+          },
+          "type": "array"
+        },
+        "code": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        },
+        "dry_run": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "domain.Form": {
+      "additionalProperties": false,
+      "description": "A command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, the sections a surface groups them in, and the request's problems.",
+      "properties": {
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/domain.Field"
+          },
+          "type": "array"
+        },
+        "problems": {
+          "items": {
+            "$ref": "#/$defs/domain.FieldError"
+          },
+          "type": "array"
+        },
+        "sections": {
+          "description": "In the order a surface shows them; a field names its own by key.",
+          "items": {
+            "$ref": "#/$defs/domain.Section"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "fields",
+        "sections",
+        "problems"
+      ],
+      "type": "object"
+    },
+    "domain.Item": {
+      "additionalProperties": false,
+      "description": "The outcome of one subject of an operation or a read: a worktree for instance.",
+      "properties": {
+        "detail": {
+          "description": "What the command reports of the subject, {} when nothing. Each command's envelope says its shape.",
+          "type": "object"
+        },
+        "error": {
+          "$ref": "#/$defs/domain.Error"
+        },
+        "reason": {
+          "description": "What qualifies the status; absent when nothing does.",
+          "enum": [
+            "unchanged",
+            "incomplete",
+            "interrupted",
+            "not_reached"
+          ]
+        },
+        "status": {
+          "enum": [
+            "done",
+            "failed",
+            "skipped",
+            "cancelled"
+          ]
+        },
+        "subject": {
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/domain.Warning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "subject",
+        "status",
+        "detail"
+      ],
+      "type": "object"
+    },
+    "domain.Line": {
+      "$ref": "events.v2.json"
+    },
+    "domain.MultiSelectField": {
+      "additionalProperties": false,
+      "properties": {
+        "empty": {
+          "type": "string"
+        },
+        "flag": {
+          "type": "string"
+        },
+        "help": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "multi_select"
+        },
+        "label": {
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/domain.Option"
+          },
+          "type": "array"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "picked": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "section": {
+          "type": "string"
+        },
+        "skip": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "path",
+        "flag",
+        "label",
+        "help",
+        "picked",
+        "options"
+      ],
+      "type": "object"
+    },
+    "domain.Option": {
+      "additionalProperties": false,
+      "properties": {
+        "badge": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "short": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "label"
+      ],
+      "type": "object"
+    },
+    "domain.RecapRow": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "mark": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "values": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/domain.RecapValue"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "key",
+        "label",
+        "values"
+      ],
+      "type": "object"
+    },
+    "domain.RecapValue": {
+      "additionalProperties": false,
+      "properties": {
+        "note": {
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "text": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "text"
+      ],
+      "type": "object"
+    },
+    "domain.Section": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "title"
+      ],
+      "type": "object"
+    },
+    "domain.SelectField": {
+      "additionalProperties": false,
+      "properties": {
+        "flag": {
+          "type": "string"
+        },
+        "help": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "select"
+        },
+        "label": {
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/domain.Option"
+          },
+          "type": "array"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "pinned": {
+          "type": "string"
+        },
+        "refreshable": {
+          "type": "boolean"
+        },
+        "remember": {
+          "type": "boolean"
+        },
+        "rememberable": {
+          "type": "boolean"
+        },
+        "remembered": {
+          "type": "string"
+        },
+        "section": {
+          "type": "string"
+        },
+        "skip": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "path",
+        "flag",
+        "label",
+        "help",
+        "value",
+        "options",
+        "rememberable",
+        "remember",
+        "refreshable"
+      ],
+      "type": "object"
+    },
+    "domain.TextField": {
+      "additionalProperties": false,
+      "properties": {
+        "flag": {
+          "type": "string"
+        },
+        "help": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "text"
+        },
+        "label": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "section": {
+          "type": "string"
+        },
+        "skip": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "path",
+        "flag",
+        "label",
+        "help",
+        "value"
+      ],
+      "type": "object"
+    },
+    "domain.TextListField": {
+      "additionalProperties": false,
+      "properties": {
+        "entries": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "flag": {
+          "type": "string"
+        },
+        "help": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "text_list"
+        },
+        "label": {
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/domain.Option"
+          },
+          "type": "array"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "section": {
+          "type": "string"
+        },
+        "skip": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "path",
+        "flag",
+        "label",
+        "help",
+        "entries",
+        "options"
+      ],
+      "type": "object"
+    },
+    "domain.Warning": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "follow_up": {
+          "$ref": "#/$defs/domain.FollowUp"
+        },
+        "message": {
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "ports": {
+          "items": {
+            "$ref": "#/$defs/env.Entry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "env.Drift": {
+      "additionalProperties": false,
+      "properties": {
+        "conflicting": {
+          "type": "integer"
+        },
+        "missing": {
+          "type": "integer"
+        },
+        "orphan": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "missing",
+        "conflicting",
+        "orphan"
+      ],
+      "type": "object"
+    },
+    "env.Entry": {
+      "additionalProperties": false,
+      "properties": {
+        "addressing": {
+          "type": "string"
+        },
+        "base": {
+          "type": "integer"
+        },
+        "current_value": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "foreign_host": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "moves": {
+          "items": {
+            "$ref": "#/$defs/env.Move"
+          },
+          "type": "array"
+        },
+        "new_value": {
+          "type": "string"
+        },
+        "port": {
+          "type": "string"
+        },
+        "resolved": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "key",
+        "port",
+        "base",
+        "resolved",
+        "addressing",
+        "status"
+      ],
+      "type": "object"
+    },
+    "env.Move": {
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "type": "integer"
+        },
+        "job": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "port": {
+          "type": "string"
+        },
+        "resolved": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "port",
+        "job",
+        "base",
+        "resolved"
+      ],
+      "type": "object"
+    },
+    "env.OwnedEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "changed": {
+          "type": "boolean"
+        },
+        "file": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "key",
+        "value",
+        "changed"
+      ],
+      "type": "object"
+    },
+    "env.Redacted": {
+      "additionalProperties": false,
+      "properties": {
+        "addressing": {
+          "type": "string"
+        },
+        "applied": {
+          "type": "boolean"
+        },
+        "entries": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/env.Entry"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "owned": {
+          "items": {
+            "$ref": "#/$defs/env.OwnedEntry"
+          },
+          "type": "array"
+        },
+        "public_port": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "offset",
+        "entries",
+        "addressing",
+        "applied"
+      ],
+      "type": "object"
+    },
+    "events.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "events"
+        },
+        "items": false,
+        "plan": false
+      }
+    },
+    "events.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "repo"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "all"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "extract.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "conflicts": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "env_ports": {
+          "$ref": "#/$defs/env.Redacted"
+        },
+        "existing_branch": {
+          "type": "boolean"
+        },
+        "files": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/worktree.Change"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "isolation": {
+          "type": "string"
+        },
+        "kept": {
+          "type": "boolean"
+        },
+        "origin_ahead": {
+          "type": "integer"
+        },
+        "origin_behind": {
+          "type": "integer"
+        },
+        "origin_state": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "upstream": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "files",
+        "kept",
+        "conflicts",
+        "existing_branch"
+      ],
+      "type": "object"
+    },
+    "extract.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "conflicts": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/worktree.Conflict"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "creates": {
+          "type": "integer"
+        },
+        "env_from": {
+          "type": "string"
+        },
+        "fast_forward": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "files": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/worktree.Change"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "from": {
+          "type": "string"
+        },
+        "isolation": {
+          "type": "string"
+        },
+        "keep": {
+          "type": "boolean"
+        },
+        "on_conflict": {
+          "type": "string"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "remember": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "source": {
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/extract.Summary"
+        },
+        "target": {
+          "$ref": "#/$defs/extract.Target"
+        }
+      },
+      "required": [
+        "source",
+        "files",
+        "creates",
+        "keep",
+        "conflicts"
+      ],
+      "type": "object"
+    },
+    "extract.Summary": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "extract.Target": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "upstream": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch",
+        "path",
+        "action"
+      ],
+      "type": "object"
+    },
+    "extract.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "extract"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/extract.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/extract.Plan"
+        }
+      }
+    },
+    "extract.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "source"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "files"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "to"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "from"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "env_from"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "isolation"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "fast_forward"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "keep"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "on_conflict"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "remember"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "env_from",
+                    "isolation",
+                    "fast_forward"
+                  ]
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "ask"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "list.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/domain.FollowUp"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "commits_ahead": {
+          "type": "integer"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dirty": {
+          "type": "boolean"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "main": {
+          "type": "boolean"
+        },
+        "missing": {
+          "type": "boolean"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/worktree.Origin"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "pr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/list.PR"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rebasing": {
+          "type": "boolean"
+        },
+        "services": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "branch",
+        "path",
+        "main",
+        "dirty",
+        "locked",
+        "rebasing",
+        "active",
+        "missing",
+        "commits_ahead",
+        "created_at",
+        "origin",
+        "pr",
+        "services",
+        "actions"
+      ],
+      "type": "object"
+    },
+    "list.PR": {
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "type": "integer"
+        },
+        "state": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "number",
+        "url",
+        "state"
+      ],
+      "type": "object"
+    },
+    "list.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "list"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/list.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": false
+      }
+    },
+    "list.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "with_prs"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "fetch"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "status.Base": {
+      "additionalProperties": false,
+      "properties": {
+        "ahead": {
+          "type": "integer"
+        },
+        "behind": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "ahead",
+        "behind"
+      ],
+      "type": "object"
+    },
+    "status.Changes": {
+      "additionalProperties": false,
+      "properties": {
+        "deletions": {
+          "type": "integer"
+        },
+        "files": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/worktree.Change"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "insertions": {
+          "type": "integer"
+        },
+        "modified": {
+          "type": "integer"
+        },
+        "staged": {
+          "type": "integer"
+        },
+        "untracked": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "staged",
+        "modified",
+        "untracked",
+        "insertions",
+        "deletions",
+        "files"
+      ],
+      "type": "object"
+    },
+    "status.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/status.Base"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "branch": {
+          "type": "string"
+        },
+        "changes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/status.Changes"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "children": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "commits": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/worktree.Commit"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "env": {
+          "$ref": "#/$defs/status.Env"
+        },
+        "isolation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/status.Job"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "main": {
+          "type": "boolean"
+        },
+        "missing": {
+          "type": "boolean"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/worktree.Origin"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parent": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "problems": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/status.Problem"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rebasing": {
+          "type": "boolean"
+        },
+        "review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/status.Review"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "run": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/status.Run"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "run_toml": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch",
+        "path",
+        "main",
+        "locked",
+        "rebasing",
+        "missing",
+        "created_at",
+        "parent",
+        "children",
+        "base",
+        "origin",
+        "changes",
+        "commits",
+        "review",
+        "isolation",
+        "run_toml",
+        "run",
+        "jobs",
+        "env",
+        "problems"
+      ],
+      "type": "object"
+    },
+    "status.Env": {
+      "additionalProperties": false,
+      "properties": {
+        "declared": {
+          "type": "integer"
+        },
+        "files": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/status.EnvFile"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "declared",
+        "files"
+      ],
+      "type": "object"
+    },
+    "status.EnvFile": {
+      "additionalProperties": false,
+      "properties": {
+        "keys": {
+          "$ref": "#/$defs/env.Drift"
+        },
+        "missing": {
+          "type": "boolean"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "missing",
+        "keys"
+      ],
+      "type": "object"
+    },
+    "status.Job": {
+      "additionalProperties": false,
+      "properties": {
+        "exit_code": {
+          "type": "integer"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "owner": {
+          "$ref": "#/$defs/status.Owner"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "shared": {
+          "type": "boolean"
+        },
+        "started_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "state",
+        "url"
+      ],
+      "type": "object"
+    },
+    "status.Owner": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch",
+        "path"
+      ],
+      "type": "object"
+    },
+    "status.Problem": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "fix": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/domain.FollowUp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "fix"
+      ],
+      "type": "object"
+    },
+    "status.Review": {
+      "additionalProperties": false,
+      "properties": {
+        "checks": {
+          "$ref": "#/$defs/worktree.Checks"
+        },
+        "decision": {
+          "type": "string"
+        },
+        "draft": {
+          "type": "boolean"
+        },
+        "number": {
+          "type": "integer"
+        },
+        "state": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "number",
+        "url",
+        "state"
+      ],
+      "type": "object"
+    },
+    "status.Run": {
+      "additionalProperties": false,
+      "properties": {
+        "addressing": {
+          "type": "string"
+        },
+        "offset": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ports": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "addressing",
+        "offset",
+        "ports"
+      ],
+      "type": "object"
+    },
+    "status.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "status"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/status.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": false
+      }
+    },
+    "status.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "worktree"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "all"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "with_prs"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "tree.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/domain.FollowUp"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ahead": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "behind": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "branch": {
+          "type": "string"
+        },
+        "children": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cycle": {
+          "type": "boolean"
+        },
+        "dirty": {
+          "type": "boolean"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "main": {
+          "type": "boolean"
+        },
+        "missing": {
+          "type": "boolean"
+        },
+        "needs_sync": {
+          "type": "boolean"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/worktree.Origin"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/tree.PR"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rebasing": {
+          "type": "boolean"
+        },
+        "services": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "virtual": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "branch",
+        "path",
+        "main",
+        "virtual",
+        "parent",
+        "children",
+        "ahead",
+        "behind",
+        "needs_sync",
+        "dirty",
+        "locked",
+        "rebasing",
+        "missing",
+        "cycle",
+        "origin",
+        "pr",
+        "services",
+        "actions"
+      ],
+      "type": "object"
+    },
+    "tree.PR": {
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "type": "integer"
+        },
+        "state": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "number",
+        "url",
+        "state"
+      ],
+      "type": "object"
+    },
+    "tree.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "tree"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/tree.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": false
+      }
+    },
+    "tree.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "with_prs"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "worktree.Change": {
+      "additionalProperties": false,
+      "properties": {
+        "orig_path": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "status"
+      ],
+      "type": "object"
+    },
+    "worktree.Checks": {
+      "additionalProperties": false,
+      "properties": {
+        "failed": {
+          "type": "integer"
+        },
+        "passed": {
+          "type": "integer"
+        },
+        "pending": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "passed",
+        "failed",
+        "pending"
+      ],
+      "type": "object"
+    },
+    "worktree.Commit": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "sha": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sha",
+        "subject",
+        "author",
+        "at"
+      ],
+      "type": "object"
+    },
+    "worktree.Conflict": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "worktree.Meta": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "env_strategy": {
+          "type": "string"
+        },
+        "isolation": {
+          "type": "string"
+        },
+        "namespaces": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ordinal": {
+          "type": "integer"
+        },
+        "schema": {
+          "type": "integer"
+        },
+        "source_branch": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_branch",
+        "created_at",
+        "env_strategy"
+      ],
+      "type": "object"
+    },
+    "worktree.Origin": {
+      "additionalProperties": false,
+      "properties": {
+        "ahead": {
+          "type": "integer"
+        },
+        "behind": {
+          "type": "integer"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ahead",
+        "behind",
+        "state"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://wtm.sh/schemas/api.v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the catalogue of wtm's commands sends a surface other than the command line: the v2 envelope, the form of a request and its fields, the events of an operation, and each command's request, plan, detail and envelope under $defs. Generated from the Go types by make schema: never edit it by hand.",
+  "title": "wtm api v2"
+}

@@ -6,5 +6,5 @@
   feat/a    .trees/feat-a
   feat/b    .trees/feat-b
 
-  → wtm go feat/a
-  → wtm go feat/b
+  → wtm go feat/a   jump in
+  → wtm go feat/b   jump in

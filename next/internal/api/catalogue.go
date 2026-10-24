@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 	"path/filepath"
+	"reflect"
 	"strconv"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -28,10 +29,12 @@ func (c Catalogue) Find(name string) (Command, bool) {
 	return Command{}, false
 }
 
-// A Command is one command of the catalogue: its name, the schema of its request as a surface renders it, its questions and its execution.
+// A Command is one command of the catalogue: its name, the schema of its request as a surface renders it, the Go types of the plan and the detail its envelope carries, its questions and its execution.
 type Command struct {
-	Name string
-	Form domain.Form // the schema outside any repository: no option observed, no answer remembered
+	Name   string
+	Form   domain.Form  // the schema outside any repository: no option observed, no answer remembered
+	Plan   reflect.Type // nil for a read, which has no plan
+	Detail reflect.Type
 	// Questions is the form of the call's request as the repository stands: the options observed, the answers remembered, the problems of each field by its path; the call's options are not read.
 	Questions func(ctx context.Context, call Call) (domain.Form, error)
 	Execute   func(ctx context.Context, call Call) Response
@@ -63,9 +66,10 @@ type Response struct {
 	Envelope domain.Envelope
 }
 
-// An Outcome is what a command's run returns: it reports itself as an envelope, a stale plan followed up by its replan.
+// An Outcome is what a command's run returns: it reports itself as an envelope, a stale plan followed up by its replan, and says the Go types of the plan and the detail that envelope carries.
 type Outcome interface {
 	Envelope(params domain.EnvelopeParams) domain.Envelope
+	Types() (plan, detail reflect.Type)
 }
 
 // A Request is a command's request: it takes the answer of a field at a time and says the answer it gives each.
@@ -82,8 +86,12 @@ type Form interface {
 // Bind returns the command called name that opens its use case on the call's directory with open, then asks it the call's request with questions or runs it with run, method expressions such as create.UseCase.Questions and create.UseCase.Run.
 // The use case is opened on every call, so the catalogue lists its commands outside any repository, with the form of zero questions; an answer the request refuses is refused by its path. A stale plan is followed up by its request as a dry run, as the command line follows it up.
 func Bind[U any, Req Request[Req], Q Form, Out Outcome](name string, open func(ctx context.Context, dir string) (U, error), questions func(useCase U, ctx context.Context, req Req) (Q, error), run func(useCase U, ctx context.Context, req Req, opts domain.RunOptions) (Out, error)) Command {
-	var zero Q
+	var (
+		zero Q
+		out  Out
+	)
 	form := zero.Form()
+	plan, detail := out.Types()
 
 	prepare := func(ctx context.Context, call Call) (U, Req, error) {
 		var (
@@ -130,7 +138,7 @@ func Bind[U any, Req Request[Req], Q Form, Out Outcome](name string, open func(c
 		return respond(outcome.Envelope(domain.EnvelopeParams{Command: name, Err: domain.AsError(domain.AsErrorParams{Err: err}), Answers: domain.AnswersOf(form, req)}))
 	}
 
-	return Command{Name: name, Form: form, Questions: ask, Execute: execute}
+	return Command{Name: name, Form: form, Plan: plan, Detail: detail, Questions: ask, Execute: execute}
 }
 
 // statusClientClosed is the status of an operation its caller cancelled: nginx's 499, which net/http does not name.

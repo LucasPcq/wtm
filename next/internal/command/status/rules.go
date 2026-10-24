@@ -666,7 +666,7 @@ func Problems(params ProblemsParams) []Problem {
 	if params.Gone {
 		gone := Problem{Code: CodeMissing, Message: "its directory is gone"}
 		if params.Branch != "" {
-			gone.Fix = fix(CodeMissing, domain.CommandClean, params.Branch)
+			gone.Fix = fix(CodeMissing, "remove what is left of it", domain.CommandClean, params.Branch)
 		}
 		return []Problem{gone}
 	}
@@ -676,7 +676,7 @@ func Problems(params ProblemsParams) []Problem {
 		return problems
 	}
 	if params.Merged {
-		problems = append(problems, Problem{Code: CodeMerged, Message: "its pull request is merged", Fix: fix(CodeMerged, domain.CommandClean, params.Branch)})
+		problems = append(problems, Problem{Code: CodeMerged, Message: "its pull request is merged", Fix: fix(CodeMerged, "clean it up", domain.CommandClean, params.Branch)})
 	}
 	for _, missing := range params.Missing {
 		problems = append(problems, missingProblem(params.Branch, missing))
@@ -685,7 +685,7 @@ func Problems(params ProblemsParams) []Problem {
 		problems = append(problems, Problem{
 			Code:    CodeIsolationPending,
 			Message: "predates the isolation choice: run up and run start refuse it",
-			Fix:     fix(CodeIsolationPending, commandEnv, params.Branch, domain.Answered{Path: domain.PathIsolation, Values: []string{string(project.Isolated)}}),
+			Fix:     fix(CodeIsolationPending, "isolate it", commandEnv, params.Branch, domain.Answered{Path: domain.PathIsolation, Values: []string{string(project.Isolated)}}),
 		})
 	}
 	for _, job := range params.Jobs {
@@ -699,7 +699,7 @@ func Problems(params ProblemsParams) []Problem {
 		problems = append(problems, Problem{
 			Code:    CodeJobCrashed,
 			Message: crashed(job),
-			Fix:     fix(CodeJobCrashed, commandRunStart, owner, domain.Answered{Path: pathJob, Values: []string{job.Name}}, domain.Answered{Path: pathDetach, Values: []string{"true"}}),
+			Fix:     fix(CodeJobCrashed, "start it again", commandRunStart, owner, domain.Answered{Path: pathJob, Values: []string{job.Name}}, domain.Answered{Path: pathDetach, Values: []string{"true"}}),
 		})
 	}
 
@@ -710,20 +710,20 @@ func missingProblem(subject string, missing Missing) Problem {
 	problem := Problem{Code: CodeEnvMissing, Message: missing.Target + " is missing"}
 	switch missing.From {
 	case FromSource:
-		problem.Fix = fix(CodeEnvMissing, commandEnv, subject)
+		problem.Fix = fix(CodeEnvMissing, "rebuild it", commandEnv, subject)
 	case FromExample, FromMain:
-		problem.Fix = fix(CodeEnvMissing, commandEnv, subject, domain.Answered{Path: pathFrom, Values: []string{string(missing.From)}})
+		problem.Fix = fix(CodeEnvMissing, "rebuild it", commandEnv, subject, domain.Answered{Path: pathFrom, Values: []string{string(missing.From)}})
 	case FromNowhere:
 		problem.Message = missing.Target + " is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand"
-		problem.Fix = &domain.FollowUp{Command: commandConfigEdit, Code: CodeEnvMissing}
+		problem.Fix = &domain.FollowUp{Command: commandConfigEdit, Code: CodeEnvMissing, Message: "declare where it comes from"}
 	}
 
 	return problem
 }
 
-// fix is the follow-up that runs command on the worktree subject with answers.
-func fix(code, command, subject string, answers ...domain.Answered) *domain.FollowUp {
-	return &domain.FollowUp{Command: command, Answers: append([]domain.Answered{{Path: domain.PathWorktree, Values: []string{subject}}}, answers...), Code: code}
+// fix is the follow-up that runs command on the worktree subject with answers, saying what it does with message.
+func fix(code, message, command, subject string, answers ...domain.Answered) *domain.FollowUp {
+	return &domain.FollowUp{Command: command, Answers: append([]domain.Answered{{Path: domain.PathWorktree, Values: []string{subject}}}, answers...), Code: code, Message: message}
 }
 
 func crashed(job Job) string {

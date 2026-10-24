@@ -224,7 +224,7 @@
                 }
               ],
               "code": "status.env_missing",
-              "message": ""
+              "message": "rebuild it"
             }
           }
         ]
@@ -271,7 +271,7 @@
                 }
               ],
               "code": "status.missing",
-              "message": ""
+              "message": "remove what is left of it"
             }
           }
         ]
