@@ -68,6 +68,11 @@ func (r Request) Values(path string) []string {
 // ----------------------------------------------------------------------------
 // The form
 
+// query is how req names its worktree, located the path its name stands for.
+func (r Request) query(located string) domain.WorktreeQuery {
+	return domain.WorktreeQuery{Name: r.Worktree, Located: located, Cwd: r.Caller.Cwd}
+}
+
 // Skips is why the field at path is not asked, empty when it is: the worktree, when every worktree is read.
 func (r Request) Skips(path string) domain.Skip {
 	if path == domain.PathWorktree && r.All {
@@ -87,13 +92,7 @@ type Questions struct {
 // NewQuestions is the form of req over the worktrees of facts, its named worktree located at a path (or ""): each one an option, or each one an ambiguous name matches, the one req reads its answer.
 func NewQuestions(facts worktree.Repository, req Request, located string) Questions {
 	q := Questions{skip: req.Skips(domain.PathWorktree)}
-	worktrees := facts.Snapshot.MainFirst()
-	offered := worktrees
-	// an ambiguous name is asked again among the worktrees it matches
-	if matches := worktree.Named(worktrees, req.Worktree, located); len(matches) > 1 {
-		offered = matches
-	}
-	q.worktrees = domain.WorktreeOptions(offered, req.Caller.Cwd)
+	q.worktrees = domain.WorktreeOptions(facts.Snapshot.MainFirst(), req.query(located))
 
 	targets, err := Targets(facts.Snapshot, req, located)
 	if failure, ok := errors.AsType[*domain.Error](err); ok {

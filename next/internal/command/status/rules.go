@@ -197,7 +197,7 @@ const (
 // ----------------------------------------------------------------------------
 // The worktrees read
 
-// Targets are the worktrees req reads of snapshot: every one with All, the main first; else the one it names, by its branch, by a path (located, resolved and existing, "" when the name is none) in it, or by a part of its branch found in no other; else the deepest holding req.Caller.Cwd, where the caller stands; else the main one. It refuses All with a worktree named, a name that matches no worktree or several, and a repository with no worktree to read.
+// Targets are the worktrees req reads of snapshot: every one with All, the main first; else the one it names, by its branch, by a part of its branch found in no other, or by a path (located, resolved and existing, "" when the name is none) in it; else the deepest holding req.Caller.Cwd, where the caller stands; else the main one. It refuses All with a worktree named, a name that matches no worktree or several, and a repository with no worktree to read.
 func Targets(snapshot worktree.Snapshot, req Request, located string) ([]worktree.Worktree, error) {
 	worktrees := snapshot.MainFirst()
 	switch {
@@ -209,18 +209,13 @@ func Targets(snapshot worktree.Snapshot, req Request, located string) ([]worktre
 		}}
 	case req.All:
 		return worktrees, nil
-	case req.Worktree != "":
-		named, err := domain.NamedWorktree(worktrees, req.Worktree, located)
-		if err != nil {
-			return nil, err
-		}
-		return []worktree.Worktree{named}, nil
 	}
 
-	if at := worktree.Holding(worktrees, req.Caller.Cwd, pathOf); at >= 0 {
-		return []worktree.Worktree{worktrees[at]}, nil
+	target, err := domain.TargetWorktree(worktrees, req.query(located))
+	if err != nil {
+		return nil, err
 	}
-	return worktrees[:1], nil
+	return []worktree.Worktree{target}, nil
 }
 
 // ----------------------------------------------------------------------------
@@ -722,11 +717,6 @@ func (f Facts) warnings() []domain.Warning {
 
 // ----------------------------------------------------------------------------
 // Helpers
-
-// pathOf is where w is.
-func pathOf(w worktree.Worktree) string {
-	return w.Path
-}
 
 // orEmpty is list, empty rather than nil: a list status reads is never null.
 func orEmpty[T any](list []T) []T {

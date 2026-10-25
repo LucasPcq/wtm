@@ -22,20 +22,14 @@ const (
 	CodeUnreadable = Name + domain.Unreadable
 )
 
-// Target is the worktree req names of snapshot: by its branch, by a path (located, resolved and existing, "" when the name is none) in it, or by a part of its branch found in no other; else the deepest holding req.Caller.Cwd, where the caller stands; else the main one. It refuses a name that matches no worktree or several, and a repository with no worktree.
+// Target is the worktree req names of snapshot: by its branch, by a part of its branch found in no other, or by a path (located, resolved and existing, "" when the name is none) in it; else the deepest holding req.Caller.Cwd, where the caller stands; else the main one. It refuses a name that matches no worktree or several, and a repository with no worktree.
 func Target(snapshot worktree.Snapshot, req Request, located string) (worktree.Worktree, error) {
 	worktrees := snapshot.MainFirst()
-	switch {
-	case len(worktrees) == 0:
+	if len(worktrees) == 0 {
 		return worktree.Worktree{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeNoWorktree, Message: "the repository has no worktree to resolve"}
-	case req.Worktree != "":
-		return domain.NamedWorktree(worktrees, req.Worktree, located)
 	}
 
-	if at := worktree.Holding(worktrees, req.Caller.Cwd, func(w worktree.Worktree) string { return w.Path }); at >= 0 {
-		return worktrees[at], nil
-	}
-	return worktrees[0], nil
+	return domain.TargetWorktree(worktrees, req.query(located))
 }
 
 // ----------------------------------------------------------------------------

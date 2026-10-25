@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,6 +34,14 @@ func TestAWorktreeIsNamedByItsBranchItsPathOrAPartOfItsBranch(t *testing.T) {
 			assert.Equal(t, c.want, resolved(t, w, resolve.Request{Worktree: c.named, Caller: domain.Caller{Cwd: c.cwd}}))
 		})
 	}
+}
+
+func TestAPartOfABranchWinsOverADirectoryOfTheSameName(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/docs-site")}, Empty: []string{mainPath + "/docs"}}})
+
+	got := resolved(t, w, resolve.Request{Worktree: "docs", Caller: domain.Caller{Cwd: mainPath}})
+
+	assert.Equal(t, "feat/docs-site", got.Branch, "standing in main beside its docs/, wtm go docs enters feat/docs-site")
 }
 
 func TestWithNoWorktreeNamedTheOneHoldingTheDirectoryIsResolvedElseTheMainOne(t *testing.T) {

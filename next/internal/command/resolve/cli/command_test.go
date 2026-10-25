@@ -9,6 +9,7 @@ import (
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
@@ -123,6 +124,16 @@ func TestOnATerminalWithStdoutCapturedTheWorktreeIsPicked(t *testing.T) {
 			assert.Equal(t, c.path+"\n", got.Stdout)
 		})
 	}
+}
+
+func TestLeavingThePickerWithStdoutCapturedIsCancelledAndPrintsNothing(t *testing.T) {
+	got := runOn(t, func(streams *output.Streams) {
+		captured(streams)
+		streams.In = formtest.Escapes{}
+	}, world{}, "log")
+
+	assert.Equal(t, uicli.ExitCancelled, got.Code)
+	assert.Empty(t, got.Stdout)
 }
 
 func TestThePickerOffersEveryWorktreeAndLeavingItCancels(t *testing.T) {

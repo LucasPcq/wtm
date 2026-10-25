@@ -21,8 +21,8 @@ const (
 		"On a terminal, a part of a branch several worktrees hold opens the picker over\n" +
 		"them, and no [worktree] the picker over every worktree, the cursor on the one\n" +
 		"you are in. Anywhere else (no terminal, --output json, --quiet) an ambiguous\n" +
-		"name is refused and no [worktree] resolves the one you are in. Nothing is\n" +
-		"printed on stdout unless a worktree is resolved."
+		"name is refused and no [worktree] resolves the one you are in. In text, nothing\n" +
+		"is printed on stdout unless a worktree is resolved."
 	resolveExample = `  wtm resolve feat/login
 
   # Use it in a script

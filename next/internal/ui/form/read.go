@@ -77,7 +77,7 @@ func (q *Query[R, Q, O]) Launch(cmd *cobra.Command, args []string) error {
 		return q.io.FailWith(domain.AsError(domain.AsErrorParams{Err: err}), nil)
 	}
 
-	req, err = q.ask(ctx, app, req, nil)
+	req, err = q.ask(ctx, app, req, "")
 	if err != nil {
 		var none O
 		return q.conclude(none, req, err)
@@ -86,7 +86,7 @@ func (q *Query[R, Q, O]) Launch(cmd *cobra.Command, args []string) error {
 	opts := domain.RunOptions{Surface: uicli.SurfaceCLI, CorrelationID: q.io.Env.CorrelationID}
 	read, err := app.Run(ctx, req, opts)
 	// A subject refused as ambiguous is asked again among what it matches, then read.
-	if refused := ambiguous(err); refused != nil && q.interactive() {
+	if refused := ambiguous(err); refused != "" && q.interactive() {
 		if req, err = q.ask(ctx, app, req, refused); err == nil {
 			read, err = app.Run(ctx, req, opts)
 		}
@@ -98,8 +98,8 @@ func (q *Query[R, Q, O]) Launch(cmd *cobra.Command, args []string) error {
 	return q.conclude(read, req, err)
 }
 
-// ask asks the subject of the read, the positional select its questions leave open, before the read: when the user can see and answer it, and the request neither answers it nor rules it out, or answers it with a value refused reports refused, asked again among the options its questions narrow it to.
-func (q *Query[R, Q, O]) ask(ctx context.Context, app Reader[R, Q, O], req R, refused func(path string) bool) (R, error) {
+// ask asks the subject of the read, the positional select its questions leave open, before the read: when the user can see and answer it, and the request neither answers it nor rules it out, or answers the field at refused with a value refused, asked again among the options its questions narrow it to.
+func (q *Query[R, Q, O]) ask(ctx context.Context, app Reader[R, Q, O], req R, refused string) (R, error) {
 	// The schema says whether the request leaves a subject to ask before the questions are read.
 	if _, open := subjectOf(q.schema(), req, refused); !open || !q.interactive() {
 		return req, nil
@@ -125,15 +125,15 @@ type Skipper interface {
 	Skips(path string) domain.Skip
 }
 
-// subjectOf returns the positional select of form req leaves open, and reports whether there is one: not ruled out, by the form or by req, and not answered, or answered with a value refused (nil: none) reports refused.
-func subjectOf(form []worded, req domain.Valued, refused func(path string) bool) (*Subject, bool) {
+// subjectOf returns the positional select of form req leaves open, and reports whether there is one: not ruled out, by the form or by req, and not answered, or the field at refused, whose value was refused ("" refuses none).
+func subjectOf(form []worded, req domain.Valued, refused string) (*Subject, bool) {
 	skipper, skips := req.(Skipper)
 	for _, field := range form {
 		subject, ok := field.Field.(domain.SelectField)
 		if skips && ok && skipper.Skips(subject.Path) != "" {
 			continue
 		}
-		if ok && positional(field) && subject.Skip == "" && (req.Values(subject.Path) == nil || refused != nil && refused(subject.Path)) {
+		if ok && positional(field) && subject.Skip == "" && (req.Values(subject.Path) == nil || subject.Path == refused) {
 			return &Subject{Field: subject, Words: field.Words}, true
 		}
 	}
@@ -141,16 +141,18 @@ func subjectOf(form []worded, req domain.Valued, refused func(path string) bool)
 	return nil, false
 }
 
-// ambiguous reports whether err refuses the value of the field at path as ambiguous; nil when err refuses none so.
-func ambiguous(err error) func(path string) bool {
+// ambiguous is the path of the field err refuses as ambiguous, "" when it refuses none so.
+func ambiguous(err error) string {
 	failure, ok := errors.AsType[*domain.Error](err)
-	if !ok || !slices.ContainsFunc(failure.Fields, func(p domain.FieldError) bool { return p.Code == domain.CodeAmbiguous }) {
-		return nil
+	if !ok {
+		return ""
 	}
-
-	return func(path string) bool {
-		return slices.ContainsFunc(failure.Fields, func(p domain.FieldError) bool { return p.Path == path && p.Code == domain.CodeAmbiguous })
+	for _, problem := range failure.Fields {
+		if problem.Code == domain.CodeAmbiguous {
+			return problem.Path
+		}
 	}
+	return ""
 }
 
 // interactive reports whether the user can see and answer a picker, and see what it ends on: stdout too is a terminal, since a read piped elsewhere is asked for its data, unless the read is Captured, whose data is what the user picks; the output is for a human and --quiet does not silence it.

@@ -7,8 +7,8 @@
   On a terminal, a part of a branch several worktrees hold opens the picker over
   them, and no [worktree] the picker over every worktree, the cursor on the one
   you are in. Anywhere else (no terminal, --output json, --quiet) an ambiguous
-  name is refused and no [worktree] resolves the one you are in. Nothing is
-  printed on stdout unless a worktree is resolved.
+  name is refused and no [worktree] resolves the one you are in. In text, nothing
+  is printed on stdout unless a worktree is resolved.
 
   Usage:
     wtm-next resolve [worktree] [flags]
