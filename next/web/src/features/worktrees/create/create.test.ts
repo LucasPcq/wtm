@@ -4,37 +4,27 @@ import type { CreatePlan, DomainField, DomainForm } from '@/api/types.gen'
 import { advance, current, doneOf, planned } from './progress'
 import { stepsOf } from './steps'
 
-const text = (path: string, section?: string, skip?: string): DomainField => ({
+const text = (path: string, skip?: string): DomainField => ({
   kind: 'text',
   path,
   flag: `--${path}`,
   label: path,
   help: '',
   value: '',
-  ...(section && { section }),
   ...(skip && { skip }),
 })
 
-test('each section is a step, a field of no section goes with the last, a skipped one is listed apart', () => {
+test('each question goes in its step, a skipped one is listed apart, one the build does not know goes last', () => {
   const form: DomainForm = {
-    sections: [
-      { key: 'branch', title: 'Branch' },
-      { key: 'environment', title: 'Environment' },
-    ],
-    fields: [
-      text('branches', 'branch'),
-      text('env_from', 'environment', 'the branch exists'),
-      text('if_not_exists', undefined, 'set by its flag only'),
-    ],
+    fields: [text('branches'), text('env_from', 'the branch exists'), text('if_not_exists', 'set by its flag only'), text('new_one')],
     problems: [],
   }
 
   const [branch, environment] = stepsOf(form)
 
   expect(branch?.asked.map((f) => f.path)).toEqual(['branches'])
-  expect(environment?.asked).toEqual([])
+  expect(environment?.asked.map((f) => f.path)).toEqual(['new_one'])
   expect(environment?.skipped.map((f) => f.path)).toEqual(['env_from', 'if_not_exists'])
-  expect(stepsOf({ ...form, sections: [] }).map((step) => step.fields.length)).toEqual([3])
 })
 
 const plan: CreatePlan = {

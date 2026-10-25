@@ -82,7 +82,7 @@ func TestEveryFollowUpOfAGoldenSaysWhatItDoes(t *testing.T) {
 }
 
 func TestAFieldOfEachKindMatchesTheSchema(t *testing.T) {
-	form := domain.Form{Fields: fieldKinds(), Sections: []domain.Section{{Key: "where", Title: "Where", Summary: "next to main"}}}
+	form := domain.Form{Fields: fieldKinds()}
 	document, err := json.Marshal(form)
 	require.NoError(t, err)
 
@@ -172,7 +172,7 @@ func TestTheSchemaRefusesWhatNoCommandSends(t *testing.T) {
 		"plan_on_a_read":     {def: "list.envelope", document: `{"v":2,"command":"list","ok":true,"plan":{},"follow_ups":[],"warnings":[]}`},
 		"field_not_in_plan":  {def: "create.envelope", document: `{"v":2,"command":"create","ok":true,"plan":{"branches":[],"env_from":"main","creates":0,"surprise":1},"follow_ups":[],"warnings":[]}`},
 		"failure_no_error":   {def: "create.envelope", document: `{"v":2,"command":"create","ok":false,"follow_ups":[],"warnings":[]}`},
-		"field_of_no_kind":   {def: "domain.Form", document: `{"fields":[{"kind":"slider","path":"x"}],"sections":[],"problems":[]}`},
+		"field_of_no_kind":   {def: "domain.Form", document: `{"fields":[{"kind":"slider","path":"x"}],"problems":[]}`},
 		"another_command":    {def: "create.envelope", document: `{"v":2,"command":"extract","ok":true,"follow_ups":[],"warnings":[]}`},
 		"event_of_no_fields": {def: "domain.Event", document: `{"type":"unit.started"}`},
 	} {

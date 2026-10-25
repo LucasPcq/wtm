@@ -415,9 +415,6 @@
         "remembered": {
           "type": "boolean"
         },
-        "section": {
-          "type": "string"
-        },
         "skip": {
           "type": "string"
         },
@@ -679,7 +676,7 @@
     },
     "domain.Form": {
       "additionalProperties": false,
-      "description": "A command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, the sections a surface groups them in, and the request's problems.",
+      "description": "A command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, and the request's problems.",
       "properties": {
         "fields": {
           "items": {
@@ -692,18 +689,10 @@
             "$ref": "#/$defs/domain.FieldError"
           },
           "type": "array"
-        },
-        "sections": {
-          "description": "In the order a surface shows them; a field names its own by key.",
-          "items": {
-            "$ref": "#/$defs/domain.Section"
-          },
-          "type": "array"
         }
       },
       "required": [
         "fields",
-        "sections",
         "problems"
       ],
       "type": "object"
@@ -791,9 +780,6 @@
             "type": "string"
           },
           "type": "array"
-        },
-        "section": {
-          "type": "string"
         },
         "skip": {
           "type": "string"
@@ -896,25 +882,6 @@
       ],
       "type": "object"
     },
-    "domain.Section": {
-      "additionalProperties": false,
-      "properties": {
-        "key": {
-          "type": "string"
-        },
-        "summary": {
-          "type": "string"
-        },
-        "title": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "key",
-        "title"
-      ],
-      "type": "object"
-    },
     "domain.SelectField": {
       "additionalProperties": false,
       "properties": {
@@ -957,9 +924,6 @@
         "remembered": {
           "type": "string"
         },
-        "section": {
-          "type": "string"
-        },
         "skip": {
           "type": "string"
         },
@@ -1000,9 +964,6 @@
           "type": "string"
         },
         "path": {
-          "type": "string"
-        },
-        "section": {
           "type": "string"
         },
         "skip": {
@@ -1053,9 +1014,6 @@
           "type": "string"
         },
         "path": {
-          "type": "string"
-        },
-        "section": {
           "type": "string"
         },
         "skip": {

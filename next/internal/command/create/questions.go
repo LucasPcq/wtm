@@ -126,27 +126,7 @@ func (q Questions) Form() domain.Form {
 		Value:     q.IfNotExists.Value,
 	})
 
-	for i, field := range fields {
-		fields[i] = domain.InSection(field, sectionOf[field.Spec().Path])
-	}
-	return domain.Form{Problems: q.Errors, Fields: fields, Sections: sections}
-}
-
-// The sections of create's form: the branch a worktree is on and where it starts from, then the environment it is
-// provisioned with. A field in neither (--if-not-exists, set by its flag only) is shown with the last.
-const (
-	sectionBranch      = "branch"
-	sectionEnvironment = "environment"
-)
-
-var sections = []domain.Section{{Key: sectionBranch, Title: "Branch"}, {Key: sectionEnvironment, Title: "Environment"}}
-
-var sectionOf = map[string]string{
-	pathBranches:           sectionBranch,
-	pathFrom:               sectionBranch,
-	domain.PathFastForward: sectionBranch,
-	domain.PathEnvFrom:     sectionEnvironment,
-	domain.PathIsolation:   sectionEnvironment,
+	return domain.Form{Problems: q.Errors, Fields: fields}
 }
 
 const envHelp = "How the .env files of the new worktrees are provisioned: config (config.toml's strategy), example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy"

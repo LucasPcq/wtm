@@ -287,7 +287,7 @@ func generatedSchema(t *testing.T) []byte {
 	s.defs["domain.Line"] = map[string]any{"$ref": "events.v2.json"}
 	s.defs["domain.Phase"] = map[string]any{"$ref": "events.v2.json#/$defs/phase"}
 	// the types the fragments name
-	for _, named := range []reflect.Type{reflect.TypeFor[domain.Warning](), reflect.TypeFor[domain.FollowUp](), reflect.TypeFor[domain.Section]()} {
+	for _, named := range []reflect.Type{reflect.TypeFor[domain.Warning](), reflect.TypeFor[domain.FollowUp]()} {
 		s.of(named)
 	}
 	var names []string
