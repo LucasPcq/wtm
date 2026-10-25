@@ -30,6 +30,12 @@ export function RemoveProgress({
   const { done, total } = doneOf(progress)
   const { cancelled, failure } = ending(progress)
   const ok = !running && !failure && !cancelled
+  const plan = progress.envelope?.plan
+  const moved = (subject: string) =>
+    (plan?.reparent_children ? (plan.moves ?? []) : [])
+      .filter((move) => move.from === subject)
+      .map((move) => `; ${move.branch} moved onto ${move.to}`)
+      .join('')
 
   const title = () => {
     if (running)
@@ -113,7 +119,7 @@ export function RemoveProgress({
                   <span className="flex min-w-0 flex-col">
                     <span className="text-sm font-medium">{item.subject}</span>
                     <span className={item.error ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'}>
-                      {item.error?.message ?? 'Removed, with its branch and its record.'}
+                      {item.error?.message ?? `Removed, with its branch and its record${moved(item.subject)}.`}
                     </span>
                   </span>
                 </li>

@@ -21,7 +21,7 @@ export function SelectionBar({
         Clear
       </Button>
       <div className="flex-1" />
-      <Separator orientation="vertical" className="mx-1 !h-5" />
+      <Separator orientation="vertical" className="mx-1 data-[orientation=vertical]:h-5" />
       {destructive}
     </div>
   )

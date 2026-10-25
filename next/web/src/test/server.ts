@@ -1,18 +1,12 @@
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import type { DomainAnswered, DomainField, DomainFollowUp, ListDetail, WebCall } from '@/api/types.gen'
-import { envelope, followUp, listDetail, statusDetail, treeDetail } from '@/test/fixtures'
+import { repo, worktrees } from '@/test/acme'
+import { cleanPlan, cleanQuestionsOf, cleanRun } from '@/test/clean'
+import { envelope, followUp, statusDetail, treeDetail } from '@/test/fixtures'
+import { line, streamed } from '@/test/stream'
 
-// The server the component tests talk to: the API of `wtm-next ui` over one repository, acme, with a stack (feat/billing,
-// feat/billing-ui behind it) and a worktree with a change (fix/login). A test changes what it answers with server.use.
-export const repo = { id: 'r1', root: '/acme', common_dir: '/acme/.git' }
-
-export const worktrees: ListDetail[] = [
-  listDetail('main', { main: true, parent: '', ahead: null, behind: null, path: '/acme' }),
-  listDetail('feat/billing', { ahead: 1 }),
-  listDetail('feat/billing-ui', { parent: 'feat/billing', behind: 1, needs_sync: true }),
-  listDetail('fix/login', { dirty: true, changes: { changed: 0, untracked: 1 } }),
-]
+export { line, repo, streamed, worktrees }
 
 const sync = (branch: string) =>
   followUp('sync', branch, { code: 'status.behind', message: 'sync it onto feat/billing' })
@@ -100,112 +94,6 @@ export function questionsOf(answers: DomainAnswered[] = []) {
       : [{ path: 'branches', code: 'required', flag: '<branches>', message: 'branches is required' }],
   }
 }
-
-// clean offers every worktree but main; fix/login, with a change, is unsafe until forced
-export function cleanQuestionsOf(answers: DomainAnswered[] = []) {
-  const picked = answers.find((a) => a.path === 'worktree')?.values ?? []
-  return {
-    fields: [
-      field({
-        kind: 'multi_select',
-        path: 'worktree',
-        picked,
-        options: worktrees.filter((w) => !w.main).map((w) => ({ value: w.branch })),
-      }),
-    ],
-    problems: picked.length
-      ? []
-      : [{ path: 'worktree', code: 'required', flag: '<worktree>', message: 'worktree is required' }],
-  }
-}
-
-const cleanPlan = (call: WebCall) => {
-  const picked = call.answers?.find((a) => a.path === 'worktree')?.values ?? []
-  const said = (path: string) => call.answers?.some((a) => a.path === path && a.values[0] === 'true') ?? false
-  const unsafe = picked.filter((branch) => worktrees.find((w) => w.branch === branch)?.dirty)
-  if (unsafe.length > 0 && !said('force'))
-    return HttpResponse.json(
-      {
-        ...envelope('clean', []),
-        ok: false,
-        error: {
-          kind: 'refused',
-          code: 'clean.unsafe',
-          message: `nothing removed: ${unsafe.length} worktree(s) can't be removed safely`,
-          fields: unsafe.map((branch) => ({
-            path: `worktree[${picked.indexOf(branch)}]`,
-            code: 'clean.dirty',
-            params: { value: branch },
-            flag: '<worktree>',
-            message: `${branch} has uncommitted changes`,
-          })),
-        },
-      },
-      { status: 403 },
-    )
-
-  const children = worktrees.filter((w) => picked.includes(w.parent) && !picked.includes(w.branch))
-  return HttpResponse.json({
-    ...envelope('clean', []),
-    fingerprint: 'c1',
-    plan: {
-      worktrees: picked.map((branch) => ({
-        worktree: branch,
-        branch,
-        path: `/acme.trees/${branch.replace('/', '-')}`,
-        hooks: ['docker compose down'],
-        phases: ['on_clean', 'remove'],
-        blockers: unsafe.includes(branch) ? ['dirty'] : [],
-      })),
-      moves: children.map((w) => ({ branch: w.branch, from: w.parent, to: 'main', base: true })),
-      reparent_children: said('reparent_children'),
-      force: said('force'),
-    },
-  })
-}
-
-const cleanRun = (call: WebCall) => {
-  const picked = call.answers?.find((a) => a.path === 'worktree')?.values ?? []
-  const reparent = call.answers?.some((a) => a.path === 'reparent_children') ?? false
-  const orphans = reparent ? [] : worktrees.filter((w) => picked.includes(w.parent) && !picked.includes(w.branch))
-  return streamed(
-    [
-      ...picked.flatMap((branch) => [
-        line({ type: 'unit.started', subject: branch }),
-        line({ type: 'phase.started', subject: branch, phase: 'on_clean' }),
-        line({ type: 'phase.output', subject: branch, line: 'Container acme-api-1  Stopped' }),
-        line({ type: 'phase.finished', subject: branch, phase: 'on_clean', failed: false }),
-        line({ type: 'phase.started', subject: branch, phase: 'remove' }),
-        line({ type: 'phase.finished', subject: branch, phase: 'remove', failed: false }),
-        line({ type: 'unit.finished', subject: branch, status: 'done' }),
-      ]),
-      `event: envelope\ndata: ${JSON.stringify({
-        ...envelope('clean', []),
-        items: picked.map((branch) => ({ subject: branch, status: 'done', detail: { path: `/acme.trees/${branch}` } })),
-        warnings: orphans.map((w) => ({
-          code: 'clean.orphaned',
-          message: `${w.branch} still points at the removed parent ${w.parent}`,
-          follow_up: {
-            command: 'reparent',
-            answers: [
-              { path: 'worktree', values: [w.branch] },
-              { path: 'to', values: ['main'] },
-            ],
-            code: 'clean.reparent',
-            message: 'move it onto main',
-          },
-        })),
-      })}\n\n`,
-    ].join(''),
-  )
-}
-
-export const line = (event: object) => `data: ${JSON.stringify({ v: 2, ts: '2026-10-25T12:00:00Z', ...event })}\n\n`
-
-export const streamed = (body: string, operation: string | null = 'op-1') =>
-  new HttpResponse(body, {
-    headers: { 'Content-Type': 'text/event-stream', ...(operation && { 'X-Wtm-Operation': operation }) },
-  })
 
 const createRun = (branch: string) =>
   streamed(

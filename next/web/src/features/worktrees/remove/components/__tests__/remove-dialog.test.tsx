@@ -50,6 +50,9 @@ test('an unsafe worktree waits for a choice; kept, the others go through the chi
   await user.click(within(dialog).getByRole('button', { name: 'Remove feat/billing' }))
 
   expect(await within(dialog).findByText('feat/billing is removed')).toBeTruthy()
+  expect(
+    within(dialog).getByText('Removed, with its branch and its record; feat/billing-ui moved onto main.'),
+  ).toBeTruthy()
   expect(within(dialog).queryByText(/still points at the removed parent/)).toBeNull()
   expect(screen.queryByRole('toolbar', { name: 'Selection' })).toBeNull()
 })
