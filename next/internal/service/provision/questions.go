@@ -99,8 +99,8 @@ type QuestionsParams struct {
 }
 
 const (
-	isolationHelp   = "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated"
-	fastForwardHelp = "Fast-forward to origin first the branch a new worktree starts from, or the branch itself when it already exists locally, when it is behind; one that has diverged or holds uncommitted changes starts as it is"
+	isolationHelp   = "How it stands against its source: isolated or verbatim; run.toml's isolation by default"
+	fastForwardHelp = "Fast-forward the source branch to origin first when it is behind"
 	notBehind       = "nothing to fast-forward: the source is not behind origin"
 )
 
@@ -255,24 +255,24 @@ func (q Questions) fastForwardLabel() string {
 func (q Questions) isolationOptions() []domain.Option {
 	if q.Many {
 		return []domain.Option{
-			{Value: string(project.Isolated), Label: "isolated — each its own ports, compose project and namespaces"},
-			{Value: string(project.Verbatim), Label: "verbatim — keep the copied .env, one of them runs at a time"},
+			{Value: string(project.Isolated), Label: "isolated — each its own ports and namespaces"},
+			{Value: string(project.Verbatim), Label: "verbatim — the copied .env as is, one runs at a time"},
 		}
 	}
 
 	return []domain.Option{
-		{Value: string(project.Isolated), Label: "isolated — its own ports, compose project and namespaces"},
-		{Value: string(project.Verbatim), Label: "verbatim — keep the copied .env, one of the two runs at a time"},
+		{Value: string(project.Isolated), Label: "isolated — its own ports and namespaces"},
+		{Value: string(project.Verbatim), Label: "verbatim — the copied .env as is, one runs at a time"},
 	}
 }
 
 // envOptions are the env strategies as the legacy wizard offers them, config.toml's first.
 func (q Questions) envOptions() []domain.Option {
 	return []domain.Option{
-		{Value: string(EnvFromConfig), Label: "Use config default (" + string(q.Configured) + ")", Short: "config default"},
-		{Value: string(project.EnvExample), Label: "example — copy .env.example → .env"},
-		{Value: string(project.EnvMain), Label: "main — copy .env from the main checkout"},
-		{Value: string(project.EnvParent), Label: "parent — copy .env from source worktree"},
+		{Value: string(EnvFromConfig), Label: "config default (" + string(q.Configured) + ")", Short: "config default"},
+		{Value: string(project.EnvExample), Label: "example — from .env.example"},
+		{Value: string(project.EnvMain), Label: "main — the main checkout's .env"},
+		{Value: string(project.EnvParent), Label: "parent — the source worktree's .env"},
 	}
 }
 

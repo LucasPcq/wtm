@@ -2,6 +2,7 @@ package git_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 
@@ -93,6 +94,7 @@ func TestTheFakeAndGitDateTheTipOfEveryLocalBranch(t *testing.T) {
 			require.Len(t, dates, len(branches.Local))
 			for _, b := range branches.Local {
 				assert.False(t, dates[b.Name].IsZero(), b.Name)
+				assert.Equal(t, time.UTC, dates[b.Name].Location(), b.Name)
 			}
 		})
 	}

@@ -208,7 +208,7 @@ func TestANewTargetStartsOnARememberedConfigDefaultTicked(t *testing.T) {
 	d.Keys("enter")
 
 	require.Equal(t, stepEnvFrom, d.Wizard.Current())
-	assert.Contains(t, d.Screen(), "▌› Use config default (example)")
+	assert.Contains(t, d.Screen(), "▌› config default (example)")
 	assert.Contains(t, d.Screen(), "[x] Always use this answer in this repo")
 
 	d.Keys("down", "down", "enter")

@@ -221,7 +221,7 @@ func (q Questions) Form() domain.Form {
 	return domain.Form{Problems: q.Errors, Fields: fields}
 }
 
-const envHelp = "How the .env files of the new target are provisioned: config (config.toml's strategy), example (from its template), main (copied from the main checkout) or parent (from the worktree of the branch it starts from, --from); defaults to config.toml's strategy"
+const envHelp = "Where the new target's .env files come from: config, example, main or parent; config.toml's strategy by default"
 
 func (q Questions) filesHelp() string {
 	if q.Source.Given != "" && len(q.Files.Options) == 0 {

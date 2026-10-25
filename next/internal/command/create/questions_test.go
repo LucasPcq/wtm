@@ -411,6 +411,6 @@ func TestTheConfigDefaultIsTheFirstEnvOptionNamingTheConfiguredStrategy(t *testi
 
 	field, found := fieldAt(form, "env_from").(domain.SelectField)
 	require.True(t, found)
-	assert.Equal(t, domain.Option{Value: "config", Label: "Use config default (main)", Short: "config default"}, field.Options[0])
+	assert.Equal(t, domain.Option{Value: "config", Label: "config default (main)", Short: "config default"}, field.Options[0])
 	assert.Equal(t, []string{"config", "example", "main", "parent"}, valuesOf(field.Options))
 }

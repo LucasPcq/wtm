@@ -9,9 +9,7 @@
   ✓ Env strategy: config default
   ✓ Isolation: isolated
 
-  Fast-forward to origin first the branch a new worktree starts from, or the branch itself when it
-  already exists locally, when it is behind; one that has diverged or holds uncommitted changes
-  starts as it is
+  Fast-forward the source branch to origin first when it is behind
 
    Fast-forward main to origin
   ────────────────────────────────────────────────────────────────────────────────────────────────

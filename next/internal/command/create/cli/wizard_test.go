@@ -194,7 +194,7 @@ func TestARememberedConfigDefaultStartsOnItsRowTicked(t *testing.T) {
 	d := open(t, sessionParams{App: newApp(seed{Remembered: map[string]string{project.RememberEnvStrategy: project.RememberEnvConfig}}), Request: create.Request{Branches: []string{"feat/a"}, From: "main", Given: provision.Given{Ask: true}}})
 
 	assert.Equal(t, stepEnvFrom, d.Wizard.Current())
-	assert.Contains(t, d.Screen(), "▌› Use config default (example)")
+	assert.Contains(t, d.Screen(), "▌› config default (example)")
 	assert.Contains(t, d.Screen(), "[x] Always use this answer in this repo")
 }
 

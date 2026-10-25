@@ -108,12 +108,12 @@ func NewQuestions(f Facts, req Request) Questions {
 func (q Questions) Form() domain.Form {
 	fields := []domain.Field{
 		domain.TextListField{
-			FieldSpec: domain.FieldSpec{Path: pathBranches, Flag: "<branches>", Label: "Branches", Help: "The branches to create a worktree for; one that already exists is checked out as it is"},
+			FieldSpec: domain.FieldSpec{Path: pathBranches, Flag: "<branches>", Label: "Branches", Help: "One per line; a branch that exists is checked out as it is"},
 			Entries:   q.Branches.Given,
 			Options:   q.Branches.Options,
 		},
 		domain.SelectField{
-			FieldSpec:   domain.FieldSpec{Path: pathFrom, Flag: "--from", Label: "Source branch", Help: "The branch a new branch starts from, or the parent recorded for wtm sync of one that already exists", Origin: q.From.Origin},
+			FieldSpec:   domain.FieldSpec{Path: pathFrom, Flag: "--from", Label: "Source branch", Help: "Where a new branch starts, and the parent wtm sync rebases it onto", Origin: q.From.Origin},
 			Value:       q.From.Value,
 			Options:     q.From.Options,
 			Pinned:      q.From.Pinned,
@@ -122,14 +122,14 @@ func (q Questions) Form() domain.Form {
 	}
 	fields = append(fields, q.Questions.Fields(envHelp)...)
 	fields = append(fields, domain.ConfirmField{
-		FieldSpec: domain.FieldSpec{Path: pathIfNotExists, Flag: "--if-not-exists", Label: "If not exists", Help: "Succeed without a change when the worktree already exists (idempotent)", Origin: q.IfNotExists.Origin, Skip: q.IfNotExists.Skip},
+		FieldSpec: domain.FieldSpec{Path: pathIfNotExists, Flag: "--if-not-exists", Label: "If not exists", Help: "Succeed with no change when the worktree exists", Origin: q.IfNotExists.Origin, Skip: q.IfNotExists.Skip},
 		Value:     q.IfNotExists.Value,
 	})
 
 	return domain.Form{Problems: q.Errors, Fields: fields}
 }
 
-const envHelp = "How the .env files of the new worktrees are provisioned: config (config.toml's strategy), example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy"
+const envHelp = "Where its .env files come from: config, example, main or parent; config.toml's strategy by default"
 
 func (f Facts) branchOptions() []domain.Option {
 	options := make([]domain.Option, 0, len(f.Branches.Local)+len(f.Branches.Remote))

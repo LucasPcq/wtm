@@ -3,8 +3,7 @@
 
   ✓ Branches: feat/a, feature
 
-  The branch a new branch starts from, or the parent recorded for wtm sync of one that already
-  exists
+  Where a new branch starts, and the parent wtm sync rebases it onto
 
 ▌› main (default)
 

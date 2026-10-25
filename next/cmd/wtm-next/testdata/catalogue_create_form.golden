@@ -5,7 +5,7 @@
       "path": "branches",
       "flag": "\u003cbranches\u003e",
       "label": "Branches",
-      "help": "The branches to create a worktree for; one that already exists is checked out as it is",
+      "help": "One per line; a branch that exists is checked out as it is",
       "entries": [],
       "options": []
     },
@@ -14,7 +14,7 @@
       "path": "from",
       "flag": "--from",
       "label": "Source branch",
-      "help": "The branch a new branch starts from, or the parent recorded for wtm sync of one that already exists",
+      "help": "Where a new branch starts, and the parent wtm sync rebases it onto",
       "value": "",
       "options": [],
       "rememberable": false,
@@ -26,25 +26,25 @@
       "path": "env_from",
       "flag": "--env-from",
       "label": "Env strategy",
-      "help": "How the .env files of the new worktrees are provisioned: config (config.toml's strategy), example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy",
+      "help": "Where its .env files come from: config, example, main or parent; config.toml's strategy by default",
       "value": "",
       "options": [
         {
           "value": "config",
-          "label": "Use config default ()",
+          "label": "config default ()",
           "short": "config default"
         },
         {
           "value": "example",
-          "label": "example — copy .env.example → .env"
+          "label": "example — from .env.example"
         },
         {
           "value": "main",
-          "label": "main — copy .env from the main checkout"
+          "label": "main — the main checkout's .env"
         },
         {
           "value": "parent",
-          "label": "parent — copy .env from source worktree"
+          "label": "parent — the source worktree's .env"
         }
       ],
       "rememberable": true,
@@ -56,16 +56,16 @@
       "path": "isolation",
       "flag": "--isolation",
       "label": "Isolation",
-      "help": "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated",
+      "help": "How it stands against its source: isolated or verbatim; run.toml's isolation by default",
       "value": "",
       "options": [
         {
           "value": "isolated",
-          "label": "isolated — its own ports, compose project and namespaces"
+          "label": "isolated — its own ports and namespaces"
         },
         {
           "value": "verbatim",
-          "label": "verbatim — keep the copied .env, one of the two runs at a time"
+          "label": "verbatim — the copied .env as is, one runs at a time"
         }
       ],
       "rememberable": true,
@@ -77,7 +77,7 @@
       "path": "fast_forward",
       "flag": "--ff",
       "label": "Source update",
-      "help": "Fast-forward to origin first the branch a new worktree starts from, or the branch itself when it already exists locally, when it is behind; one that has diverged or holds uncommitted changes starts as it is",
+      "help": "Fast-forward the source branch to origin first when it is behind",
       "value": false,
       "yes": {
         "value": "true",
@@ -98,7 +98,7 @@
       "path": "if_not_exists",
       "flag": "--if-not-exists",
       "label": "If not exists",
-      "help": "Succeed without a change when the worktree already exists (idempotent)",
+      "help": "Succeed with no change when the worktree exists",
       "value": false,
       "yes": {
         "value": "true",

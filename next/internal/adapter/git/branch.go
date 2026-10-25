@@ -53,7 +53,7 @@ func (r Repo) Branches(ctx context.Context) (worktree.Branches, error) {
 	return branches, nil
 }
 
-// CommitDates returns, by local branch, when the commit at its tip was made.
+// CommitDates returns, by local branch, when the commit at its tip was made, in UTC as every date wtm writes.
 func (r Repo) CommitDates(ctx context.Context) (map[string]time.Time, error) {
 	out, err := r.git(ctx, "for-each-ref", "--format=%(committerdate:iso-strict) %(refname)", strings.TrimSuffix(headsPrefix, "/"))
 	if err != nil {
@@ -67,7 +67,7 @@ func (r Repo) CommitDates(ctx context.Context) (map[string]time.Time, error) {
 		if err != nil {
 			return nil, fmt.Errorf("read the date of %s: %w", refname, err)
 		}
-		dates[strings.TrimPrefix(refname, headsPrefix)] = at
+		dates[strings.TrimPrefix(refname, headsPrefix)] = at.UTC()
 	}
 
 	return dates, nil

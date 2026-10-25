@@ -42,10 +42,10 @@ func TestTheConfigDefaultIsTheFirstEnvOptionNamingTheConfiguredStrategy(t *testi
 	field, isSelect := fields[0].(domain.SelectField)
 	require.True(t, isSelect)
 	assert.Equal(t, []domain.Option{
-		{Value: "config", Label: "Use config default (example)", Short: "config default"},
-		{Value: "example", Label: "example — copy .env.example → .env"},
-		{Value: "main", Label: "main — copy .env from the main checkout"},
-		{Value: "parent", Label: "parent — copy .env from source worktree"},
+		{Value: "config", Label: "config default (example)", Short: "config default"},
+		{Value: "example", Label: "example — from .env.example"},
+		{Value: "main", Label: "main — the main checkout's .env"},
+		{Value: "parent", Label: "parent — the source worktree's .env"},
 	}, field.Options)
 }
 
@@ -175,8 +175,8 @@ func TestTheIsolationOptionsAreWordedForOneWorktreeOrSeveral(t *testing.T) {
 		many bool
 		want []string
 	}{
-		"one":     {false, []string{"isolated — its own ports, compose project and namespaces", "verbatim — keep the copied .env, one of the two runs at a time"}},
-		"several": {true, []string{"isolated — each its own ports, compose project and namespaces", "verbatim — keep the copied .env, one of them runs at a time"}},
+		"one":     {false, []string{"isolated — its own ports and namespaces", "verbatim — the copied .env as is, one runs at a time"}},
+		"several": {true, []string{"isolated — each its own ports and namespaces", "verbatim — the copied .env as is, one runs at a time"}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

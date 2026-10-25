@@ -7,14 +7,13 @@
   ✓ Branch name: feat/split
   ✓ Source branch: main
 
-  How the .env files of the new target are provisioned: config (config.toml's strategy), example
-  (from its template), main (copied from the main checkout) or parent (from the worktree of the
-  branch it starts from, --from); defaults to config.toml's strategy
+  Where the new target's .env files come from: config, example, main or parent; config.toml's
+  strategy by default
 
-▌› Use config default (example)
-   example — copy .env.example → .env
-   main — copy .env from the main checkout
-   parent — copy .env from source worktree
+▌› config default (example)
+   example — from .env.example
+   main — the main checkout's .env
+   parent — the source worktree's .env
 
    [ ] Always use this answer in this repo
 
