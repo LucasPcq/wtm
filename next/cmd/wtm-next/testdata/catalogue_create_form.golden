@@ -19,7 +19,8 @@
       "options": [],
       "rememberable": false,
       "remember": false,
-      "refreshable": true
+      "refreshable": true,
+      "closed": false
     },
     {
       "kind": "select",
@@ -49,7 +50,8 @@
       ],
       "rememberable": true,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": true
     },
     {
       "kind": "select",
@@ -70,7 +72,8 @@
       ],
       "rememberable": true,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": true
     },
     {
       "kind": "confirm",

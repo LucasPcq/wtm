@@ -120,9 +120,9 @@ func (r request) Answer(path string, values []string) (request, error) {
 func (r request) Values(path string) []string { return r[path] }
 
 // Skips rules the worktree out of a request that reads them all.
-func (r request) Skips(path string) string {
+func (r request) Skips(path string) domain.Skip {
 	if path == "worktree" && len(r["all"]) > 0 {
-		return "--all reads every worktree"
+		return domain.SkipAll
 	}
 	return ""
 }
@@ -209,7 +209,7 @@ type subjects struct{ req request }
 func (q subjects) Form() domain.Form {
 	field := domain.SelectField{FieldSpec: domain.FieldSpec{Path: "worktree", Flag: "<worktree>", Label: "Worktree", Help: "The worktree to read"}, Value: "main", Options: []domain.Option{{Value: "main"}, {Value: "feat/x", Label: "feat/x (detached)"}}}
 	if len(q.req["all"]) > 0 {
-		field.Skip = "--all reads every worktree"
+		field.Skip = domain.SkipAll
 	}
 	return domain.Form{Fields: []domain.Field{field, domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "all", Flag: "--all", Label: "All", Help: "Every worktree"}}}}
 }

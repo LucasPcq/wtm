@@ -13,6 +13,27 @@ const (
 	OriginDefault    Origin = "default"    // the question's default
 )
 
+// Origins are every Origin.
+var Origins = []Origin{OriginRequest, OriginRemembered, OriginConfig, OriginDefault}
+
+// Skip says why a question is not asked, as a code each surface words its own way; empty when it is asked.
+type Skip string
+
+// The reasons a question is not asked.
+const (
+	SkipFlagOnly        Skip = "flag_only"        // only its flag sets it: a form does not ask it
+	SkipExists          Skip = "exists"           // the target worktree exists: nothing is created
+	SkipNotBehind       Skip = "not_behind"       // the source is not behind origin: nothing to fast-forward
+	SkipHeld            Skip = "held"             // the source holds the changes being extracted: it is not fast-forwarded
+	SkipRunUnread       Skip = "run_unread"       // run.toml could not be read
+	SkipNothingIsolated Skip = "nothing_isolated" // run.toml declares nothing a worktree isolates
+	SkipNoConflict      Skip = "no_conflict"      // nothing conflicts with the target
+	SkipAll             Skip = "all"              // every worktree is read
+)
+
+// Skips are every Skip.
+var Skips = []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll}
+
 // Answer is the value a question settled on, and where that value came from.
 type Answer[T any] struct {
 	Value  T
@@ -31,14 +52,14 @@ type Option struct {
 type Choice[T ~string] struct {
 	Answer[T]
 	Options    []T
-	Skip       string
+	Skip       Skip
 	Remembered T
 }
 
 // Confirm is a yes-or-no question: its answer, the reason it is not asked (Skip, empty when it is), and the answer remembered for it (nil when none).
 type Confirm struct {
 	Answer[bool]
-	Skip       string
+	Skip       Skip
 	Remembered *bool
 }
 

@@ -174,7 +174,7 @@ func ifNotExists(given bool) domain.Confirm {
 		return domain.Confirm{Answer: domain.Answer[bool]{Value: true, Origin: domain.OriginRequest}}
 	}
 
-	return domain.Confirm{Answer: domain.Answer[bool]{Origin: domain.OriginDefault}, Skip: "set by its flag only"}
+	return domain.Confirm{Answer: domain.Answer[bool]{Origin: domain.OriginDefault}, Skip: domain.SkipFlagOnly}
 }
 
 // ----------------------------------------------------------------------------

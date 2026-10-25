@@ -16,7 +16,8 @@
       ],
       "rememberable": false,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": false
     },
     {
       "kind": "multi_select",
@@ -52,7 +53,8 @@
       ],
       "rememberable": false,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": false
     },
     {
       "kind": "text",
@@ -79,7 +81,8 @@
       "pinned": "main",
       "rememberable": false,
       "remember": false,
-      "refreshable": true
+      "refreshable": true,
+      "closed": false
     },
     {
       "kind": "select",
@@ -110,7 +113,8 @@
       ],
       "rememberable": true,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": true
     },
     {
       "kind": "select",
@@ -119,7 +123,7 @@
       "label": "Isolation",
       "help": "How it stands against its source: isolated or verbatim; run.toml's isolation by default",
       "origin": "default",
-      "skip": "run.toml declares nothing a worktree isolates",
+      "skip": "nothing_isolated",
       "value": "isolated",
       "options": [
         {
@@ -133,7 +137,8 @@
       ],
       "rememberable": true,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": true
     },
     {
       "kind": "confirm",
@@ -141,7 +146,7 @@
       "flag": "--ff",
       "label": "Source update",
       "help": "Fast-forward the source branch to origin first when it is behind",
-      "skip": "nothing to fast-forward: the source is not behind origin",
+      "skip": "not_behind",
       "value": false,
       "yes": {
         "value": "true",
@@ -186,7 +191,7 @@
       "label": "On conflict",
       "help": "On conflict: abort (default) or resolve (write conflict markers in the target)",
       "origin": "default",
-      "skip": "nothing conflicts with the target",
+      "skip": "no_conflict",
       "value": "abort",
       "options": [
         {
@@ -200,7 +205,8 @@
       ],
       "rememberable": false,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": true
     }
   ],
   "problems": []

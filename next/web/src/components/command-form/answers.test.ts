@@ -11,6 +11,7 @@ const from: DomainField = {
   value: 'main',
   options: [],
   refreshable: false,
+  closed: false,
   remember: false,
   rememberable: true,
 }

@@ -137,7 +137,7 @@ type From struct {
 	domain.Answer[string]
 	Options []domain.Option
 	Pinned  string
-	Skip    string
+	Skip    domain.Skip
 }
 
 // Conflicting is the question of what to do on conflict, with the conflicts the target would meet; it is skipped when there are none.
@@ -145,8 +145,6 @@ type Conflicting struct {
 	domain.Choice[OnConflict]
 	Conflicts []worktree.Conflict
 }
-
-const existingSkip = "the target worktree exists: nothing is created"
 
 // NewQuestions builds the questions for the request on the facts: a field given keeps its value, an empty one takes its remembered answer (unless the request asks again), its recorded or configured value or its default. Its conflict question has no conflicts yet: they are read once the request has no problem (UseCase.Questions).
 func NewQuestions(f Facts, req Request) Questions {
@@ -215,6 +213,7 @@ func (q Questions) Form() domain.Form {
 				{Value: string(OnConflictAbort), Label: "Abort — leave both worktrees untouched"},
 				{Value: string(OnConflictResolve), Label: "Resolve — write conflict markers in " + to},
 			},
+			Closed: true,
 		},
 	)
 
@@ -241,9 +240,9 @@ func (q Questions) fileOptions() []domain.Option {
 }
 
 // branchSkip skips the branch of the target while the target is a worktree that exists: the source, or another one.
-func (q Questions) branchSkip() string {
+func (q Questions) branchSkip() domain.Skip {
 	if to := q.To.Given; to != "" && !q.CreatesTarget(to) {
-		return existingSkip
+		return domain.SkipExists
 	}
 
 	return ""
@@ -331,7 +330,7 @@ func (f Facts) from(req Request) From {
 	question := From{Options: domain.SourceOptions(f.Repository, req.To), Pinned: cmp.Or(recorded, base)}
 	target, decided := f.planned(req)
 	if decided && !target.creates() {
-		question.Skip = existingSkip
+		question.Skip = domain.SkipExists
 	}
 
 	switch {
@@ -353,9 +352,9 @@ func (f Facts) newWorktree(req Request) provision.Questions {
 	behind := f.subjectAt(req, worktree.Behind)
 	switch {
 	case f.existing(req):
-		params.Exists = existingSkip
+		params.Exists = domain.SkipExists
 	case behind != "" && behind == req.Source:
-		params.Held = "nothing to fast-forward: " + behind + " holds the changes being extracted"
+		params.Held = domain.SkipHeld
 	case behind != "":
 		params.Behind = []string{behind}
 	}
@@ -372,7 +371,7 @@ func keep(given *bool) domain.Confirm {
 }
 
 func onConflict(given OnConflict) Conflicting {
-	question := Conflicting{Choice: domain.Choice[OnConflict]{Options: OnConflicts(), Skip: "nothing conflicts with the target"}}
+	question := Conflicting{Choice: domain.Choice[OnConflict]{Options: OnConflicts(), Skip: domain.SkipNoConflict}}
 	question.Answer = domain.Answer[OnConflict]{Value: OnConflictAbort, Origin: domain.OriginDefault}
 	if given != "" {
 		question.Answer = domain.Answer[OnConflict]{Value: given, Origin: domain.OriginRequest}

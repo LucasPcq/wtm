@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { Start } from '../hooks/use-create-run'
 import { Stepper, type StepState } from './stepper'
 import { stepsOf } from './steps'
+import { createWords, labelOf, skipWords } from './words'
 
 const remembered = (form: DomainForm) =>
   form.fields.filter((field) => 'remember' in field && field.remember).map((field) => field.path)
@@ -38,6 +39,11 @@ export function Wizard(props: {
   ]
 
   const step = steps[at]
+  // only a reason that tells the person something; one that holds on the command line alone is not said
+  const notAsked = (step?.skipped ?? []).flatMap((field) => {
+    const reason = field.skip && skipWords[field.skip]
+    return reason ? [{ path: field.path, reason }] : []
+  })
   // a step the core asks nothing of is passed over, as not asked
   const next = (from: number) => {
     const ahead = steps.findIndex((candidate, i) => i > from && candidate.asked.length > 0)
@@ -66,6 +72,7 @@ export function Wizard(props: {
           <CommandFields
             form={form}
             fields={step.asked}
+            words={createWords}
             problems={problems}
             remember={{
               paths: remember,
@@ -74,11 +81,11 @@ export function Wizard(props: {
             }}
           />
           {problems[''] && <p className="text-sm text-destructive">{problems['']}</p>}
-          {step.skipped.length > 0 && (
+          {notAsked.length > 0 && (
             <ul className="border-t pt-3 text-xs text-muted-foreground">
-              {step.skipped.map((field) => (
-                <li key={field.path}>
-                  Not asked: {field.label} — {field.skip}.
+              {notAsked.map(({ path, reason }) => (
+                <li key={path}>
+                  Not asked: {labelOf(path)}, {reason}.
                 </li>
               ))}
             </ul>

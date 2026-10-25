@@ -140,6 +140,7 @@ export function questionsOf(answers: DomainAnswered[] = []) {
         value: 'main',
         origin: 'config',
         refreshable: true,
+        closed: false,
         remember: false,
         rememberable: false,
         options: [
@@ -154,6 +155,7 @@ export function questionsOf(answers: DomainAnswered[] = []) {
         value: 'config',
         origin: 'default',
         refreshable: false,
+        closed: true,
         remember: false,
         rememberable: true,
         options: [
@@ -169,7 +171,7 @@ export function questionsOf(answers: DomainAnswered[] = []) {
         no_first: false,
         remember: false,
         rememberable: false,
-        skip: 'set by its flag only',
+        skip: 'flag_only',
         yes: { value: 'true', label: 'Yes' },
         no: { value: 'false', label: 'No' },
       }),

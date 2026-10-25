@@ -49,8 +49,10 @@ test('create shows a problem only once asked to go on, then confirms the plan, r
 
   await user.type(within(dialog).getByRole('textbox', { name: 'Branches' }), 'feat/new')
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
-  expect(await within(dialog).findByText('Env strategy')).toBeTruthy()
-  expect(within(dialog).getByText(/Not asked: If not exists — set by its flag only/)).toBeTruthy()
+  // the web's own words, not the command line's; a question only a flag sets is not said to be skipped
+  expect(await within(dialog).findByText('Env files')).toBeTruthy()
+  expect(within(dialog).getByText('Project default')).toBeTruthy()
+  expect(within(dialog).queryByText(/Not asked/)).toBeNull()
 
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Create worktree' }))

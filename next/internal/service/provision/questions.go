@@ -92,16 +92,15 @@ type Questions struct {
 type QuestionsParams struct {
 	Given      Given
 	Repository worktree.Repository
-	Exists     string
+	Exists     domain.Skip
 	Behind     []string
-	Held       string // why a branch behind origin is not fast-forwarded all the same, set by the command
+	Held       domain.Skip // why a branch behind origin is not fast-forwarded all the same, set by the command
 	Many       bool
 }
 
 const (
 	isolationHelp   = "How it stands against its source: isolated or verbatim; run.toml's isolation by default"
 	fastForwardHelp = "Fast-forward the source branch to origin first when it is behind"
-	notBehind       = "nothing to fast-forward: the source is not behind origin"
 )
 
 // NewQuestions builds the questions of a new worktree: a field given keeps its value, an empty one takes its remembered answer, its configured value or its default; none is answered by default when the worktree is not created.
@@ -150,9 +149,9 @@ func isolation(params QuestionsParams) domain.Choice[project.Isolation] {
 	case params.Exists != "":
 		question.Skip = params.Exists
 	case params.Repository.RunErr != nil:
-		question.Skip = "run.toml could not be read"
+		question.Skip = domain.SkipRunUnread
 	case !params.Repository.Run.IsolationApplies():
-		question.Skip = "run.toml declares nothing a worktree isolates"
+		question.Skip = domain.SkipNothingIsolated
 	}
 
 	switch {
@@ -183,7 +182,7 @@ func fastForward(params QuestionsParams) domain.Confirm {
 	remembered := params.Repository.Config.Remembered[project.RememberSourceUpdate]
 	question := domain.Confirm{Skip: cmp.Or(params.Exists, params.Held)}
 	if question.Skip == "" && len(params.Behind) == 0 {
-		question.Skip = notBehind
+		question.Skip = domain.SkipNotBehind
 	}
 	switch {
 	case params.Given.FastForward != nil:
@@ -222,6 +221,7 @@ func (q Questions) Fields(envHelp string) []domain.Field {
 			Remembered:   string(q.EnvFrom.Remembered),
 			Rememberable: true,
 			Remember:     q.Remembers(domain.PathEnvFrom),
+			Closed:       true,
 		},
 		domain.SelectField{
 			FieldSpec:    domain.FieldSpec{Path: domain.PathIsolation, Flag: "--isolation", Label: "Isolation", Help: isolationHelp, Origin: q.Isolation.Origin, Skip: q.Isolation.Skip},
@@ -230,6 +230,7 @@ func (q Questions) Fields(envHelp string) []domain.Field {
 			Remembered:   string(q.Isolation.Remembered),
 			Rememberable: true,
 			Remember:     q.Remembers(domain.PathIsolation),
+			Closed:       true,
 		},
 		domain.ConfirmField{
 			FieldSpec:    domain.FieldSpec{Path: domain.PathFastForward, Flag: "--ff", Label: "Source update", Help: fastForwardHelp, Origin: q.FastForward.Origin, Skip: q.FastForward.Skip},

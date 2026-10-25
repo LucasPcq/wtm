@@ -286,6 +286,8 @@ func generatedSchema(t *testing.T) []byte {
 	s.defs["domain.Event"] = map[string]any{"$ref": "events.v2.json#/$defs/event"}
 	s.defs["domain.Line"] = map[string]any{"$ref": "events.v2.json"}
 	s.defs["domain.Phase"] = map[string]any{"$ref": "events.v2.json#/$defs/phase"}
+	s.defs["domain.Skip"] = map[string]any{"description": "Why a field is not asked, as a code each surface words its own way.", "enum": domain.Skips}
+	s.defs["domain.Origin"] = map[string]any{"description": "Where a field's answer came from.", "enum": domain.Origins}
 	// the types the fragments name
 	for _, named := range []reflect.Type{reflect.TypeFor[domain.Warning](), reflect.TypeFor[domain.FollowUp]()} {
 		s.of(named)
@@ -422,8 +424,17 @@ func answerSchema(path string, values map[string]any) map[string]any {
 }
 
 func valuesSchema(field domain.Field) map[string]any {
-	switch field.(type) {
-	case domain.SelectField, domain.TextField:
+	switch field := field.(type) {
+	case domain.SelectField:
+		if field.Closed {
+			values := []string{""}
+			for _, option := range field.Options {
+				values = append(values, option.Value)
+			}
+			return oneValue(map[string]any{"description": "One of its options, or empty for its default.", "enum": values})
+		}
+		return oneValue(map[string]any{"type": "string"})
+	case domain.TextField:
 		return oneValue(map[string]any{"type": "string"})
 	case domain.ConfirmField:
 		return oneValue(map[string]any{"enum": []string{"true", "false"}})
@@ -449,6 +460,12 @@ func (s *schemaWriter) of(t reflect.Type) map[string]any {
 	}
 	if t == reflect.TypeFor[domain.Phase]() {
 		return ref("domain.Phase")
+	}
+	if t == reflect.TypeFor[domain.Skip]() {
+		return ref("domain.Skip")
+	}
+	if t == reflect.TypeFor[domain.Origin]() {
+		return ref("domain.Origin")
 	}
 	if t.Implements(marshaler) || reflect.PointerTo(t).Implements(marshaler) {
 		name := defName(t)

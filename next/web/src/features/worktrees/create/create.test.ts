@@ -1,10 +1,10 @@
 import { expect, test } from 'vitest'
 import type { OperationLine } from '@/api/queries/operations'
-import type { CreatePlan, DomainField, DomainForm } from '@/api/types.gen'
+import type { CreatePlan, DomainField, DomainForm, DomainSkip } from '@/api/types.gen'
 import { advance, current, doneOf, planned, seconds } from './progress'
 import { stepsOf } from './steps'
 
-const text = (path: string, skip?: string): DomainField => ({
+const text = (path: string, skip?: DomainSkip): DomainField => ({
   kind: 'text',
   path,
   flag: `--${path}`,
@@ -16,12 +16,7 @@ const text = (path: string, skip?: string): DomainField => ({
 
 test('each question goes in its step, a skipped one is listed apart, one the build does not know goes last', () => {
   const form: DomainForm = {
-    fields: [
-      text('branches'),
-      text('env_from', 'the branch exists'),
-      text('if_not_exists', 'set by its flag only'),
-      text('new_one'),
-    ],
+    fields: [text('branches'), text('env_from', 'exists'), text('if_not_exists', 'flag_only'), text('new_one')],
     problems: [],
   }
 

@@ -92,7 +92,7 @@ type FieldSpec struct {
 	Label  string `json:"label"`            // its name in a wizard's breadcrumb, trail and problems
 	Help   string `json:"help"`             // what its answer decides: a wizard's description and its flag's usage
 	Origin Origin `json:"origin,omitempty"` // where its answer came from, empty when the field does not say
-	Skip   string `json:"skip,omitempty"`   // why it is not asked, empty when it is
+	Skip   Skip   `json:"skip,omitempty"`   // why it is not asked, empty when it is
 }
 
 // Spec is the spec itself, so each kind of field has it by embedding.
@@ -100,7 +100,7 @@ func (s FieldSpec) Spec() FieldSpec {
 	return s
 }
 
-// SelectField asks one of its options; Pinned is the option listed first, Remembered the answer remembered for it, Remember whether this run's answer is to be, Refreshable whether its options are facts the user may read again while it is asked.
+// SelectField asks one of its options; Pinned is the option listed first, Remembered the answer remembered for it, Remember whether this run's answer is to be, Refreshable whether its options are facts the user may read again while it is asked, Closed whether its options are every value it accepts, the same in every repository, so a surface may word each one its own way.
 type SelectField struct {
 	FieldSpec
 	Value        string   `json:"value"`
@@ -110,6 +110,7 @@ type SelectField struct {
 	Rememberable bool     `json:"rememberable"`
 	Remember     bool     `json:"remember"`
 	Refreshable  bool     `json:"refreshable"`
+	Closed       bool     `json:"closed"`
 }
 
 // MultiSelectField asks any of its options; Empty is the problem of answering none.

@@ -10,7 +10,8 @@
       "options": [],
       "rememberable": false,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": false
     },
     {
       "kind": "multi_select",
@@ -38,7 +39,8 @@
       ],
       "rememberable": false,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": false
     },
     {
       "kind": "text",
@@ -58,7 +60,8 @@
       "options": [],
       "rememberable": false,
       "remember": false,
-      "refreshable": true
+      "refreshable": true,
+      "closed": false
     },
     {
       "kind": "select",
@@ -88,7 +91,8 @@
       ],
       "rememberable": true,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": true
     },
     {
       "kind": "select",
@@ -109,7 +113,8 @@
       ],
       "rememberable": true,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": true
     },
     {
       "kind": "confirm",
@@ -172,7 +177,8 @@
       ],
       "rememberable": false,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": true
     }
   ],
   "problems": []

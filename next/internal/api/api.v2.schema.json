@@ -225,7 +225,14 @@
               },
               "values": {
                 "items": {
-                  "type": "string"
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "config",
+                    "example",
+                    "main",
+                    "parent"
+                  ]
                 },
                 "maxItems": 1,
                 "minItems": 1,
@@ -246,7 +253,12 @@
               },
               "values": {
                 "items": {
-                  "type": "string"
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "isolated",
+                    "verbatim"
+                  ]
                 },
                 "maxItems": 1,
                 "minItems": 1,
@@ -401,7 +413,7 @@
           "type": "boolean"
         },
         "origin": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Origin"
         },
         "path": {
           "type": "string"
@@ -416,7 +428,7 @@
           "type": "boolean"
         },
         "skip": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Skip"
         },
         "value": {
           "type": "boolean"
@@ -770,7 +782,7 @@
           "type": "array"
         },
         "origin": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Origin"
         },
         "path": {
           "type": "string"
@@ -782,7 +794,7 @@
           "type": "array"
         },
         "skip": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Skip"
         }
       },
       "required": [
@@ -817,6 +829,15 @@
         "label"
       ],
       "type": "object"
+    },
+    "domain.Origin": {
+      "description": "Where a field's answer came from.",
+      "enum": [
+        "request",
+        "remembered",
+        "config",
+        "default"
+      ]
     },
     "domain.Phase": {
       "$ref": "events.v2.json#/$defs/phase"
@@ -885,6 +906,9 @@
     "domain.SelectField": {
       "additionalProperties": false,
       "properties": {
+        "closed": {
+          "type": "boolean"
+        },
         "flag": {
           "type": "string"
         },
@@ -904,7 +928,7 @@
           "type": "array"
         },
         "origin": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Origin"
         },
         "path": {
           "type": "string"
@@ -925,7 +949,7 @@
           "type": "string"
         },
         "skip": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Skip"
         },
         "value": {
           "type": "string"
@@ -941,9 +965,23 @@
         "options",
         "rememberable",
         "remember",
-        "refreshable"
+        "refreshable",
+        "closed"
       ],
       "type": "object"
+    },
+    "domain.Skip": {
+      "description": "Why a field is not asked, as a code each surface words its own way.",
+      "enum": [
+        "flag_only",
+        "exists",
+        "not_behind",
+        "held",
+        "run_unread",
+        "nothing_isolated",
+        "no_conflict",
+        "all"
+      ]
     },
     "domain.TextField": {
       "additionalProperties": false,
@@ -961,13 +999,13 @@
           "type": "string"
         },
         "origin": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Origin"
         },
         "path": {
           "type": "string"
         },
         "skip": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Skip"
         },
         "value": {
           "type": "string"
@@ -1011,13 +1049,13 @@
           "type": "array"
         },
         "origin": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Origin"
         },
         "path": {
           "type": "string"
         },
         "skip": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Skip"
         }
       },
       "required": [
@@ -1619,7 +1657,14 @@
               },
               "values": {
                 "items": {
-                  "type": "string"
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "config",
+                    "example",
+                    "main",
+                    "parent"
+                  ]
                 },
                 "maxItems": 1,
                 "minItems": 1,
@@ -1640,7 +1685,12 @@
               },
               "values": {
                 "items": {
-                  "type": "string"
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "isolated",
+                    "verbatim"
+                  ]
                 },
                 "maxItems": 1,
                 "minItems": 1,
@@ -1709,7 +1759,12 @@
               },
               "values": {
                 "items": {
-                  "type": "string"
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "abort",
+                    "resolve"
+                  ]
                 },
                 "maxItems": 1,
                 "minItems": 1,

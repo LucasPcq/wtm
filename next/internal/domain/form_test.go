@@ -103,7 +103,7 @@ func TestAFormIsEncodedWithTheKindOfEachField(t *testing.T) {
 		"fields": [
 			{"kind": "text_list", "path": "branches", "flag": "<branches>", "label": "Branches", "help": "", "entries": ["feat/x"], "options": []},
 			{"kind": "confirm", "path": "keep", "flag": "--keep", "label": "Keep", "help": "", "skip": "not asked", "value": false, "yes": {"value": "true", "label": "Copy", "short": "copy"}, "no": {"value": "false", "label": "Move"}, "no_first": true, "rememberable": false, "remember": false},
-			{"kind": "select", "path": "isolation", "flag": "--isolation", "label": "Isolation", "help": "", "origin": "remembered", "value": "shared", "options": [{"value": "shared", "label": "Shared", "badge": "remembered"}], "remembered": "shared", "rememberable": true, "remember": false, "refreshable": true},
+			{"kind": "select", "path": "isolation", "flag": "--isolation", "label": "Isolation", "help": "", "origin": "remembered", "value": "shared", "options": [{"value": "shared", "label": "Shared", "badge": "remembered"}], "remembered": "shared", "rememberable": true, "remember": false, "refreshable": true, "closed": false},
 			{"kind": "multi_select", "path": "files", "flag": "--files", "label": "Files", "help": "", "picked": [], "options": [], "empty": "Pick one"},
 			{"kind": "text", "path": "to", "flag": "--to", "label": "Target", "help": "Target branch", "value": "feat/y"}
 		],
