@@ -42,11 +42,9 @@ type projectFile struct {
 	} `toml:"wizard"`
 }
 
-// savedProject is config.toml as written on disk, before defaults: the config a
-// use case reads and the on_clean hooks, which only a rewrite of the file needs.
+// savedProject is config.toml as written on disk, before defaults.
 type savedProject struct {
-	Config  project.Config
-	OnClean []project.Hook
+	Config project.Config
 }
 
 // Project reads and writes the config of the project whose state lives in
@@ -121,9 +119,9 @@ func parseProject(path string, data []byte) (savedProject, error) {
 			Worktrees:  project.Worktrees{BasePath: file.Worktrees.BasePath, BaseBranch: file.Worktrees.BaseBranch},
 			Env:        project.Env{Strategy: project.EnvStrategy(file.Env.Strategy), Files: files},
 			OnCreate:   onCreate,
+			OnClean:    onClean,
 			Remembered: file.Wizard.Remembered,
 		},
-		OnClean: onClean,
 	}, nil
 }
 

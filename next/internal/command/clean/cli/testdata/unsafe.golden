@@ -1,0 +1,5 @@
+
+  ✗ nothing removed: 1 worktree(s) can't be removed safely
+    feat/dirty has uncommitted changes
+  → wtm-next clean feat/plain feat/dirty --force   remove anyway
+

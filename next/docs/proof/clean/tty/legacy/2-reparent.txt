@@ -1,0 +1,15 @@
+$ wtm clean; echo EXIT=$?
+
+  Step 2/4 • Reparent children
+
+  ✓ Worktrees: feat/tty-dirty, feat/tty-parent
+
+  These children would otherwise be left orphaned:
+    • feat/tty-child will rebase onto main instead of feat/tty-parent
+
+▌▸ Reparent onto main (1)
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   Leave orphaned
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

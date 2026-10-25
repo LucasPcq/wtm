@@ -180,6 +180,25 @@ func (f *Fake) Update(_ context.Context, update worktree.MetaUpdate) (domain.Wri
 	return domain.Written{Changed: true}, nil
 }
 
+// Delete removes the record of branch, readable or not, as store.Meta.Delete
+// does: an error for a branch that maps onto no directory, nothing to do for
+// one with no record.
+func (f *Fake) Delete(branch string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("Delete", branch); err != nil {
+		return err
+	}
+
+	if err := segmentOf(branch); err != nil {
+		return err
+	}
+
+	delete(f.meta, branch)
+	delete(f.unreadable, branch)
+	return nil
+}
+
 // segmentOf returns an error for a branch name that store.Meta maps onto no
 // directory.
 func segmentOf(branch string) error {

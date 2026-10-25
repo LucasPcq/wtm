@@ -80,8 +80,8 @@ func TestEveryGoFollowUpIsARequestResolveTakes(t *testing.T) {
 	}
 }
 
-func TestAnUndoLeftBehindIsRemovedByTheLegacyClean(t *testing.T) {
-	assert.Equal(t, []string{"wtm", "clean", "feat/x", "--force"}, commandLine(wire(wireParams{}).Create.Provision.LeftBehind("feat/x")))
+func TestAnUndoLeftBehindIsRemovedByCleanForced(t *testing.T) {
+	assert.Equal(t, []string{"wtm-next", "clean", "feat/x", "--force"}, commandLine(wire(wireParams{}).Create.Provision.LeftBehind("feat/x")))
 }
 
 func TestPortsLeftUnsettledAreSettledByTheLegacyEnv(t *testing.T) {
@@ -156,16 +156,16 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"run_up":      {followUp: actions[2], argv: []string{"wtm", "run", "up", "feat/a"}},
 		"run_down":    {followUp: actions[3], argv: []string{"wtm", "run", "down", "feat/a"}},
 		"logs":        {followUp: actions[4], argv: []string{"wtm", "run", "logs", "feat/a"}},
-		"clean":       {followUp: actions[5], argv: []string{"wtm", "clean", "feat/a"}},
+		"clean":       {followUp: actions[5], argv: []string{"wtm-next", "clean", "feat/a"}},
 		"go_detached": {followUp: list.Actions(list.Detail{Path: "/repo/.trees/detached"})[0], argv: []string{"cd", "/repo/.trees/detached"}},
 		"enter":       {followUp: domain.Enter("feat/notes"), argv: []string{"wtm", "go", "feat/notes"}},
-		"left_behind": {followUp: leftBehind("feat/x"), argv: []string{"wtm", "clean", "feat/x", "--force"}},
+		"left_behind": {followUp: leftBehind("feat/x"), argv: []string{"wtm-next", "clean", "feat/x", "--force"}},
 		"init":        {followUp: *initialize(), argv: []string{"wtm", "init"}},
 		"settle":      {followUp: settle("feat/x"), argv: []string{"wtm", "env", "feat/x"}},
 		"proxy":       {followUp: proxyStatus(), argv: []string{"wtm", "run", "proxy", "status"}},
-		"dry_run":     {followUp: dryRun, argv: []string{"wtm", "clean", "feat/x", "--force", "--dry-run"}},
+		"dry_run":     {followUp: dryRun, argv: []string{"wtm-next", "clean", "feat/x", "--force", "--dry-run"}},
 		"pr_url_only": {followUp: domain.FollowUp{URL: pr.URL}, argv: []string{"gh", "pr", "view", pr.URL, "--web"}},
-		"merged":      {followUp: *fixes[0].Fix, argv: []string{"wtm", "clean", "feat/a"}},
+		"merged":      {followUp: *fixes[0].Fix, argv: []string{"wtm-next", "clean", "feat/a"}},
 		"env":         {followUp: *fixes[1].Fix, argv: []string{"wtm", "env", "feat/a"}},
 		"env_example": {followUp: *fixes[2].Fix, argv: []string{"wtm", "env", "feat/a", "--from", "example"}},
 		"env_main":    {followUp: *fixes[3].Fix, argv: []string{"wtm", "env", "feat/a", "--from", "main"}},
@@ -174,16 +174,19 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"run_start":   {followUp: *fixes[6].Fix, argv: []string{"wtm", "run", "start", "feat/a", "--job", "api", "--detach"}},
 		"shared":      {followUp: *fixes[7].Fix, argv: []string{"wtm", "run", "start", "main", "--job", "db", "--detach"}},
 		"tree_go":     {followUp: tree.Actions(tree.Detail{Branch: "feat/a", Rebasing: true}, false)[0], argv: []string{"wtm", "go", "feat/a"}},
-		"tree_clean":  {followUp: tree.Actions(tree.Detail{Branch: "feat/a"}, true)[0], argv: []string{"wtm", "clean", "feat/a"}},
+		"tree_clean":  {followUp: tree.Actions(tree.Detail{Branch: "feat/a"}, true)[0], argv: []string{"wtm-next", "clean", "feat/a"}},
 		"tree_sync":   {followUp: tree.Actions(tree.Detail{Branch: "feat/a", NeedsSync: true}, false)[0], argv: []string{"wtm", "sync", "feat/a"}},
 		"behind":      {followUp: *status.Problems(status.ProblemsParams{Branch: "feat/a", Parent: "feat/b", Lacks: 1})[0].Fix, argv: []string{"wtm", "sync", "feat/a"}},
 		"reparent":    {followUp: domain.FollowUp{Command: "reparent", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "to", Values: []string{"feat/b"}}}}, argv: []string{"wtm", "reparent", "feat/a", "--to", "feat/b"}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			argv, unspelled := spelled(c.followUp)
+			_, unspelled := spelled(c.followUp)
+			if _, ok := migrated[c.followUp.Command]; ok {
+				unspelled = nil
+			}
 
-			assert.Equal(t, c.argv, argv)
+			assert.Equal(t, c.argv, commandLine(c.followUp))
 			assert.Empty(t, unspelled)
 		})
 	}

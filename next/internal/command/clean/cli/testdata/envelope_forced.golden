@@ -1,0 +1,48 @@
+{
+  "v": 2,
+  "command": "clean",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/dirty",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-dirty"
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/dirty",
+        "branch": "feat/dirty",
+        "path": "/repo/wt-feat-dirty",
+        "blockers": [
+          "dirty"
+        ]
+      }
+    ],
+    "reparent_children": false,
+    "force": true,
+    "recap": [
+      {
+        "key": "remove",
+        "label": "Remove",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/dirty",
+            "note": "forced",
+            "params": {
+              "blockers": "dirty"
+            },
+            "text": "feat/dirty (dirty, forced)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

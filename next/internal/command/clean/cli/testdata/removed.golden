@@ -1,0 +1,10 @@
+
+  ✓ clean: 2 done
+
+  Remove    feat/plain, feat/parent
+  Children  feat/child (left on feat/parent)
+
+  ! feat/child still points at the removed parent feat/parent
+
+  → wtm reparent feat/child --to main   move it onto main
+

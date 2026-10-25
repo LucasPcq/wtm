@@ -1,0 +1,7 @@
+
+  ✗ clean: 1 failed
+
+  Remove  feat/bad
+
+  ✗ feat/bad  on_clean hook failed: hook failed: exit status 3
+

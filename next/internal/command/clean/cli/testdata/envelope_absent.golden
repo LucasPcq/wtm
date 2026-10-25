@@ -1,0 +1,38 @@
+{
+  "v": 2,
+  "command": "clean",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/nope",
+      "status": "done",
+      "reason": "unchanged",
+      "detail": {}
+    }
+  ],
+  "plan": {
+    "worktrees": [],
+    "absent": [
+      "feat/nope"
+    ],
+    "reparent_children": false,
+    "force": false,
+    "recap": [
+      {
+        "key": "absent",
+        "label": "Already absent",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/nope",
+            "note": "absent",
+            "text": "feat/nope (no worktree: nothing to remove)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

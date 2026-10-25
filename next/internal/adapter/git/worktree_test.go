@@ -3,6 +3,7 @@ package git_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
@@ -350,6 +351,18 @@ func TestTheFakeAndGitUndoAnAddOnANewBranchToWhereTheyStarted(t *testing.T) {
 			assert.Equal(t, append(before.Worktrees, worktree.Worktree{Path: impl.at("topic"), State: worktree.OnBranch{Branch: "topic"}}), added.Worktrees)
 			assert.Contains(t, gittest.Names(added.Branches.Local), "topic")
 			assert.Equal(t, before, gittest.StateOf(t, impl.port))
+		})
+	}
+}
+
+func TestTheFakeAndGitRemoveALockedWorktree(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			require.NoError(t, impl.port.RemoveWorktree(t.Context(), impl.at("locked")))
+
+			worktrees, err := impl.port.Worktrees(t.Context())
+			require.NoError(t, err)
+			assert.False(t, slices.ContainsFunc(worktrees, func(w worktree.Worktree) bool { return w.Path == impl.at("locked") }))
 		})
 	}
 }

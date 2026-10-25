@@ -115,3 +115,16 @@ func TestAFakeNumbersUnderItsLockAndCanFailToTakeIt(t *testing.T) {
 	assert.Equal(t, []string{"LockOrdinals ", "Update feat/a"}, fake.Calls())
 	require.ErrorIs(t, failed, refused)
 }
+
+func TestAFakeDeletesARecordReadableOrNot(t *testing.T) {
+	fake := NewFake(FakeParams{Meta: map[string]worktree.Meta{"feat/a": {SourceBranch: "main"}, "main": {}}, Unreadable: []string{"feat/b"}})
+
+	require.NoError(t, fake.Delete("feat/a"))
+	require.NoError(t, fake.Delete("feat/b"))
+	require.NoError(t, fake.Delete("feat/never"))
+
+	listed, err := fake.List()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"main"}, listed)
+	assert.Error(t, fake.Delete(".."))
+}

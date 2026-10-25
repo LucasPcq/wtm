@@ -1,0 +1,8 @@
+
+  Hooks · On Clean
+
+  → case feat/dirty in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/dirty;; esac
+
+tearing down feat/dirty
+
+  ✓ case feat/dirty in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/dirty;; esac (<DUR>)

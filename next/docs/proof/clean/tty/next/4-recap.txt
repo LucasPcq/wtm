@@ -1,0 +1,19 @@
+$ wtm clean; echo EXIT=$?
+
+  Step 4/4 • Confirm
+
+  ✓ Worktrees: feat/tty-dirty, feat/tty-parent
+  ✓ Reparent children: reparent
+  ✓ Force: forced
+
+  ┃  Review & confirm
+  ┃
+  ┃  Remove    feat/tty-dirty (dirty, forced), feat/tty-parent
+  ┃  Children  feat/tty-child → main
+
+▌› Yes, remove 2 worktrees
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

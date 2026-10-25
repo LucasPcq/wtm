@@ -1,0 +1,6 @@
+
+  clean · dry run, nothing applied
+  Remove  feat/dry
+  fingerprint  <FP>
+  → wtm clean feat/dry --expect-fingerprint <FP>   apply this plan
+

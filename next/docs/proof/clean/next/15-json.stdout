@@ -1,0 +1,42 @@
+{
+  "v": 2,
+  "command": "clean",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/json",
+      "status": "done",
+      "detail": {
+        "path": "<SB>/acme.trees/feat-json"
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/json",
+        "branch": "feat/json",
+        "path": "<SB>/acme.trees/feat-json",
+        "blockers": []
+      }
+    ],
+    "reparent_children": false,
+    "force": false,
+    "recap": [
+      {
+        "key": "remove",
+        "label": "Remove",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/json",
+            "text": "feat/json"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

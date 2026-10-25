@@ -1,0 +1,34 @@
+{
+  "v": 2,
+  "command": "clean",
+  "ok": true,
+  "op": "<OP>",
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/fp",
+        "branch": "feat/fp",
+        "path": "<SB>/acme.trees/feat-fp",
+        "blockers": []
+      }
+    ],
+    "reparent_children": false,
+    "force": false,
+    "recap": [
+      {
+        "key": "remove",
+        "label": "Remove",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/fp",
+            "text": "feat/fp"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<FP>",
+  "follow_ups": [],
+  "warnings": []
+}

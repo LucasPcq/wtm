@@ -1,0 +1,47 @@
+{
+  "v": 2,
+  "command": "clean",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/plain",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-plain"
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/plain",
+        "branch": "feat/plain",
+        "path": "/repo/wt-feat-plain",
+        "blockers": []
+      }
+    ],
+    "reparent_children": false,
+    "force": false,
+    "recap": [
+      {
+        "key": "remove",
+        "label": "Remove",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/plain",
+            "text": "feat/plain"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": [
+    {
+      "code": "clean.jobs_unknown",
+      "message": "the run daemon is not running: which jobs are up is unknown — a job may still run in a worktree removed"
+    }
+  ]
+}

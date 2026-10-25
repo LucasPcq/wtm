@@ -1,0 +1,42 @@
+{
+  "v": 2,
+  "command": "clean",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/jsonny",
+      "status": "done",
+      "detail": {
+        "path": "<SB>/acme.trees/feat-jsonny"
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/jsonny",
+        "branch": "feat/jsonny",
+        "path": "<SB>/acme.trees/feat-jsonny",
+        "blockers": []
+      }
+    ],
+    "reparent_children": false,
+    "force": false,
+    "recap": [
+      {
+        "key": "remove",
+        "label": "Remove",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/jsonny",
+            "text": "feat/jsonny"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

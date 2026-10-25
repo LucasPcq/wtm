@@ -159,6 +159,21 @@ func TestTheFakeAndGitListTheLastCommitsOfAWorktreeNewestFirst(t *testing.T) {
 	}
 }
 
+func TestTheFakeAndGitCountWhatDeletingABranchWouldLose(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			lost := map[string]int{}
+			for _, name := range []string{"main", "feature", "unmerged", "linked", "diverged"} {
+				count, err := impl.port.Unpushed(t.Context(), name)
+				require.NoError(t, err, name)
+				lost[name] = count
+			}
+
+			assert.Equal(t, map[string]int{"main": 0, "feature": 0, "unmerged": 1, "linked": 1, "diverged": 1}, lost)
+		})
+	}
+}
+
 func TestTheFakeAndGitRefuseTheSameBranchChanges(t *testing.T) {
 	refusals := []struct {
 		name string
@@ -172,6 +187,10 @@ func TestTheFakeAndGitRefuseTheSameBranchChanges(t *testing.T) {
 		}},
 		{name: "delete_missing_branch", call: func(t *testing.T, impl implementation) error {
 			return impl.port.DeleteBranch(t.Context(), "nope")
+		}},
+		{name: "count_unpushed_of_missing_branch", call: func(t *testing.T, impl implementation) error {
+			_, err := impl.port.Unpushed(t.Context(), "remote-only")
+			return err
 		}},
 		{name: "count_unknown_ref", call: func(t *testing.T, impl implementation) error {
 			_, err := impl.port.AheadBehind(t.Context(), "unmerged")

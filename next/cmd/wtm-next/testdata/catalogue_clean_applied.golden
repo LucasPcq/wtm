@@ -1,0 +1,42 @@
+{
+  "v": 2,
+  "command": "clean",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "feat/old",
+      "status": "done",
+      "detail": {
+        "path": "<root>/.trees/feat-old"
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/old",
+        "branch": "feat/old",
+        "path": "<root>/.trees/feat-old",
+        "blockers": []
+      }
+    ],
+    "reparent_children": false,
+    "force": false,
+    "recap": [
+      {
+        "key": "remove",
+        "label": "Remove",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/old",
+            "text": "feat/old"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

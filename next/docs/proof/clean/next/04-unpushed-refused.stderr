@@ -1,0 +1,5 @@
+
+  ✗ nothing removed: 1 worktree(s) can't be removed safely
+    feat/unpushed has 1 commit(s) no other branch nor remote holds
+  → wtm clean feat/unpushed --force   remove anyway
+

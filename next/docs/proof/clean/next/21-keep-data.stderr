@@ -1,0 +1,4 @@
+
+  ✗ the request is invalid: unknown flag: --keep-data
+  → wtm clean --help
+

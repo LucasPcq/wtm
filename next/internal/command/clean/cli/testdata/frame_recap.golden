@@ -1,0 +1,17 @@
+
+  Step 4/4 • Confirm
+
+  ✓ Worktrees: feat/dirty, feat/parent
+  ✓ Reparent children: leave orphaned
+  ✓ Force: forced
+
+  ┃  Review & confirm
+  ┃
+  ┃  Remove    feat/dirty (dirty, forced), feat/parent
+  ┃  Children  feat/child (left on feat/parent)
+
+▌› Yes, remove 2 worktrees
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back

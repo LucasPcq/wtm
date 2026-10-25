@@ -1,0 +1,10 @@
+$ wtm clean; echo EXIT=$?
+
+┃  ✓ clean: 2 done
+┃
+┃  Remove    feat/tty-dirty (dirty, forced), feat/tty-parent
+┃  Children  feat/tty-child → main
+
+EXIT=0
+$
+

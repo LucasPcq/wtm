@@ -1,0 +1,13 @@
+$ wtm clean; echo EXIT=$?
+
+┃  › feat/tty-dirty (1/2)
+┃
+┃  › feat/tty-parent (2/2)
+
+┃  ✓ 2 removed · 1 reparented
+┃    feat/tty-dirty, feat/tty-parent
+┃    feat/tty-child → main
+
+EXIT=0
+$
+

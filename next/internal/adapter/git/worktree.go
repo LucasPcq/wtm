@@ -173,9 +173,9 @@ func (r Repo) add(ctx context.Context, addition worktree.Addition) error {
 	return errNoCheckout
 }
 
-// RemoveWorktree removes the worktree at path, its changes included.
+// RemoveWorktree removes the worktree at path, its changes included, locked or not.
 func (r Repo) RemoveWorktree(ctx context.Context, path string) error {
-	_, err := r.git(ctx, "worktree", "remove", "--force", "--", path)
+	_, err := r.git(ctx, "worktree", "remove", "--force", "--force", "--", path)
 	return err
 }
 

@@ -1,0 +1,5 @@
+
+  ✗ nothing removed: 1 worktree(s) can't be removed safely
+    feat/locked is locked
+  → wtm clean feat/locked --force   remove anyway
+

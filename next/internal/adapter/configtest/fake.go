@@ -56,6 +56,7 @@ func NewFake(params FakeParams) *Fake {
 func copied(config project.Config) project.Config {
 	config.Env.Files = slices.Clone(config.Env.Files)
 	config.OnCreate = slices.Clone(config.OnCreate)
+	config.OnClean = slices.Clone(config.OnClean)
 	config.Remembered = maps.Clone(config.Remembered)
 	return config
 }

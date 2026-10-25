@@ -1,0 +1,12 @@
+$ wtm clean; echo EXIT=$?
+
+  Step 1/4 • Worktrees
+
+  The worktrees to remove, by branch, or by path on no branch
+
+▌› [ ] feat/tty-child
+   [ ] feat/tty-dirty
+   [ ] feat/tty-parent
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel
+

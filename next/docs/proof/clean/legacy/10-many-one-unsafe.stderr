@@ -1,0 +1,5 @@
+
+  ✗ 1 worktree(s) cannot be removed safely, so nothing was removed:
+      feat/c has uncommitted changes
+    pass --force to remove them anyway
+

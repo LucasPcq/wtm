@@ -358,25 +358,30 @@ func (c *Command[R, Q, O]) replanned(failure *domain.Error, req R) *domain.Error
 	return &followed
 }
 
-// spell is the command line of a follow-up: the injected one, which spells the commands not migrated, unless the follow-up names this command, whose request it folds and spells from the schema (Argv), with --dry-run when it asks for one; none when its request refuses the answers, never the injected line.
+// spell is the command line of a follow-up: the injected one, unless the follow-up names this command, which [Command.Spell] spells, never the injected line.
 func (c *Command[R, Q, O]) spell(cmd *cobra.Command, injected output.CommandLine) output.CommandLine {
 	return func(followUp domain.FollowUp) []string {
 		if followUp.Command == "" || followUp.Command != c.io.Command {
 			return injected(followUp)
 		}
 
-		var zero R
-		req, err := domain.Fold(zero, followUp.Answers)
-		if err != nil {
-			return nil
-		}
-
-		argv := c.Argv(cmd.CommandPath(), req)
-		if followUp.DryRun {
-			argv = append(argv, "--"+uicli.FlagDryRun)
-		}
-		return argv
+		return c.Spell(cmd.CommandPath(), followUp)
 	}
+}
+
+// Spell spells followUp, which names this command, as command (its path on the command line) runs it: its request folded and spelled from the schema (Argv), with --dry-run when it asks for one; none when its request refuses the answers.
+func (c *Command[R, Q, O]) Spell(command string, followUp domain.FollowUp) []string {
+	var zero R
+	req, err := domain.Fold(zero, followUp.Answers)
+	if err != nil {
+		return nil
+	}
+
+	argv := c.Argv(command, req)
+	if followUp.DryRun {
+		argv = append(argv, "--"+uicli.FlagDryRun)
+	}
+	return argv
 }
 
 // applyLine is argv, the command line of the request, held to the fingerprint of the plan it previewed.

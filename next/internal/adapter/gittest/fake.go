@@ -402,7 +402,7 @@ func (f *Fake) add(addition worktree.Addition) error {
 	return errors.New("gittest: no checkout given")
 }
 
-// RemoveWorktree forgets the linked worktree at path, dirty or gone; it fails
+// RemoveWorktree forgets the linked worktree at path, dirty, gone or locked; it fails
 // for the main worktree or a path that is none.
 func (f *Fake) RemoveWorktree(_ context.Context, path string) error {
 	f.mu.Lock()
@@ -424,6 +424,44 @@ func (f *Fake) RemoveWorktree(_ context.Context, path string) error {
 	f.dirty = slices.DeleteFunc(f.dirty, func(dirty string) bool { return dirty == resolved })
 	f.gone = slices.DeleteFunc(f.gone, func(gone string) bool { return gone == resolved })
 	return nil
+}
+
+// Unpushed counts the commits of the local branch name that no other local
+// branch nor any fetched remote branch holds; it fails when the branch is
+// missing.
+func (f *Fake) Unpushed(_ context.Context, name string) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("Unpushed", name); err != nil {
+		return 0, err
+	}
+
+	of, ok := f.local[name]
+	if !ok {
+		return 0, fmt.Errorf("gittest: no branch %s", name)
+	}
+
+	held := map[string]bool{}
+	for other, commits := range f.local {
+		if other != name {
+			for _, commit := range commits {
+				held[commit] = true
+			}
+		}
+	}
+	for _, commits := range f.remote {
+		for _, commit := range commits {
+			held[commit] = true
+		}
+	}
+
+	count := 0
+	for _, commit := range of {
+		if !held[commit] {
+			count++
+		}
+	}
+	return count, nil
 }
 
 // DeleteBranch deletes the local branch name; it fails when the branch is

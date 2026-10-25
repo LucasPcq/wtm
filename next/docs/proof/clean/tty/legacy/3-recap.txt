@@ -1,0 +1,25 @@
+$ wtm clean; echo EXIT=$?
+
+  Step 4/4 • Proceed with deletion?
+
+  ✓ Worktrees: feat/tty-dirty, feat/tty-parent
+  ✓ Reparent children: reparent
+
+  ┃  Review & confirm
+  ┃
+  ┃  feat/tty-dirty — Worktree has uncommitted changes
+  ┃
+  ┃  Will delete 2 worktrees and their branches:
+  ┃    feat/tty-dirty  <SB>/acme.trees/feat-tty-dirty
+  ┃    feat/tty-parent  <SB>/acme.trees/feat-tty-parent
+  ┃
+  ┃  Then reparent 1 child worktree(s) onto main.
+
+▌▸ Yes, delete the 1 safe one(s), keep the others
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   Yes, force delete all (bypass all checks)
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

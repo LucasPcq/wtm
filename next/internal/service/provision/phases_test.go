@@ -320,7 +320,7 @@ func TestOnCreateRunsInTheNewWorktreeAndKeepsItsLog(t *testing.T) {
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{w.path(branchName), "from main on feat/x"}, report.lines())
-	assert.Equal(t, env.HookLogPath(env.HookLogPathParams{StateDir: w.stateDir, Branch: branchName}), report.logOf("on_create"))
+	assert.Equal(t, env.HookLogPath(env.HookLogPathParams{StateDir: w.stateDir, Branch: branchName, Hooks: env.OnCreateHooks}), report.logOf("on_create"))
 	assert.Contains(t, report.All(), domain.Output{Subject: branchName, Line: "from main on feat/x"})
 }
 

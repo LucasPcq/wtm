@@ -36,11 +36,13 @@ const (
 	SkipNothingIsolated Skip = "nothing_isolated" // run.toml declares nothing a worktree isolates
 	SkipNoConflict      Skip = "no_conflict"      // nothing conflicts with the target
 	SkipAll             Skip = "all"              // every worktree is read
+	SkipNoOrphan        Skip = "no_orphan"        // no worktree removed leaves a child behind
+	SkipSafe            Skip = "safe"             // every worktree removed is safe to remove: nothing to force
 )
 
 // Skips returns every Skip.
 func Skips() []Skip {
-	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll}
+	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe}
 }
 
 // Answer is the value a question settled on, and where that value came from.

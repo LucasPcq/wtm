@@ -5,11 +5,262 @@
       "enum": [
         "create",
         "extract",
+        "clean",
         "list",
         "resolve",
         "status",
         "tree"
       ]
+    },
+    "clean.Blocker": {
+      "description": "What makes a worktree unsafe to remove, a safety refusal only force lifts, as a code each surface words its own way.",
+      "enum": [
+        "locked",
+        "dirty",
+        "unpushed",
+        "open_pull_request",
+        "jobs_running"
+      ]
+    },
+    "clean.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "clean.Move": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "clean.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "absent": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "force": {
+          "type": "boolean"
+        },
+        "moves": {
+          "items": {
+            "$ref": "#/$defs/clean.Move"
+          },
+          "type": "array"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "reparent_children": {
+          "type": "boolean"
+        },
+        "worktrees": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/clean.Removal"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "worktrees",
+        "reparent_children",
+        "force"
+      ],
+      "type": "object"
+    },
+    "clean.Removal": {
+      "additionalProperties": false,
+      "properties": {
+        "blockers": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/clean.Blocker"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "branch": {
+          "type": "string"
+        },
+        "jobs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "missing": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "pull_request": {
+          "type": "string"
+        },
+        "unpushed": {
+          "type": "integer"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "path",
+        "blockers"
+      ],
+      "type": "object"
+    },
+    "clean.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "clean"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/clean.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/clean.Plan"
+        }
+      }
+    },
+    "clean.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "worktree"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "reparent_children"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "force"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
     },
     "create.Action": {
       "description": "How a branch gets its worktree.",
@@ -961,7 +1212,9 @@
         "run_unread",
         "nothing_isolated",
         "no_conflict",
-        "all"
+        "all",
+        "no_orphan",
+        "safe"
       ]
     },
     "domain.TextField": {

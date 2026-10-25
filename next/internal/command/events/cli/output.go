@@ -40,6 +40,8 @@ func drawLine(w io.Writer, received events.Received) {
 		output.SuccessLine(w, prefix+"changed "+e.Worktree.Branch+"  "+polled(e.Changed))
 	case domain.WorktreeProvisioned:
 		drawProvisioned(w, e, prefix)
+	case domain.WorktreeRemoved:
+		output.SuccessLine(w, prefix+"removed "+e.Worktree.Branch+"  "+e.Worktree.Path)
 	case domain.RepoAdded:
 		output.SuccessLine(w, "watching "+root(line))
 	case domain.RepoRemoved:

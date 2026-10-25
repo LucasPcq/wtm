@@ -18,6 +18,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./status.sh "$wtm" "$next" status
 ./tree.sh "$wtm" "$next" tree
 ./events.sh "$wtm" "$next" events
+./clean.sh "$wtm" "$next" clean
 git diff --stat .
 ```
 
@@ -332,6 +333,49 @@ The reference is the legacy `wtm events` of 0.30.1. `events` is a stream: the pr
   - **The global stream relayed the events of a repository it had sent no snapshot of** (`TestTheGlobalStreamDropsTheEventsOfARepositoryItSentNoSnapshotOf`).
   - **The first wait before subscribing again was 400 ms**, now 200 ms, doubling to 5 s (`TestTheFirstWaitBeforeSubscribingAgainIsTheShortestThenItDoublesUpToALimit`).
   - **`--help` did not list what the stream carries**: it names every type (`events_help.golden`).
+
+# Proof: `wtm clean` (legacy `flow/clean`) vs `wtm-next clean`
+
+The reference is the legacy `wtm clean` of 0.30.1. Its output differs by design (next speaks the v2 envelope, plans before it acts and refuses an unsafe worktree with exit 23), so the proof compares what each leaves on disk and keeps both outputs side by side.
+
+- `clean.sh <wtm> <wtm-next> clean`: two identical sandboxes (the `docs/demos` "acme" project with a bare `origin` and an `on_clean` hook that fails on `feat/bad*`; worktrees `feat/plain`, `feat/dirty` with an untracked file, `feat/unpushed` pushed then one commit more, `feat/local` holding a commit no other branch holds, `feat/locked`, `feat/parent` with `feat/child` and `feat/child2`, `feat/p2` with `feat/c2`, `feat/c` with an untracked file, `feat/detached` on no branch, and one worktree per other scenario), the same scenarios run by each binary; after each, the exit code, stdout, stderr and the state (branches, worktrees and their locks, every `meta.json`, `repos.json`). Paths, op ids and fingerprints are normalised. After 7, 16, 21, 22 and 24, the worktree each left apart on purpose is removed on both sides, so each difference of state stays its own scenario's. `clean/states.diff` holds them. Then, in a fresh sandbox per side, the wizard in tmux at 100×40: `clean/tty/legacy/` and `clean/tty/next/`.
+  1. a worktree, `--yes`
+  2. a dirty worktree, `--yes`
+  3. the same, `--force --yes`
+  4. a worktree with an unpushed commit, `--yes`
+  5. a locked worktree, `--yes`
+  6. the same, `--force --yes`
+  7. a branch holding a commit no other branch nor remote holds, never pushed, `--yes`
+  8. a parent, its two children left orphaned
+  9. a parent, `--reparent-children`
+  10. two worktrees, one dirty, `--yes`
+  11. two worktrees, `--yes`
+  12. a name that is no worktree
+  13. `main`
+  14. a worktree whose `on_clean` hook fails
+  15. `--output json --yes`
+  16. `--output json` without `--yes`
+  17. a dirty worktree, `--output json --yes`
+  18. no worktree, without a terminal
+  19. `-q`
+  20. `--dry-run`
+  21. `--keep-data --yes`
+  22. a worktree on no branch, by its path
+  23. `--dry-run --output json` (next only)
+  24. `--expect-fingerprint` with that fingerprint (next only)
+  25. `--expect-fingerprint` with a stale fingerprint (next only)
+- The states are identical but for 7, 16, 21, 22 and 24. The differences, all deliberate:
+  - 2, 4, 5, 10 and 17 are refused by both, nothing removed; next exits 23 (`clean.unsafe`, a safety refusal) where legacy exits 1, names each reason on its line under the failure (`feat/dirty has uncommitted changes`, `feat/unpushed has 1 commit(s) no other branch nor remote holds`, `feat/locked is locked`), and follows it with the same request forced, `→ wtm clean feat/dirty --force   remove anyway`. In JSON (17) each reason is a problem of its entry, `error.fields[]` (`worktree[0]`, `clean.dirty`), and the forced request is `error.follow_up` (`clean.force`); legacy prints its refusal as text on stderr and nothing on stdout.
+  - 7, a legacy bug: legacy counts unpushed commits against `origin/<branch>`, none for a branch origin never had, so it ran the hook and removed the worktree, then `git branch -d` refused the unmerged branch: the worktree gone, its branch and `meta.json` left behind, exit 1. Next counts the commits no other branch nor remote holds and refuses the worktree before anything runs (exit 23). Once the checks pass, next deletes the branch with `-D`, so a branch pushed but not merged locally goes whole too (legacy's `-d` refused it the same way).
+  - 12: both report the name as already absent, exit 0; next counts it `1 unchanged` with an `Already absent` row.
+  - 13: legacy warns `Cannot clean the parent worktree.` and exits 0; next refuses the entry, exit 2 (`clean.main_worktree`).
+  - 14: both keep the worktree, exit 1; the hook view is next's uniform `on_clean · <branch>`.
+  - 16: legacy refuses `--output json` without `--yes` (exit 2); next runs it unattended, as every next command.
+  - 18: legacy exits 1; next exits 2, naming `<worktree>` as required.
+  - 20 and 23 to 25: legacy has no dry run nor fingerprint (exit 2).
+  - 21: next has no `--keep-data` nor `--drop-data` until the run module migrates (LUC-339): it never drops a namespace and names the data kept (`clean.data_kept`); it refuses the flag (exit 2).
+  - 22: legacy takes only branches and says the path is already absent; next removes the worktree on no branch by its path, leaving the branch it was made from.
+  - The tty: legacy's recap offers to delete the safe ones, to force all, or to cancel; next asks a `Force` step only when a worktree is unsafe, its help naming each reason (`feat/tty-dirty — uncommitted changes`), then a recap whose button names what goes (`Yes, remove 2 worktrees`). Next's `Reparent children` puts `Leave them orphaned` first (no by default), legacy `Reparent onto main (1)`. Leaving the wizard exits 19 on both.
 
 # Deliberate differences from legacy
 

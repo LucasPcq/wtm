@@ -1,0 +1,6 @@
+
+  → case feat/json in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/json;; esac
+
+tearing down feat/json
+
+  ✓ case feat/json in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/json;; esac (<DUR>)

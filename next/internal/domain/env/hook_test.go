@@ -9,11 +9,11 @@ import (
 )
 
 func TestAHookLogIsNamedAfterItsEscapedBranch(t *testing.T) {
-	assert.Equal(t, filepath.Join("/state", "hooks", "on_create-feat%2Fx.log"), HookLogPath(HookLogPathParams{StateDir: "/state", Branch: "feat/x"}))
+	assert.Equal(t, filepath.Join("/state", "hooks", "on_create-feat%2Fx.log"), HookLogPath(HookLogPathParams{StateDir: "/state", Branch: "feat/x", Hooks: OnCreateHooks}))
 }
 
 func TestNoStateDirMeansNoLog(t *testing.T) {
-	assert.Empty(t, HookLogPath(HookLogPathParams{Branch: "feat/x"}))
+	assert.Empty(t, HookLogPath(HookLogPathParams{Branch: "feat/x", Hooks: OnCreateHooks}))
 }
 
 func TestAPlainStringTakesEveryVariableAsIs(t *testing.T) {

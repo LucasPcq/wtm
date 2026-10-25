@@ -1,0 +1,142 @@
+=== 00-before: exit legacy , next 
+=== 01-one: exit legacy 0, next 0
+=== 02-dirty-refused: exit legacy 1, next 23
+=== 03-dirty-forced: exit legacy 0, next 0
+=== 04-unpushed-refused: exit legacy 1, next 23
+=== 05-locked-refused: exit legacy 1, next 23
+=== 06-locked-forced: exit legacy 0, next 0
+=== 07-never-pushed: exit legacy 1, next 23
+--- legacy/07-never-pushed
++++ next/07-never-pushed
+@@ -31,6 +31,7 @@
+ <SB>/acme.trees/feat-fp
+ <SB>/acme.trees/feat-json
+ <SB>/acme.trees/feat-jsonny
++<SB>/acme.trees/feat-local
+ <SB>/acme.trees/feat-p2
+ <SB>/acme.trees/feat-parent
+ <SB>/acme.trees/feat-quiet
+=== 08-orphans-left: exit legacy 0, next 0
+=== 09-orphans-reparented: exit legacy 0, next 0
+=== 10-many-one-unsafe: exit legacy 1, next 23
+=== 11-many: exit legacy 0, next 0
+=== 12-absent: exit legacy 0, next 0
+=== 13-main: exit legacy 0, next 2
+=== 14-hook-fails: exit legacy 1, next 1
+=== 15-json: exit legacy 0, next 0
+=== 16-json-without-yes: exit legacy 2, next 0
+--- legacy/16-json-without-yes
++++ next/16-json-without-yes
+@@ -7,7 +7,6 @@
+ feat/detached
+ feat/dry
+ feat/fp
+-feat/jsonny
+ feat/quiet
+ feat/unpushed
+ main
+@@ -21,7 +20,6 @@
+ <SB>/acme.trees/feat-detached
+ <SB>/acme.trees/feat-dry
+ <SB>/acme.trees/feat-fp
+-<SB>/acme.trees/feat-jsonny
+ <SB>/acme.trees/feat-quiet
+ <SB>/acme.trees/feat-unpushed
+ ## .git/wtm/worktrees/feat%2Fbad/meta.json
+@@ -80,13 +78,6 @@
+   "ordinal": 16,
+   "isolation": "isolated"
+ }
+-## .git/wtm/worktrees/feat%2Fjsonny/meta.json
+-{
+-  "source_branch": "main",
+-  "env_strategy": "example",
+-  "ordinal": 13,
+-  "isolation": "isolated"
+-}
+ ## .git/wtm/worktrees/feat%2Fquiet/meta.json
+ {
+   "source_branch": "main",
+=== 17-json-refused: exit legacy 1, next 23
+=== 18-no-branch: exit legacy 1, next 2
+=== 19-quiet: exit legacy 0, next 0
+=== 20-dry-run: exit legacy 2, next 0
+=== 21-keep-data: exit legacy 0, next 2
+--- legacy/21-keep-data
++++ next/21-keep-data
+@@ -5,6 +5,7 @@
+ feat/child
+ feat/child2
+ feat/detached
++feat/dry
+ feat/fp
+ feat/unpushed
+ main
+@@ -16,6 +17,7 @@
+ <SB>/acme.trees/feat-child
+ <SB>/acme.trees/feat-child2
+ <SB>/acme.trees/feat-detached
++<SB>/acme.trees/feat-dry
+ <SB>/acme.trees/feat-fp
+ <SB>/acme.trees/feat-unpushed
+ ## .git/wtm/worktrees/feat%2Fbad/meta.json
+@@ -60,6 +62,13 @@
+   "ordinal": 17,
+   "isolation": "isolated"
+ }
++## .git/wtm/worktrees/feat%2Fdry/meta.json
++{
++  "source_branch": "main",
++  "env_strategy": "example",
++  "ordinal": 15,
++  "isolation": "isolated"
++}
+ ## .git/wtm/worktrees/feat%2Ffp/meta.json
+ {
+   "source_branch": "main",
+=== 22-detached-by-path: exit legacy 0, next 0
+--- legacy/22-detached-by-path
++++ next/22-detached-by-path
+@@ -15,7 +15,6 @@
+ <SB>/acme.trees/feat-c2
+ <SB>/acme.trees/feat-child
+ <SB>/acme.trees/feat-child2
+-<SB>/acme.trees/feat-detached
+ <SB>/acme.trees/feat-fp
+ <SB>/acme.trees/feat-unpushed
+ ## .git/wtm/worktrees/feat%2Fbad/meta.json
+=== 23-json-dry-run: exit legacy 2, next 0
+=== 24-expect-fingerprint: exit legacy 2, next 0
+--- legacy/24-expect-fingerprint
++++ next/24-expect-fingerprint
+@@ -5,7 +5,6 @@
+ feat/child
+ feat/child2
+ feat/detached
+-feat/fp
+ feat/unpushed
+ main
+ ## worktrees
+@@ -15,7 +14,6 @@
+ <SB>/acme.trees/feat-c2
+ <SB>/acme.trees/feat-child
+ <SB>/acme.trees/feat-child2
+-<SB>/acme.trees/feat-fp
+ <SB>/acme.trees/feat-unpushed
+ ## .git/wtm/worktrees/feat%2Fbad/meta.json
+ {
+@@ -59,13 +57,6 @@
+   "ordinal": 17,
+   "isolation": "isolated"
+ }
+-## .git/wtm/worktrees/feat%2Ffp/meta.json
+-{
+-  "source_branch": "main",
+-  "env_strategy": "example",
+-  "ordinal": 16,
+-  "isolation": "isolated"
+-}
+ ## .git/wtm/worktrees/feat%2Funpushed/meta.json
+ {
+   "source_branch": "main",
+=== 25-stale-fingerprint: exit legacy 2, next 25

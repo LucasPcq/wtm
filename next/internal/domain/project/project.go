@@ -31,11 +31,12 @@ const (
 	DefaultBaseBranch = "main"
 )
 
-// Config is the project's config.toml: where worktrees go, how their env is made, what runs on creation, and the wizard's remembered answers by question ID.
+// Config is the project's config.toml: where worktrees go, how their env is made, what runs on creation and before a removal, and the wizard's remembered answers by question ID.
 type Config struct {
 	Worktrees  Worktrees
 	Env        Env
 	OnCreate   []Hook
+	OnClean    []Hook
 	Remembered map[string]string
 }
 

@@ -71,6 +71,24 @@ func mutations() []mutation {
 				assert.NoFileExists(t, filepath.Join(main, "notes.txt"))
 			},
 		},
+		{
+			name:    "clean",
+			answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/old"}}},
+			setup: func(t *testing.T, main string) {
+				gittest.Git(t, main, "worktree", "add", "-q", "-b", "feat/old", filepath.Join(filepath.Dir(main), ".trees", "feat-old"))
+			},
+			// an on_clean hook is part of what the plan runs
+			stale: func(t *testing.T, main string) {
+				writeConfig(t, main, "[hooks]\non_clean = [\"true\"]\n")
+			},
+			untouched: func(t *testing.T, main string) {
+				assert.DirExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-old"))
+			},
+			applied: func(t *testing.T, main string) {
+				assert.NoDirExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-old"))
+				assert.Empty(t, gittest.Output(t, main, "branch", "--list", "feat/old"))
+			},
+		},
 	}
 }
 
@@ -111,6 +129,7 @@ func eventsOfEachType() []domain.Event {
 		domain.WorktreeCreated{Worktree: identity},
 		domain.WorktreeUpdated{Worktree: identity, Changed: []worktree.IdentityField{worktree.IdentityOrdinal}},
 		domain.WorktreeProvisioned{Worktree: identity, Hook: "make setup", ExitCode: new(2)},
+		domain.WorktreeRemoved{Worktree: identity},
 		domain.OperationStarted{Command: "create", Surface: "api"},
 		domain.OperationFinished{Command: "create", Surface: "api", Code: "unit.phase_failed"},
 		domain.Snapshot{},

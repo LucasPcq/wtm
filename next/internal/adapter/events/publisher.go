@@ -104,7 +104,7 @@ func (p Publisher) Publish(event domain.Event) {
 // stream polled changed are the stream's own lines, never published.
 func published(event domain.Event) bool {
 	switch event.(type) {
-	case domain.WorktreeCreated, domain.WorktreeUpdated, domain.WorktreeProvisioned, domain.OperationStarted, domain.UnitFinished, domain.OperationFinished, domain.RepoAdded, domain.RepoRemoved:
+	case domain.WorktreeCreated, domain.WorktreeUpdated, domain.WorktreeProvisioned, domain.WorktreeRemoved, domain.OperationStarted, domain.UnitFinished, domain.OperationFinished, domain.RepoAdded, domain.RepoRemoved:
 		return true
 	case domain.UnitStarted, domain.PhaseStarted, domain.PhaseFinished, domain.Output, domain.Snapshot, domain.Ready, domain.WorktreeChanged:
 	}

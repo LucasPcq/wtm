@@ -1,0 +1,7 @@
+$ wtm clean feat/tty-child; echo EXIT=$?
+
+┃  = Aborted.
+
+EXIT=19
+$
+

@@ -1,0 +1,57 @@
+[
+  {
+    "type": "operation.started",
+    "command": "clean",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "feat/old"
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/old",
+    "phase": "on_clean",
+    "log": "<root>/main/.git/wtm/hooks/on_clean-feat%2Fold.log"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/old",
+    "phase": "on_clean",
+    "failed": false
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/old",
+    "phase": "remove"
+  },
+  {
+    "type": "worktree.removed",
+    "worktree": {
+      "branch": "feat/old",
+      "path": "<root>/.trees/feat-old",
+      "parent": "",
+      "ordinal": null,
+      "isolation": "isolated",
+      "is_main": false,
+      "created_at": ""
+    }
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/old",
+    "phase": "remove",
+    "failed": false
+  },
+  {
+    "type": "unit.finished",
+    "subject": "feat/old",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "clean",
+    "surface": "api",
+    "ok": true
+  }
+]

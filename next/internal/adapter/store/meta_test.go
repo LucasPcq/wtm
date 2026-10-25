@@ -260,3 +260,19 @@ func TestTheRecordsListedAreTheBranchesTheyBelongTo(t *testing.T) {
 	assert.Empty(t, empty)
 	assert.ElementsMatch(t, []string{"feat/a", "main"}, listed)
 }
+
+func TestADeletedRecordIsGoneWithItsDirectory(t *testing.T) {
+	stateDir := t.TempDir()
+	meta := Meta{StateDir: stateDir}
+	writeMeta(t, stateDir, "feat/a", realRecord)
+	writeMeta(t, stateDir, "main", realRecord)
+
+	require.NoError(t, meta.Delete("feat/a"))
+	require.NoError(t, meta.Delete("feat/never"))
+
+	listed, err := meta.List()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"main"}, listed)
+	assert.NoDirExists(t, filepath.Dir(metaPath(t, stateDir, "feat/a")))
+	assert.Error(t, meta.Delete(".."))
+}
