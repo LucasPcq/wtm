@@ -427,9 +427,9 @@ func (f *Fake) RemoveWorktree(_ context.Context, path string) error {
 }
 
 // Unpushed counts the commits of the local branch name that no other local
-// branch nor any fetched remote branch holds; it fails when the branch is
-// missing.
-func (f *Fake) Unpushed(_ context.Context, name string) (int, error) {
+// branch but those going with it, nor any fetched remote branch, holds; it
+// fails when the branch is missing.
+func (f *Fake) Unpushed(_ context.Context, name string, going []string) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.enter("Unpushed", name); err != nil {
@@ -443,7 +443,7 @@ func (f *Fake) Unpushed(_ context.Context, name string) (int, error) {
 
 	held := map[string]bool{}
 	for other, commits := range f.local {
-		if other != name {
+		if other != name && !slices.Contains(going, other) {
 			for _, commit := range commits {
 				held[commit] = true
 			}

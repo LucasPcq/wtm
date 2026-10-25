@@ -141,15 +141,19 @@ func parseAheadBehind(out string) (worktree.AheadBehind, error) {
 }
 
 // Unpushed counts the commits of the local branch name that no other local
-// branch nor any remote-tracking branch holds: what deleting it would lose. It
-// fails when the branch is missing.
-func (r Repo) Unpushed(ctx context.Context, name string) (int, error) {
+// branch but those going with it, nor any remote-tracking branch, holds: what
+// deleting them would lose. It fails when the branch is missing.
+func (r Repo) Unpushed(ctx context.Context, name string, going []string) (int, error) {
 	of, err := r.refName(worktree.LocalBranch{Name: name})
 	if err != nil {
 		return 0, err
 	}
 
-	out, err := r.git(ctx, "rev-list", "--count", of, "--not", "--exclude="+name, "--branches", "--remotes", "--")
+	args := []string{"rev-list", "--count", of, "--not", "--exclude=" + name}
+	for _, other := range going {
+		args = append(args, "--exclude="+other)
+	}
+	out, err := r.git(ctx, append(args, "--branches", "--remotes", "--")...)
 	if err != nil {
 		return 0, err
 	}

@@ -118,6 +118,8 @@ func (f Facts) entries(names []string) (removals []Removal, absent []string, pro
 			problems = append(problems, domain.FieldError{Path: path, Code: domain.CodeDistinct, Template: "{path}: {value} is given twice", Params: domain.Params{"value": name}})
 		case found && w.Main:
 			problems = append(problems, domain.FieldError{Path: path, Code: CodeMainWorktree, Template: "{value} is the main worktree: it is never removed", Params: domain.Params{"value": name}})
+		case found && slices.ContainsFunc(removals, func(r Removal) bool { return r.Path == w.Path }):
+			problems = append(problems, domain.FieldError{Path: path, Code: domain.CodeDistinct, Template: "{path}: {value} names a worktree given already", Params: domain.Params{"value": name}})
 		case found:
 			removals = append(removals, f.removal(w, index))
 		default:

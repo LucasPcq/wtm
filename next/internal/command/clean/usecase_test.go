@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
@@ -77,6 +78,25 @@ func TestABranchHoldingCommitsNoOtherOneHoldsIsUnsafeBeforeAnythingRuns(t *testi
 	assert.Equal(t, "1", refused.Fields[0].Params["count"])
 	assert.True(t, w.stands(t, local))
 	assert.NoFileExists(t, filepath.Join(w.at(local), "ran"))
+}
+
+// Each branch counted only what no other branch held: a parent and the child made from it, removed together, each held the other's commits, and both went with them.
+func TestCommitsTheBranchesRemovedTogetherHoldAreUnpushedToo(t *testing.T) {
+	w := newWorld(t, seed{})
+	gittest.Git(t, w.main, "branch", "-f", "feat/stacked", local)
+	gittest.Git(t, w.main, "worktree", "add", "-q", w.at("feat/stacked"), "feat/stacked")
+
+	_, err := w.usecase.Run(t.Context(), removing(local, "feat/stacked"), domain.RunOptions{DryRun: true})
+
+	assert.Equal(t, map[string][]string{"worktree[0]": {"clean.unpushed"}, "worktree[1]": {"clean.unpushed"}}, fieldCodes(failureOf(t, err).Fields))
+}
+
+func TestOneWorktreeAskedByItsBranchAndItsPathIsAskedTwice(t *testing.T) {
+	w := newWorld(t, seed{})
+
+	_, err := w.usecase.Run(t.Context(), removing(plain, w.at(plain)), domain.RunOptions{DryRun: true})
+
+	assert.Equal(t, map[string][]string{"worktree[1]": {domain.CodeDistinct}}, fieldCodes(failureOf(t, err).Fields))
 }
 
 // Legacy deleted the branch with git branch -d, which refuses one pushed but not merged locally: the worktree was gone, its branch and record left behind.

@@ -222,8 +222,13 @@ func (u UseCase) locate(ctx context.Context, facts Facts, req Request) (map[stri
 	return located, nil
 }
 
-// check reads, for each worktree, its uncommitted changes, none once its directory is gone, and the commits of its branch no other branch holds.
+// check reads, for each worktree, its uncommitted changes, none once its directory is gone, and the commits of its branch no branch that stays holds: worktrees removed together hold nothing for each other.
 func (u UseCase) check(ctx context.Context, worktrees []worktree.Worktree, checks map[string]Check) error {
+	var going []string
+	for _, w := range worktrees {
+		going = append(going, w.Branch())
+	}
+
 	for _, w := range worktrees {
 		var check Check
 		var err error
@@ -233,7 +238,7 @@ func (u UseCase) check(ctx context.Context, worktrees []worktree.Worktree, check
 			}
 		}
 		if w.Branch() != "" {
-			if check.Unpushed, err = u.Git.Unpushed(ctx, w.Branch()); err != nil {
+			if check.Unpushed, err = u.Git.Unpushed(ctx, w.Branch(), going); err != nil {
 				return err
 			}
 		}

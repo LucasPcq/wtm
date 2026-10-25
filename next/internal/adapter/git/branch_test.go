@@ -1,6 +1,7 @@
 package git_test
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -164,12 +165,28 @@ func TestTheFakeAndGitCountWhatDeletingABranchWouldLose(t *testing.T) {
 		t.Run(impl.name, func(t *testing.T) {
 			lost := map[string]int{}
 			for _, name := range []string{"main", "feature", "unmerged", "linked", "diverged"} {
-				count, err := impl.port.Unpushed(t.Context(), name)
+				count, err := impl.port.Unpushed(t.Context(), name, nil)
 				require.NoError(t, err, name)
 				lost[name] = count
 			}
 
 			assert.Equal(t, map[string]int{"main": 0, "feature": 0, "unmerged": 1, "linked": 1, "diverged": 1}, lost)
+		})
+	}
+}
+
+func TestTheFakeAndGitCountTheCommitsHeldOnlyByTheBranchesGoingTogether(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			require.NoError(t, impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "topic"), Checkout: worktree.NewBranch{Name: "topic", From: worktree.LocalBranch{Name: "unmerged"}}}))
+
+			alone, err := impl.port.Unpushed(t.Context(), "unmerged", nil)
+			require.NoError(t, err)
+			together, err := impl.port.Unpushed(t.Context(), "unmerged", []string{"topic"})
+			require.NoError(t, err)
+
+			assert.Equal(t, 0, alone)
+			assert.Equal(t, 1, together)
 		})
 	}
 }
@@ -189,7 +206,7 @@ func TestTheFakeAndGitRefuseTheSameBranchChanges(t *testing.T) {
 			return impl.port.DeleteBranch(t.Context(), "nope")
 		}},
 		{name: "count_unpushed_of_missing_branch", call: func(t *testing.T, impl implementation) error {
-			_, err := impl.port.Unpushed(t.Context(), "remote-only")
+			_, err := impl.port.Unpushed(t.Context(), "remote-only", nil)
 			return err
 		}},
 		{name: "count_unknown_ref", call: func(t *testing.T, impl implementation) error {

@@ -28,7 +28,7 @@ type port interface {
 	AddWorktree(ctx context.Context, addition worktree.Addition) error
 	RemoveWorktree(ctx context.Context, path string) error
 	DeleteBranch(ctx context.Context, name string) error
-	Unpushed(ctx context.Context, name string) (int, error)
+	Unpushed(ctx context.Context, name string, going []string) (int, error)
 	Fetch(ctx context.Context) error
 	FetchRef(ctx context.Context, name string) error
 	FastForwardRef(ctx context.Context, name string) error
