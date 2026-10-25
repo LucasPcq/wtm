@@ -25,12 +25,18 @@
         "worktree": "feat/plain",
         "branch": "feat/plain",
         "path": "/repo/wt-feat-plain",
+        "phases": [
+          "remove"
+        ],
         "blockers": []
       },
       {
         "worktree": "feat/parent",
         "branch": "feat/parent",
         "path": "/repo/wt-feat-parent",
+        "phases": [
+          "remove"
+        ],
         "blockers": []
       }
     ],

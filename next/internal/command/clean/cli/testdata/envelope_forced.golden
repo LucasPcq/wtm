@@ -18,6 +18,9 @@
         "worktree": "feat/dirty",
         "branch": "feat/dirty",
         "path": "/repo/wt-feat-dirty",
+        "phases": [
+          "remove"
+        ],
         "blockers": [
           "dirty"
         ]

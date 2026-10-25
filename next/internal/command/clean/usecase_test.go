@@ -201,6 +201,27 @@ func TestANameThatIsNoWorktreeIsAlreadyAbsent(t *testing.T) {
 	assert.Nil(t, outcome.Result.Failure())
 }
 
+// go and status read a part of a branch as its name; a removal never does: run again once feat/plain went, it would take another worktree.
+func TestAPartOfABranchNamesNoWorktreeToRemove(t *testing.T) {
+	w := newWorld(t, seed{})
+
+	outcome, err := w.usecase.Run(t.Context(), removing("feat/pla"), domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"feat/pla"}, outcome.Plan.Absent)
+	assert.True(t, w.stands(t, plain))
+}
+
+func TestAPathInsideAWorktreeNamesIt(t *testing.T) {
+	w := newWorld(t, seed{})
+	req := removing("wt-feat-plain/apps").From(domain.Caller{Cwd: w.root})
+	writeFile(t, filepath.Join(w.at(plain), "apps", "keep.txt"), "x")
+
+	_, err := w.usecase.Run(t.Context(), req, domain.RunOptions{DryRun: true})
+
+	assert.Equal(t, map[string][]string{"worktree[0]": {"clean.dirty"}}, fieldCodes(failureOf(t, err).Fields))
+}
+
 func TestAWorktreeOnNoBranchIsRemovedByItsPath(t *testing.T) {
 	w := newWorld(t, seed{})
 	path := w.at("detached")

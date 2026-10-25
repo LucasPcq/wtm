@@ -21,6 +21,13 @@
         "worktree": "feat/plain",
         "branch": "feat/plain",
         "path": "/repo/wt-feat-plain",
+        "hooks": [
+          "make down"
+        ],
+        "phases": [
+          "on_clean",
+          "remove"
+        ],
         "blockers": []
       }
     ],

@@ -9,6 +9,9 @@
         "worktree": "feat/old",
         "branch": "feat/old",
         "path": "<root>/.trees/feat-old",
+        "phases": [
+          "remove"
+        ],
         "blockers": []
       }
     ],

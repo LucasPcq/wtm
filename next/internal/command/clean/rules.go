@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -32,11 +33,11 @@ type Check struct {
 	Jobs        []string // its jobs up, sorted
 }
 
-// named returns the worktree asked by name, its branch or, on no branch, its path as git spells it or as it leads there, and whether there is one.
+// named returns the worktree asked by name, its branch or, on no branch, its path as git spells it, else the deepest holding the path name stands for, and whether there is one. Unlike worktree.Named, a part of a branch names none: run again once feat/login went, `clean feat/login` would otherwise remove feat/login-ui.
 func (f Facts) named(name string) (worktree.Worktree, bool) {
 	at := slices.IndexFunc(f.Worktrees, func(w worktree.Worktree) bool { return w.Name() == name })
 	if located, ok := f.Located[name]; at < 0 && ok {
-		at = slices.IndexFunc(f.Worktrees, func(w worktree.Worktree) bool { return w.Branch() == "" && w.Path == located })
+		at = worktree.Holding(f.Worktrees, located, func(w worktree.Worktree) string { return w.Path })
 	}
 	if at < 0 {
 		return worktree.Worktree{}, false
@@ -90,17 +91,20 @@ func Blockers() []Blocker {
 	return []Blocker{BlockerLocked, BlockerDirty, BlockerUnpushed, BlockerOpenPullRequest, BlockerJobsRunning}
 }
 
-// A Removal is one worktree the plan removes: its name, its branch, deleted with it (none on no branch), its path, whether its directory is gone already, and what makes it unsafe to remove with what Force would lose.
+// A Removal is one worktree the plan removes: its name, its branch, deleted with it (none on no branch), its path, whether its directory is gone already, the on_clean hooks it runs first as they will run (none once its directory is gone), the phases of its removal, the namespaces its record names, which stay in their shared services, and what makes it unsafe to remove with what Force would lose.
 type Removal struct {
-	Worktree    string    `json:"worktree"`
-	Branch      string    `json:"branch,omitempty"`
-	Path        string    `json:"path"`
-	Missing     bool      `json:"missing,omitempty"`
-	Blockers    []Blocker `json:"blockers"`
-	Unpushed    int       `json:"unpushed,omitempty"`
-	PullRequest string    `json:"pull_request,omitempty"`
-	Jobs        []string  `json:"jobs,omitempty"`
-	entry       int       // its index among the worktrees asked
+	Worktree    string         `json:"worktree"`
+	Branch      string         `json:"branch,omitempty"`
+	Path        string         `json:"path"`
+	Missing     bool           `json:"missing,omitempty"`
+	Hooks       []string       `json:"hooks,omitempty"`
+	Phases      []domain.Phase `json:"phases"`
+	Namespaces  []string       `json:"namespaces,omitempty"`
+	Blockers    []Blocker      `json:"blockers"`
+	Unpushed    int            `json:"unpushed,omitempty"`
+	PullRequest string         `json:"pull_request,omitempty"`
+	Jobs        []string       `json:"jobs,omitempty"`
+	entry       int            // its index among the worktrees asked
 }
 
 // entries decides each worktree names asks: a Removal, a name that is no worktree (already absent, nothing to remove), or the problem of its entry: blank, given twice, or the main worktree.
@@ -136,6 +140,17 @@ func (f Facts) removal(w worktree.Worktree, entry int) Removal {
 		}
 	}
 
+	for _, hook := range f.onClean(removal) {
+		removal.Hooks = append(removal.Hooks, hook.Cmd)
+	}
+	removal.Phases = []domain.Phase{domain.PhaseRemove}
+	if len(removal.Hooks) > 0 {
+		removal.Phases = []domain.Phase{domain.PhaseOnClean, domain.PhaseRemove}
+	}
+	if removal.Branch != "" {
+		removal.Namespaces = f.Records[removal.Branch].Namespaces
+	}
+
 	add(BlockerLocked, w.Locked)
 	add(BlockerDirty, check.Dirty)
 	add(BlockerUnpushed, check.Unpushed > 0)
@@ -143,6 +158,20 @@ func (f Facts) removal(w worktree.Worktree, entry int) Removal {
 	add(BlockerJobsRunning, len(check.Jobs) > 0)
 	removal.Unpushed, removal.PullRequest, removal.Jobs = check.Unpushed, check.PullRequest, check.Jobs
 	return removal
+}
+
+// onClean are the on_clean hooks of removal, their variables expanded as they will run; none once its directory is gone, where they cannot run.
+func (f Facts) onClean(removal Removal) []project.Hook {
+	if removal.Missing {
+		return nil
+	}
+
+	vars := env.HookVars{Worktree: removal.Path, Branch: removal.Branch, Root: f.MainPath, FromBranch: f.Records[removal.Branch].SourceBranch}
+	var hooks []project.Hook
+	for _, hook := range f.Config.OnClean {
+		hooks = append(hooks, vars.Hook(hook))
+	}
+	return hooks
 }
 
 // unsafe are the removals a blocker refuses unless forced.
@@ -281,8 +310,8 @@ func (f Facts) warnings(planned Plan) []domain.Warning {
 		if len(r.Jobs) > 0 {
 			warnings = append(warnings, domain.Warning{Code: "clean.jobs_left", Message: r.Worktree + " is removed with its jobs still running: " + strings.Join(r.Jobs, ", "), Params: params})
 		}
-		if kept := f.Records[r.Branch].Namespaces; r.Branch != "" && len(kept) > 0 {
-			params["namespaces"] = strings.Join(kept, ", ")
+		if len(r.Namespaces) > 0 {
+			params["namespaces"] = strings.Join(r.Namespaces, ", ")
 			warnings = append(warnings, domain.Warning{Code: "clean.data_kept", Message: r.Worktree + " keeps its data in shared services: " + params["namespaces"] + " (wtm-next does not drop it yet)", Params: params})
 		}
 	}
@@ -320,13 +349,10 @@ func (p Plan) Locks() []domain.Lock {
 	return domain.WorktreeLocks(names)
 }
 
-// Fingerprinted is what the plan's fingerprint covers: the plan with the on_clean hooks it runs.
+// Fingerprinted is what the plan's fingerprint covers: the plan, the on_clean hooks of each removal among it, its recap left out.
 func (p Plan) Fingerprinted() any {
 	p.Recapped = domain.Recapped{}
-	return struct {
-		Plan
-		OnClean []project.Hook
-	}{p, p.facts.Config.OnClean}
+	return p
 }
 
 // Locks are the locks taken before planning: the repository shared, and each worktree asked exclusive.

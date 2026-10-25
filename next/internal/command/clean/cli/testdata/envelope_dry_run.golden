@@ -9,6 +9,9 @@
         "worktree": "feat/parent",
         "branch": "feat/parent",
         "path": "/repo/wt-feat-parent",
+        "phases": [
+          "remove"
+        ],
         "blockers": []
       }
     ],
@@ -50,7 +53,7 @@
       }
     ]
   },
-  "fingerprint": "29ee4220186d0075808ab7eb",
+  "fingerprint": "9b9f6f7495756c77d712a0cb",
   "follow_ups": [],
   "warnings": []
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
-	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
@@ -203,7 +202,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	return facts, nil
 }
 
-// locate resolves each name req asks that is no worktree's name as a path, from where the caller stands, through its symbolic links as git spells a worktree's path.
+// locate resolves each name req asks that is no worktree's name as the path it stands for, from where the caller stands (repository.Located).
 func (u UseCase) locate(ctx context.Context, facts Facts, req Request) (map[string]string, error) {
 	located := map[string]string{}
 	for _, name := range req.Worktrees {
@@ -211,16 +210,12 @@ func (u UseCase) locate(ctx context.Context, facts Facts, req Request) (map[stri
 			continue
 		}
 
-		path := name
-		if !filepath.IsAbs(path) && req.Caller.Cwd != "" {
-			path = filepath.Join(req.Caller.Cwd, path)
-		}
-		location, err := u.Git.Locate(ctx, path)
+		path, err := repository.Located(ctx, u.Git, name, req.Caller)
 		if err != nil {
 			return nil, err
 		}
-		if location.Exists {
-			located[name] = location.Path
+		if path != "" {
+			located[name] = path
 		}
 	}
 
@@ -286,20 +281,15 @@ func (u UseCase) remove(ctx context.Context, plan Plan, removal Removal, report 
 
 // hooks runs the on_clean hooks in the worktree, their variables expanded and the worktree's run environment set, between their phase's events; a worktree whose directory is gone runs none, with a warning.
 func (u UseCase) hooks(ctx context.Context, plan Plan, removal Removal, report domain.Report) ([]domain.Warning, error) {
-	configured := plan.facts.Config.OnClean
+	hooks := plan.facts.onClean(removal)
 	switch {
-	case len(configured) == 0:
-		return nil, nil
-	case removal.Missing:
+	case len(hooks) == 0 && removal.Missing && len(plan.facts.Config.OnClean) > 0:
 		return []domain.Warning{{Code: "clean.hooks_skipped", Message: "its directory is gone: the on_clean hooks did not run", Params: domain.Params{"path": removal.Path}}}, nil
+	case len(hooks) == 0:
+		return nil, nil
 	}
 
 	record := plan.facts.Records[removal.Branch]
-	vars := env.HookVars{Worktree: removal.Path, Branch: removal.Branch, Root: plan.facts.MainPath, FromBranch: record.SourceBranch}
-	hooks := make([]project.Hook, 0, len(configured))
-	for _, hook := range configured {
-		hooks = append(hooks, vars.Hook(hook))
-	}
 
 	log := env.HookLogPath(env.HookLogPathParams{StateDir: u.StateDir, Branch: removal.Branch, Hooks: env.OnCleanHooks})
 	hookEnv, warnings := u.hookEnv(plan, removal, record)

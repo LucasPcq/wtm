@@ -18,6 +18,13 @@
         "worktree": "feat/old",
         "branch": "feat/old",
         "path": "<root>/.trees/feat-old",
+        "hooks": [
+          "true"
+        ],
+        "phases": [
+          "on_clean",
+          "remove"
+        ],
         "blockers": []
       }
     ],

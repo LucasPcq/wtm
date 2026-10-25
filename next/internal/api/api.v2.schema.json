@@ -127,6 +127,12 @@
         "branch": {
           "type": "string"
         },
+        "hooks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "jobs": {
           "items": {
             "type": "string"
@@ -136,8 +142,27 @@
         "missing": {
           "type": "boolean"
         },
+        "namespaces": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "path": {
           "type": "string"
+        },
+        "phases": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/domain.Phase"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "pull_request": {
           "type": "string"
@@ -152,6 +177,7 @@
       "required": [
         "worktree",
         "path",
+        "phases",
         "blockers"
       ],
       "type": "object"
