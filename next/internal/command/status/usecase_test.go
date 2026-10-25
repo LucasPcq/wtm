@@ -62,6 +62,7 @@ func TestAWorktreeIsReadWholeGitAndIsolation(t *testing.T) {
 			Command: "run start", Code: status.CodeJobCrashed, Message: "start it again",
 			Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "job", Values: []string{"web"}}, {Path: "detach", Values: []string{"true"}}},
 		}}},
+		Condition: worktree.ConditionChanged,
 	}, a)
 	assert.Empty(t, got.Warnings)
 }
@@ -338,7 +339,7 @@ func TestTheReviewIsTheNewestPullRequestAndAMergedOneAsksToCleanFirst(t *testing
 		},
 		"merged": {
 			pr:     []worktree.PullRequest{{Number: 12, URL: url, Branch: "feat/a", Head: gittest.Root, State: worktree.PullRequestMerged, Title: "Add a"}},
-			review: &status.Review{Number: 12, URL: url, State: worktree.PullRequestMerged, Fix: clean},
+			review: &status.Review{Number: 12, URL: url, State: worktree.PullRequestMerged},
 			problems: []status.Problem{
 				{Code: status.CodeMerged, Message: "its pull request is merged", Fix: clean},
 				{Code: status.CodeEnvMissing, Message: ".env is missing", Fix: fixOf("env", domain.Answered{Path: domain.PathWorktree, Values: []string{"feat/a"}})},
@@ -604,5 +605,28 @@ func TestAWorktreeBehindItsParentIsToldToSyncOntoIt(t *testing.T) {
 				assert.Equal(t, "sync", ui.Problems[0].Fix.Command)
 			}
 		})
+	}
+}
+
+func TestEachWorktreeCarriesItsConditionTheFirstThatApplies(t *testing.T) {
+	merged := linked("feat/merged")
+	w := newWorld(seed{
+		Git: gittest.FakeParams{
+			Worktrees: []worktree.Worktree{linked("feat/clean"), linked("feat/changed"), merged, linked("feat/gone")},
+			Changes:   map[string][]worktree.Change{"/repo/.trees/feat/changed": {{Path: "a.go", Status: worktree.ChangeUntracked}}, merged.Path: {{Path: "b.go", Status: worktree.ChangeUntracked}}},
+			Gone:      []string{"/repo/.trees/feat/gone"},
+		},
+		PRs: []worktree.PullRequest{{Number: 1, Branch: "feat/merged", Head: gittest.Root, State: worktree.PullRequestMerged}},
+	})
+
+	got := read(t, w, status.Request{All: true, WithPRs: true})
+
+	for branch, want := range map[string]worktree.Condition{
+		"feat/clean":   worktree.ConditionClean,
+		"feat/changed": worktree.ConditionChanged,
+		"feat/merged":  worktree.ConditionMerged,
+		"feat/gone":    worktree.ConditionMissing,
+	} {
+		assert.Equal(t, want, detailOf(t, got, branch).Condition, branch)
 	}
 }

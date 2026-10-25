@@ -2297,6 +2297,9 @@
             }
           ]
         },
+        "condition": {
+          "$ref": "#/$defs/worktree.Condition"
+        },
         "created_at": {
           "anyOf": [
             {
@@ -2419,7 +2422,8 @@
         "run",
         "jobs",
         "env",
-        "problems"
+        "problems",
+        "condition"
       ],
       "type": "object"
     },
@@ -2564,16 +2568,6 @@
         "draft": {
           "type": "boolean"
         },
-        "fix": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/domain.FollowUp"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "number": {
           "type": "integer"
         },
@@ -2590,8 +2584,7 @@
       "required": [
         "number",
         "url",
-        "state",
-        "fix"
+        "state"
       ],
       "type": "object"
     },

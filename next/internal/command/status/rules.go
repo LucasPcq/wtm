@@ -78,6 +78,7 @@ type Detail struct {
 	Jobs      []Job              `json:"jobs"` // null when the run daemon cannot tell
 	Env       Env                `json:"env"`
 	Problems  []Problem          `json:"problems"`
+	Condition worktree.Condition `json:"condition"` // the one fact of it that most changes what to do first, as this read knows it
 }
 
 // Base is where a worktree's branch stands against the base branch.
@@ -97,13 +98,12 @@ type Changes struct {
 	Files      []worktree.Change `json:"files"`
 }
 
-// Review is a worktree's newest pull request: its number, its page and its state, open, merged or closed; for an open one only, where its review stands; and what its pull request leaves to do, the same follow-up as the problem it raises: clean a worktree it merged.
+// Review is a worktree's newest pull request: its number, its page and its state, open, merged or closed; for an open one only, where its review stands.
 type Review struct {
 	Number int                       `json:"number"`
 	URL    string                    `json:"url"`
 	State  worktree.PullRequestState `json:"state"`
 	*worktree.Progress
-	Fix *domain.FollowUp `json:"fix"` // null when the pull request leaves nothing to do
 }
 
 // RunToml is whether the project's run.toml exists and reads.
@@ -310,13 +310,14 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Origin:    f.OriginOf(branch),
 		Changes:   changesOf(state),
 		Commits:   commitsOf(state),
-		Review:    reviewOf(pr, hasPR, merged),
+		Review:    reviewOf(pr, hasPR),
 		Isolation: isolationOf(record, pending || recordErr != nil),
 		RunToml:   f.runToml(),
 		Run:       f.runOf(w, portsParams{record: record, pending: pending, unread: recordErr != nil, offset: offset}),
 		Jobs:      f.jobs(w, offset),
 		Env:       f.envOf(w, state),
 	}
+	detail.Condition = worktree.ConditionOf(worktree.ConditionParams{Missing: state.Missing, Rebasing: rebasing, Merged: merged, Dirty: len(state.Changes) > 0})
 	detail.Problems = Problems(ProblemsParams{Branch: branch, Gone: state.Missing, Merged: merged, Parent: parent, Lacks: state.Lacks, Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
 
 	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
@@ -366,17 +367,12 @@ func commitsOf(state State) []worktree.Commit {
 	return orEmpty(state.Commits)
 }
 
-// reviewOf is the review of pr when ok, its fix the merged problem's when it merged the worktree.
-func reviewOf(pr worktree.PullRequest, ok, merged bool) *Review {
+func reviewOf(pr worktree.PullRequest, ok bool) *Review {
 	if !ok {
 		return nil
 	}
 
-	review := &Review{Number: pr.Number, URL: pr.URL, State: pr.State, Progress: pr.Progress()}
-	if merged {
-		review.Fix = mergedFix(pr.Branch)
-	}
-	return review
+	return &Review{Number: pr.Number, URL: pr.URL, State: pr.State, Progress: pr.Progress()}
 }
 
 // pending reports whether w has yet to choose its isolation, which run up and run start then refuse: a worktree on a branch other than the main one, whose record holds no choice, while run.toml declares something a worktree isolates.

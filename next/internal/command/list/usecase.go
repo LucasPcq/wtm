@@ -110,30 +110,21 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 		}
 	}
 
-	// A branch with no commit yet, an orphan, has nothing to count: it is not counted rather than unreadable. A gap
-	// read once is not read again when the parent is the base branch; one that failed is not kept.
-	counts := map[string]worktree.AheadBehind{}
 	count := func(against string) (worktree.AheadBehind, error) {
-		if gap, ok := counts[against]; ok {
-			return gap, nil
-		}
 		gap, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: against})
-		if err != nil {
-			return gap, repository.Interrupted(ctx, err)
-		}
-		counts[against] = gap
-		return gap, nil
+		return gap, repository.Interrupted(ctx, err)
 	}
 
+	var base *worktree.AheadBehind
 	if facts.CountedAgainstBase(w) {
 		gap, err := count(facts.Config.Worktrees.BaseBranch)
 		if state.Err = err; err != nil {
 			return state
 		}
-		state.Ahead = gap.Ahead
+		state.Ahead, base = gap.Ahead, &gap
 	}
 
-	parent, err := repository.GapToParent(facts.Repository, facts.Stack, w, count)
+	parent, err := repository.GapToParent(repository.GapParams{Repo: facts.Repository, Stack: facts.Stack, Worktree: w, Base: base, Count: count})
 	state.ParentAhead, state.ParentBehind, state.Err = parent.Ahead, parent.Behind, err
 	return state
 }

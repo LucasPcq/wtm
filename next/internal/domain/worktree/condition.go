@@ -19,23 +19,18 @@ func Conditions() []Condition {
 	return []Condition{ConditionNoWorktree, ConditionUnreadable, ConditionMissing, ConditionRebasing, ConditionMerged, ConditionChanged, ConditionClean}
 }
 
-// ConditionParams are what a read knows of a worktree.
+// ConditionParams are what a read knows of a worktree it could read; a read sets ConditionNoWorktree and
+// ConditionUnreadable itself, since nothing else of such a worktree is known.
 type ConditionParams struct {
-	NoWorktree bool
-	Unreadable bool
-	Missing    bool
-	Rebasing   bool
-	Merged     bool
-	Dirty      bool
+	Missing  bool
+	Rebasing bool
+	Merged   bool
+	Dirty    bool
 }
 
-// ConditionOf is the condition of a worktree as a read knows it: the first of Conditions that applies.
+// ConditionOf is the condition of a worktree a read could read: the first of Conditions that applies.
 func ConditionOf(p ConditionParams) Condition {
 	switch {
-	case p.NoWorktree:
-		return ConditionNoWorktree
-	case p.Unreadable:
-		return ConditionUnreadable
 	case p.Missing:
 		return ConditionMissing
 	case p.Rebasing:

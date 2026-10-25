@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -24,6 +25,19 @@ func TestThePublishedSchemaIsTheOneTheGoTypesGive(t *testing.T) {
 	}
 
 	assert.Equal(t, string(readFile(t, apiSchemaFile)), string(generated), "api.v2.schema.json is stale: run make schema")
+}
+
+func TestEachPublishedEnumListsEveryConstantOfItsType(t *testing.T) {
+	published := map[reflect.Type]any{reflect.TypeFor[domain.Phase](): domain.Phases()}
+	for typ, e := range enums {
+		published[typ] = e.values
+	}
+
+	for typ, values := range published {
+		t.Run(typ.Name(), func(t *testing.T) {
+			assert.ElementsMatch(t, declaredOf(t, typ), stringsOf(values), "a constant of %s the enum leaves out", typ)
+		})
+	}
 }
 
 func TestEachGoldenOfTheCatalogueMatchesTheSchema(t *testing.T) {

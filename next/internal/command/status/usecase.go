@@ -174,18 +174,12 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 			state.Base = &gap
 		}
 	}
-	// A root has no parent to fall behind; a child of the base branch was just counted against it.
-	parent, counted := facts.CountedAgainstParent(facts.Stack, w)
-	if _, child := facts.Stack.Parent(w.Branch()); counted && child {
-		switch {
-		case parent == base && state.Base != nil:
-			state.Lacks = state.Base.Behind
-		case parent != base:
-			gap, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: parent})
-			if !unread("where it stands against "+parent, err) {
-				state.Lacks = gap.Behind
-			}
-		}
+	parent, _ := facts.CountedAgainstParent(facts.Stack, w)
+	gap, err := repository.GapToParent(repository.GapParams{Repo: facts.Repository, Stack: facts.Stack, Worktree: w, Base: state.Base, Count: func(against string) (worktree.AheadBehind, error) {
+		return u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: against})
+	}})
+	if !unread("where it stands against "+parent, err) && gap.Behind != nil {
+		state.Lacks = *gap.Behind
 	}
 	if state.Err != nil {
 		return state

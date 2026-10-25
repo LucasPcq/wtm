@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"maps"
@@ -734,4 +735,63 @@ func post(t *testing.T, record webserver.Record, path, body string) *http.Respon
 	require.NoError(t, err)
 	t.Cleanup(func() { response.Body.Close() })
 	return response
+}
+
+// declaredOf are the values of every constant of typ its package declares, read from its source: typed as in
+// `X T = "x"` or converted as in `X = T("x")`.
+func declaredOf(t *testing.T, typ reflect.Type) []string {
+	t.Helper()
+	dir := filepath.Join("..", "..", strings.TrimPrefix(typ.PkgPath(), "github.com/LucasPcq/wtm/next/"))
+	names, err := filepath.Glob(filepath.Join(dir, "*.go"))
+	require.NoError(t, err)
+
+	var values []string
+	for _, name := range names {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(token.NewFileSet(), name, nil, 0)
+		require.NoError(t, err)
+		ast.Inspect(file, func(node ast.Node) bool {
+			spec, ok := node.(*ast.ValueSpec)
+			if !ok {
+				return true
+			}
+			for _, value := range spec.Values {
+				if literal, ok := constantOf(spec.Type, value, typ.Name()); ok {
+					unquoted, err := strconv.Unquote(literal.Value)
+					require.NoError(t, err)
+					values = append(values, unquoted)
+				}
+			}
+			return false
+		})
+	}
+	return values
+}
+
+func constantOf(declared ast.Expr, value ast.Expr, typ string) (*ast.BasicLit, bool) {
+	if ident, ok := declared.(*ast.Ident); ok && ident.Name == typ {
+		literal, ok := value.(*ast.BasicLit)
+		return literal, ok && literal.Kind == token.STRING
+	}
+	call, ok := value.(*ast.CallExpr)
+	if !ok || len(call.Args) != 1 {
+		return nil, false
+	}
+	if ident, ok := call.Fun.(*ast.Ident); !ok || ident.Name != typ {
+		return nil, false
+	}
+	literal, ok := call.Args[0].(*ast.BasicLit)
+	return literal, ok && literal.Kind == token.STRING
+}
+
+// stringsOf are the values of a slice of a string type, as strings.
+func stringsOf(values any) []string {
+	slice := reflect.ValueOf(values)
+	found := make([]string, slice.Len())
+	for i := range found {
+		found[i] = slice.Index(i).String()
+	}
+	return found
 }

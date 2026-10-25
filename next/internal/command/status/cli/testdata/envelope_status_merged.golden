@@ -66,20 +66,7 @@
         "review": {
           "number": 12,
           "url": "https://github.com/acme/acme/pull/12",
-          "state": "merged",
-          "fix": {
-            "command": "clean",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/a"
-                ]
-              }
-            ],
-            "code": "status.merged",
-            "message": "clean it up"
-          }
+          "state": "merged"
         },
         "isolation": "isolated",
         "run_toml": "declared",
@@ -209,7 +196,8 @@
               "message": "start it again"
             }
           }
-        ]
+        ],
+        "condition": "merged"
       }
     }
   ],

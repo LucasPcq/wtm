@@ -98,10 +98,10 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 		return state
 	}
 
-	gap, err := repository.GapToParent(facts.Repository, facts.Stack, w, func(against string) (worktree.AheadBehind, error) {
+	gap, err := repository.GapToParent(repository.GapParams{Repo: facts.Repository, Stack: facts.Stack, Worktree: w, Count: func(against string) (worktree.AheadBehind, error) {
 		counts, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: against})
 		return counts, repository.Interrupted(ctx, err)
-	})
+	}})
 	state.Ahead, state.Behind, state.Err = gap.Ahead, gap.Behind, err
 	return state
 }
