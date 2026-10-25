@@ -15,8 +15,7 @@ export type Start = { answers: DomainAnswered[]; fingerprint: string; plan: Crea
 // cancel it (then force it) and put it away once it ended.
 export function useCreateRun(repo: string) {
   const client = useQueryClient()
-  const progress = useQuery<Progress>({ queryKey: progressKey(repo), queryFn: skipToken }).data
-  const running = useMutationState({ filters: { mutationKey: runKey(repo), status: 'pending' } }).length > 0
+  const { progress, running } = useRun(repo)
   const update = (change: (progress: Progress) => Progress) =>
     client.setQueryData<Progress>(progressKey(repo), (current) => current && change(current))
 
@@ -50,9 +49,16 @@ export function useCreateRun(repo: string) {
   }
 }
 
+// useRun is the progress of the create this page runs and whether it still runs, read without running one.
+function useRun(repo: string) {
+  const progress = useQuery<Progress>({ queryKey: progressKey(repo), queryFn: skipToken }).data
+  const running = useMutationState({ filters: { mutationKey: runKey(repo), status: 'pending' } }).length > 0
+  return { progress, running }
+}
+
 // useUnderWay is what the create this page runs does to each worktree, by branch, while it runs.
 export function useUnderWay(repo: string): Record<string, string> {
-  const { progress, running } = useCreateRun(repo)
+  const { progress, running } = useRun(repo)
   if (!running || !progress) return {}
   return Object.fromEntries(
     progress.units

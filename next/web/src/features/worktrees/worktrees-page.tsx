@@ -1,13 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { CircleAlert, GitBranchPlus, SearchX } from 'lucide-react'
+import { GitBranchPlus, Info, SearchX } from 'lucide-react'
 import { githubQuery, readQuery } from '@/api/queries/commands'
+import type { DomainWarning } from '@/api/types.gen'
 import { reposQuery } from '@/api/queries/repos'
-import { Centered } from '@/components/centered'
 import { PageHeader } from '@/components/page-header'
 import { StatePage } from '@/components/state-page'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { repoName } from '@/lib/repo'
 import { CreateButton } from './create/create-dialog'
 import { DetailPanel } from './detail/detail-panel'
@@ -20,6 +19,8 @@ import { Toolbar } from './list/toolbar'
 import { WorktreeTable } from './list/worktree-table'
 import type { WorktreesSearch } from './search'
 import { unavailable } from './shared/github'
+import { sentence } from './shared/sentence'
+import { Loading, ReadFailed } from './shared/loading'
 import { useUnderWay } from './hooks/use-create-run'
 import { TreeView } from './tree/tree-view'
 
@@ -57,13 +58,7 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1 overflow-y-auto px-3 py-2" aria-busy={live.isPending}>
           {live.isPending && <Loading />}
-          {live.isError && (
-            <Centered>
-              <StatePage icon={<CircleAlert />} title="wtm couldn't read the worktrees">
-                {live.error.message}
-              </StatePage>
-            </Centered>
-          )}
+          {live.isError && <ReadFailed message={live.error.message} />}
           {live.data && tree && <TreeView repo={repo} search={search} underWay={underWay} />}
           {live.data && !tree && (
             <>
@@ -76,6 +71,7 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
                   now={live.dataUpdatedAt}
                 />
               )}
+              <Notes warnings={live.data.warnings} />
               {rows.length === 1 && filter === 'all' && !search.q && <OnlyMain />}
               {shown.length === 0 && (rows.length > 1 || filter !== 'all' || search.q) && <NoMatch />}
             </>
@@ -89,21 +85,19 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
   )
 }
 
-function Loading() {
+// Notes are what the read could not tell, said under the list as facts of the moment, not as a failure of it: the
+// run daemon that cannot say which jobs are up, a base branch missing, origin out of reach.
+function Notes({ warnings }: { warnings: DomainWarning[] }) {
+  if (warnings.length === 0) return null
   return (
-    <div className="flex flex-col">
-      {[220, 160, 240, 180, 200].map((width) => (
-        <div key={width} className="flex h-14 items-center gap-6 border-b px-5">
-          <div className="flex flex-1 flex-col gap-1.5">
-            <Skeleton className="h-3" style={{ width }} />
-            <Skeleton className="h-2.5 w-20" />
-          </div>
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-3 w-32" />
-          <Skeleton className="h-3 w-16" />
-        </div>
+    <ul className="flex flex-col gap-1 px-5 py-3 text-xs text-muted-foreground">
+      {warnings.map((warning) => (
+        <li key={warning.code} className="flex items-center gap-1.5">
+          <Info className="size-3.5 shrink-0" aria-hidden="true" />
+          {sentence(warning.message)}
+        </li>
       ))}
-    </div>
+    </ul>
   )
 }
 

@@ -15,8 +15,3 @@ export function shownSections(stored: unknown): SectionId[] {
   if (!Array.isArray(stored)) return [...sectionIds]
   return sectionIds.filter((id) => stored.includes(id))
 }
-
-// sentence is a message of the core, which reads as a clause ("its pull request is merged"), as a sentence; one that
-// opens on a name (a branch, a file) keeps it as it is spelled.
-export const sentence = (message: string) =>
-  /^[a-z]+ /.test(message) ? message.charAt(0).toUpperCase() + message.slice(1) : message

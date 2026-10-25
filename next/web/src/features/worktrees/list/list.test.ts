@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import type { Read } from '@/api/queries/commands'
 import type { ListDetail } from '@/api/types.gen'
-import { sentence } from '../detail/sections'
+import { sentence } from '../shared/sentence'
 import { shownColumns, toggled } from './columns'
 import { countsOf, matches, searched } from './filters'
 import { rowsOf, type Row } from './rows'

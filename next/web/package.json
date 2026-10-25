@@ -8,8 +8,8 @@
     "predev": "npm run types",
     "dev": "vite",
     "prebuild": "npm run types && tsr generate",
-    "build": "tsc -b && vite build && oxlint --deny-warnings && prettier --check .",
-    "lint": "oxlint",
+    "build": "tsc -b && vite build && npm run lint && prettier --check .",
+    "lint": "oxlint --deny-warnings",
     "test": "vitest run",
     "format": "prettier --write ."
   },

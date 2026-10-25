@@ -21,8 +21,8 @@ export function ProgressView(props: {
 }) {
   const { progress } = props
   const branches = progress.units
+    .filter(([, unit]) => unit.phases.some((run) => run.phase !== 'fast_forward'))
     .map(([subject]) => subject)
-    .filter((s) => progress.units.find(([u]) => u === s)?.[1].phases.some((p) => p.phase !== 'fast_forward'))
   const now = current(progress)
   const { done, total } = doneOf(progress)
   const ended = !props.running

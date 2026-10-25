@@ -15,7 +15,8 @@ import { copy } from '../shared/copy'
 import { unavailable } from '../shared/github'
 import { Glyph, type Tone } from '../shared/glyph'
 import { ActionsMenu } from './actions-menu'
-import { sectionIds, sectionTitle, sentence, shownSections, type SectionId } from './sections'
+import { sentence } from '../shared/sentence'
+import { sectionIds, sectionTitle, shownSections, type SectionId } from './sections'
 
 // DetailPanel is the whole read of one worktree: its status as it changes, what GitHub said of it when the panel
 // opened, the problem to fix first with its command, and the sections chosen.

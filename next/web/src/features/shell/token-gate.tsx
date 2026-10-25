@@ -1,10 +1,11 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { onTokenChange, token } from '@/api/token'
 import { StatePage } from '@/components/state-page'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 // TokenGate shows the page only with a token of the server, and else how to open it.
 export function TokenGate(props: { children: ReactNode }) {
-  if (useSyncExternalStore(onTokenChange, token) !== null) return props.children
+  if (useSyncExternalStore(onTokenChange, token) !== null) return <TooltipProvider>{props.children}</TooltipProvider>
 
   return (
     <main className="flex min-h-svh items-center justify-center p-4">

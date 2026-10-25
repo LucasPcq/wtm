@@ -4,7 +4,253 @@
   "ignorePatterns": ["src/components/ui/**", "src/hooks/**", "src/**/*.gen.ts"],
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+    "react/only-export-components": [
+      "warn",
+      {
+        "allowConstantExport": true
+      }
+    ],
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "react",
+            "importNames": ["useEffect", "useLayoutEffect", "useInsertionEffect"],
+            "message": "No effects: derive while rendering, put data and side effects in TanStack Query/Router/Form, a DOM hook in a ref callback (docs/dev/web-front.md)."
+          },
+          {
+            "name": "eventsource-parser",
+            "message": "Streams are parsed in src/api/ only."
+          },
+          {
+            "name": "eventsource-parser/stream",
+            "message": "Streams are parsed in src/api/ only."
+          }
+        ]
+      }
+    ],
+    "no-restricted-properties": [
+      "error",
+      {
+        "object": "React",
+        "property": "useEffect",
+        "message": "No effects: derive while rendering, put data and side effects in TanStack Query/Router/Form, a DOM hook in a ref callback (docs/dev/web-front.md)."
+      },
+      {
+        "object": "React",
+        "property": "useLayoutEffect",
+        "message": "No effects: derive while rendering, put data and side effects in TanStack Query/Router/Form, a DOM hook in a ref callback (docs/dev/web-front.md)."
+      }
+    ],
+    "no-restricted-globals": [
+      "error",
+      {
+        "name": "fetch",
+        "message": "The server is reached through src/api/ only: a component reads with useQuery and writes with useMutation over api/queries/."
+      },
+      {
+        "name": "EventSource",
+        "message": "The server is reached through src/api/ only: a component reads with useQuery and writes with useMutation over api/queries/."
+      },
+      {
+        "name": "XMLHttpRequest",
+        "message": "The server is reached through src/api/ only: a component reads with useQuery and writes with useMutation over api/queries/."
+      },
+      {
+        "name": "WebSocket",
+        "message": "The server is reached through src/api/ only: a component reads with useQuery and writes with useMutation over api/queries/."
+      }
+    ]
   },
-  "overrides": [{ "files": ["src/routes/**"], "rules": { "react/only-export-components": "off" } }]
+  "overrides": [
+    {
+      "files": ["src/api/**"],
+      "rules": {
+        "no-restricted-globals": "off",
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react",
+                "importNames": ["useEffect", "useLayoutEffect", "useInsertionEffect"],
+                "message": "No effects: derive while rendering, put data and side effects in TanStack Query/Router/Form, a DOM hook in a ref callback (docs/dev/web-front.md)."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["@/**"],
+                "message": "src/api/ is the bottom layer: it imports nothing of the app, only itself and its packages."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/*/*.ts", "src/features/*/*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react",
+                "importNames": ["useEffect", "useLayoutEffect", "useInsertionEffect"],
+                "message": "No effects: derive while rendering, put data and side effects in TanStack Query/Router/Form, a DOM hook in a ref callback (docs/dev/web-front.md)."
+              },
+              {
+                "name": "eventsource-parser",
+                "message": "Streams are parsed in src/api/ only."
+              },
+              {
+                "name": "eventsource-parser/stream",
+                "message": "Streams are parsed in src/api/ only."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["@/features/**"],
+                "message": "A feature reaches another one's code only once it moved to components/ or lib/: import within this feature by a relative path."
+              },
+              {
+                "group": ["../**"],
+                "message": "Out of this feature: reach shared code by @/components or @/lib."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/*/*/*.ts", "src/features/*/*/*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react",
+                "importNames": ["useEffect", "useLayoutEffect", "useInsertionEffect"],
+                "message": "No effects: derive while rendering, put data and side effects in TanStack Query/Router/Form, a DOM hook in a ref callback (docs/dev/web-front.md)."
+              },
+              {
+                "name": "eventsource-parser",
+                "message": "Streams are parsed in src/api/ only."
+              },
+              {
+                "name": "eventsource-parser/stream",
+                "message": "Streams are parsed in src/api/ only."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["@/features/**"],
+                "message": "A feature reaches another one's code only once it moved to components/ or lib/: import within this feature by a relative path."
+              },
+              {
+                "group": ["../../**"],
+                "message": "Out of this feature: reach shared code by @/components or @/lib."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/routes/**"],
+      "rules": {
+        "react/only-export-components": "off",
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react",
+                "importNames": ["useEffect", "useLayoutEffect", "useInsertionEffect"],
+                "message": "No effects: derive while rendering, put data and side effects in TanStack Query/Router/Form, a DOM hook in a ref callback (docs/dev/web-front.md)."
+              },
+              {
+                "name": "eventsource-parser",
+                "message": "Streams are parsed in src/api/ only."
+              },
+              {
+                "name": "eventsource-parser/stream",
+                "message": "Streams are parsed in src/api/ only."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["@/api/**", "@/components/**", "@/lib/**", "@/hooks/**", "lucide-react"],
+                "message": "A route is a path and a feature: it reads its params and renders the feature's component, no markup, no query."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/components/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react",
+                "importNames": ["useEffect", "useLayoutEffect", "useInsertionEffect"],
+                "message": "No effects: derive while rendering, put data and side effects in TanStack Query/Router/Form, a DOM hook in a ref callback (docs/dev/web-front.md)."
+              },
+              {
+                "name": "eventsource-parser",
+                "message": "Streams are parsed in src/api/ only."
+              },
+              {
+                "name": "eventsource-parser/stream",
+                "message": "Streams are parsed in src/api/ only."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["@/features/**", "@/routes/**"],
+                "message": "components/ holds what features share: it never reaches into a feature."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/lib/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react",
+                "importNames": ["useEffect", "useLayoutEffect", "useInsertionEffect"],
+                "message": "No effects: derive while rendering, put data and side effects in TanStack Query/Router/Form, a DOM hook in a ref callback (docs/dev/web-front.md)."
+              },
+              {
+                "name": "eventsource-parser",
+                "message": "Streams are parsed in src/api/ only."
+              },
+              {
+                "name": "eventsource-parser/stream",
+                "message": "Streams are parsed in src/api/ only."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["@/**", "react"],
+                "message": "lib/ is pure helpers: no React, no fetch, nothing of the app."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

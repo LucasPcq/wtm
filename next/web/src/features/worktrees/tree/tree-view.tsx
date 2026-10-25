@@ -16,12 +16,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import { Loading, ReadFailed } from '../shared/loading'
 import { UnderWay } from '../shared/under-way'
 import type { WorktreesSearch } from '../search'
 import { CommandLine } from '../shared/command-line'
 import { Glyph } from '../shared/glyph'
 import { reparent, sync, nodesOf, type Node } from './nodes'
-import { sentence } from '../detail/sections'
+import { sentence } from '../shared/sentence'
 
 type Drop = { branch: string; parent: string }
 
@@ -31,7 +32,8 @@ export function TreeView(props: { repo: string; search: WorktreesSearch; underWa
   const live = useQuery(readQuery(props.repo, 'tree'))
   const github = useQuery(githubQuery(props.repo, 'tree'))
   const [dropped, setDropped] = useState<Drop>()
-  if (!live.data) return null
+  if (live.isPending) return <Loading />
+  if (live.isError) return <ReadFailed message={live.error.message} />
 
   const view: View = {
     query: (props.search.q ?? '').trim().toLowerCase(),

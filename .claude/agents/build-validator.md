@@ -84,6 +84,15 @@ make test        # scope=full: go test ./... -race -count=1
 
 Report failed tests by package and name, and flag any data race separately: a race is a blocker even when the test passed.
 
+### Step 4b — The web front (when the change touches next/web)
+
+```bash
+git diff --quiet "$fork" -- next/web && [ -z "$(git ls-files --others --exclude-standard next/web)" ] ||
+  { make lint-ui && (cd next/web && npm test); }
+```
+
+`make lint-ui` is the front's gate (types, oxlint with the `web-front` skill's rules, prettier); `npm test` runs Vitest. A failure of either is a blocker. Then `make ui` and `git status --porcelain next/internal/web/dist` must be clean: a `dist/` that differs from what `make ui` writes fails the CI `ui` gate.
+
 ### Step 5 — Duplication (informative)
 
 ```bash

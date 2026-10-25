@@ -16,7 +16,12 @@ const text = (path: string, skip?: string): DomainField => ({
 
 test('each question goes in its step, a skipped one is listed apart, one the build does not know goes last', () => {
   const form: DomainForm = {
-    fields: [text('branches'), text('env_from', 'the branch exists'), text('if_not_exists', 'set by its flag only'), text('new_one')],
+    fields: [
+      text('branches'),
+      text('env_from', 'the branch exists'),
+      text('if_not_exists', 'set by its flag only'),
+      text('new_one'),
+    ],
     problems: [],
   }
 
