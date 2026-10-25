@@ -9,6 +9,7 @@ import { DetailPanel } from '@/features/worktrees/detail/detail-panel'
 import { useRead } from '@/features/worktrees/hooks/use-read'
 import { columnIds, defaultColumns } from '@/features/worktrees/list/components/columns'
 import { ColumnsPanel } from '@/features/worktrees/list/components/columns-panel'
+import { Notes } from '@/features/worktrees/list/components/notes'
 import { ListView } from '@/features/worktrees/list/list-view'
 import { rowsOf } from '@/features/worktrees/list/utils/rows'
 import { useChoice } from '@/features/worktrees/store/ui-store'
@@ -65,11 +66,17 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
       />
 
       <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1 overflow-y-auto px-3 py-2" aria-busy={!read}>
-          {tree ? (
-            <TreeView repo={repo} search={search} underWay={underWay} />
-          ) : (
-            <ListView live={list.live} githubOut={githubOut} rows={rows} shown={columns.shown} search={search} />
+        <div className="flex min-w-0 flex-1 flex-col" aria-busy={!read}>
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+            {tree ? (
+              <TreeView repo={repo} search={search} underWay={underWay} />
+            ) : (
+              <ListView live={list.live} rows={rows} shown={columns.shown} search={search} />
+            )}
+          </div>
+          {/* below the rows, not after them: the notes stay put whatever the filters keep */}
+          {!tree && list.live.data && (
+            <Notes warnings={githubOut ? [...list.live.data.warnings, githubOut] : list.live.data.warnings} />
           )}
         </div>
         {search.worktree && (

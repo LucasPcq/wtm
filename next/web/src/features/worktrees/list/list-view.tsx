@@ -2,13 +2,11 @@ import type { UseQueryResult } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { GitBranchPlus, SearchX } from 'lucide-react'
 import type { Read } from '@/api/queries/commands'
-import type { DomainWarning } from '@/api/types.gen'
 import { StatePage } from '@/components/state-page'
 import { Button } from '@/components/ui/button'
 import { Loading } from '@/features/worktrees/components/loading'
 import { ReadFailed } from '@/features/worktrees/components/read-failed'
 import type { ColumnId } from '@/features/worktrees/list/components/columns'
-import { Notes } from '@/features/worktrees/list/components/notes'
 import { WorktreeTable } from '@/features/worktrees/list/components/worktree-table'
 import type { Row } from '@/features/worktrees/list/utils/rows'
 import { matches, searched } from '@/features/worktrees/utils/filters'
@@ -16,13 +14,11 @@ import type { WorktreesSearch } from '@/features/worktrees/utils/search'
 
 export function ListView({
   live,
-  githubOut,
   rows,
   shown,
   search,
 }: {
   live: UseQueryResult<Read<'list'>>
-  githubOut: DomainWarning | undefined
   rows: Row[]
   shown: ColumnId[]
   search: WorktreesSearch
@@ -38,7 +34,6 @@ export function ListView({
   return (
     <>
       {kept.length > 0 && <WorktreeTable rows={kept} shown={shown} open={search.worktree} />}
-      <Notes warnings={githubOut ? [...live.data.warnings, githubOut] : live.data.warnings} />
       {rows.length === 1 && !narrowed && <OnlyMain />}
       {kept.length === 0 && (rows.length > 1 || narrowed) && <NoMatch />}
     </>
