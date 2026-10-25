@@ -26,7 +26,7 @@
           "anyOf": [
             {
               "items": {
-                "type": "string"
+                "$ref": "#/$defs/domain.Phase"
               },
               "type": "array"
             },
@@ -831,6 +831,9 @@
         "label"
       ],
       "type": "object"
+    },
+    "domain.Phase": {
+      "$ref": "events.v2.json#/$defs/phase"
     },
     "domain.RecapRow": {
       "additionalProperties": false,

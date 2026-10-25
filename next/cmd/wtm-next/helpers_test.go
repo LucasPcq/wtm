@@ -285,6 +285,7 @@ func generatedSchema(t *testing.T) []byte {
 	s.fieldUnion()
 	s.defs["domain.Event"] = map[string]any{"$ref": "events.v2.json#/$defs/event"}
 	s.defs["domain.Line"] = map[string]any{"$ref": "events.v2.json"}
+	s.defs["domain.Phase"] = map[string]any{"$ref": "events.v2.json#/$defs/phase"}
 	// the types the fragments name
 	for _, named := range []reflect.Type{reflect.TypeFor[domain.Warning](), reflect.TypeFor[domain.FollowUp](), reflect.TypeFor[domain.Section]()} {
 		s.of(named)
@@ -445,6 +446,9 @@ func (s *schemaWriter) of(t reflect.Type) map[string]any {
 	}
 	if t == reflect.TypeFor[time.Time]() {
 		return map[string]any{"type": "string", "format": "date-time"}
+	}
+	if t == reflect.TypeFor[domain.Phase]() {
+		return ref("domain.Phase")
 	}
 	if t.Implements(marshaler) || reflect.PointerTo(t).Implements(marshaler) {
 		name := defName(t)

@@ -63,3 +63,17 @@ test('the connection reads the query of the stream', () => {
     'disconnected',
   )
 })
+
+test('back after a break, everything is read again but what GitHub answered, asked on demand only', async () => {
+  const client = new QueryClient()
+  client.setQueryData(['repos'], [repo])
+  client.setQueryData(eventsQuery.queryKey, {})
+  client.setQueryData(['repo', 'r1', 'list', []], { ok: true })
+  client.setQueryData(['github', 'r1', 'list', []], { ok: true })
+  serve(200)
+
+  await client.fetchQuery({ ...eventsQuery, staleTime: 0 })
+
+  expect(client.getQueryState(['repo', 'r1', 'list', []])?.isInvalidated).toBe(true)
+  expect(client.getQueryState(['github', 'r1', 'list', []])?.isInvalidated).toBe(false)
+})

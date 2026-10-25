@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { cva } from 'class-variance-authority'
 import { RefreshCw } from 'lucide-react'
 import { connectionOf, eventsQuery, type Connection } from '@/api/queries/events'
-import { repoKey, run } from '@/api/queries/commands'
+import { githubKey, githubQuery, refreshList, repoKey } from '@/api/queries/commands'
 import { Button } from '@/components/ui/button'
 import { SidebarFooter } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
@@ -38,9 +38,14 @@ export function ConnectionFooter({ repo }: { repo: string | undefined }) {
   const client = useQueryClient()
   const events = useQuery(eventsQuery)
   const connection = connectionOf(events)
-  // list with its fetch answer, as the picker's refresh does on the command line
+  // list fetching origin and asking GitHub, as the picker's refresh does: GitHub's list is the one it read, its
+  // other reads (an open detail's) are asked again
   const fetchOrigin = useMutation({
-    mutationFn: (repo: string) => run(repo, 'list', { answers: [{ path: 'fetch', values: ['true'] }] }),
+    mutationFn: refreshList,
+    onSuccess: (read, repo) => {
+      client.setQueryData(githubQuery(repo, 'list').queryKey, read)
+      void client.invalidateQueries({ queryKey: githubKey(repo), predicate: (q) => q.queryKey[2] !== 'list' })
+    },
     onSettled: (_data, _error, repo) => client.invalidateQueries({ queryKey: repoKey(repo) }),
   })
   const problem = fetchOrigin.error?.message ?? fetchOrigin.data?.warnings[0]?.message

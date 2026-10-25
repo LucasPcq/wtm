@@ -31,9 +31,9 @@ const refused = (error: unknown) => error instanceof HttpError && error.status =
 async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<Live> {
   const response = await request('/api/events', { signal })
   if (!response.ok || !response.body) throw new HttpError(response.status, 'the event stream was refused')
-  // back after a break: the lines in between are lost, so everything is read again
+  // back after a break: the lines in between are lost, so everything is read again, but GitHub, asked on demand only
   if (client.getQueryData(eventsQuery.queryKey))
-    client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'events' })
+    client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'events' && q.queryKey[0] !== 'github' })
   yield {}
 
   const reader = response.body

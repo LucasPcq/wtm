@@ -1,0 +1,112 @@
+import type { OperationLine } from '@/api/queries/operations'
+import type { CreatePlan, DomainEnvelope, DomainItem } from '@/api/types.gen'
+import type { Phase } from './phases'
+
+export type PhaseRun = {
+  phase: Phase
+  state: 'todo' | 'now' | 'done' | 'failed'
+  startedAt?: string
+  endedAt?: string
+  log?: string
+}
+
+// A Unit is one subject of the operation: its phases, the lines its hooks printed, and how it ended.
+export type Unit = { phases: PhaseRun[]; lines: string[]; status?: DomainItem['status'] }
+
+// Progress is a create as it runs: its operation, each subject's unit in the plan's order, whether a cancel was
+// asked (then forced), and its envelope once it ended, or why the server refused it.
+export type Progress = {
+  operation?: string
+  units: [string, Unit][]
+  cancelling?: 'asked' | 'forced'
+  envelope?: DomainEnvelope
+  refused?: string
+}
+
+const kept = 200
+
+// planned is the progress of plan before it starts: each source branch it fast-forwards, then each branch it
+// opens, with the phases the plan says it runs, none started.
+export function planned(plan: CreatePlan): Progress {
+  const todo = (phases: Phase[]): Unit => ({ phases: phases.map((phase) => ({ phase, state: 'todo' })), lines: [] })
+  return {
+    units: [
+      ...(plan.fast_forward ?? []).map((subject): [string, Unit] => [subject, todo(['fast_forward'])]),
+      ...(plan.branches ?? [])
+        .filter((branch) => branch.phases && branch.phases.length > 0)
+        .map((branch): [string, Unit] => [branch.branch, todo(branch.phases ?? [])]),
+    ],
+  }
+}
+
+// advance is progress once line happened; a line of a subject or a phase the plan did not foresee adds it.
+export function advance(progress: Progress, line: OperationLine): Progress {
+  if (!('subject' in line) || typeof line.subject !== 'string') return progress
+  const subject = line.subject
+  const units = progress.units.some(([s]) => s === subject)
+    ? progress.units
+    : [...progress.units, [subject, { phases: [], lines: [] }] as [string, Unit]]
+  return {
+    ...progress,
+    units: units.map(([s, unit]) => [s, s === subject ? step(unit, line) : unit]),
+  }
+}
+
+function step(unit: Unit, line: OperationLine): Unit {
+  switch (line.type) {
+    case 'phase.started':
+      return {
+        ...unit,
+        phases: upsert(unit.phases, {
+          phase: line.phase,
+          state: 'now',
+          startedAt: line.ts,
+          ...(line.log && { log: line.log }),
+        }),
+      }
+    case 'phase.finished': {
+      const run = unit.phases.find((p) => p.phase === line.phase)
+      return {
+        ...unit,
+        phases: upsert(unit.phases, {
+          ...run,
+          phase: line.phase,
+          state: line.failed ? 'failed' : 'done',
+          endedAt: line.ts,
+        }),
+      }
+    }
+    case 'phase.output':
+      return { ...unit, lines: [...unit.lines, line.line].slice(-kept) }
+    case 'unit.finished':
+      return { ...unit, status: line.status }
+    default:
+      return unit
+  }
+}
+
+function upsert(phases: PhaseRun[], run: PhaseRun): PhaseRun[] {
+  return phases.some((p) => p.phase === run.phase)
+    ? phases.map((p) => (p.phase === run.phase ? run : p))
+    : [...phases, run]
+}
+
+// current is the phase under way in progress, else the next one to run, none once every one ended.
+export function current(
+  progress: Progress,
+): { subject: string; run: PhaseRun; index: number; total: number } | undefined {
+  const all = progress.units.flatMap(([subject, unit]) => unit.phases.map((run) => ({ subject, run })))
+  const index = all.findIndex(({ run }) => run.state === 'now' || run.state === 'todo')
+  const found = all[index]
+  return found && { ...found, index, total: all.length }
+}
+
+// done counts the phases that ended, of all of them.
+export function doneOf(progress: Progress): { done: number; total: number } {
+  const all = progress.units.flatMap(([, unit]) => unit.phases)
+  return { done: all.filter((run) => run.state === 'done' || run.state === 'failed').length, total: all.length }
+}
+
+// seconds is how long a phase took, to the tenth.
+export const seconds = (run: PhaseRun) =>
+  run.startedAt && run.endedAt ? `${((Date.parse(run.endedAt) - Date.parse(run.startedAt)) / 1000).toFixed(1)} s` : ''

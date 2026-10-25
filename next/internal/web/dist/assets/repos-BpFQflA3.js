@@ -1,0 +1,1 @@
+import{H as e,I as t}from"./state-page-C84ybmt_.js";var n=e({queryKey:[`repos`],queryFn:()=>t(`/api/repos`)});export{n as t};

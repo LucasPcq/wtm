@@ -5,6 +5,7 @@ import { connectionOf, eventsQuery } from '@/api/queries/events'
 import { Centered } from '@/components/centered'
 import { StatePage } from '@/components/state-page'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { Toaster } from 'sonner'
 import { AppSidebar } from './app-sidebar'
 
 // Shell is the frame of every screen: the sidebar, and the screen beside it, unless the server restarted.
@@ -26,6 +27,7 @@ export function Shell(props: { repo: string | undefined; children: ReactNode }) 
           props.children
         )}
       </SidebarInset>
+      <Toaster position="bottom-right" theme="system" />
     </SidebarProvider>
   )
 }
