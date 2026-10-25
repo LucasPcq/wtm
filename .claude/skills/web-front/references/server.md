@@ -34,7 +34,12 @@ A follow-up the catalogue cannot run (clean, sync, go, reparent, run …) shows 
 
 `runStreamed({ repo, command, call, started, line })` (`queries/operations.ts`) posts a command with `Accept: text/event-stream` and `expect_fingerprint` from the dry run. It hands the operation's id to `started` as soon as the server names it (`X-Wtm-Operation`), each event to `line`, and resolves with the narrowed envelope. An answer that names no operation is refused and its connection aborted: nothing could cancel it. `cancel(repo, operation, force)` is `DELETE …/operations/{id}` (`?force=true` the second time).
 
-Create's run lives in a zustand store (`useCreateRun`, `useUnderWay` in `features/worktrees/create/hooks/use-create-run.ts`): the dialog shows it, closed and opened again, and the list dims the rows it works on. `progress.ts` turns the plan into units (one per subject, a fast-forward first) and each event into their phases; `ending()` says how a run ended: cancelled (an item cancelled, or the envelope's error of kind `cancelled` when only the plan was under way), failed with why, or done.
+A mutation's run lives in one zustand store, keyed by command and repository (`useRun(repo, command)`, `useUnderWay` in `features/worktrees/hooks/use-run.ts`): the dialog shows it, closed and opened again, and the list dims the rows it works on. Each command turns its plan into units (create's `planned`, a fast-forward first; clean's `unitsOf`, one per worktree removed); the shared `utils/progress.ts` turns each event into their phases, the shared `Timeline` draws them, and `ending()` says how a run ended: cancelled (an item cancelled, or the envelope's error of kind `cancelled` when only the plan was under way), failed with why, or done.
+
+## Clean
+
+- **Selection**: rows are checked in the table (`useSelection`, every row but the main worktree's); while some are, `SelectionBar` stands in for the toolbar, its destructive action last and apart. The detail's "…" menu runs clean's own follow-up as "Remove worktree…", on that worktree alone; both open the one `RemoveDialog` of the page (`useRemoveDialog`).
+- **Steps**: Worktrees, Children, Confirm. The first reviews a forced dry run of every worktree asked, so each unsafe one shows what keeps it (`blockers`) and asks keep it or remove anyway; the request is the worktrees not kept, forced when one is removed anyway. Children is skipped when no child is left behind; its one choice is `reparent_children`, each child listed under the parent that goes with where it lands (`moves`). Confirm and the apply hold to the dry run of that request; a choice plans again, and the buttons wait for the fresh plan.
 
 ## The event stream
 

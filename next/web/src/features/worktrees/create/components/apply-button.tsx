@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { dryRunQuery } from '@/api/queries/commands'
 import type { DomainAnswered } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
-import type { Start } from '@/features/worktrees/create/hooks/use-create-run'
+import type { Planned } from '@/features/worktrees/create/utils/progress'
 
 export function ApplyButton({
   repo,
@@ -11,7 +11,7 @@ export function ApplyButton({
 }: {
   repo: string
   answers: DomainAnswered[]
-  onStart: (start: Start) => void
+  onStart: (start: Planned) => void
 }) {
   const dry = useQuery(dryRunQuery(repo, 'create', answers))
   const plan = dry.data?.plan

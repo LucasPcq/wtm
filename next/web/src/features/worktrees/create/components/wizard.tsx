@@ -9,7 +9,7 @@ import { Stepper, type StepState } from '@/features/worktrees/components/stepper
 import { ApplyButton } from '@/features/worktrees/create/components/apply-button'
 import { Confirm } from '@/features/worktrees/create/components/confirm'
 import { NotAsked } from '@/features/worktrees/create/components/not-asked'
-import type { Start } from '@/features/worktrees/create/hooks/use-create-run'
+import type { Planned } from '@/features/worktrees/create/utils/progress'
 import { nextAsked, stepsOf } from '@/features/worktrees/create/utils/steps'
 import { initialWizard, wizardReducer } from '@/features/worktrees/create/utils/wizard-state'
 import { createWords } from '@/features/worktrees/create/utils/words'
@@ -22,7 +22,7 @@ export function Wizard({
 }: {
   repo: string
   form: DomainForm
-  onStart: (start: Start) => void
+  onStart: (start: Planned) => void
   onCancel: () => void
 }) {
   const { form, asked, answers, check, problems } = useCommandForm({ repo, command: 'create', form: initial })

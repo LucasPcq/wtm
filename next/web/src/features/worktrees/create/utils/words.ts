@@ -1,4 +1,4 @@
-import type { CreateAction, CreateRequest, DomainField, DomainPhase, DomainSkip } from '@/api/types.gen'
+import type { CreateAction, CreateRequest, DomainField, DomainSkip } from '@/api/types.gen'
 import type { FieldWords, OptionWords } from '@/components/command-form/command-fields'
 
 // The core words its questions for the command line; the web says them its own way. Each record is exhaustive over
@@ -81,17 +81,4 @@ export const actionWords: Record<CreateAction, string> = {
   check_out: 'Existing branch, as it is',
   resume: 'From origin, tracking it',
   unchanged: 'Already open, left as it is',
-}
-
-export const phaseLabel: Record<DomainPhase, string> = {
-  fast_forward: 'Fast-forward the source branch',
-  worktree: 'Add the worktree',
-  env: 'Copy its .env files',
-  meta: 'Record it',
-  ordinal: 'Number it',
-  ports: 'Settle its ports',
-  on_create: 'Run the on_create hooks',
-  move: 'Move the changes',
-  on_clean: 'Run the on_clean hooks',
-  remove: 'Remove the worktree',
 }

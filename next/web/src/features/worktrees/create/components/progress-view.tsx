@@ -4,10 +4,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress as Bar } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Timeline } from '@/features/worktrees/components/timeline'
 import { Made } from '@/features/worktrees/create/components/made'
-import { Timeline } from '@/features/worktrees/create/components/timeline'
-import { current, doneOf, ending, type Progress, took } from '@/features/worktrees/create/utils/progress'
-import { phaseLabel } from '@/features/worktrees/create/utils/words'
+import { phaseLabel } from '@/features/worktrees/utils/phases'
+import { current, doneOf, ending, type Progress, took } from '@/features/worktrees/utils/progress'
 import { cn } from '@/lib/utils'
 
 export function ProgressView({
@@ -18,7 +18,7 @@ export function ProgressView({
   onAnother,
   onDone,
 }: {
-  progress: Progress
+  progress: Progress<'create'>
   running: boolean
   onHide: () => void
   onCancel: (force: boolean) => void
@@ -117,11 +117,11 @@ export function ProgressView({
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-3">
-                <Timeline progress={progress} />
+                <Timeline units={progress.units} />
               </CollapsibleContent>
             </Collapsible>
           ) : (
-            <Timeline progress={progress} />
+            <Timeline units={progress.units} />
           )}
           {!running && failure && <p className="text-sm text-destructive">{failure}</p>}
           {!running && progress.envelope && <Made envelope={progress.envelope} />}

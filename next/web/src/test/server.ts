@@ -153,9 +153,11 @@ const cleanPlan = (call: WebCall) => {
         worktree: branch,
         branch,
         path: `/acme.trees/${branch.replace('/', '-')}`,
+        hooks: ['docker compose down'],
+        phases: ['on_clean', 'remove'],
         blockers: unsafe.includes(branch) ? ['dirty'] : [],
       })),
-      moves: children.map((w) => ({ branch: w.branch, from: w.parent, to: 'main' })),
+      moves: children.map((w) => ({ branch: w.branch, from: w.parent, to: 'main', base: true })),
       reparent_children: said('reparent_children'),
       force: said('force'),
     },
@@ -170,6 +172,9 @@ const cleanRun = (call: WebCall) => {
     [
       ...picked.flatMap((branch) => [
         line({ type: 'unit.started', subject: branch }),
+        line({ type: 'phase.started', subject: branch, phase: 'on_clean' }),
+        line({ type: 'phase.output', subject: branch, line: 'Container acme-api-1  Stopped' }),
+        line({ type: 'phase.finished', subject: branch, phase: 'on_clean', failed: false }),
         line({ type: 'phase.started', subject: branch, phase: 'remove' }),
         line({ type: 'phase.finished', subject: branch, phase: 'remove', failed: false }),
         line({ type: 'unit.finished', subject: branch, status: 'done' }),

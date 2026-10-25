@@ -1,8 +1,8 @@
 import { Check, LoaderCircle, X } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { type PhaseRun, type Progress, seconds } from '@/features/worktrees/create/utils/progress'
-import { phaseLabel } from '@/features/worktrees/create/utils/words'
 import { copy } from '@/features/worktrees/utils/copy'
+import { phaseLabel } from '@/features/worktrees/utils/phases'
+import { type PhaseRun, seconds, type Unit } from '@/features/worktrees/utils/progress'
 import { cn } from '@/lib/utils'
 
 const marker: Record<PhaseRun['state'], ReactNode> = {
@@ -12,12 +12,12 @@ const marker: Record<PhaseRun['state'], ReactNode> = {
   failed: <X className="size-3 text-destructive" />,
 }
 
-export function Timeline({ progress }: { progress: Progress }) {
-  const named = progress.units.length > 1
+export function Timeline({ units }: { units: Unit[] }) {
+  const named = units.length > 1
 
   return (
     <div className="flex flex-col gap-4">
-      {progress.units.map(({ subject, phases, lines }) => (
+      {units.map(({ subject, phases, lines }) => (
         <section key={subject} aria-label={subject}>
           {named && <h3 className="mb-2 font-mono text-xs text-muted-foreground">{subject}</h3>}
           <ol className="flex flex-col">

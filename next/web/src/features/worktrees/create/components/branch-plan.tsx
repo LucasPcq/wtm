@@ -1,6 +1,7 @@
 import type { CreateBranchPlan, CreatePlan } from '@/api/types.gen'
 import { Path } from '@/features/worktrees/components/path'
-import { actionWords, envFrom, isolation, phaseLabel } from '@/features/worktrees/create/utils/words'
+import { actionWords, envFrom, isolation } from '@/features/worktrees/create/utils/words'
+import { phaseLabel } from '@/features/worktrees/utils/phases'
 
 type Fact = { label: string; value: string; line?: string }
 

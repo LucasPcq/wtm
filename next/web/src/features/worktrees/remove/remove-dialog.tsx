@@ -1,64 +1,46 @@
-import { useQuery } from '@tanstack/react-query'
-import { Trash2 } from 'lucide-react'
-import { questionsQuery } from '@/api/queries/commands'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Skeleton } from '@/components/ui/skeleton'
-import { openRemove, useRemoveDialog } from '@/features/worktrees/hooks/use-remove-dialog'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { useRemoveDialog } from '@/features/worktrees/hooks/use-remove-dialog'
+import { useRun } from '@/features/worktrees/hooks/use-run'
+import { useSelection } from '@/features/worktrees/hooks/use-selection'
 import { RemoveProgress } from '@/features/worktrees/remove/components/remove-progress'
 import { RemoveWizard } from '@/features/worktrees/remove/components/remove-wizard'
-import { useRemoveRun } from '@/features/worktrees/remove/hooks/use-remove-run'
+import { cn } from '@/lib/utils'
 
 export function RemoveDialog({ repo }: { repo: string }) {
-  const { open, preset } = useRemoveDialog()
-  const run = useRemoveRun(repo)
-  const form = useQuery({ ...questionsQuery(repo, 'clean'), enabled: open })
+  const { open, worktrees } = useRemoveDialog()
+  const run = useRun(repo, 'clean')
+  const selection = useSelection(repo)
   const close = () => useRemoveDialog.setState({ open: false })
 
-  const content = () => {
-    if (run.progress)
-      return (
-        <RemoveProgress
-          progress={run.progress}
-          running={run.running}
-          onHide={close}
-          onCancel={run.cancel}
-          onClose={() => {
-            run.dismiss()
-            close()
-          }}
-        />
-      )
-
-    if (form.data)
-      return (
-        <RemoveWizard
-          key={preset.join('\n')}
-          repo={repo}
-          form={form.data}
-          preset={preset}
-          onStart={run.start}
-          onCancel={close}
-        />
-      )
-
-    return (
-      <DialogHeader>
-        <DialogTitle>Remove worktrees</DialogTitle>
-        <DialogDescription>{form.isError ? form.error.message : 'Asking wtm what it can remove…'}</DialogDescription>
-        {form.isPending && <Skeleton className="h-40 w-full" />}
-      </DialogHeader>
-    )
-  }
-
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? openRemove([]) : close())}>
-      <Button variant="outline" onClick={() => openRemove([])}>
-        <Trash2 />
-        Remove…
-      </Button>
-      <DialogContent className="flex max-h-[90vh] flex-col gap-6 sm:max-w-xl" showCloseButton={!run.running}>
-        {content()}
+    <Dialog open={open} onOpenChange={(next) => !next && close()}>
+      <DialogContent
+        className={cn('flex max-h-[90vh] flex-col gap-6 sm:max-w-xl', run.running && 'h-[min(36rem,85vh)]')}
+        showCloseButton={!run.running}
+      >
+        {run.progress ? (
+          <RemoveProgress
+            progress={run.progress}
+            running={run.running}
+            onHide={close}
+            onCancel={run.cancel}
+            onDone={() => {
+              run.dismiss()
+              close()
+            }}
+          />
+        ) : (
+          <RemoveWizard
+            key={worktrees.join('\n')}
+            repo={repo}
+            worktrees={worktrees}
+            onStart={(start) => {
+              selection.clear()
+              run.start(start)
+            }}
+            onCancel={close}
+          />
+        )}
       </DialogContent>
     </Dialog>
   )

@@ -5,65 +5,69 @@ import { envelope, followUp } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
 import { server, worktrees } from '@/test/server'
 
-async function openRemove() {
+async function selectAndRemove(...names: string[]) {
   const app = await renderApp('/r/r1/worktrees')
-  await app.user.click(await screen.findByRole('button', { name: 'Remove…' }))
+  for (const name of names) await app.user.click(await screen.findByRole('checkbox', { name: `Select ${name}` }))
+  const bar = screen.getByRole('toolbar', { name: 'Selection' })
+  expect(within(bar).getByText(`${names.length} selected`)).toBeTruthy()
+  await app.user.click(within(bar).getByRole('button', { name: /^Remove/ }))
   return { ...app, dialog: await screen.findByRole('dialog') }
 }
 
-test('remove asks which worktrees, shows the plan with the children it leaves, runs it, and names each child left with its command', async () => {
-  const { user, dialog } = await openRemove()
+test('the main worktree has no box, and checking every worktree checks the others', async () => {
+  const { user } = await renderApp('/r/r1/worktrees')
 
+  await user.click(await screen.findByRole('checkbox', { name: 'Select every worktree' }))
+
+  expect(screen.queryByRole('checkbox', { name: 'Select main' })).toBeNull()
+  expect(within(screen.getByRole('toolbar', { name: 'Selection' })).getByText('3 selected')).toBeTruthy()
+  await user.click(screen.getByRole('button', { name: 'Clear' }))
+  expect(screen.queryByRole('toolbar', { name: 'Selection' })).toBeNull()
+})
+
+test('an unsafe worktree waits for a choice; kept, the others go through the children and the plan, then run', async () => {
+  const { user, dialog } = await selectAndRemove('feat/billing', 'fix/login')
+
+  const unsafe = await within(dialog).findByRole('region', { name: 'fix/login' })
+  expect(within(unsafe).getByText('Uncommitted changes')).toBeTruthy()
+  expect(within(dialog).getByText("1 of 2 can't be removed safely: choose for each before going on.")).toBeTruthy()
+  expect(within(dialog).getByRole('button', { name: 'Next' }).hasAttribute('disabled')).toBe(true)
+
+  await user.click(within(unsafe).getByRole('button', { name: 'Keep it' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
-  expect(await within(dialog).findByText('worktree is required')).toBeTruthy()
 
-  await user.click(within(dialog).getByRole('checkbox', { name: 'feat/billing' }))
-  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
-  expect(await within(dialog).findByRole('heading', { name: 'Remove feat/billing' })).toBeTruthy()
-  expect(within(dialog).getByText('/acme.trees/feat-billing')).toBeTruthy()
-  expect(within(dialog).getByText('feat/billing-ui still points at feat/billing.')).toBeTruthy()
-  expect(within(dialog).getByRole('switch', { name: 'Move it onto main' })).toBeTruthy()
-
-  await user.click(within(dialog).getByRole('button', { name: 'Remove feat/billing' }))
-
-  expect(await within(dialog).findByText('1 worktree removed')).toBeTruthy()
-  expect(within(dialog).getByText('Removed')).toBeTruthy()
-  expect(within(dialog).getByText('feat/billing-ui still points at the removed parent feat/billing')).toBeTruthy()
-  expect(await within(dialog).findByText('wtm reparent feat/billing-ui --to main')).toBeTruthy()
-})
-
-test('children moved onto the nearest worktree that stays leave no warning', async () => {
-  const { user, dialog } = await openRemove()
-  await user.click(await within(dialog).findByRole('checkbox', { name: 'feat/billing' }))
+  expect(await within(dialog).findByText('feat/billing-ui is stacked on feat/billing, which goes.')).toBeTruthy()
+  const children = within(dialog).getByRole('region', { name: 'Under feat/billing' })
+  expect(within(children).getByText('stays on feat/billing, which goes')).toBeTruthy()
+  await user.click(within(dialog).getByRole('radio', { name: /Move it onto the nearest worktree that stays/ }))
+  expect(within(children).getByText('base branch')).toBeTruthy()
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
 
-  await user.click(await within(dialog).findByRole('switch', { name: 'Move it onto main' }))
+  const planned = await within(dialog).findByRole('region', { name: 'feat/billing' })
+  expect(within(planned).getByText('feat/billing-ui moves onto main')).toBeTruthy()
+  expect(within(planned).getByText('docker compose down')).toBeTruthy()
+  expect(within(dialog).queryByRole('region', { name: 'fix/login' })).toBeNull()
   await user.click(within(dialog).getByRole('button', { name: 'Remove feat/billing' }))
 
-  expect(await within(dialog).findByText('1 worktree removed')).toBeTruthy()
+  expect(await within(dialog).findByText('feat/billing is removed')).toBeTruthy()
   expect(within(dialog).queryByText(/still points at the removed parent/)).toBeNull()
+  expect(screen.queryByRole('toolbar', { name: 'Selection' })).toBeNull()
 })
 
-test('an unsafe worktree is refused with its reason until removing it anyway is ticked', async () => {
-  const { user, dialog } = await openRemove()
-  await user.click(await within(dialog).findByRole('checkbox', { name: 'fix/login' }))
-  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+test('removing an unsafe worktree anyway says what is lost and forces it', async () => {
+  const { user, dialog } = await selectAndRemove('fix/login')
 
-  const refused = await within(dialog).findByRole('region', { name: 'Refused' })
-  expect(within(refused).getByText('Uncommitted changes')).toBeTruthy()
-  expect(
-    within(dialog)
-      .getByRole('button', { name: /^Remove/ })
-      .hasAttribute('disabled'),
-  ).toBe(true)
+  const unsafe = await within(dialog).findByRole('region', { name: 'fix/login' })
+  await user.click(within(unsafe).getByRole('button', { name: 'Remove anyway' }))
 
-  await user.click(within(dialog).getByRole('checkbox', { name: 'Remove anyway: what they hold is lost' }))
-
-  expect(await within(dialog).findByText('Uncommitted changes, removed anyway')).toBeTruthy()
+  expect(within(unsafe).getByText('Removed anyway: its uncommitted changes are lost.')).toBeTruthy()
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  const planned = await within(dialog).findByRole('region', { name: 'fix/login' })
+  expect(within(planned).getByText('Removed anyway')).toBeTruthy()
   expect(within(dialog).getByRole('button', { name: 'Remove fix/login' }).hasAttribute('disabled')).toBe(false)
 })
 
-test("the detail's menu removes the worktree it shows, straight to the plan", async () => {
+test("the detail's menu removes the worktree it shows, and a child left on it is named with its command", async () => {
   server.use(
     http.post('/api/repos/r1/commands/list', () =>
       HttpResponse.json(
@@ -83,8 +87,15 @@ test("the detail's menu removes the worktree it shows, straight to the plan", as
 
   await user.click(await screen.findByRole('button', { name: 'More actions' }))
   await user.click(await screen.findByRole('menuitem', { name: 'Remove worktree…' }))
-
   const dialog = await screen.findByRole('dialog')
   expect(await within(dialog).findByRole('heading', { name: 'Remove feat/billing' })).toBeTruthy()
-  expect(within(dialog).queryByText('Clean (delete the worktree)')).toBeNull()
+
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Remove feat/billing' }))
+
+  expect(
+    await within(dialog).findByText('feat/billing-ui still points at the removed parent feat/billing'),
+  ).toBeTruthy()
+  expect(await within(dialog).findByText('wtm reparent feat/billing-ui --to main')).toBeTruthy()
 })

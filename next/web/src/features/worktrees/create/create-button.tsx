@@ -8,14 +8,15 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Skeleton } from '@/components/ui/skeleton'
 import { ProgressView } from '@/features/worktrees/create/components/progress-view'
 import { Wizard } from '@/features/worktrees/create/components/wizard'
-import { useCreateRun } from '@/features/worktrees/create/hooks/use-create-run'
+import { planned } from '@/features/worktrees/create/utils/progress'
+import { useRun } from '@/features/worktrees/hooks/use-run'
 import { cn } from '@/lib/utils'
 
 export function CreateButton({ repo }: { repo: string }) {
   const [open, setOpen] = useState(false)
   // a new round mounts a fresh wizard: Create another starts from nothing typed
   const [round, setRound] = useState(0)
-  const run = useCreateRun(repo)
+  const run = useRun(repo, 'create')
   const form = useQuery({ ...questionsQuery(repo, 'create'), enabled: open })
   const navigate = useNavigate({ from: '/r/$repo/worktrees' })
 
@@ -40,7 +41,15 @@ export function CreateButton({ repo }: { repo: string }) {
       )
 
     if (form.data)
-      return <Wizard key={round} repo={repo} form={form.data} onStart={run.start} onCancel={() => setOpen(false)} />
+      return (
+        <Wizard
+          key={round}
+          repo={repo}
+          form={form.data}
+          onStart={({ answers, fingerprint, plan }) => run.start({ answers, fingerprint, units: planned(plan) })}
+          onCancel={() => setOpen(false)}
+        />
+      )
 
     return (
       <>

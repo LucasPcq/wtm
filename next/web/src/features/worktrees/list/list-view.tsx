@@ -17,11 +17,15 @@ export function ListView({
   rows,
   shown,
   search,
+  selected,
+  onSelect,
 }: {
   live: UseQueryResult<Read<'list'>>
   rows: Row[]
   shown: ColumnId[]
   search: WorktreesSearch
+  selected: string[]
+  onSelect: (subjects: string[]) => void
 }) {
   if (live.isPending) return <Loading />
   if (live.isError) return <ReadFailed message={live.error.message} />
@@ -33,7 +37,9 @@ export function ListView({
 
   return (
     <>
-      {kept.length > 0 && <WorktreeTable rows={kept} shown={shown} open={search.worktree} />}
+      {kept.length > 0 && (
+        <WorktreeTable rows={kept} shown={shown} open={search.worktree} selected={selected} onSelect={onSelect} />
+      )}
       {rows.length === 1 && !narrowed && <OnlyMain />}
       {kept.length === 0 && (rows.length > 1 || narrowed) && <NoMatch />}
     </>
