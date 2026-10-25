@@ -176,3 +176,40 @@ test('an answer to older typing that lands last is dropped, the newer one stands
 
   expect(within(dialog).queryByText('an older answer')).toBeNull()
 })
+
+// The page asked GitHub for the list whatever the view: opening the Tree asked it twice, and Fetch origin twice more.
+test('the Tree asks GitHub once, and Fetch origin once more', async () => {
+  // Fetch origin is offered while the page is live: the stream stays open for the test
+  server.use(
+    http.get(
+      '/api/events',
+      () =>
+        new HttpResponse(
+          new ReadableStream({
+            start: (c) => {
+              c.enqueue(new TextEncoder().encode(': open\n\n'))
+              setTimeout(() => c.close(), 3000)
+            },
+          }),
+          {
+            headers: { 'Content-Type': 'text/event-stream' },
+          },
+        ),
+    ),
+  )
+  const asked: string[] = []
+  server.events.on('request:start', async ({ request }) => {
+    const body = request.method === 'POST' ? await request.clone().text() : ''
+    if (body.includes('"with_prs"')) asked.push(new URL(request.url).pathname.split('/').at(-1) ?? '')
+  })
+  const { user } = await renderApp('/r/r1/worktrees?view=tree')
+  await screen.findByRole('button', { name: 'Sync' })
+  await waitFor(() => expect(asked).toEqual(['tree']))
+
+  const fetch = await screen.findByRole('button', { name: 'Fetch origin' })
+  await waitFor(() => expect((fetch as HTMLButtonElement).disabled).toBe(false))
+  await user.click(fetch)
+
+  await waitFor(() => expect(asked).toEqual(['tree', 'tree']))
+  server.events.removeAllListeners()
+})

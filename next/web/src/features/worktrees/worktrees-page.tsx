@@ -27,9 +27,10 @@ import { TreeView } from './tree/tree-view'
 // Worktrees is the screen of a repository's worktrees: the list or the tree, filtered and searched, and the detail
 // of the one open beside it.
 export function WorktreesPage({ repo, search }: { repo: string; search: WorktreesSearch }) {
+  const tree = search.view === 'tree'
   const live = useQuery(readQuery(repo, 'list'))
-  // GitHub is asked once for this screen; Fetch origin asks it again
-  const github = useQuery(githubQuery(repo, 'list'))
+  // GitHub is asked once per view, by the view on screen (the tree asks its own); Fetch origin asks it again
+  const github = useQuery({ ...githubQuery(repo, 'list'), enabled: !tree })
   const root = useQuery(reposQuery).data?.find((known) => known.id === repo)?.root
   const [stored, store] = useStored(`wtm.columns.${repo}`)
   const underWay = useUnderWay(repo)
@@ -40,7 +41,6 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
   const filter = search.filter ?? 'all'
   const shown = rows.filter((row) => matches(row, filter) && searched(row, search.q ?? ''))
   const open = rows.find((row) => row.subject === search.worktree)
-  const tree = search.view === 'tree'
 
   return (
     <>

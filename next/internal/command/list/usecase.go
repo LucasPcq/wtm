@@ -76,12 +76,10 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, err
 	}
 
-	dates, err := u.Git.CommitDates(ctx)
-	if err != nil {
-		return Facts{}, err
-	}
+	// the dates only date the rows: one unreadable is a warning, never a failure of the whole list
+	dates, datesErr := u.Git.CommitDates(ctx)
 
-	facts := Facts{Repository: repo, FetchErr: fetchErr, Dates: dates}
+	facts := Facts{Repository: repo, FetchErr: fetchErr, Dates: dates, DatesErr: datesErr}
 	facts.Records, facts.RecordErrs = repository.Records(u.Meta, repo.Live())
 	facts.Stack = worktree.StackOf(repo.Worktrees, facts.Records, repo.Config.Worktrees.BaseBranch)
 	worktrees := facts.Checkouts()
@@ -112,15 +110,19 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 		}
 	}
 
-	// A branch with no commit yet, an orphan, has nothing to count: it is not counted rather than unreadable.
+	// A branch with no commit yet, an orphan, has nothing to count: it is not counted rather than unreadable. A gap
+	// read once is not read again when the parent is the base branch; one that failed is not kept.
 	counts := map[string]worktree.AheadBehind{}
 	count := func(against string) (worktree.AheadBehind, error) {
 		if gap, ok := counts[against]; ok {
 			return gap, nil
 		}
 		gap, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: against})
+		if err != nil {
+			return gap, repository.Interrupted(ctx, err)
+		}
 		counts[against] = gap
-		return gap, repository.Interrupted(ctx, err)
+		return gap, nil
 	}
 
 	if facts.CountedAgainstBase(w) {
@@ -131,17 +133,7 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 		state.Ahead = gap.Ahead
 	}
 
-	parent, counted := facts.CountedAgainstParent(facts.Stack, w)
-	if !counted {
-		return state
-	}
-	gap, err := count(parent)
-	if state.Err = err; err != nil {
-		return state
-	}
-	state.ParentAhead = &gap.Ahead
-	if _, child := facts.Stack.Parent(w.Branch()); child {
-		state.ParentBehind = &gap.Behind
-	}
+	parent, err := repository.GapToParent(facts.Repository, facts.Stack, w, count)
+	state.ParentAhead, state.ParentBehind, state.Err = parent.Ahead, parent.Behind, err
 	return state
 }

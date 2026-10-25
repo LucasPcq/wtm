@@ -197,6 +197,16 @@ func TestARefreshThatCannotFetchIsAWarning(t *testing.T) {
 	assert.Contains(t, read.Warnings[0].Message, "could not read from remote repository")
 }
 
+func TestDatesThatCannotBeReadAreAWarningNotAFailure(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Fail: map[string]error{"CommitDates": errors.New("for-each-ref failed")}}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{list.CodeDatesUnreadable}, codes(read))
+	assert.Nil(t, detailOf(t, read, "main").LastCommitAt)
+}
+
 func TestJobsThatCannotBeToldAreNoServicesAtAll(t *testing.T) {
 	unknown, err := newWorld(seed{JobsErr: run.ErrUnknown}).usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
 	require.NoError(t, err)
@@ -453,13 +463,4 @@ func TestAMissingWorktreeHasNoChangesToCount(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, detailOf(t, read, "feat/a").Changes)
 	assert.Equal(t, &list.Changes{}, detailOf(t, read, "feat/b").Changes)
-}
-
-func TestBranchDatesThatCannotBeReadRefuseTheRead(t *testing.T) {
-	boom := errors.New("for-each-ref failed")
-	w := newWorld(seed{Git: gittest.FakeParams{Fail: map[string]error{"CommitDates": boom}}})
-
-	_, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
-
-	require.ErrorIs(t, err, boom)
 }

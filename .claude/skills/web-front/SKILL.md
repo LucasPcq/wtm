@@ -38,7 +38,7 @@ Render the page at its address and use it as its user does; mock the server, nev
 
 ```tsx
 test('a row opens its own worktree, not another', async () => {
-  const { user, router } = renderApp('/r/r1/worktrees')            // src/test/render.tsx
+  const { user, router } = await renderApp('/r/r1/worktrees')      // src/test/render.tsx
   await user.click(await screen.findByRole('link', { name: /feat\/billing from main/ }))
   await waitFor(() => expect(router.state.location.search).toEqual({ worktree: 'feat/billing' }))
 })
@@ -46,11 +46,11 @@ test('a row opens its own worktree, not another', async () => {
 
 - Queries by role, label or text; actions through `user-event`; assert what the screen shows or the address holds.
 - The server's answers are msw handlers (`src/test/server.ts`); another answer for one test is `server.use(http.post(…))`.
-- Not `renderHook`, not `vi.mock` of `src/api` or any app module, not a component rendered alone with props invented for it: the linter refuses the first two.
+- Not `renderHook`, not `vi.mock` or `vi.spyOn` of `src/api` or any app module, not a component rendered alone with props invented for it: the linter refuses the first two.
 
 ## What the linter refuses
 
-`npm run lint` (part of `make ui`, `make lint-ui`, the CI `ui` gate) fails on: `useEffect`/`useLayoutEffect`/`useInsertionEffect`; `fetch`, `EventSource`, stream parsing outside `src/api/`; `src/api/` importing the app; a feature importing another feature (`@/features/…` or a relative path out of it); a route importing anything but the router and features; `components/` reaching into a feature; React or the app in `lib/`; `renderHook` in a test, `vi.mock` in a component test. A drift the linter misses becomes a rule in `.oxlintrc.json`.
+`npm run lint` (part of `make ui`, `make lint-ui`, the CI `ui` gate) fails on: an effect by any spelling; the network (`fetch`, `EventSource`, sockets, `navigator.sendBeacon`, through any global) or stream parsing outside `src/api/`; an import outside its layer's allowlist, resolved whatever its spelling: `src/api/` and `lib/` import nothing of the app, a route only the router and features, a feature no other feature, `components/` no feature; testing packages outside tests; in a test, `renderHook`, `vi.spyOn` on an app module, `vi.mock`/`vi.doMock` in a component test. The rules live in `lint/wtm.js`, each with a planted violation in `lint/fixtures/` that `lint/rules.test.ts` checks it refuses. A drift the linter misses becomes a rule there, with its fixture.
 
 ## Common mistakes
 

@@ -94,21 +94,14 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) State {
 	presence, err := repository.Present(ctx, u.Git, w)
 	state := State{Missing: presence.Missing, Dirty: presence.Dirty, Err: err}
-	against, counted := facts.CountedAgainstParent(facts.Stack, w)
-	if state.Missing || state.Err != nil || !counted {
+	if state.Missing || state.Err != nil {
 		return state
 	}
 
-	counts, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: against})
-	state.Err = repository.Interrupted(ctx, err)
-	if err != nil {
-		return state
-	}
-
-	// A root has no parent to fall behind: only what it has past the base is counted.
-	state.Ahead = &counts.Ahead
-	if _, child := facts.Stack.Parent(w.Branch()); child {
-		state.Behind = &counts.Behind
-	}
+	gap, err := repository.GapToParent(facts.Repository, facts.Stack, w, func(against string) (worktree.AheadBehind, error) {
+		counts, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: against})
+		return counts, repository.Interrupted(ctx, err)
+	})
+	state.Ahead, state.Behind, state.Err = gap.Ahead, gap.Behind, err
 	return state
 }

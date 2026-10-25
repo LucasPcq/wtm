@@ -60,9 +60,9 @@ export const githubQuery = <C extends ReadCommand>(repo: string, command: C, ans
     staleTime: Infinity,
   })
 
-// refreshList fetches origin and asks GitHub, as the picker's refresh does: the list it reads is GitHub's list read.
-export const refreshList = (repo: string) =>
-  run(repo, 'list', { answers: [{ path: 'fetch', values: ['true'] }, withPRs] })
+// fetchOrigin fetches origin through a list read, without GitHub: the reads asking GitHub on screen ask it again
+// once it fetched, each view its own.
+export const fetchOrigin = (repo: string) => run(repo, 'list', { answers: [{ path: 'fetch', values: ['true'] }] })
 
 // run executes a command of the catalogue; a refusal throws the core's message.
 export const run = (repo: string, command: ApiCommandName, call: WebCall) =>

@@ -14,11 +14,12 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what list reads: the repository, why fetching origin failed when it was asked to, the meta record of each live branch (and the error of a record that exists but does not read), the stack they make, when each branch last moved, what each worktree holds, what the run daemon and GitHub said, and the branches behind their merged pull request (repository.Behind).
+// Facts are what list reads: the repository, why fetching origin failed when it was asked to, the meta record of each live branch (and the error of a record that exists but does not read), the stack they make, when each branch last moved (and why it could not be read), what each worktree holds, what the run daemon and GitHub said, and the branches behind their merged pull request (repository.Behind).
 type Facts struct {
 	worktree.Repository
 	repository.Asked
 	FetchErr   error
+	DatesErr   error                    // why when each branch last moved could not be read: none is told
 	Records    map[string]worktree.Meta // by branch
 	RecordErrs map[string]error         // by branch
 	Stack      worktree.Stack
@@ -85,12 +86,13 @@ type PR struct {
 
 // The codes of list's warnings and failures.
 const (
-	CodePRsUnavailable = Name + domain.PRsUnavailable
-	CodeJobsUnknown    = Name + domain.JobsUnknown
-	CodeBaseMissing    = Name + ".base_missing"
-	CodeFetchFailed    = Name + ".fetch_failed"
-	CodeMetaUnreadable = Name + domain.MetaUnreadable
-	CodeUnreadable     = Name + domain.Unreadable
+	CodePRsUnavailable  = Name + domain.PRsUnavailable
+	CodeJobsUnknown     = Name + domain.JobsUnknown
+	CodeBaseMissing     = Name + ".base_missing"
+	CodeFetchFailed     = Name + ".fetch_failed"
+	CodeDatesUnreadable = Name + ".dates_unreadable"
+	CodeMetaUnreadable  = Name + domain.MetaUnreadable
+	CodeUnreadable      = Name + domain.Unreadable
 )
 
 // ----------------------------------------------------------------------------
@@ -201,6 +203,9 @@ func (f Facts) warnings() []domain.Warning {
 	var warnings []domain.Warning
 	if base, missing := f.MissingBase(); missing {
 		warnings = append(warnings, domain.Warning{Code: CodeBaseMissing, Message: "the base branch " + base + " does not exist: commits ahead of it are not counted", Params: domain.Params{"branch": base}})
+	}
+	if f.DatesErr != nil {
+		warnings = append(warnings, domain.Warning{Code: CodeDatesUnreadable, Message: "couldn't read when each branch last moved: " + f.DatesErr.Error()})
 	}
 	if f.FetchErr != nil && !f.Interrupted {
 		warnings = append(warnings, domain.Warning{Code: CodeFetchFailed, Message: "couldn't fetch origin: where each branch stands against it is as last fetched: " + f.FetchErr.Error()})
