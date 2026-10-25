@@ -3,7 +3,7 @@ import { expect, test } from 'vitest'
 import { renderApp } from '@/test/render'
 
 test('each worktree is listed, and its row opens the detail with the problem to fix first and its command', async () => {
-  const { user } = renderApp('/r/r1/worktrees')
+  const { user } = await renderApp('/r/r1/worktrees')
 
   await user.click(await screen.findByRole('link', { name: /feat\/billing-ui/ }))
 
@@ -14,7 +14,7 @@ test('each worktree is listed, and its row opens the detail with the problem to 
 
 // Every row's link covered the whole table: a click on any row opened the last one.
 test('a row opens its own worktree, not another', async () => {
-  const { user, router } = renderApp('/r/r1/worktrees')
+  const { user, router } = await renderApp('/r/r1/worktrees')
 
   await user.click(await screen.findByRole('link', { name: /feat\/billing from main/ }))
 
@@ -22,7 +22,7 @@ test('a row opens its own worktree, not another', async () => {
 })
 
 test('Needs sync keeps the worktrees behind their parent, the search narrows the list, and both clear', async () => {
-  const { user } = renderApp('/r/r1/worktrees')
+  const { user } = await renderApp('/r/r1/worktrees')
   await screen.findByRole('link', { name: /fix\/login/ })
 
   await user.click(screen.getByRole('radio', { name: /Needs sync/ }))
@@ -38,7 +38,7 @@ test('Needs sync keeps the worktrees behind their parent, the search narrows the
 })
 
 test('create shows a problem only once asked to go on, then confirms the plan, runs it, and ends on where the worktree is and what next', async () => {
-  const { user } = renderApp('/r/r1/worktrees')
+  const { user } = await renderApp('/r/r1/worktrees')
   await user.click(await screen.findByRole('button', { name: 'Create worktree' }))
   const dialog = await screen.findByRole('dialog')
   await within(dialog).findByRole('textbox', { name: 'Branches' })
@@ -65,7 +65,7 @@ test('create shows a problem only once asked to go on, then confirms the plan, r
 
 // A branch the core lists with no label of its own was a blank entry of the source branch.
 test('an option of no label is offered by its value', async () => {
-  const { user } = renderApp('/r/r1/worktrees')
+  const { user } = await renderApp('/r/r1/worktrees')
   await user.click(await screen.findByRole('button', { name: 'Create worktree' }))
   const dialog = await screen.findByRole('dialog')
 
@@ -75,7 +75,7 @@ test('an option of no label is offered by its value', async () => {
 })
 
 test("a node's action the web does not run yet shows its command line to copy", async () => {
-  const { user } = renderApp('/r/r1/worktrees?view=tree')
+  const { user } = await renderApp('/r/r1/worktrees?view=tree')
 
   await user.click(await screen.findByRole('button', { name: 'Sync' }))
 
@@ -83,7 +83,7 @@ test("a node's action the web does not run yet shows its command line to copy", 
 })
 
 test('a column hidden in the Columns panel leaves the list, and stays hidden on the next visit', async () => {
-  const first = renderApp('/r/r1/worktrees')
+  const first = await renderApp('/r/r1/worktrees')
   await screen.findByRole('link', { name: /feat\/billing-ui/ })
   expect(screen.getByRole('columnheader', { name: 'Running' })).toBeTruthy()
 
@@ -92,7 +92,7 @@ test('a column hidden in the Columns panel leaves the list, and stays hidden on 
   expect(screen.queryByRole('columnheader', { name: 'Running' })).toBeNull()
 
   cleanup()
-  renderApp('/r/r1/worktrees')
+  await renderApp('/r/r1/worktrees')
   await screen.findByRole('link', { name: /feat\/billing-ui/ })
   expect(screen.queryByRole('columnheader', { name: 'Running' })).toBeNull()
   expect(screen.getByRole('columnheader', { name: 'State' })).toBeTruthy()
