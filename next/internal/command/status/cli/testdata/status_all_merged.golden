@@ -10,12 +10,16 @@
   feat/a
   ! its pull request is merged
   → wtm clean feat/a   clean it up
+  ! main has 1 commit it lacks
+  → wtm sync feat/a   sync it onto main
   ! web/.env is missing
   → wtm env feat/a   rebuild it
   ! api crashed (exit 1)
   → wtm run start feat/a --job api --detach   start it again
 
   feat/old
+  ! main has 1 commit it lacks
+  → wtm sync feat/old   sync it onto main
   ! predates the isolation choice: run up and run start refuse it
   → wtm env feat/old --isolation isolated   isolate it
 

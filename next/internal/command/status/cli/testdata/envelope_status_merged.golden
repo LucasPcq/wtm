@@ -66,7 +66,20 @@
         "review": {
           "number": 12,
           "url": "https://github.com/acme/acme/pull/12",
-          "state": "merged"
+          "state": "merged",
+          "fix": {
+            "command": "clean",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/a"
+                ]
+              }
+            ],
+            "code": "status.merged",
+            "message": "clean it up"
+          }
         },
         "isolation": "isolated",
         "run_toml": "declared",
@@ -131,6 +144,23 @@
               ],
               "code": "status.merged",
               "message": "clean it up"
+            }
+          },
+          {
+            "code": "status.behind",
+            "message": "main has 1 commit it lacks",
+            "fix": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "status.behind",
+              "message": "sync it onto main"
             }
           },
           {

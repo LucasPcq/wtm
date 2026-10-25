@@ -66,3 +66,20 @@ func (r Repository) mergedInto(pr PullRequest, w Worktree) (string, bool) {
 
 // ErrPullRequestsUnavailable is why the pull requests could not be listed, wrapped with what to do about it.
 var ErrPullRequestsUnavailable = errors.New("pull requests unavailable")
+
+// Progress is where an open pull request's review stands: its title, whether it is a draft, its checks counted and GitHub's review decision.
+type Progress struct {
+	Title    string `json:"title"`
+	Draft    bool   `json:"draft"`
+	Checks   Checks `json:"checks"`
+	Decision string `json:"decision"`
+}
+
+// Progress returns where pr's review stands, nil unless pr is open.
+func (pr PullRequest) Progress() *Progress {
+	if pr.State != PullRequestOpen {
+		return nil
+	}
+
+	return &Progress{Title: pr.Title, Draft: pr.Draft, Checks: pr.Checks, Decision: pr.Decision}
+}

@@ -95,7 +95,7 @@ func TestOnATerminalTheWorktreeIsPickedFirstTheCursorOnTheOneYouAreIn(t *testing
 	got := runOn(t, terminal, world{Cwd: "/repo/.trees/feat-old"})
 
 	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
-	assert.Contains(t, got.Stdout, "feat/old — 1 problem")
+	assert.Contains(t, got.Stdout, "feat/old — 2 problems")
 }
 
 func TestThePickerOffersEveryWorktreeADetachedOneSaidSo(t *testing.T) {

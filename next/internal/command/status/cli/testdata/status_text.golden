@@ -1,5 +1,5 @@
 
-  ! feat/a — 2 problems
+  ! feat/a — 3 problems
 
   path         /repo/.trees/feat-a
   isolation    isolated
@@ -17,6 +17,8 @@
   web  running  http://web.feat-a.main.localhost:11080  up 1h
   api  crashed
 
+  ! main has 1 commit it lacks
+  → wtm sync feat/a   sync it onto main
   ! web/.env is missing
   → wtm env feat/a   rebuild it
   ! api crashed (exit 1)

@@ -222,7 +222,7 @@ type provisioning struct {
 // A phase is one step after the add, reported as it starts and finishes; log
 // is the file its output goes to, if any.
 type phase struct {
-	name string
+	name domain.Phase
 	log  string
 	run  func(ctx context.Context) error
 }
@@ -232,13 +232,13 @@ type phase struct {
 func (p *provisioning) phases(provisioned *Provisioned) []phase {
 	var phases []phase
 	if p.needsOrdinal() {
-		phases = append(phases, phase{name: "ordinal", run: func(ctx context.Context) error { return p.number(ctx, provisioned) }})
+		phases = append(phases, phase{name: domain.PhaseOrdinal, run: func(ctx context.Context) error { return p.number(ctx, provisioned) }})
 	}
 	if p.settlesPorts() {
-		phases = append(phases, phase{name: "ports", run: func(ctx context.Context) error { return p.settle(ctx, provisioned) }})
+		phases = append(phases, phase{name: domain.PhasePorts, run: func(ctx context.Context) error { return p.settle(ctx, provisioned) }})
 	}
 	if len(p.Project.OnCreate) > 0 {
-		phases = append(phases, phase{name: "on_create", log: p.hookLog, run: func(ctx context.Context) error { return p.runHooks(ctx, *provisioned) }})
+		phases = append(phases, phase{name: domain.PhaseOnCreate, log: p.hookLog, run: func(ctx context.Context) error { return p.runHooks(ctx, *provisioned) }})
 	}
 	return phases
 }
@@ -274,9 +274,9 @@ func (p *provisioning) do(ctx context.Context, next phase) error {
 
 // stopped is the outcome of a phase that failed with err: cancelled when ctx
 // was, failed otherwise, incomplete either way.
-func (p *provisioning) stopped(ctx context.Context, err error, phase string, provisioned Provisioned) Outcome {
-	params := domain.Params{"phase": phase}
-	failure := domain.AsError(domain.AsErrorParams{Err: err, Code: "unit.phase_failed", Message: phase + " failed", Params: params})
+func (p *provisioning) stopped(ctx context.Context, err error, phase domain.Phase, provisioned Provisioned) Outcome {
+	params := domain.Params{"phase": string(phase)}
+	failure := domain.AsError(domain.AsErrorParams{Err: err, Code: "unit.phase_failed", Message: string(phase) + " failed", Params: params})
 
 	status := domain.StatusFailed
 	if ctx.Err() != nil {
@@ -338,16 +338,16 @@ func (p *provisioning) add(ctx context.Context) (Provisioned, *domain.Error) {
 	shielded, release := p.Service.Shield(ctx)
 	defer release()
 
-	if err := p.do(shielded, phase{name: "worktree", run: p.addWorktree}); err != nil {
+	if err := p.do(shielded, phase{name: domain.PhaseWorktree, run: p.addWorktree}); err != nil {
 		return Provisioned{}, stepFailed("worktree", err)
 	}
 
 	meta := p.meta()
-	if err := p.do(shielded, phase{name: "env", run: p.copyEnv}); err != nil {
+	if err := p.do(shielded, phase{name: domain.PhaseEnv, run: p.copyEnv}); err != nil {
 		return Provisioned{}, p.undo(shielded, stepFailed("env", err))
 	}
 
-	if err := p.do(shielded, phase{name: "meta", run: func(ctx context.Context) error { return p.record(ctx, meta) }}); err != nil {
+	if err := p.do(shielded, phase{name: domain.PhaseMeta, run: func(ctx context.Context) error { return p.record(ctx, meta) }}); err != nil {
 		return Provisioned{}, p.undo(shielded, stepFailed("meta", err))
 	}
 	return Provisioned{Meta: meta}, nil

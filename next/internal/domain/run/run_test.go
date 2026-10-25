@@ -7,6 +7,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestTheURLsOfAWorktreeAreThoseOfItsJobsUp(t *testing.T) {
+	jobs := []Job{{Name: "web", WorkDir: "/a", Up: true, URL: "http://web.a"}, {Name: "api", WorkDir: "/a", Up: true, URL: "http://api.a"}, {Name: "worker", WorkDir: "/a", Up: true}, {Name: "db", WorkDir: "/a", URL: "http://db.a"}, {Name: "web", WorkDir: "/b", Up: true, URL: "http://web.b"}}
+
+	assert.Equal(t, []string{"http://api.a", "http://web.a"}, URLsIn(jobs, "/a"))
+	assert.Equal(t, []string{}, URLsIn(jobs, "/c"))
+}
+
 func TestTheJobsUpInAWorktreeAreItsOwnByName(t *testing.T) {
 	jobs := []Job{{Name: "web", WorkDir: "/a", Up: true}, {Name: "api", WorkDir: "/a", Up: true}, {Name: "db", WorkDir: "/a"}, {Name: "web", WorkDir: "/b", Up: true}}
 

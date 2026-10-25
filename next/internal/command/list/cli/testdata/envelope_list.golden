@@ -16,14 +16,25 @@
         "active": true,
         "missing": false,
         "commits_ahead": 0,
+        "parent": "",
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "changes": {
+          "changed": 0,
+          "untracked": 0
+        },
         "created_at": null,
+        "last_commit_at": "2026-10-01T09:00:00Z",
         "origin": {
           "ahead": 0,
           "behind": 0,
           "state": "up-to-date"
         },
         "pr": null,
+        "merged": false,
         "services": [],
+        "urls": [],
         "actions": [
           {
             "command": "go",
@@ -93,7 +104,16 @@
         "active": false,
         "missing": false,
         "commits_ahead": 2,
+        "parent": "",
+        "ahead": 2,
+        "behind": null,
+        "needs_sync": false,
+        "changes": {
+          "changed": 0,
+          "untracked": 0
+        },
         "created_at": "2026-10-16T12:00:00Z",
+        "last_commit_at": "2026-10-01T09:00:00Z",
         "origin": {
           "ahead": 2,
           "behind": 0,
@@ -104,9 +124,11 @@
           "url": "https://github.com/acme/acme/pull/9",
           "state": "merged"
         },
+        "merged": false,
         "services": [
           "web"
         ],
+        "urls": [],
         "actions": [
           {
             "command": "go",
@@ -197,14 +219,33 @@
         "active": false,
         "missing": false,
         "commits_ahead": 0,
+        "parent": "",
+        "ahead": 0,
+        "behind": null,
+        "needs_sync": false,
+        "changes": {
+          "changed": 0,
+          "untracked": 0
+        },
         "created_at": "2026-10-16T12:00:00Z",
+        "last_commit_at": "2026-10-01T09:00:00Z",
         "origin": null,
         "pr": {
           "number": 12,
           "url": "https://github.com/acme/acme/pull/12",
-          "state": "open"
+          "state": "open",
+          "title": "",
+          "draft": false,
+          "checks": {
+            "passed": 0,
+            "failed": 0,
+            "pending": 0
+          },
+          "decision": ""
         },
+        "merged": false,
         "services": [],
+        "urls": [],
         "actions": [
           {
             "command": "go",
@@ -295,10 +336,21 @@
         "active": false,
         "missing": false,
         "commits_ahead": 0,
+        "parent": "",
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "changes": {
+          "changed": 0,
+          "untracked": 0
+        },
         "created_at": null,
+        "last_commit_at": null,
         "origin": null,
         "pr": null,
+        "merged": false,
         "services": [],
+        "urls": [],
         "actions": [
           {
             "command": "go",
@@ -329,10 +381,18 @@
         "active": false,
         "missing": true,
         "commits_ahead": 0,
+        "parent": "",
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "changes": null,
         "created_at": null,
+        "last_commit_at": "2026-10-01T09:00:00Z",
         "origin": null,
         "pr": null,
+        "merged": false,
         "services": [],
+        "urls": [],
         "actions": [
           {
             "command": "clean",

@@ -51,6 +51,19 @@ func UpIn(jobs []Job, dir string) []string {
 	return names
 }
 
+// URLsIn returns the URLs of the jobs up in the worktree at dir that have one, sorted, empty and not nil when none has.
+func URLsIn(jobs []Job, dir string) []string {
+	urls := []string{}
+	for _, job := range jobs {
+		if job.Up && job.WorkDir == dir && job.URL != "" {
+			urls = append(urls, job.URL)
+		}
+	}
+	slices.Sort(urls)
+
+	return urls
+}
+
 // UnknownMessage says why the jobs up are unknown, err being why the daemon could not tell.
 func UnknownMessage(err error) string {
 	if errors.Is(err, ErrUnknown) {

@@ -90,6 +90,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 
 	facts := Facts{Repository: repo, Targets: targets}
 	facts.Records, facts.RecordErrs = repository.Records(u.Meta, repo.Live())
+	facts.Stack = worktree.StackOf(repo.Worktrees, facts.Records, repo.Config.Worktrees.BaseBranch)
 	branches := make([]string, 0, len(targets))
 	for _, w := range targets {
 		branches = append(branches, w.Branch())
@@ -166,11 +167,24 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 	unread("its diffstat", err)
 	state.Commits, err = u.Git.Commits(ctx, w.Path, commitsShown)
 	unread("its commits", err)
+	base := facts.Config.Worktrees.BaseBranch
 	if facts.CountedAgainstBase(w) {
-		base := facts.Config.Worktrees.BaseBranch
 		gap, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: base})
 		if !unread("where it stands against "+base, err) {
 			state.Base = &gap
+		}
+	}
+	// A root has no parent to fall behind; a child of the base branch was just counted against it.
+	parent, counted := facts.CountedAgainstParent(facts.Stack, w)
+	if _, child := facts.Stack.Parent(w.Branch()); counted && child {
+		switch {
+		case parent == base && state.Base != nil:
+			state.Lacks = state.Base.Behind
+		case parent != base:
+			gap, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: parent})
+			if !unread("where it stands against "+parent, err) {
+				state.Lacks = gap.Behind
+			}
 		}
 	}
 	if state.Err != nil {

@@ -81,6 +81,23 @@ func TestTheFakeAndGitAgreeOnTheTipsAndCountsOfTheirBranches(t *testing.T) {
 	}
 }
 
+func TestTheFakeAndGitDateTheTipOfEveryLocalBranch(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			branches, err := impl.port.Branches(t.Context())
+			require.NoError(t, err)
+
+			dates, err := impl.port.CommitDates(t.Context())
+
+			require.NoError(t, err)
+			require.Len(t, dates, len(branches.Local))
+			for _, b := range branches.Local {
+				assert.False(t, dates[b.Name].IsZero(), b.Name)
+			}
+		})
+	}
+}
+
 func TestTheFakeAndGitCountBothWaysBetweenABranchAndItsBase(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {

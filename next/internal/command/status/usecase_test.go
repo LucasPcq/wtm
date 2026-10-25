@@ -52,13 +52,13 @@ func TestAWorktreeIsReadWholeGitAndIsolation(t *testing.T) {
 		Origin:    &worktree.Origin{Ahead: 2, State: worktree.Ahead},
 		Changes:   &status.Changes{Staged: 1, Modified: 1, Untracked: 1, Insertions: 12, Deletions: 3, Files: []worktree.Change{{Path: "a.go", Status: worktree.ChangeModified}, {Path: "new.go", Status: worktree.ChangeUntracked}}},
 		Commits:   []worktree.Commit{{SHA: "two", Subject: "two"}, {SHA: "one", Subject: "one"}, {SHA: gittest.Root, Subject: gittest.Root}},
-		Review:    &status.Review{Number: 12, URL: "https://github.com/acme/acme/pull/12", State: worktree.PullRequestOpen, Progress: &status.Progress{Title: "Add a", Checks: worktree.Checks{Passed: 2, Failed: 1}, Decision: "APPROVED"}},
+		Review:    &status.Review{Number: 12, URL: "https://github.com/acme/acme/pull/12", State: worktree.PullRequestOpen, Progress: &worktree.Progress{Title: "Add a", Checks: worktree.Checks{Passed: 2, Failed: 1}, Decision: "APPROVED"}},
 		Isolation: &isolated,
 		RunToml:   status.RunTomlDeclared,
 		Run:       &status.Run{Addressing: project.AddressNames, Offset: &offset, Ports: status.PortsOffset},
 		Jobs:      []status.Job{{Name: "web", State: run.Crashed, URL: "http://web.feat-a.main.localhost:11080", Port: &port, ExitCode: &exit}},
 		Env:       status.Env{Files: []status.EnvFile{}},
-		Problems: []status.Problem{{Code: status.CodeJobCrashed, Message: "web crashed (exit 1)", Fix: &domain.FollowUp{
+		Problems: []status.Problem{{Code: status.CodeBehind, Message: "main has 1 commit it lacks", Fix: &domain.FollowUp{Command: "sync", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}, Code: status.CodeBehind, Message: "sync it onto main"}}, {Code: status.CodeJobCrashed, Message: "web crashed (exit 1)", Fix: &domain.FollowUp{
 			Command: "run start", Code: status.CodeJobCrashed, Message: "start it again",
 			Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "job", Values: []string{"web"}}, {Path: "detach", Values: []string{"true"}}},
 		}}},
@@ -333,12 +333,12 @@ func TestTheReviewIsTheNewestPullRequestAndAMergedOneAsksToCleanFirst(t *testing
 	}{
 		"open": {
 			pr:       []worktree.PullRequest{{Number: 12, URL: url, Branch: "feat/a", State: worktree.PullRequestOpen, Title: "Add a", Draft: true, Checks: worktree.Checks{Pending: 1}, Decision: "REVIEW_REQUIRED"}},
-			review:   &status.Review{Number: 12, URL: url, State: worktree.PullRequestOpen, Progress: &status.Progress{Title: "Add a", Draft: true, Checks: worktree.Checks{Pending: 1}, Decision: "REVIEW_REQUIRED"}},
+			review:   &status.Review{Number: 12, URL: url, State: worktree.PullRequestOpen, Progress: &worktree.Progress{Title: "Add a", Draft: true, Checks: worktree.Checks{Pending: 1}, Decision: "REVIEW_REQUIRED"}},
 			problems: []status.Problem{{Code: status.CodeEnvMissing, Message: ".env is missing", Fix: fixOf("env", domain.Answered{Path: domain.PathWorktree, Values: []string{"feat/a"}})}},
 		},
 		"merged": {
 			pr:     []worktree.PullRequest{{Number: 12, URL: url, Branch: "feat/a", Head: gittest.Root, State: worktree.PullRequestMerged, Title: "Add a"}},
-			review: &status.Review{Number: 12, URL: url, State: worktree.PullRequestMerged},
+			review: &status.Review{Number: 12, URL: url, State: worktree.PullRequestMerged, Fix: clean},
 			problems: []status.Problem{
 				{Code: status.CodeMerged, Message: "its pull request is merged", Fix: clean},
 				{Code: status.CodeEnvMissing, Message: ".env is missing", Fix: fixOf("env", domain.Answered{Path: domain.PathWorktree, Values: []string{"feat/a"}})},
@@ -565,4 +565,44 @@ func TestAReadCancelledReportsItsWorktreeInterruptedAndWhatDidNotReadIsSaid(t *t
 	assert.Equal(t, domain.StatusDone, half.Items[0].Status)
 	assert.Equal(t, []string{status.CodePartial}, codes(half.Items[0].Warnings))
 	assert.Contains(t, half.Items[0].Warnings[0].Message, "its commits: no commit yet")
+}
+
+func TestAWorktreeBehindItsParentIsToldToSyncOntoIt(t *testing.T) {
+	cases := map[string]struct {
+		meta  map[string]worktree.Meta
+		want  []string
+		lacks string
+	}{
+		"child_of_a_worktree": {meta: map[string]worktree.Meta{"feat/a": {SourceBranch: "main"}, "feat/a-ui": {SourceBranch: "feat/a"}}, want: []string{status.CodeBehind}, lacks: "feat/a has 2 commits it lacks"},
+		"root":                {want: []string{}},
+		"in_step":             {meta: map[string]worktree.Meta{"feat/a-ui": {SourceBranch: "feat/a-ui-base"}}, want: []string{}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(seed{
+				Git: gittest.FakeParams{
+					Worktrees: []worktree.Worktree{linked("feat/a"), linked("feat/a-ui")},
+					Local:     []string{"feat/a-ui-base"},
+					Commits: map[worktree.Ref][]string{
+						worktree.LocalBranch{Name: "feat/a"}:         {"a1", "a2"},
+						worktree.LocalBranch{Name: "feat/a-ui-base"}: {"u1"},
+						worktree.LocalBranch{Name: "feat/a-ui"}:      {"u1", "u2"},
+					},
+				},
+				Meta: c.meta,
+			})
+
+			ui := only(t, read(t, w, status.Request{Worktree: "feat/a-ui"}))
+
+			codes := []string{}
+			for _, problem := range ui.Problems {
+				codes = append(codes, problem.Code)
+			}
+			assert.Equal(t, c.want, codes)
+			if c.lacks != "" {
+				assert.Equal(t, c.lacks, ui.Problems[0].Message)
+				assert.Equal(t, "sync", ui.Problems[0].Fix.Command)
+			}
+		})
+	}
 }

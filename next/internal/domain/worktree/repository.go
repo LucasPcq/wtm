@@ -64,3 +64,14 @@ func (r Repository) CountedAgainstBase(w Worktree) bool {
 	base := r.Config.Worktrees.BaseBranch
 	return !w.Main && w.Branch() != "" && base != "" && r.Local(base)
 }
+
+// CountedAgainstParent returns the branch the commits of the worktree w are counted against in stack, its parent or, for a root, the base branch, and reports whether they are counted: not for the main worktree nor a member of a cycle, which has no parent to sync onto, and only when both are local branches, which git can count.
+func (r Repository) CountedAgainstParent(stack Stack, w Worktree) (string, bool) {
+	branch := w.Branch()
+	parent, ok := stack.Parent(branch)
+	if !ok {
+		parent = r.Config.Worktrees.BaseBranch
+	}
+
+	return parent, !w.Main && branch != "" && !stack.InCycle(branch) && parent != branch && r.Local(parent) && r.Local(branch)
+}

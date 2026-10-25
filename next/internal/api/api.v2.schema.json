@@ -1798,6 +1798,22 @@
       },
       "type": "array"
     },
+    "list.Changes": {
+      "additionalProperties": false,
+      "properties": {
+        "changed": {
+          "type": "integer"
+        },
+        "untracked": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "changed",
+        "untracked"
+      ],
+      "type": "object"
+    },
     "list.Detail": {
       "additionalProperties": false,
       "properties": {
@@ -1817,8 +1833,38 @@
         "active": {
           "type": "boolean"
         },
+        "ahead": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "behind": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "branch": {
           "type": "string"
+        },
+        "changes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/list.Changes"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "commits_ahead": {
           "type": "integer"
@@ -1837,13 +1883,30 @@
         "dirty": {
           "type": "boolean"
         },
+        "last_commit_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "locked": {
           "type": "boolean"
         },
         "main": {
           "type": "boolean"
         },
+        "merged": {
+          "type": "boolean"
+        },
         "missing": {
+          "type": "boolean"
+        },
+        "needs_sync": {
           "type": "boolean"
         },
         "origin": {
@@ -1855,6 +1918,9 @@
               "type": "null"
             }
           ]
+        },
+        "parent": {
+          "type": "string"
         },
         "path": {
           "type": "string"
@@ -1884,6 +1950,19 @@
               "type": "null"
             }
           ]
+        },
+        "urls": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -1896,10 +1975,18 @@
         "active",
         "missing",
         "commits_ahead",
+        "parent",
+        "ahead",
+        "behind",
+        "needs_sync",
+        "changes",
         "created_at",
+        "last_commit_at",
         "origin",
         "pr",
+        "merged",
         "services",
+        "urls",
         "actions"
       ],
       "type": "object"
@@ -1907,10 +1994,22 @@
     "list.PR": {
       "additionalProperties": false,
       "properties": {
+        "checks": {
+          "$ref": "#/$defs/worktree.Checks"
+        },
+        "decision": {
+          "type": "string"
+        },
+        "draft": {
+          "type": "boolean"
+        },
         "number": {
           "type": "integer"
         },
         "state": {
+          "type": "string"
+        },
+        "title": {
           "type": "string"
         },
         "url": {
@@ -2390,6 +2489,16 @@
         "draft": {
           "type": "boolean"
         },
+        "fix": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/domain.FollowUp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "number": {
           "type": "integer"
         },
@@ -2406,7 +2515,8 @@
       "required": [
         "number",
         "url",
-        "state"
+        "state",
+        "fix"
       ],
       "type": "object"
     },

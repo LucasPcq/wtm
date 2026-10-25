@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 
@@ -39,6 +40,7 @@ type Fake struct {
 	diffstats map[string]worktree.Diffstat
 	conflicts map[string]worktree.ConflictKind
 	moves     []worktree.Move
+	dates     map[string]time.Time
 }
 
 // FakeParams describes a repository, for NewFake and Build alike. Every branch
@@ -60,7 +62,11 @@ type FakeParams struct {
 	Changes   map[string][]worktree.Change     // the uncommitted changes Changes lists, by worktree (fake only)
 	Diffstats map[string]worktree.Diffstat     // what Diffstat measures, by worktree (fake only)
 	Conflicts map[string]worktree.ConflictKind // the paths a move conflicts on, by path (fake only)
+	Dates     map[string]time.Time             // when a local branch's tip was committed, Committed when not given (fake only)
 }
+
+// Committed is when the tip of a local branch was committed, unless FakeParams.Dates says otherwise.
+var Committed = time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
 
 // history is a branch's commits, from Root to its tip.
 type history []string
@@ -82,6 +88,7 @@ func NewFake(params FakeParams) *Fake {
 		changes:   map[string][]worktree.Change{},
 		diffstats: map[string]worktree.Diffstat{},
 		conflicts: params.Conflicts,
+		dates:     params.Dates,
 	}
 
 	for dir, stat := range params.Diffstats {
@@ -190,6 +197,22 @@ func (f *Fake) Branches(context.Context) (worktree.Branches, error) {
 	}
 
 	return worktree.Branches{Local: branchesOf(f.local), Remote: branchesOf(f.remote)}, nil
+}
+
+// CommitDates returns when the tip of each local branch was committed: as
+// seeded, else Committed.
+func (f *Fake) CommitDates(context.Context) (map[string]time.Time, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("CommitDates", ""); err != nil {
+		return nil, err
+	}
+
+	dates := map[string]time.Time{}
+	for name := range f.local {
+		dates[name] = cmp.Or(f.dates[name], Committed)
+	}
+	return dates, nil
 }
 
 // AheadBehind counts the commits of the local branch name past the history it

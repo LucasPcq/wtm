@@ -1,13 +1,19 @@
 
-  ! 4 worktrees · 1 needs attention
+  ! 4 worktrees · 2 need attention
 
      WORKTREE            ENV
      main                2 files
      ../.trees/detached  2 files
   !  feat/a              1 missing
-     feat/old            2 files
+  !  feat/old            2 files
 
   feat/a
+  ! main has 1 commit it lacks
+  → wtm sync feat/a   sync it onto main
   ! web/.env is missing
   → wtm env feat/a   rebuild it
+
+  feat/old
+  ! main has 1 commit it lacks
+  → wtm sync feat/old   sync it onto main
 

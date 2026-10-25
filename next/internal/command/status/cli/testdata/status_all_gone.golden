@@ -11,6 +11,8 @@
   ! its directory is gone
 
   feat/a
+  ! main has 1 commit it lacks
+  → wtm sync feat/a   sync it onto main
   ! web/.env is missing
   → wtm env feat/a   rebuild it
 

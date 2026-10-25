@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
@@ -50,6 +51,26 @@ func (r Repo) Branches(ctx context.Context) (worktree.Branches, error) {
 	}
 
 	return branches, nil
+}
+
+// CommitDates returns, by local branch, when the commit at its tip was made.
+func (r Repo) CommitDates(ctx context.Context) (map[string]time.Time, error) {
+	out, err := r.git(ctx, "for-each-ref", "--format=%(committerdate:iso-strict) %(refname)", strings.TrimSuffix(headsPrefix, "/"))
+	if err != nil {
+		return nil, err
+	}
+
+	dates := map[string]time.Time{}
+	for line := range strings.Lines(string(out)) {
+		date, refname, _ := strings.Cut(strings.TrimSpace(line), " ")
+		at, err := time.Parse(time.RFC3339, date)
+		if err != nil {
+			return nil, fmt.Errorf("read the date of %s: %w", refname, err)
+		}
+		dates[strings.TrimPrefix(refname, headsPrefix)] = at
+	}
+
+	return dates, nil
 }
 
 // AheadBehind counts the commits the local branch name has that its remote

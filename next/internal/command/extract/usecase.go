@@ -284,12 +284,12 @@ func (u UseCase) move(ctx context.Context, plan Plan, item Item, report domain.R
 		return item
 	}
 
-	report(domain.PhaseStarted{Subject: item.Subject, Phase: "move"})
+	report(domain.PhaseStarted{Subject: item.Subject, Phase: domain.PhaseMove})
 	// Shielded: a cancel arriving mid-move would leave the changes half in the source, half in the target.
 	shielded, release := u.Shield(ctx)
 	moved, err := u.Git.Move(shielded, plan.move())
 	release()
-	report(domain.PhaseFinished{Subject: item.Subject, Phase: "move", Failed: err != nil})
+	report(domain.PhaseFinished{Subject: item.Subject, Phase: domain.PhaseMove, Failed: err != nil})
 	if err != nil {
 		item.Status, item.Err = domain.StatusFailed, plan.failure(err)
 		return item

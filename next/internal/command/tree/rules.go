@@ -149,17 +149,6 @@ func (f Facts) warnings() []domain.Warning {
 	return append(warnings, f.Asked.Warnings(Name)...)
 }
 
-// countedAgainst returns the branch the commits of the worktree w are counted against, its parent or, for a root, the base branch, and reports whether they are counted: not for the main worktree nor a member of a cycle, which has no parent to sync onto, and only when both are local branches, which git can count.
-func (f Facts) countedAgainst(w worktree.Worktree) (string, bool) {
-	branch := w.Branch()
-	parent, ok := f.Stack.Parent(branch)
-	if !ok {
-		parent = f.Config.Worktrees.BaseBranch
-	}
-
-	return parent, !w.Main && !f.Stack.InCycle(branch) && parent != branch && f.Local(parent) && f.Local(branch)
-}
-
 // nodes are the worktrees that are nodes of the tree: those on a branch, the only place a stack has for them.
 func (f Facts) nodes() []worktree.Worktree {
 	return slices.DeleteFunc(slices.Clone(f.Worktrees), func(w worktree.Worktree) bool { return w.Branch() == "" })

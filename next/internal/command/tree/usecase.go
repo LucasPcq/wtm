@@ -94,7 +94,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) State {
 	presence, err := repository.Present(ctx, u.Git, w)
 	state := State{Missing: presence.Missing, Dirty: presence.Dirty, Err: err}
-	against, counted := facts.countedAgainst(w)
+	against, counted := facts.CountedAgainstParent(facts.Stack, w)
 	if state.Missing || state.Err != nil || !counted {
 		return state
 	}

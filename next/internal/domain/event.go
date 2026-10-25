@@ -18,17 +18,35 @@ type UnitStarted struct {
 	Subject string `json:"subject"`
 }
 
+// Phase is one phase of a subject's work, as PhaseStarted and PhaseFinished name it: a closed set, published as an enum so that a surface names each one.
+type Phase string
+
+// The phases of a subject's work.
+const (
+	PhaseFastForward Phase = "fast_forward" // its source branch fast-forwarded to origin, before the worktree is added
+	PhaseWorktree    Phase = "worktree"     // git adds the worktree
+	PhaseEnv         Phase = "env"          // its .env files copied
+	PhaseMeta        Phase = "meta"         // its meta record written
+	PhaseOrdinal     Phase = "ordinal"      // its ordinal, the number its ports are offset by
+	PhasePorts       Phase = "ports"        // its ports settled in its .env files
+	PhaseOnCreate    Phase = "on_create"    // the project's on_create hooks
+	PhaseMove        Phase = "move"         // extract moves its changes
+)
+
+// Phases are every Phase, in the order a subject's work runs them.
+var Phases = []Phase{PhaseFastForward, PhaseWorktree, PhaseEnv, PhaseMeta, PhaseOrdinal, PhasePorts, PhaseOnCreate, PhaseMove}
+
 // PhaseStarted reports that a phase of a subject's work begins; Log is the file its output goes to, if any.
 type PhaseStarted struct {
 	Subject string `json:"subject"`
-	Phase   string `json:"phase"`
+	Phase   Phase  `json:"phase"`
 	Log     string `json:"log,omitempty"`
 }
 
 // PhaseFinished reports that a phase of a subject's work ended, and whether it failed.
 type PhaseFinished struct {
 	Subject string `json:"subject"`
-	Phase   string `json:"phase"`
+	Phase   Phase  `json:"phase"`
 	Failed  bool   `json:"failed"`
 }
 

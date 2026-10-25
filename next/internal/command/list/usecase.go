@@ -63,7 +63,7 @@ func (u UseCase) Questions(context.Context, Request) (Questions, error) {
 // ----------------------------------------------------------------------------
 // Observe
 
-// Observe reads what list reports: the repository, after fetching origin when req asks to, the meta records, what each worktree holds, the jobs up and, when req asks for them, the newest pull request of each branch. The worktrees, the daemon and GitHub are read at once.
+// Observe reads what list reports: the repository, after fetching origin when req asks to, the meta records and the stack they make, when each branch last moved, what each worktree holds against the base branch and its parent, the jobs up and, when req asks for them, the newest pull request of each branch and whether it merged it. The worktrees, the daemon and GitHub are read at once.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	// A refresh fetches origin first, best effort: an origin out of reach leaves the counts of the refs already fetched, and a warning.
 	var fetchErr error
@@ -76,8 +76,14 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, err
 	}
 
-	facts := Facts{Repository: repo, FetchErr: fetchErr}
+	dates, err := u.Git.CommitDates(ctx)
+	if err != nil {
+		return Facts{}, err
+	}
+
+	facts := Facts{Repository: repo, FetchErr: fetchErr, Dates: dates}
 	facts.Records, facts.RecordErrs = repository.Records(u.Meta, repo.Live())
+	facts.Stack = worktree.StackOf(repo.Worktrees, facts.Records, repo.Config.Worktrees.BaseBranch)
 	worktrees := facts.Checkouts()
 	var read []State
 	facts.Asked = repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, PullRequests: u.PullRequests, Branches: repo.Live(), WithPRs: req.WithPRs}, func() {
@@ -88,24 +94,54 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	for i, w := range worktrees {
 		facts.States[w.Path] = read[i]
 	}
+	facts.Behind = repository.Behind(ctx, u.Git, repo, facts.PullRequests, worktrees)
 	return facts, nil
 }
 
-// state reads one worktree: whether its directory is gone, then, if it is there, its changes and the commits its branch has past the base branch.
+// state reads one worktree: whether its directory is gone, then, if it is there, its changes, the commits its branch has past the base branch, and those past its parent and behind it, counted once when its parent is the base branch.
 func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) State {
 	presence, err := repository.Present(ctx, u.Git, w)
 	state := State{Missing: presence.Missing, Dirty: presence.Dirty, Err: err}
-	if state.Missing || state.Err != nil || !facts.CountedAgainstBase(w) {
+	if state.Missing || state.Err != nil {
 		return state
+	}
+	if state.Dirty {
+		state.Changes, err = u.Git.Changes(ctx, w.Path)
+		if state.Err = repository.Interrupted(ctx, err); err != nil {
+			return state
+		}
 	}
 
 	// A branch with no commit yet, an orphan, has nothing to count: it is not counted rather than unreadable.
-	gap, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: facts.Config.Worktrees.BaseBranch})
-	state.Err = repository.Interrupted(ctx, err)
-	if err != nil {
-		return state
+	counts := map[string]worktree.AheadBehind{}
+	count := func(against string) (worktree.AheadBehind, error) {
+		if gap, ok := counts[against]; ok {
+			return gap, nil
+		}
+		gap, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: against})
+		counts[against] = gap
+		return gap, repository.Interrupted(ctx, err)
 	}
 
-	state.Ahead = gap.Ahead
+	if facts.CountedAgainstBase(w) {
+		gap, err := count(facts.Config.Worktrees.BaseBranch)
+		if state.Err = err; err != nil {
+			return state
+		}
+		state.Ahead = gap.Ahead
+	}
+
+	parent, counted := facts.CountedAgainstParent(facts.Stack, w)
+	if !counted {
+		return state
+	}
+	gap, err := count(parent)
+	if state.Err = err; err != nil {
+		return state
+	}
+	state.ParentAhead = &gap.Ahead
+	if _, child := facts.Stack.Parent(w.Branch()); child {
+		state.ParentBehind = &gap.Behind
+	}
 	return state
 }

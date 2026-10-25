@@ -264,7 +264,7 @@ func (r *recorder) phases() []string {
 	var phases []string
 	for _, event := range r.All() {
 		if started, ok := event.(domain.PhaseStarted); ok {
-			phases = append(phases, started.Phase)
+			phases = append(phases, string(started.Phase))
 		}
 	}
 	return phases
@@ -272,7 +272,7 @@ func (r *recorder) phases() []string {
 
 func (r *recorder) logOf(phase string) string {
 	for _, event := range r.All() {
-		if started, ok := event.(domain.PhaseStarted); ok && started.Phase == phase {
+		if started, ok := event.(domain.PhaseStarted); ok && string(started.Phase) == phase {
 			return started.Log
 		}
 	}
