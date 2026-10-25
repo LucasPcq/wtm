@@ -59,55 +59,59 @@ export function ProgressView(props: {
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-4 pr-3">
-          {progress.units.map(([subject, unit]) => (
-            <section key={subject} aria-label={subject}>
-              {progress.units.length > 1 && <h3 className="mb-2 font-mono text-xs text-muted-foreground">{subject}</h3>}
-              <ol className="flex flex-col">
-                {unit.phases.map((run, i) => (
-                  <li key={run.phase} className="flex gap-3">
-                    <div className="flex w-5 flex-col items-center">
-                      <Marker run={run} />
-                      {i < unit.phases.length - 1 && <span className="w-px flex-1 bg-border" />}
-                    </div>
-                    <div className="flex min-w-0 flex-1 flex-col gap-2 pb-3">
-                      <div className="flex items-center text-sm">
-                        <span
-                          className={cn(
-                            'flex-1',
-                            run.state === 'todo' && 'text-muted-foreground',
-                            run.state === 'now' && 'font-medium',
-                          )}
-                        >
-                          {phaseLabel[run.phase]}
-                        </span>
-                        <span className="text-xs text-muted-foreground tabular-nums">{seconds(run)}</span>
+          {/* once all went well, where each worktree is and what next say more than twelve ticks */}
+          {!(ended && !failure && !cancelled) &&
+            progress.units.map(([subject, unit]) => (
+              <section key={subject} aria-label={subject}>
+                {progress.units.length > 1 && (
+                  <h3 className="mb-2 font-mono text-xs text-muted-foreground">{subject}</h3>
+                )}
+                <ol className="flex flex-col">
+                  {unit.phases.map((run, i) => (
+                    <li key={run.phase} className="flex gap-3">
+                      <div className="flex w-5 flex-col items-center">
+                        <Marker run={run} />
+                        {i < unit.phases.length - 1 && <span className="w-px flex-1 bg-border" />}
                       </div>
-                      {(run.state === 'now' || run.state === 'failed') && unit.lines.length > 0 && (
-                        <div className="rounded-md bg-muted px-3 py-2">
-                          <pre
-                            // the output follows its last line, as a terminal does
-                            ref={(pre) => pre?.scrollTo({ top: pre.scrollHeight })}
-                            className="h-28 overflow-y-auto font-mono text-xs whitespace-pre-wrap text-muted-foreground [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin]"
+                      <div className="flex min-w-0 flex-1 flex-col gap-2 pb-3">
+                        <div className="flex items-center text-sm">
+                          <span
+                            className={cn(
+                              'flex-1',
+                              run.state === 'todo' && 'text-muted-foreground',
+                              run.state === 'now' && 'font-medium',
+                            )}
                           >
-                            {unit.lines.join('\n')}
-                          </pre>
-                          {run.log && (
-                            <button
-                              type="button"
-                              className="mt-1 text-xs underline underline-offset-4"
-                              onClick={() => run.log && copy(run.log)}
-                            >
-                              Copy the log's path
-                            </button>
-                          )}
+                            {phaseLabel[run.phase]}
+                          </span>
+                          <span className="text-xs text-muted-foreground tabular-nums">{seconds(run)}</span>
                         </div>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          ))}
+                        {(run.state === 'now' || run.state === 'failed') && unit.lines.length > 0 && (
+                          <div className="rounded-md bg-muted px-3 py-2">
+                            <pre
+                              // the output follows its last line, as a terminal does
+                              ref={(pre) => pre?.scrollTo({ top: pre.scrollHeight })}
+                              className="h-28 overflow-y-auto font-mono text-xs whitespace-pre-wrap text-muted-foreground [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin]"
+                            >
+                              {unit.lines.join('\n')}
+                            </pre>
+                            {run.log && (
+                              <button
+                                type="button"
+                                className="mt-1 text-xs underline underline-offset-4"
+                                onClick={() => run.log && copy(run.log)}
+                              >
+                                Copy the log's path
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ))}
           {ended && failure && <p className="text-sm text-destructive">{failure}</p>}
           {ended && <Ended envelope={progress.envelope} />}
         </div>
@@ -183,7 +187,7 @@ function Ended({ envelope }: { envelope: DomainEnvelope | undefined }) {
   if (!envelope) return null
   const made = (envelope.items ?? []).filter((item) => item.status === 'done')
   return (
-    <div className="flex flex-col gap-3 border-t pt-4">
+    <div className="flex flex-col gap-3 not-first:border-t not-first:pt-4">
       {made.map((item) => {
         const detail = item.detail as unknown as CreateDetail
         return (

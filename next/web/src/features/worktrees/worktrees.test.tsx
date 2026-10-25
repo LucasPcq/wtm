@@ -37,7 +37,7 @@ test('Needs sync keeps the worktrees behind their parent, the search narrows the
   expect((screen.getByRole('textbox', { name: 'Search branches' }) as HTMLInputElement).value).toBe('')
 })
 
-test('create shows a problem only once asked to go on, then confirms the plan and runs it to the end', async () => {
+test('create shows a problem only once asked to go on, then confirms the plan, runs it, and ends on where the worktree is and what next', async () => {
   const { user } = renderApp('/r/r1/worktrees')
   await user.click(await screen.findByRole('button', { name: 'Create worktree' }))
   const dialog = await screen.findByRole('dialog')
@@ -56,7 +56,8 @@ test('create shows a problem only once asked to go on, then confirms the plan an
   await user.click(await within(dialog).findByRole('button', { name: 'Create worktree' }))
 
   expect(await within(dialog).findByText('feat/new is ready')).toBeTruthy()
-  expect(within(dialog).getByText('Run the on_create hooks')).toBeTruthy()
+  expect(within(dialog).getByText('/acme.trees/feat/new')).toBeTruthy()
+  expect(within(dialog).queryByText('Run the on_create hooks')).toBeNull()
   expect(within(dialog).getByText('wtm go feat/new')).toBeTruthy()
 })
 
