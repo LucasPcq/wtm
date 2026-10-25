@@ -54,35 +54,21 @@ func wordedForm[Q Questions](q Q, words Worder[Q]) []worded {
 // flagsOf spells each field path of schema as the argument or flag that sets it, with the usage of that flag, its help; the first field answering a path gives both. A schema with a rememberable field also has --remember.
 func flagsOf(schema []worded) (flags, usages map[string]string) {
 	flags, usages = map[string]string{}, map[string]string{}
-	var rememberable []string
+	fields := make([]domain.Field, 0, len(schema))
 	for _, field := range schema {
 		path := field.Spec().Path
 		if _, seen := flags[path]; !seen {
 			flags[path], usages[path] = field.Flag, field.Help
 		}
-		if remembers(field.Field) {
-			rememberable = append(rememberable, path)
-		}
+		fields = append(fields, field.Field)
 	}
 
-	if len(rememberable) > 0 {
+	if rememberable := (domain.Form{Fields: fields}).Rememberable(); len(rememberable) > 0 {
 		flags[domain.PathRemember] = "--" + domain.PathRemember
 		usages[domain.PathRemember] = "The answers to always use in this repository: " + strings.Join(rememberable, ", ") + " (repeatable)"
 	}
 
 	return flags, usages
-}
-
-func remembers(field domain.Field) bool {
-	switch field := field.(type) {
-	case domain.SelectField:
-		return field.Rememberable
-	case domain.ConfirmField:
-		return field.Rememberable
-	case domain.MultiSelectField, domain.TextField, domain.TextListField:
-	}
-
-	return false
 }
 
 // labelOf spells a field path with the label of the first field of schema that answers it, keeping an entry's index: branches[1] reads Branches[1].
@@ -162,7 +148,7 @@ func originBadge(origin worktree.Origin) string {
 	case worktree.Ahead:
 		return strconv.Itoa(origin.Ahead) + " ahead"
 	case worktree.Diverged:
-		return strconv.Itoa(origin.Ahead) + " ahead, " + strconv.Itoa(origin.Behind) + " behind"
+		return worktree.AheadBehind{Ahead: origin.Ahead, Behind: origin.Behind}.String()
 	case worktree.NoOrigin, worktree.UpToDate:
 	}
 

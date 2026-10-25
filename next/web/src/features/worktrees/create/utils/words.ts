@@ -1,4 +1,4 @@
-import type { CreateAction, CreateRequest, DomainPhase, DomainSkip } from '@/api/types.gen'
+import type { CreateAction, CreateRequest, DomainField, DomainPhase, DomainSkip } from '@/api/types.gen'
 import type { FieldWords, OptionWords } from '@/components/command-form/command-fields'
 
 // The core words its questions for the command line; the web says them its own way. Each record is exhaustive over
@@ -32,7 +32,7 @@ const ifNotExists: Options<'if_not_exists'> = {
   false: { title: 'Refuse', description: 'Stop on a worktree that exists.' },
 }
 
-const createWords: Record<Question, FieldWords> = {
+export const createWords: Record<Question, FieldWords> = {
   branches: { label: 'Branches', help: 'One per line; each gets its own worktree.' },
   from: { label: 'Source branch', help: 'Where a new branch starts, and the parent it syncs onto.' },
   fast_forward: {
@@ -58,13 +58,9 @@ const createWords: Record<Question, FieldWords> = {
   },
 }
 
-export const isQuestion = (path: string): path is Question => path in createWords
+export type Asked = DomainField & { path: Question }
 
-// a path the schema publishes is a Question, so one without words is a stale types.gen.ts, never shown as is
-export const wordsOf = (path: string): FieldWords => {
-  if (!isQuestion(path)) throw new Error(`create has no words for ${path}`)
-  return createWords[path]
-}
+export const isAsked = (field: DomainField): field is Asked => field.path in createWords
 
 // null for a reason that means nothing in a browser
 export const skipWords: Record<DomainSkip, string | null> = {

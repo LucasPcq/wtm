@@ -18,7 +18,7 @@ const origin: Record<DomainOrigin, string | undefined> = {
 
 export type Remember = { paths: string[]; toggle: (path: string) => void }
 
-export function CommandFields({
+export function CommandFields<P extends string>({
   form,
   fields,
   words,
@@ -26,15 +26,15 @@ export function CommandFields({
   remember,
 }: {
   form: CommandForm
-  fields: DomainField[]
-  words: (path: string) => FieldWords
+  fields: (DomainField & { path: P })[]
+  words: Record<P, FieldWords>
   problems: Record<string, string>
   remember?: Remember
 }) {
   return (
     <FieldGroup className="gap-6">
       {fields.map((field) => {
-        const said = words(field.path)
+        const said = words[field.path]
         const rememberable = remember && 'rememberable' in field && field.rememberable
 
         const from = (dirty: boolean) => {

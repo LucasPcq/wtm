@@ -80,12 +80,11 @@ func (f *filesStep) Standing() form.Standing {
 
 // tone is the colour of a change's tag: an addition, a loss, a risk, or a rename that changes no content.
 func (f *filesStep) tone(option domain.Option) widget.Tone {
-	at := slices.IndexFunc(f.s.Questions().Files.Options, func(c worktree.Change) bool { return c.Path == option.Value })
-	if at < 0 {
+	if option.Change == nil {
 		return widget.ToneMuted
 	}
 
-	switch f.s.Questions().Files.Options[at].Status {
+	switch option.Change.Status {
 	case worktree.ChangeUntracked:
 		return widget.ToneSuccess
 	case worktree.ChangeDeleted:

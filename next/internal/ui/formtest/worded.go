@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Worded checks that words give every field of the schema, the form of zero questions, its flag, its label and its help, a multi-select its problem of none picked, and every option of a closed select its label: a question cannot ship without its command-line words.
+// Worded checks that words give every field of the schema, the form of zero questions, its flag, its label and its help, a multi-select its problem of none picked, and every option of a closed select, and an option with no value, its label: a question cannot ship without its command-line words.
 func Worded[Q form.Questions](t *testing.T, words form.Worder[Q]) {
 	t.Helper()
 	var zero Q
@@ -23,7 +23,8 @@ func Worded[Q form.Questions](t *testing.T, words form.Worder[Q]) {
 			assert.NotEmpty(t, said.Empty, "the problem of %s answered with none", path)
 		case domain.SelectField:
 			for _, option := range field.Options {
-				assert.True(t, !field.Closed || said.Options[option.Value].Label != "", "the label of %s's option %q", path, option.Value)
+				worded := field.Closed || option.Value == ""
+				assert.True(t, !worded || said.Options[option.Value].Label != "", "the label of %s's option %q", path, option.Value)
 			}
 		case domain.TextField, domain.TextListField, domain.ConfirmField:
 		}

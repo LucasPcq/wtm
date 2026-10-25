@@ -11,7 +11,7 @@ const text = (path: string, skip?: DomainSkip): DomainField => ({
   ...(skip && { skip }),
 })
 
-test('each question goes in its step, a skipped one is listed apart, one the build does not know goes last', () => {
+test('each question goes in its step, a skipped one is listed apart, a field no question of create answers is left out', () => {
   const form: DomainForm = {
     fields: [text('branches'), text('env_from', 'exists'), text('if_not_exists', 'flag_only'), text('new_one')],
     problems: [],
@@ -20,7 +20,7 @@ test('each question goes in its step, a skipped one is listed apart, one the bui
   const [branch, environment] = stepsOf(form)
 
   expect(branch?.asked.map((f) => f.path)).toEqual(['branches'])
-  expect(environment?.asked.map((f) => f.path)).toEqual(['new_one'])
+  expect(environment?.asked.map((f) => f.path)).toEqual([])
   expect(environment?.skipped.map((f) => f.path)).toEqual(['env_from', 'if_not_exists'])
 })
 
