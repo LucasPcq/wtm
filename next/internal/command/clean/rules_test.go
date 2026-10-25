@@ -33,7 +33,7 @@ func TestAChildMovesPastEveryParentRemovedToTheBaseBranchAtTheEnd(t *testing.T) 
 		moves   []clean.Move
 	}{
 		"onto_grandparent": {removed: []string{"b"}, moves: []clean.Move{{Branch: "c", From: "b", To: "a"}}},
-		"past_two":         {removed: []string{"a", "b"}, moves: []clean.Move{{Branch: "d", From: "a", To: "main"}, {Branch: "c", From: "b", To: "main"}}},
+		"past_two":         {removed: []string{"a", "b"}, moves: []clean.Move{{Branch: "d", From: "a", To: "main", Base: true}, {Branch: "c", From: "b", To: "main", Base: true}}},
 		"leaf":             {removed: []string{"c"}},
 	}
 	for name, c := range cases {

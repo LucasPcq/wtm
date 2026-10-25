@@ -3,6 +3,6 @@
   Remove          feat/parent
   Already absent  feat/nope (no worktree: nothing to remove)
   Children        feat/child (left on feat/parent)
-  fingerprint  25e41abdbad1947fb12e59fe
-  → wtm-next clean feat/parent feat/nope --expect-fingerprint 25e41abdbad1947fb12e59fe   apply this plan
+  fingerprint  6259edd80168ce762c50410c
+  → wtm-next clean feat/parent feat/nope --expect-fingerprint 6259edd80168ce762c50410c   apply this plan
 

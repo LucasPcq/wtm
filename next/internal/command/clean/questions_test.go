@@ -29,7 +29,7 @@ func TestReparentIsAskedOnlyWhenAChildIsLeftBehind(t *testing.T) {
 
 	assert.Equal(t, domain.SkipNoOrphan, skipOf(alone.Form(), clean.PathReparentChildren))
 	assert.Empty(t, skipOf(parenting.Form(), clean.PathReparentChildren))
-	assert.Equal(t, []clean.Move{{Branch: child, From: parent, To: "main"}}, parenting.Orphans)
+	assert.Equal(t, []clean.Move{{Branch: child, From: parent, To: "main", Base: true}}, parenting.Orphans)
 	assert.Empty(t, skipOf(given.Form(), clean.PathReparentChildren), "a flag given never makes its line disappear")
 	assert.Equal(t, domain.OriginRequest, given.Reparent.Origin)
 }

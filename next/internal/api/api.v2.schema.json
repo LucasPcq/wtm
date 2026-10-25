@@ -37,6 +37,9 @@
     "clean.Move": {
       "additionalProperties": false,
       "properties": {
+        "base": {
+          "type": "boolean"
+        },
         "branch": {
           "type": "string"
         },

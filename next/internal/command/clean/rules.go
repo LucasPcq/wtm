@@ -193,11 +193,12 @@ func unsafe(removals []Removal) []Removal {
 	return slices.DeleteFunc(slices.Clone(removals), func(r Removal) bool { return len(r.Blockers) == 0 })
 }
 
-// A Move is a child worktree a removal leaves behind: its branch, the parent removed under it, and the nearest worktree that stays, else the base branch, which reparenting records as its parent.
+// A Move is a child worktree a removal leaves behind: its branch, the parent removed under it, and the nearest worktree that stays, else the base branch, which reparenting records as its parent; Base says it is the base branch.
 type Move struct {
 	Branch string `json:"branch"`
 	From   string `json:"from"`
 	To     string `json:"to"`
+	Base   bool   `json:"base,omitempty"`
 }
 
 // moves are the children of the removed worktrees that stay, each with where it would move: up the chain of parents, past every one removed, to the base branch at its end.
@@ -216,7 +217,8 @@ func (f Facts) moves(removals []Removal) []Move {
 			if w.Main || child == "" || removed[child] || r.Branch == "" || f.Records[child].SourceBranch != r.Branch {
 				continue
 			}
-			moves = append(moves, Move{Branch: child, From: r.Branch, To: f.survivor(r.Branch, removed)})
+			to := f.survivor(r.Branch, removed)
+			moves = append(moves, Move{Branch: child, From: r.Branch, To: to, Base: to == f.Config.Worktrees.BaseBranch})
 		}
 	}
 

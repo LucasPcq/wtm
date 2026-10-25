@@ -44,7 +44,8 @@
       {
         "branch": "feat/child",
         "from": "feat/parent",
-        "to": "main"
+        "to": "main",
+        "base": true
       }
     ],
     "reparent_children": false,
