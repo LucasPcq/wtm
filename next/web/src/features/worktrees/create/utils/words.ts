@@ -72,6 +72,8 @@ export const skipWords: Record<DomainSkip, string | null> = {
   run_unread: "run.toml couldn't be read",
   nothing_isolated: 'run.toml declares nothing to isolate',
   no_conflict: 'nothing conflicts',
+  no_orphan: 'no child worktree is left behind',
+  safe: 'every worktree is safe to remove',
 }
 
 export const actionWords: Record<CreateAction, string> = {
@@ -90,4 +92,6 @@ export const phaseLabel: Record<DomainPhase, string> = {
   ports: 'Settle its ports',
   on_create: 'Run the on_create hooks',
   move: 'Move the changes',
+  on_clean: 'Run the on_clean hooks',
+  remove: 'Remove the worktree',
 }

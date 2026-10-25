@@ -12,6 +12,7 @@ import { ColumnsPanel } from '@/features/worktrees/list/components/columns-panel
 import { Notes } from '@/features/worktrees/list/components/notes'
 import { ListView } from '@/features/worktrees/list/list-view'
 import { rowsOf } from '@/features/worktrees/list/utils/rows'
+import { RemoveDialog } from '@/features/worktrees/remove/remove-dialog'
 import { useChoice } from '@/features/worktrees/store/ui-store'
 import { TreeView } from '@/features/worktrees/tree/tree-view'
 import { overlaid } from '@/features/worktrees/utils/condition'
@@ -55,7 +56,12 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
       <PageHeader
         title="Worktrees"
         description={read && root && `${count} ${count === 1 ? 'worktree' : 'worktrees'} in ${repoName(root)}`}
-        action={<CreateButton repo={repo} />}
+        action={
+          <div className="flex items-center gap-2">
+            <RemoveDialog repo={repo} />
+            <CreateButton repo={repo} />
+          </div>
+        }
       />
       <Toolbar
         search={search}

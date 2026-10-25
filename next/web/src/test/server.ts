@@ -101,6 +101,100 @@ export function questionsOf(answers: DomainAnswered[] = []) {
   }
 }
 
+// clean offers every worktree but main; fix/login, with a change, is unsafe until forced
+export function cleanQuestionsOf(answers: DomainAnswered[] = []) {
+  const picked = answers.find((a) => a.path === 'worktree')?.values ?? []
+  return {
+    fields: [
+      field({
+        kind: 'multi_select',
+        path: 'worktree',
+        picked,
+        options: worktrees.filter((w) => !w.main).map((w) => ({ value: w.branch })),
+      }),
+    ],
+    problems: picked.length
+      ? []
+      : [{ path: 'worktree', code: 'required', flag: '<worktree>', message: 'worktree is required' }],
+  }
+}
+
+const cleanPlan = (call: WebCall) => {
+  const picked = call.answers?.find((a) => a.path === 'worktree')?.values ?? []
+  const said = (path: string) => call.answers?.some((a) => a.path === path && a.values[0] === 'true') ?? false
+  const unsafe = picked.filter((branch) => worktrees.find((w) => w.branch === branch)?.dirty)
+  if (unsafe.length > 0 && !said('force'))
+    return HttpResponse.json(
+      {
+        ...envelope('clean', []),
+        ok: false,
+        error: {
+          kind: 'refused',
+          code: 'clean.unsafe',
+          message: `nothing removed: ${unsafe.length} worktree(s) can't be removed safely`,
+          fields: unsafe.map((branch) => ({
+            path: `worktree[${picked.indexOf(branch)}]`,
+            code: 'clean.dirty',
+            params: { value: branch },
+            flag: '<worktree>',
+            message: `${branch} has uncommitted changes`,
+          })),
+        },
+      },
+      { status: 403 },
+    )
+
+  const children = worktrees.filter((w) => picked.includes(w.parent) && !picked.includes(w.branch))
+  return HttpResponse.json({
+    ...envelope('clean', []),
+    fingerprint: 'c1',
+    plan: {
+      worktrees: picked.map((branch) => ({
+        worktree: branch,
+        branch,
+        path: `/acme.trees/${branch.replace('/', '-')}`,
+        blockers: unsafe.includes(branch) ? ['dirty'] : [],
+      })),
+      moves: children.map((w) => ({ branch: w.branch, from: w.parent, to: 'main' })),
+      reparent_children: said('reparent_children'),
+      force: said('force'),
+    },
+  })
+}
+
+const cleanRun = (call: WebCall) => {
+  const picked = call.answers?.find((a) => a.path === 'worktree')?.values ?? []
+  const reparent = call.answers?.some((a) => a.path === 'reparent_children') ?? false
+  const orphans = reparent ? [] : worktrees.filter((w) => picked.includes(w.parent) && !picked.includes(w.branch))
+  return streamed(
+    [
+      ...picked.flatMap((branch) => [
+        line({ type: 'unit.started', subject: branch }),
+        line({ type: 'phase.started', subject: branch, phase: 'remove' }),
+        line({ type: 'phase.finished', subject: branch, phase: 'remove', failed: false }),
+        line({ type: 'unit.finished', subject: branch, status: 'done' }),
+      ]),
+      `event: envelope\ndata: ${JSON.stringify({
+        ...envelope('clean', []),
+        items: picked.map((branch) => ({ subject: branch, status: 'done', detail: { path: `/acme.trees/${branch}` } })),
+        warnings: orphans.map((w) => ({
+          code: 'clean.orphaned',
+          message: `${w.branch} still points at the removed parent ${w.parent}`,
+          follow_up: {
+            command: 'reparent',
+            answers: [
+              { path: 'worktree', values: [w.branch] },
+              { path: 'to', values: ['main'] },
+            ],
+            code: 'clean.reparent',
+            message: 'move it onto main',
+          },
+        })),
+      })}\n\n`,
+    ].join(''),
+  )
+}
+
 export const line = (event: object) => `data: ${JSON.stringify({ v: 2, ts: '2026-10-25T12:00:00Z', ...event })}\n\n`
 
 export const streamed = (body: string, operation: string | null = 'op-1') =>
@@ -166,6 +260,9 @@ const handlers = [
   http.post('/api/command-line', async ({ request }) =>
     HttpResponse.json({ argv: spelled((await request.json()) as DomainFollowUp) }),
   ),
+  http.post('/api/repos/r1/commands/clean/questions', async ({ request }) =>
+    HttpResponse.json(cleanQuestionsOf(((await request.json()) as WebCall).answers)),
+  ),
   http.post('/api/repos/r1/commands/create/questions', async ({ request }) =>
     HttpResponse.json(questionsOf(((await request.json()) as WebCall).answers)),
   ),
@@ -183,6 +280,8 @@ const handlers = [
         )
       case 'create':
         return call.dry_run ? HttpResponse.json(plan(asked('branches') ?? '')) : createRun(asked('branches') ?? '')
+      case 'clean':
+        return call.dry_run ? cleanPlan(call) : cleanRun(call)
     }
     return HttpResponse.json({ error: { message: 'unknown command' } }, { status: 404 })
   }),
