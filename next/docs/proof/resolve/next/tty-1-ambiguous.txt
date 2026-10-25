@@ -1,0 +1,11 @@
+$ dir=$(wtm resolve feat/log); echo "EXIT=$? dir=$dir"
+
+  Step 1/1 • Worktree
+
+  The worktree to resolve, by its branch, its path or part of its branch
+
+▌› feat/login
+   feat/logout
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

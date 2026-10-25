@@ -2,6 +2,7 @@ package domain
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
@@ -134,4 +135,39 @@ func OptionsOf[T ~string](values []T) []Option {
 	}
 
 	return options
+}
+
+// WorktreeOptions are worktrees as a worktree picker offers them, in order: each by its name (worktree.Worktree.Name), tagged current when it is the deepest holding cwd, where the caller stands, else main for the main worktree.
+func WorktreeOptions(worktrees []worktree.Worktree, cwd string) []Option {
+	current := worktree.Holding(worktrees, cwd, func(w worktree.Worktree) string { return w.Path })
+	options := make([]Option, 0, len(worktrees))
+	for i, w := range worktrees {
+		option := Option{Value: w.Name(), Detached: w.Branch() == ""}
+		switch {
+		case i == current:
+			option.Tag = TagCurrent
+		case w.Main:
+			option.Tag = TagMain
+		}
+		options = append(options, option)
+	}
+
+	return options
+}
+
+// NamedWorktree is the worktree of worktrees that query names (worktree.Named, located the path it stands for), or the request's failure, a problem of the field at PathWorktree: a query that names no worktree (CodeNotFound) or several (CodeAmbiguous, their branches in its params).
+func NamedWorktree(worktrees []worktree.Worktree, query, located string) (worktree.Worktree, error) {
+	matches := worktree.Named(worktrees, query, located)
+	switch len(matches) {
+	case 1:
+		return matches[0], nil
+	case 0:
+		return worktree.Worktree{}, Invalid([]FieldError{{Path: PathWorktree, Code: CodeNotFound, Template: "{value} names no worktree", Params: Params{"value": query}}})
+	}
+
+	names := make([]string, 0, len(matches))
+	for _, w := range matches {
+		names = append(names, w.Branch())
+	}
+	return worktree.Worktree{}, Invalid([]FieldError{{Path: PathWorktree, Code: CodeAmbiguous, Template: "{value} matches several worktrees: {matches}", Params: Params{"value": query, "matches": strings.Join(names, ", ")}}})
 }

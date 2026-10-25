@@ -1,0 +1,18 @@
+{
+  "v": 2,
+  "command": "resolve",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/login",
+      "status": "done",
+      "detail": {
+        "branch": "feat/login",
+        "path": "/repo/.trees/feat-login",
+        "missing": false
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

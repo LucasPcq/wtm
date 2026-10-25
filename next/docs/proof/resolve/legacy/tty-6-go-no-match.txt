@@ -1,0 +1,7 @@
+
+┃  ! No worktree found matching "nope"
+
+EXIT=0
+<SB>/acme.trees/feat-login
+$
+

@@ -78,6 +78,27 @@ func Holding[T any](list []T, dir string, path func(T) string) int {
 	return found
 }
 
+// Named are the worktrees of list that query names: the one on that branch; else the deepest holding located, the path query stands for, resolved ("" when it stands for none); else each one whose branch holds query. One is the worktree named, none a query that names no worktree (an empty one names none), several an ambiguous one.
+func Named(list []Worktree, query, located string) []Worktree {
+	if query == "" {
+		return nil
+	}
+	if at := slices.IndexFunc(list, func(w Worktree) bool { return w.Branch() == query }); at >= 0 {
+		return list[at : at+1]
+	}
+	if at := Holding(list, located, func(w Worktree) string { return w.Path }); at >= 0 {
+		return list[at : at+1]
+	}
+
+	var matches []Worktree
+	for _, w := range list {
+		if w.Branch() != "" && strings.Contains(w.Branch(), query) {
+			matches = append(matches, w)
+		}
+	}
+	return matches
+}
+
 // Location is a path resolved through its symbolic links, and whether something is there.
 type Location struct {
 	Path   string

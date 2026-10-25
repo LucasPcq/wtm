@@ -191,7 +191,6 @@ const (
 	CodePartial          = Name + ".partial"
 	CodeNoWorktree       = Name + ".no_worktree"
 	CodeUnreadable       = Name + domain.Unreadable
-	CodeAmbiguous        = Name + ".ambiguous"
 	CodeAllWithWorktree  = Name + ".all_with_worktree"
 )
 
@@ -200,7 +199,7 @@ const (
 
 // Targets are the worktrees req reads of snapshot: every one with All, the main first; else the one it names, by its branch, by a path (located, resolved and existing, "" when the name is none) in it, or by a part of its branch found in no other; else the deepest holding req.Caller.Cwd, where the caller stands; else the main one. It refuses All with a worktree named, a name that matches no worktree or several, and a repository with no worktree to read.
 func Targets(snapshot worktree.Snapshot, req Request, located string) ([]worktree.Worktree, error) {
-	worktrees := listed(snapshot)
+	worktrees := snapshot.MainFirst()
 	switch {
 	case len(worktrees) == 0 && !req.All:
 		return nil, &domain.Error{Kind: domain.KindPrecondition, Code: CodeNoWorktree, Message: "the repository has no worktree to read"}
@@ -211,7 +210,7 @@ func Targets(snapshot worktree.Snapshot, req Request, located string) ([]worktre
 	case req.All:
 		return worktrees, nil
 	case req.Worktree != "":
-		named, err := named(worktrees, req.Worktree, located)
+		named, err := domain.NamedWorktree(worktrees, req.Worktree, located)
 		if err != nil {
 			return nil, err
 		}
@@ -222,47 +221,6 @@ func Targets(snapshot worktree.Snapshot, req Request, located string) ([]worktre
 		return []worktree.Worktree{worktrees[at]}, nil
 	}
 	return worktrees[:1], nil
-}
-
-// named is the worktree query names: the one on that branch, else the deepest holding the path located, else the only one whose branch holds query.
-func named(worktrees []worktree.Worktree, query, located string) (worktree.Worktree, error) {
-	if at := slices.IndexFunc(worktrees, func(w worktree.Worktree) bool { return w.Branch() == query }); at >= 0 {
-		return worktrees[at], nil
-	}
-	if at := worktree.Holding(worktrees, located, pathOf); at >= 0 {
-		return worktrees[at], nil
-	}
-
-	var matches []worktree.Worktree
-	var names []string
-	for _, w := range worktrees {
-		if w.Branch() != "" && strings.Contains(w.Branch(), query) {
-			matches, names = append(matches, w), append(names, w.Branch())
-		}
-	}
-	switch len(matches) {
-	case 1:
-		return matches[0], nil
-	case 0:
-		return worktree.Worktree{}, domain.Invalid([]domain.FieldError{{Path: domain.PathWorktree, Code: domain.CodeNotFound, Template: "{value} names no worktree", Params: domain.Params{"value": query}}})
-	}
-	return worktree.Worktree{}, domain.Invalid([]domain.FieldError{{Path: domain.PathWorktree, Code: CodeAmbiguous, Template: "{value} matches several worktrees: {matches}", Params: domain.Params{"value": query, "matches": strings.Join(names, ", ")}}})
-}
-
-// listed are the worktrees status reads, the main first: all but a bare repository's entry, which has no working tree.
-func listed(snapshot worktree.Snapshot) []worktree.Worktree {
-	worktrees := snapshot.Checkouts()
-	slices.SortStableFunc(worktrees, func(a, b worktree.Worktree) int {
-		switch {
-		case a.Main == b.Main:
-			return 0
-		case a.Main:
-			return -1
-		}
-		return 1
-	})
-
-	return worktrees
 }
 
 // ----------------------------------------------------------------------------

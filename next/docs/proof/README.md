@@ -14,6 +14,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./tty.sh next "${sandboxes#* }" "$next" tty/next
 ./extract.sh "$wtm" "$next" extract
 ./list.sh "$wtm" "$next" list
+./resolve.sh "$wtm" "$next" resolve
 ./status.sh "$wtm" "$next" status
 ./tree.sh "$wtm" "$next" tree
 ./events.sh "$wtm" "$next" events
@@ -206,7 +207,49 @@ The reference is the legacy `wtm status` of 0.30.1. `status` is a read: the proo
   - **A merged pull request is a problem, the first** (`status.merged`, `its pull request is merged`, `→ wtm clean feat/b`; 21 to 23), since cleaning the worktree makes every other fix moot; only while the worktree's branch stands at the commit the pull request merged (its `headRefOid`) or behind it (`git merge-base --is-ancestor <tip> <head>`, asked only when the tip is not the head), so a branch name reused or moved on since is not taken for merged, and one behind its pull request's head is; a head never fetched cannot be told behind, so it offers nothing; never on the main worktree nor the base branch, which outlive any pull request (the rule `tree` follows to offer its clean); a closed one is no problem. A branch with an open pull request and a newer closed one reads the open one. Legacy's status read no pull request.
   - **A check whose status is `EXPECTED` is pending**, not failed as legacy's unknown values are: it waits for a status to report.
   - **The picker reads the questions only when it asks**: with a worktree named or `--all`, nothing is read before the read itself.
+  - **An ambiguous name is picked among its matches on a terminal** (approved deviation, shared with `resolve`): a part of a branch several worktrees hold opens the picker over them, where legacy refused it; anywhere else it is refused, exit 2, its field code `ambiguous` (shared with `resolve`, was `status.ambiguous`) naming the matches (`TestOnATerminalAnAmbiguousNameIsPickedAmongTheWorktreesItMatches`).
   - **The other legacy bugs of the issue**: 5, the stale comment on a constant, has nothing to fix in next, whose status declares no such constant; 9, legacy listing the worktrees with `git worktree list` once per question, is one snapshot read once per run here.
+
+# Proof: `wtm resolve` and the `wtm go` wrapper (legacy `surface/cli/resolve`) vs `wtm-next resolve`
+
+The reference is the legacy `wtm resolve` of 0.30.1 and the `wtm go` function `wtm shell-init` prints, which runs `command wtm resolve "${@:2}"` and cds into what it prints. `resolve` is a read: the proof checks that neither binary changes anything on disk, keeps both outputs side by side, and enters worktrees through the wrapper for real.
+
+- `resolve.sh <wtm> <wtm-next> resolve`: two identical sandboxes (the `docs/demos` "acme" project with `feat/login`, `feat/logout` and `fix/nav`; `feat/gone`, whose directory was deleted; a detached worktree; a git repository with no wtm config; a plain directory), the same scenarios run by each binary without a terminal; each records the exit code, stdout and stderr, and the state before and after it (every ref, `git worktree list`, each worktree's status, every `meta.json`, wtm's global directory) into `<side>/unchanged.diff`, empty for both sides.
+  1. `feat/login`
+  2. the same, `--output json`
+  3. a part of a branch no other worktree holds, `logi`
+  4. the same, `--output json`
+  5. `main`, from inside `fix/nav`
+  6. a part two worktrees hold, `feat/log`
+  7. the same, `--output json`
+  8. a name no worktree answers, `nope`
+  9. the same, `--output json`
+  10. no name, from inside `fix/nav`
+  11. the same, `--output json`
+  12. `feat/login -q`
+  13. `nope -q`
+  14. the detached worktree by its path
+  15. two words, `feat login`
+  16. `feat/gone`
+  17. the same, `--output json`
+  18. a repository with no wtm config
+  19. the same, `--output json`
+  20. a plain directory, `--output json`
+- Then in tmux at 100×30, each side's binary being `wtm` on the shell's `PATH` (`tty-*.txt`): `dir=$(wtm resolve feat/log)`, stdout captured as the wrapper captures it, opens the picker over the two matches, enter prints the first (1, 2); `dir=$(wtm resolve)` from `fix/nav` opens it over every worktree, left with esc (3, 4); then the wrapper as `wtm shell-init zsh` prints it, sourced: `wtm go feat/login; pwd` enters it (5), `wtm go nope` stays where it is (6), `wtm go log` opens the picker, down and enter enters `feat/logout` (7, 8).
+- The wrapper's contract is unchanged: the path alone on stdout and exit 0 when a worktree is resolved, nothing on stdout otherwise; the picker draws on stderr and opens while stdout is captured. `wtm shell-init` (LUC-336) ships the same function over `wtm resolve`; a `wtm go` run without it (legacy: a hint to install it) ships with `shell-init`.
+- The differences, each an approved deviation or a legacy bug fixed with its test:
+  - **The JSON is the v2 envelope of a read** (2, 4, 11, 17): one item whose detail is `{branch, path, missing}` where legacy printed `{path, branch}`; `missing` is the read policy for a worktree whose directory is gone (17), whose path is still printed (16), as legacy, so `cd` fails loudly. `next` has no consumer yet: no envelope version bump.
+  - **A name no worktree answers is refused, exit 2, nothing on stdout** (8, 9, 13): bug 1, legacy warned on stderr and exited 0, so `cd "$(wtm resolve nope)"` went home, and `-q` did not silence the warning (`TestARefusalLeavesStdoutEmptyAndExitsUsage`).
+  - **A failure with `--output json` is the envelope on stdout** (7, 9, 19, 20): bug 2, legacy printed framed text on stderr and no document (`TestARefusalWithJSONIsTheEnvelopeOnStdout`).
+  - **An ambiguous name is picked among its matches on a terminal, refused anywhere else** (6, 7, `tty-1`, `tty-7`): bug 3, legacy tried the picker without a terminal (`could not open a new TTY`, exit 1) and, under JSON, refused `"" is ambiguous` without naming the matches; next refuses it, exit 2, field code `ambiguous` naming them (`TestOnATerminalWithStdoutCapturedTheWorktreeIsPicked`, `TestANameMatchingNoWorktreeOrSeveralIsRefused`). The picker is next's: titled `Worktree` with the field's help (legacy: `Select a worktree`, with each row's status and a GitHub banner), `main` and `current` badges, the detached worktree by its path.
+  - **No name resolves the worktree you are in, unless a terminal asks** (10, 11, `tty-3`): legacy tried the picker without a terminal and failed; next resolves the worktree holding the working directory, else the main one, as `status` reads (`TestWithNoWorktreeNamedAndNoTerminalTheOneYouAreInIsResolved`). On a terminal the picker opens with the cursor on the worktree you are in: bug 7, legacy's cursor stayed on main (`TestOnATerminalWithStdoutCapturedTheWorktreeIsPicked`, `TestThePickerOffersEveryWorktreeTheCursorOnTheOneYouAreIn`).
+  - **A worktree on no branch is resolved by its path** (14): bug 4, legacy could not name it, and listed it in its picker as a blank row (`TestAWorktreeOnNoBranchIsResolvedByItsPath`). A name is a branch first, then a path, read from where the command runs, that a worktree holds, then a part of a branch found in no other, as `status`.
+  - **One positional at most** (15): bug 5, legacy joined two words with a space and looked `feat login` up, which matches nothing; next refuses the second argument, exit 2.
+  - **Leaving the picker is cancelled, exit 19** (`tty-4`): bug 6, legacy exited 0 with nothing printed; stdout stays empty, so the wrapper does not cd either way (`TestThePickerOffersEveryWorktreeAndLeavingItCancels`).
+  - **A repository with no wtm config is refused** (18, 19): `resolve.config_not_found`, exit 12, its follow-up `wtm init`, as every read of next; legacy resolved there.
+  - **`-q` still prints the path** (12), as legacy: the path is data a shell reads (`Query.Captured`), never silenced.
+  - **A follow-up that enters a worktree names `go`**, the shell function over `resolve`, with resolve's answers (`TestEveryGoFollowUpIsARequestResolveTakes`): the command line spells it `wtm go feat/x`, a worktree on no branch `cd <path>`.
+  - **The web** needs nothing of `resolve`: `list` and `status` give each worktree's path; `resolve` is in the catalogue all the same.
 
 # Proof: `wtm tree` (legacy `surface/cli/wt`) vs `wtm-next tree`
 

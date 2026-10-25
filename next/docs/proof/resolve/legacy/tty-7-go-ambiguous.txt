@@ -1,0 +1,14 @@
+
+  Step 1/1 • Select a worktree
+
+  ╭──────────────────────────────────────────────╮
+  │ GitHub not connected                         │
+  │ Connect to see PRs linked to your worktrees: │
+  │ run `gh auth login`                          │
+  ╰──────────────────────────────────────────────╯
+
+▌▸ feat/login                                                                    ● active   ✓ clean
+   feat/logout                                                                              ✓ clean
+
+  ↑↓ navigate • / filter • r refresh • enter confirm • esc cancel
+

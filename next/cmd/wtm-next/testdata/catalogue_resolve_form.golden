@@ -1,0 +1,15 @@
+{
+  "fields": [
+    {
+      "kind": "select",
+      "path": "worktree",
+      "value": "",
+      "options": [],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    }
+  ],
+  "problems": []
+}

@@ -75,7 +75,7 @@ func mutations() []mutation {
 }
 
 // reads are the commands of the catalogue that change nothing.
-var reads = []string{"list", "status", "tree"}
+var reads = []string{"list", "resolve", "status", "tree"}
 
 // streamsListed are the commands that stream rather than return: out of the catalogue's contract, each a stream of catalogue.go's streams.
 var streamsListed = []string{"events"}

@@ -1,0 +1,12 @@
+
+  Step 1/1 • Worktree
+
+  The worktree to resolve, by its branch, its path or part of its branch
+
+   main                                                                                       main
+   /repo/.trees/detached (detached)
+   feat/login
+▌› feat/logout                                                                             current
+   fix/nav
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel

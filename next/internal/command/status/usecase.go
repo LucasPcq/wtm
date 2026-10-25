@@ -116,25 +116,8 @@ func (u UseCase) observeRequest(ctx context.Context, req Request) (worktree.Repo
 		return worktree.Repository{}, "", err
 	}
 
-	located, err := u.located(ctx, req)
+	located, err := repository.Located(ctx, u.Git, req.Worktree, req.Caller)
 	return repo, located, err
-}
-
-// located is the path the worktree req names stands for, resolved through its symbolic links from where the caller stands; "" when it names none, or nothing exists there.
-func (u UseCase) located(ctx context.Context, req Request) (string, error) {
-	if req.Worktree == "" {
-		return "", nil
-	}
-
-	path := req.Worktree
-	if !filepath.IsAbs(path) && req.Caller.Cwd != "" {
-		path = filepath.Join(req.Caller.Cwd, path)
-	}
-	location, err := u.Git.Locate(ctx, path)
-	if err != nil || !location.Exists {
-		return "", err
-	}
-	return location.Path, nil
 }
 
 // state reads one worktree: whether its directory is gone, which leaves nothing else to read, then its changes, then how much they weigh, its last commits and how its branch stands against the base branch, each of which a branch with no commit yet cannot tell, so it is only said unread; then its .env files. A cancelled read cancels the worktree.

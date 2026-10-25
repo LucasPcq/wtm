@@ -93,9 +93,11 @@ type FollowUp struct {
 	Params  Params     `json:"params,omitempty"`
 }
 
-// The vocabulary a follow-up names a command with, for the commands not yet migrated whose follow-ups several commands give: go enters a worktree, clean removes it, env settles its .env files, each answered by PathWorktree; init sets wtm up in a repository.
+// CommandGo is the command a follow-up enters a worktree with: go, the shell function wtm shell-init installs, which cds into the path resolve prints; answered as resolve is, by PathWorktree.
+const CommandGo = "go"
+
+// The vocabulary a follow-up names a command with, for the commands not yet migrated whose follow-ups several commands give: clean removes a worktree, env settles its .env files, each answered by PathWorktree; init sets wtm up in a repository.
 const (
-	CommandGo    = "go"
 	CommandClean = "clean"
 	CommandEnv   = "env"
 	CommandInit  = "init"
@@ -146,6 +148,7 @@ func Invalid(fields []FieldError) *Error {
 const (
 	CodeRequired   = "required"    // the field has no value
 	CodeNotFound   = "not_found"   // the value names nothing the repository holds
+	CodeAmbiguous  = "ambiguous"   // the value names several things the repository holds
 	CodeSelfParent = "self_parent" // the branch is given as its own parent
 	CodeDistinct   = "distinct"    // the value is given twice
 )

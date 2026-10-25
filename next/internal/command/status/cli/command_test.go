@@ -98,6 +98,13 @@ func TestOnATerminalTheWorktreeIsPickedFirstTheCursorOnTheOneYouAreIn(t *testing
 	assert.Contains(t, got.Stdout, "feat/old — 2 problems")
 }
 
+func TestOnATerminalAnAmbiguousNameIsPickedAmongTheWorktreesItMatches(t *testing.T) {
+	got := runOn(t, terminal, world{}, "feat")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	assert.Contains(t, got.Stdout, "feat/a")
+}
+
 func TestThePickerOffersEveryWorktreeADetachedOneSaidSo(t *testing.T) {
 	app, err := world{}.open(t.Context(), mainPath)
 	require.NoError(t, err)

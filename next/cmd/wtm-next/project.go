@@ -17,6 +17,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
+	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -32,6 +33,7 @@ var (
 	openCreate  = opener(func(a app) create.UseCase { return a.Create })
 	openExtract = opener(func(a app) extract.UseCase { return a.Extract })
 	openList    = opener(func(a app) list.UseCase { return a.List })
+	openResolve = opener(func(a app) resolve.UseCase { return a.Resolve })
 	openStatus  = opener(func(a app) status.UseCase { return a.Status })
 	openTree    = opener(func(a app) tree.UseCase { return a.Tree })
 )
