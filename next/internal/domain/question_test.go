@@ -18,3 +18,9 @@ func TestAValueOutsideItsChoicesIsAFieldError(t *testing.T) {
 func TestNamesSpellsEachValueInOrder(t *testing.T) {
 	assert.Equal(t, []string{"isolated", "verbatim"}, Names(project.Isolations()))
 }
+
+func TestEachClosedSetListsEveryOneOfItsConstants(t *testing.T) {
+	assert.ElementsMatch(t, declared(t, "Skip"), Names(Skips()))
+	assert.ElementsMatch(t, declared(t, "Origin"), Names(Origins()))
+	assert.ElementsMatch(t, declared(t, "Phase"), Names(Phases()))
+}

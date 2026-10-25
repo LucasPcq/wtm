@@ -11,7 +11,7 @@ export function Confirm(props: { repo: string; answers: DomainAnswered[] }) {
   const dry = useQuery(dryRunQuery(props.repo, 'create', props.answers))
   if (dry.isPending) return <Skeleton className="h-40 w-full" />
   if (dry.isError) return <p className="text-sm text-destructive">{dry.error.message}</p>
-  const plan = dry.data.plan as CreatePlan | undefined
+  const plan = dry.data.plan
   const branches = plan?.branches ?? []
   const made = branches.filter((branch) => branch.action !== 'unchanged')
   return (

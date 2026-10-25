@@ -1,5 +1,6 @@
 import { Check, ChevronRight, CircleCheck, CircleX, Copy, LoaderCircle, Square, X } from 'lucide-react'
-import type { CreateDetail, DomainEnvelope, DomainFollowUp } from '@/api/types.gen'
+import type { Applied } from '@/api/queries/commands'
+import type { DomainFollowUp } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -205,14 +206,14 @@ function Marker({ run }: { run: PhaseRun }) {
   )
 }
 
-function failureOf(envelope: DomainEnvelope | undefined): string | undefined {
+function failureOf(envelope: Applied<'create'> | undefined): string | undefined {
   if (!envelope) return undefined
   return envelope.error?.message ?? envelope.items?.find((item) => item.error)?.error?.message
 }
 
 // Made is what a create that ended leaves, as its envelope says: each worktree, where it is and the command to go on
 // with it, then a follow-up of none in particular; each a command to copy until the web runs it.
-function Made({ envelope }: { envelope: DomainEnvelope | undefined }) {
+function Made({ envelope }: { envelope: Applied<'create'> | undefined }) {
   if (!envelope) return null
   const items = envelope.items ?? []
   const nextOf = (subject: string) =>
@@ -224,12 +225,7 @@ function Made({ envelope }: { envelope: DomainEnvelope | undefined }) {
     <div className="flex flex-col gap-3 not-first:border-t not-first:pt-4">
       {items.map((item) =>
         item.status === 'done' ? (
-          <Worktree
-            key={item.subject}
-            branch={item.subject}
-            path={(item.detail as unknown as CreateDetail).path}
-            next={nextOf(item.subject)}
-          />
+          <Worktree key={item.subject} branch={item.subject} path={item.detail.path} next={nextOf(item.subject)} />
         ) : (
           <p key={item.subject} className="flex items-center gap-2 text-sm">
             <CircleX className="size-4 shrink-0 text-destructive" aria-hidden="true" />

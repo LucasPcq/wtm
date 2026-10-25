@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { CircleCheck, CircleDot, CircleX, Copy, ExternalLink, SlidersHorizontal, TriangleAlert, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { githubQuery, readQuery } from '@/api/queries/commands'
-import type { ListDetail, StatusDetail, StatusProblem, StatusReview } from '@/api/types.gen'
+import type { ListDetail, RunState, StatusDetail, StatusProblem, StatusReview } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -12,7 +12,7 @@ import { ago } from '@/lib/time'
 import { useStored } from '../hooks/use-stored'
 import { CommandLine } from '../shared/command-line'
 import { copy } from '../shared/copy'
-import { unavailable } from '../shared/github'
+import { prState, unavailable } from '../shared/github'
 import { Glyph, type Tone } from '../shared/glyph'
 import { ActionsMenu } from './actions-menu'
 import { sentence } from '../shared/sentence'
@@ -32,7 +32,8 @@ export function DetailPanel(props: { repo: string; worktree: string; row: ListDe
   const asked = github.data?.items[0]?.detail
   const merged = asked?.review?.fix && asked.problems?.find((problem) => problem.fix?.code === asked.review?.fix?.code)
   const problems = [...(merged ? [merged] : []), ...(detail?.problems ?? [])]
-  const pr = props.row?.actions?.find((action) => action.url)
+  // the pull request is what GitHub said when the panel opened: the live list never asks it
+  const pr = asked?.review
   const actions = props.row?.actions?.filter((action) => !action.url) ?? []
 
   return (
@@ -40,10 +41,15 @@ export function DetailPanel(props: { repo: string; worktree: string; row: ListDe
       <header className="flex flex-col gap-1 px-6 pt-5 pb-4">
         <div className="flex items-center gap-1">
           <h2 className="min-w-0 flex-1 truncate text-lg font-semibold">{props.worktree}</h2>
-          {pr?.url && (
+          {pr && (
             <Button variant="ghost" size="sm" asChild>
-              <a href={pr.url} target="_blank" rel="noreferrer">
-                <ExternalLink />#{pr.params?.number}
+              <a
+                href={pr.url}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open pull request #${pr.number} on GitHub`}
+              >
+                <ExternalLink />#{pr.number}
               </a>
             </Button>
           )}
@@ -182,7 +188,14 @@ function Section(props: { id: SectionId; meta: string; children: ReactNode }) {
   )
 }
 
-const jobTone = (state: string): Tone => (state === 'crashed' ? 'failed' : state === 'running' ? 'ok' : 'muted')
+// How each state of a job shows: its tone, and whether it serves its address now.
+const look: Record<RunState, { tone: Tone; up: boolean }> = {
+  starting: { tone: 'muted', up: false },
+  running: { tone: 'ok', up: true },
+  crashed: { tone: 'failed', up: false },
+  exited: { tone: 'muted', up: false },
+  stopped: { tone: 'muted', up: false },
+}
 
 function Run({ detail, now }: { detail: StatusDetail; now: number }) {
   if (detail.jobs === null) return <p className="text-sm text-muted-foreground">Which jobs run is unknown.</p>
@@ -192,13 +205,13 @@ function Run({ detail, now }: { detail: StatusDetail; now: number }) {
       {detail.jobs.map((job) => (
         <li key={job.name} className="flex items-center gap-3 text-sm">
           <Glyph
-            icon={jobTone(job.state) === 'failed' ? CircleX : CircleDot}
-            tone={jobTone(job.state)}
+            icon={look[job.state].tone === 'failed' ? CircleX : CircleDot}
+            tone={look[job.state].tone}
             className="w-24 font-medium"
           >
             {job.name}
           </Glyph>
-          {job.url && job.state === 'running' ? (
+          {job.url && look[job.state].up ? (
             <a
               href={job.url}
               target="_blank"
@@ -213,7 +226,7 @@ function Run({ detail, now }: { detail: StatusDetail; now: number }) {
             </span>
           )}
           <span className="text-xs text-muted-foreground">
-            {job.state === 'running' && job.started_at ? ago(job.started_at, now) : job.state}
+            {look[job.state].up && job.started_at ? ago(job.started_at, now) : job.state}
           </span>
         </li>
       ))}
@@ -238,7 +251,7 @@ function Review(props: { review: StatusReview | null | undefined; pending: boole
       </a>
       <div className="flex flex-wrap gap-4">
         {props.review.draft && <span className="text-muted-foreground">draft</span>}
-        {props.review.state !== 'open' && <span className="text-muted-foreground">{props.review.state}</span>}
+        {prState[props.review.state] && <span className="text-muted-foreground">{prState[props.review.state]}</span>}
         {checks && (
           <Glyph
             icon={checks.failed ? CircleX : CircleCheck}

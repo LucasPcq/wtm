@@ -1,6 +1,7 @@
 package form
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"strings"
@@ -127,13 +128,24 @@ func (s *Session[R, Q, O]) Problems(path string) []domain.FieldError {
 func (s *Session[R, Q, O]) Standing(at int) Standing {
 	field := s.Field(at)
 	spec := field.Spec()
-	st := Standing{Value: trailOf(field), Origin: spec.Origin, Skip: Skipped(spec.Skip, s.form), Erred: len(s.Problems(spec.Path)) > 0}
+	st := Standing{Value: trailOf(field), Origin: spec.Origin, Skip: spec.Skip, Reason: s.reason(spec.Skip), Erred: len(s.Problems(spec.Path)) > 0}
 	st.Given = len(s.given.Values(spec.Path)) > 0
 	if st.Given && !positional(field) {
 		st.Flag = s.command.Flags().Spell(spec.Path)
 	}
 
 	return st
+}
+
+// reason is how the trail words why a step is not asked: the command's own words, else the wizard's, else the code.
+func (s *Session[R, Q, O]) reason(skip domain.Skip) string {
+	if s.command.Skipped != nil {
+		if words := s.command.Skipped(s, skip); words != "" {
+			return words
+		}
+	}
+
+	return cmp.Or(Skipped(skip), string(skip))
 }
 
 // Problem is found as a step shows it: under label, followed by the step that gets past it, if any.

@@ -143,7 +143,7 @@ func (q questions) Form() domain.Form {
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "ff", Flag: "--ff", Label: "Update", Help: "Update first"}, Value: one("ff") == "true", Rememberable: true},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "keep", Flag: "--keep", Label: "Keep", Help: "Keep it"}, Value: one("keep") == "true", Yes: domain.Option{Label: "Copy", Short: "copy"}, No: domain.Option{Label: "Move", Short: "move"}, NoFirst: true},
 		domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: "files", Flag: "--files", Label: "Files", Help: "The files"}, Picked: q.req["files"], Options: []domain.Option{{Value: "a.txt"}, {Value: "b.txt"}}, Empty: "Pick one"},
-		domain.TextField{FieldSpec: domain.FieldSpec{Path: "name", Flag: "--name", Label: "Name", Help: "The name"}, Value: one("name")},
+		domain.TextField{FieldSpec: domain.FieldSpec{Path: "name", Flag: "--name", Label: "Name", Help: "The name", Skip: domain.Skip(one("unworded"))}, Value: one("name")},
 	}}
 }
 

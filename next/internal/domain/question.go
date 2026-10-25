@@ -13,8 +13,10 @@ const (
 	OriginDefault    Origin = "default"    // the question's default
 )
 
-// Origins are every Origin.
-var Origins = []Origin{OriginRequest, OriginRemembered, OriginConfig, OriginDefault}
+// Origins returns every Origin.
+func Origins() []Origin {
+	return []Origin{OriginRequest, OriginRemembered, OriginConfig, OriginDefault}
+}
 
 // Skip says why a question is not asked, as a code each surface words its own way; empty when it is asked.
 type Skip string
@@ -31,8 +33,10 @@ const (
 	SkipAll             Skip = "all"              // every worktree is read
 )
 
-// Skips are every Skip.
-var Skips = []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll}
+// Skips returns every Skip.
+func Skips() []Skip {
+	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll}
+}
 
 // Answer is the value a question settled on, and where that value came from.
 type Answer[T any] struct {

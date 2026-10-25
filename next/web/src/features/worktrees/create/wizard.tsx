@@ -137,7 +137,7 @@ function applyLabel(plan: CreatePlan | undefined): string {
 
 function ApplyButton(props: { repo: string; answers: DomainAnswered[]; onStart: (start: Start) => void }) {
   const dry = useQuery(dryRunQuery(props.repo, 'create', props.answers))
-  const plan = dry.data?.plan as CreatePlan | undefined
+  const plan = dry.data?.plan
   const fingerprint = dry.data?.fingerprint
   return (
     <Button

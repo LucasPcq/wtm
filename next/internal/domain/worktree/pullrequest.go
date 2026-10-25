@@ -35,6 +35,11 @@ const (
 	PullRequestClosed PullRequestState = "closed"
 )
 
+// PullRequestStates returns every PullRequestState.
+func PullRequestStates() []PullRequestState {
+	return []PullRequestState{PullRequestOpen, PullRequestMerged, PullRequestClosed}
+}
+
 // PullRequestOf returns the pull request of branch among prs, and reports whether it has one; a worktree on no branch has none.
 func PullRequestOf(prs []PullRequest, branch string) (PullRequest, bool) {
 	at := slices.IndexFunc(prs, func(pr PullRequest) bool { return branch != "" && pr.Branch == branch })

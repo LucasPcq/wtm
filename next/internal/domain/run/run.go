@@ -35,6 +35,11 @@ const (
 	Stopped  State = "stopped"
 )
 
+// States returns every State.
+func States() []State {
+	return []State{Starting, Running, Crashed, Exited, Stopped}
+}
+
 // ErrUnknown says whether a job is up cannot be told: no daemon answers, yet its index holds jobs it would run.
 var ErrUnknown = errors.New("the run daemon is not running: which jobs are up is unknown")
 

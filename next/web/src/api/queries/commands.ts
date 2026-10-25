@@ -2,6 +2,8 @@ import { queryOptions } from '@tanstack/react-query'
 import { json } from '../fetch'
 import type {
   ApiCommandName,
+  CreateDetail,
+  CreatePlan,
   DomainAnswered,
   DomainEnvelope,
   DomainForm,
@@ -74,11 +76,32 @@ export const questionsQuery = (repo: string, command: ApiCommandName) =>
     staleTime: Infinity,
   })
 
+// The plan of each mutation the web runs and the detail of its items, as the catalogue's schema names them.
+type Mutation = { create: { plan: CreatePlan; detail: CreateDetail } }
+export type MutationCommand = keyof Mutation
+
+// An Applied is a mutation's envelope, a dry run's or an apply's, its plan and its items' details typed.
+export type Applied<C extends MutationCommand> = Omit<DomainEnvelope, 'plan' | 'items'> & {
+  plan: Mutation[C]['plan'] | undefined
+  items: (Omit<DomainItem, 'detail'> & { detail: Mutation[C]['detail'] })[]
+}
+
+// applied narrows a mutation's envelope once, here, so that no component casts it.
+export const applied = (envelope: DomainEnvelope): Applied<MutationCommand> => ({
+  ...envelope,
+  plan: envelope.plan as Mutation[MutationCommand]['plan'] | undefined,
+  items: (envelope.items ?? []).map((item) => ({
+    ...item,
+    detail: item.detail as unknown as Mutation[MutationCommand]['detail'],
+  })),
+})
+
 // dryRunQuery is what a command would do with answers, and the fingerprint its apply is held to.
-export const dryRunQuery = (repo: string, command: ApiCommandName, answers: DomainAnswered[]) =>
+export const dryRunQuery = (repo: string, command: MutationCommand, answers: DomainAnswered[]) =>
   queryOptions({
     queryKey: [...repoKey(repo), command, 'dry_run', answers],
     queryFn: () => run(repo, command, { answers, dry_run: true }),
+    select: applied,
   })
 
 // questions asks a command's questions as the repository stands, with the answers so far.

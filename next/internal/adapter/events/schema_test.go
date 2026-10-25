@@ -69,5 +69,5 @@ func TestTheSchemasPhasesAreTheCoresEveryOne(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(data, &doc))
 
-	assert.Equal(t, domain.Phases, doc.Defs.Phase.Enum)
+	assert.Equal(t, domain.Phases(), doc.Defs.Phase.Enum)
 }

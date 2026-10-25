@@ -1,5 +1,5 @@
 import { useForm } from '@tanstack/react-form'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { questions } from '@/api/queries/commands'
 import type { ApiCommandName, DomainAnswered, DomainForm } from '@/api/types.gen'
 import { answersOf, problemsByKey, valuesOf } from './answers'
@@ -10,6 +10,8 @@ import { answersOf, problemsByKey, valuesOf } from './answers'
 // their problems.
 export function useCommandForm(params: { repo: string; command: ApiCommandName; form: DomainForm }) {
   const [asked, setAsked] = useState(params.form)
+  // each call is numbered: an answer overtaken by a later call's is dropped, never kept over it
+  const calls = useRef(0)
   const form = useForm({
     defaultValues: valuesOf(params.form.fields),
     validators: {
@@ -25,8 +27,9 @@ export function useCommandForm(params: { repo: string; command: ApiCommandName; 
   const answers = (): DomainAnswered[] =>
     answersOf(asked.fields, form.state.values, (key) => form.getFieldMeta(key)?.isDirty ?? false)
   const check = async () => {
+    const call = ++calls.current
     const answered = await questions(params.repo, params.command, answers())
-    setAsked(answered)
+    if (call === calls.current) setAsked(answered)
     return answered
   }
   return { form, asked, answers, check, problems: problemsByKey(asked.fields, asked.problems) }

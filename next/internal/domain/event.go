@@ -33,8 +33,10 @@ const (
 	PhaseMove        Phase = "move"         // extract moves its changes
 )
 
-// Phases are every Phase, in the order a subject's work runs them.
-var Phases = []Phase{PhaseFastForward, PhaseWorktree, PhaseEnv, PhaseMeta, PhaseOrdinal, PhasePorts, PhaseOnCreate, PhaseMove}
+// Phases returns every Phase, in the order a subject's work runs them.
+func Phases() []Phase {
+	return []Phase{PhaseFastForward, PhaseWorktree, PhaseEnv, PhaseMeta, PhaseOrdinal, PhasePorts, PhaseOnCreate, PhaseMove}
+}
 
 // PhaseStarted reports that a phase of a subject's work begins; Log is the file its output goes to, if any.
 type PhaseStarted struct {

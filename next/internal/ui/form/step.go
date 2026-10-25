@@ -41,7 +41,8 @@ type Standing struct {
 	Given  bool          // reports whether the command line set Value, by a flag or an argument: the step is not asked
 	Flag   string        // the flag that set Value, if one did, named in the trail
 	Origin domain.Origin // where Value comes from; a remembered answer is not asked
-	Skip   string        // why the step does not apply, if it does not: the step is not asked
+	Skip   domain.Skip   // why the step does not apply, if it does not: the step is not asked, whether worded or not
+	Reason string        // how the trail words Skip
 	Erred  bool          // reports whether Value is refused, so the step is asked even when a flag set it
 }
 
@@ -57,7 +58,7 @@ func decided(st Standing, answered bool) mark {
 	value := cmp.Or(st.Value, none)
 	switch {
 	case st.Skip != "":
-		return mark{ruled: st.Skip}
+		return mark{ruled: cmp.Or(st.Reason, string(st.Skip))}
 	case st.Erred:
 		return mark{asked: true}
 	case st.Given && st.Flag != "":

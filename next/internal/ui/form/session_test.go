@@ -78,3 +78,12 @@ func TestTheRecapAppliesThePlanItPreviewedHeldToItsFingerprint(t *testing.T) {
 	assert.Equal(t, domain.RunOptions{ExpectFingerprint: "print", Surface: "tui", CorrelationID: "corr-1"}, a.runs[1])
 	assert.Equal(t, "print", s.Outcome().PlanFingerprint())
 }
+
+// The wizard decided from the skip's sentence: a code it had no words for asked a question the core ruled out.
+func TestAStepIsRuledOutByTheCodeOfItsSkipWordedOrNot(t *testing.T) {
+	s := observed(t, &app{}, request{"unworded": {"a_code_with_no_words"}})
+
+	st := s.Standing(atName)
+	assert.Equal(t, domain.Skip("a_code_with_no_words"), st.Skip)
+	assert.Equal(t, "a_code_with_no_words", st.Reason)
+}

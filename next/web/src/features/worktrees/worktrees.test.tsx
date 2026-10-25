@@ -1,8 +1,8 @@
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
-import { http, HttpResponse } from 'msw'
-import { expect, test } from 'vitest'
+import { delay, http, HttpResponse } from 'msw'
+import { expect, test, vi } from 'vitest'
 import { renderApp } from '@/test/render'
-import { server } from '@/test/server'
+import { questionsOf, server } from '@/test/server'
 
 test('each worktree is listed, and its row opens the detail with the problem to fix first and its command', async () => {
   const { user } = await renderApp('/r/r1/worktrees')
@@ -120,4 +120,59 @@ test('a next command the server cannot spell is said with what it meant, not hid
   await user.click(await within(dialog).findByRole('button', { name: 'Create worktree' }))
 
   expect(await within(dialog).findByText('No command line for this: jump in')).toBeTruthy()
+})
+
+// The header read its link from the list's actions, which the live list, never asked GitHub, does not carry.
+test("the detail's header links the worktree's pull request, as GitHub tells it on open", async () => {
+  const { user } = await renderApp('/r/r1/worktrees')
+  await user.click(await screen.findByRole('link', { name: /feat\/billing from main/ }))
+
+  const detail = await screen.findByRole('complementary', { name: 'feat/billing' })
+  const pr = await within(detail).findByRole('link', { name: 'Open pull request #214 on GitHub' })
+  expect(pr.getAttribute('href')).toBe('https://github.com/acme/acme/pull/214')
+})
+
+// A private window refuses storage: the choice was dropped as soon as it was made, the page reading storage again.
+test('a column hidden where the browser refuses storage stays hidden for the page', async () => {
+  const setItem = localStorage.setItem.bind(localStorage)
+  vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+    if (key.startsWith('wtm.columns')) throw new DOMException('refused', 'SecurityError')
+    setItem(key, value)
+  })
+  const { user } = await renderApp('/r/r1/worktrees')
+  await screen.findByRole('link', { name: /feat\/billing-ui/ })
+
+  await user.click(screen.getByRole('button', { name: 'Columns' }))
+  await user.click(await screen.findByRole('checkbox', { name: /^Running/ }))
+
+  expect(screen.queryByRole('columnheader', { name: 'Running' })).toBeNull()
+  vi.restoreAllMocks()
+})
+
+// Each pause in typing asks the core again: a slow answer to older typing overwrote a newer one.
+test('an answer to older typing that lands last is dropped, the newer one stands', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/create/questions', async ({ request }) => {
+      const answers = ((await request.json()) as { answers: { path: string; values: string[] }[] }).answers
+      const branches = answers.find((answer) => answer.path === 'branches')?.values[0] ?? ''
+      if (branches !== 'old') return HttpResponse.json(questionsOf(answers))
+      await delay(700)
+      const stale = questionsOf(answers)
+      return HttpResponse.json({
+        ...stale,
+        problems: [{ path: 'branches', code: 'stale', message: 'an older answer' }],
+      })
+    }),
+  )
+  const { user } = await renderApp('/r/r1/worktrees')
+  await user.click(await screen.findByRole('button', { name: 'Create worktree' }))
+  const dialog = await screen.findByRole('dialog')
+  const branches = await within(dialog).findByRole('textbox', { name: 'Branches' })
+
+  await user.type(branches, 'old')
+  await new Promise((resolve) => setTimeout(resolve, 400))
+  await user.type(branches, 'er')
+  await new Promise((resolve) => setTimeout(resolve, 900))
+
+  expect(within(dialog).queryByText('an older answer')).toBeNull()
 })

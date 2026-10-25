@@ -29,6 +29,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/web"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -454,11 +456,14 @@ var enums = map[reflect.Type]struct {
 	description string
 	values      any
 }{
-	reflect.TypeFor[domain.Skip]():         {"Why a field is not asked, as a code each surface words its own way.", domain.Skips},
-	reflect.TypeFor[domain.Origin]():       {"Where a field's answer came from.", domain.Origins},
-	reflect.TypeFor[create.Action]():       {"How a branch gets its worktree.", create.Actions()},
-	reflect.TypeFor[project.EnvStrategy](): {"Where a worktree's .env files are copied from.", project.EnvStrategies()},
-	reflect.TypeFor[project.Isolation]():   {"How a worktree stands against its source.", project.Isolations()},
+	reflect.TypeFor[domain.Skip]():               {"Why a field is not asked, as a code each surface words its own way.", domain.Skips()},
+	reflect.TypeFor[domain.Origin]():             {"Where a field's answer came from.", domain.Origins()},
+	reflect.TypeFor[create.Action]():             {"How a branch gets its worktree.", create.Actions()},
+	reflect.TypeFor[project.EnvStrategy]():       {"Where a worktree's .env files are copied from.", project.EnvStrategies()},
+	reflect.TypeFor[project.Isolation]():         {"How a worktree stands against its source.", project.Isolations()},
+	reflect.TypeFor[project.JobKind]():           {"Whether a job keeps running or runs to its end.", project.JobKinds()},
+	reflect.TypeFor[run.State]():                 {"A job's state.", run.States()},
+	reflect.TypeFor[worktree.PullRequestState](): {"Where a pull request stands.", worktree.PullRequestStates()},
 }
 
 // of is the schema of a value of type t as encoding/json writes it: a reference to its definition for a named struct, defined on first sight, or to the fragment written by hand beside its MarshalJSON.

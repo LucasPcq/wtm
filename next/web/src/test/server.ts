@@ -55,7 +55,8 @@ const sync = (branch: string): DomainFollowUp => ({
   message: 'sync it onto feat/billing',
 })
 
-const status = (branch: string): StatusDetail => ({
+// status is a worktree's status; feat/billing has an open pull request, which GitHub tells only when asked (with_prs)
+const status = (branch: string, withPRs = false): StatusDetail => ({
   base: { name: 'main', ahead: 0, behind: 0 },
   branch,
   changes: { deletions: 0, files: [], insertions: 0, modified: 0, staged: 0, untracked: 0 },
@@ -76,7 +77,16 @@ const status = (branch: string): StatusDetail => ({
       ? [{ code: 'status.behind', message: 'feat/billing has 1 commit it lacks', fix: sync(branch) }]
       : [],
   rebasing: false,
-  review: null,
+  review:
+    withPRs && branch === 'feat/billing'
+      ? {
+          number: 214,
+          url: 'https://github.com/acme/acme/pull/214',
+          state: 'open',
+          title: 'Monthly invoices',
+          fix: null,
+        }
+      : null,
   run: null,
   run_toml: 'absent',
 })
@@ -231,7 +241,9 @@ export const handlers = [
       case 'tree':
         return HttpResponse.json(envelope('tree', worktrees.map(tree)))
       case 'status':
-        return HttpResponse.json(envelope('status', [status(asked('worktree') ?? 'main')]))
+        return HttpResponse.json(
+          envelope('status', [status(asked('worktree') ?? 'main', asked('with_prs') === 'true')]),
+        )
       case 'create': {
         const branch = asked('branches') ?? ''
         if (call.dry_run)

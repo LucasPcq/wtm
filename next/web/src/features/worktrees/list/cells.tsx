@@ -86,8 +86,8 @@ function prCell(row: Row) {
       href={row.pr.url}
       target="_blank"
       rel="noreferrer"
-      className="underline-offset-4 hover:underline"
-      onClick={(e) => e.stopPropagation()}
+      // above the row's link, which covers the row to open its worktree
+      className="relative z-10 underline-offset-4 hover:underline"
     >
       #{row.pr.number} {row.pr.draft ? 'draft' : row.pr.state}
     </a>
@@ -121,13 +121,7 @@ function addressCell(detail: ListDetail) {
   if (!first) return none
   return (
     <span className="flex min-w-0 items-center gap-1">
-      <a
-        href={first}
-        target="_blank"
-        rel="noreferrer"
-        className="truncate underline underline-offset-4"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <a href={first} target="_blank" rel="noreferrer" className="relative z-10 truncate underline underline-offset-4">
         {first.replace(/^https?:\/\//, '')}
       </a>
       {more.length > 0 && muted(`+${more.length}`)}

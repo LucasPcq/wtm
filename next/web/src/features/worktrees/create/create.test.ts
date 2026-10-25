@@ -48,6 +48,20 @@ test('the progress starts from the plan: what each branch will run, an open one 
   expect(current(progress)?.run).toEqual({ phase: 'fast_forward', state: 'todo' })
 })
 
+// A branch checked out as it is, behind origin and fast-forwarded first, was two units: its phases counted twice.
+test('a branch fast-forwarded then opened is one unit, its fast-forward first', () => {
+  const progress = planned({
+    branches: [{ branch: 'feat/x', path: '/x', action: 'check_out', phases: ['worktree', 'env'] }],
+    creates: 1,
+    env_from: 'example',
+    fast_forward: ['feat/x'],
+  })
+
+  expect(progress.units.map(([subject]) => subject)).toEqual(['feat/x'])
+  expect(progress.units[0]?.[1].phases.map((run) => run.phase)).toEqual(['fast_forward', 'worktree', 'env'])
+  expect(doneOf(progress).total).toBe(3)
+})
+
 test('each event moves the progress: a phase under way, ended or failed, the output of a hook', () => {
   let progress = planned(plan)
   for (const event of [

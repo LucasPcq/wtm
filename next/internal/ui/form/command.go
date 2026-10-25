@@ -52,6 +52,8 @@ type Command[R Request[R], Q Questions, O Outcome] struct {
 	ApplyLabel func(previewed O) string                       // the recap's option that applies, nil for "Yes, apply"
 	// Special returns the step a command asks its own way for the field at, nil for the step of the field's kind.
 	Special func(s *Session[R, Q, O], at int, field domain.Field) Step
+	// Skipped words why a step is not asked the command's own way, empty for the wizard's words.
+	Skipped func(s *Session[R, Q, O], skip domain.Skip) string
 
 	io     *uicli.Run
 	yes    bool

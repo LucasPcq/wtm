@@ -2046,7 +2046,7 @@
           "type": "integer"
         },
         "state": {
-          "type": "string"
+          "$ref": "#/$defs/worktree.PullRequestState"
         },
         "title": {
           "type": "string"
@@ -2160,6 +2160,23 @@
       "enum": [
         "isolated",
         "verbatim"
+      ]
+    },
+    "project.JobKind": {
+      "description": "Whether a job keeps running or runs to its end.",
+      "enum": [
+        "service",
+        "task"
+      ]
+    },
+    "run.State": {
+      "description": "A job's state.",
+      "enum": [
+        "starting",
+        "running",
+        "crashed",
+        "exited",
+        "stopped"
       ]
     },
     "status.Base": {
@@ -2455,7 +2472,7 @@
           "type": "integer"
         },
         "kind": {
-          "type": "string"
+          "$ref": "#/$defs/project.JobKind"
         },
         "name": {
           "type": "string"
@@ -2474,7 +2491,7 @@
           "type": "string"
         },
         "state": {
-          "type": "string"
+          "$ref": "#/$defs/run.State"
         },
         "url": {
           "type": "string"
@@ -2557,7 +2574,7 @@
           "type": "integer"
         },
         "state": {
-          "type": "string"
+          "$ref": "#/$defs/worktree.PullRequestState"
         },
         "title": {
           "type": "string"
@@ -2866,7 +2883,7 @@
           "type": "integer"
         },
         "state": {
-          "type": "string"
+          "$ref": "#/$defs/worktree.PullRequestState"
         },
         "url": {
           "type": "string"
@@ -3249,6 +3266,14 @@
         "state"
       ],
       "type": "object"
+    },
+    "worktree.PullRequestState": {
+      "description": "Where a pull request stands.",
+      "enum": [
+        "open",
+        "merged",
+        "closed"
+      ]
     }
   },
   "$id": "https://wtm.sh/schemas/api.v2.schema.json",

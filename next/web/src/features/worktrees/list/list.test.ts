@@ -53,7 +53,7 @@ const row = (over: Partial<Row> = {}): Row => ({
 })
 
 test('a row takes its pull request and whether it merged from the last GitHub read, by subject', () => {
-  const pr = { number: 3, url: 'https://github.com/acme/acme/pull/3', state: 'merged' }
+  const pr = { number: 3, url: 'https://github.com/acme/acme/pull/3', state: 'merged' as const }
   const live = read([
     ['feat/a', detail()],
     ['feat/new', detail({ branch: 'feat/new' })],

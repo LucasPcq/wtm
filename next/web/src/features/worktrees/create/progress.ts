@@ -1,5 +1,6 @@
 import type { OperationLine } from '@/api/queries/operations'
-import type { CreatePlan, DomainEnvelope, DomainItem } from '@/api/types.gen'
+import type { Applied } from '@/api/queries/commands'
+import type { CreatePlan, DomainItem } from '@/api/types.gen'
 import type { Phase } from './phases'
 
 export type PhaseRun = {
@@ -19,23 +20,26 @@ export type Progress = {
   operation?: string
   units: [string, Unit][]
   cancelling?: 'asked' | 'forced'
-  envelope?: DomainEnvelope
+  envelope?: Applied<'create'>
   refused?: string
 }
 
 const kept = 200
 
-// planned is the progress of plan before it starts: each source branch it fast-forwards, then each branch it
-// opens, with the phases the plan says it runs, none started.
+// planned is the progress of plan before it starts: each subject once, in the plan's order, a source branch it
+// fast-forwards first, then the phases of each branch it opens, none started. A branch both fast-forwarded and
+// opened (checked out as it is, behind origin) is one unit, its fast-forward first.
 export function planned(plan: CreatePlan): Progress {
-  const todo = (phases: Phase[]): Unit => ({ phases: phases.map((phase) => ({ phase, state: 'todo' })), lines: [] })
+  const units = new Map<string, Phase[]>()
+  for (const subject of plan.fast_forward ?? []) units.set(subject, ['fast_forward'])
+  for (const branch of plan.branches ?? [])
+    if (branch.phases && branch.phases.length > 0)
+      units.set(branch.branch, [...(units.get(branch.branch) ?? []), ...branch.phases])
   return {
-    units: [
-      ...(plan.fast_forward ?? []).map((subject): [string, Unit] => [subject, todo(['fast_forward'])]),
-      ...(plan.branches ?? [])
-        .filter((branch) => branch.phases && branch.phases.length > 0)
-        .map((branch): [string, Unit] => [branch.branch, todo(branch.phases ?? [])]),
-    ],
+    units: [...units].map(([subject, phases]): [string, Unit] => [
+      subject,
+      { phases: phases.map((phase) => ({ phase, state: 'todo' })), lines: [] },
+    ]),
   }
 }
 
