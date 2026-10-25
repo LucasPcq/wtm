@@ -1,18 +1,19 @@
 import { QueryClient } from '@tanstack/react-query'
-import { afterEach, expect, test, vi } from 'vitest'
+import { http, HttpResponse } from 'msw'
+import { expect, test, vi } from 'vitest'
+import { server } from '@/test/server'
 import { connectionOf, eventsQuery, reconnectEvery } from './events'
 import { HttpError } from '../fetch'
 
 vi.mock('../token', () => ({ token: () => 't' }))
-afterEach(() => vi.unstubAllGlobals())
 
 function serve(status: number, body = '') {
-  const fetch = vi.fn(async (_: string, init: RequestInit) => {
-    expect(new Headers(init.headers).get('X-Wtm-Token')).toBe('t')
-    return new Response(body, { status })
-  })
-  vi.stubGlobal('fetch', fetch)
-  return fetch
+  server.use(
+    http.get('/api/events', ({ request }) => {
+      expect(request.headers.get('X-Wtm-Token')).toBe('t')
+      return new HttpResponse(body, { status })
+    }),
+  )
 }
 
 const repo = { id: 'r1', root: '/acme', common_dir: '/acme/.git' }

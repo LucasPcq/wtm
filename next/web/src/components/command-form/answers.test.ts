@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
-import type { DomainAnswered, DomainField } from '@/api/types.gen'
-import { answersOf, keyOf, problemsByKey, problemsOf, valuesOf } from './answers'
+import type { DomainField } from '@/api/types.gen'
+import { answersOf, keyOf, problemsByKey, valuesOf } from './answers'
 
 const base = { flag: '', help: '', label: '' }
 const branch: DomainField = { ...base, kind: 'text', path: 'branch', value: '' }
@@ -81,19 +81,4 @@ test('a problem of one value of a field goes under that field', () => {
     branches: 'exists already',
     'remember%5B0%5D': 'unknown',
   })
-})
-
-test('the validator asks the core with the changed answers and files what it says', async () => {
-  const asked: DomainAnswered[][] = []
-  const ask = async (answers: DomainAnswered[]) => {
-    asked.push(answers)
-    return { problems: answers.length ? [problem('branch', 'exists already')] : [] }
-  }
-  const values = { ...valuesOf(fields), branch: ['main'] }
-
-  expect(await problemsOf({ fields, values, changed: (key) => key === 'branch', ask })).toEqual({
-    fields: { branch: 'exists already' },
-  })
-  expect(await problemsOf({ fields, values, changed: () => false, ask })).toBeUndefined()
-  expect(asked).toEqual([[{ path: 'branch', values: ['main'] }], []])
 })

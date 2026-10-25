@@ -111,7 +111,7 @@ function NodeRow({ node, view }: { node: Node; view: View }) {
             dropRef(element)
           }}
           className={cn(
-            'flex h-12 items-center gap-2.5 rounded-md px-2',
+            'relative flex h-12 items-center gap-2.5 rounded-md px-2 hover:bg-muted/50',
             node.branch === view.open && 'bg-muted',
             isDropTarget && !isDragSource && 'bg-accent ring-1 ring-ring',
             (isDragSource || !found || underWay) && 'opacity-50',
@@ -122,7 +122,7 @@ function NodeRow({ node, view }: { node: Node; view: View }) {
               type="button"
               ref={handleRef}
               aria-label={`Move ${node.branch} under another branch`}
-              className="-ml-1 cursor-grab rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              className="relative z-10 -ml-1 cursor-grab rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
               <GripVertical className="size-4" />
             </button>
@@ -139,10 +139,11 @@ function NodeRow({ node, view }: { node: Node; view: View }) {
           {detail.virtual ? (
             <span className="font-medium text-muted-foreground">{node.branch}</span>
           ) : (
+            // the whole row opens the detail; the grip and the buttons sit above the link
             <Link
               from="/r/$repo/worktrees"
               search={(search) => ({ ...search, worktree: node.branch })}
-              className="font-medium underline-offset-4 hover:underline"
+              className="rounded-sm font-medium outline-none after:absolute after:inset-0 focus-visible:ring-2 focus-visible:ring-ring"
             >
               {node.branch}
             </Link>
@@ -150,13 +151,13 @@ function NodeRow({ node, view }: { node: Node; view: View }) {
           {underWay ? <UnderWay what={underWay} /> : <State node={node} />}
           <span className="truncate text-sm text-muted-foreground">{meta(detail)}</span>
           {node.pr && (
-            <Badge variant="outline" asChild>
+            <Badge variant="outline" className="relative z-10" asChild>
               <a href={node.pr.url} target="_blank" rel="noreferrer">
                 #{node.pr.number} {node.pr.state}
               </a>
             </Badge>
           )}
-          <span className="ml-auto flex items-center gap-3">
+          <span className="relative z-10 ml-auto flex items-center gap-3">
             {detail.services && detail.services.length > 0 && (
               <Glyph icon={CircleDot} tone="ok" className="text-sm">
                 {detail.services.length} up

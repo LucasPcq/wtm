@@ -11,7 +11,7 @@ export default defineConfig({
   plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, './src') } },
   build: { outDir: '../internal/web/dist', emptyOutDir: true, sourcemap: false },
-  test: { include: ['src/**/*.test.ts'] },
+  test: { include: ['src/**/*.test.{ts,tsx}'], environment: 'happy-dom', setupFiles: ['src/test/setup.ts'] },
   server: {
     // Dev mode: the page comes from Vite, /api from the Go server of `wtm-next ui`.
     proxy: { '/api': { target: api, changeOrigin: true, headers: { origin: api } } },

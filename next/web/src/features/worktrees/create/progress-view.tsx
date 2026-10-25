@@ -3,8 +3,10 @@ import type { CreateDetail, DomainEnvelope } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress as Bar } from '@/components/ui/progress'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { CommandLine } from '../shared/command-line'
+import { sentence } from '../shared/sentence'
 import { copy } from '../shared/copy'
 import { phaseLabel } from './phases'
 import { current, doneOf, seconds, type PhaseRun, type Progress } from './progress'
@@ -26,80 +28,90 @@ export function ProgressView(props: {
   const now = current(progress)
   const { done, total } = doneOf(progress)
   const ended = !props.running
-  const failure = progress.refused ?? failureOf(progress.envelope)
+  const cancelled = progress.envelope?.items?.some((item) => item.status === 'cancelled') ?? false
+  const failure = cancelled ? undefined : (progress.refused ?? failureOf(progress.envelope))
+  const succeeded = progress.units.flatMap(([, unit]) => unit.phases).filter((run) => run.state === 'done').length
+  const names = branches.join(', ')
   const title = ended
-    ? failure
-      ? `Couldn't create ${branches.join(', ')}`
-      : progress.envelope?.items?.some((item) => item.status === 'cancelled')
-        ? `Cancelled ${branches.join(', ')}`
-        : `${branches.join(', ')} ${branches.length === 1 ? 'is' : 'are'} ready`
+    ? cancelled
+      ? `Cancelled ${names}`
+      : failure
+        ? `Couldn't create ${names}`
+        : `${names} ${branches.length === 1 ? 'is' : 'are'} ready`
     : progress.cancelling
-      ? `Cancelling ${branches.join(', ')}`
-      : `Creating ${branches.join(', ')}`
+      ? `Cancelling ${names}`
+      : `Creating ${names}`
+  const description = ended
+    ? `${succeeded} of ${total} steps done.${cancelled ? ' What is done stays: clean it to remove it.' : ''}`
+    : now
+      ? `Step ${now.index + 1} of ${now.total} · ${phaseLabel[now.run.phase]}`
+      : done > 0
+        ? 'Finishing…'
+        : 'Starting…'
 
   return (
     <>
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>
-          {ended
-            ? `${done} of ${total} steps done.`
-            : now
-              ? `Step ${now.index + 1} of ${now.total} · ${phaseLabel[now.run.phase]}`
-              : 'Starting…'}
-        </DialogDescription>
+        <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
       {!ended && <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />}
 
-      <div className="flex max-h-[50vh] flex-col gap-4 overflow-y-auto">
-        {progress.units.map(([subject, unit]) => (
-          <section key={subject} aria-label={subject}>
-            {progress.units.length > 1 && <h3 className="mb-2 font-mono text-xs text-muted-foreground">{subject}</h3>}
-            <ol className="flex flex-col">
-              {unit.phases.map((run, i) => (
-                <li key={run.phase} className="flex gap-3">
-                  <div className="flex w-5 flex-col items-center">
-                    <Marker run={run} />
-                    {i < unit.phases.length - 1 && <span className="w-px flex-1 bg-border" />}
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-2 pb-3">
-                    <div className="flex items-center text-sm">
-                      <span
-                        className={cn(
-                          'flex-1',
-                          run.state === 'todo' && 'text-muted-foreground',
-                          run.state === 'now' && 'font-medium',
-                        )}
-                      >
-                        {phaseLabel[run.phase]}
-                      </span>
-                      <span className="text-xs text-muted-foreground tabular-nums">{seconds(run)}</span>
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="flex flex-col gap-4 pr-3">
+          {progress.units.map(([subject, unit]) => (
+            <section key={subject} aria-label={subject}>
+              {progress.units.length > 1 && <h3 className="mb-2 font-mono text-xs text-muted-foreground">{subject}</h3>}
+              <ol className="flex flex-col">
+                {unit.phases.map((run, i) => (
+                  <li key={run.phase} className="flex gap-3">
+                    <div className="flex w-5 flex-col items-center">
+                      <Marker run={run} />
+                      {i < unit.phases.length - 1 && <span className="w-px flex-1 bg-border" />}
                     </div>
-                    {(run.state === 'now' || run.state === 'failed') && unit.lines.length > 0 && (
-                      <div className="rounded-md bg-muted px-3 py-2">
-                        <pre className="max-h-40 overflow-y-auto font-mono text-xs whitespace-pre-wrap text-muted-foreground">
-                          {unit.lines.slice(-8).join('\n')}
-                        </pre>
-                        {run.log && (
-                          <button
-                            type="button"
-                            className="mt-1 text-xs underline underline-offset-4"
-                            onClick={() => run.log && copy(run.log)}
-                          >
-                            Copy the log's path
-                          </button>
-                        )}
+                    <div className="flex min-w-0 flex-1 flex-col gap-2 pb-3">
+                      <div className="flex items-center text-sm">
+                        <span
+                          className={cn(
+                            'flex-1',
+                            run.state === 'todo' && 'text-muted-foreground',
+                            run.state === 'now' && 'font-medium',
+                          )}
+                        >
+                          {phaseLabel[run.phase]}
+                        </span>
+                        <span className="text-xs text-muted-foreground tabular-nums">{seconds(run)}</span>
                       </div>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </section>
-        ))}
-        {ended && failure && <p className="text-sm text-destructive">{failure}</p>}
-        {ended && <Ended envelope={progress.envelope} />}
-      </div>
+                      {(run.state === 'now' || run.state === 'failed') && unit.lines.length > 0 && (
+                        <div className="rounded-md bg-muted px-3 py-2">
+                          <pre
+                            // the output follows its last line, as a terminal does
+                            ref={(pre) => pre?.scrollTo({ top: pre.scrollHeight })}
+                            className="h-28 overflow-y-auto font-mono text-xs whitespace-pre-wrap text-muted-foreground [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin]"
+                          >
+                            {unit.lines.join('\n')}
+                          </pre>
+                          {run.log && (
+                            <button
+                              type="button"
+                              className="mt-1 text-xs underline underline-offset-4"
+                              onClick={() => run.log && copy(run.log)}
+                            >
+                              Copy the log's path
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ))}
+          {ended && failure && <p className="text-sm text-destructive">{failure}</p>}
+          {ended && <Ended envelope={progress.envelope} />}
+        </div>
+      </ScrollArea>
 
       <DialogFooter className="items-center">
         {!ended && (
@@ -197,7 +209,7 @@ function Ended({ envelope }: { envelope: DomainEnvelope | undefined }) {
           <p className="text-sm text-muted-foreground">Not in the web interface yet: copy into a terminal.</p>
           {envelope.follow_ups.map((followUp) => (
             <div key={followUp.code + JSON.stringify(followUp.answers)} className="flex flex-col gap-1">
-              <span className="text-sm">{followUp.message}</span>
+              <span className="text-sm">{sentence(followUp.message)}</span>
               <CommandLine followUp={followUp} />
             </div>
           ))}

@@ -56,16 +56,3 @@ export function problemsByKey(fields: DomainField[], problems: DomainFieldError[
   }
   return filed
 }
-
-// problemsOf asks the core the questions again with the answers the person changed, and returns its problems
-// filed for the form: under each field's key, and under form those of no field. The front checks nothing itself.
-export async function problemsOf(params: {
-  fields: DomainField[]
-  values: Values
-  changed: (key: string) => boolean
-  ask: (answers: DomainAnswered[]) => Promise<{ problems: DomainFieldError[] }>
-}): Promise<{ form: string | undefined; fields: Record<string, string> } | undefined> {
-  const asked = await params.ask(answersOf(params.fields, params.values, params.changed))
-  const { '': form, ...fields } = problemsByKey(params.fields, asked.problems)
-  return form || Object.keys(fields).length ? { form, fields } : undefined
-}

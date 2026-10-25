@@ -251,6 +251,51 @@
           }
         ]
       }
+    },
+    {
+      "files": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react",
+                "importNames": ["useEffect", "useLayoutEffect", "useInsertionEffect"],
+                "message": "No effects: derive while rendering, put data and side effects in TanStack Query/Router/Form, a DOM hook in a ref callback (docs/dev/web-front.md)."
+              },
+              {
+                "name": "@testing-library/react",
+                "importNames": ["renderHook"],
+                "message": "Test a component through what its user does (queries by role, label or text, user-event), never a hook directly (docs/dev/web-front.md)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/**/*.test.tsx"],
+      "rules": {
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "React",
+            "property": "useEffect",
+            "message": "No effects: derive while rendering, put data and side effects in TanStack Query/Router/Form, a DOM hook in a ref callback (docs/dev/web-front.md)."
+          },
+          {
+            "object": "React",
+            "property": "useLayoutEffect",
+            "message": "No effects: derive while rendering, put data and side effects in TanStack Query/Router/Form, a DOM hook in a ref callback (docs/dev/web-front.md)."
+          },
+          {
+            "object": "vi",
+            "property": "mock",
+            "message": "A component test mocks the server at the network level with msw (src/test/server.ts), never a module of the app (docs/dev/web-front.md)."
+          }
+        ]
+      }
     }
   ]
 }

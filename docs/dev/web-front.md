@@ -15,7 +15,7 @@
 | Toasts | `sonner`'s `Toaster`, mounted by the shell (shadcn's wrapper does not type-check under `exactOptionalPropertyTypes`) |
 | Types | generated from `next/internal/api/api.v2.schema.json` by json-schema-to-typescript into `src/api/types.gen.ts` (`npm run types`, run before `dev` and `build`): the catalogue's shapes, the names of its commands (`ApiCommandName`) and the server's own (`WebRepo`, `WebVersion`, `WebCall`, `WebRefusal`…); the front types nothing by hand |
 | Event stream | `eventsource-parser` (`EventSourceParserStream`) inside TanStack Query's `streamedQuery` |
-| Lint, format and tests | oxlint with the rules below and `prettier --check` (part of `npm run build`, a warning or an unformatted file fails it; `npm run format` writes), `tsc -b`, Vitest over `src/**/*.test.ts` (`npm test`): the non-trivial logic (the token, the event stream, the rows and filters, the steps and progress of create, the tree), no component test yet |
+| Lint, format and tests | oxlint with the rules below and `prettier --check` (part of `npm run build`, a warning or an unformatted file fails it; `npm run format` writes), `tsc -b`, Vitest over `src/**/*.test.{ts,tsx}` (`npm test`, happy-dom), Testing Library and `user-event` for the components, msw for the server (see Tests below) |
 
 ## Where code goes
 
@@ -43,7 +43,7 @@ src/
 
 ### The rules the linter keeps
 
-`.oxlintrc.json` fails the build on: `useEffect`, `useLayoutEffect`, `useInsertionEffect` (and `React.useEffect`); `fetch`, `EventSource`, `XMLHttpRequest`, `WebSocket` and `eventsource-parser` outside `src/api/`; `src/api/` importing the app (`@/…`); a feature importing another feature, by `@/features/…` or by a relative path out of its folder; a route importing anything but the router and features (no markup, no query); `components/` importing a feature or a route; `lib/` importing React or the app. `src/components/ui/` and `src/hooks/` are shadcn's code, out of the lint. A drift found in review becomes a rule there. `make lint-ui` runs the types, the lint and the format check alone. How a change is made here: the `web-front` skill (`.claude/skills/web-front/`).
+`.oxlintrc.json` fails the build on: `useEffect`, `useLayoutEffect`, `useInsertionEffect` (and `React.useEffect`); `fetch`, `EventSource`, `XMLHttpRequest`, `WebSocket` and `eventsource-parser` outside `src/api/`; `src/api/` importing the app (`@/…`); a feature importing another feature, by `@/features/…` or by a relative path out of its folder; a route importing anything but the router and features (no markup, no query); `components/` importing a feature or a route; `lib/` importing React or the app; in a test, `renderHook`, and `vi.mock` in a component test. `src/components/ui/` and `src/hooks/` are shadcn's code, out of the lint. A drift found in review becomes a rule there. `make lint-ui` runs the types, the lint and the format check alone. How a change is made here: the `web-front` skill (`.claude/skills/web-front/`).
 
 ## The look
 
@@ -75,6 +75,15 @@ The identity is shadcn's defaults plus two marks of `docs/dev/identity.md`: the 
 - a binary built `-tags noui` (`front_noui.go`) embeds no front and serves a page saying so, its API unchanged; `make test-next` and the CI run the server's tests in both builds.
 
 A change to `next/web/` is committed with the `dist/` that `make ui` writes from it.
+
+## Tests
+
+Two kinds, both under Vitest:
+
+- **Logic** (`*.test.ts` beside the code): a non-trivial pure function — the rows and filters, the tree's nodes, the steps and progress of create, a sentence — called with values, its result compared.
+- **Components** (`*.test.tsx`): the whole page rendered at an address (`renderApp(path)`, `src/test/render.tsx`) and used as its user does: queries by role, label or text (`findByRole('link', { name: … })`), actions through `user-event`, assertions on what the screen shows or the address holds. Never a hook called directly (`renderHook`), never a module of the app mocked (`vi.mock`): the linter refuses both in a `*.test.tsx`.
+
+The server is mocked at the network level by msw (`src/test/server.ts`): one repository and its worktrees, its reads, `create`'s questions, dry run and stream, the spelling of a command line, an event stream that says nothing. A test that needs another answer overrides one route with `server.use(http.get(…))`; a request no handler answers fails the test. A regression found in a browser gets its component test, named after what the user saw (`a row opens its own worktree, not another`).
 
 ## Dev mode
 

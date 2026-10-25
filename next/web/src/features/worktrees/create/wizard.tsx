@@ -23,11 +23,10 @@ export function Wizard(props: {
   onStart: (start: Start) => void
   onCancel: () => void
 }) {
-  const { form, asked, answers } = useCommandForm({
+  const { form, asked, answers, check, problems } = useCommandForm({
     repo: props.repo,
     command: 'create',
     form: props.form,
-    onSubmit: () => {},
   })
   const [at, setAt] = useState(0)
   const [remember, setRemember] = useState(() => remembered(props.form))
@@ -39,8 +38,6 @@ export function Wizard(props: {
   ]
 
   const step = steps[at]
-  const problems = problemsByKey(asked.fields, asked.problems)
-  const blocked = step?.asked.some((field) => problems[keyOf(field.path)]) ?? false
   // a step the core asks nothing of is passed over, as not asked
   const next = (from: number) => {
     const ahead = steps.findIndex((candidate, i) => i > from && candidate.asked.length > 0)
@@ -65,10 +62,11 @@ export function Wizard(props: {
         />
       </div>
       {step && (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-6">
           <CommandFields
             form={form}
             fields={step.asked}
+            problems={problems}
             remember={{
               paths: remember,
               toggle: (path) =>
@@ -100,7 +98,19 @@ export function Wizard(props: {
         {!confirming && (
           <form.Subscribe selector={(s) => s.isValidating}>
             {(validating) => (
-              <Button disabled={validating || blocked} onClick={() => setAt(next(at))}>
+              <Button
+                disabled={validating}
+                onClick={async () => {
+                  // Next asks the core with the answers as typed, not as last checked: a step with problems shows
+                  // them, rather than a Next that cannot be pressed
+                  const answered = await check()
+                  const filed = problemsByKey(answered.fields, answered.problems)
+                  const here = stepsOf(answered)[at]
+                  if (!here?.asked.some((field) => filed[keyOf(field.path)])) return setAt(next(at))
+                  for (const field of here.asked)
+                    form.setFieldMeta(keyOf(field.path), (meta) => ({ ...meta, isTouched: true }))
+                }}
+              >
                 Next
               </Button>
             )}

@@ -11,7 +11,7 @@ The web front is a thin surface over the core: it shows what the catalogue's rea
 
 1. **Draw it in Pencil first.** A new screen, panel, section, state or control is drawn in `wtm-ui.pen` (the `pencil` MCP) from its `wtm/` components, and validated by the owner, before it is built. A deviation found while coding goes back into Pencil. Pencil holds design only, never proof screenshots.
 2. **Find the fact in the core.** Every state, count, problem, available action and its order comes from a read or an envelope. If the screen needs a fact the core does not give, add it to the core's read (Go, under `next/`, the `go-architecture` skill) with its test and golden; never compute it in the front.
-3. **Build it** in its feature folder, its logic in plain `.ts` files with Vitest tests.
+3. **Build it** in its feature folder, its logic in plain `.ts` files with Vitest tests, what the user does with it in a component test (below).
 4. **See it run**: `make ui-dev` against `wtm-next ui --no-open` in a sandbox (`wtm-sandbox` skill), click through it in a browser.
 5. **`make ui`**, then commit the sources with the `dist/` it writes.
 
@@ -31,9 +31,25 @@ A problem shows where it is decided, never as a page banner. Colour carries a me
 
 The generated types (`src/api/types.gen.ts`) are the only types of the server. A loose envelope is narrowed once, in `src/api/` (`readQuery`'s `select`), never with a cast in a component. A closed set (a phase, a state, a column) is a union, and what each value shows is a `Record` over it, so a new value fails the build.
 
+## Testing a component
+
+Render the page at its address and use it as its user does; mock the server, never the app.
+
+```tsx
+test('a row opens its own worktree, not another', async () => {
+  const { user, router } = renderApp('/r/r1/worktrees')            // src/test/render.tsx
+  await user.click(await screen.findByRole('link', { name: /feat\/billing from main/ }))
+  await waitFor(() => expect(router.state.location.search).toEqual({ worktree: 'feat/billing' }))
+})
+```
+
+- Queries by role, label or text; actions through `user-event`; assert what the screen shows or the address holds.
+- The server's answers are msw handlers (`src/test/server.ts`); another answer for one test is `server.use(http.post(…))`.
+- Not `renderHook`, not `vi.mock` of `src/api` or any app module, not a component rendered alone with props invented for it: the linter refuses the first two.
+
 ## What the linter refuses
 
-`npm run lint` (part of `make ui`, `make lint-ui`, the CI `ui` gate) fails on: `useEffect`/`useLayoutEffect`/`useInsertionEffect`; `fetch`, `EventSource`, stream parsing outside `src/api/`; `src/api/` importing the app; a feature importing another feature (`@/features/…` or a relative path out of it); a route importing anything but the router and features; `components/` reaching into a feature; React or the app in `lib/`. A drift the linter misses becomes a rule in `.oxlintrc.json`.
+`npm run lint` (part of `make ui`, `make lint-ui`, the CI `ui` gate) fails on: `useEffect`/`useLayoutEffect`/`useInsertionEffect`; `fetch`, `EventSource`, stream parsing outside `src/api/`; `src/api/` importing the app; a feature importing another feature (`@/features/…` or a relative path out of it); a route importing anything but the router and features; `components/` reaching into a feature; React or the app in `lib/`; `renderHook` in a test, `vi.mock` in a component test. A drift the linter misses becomes a rule in `.oxlintrc.json`.
 
 ## Common mistakes
 

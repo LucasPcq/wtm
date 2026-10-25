@@ -23,7 +23,7 @@ export function ActionsMenu({ actions }: { actions: DomainFollowUp[] }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" aria-label="More actions">
+        <Button variant="ghost" size="icon-sm" aria-label="More actions">
           <Ellipsis />
         </Button>
       </DropdownMenuTrigger>

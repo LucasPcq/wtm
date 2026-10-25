@@ -38,8 +38,16 @@ export function DetailPanel(props: { repo: string; worktree: string; row: ListDe
   return (
     <aside aria-label={props.worktree} className="flex w-[440px] shrink-0 flex-col border-l bg-background">
       <header className="flex flex-col gap-1 px-6 pt-5 pb-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <h2 className="min-w-0 flex-1 truncate text-lg font-semibold">{props.worktree}</h2>
+          {pr?.url && (
+            <Button variant="ghost" size="sm" asChild>
+              <a href={pr.url} target="_blank" rel="noreferrer">
+                <ExternalLink />#{pr.params?.number}
+              </a>
+            </Button>
+          )}
+          {actions.length > 0 && <ActionsMenu actions={actions} />}
           <Button variant="ghost" size="icon-sm" aria-label="Close the detail" asChild>
             <Link from="/r/$repo/worktrees" search={(search) => ({ ...search, worktree: undefined })}>
               <X />
@@ -53,23 +61,6 @@ export function DetailPanel(props: { repo: string; worktree: string; row: ListDe
         {live.isPending && <Skeleton className="h-32 w-full" />}
         {live.isError && <p className="text-sm text-destructive">{live.error.message}</p>}
         {problems[0] && <Problems problems={problems} />}
-        {(pr || actions.length > 0) && (
-          <div className="flex items-center gap-2">
-            {pr?.url && (
-              <Button variant="outline" asChild>
-                <a href={pr.url} target="_blank" rel="noreferrer">
-                  <ExternalLink />
-                  Pull request #{pr.params?.number}
-                </a>
-              </Button>
-            )}
-            {actions.length > 0 && (
-              <div className="ml-auto">
-                <ActionsMenu actions={actions} />
-              </div>
-            )}
-          </div>
-        )}
         {detail &&
           shown.map((section) => (
             <Section key={section} id={section} meta={meta(section, detail, github.dataUpdatedAt)}>
@@ -95,21 +86,27 @@ export function DetailPanel(props: { repo: string; worktree: string; row: ListDe
   )
 }
 
+// Origin is where the worktree comes from, how it runs, and where it is: its path on one line, cut at its start,
+// whole on hover and on copy.
 function Origin({ detail, now }: { detail: StatusDetail; now: number }) {
-  const from = detail.main ? 'main worktree' : detail.parent ? `from ${detail.parent}` : 'a root'
+  const facts = [
+    detail.main ? 'main worktree' : detail.parent ? `from ${detail.parent}` : 'a root',
+    detail.created_at && `created ${ago(detail.created_at, now)}`,
+    detail.isolation,
+  ].filter(Boolean)
   return (
     <>
-      <p className="text-sm text-muted-foreground">
-        {from}
-        {detail.created_at && ` · created ${ago(detail.created_at, now)}`}
-      </p>
+      <p className="text-sm text-muted-foreground">{facts.join(' · ')}</p>
       <button
         type="button"
-        className="flex items-start gap-1.5 text-left font-mono text-xs break-all text-muted-foreground hover:text-foreground"
+        title={detail.path}
+        className="flex min-w-0 items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground"
         onClick={() => copy(detail.path)}
       >
-        {detail.path}
-        <Copy className="mt-0.5 size-3 shrink-0" aria-label="Copy the path" />
+        <span className="truncate [direction:rtl]">
+          <bdi>{detail.path}</bdi>
+        </span>
+        <Copy className="size-3 shrink-0" aria-label="Copy the path" />
       </button>
     </>
   )

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import type { OperationLine } from '@/api/queries/operations'
 import type { CreatePlan, DomainField, DomainForm } from '@/api/types.gen'
-import { advance, current, doneOf, planned } from './progress'
+import { advance, current, doneOf, planned, seconds } from './progress'
 import { stepsOf } from './steps'
 
 const text = (path: string, skip?: string): DomainField => ({
@@ -88,4 +88,14 @@ test('an event of a subject or a phase the plan did not foresee is added, not dr
     'feat/b',
     { phases: [{ phase: 'ports', state: 'now', startedAt: '2026-10-25T12:00:00Z' }], lines: [] },
   ])
+})
+
+test('a phase is timed from a second up, the quick ones left blank', () => {
+  expect(
+    seconds({ phase: 'env', state: 'done', startedAt: '2026-10-25T12:00:00Z', endedAt: '2026-10-25T12:00:00.2Z' }),
+  ).toBe('')
+  expect(
+    seconds({ phase: 'on_create', state: 'done', startedAt: '2026-10-25T12:00:00Z', endedAt: '2026-10-25T12:00:08Z' }),
+  ).toBe('8.0 s')
+  expect(seconds({ phase: 'on_create', state: 'now', startedAt: '2026-10-25T12:00:00Z' })).toBe('')
 })

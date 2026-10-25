@@ -1,6 +1,7 @@
+import { useDebouncedCallback } from '@tanstack/react-pacer'
 import { useNavigate } from '@tanstack/react-router'
 import { Search } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Kbd } from '@/components/ui/kbd'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -32,6 +33,14 @@ export function Toolbar(props: {
   const set = (change: Partial<WorktreesSearch>) =>
     void navigate({ search: (search) => ({ ...search, ...change }), replace: true })
   const filter = props.search.filter ?? 'all'
+  // the search goes to the address once typing pauses; a search cleared from elsewhere (No match) empties the box
+  const [query, setQuery] = useState(props.search.q ?? '')
+  const [asked, setAsked] = useState(props.search.q)
+  if (props.search.q !== asked) {
+    setAsked(props.search.q)
+    if (props.search.q === undefined) setQuery('')
+  }
+  const search = useDebouncedCallback((q: string) => set({ q: q.trim() || undefined }), { wait: 250 })
 
   return (
     <div className="flex flex-wrap items-center gap-3 border-b px-8 py-3">
@@ -52,8 +61,11 @@ export function Toolbar(props: {
           ref={focusOnSlash}
           aria-label="Search branches"
           placeholder="Search branches"
-          value={props.search.q ?? ''}
-          onChange={(e) => set({ q: e.target.value || undefined })}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            search(e.target.value)
+          }}
         />
         <InputGroupAddon align="inline-end">
           <Kbd>/</Kbd>

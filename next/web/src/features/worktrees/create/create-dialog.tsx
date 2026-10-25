@@ -6,6 +6,7 @@ import { questionsQuery } from '@/api/queries/commands'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import { useCreateRun } from '../hooks/use-create-run'
 import { ProgressView } from './progress-view'
 import { Wizard } from './wizard'
@@ -25,7 +26,11 @@ export function CreateButton({ repo }: { repo: string }) {
         <Plus />
         Create worktree
       </Button>
-      <DialogContent className="flex max-h-[90vh] flex-col gap-5 sm:max-w-xl" showCloseButton={!run.running}>
+      <DialogContent
+        // a run keeps one size while its phases come and go; only its lists scroll
+        className={cn('flex max-h-[90vh] flex-col gap-6 sm:max-w-xl', run.progress && 'h-[min(36rem,85vh)]')}
+        showCloseButton={!run.running}
+      >
         {run.progress ? (
           <ProgressView
             progress={run.progress}

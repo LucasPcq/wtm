@@ -107,6 +107,8 @@ export function doneOf(progress: Progress): { done: number; total: number } {
   return { done: all.filter((run) => run.state === 'done' || run.state === 'failed').length, total: all.length }
 }
 
-// seconds is how long a phase took, to the tenth.
-export const seconds = (run: PhaseRun) =>
-  run.startedAt && run.endedAt ? `${((Date.parse(run.endedAt) - Date.parse(run.startedAt)) / 1000).toFixed(1)} s` : ''
+// seconds is how long a phase took, to the tenth, nothing under a second: the time of what made the wait.
+export function seconds(run: PhaseRun): string {
+  const took = run.startedAt && run.endedAt ? Date.parse(run.endedAt) - Date.parse(run.startedAt) : 0
+  return took < 1000 ? '' : `${(took / 1000).toFixed(1)} s`
+}
