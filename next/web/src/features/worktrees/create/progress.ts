@@ -112,3 +112,12 @@ export function seconds(run: PhaseRun): string {
   const took = run.startedAt && run.endedAt ? Date.parse(run.endedAt) - Date.parse(run.startedAt) : 0
   return took < 1000 ? '' : `${(took / 1000).toFixed(1)} s`
 }
+
+// took is how long the whole run took, from its first phase started to its last ended, to the tenth.
+export function took(progress: Progress): string {
+  const runs = progress.units.flatMap(([, unit]) => unit.phases)
+  const starts = runs.flatMap((run) => (run.startedAt ? [Date.parse(run.startedAt)] : []))
+  const ends = runs.flatMap((run) => (run.endedAt ? [Date.parse(run.endedAt)] : []))
+  if (starts.length === 0 || ends.length === 0) return ''
+  return `${((Math.max(...ends) - Math.min(...starts)) / 1000).toFixed(1)} s`
+}

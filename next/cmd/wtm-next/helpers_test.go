@@ -26,7 +26,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/webserver"
 	"github.com/LucasPcq/wtm/next/internal/api"
+	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/web"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -286,8 +288,6 @@ func generatedSchema(t *testing.T) []byte {
 	s.defs["domain.Event"] = map[string]any{"$ref": "events.v2.json#/$defs/event"}
 	s.defs["domain.Line"] = map[string]any{"$ref": "events.v2.json"}
 	s.defs["domain.Phase"] = map[string]any{"$ref": "events.v2.json#/$defs/phase"}
-	s.defs["domain.Skip"] = map[string]any{"description": "Why a field is not asked, as a code each surface words its own way.", "enum": domain.Skips}
-	s.defs["domain.Origin"] = map[string]any{"description": "Where a field's answer came from.", "enum": domain.Origins}
 	// the types the fragments name
 	for _, named := range []reflect.Type{reflect.TypeFor[domain.Warning](), reflect.TypeFor[domain.FollowUp]()} {
 		s.of(named)
@@ -449,6 +449,18 @@ func oneValue(value map[string]any) map[string]any {
 
 var marshaler = reflect.TypeFor[json.Marshaler]()
 
+// enums are the closed sets of values a surface words its own way, published as an enum under their type's name.
+var enums = map[reflect.Type]struct {
+	description string
+	values      any
+}{
+	reflect.TypeFor[domain.Skip]():         {"Why a field is not asked, as a code each surface words its own way.", domain.Skips},
+	reflect.TypeFor[domain.Origin]():       {"Where a field's answer came from.", domain.Origins},
+	reflect.TypeFor[create.Action]():       {"How a branch gets its worktree.", create.Actions()},
+	reflect.TypeFor[project.EnvStrategy](): {"Where a worktree's .env files are copied from.", project.EnvStrategies()},
+	reflect.TypeFor[project.Isolation]():   {"How a worktree stands against its source.", project.Isolations()},
+}
+
 // of is the schema of a value of type t as encoding/json writes it: a reference to its definition for a named struct, defined on first sight, or to the fragment written by hand beside its MarshalJSON.
 func (s *schemaWriter) of(t reflect.Type) map[string]any {
 	s.t.Helper()
@@ -461,11 +473,9 @@ func (s *schemaWriter) of(t reflect.Type) map[string]any {
 	if t == reflect.TypeFor[domain.Phase]() {
 		return ref("domain.Phase")
 	}
-	if t == reflect.TypeFor[domain.Skip]() {
-		return ref("domain.Skip")
-	}
-	if t == reflect.TypeFor[domain.Origin]() {
-		return ref("domain.Origin")
+	if e, ok := enums[t]; ok {
+		s.defs[defName(t)] = map[string]any{"description": e.description, "enum": e.values}
+		return ref(defName(t))
 	}
 	if t.Implements(marshaler) || reflect.PointerTo(t).Implements(marshaler) {
 		name := defName(t)

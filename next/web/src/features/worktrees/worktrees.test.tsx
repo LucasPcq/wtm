@@ -1,6 +1,8 @@
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { http, HttpResponse } from 'msw'
 import { expect, test } from 'vitest'
 import { renderApp } from '@/test/render'
+import { server } from '@/test/server'
 
 test('each worktree is listed, and its row opens the detail with the problem to fix first and its command', async () => {
   const { user } = await renderApp('/r/r1/worktrees')
@@ -55,12 +57,20 @@ test('create shows a problem only once asked to go on, then confirms the plan, r
   expect(within(dialog).queryByText(/Not asked/)).toBeNull()
 
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
-  await user.click(await within(dialog).findByRole('button', { name: 'Create worktree' }))
+  // the confirmation reads the plan, not the command line's recap
+  const planned = await within(dialog).findByRole('region', { name: 'feat/new' })
+  expect(within(dialog).getByRole('heading', { name: 'Create feat/new' })).toBeTruthy()
+  expect(within(planned).getByText('Copied from .env.example.')).toBeTruthy()
+  expect(within(planned).getByText('Add the worktree · Run the on_create hooks')).toBeTruthy()
+  await user.click(within(dialog).getByRole('button', { name: 'Create worktree' }))
 
   expect(await within(dialog).findByText('feat/new is ready')).toBeTruthy()
   expect(within(dialog).getByText('/acme.trees/feat/new')).toBeTruthy()
-  expect(within(dialog).queryByText('Run the on_create hooks')).toBeNull()
   expect(within(dialog).getByText('wtm go feat/new')).toBeTruthy()
+  // a run that went well folds its steps away, one click from them
+  expect(within(dialog).queryByText('Run the on_create hooks')).toBeNull()
+  await user.click(within(dialog).getByRole('button', { name: /2 steps/ }))
+  expect(within(dialog).getByText('Run the on_create hooks')).toBeTruthy()
 })
 
 // A branch the core lists with no label of its own was a blank entry of the source branch.
@@ -96,4 +106,18 @@ test('a column hidden in the Columns panel leaves the list, and stays hidden on 
   await screen.findByRole('link', { name: /feat\/billing-ui/ })
   expect(screen.queryByRole('columnheader', { name: 'Running' })).toBeNull()
   expect(screen.getByRole('columnheader', { name: 'State' })).toBeTruthy()
+})
+
+// A follow-up the command line cannot spell was left out of the done state: it is said, never hidden.
+test('a next command the server cannot spell is said with what it meant, not hidden', async () => {
+  server.use(http.post('/api/command-line', () => HttpResponse.json({ argv: [] })))
+  const { user } = await renderApp('/r/r1/worktrees')
+  await user.click(await screen.findByRole('button', { name: 'Create worktree' }))
+  const dialog = await screen.findByRole('dialog')
+  await user.type(await within(dialog).findByRole('textbox', { name: 'Branches' }), 'feat/new')
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Create worktree' }))
+
+  expect(await within(dialog).findByText('No command line for this: jump in')).toBeTruthy()
 })

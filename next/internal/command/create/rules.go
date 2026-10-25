@@ -279,6 +279,11 @@ const (
 	ActionUnchanged Action = "unchanged" // its worktree is already open (--if-not-exists)
 )
 
+// Actions are every Action.
+func Actions() []Action {
+	return []Action{ActionCreate, ActionCheckOut, ActionResume, ActionUnchanged}
+}
+
 // start is how the worktree of the action begins; "" for an action that makes none.
 func (a Action) start() worktree.Start {
 	switch a {

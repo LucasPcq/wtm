@@ -4,6 +4,7 @@ import { commandLineQuery } from '@/api/queries/command-line'
 import type { DomainFollowUp } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { shellLine } from '@/lib/shell'
 import { copy } from './copy'
 
@@ -27,5 +28,32 @@ export function CommandLine({ followUp }: { followUp: DomainFollowUp }) {
         <Copy />
       </Button>
     </div>
+  )
+}
+
+// InlineCommand is a follow-up as a short command beside what it is about, the why of copying it in its tooltip.
+export function InlineCommand({ followUp }: { followUp: DomainFollowUp }) {
+  const line = useQuery(commandLineQuery(followUp))
+  if (line.isPending) return <Skeleton className="h-7 w-36" />
+  if (line.isError || line.data.argv.length === 0)
+    return (
+      <span className="text-xs text-muted-foreground">
+        No command line for this{line.isError ? ` (${line.error.message})` : ''}: {followUp.message}
+      </span>
+    )
+
+  const text = shellLine(line.data.argv)
+  return (
+    <span className="flex shrink-0 items-center gap-0.5 rounded-md bg-muted py-0.5 pr-0.5 pl-2">
+      <code className="font-mono text-xs">{text}</code>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon-xs" aria-label={`Copy ${text}`} onClick={() => copy(text)}>
+            <Copy />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Not in the web interface yet: copy it into a terminal.</TooltipContent>
+      </Tooltip>
+    </span>
   )
 }

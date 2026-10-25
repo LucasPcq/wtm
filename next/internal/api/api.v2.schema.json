@@ -10,11 +10,20 @@
         "tree"
       ]
     },
+    "create.Action": {
+      "description": "How a branch gets its worktree.",
+      "enum": [
+        "create",
+        "check_out",
+        "resume",
+        "unchanged"
+      ]
+    },
     "create.BranchPlan": {
       "additionalProperties": false,
       "properties": {
         "action": {
-          "type": "string"
+          "$ref": "#/$defs/create.Action"
         },
         "branch": {
           "type": "string"
@@ -102,7 +111,7 @@
           "type": "integer"
         },
         "env_from": {
-          "type": "string"
+          "$ref": "#/$defs/project.EnvStrategy"
         },
         "fast_forward": {
           "items": {
@@ -114,7 +123,7 @@
           "type": "string"
         },
         "isolation": {
-          "type": "string"
+          "$ref": "#/$defs/project.Isolation"
         },
         "recalled": {
           "items": {
@@ -1367,7 +1376,7 @@
           ]
         },
         "isolation": {
-          "type": "string"
+          "$ref": "#/$defs/project.Isolation"
         },
         "kept": {
           "type": "boolean"
@@ -1417,7 +1426,7 @@
           "type": "integer"
         },
         "env_from": {
-          "type": "string"
+          "$ref": "#/$defs/project.EnvStrategy"
         },
         "fast_forward": {
           "items": {
@@ -1442,7 +1451,7 @@
           "type": "string"
         },
         "isolation": {
-          "type": "string"
+          "$ref": "#/$defs/project.Isolation"
         },
         "keep": {
           "type": "boolean"
@@ -2138,6 +2147,21 @@
       },
       "type": "array"
     },
+    "project.EnvStrategy": {
+      "description": "Where a worktree's .env files are copied from.",
+      "enum": [
+        "example",
+        "main",
+        "parent"
+      ]
+    },
+    "project.Isolation": {
+      "description": "How a worktree stands against its source.",
+      "enum": [
+        "isolated",
+        "verbatim"
+      ]
+    },
     "status.Base": {
       "additionalProperties": false,
       "properties": {
@@ -2269,7 +2293,7 @@
         "isolation": {
           "anyOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/project.Isolation"
             },
             {
               "type": "null"
@@ -3178,10 +3202,10 @@
           "type": "string"
         },
         "env_strategy": {
-          "type": "string"
+          "$ref": "#/$defs/project.EnvStrategy"
         },
         "isolation": {
-          "type": "string"
+          "$ref": "#/$defs/project.Isolation"
         },
         "namespaces": {
           "items": {

@@ -27,8 +27,12 @@ export function CreateButton({ repo }: { repo: string }) {
         Create worktree
       </Button>
       <DialogContent
-        // a run keeps one size while its phases come and go; only its lists scroll
-        className={cn('flex max-h-[90vh] flex-col gap-6 sm:max-w-xl', run.progress && 'h-[min(36rem,85vh)]')}
+        // a run keeps one size while its phases come and go, only its lists scroll; once it ended, the dialog eases
+        // to what it has left to say
+        className={cn(
+          'flex max-h-[90vh] flex-col gap-6 transition-[height] duration-300 ease-out [interpolate-size:allow-keywords] sm:max-w-xl motion-reduce:transition-none',
+          run.running && 'h-[min(36rem,85vh)]',
+        )}
         showCloseButton={!run.running}
       >
         {run.progress ? (

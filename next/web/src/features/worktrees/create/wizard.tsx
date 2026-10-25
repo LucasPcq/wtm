@@ -7,8 +7,8 @@ import { keyOf, problemsByKey } from '@/components/command-form/answers'
 import { useCommandForm } from '@/components/command-form/use-command-form'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Skeleton } from '@/components/ui/skeleton'
 import type { Start } from '../hooks/use-create-run'
+import { Confirm } from './confirm'
 import { Stepper, type StepState } from './stepper'
 import { stepsOf } from './steps'
 import { createWords, labelOf, skipWords } from './words'
@@ -146,40 +146,5 @@ function ApplyButton(props: { repo: string; answers: DomainAnswered[]; onStart: 
     >
       {applyLabel(plan)}
     </Button>
-  )
-}
-
-// Confirm is the dry run's recap: what the apply will do, each row as the core words it.
-function Confirm(props: { repo: string; answers: DomainAnswered[] }) {
-  const dry = useQuery(dryRunQuery(props.repo, 'create', props.answers))
-  if (dry.isPending) return <Skeleton className="h-40 w-full" />
-  if (dry.isError) return <p className="text-sm text-destructive">{dry.error.message}</p>
-  const plan = dry.data.plan as CreatePlan | undefined
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm">
-        wtm will create {plan?.creates ?? 0} {plan?.creates === 1 ? 'worktree' : 'worktrees'}:
-      </p>
-      <dl className="divide-y rounded-lg border text-sm">
-        {(plan?.recap ?? []).map((row) => (
-          <div key={row.key} className="grid grid-cols-[7rem_1fr] gap-4 px-3.5 py-2.5">
-            <dt className="text-muted-foreground">{row.label}</dt>
-            <dd className="flex flex-col">
-              {(row.values ?? []).map((value) => (
-                <span key={value.value + value.text}>
-                  {value.text}
-                  {value.note && <span className="block text-xs text-muted-foreground">{value.note}</span>}
-                </span>
-              ))}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      {dry.data.warnings.map((warning) => (
-        <p key={warning.code} className="text-sm text-amber-600 dark:text-amber-500">
-          {warning.message}
-        </p>
-      ))}
-    </div>
   )
 }

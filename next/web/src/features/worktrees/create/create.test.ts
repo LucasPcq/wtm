@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import type { OperationLine } from '@/api/queries/operations'
 import type { CreatePlan, DomainField, DomainForm, DomainSkip } from '@/api/types.gen'
-import { advance, current, doneOf, planned, seconds } from './progress'
+import { advance, current, doneOf, planned, seconds, took } from './progress'
 import { stepsOf } from './steps'
 
 const text = (path: string, skip?: DomainSkip): DomainField => ({
@@ -93,4 +93,22 @@ test('a phase is timed from a second up, the quick ones left blank', () => {
     seconds({ phase: 'on_create', state: 'done', startedAt: '2026-10-25T12:00:00Z', endedAt: '2026-10-25T12:00:08Z' }),
   ).toBe('8.0 s')
   expect(seconds({ phase: 'on_create', state: 'now', startedAt: '2026-10-25T12:00:00Z' })).toBe('')
+})
+
+test('the whole run is timed from its first phase started to its last ended, across branches', () => {
+  const run = (startedAt: string, endedAt: string) => ({
+    phase: 'env' as const,
+    state: 'done' as const,
+    startedAt,
+    endedAt,
+  })
+  expect(
+    took({
+      units: [
+        ['feat/a', { phases: [run('2026-10-25T12:00:01Z', '2026-10-25T12:00:03Z')], lines: [] }],
+        ['feat/b', { phases: [run('2026-10-25T12:00:03Z', '2026-10-25T12:00:09Z')], lines: [] }],
+      ],
+    }),
+  ).toBe('8.0 s')
+  expect(took({ units: [] })).toBe('')
 })

@@ -1,4 +1,4 @@
-import type { CreateRequest, DomainSkip } from '@/api/types.gen'
+import type { CreateAction, CreateRequest, DomainSkip } from '@/api/types.gen'
 import type { FieldWords, OptionWords } from '@/components/command-form/command-fields'
 
 // The core words its questions for the command line; the web says them its own way. Each record is exhaustive over
@@ -8,14 +8,14 @@ type Question = Exclude<CreateRequest[number]['path'], 'remember' | 'ask'>
 type ValuesOf<P extends Question> = Exclude<Extract<CreateRequest[number], { path: P }>['values'][number], ''>
 type Options<P extends Question> = Record<ValuesOf<P>, OptionWords>
 
-const envFrom: Options<'env_from'> = {
+export const envFrom: Options<'env_from'> = {
   config: { title: 'Project default', description: 'The strategy config.toml sets for this project.' },
   example: { title: 'Example', description: 'Copied from .env.example.' },
   main: { title: 'Main', description: "Copied from the main checkout's .env." },
   parent: { title: 'Parent', description: "Copied from the source worktree's .env." },
 }
 
-const isolation: Options<'isolation'> = {
+export const isolation: Options<'isolation'> = {
   isolated: { title: 'Isolated', description: 'Its own ports and namespaces: it runs beside the others.' },
   verbatim: { title: 'Verbatim', description: 'The .env as copied: it runs in turn with the others.' },
 }
@@ -71,4 +71,12 @@ export const skipWords: Record<DomainSkip, string | null> = {
   run_unread: "run.toml couldn't be read",
   nothing_isolated: 'run.toml declares nothing to isolate',
   no_conflict: 'nothing conflicts',
+}
+
+// How each branch gets its worktree, as the confirmation says it.
+export const actionWords: Record<CreateAction, string> = {
+  create: 'New branch',
+  check_out: 'Existing branch, as it is',
+  resume: 'From origin, tracking it',
+  unchanged: 'Already open, left as it is',
 }

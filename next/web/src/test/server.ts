@@ -243,7 +243,9 @@ export const handlers = [
                 { branch, path: `/acme.trees/${branch}`, action: 'create', phases: ['worktree', 'on_create'] },
               ],
               creates: 1,
+              from: 'main',
               env_from: 'example',
+              isolation: 'isolated',
               recap: [{ key: 'branches', label: 'Branches', values: [{ value: branch, text: branch }] }],
             },
           })
