@@ -127,7 +127,7 @@ func (s *Session[R, Q, O]) Problems(path string) []domain.FieldError {
 func (s *Session[R, Q, O]) Standing(at int) Standing {
 	field := s.Field(at)
 	spec := field.Spec()
-	st := Standing{Value: trailOf(field), Origin: spec.Origin, Skip: Skipped(spec.Skip), Erred: len(s.Problems(spec.Path)) > 0}
+	st := Standing{Value: trailOf(field), Origin: spec.Origin, Skip: Skipped(spec.Skip, s.form), Erred: len(s.Problems(spec.Path)) > 0}
 	st.Given = len(s.given.Values(spec.Path)) > 0
 	if st.Given && !positional(field) {
 		st.Flag = s.command.Flags().Spell(spec.Path)

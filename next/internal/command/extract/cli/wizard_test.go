@@ -214,3 +214,11 @@ func TestANewTargetStartsOnARememberedConfigDefaultTicked(t *testing.T) {
 	d.Keys("down", "down", "enter")
 	assert.Equal(t, project.EnvMain, d.s.Request().EnvFrom)
 }
+
+func TestASourceBehindOriginIsNotFastForwardedAndTheTrailNamesIt(t *testing.T) {
+	d := open(t, sessionParams{App: newWorld(seed{Held: true}).usecase(), Request: extract.Request{Source: source, Files: []string{"old.txt"}, To: split, From: source}})
+
+	d.Keys("enter", "enter")
+
+	assert.Contains(t, d.Screen(), "· Source update — nothing to fast-forward: feat/login holds the changes being extracted")
+}
