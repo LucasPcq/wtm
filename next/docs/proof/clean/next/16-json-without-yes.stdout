@@ -18,6 +18,13 @@
         "worktree": "feat/jsonny",
         "branch": "feat/jsonny",
         "path": "<SB>/acme.trees/feat-jsonny",
+        "hooks": [
+          "case feat/jsonny in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/jsonny;; esac"
+        ],
+        "phases": [
+          "on_clean",
+          "remove"
+        ],
         "blockers": []
       }
     ],

@@ -9,6 +9,13 @@
         "worktree": "feat/fp",
         "branch": "feat/fp",
         "path": "<SB>/acme.trees/feat-fp",
+        "hooks": [
+          "case feat/fp in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/fp;; esac"
+        ],
+        "phases": [
+          "on_clean",
+          "remove"
+        ],
         "blockers": []
       }
     ],

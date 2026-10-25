@@ -18,6 +18,13 @@
         "worktree": "feat/json",
         "branch": "feat/json",
         "path": "<SB>/acme.trees/feat-json",
+        "hooks": [
+          "case feat/json in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/json;; esac"
+        ],
+        "phases": [
+          "on_clean",
+          "remove"
+        ],
         "blockers": []
       }
     ],
