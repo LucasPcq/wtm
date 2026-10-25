@@ -22,6 +22,19 @@
         "path": {
           "type": "string"
         },
+        "phases": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "upstream": {
           "type": "string"
         }
@@ -29,7 +42,8 @@
       "required": [
         "branch",
         "path",
-        "action"
+        "action",
+        "phases"
       ],
       "type": "object"
     },

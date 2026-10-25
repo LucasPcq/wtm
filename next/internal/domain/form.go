@@ -170,6 +170,28 @@ func (f TextListField) Answer() []string { return f.Entries }
 // Answer is true or false, as strconv spells it.
 func (f ConfirmField) Answer() []string { return []string{strconv.FormatBool(f.Value)} }
 
+// InSection is field shown in the section of the form whose key is key.
+func InSection(field Field, key string) Field {
+	switch f := field.(type) {
+	case SelectField:
+		f.Section = key
+		return f
+	case MultiSelectField:
+		f.Section = key
+		return f
+	case TextField:
+		f.Section = key
+		return f
+	case TextListField:
+		f.Section = key
+		return f
+	case ConfirmField:
+		f.Section = key
+		return f
+	}
+	return field
+}
+
 func (SelectField) field()      {}
 func (MultiSelectField) field() {}
 func (TextField) field()        {}

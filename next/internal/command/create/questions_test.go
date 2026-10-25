@@ -414,3 +414,18 @@ func TestTheConfigDefaultIsTheFirstEnvOptionNamingTheConfiguredStrategy(t *testi
 	assert.Equal(t, domain.Option{Value: "config", Label: "Use config default (main)", Short: "config default"}, field.Options[0])
 	assert.Equal(t, []string{"config", "example", "main", "parent"}, valuesOf(field.Options))
 }
+
+func TestTheFormGroupsItsFieldsInTheBranchThenTheEnvironment(t *testing.T) {
+	form := create.Questions{}.Form()
+
+	assert.Equal(t, []domain.Section{{Key: "branch", Title: "Branch"}, {Key: "environment", Title: "Environment"}}, form.Sections)
+	sectionOf := map[string]string{}
+	for _, field := range form.Fields {
+		sectionOf[field.Spec().Path] = field.Spec().Section
+	}
+	assert.Equal(t, map[string]string{
+		"branches": "branch", "from": "branch", domain.PathFastForward: "branch",
+		domain.PathEnvFrom: "environment", domain.PathIsolation: "environment",
+		"if_not_exists": "",
+	}, sectionOf, "a field set by its flag only is in no section")
+}

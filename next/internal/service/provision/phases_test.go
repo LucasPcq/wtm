@@ -399,3 +399,29 @@ func TestAHookReadsTheRunEnvironmentOnlyWhenTheRunReachesHooks(t *testing.T) {
 	require.Len(t, composedReport.lines(), 1)
 	assert.True(t, strings.HasPrefix(composedReport.lines()[0], "offset=10 project=main-feat-x"), composedReport.lines())
 }
+
+func TestThePhasesForeseenAreThoseRunReports(t *testing.T) {
+	cases := map[string]func(provision.Params) provision.Params{
+		"bare":        func(p provision.Params) provision.Params { return p },
+		"port_linked": portLinked,
+		"hooked":      func(p provision.Params) provision.Params { return hooked(portLinked(p), "true") },
+		"composed":    composed,
+	}
+	for name, shape := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := onDisk(t)
+			report := &recorder{}
+			params := shape(w.params(report))
+			foreseen := provision.Phases(params)
+
+			outcome := w.service.Run(t.Context(), params)
+
+			require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
+			var reported []domain.Phase
+			for _, phase := range report.phases() {
+				reported = append(reported, domain.Phase(phase))
+			}
+			assert.Equal(t, foreseen, reported)
+		})
+	}
+}

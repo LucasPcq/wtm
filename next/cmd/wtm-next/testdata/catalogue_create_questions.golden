@@ -6,6 +6,7 @@
       "flag": "\u003cbranches\u003e",
       "label": "Branches",
       "help": "The branches to create a worktree for; one that already exists is checked out as it is",
+      "section": "branch",
       "entries": [
         "feat/x"
       ],
@@ -24,6 +25,7 @@
       "label": "Source branch",
       "help": "The branch a new branch starts from, or the parent recorded for wtm sync of one that already exists",
       "origin": "config",
+      "section": "branch",
       "value": "main",
       "options": [
         {
@@ -43,6 +45,7 @@
       "label": "Env strategy",
       "help": "How the .env files of the new worktrees are provisioned: config (config.toml's strategy), example (from its template), main (copied from the main checkout) or parent (from the source's worktree); defaults to config.toml's strategy",
       "origin": "default",
+      "section": "environment",
       "value": "config",
       "options": [
         {
@@ -75,6 +78,7 @@
       "help": "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated",
       "origin": "default",
       "skip": "run.toml declares nothing a worktree isolates",
+      "section": "environment",
       "value": "isolated",
       "options": [
         {
@@ -97,6 +101,7 @@
       "label": "Source update",
       "help": "Fast-forward to origin first the branch a new worktree starts from, or the branch itself when it already exists locally, when it is behind; one that has diverged or holds uncommitted changes starts as it is",
       "skip": "nothing to fast-forward: the source is not behind origin",
+      "section": "branch",
       "value": false,
       "yes": {
         "value": "true",
@@ -134,6 +139,15 @@
       "remember": false
     }
   ],
-  "sections": [],
+  "sections": [
+    {
+      "key": "branch",
+      "title": "Branch"
+    },
+    {
+      "key": "environment",
+      "title": "Environment"
+    }
+  ],
   "problems": []
 }

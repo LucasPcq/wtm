@@ -176,3 +176,9 @@ func TestAFoldStopsAtTheFirstAnswerRefused(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, answers{"from": {"main"}}, req)
 }
+
+func TestAFieldOfEachKindIsPutInASection(t *testing.T) {
+	for _, field := range []Field{SelectField{}, MultiSelectField{}, TextField{}, TextListField{}, ConfirmField{}} {
+		assert.Equal(t, "env", InSection(field, "env").Spec().Section, "%T", field)
+	}
+}

@@ -139,9 +139,8 @@ func (s Service) Run(ctx context.Context, params Params) Outcome {
 		return Outcome{Status: domain.StatusFailed, Err: &domain.Error{Kind: domain.KindInternal, Code: "provision.unasked", Message: "the questions of a new worktree were not asked: Answers come from Questions.Answers", Params: domain.Params{"branch": params.Worktree.Branch}}}
 	}
 
-	params.Worktree.Answers.isolation = params.Worktree.Answers.isolation.Effective()
-	p := &provisioning{Params: params, Service: s, hookLog: env.HookLogPath(env.HookLogPathParams{StateDir: s.StateDir, Branch: params.Worktree.Branch})}
-	p.kept, p.ignored = env.Targets(params.Project.Run, params.Project.EnvFiles)
+	p := prepared(params)
+	p.Service, p.hookLog = s, env.HookLogPath(env.HookLogPathParams{StateDir: s.StateDir, Branch: params.Worktree.Branch})
 
 	if err := ctx.Err(); err != nil {
 		return p.outcome(Outcome{Status: domain.StatusCancelled, Reason: domain.ReasonInterrupted, Err: interrupted(err, nil)})
@@ -156,6 +155,25 @@ func (s Service) Run(ctx context.Context, params Params) Outcome {
 	outcome := p.complete(ctx, provisioned)
 	p.Report(p.provisionedEvent(outcome))
 	return outcome
+}
+
+// Phases are the phases Run takes the worktree of params through, in the order it reports them: the add's, then
+// those its project needs.
+func Phases(params Params) []domain.Phase {
+	phases := []domain.Phase{domain.PhaseWorktree, domain.PhaseEnv, domain.PhaseMeta}
+	for _, next := range prepared(params).phases(&Provisioned{}) {
+		phases = append(phases, next.name)
+	}
+	return phases
+}
+
+// prepared is the provisioning of params as far as what it runs goes: its isolation settled, and the env targets
+// run.toml keeps.
+func prepared(params Params) *provisioning {
+	params.Worktree.Answers.isolation = params.Worktree.Answers.isolation.Effective()
+	p := &provisioning{Params: params}
+	p.kept, p.ignored = env.Targets(params.Project.Run, params.Project.EnvFiles)
+	return p
 }
 
 // ----------------------------------------------------------------------------

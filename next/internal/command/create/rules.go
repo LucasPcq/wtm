@@ -210,6 +210,12 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning) {
 	}
 
 	answers := f.newWorktree(req).Answers()
+	for i, b := range branches {
+		branches[i].Phases = []domain.Phase{}
+		if b.Action != ActionUnchanged {
+			branches[i].Phases = provision.Phases(provision.ParamsOf(f.Repository, provision.Planned{Branch: b.Branch, Path: b.Path, Placement: b.placement(), From: req.From, Answers: answers}, nil))
+		}
+	}
 	planned := Plan{
 		Branches:    branches,
 		From:        req.From,
@@ -303,12 +309,13 @@ type Plan struct {
 	settled provision.Answers // as resolved, handed to provisioning even where the plan shows none, and remembered
 }
 
-// A BranchPlan is what becomes of one branch: the path of its worktree, how it gets there, and the remote branch it resumes.
+// A BranchPlan is what becomes of one branch: the path of its worktree, how it gets there, the remote branch it resumes, and the phases of its provisioning.
 type BranchPlan struct {
-	Branch   string `json:"branch"`
-	Path     string `json:"path"`
-	Action   Action `json:"action"`
-	Upstream string `json:"upstream,omitempty"`
+	Branch   string         `json:"branch"`
+	Path     string         `json:"path"`
+	Action   Action         `json:"action"`
+	Upstream string         `json:"upstream,omitempty"`
+	Phases   []domain.Phase `json:"phases"` // the phases its provisioning runs, in order; none for a worktree already open
 }
 
 // Locks are the locks the plan needs: the repository shared, and each worktree it makes or fast-forwards exclusive.

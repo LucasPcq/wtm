@@ -33,7 +33,13 @@
       {
         "branch": "feat/x",
         "path": "/repo/.trees/feat-x",
-        "action": "create"
+        "action": "create",
+        "phases": [
+          "worktree",
+          "env",
+          "meta",
+          "on_create"
+        ]
       }
     ],
     "from": "main",

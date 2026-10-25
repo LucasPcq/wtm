@@ -8,7 +8,12 @@
       {
         "branch": "feat/x",
         "path": "/repo/.trees/feat-x",
-        "action": "create"
+        "action": "create",
+        "phases": [
+          "worktree",
+          "env",
+          "meta"
+        ]
       }
     ],
     "from": "main",
@@ -50,7 +55,7 @@
       }
     ]
   },
-  "fingerprint": "86a497268d3552e277ba9079",
+  "fingerprint": "7a5091e20f5a727bd582bd6c",
   "follow_ups": [],
   "warnings": []
 }

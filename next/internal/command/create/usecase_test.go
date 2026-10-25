@@ -76,7 +76,7 @@ func TestOneBranchThatFailsLeavesTheOthersCreated(t *testing.T) {
 func TestABranchThatFailsBeforeItsWorktreeHasNoDetail(t *testing.T) {
 	w := newWorld(t, seed{})
 	planned := decided(t, w.facts(t, branchName), create.Request{Branches: []string{branchName}, From: "main", Given: provision.Given{EnvFrom: project.EnvMain}})
-	require.Equal(t, []create.BranchPlan{{Branch: branchName, Path: w.path(branchName), Action: create.ActionCreate}}, planned.Branches)
+	require.Equal(t, []create.BranchPlan{{Branch: branchName, Path: w.path(branchName), Action: create.ActionCreate, Phases: []domain.Phase{domain.PhaseWorktree, domain.PhaseEnv, domain.PhaseMeta}}}, planned.Branches)
 	writeFile(t, w.path(branchName), "a file where the worktree goes")
 
 	result := w.usecase.Apply(t.Context(), planned, (&operationtest.Recorder{}).Add)
@@ -341,7 +341,7 @@ func TestADryRunPlansDespiteAHeldLockAndWritesNothing(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "op-1", outcome.Op)
-	assert.Equal(t, []create.BranchPlan{{Branch: branchName, Path: w.path(branchName), Action: create.ActionCreate}}, outcome.Plan.Branches)
+	assert.Equal(t, []create.BranchPlan{{Branch: branchName, Path: w.path(branchName), Action: create.ActionCreate, Phases: []domain.Phase{domain.PhaseWorktree, domain.PhaseEnv, domain.PhaseMeta}}}, outcome.Plan.Branches)
 	assert.Regexp(t, regexp.MustCompile(`^[0-9a-f]{24}$`), outcome.Fingerprint)
 	assert.Nil(t, outcome.Result)
 	assert.NoDirExists(t, w.path(branchName))
