@@ -1,11 +1,11 @@
 import { QueryClient } from '@tanstack/react-query'
-import { http, HttpResponse } from 'msw'
-import { expect, test, vi } from 'vitest'
+import { HttpResponse, http } from 'msw'
+import { beforeEach, expect, test } from 'vitest'
+import { HttpError } from '@/api/fetch'
+import { connectionOf, eventsQuery, reconnectEvery } from '@/api/queries/events'
 import { server } from '@/test/server'
-import { connectionOf, eventsQuery, reconnectEvery } from './events'
-import { HttpError } from '../fetch'
 
-vi.mock('../token', () => ({ token: () => 't' }))
+beforeEach(() => localStorage.setItem('wtm.token', 't'))
 
 function serve(status: number, body = '') {
   server.use(

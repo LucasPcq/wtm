@@ -91,7 +91,7 @@ git diff --quiet "$fork" -- next/web && [ -z "$(git ls-files --others --exclude-
   { make lint-ui && (cd next/web && npm test); }
 ```
 
-`make lint-ui` is the front's gate (types, oxlint with the `web-front` skill's rules, prettier); `npm test` runs Vitest. A failure of either is a blocker. Then `make ui` and `git status --porcelain next/internal/web/dist` must be clean: a `dist/` that differs from what `make ui` writes fails the CI `ui` gate.
+`make lint-ui` is the front's gate (types, then Biome: format, imports and the `web-front` skill's rules); `npm test` runs Vitest, the lint's fixture guard included. A failure of either is a blocker. Then `make ui` and `git status --porcelain next/internal/web/dist` must be clean: a `dist/` that differs from what `make ui` writes fails the CI `ui` gate.
 
 ### Step 5 — Duplication (informative)
 

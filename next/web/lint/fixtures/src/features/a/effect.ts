@@ -1,5 +1,3 @@
-// expect: wtm(effects)
+// expect: style/noRestrictedImports
 import { useEffect } from 'react'
-export function useRun() {
-  useEffect(() => {}, [])
-}
+export function useRun() { useEffect(() => {}, []) }

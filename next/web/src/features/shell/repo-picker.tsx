@@ -8,13 +8,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
 import { repoName } from '@/lib/repo'
 
-// RepoPicker is the sidebar's switcher of repositories, on shadcn's pattern: a large menu button of the sidebar
-// opening a searchable list as wide as itself.
-export function RepoPicker(props: { current: string | undefined }) {
+export function RepoPicker({ current: id }: { current: string | undefined }) {
   const repos = useQuery(reposQuery)
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
-  const current = repos.data?.find((repo) => repo.id === props.current)
+  const current = repos.data?.find((repo) => repo.id === id)
 
   return (
     <SidebarMenu>
@@ -44,7 +42,7 @@ export function RepoPicker(props: { current: string | undefined }) {
                     <CommandItem
                       key={repo.id}
                       value={repo.root}
-                      data-checked={repo.id === props.current}
+                      data-checked={repo.id === id}
                       onSelect={() => {
                         setOpen(false)
                         void navigate({ to: '/r/$repo/worktrees', params: { repo: repo.id } })

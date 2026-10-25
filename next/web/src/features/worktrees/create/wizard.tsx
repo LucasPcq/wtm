@@ -1,57 +1,63 @@
-import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
-import { dryRunQuery } from '@/api/queries/commands'
-import type { CreatePlan, DomainAnswered, DomainForm } from '@/api/types.gen'
-import { CommandFields } from '@/components/command-form/command-fields'
+import { useReducer } from 'react'
+import type { DomainAnswered, DomainForm } from '@/api/types.gen'
 import { keyOf, problemsByKey } from '@/components/command-form/answers'
+import { CommandFields } from '@/components/command-form/command-fields'
 import { useCommandForm } from '@/components/command-form/use-command-form'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import type { Start } from '../hooks/use-create-run'
-import { Confirm } from './confirm'
-import { Stepper, type StepState } from './stepper'
-import { stepsOf } from './steps'
-import { createWords, labelOf, skipWords } from './words'
+import { ApplyButton } from '@/features/worktrees/create/apply-button'
+import { Confirm } from '@/features/worktrees/create/confirm'
+import { NotAsked } from '@/features/worktrees/create/not-asked'
+import { Stepper, type StepState } from '@/features/worktrees/create/stepper'
+import { nextAsked, stepsOf } from '@/features/worktrees/create/steps'
+import { initialWizard, wizardReducer } from '@/features/worktrees/create/wizard-state'
+import { createWords } from '@/features/worktrees/create/words'
+import type { Start } from '@/features/worktrees/hooks/use-create-run'
 
-const remembered = (form: DomainForm) =>
-  form.fields.filter((field) => 'remember' in field && field.remember).map((field) => field.path)
-
-// Wizard asks create's questions a step at a time, as the core groups them and asks them again after each answer,
-// then shows what the dry run would do, and starts it held to its fingerprint.
-export function Wizard(props: {
+export function Wizard({
+  repo,
+  form: initial,
+  onStart,
+  onCancel,
+}: {
   repo: string
   form: DomainForm
   onStart: (start: Start) => void
   onCancel: () => void
 }) {
-  const { form, asked, answers, check, problems } = useCommandForm({
-    repo: props.repo,
-    command: 'create',
-    form: props.form,
-  })
-  const [at, setAt] = useState(0)
-  const [remember, setRemember] = useState(() => remembered(props.form))
+  const { form, asked, answers, check, problems } = useCommandForm({ repo, command: 'create', form: initial })
+  const [{ at, remember }, dispatch] = useReducer(wizardReducer, initial, initialWizard)
+
   const steps = stepsOf(asked)
+  const step = steps[at]
   const confirming = at >= steps.length
   const request: DomainAnswered[] = [
     ...answers(),
     ...(remember.length > 0 ? [{ path: 'remember', values: remember }] : []),
   ]
+  const previous = Math.max(
+    steps.findLastIndex((candidate, i) => i < at && candidate.asked.length > 0),
+    0,
+  )
 
-  const step = steps[at]
-  // only a reason that tells the person something; one that holds on the command line alone is not said
-  const notAsked = (step?.skipped ?? []).flatMap((field) => {
-    const reason = field.skip && skipWords[field.skip]
-    return reason ? [{ path: field.path, reason }] : []
-  })
-  // a step the core asks nothing of is passed over, as not asked
-  const next = (from: number) => {
-    const ahead = steps.findIndex((candidate, i) => i > from && candidate.asked.length > 0)
-    return ahead < 0 ? steps.length : ahead
+  const state = (i: number): StepState => {
+    if (i === at) return 'now'
+    if (i > at) return 'todo'
+    return steps[i]?.asked.length === 0 ? 'skipped' : 'done'
   }
-  const previous = steps.findLastIndex((candidate, i) => i < at && candidate.asked.length > 0)
-  const state = (i: number): StepState =>
-    i === at ? 'now' : steps[i]?.asked.length === 0 && i < at ? 'skipped' : i < at ? 'done' : 'todo'
+
+  // Next asks the core with the answers as typed, not as last checked, and goes by the steps of that answer: a step
+  // with problems shows them rather than a Next that cannot be pressed
+  const next = async () => {
+    const answered = await check()
+    const fresh = stepsOf(answered)
+    const filed = problemsByKey(answered.fields, answered.problems)
+    const here = fresh[at]
+    if (!here?.asked.some((field) => filed[keyOf(field.path)]))
+      return dispatch({ type: 'go', to: nextAsked(fresh, at) })
+
+    for (const field of here.asked) form.setFieldMeta(keyOf(field.path), (meta) => ({ ...meta, isTouched: true }))
+  }
 
   return (
     <>
@@ -59,14 +65,16 @@ export function Wizard(props: {
         <DialogTitle>Create worktree</DialogTitle>
         <DialogDescription>Each branch gets its own folder, .env and ports.</DialogDescription>
       </DialogHeader>
+
       <div className="border-b pb-4">
         <Stepper
           steps={[
-            ...steps.map((s, i) => ({ title: s.title, state: state(i) })),
+            ...steps.map(({ title }, i) => ({ title, state: state(i) })),
             { title: 'Confirm', state: confirming ? 'now' : 'todo' },
           ]}
         />
       </div>
+
       {step && (
         <div className="flex flex-col gap-6">
           <CommandFields
@@ -74,77 +82,35 @@ export function Wizard(props: {
             fields={step.asked}
             words={createWords}
             problems={problems}
-            remember={{
-              paths: remember,
-              toggle: (path) =>
-                setRemember((paths) => (paths.includes(path) ? paths.filter((p) => p !== path) : [...paths, path])),
-            }}
+            remember={{ paths: remember, toggle: (path) => dispatch({ type: 'remember', path }) }}
           />
           {problems[''] && <p className="text-sm text-destructive">{problems['']}</p>}
-          {notAsked.length > 0 && (
-            <ul className="border-t pt-3 text-xs text-muted-foreground">
-              {notAsked.map(({ path, reason }) => (
-                <li key={path}>
-                  Not asked: {labelOf(path)}, {reason}.
-                </li>
-              ))}
-            </ul>
-          )}
+          <NotAsked fields={step.skipped} />
         </div>
       )}
-      {confirming && <Confirm repo={props.repo} answers={request} />}
+
+      {confirming && <Confirm repo={repo} answers={request} />}
+
       <DialogFooter className="items-center">
-        <Button variant="ghost" className="mr-auto" onClick={props.onCancel}>
+        <Button variant="ghost" className="mr-auto" onClick={onCancel}>
           Cancel
         </Button>
         {at > 0 && (
-          <Button variant="outline" onClick={() => setAt(previous < 0 ? 0 : previous)}>
+          <Button variant="outline" onClick={() => dispatch({ type: 'go', to: previous })}>
             Back
           </Button>
         )}
         {!confirming && (
           <form.Subscribe selector={(s) => s.isValidating}>
             {(validating) => (
-              <Button
-                disabled={validating}
-                onClick={async () => {
-                  // Next asks the core with the answers as typed, not as last checked: a step with problems shows
-                  // them, rather than a Next that cannot be pressed
-                  const answered = await check()
-                  const filed = problemsByKey(answered.fields, answered.problems)
-                  const here = stepsOf(answered)[at]
-                  if (!here?.asked.some((field) => filed[keyOf(field.path)])) return setAt(next(at))
-                  for (const field of here.asked)
-                    form.setFieldMeta(keyOf(field.path), (meta) => ({ ...meta, isTouched: true }))
-                }}
-              >
+              <Button disabled={validating} onClick={next}>
                 Next
               </Button>
             )}
           </form.Subscribe>
         )}
-        {confirming && <ApplyButton repo={props.repo} answers={request} onStart={props.onStart} />}
+        {confirming && <ApplyButton repo={repo} answers={request} onStart={onStart} />}
       </DialogFooter>
     </>
-  )
-}
-
-// applyLabel names the apply by the worktrees it opens, as the command line's wizard does.
-function applyLabel(plan: CreatePlan | undefined): string {
-  if (!plan || plan.creates === 0) return 'Apply'
-  return plan.creates === 1 ? 'Create worktree' : `Create ${plan.creates} worktrees`
-}
-
-function ApplyButton(props: { repo: string; answers: DomainAnswered[]; onStart: (start: Start) => void }) {
-  const dry = useQuery(dryRunQuery(props.repo, 'create', props.answers))
-  const plan = dry.data?.plan
-  const fingerprint = dry.data?.fingerprint
-  return (
-    <Button
-      disabled={!plan || !fingerprint}
-      onClick={() => plan && fingerprint && props.onStart({ answers: props.answers, fingerprint, plan })}
-    >
-      {applyLabel(plan)}
-    </Button>
   )
 }

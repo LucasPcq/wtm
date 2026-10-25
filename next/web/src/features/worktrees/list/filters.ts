@@ -1,4 +1,4 @@
-import type { Row } from './rows'
+import type { Row } from '@/features/worktrees/list/rows'
 
 export const filters = ['all', 'running', 'needs_sync', 'prunable'] as const
 export type Filter = (typeof filters)[number]
@@ -10,7 +10,6 @@ export const filterLabel: Record<Filter, string> = {
   prunable: 'Prunable',
 }
 
-// matches reports whether row passes filter; prunable is known only once GitHub was asked.
 export function matches(row: Row, filter: Filter): boolean {
   switch (filter) {
     case 'all':
@@ -24,12 +23,8 @@ export function matches(row: Row, filter: Filter): boolean {
   }
 }
 
-// searched reports whether the branch of row, or its path for one on no branch, holds query, whatever its case.
-export function searched(row: Row, query: string): boolean {
-  return row.subject.toLowerCase().includes(query.trim().toLowerCase())
-}
+export const searched = (subject: string, query: string) => subject.toLowerCase().includes(query.trim().toLowerCase())
 
-// countsOf counts the rows each filter keeps; prunable is undefined while GitHub has not been asked.
 export function countsOf(rows: Row[], githubAsked: boolean): Record<Filter, number | undefined> {
   const count = (filter: Filter) => rows.filter((row) => matches(row, filter)).length
   return {

@@ -1,0 +1,29 @@
+language js
+
+or {
+  JsImport(),
+  JsExport()
+} as $item where {
+  or {
+    and {
+      $filename <: r".*/src/([^/]+)/.*"($dir),
+      not $dir <: or {
+        "api",
+        "lib",
+        "routes",
+        "components",
+        "features",
+        "test",
+        "hooks"
+      }
+    },
+    and {
+      $filename <: r".*/src/([^/]+)"($file),
+      not $file <: or {
+        "main.tsx",
+        "routeTree.gen.ts"
+      }
+    }
+  },
+  register_diagnostic(span=$item, message="A file of src/ lives in a known layer, or is the entry (web-front skill, unknown-folder).")
+}

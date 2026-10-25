@@ -1,111 +1,63 @@
 import { expect, test } from 'vitest'
-import type { Read } from '@/api/queries/commands'
-import type { ListDetail } from '@/api/types.gen'
-import { sentence } from '../shared/sentence'
-import { shownColumns, toggled } from './columns'
-import { countsOf, matches, searched } from './filters'
-import { rowsOf, type Row } from './rows'
-import { changedLabel } from './state'
+import { countsOf, matches, searched } from '@/features/worktrees/list/filters'
+import { type Row, rowsOf } from '@/features/worktrees/list/rows'
+import { sentence } from '@/features/worktrees/shared/sentence'
+import { listDetail, read } from '@/test/fixtures'
 
-const detail = (over: Partial<ListDetail> = {}): ListDetail => ({
-  actions: [],
-  active: false,
-  ahead: 0,
-  behind: 0,
-  branch: 'feat/a',
-  changes: { changed: 0, untracked: 0 },
-  commits_ahead: 0,
-  condition: 'clean',
-  created_at: null,
-  dirty: false,
-  last_commit_at: null,
-  locked: false,
-  main: false,
-  merged: false,
-  missing: false,
-  needs_sync: false,
-  origin: null,
-  parent: 'main',
-  path: '/repo/.trees/feat-a',
-  pr: null,
-  rebasing: false,
-  services: [],
-  urls: [],
-  ...over,
-})
-
-const read = (items: [string, ListDetail][]): Read<'list'> => ({
-  v: 2,
-  ok: true,
-  command: 'list',
-  follow_ups: [],
-  warnings: [],
-  items: items.map(([subject, d]) => ({ subject, status: 'done', detail: d })),
-})
+const rows = (live: Parameters<typeof rowsOf>[0]['live'], github?: Parameters<typeof rowsOf>[0]['github']) =>
+  rowsOf({ live, github, readAt: 0, underWay: {} })
 
 const row = (over: Partial<Row> = {}): Row => ({
   subject: 'feat/a',
-  detail: detail(),
+  status: 'done',
+  detail: listDetail('feat/a'),
   error: undefined,
-  warnings: [],
   pr: undefined,
   merged: undefined,
   condition: 'clean',
   actions: [],
+  underWay: undefined,
+  readAt: 0,
   ...over,
 })
 
 test('a row takes its pull request and whether it merged from the last GitHub read, by subject', () => {
   const pr = { number: 3, url: 'https://github.com/acme/acme/pull/3', state: 'merged' as const }
-  const live = read([
-    ['feat/a', detail()],
-    ['feat/new', detail({ branch: 'feat/new' })],
-  ])
-  const github = read([['feat/a', detail({ pr, merged: true })]])
+  const live = read('list', [listDetail('feat/a'), listDetail('feat/new')])
+  const github = read('list', [listDetail('feat/a', { pr, merged: true })])
 
-  const [a, created] = rowsOf(live, github)
+  const [a, created] = rows(live, github)
 
   expect(a?.pr).toEqual(pr)
   expect(a?.merged).toBe(true)
   expect(created?.pr, 'a worktree created since GitHub was asked has no pull request known yet').toBeUndefined()
-  expect(rowsOf(live, undefined)[0]?.merged).toBeUndefined()
+  expect(rows(live)[0]?.merged).toBeUndefined()
 })
 
 test('each filter keeps the rows the core says belong to it', () => {
-  const running = row({ detail: detail({ services: ['web'] }) })
-  const behind = row({ detail: detail({ needs_sync: true }) })
+  const running = row({ detail: listDetail('feat/a', { services: ['web'] }) })
+  const behind = row({ detail: listDetail('feat/a', { needs_sync: true }) })
   const merged = row({ merged: true })
-  const rows = [running, behind, merged, row()]
+  const all = [running, behind, merged, row()]
 
-  expect(rows.filter((r) => matches(r, 'running'))).toEqual([running])
-  expect(rows.filter((r) => matches(r, 'needs_sync'))).toEqual([behind])
-  expect(rows.filter((r) => matches(r, 'prunable'))).toEqual([merged])
-  expect(countsOf(rows, true)).toEqual({ all: 4, running: 1, needs_sync: 1, prunable: 1 })
-  expect(countsOf(rows, false).prunable, 'not known before GitHub is asked').toBeUndefined()
+  expect(all.filter((r) => matches(r, 'running'))).toEqual([running])
+  expect(all.filter((r) => matches(r, 'needs_sync'))).toEqual([behind])
+  expect(all.filter((r) => matches(r, 'prunable'))).toEqual([merged])
+  expect(countsOf(all, true)).toEqual({ all: 4, running: 1, needs_sync: 1, prunable: 1 })
+  expect(countsOf(all, false).prunable, 'not known before GitHub is asked').toBeUndefined()
 })
 
 test('the search finds a branch by any part of it, whatever its case', () => {
-  expect(searched(row({ subject: 'feat/Billing-ui' }), ' billing ')).toBe(true)
-  expect(searched(row({ subject: 'fix/login' }), 'billing')).toBe(false)
-})
-
-test('a changed worktree says how many files it changed, its untracked ones included', () => {
-  expect(changedLabel(detail({ changes: { changed: 2, untracked: 1 } }))).toBe('3 changed')
+  expect(searched('feat/Billing-ui', ' billing ')).toBe(true)
+  expect(searched('fix/login', 'billing')).toBe(false)
 })
 
 test('a row is merged when GitHub says so over a changed worktree, as the one rule over two reads says', () => {
-  const live = read([['feat/a', detail({ condition: 'changed', dirty: true })]])
-  const github = read([['feat/a', detail({ condition: 'merged', merged: true })]])
+  const live = read('list', [listDetail('feat/a', { condition: 'changed', dirty: true })])
+  const github = read('list', [listDetail('feat/a', { condition: 'merged', merged: true })])
 
-  expect(rowsOf(live, github)[0]?.condition).toBe('merged')
-  expect(rowsOf(live, undefined)[0]?.condition).toBe('changed')
-})
-
-test('the columns shown are those stored, in the table order, else the default', () => {
-  expect(shownColumns(['path', 'state', 'nope'])).toEqual(['state', 'path'])
-  expect(shownColumns(null)).toEqual(['state', 'running', 'active'])
-  expect(toggled(['state', 'active'], 'running')).toEqual(['state', 'running', 'active'])
-  expect(toggled(['state', 'active'], 'state')).toEqual(['active'])
+  expect(rows(live, github)[0]?.condition).toBe('merged')
+  expect(rows(live)[0]?.condition).toBe('changed')
 })
 
 test('a message of the core reads as a sentence, a name it opens on kept as spelled', () => {

@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Activity, FileKey, GitBranch, Layers, Settings, SlidersHorizontal, type LucideIcon } from 'lucide-react'
+import { Activity, FileKey, GitBranch, Layers, type LucideIcon, Settings, SlidersHorizontal } from 'lucide-react'
 import { readQuery } from '@/api/queries/commands'
+import { VersionedLogo } from '@/components/logo'
 import {
   Sidebar,
   SidebarContent,
@@ -14,7 +15,6 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { ConnectionFooter } from './connection-footer'
-import { VersionedLogo } from '@/components/logo'
 import { RepoPicker } from './repo-picker'
 
 // The screens that are not built yet show where they will be, muted and out of reach.
@@ -31,23 +31,23 @@ const soon: { group: string; items: { label: string; icon: LucideIcon }[] }[] = 
   { group: 'Project', items: [{ label: 'Settings', icon: Settings }] },
 ]
 
-export function AppSidebar(props: { repo: string | undefined }) {
+export function AppSidebar({ repo }: { repo: string | undefined }) {
   return (
     <Sidebar>
       <SidebarHeader className="gap-6 pt-5">
         <div className="px-2">
           <VersionedLogo />
         </div>
-        <RepoPicker current={props.repo} />
+        <RepoPicker current={repo} />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Worktrees</SidebarGroupLabel>
           <SidebarMenu>
             <SidebarMenuItem>
-              {props.repo ? (
+              {repo ? (
                 <SidebarMenuButton asChild isActive>
-                  <Link to="/r/$repo/worktrees" params={{ repo: props.repo }}>
+                  <Link to="/r/$repo/worktrees" params={{ repo: repo }}>
                     <GitBranch />
                     All worktrees
                   </Link>
@@ -58,7 +58,7 @@ export function AppSidebar(props: { repo: string | undefined }) {
                   All worktrees
                 </SidebarMenuButton>
               )}
-              {props.repo && <WorktreeCount repo={props.repo} />}
+              {repo && <WorktreeCount repo={repo} />}
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
@@ -79,12 +79,23 @@ export function AppSidebar(props: { repo: string | undefined }) {
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <ConnectionFooter repo={props.repo} />
+      <ConnectionFooter repo={repo} />
     </Sidebar>
   )
 }
 
+// WorktreeCount reads nothing of its own: it counts what the view on screen read last, the list or the tree, so that
+// the tree is not paid with a list read on every event
 function WorktreeCount({ repo }: { repo: string }) {
-  const list = useQuery(readQuery(repo, 'list'))
-  return list.data?.items && <SidebarMenuBadge>{list.data.items.length}</SidebarMenuBadge>
+  const list = useQuery({ ...readQuery(repo, 'list'), enabled: false })
+  const tree = useQuery({ ...readQuery(repo, 'tree'), enabled: false })
+
+  const count = () => {
+    if (tree.data && tree.dataUpdatedAt > list.dataUpdatedAt)
+      return tree.data.items.filter(({ detail }) => !detail?.virtual).length
+    return list.data?.items.length
+  }
+
+  const shown = count()
+  return shown !== undefined && <SidebarMenuBadge>{shown}</SidebarMenuBadge>
 }

@@ -1,9 +1,9 @@
-import { http, HttpResponse } from 'msw'
-import { expect, test, vi } from 'vitest'
+import { HttpResponse, http } from 'msw'
+import { beforeEach, expect, test, vi } from 'vitest'
+import { runStreamed } from '@/api/queries/operations'
 import { server } from '@/test/server'
-import { runStreamed } from './operations'
 
-vi.mock('../token', () => ({ token: () => 't' }))
+beforeEach(() => localStorage.setItem('wtm.token', 't'))
 
 // An answer naming no operation was started as '': its cancel then went nowhere, silently.
 test('an operation the server does not name is refused, since nothing could cancel it', async () => {

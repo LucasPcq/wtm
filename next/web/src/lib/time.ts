@@ -9,7 +9,6 @@ const steps: [Intl.RelativeTimeFormatUnit, number][] = [
   ['minute', 60],
 ]
 
-// ago is how long before now at is, in its largest whole unit: "12 min. ago", "yesterday", "just now".
 export function ago(at: string, now: number): string {
   const seconds = Math.round((now - Date.parse(at)) / 1000)
   for (const [unit, size] of steps) {

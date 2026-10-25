@@ -1,5 +1,3 @@
-// expect: wtm(effects)
+// expect: nursery/noJsRestrictedProperties
 import React from 'react'
-export function useRun() {
-  React.useInsertionEffect(() => {}, [])
-}
+export function useRun() { React.useInsertionEffect(() => {}, []) }

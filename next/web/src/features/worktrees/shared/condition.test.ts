@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import type { DomainFollowUp, WorktreeCondition } from '@/api/types.gen'
-import { overlaid } from './condition'
+import { overlaid } from '@/features/worktrees/shared/condition'
 
 const said = (condition: WorktreeCondition, command: string) => ({
   condition,

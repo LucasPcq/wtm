@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import type { DomainField } from '@/api/types.gen'
-import { answersOf, keyOf, problemsByKey, valuesOf } from './answers'
+import { answersOf, keyOf, problemsByKey, valuesOf } from '@/components/command-form/answers'
 
 const base = { flag: '', help: '', label: '' }
 const branch: DomainField = { ...base, kind: 'text', path: 'branch', value: '' }

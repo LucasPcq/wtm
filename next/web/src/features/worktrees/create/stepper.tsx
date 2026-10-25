@@ -4,8 +4,6 @@ import { cn } from '@/lib/utils'
 
 export type StepState = 'done' | 'now' | 'todo' | 'skipped'
 
-// Stepper is where the dialog stands among its steps: done, the current one, those to come, one the core asks
-// nothing of passed as not asked.
 export function Stepper({ steps }: { steps: { title: string; state: StepState }[] }) {
   return (
     <ol className="flex items-center gap-3" aria-label="Steps">

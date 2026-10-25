@@ -1,14 +1,11 @@
-import type { CreateRequest, DomainField, DomainForm } from '@/api/types.gen'
-
-// The questions of create, as its request names them; remember and ask say how the others are answered, not what.
-type Question = Exclude<CreateRequest[number]['path'], 'remember' | 'ask'>
+import type { DomainField, DomainForm } from '@/api/types.gen'
+import { isQuestion, type Question } from '@/features/worktrees/create/words'
 
 const steps = ['branch', 'environment'] as const
 type StepKey = (typeof steps)[number]
 
 const stepTitle: Record<StepKey, string> = { branch: 'Branch', environment: 'Environment' }
 
-// The step each question of create is asked in: a question create adds fails the build until it has one.
 const stepOf: Record<Question, StepKey> = {
   branches: 'branch',
   from: 'branch',
@@ -18,22 +15,20 @@ const stepOf: Record<Question, StepKey> = {
   if_not_exists: 'environment',
 }
 
-// A Step is one screen of the create dialog: its fields, those it asks and those the core does not ask, with why.
-export type Step = { key: StepKey; title: string; fields: DomainField[]; asked: DomainField[]; skipped: DomainField[] }
+export type Step = { title: string; asked: DomainField[]; skipped: DomainField[] }
 
-const known = (path: string): path is Question => path in stepOf
-
-// stepsOf is create's form as the dialog's steps, in their order; a field the build did not know of goes with the
-// last, never dropped.
 export function stepsOf(form: DomainForm): Step[] {
   return steps.map((key) => {
-    const fields = form.fields.filter((field) => (known(field.path) ? stepOf[field.path] : steps.at(-1)) === key)
+    const fields = form.fields.filter((field) => (isQuestion(field.path) ? stepOf[field.path] : steps.at(-1)) === key)
     return {
-      key,
       title: stepTitle[key],
-      fields,
       asked: fields.filter((field) => !field.skip),
       skipped: fields.filter((field) => field.skip),
     }
   })
+}
+
+export function nextAsked(steps: Step[], from: number): number {
+  const ahead = steps.findIndex((step, i) => i > from && step.asked.length > 0)
+  return ahead < 0 ? steps.length : ahead
 }

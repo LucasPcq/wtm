@@ -41,15 +41,14 @@ export function Logo() {
   )
 }
 
-// VersionedLogo carries the version of the binary in its tooltip: chrome nobody needs at a glance.
 export function VersionedLogo() {
   const version = useQuery(versionQuery)
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span tabIndex={0} className="w-fit rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+        <button type="button" className="w-fit rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
           <Logo />
-        </span>
+        </button>
       </TooltipTrigger>
       <TooltipContent side="right">wtm {version.data?.version ?? '…'}</TooltipContent>
     </Tooltip>

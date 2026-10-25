@@ -1,133 +1,51 @@
-import { http, HttpResponse } from 'msw'
+import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
-import type {
-  DomainAnswered,
-  DomainEnvelope,
-  DomainField,
-  DomainFollowUp,
-  ListDetail,
-  StatusDetail,
-  TreeDetail,
-  WebCall,
-} from '@/api/types.gen'
+import type { DomainAnswered, DomainField, DomainFollowUp, ListDetail, WebCall } from '@/api/types.gen'
+import { envelope, followUp, listDetail, statusDetail, treeDetail } from './fixtures'
 
 // The server the component tests talk to: the API of `wtm-next ui` over one repository, acme, with a stack (feat/billing,
 // feat/billing-ui behind it) and a worktree with a change (fix/login). A test changes what it answers with server.use.
 export const repo = { id: 'r1', root: '/acme', common_dir: '/acme/.git' }
 
-const list = (branch: string, over: Partial<ListDetail> = {}): ListDetail => ({
-  actions: [],
-  active: false,
-  condition: over.dirty ? 'changed' : 'clean',
-  ahead: 0,
-  behind: 0,
-  branch,
-  changes: { changed: 0, untracked: 0 },
-  commits_ahead: 0,
-  created_at: '2026-10-25T11:00:00Z',
-  dirty: false,
-  last_commit_at: '2026-10-25T11:50:00Z',
-  locked: false,
-  main: false,
-  merged: false,
-  missing: false,
-  needs_sync: false,
-  origin: null,
-  parent: 'main',
-  path: `/acme.trees/${branch.replace('/', '-')}`,
-  pr: null,
-  rebasing: false,
-  services: [],
-  urls: [],
-  ...over,
-})
-
 export const worktrees: ListDetail[] = [
-  list('main', { main: true, parent: '', ahead: null, behind: null, path: '/acme' }),
-  list('feat/billing', { ahead: 1 }),
-  list('feat/billing-ui', { parent: 'feat/billing', behind: 1, needs_sync: true }),
-  list('fix/login', { dirty: true, changes: { changed: 0, untracked: 1 } }),
+  listDetail('main', { main: true, parent: '', ahead: null, behind: null, path: '/acme' }),
+  listDetail('feat/billing', { ahead: 1 }),
+  listDetail('feat/billing-ui', { parent: 'feat/billing', behind: 1, needs_sync: true }),
+  listDetail('fix/login', { dirty: true, changes: { changed: 0, untracked: 1 } }),
 ]
 
-const sync = (branch: string): DomainFollowUp => ({
-  command: 'sync',
-  answers: [{ path: 'worktree', values: [branch] }],
-  code: 'status.behind',
-  message: 'sync it onto feat/billing',
-})
+const sync = (branch: string) =>
+  followUp('sync', branch, { code: 'status.behind', message: 'sync it onto feat/billing' })
 
-// status is a worktree's status; feat/billing has an open pull request, which GitHub tells only when asked (with_prs)
-const status = (branch: string, withPRs = false): StatusDetail => ({
-  base: { name: 'main', ahead: 0, behind: 0 },
-  branch,
-  changes: { deletions: 0, files: [], insertions: 0, modified: 0, staged: 0, untracked: 0 },
-  children: [],
-  commits: [],
-  created_at: '2026-10-25T11:00:00Z',
-  env: { declared: 0, files: [] },
-  isolation: 'isolated',
-  jobs: [],
-  locked: false,
-  main: false,
-  missing: false,
-  origin: null,
-  parent: 'feat/billing',
-  path: `/acme.trees/${branch.replace('/', '-')}`,
-  problems:
-    branch === 'feat/billing-ui'
-      ? [{ code: 'status.behind', message: 'feat/billing has 1 commit it lacks', fix: sync(branch) }]
+// feat/billing has an open pull request, which GitHub tells only when asked (with_prs)
+const status = (branch: string, withPRs: boolean) =>
+  statusDetail(branch, {
+    parent: 'feat/billing',
+    problems:
+      branch === 'feat/billing-ui'
+        ? [{ code: 'status.behind', message: 'feat/billing has 1 commit it lacks', fix: sync(branch) }]
+        : [],
+    review:
+      withPRs && branch === 'feat/billing'
+        ? { number: 214, url: 'https://github.com/acme/acme/pull/214', state: 'open', title: 'Monthly invoices' }
+        : null,
+  })
+
+const tree = (detail: ListDetail) =>
+  treeDetail(detail.branch, {
+    actions: detail.needs_sync
+      ? [{ ...sync(detail.branch), code: 'tree.sync', message: 'Sync the worktree: its parent has commits it lacks' }]
       : [],
-  rebasing: false,
-  review:
-    withPRs && branch === 'feat/billing'
-      ? {
-          number: 214,
-          url: 'https://github.com/acme/acme/pull/214',
-          state: 'open',
-          title: 'Monthly invoices',
-          fix: null,
-        }
-      : null,
-  run: null,
-  run_toml: 'absent',
-})
-
-const tree = (detail: ListDetail): TreeDetail => ({
-  actions: detail.needs_sync
-    ? [{ ...sync(detail.branch), code: 'tree.sync', message: 'Sync the worktree: its parent has commits it lacks' }]
-    : [],
-  ahead: detail.ahead,
-  behind: detail.behind,
-  branch: detail.branch,
-  condition: detail.condition,
-  children: worktrees.filter((w) => w.parent === detail.branch).map((w) => w.branch),
-  cycle: false,
-  dirty: detail.dirty,
-  locked: false,
-  main: detail.main,
-  missing: false,
-  needs_sync: detail.needs_sync,
-  origin: null,
-  parent: detail.parent || null,
-  path: detail.path,
-  pr: null,
-  rebasing: false,
-  services: [],
-  virtual: false,
-})
-
-const envelope = (command: string, details: object[]): DomainEnvelope => ({
-  v: 2,
-  ok: true,
-  command,
-  follow_ups: [],
-  warnings: [],
-  items: details.map((detail) => ({
-    subject: (detail as { branch: string }).branch,
-    status: 'done',
-    detail: detail as never,
-  })),
-})
+    ahead: detail.ahead,
+    behind: detail.behind,
+    condition: detail.condition,
+    children: worktrees.filter((w) => w.parent === detail.branch).map((w) => w.branch),
+    dirty: detail.dirty,
+    main: detail.main,
+    needs_sync: detail.needs_sync,
+    parent: detail.parent || null,
+    path: detail.path,
+  })
 
 const field = (over: Partial<DomainField> & { kind: DomainField['kind']; path: string }): DomainField =>
   ({ flag: `--${over.path}`, label: over.path, help: '', ...over }) as DomainField
@@ -135,6 +53,7 @@ const field = (over: Partial<DomainField> & { kind: DomainField['kind']; path: s
 // questionsOf is create's form for answers: a branch is required, an existing one is not asked its environment.
 export function questionsOf(answers: DomainAnswered[] = []) {
   const branches = answers.find((a) => a.path === 'branches')?.values ?? []
+  const exists = branches.some((branch) => worktrees.some((w) => w.branch === branch))
   return {
     fields: [
       field({
@@ -170,6 +89,7 @@ export function questionsOf(answers: DomainAnswered[] = []) {
         closed: true,
         remember: false,
         rememberable: true,
+        ...(exists && { skip: 'exists' }),
         options: [
           { value: 'config', label: 'config default (example)' },
           { value: 'main', label: "main — the main checkout's .env" },
@@ -194,33 +114,61 @@ export function questionsOf(answers: DomainAnswered[] = []) {
   }
 }
 
-const line = (event: object) => `data: ${JSON.stringify({ v: 2, ts: '2026-10-25T12:00:00Z', ...event })}\n\n`
+export const line = (event: object) => `data: ${JSON.stringify({ v: 2, ts: '2026-10-25T12:00:00Z', ...event })}\n\n`
 
-// createRun streams a create of branch: its phases, a line of its hook, then its envelope.
-function createRun(branch: string) {
-  const body = [
-    line({ type: 'unit.started', subject: branch }),
-    line({ type: 'phase.started', subject: branch, phase: 'worktree' }),
-    line({ type: 'phase.finished', subject: branch, phase: 'worktree', failed: false }),
-    line({ type: 'phase.started', subject: branch, phase: 'on_create' }),
-    line({ type: 'phase.output', subject: branch, line: 'pnpm install: resolve' }),
-    line({ type: 'phase.finished', subject: branch, phase: 'on_create', failed: false }),
-    line({ type: 'unit.finished', subject: branch, status: 'done' }),
-    `event: envelope\ndata: ${JSON.stringify({
-      ...envelope('create', []),
-      items: [{ subject: branch, status: 'done', detail: { path: `/acme.trees/${branch}` } }],
-      follow_ups: [
-        { command: 'go', answers: [{ path: 'worktree', values: [branch] }], code: 'create.go', message: 'jump in' },
-      ],
-    })}\n\n`,
-  ].join('')
-  return new HttpResponse(body, { headers: { 'Content-Type': 'text/event-stream', 'X-Wtm-Operation': 'op-1' } })
-}
+export const streamed = (body: string, operation: string | null = 'op-1') =>
+  new HttpResponse(body, {
+    headers: { 'Content-Type': 'text/event-stream', ...(operation && { 'X-Wtm-Operation': operation }) },
+  })
 
-const spelled = (followUp: DomainFollowUp) => [
+const createRun = (branch: string) =>
+  streamed(
+    [
+      line({ type: 'unit.started', subject: branch }),
+      line({ type: 'phase.started', subject: branch, phase: 'worktree' }),
+      line({ type: 'phase.finished', subject: branch, phase: 'worktree', failed: false }),
+      line({ type: 'phase.started', subject: branch, phase: 'on_create' }),
+      line({ type: 'phase.output', subject: branch, line: 'pnpm install: resolve' }),
+      line({ type: 'phase.finished', subject: branch, phase: 'on_create', failed: false }),
+      line({ type: 'unit.finished', subject: branch, status: 'done' }),
+      `event: envelope\ndata: ${JSON.stringify({
+        ...envelope('create', []),
+        items: [{ subject: branch, status: 'done', detail: { path: `/acme.trees/${branch}` } }],
+        follow_ups: [followUp('go', branch, { code: 'create.go', message: 'jump in' })],
+      })}\n\n`,
+    ].join(''),
+  )
+
+const plan = (branch: string) => ({
+  ...envelope('create', []),
+  fingerprint: 'f1',
+  plan: {
+    branches: [{ branch, path: `/acme.trees/${branch}`, action: 'create', phases: ['worktree', 'on_create'] }],
+    creates: 1,
+    from: 'main',
+    env_from: 'example',
+    isolation: 'isolated',
+    recap: [],
+  },
+})
+
+// a stream that stays open, for a test that needs the page live
+export const liveEvents = http.get('/api/events', () => {
+  let closing: ReturnType<typeof setTimeout>
+  const stream = new ReadableStream({
+    start: (controller) => {
+      controller.enqueue(new TextEncoder().encode(': open\n\n'))
+      closing = setTimeout(() => controller.close(), 3000)
+    },
+    cancel: () => clearTimeout(closing),
+  })
+  return new HttpResponse(stream, { headers: { 'Content-Type': 'text/event-stream' } })
+})
+
+const spelled = ({ command, answers }: DomainFollowUp) => [
   'wtm',
-  ...(followUp.command ?? '').split(' '),
-  ...(followUp.answers ?? []).flatMap((a) => (a.path === 'worktree' ? a.values : [`--${a.path}`, ...a.values])),
+  ...(command ?? '').split(' '),
+  ...(answers ?? []).flatMap((a) => (a.path === 'worktree' ? a.values : [`--${a.path}`, ...a.values])),
 ]
 
 export const handlers = [
@@ -246,25 +194,8 @@ export const handlers = [
         return HttpResponse.json(
           envelope('status', [status(asked('worktree') ?? 'main', asked('with_prs') === 'true')]),
         )
-      case 'create': {
-        const branch = asked('branches') ?? ''
-        if (call.dry_run)
-          return HttpResponse.json({
-            ...envelope('create', []),
-            fingerprint: 'f1',
-            plan: {
-              branches: [
-                { branch, path: `/acme.trees/${branch}`, action: 'create', phases: ['worktree', 'on_create'] },
-              ],
-              creates: 1,
-              from: 'main',
-              env_from: 'example',
-              isolation: 'isolated',
-              recap: [{ key: 'branches', label: 'Branches', values: [{ value: branch, text: branch }] }],
-            },
-          })
-        return createRun(branch)
-      }
+      case 'create':
+        return call.dry_run ? HttpResponse.json(plan(asked('branches') ?? '')) : createRun(asked('branches') ?? '')
     }
     return HttpResponse.json({ error: { message: 'unknown command' } }, { status: 404 })
   }),

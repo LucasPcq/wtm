@@ -3,7 +3,6 @@ import { Centered } from '@/components/centered'
 import { StatePage } from '@/components/state-page'
 import { Skeleton } from '@/components/ui/skeleton'
 
-// Loading is the worktrees while they are read: rows of the list's shape, empty.
 export function Loading() {
   return (
     <div className="flex flex-col">
@@ -22,7 +21,6 @@ export function Loading() {
   )
 }
 
-// ReadFailed is a read of the worktrees the core refused, with its message.
 export function ReadFailed({ message }: { message: string }) {
   return (
     <Centered>

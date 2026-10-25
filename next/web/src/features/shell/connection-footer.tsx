@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { cva } from 'class-variance-authority'
 import { RefreshCw } from 'lucide-react'
-import { connectionOf, eventsQuery, type Connection } from '@/api/queries/events'
 import { fetchOrigin as fetchOriginOf, githubKey, repoKey } from '@/api/queries/commands'
+import { type Connection, connectionOf, eventsQuery } from '@/api/queries/events'
 import { Button } from '@/components/ui/button'
 import { SidebarFooter } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
@@ -32,8 +32,6 @@ const detail: Record<Connection, string> = {
   disconnected: 'The server restarted under a new session',
 }
 
-// ConnectionFooter says first whether the page is live, then offers the fetch of origin and says how it went
-// wrong, if it did.
 export function ConnectionFooter({ repo }: { repo: string | undefined }) {
   const client = useQueryClient()
   const events = useQuery(eventsQuery)

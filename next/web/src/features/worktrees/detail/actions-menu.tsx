@@ -11,13 +11,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { shellLine } from '@/lib/shell'
-import { copy } from '../shared/copy'
+import { copy } from '@/features/worktrees/shared/copy'
 
-// ActionsMenu is what may be done next with a worktree that the web does not run yet: each item copies its command
-// line, which it shows; the last one, which deletes it, apart.
 export function ActionsMenu({ actions }: { actions: DomainFollowUp[] }) {
-  const lines = useQueries({ queries: actions.map(commandLineQuery) }).map((line) => line.data?.argv)
+  const lines = useQueries({ queries: actions.map(commandLineQuery) })
   const last = actions.at(-1)
 
   return (
@@ -32,8 +29,7 @@ export function ActionsMenu({ actions }: { actions: DomainFollowUp[] }) {
           Not in the web interface yet: click to copy the command.
         </DropdownMenuLabel>
         {actions.map((action, i) => {
-          const argv = lines[i]
-          const line = argv && argv.length > 0 ? shellLine(argv) : undefined
+          const { data: line, isPending } = lines[i] ?? { isPending: true }
           const destructive = action === last && action.command === 'clean'
           return [
             destructive && <DropdownMenuSeparator key={`${action.code}-separator`} />,
@@ -46,7 +42,7 @@ export function ActionsMenu({ actions }: { actions: DomainFollowUp[] }) {
             >
               <span>{action.message}</span>
               <code className="font-mono text-xs text-muted-foreground">
-                {line ?? (argv ? 'no command line for this' : '…')}
+                {line ?? (isPending ? '…' : 'no command line for this')}
               </code>
             </DropdownMenuItem>,
           ]

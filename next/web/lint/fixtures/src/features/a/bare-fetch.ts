@@ -1,2 +1,2 @@
-// expect: eslint(no-restricted-globals)
+// expect: style/noRestrictedGlobals
 export const get = () => fetch('/api/x')

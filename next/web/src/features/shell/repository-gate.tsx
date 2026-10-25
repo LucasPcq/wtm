@@ -5,10 +5,10 @@ import { reposQuery } from '@/api/queries/repos'
 import { Centered } from '@/components/centered'
 import { StatePage } from '@/components/state-page'
 
-// RepositoryGate shows the screens of the repository its id names once the server knows it.
-export function RepositoryGate(props: { repo: string; children: ReactNode }) {
+export function RepositoryGate({ repo, children }: { repo: string; children: ReactNode }) {
   const repos = useQuery(reposQuery)
-  if (!repos.data || repos.data.some((known) => known.id === props.repo)) return props.children
+
+  if (!repos.data || repos.data.some((known) => known.id === repo)) return children
 
   return (
     <Centered>

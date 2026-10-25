@@ -17,7 +17,6 @@ export function request(path: string, init: RequestInit = {}): Promise<Response>
   return fetch(path, { ...init, headers })
 }
 
-// json returns the body of an accepted response, and throws the message of the server's error for any other.
 export async function json<T>(path: string, body?: unknown): Promise<T> {
   const response = await request(path, body === undefined ? {} : { method: 'POST', body: JSON.stringify(body) })
   const read: unknown = await response.json().catch(() => undefined)

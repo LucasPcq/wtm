@@ -1,10 +1,9 @@
-import { queryOptions, experimental_streamedQuery as streamedQuery, type QueryClient } from '@tanstack/react-query'
+import { type QueryClient, queryOptions, experimental_streamedQuery as streamedQuery } from '@tanstack/react-query'
 import { EventSourceParserStream } from 'eventsource-parser/stream'
-import { HttpError, request } from '../fetch'
-import type { WebRepos, WebWarning, WtmEventsV2 } from '../types.gen'
+import { HttpError, request } from '@/api/fetch'
+import type { WebRepos, WebWarning, WtmEventsV2 } from '@/api/types.gen'
 
-// Live is what the event stream says of itself: what kept a line or a repository from it for a while (the bus
-// lost, a repository skipped), until the next line.
+// what kept a line or a repository from the stream for a while (the bus lost), until the next line
 export type Live = { warning?: string }
 
 export const reconnectEvery = 2000
@@ -59,7 +58,6 @@ function invalidate(client: QueryClient, line: WtmEventsV2): Live {
 
 export type Connection = 'connecting' | 'live' | 'reconnecting' | 'disconnected'
 
-// connectionOf is the state of the stream as its query stands.
 export function connectionOf(query: { status: string; fetchStatus: string; error: unknown }): Connection {
   if (refused(query.error)) return 'disconnected'
   if (query.status === 'pending') return 'connecting'

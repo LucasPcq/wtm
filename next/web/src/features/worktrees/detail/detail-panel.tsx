@@ -1,46 +1,74 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { CircleCheck, CircleDot, CircleX, Copy, ExternalLink, SlidersHorizontal, TriangleAlert, X } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { ExternalLink, X } from 'lucide-react'
+import { Fragment, type ReactNode } from 'react'
 import { githubQuery, readQuery } from '@/api/queries/commands'
-import type { DomainFollowUp, RunState, StatusDetail, StatusProblem, StatusReview } from '@/api/types.gen'
+import type { DomainFollowUp } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ago } from '@/lib/time'
-import { useStored } from '../hooks/use-stored'
-import { CommandLine } from '../shared/command-line'
-import { copy } from '../shared/copy'
-import { prState, unavailable } from '../shared/github'
-import { Glyph, type Tone } from '../shared/glyph'
-import { ActionsMenu } from './actions-menu'
-import { sentence } from '../shared/sentence'
-import { sectionIds, sectionTitle, shownSections, type SectionId } from './sections'
+import { ActionsMenu } from '@/features/worktrees/detail/actions-menu'
+import { ActivitySection } from '@/features/worktrees/detail/activity-section'
+import { ChangesSection } from '@/features/worktrees/detail/changes-section'
+import { LinksSection } from '@/features/worktrees/detail/links-section'
+import { Origin } from '@/features/worktrees/detail/origin'
+import { Problems } from '@/features/worktrees/detail/problems'
+import { ReviewSection } from '@/features/worktrees/detail/review-section'
+import { RunSection } from '@/features/worktrees/detail/run-section'
+import { type SectionId, sectionIds } from '@/features/worktrees/detail/sections'
+import { SectionsChooser } from '@/features/worktrees/detail/sections-chooser'
+import { overlaid } from '@/features/worktrees/shared/condition'
+import { unavailable } from '@/features/worktrees/shared/github'
+import { useChoice } from '@/features/worktrees/ui-store'
 
-// DetailPanel is the whole read of one worktree: its status as it changes, what GitHub said of it when the panel
-// opened, the problem to fix first with its command, and the sections chosen.
-export function DetailPanel(props: { repo: string; worktree: string; actions: DomainFollowUp[] }) {
-  const answers = [{ path: 'worktree', values: [props.worktree] }]
-  const live = useQuery(readQuery(props.repo, 'status', answers))
-  // GitHub is asked again each time the panel opens, never on an event
-  const github = useQuery({ ...githubQuery(props.repo, 'status', answers), refetchOnMount: 'always' })
-  const [stored, store] = useStored(`wtm.sections.${props.repo}`)
-  const shown = shownSections(stored)
+export function DetailPanel({
+  repo,
+  worktree,
+  actions,
+}: {
+  repo: string
+  worktree: string
+  actions: DomainFollowUp[]
+}) {
+  const answers = [{ path: 'worktree', values: [worktree] }]
+  const live = useQuery(readQuery(repo, 'status', answers))
+  // asked again each time the panel opens, never on an event
+  const github = useQuery({ ...githubQuery(repo, 'status', answers), refetchOnMount: 'always' })
+  const sections = useChoice('sections', repo, sectionIds, sectionIds)
 
   const detail = live.data?.items[0]?.detail
   const asked = github.data?.items[0]?.detail
-  const merged = asked?.review?.fix && asked.problems?.find((problem) => problem.fix?.code === asked.review?.fix?.code)
-  const problems = [...(merged ? [merged] : []), ...(detail?.problems ?? [])]
-  // the pull request is what GitHub said when the panel opened: the live list never asks it
+  const shown = detail && overlaid(detail, asked)
   const pr = asked?.review
-  const actions = props.actions.filter((action) => !action.url)
+  const now = live.dataUpdatedAt
+  const commands = actions.filter((action) => !action.url)
+
+  const section = (id: SectionId, of: NonNullable<typeof detail>): ReactNode => {
+    switch (id) {
+      case 'run':
+        return <RunSection detail={of} now={now} />
+      case 'review':
+        return (
+          <ReviewSection
+            review={pr}
+            pending={github.isPending}
+            warning={unavailable(github.data?.warnings)?.message}
+            askedAt={github.dataUpdatedAt}
+          />
+        )
+      case 'changes':
+        return <ChangesSection detail={of} />
+      case 'activity':
+        return <ActivitySection detail={of} now={now} />
+      case 'links':
+        return <LinksSection detail={of} />
+    }
+  }
 
   return (
-    <aside aria-label={props.worktree} className="flex w-[440px] shrink-0 flex-col border-l bg-background">
+    <aside aria-label={worktree} className="flex w-[440px] shrink-0 flex-col border-l bg-background">
       <header className="flex flex-col gap-1 px-6 pt-5 pb-4">
         <div className="flex items-center gap-1">
-          <h2 className="min-w-0 flex-1 truncate text-lg font-semibold">{props.worktree}</h2>
+          <h2 className="min-w-0 flex-1 truncate text-lg font-semibold">{worktree}</h2>
           {pr && (
             <Button variant="ghost" size="sm" asChild>
               <a
@@ -53,331 +81,26 @@ export function DetailPanel(props: { repo: string; worktree: string; actions: Do
               </a>
             </Button>
           )}
-          {actions.length > 0 && <ActionsMenu actions={actions} />}
+          {commands.length > 0 && <ActionsMenu actions={commands} />}
           <Button variant="ghost" size="icon-sm" aria-label="Close the detail" asChild>
             <Link from="/r/$repo/worktrees" search={(search) => ({ ...search, worktree: undefined })}>
               <X />
             </Link>
           </Button>
         </div>
-        {detail && <Origin detail={detail} now={live.dataUpdatedAt} />}
+        {detail && <Origin detail={detail} now={now} />}
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 pb-6">
         {live.isPending && <Skeleton className="h-32 w-full" />}
         {live.isError && <p className="text-sm text-destructive">{live.error.message}</p>}
-        {problems[0] && <Problems problems={problems} />}
-        {detail &&
-          shown.map((section) => (
-            <Section key={section} id={section} meta={meta(section, detail, github.dataUpdatedAt)}>
-              {section === 'run' && <Run detail={detail} now={live.dataUpdatedAt} />}
-              {section === 'review' && (
-                <Review
-                  review={asked?.review}
-                  pending={github.isPending}
-                  warning={unavailable(github.data?.warnings)?.message}
-                />
-              )}
-              {section === 'changes' && <Changes detail={detail} />}
-              {section === 'activity' && <Activity detail={detail} now={live.dataUpdatedAt} />}
-              {section === 'links' && <Links detail={detail} />}
-            </Section>
-          ))}
+        <Problems problems={shown?.problems ?? []} />
+        {detail && sections.shown.map((id) => <Fragment key={id}>{section(id, detail)}</Fragment>)}
       </div>
 
       <footer className="border-t px-6 py-3">
-        <SectionsChooser shown={shown} onChange={store} />
+        <SectionsChooser shown={sections.shown} onToggle={sections.toggle} />
       </footer>
     </aside>
-  )
-}
-
-// Origin is where the worktree comes from, how it runs, and where it is: its path on one line, cut at its start,
-// whole on hover and on copy.
-function Origin({ detail, now }: { detail: StatusDetail; now: number }) {
-  const facts = [
-    detail.main ? 'main worktree' : detail.parent ? `from ${detail.parent}` : 'a root',
-    detail.created_at && `created ${ago(detail.created_at, now)}`,
-    detail.isolation,
-  ].filter(Boolean)
-  return (
-    <>
-      <p className="text-sm text-muted-foreground">{facts.join(' · ')}</p>
-      <button
-        type="button"
-        title={detail.path}
-        className="flex min-w-0 items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground"
-        onClick={() => copy(detail.path)}
-      >
-        <span className="truncate [direction:rtl]">
-          <bdi>{detail.path}</bdi>
-        </span>
-        <Copy className="size-3 shrink-0" aria-label="Copy the path" />
-      </button>
-    </>
-  )
-}
-
-// Problems are what to fix in the worktree, the first given the most room: its message and the command that fixes it.
-function Problems({ problems }: { problems: StatusProblem[] }) {
-  const [first, ...more] = problems
-  if (!first) return null
-  return (
-    <section aria-label="To do" className="flex flex-col gap-3 rounded-lg border bg-card p-4">
-      <Fix problem={first} />
-      {more.length > 0 && (
-        <details className="group text-sm">
-          <summary className="cursor-pointer text-muted-foreground">
-            {more.length} more {more.length === 1 ? 'problem' : 'problems'}
-          </summary>
-          <div className="mt-3 flex flex-col gap-4">
-            {more.map((problem) => (
-              <Fix key={problem.code + problem.message} problem={problem} />
-            ))}
-          </div>
-        </details>
-      )}
-    </section>
-  )
-}
-
-function Fix({ problem }: { problem: StatusProblem }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <Glyph icon={TriangleAlert} tone="attention" className="font-medium">
-        {sentence(problem.message)}
-      </Glyph>
-      {problem.fix && (
-        <>
-          <p className="text-sm text-muted-foreground">
-            {sentence(problem.fix.message)}. Not in the web interface yet: copy this into a terminal.
-          </p>
-          <CommandLine followUp={problem.fix} />
-        </>
-      )}
-    </div>
-  )
-}
-
-function meta(section: SectionId, detail: StatusDetail, askedAt: number): string {
-  switch (section) {
-    case 'run':
-      return [detail.isolation, detail.run?.offset ? `ports +${detail.run.offset}` : undefined]
-        .filter(Boolean)
-        .join(' · ')
-    case 'review':
-      return askedAt ? `as of ${new Date(askedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''
-    case 'changes':
-      return detail.base ? `${detail.base.ahead} ahead of ${detail.base.name}` : ''
-    case 'activity':
-      return detail.commits?.length ? `last ${detail.commits.length} commits` : ''
-    case 'links':
-      return ''
-  }
-}
-
-function Section(props: { id: SectionId; meta: string; children: ReactNode }) {
-  return (
-    <section aria-label={sectionTitle[props.id]} className="flex flex-col gap-2.5 border-t pt-4">
-      <div className="flex items-baseline gap-2">
-        <h3 className="text-sm font-semibold">{sectionTitle[props.id]}</h3>
-        <span className="ml-auto text-xs text-muted-foreground">{props.meta}</span>
-      </div>
-      {props.children}
-    </section>
-  )
-}
-
-// How each state of a job shows: its tone, and whether it serves its address now.
-const look: Record<RunState, { tone: Tone; up: boolean }> = {
-  starting: { tone: 'muted', up: false },
-  running: { tone: 'ok', up: true },
-  crashed: { tone: 'failed', up: false },
-  exited: { tone: 'muted', up: false },
-  stopped: { tone: 'muted', up: false },
-}
-
-function Run({ detail, now }: { detail: StatusDetail; now: number }) {
-  if (detail.jobs === null) return <p className="text-sm text-muted-foreground">Which jobs run is unknown.</p>
-  if (detail.jobs.length === 0) return <p className="text-sm text-muted-foreground">No job declared.</p>
-  return (
-    <ul className="flex flex-col gap-2">
-      {detail.jobs.map((job) => (
-        <li key={job.name} className="flex items-center gap-3 text-sm">
-          <Glyph
-            icon={look[job.state].tone === 'failed' ? CircleX : CircleDot}
-            tone={look[job.state].tone}
-            className="w-24 font-medium"
-          >
-            {job.name}
-          </Glyph>
-          {job.url && look[job.state].up ? (
-            <a
-              href={job.url}
-              target="_blank"
-              rel="noreferrer"
-              className="min-w-0 flex-1 truncate font-mono text-xs underline underline-offset-4"
-            >
-              {job.url.replace(/^https?:\/\//, '')}
-            </a>
-          ) : (
-            <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
-              {job.exit_code !== undefined ? `exit ${job.exit_code}` : job.port ? `:${job.port}` : ''}
-            </span>
-          )}
-          <span className="text-xs text-muted-foreground">
-            {look[job.state].up && job.started_at ? ago(job.started_at, now) : job.state}
-          </span>
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-function Review(props: { review: StatusReview | null | undefined; pending: boolean; warning: string | undefined }) {
-  if (props.pending) return <Skeleton className="h-10 w-full" />
-  if (props.warning) return <p className="text-sm text-muted-foreground">{props.warning}</p>
-  if (!props.review) return <p className="text-sm text-muted-foreground">No pull request.</p>
-  const { checks } = props.review
-  return (
-    <div className="flex flex-col gap-2 text-sm">
-      <a
-        href={props.review.url}
-        target="_blank"
-        rel="noreferrer"
-        className="font-medium underline-offset-4 hover:underline"
-      >
-        #{props.review.number} {props.review.title ?? props.review.state}
-      </a>
-      <div className="flex flex-wrap gap-4">
-        {props.review.draft && <span className="text-muted-foreground">draft</span>}
-        {prState[props.review.state] && <span className="text-muted-foreground">{prState[props.review.state]}</span>}
-        {checks && (
-          <Glyph
-            icon={checks.failed ? CircleX : CircleCheck}
-            tone={checks.failed ? 'failed' : checks.pending ? 'attention' : 'ok'}
-          >
-            {checks.failed
-              ? `${checks.failed} checks failed`
-              : checks.pending
-                ? `${checks.pending} checks pending`
-                : `${checks.passed} checks passed`}
-          </Glyph>
-        )}
-        {props.review.decision && (
-          <span className="text-muted-foreground">{props.review.decision.toLowerCase().replaceAll('_', ' ')}</span>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function Changes({ detail }: { detail: StatusDetail }) {
-  const changes = detail.changes
-  const origin = detail.origin
-  const standing = origin
-    ? origin.ahead || origin.behind
-      ? `origin ↑${origin.ahead} ↓${origin.behind}`
-      : 'in step with origin'
-    : 'not on origin'
-  if (!changes) return null
-  const files = changes.files ?? []
-  return (
-    <div className="flex flex-col gap-2 text-sm">
-      <p className="text-muted-foreground">
-        {files.length === 0
-          ? 'Working tree clean'
-          : `${changes.staged} staged · ${changes.modified} modified · ${changes.untracked} untracked · +${changes.insertions} −${changes.deletions}`}
-        {` · ${standing}`}
-      </p>
-      {files.length > 0 && (
-        <ul className="flex flex-col gap-0.5 font-mono text-xs">
-          {files.slice(0, 8).map((file) => (
-            <li key={file.path} className="flex gap-2">
-              <span className="w-20 shrink-0 text-muted-foreground">{file.status}</span>
-              <span className="truncate">{file.path}</span>
-            </li>
-          ))}
-          {files.length > 8 && <li className="text-muted-foreground">and {files.length - 8} more</li>}
-        </ul>
-      )}
-    </div>
-  )
-}
-
-function Activity({ detail, now }: { detail: StatusDetail; now: number }) {
-  if (!detail.commits?.length) return <p className="text-sm text-muted-foreground">No commit yet.</p>
-  return (
-    <ul className="flex flex-col gap-2">
-      {detail.commits.map((commit) => (
-        <li key={commit.sha} className="flex flex-col">
-          <span className="truncate text-sm">{commit.subject}</span>
-          <span className="font-mono text-xs text-muted-foreground">
-            {commit.sha.slice(0, 7)} · {commit.author} · {ago(commit.at, now)}
-          </span>
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-function Links({ detail }: { detail: StatusDetail }) {
-  const drift = (detail.env.files ?? []).filter(
-    (file) => file.missing || file.keys.missing || file.keys.conflicting || file.keys.orphan,
-  )
-  return (
-    <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1.5 text-sm">
-      <dt className="text-muted-foreground">Parent</dt>
-      <dd>{detail.parent || '—'}</dd>
-      <dt className="text-muted-foreground">Children</dt>
-      <dd>{detail.children?.length ? detail.children.join(', ') : '—'}</dd>
-      <dt className="text-muted-foreground">.env</dt>
-      <dd>
-        {detail.env.declared === 0
-          ? 'none declared'
-          : drift.length === 0
-            ? `${detail.env.declared} ${detail.env.declared === 1 ? 'file' : 'files'}, in step`
-            : drift
-                .map(
-                  (file) =>
-                    `${file.target}: ${file.missing ? 'missing' : `${file.keys.missing} missing, ${file.keys.conflicting} differ`}`,
-                )
-                .join('; ')}
-      </dd>
-    </dl>
-  )
-}
-
-function SectionsChooser(props: { shown: SectionId[]; onChange: (shown: SectionId[]) => void }) {
-  const hidden = sectionIds.length - props.shown.length
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-muted-foreground">
-          <SlidersHorizontal />
-          Sections · {hidden === 0 ? 'all shown' : `${hidden} hidden`}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" side="top" className="w-56 p-2">
-        {sectionIds.map((id) => (
-          <label
-            key={id}
-            className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
-          >
-            <Checkbox
-              checked={props.shown.includes(id)}
-              onCheckedChange={() =>
-                props.onChange(
-                  props.shown.includes(id)
-                    ? props.shown.filter((s) => s !== id)
-                    : sectionIds.filter((s) => s === id || props.shown.includes(s)),
-                )
-              }
-            />
-            {sectionTitle[id]}
-          </label>
-        ))}
-      </PopoverContent>
-    </Popover>
   )
 }

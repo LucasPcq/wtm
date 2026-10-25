@@ -2,7 +2,6 @@ import { FolderSearch } from 'lucide-react'
 import { Centered } from '@/components/centered'
 import { StatePage } from '@/components/state-page'
 
-// NoRepository is the shell with no repository chosen: where to choose one.
 export function NoRepository() {
   return (
     <Centered>

@@ -1,12 +1,14 @@
 import { queryOptions } from '@tanstack/react-query'
-import { json } from '../fetch'
-import type { DomainFollowUp, WebCommandLine } from '../types.gen'
+import { json } from '@/api/fetch'
+import type { DomainFollowUp, WebCommandLine } from '@/api/types.gen'
 
-// commandLineQuery is a follow-up the catalogue cannot run, as the command line runs it: its argv, empty when it
-// cannot be spelled. It never changes for a follow-up.
+export const shellLine = (argv: string[]) =>
+  argv.map((arg) => (/^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", `'\\''`)}'`)).join(' ')
+
 export const commandLineQuery = (followUp: DomainFollowUp) =>
   queryOptions({
     queryKey: ['command-line', followUp],
     queryFn: () => json<WebCommandLine>('/api/command-line', followUp),
+    select: ({ argv }) => (argv.length > 0 ? shellLine(argv) : undefined),
     staleTime: Infinity,
   })

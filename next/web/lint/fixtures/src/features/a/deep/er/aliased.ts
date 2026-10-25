@@ -1,2 +1,2 @@
-// expect: wtm(layers)
+// expect: plugin/layers
 export { x } from '@/features/b/x'

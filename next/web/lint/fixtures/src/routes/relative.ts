@@ -1,2 +1,2 @@
-// expect: wtm(layers)
-export { x } from '../lib/x'
+// expect: style/noRestrictedImports, plugin/layers
+export { x } from '../features/a/x'

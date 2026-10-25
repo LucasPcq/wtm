@@ -1,5 +1,3 @@
-// expect: wtm(effects)
+// expect: nursery/noJsRestrictedProperties
 import * as R from 'react'
-export function useRun() {
-  R.useEffect(() => {}, [])
-}
+export function useRun() { R.useEffect(() => {}, []) }

@@ -7,12 +7,11 @@ export type Values = Record<string, string[]>
 
 export const keyOf = (path: string) => encodeURIComponent(path).replaceAll('.', '%2E')
 
-// valuesOf is what each field holds as the form stands, the core's defaults included.
 export function valuesOf(fields: DomainField[]): Values {
-  return Object.fromEntries(fields.map((field) => [keyOf(field.path), valueOf(field)]))
+  return Object.fromEntries(fields.map((field) => [keyOf(field.path), defaultOf(field)]))
 }
 
-export function valueOf(field: DomainField): string[] {
+export function defaultOf(field: DomainField): string[] {
   switch (field.kind) {
     case 'select':
     case 'text':
@@ -26,13 +25,11 @@ export function valueOf(field: DomainField): string[] {
   }
 }
 
-// answersOf is the request a form's values make: only the fields the person changed, so that what they left to
-// its default (a remembered answer included) stays the core's to decide.
 export function answersOf(fields: DomainField[], values: Values, changed: (key: string) => boolean): DomainAnswered[] {
   return fields.flatMap((field) => {
     const key = keyOf(field.path)
     if (!changed(key)) return []
-    const value = values[key] ?? valueOf(field)
+    const value = values[key] ?? defaultOf(field)
     return [{ path: field.path, values: field.kind === 'text_list' ? lines(value[0] ?? '') : value }]
   })
 }
@@ -43,8 +40,6 @@ const lines = (text: string) =>
     .map((line) => line.trim())
     .filter(Boolean)
 
-// problemsByKey files each problem of the core under the key of its field, one of a field's value (branches[1])
-// under that field, and a problem no field holds under ''.
 export function problemsByKey(fields: DomainField[], problems: DomainFieldError[]): Record<string, string> {
   const paths = new Set(fields.map((field) => field.path))
   const fieldOf = (path: string) => [path, path.replace(/\[\d+\]$/, '')].find((candidate) => paths.has(candidate))

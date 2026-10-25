@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest'
 import type { OperationLine } from '@/api/queries/operations'
 import type { CreatePlan, DomainField, DomainForm, DomainSkip } from '@/api/types.gen'
-import { advance, current, doneOf, planned, seconds, took } from './progress'
-import { stepsOf } from './steps'
+import { advance, current, doneOf, planned, seconds, took } from '@/features/worktrees/create/progress'
+import { stepsOf } from '@/features/worktrees/create/steps'
 
 const text = (path: string, skip?: DomainSkip): DomainField => ({
   kind: 'text',
@@ -43,7 +43,7 @@ const line = (event: Record<string, unknown>, ts = '2026-10-25T12:00:00Z') =>
 test('the progress starts from the plan: what each branch will run, an open one left out', () => {
   const progress = planned(plan)
 
-  expect(progress.units.map(([subject]) => subject)).toEqual(['main', 'feat/a'])
+  expect(progress.units.map((unit) => unit.subject)).toEqual(['main', 'feat/a'])
   expect(doneOf(progress)).toEqual({ done: 0, total: 5 })
   expect(current(progress)?.run).toEqual({ phase: 'fast_forward', state: 'todo' })
 })
@@ -57,8 +57,8 @@ test('a branch fast-forwarded then opened is one unit, its fast-forward first', 
     fast_forward: ['feat/x'],
   })
 
-  expect(progress.units.map(([subject]) => subject)).toEqual(['feat/x'])
-  expect(progress.units[0]?.[1].phases.map((run) => run.phase)).toEqual(['fast_forward', 'worktree', 'env'])
+  expect(progress.units.map((unit) => unit.subject)).toEqual(['feat/x'])
+  expect(progress.units[0]?.phases.map((run) => run.phase)).toEqual(['fast_forward', 'worktree', 'env'])
   expect(doneOf(progress).total).toBe(3)
 })
 
@@ -73,8 +73,8 @@ test('each event moves the progress: a phase under way, ended or failed, the out
   ])
     progress = advance(progress, event)
 
-  const [, a] = progress.units[1] ?? []
-  expect(progress.units[0]?.[1].phases[0]).toEqual({
+  const a = progress.units[1]
+  expect(progress.units[0]?.phases[0]).toEqual({
     phase: 'fast_forward',
     state: 'done',
     startedAt: '2026-10-25T12:00:00Z',
@@ -93,10 +93,11 @@ test('each event moves the progress: a phase under way, ended or failed, the out
 test('an event of a subject or a phase the plan did not foresee is added, not dropped', () => {
   const progress = advance(planned(plan), line({ type: 'phase.started', subject: 'feat/b', phase: 'ports' }))
 
-  expect(progress.units.at(-1)).toEqual([
-    'feat/b',
-    { phases: [{ phase: 'ports', state: 'now', startedAt: '2026-10-25T12:00:00Z' }], lines: [] },
-  ])
+  expect(progress.units.at(-1)).toEqual({
+    subject: 'feat/b',
+    phases: [{ phase: 'ports', state: 'now', startedAt: '2026-10-25T12:00:00Z' }],
+    lines: [],
+  })
 })
 
 test('a phase is timed from a second up, the quick ones left blank', () => {
@@ -119,8 +120,8 @@ test('the whole run is timed from its first phase started to its last ended, acr
   expect(
     took({
       units: [
-        ['feat/a', { phases: [run('2026-10-25T12:00:01Z', '2026-10-25T12:00:03Z')], lines: [] }],
-        ['feat/b', { phases: [run('2026-10-25T12:00:03Z', '2026-10-25T12:00:09Z')], lines: [] }],
+        { subject: 'feat/a', phases: [run('2026-10-25T12:00:01Z', '2026-10-25T12:00:03Z')], lines: [] },
+        { subject: 'feat/b', phases: [run('2026-10-25T12:00:03Z', '2026-10-25T12:00:09Z')], lines: [] },
       ],
     }),
   ).toBe('8.0 s')

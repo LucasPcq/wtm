@@ -1,10 +1,12 @@
-import type { CreateAction, CreateRequest, DomainSkip } from '@/api/types.gen'
+import type { CreateAction, CreateRequest, DomainPhase, DomainSkip } from '@/api/types.gen'
 import type { FieldWords, OptionWords } from '@/components/command-form/command-fields'
 
 // The core words its questions for the command line; the web says them its own way. Each record is exhaustive over
-// what the schema publishes, so a question, an option or a reason create adds fails the build until it has words.
+// what the schema publishes, so a question, an option, a reason or a phase the core adds fails the build until it
+// has words.
 
-type Question = Exclude<CreateRequest[number]['path'], 'remember' | 'ask'>
+// remember and ask say how the other questions are answered, not what
+export type Question = Exclude<CreateRequest[number]['path'], 'remember' | 'ask'>
 type ValuesOf<P extends Question> = Exclude<Extract<CreateRequest[number], { path: P }>['values'][number], ''>
 type Options<P extends Question> = Record<ValuesOf<P>, OptionWords>
 
@@ -56,12 +58,11 @@ export const createWords: Record<Question, FieldWords> = {
   },
 }
 
-const isQuestion = (path: string): path is Question => path in createWords
+export const isQuestion = (path: string): path is Question => path in createWords
 
-// labelOf is the name of the question at path, as the web says it.
 export const labelOf = (path: string): string => (isQuestion(path) ? createWords[path].label : path)
 
-// Why a question is not asked, said at the foot of its step; null for a reason that means nothing in a browser.
+// null for a reason that means nothing in a browser
 export const skipWords: Record<DomainSkip, string | null> = {
   flag_only: null,
   all: null,
@@ -73,10 +74,20 @@ export const skipWords: Record<DomainSkip, string | null> = {
   no_conflict: 'nothing conflicts',
 }
 
-// How each branch gets its worktree, as the confirmation says it.
 export const actionWords: Record<CreateAction, string> = {
   create: 'New branch',
   check_out: 'Existing branch, as it is',
   resume: 'From origin, tracking it',
   unchanged: 'Already open, left as it is',
+}
+
+export const phaseLabel: Record<DomainPhase, string> = {
+  fast_forward: 'Fast-forward the source branch',
+  worktree: 'Add the worktree',
+  env: 'Copy its .env files',
+  meta: 'Record it',
+  ordinal: 'Number it',
+  ports: 'Settle its ports',
+  on_create: 'Run the on_create hooks',
+  move: 'Move the changes',
 }

@@ -1,0 +1,6 @@
+language js
+
+`vi.spyOn($obj, $_)` as $call where {
+  $program <: contains `import * as $obj from $_`,
+  register_diagnostic(span=$call, message="vi.spyOn on a module of the app replaces it: mock the server with msw (web-front skill, spy-module).")
+}

@@ -1,46 +1,11 @@
 import { expect, test } from 'vitest'
-import type { Read } from '@/api/queries/commands'
-import type { DomainFollowUp, TreeDetail } from '@/api/types.gen'
-import { nodesOf } from './nodes'
+import { nodesOf } from '@/features/worktrees/tree/nodes'
+import { followUp as action, read as readOf, treeDetail } from '@/test/fixtures'
 
-const action = (command: string, branch: string): DomainFollowUp => ({
-  command,
-  answers: [{ path: 'worktree', values: [branch] }],
-  code: `tree.${command}`,
-  message: command,
-})
+const node = (branch: string, parent: string | null, over: Parameters<typeof treeDetail>[1] = {}) =>
+  treeDetail(branch, { parent, ...over })
 
-const node = (branch: string, parent: string | null, over: Partial<TreeDetail> = {}): TreeDetail => ({
-  actions: [],
-  ahead: 0,
-  behind: 0,
-  branch,
-  children: [],
-  condition: 'clean',
-  cycle: false,
-  dirty: false,
-  locked: false,
-  main: false,
-  missing: false,
-  needs_sync: false,
-  origin: null,
-  parent,
-  path: `/repo/.trees/${branch}`,
-  pr: null,
-  rebasing: false,
-  services: [],
-  virtual: false,
-  ...over,
-})
-
-const read = (details: TreeDetail[]): Read<'tree'> => ({
-  v: 2,
-  ok: true,
-  command: 'tree',
-  follow_ups: [],
-  warnings: [],
-  items: details.map((detail) => ({ subject: detail.branch, status: 'done', detail })),
-})
+const read = (details: ReturnType<typeof treeDetail>[]) => readOf('tree', details)
 
 test('each node sits under its parent, a node whose parent is not in the read is a root', () => {
   const roots = nodesOf(

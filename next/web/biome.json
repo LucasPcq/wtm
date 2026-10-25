@@ -1,0 +1,243 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!src/components/ui",
+      "!src/hooks/use-mobile.ts",
+      "!**/*.gen.ts",
+      "!lint/fixtures",
+      "!package-lock.json"
+    ]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "lineWidth": 120
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "asNeeded"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    },
+    "formatter": {
+      "quoteStyle": "single"
+    }
+  },
+  "plugins": [
+    "./lint/layers.grit",
+    "./lint/unknown-folder.grit",
+    "./lint/props.grit",
+    {
+      "path": "./lint/spy-module.grit",
+      "includes": ["**/*.test.ts", "**/*.test.tsx", "**/src/test/**"]
+    }
+  ],
+  "linter": {
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "noNestedTernary": "error",
+        "noExcessiveLinesPerFile": {
+          "level": "error",
+          "options": {
+            "maxLines": 300
+          }
+        },
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "react": {
+                "importNames": ["useEffect", "useLayoutEffect", "useInsertionEffect"],
+                "message": "No effects: derive while rendering, data in TanStack Query/Router/Form, a DOM hook in a ref callback (web-front skill)."
+              },
+              "@testing-library/react": {
+                "importNames": ["renderHook"],
+                "message": "Test a component through what its user does, never a hook alone (web-front skill)."
+              }
+            },
+            "patterns": [
+              {
+                "group": ["../**", ".."],
+                "message": "Import another folder through @/, never ../: a parent-relative import hides the layer it reaches (web-front skill)."
+              }
+            ]
+          }
+        },
+        "noRestrictedGlobals": {
+          "level": "error",
+          "options": {
+            "deniedGlobals": {
+              "fetch": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill).",
+              "EventSource": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill).",
+              "XMLHttpRequest": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill).",
+              "WebSocket": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill)."
+            }
+          }
+        }
+      },
+      "nursery": {
+        "noJsRestrictedProperties": {
+          "level": "error",
+          "options": {
+            "entries": [
+              {
+                "property": "useEffect",
+                "message": "No effects: derive while rendering, data in TanStack Query/Router/Form, a DOM hook in a ref callback (web-front skill)."
+              },
+              {
+                "property": "useLayoutEffect",
+                "message": "No effects: derive while rendering, data in TanStack Query/Router/Form, a DOM hook in a ref callback (web-front skill)."
+              },
+              {
+                "property": "useInsertionEffect",
+                "message": "No effects: derive while rendering, data in TanStack Query/Router/Form, a DOM hook in a ref callback (web-front skill)."
+              },
+              {
+                "object": "window",
+                "property": "fetch",
+                "message": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill)."
+              },
+              {
+                "object": "window",
+                "property": "EventSource",
+                "message": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill)."
+              },
+              {
+                "object": "window",
+                "property": "XMLHttpRequest",
+                "message": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill)."
+              },
+              {
+                "object": "window",
+                "property": "WebSocket",
+                "message": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill)."
+              },
+              {
+                "object": "globalThis",
+                "property": "fetch",
+                "message": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill)."
+              },
+              {
+                "object": "globalThis",
+                "property": "EventSource",
+                "message": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill)."
+              },
+              {
+                "object": "globalThis",
+                "property": "XMLHttpRequest",
+                "message": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill)."
+              },
+              {
+                "object": "globalThis",
+                "property": "WebSocket",
+                "message": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill)."
+              },
+              {
+                "object": "self",
+                "property": "fetch",
+                "message": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill)."
+              },
+              {
+                "object": "self",
+                "property": "EventSource",
+                "message": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill)."
+              },
+              {
+                "object": "self",
+                "property": "XMLHttpRequest",
+                "message": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill)."
+              },
+              {
+                "object": "self",
+                "property": "WebSocket",
+                "message": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill)."
+              },
+              {
+                "object": "navigator",
+                "property": "sendBeacon",
+                "message": "The server is reached through src/api/ only: read with useQuery, write with useMutation over api/queries/ (web-front skill)."
+              },
+              {
+                "object": "vi",
+                "property": "mock",
+                "message": "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill)."
+              },
+              {
+                "object": "vi",
+                "property": "doMock",
+                "message": "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill)."
+              },
+              {
+                "object": "vi",
+                "property": "stubGlobal",
+                "message": "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill)."
+              }
+            ]
+          }
+        }
+      },
+      "correctness": {
+        "useHookAtTopLevel": "error"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["src/api/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedGlobals": "off"
+          },
+          "nursery": {
+            "noJsRestrictedProperties": {
+              "level": "error",
+              "options": {
+                "entries": [
+                  {
+                    "property": "useEffect",
+                    "message": "No effects: derive while rendering, data in TanStack Query/Router/Form, a DOM hook in a ref callback (web-front skill)."
+                  },
+                  {
+                    "property": "useLayoutEffect",
+                    "message": "No effects: derive while rendering, data in TanStack Query/Router/Form, a DOM hook in a ref callback (web-front skill)."
+                  },
+                  {
+                    "property": "useInsertionEffect",
+                    "message": "No effects: derive while rendering, data in TanStack Query/Router/Form, a DOM hook in a ref callback (web-front skill)."
+                  },
+                  {
+                    "object": "vi",
+                    "property": "mock",
+                    "message": "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill)."
+                  },
+                  {
+                    "object": "vi",
+                    "property": "doMock",
+                    "message": "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill)."
+                  },
+                  {
+                    "object": "vi",
+                    "property": "stubGlobal",
+                    "message": "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

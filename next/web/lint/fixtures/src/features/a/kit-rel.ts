@@ -1,0 +1,3 @@
+// expect: style/noRestrictedImports
+import { server } from '../../test/server'
+export const s = server

@@ -1,4 +1,4 @@
-import { Outlet, createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Outlet } from '@tanstack/react-router'
 import { RepositoryGate } from '@/features/shell/repository-gate'
 
 export const Route = createFileRoute('/_shell/r/$repo')({ component: Repository })

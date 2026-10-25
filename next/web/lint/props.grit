@@ -1,0 +1,13 @@
+language js
+
+or {
+  JsFunctionDeclaration(id=$id, parameters=$ps),
+  JsVariableDeclarator(id=$id, initializer=JsInitializerClause(expression=JsArrowFunctionExpression(parameters=$ps)))
+} where {
+  $id <: r"[A-Z].*",
+  $ps <: or {
+    JsParameters(items=[JsFormalParameter(binding=JsIdentifierBinding() as $p), ...]),
+    JsIdentifierBinding() as $p
+  },
+  register_diagnostic(span=$p, message="Destructure props in the parameters (web-front skill, props).")
+}
