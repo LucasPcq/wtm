@@ -42,10 +42,10 @@ func TestTheConfigDefaultIsTheFirstEnvOptionNamingTheConfiguredStrategy(t *testi
 	field, isSelect := fields[0].(domain.SelectField)
 	require.True(t, isSelect)
 	assert.Equal(t, []domain.Option{
-		{Value: "config", Label: "Use config default (example)", Short: "config default"},
-		{Value: "example", Label: "example — copy .env.example → .env"},
-		{Value: "main", Label: "main — copy .env from the main checkout"},
-		{Value: "parent", Label: "parent — copy .env from source worktree"},
+		{Value: "config", Label: "config default (example)", Short: "config default"},
+		{Value: "example", Label: "example — from .env.example"},
+		{Value: "main", Label: "main — the main checkout's .env"},
+		{Value: "parent", Label: "parent — the source worktree's .env"},
 	}, field.Options)
 }
 
@@ -61,10 +61,10 @@ func TestAskingAgainStillShowsWhatIsRemembered(t *testing.T) {
 
 func TestAWorktreeThatIsNotCreatedIsAskedNothingAndRemembersNothing(t *testing.T) {
 	remembered := map[string]string{project.RememberEnvStrategy: string(project.EnvParent), project.RememberIsolation: string(project.Verbatim)}
-	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Remember: []string{"env_from", "isolation", "fast_forward"}}, Repository: repository(remembered), Exists: "exists"})
+	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Remember: []string{"env_from", "isolation", "fast_forward"}}, Repository: repository(remembered), Exists: domain.SkipExists})
 
 	for _, field := range questions.Fields("") {
-		assert.Equal(t, "exists", field.Spec().Skip, field.Spec().Path)
+		assert.Equal(t, domain.SkipExists, field.Spec().Skip, field.Spec().Path)
 		assert.False(t, questions.Remembers(field.Spec().Path), field.Spec().Path)
 	}
 	assert.Empty(t, questions.EnvFrom.Value)
@@ -99,7 +99,7 @@ func TestTheFastForwardIsTheRequestsElseNoneWhenSkippedElseTheRememberedElseNo(t
 	ff := map[string]string{project.RememberSourceUpdate: project.SourceUpdateFastForward}
 	keep := map[string]string{project.RememberSourceUpdate: project.SourceUpdateKeep}
 	main := []string{"main"}
-	notBehind := "nothing to fast-forward: the source is not behind origin"
+	notBehind := domain.SkipNotBehind
 	cases := map[string]struct {
 		given      *bool
 		behind     []string
@@ -127,7 +127,7 @@ func TestTheIsolationIsSkippedWithWhyRunTomlIsNotRead(t *testing.T) {
 
 	questions := provision.NewQuestions(provision.QuestionsParams{Repository: repo})
 
-	assert.Equal(t, "run.toml could not be read", questions.Isolation.Skip)
+	assert.Equal(t, domain.SkipRunUnread, questions.Isolation.Skip)
 	assert.Equal(t, domain.Answer[project.Isolation]{Value: project.Isolated, Origin: domain.OriginDefault}, questions.Isolation.Answer)
 }
 
@@ -155,7 +155,7 @@ func TestARememberedIsolationHoldsWhenRunTomlIsNotRead(t *testing.T) {
 func TestTheFastForwardIsSkippedWhenNothingIsBehind(t *testing.T) {
 	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Remember: []string{"fast_forward", "env_from", "env_from"}}, Repository: repository(nil)})
 
-	assert.Equal(t, "nothing to fast-forward: the source is not behind origin", questions.FastForward.Skip)
+	assert.Equal(t, domain.SkipNotBehind, questions.FastForward.Skip)
 	assert.False(t, questions.Remembers("fast_forward"))
 	assert.Equal(t, []string{"env_from"}, questions.Given().Remember)
 }
@@ -175,8 +175,8 @@ func TestTheIsolationOptionsAreWordedForOneWorktreeOrSeveral(t *testing.T) {
 		many bool
 		want []string
 	}{
-		"one":     {false, []string{"isolated — its own ports, compose project and namespaces", "verbatim — keep the copied .env, one of the two runs at a time"}},
-		"several": {true, []string{"isolated — each its own ports, compose project and namespaces", "verbatim — keep the copied .env, one of them runs at a time"}},
+		"one":     {false, []string{"isolated — its own ports and namespaces", "verbatim — the copied .env as is, one runs at a time"}},
+		"several": {true, []string{"isolated — each its own ports and namespaces", "verbatim — the copied .env as is, one runs at a time"}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

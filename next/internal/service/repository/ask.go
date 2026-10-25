@@ -51,6 +51,15 @@ func (a Asked) Services(dir string) []string {
 	return run.UpIn(a.Jobs, dir)
 }
 
+// URLs are the URLs of the jobs up in the worktree at dir, nil when the daemon could not tell.
+func (a Asked) URLs(dir string) []string {
+	if a.JobsErr != nil {
+		return nil
+	}
+
+	return run.URLsIn(a.Jobs, dir)
+}
+
 // Warnings are the warnings of what the read of the command named command could not ask: <command>.jobs_unknown when the daemon could not tell which jobs are up, <command>.prs_unavailable when the forge could not be asked; none once the read was interrupted, which says so and nothing more.
 func (a Asked) Warnings(command string) []domain.Warning {
 	if a.Interrupted {

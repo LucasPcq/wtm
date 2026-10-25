@@ -50,9 +50,9 @@ func (s Service) FastForwardEach(ctx context.Context, params FastForwardEachPara
 			return advanced, warnings
 		}
 
-		report(domain.PhaseStarted{Subject: subject, Phase: "fast_forward"})
+		report(domain.PhaseStarted{Subject: subject, Phase: domain.PhaseFastForward})
 		forwarded := s.FastForward(ctx, FastForwardParams{Subject: subject, CheckedOutAt: params.Snapshot.CheckedOutAt(subject)})
-		report(domain.PhaseFinished{Subject: subject, Phase: "fast_forward", Failed: forwarded.Failed()})
+		report(domain.PhaseFinished{Subject: subject, Phase: domain.PhaseFastForward, Failed: forwarded.Failed()})
 
 		switch {
 		case !forwarded.Failed():

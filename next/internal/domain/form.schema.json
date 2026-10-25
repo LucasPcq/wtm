@@ -2,13 +2,12 @@
   "$comment": "The shapes Form.MarshalJSON and Answered.MarshalJSON write by hand (form.go); the generator of api.v2.schema.json copies these $defs as they are and generates domain.Field, the union of its kinds, each discriminated by the kind MarshalJSON writes. Change them with form.go.",
   "$defs": {
     "domain.Form": {
-      "description": "A command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, the sections a surface groups them in, and the request's problems.",
+      "description": "A command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, and the request's problems.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["fields", "sections", "problems"],
+      "required": ["fields", "problems"],
       "properties": {
         "fields": { "type": "array", "items": { "$ref": "#/$defs/domain.Field" } },
-        "sections": { "type": "array", "items": { "$ref": "#/$defs/domain.Section" }, "description": "In the order a surface shows them; a field names its own by key." },
         "problems": { "type": "array", "items": { "$ref": "#/$defs/domain.FieldError" } }
       }
     },

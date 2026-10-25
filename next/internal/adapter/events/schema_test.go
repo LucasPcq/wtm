@@ -1,10 +1,13 @@
 package events
 
 import (
+	"encoding/json"
+	"os"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestALineOfEachTypeTheStreamCarriesMatchesTheSchema(t *testing.T) {
@@ -52,4 +55,19 @@ func TestTheSchemaRefusesWhatTheContractForbids(t *testing.T) {
 			assert.Error(t, validates(t, schema, line))
 		})
 	}
+}
+
+func TestTheSchemasPhasesAreTheCoresEveryOne(t *testing.T) {
+	data, err := os.ReadFile("events.v2.json")
+	require.NoError(t, err)
+	var doc struct {
+		Defs struct {
+			Phase struct {
+				Enum []domain.Phase `json:"enum"`
+			} `json:"phase"`
+		} `json:"$defs"`
+	}
+	require.NoError(t, json.Unmarshal(data, &doc))
+
+	assert.Equal(t, domain.Phases(), doc.Defs.Phase.Enum)
 }

@@ -91,9 +91,8 @@ func TestAFormIsEncodedWithTheKindOfEachField(t *testing.T) {
 			ConfirmField{FieldSpec: FieldSpec{Path: "keep", Flag: "--keep", Label: "Keep", Skip: "not asked"}, Yes: Option{Value: "true", Label: "Copy", Short: "copy"}, No: Option{Value: "false", Label: "Move"}, NoFirst: true},
 			SelectField{FieldSpec: FieldSpec{Path: "isolation", Flag: "--isolation", Label: "Isolation", Origin: OriginRemembered}, Value: "shared", Options: []Option{{Value: "shared", Label: "Shared", Badge: "remembered"}}, Remembered: "shared", Rememberable: true, Refreshable: true},
 			MultiSelectField{FieldSpec: FieldSpec{Path: "files", Flag: "--files", Label: "Files"}, Empty: "Pick one"},
-			TextField{FieldSpec: FieldSpec{Path: "to", Flag: "--to", Label: "Target", Help: "Target branch", Section: "target"}, Value: "feat/y"},
+			TextField{FieldSpec: FieldSpec{Path: "to", Flag: "--to", Label: "Target", Help: "Target branch"}, Value: "feat/y"},
 		},
-		Sections: []Section{{Key: "target", Title: "Where it goes", Summary: "feat/y"}},
 		Problems: []FieldError{{Path: "branches[0]", Code: "required", Template: "{path} is required"}},
 	}
 
@@ -104,11 +103,10 @@ func TestAFormIsEncodedWithTheKindOfEachField(t *testing.T) {
 		"fields": [
 			{"kind": "text_list", "path": "branches", "flag": "<branches>", "label": "Branches", "help": "", "entries": ["feat/x"], "options": []},
 			{"kind": "confirm", "path": "keep", "flag": "--keep", "label": "Keep", "help": "", "skip": "not asked", "value": false, "yes": {"value": "true", "label": "Copy", "short": "copy"}, "no": {"value": "false", "label": "Move"}, "no_first": true, "rememberable": false, "remember": false},
-			{"kind": "select", "path": "isolation", "flag": "--isolation", "label": "Isolation", "help": "", "origin": "remembered", "value": "shared", "options": [{"value": "shared", "label": "Shared", "badge": "remembered"}], "remembered": "shared", "rememberable": true, "remember": false, "refreshable": true},
+			{"kind": "select", "path": "isolation", "flag": "--isolation", "label": "Isolation", "help": "", "origin": "remembered", "value": "shared", "options": [{"value": "shared", "label": "Shared", "badge": "remembered"}], "remembered": "shared", "rememberable": true, "remember": false, "refreshable": true, "closed": false},
 			{"kind": "multi_select", "path": "files", "flag": "--files", "label": "Files", "help": "", "picked": [], "options": [], "empty": "Pick one"},
-			{"kind": "text", "path": "to", "flag": "--to", "label": "Target", "help": "Target branch", "section": "target", "value": "feat/y"}
+			{"kind": "text", "path": "to", "flag": "--to", "label": "Target", "help": "Target branch", "value": "feat/y"}
 		],
-		"sections": [{"key": "target", "title": "Where it goes", "summary": "feat/y"}],
 		"problems": [{"path": "branches[0]", "code": "required", "flag": "branches[0]", "message": "branches[0] is required"}]
 	}`, string(data))
 }
@@ -125,7 +123,7 @@ func TestAFormWithoutProblemsHasAnEmptyList(t *testing.T) {
 	data, err := json.Marshal(Form{})
 
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"fields": [], "sections": [], "problems": []}`, string(data))
+	assert.JSONEq(t, `{"fields": [], "problems": []}`, string(data))
 }
 
 func TestAFormFoldsIntoTheRequestItsFieldsAnswer(t *testing.T) {

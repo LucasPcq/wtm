@@ -1,106 +1,92 @@
-import type { DomainField } from '@/api/types.gen'
+import type { DomainField, DomainOrigin } from '@/api/types.gen'
+import { defaultOf, keyOf } from '@/components/command-form/answers'
+import { FieldInput } from '@/components/command-form/field-input'
+import type { CommandForm } from '@/components/command-form/use-command-form'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
-import { keyOf, valueOf } from './answers'
-import type { CommandForm } from './use-command-form'
 
-// CommandFields draws each field of a command's form with the input of its kind.
-export function CommandFields(props: { form: CommandForm; fields: DomainField[] }) {
+// The core's labels and helps are the command line's: a screen gives its fields its own words.
+export type OptionWords = { title: string; description: string }
+export type FieldWords = { label: string; help: string; options?: Record<string, OptionWords>; config?: string }
+
+const origin: Record<DomainOrigin, string | undefined> = {
+  request: undefined,
+  default: undefined,
+  remembered: 'remembered',
+  config: 'from config',
+}
+
+export type Remember = { paths: string[]; toggle: (path: string) => void }
+
+export function CommandFields({
+  form,
+  fields,
+  words,
+  problems,
+  remember,
+}: {
+  form: CommandForm
+  fields: DomainField[]
+  words: Record<string, FieldWords>
+  problems: Record<string, string>
+  remember?: Remember
+}) {
   return (
-    <FieldGroup>
-      {props.fields.map((field) => (
-        <props.form.Field key={field.path} name={keyOf(field.path)} defaultValue={valueOf(field)}>
-          {(input) => {
-            const errors = input.state.meta.errors.filter(Boolean).map((message) => ({ message: String(message) }))
-            const set = (values: string[]) => input.handleChange(values)
-            return (
-              <Field data-invalid={errors.length > 0}>
-                {field.kind !== 'confirm' && <FieldLabel htmlFor={input.name}>{field.label}</FieldLabel>}
-                <FieldInput
-                  field={field}
-                  id={input.name}
-                  values={input.state.value ?? valueOf(field)}
-                  onChange={set}
-                  invalid={errors.length > 0}
-                />
-                {field.help && <FieldDescription>{field.help}</FieldDescription>}
-                <FieldError errors={errors} />
-              </Field>
-            )
-          }}
-        </props.form.Field>
-      ))}
+    <FieldGroup className="gap-6">
+      {fields.map((field) => {
+        const said = words[field.path]
+        const rememberable = remember && 'rememberable' in field && field.rememberable
+
+        const from = (dirty: boolean) => {
+          if (!field.origin || dirty) return undefined
+          if (field.origin === 'config') return said?.config ?? origin.config
+          return origin[field.origin]
+        }
+
+        return (
+          <form.Field key={field.path} name={keyOf(field.path)} defaultValue={defaultOf(field)}>
+            {(input) => {
+              const { isTouched, isDirty } = input.state.meta
+              // a field's problems show once the person touched it, not when the form opens empty
+              const problem = isTouched ? problems[input.name] : undefined
+              const errors = problem ? problem.split('\n').map((message) => ({ message })) : []
+
+              return (
+                <Field data-invalid={errors.length > 0} className="gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <FieldLabel htmlFor={input.name}>{said?.label ?? field.label}</FieldLabel>
+                    {rememberable && (
+                      <label
+                        htmlFor={`${input.name}-remember`}
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                      >
+                        <Checkbox
+                          id={`${input.name}-remember`}
+                          className="size-3.5"
+                          checked={remember.paths.includes(field.path)}
+                          onCheckedChange={() => remember.toggle(field.path)}
+                        />
+                        Remember
+                      </label>
+                    )}
+                  </div>
+                  <FieldInput
+                    field={field}
+                    id={input.name}
+                    words={said}
+                    from={from(isDirty)}
+                    values={isDirty ? (input.state.value ?? defaultOf(field)) : defaultOf(field)}
+                    onChange={(values) => input.handleChange(values)}
+                    invalid={errors.length > 0}
+                  />
+                  <FieldDescription className="text-sm text-pretty">{said?.help ?? field.help}</FieldDescription>
+                  <FieldError errors={errors} />
+                </Field>
+              )
+            }}
+          </form.Field>
+        )
+      })}
     </FieldGroup>
   )
-}
-
-type InputProps = {
-  field: DomainField
-  id: string
-  values: string[]
-  onChange: (values: string[]) => void
-  invalid: boolean
-}
-
-function FieldInput({ field, id, values, onChange, invalid }: InputProps) {
-  switch (field.kind) {
-    case 'select':
-      return (
-        <Select value={values[0] ?? ''} onValueChange={(value) => onChange([value])}>
-          <SelectTrigger id={id} aria-invalid={invalid}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {field.options.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )
-    case 'multi_select':
-      return (
-        <div id={id} className="flex flex-col gap-2">
-          {field.options.map((option) => (
-            <label key={option.value} className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={values.includes(option.value)}
-                onCheckedChange={(on) =>
-                  onChange(on ? [...values, option.value] : values.filter((value) => value !== option.value))
-                }
-              />
-              {option.label}
-            </label>
-          ))}
-        </div>
-      )
-    case 'text':
-      return (
-        <Input
-          id={id}
-          aria-invalid={invalid}
-          value={values[0] ?? ''}
-          onChange={(e) => onChange(e.target.value ? [e.target.value] : [])}
-        />
-      )
-    case 'text_list':
-      return (
-        <Textarea id={id} aria-invalid={invalid} value={values[0] ?? ''} onChange={(e) => onChange([e.target.value])} />
-      )
-    case 'confirm':
-      return (
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox
-            id={id}
-            checked={values[0] === field.yes.value}
-            onCheckedChange={(on) => onChange([on ? field.yes.value : field.no.value])}
-          />
-          {field.label}
-        </label>
-      )
-  }
 }

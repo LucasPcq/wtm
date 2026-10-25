@@ -157,6 +157,8 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"tree_go":     {followUp: tree.Actions(tree.Detail{Branch: "feat/a", Rebasing: true}, false)[0], argv: []string{"wtm", "go", "feat/a"}},
 		"tree_clean":  {followUp: tree.Actions(tree.Detail{Branch: "feat/a"}, true)[0], argv: []string{"wtm", "clean", "feat/a"}},
 		"tree_sync":   {followUp: tree.Actions(tree.Detail{Branch: "feat/a", NeedsSync: true}, false)[0], argv: []string{"wtm", "sync", "feat/a"}},
+		"behind":      {followUp: *status.Problems(status.ProblemsParams{Branch: "feat/a", Parent: "feat/b", Lacks: 1})[0].Fix, argv: []string{"wtm", "sync", "feat/a"}},
+		"reparent":    {followUp: domain.FollowUp{Command: "reparent", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "to", Values: []string{"feat/b"}}}}, argv: []string{"wtm", "reparent", "feat/a", "--to", "feat/b"}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

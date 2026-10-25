@@ -2,16 +2,20 @@ package list
 
 import (
 	"context"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
-// Git is the repository as list reads it, a worktree at a time, and refreshes it from origin.
+// Git is the repository as list reads it: a worktree at a time, its uncommitted changes, when each branch last moved and whether a commit is behind another; and it refreshes it from origin.
 type Git interface {
 	repository.Prober
+	repository.Ancestors
+	Changes(ctx context.Context, dir string) ([]worktree.Change, error)
 	AheadBehindOf(ctx context.Context, span worktree.Span) (worktree.AheadBehind, error)
+	CommitDates(ctx context.Context) (map[string]time.Time, error)
 	Fetch(ctx context.Context) error
 }
 

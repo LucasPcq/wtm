@@ -57,7 +57,7 @@ func TestIfNotExistsIsSetByItsFlagOnly(t *testing.T) {
 	unset := w.questions(t, create.Request{Branches: []string{branchName}})
 
 	assert.Equal(t, domain.Confirm{Answer: domain.Answer[bool]{Value: true, Origin: domain.OriginRequest}}, given.IfNotExists)
-	assert.Equal(t, domain.Confirm{Answer: domain.Answer[bool]{Origin: domain.OriginDefault}, Skip: "set by its flag only"}, unset.IfNotExists)
+	assert.Equal(t, domain.Confirm{Answer: domain.Answer[bool]{Origin: domain.OriginDefault}, Skip: domain.SkipFlagOnly}, unset.IfNotExists)
 }
 
 func TestAnAnswerGivenWinsOverARememberedOne(t *testing.T) {
@@ -85,7 +85,7 @@ func TestIsolationIsAskedOnlyWhenTheRunHasSomethingToIsolate(t *testing.T) {
 	skipped := bare.questions(t, create.Request{Branches: []string{branchName}})
 	asked := isolating.questions(t, create.Request{Branches: []string{branchName}})
 
-	assert.Equal(t, "run.toml declares nothing a worktree isolates", skipped.Isolation.Skip)
+	assert.Equal(t, domain.SkipNothingIsolated, skipped.Isolation.Skip)
 	assert.Equal(t, domain.Answer[project.Isolation]{Value: project.Isolated, Origin: domain.OriginDefault}, skipped.Isolation.Answer)
 	assert.Empty(t, asked.Isolation.Skip)
 	assert.Equal(t, []project.Isolation{project.Isolated, project.Verbatim}, asked.Isolation.Options)
@@ -95,7 +95,7 @@ func TestTheFastForwardIsAskedOnlyWhenTheBranchItStartsFromIsBehind(t *testing.T
 	upToDate := newWorld(t, seed{})
 	behind := newWorld(t, seed{Behind: true})
 
-	assert.Equal(t, "nothing to fast-forward: the source is not behind origin", upToDate.questions(t, create.Request{Branches: []string{branchName}}).FastForward.Skip)
+	assert.Equal(t, domain.SkipNotBehind, upToDate.questions(t, create.Request{Branches: []string{branchName}}).FastForward.Skip)
 	assert.Empty(t, behind.questions(t, create.Request{Branches: []string{branchName}}).FastForward.Skip)
 }
 
@@ -411,6 +411,6 @@ func TestTheConfigDefaultIsTheFirstEnvOptionNamingTheConfiguredStrategy(t *testi
 
 	field, found := fieldAt(form, "env_from").(domain.SelectField)
 	require.True(t, found)
-	assert.Equal(t, domain.Option{Value: "config", Label: "Use config default (main)", Short: "config default"}, field.Options[0])
+	assert.Equal(t, domain.Option{Value: "config", Label: "config default (main)", Short: "config default"}, field.Options[0])
 	assert.Equal(t, []string{"config", "example", "main", "parent"}, valuesOf(field.Options))
 }

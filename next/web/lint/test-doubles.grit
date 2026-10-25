@@ -1,0 +1,23 @@
+language js
+
+or {
+  `import { $names } from "vitest"` where {
+    $names <: contains `vi as $_`,
+    $msg = "vi renamed hides it from the rules on mocks: import it as vi (web-front skill, test-doubles)."
+  },
+  `import * as $_ from "vitest"` where {
+    $msg = "vitest imported whole hides vi from the rules on mocks: import vi by name (web-front skill, test-doubles)."
+  },
+  `$_.renderHook` where {
+    $msg = "Test a component through what its user does, never a hook alone (web-front skill, test-doubles)."
+  },
+  `vi.spyOn($global, $name)` where {
+    $global <: or {
+      `window`,
+      `globalThis`,
+      `self`
+    },
+    $name <: r"['\"](?:fetch|EventSource|XMLHttpRequest|WebSocket)['\"]",
+    $msg = "A spy on the network replaces it: mock the server with msw (web-front skill, test-doubles)."
+  }
+} as $node where { register_diagnostic(span=$node, message=$msg) }

@@ -1,20 +1,20 @@
 import { useQuery } from '@tanstack/react-query'
 import { Unplug } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Toaster } from 'sonner'
 import { connectionOf, eventsQuery } from '@/api/queries/events'
 import { Centered } from '@/components/centered'
 import { StatePage } from '@/components/state-page'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
-import { AppSidebar } from './app-sidebar'
+import { AppSidebar } from '@/features/shell/components/app-sidebar'
 
-// Shell is the frame of every screen: the sidebar, and the screen beside it, unless the server restarted.
-export function Shell(props: { repo: string | undefined; children: ReactNode }) {
+export function Shell({ repo, children }: { repo: string | undefined; children: ReactNode }) {
   const connection = connectionOf(useQuery(eventsQuery))
 
   return (
     <SidebarProvider>
-      <AppSidebar repo={props.repo} />
-      <SidebarInset>
+      <AppSidebar repo={repo} />
+      <SidebarInset className="h-svh min-h-0 overflow-hidden">
         {connection === 'disconnected' ? (
           <Centered>
             <StatePage icon={<Unplug />} title="The server restarted" command="wtm-next ui">
@@ -23,9 +23,10 @@ export function Shell(props: { repo: string | undefined; children: ReactNode }) 
             </StatePage>
           </Centered>
         ) : (
-          props.children
+          children
         )}
       </SidebarInset>
+      <Toaster position="bottom-right" theme="system" />
     </SidebarProvider>
   )
 }

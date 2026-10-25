@@ -56,16 +56,17 @@ func TestARunConfigThatDoesNotLoadIsAFactNotAFailure(t *testing.T) {
 }
 
 func TestThePlanSaysWhatBecomesOfEachBranch(t *testing.T) {
+	added := []domain.Phase{domain.PhaseWorktree, domain.PhaseEnv, domain.PhaseMeta}
 	w := newWorld(t, seed{Linked: []string{"linked"}})
 
 	planned, warnings := w.plan(t, create.Request{Branches: []string{branchName, existing, remote, "linked"}, From: "main", IfNotExists: true})
 
 	assert.Equal(t, create.Plan{
 		Branches: []create.BranchPlan{
-			{Branch: branchName, Path: w.path(branchName), Action: create.ActionCreate},
-			{Branch: existing, Path: w.path(existing), Action: create.ActionCheckOut},
-			{Branch: remote, Path: w.path(remote), Action: create.ActionResume, Upstream: "origin/" + remote},
-			{Branch: "linked", Path: linkedPath(w.root, "linked"), Action: create.ActionUnchanged},
+			{Branch: branchName, Path: w.path(branchName), Action: create.ActionCreate, Phases: added},
+			{Branch: existing, Path: w.path(existing), Action: create.ActionCheckOut, Phases: added},
+			{Branch: remote, Path: w.path(remote), Action: create.ActionResume, Upstream: "origin/" + remote, Phases: added},
+			{Branch: "linked", Path: linkedPath(w.root, "linked"), Action: create.ActionUnchanged, Phases: []domain.Phase{}},
 		},
 		From:    "main",
 		EnvFrom: project.EnvMain,

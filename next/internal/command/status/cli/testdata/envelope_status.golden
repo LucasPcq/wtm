@@ -125,6 +125,23 @@
         },
         "problems": [
           {
+            "code": "status.behind",
+            "message": "main has 1 commit it lacks",
+            "fix": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "status.behind",
+              "message": "sync it onto main"
+            }
+          },
+          {
             "code": "status.env_missing",
             "message": "web/.env is missing",
             "fix": {
@@ -170,7 +187,8 @@
               "message": "start it again"
             }
           }
-        ]
+        ],
+        "condition": "changed"
       }
     }
   ],

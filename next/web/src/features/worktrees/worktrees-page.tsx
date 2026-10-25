@@ -1,50 +1,87 @@
 import { useQuery } from '@tanstack/react-query'
-import { CircleAlert, Plus } from 'lucide-react'
-import { readQuery } from '@/api/queries/commands'
+import { worktreeCount } from '@/api/queries/commands'
 import { reposQuery } from '@/api/queries/repos'
-import { Centered } from '@/components/centered'
 import { PageHeader } from '@/components/page-header'
-import { StatePage } from '@/components/state-page'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Toolbar } from '@/features/worktrees/components/toolbar'
+import { CreateButton } from '@/features/worktrees/create/create-button'
+import { useUnderWay } from '@/features/worktrees/create/hooks/use-create-run'
+import { DetailPanel } from '@/features/worktrees/detail/detail-panel'
+import { useRead } from '@/features/worktrees/hooks/use-read'
+import { columnIds, defaultColumns } from '@/features/worktrees/list/components/columns'
+import { ColumnsPanel } from '@/features/worktrees/list/components/columns-panel'
+import { Notes } from '@/features/worktrees/list/components/notes'
+import { ListView } from '@/features/worktrees/list/list-view'
+import { rowsOf } from '@/features/worktrees/list/utils/rows'
+import { useChoice } from '@/features/worktrees/store/ui-store'
+import { TreeView } from '@/features/worktrees/tree/tree-view'
+import { overlaid } from '@/features/worktrees/utils/condition'
+import { countsOf } from '@/features/worktrees/utils/filters'
+import { unavailable } from '@/features/worktrees/utils/github'
+import type { WorktreesSearch } from '@/features/worktrees/utils/search'
 import { repoName } from '@/lib/repo'
 
-// Worktrees is the screen of a repository's worktrees; its table arrives with LUC-360, the shell draws its frame.
-export function WorktreesPage({ repo }: { repo: string }) {
-  const list = useQuery(readQuery(repo, 'list'))
+export function WorktreesPage({ repo, search }: { repo: string; search: WorktreesSearch }) {
+  const tree = search.view === 'tree'
+  // only the view on screen is read: two reads of git on every event otherwise
+  const list = useRead(repo, 'list', !tree)
+  const forest = useRead(repo, 'tree', tree)
   const root = useQuery(reposQuery).data?.find((known) => known.id === repo)?.root
-  const count = list.data?.items?.length
+  const columns = useChoice('columns', repo, columnIds, defaultColumns)
+  const underWay = useUnderWay(repo)
+
+  const githubOut = unavailable(list.github.data?.warnings)
+  const githubAsked = list.github.isSuccess && !githubOut
+  const rows = list.live.data
+    ? rowsOf({
+        live: list.live.data,
+        github: githubAsked ? list.github.data : undefined,
+        readAt: list.live.dataUpdatedAt,
+        underWay,
+      })
+    : []
+  const read = tree ? forest.live.data : list.live.data
+  const count = read ? worktreeCount(read) : 0
+
+  const actions = () => {
+    if (!tree) return rows.find((row) => row.subject === search.worktree)?.actions ?? []
+
+    const live = forest.live.data?.items.find((item) => item.subject === search.worktree)?.detail
+    const asked = forest.github.data?.items.find((item) => item.subject === search.worktree)?.detail
+    return (live && overlaid(live, asked).actions) ?? []
+  }
 
   return (
     <>
       <PageHeader
         title="Worktrees"
-        description={
-          count !== undefined && root && `${count} ${count === 1 ? 'worktree' : 'worktrees'} in ${repoName(root)}`
-        }
-        action={
-          <Button disabled>
-            <Plus />
-            Create worktree
-          </Button>
-        }
+        description={read && root && `${count} ${count === 1 ? 'worktree' : 'worktrees'} in ${repoName(root)}`}
+        action={<CreateButton repo={repo} />}
       />
-      {list.isError && (
-        <Centered>
-          <StatePage icon={<CircleAlert />} title="wtm couldn't read the worktrees">
-            {list.error.message}
-          </StatePage>
-        </Centered>
-      )}
-      <div className="flex flex-col gap-3 p-8" aria-busy={list.isPending}>
-        {list.isPending &&
-          [260, 195, 213, 156, 182].map((width) => (
-            <div key={width} className="flex h-11 items-center gap-6 border-b px-3">
-              <Skeleton className="h-3.5" style={{ width }} />
-              <Skeleton className="h-3.5 w-[90px]" />
-              <Skeleton className="h-3.5 w-[60px]" />
-            </div>
-          ))}
+      <Toolbar
+        search={search}
+        {...(!tree && {
+          counts: countsOf(rows, githubAsked),
+          trailing: <ColumnsPanel shown={columns.shown} onToggle={columns.toggle} onReset={columns.reset} />,
+        })}
+      />
+
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col" aria-busy={!read}>
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+            {tree ? (
+              <TreeView repo={repo} search={search} underWay={underWay} />
+            ) : (
+              <ListView live={list.live} rows={rows} shown={columns.shown} search={search} />
+            )}
+          </div>
+          {/* below the rows, not after them: the notes stay put whatever the filters keep */}
+          {!tree && list.live.data && (
+            <Notes warnings={githubOut ? [...list.live.data.warnings, githubOut] : list.live.data.warnings} />
+          )}
+        </div>
+        {search.worktree && (
+          <DetailPanel key={search.worktree} repo={repo} worktree={search.worktree} actions={actions()} />
+        )}
       </div>
     </>
   )

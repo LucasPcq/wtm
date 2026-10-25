@@ -112,7 +112,7 @@ func (q *Query[R, Q, O]) ask(ctx context.Context, app Reader[R, Q, O], req R) (R
 
 // A Skipper is a request that says why it leaves a field unasked, empty when it does not: what the field's Skip says once its questions are read.
 type Skipper interface {
-	Skips(path string) string
+	Skips(path string) domain.Skip
 }
 
 // subjectOf returns the positional select of form req leaves open, and reports whether there is one: neither answered nor ruled out, by the form or by req.

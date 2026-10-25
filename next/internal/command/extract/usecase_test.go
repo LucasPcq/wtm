@@ -280,7 +280,7 @@ func TestTheSourcesOwnBranchIsNeverFastForwarded(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, planned.FastForward)
-	assert.Equal(t, "nothing to fast-forward: feat/login holds the changes being extracted", questions.FastForward.Skip)
+	assert.Equal(t, domain.SkipHeld, questions.FastForward.Skip)
 }
 
 func TestARefTheApplyFastForwardsIsCheckedForConflictsAsOriginHasIt(t *testing.T) {

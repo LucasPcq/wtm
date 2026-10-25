@@ -35,6 +35,11 @@ const (
 	PullRequestClosed PullRequestState = "closed"
 )
 
+// PullRequestStates returns every PullRequestState.
+func PullRequestStates() []PullRequestState {
+	return []PullRequestState{PullRequestOpen, PullRequestMerged, PullRequestClosed}
+}
+
 // PullRequestOf returns the pull request of branch among prs, and reports whether it has one; a worktree on no branch has none.
 func PullRequestOf(prs []PullRequest, branch string) (PullRequest, bool) {
 	at := slices.IndexFunc(prs, func(pr PullRequest) bool { return branch != "" && pr.Branch == branch })
@@ -66,3 +71,20 @@ func (r Repository) mergedInto(pr PullRequest, w Worktree) (string, bool) {
 
 // ErrPullRequestsUnavailable is why the pull requests could not be listed, wrapped with what to do about it.
 var ErrPullRequestsUnavailable = errors.New("pull requests unavailable")
+
+// Progress is where an open pull request's review stands: its title, whether it is a draft, its checks counted and GitHub's review decision.
+type Progress struct {
+	Title    string `json:"title"`
+	Draft    bool   `json:"draft"`
+	Checks   Checks `json:"checks"`
+	Decision string `json:"decision"`
+}
+
+// Progress returns where pr's review stands, nil unless pr is open.
+func (pr PullRequest) Progress() *Progress {
+	if pr.State != PullRequestOpen {
+		return nil
+	}
+
+	return &Progress{Title: pr.Title, Draft: pr.Draft, Checks: pr.Checks, Decision: pr.Decision}
+}

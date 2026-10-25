@@ -1,8 +1,3 @@
-import { useQuery } from '@tanstack/react-query'
-import { versionQuery } from '@/api/queries/version'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-
-// The mark of docs/dev/identity.md: a dot that splits into three lanes, one branch and three worktrees.
 function Mark() {
   return (
     <svg width="30" height="24" viewBox="0 0 30 24" aria-hidden="true">
@@ -38,20 +33,5 @@ export function Logo() {
       <Mark />
       <span className="text-lg font-bold">wtm</span>
     </span>
-  )
-}
-
-// VersionedLogo carries the version of the binary in its tooltip: chrome nobody needs at a glance.
-export function VersionedLogo() {
-  const version = useQuery(versionQuery)
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span tabIndex={0} className="w-fit rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-          <Logo />
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="right">wtm {version.data?.version ?? '…'}</TooltipContent>
-    </Tooltip>
   )
 }

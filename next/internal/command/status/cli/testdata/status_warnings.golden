@@ -1,5 +1,5 @@
 
-  ! feat/a — 1 problem
+  ! feat/a — 2 problems
 
   path         /repo/.trees/feat-a
   isolation    isolated
@@ -11,6 +11,8 @@
   last commit  Wire the session Wire the session
   parent       main
 
+  ! main has 1 commit it lacks
+  → wtm sync feat/a   sync it onto main
   ! web/.env is missing
   → wtm env feat/a   rebuild it
   ! run.toml does not read: its jobs and ports are not shown: invalid run config: unknown addressing "nope"

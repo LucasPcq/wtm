@@ -37,3 +37,5 @@ func codes(read list.Outcome) []string {
 	}
 	return found
 }
+
+func ptr(n int) *int { return &n }

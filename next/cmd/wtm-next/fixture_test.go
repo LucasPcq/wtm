@@ -104,8 +104,8 @@ func eventsOfEachType() []domain.Event {
 	identity := worktree.Identity{Branch: "feat/a", Path: "/repo/.trees/feat-a", Parent: "main", Isolation: "isolated", CreatedAt: "2026-10-24T12:00:00Z"}
 	return []domain.Event{
 		domain.UnitStarted{Subject: "feat/a"},
-		domain.PhaseStarted{Subject: "feat/a", Phase: "hooks", Log: "/repo/.git/wtm/logs/feat-a.log"},
-		domain.PhaseFinished{Subject: "feat/a", Phase: "hooks", Failed: true},
+		domain.PhaseStarted{Subject: "feat/a", Phase: domain.PhaseOnCreate, Log: "/repo/.git/wtm/logs/feat-a.log"},
+		domain.PhaseFinished{Subject: "feat/a", Phase: domain.PhaseOnCreate, Failed: true},
 		domain.Output{Subject: "feat/a", Line: "installing"},
 		domain.UnitFinished{Subject: "feat/a", Status: domain.StatusDone},
 		domain.WorktreeCreated{Worktree: identity},

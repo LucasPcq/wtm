@@ -63,3 +63,14 @@ func TestOnlyAMergedPullRequestPastItsBranchTipAsksWhetherTheTipIsBehind(t *test
 	assert.False(t, open)
 	assert.False(t, base)
 }
+
+func TestOnlyAnOpenPullRequestHasAReviewInProgress(t *testing.T) {
+	pr := PullRequest{Title: "Add a", Draft: true, Checks: Checks{Passed: 1}, Decision: "APPROVED"}
+
+	for _, state := range []PullRequestState{PullRequestMerged, PullRequestClosed} {
+		pr.State = state
+		assert.Nil(t, pr.Progress(), state)
+	}
+	pr.State = PullRequestOpen
+	assert.Equal(t, &Progress{Title: "Add a", Draft: true, Checks: Checks{Passed: 1}, Decision: "APPROVED"}, pr.Progress())
+}

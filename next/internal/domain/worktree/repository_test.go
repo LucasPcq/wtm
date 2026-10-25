@@ -82,3 +82,30 @@ func TestThePlannedIsolationIsNoneOnlyWhenRunTomlIsolatesNothing(t *testing.T) {
 		})
 	}
 }
+
+func TestAWorktreeIsCountedAgainstItsParentOrForARootTheBase(t *testing.T) {
+	repo := Repository{Config: project.Config{Worktrees: project.Worktrees{BaseBranch: "main"}}, Snapshot: Snapshot{Branches: Branches{Local: []Branch{{Name: "main"}, {Name: "feat/a"}, {Name: "feat/a-ui"}, {Name: "root"}, {Name: "x"}, {Name: "y"}}}}}
+	on := func(branch string) Worktree { return Worktree{State: OnBranch{Branch: branch}} }
+	worktrees := []Worktree{{Main: true, State: OnBranch{Branch: "main"}}, on("feat/a"), on("feat/a-ui"), on("root"), on("gone"), on("x"), on("y")}
+	stack := StackOf(worktrees, map[string]Meta{"feat/a": {SourceBranch: "main"}, "feat/a-ui": {SourceBranch: "feat/a"}, "gone": {SourceBranch: "nowhere"}, "x": {SourceBranch: "y"}, "y": {SourceBranch: "x"}}, "main")
+	cases := map[string]struct {
+		w       Worktree
+		against string
+		counted bool
+	}{
+		"child":       {w: on("feat/a-ui"), against: "feat/a", counted: true},
+		"root":        {w: on("root"), against: "main", counted: true},
+		"main":        {w: worktrees[0], against: "main"},
+		"no_branch":   {w: Worktree{State: Detached{}}, against: "main"},
+		"cycle":       {w: on("x"), against: "main"},
+		"parent_gone": {w: on("gone"), against: "nowhere"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			against, counted := repo.CountedAgainstParent(stack, c.w)
+
+			assert.Equal(t, c.against, against)
+			assert.Equal(t, c.counted, counted)
+		})
+	}
+}

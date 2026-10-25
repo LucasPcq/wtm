@@ -68,9 +68,9 @@ func (r Request) Values(path string) []string {
 // The form
 
 // Skips is why the field at path is not asked, empty when it is: the worktree, when every worktree is read.
-func (r Request) Skips(path string) string {
+func (r Request) Skips(path string) domain.Skip {
 	if path == domain.PathWorktree && r.All {
-		return "--all reads every worktree"
+		return domain.SkipAll
 	}
 	return ""
 }
@@ -79,7 +79,7 @@ func (r Request) Skips(path string) string {
 type Questions struct {
 	worktrees []domain.Option
 	read      string
-	skip      string
+	skip      domain.Skip
 	problems  []domain.FieldError
 }
 

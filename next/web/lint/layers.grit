@@ -1,0 +1,63 @@
+language js
+
+or {
+  JsModuleSource() as $src,
+  `import($src)`
+} as $node where {
+  $filename <: r".*/src/(.*)"($rel),
+  or {
+    and {
+      $src <: r"['\"](?:@/|\./).*\.\./.*",
+      $msg = "A path with .. in it hides the folder it reaches: name it whole (web-front skill, layers)."
+    },
+    and {
+      $rel <: r"api/.*",
+      $src <: r"['\"]@/.*",
+      not $src <: r"['\"]@/(?:api|test)/.*",
+      $msg = "src/api/ imports nothing of the app (web-front skill, layers)."
+    },
+    and {
+      $rel <: r"lib/.*",
+      not $src <: r"['\"](?:\./|@/lib/|cn['\"]|clsx['\"]|tailwind-merge['\"]|vitest['\"]).*",
+      $msg = "lib/ is pure: no react, nothing of the app (web-front skill, layers)."
+    },
+    and {
+      $rel <: r"routes/.*",
+      not $src <: r"['\"](?:\./|@/features/|@/routes/|@tanstack/react-router['\"]).*",
+      not and { $src <: r"['\"]@tanstack/react-query['\"]", $src <: within `import type $_ from $_` },
+      $msg = "A route imports the router and features only (web-front skill, layers)."
+    },
+    and {
+      $rel <: r"components/.*",
+      $src <: r"['\"]@/(?:features|routes)/.*",
+      $msg = "components/ never reaches a feature (web-front skill, layers)."
+    },
+    and {
+      $rel <: r"features/([^/]+)/.*"($own),
+      $src <: r"['\"]@/([^/]+)/.*"($to),
+      not $to <: or {
+        "components",
+        "lib",
+        "api",
+        "hooks",
+        "test"
+      },
+      not and { $to <: "features", $src <: r"['\"]@/features/([^/]+)/.*"($other), $other <: $own },
+      $msg = "A feature imports no other feature, nor routes (web-front skill, layers)."
+    },
+    and {
+      not $rel <: or {
+        r"test/.*",
+        r".*\.test\.tsx?"
+      },
+      $src <: r"['\"](?:vitest|msw|@testing-library/|@/test/).*",
+      $msg = "Testing packages and src/test/ are for tests only (web-front skill, layers)."
+    },
+    and {
+      not $rel <: r"api/.*",
+      $src <: r"['\"]eventsource-parser.*",
+      $msg = "Streams are parsed in src/api/ only (web-front skill, layers)."
+    }
+  },
+  register_diagnostic(span=$node, message=$msg)
+}

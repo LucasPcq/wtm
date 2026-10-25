@@ -90,6 +90,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 
 	facts := Facts{Repository: repo, Targets: targets}
 	facts.Records, facts.RecordErrs = repository.Records(u.Meta, repo.Live())
+	facts.Stack = worktree.StackOf(repo.Worktrees, facts.Records, repo.Config.Worktrees.BaseBranch)
 	branches := make([]string, 0, len(targets))
 	for _, w := range targets {
 		branches = append(branches, w.Branch())
@@ -166,11 +167,21 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 	unread("its diffstat", err)
 	state.Commits, err = u.Git.Commits(ctx, w.Path, commitsShown)
 	unread("its commits", err)
+	base := facts.Config.Worktrees.BaseBranch
 	if facts.CountedAgainstBase(w) {
-		base := facts.Config.Worktrees.BaseBranch
 		gap, err := u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: base})
 		if !unread("where it stands against "+base, err) {
 			state.Base = &gap
+		}
+	}
+	// a parent that is the base branch, whose count just failed, is not asked again: it was said unread once
+	parent, _ := facts.CountedAgainstParent(facts.Stack, w)
+	if parent != base || !facts.CountedAgainstBase(w) || state.Base != nil {
+		gap, err := repository.GapToParent(repository.GapParams{Repo: facts.Repository, Stack: facts.Stack, Worktree: w, Base: state.Base, Count: func(against string) (worktree.AheadBehind, error) {
+			return u.Git.AheadBehindOf(ctx, worktree.Span{Branch: w.Branch(), Base: against})
+		}})
+		if !unread("where it stands against "+parent, err) && gap.Behind != nil {
+			state.Lacks = *gap.Behind
 		}
 	}
 	if state.Err != nil {

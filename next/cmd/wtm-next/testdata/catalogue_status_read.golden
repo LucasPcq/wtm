@@ -43,7 +43,8 @@
           "declared": 0,
           "files": []
         },
-        "problems": []
+        "problems": [],
+        "condition": "clean"
       }
     }
   ],

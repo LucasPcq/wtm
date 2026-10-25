@@ -1,9 +1,13 @@
 
-  ✗ 4 worktrees · 1 not read
+  ✗ 4 worktrees · 1 needs attention · 1 not read
 
-  WORKTREE            ENV
-  main                2 files
-  ../.trees/detached  2 files
-  feat/old            2 files
+     WORKTREE            ENV
+     main                2 files
+     ../.trees/detached  2 files
+  !  feat/old            2 files
+
+  feat/old
+  ! main has 1 commit it lacks
+  → wtm sync feat/old   sync it onto main
   ✗ couldn't read /repo/.trees/feat-a: broken index
 

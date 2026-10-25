@@ -120,9 +120,9 @@ func (r request) Answer(path string, values []string) (request, error) {
 func (r request) Values(path string) []string { return r[path] }
 
 // Skips rules the worktree out of a request that reads them all.
-func (r request) Skips(path string) string {
+func (r request) Skips(path string) domain.Skip {
 	if path == "worktree" && len(r["all"]) > 0 {
-		return "--all reads every worktree"
+		return domain.SkipAll
 	}
 	return ""
 }
@@ -143,7 +143,7 @@ func (q questions) Form() domain.Form {
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "ff", Flag: "--ff", Label: "Update", Help: "Update first"}, Value: one("ff") == "true", Rememberable: true},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "keep", Flag: "--keep", Label: "Keep", Help: "Keep it"}, Value: one("keep") == "true", Yes: domain.Option{Label: "Copy", Short: "copy"}, No: domain.Option{Label: "Move", Short: "move"}, NoFirst: true},
 		domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: "files", Flag: "--files", Label: "Files", Help: "The files"}, Picked: q.req["files"], Options: []domain.Option{{Value: "a.txt"}, {Value: "b.txt"}}, Empty: "Pick one"},
-		domain.TextField{FieldSpec: domain.FieldSpec{Path: "name", Flag: "--name", Label: "Name", Help: "The name"}, Value: one("name")},
+		domain.TextField{FieldSpec: domain.FieldSpec{Path: "name", Flag: "--name", Label: "Name", Help: "The name", Skip: domain.Skip(one("unworded"))}, Value: one("name")},
 	}}
 }
 
@@ -209,7 +209,7 @@ type subjects struct{ req request }
 func (q subjects) Form() domain.Form {
 	field := domain.SelectField{FieldSpec: domain.FieldSpec{Path: "worktree", Flag: "<worktree>", Label: "Worktree", Help: "The worktree to read"}, Value: "main", Options: []domain.Option{{Value: "main"}, {Value: "feat/x", Label: "feat/x (detached)"}}}
 	if len(q.req["all"]) > 0 {
-		field.Skip = "--all reads every worktree"
+		field.Skip = domain.SkipAll
 	}
 	return domain.Form{Fields: []domain.Field{field, domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "all", Flag: "--all", Label: "All", Help: "Every worktree"}}}}
 }

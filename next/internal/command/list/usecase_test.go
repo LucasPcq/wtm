@@ -27,12 +27,13 @@ func TestEachWorktreeIsReadTheMainOneFirstThenTheOldest(t *testing.T) {
 			Main: mainPath, Branch: "main", Remote: []string{"main", "feat/a"},
 			Worktrees: []worktree.Worktree{linked("feat/a"), linked("feat/b"), linked("feat/c")},
 			Dirty:     []string{"/repo/.trees/feat/a"},
+			Changes:   map[string][]worktree.Change{"/repo/.trees/feat/a": {{Path: "a.go", Status: worktree.ChangeModified}, {Path: "b.go", Status: worktree.ChangeUntracked}}},
 			Commits: map[worktree.Ref][]string{
 				worktree.LocalBranch{Name: "feat/a"}: {"one", "two"},
 			},
 		},
 		Meta: map[string]worktree.Meta{"feat/a": {CreatedAt: newer}, "feat/b": {CreatedAt: older}},
-		Jobs: []run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true}, {Name: "api", WorkDir: "/repo/.trees/feat/a"}},
+		Jobs: []run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true, URL: "http://web.feat-a.acme.localhost"}, {Name: "api", WorkDir: "/repo/.trees/feat/a", URL: "http://api.feat-a.acme.localhost"}},
 	})
 
 	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
@@ -42,8 +43,10 @@ func TestEachWorktreeIsReadTheMainOneFirstThenTheOldest(t *testing.T) {
 	assert.Empty(t, read.Warnings)
 	a := detailOf(t, read, "feat/a")
 	assert.Equal(t, list.Detail{
-		Branch: "feat/a", Path: "/repo/.trees/feat/a", Dirty: true, CommitsAhead: 2, CreatedAt: a.CreatedAt,
-		Origin: &worktree.Origin{Ahead: 2, State: worktree.Ahead}, Services: []string{"web"}, Actions: a.Actions,
+		Branch: "feat/a", Path: "/repo/.trees/feat/a", Dirty: true, CommitsAhead: 2, Ahead: ptr(2), Changes: &list.Changes{Changed: 1, Untracked: 1},
+		CreatedAt: a.CreatedAt, LastCommitAt: &gittest.Committed, Origin: &worktree.Origin{Ahead: 2, State: worktree.Ahead},
+		Condition: worktree.ConditionChanged,
+		Services:  []string{"web"}, URLs: []string{"http://web.feat-a.acme.localhost"}, Actions: a.Actions,
 	}, a)
 	assert.Equal(t, created.Add(time.Hour), *a.CreatedAt)
 	assert.True(t, detailOf(t, read, "main").Main)
@@ -59,7 +62,7 @@ func TestAReadChangesNothingAndTakesNoLock(t *testing.T) {
 
 	require.NoError(t, err)
 	for _, call := range append(w.git.Calls(), w.meta.Calls()...) {
-		assert.Regexp(t, `^(Worktrees|Branches|AheadBehind|Locate|Dirty|AheadBehindOf|Load) `, call)
+		assert.Regexp(t, `^(Worktrees|Branches|CommitDates|AheadBehind|Locate|Dirty|AheadBehindOf|Load) `, call)
 	}
 }
 
@@ -193,6 +196,16 @@ func TestARefreshThatCannotFetchIsAWarning(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{list.CodeFetchFailed}, codes(read))
 	assert.Contains(t, read.Warnings[0].Message, "could not read from remote repository")
+}
+
+func TestDatesThatCannotBeReadAreAWarningNotAFailure(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Fail: map[string]error{"CommitDates": errors.New("for-each-ref failed")}}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{list.CodeDatesUnreadable}, codes(read))
+	assert.Nil(t, detailOf(t, read, "main").LastCommitAt)
 }
 
 func TestJobsThatCannotBeToldAreNoServicesAtAll(t *testing.T) {
@@ -362,4 +375,107 @@ func TestARefreshFetchesOriginOnce(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, fetches)
+}
+
+func TestAStackedWorktreeIsCountedAgainstItsParentAndARootAgainstTheBase(t *testing.T) {
+	w := newWorld(seed{
+		Git: gittest.FakeParams{
+			Worktrees: []worktree.Worktree{linked("feat/a"), linked("feat/a-ui"), linked("feat/root")},
+			Commits: map[worktree.Ref][]string{
+				worktree.LocalBranch{Name: "feat/a"}:    {"a1", "a2"},
+				worktree.LocalBranch{Name: "feat/a-ui"}: {"a1", "u1"},
+			},
+		},
+		Meta: map[string]worktree.Meta{"feat/a": {SourceBranch: "main"}, "feat/a-ui": {SourceBranch: "feat/a"}},
+	})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	a, ui := detailOf(t, read, "feat/a"), detailOf(t, read, "feat/a-ui")
+	assert.Equal(t, "main", a.Parent)
+	assert.Equal(t, ptr(2), a.Ahead)
+	assert.Equal(t, ptr(0), a.Behind)
+	assert.False(t, a.NeedsSync)
+	root := detailOf(t, read, "feat/root")
+	assert.Empty(t, root.Parent, "a worktree without a record is a root")
+	assert.Equal(t, ptr(0), root.Ahead, "a root is counted against the base branch")
+	assert.Nil(t, root.Behind, "a root has no parent to fall behind")
+	assert.Equal(t, "feat/a", ui.Parent)
+	assert.Equal(t, ptr(1), ui.Ahead)
+	assert.Equal(t, ptr(1), ui.Behind)
+	assert.True(t, ui.NeedsSync)
+	assert.Equal(t, 2, ui.CommitsAhead, "commits_ahead stays counted against the base branch")
+	main := detailOf(t, read, "main")
+	assert.Nil(t, main.Ahead, "the main worktree is not counted")
+	assert.Empty(t, main.Parent)
+}
+
+func TestAPullRequestMergedAtTheBranchTipMarksItsWorktreeMergedOnlyWhenAsked(t *testing.T) {
+	merged := worktree.PullRequest{Number: 1, Branch: "feat/a", Head: gittest.Root, State: worktree.PullRequestMerged}
+	moved := worktree.PullRequest{Number: 2, Branch: "feat/moved", Head: gittest.Root, State: worktree.PullRequestMerged}
+	w := newWorld(seed{
+		Git: gittest.FakeParams{
+			Worktrees: []worktree.Worktree{linked("feat/a"), linked("feat/moved")},
+			Commits:   map[worktree.Ref][]string{worktree.LocalBranch{Name: "feat/moved"}: {"m1"}},
+		},
+		PRs: []worktree.PullRequest{merged, moved},
+	})
+
+	without, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+	require.NoError(t, err)
+	with, err := w.usecase.Run(t.Context(), list.Request{WithPRs: true}, domain.RunOptions{})
+	require.NoError(t, err)
+
+	assert.False(t, detailOf(t, without, "feat/a").Merged, "GitHub not asked: not known")
+	assert.True(t, detailOf(t, with, "feat/a").Merged)
+	assert.False(t, detailOf(t, with, "feat/moved").Merged, "a branch that moved past its pull request is not merged")
+	assert.Equal(t, worktree.ConditionClean, detailOf(t, without, "feat/a").Condition)
+	assert.Equal(t, worktree.ConditionMerged, detailOf(t, with, "feat/a").Condition)
+}
+
+func TestAnOpenPullRequestCarriesWhereItsReviewStands(t *testing.T) {
+	open := worktree.PullRequest{Number: 3, URL: "https://github.com/acme/acme/pull/3", Branch: "feat/a", State: worktree.PullRequestOpen, Title: "Add a", Draft: true, Checks: worktree.Checks{Passed: 2, Pending: 1}, Decision: "APPROVED"}
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}}, PRs: []worktree.PullRequest{open}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{WithPRs: true}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, &list.PR{Number: 3, URL: open.URL, State: worktree.PullRequestOpen, Progress: &worktree.Progress{Title: "Add a", Draft: true, Checks: worktree.Checks{Passed: 2, Pending: 1}, Decision: "APPROVED"}}, detailOf(t, read, "feat/a").PR)
+}
+
+func TestEachWorktreeSaysWhenItsBranchLastMoved(t *testing.T) {
+	moved := created.Add(48 * time.Hour)
+	w := newWorld(seed{Git: gittest.FakeParams{
+		Worktrees: []worktree.Worktree{linked("feat/a"), {Path: "/repo/.trees/detached", State: worktree.Detached{}}},
+		Dates:     map[string]time.Time{"feat/a": moved},
+	}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, &moved, detailOf(t, read, "feat/a").LastCommitAt)
+	assert.Nil(t, detailOf(t, read, "/repo/.trees/detached").LastCommitAt, "a worktree on no branch has no branch to date")
+}
+
+func TestAMissingWorktreeHasNoChangesToCount(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), linked("feat/b")}, Gone: []string{"/repo/.trees/feat/a"}}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Nil(t, detailOf(t, read, "feat/a").Changes)
+	assert.Equal(t, &list.Changes{}, detailOf(t, read, "feat/b").Changes)
+}
+
+func TestAListCancelledWarnsOfNoDatesItCouldNotRead(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}, Fail: map[string]error{"CommitDates": context.Canceled}}})
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	read, err := w.usecase.Run(ctx, list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.True(t, read.Interrupted)
+	assert.NotContains(t, codes(read), list.CodeDatesUnreadable, "a cancelled read is said once, as interrupted")
 }

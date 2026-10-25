@@ -73,6 +73,7 @@ type seed struct {
 	Env        uicli.Env // zero runs in the main worktree
 	Clean      bool
 	Behind     bool // origin's main is ahead of main
+	Held       bool // origin's feat/login is ahead of it: the source holds the changes and is not fast-forwarded
 	Isolates   bool // run.toml declares a port, so the isolation is asked
 	Conflicts  map[string]worktree.ConflictKind
 	Remembered map[string]string
@@ -127,11 +128,16 @@ func newWorld(s seed) world {
 	if s.Behind {
 		commits[worktree.RemoteBranch{Name: "main"}] = []string{"upstream main"}
 	}
+	remote := []string{"main"}
+	if s.Held {
+		remote = append(remote, source)
+		commits[worktree.RemoteBranch{Name: source}] = []string{"upstream feat/login"}
+	}
 	return world{
 		git: gittest.NewFake(gittest.FakeParams{
 			Main:   mainPath,
 			Branch: "main",
-			Remote: []string{"main"},
+			Remote: remote,
 			Worktrees: []worktree.Worktree{
 				{Path: sourcePath, State: worktree.OnBranch{Branch: source}},
 				{Path: otherPath, State: worktree.OnBranch{Branch: other}},

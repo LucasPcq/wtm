@@ -30,7 +30,7 @@ type Progress struct {
 	status    string
 	painted   bool
 	hook      *hookView
-	phase     string
+	phase     domain.Phase
 	phaseLog  string
 	phaseOpen bool
 	started   time.Time
@@ -80,7 +80,7 @@ func (p *Progress) announce() {
 func (p *Progress) cancellingMessage() string {
 	switch {
 	case p.phase != "" && p.unit != "":
-		return "Cancelling — finishing " + p.phase + " of " + p.unit + "; Ctrl+C again to stop now"
+		return "Cancelling — finishing " + string(p.phase) + " of " + p.unit + "; Ctrl+C again to stop now"
 	case p.unit != "":
 		return "Cancelling — finishing " + p.unit + "; Ctrl+C again to stop now"
 	}
@@ -120,7 +120,7 @@ func (p *Progress) Report(event domain.Event) {
 }
 
 func (p *Progress) label() string {
-	return p.phase + Dot + p.unit
+	return string(p.phase) + Dot + p.unit
 }
 
 // output writes a line a hook printed, opening its phase first: a phase that prints nothing shows nothing.

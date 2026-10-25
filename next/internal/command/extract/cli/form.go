@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 )
 
@@ -24,6 +25,7 @@ func newForm(open func(ctx context.Context, dir string) (extract.UseCase, error)
 		Draw:       drawOutcome,
 		ApplyLabel: applyLabel,
 		Special:    special,
+		Skipped:    skipped,
 	}
 }
 
@@ -33,4 +35,13 @@ func applyLabel(previewed extract.Outcome) string {
 		return "Yes, create & extract"
 	}
 	return "Yes, extract"
+}
+
+// skipped names the branch that holds the changes when the fast-forward is held: the source the request extracts
+// from, which the code does not carry.
+func skipped(s *session, skip domain.Skip) string {
+	if source := s.Request().Source; skip == domain.SkipHeld && source != "" {
+		return "nothing to fast-forward: " + source + " holds the changes being extracted"
+	}
+	return ""
 }

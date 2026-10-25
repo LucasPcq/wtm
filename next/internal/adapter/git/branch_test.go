@@ -2,6 +2,7 @@ package git_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 
@@ -77,6 +78,24 @@ func TestTheFakeAndGitAgreeOnTheTipsAndCountsOfTheirBranches(t *testing.T) {
 			assert.Equal(t, tip(t, impl.port, main), tip(t, impl.port, worktree.RemoteBranch{Name: "feature"}))
 			assert.NotEqual(t, tip(t, impl.port, main), tip(t, impl.port, worktree.LocalBranch{Name: "unmerged"}))
 			assert.NotEqual(t, tip(t, impl.port, worktree.LocalBranch{Name: "diverged"}), tip(t, impl.port, worktree.RemoteBranch{Name: "diverged"}))
+		})
+	}
+}
+
+func TestTheFakeAndGitDateTheTipOfEveryLocalBranch(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			branches, err := impl.port.Branches(t.Context())
+			require.NoError(t, err)
+
+			dates, err := impl.port.CommitDates(t.Context())
+
+			require.NoError(t, err)
+			require.Len(t, dates, len(branches.Local))
+			for _, b := range branches.Local {
+				assert.False(t, dates[b.Name].IsZero(), b.Name)
+				assert.Equal(t, time.UTC, dates[b.Name].Location(), b.Name)
+			}
 		})
 	}
 }

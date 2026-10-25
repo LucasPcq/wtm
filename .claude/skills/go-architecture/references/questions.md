@@ -12,7 +12,7 @@ Pure (no port, no context), in three sections:
 
 ## The field kinds
 
-`domain.Field` is sealed (`domain/form.go`); each kind embeds `domain.FieldSpec{Path, Flag, Label, Help, Origin, Skip}`, `Help` being both the wizard's description and the flag's usage.
+`domain.Field` is sealed (`domain/form.go`); each kind embeds `domain.FieldSpec{Path, Flag, Label, Help, Origin, Skip}`, `Help` being both the wizard's description and the flag's usage: CLI copy, which another surface replaces with its own words. A select whose options are every value it accepts, the same in every repository, says so with `Closed`, and the schema publishes its values as an enum of the command's request.
 
 | Kind | Asks |
 | -- | -- |
@@ -33,7 +33,7 @@ An option is a `domain.Option{Value, Label, Badge, Short}`. A new kind is a type
 5. Its problems in the validation: a `domain.FieldError{Path, Code, Template, Params}` naming the field or an entry (`branches[1]`), coded `<name>.<problem>` or with a shared field code (`domain.CodeOneOf`).
 6. If the plan depends on it, its use in `rules.go` and in `Plan.Fingerprinted()`.
 
-Nothing in `cli/`: the engine registers its flag, usage and step from the schema. A field two steps answer (extract's target, picked as a worktree then typed as a branch) appears once per step. A question that does not apply is skipped with its reason (`Skip`), never left out: the recap still shows it, and a flag or a remembered answer never makes a recap line disappear. Only a select or a confirmation that opts in is rememberable, never a destructive option; `--remember <field>` (`domain.PathRemember`) names the answers to write.
+Nothing in `cli/`: the engine registers its flag, usage and step from the schema. A field two steps answer (extract's target, picked as a worktree then typed as a branch) appears once per step. A question that does not apply is skipped with its reason (`Skip`, a `domain.Skip` code the schema publishes as an enum, which the wizard words in `ui/form/skip.go` and each other surface its own way), never left out: the recap still shows it, and a flag or a remembered answer never makes a recap line disappear. Only a select or a confirmation that opts in is rememberable, never a destructive option; `--remember <field>` (`domain.PathRemember`) names the answers to write.
 
 ## The shared fragment: a question two commands ask
 

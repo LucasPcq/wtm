@@ -2,7 +2,7 @@ BINARY      := wtm
 BINARY_NEXT := wtm-next
 BUILD_DIR   := bin
 
-.PHONY: build next ui ui-dev schema test test-next vet fmt lint lint-next next-lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
+.PHONY: build next ui ui-dev lint-ui schema test test-next vet fmt lint lint-next next-lint arch dead sumtype dead-strict dupl tidy docs site site-dev demos release release-notes install clean
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY) .
@@ -15,6 +15,13 @@ next:
 # from the lockfile and fails when the result differs from the commit.
 ui:
 	cd next/web && npm ci && npm test && npm run build
+
+# lint-ui runs the front's gates alone: the types, then Biome, its formatter and
+# the rules of the web-front skill (no effect, the server through src/api only,
+# the layers, props destructured). make ui runs them too, as part of its build,
+# and so does the CI's ui gate.
+lint-ui:
+	cd next/web && npm ci && npm run types && npx tsr generate && npx tsc -b && npm run lint
 
 # ui-dev serves the front from Vite with /api proxied to the server of `wtm-next ui`
 # (WTM_API=http://127.0.0.1:<port> when it listens elsewhere than 4777).

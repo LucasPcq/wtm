@@ -1,6 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
-import { json } from '../fetch'
-import type { WebVersion } from '../types.gen'
+import { json } from '@/api/fetch'
+import type { WebVersion } from '@/api/types.gen'
 
 export const versionQuery = queryOptions({
   queryKey: ['version'],

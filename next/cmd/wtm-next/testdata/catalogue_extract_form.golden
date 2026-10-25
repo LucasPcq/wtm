@@ -10,7 +10,8 @@
       "options": [],
       "rememberable": false,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": false
     },
     {
       "kind": "multi_select",
@@ -38,7 +39,8 @@
       ],
       "rememberable": false,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": false
     },
     {
       "kind": "text",
@@ -58,65 +60,68 @@
       "options": [],
       "rememberable": false,
       "remember": false,
-      "refreshable": true
+      "refreshable": true,
+      "closed": false
     },
     {
       "kind": "select",
       "path": "env_from",
       "flag": "--env-from",
       "label": "Env strategy",
-      "help": "How the .env files of the new target are provisioned: config (config.toml's strategy), example (from its template), main (copied from the main checkout) or parent (from the worktree of the branch it starts from, --from); defaults to config.toml's strategy",
+      "help": "Where the new target's .env files come from: config, example, main or parent; config.toml's strategy by default",
       "value": "",
       "options": [
         {
           "value": "config",
-          "label": "Use config default ()",
+          "label": "config default ()",
           "short": "config default"
         },
         {
           "value": "example",
-          "label": "example — copy .env.example → .env"
+          "label": "example — from .env.example"
         },
         {
           "value": "main",
-          "label": "main — copy .env from the main checkout"
+          "label": "main — the main checkout's .env"
         },
         {
           "value": "parent",
-          "label": "parent — copy .env from source worktree"
+          "label": "parent — the source worktree's .env"
         }
       ],
       "rememberable": true,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": true
     },
     {
       "kind": "select",
       "path": "isolation",
       "flag": "--isolation",
       "label": "Isolation",
-      "help": "How the new worktree stands against its source: isolated (its own ports, compose project and namespaces in shared services, in the .env and at run time) or verbatim (.env kept exactly as copied, run on its source's ports and data); defaults to run.toml's isolation, else isolated",
+      "help": "How it stands against its source: isolated or verbatim; run.toml's isolation by default",
       "value": "",
       "options": [
         {
           "value": "isolated",
-          "label": "isolated — its own ports, compose project and namespaces"
+          "label": "isolated — its own ports and namespaces"
         },
         {
           "value": "verbatim",
-          "label": "verbatim — keep the copied .env, one of the two runs at a time"
+          "label": "verbatim — the copied .env as is, one runs at a time"
         }
       ],
       "rememberable": true,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": true
     },
     {
       "kind": "confirm",
       "path": "fast_forward",
       "flag": "--ff",
       "label": "Source update",
-      "help": "Fast-forward to origin first the branch a new worktree starts from, or the branch itself when it already exists locally, when it is behind; one that has diverged or holds uncommitted changes starts as it is",
+      "help": "Fast-forward the source branch to origin first when it is behind",
       "value": false,
       "yes": {
         "value": "true",
@@ -172,9 +177,9 @@
       ],
       "rememberable": false,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": true
     }
   ],
-  "sections": [],
   "problems": []
 }

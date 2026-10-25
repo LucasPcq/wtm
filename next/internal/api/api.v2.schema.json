@@ -10,17 +10,39 @@
         "tree"
       ]
     },
+    "create.Action": {
+      "description": "How a branch gets its worktree.",
+      "enum": [
+        "create",
+        "check_out",
+        "resume",
+        "unchanged"
+      ]
+    },
     "create.BranchPlan": {
       "additionalProperties": false,
       "properties": {
         "action": {
-          "type": "string"
+          "$ref": "#/$defs/create.Action"
         },
         "branch": {
           "type": "string"
         },
         "path": {
           "type": "string"
+        },
+        "phases": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/domain.Phase"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "upstream": {
           "type": "string"
@@ -29,7 +51,8 @@
       "required": [
         "branch",
         "path",
-        "action"
+        "action",
+        "phases"
       ],
       "type": "object"
     },
@@ -88,7 +111,7 @@
           "type": "integer"
         },
         "env_from": {
-          "type": "string"
+          "$ref": "#/$defs/project.EnvStrategy"
         },
         "fast_forward": {
           "items": {
@@ -100,7 +123,7 @@
           "type": "string"
         },
         "isolation": {
-          "type": "string"
+          "$ref": "#/$defs/project.Isolation"
         },
         "recalled": {
           "items": {
@@ -211,7 +234,14 @@
               },
               "values": {
                 "items": {
-                  "type": "string"
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "config",
+                    "example",
+                    "main",
+                    "parent"
+                  ]
                 },
                 "maxItems": 1,
                 "minItems": 1,
@@ -232,7 +262,12 @@
               },
               "values": {
                 "items": {
-                  "type": "string"
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "isolated",
+                    "verbatim"
+                  ]
                 },
                 "maxItems": 1,
                 "minItems": 1,
@@ -387,7 +422,7 @@
           "type": "boolean"
         },
         "origin": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Origin"
         },
         "path": {
           "type": "string"
@@ -401,11 +436,8 @@
         "remembered": {
           "type": "boolean"
         },
-        "section": {
-          "type": "string"
-        },
         "skip": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Skip"
         },
         "value": {
           "type": "boolean"
@@ -665,7 +697,7 @@
     },
     "domain.Form": {
       "additionalProperties": false,
-      "description": "A command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, the sections a surface groups them in, and the request's problems.",
+      "description": "A command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, and the request's problems.",
       "properties": {
         "fields": {
           "items": {
@@ -678,18 +710,10 @@
             "$ref": "#/$defs/domain.FieldError"
           },
           "type": "array"
-        },
-        "sections": {
-          "description": "In the order a surface shows them; a field names its own by key.",
-          "items": {
-            "$ref": "#/$defs/domain.Section"
-          },
-          "type": "array"
         }
       },
       "required": [
         "fields",
-        "sections",
         "problems"
       ],
       "type": "object"
@@ -767,7 +791,7 @@
           "type": "array"
         },
         "origin": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Origin"
         },
         "path": {
           "type": "string"
@@ -778,11 +802,8 @@
           },
           "type": "array"
         },
-        "section": {
-          "type": "string"
-        },
         "skip": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Skip"
         }
       },
       "required": [
@@ -817,6 +838,18 @@
         "label"
       ],
       "type": "object"
+    },
+    "domain.Origin": {
+      "description": "Where a field's answer came from.",
+      "enum": [
+        "request",
+        "remembered",
+        "config",
+        "default"
+      ]
+    },
+    "domain.Phase": {
+      "$ref": "events.v2.json#/$defs/phase"
     },
     "domain.RecapRow": {
       "additionalProperties": false,
@@ -879,28 +912,12 @@
       ],
       "type": "object"
     },
-    "domain.Section": {
-      "additionalProperties": false,
-      "properties": {
-        "key": {
-          "type": "string"
-        },
-        "summary": {
-          "type": "string"
-        },
-        "title": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "key",
-        "title"
-      ],
-      "type": "object"
-    },
     "domain.SelectField": {
       "additionalProperties": false,
       "properties": {
+        "closed": {
+          "type": "boolean"
+        },
         "flag": {
           "type": "string"
         },
@@ -920,7 +937,7 @@
           "type": "array"
         },
         "origin": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Origin"
         },
         "path": {
           "type": "string"
@@ -940,11 +957,8 @@
         "remembered": {
           "type": "string"
         },
-        "section": {
-          "type": "string"
-        },
         "skip": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Skip"
         },
         "value": {
           "type": "string"
@@ -960,9 +974,23 @@
         "options",
         "rememberable",
         "remember",
-        "refreshable"
+        "refreshable",
+        "closed"
       ],
       "type": "object"
+    },
+    "domain.Skip": {
+      "description": "Why a field is not asked, as a code each surface words its own way.",
+      "enum": [
+        "flag_only",
+        "exists",
+        "not_behind",
+        "held",
+        "run_unread",
+        "nothing_isolated",
+        "no_conflict",
+        "all"
+      ]
     },
     "domain.TextField": {
       "additionalProperties": false,
@@ -980,16 +1008,13 @@
           "type": "string"
         },
         "origin": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Origin"
         },
         "path": {
           "type": "string"
         },
-        "section": {
-          "type": "string"
-        },
         "skip": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Skip"
         },
         "value": {
           "type": "string"
@@ -1033,16 +1058,13 @@
           "type": "array"
         },
         "origin": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Origin"
         },
         "path": {
           "type": "string"
         },
-        "section": {
-          "type": "string"
-        },
         "skip": {
-          "type": "string"
+          "$ref": "#/$defs/domain.Skip"
         }
       },
       "required": [
@@ -1354,7 +1376,7 @@
           ]
         },
         "isolation": {
-          "type": "string"
+          "$ref": "#/$defs/project.Isolation"
         },
         "kept": {
           "type": "boolean"
@@ -1404,7 +1426,7 @@
           "type": "integer"
         },
         "env_from": {
-          "type": "string"
+          "$ref": "#/$defs/project.EnvStrategy"
         },
         "fast_forward": {
           "items": {
@@ -1429,7 +1451,7 @@
           "type": "string"
         },
         "isolation": {
-          "type": "string"
+          "$ref": "#/$defs/project.Isolation"
         },
         "keep": {
           "type": "boolean"
@@ -1644,7 +1666,14 @@
               },
               "values": {
                 "items": {
-                  "type": "string"
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "config",
+                    "example",
+                    "main",
+                    "parent"
+                  ]
                 },
                 "maxItems": 1,
                 "minItems": 1,
@@ -1665,7 +1694,12 @@
               },
               "values": {
                 "items": {
-                  "type": "string"
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "isolated",
+                    "verbatim"
+                  ]
                 },
                 "maxItems": 1,
                 "minItems": 1,
@@ -1734,7 +1768,12 @@
               },
               "values": {
                 "items": {
-                  "type": "string"
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "abort",
+                    "resolve"
+                  ]
                 },
                 "maxItems": 1,
                 "minItems": 1,
@@ -1798,6 +1837,22 @@
       },
       "type": "array"
     },
+    "list.Changes": {
+      "additionalProperties": false,
+      "properties": {
+        "changed": {
+          "type": "integer"
+        },
+        "untracked": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "changed",
+        "untracked"
+      ],
+      "type": "object"
+    },
     "list.Detail": {
       "additionalProperties": false,
       "properties": {
@@ -1817,11 +1872,44 @@
         "active": {
           "type": "boolean"
         },
+        "ahead": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "behind": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "branch": {
           "type": "string"
         },
+        "changes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/list.Changes"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "commits_ahead": {
           "type": "integer"
+        },
+        "condition": {
+          "$ref": "#/$defs/worktree.Condition"
         },
         "created_at": {
           "anyOf": [
@@ -1837,13 +1925,30 @@
         "dirty": {
           "type": "boolean"
         },
+        "last_commit_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "locked": {
           "type": "boolean"
         },
         "main": {
           "type": "boolean"
         },
+        "merged": {
+          "type": "boolean"
+        },
         "missing": {
+          "type": "boolean"
+        },
+        "needs_sync": {
           "type": "boolean"
         },
         "origin": {
@@ -1855,6 +1960,9 @@
               "type": "null"
             }
           ]
+        },
+        "parent": {
+          "type": "string"
         },
         "path": {
           "type": "string"
@@ -1884,6 +1992,19 @@
               "type": "null"
             }
           ]
+        },
+        "urls": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -1896,10 +2017,19 @@
         "active",
         "missing",
         "commits_ahead",
+        "parent",
+        "ahead",
+        "behind",
+        "needs_sync",
+        "changes",
         "created_at",
+        "last_commit_at",
         "origin",
         "pr",
+        "merged",
+        "condition",
         "services",
+        "urls",
         "actions"
       ],
       "type": "object"
@@ -1907,10 +2037,22 @@
     "list.PR": {
       "additionalProperties": false,
       "properties": {
+        "checks": {
+          "$ref": "#/$defs/worktree.Checks"
+        },
+        "decision": {
+          "type": "string"
+        },
+        "draft": {
+          "type": "boolean"
+        },
         "number": {
           "type": "integer"
         },
         "state": {
+          "$ref": "#/$defs/worktree.PullRequestState"
+        },
+        "title": {
           "type": "string"
         },
         "url": {
@@ -2008,6 +2150,38 @@
         ]
       },
       "type": "array"
+    },
+    "project.EnvStrategy": {
+      "description": "Where a worktree's .env files are copied from.",
+      "enum": [
+        "example",
+        "main",
+        "parent"
+      ]
+    },
+    "project.Isolation": {
+      "description": "How a worktree stands against its source.",
+      "enum": [
+        "isolated",
+        "verbatim"
+      ]
+    },
+    "project.JobKind": {
+      "description": "Whether a job keeps running or runs to its end.",
+      "enum": [
+        "service",
+        "task"
+      ]
+    },
+    "run.State": {
+      "description": "A job's state.",
+      "enum": [
+        "starting",
+        "running",
+        "crashed",
+        "exited",
+        "stopped"
+      ]
     },
     "status.Base": {
       "additionalProperties": false,
@@ -2123,6 +2297,9 @@
             }
           ]
         },
+        "condition": {
+          "$ref": "#/$defs/worktree.Condition"
+        },
         "created_at": {
           "anyOf": [
             {
@@ -2140,7 +2317,7 @@
         "isolation": {
           "anyOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/project.Isolation"
             },
             {
               "type": "null"
@@ -2245,7 +2422,8 @@
         "run",
         "jobs",
         "env",
-        "problems"
+        "problems",
+        "condition"
       ],
       "type": "object"
     },
@@ -2302,7 +2480,7 @@
           "type": "integer"
         },
         "kind": {
-          "type": "string"
+          "$ref": "#/$defs/project.JobKind"
         },
         "name": {
           "type": "string"
@@ -2321,7 +2499,7 @@
           "type": "string"
         },
         "state": {
-          "type": "string"
+          "$ref": "#/$defs/run.State"
         },
         "url": {
           "type": "string"
@@ -2394,7 +2572,7 @@
           "type": "integer"
         },
         "state": {
-          "type": "string"
+          "$ref": "#/$defs/worktree.PullRequestState"
         },
         "title": {
           "type": "string"
@@ -2595,6 +2773,9 @@
             }
           ]
         },
+        "condition": {
+          "$ref": "#/$defs/worktree.Condition"
+        },
         "cycle": {
           "type": "boolean"
         },
@@ -2687,6 +2868,7 @@
         "locked",
         "rebasing",
         "missing",
+        "condition",
         "cycle",
         "origin",
         "pr",
@@ -2702,7 +2884,7 @@
           "type": "integer"
         },
         "state": {
-          "type": "string"
+          "$ref": "#/$defs/worktree.PullRequestState"
         },
         "url": {
           "type": "string"
@@ -3015,6 +3197,18 @@
       ],
       "type": "object"
     },
+    "worktree.Condition": {
+      "description": "The one fact of a worktree that most changes what to do with it first, as one read knows it, the first that applies first.",
+      "enum": [
+        "no_worktree",
+        "unreadable",
+        "missing",
+        "rebasing",
+        "merged",
+        "changed",
+        "clean"
+      ]
+    },
     "worktree.Conflict": {
       "additionalProperties": false,
       "properties": {
@@ -3038,10 +3232,10 @@
           "type": "string"
         },
         "env_strategy": {
-          "type": "string"
+          "$ref": "#/$defs/project.EnvStrategy"
         },
         "isolation": {
-          "type": "string"
+          "$ref": "#/$defs/project.Isolation"
         },
         "namespaces": {
           "items": {
@@ -3085,6 +3279,14 @@
         "state"
       ],
       "type": "object"
+    },
+    "worktree.PullRequestState": {
+      "description": "Where a pull request stands.",
+      "enum": [
+        "open",
+        "merged",
+        "closed"
+      ]
     }
   },
   "$id": "https://wtm.sh/schemas/api.v2.schema.json",

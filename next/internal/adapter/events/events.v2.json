@@ -14,6 +14,10 @@
     "op_id": { "type": "string", "minLength": 1, "description": "The operation the event belongs to; absent outside an operation." }
   },
   "$defs": {
+    "phase": {
+      "description": "A phase of a subject's work, as phase.started and phase.finished name it: a closed set a surface names one by one.",
+      "enum": ["fast_forward", "worktree", "env", "meta", "ordinal", "ports", "on_create", "move"]
+    },
     "repo": {
       "type": "object",
       "required": ["root", "common_dir"],
@@ -48,7 +52,7 @@
       "properties": {
         "type": { "const": "phase.started" },
         "subject": { "type": "string", "minLength": 1, "description": "What the unit works on: a branch." },
-        "phase": { "type": "string", "minLength": 1 },
+        "phase": { "$ref": "#/$defs/phase" },
         "log": { "type": "string", "minLength": 1, "description": "The file the phase's output goes to; absent when it has none." }
       }
     },
@@ -59,7 +63,7 @@
       "properties": {
         "type": { "const": "phase.finished" },
         "subject": { "type": "string", "minLength": 1, "description": "What the unit works on: a branch." },
-        "phase": { "type": "string", "minLength": 1 },
+        "phase": { "$ref": "#/$defs/phase" },
         "failed": { "type": "boolean" }
       }
     },

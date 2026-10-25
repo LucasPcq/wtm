@@ -10,7 +10,8 @@
       "options": [],
       "rememberable": false,
       "remember": false,
-      "refreshable": false
+      "refreshable": false,
+      "closed": false
     },
     {
       "kind": "confirm",
@@ -51,6 +52,5 @@
       "remember": false
     }
   ],
-  "sections": [],
   "problems": []
 }

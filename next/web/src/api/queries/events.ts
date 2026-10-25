@@ -1,17 +1,14 @@
-import { queryOptions, experimental_streamedQuery as streamedQuery, type QueryClient } from '@tanstack/react-query'
+import { type QueryClient, queryOptions, experimental_streamedQuery as streamedQuery } from '@tanstack/react-query'
 import { EventSourceParserStream } from 'eventsource-parser/stream'
-import { HttpError, request } from '../fetch'
-import type { WebRepos, WebWarning, WtmEventsV2 } from '../types.gen'
+import { HttpError, request } from '@/api/fetch'
+import type { WebRepos, WebWarning, WtmEventsV2 } from '@/api/types.gen'
 
-// Live is what the event stream says of itself: what kept a line or a repository from it for a while (the bus
-// lost, a repository skipped), until the next line.
 export type Live = { warning?: string }
 
 export const reconnectEvery = 2000
 
-// eventsQuery holds the event stream of every repository open. Each line invalidates what it changed; the stream
-// ending or failing is retried every reconnectEvery, until the server refuses the token: it restarted under a new
-// one, which a token change brings (main.tsx reloads the page then).
+// retried every reconnectEvery until the server refuses the token: it restarted, and the token change that follows
+// reloads the page (main.tsx)
 export const eventsQuery = queryOptions({
   queryKey: ['events'],
   queryFn: streamedQuery<Live, Live>({
@@ -31,9 +28,9 @@ const refused = (error: unknown) => error instanceof HttpError && error.status =
 async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<Live> {
   const response = await request('/api/events', { signal })
   if (!response.ok || !response.body) throw new HttpError(response.status, 'the event stream was refused')
-  // back after a break: the lines in between are lost, so everything is read again
+  // back after a break: the lines in between are lost, so everything is read again, but GitHub, asked on demand only
   if (client.getQueryData(eventsQuery.queryKey))
-    client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'events' })
+    client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'events' && q.queryKey[0] !== 'github' })
   yield {}
 
   const reader = response.body
@@ -59,7 +56,6 @@ function invalidate(client: QueryClient, line: WtmEventsV2): Live {
 
 export type Connection = 'connecting' | 'live' | 'reconnecting' | 'disconnected'
 
-// connectionOf is the state of the stream as its query stands.
 export function connectionOf(query: { status: string; fetchStatus: string; error: unknown }): Connection {
   if (refused(query.error)) return 'disconnected'
   if (query.status === 'pending') return 'connecting'

@@ -144,7 +144,7 @@ const pathForce = "force"
 // The answers the legacy commands a follow-up names take as flags of their own name: a switch alone when said true (run start's --detach), the others followed by their value (env's --from and --isolation, run start's --job).
 var (
 	switches = []string{pathForce, "detach"}
-	valued   = []string{"from", domain.PathIsolation, "job"}
+	valued   = []string{"from", domain.PathIsolation, "job", "to"}
 )
 
 // leftBehind is the repair of a branch an undo left behind, and of its worktree: clean, forced, in the legacy wtm until it migrates.

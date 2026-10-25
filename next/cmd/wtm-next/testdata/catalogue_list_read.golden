@@ -16,10 +16,22 @@
         "active": true,
         "missing": false,
         "commits_ahead": 0,
+        "parent": "",
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "changes": {
+          "changed": 0,
+          "untracked": 0
+        },
         "created_at": null,
+        "last_commit_at": "<time>",
         "origin": null,
         "pr": null,
+        "merged": false,
+        "condition": "clean",
         "services": [],
+        "urls": [],
         "actions": [
           {
             "command": "go",

@@ -28,15 +28,17 @@ type Facts struct {
 	RecordErrs map[string]error         // by branch
 	States     map[string]State         // by worktree path
 	Behind     map[string]bool          // by branch
+	Stack      worktree.Stack
 }
 
-// A State is what one worktree holds: whether its directory is gone, which leaves nothing else to read, its uncommitted changes and how much they weigh, its last commits, how its branch stands against the base branch (nil when it is not counted), its declared .env files as read, what of these could not be read and why, and the error that kept the worktree from being read.
+// A State is what one worktree holds: whether its directory is gone, which leaves nothing else to read, its uncommitted changes and how much they weigh, its last commits, how its branch stands against the base branch (nil when it is not counted), the commits of its parent it lacks (zero for a root or when not counted), its declared .env files as read, what of these could not be read and why, and the error that kept the worktree from being read.
 type State struct {
 	Missing  bool
 	Changes  []worktree.Change
 	Diffstat worktree.Diffstat
 	Commits  []worktree.Commit
 	Base     *worktree.AheadBehind
+	Lacks    int
 	Env      []EnvRead
 	Unread   []string
 	Err      error
@@ -76,6 +78,7 @@ type Detail struct {
 	Jobs      []Job              `json:"jobs"` // null when the run daemon cannot tell
 	Env       Env                `json:"env"`
 	Problems  []Problem          `json:"problems"`
+	Condition worktree.Condition `json:"condition"` // the one fact of it that most changes what to do first, as this read knows it
 }
 
 // Base is where a worktree's branch stands against the base branch.
@@ -95,20 +98,12 @@ type Changes struct {
 	Files      []worktree.Change `json:"files"`
 }
 
-// Review is a worktree's newest pull request: its number, its page and its state, open, merged or closed; and, for an open one only, where its review stands.
+// Review is a worktree's newest pull request: its number, its page and its state, open, merged or closed; for an open one only, where its review stands.
 type Review struct {
 	Number int                       `json:"number"`
 	URL    string                    `json:"url"`
 	State  worktree.PullRequestState `json:"state"`
-	*Progress
-}
-
-// Progress is where an open pull request's review stands: its title, whether it is a draft, its checks counted and GitHub's review decision.
-type Progress struct {
-	Title    string          `json:"title"`
-	Draft    bool            `json:"draft"`
-	Checks   worktree.Checks `json:"checks"`
-	Decision string          `json:"decision"`
+	*worktree.Progress
 }
 
 // RunToml is whether the project's run.toml exists and reads.
@@ -184,6 +179,7 @@ type Problem struct {
 const (
 	CodeMissing          = Name + ".missing"
 	CodeMerged           = Name + ".merged"
+	CodeBehind           = Name + ".behind"
 	CodeEnvMissing       = Name + ".env_missing"
 	CodeIsolationPending = Name + ".isolation_pending"
 	CodeJobCrashed       = Name + ".job_crashed"
@@ -294,11 +290,11 @@ func (f Facts) item(w worktree.Worktree) Item {
 	branch := w.Branch()
 	record, recordErr := f.Records[branch], f.RecordErrs[branch]
 	_, rebasing := w.State.(worktree.Rebasing)
-	stack := worktree.StackOf(f.Worktrees, f.Records, f.Config.Worktrees.BaseBranch)
-	parent, _ := stack.Parent(branch)
+	parent, _ := f.Stack.Parent(branch)
 	pending := recordErr == nil && f.pending(w)
 	offset := f.offset(w)
 	pr, hasPR := worktree.PullRequestOf(f.PullRequests, branch)
+	merged := !state.Missing && f.Repository.Cleans(pr, w, f.Behind[branch])
 
 	detail := Detail{
 		Branch:    branch,
@@ -309,7 +305,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Missing:   state.Missing,
 		CreatedAt: record.Created(),
 		Parent:    parent,
-		Children:  orEmpty(stack.Children(branch)),
+		Children:  orEmpty(f.Stack.Children(branch)),
 		Base:      f.base(state),
 		Origin:    f.OriginOf(branch),
 		Changes:   changesOf(state),
@@ -321,7 +317,8 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Jobs:      f.jobs(w, offset),
 		Env:       f.envOf(w, state),
 	}
-	detail.Problems = Problems(ProblemsParams{Branch: branch, Gone: state.Missing, Merged: f.Repository.Cleans(pr, w, f.Behind[branch]), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
+	detail.Condition = worktree.ConditionOf(worktree.ConditionParams{Missing: state.Missing, Rebasing: rebasing, Merged: merged, Dirty: len(state.Changes) > 0})
+	detail.Problems = Problems(ProblemsParams{Branch: branch, Gone: state.Missing, Merged: merged, Parent: parent, Lacks: state.Lacks, Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
 
 	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
 	if len(state.Unread) > 0 {
@@ -375,11 +372,7 @@ func reviewOf(pr worktree.PullRequest, ok bool) *Review {
 		return nil
 	}
 
-	review := &Review{Number: pr.Number, URL: pr.URL, State: pr.State}
-	if pr.State == worktree.PullRequestOpen {
-		review.Progress = &Progress{Title: pr.Title, Draft: pr.Draft, Checks: pr.Checks, Decision: pr.Decision}
-	}
-	return review
+	return &Review{Number: pr.Number, URL: pr.URL, State: pr.State, Progress: pr.Progress()}
 }
 
 // pending reports whether w has yet to choose its isolation, which run up and run start then refuse: a worktree on a branch other than the main one, whose record holds no choice, while run.toml declares something a worktree isolates.
@@ -646,6 +639,8 @@ type ProblemsParams struct {
 	Branch  string
 	Gone    bool
 	Merged  bool
+	Parent  string
+	Lacks   int // the commits of Parent the worktree lacks
 	Missing []Missing
 	Pending bool
 	Jobs    []Job
@@ -656,6 +651,7 @@ const (
 	commandEnv        = domain.CommandEnv
 	commandConfigEdit = "config edit"
 	commandRunStart   = "run start"
+	commandSync       = "sync"
 	pathFrom          = "from"
 	pathJob           = "job"
 	pathDetach        = "detach"
@@ -676,7 +672,10 @@ func Problems(params ProblemsParams) []Problem {
 		return problems
 	}
 	if params.Merged {
-		problems = append(problems, Problem{Code: CodeMerged, Message: "its pull request is merged", Fix: fix(CodeMerged, "clean it up", domain.CommandClean, params.Branch)})
+		problems = append(problems, Problem{Code: CodeMerged, Message: "its pull request is merged", Fix: mergedFix(params.Branch)})
+	}
+	if params.Lacks > 0 {
+		problems = append(problems, Problem{Code: CodeBehind, Message: params.Parent + " has " + commits(params.Lacks) + " it lacks", Fix: fix(CodeBehind, "sync it onto "+params.Parent, commandSync, params.Branch)})
 	}
 	for _, missing := range params.Missing {
 		problems = append(problems, missingProblem(params.Branch, missing))
@@ -724,6 +723,17 @@ func missingProblem(subject string, missing Missing) Problem {
 // fix is the follow-up that runs command on the worktree subject with answers, saying what it does with message.
 func fix(code, message, command, subject string, answers ...domain.Answered) *domain.FollowUp {
 	return &domain.FollowUp{Command: command, Answers: append([]domain.Answered{{Path: domain.PathWorktree, Values: []string{subject}}}, answers...), Code: code, Message: message}
+}
+
+func commits(n int) string {
+	if n == 1 {
+		return "1 commit"
+	}
+	return strconv.Itoa(n) + " commits"
+}
+
+func mergedFix(branch string) *domain.FollowUp {
+	return fix(CodeMerged, "clean it up", domain.CommandClean, branch)
 }
 
 func crashed(job Job) string {

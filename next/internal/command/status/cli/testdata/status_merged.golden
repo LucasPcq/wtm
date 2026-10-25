@@ -1,5 +1,5 @@
 
-  ! feat/a — 3 problems
+  ! feat/a — 4 problems
 
   path         /repo/.trees/feat-a
   isolation    isolated
@@ -19,6 +19,8 @@
 
   ! its pull request is merged
   → wtm clean feat/a   clean it up
+  ! main has 1 commit it lacks
+  → wtm sync feat/a   sync it onto main
   ! web/.env is missing
   → wtm env feat/a   rebuild it
   ! api crashed (exit 1)

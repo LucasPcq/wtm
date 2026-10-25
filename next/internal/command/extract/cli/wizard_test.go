@@ -208,9 +208,17 @@ func TestANewTargetStartsOnARememberedConfigDefaultTicked(t *testing.T) {
 	d.Keys("enter")
 
 	require.Equal(t, stepEnvFrom, d.Wizard.Current())
-	assert.Contains(t, d.Screen(), "▌› Use config default (example)")
+	assert.Contains(t, d.Screen(), "▌› config default (example)")
 	assert.Contains(t, d.Screen(), "[x] Always use this answer in this repo")
 
 	d.Keys("down", "down", "enter")
 	assert.Equal(t, project.EnvMain, d.s.Request().EnvFrom)
+}
+
+func TestASourceBehindOriginIsNotFastForwardedAndTheTrailNamesIt(t *testing.T) {
+	d := open(t, sessionParams{App: newWorld(seed{Held: true}).usecase(), Request: extract.Request{Source: source, Files: []string{"old.txt"}, To: split, From: source}})
+
+	d.Keys("enter", "enter")
+
+	assert.Contains(t, d.Screen(), "· Source update — nothing to fast-forward: feat/login holds the changes being extracted")
 }

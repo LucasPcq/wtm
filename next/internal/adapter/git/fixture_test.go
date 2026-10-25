@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 
@@ -18,6 +19,7 @@ type port interface {
 	CommonDir(ctx context.Context) (string, error)
 	Locate(ctx context.Context, path string) (worktree.Location, error)
 	Branches(ctx context.Context) (worktree.Branches, error)
+	CommitDates(ctx context.Context) (map[string]time.Time, error)
 	AheadBehind(ctx context.Context, name string) (worktree.AheadBehind, error)
 	AheadBehindOf(ctx context.Context, span worktree.Span) (worktree.AheadBehind, error)
 	IsAncestor(ctx context.Context, ancestry worktree.Ancestry) (bool, error)

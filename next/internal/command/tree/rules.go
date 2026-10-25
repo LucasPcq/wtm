@@ -43,17 +43,19 @@ type Detail struct {
 	Parent   *string  `json:"parent"` // null for a root
 	Children []string `json:"children"`
 	// Ahead are the commits the branch has that its parent lacks, the base branch's for a root; Behind those of the parent it lacks, null for a root, which has none. Both null when not counted: the main worktree, a member of a cycle, a parent that is not a local branch.
-	Ahead     *int             `json:"ahead"`
-	Behind    *int             `json:"behind"`
-	NeedsSync bool             `json:"needs_sync"` // its parent has commits it lacks: a rebase is due
-	Dirty     bool             `json:"dirty"`
-	Locked    bool             `json:"locked"`
-	Rebasing  bool             `json:"rebasing"`
-	Missing   bool             `json:"missing"`  // its directory is gone
-	Cycle     bool             `json:"cycle"`    // its parents lead back to it: drawn as a root
-	Origin    *worktree.Origin `json:"origin"`   // null when origin has no branch of that name
-	PR        *PR              `json:"pr"`       // null without one, or when GitHub was not asked
-	Services  []string         `json:"services"` // the jobs up in it, null when that cannot be told or it has no worktree
+	Ahead     *int `json:"ahead"`
+	Behind    *int `json:"behind"`
+	NeedsSync bool `json:"needs_sync"` // its parent has commits it lacks: a rebase is due
+	Dirty     bool `json:"dirty"`
+	Locked    bool `json:"locked"`
+	Rebasing  bool `json:"rebasing"`
+	Missing   bool `json:"missing"` // its directory is gone
+	// Condition is the one fact of it that most changes what to do first, as this read knows it.
+	Condition worktree.Condition `json:"condition"`
+	Cycle     bool               `json:"cycle"`    // its parents lead back to it: drawn as a root
+	Origin    *worktree.Origin   `json:"origin"`   // null when origin has no branch of that name
+	PR        *PR                `json:"pr"`       // null without one, or when GitHub was not asked
+	Services  []string           `json:"services"` // the jobs up in it, null when that cannot be told or it has no worktree
 	// Actions are what the node needs next, as Actions decides it: a command and its answers.
 	Actions []domain.FollowUp `json:"actions"`
 }
@@ -101,7 +103,7 @@ func (f Facts) item(branch string) Item {
 		detail.Parent = &parent
 	}
 	if f.Stack.Virtual(branch) {
-		detail.Virtual = true
+		detail.Virtual, detail.Condition = true, worktree.ConditionNoWorktree
 		return Item{Subject: branch, Status: domain.StatusDone, Detail: &detail}
 	}
 
@@ -109,6 +111,7 @@ func (f Facts) item(branch string) Item {
 	state := f.States[branch]
 	detail.Path, detail.Main, detail.Locked = &w.Path, w.Main, w.Locked
 	if state.Err != nil {
+		detail.Condition = worktree.ConditionUnreadable
 		item := domain.Unread[Detail](domain.UnreadParams{Command: Name, Subject: branch, Path: w.Path, Err: state.Err})
 		item.Detail, item.Warnings = &detail, f.recordWarnings(branch)
 		return item
@@ -125,7 +128,9 @@ func (f Facts) item(branch string) Item {
 		detail.PR = &PR{Number: pr.Number, URL: pr.URL, State: pr.State}
 	}
 	detail.Services = f.Services(w.Path)
-	detail.Actions = Actions(detail, f.Repository.Cleans(pr, w, f.Behind[branch]))
+	cleans := f.Repository.Cleans(pr, w, f.Behind[branch])
+	detail.Condition = worktree.ConditionOf(worktree.ConditionParams{Missing: detail.Missing, Rebasing: detail.Rebasing, Merged: cleans, Dirty: detail.Dirty})
+	detail.Actions = Actions(detail, cleans)
 
 	return Item{Subject: branch, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
 }
@@ -147,17 +152,6 @@ func (f Facts) warnings() []domain.Warning {
 	}
 
 	return append(warnings, f.Asked.Warnings(Name)...)
-}
-
-// countedAgainst returns the branch the commits of the worktree w are counted against, its parent or, for a root, the base branch, and reports whether they are counted: not for the main worktree nor a member of a cycle, which has no parent to sync onto, and only when both are local branches, which git can count.
-func (f Facts) countedAgainst(w worktree.Worktree) (string, bool) {
-	branch := w.Branch()
-	parent, ok := f.Stack.Parent(branch)
-	if !ok {
-		parent = f.Config.Worktrees.BaseBranch
-	}
-
-	return parent, !w.Main && !f.Stack.InCycle(branch) && parent != branch && f.Local(parent) && f.Local(branch)
 }
 
 // nodes are the worktrees that are nodes of the tree: those on a branch, the only place a stack has for them.

@@ -75,7 +75,8 @@
             }
           ]
         },
-        "problems": []
+        "problems": [],
+        "condition": "clean"
       }
     },
     {
@@ -110,7 +111,8 @@
             "message": "its directory is gone",
             "fix": null
           }
-        ]
+        ],
+        "condition": "missing"
       }
     },
     {
@@ -211,6 +213,23 @@
         },
         "problems": [
           {
+            "code": "status.behind",
+            "message": "main has 1 commit it lacks",
+            "fix": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "status.behind",
+              "message": "sync it onto main"
+            }
+          },
+          {
             "code": "status.env_missing",
             "message": "web/.env is missing",
             "fix": {
@@ -227,7 +246,8 @@
               "message": "rebuild it"
             }
           }
-        ]
+        ],
+        "condition": "changed"
       }
     },
     {
@@ -274,7 +294,8 @@
               "message": "remove what is left of it"
             }
           }
-        ]
+        ],
+        "condition": "missing"
       }
     }
   ],

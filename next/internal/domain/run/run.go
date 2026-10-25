@@ -35,6 +35,11 @@ const (
 	Stopped  State = "stopped"
 )
 
+// States returns every State.
+func States() []State {
+	return []State{Starting, Running, Crashed, Exited, Stopped}
+}
+
 // ErrUnknown says whether a job is up cannot be told: no daemon answers, yet its index holds jobs it would run.
 var ErrUnknown = errors.New("the run daemon is not running: which jobs are up is unknown")
 
@@ -49,6 +54,19 @@ func UpIn(jobs []Job, dir string) []string {
 	slices.Sort(names)
 
 	return names
+}
+
+// URLsIn returns the URLs of the jobs up in the worktree at dir that have one, sorted, empty and not nil when none has.
+func URLsIn(jobs []Job, dir string) []string {
+	urls := []string{}
+	for _, job := range jobs {
+		if job.Up && job.WorkDir == dir && job.URL != "" {
+			urls = append(urls, job.URL)
+		}
+	}
+	slices.Sort(urls)
+
+	return urls
 }
 
 // UnknownMessage says why the jobs up are unknown, err being why the daemon could not tell.

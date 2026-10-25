@@ -26,6 +26,11 @@ const (
 	Task    JobKind = "task"
 )
 
+// JobKinds returns every JobKind.
+func JobKinds() []JobKind {
+	return []JobKind{Service, Task}
+}
+
 // Scope says whether a job runs once per worktree or once for every worktree of the project.
 type Scope string
 

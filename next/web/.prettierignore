@@ -1,5 +1,0 @@
-# shadcn/ui code stays as upstream writes it
-src/components/ui/
-src/hooks/
-*.gen.ts
-package-lock.json
