@@ -188,6 +188,21 @@
                 "object": "vi",
                 "property": "stubGlobal",
                 "message": "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill)."
+              },
+              {
+                "object": "vitest",
+                "property": "mock",
+                "message": "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill)."
+              },
+              {
+                "object": "vitest",
+                "property": "doMock",
+                "message": "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill)."
+              },
+              {
+                "object": "vitest",
+                "property": "stubGlobal",
+                "message": "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill)."
               }
             ]
           }
@@ -235,6 +250,21 @@
                   },
                   {
                     "object": "vi",
+                    "property": "stubGlobal",
+                    "message": "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill)."
+                  },
+                  {
+                    "object": "vitest",
+                    "property": "mock",
+                    "message": "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill)."
+                  },
+                  {
+                    "object": "vitest",
+                    "property": "doMock",
+                    "message": "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill)."
+                  },
+                  {
+                    "object": "vitest",
                     "property": "stubGlobal",
                     "message": "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill)."
                   }

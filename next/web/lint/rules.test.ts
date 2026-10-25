@@ -6,8 +6,8 @@ import { expect, onTestFinished, test } from 'vitest'
 
 // A GritQL plugin that breaks at runtime lets everything through without failing: only this test notices. Each case
 // is a file of src/ (a path outside it starts with ../) and the plugin that must refuse it, none for a clean one.
-// Biome's built-in rules are its own to test.
-type Rule = 'layers' | 'unknown-folder' | 'props' | 'test-doubles' | 'spy-module' | 'none'
+// Biome's built-in rules are its own to test, but for noJsRestrictedProperties, whose entries are ours.
+type Rule = 'layers' | 'unknown-folder' | 'props' | 'test-doubles' | 'spy-module' | 'noJsRestrictedProperties' | 'none'
 
 const cases: { path: string; source: string; rule: Rule }[] = [
   { path: 'features/a/utils/to-b.ts', source: "export { y } from '@/features/b/utils/y'", rule: 'layers' },
@@ -99,7 +99,17 @@ const cases: { path: string; source: string; rule: Rule }[] = [
   {
     path: 'features/a/components/__tests__/vitest.test.tsx',
     source: "import { vitest } from 'vitest'\nvitest.mock('@/api/fetch')",
-    rule: 'test-doubles',
+    rule: 'noJsRestrictedProperties',
+  },
+  {
+    path: 'features/a/components/__tests__/factory.test.tsx',
+    source: "import { vitest } from 'vitest'\nvitest.mock('@/api/fetch', () => ({}))",
+    rule: 'noJsRestrictedProperties',
+  },
+  {
+    path: 'features/a/components/__tests__/destructured.test.tsx',
+    source: "import { vitest } from 'vitest'\nconst { mock } = vitest\nmock('@/api/fetch')",
+    rule: 'noJsRestrictedProperties',
   },
   {
     path: 'features/a/components/__tests__/hook.test.tsx',
@@ -160,9 +170,12 @@ test('each case is refused by exactly its plugin, and a clean one by none', { ti
   })
   const found = new Map<string, Set<string>>()
   for (const { category, message, description, location } of JSON.parse(run.stdout).diagnostics as Diagnostic[]) {
-    if (category !== 'plugin') continue
+    if (category !== 'plugin' && category !== 'lint/nursery/noJsRestrictedProperties') continue
     const at = path.normalize(typeof location.path === 'string' ? location.path : (location.path?.file ?? ''))
-    const rule = /web-front skill, ([a-z-]+)/.exec(String(message ?? description))?.[1] ?? '?'
+    const rule =
+      category === 'plugin'
+        ? (/web-front skill, ([a-z-]+)/.exec(String(message ?? description))?.[1] ?? '?')
+        : 'noJsRestrictedProperties'
     found.set(at, (found.get(at) ?? new Set()).add(rule))
   }
 

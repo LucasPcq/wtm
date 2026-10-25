@@ -8,14 +8,6 @@ or {
   `import * as $_ from "vitest"` where {
     $msg = "vitest imported whole hides vi from the rules on mocks: import vi by name (web-front skill, test-doubles)."
   },
-  `vitest.$method($_)` where {
-    $method <: or {
-      `mock`,
-      `doMock`,
-      `stubGlobal`
-    },
-    $msg = "Mock the server with msw (src/test/server.ts), never a module or a global (web-front skill, test-doubles)."
-  },
   `$_.renderHook` where {
     $msg = "Test a component through what its user does, never a hook alone (web-front skill, test-doubles)."
   },

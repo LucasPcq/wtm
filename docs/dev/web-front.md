@@ -13,7 +13,7 @@ next/web/
   biome.json     lint, format and imports, the one gate
 ```
 
-A feature has one shape at every level: its entry `.tsx` alone at the root, then `components/` (`.tsx`), `hooks/` (`use-*.ts`), `utils/`, `store/` (the feature's root only), and its sub-features (`list/`, `tree/`, `detail/`, `create/`) in the same shape. Code two sub-features use moves up to the feature's own folders; there is no `shared/`. Tests sit in the `__tests__/` of `components/` or `utils/`, never in `hooks/`: a hook is tested through its component. The lint refuses any other file or folder. The why and the rest of the rules: the `web-front` skill.
+A feature has one shape at every level: its entry `.tsx` alone at the root (the lint refuses anything but `.tsx` there; one only is a review rule), then `components/` (`.tsx`), `hooks/` (`use-*.ts`), `utils/`, `store/` (the feature's root only), and its sub-features (`list/`, `tree/`, `detail/`, `create/`) in the same shape. Code two sub-features use moves up to the feature's own folders; there is no `shared/`. Tests sit in the `__tests__/` of `components/` or `utils/`, never in `hooks/`: a hook is tested through its component. The lint refuses any other file or folder. The why and the rest of the rules: the `web-front` skill.
 
 ## Building it
 

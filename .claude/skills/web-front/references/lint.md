@@ -25,16 +25,16 @@ Single quotes, no semicolons, 120 columns, spaces (Prettier's old output, unchan
 | -- | -- | -- |
 | `style/noRestrictedImports` (paths) | `useEffect`, `useLayoutEffect`, `useInsertionEffect` from `react`, also re-exported; `renderHook` | no effects: derive while rendering, Query/Router/Form, a ref callback; a hook is tested through the page |
 | `style/noRestrictedImports` (patterns) | `../` imports | a parent-relative path hides the layer it lands in, and Biome cannot resolve it: `@/` names it whole |
-| `nursery/noJsRestrictedProperties` | `X.useEffect` (and the two others) on any object, including destructuring; `window`/`globalThis`/`self` `.fetch`, `.EventSource`, `.XMLHttpRequest`, `.WebSocket`; `navigator.sendBeacon`; `vi.mock`, `vi.doMock`, `vi.stubGlobal` | the member spellings of the two rules around it; a module or a global mocked replaces the app under test |
+| `nursery/noJsRestrictedProperties` | `X.useEffect` (and the two others) on any object, including destructuring; `window`/`globalThis`/`self` `.fetch`, `.EventSource`, `.XMLHttpRequest`, `.WebSocket`; `navigator.sendBeacon`; `vi.mock`, `vi.doMock`, `vi.stubGlobal`, and the same on `vitest`, called or destructured | the member spellings of the two rules around it; a module or a global mocked replaces the app under test |
 | `style/noRestrictedGlobals` | bare `fetch`, `EventSource`, `XMLHttpRequest`, `WebSocket` | the server is reached through `src/api/` only |
 | `style/noNestedTernary` | `a ? b : c ? d : e` | a named function with early returns reads in one pass |
 | `style/noExcessiveLinesPerFile` (300) | a file past 300 lines | split it by what it draws |
 | `correctness/useHookAtTopLevel` | a hook called in a branch or a loop | React's rules of hooks |
 | the `recommended` preset | a11y (a label tied to its control by `htmlFor`/`id`), suspicious and correctness rules | |
 | plugin `layers` (`lint/layers.grit`) | an import outside its layer's allowlist; a path with `..` inside it (`@/a/../b`, `./../b`); `vitest`, `msw`, Testing Library or `@/test/` outside tests and `src/test/`; `eventsource-parser` outside `src/api/` | the layers of the SKILL ("Where code goes") |
-| plugin `unknown-folder` | a file of `src/` in a folder that is no layer, or at the root other than `main.tsx`; a test outside a `__tests__/`; in a feature, any file but the entry `.tsx` at a feature's or sub-feature's root, `components/*.tsx`, `hooks/use-*.ts`, `utils/*`, `store/*` at the feature's root, and tests in `components/__tests__/` or `utils/__tests__/`; a `shared/` folder | a new layer, folder or kind of file is a decision, made in this plugin and the skill |
+| plugin `unknown-folder` | a file of `src/` in a folder that is no layer, or at the root other than `main.tsx`; a test outside a `__tests__/`; in a feature, any file but a non-test `.tsx` at a feature's or sub-feature's root (one entry only is a review rule: GritQL cannot count files), `components/*.tsx`, `hooks/use-*.ts`, `utils/*`, `store/*` at the feature's root, and tests in `components/__tests__/` or `utils/__tests__/`; a `shared/` folder | a new layer, folder or kind of file is a decision, made in this plugin and the skill |
 | plugin `props` | a component (a capitalised function: a declaration, a default export, a function expression, an arrow, a `memo(…)`) taking `props` whole | destructured props say what it uses |
-| plugin `test-doubles` | `vi` imported under another name, `vitest.mock`/`doMock`/`stubGlobal`, any `.renderHook` (a namespace import included), `vi.spyOn` on the network of `window`, `globalThis` or `self` | the spellings that slip past the built-in bans on mocks |
+| plugin `test-doubles` | `vi` imported under another name, `vitest` imported whole, any `.renderHook` (a namespace import included), `vi.spyOn` on the network of `window`, `globalThis` or `self` | the spellings that slip past the built-in bans on mocks |
 | plugin `spy-module` (tests only) | `vi.spyOn` on a namespace import of the app | it replaces a module: mock the server with msw |
 
 The `src/api/` override turns the network rules off there. **An override replaces a rule's options instead of merging them**: the override repeats the whole `noJsRestrictedProperties` list minus the network entries. Change one, change both.
@@ -45,9 +45,9 @@ Prefer a precise entry (`{ "object": "window", "property": "fetch" }`) to a bare
 
 ## The guard: a table of cases
 
-A GritQL plugin that fails at runtime (a node name that changed, a typo) prints an info line and lets everything through: the lint goes green on everything. Biome's built-in rules don't fail that way, and Biome tests them itself; the plugins are ours.
+A GritQL plugin that fails at runtime (a node name that changed, a typo) prints an info line and lets everything through: the lint goes green on everything. Biome's built-in rules don't fail that way, and Biome tests them itself; the plugins are ours, and so are the entries of `noJsRestrictedProperties`, which the table covers too.
 
-`lint/rules.test.ts` holds a table, one line per case: a path under `src/`, a few lines of source, and the plugin that must refuse it, `none` for a clean case (a rule that refuses too much is broken too):
+`lint/rules.test.ts` holds a table, one line per case: a path under `src/`, a few lines of source, and the plugin (or `noJsRestrictedProperties`) that must refuse it, `none` for a clean case (a rule that refuses too much is broken too):
 
 ```ts
 { path: 'features/a/to-b.ts', source: "export { y } from '@/features/b/y'", rule: 'layers' },
@@ -58,7 +58,7 @@ At run time it writes the cases into a temp dir beside the build's own `biome.js
 
 ## Adding or changing a rule
 
-1. For a plugin, add its case first, and a clean neighbour if the rule could over-reach. Run `npx vitest run lint` and see it fail. A built-in rule needs no case: check it once by hand on a planted file.
+1. For a plugin, add its case first, and a clean neighbour if the rule could over-reach. Run `npx vitest run lint` and see it fail. An entry of `noJsRestrictedProperties` gets a case too; another built-in rule needs none: check it once by hand on a planted file.
 2. Write the rule: a built-in in `biome.json` (both the root and the `src/api/` override when it is `noJsRestrictedProperties`), or a `.grit` file listed in `plugins` with `"includes": ["src/**"]`. A GritQL message ends with `(web-front skill, <name>)`.
 3. Run the test again, then `npm run lint` on the app: the app's own code must stay green.
 4. Say it in this file's table, with its why.

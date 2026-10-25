@@ -210,7 +210,7 @@ func (f Facts) warnings() []domain.Warning {
 	if base, missing := f.MissingBase(); missing {
 		warnings = append(warnings, domain.Warning{Code: CodeBaseMissing, Message: "the base branch " + base + " does not exist: commits ahead of it are not counted", Params: domain.Params{"branch": base}})
 	}
-	if f.DatesErr != nil {
+	if f.DatesErr != nil && !f.Interrupted {
 		warnings = append(warnings, domain.Warning{Code: CodeDatesUnreadable, Message: "couldn't read when each branch last moved: " + f.DatesErr.Error()})
 	}
 	if f.FetchErr != nil && !f.Interrupted {

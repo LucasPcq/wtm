@@ -149,3 +149,22 @@ test('the search box follows the address when it changes from elsewhere, back an
 
   await waitFor(() => expect(box.value).toBe('ab'))
 })
+
+// GitHub out of reach answered no pull request for every row, and nothing said why.
+test('a list whose GitHub could not be asked says why, and claims no pull request', async () => {
+  localStorage.setItem('wtm.ui', JSON.stringify({ state: { columns: { r1: ['pr'] }, sections: {} }, version: 0 }))
+  server.use(
+    http.post('/api/repos/r1/commands/list', async ({ request }) => {
+      if (!(await request.clone().text()).includes('with_prs')) return undefined
+      return HttpResponse.json({
+        ...envelope('list', [listDetail('main', { main: true }), listDetail('feat/billing')]),
+        warnings: [{ code: 'list.prs_unavailable', message: 'pull requests unavailable: run `gh auth login`' }],
+      })
+    }),
+  )
+
+  await renderApp('/r/r1/worktrees')
+
+  expect(await screen.findByText('Pull requests unavailable: run `gh auth login`')).toBeTruthy()
+  expect(screen.queryByText('none')).toBeNull()
+})

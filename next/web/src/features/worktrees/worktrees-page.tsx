@@ -3,7 +3,7 @@ import { worktreeCount } from '@/api/queries/commands'
 import { reposQuery } from '@/api/queries/repos'
 import { PageHeader } from '@/components/page-header'
 import { Toolbar } from '@/features/worktrees/components/toolbar'
-import { CreateButton } from '@/features/worktrees/create/create-dialog'
+import { CreateButton } from '@/features/worktrees/create/create-button'
 import { useUnderWay } from '@/features/worktrees/create/hooks/use-create-run'
 import { DetailPanel } from '@/features/worktrees/detail/detail-panel'
 import { useRead } from '@/features/worktrees/hooks/use-read'
@@ -28,10 +28,16 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
   const columns = useChoice('columns', repo, columnIds, defaultColumns)
   const underWay = useUnderWay(repo)
 
+  const githubOut = unavailable(list.github.data?.warnings)
+  const githubAsked = list.github.isSuccess && !githubOut
   const rows = list.live.data
-    ? rowsOf({ live: list.live.data, github: list.github.data, readAt: list.live.dataUpdatedAt, underWay })
+    ? rowsOf({
+        live: list.live.data,
+        github: githubAsked ? list.github.data : undefined,
+        readAt: list.live.dataUpdatedAt,
+        underWay,
+      })
     : []
-  const githubAsked = list.github.isSuccess && !unavailable(list.github.data.warnings)
   const read = tree ? forest.live.data : list.live.data
   const count = read ? worktreeCount(read) : 0
 
@@ -63,7 +69,7 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
           {tree ? (
             <TreeView repo={repo} search={search} underWay={underWay} />
           ) : (
-            <ListView live={list.live} rows={rows} shown={columns.shown} search={search} />
+            <ListView live={list.live} githubOut={githubOut} rows={rows} shown={columns.shown} search={search} />
           )}
         </div>
         {search.worktree && (

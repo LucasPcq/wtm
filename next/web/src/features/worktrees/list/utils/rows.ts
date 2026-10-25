@@ -46,5 +46,4 @@ export function rowsOf({
   })
 }
 
-// a read cancelled is said not read, one that failed unreadable
 export const unread = ({ status }: Row) => (status === 'cancelled' ? 'not read' : 'unreadable')

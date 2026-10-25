@@ -467,3 +467,15 @@ func TestAMissingWorktreeHasNoChangesToCount(t *testing.T) {
 	assert.Nil(t, detailOf(t, read, "feat/a").Changes)
 	assert.Equal(t, &list.Changes{}, detailOf(t, read, "feat/b").Changes)
 }
+
+func TestAListCancelledWarnsOfNoDatesItCouldNotRead(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}, Fail: map[string]error{"CommitDates": context.Canceled}}})
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	read, err := w.usecase.Run(ctx, list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.True(t, read.Interrupted)
+	assert.NotContains(t, codes(read), list.CodeDatesUnreadable, "a cancelled read is said once, as interrupted")
+}

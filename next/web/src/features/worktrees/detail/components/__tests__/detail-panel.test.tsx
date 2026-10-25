@@ -83,3 +83,20 @@ test('a .env file says only how it drifts: keys missing, differing or its own', 
   const links = await within(detail).findByRole('region', { name: 'Links' })
   expect(within(links).getByText('.env: 2 of its own')).toBeTruthy()
 })
+
+// A GitHub read that failed said "No pull request.", as if GitHub had answered none.
+test('a GitHub read that failed says why in the review, not that there is no pull request', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/status', async ({ request }) => {
+      const asked = await answers(request)
+      if (asked('with_prs') !== 'true') return HttpResponse.json(envelope('status', [statusDetail('feat/billing')]))
+      return HttpResponse.json({ error: { message: 'the server went away' } }, { status: 503 })
+    }),
+  )
+
+  const { detail } = await openDetail('feat/billing')
+
+  const review = await within(detail).findByRole('region', { name: 'Review' })
+  expect(await within(review).findByText('the server went away')).toBeTruthy()
+  expect(within(review).queryByText('No pull request.')).toBeNull()
+})

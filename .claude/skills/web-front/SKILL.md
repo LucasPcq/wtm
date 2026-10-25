@@ -36,10 +36,10 @@ src/
 
 ```
 features/worktrees/
-  worktrees-page.tsx         the feature's entry, the only file at its root
+  worktrees-page.tsx         the feature's entry, the one file at its root
   components/  hooks/  utils/  store/    what the feature's own entry and two or more sub-features use
   list/                      a sub-feature (list, tree, detail, create)
-    list-view.tsx            its entry component, the only file at its root
+    list-view.tsx            its entry component, the one file at its root
     components/              .tsx only; components/__tests__/ holds the component tests
     hooks/                   use-*.ts only, never a test
     utils/                   plain functions (rows, steps, words…); utils/__tests__/ their tests
@@ -48,7 +48,7 @@ features/worktrees/
 
 - A file only one sub-feature uses stays in it; one that two sub-features, or the feature's entry and a sub-feature, use moves up to the feature's own `components/`, `hooks/` or `utils/`. There is no `shared/`.
 - **A test lives in the `__tests__/` of `components/` or `utils/`**, beside the code it tests: never at a root, never beside its code, never in `hooks/` (a hook is tested through a component that uses it, in `components/__tests__/`), never in `store/`. A page-level test of an entry component goes in its sub-feature's `components/__tests__/`. Outside features a test sits in a `__tests__/` too: `api/queries/__tests__/`, `components/command-form/__tests__/`, `lib/__tests__/`.
-- The `unknown-folder` lint refuses any other file or folder in a feature, and any test outside a `__tests__/`.
+- The `unknown-folder` lint refuses any other folder or kind of file in a feature (a root holds `.tsx` only, never a test), and any test outside a `__tests__/`. That a root holds one entry and nothing more is a review rule: GritQL sees one file at a time and cannot count.
 
 - **Imports between folders go through `@/`; `./` stays for the same folder; `../` never.** Biome matches the raw import text and resolves nothing, so `@/features/x/…` is what lets the layer rules see where an import lands.
 - **A layer imports only what it may**: `api/` nothing of the app; `lib/` nothing of the app, no React; a route the router, features and Query's types; `components/` no feature; a feature its own folder, `components/`, `lib/`, `api/`, `hooks/`, never another feature or a route. Code moves to `components/` or `lib/` on the second feature that needs it, not before.

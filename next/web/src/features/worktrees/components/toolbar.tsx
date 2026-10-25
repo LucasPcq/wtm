@@ -32,7 +32,6 @@ export function Toolbar({
     if (!own) ask.cancel()
   }
 
-  // / focuses the search from anywhere but a field, as the hint beside it says
   const focusOnSlash = (input: HTMLInputElement | null) => {
     if (!input) return
 

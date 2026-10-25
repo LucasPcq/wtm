@@ -15,9 +15,10 @@ type TreeCommand = 'go' | 'sync' | 'clean'
 
 const label: Record<TreeCommand, string> = { go: 'Go to the worktree', sync: 'Sync', clean: 'Clean' }
 
-const isTreeCommand = (command: string | undefined): command is TreeCommand => command !== undefined && command in label
-
 export function ActionButton({ action }: { action: DomainFollowUp }) {
+  const isTreeCommand = (command: string | undefined): command is TreeCommand =>
+    command !== undefined && Object.hasOwn(label, command)
+
   return (
     <Popover>
       <PopoverTrigger asChild>
