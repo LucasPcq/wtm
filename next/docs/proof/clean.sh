@@ -137,6 +137,8 @@ run_side() {
     scenario 24-expect-fingerprint clean feat/fp --expect-fingerprint "${fp:-none}" --yes
     forget feat/fp
     scenario 25-stale-fingerprint clean feat/c --force --expect-fingerprint 0123456789abcdef01234567 --yes
+    git branch feat/orphan main
+    scenario 26-branch-without-worktree clean feat/orphan --yes
   )
   sed -i '' -E \
     -e "s#(/private)?$root#<SB>#g" \

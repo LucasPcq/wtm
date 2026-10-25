@@ -364,7 +364,8 @@ The reference is the legacy `wtm clean` of 0.30.1. Its output differs by design 
   23. `--dry-run --output json` (next only)
   24. `--expect-fingerprint` with that fingerprint (next only)
   25. `--expect-fingerprint` with a stale fingerprint (next only)
-- The states are identical but for 7, 16, 21, 22 and 24. The differences, all deliberate:
+  26. a branch no worktree holds, as create's undo can leave one
+- The states are identical but for 7, 16, 21, 22, 24 and 26. The differences, all deliberate:
   - 2, 4, 5, 10 and 17 are refused by both, nothing removed; next exits 23 (`clean.unsafe`, a safety refusal) where legacy exits 1, names each reason on its line under the failure (`feat/dirty has uncommitted changes`, `feat/unpushed has 1 commit(s) no other branch nor remote holds`, `feat/locked is locked`), and follows it with the same request forced, `→ wtm clean feat/dirty --force   remove anyway`. In JSON (17) each reason is a problem of its entry, `error.fields[]` (`worktree[0]`, `clean.dirty`), and the forced request is `error.follow_up` (`clean.force`); legacy prints its refusal as text on stderr and nothing on stdout.
   - 7, a legacy bug: legacy counts unpushed commits against `origin/<branch>`, none for a branch origin never had, so it ran the hook and removed the worktree, then `git branch -d` refused the unmerged branch: the worktree gone, its branch and `meta.json` left behind, exit 1. Next counts the commits no other branch nor remote holds and refuses the worktree before anything runs (exit 23). Once the checks pass, next deletes the branch with `-D`, so a branch pushed but not merged locally goes whole too (legacy's `-d` refused it the same way).
   - 12: both report the name as already absent, exit 0; next counts it `1 unchanged` with an `Already absent` row.
@@ -375,6 +376,7 @@ The reference is the legacy `wtm clean` of 0.30.1. Its output differs by design 
   - 20 and 23 to 25: legacy has no dry run nor fingerprint (exit 2).
   - 21: next has no `--keep-data` nor `--drop-data` until the run module migrates (LUC-339): it never drops a namespace and names the data kept (`clean.data_kept`); it refuses the flag (exit 2).
   - 22: legacy takes only branches and says the path is already absent; next removes the worktree on no branch by its path, leaving the branch it was made from.
+  - 26, an owner decision: legacy says the branch is already absent and keeps it, so create's `→ wtm clean feat/x --force` repaired nothing after an undo that left the branch; next deletes a branch no worktree holds, with its record, behind the same checks (refused when it holds commits no other branch nor remote holds, unless `--force`).
   - The tty: legacy's recap offers to delete the safe ones, to force all, or to cancel; next asks a `Force` step only when a worktree is unsafe, its help naming each reason (`feat/tty-dirty — uncommitted changes`), then a recap whose button names what goes (`Yes, remove 2 worktrees`). Next's `Reparent children` puts `Leave them orphaned` first (no by default), legacy `Reparent onto main (1)`. Leaving the wizard exits 19 on both.
 
 # Deliberate differences from legacy
