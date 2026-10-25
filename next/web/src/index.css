@@ -120,6 +120,21 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    /* every native scrollbar thin and muted, in both themes, its track the surface it scrolls */
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 35%, transparent) transparent;
+  }
+  /* Safari, which reads neither property above */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--muted-foreground) 35%, transparent);
   }
   body {
     @apply bg-background text-foreground;

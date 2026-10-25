@@ -53,7 +53,7 @@ export function Timeline({ progress }: { progress: Progress }) {
                       <pre
                         // the output follows its last line, as a terminal does
                         ref={(pre) => pre?.scrollTo({ top: pre.scrollHeight })}
-                        className="h-28 overflow-y-auto font-mono text-xs whitespace-pre-wrap text-muted-foreground [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin]"
+                        className="h-28 overflow-y-auto font-mono text-xs whitespace-pre-wrap text-muted-foreground"
                       >
                         {lines.join('\n')}
                       </pre>
