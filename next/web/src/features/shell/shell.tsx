@@ -6,7 +6,7 @@ import { connectionOf, eventsQuery } from '@/api/queries/events'
 import { Centered } from '@/components/centered'
 import { StatePage } from '@/components/state-page'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
-import { AppSidebar } from '@/features/shell/app-sidebar'
+import { AppSidebar } from '@/features/shell/components/app-sidebar'
 
 export function Shell({ repo, children }: { repo: string | undefined; children: ReactNode }) {
   const connection = connectionOf(useQuery(eventsQuery))

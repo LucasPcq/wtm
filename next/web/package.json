@@ -8,7 +8,7 @@
     "predev": "npm run types",
     "dev": "vite",
     "prebuild": "npm run types && tsr generate",
-    "build": "tsc -b && vite build && npm run lint",
+    "build": "tsc -b && npm run lint && vite build",
     "lint": "biome check --error-on-warnings .",
     "test": "vitest run",
     "format": "biome check --write ."

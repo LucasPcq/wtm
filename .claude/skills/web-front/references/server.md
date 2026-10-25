@@ -24,17 +24,17 @@ Every envelope is typed by `narrowed()` in its `select`: an item's detail is the
 
 ## A worktree's condition
 
-Each read, live or GitHub's, publishes a worktree's `condition` (`no_worktree`, `unreadable`, `missing`, `rebasing`, `merged`, `changed`, `clean`, the first that applies, ranked in Go) and its `actions`, already ordered. The screen maps a condition to its look (`conditionLook`) and shows the first action. Over the two reads of one worktree there is one rule, `overlaid(live, github)` in `features/worktrees/shared/condition.ts`, used by the list, the tree and the detail: it returns the GitHub read when that one says merged and the live one says changed or clean, the live read otherwise. The detail then shows the winning read's problems.
+Each read, live or GitHub's, publishes a worktree's `condition` (`no_worktree`, `unreadable`, `missing`, `rebasing`, `merged`, `changed`, `clean`, the first that applies, ranked in Go) and its `actions`, already ordered. The screen maps a condition to its look (`conditionLook`) and shows the first action. Over the two reads of one worktree there is one rule, `overlaid(live, github)` in `features/worktrees/shared/utils/condition.ts`, used by the list, the tree and the detail: it returns the GitHub read when that one says merged and the live one says changed or clean, the live read otherwise. The detail then shows the winning read's problems.
 
 ## Follow-ups
 
-A follow-up the catalogue cannot run (clean, sync, go, reparent, run …) shows as its command line to copy: `CommandLine` (`features/worktrees/shared/command-line.tsx`), a block or `inline`; a menu of them, `ActionsMenu`. One the server cannot spell says so with what it meant (`No command line for this: …`), never disappears.
+A follow-up the catalogue cannot run (clean, sync, go, reparent, run …) shows as its command line to copy: `CommandLine` (`features/worktrees/shared/components/command-line.tsx`), a block or `inline`; a menu of them, `ActionsMenu`. One the server cannot spell says so with what it meant (`No command line for this: …`), never disappears.
 
 ## Operations
 
 `runStreamed({ repo, command, call, started, line })` (`queries/operations.ts`) posts a command with `Accept: text/event-stream` and `expect_fingerprint` from the dry run. It hands the operation's id to `started` as soon as the server names it (`X-Wtm-Operation`), each event to `line`, and resolves with the narrowed envelope. An answer that names no operation is refused and its connection aborted: nothing could cancel it. `cancel(repo, operation, force)` is `DELETE …/operations/{id}` (`?force=true` the second time).
 
-Create's run lives in a zustand store (`useCreateRun`, `useUnderWay` in `features/worktrees/hooks/use-create-run.ts`): the dialog shows it, closed and opened again, and the list dims the rows it works on. `progress.ts` turns the plan into units (one per subject, a fast-forward first) and each event into their phases; `ending()` says how a run ended: cancelled (an item cancelled, or the envelope's error of kind `cancelled` when only the plan was under way), failed with why, or done.
+Create's run lives in a zustand store (`useCreateRun`, `useUnderWay` in `features/worktrees/create/hooks/use-create-run.ts`): the dialog shows it, closed and opened again, and the list dims the rows it works on. `progress.ts` turns the plan into units (one per subject, a fast-forward first) and each event into their phases; `ending()` says how a run ended: cancelled (an item cancelled, or the envelope's error of kind `cancelled` when only the plan was under way), failed with why, or done.
 
 ## The event stream
 
@@ -48,7 +48,7 @@ Create's run lives in a zustand store (`useCreateRun`, `useUnderWay` in `feature
 
 ## Create
 
-- **Words** (`create/words.ts`): exhaustive Records over create's question paths (`createWords`), each closed select's values (`envFrom`, `isolation`, …), the skip codes (`skipWords`, `null` for a reason that means nothing in a browser), the plan's actions and phases. A question, option, reason or phase the core adds fails the build until it has words. An option of no words is data (a branch) and reads as its value.
-- **Steps** (`create/steps.ts`): a Record from each question to its step; a field the build does not know goes to the last step. A skipped field is said at the foot of its step (`NotAsked`) unless its reason means nothing here; a step that asks nothing is passed. Next goes by the steps of the core's answer to the typing, not the last answer before it.
+- **Words** (`create/utils/words.ts`): exhaustive Records over create's question paths (`createWords`), each closed select's values (`envFrom`, `isolation`, …), the skip codes (`skipWords`, `null` for a reason that means nothing in a browser), the plan's actions and phases. A question, option, reason or phase the core adds fails the build until it has words. An option of no words is data (a branch) and reads as its value.
+- **Steps** (`create/utils/steps.ts`): a Record from each question to its step; a field the build does not know goes to the last step. A skipped field is said at the foot of its step (`NotAsked`) unless its reason means nothing here; a step that asks nothing is passed. Next goes by the steps of the core's answer to the typing, not the last answer before it.
 - **Confirm**: built from the dry run's plan (one `BranchPlan` per branch), never from its recap, which is the command line's. Apply is held to the plan's fingerprint.
 - **Run and done**: the dialog keeps a fixed height while it runs; then a run that went well folds its steps into a summary and lists each worktree with its path (copyable) and next command; a failed or cancelled one keeps its timeline open.

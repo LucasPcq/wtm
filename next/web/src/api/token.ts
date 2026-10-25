@@ -5,8 +5,7 @@ const key = 'wtm.token'
 
 export const token = (): string | null => localStorage.getItem(key)
 
-// takeFragment keeps the token of the address, drops the fragment so that it never shows again, and returns the
-// repository the address names, if any.
+// the fragment is dropped so that the token never shows in the address bar again
 export function takeFragment(): string | undefined {
   const fragment = new URLSearchParams(location.hash.slice(1))
   const fresh = fragment.get('token')

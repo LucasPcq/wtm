@@ -6,9 +6,9 @@ import { questionsQuery } from '@/api/queries/commands'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ProgressView } from '@/features/worktrees/create/progress-view'
-import { Wizard } from '@/features/worktrees/create/wizard'
-import { useCreateRun } from '@/features/worktrees/hooks/use-create-run'
+import { ProgressView } from '@/features/worktrees/create/components/progress-view'
+import { Wizard } from '@/features/worktrees/create/components/wizard'
+import { useCreateRun } from '@/features/worktrees/create/hooks/use-create-run'
 import { cn } from '@/lib/utils'
 
 export function CreateButton({ repo }: { repo: string }) {

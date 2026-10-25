@@ -1,21 +1,22 @@
 import { useQuery } from '@tanstack/react-query'
+import { worktreeCount } from '@/api/queries/commands'
 import { reposQuery } from '@/api/queries/repos'
 import { PageHeader } from '@/components/page-header'
+import { Toolbar } from '@/features/worktrees/components/toolbar'
 import { CreateButton } from '@/features/worktrees/create/create-dialog'
+import { useUnderWay } from '@/features/worktrees/create/hooks/use-create-run'
 import { DetailPanel } from '@/features/worktrees/detail/detail-panel'
-import { useUnderWay } from '@/features/worktrees/hooks/use-create-run'
-import { useRead } from '@/features/worktrees/hooks/use-read'
-import { columnIds, defaultColumns } from '@/features/worktrees/list/columns'
-import { ColumnsPanel } from '@/features/worktrees/list/columns-panel'
-import { countsOf } from '@/features/worktrees/list/filters'
+import { columnIds, defaultColumns } from '@/features/worktrees/list/components/columns'
+import { ColumnsPanel } from '@/features/worktrees/list/components/columns-panel'
 import { ListView } from '@/features/worktrees/list/list-view'
-import { rowsOf } from '@/features/worktrees/list/rows'
-import { Toolbar } from '@/features/worktrees/list/toolbar'
-import type { WorktreesSearch } from '@/features/worktrees/search'
-import { overlaid } from '@/features/worktrees/shared/condition'
-import { unavailable } from '@/features/worktrees/shared/github'
+import { countsOf } from '@/features/worktrees/list/utils/filters'
+import { rowsOf } from '@/features/worktrees/list/utils/rows'
+import { useRead } from '@/features/worktrees/shared/hooks/use-read'
+import { overlaid } from '@/features/worktrees/shared/utils/condition'
+import { unavailable } from '@/features/worktrees/shared/utils/github'
+import { useChoice } from '@/features/worktrees/store/ui-store'
 import { TreeView } from '@/features/worktrees/tree/tree-view'
-import { useChoice } from '@/features/worktrees/ui-store'
+import type { WorktreesSearch } from '@/features/worktrees/utils/search'
 import { repoName } from '@/lib/repo'
 
 export function WorktreesPage({ repo, search }: { repo: string; search: WorktreesSearch }) {
@@ -31,9 +32,8 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
     ? rowsOf({ live: list.live.data, github: list.github.data, readAt: list.live.dataUpdatedAt, underWay })
     : []
   const githubAsked = list.github.isSuccess && !unavailable(list.github.data.warnings)
-  const worktrees = forest.live.data?.items.filter(({ detail }) => detail && !detail.virtual) ?? []
-  const count = tree ? worktrees.length : rows.length
   const read = tree ? forest.live.data : list.live.data
+  const count = read ? worktreeCount(read) : 0
 
   const actions = () => {
     if (!tree) return rows.find((row) => row.subject === search.worktree)?.actions ?? []

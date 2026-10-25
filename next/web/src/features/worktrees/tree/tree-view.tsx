@@ -1,10 +1,11 @@
 import { DragDropProvider, KeyboardSensor, PointerSensor } from '@dnd-kit/react'
 import { useState } from 'react'
-import { useRead } from '@/features/worktrees/hooks/use-read'
-import type { WorktreesSearch } from '@/features/worktrees/search'
-import { Loading, ReadFailed } from '@/features/worktrees/shared/loading'
-import { Branch, type Drop, type View } from '@/features/worktrees/tree/branch'
-import { nodesOf } from '@/features/worktrees/tree/nodes'
+import { Loading } from '@/features/worktrees/shared/components/loading'
+import { ReadFailed } from '@/features/worktrees/shared/components/read-failed'
+import { useRead } from '@/features/worktrees/shared/hooks/use-read'
+import { Branch, type Drop, type View } from '@/features/worktrees/tree/components/branch'
+import { nodesOf } from '@/features/worktrees/tree/utils/nodes'
+import type { WorktreesSearch } from '@/features/worktrees/utils/search'
 
 export function TreeView({
   repo,

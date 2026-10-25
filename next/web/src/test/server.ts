@@ -1,7 +1,7 @@
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import type { DomainAnswered, DomainField, DomainFollowUp, ListDetail, WebCall } from '@/api/types.gen'
-import { envelope, followUp, listDetail, statusDetail, treeDetail } from './fixtures'
+import { envelope, followUp, listDetail, statusDetail, treeDetail } from '@/test/fixtures'
 
 // The server the component tests talk to: the API of `wtm-next ui` over one repository, acme, with a stack (feat/billing,
 // feat/billing-ui behind it) and a worktree with a change (fix/login). A test changes what it answers with server.use.
@@ -50,7 +50,7 @@ const tree = (detail: ListDetail) =>
 const field = (over: Partial<DomainField> & { kind: DomainField['kind']; path: string }): DomainField =>
   ({ flag: `--${over.path}`, label: over.path, help: '', ...over }) as DomainField
 
-// questionsOf is create's form for answers: a branch is required, an existing one is not asked its environment.
+// a branch is required; an existing one is not asked its environment
 export function questionsOf(answers: DomainAnswered[] = []) {
   const branches = answers.find((a) => a.path === 'branches')?.values ?? []
   const exists = branches.some((branch) => worktrees.some((w) => w.branch === branch))

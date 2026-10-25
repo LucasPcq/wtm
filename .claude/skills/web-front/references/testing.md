@@ -15,7 +15,7 @@ expect(rowsOf({ live, github, readAt: 0, underWay: {} })[0]?.condition).toBe('me
 
 ## Component tests (`*.test.tsx`)
 
-One file per screen or dialog, beside it (`list/list-page.test.tsx`, `create/create-dialog.test.tsx`). Render the whole app at an address and use it as its user does:
+One file per screen or dialog, in its sub-feature's `components/__tests__/` (`list/components/__tests__/list-page.test.tsx`). A hook has no test of its own: the component that uses it is tested, and the hook with it. Render the whole app at an address and use it as its user does:
 
 ```tsx
 test('a row opens its own worktree, not another', async () => {
@@ -42,7 +42,9 @@ test('a row opens its own worktree, not another', async () => {
 
 ## The stores
 
-zustand stores outlive a render, as they outlive a page in the browser. `src/test/setup.ts` clears `localStorage` and resets every store to its initial state after each test (`useUi.setState(useUi.getInitialState(), true)`). A new store gets its reset line there.
+zustand stores outlive a render, as they outlive a page in the browser. `src/test/setup.ts` clears `localStorage` and resets every store to its initial state after each test (`useUi.setState(useUi.getInitialState(), true)`). A new store gets its reset line there. Another tab is a `storage` event: write the key, then `window.dispatchEvent(new StorageEvent('storage', { key: 'wtm.ui' }))` inside `act`.
+
+A spy on a browser object is restored by its own handle (`const refused = vi.spyOn(…); onTestFinished(() => refused.mockRestore())`): `vi.restoreAllMocks()` let one leak into the next test.
 
 ## What is refused, and what to do instead
 

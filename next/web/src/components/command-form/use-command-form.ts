@@ -6,12 +6,21 @@ import { answersOf, problemsByKey, valuesOf } from '@/components/command-form/an
 
 // The core validates: a change asks the questions again once typing pauses, check asks them at once, and the
 // core's answer is the form as it stands now (a field it no longer asks, a default that followed another answer).
-export function useCommandForm(params: { repo: string; command: ApiCommandName; form: DomainForm }) {
-  const [asked, setAsked] = useState(params.form)
+export function useCommandForm({
+  repo,
+  command,
+  form: initial,
+}: {
+  repo: string
+  command: ApiCommandName
+  form: DomainForm
+}) {
+  const [asked, setAsked] = useState(initial)
   // each call is numbered: an answer overtaken by a later call's is dropped, never kept over it
   const calls = useRef(0)
+
   const form = useForm({
-    defaultValues: valuesOf(params.form.fields),
+    defaultValues: valuesOf(initial.fields),
     validators: {
       onChangeAsyncDebounceMs: 300,
       onChangeAsync: async () => {
@@ -21,15 +30,17 @@ export function useCommandForm(params: { repo: string; command: ApiCommandName; 
     },
   })
 
-  // answers is the request the form makes now: only the fields the person changed
+  // only the fields the person changed: a default or a remembered answer stays the core's to decide
   const answers = (): DomainAnswered[] =>
     answersOf(asked.fields, form.state.values, (key) => form.getFieldMeta(key)?.isDirty ?? false)
+
   const check = async () => {
     const call = ++calls.current
-    const answered = await questions(params.repo, params.command, answers())
+    const answered = await questions(repo, command, answers())
     if (call === calls.current) setAsked(answered)
     return answered
   }
+
   return { form, asked, answers, check, problems: problemsByKey(asked.fields, asked.problems) }
 }
 

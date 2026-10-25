@@ -3,6 +3,7 @@ package status_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -629,4 +630,21 @@ func TestEachWorktreeCarriesItsConditionTheFirstThatApplies(t *testing.T) {
 	} {
 		assert.Equal(t, want, detailOf(t, got, branch).Condition, branch)
 	}
+}
+
+func TestWhereABranchStandsAgainstTheBaseIsAskedOnceAndSaidUnreadOnceWhenItFails(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}, Fail: map[string]error{"AheadBehindOf": errors.New("rev-list failed")}}})
+
+	got := read(t, w, status.Request{Worktree: "feat/a"})
+
+	require.Len(t, got.Items, 1)
+	assert.Equal(t, []string{status.CodePartial}, codes(got.Items[0].Warnings))
+	assert.Equal(t, 1, strings.Count(got.Items[0].Warnings[0].Message, "where it stands against main"), got.Items[0].Warnings[0].Message)
+	asked := 0
+	for _, call := range w.git.Calls() {
+		if strings.HasPrefix(call, "AheadBehindOf ") {
+			asked++
+		}
+	}
+	assert.Equal(t, 1, asked, "a count that failed is not asked again")
 }

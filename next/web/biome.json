@@ -6,14 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": [
-      "**",
-      "!src/components/ui",
-      "!src/hooks/use-mobile.ts",
-      "!**/*.gen.ts",
-      "!lint/fixtures",
-      "!package-lock.json"
-    ]
+    "includes": ["**", "!src/components/ui", "!src/hooks/use-mobile.ts", "!**/*.gen.ts", "!package-lock.json"]
   },
   "formatter": {
     "indentStyle": "space",
@@ -34,12 +27,25 @@
     }
   },
   "plugins": [
-    "./lint/layers.grit",
-    "./lint/unknown-folder.grit",
-    "./lint/props.grit",
+    {
+      "path": "./lint/layers.grit",
+      "includes": ["src/**"]
+    },
+    {
+      "path": "./lint/unknown-folder.grit",
+      "includes": ["src/**"]
+    },
+    {
+      "path": "./lint/props.grit",
+      "includes": ["src/**"]
+    },
+    {
+      "path": "./lint/test-doubles.grit",
+      "includes": ["src/**"]
+    },
     {
       "path": "./lint/spy-module.grit",
-      "includes": ["**/*.test.ts", "**/*.test.tsx", "**/src/test/**"]
+      "includes": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test/**"]
     }
   ],
   "linter": {

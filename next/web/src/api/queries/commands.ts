@@ -14,8 +14,7 @@ import type {
   WebCall,
 } from '@/api/types.gen'
 
-// An event of a repository invalidates everything under ['repo', id]; nothing invalidates ['github', id], which is
-// read on demand only.
+// no event invalidates ['github', id]: GitHub is read on demand only
 export const repoKey = (repo: string) => ['repo', repo] as const
 export const githubKey = (repo: string) => ['github', repo] as const
 
@@ -25,7 +24,7 @@ export type ReadCommand = keyof ReadDetail
 type Mutation = { create: { plan: CreatePlan; detail: CreateDetail } }
 export type MutationCommand = keyof Mutation
 
-// An item's detail is none when it was not read (failed, cancelled): the core sends {} then.
+// the core sends {} for an item it did not read (failed, cancelled)
 type Narrowed<Detail, Plan> = Omit<DomainEnvelope, 'plan' | 'items'> & {
   plan: Plan | undefined
   items: (Omit<DomainItem, 'detail'> & { detail: Detail | undefined })[]
@@ -33,7 +32,7 @@ type Narrowed<Detail, Plan> = Omit<DomainEnvelope, 'plan' | 'items'> & {
 export type Read<C extends ReadCommand> = Narrowed<ReadDetail[C], never>
 export type Applied<C extends MutationCommand> = Narrowed<Mutation[C]['detail'], Mutation[C]['plan']>
 
-// narrowed types an envelope once, here, so that no component casts it
+// typed once, here, so that no component casts
 export const narrowed = <Detail, Plan = never>(envelope: DomainEnvelope): Narrowed<Detail, Plan> => ({
   ...envelope,
   plan: envelope.plan as Plan | undefined,
@@ -42,6 +41,10 @@ export const narrowed = <Detail, Plan = never>(envelope: DomainEnvelope): Narrow
     detail: Object.keys(item.detail).length === 0 ? undefined : (item.detail as unknown as Detail),
   })),
 })
+
+// a branch of the tree with no worktree of its own is none
+export const worktreeCount = ({ items }: Read<'list'> | Read<'tree'>) =>
+  items.filter(({ detail }) => !(detail && 'virtual' in detail && detail.virtual)).length
 
 export const run = (repo: string, command: ApiCommandName, call: WebCall) =>
   json<DomainEnvelope>(`/api/repos/${repo}/commands/${command}`, call)

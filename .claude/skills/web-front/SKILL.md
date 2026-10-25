@@ -25,17 +25,35 @@ src/
   components/ui/       shadcn's code, added by its CLI or MCP, never edited
   hooks/               shadcn's hooks (use-mobile)
   components/          what two features share (page header, state pages, logo, command-form/)
-  features/<feature>/  one area: its components, hooks/, its stores, its plain .ts logic, its tests
+  features/<feature>/  one area, in the shape below
   routes/              thin: a path and the feature it renders
   lib/                 pure helpers: no React, nothing of the app
   test/                the test kit: render.tsx, server.ts (msw), fixtures.ts, setup.ts
   main.tsx, routeTree.gen.ts
 ```
 
+### Inside a feature: one shape at every level
+
+```
+features/worktrees/
+  worktrees-page.tsx         the feature's entry, at its root
+  components/  hooks/  utils/  store/
+  list/                      a sub-feature (list, tree, detail, create, shared)
+    list-view.tsx            its entry component, at its root
+    components/              .tsx only; components/__tests__/ holds the component tests
+    hooks/                   use-*.ts only, never a __tests__/
+    utils/                   plain functions (rows, filters, words…); utils/__tests__/ their tests
+  store/ui-store.ts          a store, store/__tests__/ if it ever needs one
+```
+
+- A file only one sub-feature uses stays in it; one two sub-features share goes in `shared/`, in the same shape.
+- **`__tests__/` sits inside the code folder it tests** (`components/`, `utils/`, `store/`), never at a sub-feature's root, never in `hooks/`: a hook is tested through a component that uses it, in `components/__tests__/`. A page-level test of an entry component goes in its sub-feature's `components/__tests__/`. Outside features the same holds: `api/queries/__tests__/`, `components/command-form/__tests__/`, `lib/__tests__/`.
+- The `unknown-folder` lint refuses anything else in a feature.
+
 - **Imports between folders go through `@/`; `./` stays for the same folder; `../` never.** Biome matches the raw import text and resolves nothing, so `@/features/x/…` is what lets the layer rules see where an import lands.
 - **A layer imports only what it may**: `api/` nothing of the app; `lib/` nothing of the app, no React; a route the router, features and Query's types; `components/` no feature; a feature its own folder, `components/`, `lib/`, `api/`, `hooks/`, never another feature or a route. Code moves to `components/` or `lib/` on the second feature that needs it, not before.
 - **A file is named after what it declares**, kebab-case (`node-row.tsx` declares `NodeRow`); a hook's file starts with `use-` and lives in `hooks/`.
-- **One component per file**, and a file stays under 300 lines (the lint enforces it). A big one splits by what it draws: the detail panel is a panel plus one file per section.
+- **One exported component per file.** A small sub-component only that component uses may live in its file, unexported, like a helper function (`ListView`'s empty states, the sidebar's `WorktreeCount`); once a second component uses it, it moves to its own file. A file stays under 300 lines (the lint enforces it): a big one splits by what it draws, as the detail panel is a panel plus one file per section.
 
 ## Writing a component
 
@@ -67,12 +85,12 @@ These are the owner's rules, and the reason behind each.
 | State | Lives in |
 | -- | -- |
 | anything the server says (reads, forms, dry runs, the event stream) | TanStack Query, through `src/api/queries/` |
-| what is linkable (view, filter, search, the worktree open) | the route's search params (`features/worktrees/search.ts`) |
-| a viewer's own choices (columns, detail sections, other UI options) | a zustand store with `persist` (`features/worktrees/ui-store.ts`, key `wtm.ui`), per repository |
-| an operation this page runs (create's progress) | a zustand store without persist (`hooks/use-create-run.ts`), read by the dialog and the list |
+| what is linkable (view, filter, search, the worktree open) | the route's search params (`features/worktrees/utils/search.ts`) |
+| a viewer's own choices (columns, detail sections, other UI options) | a zustand store with `persist` (`features/worktrees/store/ui-store.ts`, key `wtm.ui`), per repository, the same in every tab |
+| an operation this page runs (create's progress) | a zustand store without persist (`create/hooks/use-create-run.ts`), read by the dialog and the list |
 | what one component alone needs for a moment (a popover open, typing not yet sent) | `useState` / `useReducer` |
 
-Never server data in zustand, never a choice of the viewer in Query, never `localStorage` by hand. The persisted store's storage swallows a refused write (a private window): the choice then lives in memory until the page closes.
+Never server data in zustand, never a choice of the viewer in Query, never `localStorage` by hand. The persisted store's storage swallows a refused write (a private window): the choice then lives in memory until the page closes. A choice made in another tab reaches this one: the store's file listens to the `storage` event for its key and rehydrates (`persist.rehydrate()`), at module level, no effect.
 
 ## Showing what the core says
 
@@ -80,11 +98,11 @@ Never server data in zustand, never a choice of the viewer in Query, never `loca
 | -- | -- | -- |
 | what is wrong with a worktree and how to fix it | `status`'s `problems` (message and `fix`), in the detail | a check of your own (`if (detail.missing)`), a page banner |
 | a worktree's condition and what to do first | the read's `condition` and `actions`, ranked by the core | a ranking of your own (`if (missing) … else if (rebasing)`) |
-| one worktree over its live and GitHub reads | `overlaid(live, github)` (`shared/condition.ts`), the one rule: a pull request GitHub says is merged wins over changed and clean, with that read; anything else is the live read | a second merge rule anywhere |
+| one worktree over its live and GitHub reads | `overlaid(live, github)` (`shared/utils/condition.ts`), the one rule: a pull request GitHub says is merged wins over changed and clean, with that read; anything else is the live read | a second merge rule anywhere |
 | a follow-up the web cannot run (clean, sync, go, reparent…) | `CommandLine` (the server spells it, `POST /api/command-line`), inline or as a block | a button that pretends to run it, or nothing |
 | a pull request, its checks | `githubQuery`, asked once per view on screen, when the detail opens, and after Fetch origin | `with_prs` on every event, a timer |
 | fresh data | the event stream invalidating `['repo', id]` | polling, `refetchInterval` on a read |
-| the words of a field, an option, a reason a field is not asked | the screen's own exhaustive `Record` over the paths, values and skip codes the schema publishes (`create/words.ts`) | the core's `label`, `help`, option label or skip code: those are the command line's |
+| the words of a field, an option, a reason a field is not asked | the screen's own exhaustive `Record` over the paths, values and skip codes the schema publishes (`create/utils/words.ts`) | the core's `label`, `help`, option label or skip code: those are the command line's |
 
 A problem shows where it is decided, never as a banner or a toast. Colour carries a meaning only (healthy, needs the person, failed, nothing to say), always beside its word (`Glyph`).
 
@@ -94,8 +112,8 @@ A problem shows where it is decided, never as a banner or a toast. Colour carrie
 
 ## Tests, briefly
 
-- **Logic** in plain `.ts` files gets a Vitest test beside it (`list.test.ts`, `create.test.ts`), with builders from `src/test/fixtures.ts`.
-- **Components** are tested by rendering the whole app at an address (`await renderApp('/r/r1/worktrees')`) and using it as its user does: queries by role, label or text, actions through `user-event`, assertions on the screen or the address. The server is msw (`src/test/server.ts`); one test changes an answer with `server.use(...)`.
+- **Logic** in `utils/` gets a Vitest test in `utils/__tests__/` (`list/utils/__tests__/list.test.ts`), with builders from `src/test/fixtures.ts`.
+- **Components, and the hooks they use,** are tested by rendering the whole app at an address (`await renderApp('/r/r1/worktrees')`) and using it as its user does: queries by role, label or text, actions through `user-event`, assertions on the screen or the address. The server is msw (`src/test/server.ts`); one test changes an answer with `server.use(...)`.
 - **Never** `renderHook`, `vi.mock`/`vi.doMock`/`vi.stubGlobal`, or `vi.spyOn` on a module of the app: the lint refuses them. Spying on a browser object (`localStorage`) is fine.
 - **A bug fix starts with a test that fails** for the bug's reason, named after what the user saw.
 
@@ -103,7 +121,7 @@ Read `references/testing.md` before writing or fixing a test: the kit, the msw p
 
 ## The lint
 
-`npm run lint` (`biome check --error-on-warnings .`) formats, organises imports and lints. It is part of `npm run build`, `make ui`, `make lint-ui` and the CI `ui` gate. `npm run format` writes the fixes. Read `references/lint.md` before changing `biome.json` or a GritQL rule in `lint/`, or when a rule refuses your code and you don't see why. Above all: **a plugin that breaks passes silently**, so every rule has a planted violation in `lint/fixtures/` that `lint/rules.test.ts` checks it refuses.
+`npm run lint` (`biome check --error-on-warnings .`) formats, organises imports and lints. It is part of `npm run build`, `make ui`, `make lint-ui` and the CI `ui` gate. `npm run format` writes the fixes. Read `references/lint.md` before changing `biome.json` or a GritQL rule in `lint/`, or when a rule refuses your code and you don't see why. Above all: **a GritQL plugin that breaks passes silently**, so `lint/rules.test.ts` holds a table of cases, each a small file and the plugin that must refuse it, which it lints with the real `biome.json`.
 
 ## The server, the stream, forms, operations
 

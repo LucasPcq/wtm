@@ -4,10 +4,11 @@ or {
   JsImport(),
   JsExport()
 } as $item where {
+  $filename <: r".*/src/(.*)"($rel),
   or {
     and {
-      $filename <: r".*/src/([^/]+)/.*"($dir),
-      not $dir <: or {
+      $rel <: r"([^/]+)/.*"($layer),
+      not $layer <: or {
         "api",
         "lib",
         "routes",
@@ -15,15 +16,37 @@ or {
         "features",
         "test",
         "hooks"
-      }
+      },
+      $msg = "A file of src/ lives in a known layer, or is the entry (web-front skill, unknown-folder)."
     },
     and {
-      $filename <: r".*/src/([^/]+)"($file),
-      not $file <: or {
+      $rel <: r"[^/]+",
+      not $rel <: or {
         "main.tsx",
         "routeTree.gen.ts"
-      }
+      },
+      $msg = "A file of src/ lives in a known layer, or is the entry (web-front skill, unknown-folder)."
+    },
+    and {
+      $rel <: r"features/.*",
+      not or {
+        $rel <: r"features/[^/]+/[^/]+\.tsx?",
+        and {
+          $rel <: r"features/[^/]+/([^/]+)/[^/]+\.tsx?"($sub),
+          not $sub <: or {
+            "components",
+            "hooks",
+            "utils",
+            "store",
+            "__tests__"
+          }
+        },
+        $rel <: r"features/[^/]+/(?:[^/]+/)?components/(?:__tests__/[^/]+\.test\.tsx?|[^/]+\.tsx)",
+        $rel <: r"features/[^/]+/(?:[^/]+/)?hooks/use-[^/]+\.ts",
+        $rel <: r"features/[^/]+/(?:[^/]+/)?(?:utils|store)/(?:__tests__/[^/]+\.test\.tsx?|[^/]+\.tsx?)"
+      },
+      $msg = "A feature or a sub-feature holds its entry, then components/ (.tsx), hooks/ (use-*.ts), utils/ and store/, a __tests__/ inside components/, utils/ or store/ (web-front skill, unknown-folder)."
     }
   },
-  register_diagnostic(span=$item, message="A file of src/ lives in a known layer, or is the entry (web-front skill, unknown-folder).")
+  register_diagnostic(span=$item, message=$msg)
 }

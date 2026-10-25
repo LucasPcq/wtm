@@ -30,5 +30,3 @@ src/routeTree.gen.ts
 # tsr generate's scratch
 .tanstack/
 
-# lint/rules.test.ts writes the build's Biome config at the root of its fixtures while it runs
-lint/fixtures/biome.json

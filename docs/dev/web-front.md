@@ -4,9 +4,20 @@
 
 How front code is written — its layers, components, state, tests, the server and the stream, and the lint — is the `web-front` skill (`.claude/skills/web-front/`). Read it before changing anything under `next/web/`. Its design lives in the Pencil file `wtm-ui.pen` (the `pencil` MCP).
 
+## Layout
+
+```
+next/web/
+  src/           api/, components/, features/, routes/, lib/, test/, main.tsx
+  lint/          the GritQL plugins Biome runs, and rules.test.ts, a table of cases for them
+  biome.json     lint, format and imports, the one gate
+```
+
+A feature has one shape at every level: its entry at the root, then `components/` (`.tsx`), `hooks/` (`use-*.ts`), `utils/`, `store/`, and its sub-features (`list/`, `tree/`, `detail/`, `create/`, `shared/`) in the same shape. Tests sit in a `__tests__/` inside the code folder they test (`components/`, `utils/`, `store/`), never in `hooks/`: a hook is tested through its component. The lint refuses any other folder. The why and the rest of the rules: the `web-front` skill.
+
 ## Building it
 
-`make ui` is the only writer of `next/internal/web/dist/`: `npm ci`, `npm test`, `npm run build` in `next/web`. The build generates the types from `next/internal/api/api.v2.schema.json` (`npm run types`) and the route tree (`tsr generate`), type-checks (`tsc -b`), builds, then runs the lint (`npm run lint`, Biome). A type error leaves `dist/` as it was; a lint error fails the build. `make lint-ui` runs the types and the lint alone.
+`make ui` is the only writer of `next/internal/web/dist/`: `npm ci`, `npm test`, `npm run build` in `next/web`. The build generates the types from `next/internal/api/api.v2.schema.json` (`npm run types`) and the route tree (`tsr generate`), type-checks (`tsc -b`), lints (`npm run lint`, Biome), then builds: a type or a lint error leaves `dist/` as it was. `make lint-ui` runs the types and the lint alone.
 
 The build is committed, so that `go install` gives a binary with its interface, under these guards:
 

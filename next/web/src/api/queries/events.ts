@@ -3,14 +3,12 @@ import { EventSourceParserStream } from 'eventsource-parser/stream'
 import { HttpError, request } from '@/api/fetch'
 import type { WebRepos, WebWarning, WtmEventsV2 } from '@/api/types.gen'
 
-// what kept a line or a repository from the stream for a while (the bus lost), until the next line
 export type Live = { warning?: string }
 
 export const reconnectEvery = 2000
 
-// eventsQuery holds the event stream of every repository open. Each line invalidates what it changed; the stream
-// ending or failing is retried every reconnectEvery, until the server refuses the token: it restarted under a new
-// one, which a token change brings (main.tsx reloads the page then).
+// retried every reconnectEvery until the server refuses the token: it restarted, and the token change that follows
+// reloads the page (main.tsx)
 export const eventsQuery = queryOptions({
   queryKey: ['events'],
   queryFn: streamedQuery<Live, Live>({

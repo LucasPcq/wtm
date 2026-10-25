@@ -2,7 +2,12 @@ language js
 
 or {
   JsFunctionDeclaration(id=$id, parameters=$ps),
-  JsVariableDeclarator(id=$id, initializer=JsInitializerClause(expression=JsArrowFunctionExpression(parameters=$ps)))
+  JsFunctionExportDefaultDeclaration(id=$id, parameters=$ps),
+  JsVariableDeclarator(id=$id, initializer=JsInitializerClause(expression=JsArrowFunctionExpression(parameters=$ps))),
+  JsVariableDeclarator(id=$id, initializer=JsInitializerClause(expression=JsFunctionExpression(parameters=$ps))),
+  JsVariableDeclarator(id=$id, initializer=JsInitializerClause(expression=JsCallExpression(arguments=JsCallArguments(args=[
+    JsArrowFunctionExpression(parameters=$ps), ...
+  ]))))
 } where {
   $id <: r"[A-Z].*",
   $ps <: or {

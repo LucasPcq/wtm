@@ -9,7 +9,6 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/c
 export type OptionWords = { title: string; description: string }
 export type FieldWords = { label: string; help: string; options?: Record<string, OptionWords>; config?: string }
 
-// an answer the person gave, or the field's default, says nothing of where it came from
 const origin: Record<DomainOrigin, string | undefined> = {
   request: undefined,
   default: undefined,
