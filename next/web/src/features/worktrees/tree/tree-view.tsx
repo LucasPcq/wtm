@@ -1,7 +1,7 @@
 import { DragDropProvider, KeyboardSensor, PointerSensor, useDraggable, useDroppable } from '@dnd-kit/react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { CircleCheck, CircleDashed, CircleDot, CircleSlash, GitMerge, GripVertical, TriangleAlert } from 'lucide-react'
+import { CircleDot, GripVertical } from 'lucide-react'
 import { useState } from 'react'
 import { githubQuery, readQuery } from '@/api/queries/commands'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +20,7 @@ import { Loading, ReadFailed } from '../shared/loading'
 import { UnderWay } from '../shared/under-way'
 import type { WorktreesSearch } from '../search'
 import { CommandLine } from '../shared/command-line'
+import { conditionLook } from '../shared/condition'
 import { Glyph } from '../shared/glyph'
 import { reparent, sync, nodesOf, type Node } from './nodes'
 import { sentence } from '../shared/sentence'
@@ -187,35 +188,11 @@ function NodeRow({ node, view }: { node: Node; view: View }) {
 }
 
 function State({ node }: { node: Node }) {
-  const detail = node.detail
-  if (detail.virtual) return <span className="text-sm text-muted-foreground">branch without a worktree</span>
-  if (detail.missing)
-    return (
-      <Glyph icon={CircleSlash} tone="failed">
-        missing
-      </Glyph>
-    )
-  if (detail.rebasing)
-    return (
-      <Glyph icon={TriangleAlert} tone="attention">
-        rebasing
-      </Glyph>
-    )
-  if (node.action?.command === 'clean')
-    return (
-      <Glyph icon={GitMerge} tone="muted">
-        merged
-      </Glyph>
-    )
-  if (detail.dirty)
-    return (
-      <Glyph icon={CircleDashed} tone="attention">
-        changed
-      </Glyph>
-    )
+  const look = conditionLook[node.condition]
+  if (node.condition === 'no_worktree') return <span className="text-sm text-muted-foreground">{look.label}</span>
   return (
-    <Glyph icon={CircleCheck} tone="ok">
-      clean
+    <Glyph icon={look.icon} tone={look.tone}>
+      {look.label}
     </Glyph>
   )
 }

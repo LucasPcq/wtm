@@ -29,6 +29,7 @@
         "origin": null,
         "pr": null,
         "merged": false,
+        "condition": "clean",
         "services": [],
         "urls": [],
         "actions": [

@@ -33,6 +33,7 @@
         },
         "pr": null,
         "merged": false,
+        "condition": "clean",
         "services": [],
         "urls": [],
         "actions": [
@@ -125,6 +126,7 @@
           "state": "merged"
         },
         "merged": false,
+        "condition": "changed",
         "services": [
           "web"
         ],
@@ -244,6 +246,7 @@
           "decision": ""
         },
         "merged": false,
+        "condition": "clean",
         "services": [],
         "urls": [],
         "actions": [
@@ -349,6 +352,7 @@
         "origin": null,
         "pr": null,
         "merged": false,
+        "condition": "clean",
         "services": [],
         "urls": [],
         "actions": [
@@ -391,6 +395,7 @@
         "origin": null,
         "pr": null,
         "merged": false,
+        "condition": "missing",
         "services": [],
         "urls": [],
         "actions": [

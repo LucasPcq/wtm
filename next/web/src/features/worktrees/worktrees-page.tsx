@@ -78,7 +78,7 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
           )}
         </div>
         {search.worktree && (
-          <DetailPanel key={search.worktree} repo={repo} worktree={search.worktree} row={open?.detail} />
+          <DetailPanel key={search.worktree} repo={repo} worktree={search.worktree} actions={open?.actions ?? []} />
         )}
       </div>
     </>

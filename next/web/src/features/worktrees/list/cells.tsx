@@ -1,39 +1,23 @@
-import {
-  CircleCheck,
-  CircleDashed,
-  CircleDot,
-  CircleSlash,
-  CircleX,
-  GitMerge,
-  LoaderCircle,
-  TriangleAlert,
-  type LucideIcon,
-} from 'lucide-react'
+import { CircleCheck, CircleDot, CircleX, LoaderCircle, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { ListDetail } from '@/api/types.gen'
 import { ago } from '@/lib/time'
-import { Glyph, type Tone } from '../shared/glyph'
+import { Glyph } from '../shared/glyph'
 import type { ColumnId } from './columns'
 import type { Row } from './rows'
-import { changedLabel, stateOf, type State } from './state'
+import { conditionLook } from '../shared/condition'
+import { changedLabel } from './state'
 
 const muted = (text: string) => <span className="text-muted-foreground">{text}</span>
 const none = muted('—')
 
-const looks: Record<State, { icon: LucideIcon; tone: Tone; label: (detail: ListDetail) => string }> = {
-  missing: { icon: CircleSlash, tone: 'failed', label: () => 'missing' },
-  rebasing: { icon: TriangleAlert, tone: 'attention', label: () => 'rebasing' },
-  merged: { icon: GitMerge, tone: 'muted', label: () => 'merged' },
-  changed: { icon: CircleDashed, tone: 'attention', label: changedLabel },
-  clean: { icon: CircleCheck, tone: 'ok', label: () => 'clean' },
-}
-
 function stateCell(row: Row, detail: ListDetail) {
-  const look = looks[stateOf(detail, row.merged)]
-  const label = look.label(detail)
+  const condition = row.condition ?? detail.condition
+  const look = conditionLook[condition]
+  const label = condition === 'changed' ? changedLabel(detail) : look.label
   return (
     <Glyph icon={look.icon} tone={look.tone}>
-      {row.merged && row.pr ? `PR #${row.pr.number} ${label}` : label}
+      {condition === 'merged' && row.pr ? `PR #${row.pr.number} ${label}` : label}
     </Glyph>
   )
 }

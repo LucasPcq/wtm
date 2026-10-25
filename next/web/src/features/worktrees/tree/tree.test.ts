@@ -16,6 +16,7 @@ const node = (branch: string, parent: string | null, over: Partial<TreeDetail> =
   behind: 0,
   branch,
   children: [],
+  condition: 'clean',
   cycle: false,
   dirty: false,
   locked: false,
@@ -51,20 +52,20 @@ test('each node sits under its parent, a node whose parent is not in the read is
   expect(roots[0]?.children[0]?.children.map((child) => child.branch)).toEqual(['feat/a-ui'])
 })
 
-test('a worktree GitHub says to clean shows clean, unless a rebase is to finish first', () => {
+test('a worktree GitHub says is merged shows merged and its clean, unless the live read says more urgent', () => {
   const live = read([
     node('feat/a', null, { actions: [action('sync', 'feat/a')] }),
-    node('feat/b', null, { rebasing: true, actions: [action('go', 'feat/b')] }),
+    node('feat/b', null, { condition: 'rebasing', rebasing: true, actions: [action('go', 'feat/b')] }),
     node('feat/c', null),
   ])
   const github = read([
-    node('feat/a', null, { actions: [action('clean', 'feat/a')] }),
-    node('feat/b', null, { actions: [action('clean', 'feat/b')] }),
+    node('feat/a', null, { condition: 'merged', actions: [action('clean', 'feat/a')] }),
+    node('feat/b', null, { condition: 'rebasing', actions: [action('go', 'feat/b')] }),
   ])
 
   const [a, b, c] = nodesOf(live, github)
 
-  expect(a?.action?.command).toBe('clean')
-  expect(b?.action?.command).toBe('go')
-  expect(c?.action).toBeUndefined()
+  expect([a?.condition, a?.action?.command]).toEqual(['merged', 'clean'])
+  expect([b?.condition, b?.action?.command]).toEqual(['rebasing', 'go'])
+  expect([c?.condition, c?.action]).toEqual(['clean', undefined])
 })

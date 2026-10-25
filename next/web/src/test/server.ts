@@ -18,6 +18,7 @@ export const repo = { id: 'r1', root: '/acme', common_dir: '/acme/.git' }
 const list = (branch: string, over: Partial<ListDetail> = {}): ListDetail => ({
   actions: [],
   active: false,
+  condition: over.dirty ? 'changed' : 'clean',
   ahead: 0,
   behind: 0,
   branch,
@@ -98,6 +99,7 @@ const tree = (detail: ListDetail): TreeDetail => ({
   ahead: detail.ahead,
   behind: detail.behind,
   branch: detail.branch,
+  condition: detail.condition,
   children: worktrees.filter((w) => w.parent === detail.branch).map((w) => w.branch),
   cycle: false,
   dirty: detail.dirty,

@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { CircleCheck, CircleDot, CircleX, Copy, ExternalLink, SlidersHorizontal, TriangleAlert, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { githubQuery, readQuery } from '@/api/queries/commands'
-import type { ListDetail, RunState, StatusDetail, StatusProblem, StatusReview } from '@/api/types.gen'
+import type { DomainFollowUp, RunState, StatusDetail, StatusProblem, StatusReview } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -20,7 +20,7 @@ import { sectionIds, sectionTitle, shownSections, type SectionId } from './secti
 
 // DetailPanel is the whole read of one worktree: its status as it changes, what GitHub said of it when the panel
 // opened, the problem to fix first with its command, and the sections chosen.
-export function DetailPanel(props: { repo: string; worktree: string; row: ListDetail | undefined }) {
+export function DetailPanel(props: { repo: string; worktree: string; actions: DomainFollowUp[] }) {
   const answers = [{ path: 'worktree', values: [props.worktree] }]
   const live = useQuery(readQuery(props.repo, 'status', answers))
   // GitHub is asked again each time the panel opens, never on an event
@@ -34,7 +34,7 @@ export function DetailPanel(props: { repo: string; worktree: string; row: ListDe
   const problems = [...(merged ? [merged] : []), ...(detail?.problems ?? [])]
   // the pull request is what GitHub said when the panel opened: the live list never asks it
   const pr = asked?.review
-  const actions = props.row?.actions?.filter((action) => !action.url) ?? []
+  const actions = props.actions.filter((action) => !action.url)
 
   return (
     <aside aria-label={props.worktree} className="flex w-[440px] shrink-0 flex-col border-l bg-background">

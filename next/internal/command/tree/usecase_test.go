@@ -47,7 +47,7 @@ func TestTheTreeListsParentsBeforeTheirChildrenRootsMainFirst(t *testing.T) {
 	assert.Equal(t, "feat/a", *a1.Parent)
 	assert.Equal(t, "/repo/.trees/feat/a1", *a1.Path)
 	gone := detailOf(t, read, "gone")
-	assert.Equal(t, tree.Detail{Branch: "gone", Virtual: true, Children: []string{"feat/x"}, Actions: []domain.FollowUp{}}, gone)
+	assert.Equal(t, tree.Detail{Branch: "gone", Virtual: true, Condition: worktree.ConditionNoWorktree, Children: []string{"feat/x"}, Actions: []domain.FollowUp{}}, gone)
 	assert.True(t, detailOf(t, read, "y").Cycle)
 	assert.Nil(t, detailOf(t, read, "y").Parent, "a member of a cycle is drawn as a root")
 	assert.Nil(t, detailOf(t, read, "y").Behind, "a member of a cycle has no parent to sync onto")

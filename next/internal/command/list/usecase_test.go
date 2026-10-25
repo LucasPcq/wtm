@@ -45,7 +45,8 @@ func TestEachWorktreeIsReadTheMainOneFirstThenTheOldest(t *testing.T) {
 	assert.Equal(t, list.Detail{
 		Branch: "feat/a", Path: "/repo/.trees/feat/a", Dirty: true, CommitsAhead: 2, Ahead: ptr(2), Changes: &list.Changes{Changed: 1, Untracked: 1},
 		CreatedAt: a.CreatedAt, LastCommitAt: &gittest.Committed, Origin: &worktree.Origin{Ahead: 2, State: worktree.Ahead},
-		Services: []string{"web"}, URLs: []string{"http://web.feat-a.acme.localhost"}, Actions: a.Actions,
+		Condition: worktree.ConditionChanged,
+		Services:  []string{"web"}, URLs: []string{"http://web.feat-a.acme.localhost"}, Actions: a.Actions,
 	}, a)
 	assert.Equal(t, created.Add(time.Hour), *a.CreatedAt)
 	assert.True(t, detailOf(t, read, "main").Main)
@@ -429,6 +430,8 @@ func TestAPullRequestMergedAtTheBranchTipMarksItsWorktreeMergedOnlyWhenAsked(t *
 	assert.False(t, detailOf(t, without, "feat/a").Merged, "GitHub not asked: not known")
 	assert.True(t, detailOf(t, with, "feat/a").Merged)
 	assert.False(t, detailOf(t, with, "feat/moved").Merged, "a branch that moved past its pull request is not merged")
+	assert.Equal(t, worktree.ConditionClean, detailOf(t, without, "feat/a").Condition)
+	assert.Equal(t, worktree.ConditionMerged, detailOf(t, with, "feat/a").Condition)
 }
 
 func TestAnOpenPullRequestCarriesWhereItsReviewStands(t *testing.T) {

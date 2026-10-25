@@ -1908,6 +1908,9 @@
         "commits_ahead": {
           "type": "integer"
         },
+        "condition": {
+          "$ref": "#/$defs/worktree.Condition"
+        },
         "created_at": {
           "anyOf": [
             {
@@ -2024,6 +2027,7 @@
         "origin",
         "pr",
         "merged",
+        "condition",
         "services",
         "urls",
         "actions"
@@ -2776,6 +2780,9 @@
             }
           ]
         },
+        "condition": {
+          "$ref": "#/$defs/worktree.Condition"
+        },
         "cycle": {
           "type": "boolean"
         },
@@ -2868,6 +2875,7 @@
         "locked",
         "rebasing",
         "missing",
+        "condition",
         "cycle",
         "origin",
         "pr",
@@ -3195,6 +3203,18 @@
         "at"
       ],
       "type": "object"
+    },
+    "worktree.Condition": {
+      "description": "The one fact of a worktree that most changes what to do with it first, as one read knows it, the first that applies first.",
+      "enum": [
+        "no_worktree",
+        "unreadable",
+        "missing",
+        "rebasing",
+        "merged",
+        "changed",
+        "clean"
+      ]
     },
     "worktree.Conflict": {
       "additionalProperties": false,

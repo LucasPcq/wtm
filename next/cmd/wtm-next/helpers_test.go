@@ -464,6 +464,7 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[project.JobKind]():           {"Whether a job keeps running or runs to its end.", project.JobKinds()},
 	reflect.TypeFor[run.State]():                 {"A job's state.", run.States()},
 	reflect.TypeFor[worktree.PullRequestState](): {"Where a pull request stands.", worktree.PullRequestStates()},
+	reflect.TypeFor[worktree.Condition]():        {"The one fact of a worktree that most changes what to do with it first, as one read knows it, the first that applies first.", worktree.Conditions()},
 }
 
 // of is the schema of a value of type t as encoding/json writes it: a reference to its definition for a named struct, defined on first sight, or to the fragment written by hand beside its MarshalJSON.

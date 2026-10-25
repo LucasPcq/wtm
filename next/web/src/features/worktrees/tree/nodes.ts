@@ -1,32 +1,33 @@
 import type { Read } from '@/api/queries/commands'
-import type { DomainFollowUp, TreeDetail, TreePR } from '@/api/types.gen'
+import type { DomainFollowUp, TreeDetail, TreePR, WorktreeCondition } from '@/api/types.gen'
+import { overlaid } from '../shared/condition'
 
 // A Node is one branch of the tree as the screen draws it: the live read's detail, the pull request GitHub gave it
-// the last time it was asked, what it needs next, and its children.
+// the last time it was asked, its condition and what it needs next from both (overlaid), and its children.
 export type Node = {
   branch: string
   detail: TreeDetail
   pr: TreePR | null | undefined
+  condition: WorktreeCondition
   action: DomainFollowUp | undefined
   children: Node[]
 }
 
-// nodesOf is the forest of live, each node with what github read of it. The action is the core's: the live read's,
-// but for a worktree GitHub says to clean, which the live read cannot know; a rebase to finish still comes first,
-// as the core orders them.
+// nodesOf is the forest of live, each node with what github read of it, its condition and action the core's, the two
+// reads over each other as the web's one rule says (overlaid).
 export function nodesOf(live: Read<'tree'>, github: Read<'tree'> | undefined): Node[] {
   const asked = new Map(github?.items.map((item) => [item.subject, item.detail]))
   const nodes = new Map<string, Node>()
   for (const item of live.items) {
     if (!item.detail) continue
     const read = asked.get(item.subject)
-    const [own] = item.detail.actions ?? []
-    const clean = read?.actions?.find((action) => action.command === 'clean')
+    const said = overlaid(item.detail, read)
     nodes.set(item.subject, {
       branch: item.subject,
       detail: item.detail,
       pr: read?.pr,
-      action: item.detail.rebasing ? own : (clean ?? own),
+      condition: said.condition,
+      action: said.actions?.[0],
       children: [],
     })
   }

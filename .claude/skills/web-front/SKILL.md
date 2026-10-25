@@ -23,6 +23,7 @@ The web front is a thin surface over the core: it shows what the catalogue's rea
 | what to do next with a worktree | the read's `actions` / follow-ups | a list of commands written in the front |
 | a follow-up the catalogue cannot run (clean, sync, go, run …) | `CommandLine` (the server spells it, `POST /api/command-line`), or a menu item that copies it | a button that pretends to run it, or nothing |
 | a pull request, its checks, merged | the GitHub tier: `githubQuery`, asked once on open and by Fetch origin | a read `with_prs` on every event, a timer |
+| a worktree's condition and what to do first | the read's `condition` and `actions[0]`, ranked by the core; over the live and GitHub reads, `overlaid` (`shared/condition.ts`) only | a ranking of your own (`if (missing) … else if (rebasing)`) |
 | fresh data | the event stream invalidates `['repo', id]` | polling, `refetchInterval` on a read |
 | the words of a field: its label, help, option titles, why it is not asked | the screen's own `Record` over the paths, closed values and skip codes the schema publishes (`create/words.ts`) | the core's `label`/`help`/option `label`/skip: the command line's copy |
 

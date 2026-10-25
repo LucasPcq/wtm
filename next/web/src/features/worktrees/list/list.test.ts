@@ -5,7 +5,7 @@ import { sentence } from '../shared/sentence'
 import { shownColumns, toggled } from './columns'
 import { countsOf, matches, searched } from './filters'
 import { rowsOf, type Row } from './rows'
-import { changedLabel, stateOf } from './state'
+import { changedLabel } from './state'
 
 const detail = (over: Partial<ListDetail> = {}): ListDetail => ({
   actions: [],
@@ -15,6 +15,7 @@ const detail = (over: Partial<ListDetail> = {}): ListDetail => ({
   branch: 'feat/a',
   changes: { changed: 0, untracked: 0 },
   commits_ahead: 0,
+  condition: 'clean',
   created_at: null,
   dirty: false,
   last_commit_at: null,
@@ -49,6 +50,8 @@ const row = (over: Partial<Row> = {}): Row => ({
   warnings: [],
   pr: undefined,
   merged: undefined,
+  condition: 'clean',
+  actions: [],
   ...over,
 })
 
@@ -86,13 +89,16 @@ test('the search finds a branch by any part of it, whatever its case', () => {
   expect(searched(row({ subject: 'fix/login' }), 'billing')).toBe(false)
 })
 
-test('the state shown is the one that changes most what to do first', () => {
-  expect(stateOf(detail({ missing: true, dirty: true }), true)).toBe('missing')
-  expect(stateOf(detail({ rebasing: true, dirty: true }), true)).toBe('rebasing')
-  expect(stateOf(detail({ dirty: true }), true)).toBe('merged')
-  expect(stateOf(detail({ dirty: true }), undefined)).toBe('changed')
-  expect(stateOf(detail(), false)).toBe('clean')
+test('a changed worktree says how many files it changed, its untracked ones included', () => {
   expect(changedLabel(detail({ changes: { changed: 2, untracked: 1 } }))).toBe('3 changed')
+})
+
+test('a row is merged when GitHub says so over a changed worktree, as the one rule over two reads says', () => {
+  const live = read([['feat/a', detail({ condition: 'changed', dirty: true })]])
+  const github = read([['feat/a', detail({ condition: 'merged', merged: true })]])
+
+  expect(rowsOf(live, github)[0]?.condition).toBe('merged')
+  expect(rowsOf(live, undefined)[0]?.condition).toBe('changed')
 })
 
 test('the columns shown are those stored, in the table order, else the default', () => {

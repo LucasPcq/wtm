@@ -20,6 +20,7 @@
         "locked": false,
         "rebasing": false,
         "missing": false,
+        "condition": "clean",
         "cycle": false,
         "origin": null,
         "pr": null,
