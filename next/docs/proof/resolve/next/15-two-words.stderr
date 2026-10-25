@@ -1,0 +1,4 @@
+
+  ✗ the request is invalid: accepts at most 1 arg(s), received 2
+  → wtm resolve --help
+

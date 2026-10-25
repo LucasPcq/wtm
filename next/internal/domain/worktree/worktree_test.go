@@ -58,3 +58,31 @@ func TestAWorktreeIsNamedByItsBranchElseItsPath(t *testing.T) {
 	assert.Equal(t, "feat/a", Worktree{Path: "/w/a", State: Rebasing{Branch: "feat/a"}}.Name())
 	assert.Equal(t, "/w/d", Worktree{Path: "/w/d", State: Detached{}}.Name())
 }
+
+func TestAQueryNamesTheWorktreeOnThatBranchElseEachBranchHoldingItElseThePathItStandsFor(t *testing.T) {
+	log := Worktree{Path: "/r/log", State: OnBranch{Branch: "feat/log"}}
+	login := Worktree{Path: "/r/login", State: OnBranch{Branch: "feat/login"}}
+	docs := Worktree{Path: "/r/docs", State: OnBranch{Branch: "fix/docs-v1.2"}}
+	detached := Worktree{Path: "/r/detached", State: Detached{}}
+	list := []Worktree{log, login, docs, detached}
+
+	cases := map[string]struct {
+		query, located string
+		want           []Worktree
+	}{
+		"branch":         {query: "feat/log", want: []Worktree{log}},
+		"part":           {query: "logi", want: []Worktree{login}},
+		"part_over_path": {query: "docs", located: "/r/log/docs", want: []Worktree{docs}},
+		"path":           {query: "../detached/src", located: "/r/detached/src", want: []Worktree{detached}},
+		"dot_is_a_path":  {query: ".", located: "/r/detached", want: []Worktree{detached}},
+		"absolute_path":  {query: "/r/detached", located: "/r/detached", want: []Worktree{detached}},
+		"ambiguous":      {query: "feat", want: []Worktree{log, login}},
+		"none":           {query: "nope"},
+		"empty":          {located: "/r/detached"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.want, Named(list, c.query, c.located))
+		})
+	}
+}

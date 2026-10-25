@@ -6,6 +6,7 @@
         "create",
         "extract",
         "list",
+        "resolve",
         "status",
         "tree"
       ]
@@ -2119,6 +2120,84 @@
         "service",
         "task"
       ]
+    },
+    "resolve.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "missing": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch",
+        "path",
+        "missing"
+      ],
+      "type": "object"
+    },
+    "resolve.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "resolve"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/resolve.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": false
+      }
+    },
+    "resolve.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "worktree"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
     },
     "run.State": {
       "description": "A job's state.",

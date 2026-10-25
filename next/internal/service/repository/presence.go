@@ -2,8 +2,10 @@ package repository
 
 import (
 	"context"
+	"path/filepath"
 	"sync"
 
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
@@ -39,6 +41,23 @@ func Gone(ctx context.Context, git Locator, w worktree.Worktree) (bool, error) {
 	}
 
 	return !location.Exists, nil
+}
+
+// Located is the path a worktree's name stands for, read from where caller stands and resolved through its symbolic links by git; "" when the name is empty or nothing exists there, the name then being a branch or a part of one (worktree.Named).
+func Located(ctx context.Context, git Locator, name string, caller domain.Caller) (string, error) {
+	if name == "" {
+		return "", nil
+	}
+
+	path := name
+	if !filepath.IsAbs(path) && caller.Cwd != "" {
+		path = filepath.Join(caller.Cwd, path)
+	}
+	location, err := git.Locate(ctx, path)
+	if err != nil || !location.Exists {
+		return "", err
+	}
+	return location.Path, nil
 }
 
 // Each returns what read reads of each of worktrees, in their order, a few read at once.

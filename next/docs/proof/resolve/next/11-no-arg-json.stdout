@@ -1,0 +1,18 @@
+{
+  "v": 2,
+  "command": "resolve",
+  "ok": true,
+  "items": [
+    {
+      "subject": "fix/nav",
+      "status": "done",
+      "detail": {
+        "branch": "fix/nav",
+        "path": "<SB>/acme.trees/fix-nav",
+        "missing": false
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

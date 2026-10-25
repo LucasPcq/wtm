@@ -1,0 +1,17 @@
+{
+  "v": 2,
+  "command": "resolve",
+  "ok": false,
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "precondition",
+    "code": "resolve.config_not_found",
+    "message": "no wtm config found",
+    "follow_up": {
+      "command": "init",
+      "code": "repository.init",
+      "message": "set wtm up in this repository"
+    }
+  }
+}

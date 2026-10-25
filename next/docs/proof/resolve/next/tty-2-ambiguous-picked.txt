@@ -1,0 +1,4 @@
+$ dir=$(wtm resolve feat/log); echo "EXIT=$? dir=$dir"
+EXIT=0 dir=<SB>/acme.trees/feat-login
+$
+

@@ -1,0 +1,18 @@
+{
+  "v": 2,
+  "command": "resolve",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/gone",
+      "status": "done",
+      "detail": {
+        "branch": "feat/gone",
+        "path": "<SB>/acme.trees/feat-gone",
+        "missing": true
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

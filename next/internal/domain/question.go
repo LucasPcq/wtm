@@ -2,6 +2,7 @@ package domain
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
@@ -134,4 +135,59 @@ func OptionsOf[T ~string](values []T) []Option {
 	}
 
 	return options
+}
+
+// A WorktreeQuery is how a request names its worktree: Name, by its branch, a part of its branch or a path ("" names none); Located, the path Name stands for, resolved ("" when it stands for none); Cwd, where the caller stands.
+type WorktreeQuery struct {
+	Name    string
+	Located string
+	Cwd     string
+}
+
+// WorktreeOptions are worktrees as a worktree picker offers them for q, in order: each one, or only those an ambiguous name matches; each by its name (worktree.Worktree.Name), tagged current when it is the deepest holding q.Cwd, else main for the main worktree.
+func WorktreeOptions(worktrees []worktree.Worktree, q WorktreeQuery) []Option {
+	if matches := worktree.Named(worktrees, q.Name, q.Located); len(matches) > 1 {
+		worktrees = matches
+	}
+	current := worktree.Holding(worktrees, q.Cwd, func(w worktree.Worktree) string { return w.Path })
+	options := make([]Option, 0, len(worktrees))
+	for i, w := range worktrees {
+		option := Option{Value: w.Name(), Detached: w.Branch() == ""}
+		switch {
+		case i == current:
+			option.Tag = TagCurrent
+		case w.Main:
+			option.Tag = TagMain
+		}
+		options = append(options, option)
+	}
+
+	return options
+}
+
+// TargetWorktree is the worktree of worktrees, none empty, that q names (worktree.Named); else the deepest holding q.Cwd, where the caller stands; else the first. It refuses a name that names no worktree (CodeNotFound) or several (CodeAmbiguous, their branches in its params), each a problem of the field at PathWorktree.
+func TargetWorktree(worktrees []worktree.Worktree, q WorktreeQuery) (worktree.Worktree, error) {
+	if q.Name != "" {
+		return namedWorktree(worktrees, q)
+	}
+	if at := worktree.Holding(worktrees, q.Cwd, func(w worktree.Worktree) string { return w.Path }); at >= 0 {
+		return worktrees[at], nil
+	}
+	return worktrees[0], nil
+}
+
+func namedWorktree(worktrees []worktree.Worktree, q WorktreeQuery) (worktree.Worktree, error) {
+	matches := worktree.Named(worktrees, q.Name, q.Located)
+	switch len(matches) {
+	case 1:
+		return matches[0], nil
+	case 0:
+		return worktree.Worktree{}, Invalid([]FieldError{{Path: PathWorktree, Code: CodeNotFound, Template: "{value} names no worktree", Params: Params{"value": q.Name}}})
+	}
+
+	names := make([]string, 0, len(matches))
+	for _, w := range matches {
+		names = append(names, w.Branch())
+	}
+	return worktree.Worktree{}, Invalid([]FieldError{{Path: PathWorktree, Code: CodeAmbiguous, Template: "{value} matches several worktrees: {matches}", Params: Params{"value": q.Name, "matches": strings.Join(names, ", ")}}})
 }

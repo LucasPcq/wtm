@@ -185,6 +185,66 @@ func TestAReadAsksTheSubjectItsRequestLeavesOpenBeforeReading(t *testing.T) {
 	}
 }
 
+func TestASubjectRefusedAsAmbiguousIsAskedAgainAmongItsMatchesOnATerminal(t *testing.T) {
+	cases := map[string]struct {
+		Terminal bool
+		Read     string
+		Asked    int
+	}{
+		"picked_among_matches": {Terminal: true, Read: "feat/y", Asked: 1},
+		"unattended_refused":   {Read: "feat"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			q, got, asked := subjectQuery()
+			streams, _, _, _ := output.Test()
+			streams.In = formtest.Enters{}
+			streams.SetStdinTerminal(c.Terminal)
+			streams.Err.SetTerminal(c.Terminal)
+			streams.Out.SetTerminal(c.Terminal)
+
+			err := launchedSubject(t, q, &uicli.Run{Command: "fake", Streams: streams, Env: uicli.Env{Cwd: "/repo"}, CommandLine: formtest.CommandLine}, "feat")
+
+			assert.Equal(t, c.Read, strings.Join((*got)["worktree"], ""))
+			assert.Equal(t, c.Asked, *asked)
+			if c.Terminal {
+				require.NoError(t, err)
+				return
+			}
+			failed, ok := errors.AsType[*uicli.Failed](err)
+			require.True(t, ok, err)
+			assert.Equal(t, domain.CodeAmbiguous, failed.Err.Fields[0].Code)
+		})
+	}
+}
+
+func TestACapturedReadDrawsItsDataBareAndAsksItsSubjectWithStdoutCaptured(t *testing.T) {
+	cases := map[string]struct {
+		Args  []string
+		Out   string
+		Asked int
+	}{
+		"captured": {Out: "read main\n", Asked: 1},
+		"quiet":    {Args: []string{"--quiet"}, Out: "read \n"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			q, _, asked := subjectQuery()
+			q.Captured = true
+			streams, _, stdout, _ := output.Test()
+			streams.In = formtest.Enters{}
+			streams.SetStdinTerminal(true)
+			streams.Err.SetTerminal(true)
+
+			err := launchedSubject(t, q, &uicli.Run{Command: "fake", Streams: streams, Env: uicli.Env{Cwd: "/repo"}, CommandLine: formtest.CommandLine}, c.Args...)
+
+			require.NoError(t, err)
+			assert.Equal(t, c.Out, stdout.String(), "unframed, and never silenced by --quiet")
+			assert.Equal(t, c.Asked, *asked)
+		})
+	}
+}
+
 func TestTheSubjectIsAskedOnItsValueAndEachOptionReadsAsItsLabel(t *testing.T) {
 	field, ok := subjects{}.Form().Fields[0].(domain.SelectField)
 	require.True(t, ok)

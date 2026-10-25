@@ -1,0 +1,15 @@
+$ dir=$(wtm resolve); echo "EXIT=$? dir=$dir"
+
+  Step 1/1 • Worktree
+
+  The worktree to resolve, by its branch, its path or part of its branch
+
+   main                                                                                       main
+   <SB>/acme.trees/detached (detached)
+   feat/gone
+   feat/login
+   feat/logout
+▌› fix/nav                                                                                 current
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

@@ -1,0 +1,24 @@
+{
+  "v": 2,
+  "command": "resolve",
+  "ok": false,
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "worktree",
+        "code": "ambiguous",
+        "params": {
+          "matches": "feat/login, feat/logout",
+          "value": "feat/log"
+        },
+        "flag": "<worktree>",
+        "message": "feat/log matches several worktrees: feat/login, feat/logout"
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+$ dir=$(wtm resolve); echo "EXIT=$? dir=$dir"
+
+  Step 1/1 • Select a worktree
+
+  ╭──────────────────────────────────────────────╮
+  │ GitHub not connected                         │
+  │ Connect to see PRs linked to your worktrees: │
+  │ run `gh auth login`                          │
+  ╰──────────────────────────────────────────────╯
+
+▌▸ main                                                                            parent   ✓ clean
+   feat/login                                                                               ✓ clean
+   feat/logout                                                                              ✓ clean
+   fix/nav                                                                       ● active   ✓ clean
+   feat/gone                                                                                ✓ clean
+                                                                                            ✓ clean
+
+  ↑↓ navigate • / filter • r refresh • enter confirm • esc cancel
+

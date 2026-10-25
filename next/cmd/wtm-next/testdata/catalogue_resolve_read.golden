@@ -1,0 +1,18 @@
+{
+  "v": 2,
+  "command": "resolve",
+  "ok": true,
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "branch": "main",
+        "path": "<root>/main",
+        "missing": false
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

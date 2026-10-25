@@ -128,7 +128,7 @@ func TestANameMatchingNoWorktreeOrSeveralIsRefused(t *testing.T) {
 		code string
 	}{
 		"not_found":         {req: status.Request{Worktree: "nope"}, code: domain.CodeNotFound},
-		"ambiguous":         {req: status.Request{Worktree: "log"}, code: status.CodeAmbiguous},
+		"ambiguous":         {req: status.Request{Worktree: "log"}, code: domain.CodeAmbiguous},
 		"all_with_worktree": {req: status.Request{Worktree: "feat/login", All: true}, code: status.CodeAllWithWorktree},
 	}
 	for name, c := range cases {

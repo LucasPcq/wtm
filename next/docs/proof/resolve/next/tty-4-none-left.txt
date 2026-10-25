@@ -1,0 +1,7 @@
+$ dir=$(wtm resolve); echo "EXIT=$? dir=$dir"
+
+┃  ✗ interrupted
+
+EXIT=19 dir=
+$
+

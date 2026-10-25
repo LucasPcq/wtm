@@ -1,0 +1,30 @@
+
+  Print the path of a worktree, named by its branch, its path or part of its
+  branch, alone on stdout so that a shell can enter it, --quiet or not. `wtm go`
+  is the shell function (`wtm shell-init`) that runs `wtm resolve` and enters the
+  path it prints.
+
+  On a terminal, a part of a branch several worktrees hold opens the picker over
+  them, and no [worktree] the picker over every worktree, the cursor on the one
+  you are in. Anywhere else (no terminal, --output json, --quiet) an ambiguous
+  name is refused and no [worktree] resolves the one you are in. In text, nothing
+  is printed on stdout unless a worktree is resolved.
+
+  Usage:
+    wtm-next resolve [worktree] [flags]
+
+  Examples:
+    wtm resolve feat/login
+
+    # Use it in a script
+    cd "$(wtm resolve feat/login)"
+
+    wtm resolve login --output json
+
+  Flags:
+    -h, --help            help for resolve
+        --output string   Output format: text or json (default "text")
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

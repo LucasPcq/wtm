@@ -1,0 +1,8 @@
+
+┃  ✗ the request is invalid
+┃    nope names no worktree
+
+EXIT=2
+<SB>/acme.trees/feat-login
+$
+

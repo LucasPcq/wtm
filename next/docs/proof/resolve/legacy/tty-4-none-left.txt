@@ -1,0 +1,4 @@
+$ dir=$(wtm resolve); echo "EXIT=$? dir=$dir"
+EXIT=0 dir=
+$
+

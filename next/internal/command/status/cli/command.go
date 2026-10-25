@@ -23,6 +23,8 @@ const (
 		"is a problem, its fix to clean the worktree.\n\n" +
 		"Without [worktree], a terminal opens the worktree picker on the one you are in;\n" +
 		"anywhere else (no terminal, --output json, --quiet) it reads the one you are in.\n" +
+		"A part of a branch several worktrees hold opens the picker over them on a\n" +
+		"terminal, and is refused anywhere else.\n" +
 		"It changes nothing, never starts the run daemon and prints no .env value.\n" +
 		"It exits 0 whatever it finds: read `problems`."
 	statusExample = `  # Pick a worktree, the cursor on the one you are in

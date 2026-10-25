@@ -2,6 +2,7 @@ package form
 
 import (
 	"context"
+	"errors"
 	"io"
 	"maps"
 	"slices"
@@ -37,6 +38,9 @@ type Query[R Request[R], Q Questions, O ReadOutcome] struct {
 	Pick func(ctx context.Context, read O, req R, run *uicli.Run) (O, error)
 	// Formats are the machine formats the read prints besides json, by the name --output gives them: each drawn unframed on stdout from what was read, never silenced by --quiet; a refusal is printed as text.
 	Formats map[string]func(w io.Writer, read O)
+	// Captured says the read's text is data a shell captures, `cd "$(wtm resolve feat/x)"`: Draw draws it bare on stdout, never framed nor silenced by --quiet, a failure goes to stderr, and its subject is asked on a terminal even while stdout is captured.
+	// shortcut: a captured read's warnings are not drawn; draw them on stderr once a captured read has any.
+	Captured bool
 
 	io *uicli.Run
 }
@@ -73,13 +77,20 @@ func (q *Query[R, Q, O]) Launch(cmd *cobra.Command, args []string) error {
 		return q.io.FailWith(domain.AsError(domain.AsErrorParams{Err: err}), nil)
 	}
 
-	req, err = q.ask(ctx, app, req)
+	req, err = q.ask(ctx, app, req, "")
 	if err != nil {
 		var none O
 		return q.conclude(none, req, err)
 	}
 
-	read, err := app.Run(ctx, req, domain.RunOptions{Surface: uicli.SurfaceCLI, CorrelationID: q.io.Env.CorrelationID})
+	opts := domain.RunOptions{Surface: uicli.SurfaceCLI, CorrelationID: q.io.Env.CorrelationID}
+	read, err := app.Run(ctx, req, opts)
+	// A subject refused as ambiguous is asked again among what it matches, then read.
+	if refused := ambiguous(err); refused != "" && q.interactive() {
+		if req, err = q.ask(ctx, app, req, refused); err == nil {
+			read, err = app.Run(ctx, req, opts)
+		}
+	}
 	if err == nil && q.Pick != nil && q.interactive() {
 		read, err = q.Pick(ctx, read, req, q.io)
 	}
@@ -87,10 +98,10 @@ func (q *Query[R, Q, O]) Launch(cmd *cobra.Command, args []string) error {
 	return q.conclude(read, req, err)
 }
 
-// ask asks the subject of the read, the positional select its questions leave open, before the read: when the user can see and answer it, and the request neither answers it nor rules it out.
-func (q *Query[R, Q, O]) ask(ctx context.Context, app Reader[R, Q, O], req R) (R, error) {
+// ask asks the subject of the read, the positional select its questions leave open, before the read: when the user can see and answer it, and the request neither answers it nor rules it out, or answers the field at refused with a value refused, asked again among the options its questions narrow it to.
+func (q *Query[R, Q, O]) ask(ctx context.Context, app Reader[R, Q, O], req R, refused string) (R, error) {
 	// The schema says whether the request leaves a subject to ask before the questions are read.
-	if _, open := subjectOf(q.schema(), req); !open || !q.interactive() {
+	if _, open := subjectOf(q.schema(), req, refused); !open || !q.interactive() {
 		return req, nil
 	}
 
@@ -98,7 +109,7 @@ func (q *Query[R, Q, O]) ask(ctx context.Context, app Reader[R, Q, O], req R) (R
 	if err != nil {
 		return req, err
 	}
-	subject, open := subjectOf(wordedForm(questions, q.Words), req)
+	subject, open := subjectOf(wordedForm(questions, q.Words), req, refused)
 	if !open {
 		return req, nil
 	}
@@ -114,15 +125,15 @@ type Skipper interface {
 	Skips(path string) domain.Skip
 }
 
-// subjectOf returns the positional select of form req leaves open, and reports whether there is one: neither answered nor ruled out, by the form or by req.
-func subjectOf(form []worded, req domain.Valued) (*Subject, bool) {
+// subjectOf returns the positional select of form req leaves open, and reports whether there is one: not ruled out, by the form or by req, and not answered, or the field at refused, whose value was refused ("" refuses none).
+func subjectOf(form []worded, req domain.Valued, refused string) (*Subject, bool) {
 	skipper, skips := req.(Skipper)
 	for _, field := range form {
 		subject, ok := field.Field.(domain.SelectField)
 		if skips && ok && skipper.Skips(subject.Path) != "" {
 			continue
 		}
-		if ok && positional(field) && subject.Skip == "" && req.Values(subject.Path) == nil {
+		if ok && positional(field) && subject.Skip == "" && (req.Values(subject.Path) == nil || subject.Path == refused) {
 			return &Subject{Field: subject, Words: field.Words}, true
 		}
 	}
@@ -130,9 +141,23 @@ func subjectOf(form []worded, req domain.Valued) (*Subject, bool) {
 	return nil, false
 }
 
-// interactive reports whether the user can see and answer a picker, and see what it ends on: stdout too is a terminal, since a read piped elsewhere is asked for its data, the output is for a human and --quiet does not silence it.
+// ambiguous is the path of the field err refuses as ambiguous, "" when it refuses none so.
+func ambiguous(err error) string {
+	failure, ok := errors.AsType[*domain.Error](err)
+	if !ok {
+		return ""
+	}
+	for _, problem := range failure.Fields {
+		if problem.Code == domain.CodeAmbiguous {
+			return problem.Path
+		}
+	}
+	return ""
+}
+
+// interactive reports whether the user can see and answer a picker, and see what it ends on: stdout too is a terminal, since a read piped elsewhere is asked for its data, unless the read is Captured, whose data is what the user picks; the output is for a human and --quiet does not silence it.
 func (q *Query[R, Q, O]) interactive() bool {
-	return q.io.Streams.CanPrompt() && q.io.Streams.Out.IsTerminal() && q.io.Human() && !q.io.Quiet
+	return q.io.Streams.CanPrompt() && (q.Captured || q.io.Streams.Out.IsTerminal()) && q.io.Human() && !q.io.Quiet
 }
 
 // conclude prints how the read ended — the JSON envelope, a refusal, the read in a format of Formats, the follow-ups the user picked, or what Draw draws of the read — and returns the failure that sets the exit code.
@@ -149,6 +174,14 @@ func (q *Query[R, Q, O]) conclude(read O, req R, err error) error {
 	if draw, ok := q.Formats[q.io.Output]; ok {
 		draw(q.io.Streams.Out, read)
 		return q.io.Failed(read.Failure())
+	}
+
+	if q.Captured {
+		q.Draw(q.io.Streams.Out, read, req, q.io.View())
+		if failure := read.Failure(); failure != nil {
+			return q.io.FailWith(failure, nil)
+		}
+		return nil
 	}
 
 	stdout, _ := q.io.Writers()

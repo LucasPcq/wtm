@@ -102,6 +102,22 @@ func (s Snapshot) OriginOf(name string) *Origin {
 	return &Origin{Ahead: counts.Ahead, Behind: counts.Behind, State: standing}
 }
 
+// MainFirst returns the Checkouts, the main worktree first, as a reader of one of them lists them.
+func (s Snapshot) MainFirst() []Worktree {
+	worktrees := s.Checkouts()
+	slices.SortStableFunc(worktrees, func(a, b Worktree) int {
+		switch {
+		case a.Main == b.Main:
+			return 0
+		case a.Main:
+			return -1
+		}
+		return 1
+	})
+
+	return worktrees
+}
+
 // Checkouts returns the worktrees that have a working tree: all but a bare repository's entry.
 func (s Snapshot) Checkouts() []Worktree {
 	return slices.DeleteFunc(slices.Clone(s.Worktrees), func(w Worktree) bool {

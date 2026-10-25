@@ -26,6 +26,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
+	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -50,6 +51,7 @@ type app struct {
 	Create  create.UseCase
 	Extract extract.UseCase
 	List    list.UseCase
+	Resolve resolve.UseCase
 	Status  status.UseCase
 	Tree    tree.UseCase
 }
@@ -110,6 +112,10 @@ func wire(params wireParams) app {
 			PullRequests: gh.PullRequestsOf,
 			Repository:   facts,
 		},
+		Resolve: resolve.UseCase{
+			Git:        repo,
+			Repository: facts,
+		},
 		Status: status.UseCase{
 			Git:          repo,
 			Meta:         meta,
@@ -167,7 +173,7 @@ func proxyStatus() domain.FollowUp {
 	return domain.FollowUp{Command: "run proxy status"}
 }
 
-// commandLine spells a follow-up as the legacy wtm runs it until its command migrates, a worktree on no branch entered with cd, and a pull request opened by gh.
+// commandLine spells a follow-up as the command line runs it: go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
 func commandLine(followUp domain.FollowUp) []string {
 	argv, _ := spelled(followUp)
 	return argv
@@ -198,7 +204,7 @@ func spelled(followUp domain.FollowUp) (argv, unspelled []string) {
 	if followUp.DryRun {
 		flags = append(flags, "--dry-run")
 	}
-	// a branch never starts with a slash: an absolute worktree is one on no branch, which wtm go cannot name
+	// a branch never starts with a slash: an absolute worktree is one on no branch, entered without the shell function
 	if followUp.Command == domain.CommandGo && len(worktree) == 1 && filepath.IsAbs(worktree[0]) {
 		return []string{"cd", worktree[0]}, unspelled
 	}

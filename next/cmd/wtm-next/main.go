@@ -12,6 +12,7 @@ import (
 	eventscli "github.com/LucasPcq/wtm/next/internal/command/events/cli"
 	extractcli "github.com/LucasPcq/wtm/next/internal/command/extract/cli"
 	listcli "github.com/LucasPcq/wtm/next/internal/command/list/cli"
+	resolvecli "github.com/LucasPcq/wtm/next/internal/command/resolve/cli"
 	statuscli "github.com/LucasPcq/wtm/next/internal/command/status/cli"
 	treecli "github.com/LucasPcq/wtm/next/internal/command/tree/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
@@ -41,6 +42,7 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		createcli.New(streams, env, openCreate, commandLine),
 		extractcli.New(streams, env, openExtract, commandLine),
 		listcli.New(streams, env, openList, commandLine),
+		resolvecli.New(streams, env, openResolve, commandLine),
 		statuscli.New(streams, env, openStatus, commandLine),
 		treecli.New(streams, env, openTree, commandLine),
 		eventscli.New(streams, env, systemStream(), commandLine),

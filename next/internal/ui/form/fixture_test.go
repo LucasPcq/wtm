@@ -222,6 +222,9 @@ func (r reader) Questions(_ context.Context, req request) (questions, error) {
 
 func (r reader) Run(context.Context, request, domain.RunOptions) (read, error) { return r.read, nil }
 
+// ambiguousName is a worktree's name the fake read about one worktree refuses as ambiguous: feat/y and feat/z hold it.
+const ambiguousName = "feat"
+
 // subjects are the questions of a fake read about one worktree, its subject: a positional select on main, unless the request reads them all.
 type subjects struct{ req request }
 
@@ -229,6 +232,10 @@ func (q subjects) Form() domain.Form {
 	field := domain.SelectField{FieldSpec: domain.FieldSpec{Path: "worktree"}, Value: "main", Options: []domain.Option{{Value: "main"}, {Value: "feat/x", Detached: true}}}
 	if len(q.req["all"]) > 0 {
 		field.Skip = domain.SkipAll
+	}
+	// an ambiguous name narrows the options to what it matches
+	if slices.Equal(q.req["worktree"], []string{ambiguousName}) {
+		field.Value, field.Options = "", []domain.Option{{Value: "feat/y"}, {Value: "feat/z"}}
 	}
 	return domain.Form{Fields: []domain.Field{field, domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "all"}}}}
 }
@@ -246,6 +253,9 @@ func (r subjectReader) Questions(_ context.Context, req request) (subjects, erro
 
 func (r subjectReader) Run(_ context.Context, req request, _ domain.RunOptions) (read, error) {
 	*r.read = req
+	if slices.Equal(req["worktree"], []string{ambiguousName}) {
+		return read{}, domain.Invalid([]domain.FieldError{{Path: "worktree", Code: domain.CodeAmbiguous, Template: "{value} matches several worktrees", Params: domain.Params{"value": ambiguousName}}})
+	}
 	return read{Items: []domain.Unit[struct{}]{{Subject: strings.Join(req["worktree"], ""), Status: domain.StatusDone}}}, nil
 }
 

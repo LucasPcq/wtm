@@ -11,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
+	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -59,6 +60,24 @@ func TestEventsAreFiledUnderGitsCommonDirWhereverTheStateLives(t *testing.T) {
 	params := wireParams{MainPath: "/repo", StateDir: "/elsewhere/state", CommonDir: "/repo/.git"}
 
 	assert.Equal(t, "/repo/.git", params.publisherParams(domain.Operation{ID: "op-1"}).CommonDir)
+}
+
+// go is the shell function over resolve: each follow-up that names it must be a request resolve takes.
+func TestEveryGoFollowUpIsARequestResolveTakes(t *testing.T) {
+	followUps := []domain.FollowUp{
+		domain.Enter("feat/x"),
+		list.Actions(list.Detail{Branch: "feat/a"})[0],
+		list.Actions(list.Detail{Path: "/repo/.trees/detached"})[0],
+		tree.Actions(tree.Detail{Branch: "feat/a", Rebasing: true}, false)[0],
+	}
+	for _, followUp := range followUps {
+		require.Equal(t, domain.CommandGo, followUp.Command)
+
+		req, err := domain.Fold(resolve.Request{}, followUp.Answers)
+
+		require.NoError(t, err)
+		assert.NotEmpty(t, req.Worktree)
+	}
 }
 
 func TestAnUndoLeftBehindIsRemovedByTheLegacyClean(t *testing.T) {
