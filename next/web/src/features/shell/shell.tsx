@@ -14,7 +14,7 @@ export function Shell({ repo, children }: { repo: string | undefined; children: 
   return (
     <SidebarProvider>
       <AppSidebar repo={repo} />
-      <SidebarInset>
+      <SidebarInset className="h-svh min-h-0 overflow-hidden">
         {connection === 'disconnected' ? (
           <Centered>
             <StatePage icon={<Unplug />} title="The server restarted" command="wtm-next ui">
