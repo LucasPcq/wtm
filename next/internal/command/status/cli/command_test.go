@@ -105,7 +105,7 @@ func TestThePickerOffersEveryWorktreeADetachedOneSaidSo(t *testing.T) {
 	require.NoError(t, err)
 	field, ok := q.Form().Fields[0].(domain.SelectField)
 	require.True(t, ok)
-	subject := &form.Subject{Field: field}
+	subject := &form.Subject{Field: field, Words: words(status.Questions{}, field)}
 
 	d := formtest.Start(form.New(t.Context(), form.SubjectScript(subject)), tea.WindowSizeMsg{Width: 100, Height: 30})
 	formtest.Golden(t, "picker", d.Screen())

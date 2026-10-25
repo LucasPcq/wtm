@@ -37,12 +37,13 @@ const (
 type query = form.Query[tree.Request, tree.Questions, tree.Outcome]
 
 // treeFlags spells the failures: tree's only field is a flag.
-var treeFlags = (&query{}).Flags()
+var treeFlags = (&query{Words: words}).Flags()
 
 // New returns the tree command: its flags become a tree.Request, read and drawn on streams, as the v2 JSON envelope with --output json or a Mermaid flowchart with --output mermaid, its follow-ups spelled by commandLine.
 func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (tree.UseCase, error), commandLine output.CommandLine) *cobra.Command {
 	run := &uicli.Run{Command: tree.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: treeFlags}
 	q := &query{
+		Words: words,
 		Open: func(ctx context.Context, dir string) (form.Reader[tree.Request, tree.Questions, tree.Outcome], error) {
 			return open(ctx, dir)
 		},

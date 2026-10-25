@@ -18,7 +18,7 @@ internal/
     usecase.go         the story: Run (operation, plan, fingerprint, apply), Plan, Apply, Observe, Questions
     port.go            the driven ports it reaches the world through
     rules.go           pure: facts → plan (a read: facts → its Detail of each item)
-    questions.go       its form model, its schema (Questions.Form, Request.Answer and Request.Values: what the flags, --help, the command line and the wizard read) and its validation
+    questions.go       its form model, its schema as data (Questions.Form, Request.Answer and Request.Values: what the flags, --help, the command line and the wizard read, each surface wording it) and its validation
     cli/               its driving adapter: the cobra command over form.Command, what its recap and dry run show of a plan (Preview) and how it draws an apply (Draw), the steps it asks its own way
   service/             what the use cases call
     operation/         the operation every mutating use case goes through: its record, its locks, its plan under them and fingerprinted, its events
@@ -40,7 +40,7 @@ web/                   the web front (React, Vite, shadcn/ui), no Go file: `make
 ```
 No file format lives in `domain/`: `adapter/config` owns the shapes of `config.toml` and `run.toml` (every key, strict decode) and maps them onto `domain/project`. `worktree.Meta` keeps its JSON tags, because `meta.json` is the record itself, shared with `wtm`; `worktree.Identity` keeps those of the events payload.
 
-A use case reads in one place. `command/<name>/usecase.go` tells the whole request top to bottom in `Run`: begin the operation (`service/operation`), plan under its locks, fingerprint, stop on a dry run, refuse a stale plan, apply between the started and finished events; then `Plan` (observe what the repository holds, settle the request on it, decide), `Apply` and `Questions` when it asks. `rules.go` holds what it observes and decides from, pure; `questions.go` its form, the schema of its fields (labels, help, flags, options) and validation; `port.go` the interfaces it reaches the world through. The root of a command holds these four files, their tests and `cli/`, nothing else (archlint, rule `slicefiles`). A service is concrete and called directly; a port is an interface, for the outside world only. A package is split only when it passes about 1,000 lines and a seam is natural.
+A use case reads in one place. `command/<name>/usecase.go` tells the whole request top to bottom in `Run`: begin the operation (`service/operation`), plan under its locks, fingerprint, stop on a dry run, refuse a stale plan, apply between the started and finished events; then `Plan` (observe what the repository holds, settle the request on it, decide), `Apply` and `Questions` when it asks. `rules.go` holds what it observes and decides from, pure; `questions.go` its form, the schema of its fields (paths, answers, options and the facts of each, origins, skips) and validation, with no word: the CLI words each field in `cli/words.go`, the web in its screen's `words.ts`; `port.go` the interfaces it reaches the world through. The root of a command holds these four files, their tests and `cli/`, nothing else (archlint, rule `slicefiles`). A service is concrete and called directly; a port is an interface, for the outside world only. A package is split only when it passes about 1,000 lines and a seam is natural.
 
 ## The published schema
 

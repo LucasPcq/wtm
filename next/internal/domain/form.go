@@ -1,13 +1,12 @@
 package domain
 
 import (
-	"cmp"
 	"encoding/json"
 	"strconv"
 	"strings"
 )
 
-// Form is a command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, the request's flags and its --help spelled from them, and the request's problems, each naming a field, an entry of one, or a field the form does not list (remember[0]).
+// Form is a command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, as data each surface words its own way, and the request's problems, each naming a field, an entry of one, or a field the form does not list (remember[0]).
 type Form struct {
 	Fields   []Field
 	Problems []FieldError
@@ -46,9 +45,6 @@ func fieldKind(field Field) (string, Field) {
 		field.Entries, field.Options = orEmpty(field.Entries), orEmpty(field.Options)
 		return "text_list", field
 	case ConfirmField:
-		// a surface answers with an option's value, which Yes reads: true or false, whatever the option says
-		field.Yes.Value, field.Yes.Label = "true", cmp.Or(field.Yes.Label, "Yes")
-		field.No.Value, field.No.Label = "false", cmp.Or(field.No.Label, "No")
 		return "confirm", field
 	}
 	return "", field
@@ -85,12 +81,9 @@ type Field interface {
 	field()
 }
 
-// FieldSpec is what a field of every kind has.
+// FieldSpec is what a field of every kind has; its words (its name, what its answer decides, its flag on the command line) are each surface's own, by its path.
 type FieldSpec struct {
 	Path   string `json:"path"`             // the request field it answers, as a field error names it
-	Flag   string `json:"flag"`             // the argument or flag that sets it: <branches>, --from
-	Label  string `json:"label"`            // its name in a wizard's breadcrumb, trail and problems
-	Help   string `json:"help"`             // what its answer decides: a wizard's description and its flag's usage
 	Origin Origin `json:"origin,omitempty"` // where its answer came from, empty when the field does not say
 	Skip   Skip   `json:"skip,omitempty"`   // why it is not asked, empty when it is
 }
@@ -113,12 +106,11 @@ type SelectField struct {
 	Closed       bool     `json:"closed"`
 }
 
-// MultiSelectField asks any of its options; Empty is the problem of answering none.
+// MultiSelectField asks any of its options.
 type MultiSelectField struct {
 	FieldSpec
 	Picked  []string `json:"picked"`
 	Options []Option `json:"options"`
-	Empty   string   `json:"empty,omitempty"`
 }
 
 // TextField asks one line of text.
@@ -127,23 +119,21 @@ type TextField struct {
 	Value string `json:"value"`
 }
 
-// TextListField asks a list of entries; Options are the values the repository knows, each with its badge.
+// TextListField asks a list of entries; Options are the values the repository knows, each with what it knows of it.
 type TextListField struct {
 	FieldSpec
 	Entries []string `json:"entries"`
 	Options []Option `json:"options"`
 }
 
-// ConfirmField asks yes or no; Yes and No are its two options, valued true and false, with how each reads (Yes and No when they say nothing), listed No first when NoFirst; Remembered is the answer remembered for it, nil when none.
+// ConfirmField asks yes or no, answered true or false, no listed first when NoFirst; Remembered is the answer remembered for it, nil when none.
 type ConfirmField struct {
 	FieldSpec
-	Value        bool   `json:"value"`
-	Yes          Option `json:"yes"`
-	No           Option `json:"no"`
-	NoFirst      bool   `json:"no_first"`
-	Remembered   *bool  `json:"remembered,omitempty"`
-	Rememberable bool   `json:"rememberable"`
-	Remember     bool   `json:"remember"`
+	Value        bool  `json:"value"`
+	NoFirst      bool  `json:"no_first"`
+	Remembered   *bool `json:"remembered,omitempty"`
+	Rememberable bool  `json:"rememberable"`
+	Remember     bool  `json:"remember"`
 }
 
 // Answer is the option selected.
@@ -166,24 +156,6 @@ func (MultiSelectField) field() {}
 func (TextField) field()        {}
 func (TextListField) field()    {}
 func (ConfirmField) field()     {}
-
-// Flags spells each field path as the argument or flag that sets it, with the usage of that flag, its Help; the first field answering a path gives both. A form with a rememberable field also has --remember.
-func (f Form) Flags() (flags, usages map[string]string) {
-	flags, usages = map[string]string{}, map[string]string{}
-	for _, field := range f.Fields {
-		spec := field.Spec()
-		if _, seen := flags[spec.Path]; !seen {
-			flags[spec.Path], usages[spec.Path] = spec.Flag, spec.Help
-		}
-	}
-
-	if rememberable := f.Rememberable(); len(rememberable) > 0 {
-		flags[PathRemember] = "--" + PathRemember
-		usages[PathRemember] = "The answers to always use in this repository: " + strings.Join(rememberable, ", ") + " (repeatable)"
-	}
-
-	return flags, usages
-}
 
 // Rememberable are the paths of the fields whose answer can be remembered, in order.
 func (f Form) Rememberable() []string {

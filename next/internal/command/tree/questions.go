@@ -12,11 +12,12 @@ type Request struct {
 	WithPRs bool `json:"with_prs"`
 }
 
-const pathWithPRs = "with_prs"
+// PathWithPRs is the path of tree's field, by which each surface words it.
+const PathWithPRs = "with_prs"
 
 // Answer is the request with the field at path answered by values.
 func (r Request) Answer(path string, values []string) (Request, error) {
-	if path != pathWithPRs {
+	if path != PathWithPRs {
 		return r, domain.Unknown(path)
 	}
 
@@ -30,7 +31,7 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 
 // Values is the request's answer to the field at path, nil when it leaves the field to its default.
 func (r Request) Values(path string) []string {
-	if path == pathWithPRs {
+	if path == PathWithPRs {
 		return domain.SaidYes(r.WithPRs)
 	}
 
@@ -46,8 +47,6 @@ type Questions struct{}
 // Form is the schema of the request: whether to ask GitHub for pull requests.
 func (Questions) Form() domain.Form {
 	return domain.Form{Fields: []domain.Field{
-		domain.ConfirmField{
-			FieldSpec: domain.FieldSpec{Path: pathWithPRs, Flag: "--with-prs", Label: "Pull requests", Help: "Ask GitHub for each branch's newest pull request, open, merged or closed (needs gh)"},
-		},
+		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathWithPRs}},
 	}}
 }

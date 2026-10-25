@@ -3,15 +3,11 @@
     {
       "kind": "select",
       "path": "source",
-      "flag": "\u003csource\u003e",
-      "label": "Source worktree",
-      "help": "Which worktree to extract changes from",
       "value": "main",
       "options": [
         {
           "value": "main",
-          "label": "",
-          "badge": "1 change"
+          "changes": 1
         }
       ],
       "rememberable": false,
@@ -22,33 +18,26 @@
     {
       "kind": "multi_select",
       "path": "files",
-      "flag": "--files",
-      "label": "Files",
-      "help": "Files to extract, or a directory to take everything below it",
       "picked": [
         "notes.txt"
       ],
       "options": [
         {
           "value": "notes.txt",
-          "label": "notes.txt",
-          "badge": "new"
+          "change": {
+            "path": "notes.txt",
+            "status": "untracked"
+          }
         }
-      ],
-      "empty": "Select at least one file"
+      ]
     },
     {
       "kind": "select",
       "path": "to",
-      "flag": "--to",
-      "label": "Target worktree",
-      "help": "Target worktree branch; created if it does not exist",
       "value": "feat/notes",
       "options": [
         {
-          "value": "",
-          "label": "+ Create a new worktree…",
-          "short": "new worktree"
+          "value": ""
         }
       ],
       "rememberable": false,
@@ -59,23 +48,17 @@
     {
       "kind": "text",
       "path": "to",
-      "flag": "--to",
-      "label": "Branch name",
-      "help": "Name for the new worktree branch",
       "value": "feat/notes"
     },
     {
       "kind": "select",
       "path": "from",
-      "flag": "--from",
-      "label": "Source branch",
-      "help": "Parent branch when creating the target worktree",
       "origin": "config",
       "value": "main",
       "options": [
         {
           "value": "main",
-          "label": "main (default)"
+          "base": true
         }
       ],
       "pinned": "main",
@@ -87,28 +70,20 @@
     {
       "kind": "select",
       "path": "env_from",
-      "flag": "--env-from",
-      "label": "Env strategy",
-      "help": "Where the new target's .env files come from: config, example, main or parent; config.toml's strategy by default",
       "origin": "default",
       "value": "config",
       "options": [
         {
-          "value": "config",
-          "label": "config default (example)",
-          "short": "config default"
+          "value": "config"
         },
         {
-          "value": "example",
-          "label": "example — from .env.example"
+          "value": "example"
         },
         {
-          "value": "main",
-          "label": "main — the main checkout's .env"
+          "value": "main"
         },
         {
-          "value": "parent",
-          "label": "parent — the source worktree's .env"
+          "value": "parent"
         }
       ],
       "rememberable": true,
@@ -119,20 +94,15 @@
     {
       "kind": "select",
       "path": "isolation",
-      "flag": "--isolation",
-      "label": "Isolation",
-      "help": "How it stands against its source: isolated or verbatim; run.toml's isolation by default",
       "origin": "default",
       "skip": "nothing_isolated",
       "value": "isolated",
       "options": [
         {
-          "value": "isolated",
-          "label": "isolated — its own ports and namespaces"
+          "value": "isolated"
         },
         {
-          "value": "verbatim",
-          "label": "verbatim — the copied .env as is, one runs at a time"
+          "value": "verbatim"
         }
       ],
       "rememberable": true,
@@ -143,21 +113,8 @@
     {
       "kind": "confirm",
       "path": "fast_forward",
-      "flag": "--ff",
-      "label": "Source update",
-      "help": "Fast-forward the source branch to origin first when it is behind",
       "skip": "not_behind",
       "value": false,
-      "yes": {
-        "value": "true",
-        "label": "Fast-forward to origin",
-        "short": "fast-forward to origin"
-      },
-      "no": {
-        "value": "false",
-        "label": "Keep it as-is",
-        "short": "keep as-is"
-      },
       "no_first": false,
       "rememberable": true,
       "remember": false
@@ -165,21 +122,8 @@
     {
       "kind": "confirm",
       "path": "keep",
-      "flag": "--keep",
-      "label": "Mode",
-      "help": "Copy instead of move (keep the changes in the source)",
       "origin": "default",
       "value": false,
-      "yes": {
-        "value": "true",
-        "label": "Copy — keep the files in main",
-        "short": "copy"
-      },
-      "no": {
-        "value": "false",
-        "label": "Move — remove the files from main",
-        "short": "move"
-      },
       "no_first": true,
       "rememberable": false,
       "remember": false
@@ -187,20 +131,15 @@
     {
       "kind": "select",
       "path": "on_conflict",
-      "flag": "--on-conflict",
-      "label": "On conflict",
-      "help": "On conflict: abort (default) or resolve (write conflict markers in the target)",
       "origin": "default",
       "skip": "no_conflict",
       "value": "abort",
       "options": [
         {
-          "value": "abort",
-          "label": "Abort — leave both worktrees untouched"
+          "value": "abort"
         },
         {
-          "value": "resolve",
-          "label": "Resolve — write conflict markers in feat/notes"
+          "value": "resolve"
         }
       ],
       "rememberable": false,

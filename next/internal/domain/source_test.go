@@ -16,5 +16,5 @@ func TestTheSourceOptionsAreTheLocalBranchesThenThoseOnlyOnOriginTheExceptedLeft
 
 	repo := worktree.Repository{Config: project.Config{Worktrees: project.Worktrees{BaseBranch: "main"}}, Snapshot: snapshot}
 
-	assert.Equal(t, []Option{{Value: "main", Label: "main (default)", Badge: "2 behind"}, {Value: "origin/feat/y"}}, SourceOptions(repo, "feat/x", "feat/z"))
+	assert.Equal(t, []Option{{Value: "main", Base: true, Origin: &worktree.Origin{Behind: 2, State: worktree.Behind}}, {Value: "origin/feat/y"}}, SourceOptions(repo, "feat/x", "feat/z"))
 }

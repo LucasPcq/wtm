@@ -372,12 +372,12 @@ func (p Plan) previewRecap() []domain.RecapRow {
 
 // recap is the plan row by row: the branches with how each gets its worktree, the source, From when a branch is created from it, else Parent, the branch recorded for wtm sync, then the answers of a new worktree.
 func (p Plan) recap(marks domain.Marks) []domain.RecapRow {
-	source := domain.RecapRow{Key: "parent", Label: "Parent", Path: pathFrom, Values: domain.RecapValues([]string{p.From})}
+	source := domain.RecapRow{Key: "parent", Label: "Parent", Path: PathFrom, Values: domain.RecapValues([]string{p.From})}
 	if slices.ContainsFunc(p.Branches, func(b BranchPlan) bool { return b.Action == ActionCreate }) {
 		source.Key, source.Label = "from", "From"
 	}
 
-	rows := []domain.RecapRow{{Key: pathBranches, Label: "Branches", Path: pathBranches, Values: recappedBranches(p.Branches)}, source}
+	rows := []domain.RecapRow{{Key: PathBranches, Label: "Branches", Path: PathBranches, Values: recappedBranches(p.Branches)}, source}
 	return append(rows, provision.RecapRows(provision.RecapParams{EnvFrom: p.EnvFrom, FollowsConfig: p.settled.FollowsConfig(), Isolation: p.Isolation, RunUnreadable: p.facts.RunErr != nil, FastForward: p.FastForward, Marks: marks})...)
 }
 

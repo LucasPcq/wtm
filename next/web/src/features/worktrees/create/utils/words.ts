@@ -32,7 +32,7 @@ const ifNotExists: Options<'if_not_exists'> = {
   false: { title: 'Refuse', description: 'Stop on a worktree that exists.' },
 }
 
-export const createWords: Record<Question, FieldWords> = {
+const createWords: Record<Question, FieldWords> = {
   branches: { label: 'Branches', help: 'One per line; each gets its own worktree.' },
   from: { label: 'Source branch', help: 'Where a new branch starts, and the parent it syncs onto.' },
   fast_forward: {
@@ -60,7 +60,11 @@ export const createWords: Record<Question, FieldWords> = {
 
 export const isQuestion = (path: string): path is Question => path in createWords
 
-export const labelOf = (path: string): string => (isQuestion(path) ? createWords[path].label : path)
+// a path the schema publishes is a Question, so one without words is a stale types.gen.ts, never shown as is
+export const wordsOf = (path: string): FieldWords => {
+  if (!isQuestion(path)) throw new Error(`create has no words for ${path}`)
+  return createWords[path]
+}
 
 // null for a reason that means nothing in a browser
 export const skipWords: Record<DomainSkip, string | null> = {

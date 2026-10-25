@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -97,11 +96,6 @@ type QuestionsParams struct {
 	Held       domain.Skip // why a branch behind origin is not fast-forwarded all the same, set by the command
 	Many       bool
 }
-
-const (
-	isolationHelp   = "How it stands against its source: isolated or verbatim; run.toml's isolation by default"
-	fastForwardHelp = "Fast-forward the source branch to origin first when it is behind"
-)
 
 // NewQuestions builds the questions of a new worktree: a field given keeps its value, an empty one takes its remembered answer, its configured value or its default; none is answered by default when the worktree is not created.
 func NewQuestions(params QuestionsParams) Questions {
@@ -211,69 +205,34 @@ func envFroms() []project.EnvStrategy {
 	return append([]project.EnvStrategy{EnvFromConfig}, project.EnvStrategies()...)
 }
 
-// Fields are the questions as the fields of a form, in the order a wizard asks them, for a command to embed in its own; envHelp says where the command's new worktree takes its .env files from.
-func (q Questions) Fields(envHelp string) []domain.Field {
+// Fields are the questions as the fields of a form, in the order a wizard asks them, for a command to embed in its own.
+func (q Questions) Fields() []domain.Field {
 	return []domain.Field{
 		domain.SelectField{
-			FieldSpec:    domain.FieldSpec{Path: domain.PathEnvFrom, Flag: "--env-from", Label: "Env strategy", Help: envHelp, Origin: q.EnvFrom.Origin, Skip: q.EnvFrom.Skip},
+			FieldSpec:    domain.FieldSpec{Path: domain.PathEnvFrom, Origin: q.EnvFrom.Origin, Skip: q.EnvFrom.Skip},
 			Value:        string(q.EnvFrom.Value),
-			Options:      q.envOptions(),
+			Options:      domain.OptionsOf(envFroms()),
 			Remembered:   string(q.EnvFrom.Remembered),
 			Rememberable: true,
 			Remember:     q.Remembers(domain.PathEnvFrom),
 			Closed:       true,
 		},
 		domain.SelectField{
-			FieldSpec:    domain.FieldSpec{Path: domain.PathIsolation, Flag: "--isolation", Label: "Isolation", Help: isolationHelp, Origin: q.Isolation.Origin, Skip: q.Isolation.Skip},
+			FieldSpec:    domain.FieldSpec{Path: domain.PathIsolation, Origin: q.Isolation.Origin, Skip: q.Isolation.Skip},
 			Value:        string(q.Isolation.Value),
-			Options:      q.isolationOptions(),
+			Options:      domain.OptionsOf(project.Isolations()),
 			Remembered:   string(q.Isolation.Remembered),
 			Rememberable: true,
 			Remember:     q.Remembers(domain.PathIsolation),
 			Closed:       true,
 		},
 		domain.ConfirmField{
-			FieldSpec:    domain.FieldSpec{Path: domain.PathFastForward, Flag: "--ff", Label: "Source update", Help: fastForwardHelp, Origin: q.FastForward.Origin, Skip: q.FastForward.Skip},
+			FieldSpec:    domain.FieldSpec{Path: domain.PathFastForward, Origin: q.FastForward.Origin, Skip: q.FastForward.Skip},
 			Value:        q.FastForward.Value,
-			Yes:          domain.Option{Value: "true", Label: q.fastForwardLabel(), Short: "fast-forward to origin"},
-			No:           domain.Option{Value: "false", Label: "Keep it as-is", Short: "keep as-is"},
 			Remembered:   q.FastForward.Remembered,
 			Rememberable: true,
 			Remember:     q.Remembers(domain.PathFastForward),
 		},
-	}
-}
-
-func (q Questions) fastForwardLabel() string {
-	if len(q.Behind) == 0 {
-		return "Fast-forward to origin"
-	}
-
-	return "Fast-forward " + strings.Join(q.Behind, ", ") + " to origin"
-}
-
-// isolationOptions are the isolations as the legacy wizard offers them, worded for one worktree or several.
-func (q Questions) isolationOptions() []domain.Option {
-	if q.Many {
-		return []domain.Option{
-			{Value: string(project.Isolated), Label: "isolated — each its own ports and namespaces"},
-			{Value: string(project.Verbatim), Label: "verbatim — the copied .env as is, one runs at a time"},
-		}
-	}
-
-	return []domain.Option{
-		{Value: string(project.Isolated), Label: "isolated — its own ports and namespaces"},
-		{Value: string(project.Verbatim), Label: "verbatim — the copied .env as is, one runs at a time"},
-	}
-}
-
-// envOptions are the env strategies as the legacy wizard offers them, config.toml's first.
-func (q Questions) envOptions() []domain.Option {
-	return []domain.Option{
-		{Value: string(EnvFromConfig), Label: "config default (" + string(q.Configured) + ")", Short: "config default"},
-		{Value: string(project.EnvExample), Label: "example — from .env.example"},
-		{Value: string(project.EnvMain), Label: "main — the main checkout's .env"},
-		{Value: string(project.EnvParent), Label: "parent — the source worktree's .env"},
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 )
 
 func TestAStreamBindsItsFieldsAndOutputAndReadsItsRequestFromThem(t *testing.T) {
-	var stream form.Stream[request, questions]
+	stream := form.Stream[request, questions]{Words: wordsOf[questions]}
 	run := &uicli.Run{}
 	cmd := &cobra.Command{Use: "stream"}
 	stream.Bind(cmd, run)

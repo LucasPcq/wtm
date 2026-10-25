@@ -7,9 +7,6 @@ import { stepsOf } from '@/features/worktrees/create/utils/steps'
 const text = (path: string, skip?: DomainSkip): DomainField => ({
   kind: 'text',
   path,
-  flag: `--${path}`,
-  label: path,
-  help: '',
   value: '',
   ...(skip && { skip }),
 })

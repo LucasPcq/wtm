@@ -3,18 +3,7 @@
     {
       "kind": "confirm",
       "path": "with_prs",
-      "flag": "--with-prs",
-      "label": "Pull requests",
-      "help": "Ask GitHub for each branch's newest pull request, open, merged or closed (needs gh)",
       "value": false,
-      "yes": {
-        "value": "true",
-        "label": "Yes"
-      },
-      "no": {
-        "value": "false",
-        "label": "No"
-      },
       "no_first": false,
       "rememberable": false,
       "remember": false

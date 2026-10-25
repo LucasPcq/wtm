@@ -21,7 +21,7 @@ func TestTheSourcePickerListsTheWorktreesWithChangesAndTheirCount(t *testing.T) 
 
 	questions := w.questions(t, extract.Request{})
 
-	assert.Equal(t, []domain.Option{{Value: source, Badge: "2 changes"}, {Value: other, Badge: "1 change"}}, questions.Source.Options)
+	assert.Equal(t, []domain.Option{{Value: source, Changes: 2}, {Value: other, Changes: 1}}, questions.Source.Options)
 	assert.Equal(t, map[string]string{"source": "required", "to": "required"}, fieldCodes(questions.Errors))
 }
 
@@ -243,9 +243,6 @@ func TestEachFieldOfTheFormAnswersTheRequestBack(t *testing.T) {
 func TestTheFormExistsBeforeAnyRead(t *testing.T) {
 	form := extract.Questions{}.Form()
 
-	flags, usages := form.Flags()
-	assert.Equal(t, map[string]string{"source": "<source>", "files": "--files", "to": "--to", "from": "--from", "env_from": "--env-from", "isolation": "--isolation", "fast_forward": "--ff", "keep": "--keep", "on_conflict": "--on-conflict", "remember": "--remember"}, flags)
-	assert.Equal(t, "The answers to always use in this repository: env_from, isolation, fast_forward (repeatable)", usages["remember"])
 	assert.Equal(t, []string{"isolated", "verbatim"}, isolationOptions(form))
 	assert.Equal(t, []string{"env_from", "isolation", "fast_forward"}, form.Rememberable())
 	assert.Len(t, form.Fields, 10, "a step per field: the target is asked as a worktree, then as a branch")
@@ -297,7 +294,7 @@ func TestAnAnswerTheRequestCannotTakeIsRefusedAndChangesNothing(t *testing.T) {
 	}
 }
 
-func TestAConfirmationsOptionsAreItsAnswers(t *testing.T) {
+func TestAConfirmationTakesTrueAndFalse(t *testing.T) {
 	form := extract.Questions{}.Form()
 	for _, field := range form.Fields {
 		confirm, isConfirm := field.(domain.ConfirmField)
@@ -305,8 +302,8 @@ func TestAConfirmationsOptionsAreItsAnswers(t *testing.T) {
 			continue
 		}
 
-		for want, option := range map[bool]domain.Option{true: confirm.Yes, false: confirm.No} {
-			req, err := extract.Request{}.Answer(confirm.Path, []string{option.Value})
+		for want, value := range map[bool]string{true: "true", false: "false"} {
+			req, err := extract.Request{}.Answer(confirm.Path, []string{value})
 			require.NoError(t, err, confirm.Path)
 			assert.Equal(t, want, answeredTrue(t, req, confirm.Path), confirm.Path)
 		}

@@ -8,17 +8,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// A Stream is the form of a command that streams rather than returns, never ending on its own (wtm events): its flags are its schema's and --output, its request is built from them, and it asks nothing. Its cli prints each line itself, never framed.
-type Stream[R Request[R], Q Questions] struct{}
+// A Stream is the form of a command that streams rather than returns, never ending on its own (wtm events): its flags are its schema's, worded by Words, and --output, its request is built from them, and it asks nothing. Its cli prints each line itself, never framed.
+type Stream[R Request[R], Q Questions] struct {
+	Words Worder[Q]
+}
 
-func (Stream[R, Q]) schema() domain.Form {
-	var zero Q
-	return zero.Form()
+func (s Stream[R, Q]) schema() []worded {
+	return wordedSchema(s.Words)
 }
 
 // Flags spells each field path of the request as the flag that sets it, for the failures.
 func (s Stream[R, Q]) Flags() output.Flags {
-	flags, _ := s.schema().Flags()
+	flags, _ := flagsOf(s.schema())
 	return flags
 }
 

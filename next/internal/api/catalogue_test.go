@@ -66,8 +66,8 @@ func TestTheQuestionsAreAskedOfTheRequestAnsweredOnTheCallsDirectory(t *testing.
 	asked, err := greet.Questions(t.Context(), Call{Dir: "/a", Answers: named("x")})
 
 	require.NoError(t, err)
-	assert.Equal(t, "/a:x", asked.Fields[0].Spec().Label)
-	assert.Empty(t, greet.Form.Fields[0].Spec().Label, "the catalogue lists the form of zero questions")
+	assert.Equal(t, []string{"/a:x"}, asked.Fields[0].Answer())
+	assert.Equal(t, []string{""}, greet.Form.Fields[0].Answer(), "the catalogue lists the form of zero questions")
 }
 
 func TestTheQuestionsOfAnInvalidCallAreRefusedBeforeAnythingOpens(t *testing.T) {

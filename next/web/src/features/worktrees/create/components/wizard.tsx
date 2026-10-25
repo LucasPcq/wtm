@@ -12,7 +12,7 @@ import { Stepper, type StepState } from '@/features/worktrees/create/components/
 import type { Start } from '@/features/worktrees/create/hooks/use-create-run'
 import { nextAsked, stepsOf } from '@/features/worktrees/create/utils/steps'
 import { initialWizard, wizardReducer } from '@/features/worktrees/create/utils/wizard-state'
-import { createWords } from '@/features/worktrees/create/utils/words'
+import { wordsOf } from '@/features/worktrees/create/utils/words'
 
 export function Wizard({
   repo,
@@ -80,7 +80,7 @@ export function Wizard({
           <CommandFields
             form={form}
             fields={step.asked}
-            words={createWords}
+            words={wordsOf}
             problems={problems}
             remember={{ paths: remember, toggle: (path) => dispatch({ type: 'remember', path }) }}
           />

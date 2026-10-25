@@ -527,12 +527,12 @@ func (p Plan) recap(marks domain.Marks) []domain.RecapRow {
 	}
 
 	rows := []domain.RecapRow{
-		{Key: pathSource, Label: "Source", Path: pathSource, Values: domain.RecapValues([]string{p.Source})},
+		{Key: PathSource, Label: "Source", Path: PathSource, Values: domain.RecapValues([]string{p.Source})},
 		{Key: PathFiles, Label: "Files", Path: PathFiles, Values: recappedFiles(p.Files)},
 		{Key: "target", Label: "Target", Path: PathTo, Values: []domain.RecapValue{p.recappedTarget()}},
 	}
 	if p.Target.Action == ActionCheckOut {
-		rows = append(rows, domain.RecapRow{Key: "parent", Label: "Parent", Path: pathFrom, Values: domain.RecapValues([]string{p.From})})
+		rows = append(rows, domain.RecapRow{Key: "parent", Label: "Parent", Path: PathFrom, Values: domain.RecapValues([]string{p.From})})
 	}
 	rows = append(rows, provision.RecapRows(provision.RecapParams{EnvFrom: p.EnvFrom, FollowsConfig: p.settled.FollowsConfig(), Isolation: p.Isolation, RunUnreadable: p.facts.RunErr != nil, FastForward: p.FastForward, Marks: marks})...)
 
@@ -540,11 +540,11 @@ func (p Plan) recap(marks domain.Marks) []domain.RecapRow {
 	if p.Keep {
 		mode = "copy"
 	}
-	rows = append(rows, domain.RecapRow{Key: "mode", Label: "Mode", Path: pathKeep, Values: domain.RecapValues([]string{mode})})
+	rows = append(rows, domain.RecapRow{Key: "mode", Label: "Mode", Path: PathKeep, Values: domain.RecapValues([]string{mode})})
 	if len(p.Conflicts) > 0 {
 		rows = append(rows,
 			domain.RecapRow{Key: "conflicts", Label: "Conflicts", Values: recappedConflicts(p.Conflicts)},
-			domain.RecapRow{Key: pathOnConflict, Label: "On conflict", Path: pathOnConflict, Values: domain.RecapValues([]string{string(p.OnConflict)})},
+			domain.RecapRow{Key: PathOnConflict, Label: "On conflict", Path: PathOnConflict, Values: domain.RecapValues([]string{string(p.OnConflict)})},
 		)
 	}
 

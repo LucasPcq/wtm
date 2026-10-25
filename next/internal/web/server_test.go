@@ -108,11 +108,11 @@ func TestTheQuestionsAreAskedOnTheReposRoot(t *testing.T) {
 	require.Equal(t, http.StatusOK, response.StatusCode)
 	form := decoded[struct {
 		Fields []struct {
-			Label string `json:"label"`
+			Value string `json:"value"`
 		} `json:"fields"`
 	}](t, response)
 	require.Len(t, form.Fields, 1)
-	assert.Equal(t, "/code/app:x", form.Fields[0].Label)
+	assert.Equal(t, "/code/app:x", form.Fields[0].Value)
 }
 
 func TestAnUnknownCommandOrABodyThatIsNoCallIsRefused(t *testing.T) {

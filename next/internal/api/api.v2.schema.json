@@ -403,20 +403,8 @@
     "domain.ConfirmField": {
       "additionalProperties": false,
       "properties": {
-        "flag": {
-          "type": "string"
-        },
-        "help": {
-          "type": "string"
-        },
         "kind": {
           "const": "confirm"
-        },
-        "label": {
-          "type": "string"
-        },
-        "no": {
-          "$ref": "#/$defs/domain.Option"
         },
         "no_first": {
           "type": "boolean"
@@ -441,20 +429,12 @@
         },
         "value": {
           "type": "boolean"
-        },
-        "yes": {
-          "$ref": "#/$defs/domain.Option"
         }
       },
       "required": [
         "kind",
         "path",
-        "flag",
-        "label",
-        "help",
         "value",
-        "yes",
-        "no",
         "no_first",
         "rememberable",
         "remember"
@@ -769,20 +749,8 @@
     "domain.MultiSelectField": {
       "additionalProperties": false,
       "properties": {
-        "empty": {
-          "type": "string"
-        },
-        "flag": {
-          "type": "string"
-        },
-        "help": {
-          "type": "string"
-        },
         "kind": {
           "const": "multi_select"
-        },
-        "label": {
-          "type": "string"
         },
         "options": {
           "items": {
@@ -809,9 +777,6 @@
       "required": [
         "kind",
         "path",
-        "flag",
-        "label",
-        "help",
         "picked",
         "options"
       ],
@@ -820,24 +785,42 @@
     "domain.Option": {
       "additionalProperties": false,
       "properties": {
-        "badge": {
-          "type": "string"
+        "base": {
+          "type": "boolean"
         },
-        "label": {
-          "type": "string"
+        "change": {
+          "$ref": "#/$defs/worktree.Change"
         },
-        "short": {
-          "type": "string"
+        "changes": {
+          "type": "integer"
+        },
+        "detached": {
+          "type": "boolean"
+        },
+        "origin": {
+          "$ref": "#/$defs/worktree.Origin"
+        },
+        "tag": {
+          "$ref": "#/$defs/domain.OptionTag"
         },
         "value": {
           "type": "string"
         }
       },
       "required": [
-        "value",
-        "label"
+        "value"
       ],
       "type": "object"
+    },
+    "domain.OptionTag": {
+      "description": "What sets an option apart, as a code each surface words its own way.",
+      "enum": [
+        "local",
+        "checked_out",
+        "remote",
+        "current",
+        "main"
+      ]
     },
     "domain.Origin": {
       "description": "Where a field's answer came from.",
@@ -918,17 +901,8 @@
         "closed": {
           "type": "boolean"
         },
-        "flag": {
-          "type": "string"
-        },
-        "help": {
-          "type": "string"
-        },
         "kind": {
           "const": "select"
-        },
-        "label": {
-          "type": "string"
         },
         "options": {
           "items": {
@@ -967,9 +941,6 @@
       "required": [
         "kind",
         "path",
-        "flag",
-        "label",
-        "help",
         "value",
         "options",
         "rememberable",
@@ -995,17 +966,8 @@
     "domain.TextField": {
       "additionalProperties": false,
       "properties": {
-        "flag": {
-          "type": "string"
-        },
-        "help": {
-          "type": "string"
-        },
         "kind": {
           "const": "text"
-        },
-        "label": {
-          "type": "string"
         },
         "origin": {
           "$ref": "#/$defs/domain.Origin"
@@ -1023,9 +985,6 @@
       "required": [
         "kind",
         "path",
-        "flag",
-        "label",
-        "help",
         "value"
       ],
       "type": "object"
@@ -1039,17 +998,8 @@
           },
           "type": "array"
         },
-        "flag": {
-          "type": "string"
-        },
-        "help": {
-          "type": "string"
-        },
         "kind": {
           "const": "text_list"
-        },
-        "label": {
-          "type": "string"
         },
         "options": {
           "items": {
@@ -1070,9 +1020,6 @@
       "required": [
         "kind",
         "path",
-        "flag",
-        "label",
-        "help",
         "entries",
         "options"
       ],

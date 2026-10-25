@@ -2,7 +2,6 @@ package worktree
 
 import (
 	"slices"
-	"strconv"
 	"strings"
 )
 
@@ -132,22 +131,6 @@ func (b Branches) Differing() []string {
 	}
 
 	return names
-}
-
-// Badge is the badge a branch offered as a source carries: how far behind or ahead of origin it is, both when it has diverged, none when it is up to date or not on origin.
-func (s Snapshot) Badge(name string) string {
-	counts := s.AheadBehind(name)
-	switch s.Standing(name) {
-	case Behind:
-		return strconv.Itoa(counts.Behind) + " behind"
-	case Ahead:
-		return strconv.Itoa(counts.Ahead) + " ahead"
-	case Diverged:
-		return counts.String()
-	case NoOrigin, UpToDate:
-	}
-
-	return ""
 }
 
 // StandingOf is where the branch of a placed worktree stood against origin: the counts of an existing branch it checks out, the branch of origin it resumes, nothing for a new branch.

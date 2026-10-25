@@ -36,17 +36,13 @@ func TestTheEnvStrategyIsTheOneGivenElseRememberedElseConfigDefault(t *testing.T
 	}
 }
 
-func TestTheConfigDefaultIsTheFirstEnvOptionNamingTheConfiguredStrategy(t *testing.T) {
-	fields := provision.NewQuestions(provision.QuestionsParams{Repository: repository(nil)}).Fields("")
+func TestTheConfigDefaultIsTheFirstEnvOptionAndTheConfiguredStrategyIsKept(t *testing.T) {
+	questions := provision.NewQuestions(provision.QuestionsParams{Repository: repository(nil)})
 
-	field, isSelect := fields[0].(domain.SelectField)
+	field, isSelect := questions.Fields()[0].(domain.SelectField)
 	require.True(t, isSelect)
-	assert.Equal(t, []domain.Option{
-		{Value: "config", Label: "config default (example)", Short: "config default"},
-		{Value: "example", Label: "example — from .env.example"},
-		{Value: "main", Label: "main — the main checkout's .env"},
-		{Value: "parent", Label: "parent — the source worktree's .env"},
-	}, field.Options)
+	assert.Equal(t, []domain.Option{{Value: "config"}, {Value: "example"}, {Value: "main"}, {Value: "parent"}}, field.Options)
+	assert.Equal(t, project.EnvExample, questions.Configured)
 }
 
 func TestAskingAgainStillShowsWhatIsRemembered(t *testing.T) {
@@ -63,7 +59,7 @@ func TestAWorktreeThatIsNotCreatedIsAskedNothingAndRemembersNothing(t *testing.T
 	remembered := map[string]string{project.RememberEnvStrategy: string(project.EnvParent), project.RememberIsolation: string(project.Verbatim)}
 	questions := provision.NewQuestions(provision.QuestionsParams{Given: provision.Given{Remember: []string{"env_from", "isolation", "fast_forward"}}, Repository: repository(remembered), Exists: domain.SkipExists})
 
-	for _, field := range questions.Fields("") {
+	for _, field := range questions.Fields() {
 		assert.Equal(t, domain.SkipExists, field.Spec().Skip, field.Spec().Path)
 		assert.False(t, questions.Remembers(field.Spec().Path), field.Spec().Path)
 	}
@@ -160,34 +156,21 @@ func TestTheFastForwardIsSkippedWhenNothingIsBehind(t *testing.T) {
 	assert.Equal(t, []string{"env_from"}, questions.Given().Remember)
 }
 
-func TestTheSourceUpdateNamesTheBranchesItFastForwards(t *testing.T) {
-	fields := provision.NewQuestions(provision.QuestionsParams{Repository: repository(nil), Behind: []string{"main", "topic"}}).Fields("")
+func TestTheSourceUpdateKeepsTheBranchesItFastForwards(t *testing.T) {
+	questions := provision.NewQuestions(provision.QuestionsParams{Repository: repository(nil), Behind: []string{"main", "topic"}})
 
-	update, isConfirm := fields[2].(domain.ConfirmField)
+	update, isConfirm := questions.Fields()[2].(domain.ConfirmField)
 	require.True(t, isConfirm)
-	assert.Equal(t, domain.Option{Value: "true", Label: "Fast-forward main, topic to origin", Short: "fast-forward to origin"}, update.Yes)
-	assert.Equal(t, domain.Option{Value: "false", Label: "Keep it as-is", Short: "keep as-is"}, update.No)
 	assert.Empty(t, update.Skip)
+	assert.Equal(t, []string{"main", "topic"}, questions.Behind)
 }
 
-func TestTheIsolationOptionsAreWordedForOneWorktreeOrSeveral(t *testing.T) {
-	cases := map[string]struct {
-		many bool
-		want []string
-	}{
-		"one":     {false, []string{"isolated — its own ports and namespaces", "verbatim — the copied .env as is, one runs at a time"}},
-		"several": {true, []string{"isolated — each its own ports and namespaces", "verbatim — the copied .env as is, one runs at a time"}},
-	}
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			fields := provision.NewQuestions(provision.QuestionsParams{Repository: repository(nil), Many: c.many}).Fields("")
+func TestTheIsolationOptionsAreTheIsolations(t *testing.T) {
+	fields := provision.NewQuestions(provision.QuestionsParams{Repository: repository(nil), Many: true}).Fields()
 
-			isolation, isSelect := fields[1].(domain.SelectField)
-			require.True(t, isSelect)
-			assert.Equal(t, []string{"isolated", "verbatim"}, []string{isolation.Options[0].Value, isolation.Options[1].Value})
-			assert.Equal(t, c.want, []string{isolation.Options[0].Label, isolation.Options[1].Label})
-		})
-	}
+	isolation, isSelect := fields[1].(domain.SelectField)
+	require.True(t, isSelect)
+	assert.Equal(t, []domain.Option{{Value: "isolated"}, {Value: "verbatim"}}, isolation.Options)
 }
 
 func TestAnUnknownStrategyAGivenIsolationOutsideTheListOrAFieldNoneRemembersIsAProblem(t *testing.T) {

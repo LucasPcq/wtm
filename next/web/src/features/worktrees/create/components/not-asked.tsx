@@ -1,5 +1,5 @@
 import type { DomainField } from '@/api/types.gen'
-import { labelOf, skipWords } from '@/features/worktrees/create/utils/words'
+import { skipWords, wordsOf } from '@/features/worktrees/create/utils/words'
 
 export function NotAsked({ fields }: { fields: DomainField[] }) {
   const said = fields.flatMap((field) => {
@@ -13,7 +13,7 @@ export function NotAsked({ fields }: { fields: DomainField[] }) {
     <ul className="border-t pt-3 text-xs text-muted-foreground">
       {said.map(({ path, reason }) => (
         <li key={path}>
-          Not asked: {labelOf(path)}, {reason}.
+          Not asked: {wordsOf(path).label}, {reason}.
         </li>
       ))}
     </ul>

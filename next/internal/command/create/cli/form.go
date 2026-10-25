@@ -17,6 +17,7 @@ var createFlags = newForm(nil).Flags()
 func newForm(open func(ctx context.Context, dir string) (create.UseCase, error)) *createForm {
 	return &createForm{
 		YesUsage:   yesUsage,
+		Words:      words,
 		Open:       form.Opener[create.Request, create.Questions, create.Outcome](open),
 		Preview:    form.PreviewOf[create.Plan, create.Detail],
 		Draw:       drawOutcome,

@@ -21,7 +21,7 @@ export function defaultOf(field: DomainField): string[] {
     case 'text_list':
       return [field.entries.join('\n')]
     case 'confirm':
-      return [field.value ? field.yes.value : field.no.value]
+      return [field.value ? 'true' : 'false']
   }
 }
 

@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/stretchr/testify/require"
 
@@ -137,14 +138,31 @@ type questions struct {
 func (q questions) Form() domain.Form {
 	one := func(path string) string { return strings.Join(q.req[path], "") }
 	return domain.Form{Problems: q.problems, Fields: []domain.Field{
-		domain.TextListField{FieldSpec: domain.FieldSpec{Path: "branches", Flag: "<branches>", Label: "Branches", Help: "The branches"}, Entries: q.req["branches"], Options: []domain.Option{{Value: "feature", Badge: "existing"}}},
-		domain.SelectField{FieldSpec: domain.FieldSpec{Path: "from", Flag: "--from", Label: "Source", Help: "The source"}, Value: one("from"), Options: []domain.Option{{Value: "main"}, {Value: "dev", Badge: "1 behind"}}, Pinned: "dev", Refreshable: true},
-		domain.SelectField{FieldSpec: domain.FieldSpec{Path: "mode", Flag: "--mode", Label: "Mode", Help: "How"}, Value: one("mode"), Options: []domain.Option{{Value: "fast"}, {Value: "slow", Short: "slowly"}}, Remembered: q.remembered, Rememberable: true, Remember: slices.Contains(q.req[domain.PathRemember], "mode")},
-		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "ff", Flag: "--ff", Label: "Update", Help: "Update first"}, Value: one("ff") == "true", Rememberable: true},
-		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "keep", Flag: "--keep", Label: "Keep", Help: "Keep it"}, Value: one("keep") == "true", Yes: domain.Option{Label: "Copy", Short: "copy"}, No: domain.Option{Label: "Move", Short: "move"}, NoFirst: true},
-		domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: "files", Flag: "--files", Label: "Files", Help: "The files"}, Picked: q.req["files"], Options: []domain.Option{{Value: "a.txt"}, {Value: "b.txt"}}, Empty: "Pick one"},
-		domain.TextField{FieldSpec: domain.FieldSpec{Path: "name", Flag: "--name", Label: "Name", Help: "The name", Skip: domain.Skip(one("unworded"))}, Value: one("name")},
+		domain.TextListField{FieldSpec: domain.FieldSpec{Path: "branches"}, Entries: q.req["branches"], Options: []domain.Option{{Value: "feature", Tag: domain.TagLocal}}},
+		domain.SelectField{FieldSpec: domain.FieldSpec{Path: "from"}, Value: one("from"), Options: []domain.Option{{Value: "main"}, {Value: "dev", Origin: &worktree.Origin{Behind: 1, State: worktree.Behind}}}, Pinned: "dev", Refreshable: true},
+		domain.SelectField{FieldSpec: domain.FieldSpec{Path: "mode"}, Value: one("mode"), Options: []domain.Option{{Value: "fast"}, {Value: "slow"}}, Remembered: q.remembered, Rememberable: true, Remember: slices.Contains(q.req[domain.PathRemember], "mode")},
+		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "ff"}, Value: one("ff") == "true", Rememberable: true},
+		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "keep"}, Value: one("keep") == "true", NoFirst: true},
+		domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: "files"}, Picked: q.req["files"], Options: []domain.Option{{Value: "a.txt"}, {Value: "b.txt"}}},
+		domain.TextField{FieldSpec: domain.FieldSpec{Path: "name", Skip: domain.Skip(one("unworded"))}, Value: one("name")},
 	}}
+}
+
+// fakeWords are how the command line words the fake command's fields.
+var fakeWords = map[string]form.Words{
+	"branches": {Flag: "<branches>", Label: "Branches", Help: "The branches"},
+	"from":     {Flag: "--from", Label: "Source", Help: "The source"},
+	"mode":     {Flag: "--mode", Label: "Mode", Help: "How", Options: map[string]form.OptionWords{"slow": {Short: "slowly"}}},
+	"ff":       {Flag: "--ff", Label: "Update", Help: "Update first"},
+	"keep":     {Flag: "--keep", Label: "Keep", Help: "Keep it", Options: map[string]form.OptionWords{"true": {Label: "Copy", Short: "copy"}, "false": {Label: "Move", Short: "move"}}},
+	"files":    {Flag: "--files", Label: "Files", Help: "The files", Empty: "Pick one"},
+	"name":     {Flag: "--name", Label: "Name", Help: "The name"},
+	"worktree": {Flag: "<worktree>", Label: "Worktree", Help: "The worktree to read"},
+	"all":      {Flag: "--all", Label: "All", Help: "Every worktree"},
+}
+
+func wordsOf[Q any](_ Q, field domain.Field) form.Words {
+	return fakeWords[field.Spec().Path]
 }
 
 // An outcome is a run of the fake command: its plan is the request it ran.
@@ -174,6 +192,7 @@ func (a *app) Run(_ context.Context, req request, opts domain.RunOptions) (outco
 func fakeCommand() *form.Command[request, questions, outcome] {
 	return &form.Command[request, questions, outcome]{
 		YesUsage: "Run unattended",
+		Words:    wordsOf[questions],
 		Open:     func(context.Context, string) (form.UseCase[request, questions, outcome], error) { return &app{}, nil },
 		Preview: func(o outcome) form.Preview {
 			return form.Preview{Rows: []output.PlanRow{{Label: "plan of", Values: o.Plan["branches"]}}}
@@ -207,11 +226,11 @@ func (r reader) Run(context.Context, request, domain.RunOptions) (read, error) {
 type subjects struct{ req request }
 
 func (q subjects) Form() domain.Form {
-	field := domain.SelectField{FieldSpec: domain.FieldSpec{Path: "worktree", Flag: "<worktree>", Label: "Worktree", Help: "The worktree to read"}, Value: "main", Options: []domain.Option{{Value: "main"}, {Value: "feat/x", Label: "feat/x (detached)"}}}
+	field := domain.SelectField{FieldSpec: domain.FieldSpec{Path: "worktree"}, Value: "main", Options: []domain.Option{{Value: "main"}, {Value: "feat/x", Detached: true}}}
 	if len(q.req["all"]) > 0 {
 		field.Skip = domain.SkipAll
 	}
-	return domain.Form{Fields: []domain.Field{field, domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "all", Flag: "--all", Label: "All", Help: "Every worktree"}}}}
+	return domain.Form{Fields: []domain.Field{field, domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "all"}}}}
 }
 
 // subjectReader is a fake read about one worktree, recording the request it read and counting its questions read.
@@ -234,6 +253,7 @@ func (r subjectReader) Run(_ context.Context, req request, _ domain.RunOptions) 
 func subjectQuery() (*form.Query[request, subjects, read], *request, *int) {
 	got, asked := request{}, 0
 	return &form.Query[request, subjects, read]{
+		Words: wordsOf[subjects],
 		Open: func(context.Context, string) (form.Reader[request, subjects, read], error) {
 			return subjectReader{read: &got, asked: &asked}, nil
 		},
@@ -247,6 +267,7 @@ func subjectQuery() (*form.Query[request, subjects, read], *request, *int) {
 func fakeQuery() (*form.Query[request, questions, read], *int) {
 	picked := 0
 	return &form.Query[request, questions, read]{
+		Words: wordsOf[questions],
 		Open: func(context.Context, string) (form.Reader[request, questions, read], error) {
 			return reader{read: read{Items: []domain.Unit[struct{}]{{Subject: "feat/x", Status: domain.StatusDone}}}}, nil
 		},

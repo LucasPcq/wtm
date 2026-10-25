@@ -2,10 +2,8 @@ import { expect, test } from 'vitest'
 import type { DomainField } from '@/api/types.gen'
 import { answersOf, keyOf, problemsByKey, valuesOf } from '@/components/command-form/answers'
 
-const base = { flag: '', help: '', label: '' }
-const branch: DomainField = { ...base, kind: 'text', path: 'branch', value: '' }
+const branch: DomainField = { kind: 'text', path: 'branch', value: '' }
 const from: DomainField = {
-  ...base,
   kind: 'select',
   path: 'from',
   value: 'main',
@@ -15,17 +13,14 @@ const from: DomainField = {
   remember: false,
   rememberable: true,
 }
-const remember: DomainField = { ...base, kind: 'text_list', path: 'remember[0]', entries: ['a'], options: [] }
+const remember: DomainField = { kind: 'text_list', path: 'remember[0]', entries: ['a'], options: [] }
 const fetch: DomainField = {
-  ...base,
   kind: 'confirm',
   path: 'env.fetch',
   value: false,
   no_first: false,
   remember: false,
   rememberable: false,
-  yes: { label: 'Yes', value: 'true' },
-  no: { label: 'No', value: 'false' },
 }
 const fields = [branch, from, remember, fetch]
 const problem = (path: string, message: string) => ({ path, message, code: 'c', flag: '' })
@@ -75,7 +70,7 @@ test('a problem goes under its field, one of no field under the form', () => {
 
 // create refuses one branch of several as branches[N]: the problem showed above the form, not under the field.
 test('a problem of one value of a field goes under that field', () => {
-  const branches: DomainField = { ...base, kind: 'text_list', path: 'branches', entries: [], options: [] }
+  const branches: DomainField = { kind: 'text_list', path: 'branches', entries: [], options: [] }
   expect(
     problemsByKey([branches, remember], [problem('branches[1]', 'exists already'), problem('remember[0]', 'unknown')]),
   ).toEqual({

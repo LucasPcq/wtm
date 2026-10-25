@@ -102,7 +102,7 @@ Never server data in zustand, never a choice of the viewer in Query, never `loca
 | a follow-up the web cannot run (clean, sync, go, reparent…) | `CommandLine` (the server spells it, `POST /api/command-line`), inline or as a block | a button that pretends to run it, or nothing |
 | a pull request, its checks | `githubQuery`, asked once per view on screen, when the detail opens, and after Fetch origin | `with_prs` on every event, a timer |
 | fresh data | the event stream invalidating `['repo', id]` | polling, `refetchInterval` on a read |
-| the words of a field, an option, a reason a field is not asked | the screen's own exhaustive `Record` over the paths, values and skip codes the schema publishes (`create/utils/words.ts`) | the core's `label`, `help`, option label or skip code: those are the command line's |
+| the words of a field, an option, a reason a field is not asked | the screen's own exhaustive `Record` over the paths, values and skip codes the schema publishes (`create/utils/words.ts`) | a fallback to the path or the value; the core publishes no words, only paths, values, option facts and skip codes |
 
 A problem shows where it is decided, never as a banner or a toast. Colour carries a meaning only (healthy, needs the person, failed, nothing to say), always beside its word (`Glyph`).
 

@@ -3,32 +3,25 @@
     {
       "kind": "text_list",
       "path": "branches",
-      "flag": "\u003cbranches\u003e",
-      "label": "Branches",
-      "help": "One per line; a branch that exists is checked out as it is",
       "entries": [
         "feat/x"
       ],
       "options": [
         {
           "value": "main",
-          "label": "",
-          "badge": "worktree exists"
+          "tag": "checked_out"
         }
       ]
     },
     {
       "kind": "select",
       "path": "from",
-      "flag": "--from",
-      "label": "Source branch",
-      "help": "Where a new branch starts, and the parent wtm sync rebases it onto",
       "origin": "config",
       "value": "main",
       "options": [
         {
           "value": "main",
-          "label": "main (default)"
+          "base": true
         }
       ],
       "pinned": "main",
@@ -40,28 +33,20 @@
     {
       "kind": "select",
       "path": "env_from",
-      "flag": "--env-from",
-      "label": "Env strategy",
-      "help": "Where its .env files come from: config, example, main or parent; config.toml's strategy by default",
       "origin": "default",
       "value": "config",
       "options": [
         {
-          "value": "config",
-          "label": "config default (example)",
-          "short": "config default"
+          "value": "config"
         },
         {
-          "value": "example",
-          "label": "example — from .env.example"
+          "value": "example"
         },
         {
-          "value": "main",
-          "label": "main — the main checkout's .env"
+          "value": "main"
         },
         {
-          "value": "parent",
-          "label": "parent — the source worktree's .env"
+          "value": "parent"
         }
       ],
       "rememberable": true,
@@ -72,20 +57,15 @@
     {
       "kind": "select",
       "path": "isolation",
-      "flag": "--isolation",
-      "label": "Isolation",
-      "help": "How it stands against its source: isolated or verbatim; run.toml's isolation by default",
       "origin": "default",
       "skip": "nothing_isolated",
       "value": "isolated",
       "options": [
         {
-          "value": "isolated",
-          "label": "isolated — its own ports and namespaces"
+          "value": "isolated"
         },
         {
-          "value": "verbatim",
-          "label": "verbatim — the copied .env as is, one runs at a time"
+          "value": "verbatim"
         }
       ],
       "rememberable": true,
@@ -96,21 +76,8 @@
     {
       "kind": "confirm",
       "path": "fast_forward",
-      "flag": "--ff",
-      "label": "Source update",
-      "help": "Fast-forward the source branch to origin first when it is behind",
       "skip": "not_behind",
       "value": false,
-      "yes": {
-        "value": "true",
-        "label": "Fast-forward to origin",
-        "short": "fast-forward to origin"
-      },
-      "no": {
-        "value": "false",
-        "label": "Keep it as-is",
-        "short": "keep as-is"
-      },
       "no_first": false,
       "rememberable": true,
       "remember": false
@@ -118,20 +85,9 @@
     {
       "kind": "confirm",
       "path": "if_not_exists",
-      "flag": "--if-not-exists",
-      "label": "If not exists",
-      "help": "Succeed with no change when the worktree exists",
       "origin": "default",
       "skip": "flag_only",
       "value": false,
-      "yes": {
-        "value": "true",
-        "label": "Yes"
-      },
-      "no": {
-        "value": "false",
-        "label": "No"
-      },
       "no_first": false,
       "rememberable": false,
       "remember": false

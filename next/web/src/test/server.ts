@@ -48,7 +48,7 @@ const tree = (detail: ListDetail) =>
   })
 
 const field = (over: Partial<DomainField> & { kind: DomainField['kind']; path: string }): DomainField =>
-  ({ flag: `--${over.path}`, label: over.path, help: '', ...over }) as DomainField
+  ({ ...over }) as DomainField
 
 // a branch is required; an existing one is not asked its environment
 export function questionsOf(answers: DomainAnswered[] = []) {
@@ -59,30 +59,23 @@ export function questionsOf(answers: DomainAnswered[] = []) {
       field({
         kind: 'text_list',
         path: 'branches',
-        label: 'Branches',
-        help: 'One per line',
         entries: branches,
         options: [],
       }),
       field({
         kind: 'select',
         path: 'from',
-        label: 'Source branch',
         value: 'main',
         origin: 'config',
         refreshable: true,
         closed: false,
         remember: false,
         rememberable: false,
-        options: [
-          { value: 'feat/billing', label: '' },
-          { value: 'main', label: 'main (default)' },
-        ],
+        options: [{ value: 'feat/billing' }, { value: 'main', base: true }],
       }),
       field({
         kind: 'select',
         path: 'env_from',
-        label: 'Env strategy',
         value: 'config',
         origin: 'default',
         refreshable: false,
@@ -90,22 +83,16 @@ export function questionsOf(answers: DomainAnswered[] = []) {
         remember: false,
         rememberable: true,
         ...(exists && { skip: 'exists' }),
-        options: [
-          { value: 'config', label: 'config default (example)' },
-          { value: 'main', label: "main — the main checkout's .env" },
-        ],
+        options: [{ value: 'config' }, { value: 'main' }],
       }),
       field({
         kind: 'confirm',
         path: 'if_not_exists',
-        label: 'If not exists',
         value: false,
         no_first: false,
         remember: false,
         rememberable: false,
         skip: 'flag_only',
-        yes: { value: 'true', label: 'Yes' },
-        no: { value: 'false', label: 'No' },
       }),
     ],
     problems: branches.length

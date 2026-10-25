@@ -5,7 +5,7 @@ import type { CommandForm } from '@/components/command-form/use-command-form'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 
-// The core's labels and helps are the command line's: a screen gives its fields its own words.
+// The core gives no words: a screen words each field, through an exhaustive Record over its command's paths.
 export type OptionWords = { title: string; description: string }
 export type FieldWords = { label: string; help: string; options?: Record<string, OptionWords>; config?: string }
 
@@ -27,19 +27,19 @@ export function CommandFields({
 }: {
   form: CommandForm
   fields: DomainField[]
-  words: Record<string, FieldWords>
+  words: (path: string) => FieldWords
   problems: Record<string, string>
   remember?: Remember
 }) {
   return (
     <FieldGroup className="gap-6">
       {fields.map((field) => {
-        const said = words[field.path]
+        const said = words(field.path)
         const rememberable = remember && 'rememberable' in field && field.rememberable
 
         const from = (dirty: boolean) => {
           if (!field.origin || dirty) return undefined
-          if (field.origin === 'config') return said?.config ?? origin.config
+          if (field.origin === 'config') return said.config ?? origin.config
           return origin[field.origin]
         }
 
@@ -54,7 +54,7 @@ export function CommandFields({
               return (
                 <Field data-invalid={errors.length > 0} className="gap-2">
                   <div className="flex items-center justify-between gap-2">
-                    <FieldLabel htmlFor={input.name}>{said?.label ?? field.label}</FieldLabel>
+                    <FieldLabel htmlFor={input.name}>{said.label}</FieldLabel>
                     {rememberable && (
                       <label
                         htmlFor={`${input.name}-remember`}
@@ -79,7 +79,7 @@ export function CommandFields({
                     onChange={(values) => input.handleChange(values)}
                     invalid={errors.length > 0}
                   />
-                  <FieldDescription className="text-sm text-pretty">{said?.help ?? field.help}</FieldDescription>
+                  <FieldDescription className="text-sm text-pretty">{said.help}</FieldDescription>
                   <FieldError errors={errors} />
                 </Field>
               )

@@ -31,9 +31,9 @@ func TestThePickerOffersEveryWorktreeOnTheOneTheRequestReads(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "feat/a", field.Value)
 	assert.Equal(t, []domain.Option{
-		{Value: "main", Badge: "main"},
-		{Value: "/repo/.trees/detached", Label: "/repo/.trees/detached (detached)"},
-		{Value: "feat/a", Badge: "current"},
+		{Value: "main", Tag: domain.TagMain},
+		{Value: "/repo/.trees/detached", Detached: true},
+		{Value: "feat/a", Tag: domain.TagCurrent},
 	}, field.Options, "a worktree on no branch is offered and says so, rather than refused once picked")
 	assert.Empty(t, field.Skip)
 }
