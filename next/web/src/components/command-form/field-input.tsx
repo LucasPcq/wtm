@@ -1,4 +1,4 @@
-import type { DomainField, DomainOption } from '@/api/types.gen'
+import type { DomainField } from '@/api/types.gen'
 import type { FieldWords } from '@/components/command-form/command-fields'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -17,14 +17,14 @@ export function FieldInput({
 }: {
   field: DomainField
   id: string
-  words: FieldWords | undefined
+  words: FieldWords
   from: string | undefined
   values: string[]
   onChange: (values: string[]) => void
   invalid: boolean
 }) {
-  const title = (option: DomainOption) => words?.options?.[option.value]?.title ?? (option.value || option.label)
-  const line = (option: DomainOption) => words?.options?.[option.value]?.description
+  const title = (value: string) => words.options?.[value]?.title ?? value
+  const line = (value: string) => words.options?.[value]?.description
 
   switch (field.kind) {
     case 'select': {
@@ -34,7 +34,7 @@ export function FieldInput({
           <SelectTrigger id={id} aria-invalid={invalid} className="w-full">
             {/* the closed select names its answer and where it came from, never the option's description */}
             <SelectValue>
-              {picked && title(picked)}
+              {picked && title(picked.value)}
               {picked && from && <span className="text-muted-foreground"> · {from}</span>}
             </SelectValue>
           </SelectTrigger>
@@ -42,8 +42,8 @@ export function FieldInput({
             {field.options.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 <span className="flex flex-col">
-                  {title(option)}
-                  {line(option) && <span className="text-xs text-muted-foreground">{line(option)}</span>}
+                  {title(option.value)}
+                  {line(option.value) && <span className="text-xs text-muted-foreground">{line(option.value)}</span>}
                 </span>
               </SelectItem>
             ))}
@@ -64,7 +64,7 @@ export function FieldInput({
                   onChange(on ? [...values, option.value] : values.filter((value) => value !== option.value))
                 }
               />
-              {title(option)}
+              {title(option.value)}
             </label>
           ))}
         </div>
@@ -86,15 +86,15 @@ export function FieldInput({
       )
 
     case 'confirm': {
-      const options = field.no_first ? [field.no, field.yes] : [field.yes, field.no]
+      const options = field.no_first ? ['false', 'true'] : ['true', 'false']
       return (
         <RadioGroup id={id} value={values[0] ?? ''} onValueChange={(value) => onChange([value])} aria-invalid={invalid}>
-          {options.map((option) => (
-            <label key={option.value} htmlFor={`${id}-${option.value}`} className="flex items-start gap-2 text-sm">
-              <RadioGroupItem id={`${id}-${option.value}`} value={option.value} className="mt-0.5" />
+          {options.map((value) => (
+            <label key={value} htmlFor={`${id}-${value}`} className="flex items-start gap-2 text-sm">
+              <RadioGroupItem id={`${id}-${value}`} value={value} className="mt-0.5" />
               <span className="flex flex-col">
-                {title(option)}
-                {line(option) && <span className="text-xs text-muted-foreground">{line(option)}</span>}
+                {title(value)}
+                {line(value) && <span className="text-xs text-muted-foreground">{line(value)}</span>}
               </span>
             </label>
           ))}

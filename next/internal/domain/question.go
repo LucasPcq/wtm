@@ -1,6 +1,10 @@
 package domain
 
-import "slices"
+import (
+	"slices"
+
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+)
 
 // Origin says where an answer to a question came from.
 type Origin string
@@ -44,12 +48,32 @@ type Answer[T any] struct {
 	Origin Origin
 }
 
-// Option is one value a choice offers, how it reads (Label, empty when it reads as its value), a badge the wizard shows beside it (`on origin`, a count of changes), and how a trail names it once picked (Short, empty when by its value).
+// Option is one value a choice offers, with what the repository knows of it: facts each surface words its own way, never copy.
 type Option struct {
-	Value string `json:"value"`
-	Label string `json:"label"`
-	Badge string `json:"badge,omitempty"`
-	Short string `json:"short,omitempty"`
+	Value    string           `json:"value"`
+	Tag      OptionTag        `json:"tag,omitempty"`      // what sets it apart, empty when nothing does
+	Base     bool             `json:"base,omitempty"`     // the configured base branch
+	Detached bool             `json:"detached,omitempty"` // a worktree on no branch, valued by its path
+	Origin   *worktree.Origin `json:"origin,omitempty"`   // where the branch stands against origin's, nil when origin has none
+	Changes  int              `json:"changes,omitempty"`  // the uncommitted changes the worktree holds
+	Change   *worktree.Change `json:"change,omitempty"`   // the uncommitted change it is
+}
+
+// OptionTag is what sets an option apart, as a code each surface words its own way.
+type OptionTag string
+
+// The tags of an option.
+const (
+	TagLocal      OptionTag = "local"       // a local branch no worktree holds
+	TagCheckedOut OptionTag = "checked_out" // a local branch a worktree holds
+	TagRemote     OptionTag = "remote"      // a branch only origin has
+	TagCurrent    OptionTag = "current"     // the worktree the caller stands in
+	TagMain       OptionTag = "main"        // the main worktree
+)
+
+// OptionTags returns every OptionTag.
+func OptionTags() []OptionTag {
+	return []OptionTag{TagLocal, TagCheckedOut, TagRemote, TagCurrent, TagMain}
 }
 
 // Choice is a question with a closed set of options: its answer, its options, the reason it is not asked (Skip, empty when it is), and the answer remembered for it.
@@ -100,4 +124,14 @@ func Names[T ~string](values []T) []string {
 	}
 
 	return found
+}
+
+// OptionsOf are values as the options of a choice, in order, with no fact of their own.
+func OptionsOf[T ~string](values []T) []Option {
+	options := make([]Option, 0, len(values))
+	for _, value := range values {
+		options = append(options, Option{Value: string(value)})
+	}
+
+	return options
 }

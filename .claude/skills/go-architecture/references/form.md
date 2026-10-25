@@ -9,6 +9,7 @@
 | Field | What it is |
 | -- | -- |
 | `YesUsage` | the usage of `--yes`, saying what an unattended run requires |
+| `Words` | a `form.Worder[Q]`, the command's `cli/words.go`: each field's flag, label, help, problem of none picked, and option labels and shorts, on the questions observed (`questions.md`, "Words"); `form.Query` and `form.Stream` take one too |
 | `Open` | `form.Opener[R, Q, O](open)`: the project's use case as a `form.UseCase[R, Q, O]` (its `Questions` and `Run`) |
 | `Preview(previewed) form.Preview` | `form.PreviewOf` for a plan embedding `domain.Recapped`; the plan not yet applied: `Rows` (`output.PlanRow`, each answer with its mark), `Warnings`, `Recalled` (the fields answered from memory, which the recap's hint names). The recap and the dry run both draw it. |
 | `Draw(w, applied, view)` | the outcome of an apply, drawn from `output.View`: paths shown from `view.Cwd`, follow-ups spelled by `view.CommandLine` (`output.FollowUpStep`); `form.Query.Draw(w, read, req, view)` takes the same view and the request read, which a layout may follow (`status --all` draws its table however many worktrees) |
@@ -19,7 +20,7 @@
 
 ## What it does with the schema
 
-- `Bind(cmd, &run)`: registers each field's flag and usage from `Q{}.Form()` by its kind, plus `--remember` when a field is rememberable, `--ask`, `--yes`, `--output`, `--dry-run`, `--expect-fingerprint` (`uicli.FlagDryRun`, `uicli.FlagExpectFingerprint`).
+- `Bind(cmd, &run)`: registers each field's flag and usage from `Q{}.Form()` and its words, by its kind, plus `--remember` when a field is rememberable, `--ask`, `--yes`, `--output`, `--dry-run`, `--expect-fingerprint` (`uicli.FlagDryRun`, `uicli.FlagExpectFingerprint`).
 - `Launch(cmd, args, conclude)`: refuses an invalid `--output` or correlation ID, turns the command line into `R` and `domain.RunOptions`, opens the use case on the project's directory, runs the wizard when the user can see and answer it (`Streams.CanPrompt`, human output, no `--yes` nor `--expect-fingerprint`), else `UseCase.Run` with its progress; hands the `form.Ran{Request, Outcome}` and the error to `conclude`.
 - `Conclude(cmd, ran, err)`, in order: the JSON envelope (`Outcome.Envelope` with the request's answers, which a stale plan is followed up with as its replan); a refusal; the framed dry run from `Preview` with the line that applies it (`--expect-fingerprint <hash>`); the outcome from `Draw`; then the failure the apply ended on, which sets the exit code.
 - `Argv(command, req)`: spells the request back as a command line from `R.Values` (the apply line, the `--dry-run` replay).
@@ -29,7 +30,7 @@ A cli's run is `c.form.Launch(cmd, args, c.form.Conclude)`. An end case of its o
 ## The wizard
 
 - **A state machine**: the current step is data, every transition happens in `Update` on a message; going back forgets an answer without a reset per step, since the `Session` folds each step's answer into the request given, in step order.
-- **No I/O in `Update`**: after each answer the questions are observed again (`UseCase.Questions`) in a `tea.Cmd`, and each step reads its label, help, options, pinned value, remembered answer, skip and problems from the form observed last. The recap previews the plan the same way (a dry run), then applies it with its fingerprint.
+- **No I/O in `Update`**: after each answer the questions are observed again (`UseCase.Questions`) in a `tea.Cmd`, and each step reads its options, pinned value, remembered answer, skip and problems from the form observed last, and its label, help and option words from `Words` on the questions observed last (`Session.Words(at)`). An option's badge and the label its facts give it (`main (default)`, `(detached)`, `a → b`, `3 behind`, `1 change`, a tag's word) are the engine's (`form.Options`, `ui/form/words.go`). The recap previews the plan the same way (a dry run), then applies it with its fingerprint.
 - **A step per field kind** (`ui/form/fieldstep.go`): select, confirmation, text list, text, multi-select. A step settled by a flag, a remembered answer or a default shows in the trail with its origin; a skipped one shows its reason.
 - **Problems** show as their templates write them, the step's label standing for `{path}`; only a template's own first word is capitalised. A problem with a follow-up (create's branch checked out elsewhere) is followed under the step's error by its next step, `→ wtm go <branch>   jump in`: `Session.Problem` spells it with the run's command line into a `widget.Problem`, which the input's error banner draws; a failed preview's field draws it in the recap too (`Script.CommandLine`).
 - **The streams are the command's**: the wizard draws on stderr, cancelled through the command's context; Ctrl+C in raw mode is a key the model turns into an abort (exit 19).

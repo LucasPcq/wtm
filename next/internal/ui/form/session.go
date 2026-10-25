@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"slices"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
@@ -38,7 +37,7 @@ type stepAnswer struct {
 
 // Session returns a session that asks app the request req as given, under opts (DryRun, CorrelationID and Report; the session sets the surface and the fingerprint), with a step per field of the command's form: the command's own where Special gives one, else the step of the field's kind.
 func (c *Command[R, Q, O]) Session(ctx context.Context, app UseCase[R, Q, O], req R, opts domain.RunOptions) *Session[R, Q, O] {
-	s := &Session[R, Q, O]{ctx: ctx, command: c, app: app, given: req, req: req, opts: opts, answers: map[int]stepAnswer{}, form: c.schema()}
+	s := &Session[R, Q, O]{ctx: ctx, command: c, app: app, given: req, req: req, opts: opts, answers: map[int]stepAnswer{}, form: c.form()}
 
 	for at, field := range s.form.Fields {
 		var step Step
@@ -119,6 +118,11 @@ func (s *Session[R, Q, O]) Field(at int) domain.Field {
 	return s.form.Fields[at]
 }
 
+// Words are the words of the field of step at, on the questions observed last.
+func (s *Session[R, Q, O]) Words(at int) Words {
+	return s.command.Words(s.q, s.Field(at))
+}
+
 // Problems are the problems of the questions observed last that name the field at path or one of its entries.
 func (s *Session[R, Q, O]) Problems(path string) []domain.FieldError {
 	return domain.ProblemsOf(s.form.Problems, path)
@@ -128,9 +132,9 @@ func (s *Session[R, Q, O]) Problems(path string) []domain.FieldError {
 func (s *Session[R, Q, O]) Standing(at int) Standing {
 	field := s.Field(at)
 	spec := field.Spec()
-	st := Standing{Value: trailOf(field), Origin: spec.Origin, Skip: spec.Skip, Reason: s.reason(spec.Skip), Erred: len(s.Problems(spec.Path)) > 0}
+	st := Standing{Value: trailOf(field, s.Words(at)), Origin: spec.Origin, Skip: spec.Skip, Reason: s.reason(spec.Skip), Erred: len(s.Problems(spec.Path)) > 0}
 	st.Given = len(s.given.Values(spec.Path)) > 0
-	if st.Given && !positional(field) {
+	if st.Given && !positional(worded{Field: field, Words: s.Words(at)}) {
 		st.Flag = s.command.Flags().Spell(spec.Path)
 	}
 
@@ -160,16 +164,7 @@ func (s *Session[R, Q, O]) Problem(found domain.FieldError, label string) error 
 
 // Label spells a field path with the label of the first field that answers it, keeping an entry's index: branches[1] reads Branches[1].
 func (s *Session[R, Q, O]) Label(path string) string {
-	name, index, indexed := strings.Cut(path, "[")
-	at := slices.IndexFunc(s.command.schema().Fields, func(f domain.Field) bool { return f.Spec().Path == name })
-	switch {
-	case at < 0:
-		return path
-	case indexed:
-		return s.command.schema().Fields[at].Spec().Label + "[" + index
-	}
-
-	return s.command.schema().Fields[at].Spec().Label
+	return labelOf(s.command.schema(), path)
 }
 
 // Check observes the questions of the request as answered so far with answers given too, without keeping them: a step checks what is typed before it answers.

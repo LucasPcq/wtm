@@ -20,9 +20,10 @@ func (r Request) From(caller domain.Caller) Request {
 	return r
 }
 
+// The paths of list's fields, by which each surface words them.
 const (
-	pathWithPRs = "with_prs"
-	pathFetch   = "fetch"
+	PathWithPRs = "with_prs"
+	PathFetch   = "fetch"
 )
 
 // Answer is the request with the field at path answered by values.
@@ -30,9 +31,9 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 	next := r
 	var err error
 	switch path {
-	case pathWithPRs:
+	case PathWithPRs:
 		next.WithPRs, err = domain.Yes(path, values)
-	case pathFetch:
+	case PathFetch:
 		next.Fetch, err = domain.Yes(path, values)
 	default:
 		return r, domain.Unknown(path)
@@ -47,9 +48,9 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 // Values is the request's answer to the field at path, nil when it leaves the field to its default.
 func (r Request) Values(path string) []string {
 	switch path {
-	case pathWithPRs:
+	case PathWithPRs:
 		return domain.SaidYes(r.WithPRs)
-	case pathFetch:
+	case PathFetch:
 		return domain.SaidYes(r.Fetch)
 	}
 
@@ -65,11 +66,7 @@ type Questions struct{}
 // Form is the schema of the request: whether to ask GitHub for pull requests, and whether to fetch origin first.
 func (Questions) Form() domain.Form {
 	return domain.Form{Fields: []domain.Field{
-		domain.ConfirmField{
-			FieldSpec: domain.FieldSpec{Path: pathWithPRs, Flag: "--with-prs", Label: "Pull requests", Help: "Ask GitHub for each worktree's newest pull request, open, merged or closed (needs gh)"},
-		},
-		domain.ConfirmField{
-			FieldSpec: domain.FieldSpec{Path: pathFetch, Flag: "--fetch", Label: "Fetch", Help: "Fetch origin first, as the picker's refresh (r) does"},
-		},
+		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathWithPRs}},
+		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathFetch}},
 	}}
 }

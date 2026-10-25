@@ -80,12 +80,11 @@ func (f *filesStep) Standing() form.Standing {
 
 // tone is the colour of a change's tag: an addition, a loss, a risk, or a rename that changes no content.
 func (f *filesStep) tone(option domain.Option) widget.Tone {
-	at := slices.IndexFunc(f.s.Questions().Files.Options, func(c worktree.Change) bool { return c.Path == option.Value })
-	if at < 0 {
+	if option.Change == nil {
 		return widget.ToneMuted
 	}
 
-	switch f.s.Questions().Files.Options[at].Status {
+	switch option.Change.Status {
 	case worktree.ChangeUntracked:
 		return widget.ToneSuccess
 	case worktree.ChangeDeleted:
@@ -129,19 +128,13 @@ func (t *targetStep) Standing() form.Standing {
 
 // created is how the trail names a worktree to create: the Short of the target's option with no value.
 func (t *targetStep) created() string {
-	field, _ := t.s.Field(t.at).(domain.SelectField)
-	at := slices.IndexFunc(field.Options, func(o domain.Option) bool { return o.Value == "" })
-	if at < 0 {
-		return ""
-	}
-
-	return field.Options[at].Short
+	return t.s.Words(t.at).Options[""].Short
 }
 
 // Open lists the worktrees after the option to create one, picked by the sentinel createTarget, set apart by a rule.
 func (t *targetStep) Open() tea.Cmd {
 	field, _ := t.s.Field(t.at).(domain.SelectField)
-	options := form.Options(field.Options)
+	options := form.Options(field.Options, t.s.Words(t.at))
 	if at := slices.IndexFunc(field.Options, func(o domain.Option) bool { return o.Value == "" }); at >= 0 {
 		options[at].Value = createTarget
 		options = slices.Insert(options, at+1, widget.Option{Separator: true})

@@ -38,12 +38,13 @@ const (
 type query = form.Query[status.Request, status.Questions, status.Outcome]
 
 // statusFlags spells the failures: the worktree is positional, the others are flags.
-var statusFlags = (&query{}).Flags()
+var statusFlags = (&query{Words: words}).Flags()
 
 // New returns the status command: its argument and flags become a status.Request, the worktree picked first when none is named and the user can see and answer the picker; it draws what it read on streams, or the v2 JSON envelope with --output json, the fixes spelled by commandLine.
 func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (status.UseCase, error), commandLine output.CommandLine) *cobra.Command {
 	run := &uicli.Run{Command: status.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: statusFlags}
 	q := &query{
+		Words: words,
 		Open: func(ctx context.Context, dir string) (form.Reader[status.Request, status.Questions, status.Outcome], error) {
 			return open(ctx, dir)
 		},

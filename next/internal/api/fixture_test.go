@@ -32,7 +32,7 @@ func (r request) Answer(path string, values []string) (request, error) {
 type questions struct{ asked string }
 
 func (q questions) Form() domain.Form {
-	return domain.Form{Fields: []domain.Field{domain.TextField{FieldSpec: domain.FieldSpec{Path: "name", Label: q.asked}}}}
+	return domain.Form{Fields: []domain.Field{domain.TextField{FieldSpec: domain.FieldSpec{Path: "name"}, Value: q.asked}}}
 }
 
 // outcome reports the request it ran with as its op, so a test sees what the use case was given; its plan is a plan and its detail a detail.

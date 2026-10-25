@@ -459,6 +459,7 @@ var enums = map[reflect.Type]struct {
 }{
 	reflect.TypeFor[domain.Skip]():               {"Why a field is not asked, as a code each surface words its own way.", domain.Skips()},
 	reflect.TypeFor[domain.Origin]():             {"Where a field's answer came from.", domain.Origins()},
+	reflect.TypeFor[domain.OptionTag]():          {"What sets an option apart, as a code each surface words its own way.", domain.OptionTags()},
 	reflect.TypeFor[create.Action]():             {"How a branch gets its worktree.", create.Actions()},
 	reflect.TypeFor[project.EnvStrategy]():       {"Where a worktree's .env files are copied from.", project.EnvStrategies()},
 	reflect.TypeFor[project.Isolation]():         {"How a worktree stands against its source.", project.Isolations()},

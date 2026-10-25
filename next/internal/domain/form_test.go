@@ -5,34 +5,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestTheFirstFieldAnsweringAPathSpellsItsFlagAndItsHelpItsUsage(t *testing.T) {
-	form := Form{Fields: []Field{
-		SelectField{FieldSpec: FieldSpec{Path: "to", Flag: "--to", Help: "Target branch"}},
-		TextField{FieldSpec: FieldSpec{Path: "to", Flag: "--branch", Help: "Name for the branch"}},
-		ConfirmField{FieldSpec: FieldSpec{Path: "keep", Flag: "--keep", Help: "Copy rather than move"}},
-	}}
-
-	flags, usages := form.Flags()
-
-	assert.Equal(t, map[string]string{"to": "--to", "keep": "--keep"}, flags)
-	assert.Equal(t, map[string]string{"to": "Target branch", "keep": "Copy rather than move"}, usages)
-}
-
-func TestAFormWithARememberableFieldHasRemember(t *testing.T) {
-	form := Form{Fields: []Field{
-		SelectField{FieldSpec: FieldSpec{Path: "isolation", Flag: "--isolation"}, Rememberable: true},
-		ConfirmField{FieldSpec: FieldSpec{Path: "fast_forward", Flag: "--ff"}, Rememberable: true},
-	}}
-
-	flags, usages := form.Flags()
-
-	assert.Equal(t, "--remember", flags[PathRemember])
-	assert.Equal(t, "The answers to always use in this repository: isolation, fast_forward (repeatable)", usages[PathRemember])
-}
 
 func TestOnlyASelectOrAConfirmationIsRemembered(t *testing.T) {
 	form := Form{Fields: []Field{
@@ -87,11 +63,11 @@ func TestOneTakesASingleValueOfItsType(t *testing.T) {
 func TestAFormIsEncodedWithTheKindOfEachField(t *testing.T) {
 	form := Form{
 		Fields: []Field{
-			TextListField{FieldSpec: FieldSpec{Path: "branches", Flag: "<branches>", Label: "Branches"}, Entries: []string{"feat/x"}},
-			ConfirmField{FieldSpec: FieldSpec{Path: "keep", Flag: "--keep", Label: "Keep", Skip: "not asked"}, Yes: Option{Value: "true", Label: "Copy", Short: "copy"}, No: Option{Value: "false", Label: "Move"}, NoFirst: true},
-			SelectField{FieldSpec: FieldSpec{Path: "isolation", Flag: "--isolation", Label: "Isolation", Origin: OriginRemembered}, Value: "shared", Options: []Option{{Value: "shared", Label: "Shared", Badge: "remembered"}}, Remembered: "shared", Rememberable: true, Refreshable: true},
-			MultiSelectField{FieldSpec: FieldSpec{Path: "files", Flag: "--files", Label: "Files"}, Empty: "Pick one"},
-			TextField{FieldSpec: FieldSpec{Path: "to", Flag: "--to", Label: "Target", Help: "Target branch"}, Value: "feat/y"},
+			TextListField{FieldSpec: FieldSpec{Path: "branches"}, Entries: []string{"feat/x"}, Options: []Option{{Value: "feat/x", Tag: TagLocal}}},
+			ConfirmField{FieldSpec: FieldSpec{Path: "keep", Skip: "not asked"}, NoFirst: true},
+			SelectField{FieldSpec: FieldSpec{Path: "isolation", Origin: OriginRemembered}, Value: "shared", Options: []Option{{Value: "shared", Base: true, Origin: &worktree.Origin{Behind: 2, State: worktree.Behind}}}, Remembered: "shared", Rememberable: true, Refreshable: true},
+			MultiSelectField{FieldSpec: FieldSpec{Path: "files"}, Options: []Option{{Value: "a.txt", Change: &worktree.Change{Path: "a.txt", Status: worktree.ChangeModified}}}},
+			TextField{FieldSpec: FieldSpec{Path: "to"}, Value: "feat/y"},
 		},
 		Problems: []FieldError{{Path: "branches[0]", Code: "required", Template: "{path} is required"}},
 	}
@@ -101,22 +77,14 @@ func TestAFormIsEncodedWithTheKindOfEachField(t *testing.T) {
 	require.NoError(t, err)
 	assert.JSONEq(t, `{
 		"fields": [
-			{"kind": "text_list", "path": "branches", "flag": "<branches>", "label": "Branches", "help": "", "entries": ["feat/x"], "options": []},
-			{"kind": "confirm", "path": "keep", "flag": "--keep", "label": "Keep", "help": "", "skip": "not asked", "value": false, "yes": {"value": "true", "label": "Copy", "short": "copy"}, "no": {"value": "false", "label": "Move"}, "no_first": true, "rememberable": false, "remember": false},
-			{"kind": "select", "path": "isolation", "flag": "--isolation", "label": "Isolation", "help": "", "origin": "remembered", "value": "shared", "options": [{"value": "shared", "label": "Shared", "badge": "remembered"}], "remembered": "shared", "rememberable": true, "remember": false, "refreshable": true, "closed": false},
-			{"kind": "multi_select", "path": "files", "flag": "--files", "label": "Files", "help": "", "picked": [], "options": [], "empty": "Pick one"},
-			{"kind": "text", "path": "to", "flag": "--to", "label": "Target", "help": "Target branch", "value": "feat/y"}
+			{"kind": "text_list", "path": "branches", "entries": ["feat/x"], "options": [{"value": "feat/x", "tag": "local"}]},
+			{"kind": "confirm", "path": "keep", "skip": "not asked", "value": false, "no_first": true, "rememberable": false, "remember": false},
+			{"kind": "select", "path": "isolation", "origin": "remembered", "value": "shared", "options": [{"value": "shared", "base": true, "origin": {"ahead": 0, "behind": 2, "state": "behind"}}], "remembered": "shared", "rememberable": true, "remember": false, "refreshable": true, "closed": false},
+			{"kind": "multi_select", "path": "files", "picked": [], "options": [{"value": "a.txt", "change": {"path": "a.txt", "status": "modified"}}]},
+			{"kind": "text", "path": "to", "value": "feat/y"}
 		],
 		"problems": [{"path": "branches[0]", "code": "required", "flag": "branches[0]", "message": "branches[0] is required"}]
 	}`, string(data))
-}
-
-func TestAConfirmationPublishesTheValuesItsAnswerTakes(t *testing.T) {
-	data, err := json.Marshal(Form{Fields: []Field{ConfirmField{FieldSpec: FieldSpec{Path: "fetch"}}}})
-
-	require.NoError(t, err)
-	assert.Contains(t, string(data), `"yes":{"value":"true","label":"Yes"}`)
-	assert.Contains(t, string(data), `"no":{"value":"false","label":"No"}`)
 }
 
 func TestAFormWithoutProblemsHasAnEmptyList(t *testing.T) {

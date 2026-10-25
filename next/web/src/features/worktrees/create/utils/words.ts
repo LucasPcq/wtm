@@ -1,4 +1,4 @@
-import type { CreateAction, CreateRequest, DomainPhase, DomainSkip } from '@/api/types.gen'
+import type { CreateAction, CreateRequest, DomainField, DomainPhase, DomainSkip } from '@/api/types.gen'
 import type { FieldWords, OptionWords } from '@/components/command-form/command-fields'
 
 // The core words its questions for the command line; the web says them its own way. Each record is exhaustive over
@@ -58,9 +58,9 @@ export const createWords: Record<Question, FieldWords> = {
   },
 }
 
-export const isQuestion = (path: string): path is Question => path in createWords
+export type Asked = DomainField & { path: Question }
 
-export const labelOf = (path: string): string => (isQuestion(path) ? createWords[path].label : path)
+export const isAsked = (field: DomainField): field is Asked => field.path in createWords
 
 // null for a reason that means nothing in a browser
 export const skipWords: Record<DomainSkip, string | null> = {

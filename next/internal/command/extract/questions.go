@@ -3,8 +3,6 @@ package extract
 import (
 	"cmp"
 	"slices"
-	"strconv"
-	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -41,12 +39,12 @@ type Request struct {
 
 // The paths of extract's own fields; the questions of a new worktree name theirs in provision.
 const (
-	pathSource     = "source"
+	PathSource     = "source"
 	PathFiles      = "files"
 	PathTo         = "to"
-	pathFrom       = "from"
-	pathKeep       = "keep"
-	pathOnConflict = "on_conflict"
+	PathFrom       = "from"
+	PathKeep       = "keep"
+	PathOnConflict = "on_conflict"
 )
 
 // Answer is the request with the field at path answered by values, spelled as the field's Answer spells them; the path "remember" answers the fields whose answer is remembered. A value the field cannot take leaves the request as it was.
@@ -56,15 +54,15 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 	switch path {
 	case PathFiles:
 		next.Files = values
-	case pathSource:
+	case PathSource:
 		next.Source, err = domain.One[string](path, values)
 	case PathTo:
 		next.To, err = domain.One[string](path, values)
-	case pathFrom:
+	case PathFrom:
 		next.From, err = domain.One[string](path, values)
-	case pathOnConflict:
+	case PathOnConflict:
 		next.OnConflict, err = domain.One[OnConflict](path, values)
-	case pathKeep:
+	case PathKeep:
 		var yes bool
 		yes, err = domain.Yes(path, values)
 		next.Keep = &yes
@@ -84,15 +82,15 @@ func (r Request) Values(path string) []string {
 	switch path {
 	case PathFiles:
 		return r.Files
-	case pathSource:
+	case PathSource:
 		return domain.Spelled(r.Source)
 	case PathTo:
 		return domain.Spelled(r.To)
-	case pathFrom:
+	case PathFrom:
 		return domain.Spelled(r.From)
-	case pathOnConflict:
+	case PathOnConflict:
 		return domain.Spelled(r.OnConflict)
-	case pathKeep:
+	case PathKeep:
 		return domain.Said(r.Keep)
 	}
 
@@ -114,7 +112,7 @@ type Questions struct {
 	Errors     []domain.FieldError
 }
 
-// Source is the question of the worktree to extract from: the branch given, and the worktrees that hold changes, each badged with how many.
+// Source is the question of the worktree to extract from: the branch given, and the worktrees that hold changes, each with how many.
 type Source struct {
 	Given   string
 	Options []domain.Option
@@ -165,75 +163,59 @@ func NewQuestions(f Facts, req Request) Questions {
 	return questions
 }
 
-// Form is the questions as the schema a surface renders: the fields in the order the wizard asks them, each with its flag, label, help and answer so far. The target is asked twice: as a worktree to pick, then, for one to create, as its branch. A zero Questions gives the schema the flags and --help are spelled from.
+// Form is the questions as the schema a surface renders: the fields in the order the wizard asks them, each with its answer so far. The target is asked twice: as a worktree to pick, the one with no value creating one, then, for one to create, as its branch. A zero Questions gives the schema the flags and --help are spelled from.
 func (q Questions) Form() domain.Form {
 	source, to := q.Source.Given, q.To.Given
 	fields := []domain.Field{
 		domain.SelectField{
-			FieldSpec: domain.FieldSpec{Path: pathSource, Flag: "<source>", Label: "Source worktree", Help: "Which worktree to extract changes from"},
+			FieldSpec: domain.FieldSpec{Path: PathSource},
 			Value:     source,
 			Options:   q.Source.Options,
 		},
 		domain.MultiSelectField{
-			FieldSpec: domain.FieldSpec{Path: PathFiles, Flag: "--files", Label: "Files", Help: q.filesHelp()},
+			FieldSpec: domain.FieldSpec{Path: PathFiles},
 			Picked:    q.Files.Given,
 			Options:   q.fileOptions(),
-			Empty:     "Select at least one file",
 		},
 		domain.SelectField{
-			FieldSpec: domain.FieldSpec{Path: PathTo, Flag: "--to", Label: "Target worktree", Help: "Target worktree branch; created if it does not exist"},
+			FieldSpec: domain.FieldSpec{Path: PathTo},
 			Value:     to,
-			Options:   append([]domain.Option{{Label: "+ Create a new worktree…", Short: "new worktree"}}, q.To.Options...),
+			Options:   append([]domain.Option{{}}, q.To.Options...),
 		},
 		domain.TextField{
-			FieldSpec: domain.FieldSpec{Path: PathTo, Flag: "--to", Label: "Branch name", Help: "Name for the new worktree branch", Skip: q.branchSkip()},
+			FieldSpec: domain.FieldSpec{Path: PathTo, Skip: q.branchSkip()},
 			Value:     to,
 		},
 		domain.SelectField{
-			FieldSpec:   domain.FieldSpec{Path: pathFrom, Flag: "--from", Label: "Source branch", Help: "Parent branch when creating the target worktree", Origin: q.From.Origin, Skip: q.From.Skip},
+			FieldSpec:   domain.FieldSpec{Path: PathFrom, Origin: q.From.Origin, Skip: q.From.Skip},
 			Value:       q.From.Value,
 			Options:     q.From.Options,
 			Pinned:      q.From.Pinned,
 			Refreshable: true,
 		},
 	}
-	fields = append(fields, q.Questions.Fields(envHelp)...)
+	fields = append(fields, q.Questions.Fields()...)
 	fields = append(fields,
 		domain.ConfirmField{
-			FieldSpec: domain.FieldSpec{Path: pathKeep, Flag: "--keep", Label: "Mode", Help: "Copy instead of move (keep the changes in the source)", Origin: q.Keep.Origin},
+			FieldSpec: domain.FieldSpec{Path: PathKeep, Origin: q.Keep.Origin},
 			Value:     q.Keep.Value,
-			Yes:       domain.Option{Value: "true", Label: "Copy — keep the files in " + source, Short: "copy"},
-			No:        domain.Option{Value: "false", Label: "Move — remove the files from " + source, Short: "move"},
 			NoFirst:   true,
 		},
 		domain.SelectField{
-			FieldSpec: domain.FieldSpec{Path: pathOnConflict, Flag: "--on-conflict", Label: "On conflict", Help: q.conflictHelp(), Origin: q.OnConflict.Origin, Skip: q.OnConflict.Skip},
+			FieldSpec: domain.FieldSpec{Path: PathOnConflict, Origin: q.OnConflict.Origin, Skip: q.OnConflict.Skip},
 			Value:     string(q.OnConflict.Value),
-			Options: []domain.Option{
-				{Value: string(OnConflictAbort), Label: "Abort — leave both worktrees untouched"},
-				{Value: string(OnConflictResolve), Label: "Resolve — write conflict markers in " + to},
-			},
-			Closed: true,
+			Options:   domain.OptionsOf(OnConflicts()),
+			Closed:    true,
 		},
 	)
 
 	return domain.Form{Problems: q.Errors, Fields: fields}
 }
 
-const envHelp = "Where the new target's .env files come from: config, example, main or parent; config.toml's strategy by default"
-
-func (q Questions) filesHelp() string {
-	if q.Source.Given != "" && len(q.Files.Options) == 0 {
-		return "No changes to extract in " + q.Source.Given + " — press esc to pick another worktree."
-	}
-
-	return "Files to extract, or a directory to take everything below it"
-}
-
 func (q Questions) fileOptions() []domain.Option {
 	options := make([]domain.Option, 0, len(q.Files.Options))
 	for _, change := range q.Files.Options {
-		options = append(options, domain.Option{Value: change.Path, Label: change.Label(), Badge: change.Status.Tag()})
+		options = append(options, domain.Option{Value: change.Path, Change: &change})
 	}
 
 	return options
@@ -246,29 +228,6 @@ func (q Questions) branchSkip() domain.Skip {
 	}
 
 	return ""
-}
-
-// conflictHelp names the files that conflict with the target and what each answer leaves behind; while nothing conflicts, it says what each answer does.
-func (q Questions) conflictHelp() string {
-	conflicts := q.OnConflict.Conflicts
-	if len(conflicts) == 0 {
-		return "On conflict: abort (default) or resolve (write conflict markers in the target)"
-	}
-
-	files := make([]string, 0, len(conflicts))
-	for _, conflict := range conflicts {
-		files = append(files, conflict.Path)
-	}
-
-	verb := " were"
-	if len(files) == 1 {
-		verb = " was"
-	}
-
-	target, source := `"`+q.To.Given+`"`, `"`+q.Source.Given+`"`
-	return strings.Join(files, ", ") + verb + " also changed in " + target + ".\n\n" +
-		"Resolving writes conflict markers there; nothing is removed from the source.\n" +
-		"Resolve them in " + target + ", then discard the same files in " + source + "; to undo, discard the applied files in " + target + "."
 }
 
 // NewTarget is the problem of branch typed as the branch of a target to create, as a field error of the target: a worktree already holds it.
@@ -294,19 +253,11 @@ func (f Facts) sourceOptions() []domain.Option {
 	var options []domain.Option
 	for _, w := range f.sources("") {
 		if count := len(f.Changes[w.Branch()]); count > 0 {
-			options = append(options, domain.Option{Value: w.Branch(), Badge: changes(count)})
+			options = append(options, domain.Option{Value: w.Branch(), Changes: count})
 		}
 	}
 
 	return options
-}
-
-func changes(count int) string {
-	if count == 1 {
-		return "1 change"
-	}
-
-	return strconv.Itoa(count) + " changes"
 }
 
 func (f Facts) targetOptions(source string) []domain.Option {
@@ -436,7 +387,7 @@ func (f Facts) problems(req Request, q Questions) []domain.FieldError {
 
 	problems = append(problems, f.fromProblems(req)...)
 	problems = append(problems, q.Questions.Problems()...)
-	problems = append(problems, domain.OneOf(domain.OneOfParams{Path: pathOnConflict, Value: string(q.OnConflict.Value), Accepted: domain.Names(OnConflicts())})...)
+	problems = append(problems, domain.OneOf(domain.OneOfParams{Path: PathOnConflict, Value: string(q.OnConflict.Value), Accepted: domain.Names(OnConflicts())})...)
 
 	return problems
 }
@@ -444,9 +395,9 @@ func (f Facts) problems(req Request, q Questions) []domain.FieldError {
 func (f Facts) sourceProblems(source string) []domain.FieldError {
 	switch {
 	case source == "":
-		return []domain.FieldError{domain.Required(pathSource)}
+		return []domain.FieldError{domain.Required(PathSource)}
 	case f.CheckedOutAt(source) == "":
-		return []domain.FieldError{{Path: pathSource, Code: domain.CodeNotFound, Template: "{path}: no worktree holds {value}", Params: domain.Params{"value": source}}}
+		return []domain.FieldError{{Path: PathSource, Code: domain.CodeNotFound, Template: "{path}: no worktree holds {value}", Params: domain.Params{"value": source}}}
 	}
 
 	return nil
@@ -477,17 +428,17 @@ func (f Facts) fromProblems(req Request) []domain.FieldError {
 		return nil
 	case from == "" && target.Action == ActionCheckOut:
 		return []domain.FieldError{{
-			Path:     pathFrom,
+			Path:     PathFrom,
 			Code:     domain.CodeRequired,
 			Template: "{path} is required: a branch that already exists locally needs its parent named (it can't be inferred, and `wtm sync` needs it)",
 			Params:   domain.Params{"because": "extract.parent_required"},
 		}}
 	case from == "":
-		return []domain.FieldError{{Path: pathFrom, Code: domain.CodeRequired, Template: "{path} is required: no parent is recorded for the source and no base branch is configured"}}
+		return []domain.FieldError{{Path: PathFrom, Code: domain.CodeRequired, Template: "{path} is required: no parent is recorded for the source and no base branch is configured"}}
 	case from == target.Branch:
-		return []domain.FieldError{{Path: pathFrom, Code: domain.CodeSelfParent, Template: "{value} cannot be its own parent: pass another value to {path}", Params: domain.Params{"value": from}, With: []string{PathTo}}}
+		return []domain.FieldError{{Path: PathFrom, Code: domain.CodeSelfParent, Template: "{value} cannot be its own parent: pass another value to {path}", Params: domain.Params{"value": from}, With: []string{PathTo}}}
 	case !f.Candidate(from):
-		return []domain.FieldError{{Path: pathFrom, Code: domain.CodeNotFound, Template: "{path}: {value} not found", Params: domain.Params{"value": from}}}
+		return []domain.FieldError{{Path: PathFrom, Code: domain.CodeNotFound, Template: "{path}: {value} not found", Params: domain.Params{"value": from}}}
 	}
 
 	return nil

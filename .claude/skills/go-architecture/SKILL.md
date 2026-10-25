@@ -33,6 +33,7 @@ next/
 | is one command's request, its form schema and its validation | `command/<name>/questions.go` |
 | is a port one command needs (an interface, or a function type) | `command/<name>/port.go` |
 | draws one command's output, or asks one of its fields its own way | `command/<name>/cli/` |
+| words one command's fields for the command line: flag, label, help, option labels | `command/<name>/cli/words.go` (`references/questions.md`, "Words") |
 | is a pure rule, type or vocabulary two commands need | `domain/<subject>/` (`worktree`, `project`, `env`, `dotenv`, `run`), the root `domain` only for the cross-cutting contract (errors, events, outcomes, forms) |
 | orchestrates I/O two commands need | `service/<name>/` (concrete, with its own `port.go`) |
 | is a question two commands ask | the fragment of the service that consumes its answers (`service/provision/questions.go`) |
@@ -62,7 +63,8 @@ Each rule names what enforces it: `[archlint]` (`tools/archlint`, rule `next` un
 10. **Every package has a package comment, every exported name a doc comment** that starts with its name and states its contract. `[revive]` (`exported`, `package-comments`) and `[staticcheck]` (`checks = ["all"]`)
 11. **A long file reads in named sections:** `usecase.go` (the use case, Run, Plan, Apply, Questions, Observe, the steps of Apply, helpers), `rules.go` (a mutation: facts, the decision of each subject, Decide, the plan, the recap, the outcome; a read: Facts, The detail, then its report under its name: List, Tree, Report) and `questions.go`, each section under go-style's separator (`// ` and 76 dashes, then its title). A file is named after what it declares; a package splits only past about 1,000 lines at a natural seam. `[review]`
 12. **Tests share one layout:** testify, only `Test…` functions in a test file, fixtures and fakes in `fixture_test.go`, helpers in `helpers_test.go`, goldens in `testdata/` behind `-update` (`formtest.Golden` in a `cli` test). A test function reads as a sentence (`TestAStaleFingerprintIsRefused`); a subtest name is a short identifier (`existing`, `stale_fingerprint_refused`), never a sentence. A `*Params` struct only for many inputs, two swappable values of one type, or a list that grows (go-style `testing.md`, `readability.md`). `[archlint]` (`testlayout`, `subtestname`), `[review]` (testify, goldens, `*Params`)
-13. **No legacy gap in limbo:** each difference between `wtm` and `wtm-next` is an owner-approved deviation listed in the PR, or a bug fixed with its test (`references/new-command.md`, step 9). `[review]`
+13. **The core gives data and decisions, each surface gives its words:** a form carries no label, help, flag nor option label, and an option carries facts, not a badge; the CLI words a field in its `cli/words.go`, the web in its screen's `words.ts`, each exhaustive over what the schema publishes. `[test]` (`formtest.Worded`, the web's typed Records), `[review]` (no copy in `questions.go`)
+14. **No legacy gap in limbo:** each difference between `wtm` and `wtm-next` is an owner-approved deviation listed in the PR, or a bug fixed with its test (`references/new-command.md`, step 9). `[review]`
 
 ## Read next, by task
 

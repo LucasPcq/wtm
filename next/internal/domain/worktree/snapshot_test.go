@@ -79,15 +79,6 @@ func TestOnlyTheLocalBranchesWhoseOriginTipDiffersAreCounted(t *testing.T) {
 	assert.Nil(t, Branches{Local: []Branch{{Name: "main", Tip: "a"}}, Remote: []Branch{{Name: "main", Tip: "a"}}}.Differing())
 }
 
-func TestASourceBadgeSaysHowFarItIsFromOrigin(t *testing.T) {
-	diverged := Snapshot{Branches: Branches{Remote: []Branch{{Name: "both"}}}, Divergence: map[string]AheadBehind{"both": {Ahead: 1, Behind: 3}}}
-	assert.Equal(t, "2 behind", snapshot.Badge("main"))
-	assert.Equal(t, "1 ahead", snapshot.Badge("ahead"))
-	assert.Equal(t, "1 ahead, 3 behind", diverged.Badge("both"))
-	assert.Empty(t, snapshot.Badge("same"))
-	assert.Empty(t, snapshot.Badge("feat/x"))
-}
-
 func TestTheStandingOfAPlacedBranchIsItsCountsWhenCheckedOutAndItsUpstreamWhenResumed(t *testing.T) {
 	cases := map[string]struct {
 		branch string

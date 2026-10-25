@@ -206,7 +206,7 @@ func Targets(snapshot worktree.Snapshot, req Request, located string) ([]worktre
 		return nil, &domain.Error{Kind: domain.KindPrecondition, Code: CodeNoWorktree, Message: "the repository has no worktree to read"}
 	case req.All && req.Worktree != "":
 		return nil, &domain.Error{Kind: domain.KindInvalid, Code: CodeAllWithWorktree, Message: "the request is invalid", Fields: []domain.FieldError{
-			{Path: pathAll, Code: CodeAllWithWorktree, Template: "{path} reads every worktree: drop the worktree named", With: []string{domain.PathWorktree}},
+			{Path: PathAll, Code: CodeAllWithWorktree, Template: "{path} reads every worktree: drop the worktree named", With: []string{domain.PathWorktree}},
 		}}
 	case req.All:
 		return worktrees, nil

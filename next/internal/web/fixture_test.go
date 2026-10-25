@@ -36,7 +36,7 @@ func (r request) Values(path string) []string {
 type questions struct{ asked string }
 
 func (q questions) Form() domain.Form {
-	return domain.Form{Fields: []domain.Field{domain.TextField{FieldSpec: domain.FieldSpec{Path: "name", Label: q.asked}}}}
+	return domain.Form{Fields: []domain.Field{domain.TextField{FieldSpec: domain.FieldSpec{Path: "name"}, Value: q.asked}}}
 }
 
 // outcome reports what it ran with as its op.

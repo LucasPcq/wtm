@@ -42,10 +42,11 @@ type UseCase[R, Q, O any] interface {
 	Run(ctx context.Context, req R, opts domain.RunOptions) (O, error)
 }
 
-// A Command is what a command's cli hands the form: the use case it opens, what its recap and its dry run show of a plan, how it draws an apply, and the steps it asks its own way.
-// Its flags, its request, its form and its command line are all spelled from its form's schema, the form of zero questions.
+// A Command is what a command's cli hands the form: the use case it opens, how it words its fields, what its recap and its dry run show of a plan, how it draws an apply, and the steps it asks its own way.
+// Its flags, its request, its form and its command line are all spelled from its form's schema, the form of zero questions, worded by Words.
 type Command[R Request[R], Q Questions, O Outcome] struct {
 	YesUsage   string // the usage of --yes, which says what an unattended run requires
+	Words      Worder[Q]
 	Open       func(ctx context.Context, dir string) (UseCase[R, Q, O], error)
 	Preview    func(previewed O) Preview                      // what the recap and the dry run show of the plan previewed
 	Draw       func(w io.Writer, applied O, view output.View) // the outcome of an apply, drawn from view
@@ -92,14 +93,19 @@ type Ran[R, O any] struct {
 	Outcome O
 }
 
-func (c *Command[R, Q, O]) schema() domain.Form {
+func (c *Command[R, Q, O]) schema() []worded {
+	return wordedSchema(c.Words)
+}
+
+// form is the schema as data, the form of zero questions.
+func (c *Command[R, Q, O]) form() domain.Form {
 	var zero Q
 	return zero.Form()
 }
 
 // Flags spells each field path of the request as the argument or flag that sets it, for the failures and the wizard.
 func (c *Command[R, Q, O]) Flags() output.Flags {
-	flags, _ := c.schema().Flags()
+	flags, _ := flagsOf(c.schema())
 	return flags
 }
 
@@ -124,13 +130,13 @@ func (c *Command[R, Q, O]) Bind(cmd *cobra.Command, run *uicli.Run) {
 }
 
 // bindFields registers on cmd a flag per field of schema, by its kind, with its usage and the values it accepts, and returns the usage of each path.
-func bindFields(cmd *cobra.Command, schema domain.Form) map[string]string {
+func bindFields(cmd *cobra.Command, schema []worded) map[string]string {
 	flags := cmd.Flags()
-	_, usages := schema.Flags()
+	_, usages := flagsOf(schema)
 
 	for _, field := range bound(schema) {
 		name, usage := flagName(field), usages[field.Spec().Path]
-		switch field := field.(type) {
+		switch field := field.Field.(type) {
 		case domain.ConfirmField:
 			flags.Bool(name, false, usage)
 		case domain.MultiSelectField, domain.TextListField:
@@ -149,10 +155,10 @@ func bindFields(cmd *cobra.Command, schema domain.Form) map[string]string {
 }
 
 // bound are the fields of schema a flag sets, the first of each path, in the order of the form.
-func bound(schema domain.Form) []domain.Field {
-	var fields []domain.Field
+func bound(schema []worded) []worded {
+	var fields []worded
 	seen := map[string]bool{}
-	for _, field := range schema.Fields {
+	for _, field := range schema {
 		path := field.Spec().Path
 		if seen[path] || positional(field) {
 			continue
@@ -164,12 +170,12 @@ func bound(schema domain.Form) []domain.Field {
 	return fields
 }
 
-func positional(field domain.Field) bool {
-	return strings.HasPrefix(field.Spec().Flag, "<")
+func positional(field worded) bool {
+	return strings.HasPrefix(field.Flag, "<")
 }
 
-func flagName(field domain.Field) string {
-	return strings.TrimPrefix(field.Spec().Flag, "--")
+func flagName(field worded) string {
+	return strings.TrimPrefix(field.Flag, "--")
 }
 
 // accepting are the values of options, those a flag accepts, an option with no value excepted.
@@ -208,11 +214,11 @@ func folded[R Request[R]](answers []domain.Answered) R {
 }
 
 // fieldAnswers are the answers cmd's flags and args give the fields of schema: each flag the user set answers its field, and the arguments the positional field.
-func fieldAnswers(cmd *cobra.Command, args []string, schema domain.Form) []domain.Answered {
+func fieldAnswers(cmd *cobra.Command, args []string, schema []worded) []domain.Answered {
 	var answers []domain.Answered
-	for _, field := range schema.Fields {
+	for _, field := range schema {
 		if positional(field) && len(args) > 0 {
-			answers = append(answers, domain.Answered{Path: field.Spec().Path, Values: arguments(field, args)})
+			answers = append(answers, domain.Answered{Path: field.Spec().Path, Values: arguments(field.Field, args)})
 			break
 		}
 	}
@@ -225,7 +231,7 @@ func fieldAnswers(cmd *cobra.Command, args []string, schema domain.Form) []domai
 		}
 
 		var values []string
-		switch field.(type) {
+		switch field.Field.(type) {
 		case domain.ConfirmField:
 			on, _ := flags.GetBool(name)
 			values = []string{strconv.FormatBool(on)}
@@ -319,7 +325,7 @@ func (c *Command[R, Q, O]) Ask(ctx context.Context, params AskParams[R, Q, O]) (
 func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error) error {
 	failure := domain.AsError(domain.AsErrorParams{Err: err})
 	if !c.io.Human() {
-		return c.io.Envelope(ran.Outcome.Envelope(domain.EnvelopeParams{Command: c.io.Command, Err: failure, Answers: domain.AnswersOf(c.schema(), ran.Request)}))
+		return c.io.Envelope(ran.Outcome.Envelope(domain.EnvelopeParams{Command: c.io.Command, Err: failure, Answers: domain.AnswersOf(c.form(), ran.Request)}))
 	}
 
 	argv := c.Argv(cmd.CommandPath(), ran.Request)
@@ -342,7 +348,7 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 
 // replanned is failure followed by the request run again as a dry run when it is a stale plan, as the envelope's follow_ups give it; failure itself otherwise.
 func (c *Command[R, Q, O]) replanned(failure *domain.Error, req R) *domain.Error {
-	replan := domain.Replan(failure, c.io.Command, domain.AnswersOf(c.schema(), req))
+	replan := domain.Replan(failure, c.io.Command, domain.AnswersOf(c.form(), req))
 	if len(replan) == 0 || failure.FollowUp != nil {
 		return failure
 	}
@@ -384,7 +390,7 @@ func applyLine(argv []string, fingerprint string) string {
 // Argv spells command and req word by word, unquoted: the positional field's words, each flag given sorted by name, then --ask.
 func (c *Command[R, Q, O]) Argv(command string, req R) []string {
 	argv := strings.Fields(command)
-	for _, field := range c.schema().Fields {
+	for _, field := range c.schema() {
 		if positional(field) {
 			argv = append(argv, req.Values(field.Spec().Path)...)
 			break
@@ -401,7 +407,7 @@ func (c *Command[R, Q, O]) Argv(command string, req R) []string {
 	}
 
 	// --remember is a string array, which reads each value as it is, not as CSV.
-	remember := domain.SelectField{FieldSpec: domain.FieldSpec{Flag: "--" + domain.PathRemember}}
+	remember := worded{Field: domain.SelectField{}, Words: Words{Flag: "--" + domain.PathRemember}}
 	flags = append(flags, given{name: domain.PathRemember, words: flagWords(remember, req.Values(domain.PathRemember))})
 	slices.SortFunc(flags, func(a, b given) int { return cmp.Compare(a.name, b.name) })
 	for _, flag := range flags {
@@ -425,11 +431,11 @@ func csvField(value string) string {
 }
 
 // flagWords are the words that give field its values: a switch as --name or --name=false, a list as one flag per value, any other as the flag then its value.
-func flagWords(field domain.Field, values []string) []string {
+func flagWords(field worded, values []string) []string {
 	name := "--" + flagName(field)
 	var words []string
 	for _, value := range values {
-		switch field.(type) {
+		switch field.Field.(type) {
 		case domain.ConfirmField:
 			if value == "true" {
 				words = append(words, name)

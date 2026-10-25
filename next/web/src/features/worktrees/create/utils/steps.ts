@@ -1,5 +1,5 @@
-import type { DomainField, DomainForm } from '@/api/types.gen'
-import { isQuestion, type Question } from '@/features/worktrees/create/utils/words'
+import type { DomainForm } from '@/api/types.gen'
+import { type Asked, isAsked, type Question } from '@/features/worktrees/create/utils/words'
 
 const steps = ['branch', 'environment'] as const
 type StepKey = (typeof steps)[number]
@@ -15,11 +15,12 @@ const stepOf: Record<Question, StepKey> = {
   if_not_exists: 'environment',
 }
 
-export type Step = { title: string; asked: DomainField[]; skipped: DomainField[] }
+export type Step = { title: string; asked: Asked[]; skipped: Asked[] }
 
 export function stepsOf(form: DomainForm): Step[] {
+  const questions = form.fields.filter(isAsked)
   return steps.map((key) => {
-    const fields = form.fields.filter((field) => (isQuestion(field.path) ? stepOf[field.path] : steps.at(-1)) === key)
+    const fields = questions.filter((field) => stepOf[field.path] === key)
     return {
       title: stepTitle[key],
       asked: fields.filter((field) => !field.skip),

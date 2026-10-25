@@ -24,9 +24,10 @@ func (r Request) From(caller domain.Caller) Request {
 	return r
 }
 
+// The paths of status's own fields, by which each surface words them; the worktree's is domain.PathWorktree.
 const (
-	pathAll     = "all"
-	pathWithPRs = "with_prs"
+	PathAll     = "all"
+	PathWithPRs = "with_prs"
 )
 
 // Answer is the request with the field at path answered by values.
@@ -36,9 +37,9 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 	switch path {
 	case domain.PathWorktree:
 		next.Worktree, err = domain.One[string](path, values)
-	case pathAll:
+	case PathAll:
 		next.All, err = domain.Yes(path, values)
-	case pathWithPRs:
+	case PathWithPRs:
 		next.WithPRs, err = domain.Yes(path, values)
 	default:
 		return r, domain.Unknown(path)
@@ -55,9 +56,9 @@ func (r Request) Values(path string) []string {
 	switch path {
 	case domain.PathWorktree:
 		return domain.Spelled(r.Worktree)
-	case pathAll:
+	case PathAll:
 		return domain.SaidYes(r.All)
-	case pathWithPRs:
+	case PathWithPRs:
 		return domain.SaidYes(r.WithPRs)
 	}
 
@@ -105,31 +106,21 @@ func NewQuestions(facts worktree.Repository, req Request, located string) Questi
 
 // Form is the schema of the request: the worktree, a positional the picker asks, unless every worktree is read; whether to read them all; whether to ask GitHub for pull requests.
 func (q Questions) Form() domain.Form {
-	worktree := domain.SelectField{
-		FieldSpec: domain.FieldSpec{Path: domain.PathWorktree, Flag: "<worktree>", Label: "Worktree", Help: "The worktree to read, by its branch, its path or part of its branch"},
-		Value:     q.read,
-		Options:   q.worktrees,
-	}
-	worktree.Skip = q.skip
-
 	return domain.Form{Problems: q.problems, Fields: []domain.Field{
-		worktree,
-		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: pathAll, Flag: "--all", Label: "All", Help: "Read every worktree of the repository"}},
-		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: pathWithPRs, Flag: "--with-prs", Label: "Pull requests", Help: "Ask GitHub for the worktree's newest pull request, open, merged or closed, and an open one's checks and review (needs gh)"}},
+		domain.SelectField{FieldSpec: domain.FieldSpec{Path: domain.PathWorktree, Skip: q.skip}, Value: q.read, Options: q.worktrees},
+		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathAll}},
+		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathWithPRs}},
 	}}
 }
 
-// optionOf is w as the picker offers it: by its branch, or by its path on no branch, which its label says; badged main, or current when the caller stands in it.
+// optionOf is w as the picker offers it: by its branch, or by its path on no branch; tagged current when the caller stands in it, else main for the main worktree.
 func optionOf(w worktree.Worktree, current bool) domain.Option {
-	option := domain.Option{Value: w.Name()}
-	if w.Branch() == "" {
-		option.Label = w.Path + " (detached)"
-	}
+	option := domain.Option{Value: w.Name(), Detached: w.Branch() == ""}
 	switch {
 	case current:
-		option.Badge = "current"
+		option.Tag = domain.TagCurrent
 	case w.Main:
-		option.Badge = "main"
+		option.Tag = domain.TagMain
 	}
 
 	return option

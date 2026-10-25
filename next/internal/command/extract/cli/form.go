@@ -20,6 +20,7 @@ var extractFlags = newForm(nil).Flags()
 func newForm(open func(ctx context.Context, dir string) (extract.UseCase, error)) *extractForm {
 	return &extractForm{
 		YesUsage:   yesUsage,
+		Words:      words,
 		Open:       form.Opener[extract.Request, extract.Questions, extract.Outcome](open),
 		Preview:    form.PreviewOf[extract.Plan, extract.Detail],
 		Draw:       drawOutcome,

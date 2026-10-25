@@ -3,9 +3,6 @@
     {
       "kind": "select",
       "path": "source",
-      "flag": "\u003csource\u003e",
-      "label": "Source worktree",
-      "help": "Which worktree to extract changes from",
       "value": "",
       "options": [],
       "rememberable": false,
@@ -16,25 +13,16 @@
     {
       "kind": "multi_select",
       "path": "files",
-      "flag": "--files",
-      "label": "Files",
-      "help": "Files to extract, or a directory to take everything below it",
       "picked": [],
-      "options": [],
-      "empty": "Select at least one file"
+      "options": []
     },
     {
       "kind": "select",
       "path": "to",
-      "flag": "--to",
-      "label": "Target worktree",
-      "help": "Target worktree branch; created if it does not exist",
       "value": "",
       "options": [
         {
-          "value": "",
-          "label": "+ Create a new worktree…",
-          "short": "new worktree"
+          "value": ""
         }
       ],
       "rememberable": false,
@@ -45,17 +33,11 @@
     {
       "kind": "text",
       "path": "to",
-      "flag": "--to",
-      "label": "Branch name",
-      "help": "Name for the new worktree branch",
       "value": ""
     },
     {
       "kind": "select",
       "path": "from",
-      "flag": "--from",
-      "label": "Source branch",
-      "help": "Parent branch when creating the target worktree",
       "value": "",
       "options": [],
       "rememberable": false,
@@ -66,27 +48,19 @@
     {
       "kind": "select",
       "path": "env_from",
-      "flag": "--env-from",
-      "label": "Env strategy",
-      "help": "Where the new target's .env files come from: config, example, main or parent; config.toml's strategy by default",
       "value": "",
       "options": [
         {
-          "value": "config",
-          "label": "config default ()",
-          "short": "config default"
+          "value": "config"
         },
         {
-          "value": "example",
-          "label": "example — from .env.example"
+          "value": "example"
         },
         {
-          "value": "main",
-          "label": "main — the main checkout's .env"
+          "value": "main"
         },
         {
-          "value": "parent",
-          "label": "parent — the source worktree's .env"
+          "value": "parent"
         }
       ],
       "rememberable": true,
@@ -97,18 +71,13 @@
     {
       "kind": "select",
       "path": "isolation",
-      "flag": "--isolation",
-      "label": "Isolation",
-      "help": "How it stands against its source: isolated or verbatim; run.toml's isolation by default",
       "value": "",
       "options": [
         {
-          "value": "isolated",
-          "label": "isolated — its own ports and namespaces"
+          "value": "isolated"
         },
         {
-          "value": "verbatim",
-          "label": "verbatim — the copied .env as is, one runs at a time"
+          "value": "verbatim"
         }
       ],
       "rememberable": true,
@@ -119,20 +88,7 @@
     {
       "kind": "confirm",
       "path": "fast_forward",
-      "flag": "--ff",
-      "label": "Source update",
-      "help": "Fast-forward the source branch to origin first when it is behind",
       "value": false,
-      "yes": {
-        "value": "true",
-        "label": "Fast-forward to origin",
-        "short": "fast-forward to origin"
-      },
-      "no": {
-        "value": "false",
-        "label": "Keep it as-is",
-        "short": "keep as-is"
-      },
       "no_first": false,
       "rememberable": true,
       "remember": false
@@ -140,20 +96,7 @@
     {
       "kind": "confirm",
       "path": "keep",
-      "flag": "--keep",
-      "label": "Mode",
-      "help": "Copy instead of move (keep the changes in the source)",
       "value": false,
-      "yes": {
-        "value": "true",
-        "label": "Copy — keep the files in ",
-        "short": "copy"
-      },
-      "no": {
-        "value": "false",
-        "label": "Move — remove the files from ",
-        "short": "move"
-      },
       "no_first": true,
       "rememberable": false,
       "remember": false
@@ -161,18 +104,13 @@
     {
       "kind": "select",
       "path": "on_conflict",
-      "flag": "--on-conflict",
-      "label": "On conflict",
-      "help": "On conflict: abort (default) or resolve (write conflict markers in the target)",
       "value": "",
       "options": [
         {
-          "value": "abort",
-          "label": "Abort — leave both worktrees untouched"
+          "value": "abort"
         },
         {
-          "value": "resolve",
-          "label": "Resolve — write conflict markers in "
+          "value": "resolve"
         }
       ],
       "rememberable": false,

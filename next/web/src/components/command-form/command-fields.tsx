@@ -5,7 +5,7 @@ import type { CommandForm } from '@/components/command-form/use-command-form'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 
-// The core's labels and helps are the command line's: a screen gives its fields its own words.
+// The core gives no words: a screen words each field, through an exhaustive Record over its command's paths.
 export type OptionWords = { title: string; description: string }
 export type FieldWords = { label: string; help: string; options?: Record<string, OptionWords>; config?: string }
 
@@ -18,7 +18,7 @@ const origin: Record<DomainOrigin, string | undefined> = {
 
 export type Remember = { paths: string[]; toggle: (path: string) => void }
 
-export function CommandFields({
+export function CommandFields<P extends string>({
   form,
   fields,
   words,
@@ -26,8 +26,8 @@ export function CommandFields({
   remember,
 }: {
   form: CommandForm
-  fields: DomainField[]
-  words: Record<string, FieldWords>
+  fields: (DomainField & { path: P })[]
+  words: Record<P, FieldWords>
   problems: Record<string, string>
   remember?: Remember
 }) {
@@ -39,7 +39,7 @@ export function CommandFields({
 
         const from = (dirty: boolean) => {
           if (!field.origin || dirty) return undefined
-          if (field.origin === 'config') return said?.config ?? origin.config
+          if (field.origin === 'config') return said.config ?? origin.config
           return origin[field.origin]
         }
 
@@ -54,7 +54,7 @@ export function CommandFields({
               return (
                 <Field data-invalid={errors.length > 0} className="gap-2">
                   <div className="flex items-center justify-between gap-2">
-                    <FieldLabel htmlFor={input.name}>{said?.label ?? field.label}</FieldLabel>
+                    <FieldLabel htmlFor={input.name}>{said.label}</FieldLabel>
                     {rememberable && (
                       <label
                         htmlFor={`${input.name}-remember`}
@@ -79,7 +79,7 @@ export function CommandFields({
                     onChange={(values) => input.handleChange(values)}
                     invalid={errors.length > 0}
                   />
-                  <FieldDescription className="text-sm text-pretty">{said?.help ?? field.help}</FieldDescription>
+                  <FieldDescription className="text-sm text-pretty">{said.help}</FieldDescription>
                   <FieldError errors={errors} />
                 </Field>
               )

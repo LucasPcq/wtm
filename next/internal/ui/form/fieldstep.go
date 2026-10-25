@@ -15,6 +15,7 @@ import (
 // A sheet is what the step of a field kind reads and answers of its [Session], whatever its command.
 type sheet interface {
 	Field(at int) domain.Field
+	Words(at int) Words
 	Standing(at int) Standing
 	Label(path string) string
 	Problem(found domain.FieldError, label string) error
@@ -69,12 +70,12 @@ type Asked struct {
 
 // Label is the field's label.
 func (a Asked) Label() string {
-	return a.sheet.Field(a.at).Spec().Label
+	return a.sheet.Words(a.at).Label
 }
 
 // Description is the field's help.
 func (a Asked) Description() string {
-	return a.sheet.Field(a.at).Spec().Help
+	return a.sheet.Words(a.at).Help
 }
 
 // Standing is where the field's answer stands.
@@ -91,13 +92,13 @@ func (a Asked) path() string {
 	return a.sheet.Field(a.at).Spec().Path
 }
 
-// trailOf is the answer of field as the trail shows it.
-func trailOf(field domain.Field) string {
+// trailOf is the answer of field as the trail shows it, in its words.
+func trailOf(field domain.Field, words Words) string {
 	switch field := field.(type) {
 	case domain.SelectField:
-		return shortOf(field.Options, field.Value)
+		return shortOf(words, field.Value)
 	case domain.ConfirmField:
-		return confirmed(field, field.Value)
+		return confirmed(words, field.Value)
 	case domain.TextListField:
 		return strings.Join(field.Entries, ", ")
 	case domain.TextField:
@@ -107,16 +108,6 @@ func trailOf(field domain.Field) string {
 	}
 
 	return ""
-}
-
-// shortOf names value as the trail does: the Short of its option, else the value itself.
-func shortOf(options []domain.Option, value string) string {
-	at := slices.IndexFunc(options, func(o domain.Option) bool { return o.Value == value })
-	if at < 0 {
-		return value
-	}
-
-	return cmp.Or(options[at].Short, value)
 }
 
 // ----------------------------------------------------------------------------
@@ -136,7 +127,7 @@ func (s *selectStep) Open() tea.Cmd {
 
 func (s *selectStep) build() *widget.SelectList {
 	field, _ := s.sheet.Field(s.at).(domain.SelectField)
-	options := Options(field.Options)
+	options := Options(field.Options, s.sheet.Words(s.at))
 	if at := slices.IndexFunc(options, func(o widget.Option) bool { return o.Value == field.Pinned }); field.Pinned != "" && at > 0 {
 		pinned := options[at]
 		options = append([]widget.Option{pinned}, slices.Delete(options, at, at+1)...)
@@ -165,7 +156,7 @@ func (s *selectStep) Answer() string {
 		s.sheet.Answer(s.at, answered)
 	}
 
-	return shortOf(field.Options, s.list.Value())
+	return shortOf(s.sheet.Words(s.at), s.list.Value())
 }
 
 // refreshedSelectStep is a select whose options are facts the user may read again with r.
@@ -185,16 +176,6 @@ func (s *refreshedSelectStep) Refreshed() {
 	s.list.StartOn(kept)
 }
 
-// Options are the rows of a select list that offer options, each read as its label, else its value.
-func Options(found []domain.Option) []widget.Option {
-	options := make([]widget.Option, 0, len(found))
-	for _, o := range found {
-		options = append(options, widget.Option{Label: cmp.Or(o.Label, o.Value), Value: o.Value, Badge: o.Badge})
-	}
-
-	return options
-}
-
 // ----------------------------------------------------------------------------
 // A confirmation
 
@@ -212,8 +193,9 @@ type confirmStep struct {
 // Open builds the list on the answer so far; a remembered answer starts the list on it, the toggle ticked.
 func (s *confirmStep) Open() tea.Cmd {
 	field, _ := s.sheet.Field(s.at).(domain.ConfirmField)
-	yes := widget.Option{Label: cmp.Or(field.Yes.Label, yesLabel), Value: strconv.FormatBool(true)}
-	no := widget.Option{Label: cmp.Or(field.No.Label, noLabel), Value: strconv.FormatBool(false)}
+	words := s.sheet.Words(s.at).Options
+	yes := widget.Option{Label: cmp.Or(words["true"].Label, yesLabel), Value: strconv.FormatBool(true)}
+	no := widget.Option{Label: cmp.Or(words["false"].Label, noLabel), Value: strconv.FormatBool(false)}
 
 	options := []widget.Option{yes, no}
 	if field.NoFirst {
@@ -247,16 +229,16 @@ func (s *confirmStep) Answer() string {
 		s.sheet.Answer(s.at, answered)
 	}
 
-	return confirmed(field, s.list.Value() == strconv.FormatBool(true))
+	return confirmed(s.sheet.Words(s.at), s.list.Value() == strconv.FormatBool(true))
 }
 
-// confirmed names the answer yes of field as the trail does: the Short of its option, else yes or no.
-func confirmed(field domain.ConfirmField, yes bool) string {
+// confirmed names the answer yes as the trail does: the Short its words give it, else yes or no.
+func confirmed(words Words, yes bool) string {
 	if yes {
-		return cmp.Or(field.Yes.Short, "yes")
+		return cmp.Or(words.Options["true"].Short, "yes")
 	}
 
-	return cmp.Or(field.No.Short, "no")
+	return cmp.Or(words.Options["false"].Short, "no")
 }
 
 // ----------------------------------------------------------------------------
@@ -307,7 +289,7 @@ func (s *textListStep) badge(entry string) string {
 		return newBadge
 	}
 
-	return field.Options[at].Badge
+	return badgeOf(field.Options[at])
 }
 
 // Widget is the text list.
@@ -370,7 +352,7 @@ func (s *TextStep) Answer() string {
 // ----------------------------------------------------------------------------
 // A multi-select
 
-// MultiSelectStep asks any of a field's options, those answered so far picked, each tag in the Tone a command's own step gives it (muted otherwise); none picked is refused with the field's Empty problem.
+// MultiSelectStep asks any of a field's options, those answered so far picked, each tag in the Tone a command's own step gives it (muted otherwise); none picked is refused with the Empty problem of its words.
 type MultiSelectStep struct {
 	Asked
 	Tone  func(option domain.Option) widget.Tone
@@ -380,17 +362,18 @@ type MultiSelectStep struct {
 // Open builds the multi-select.
 func (s *MultiSelectStep) Open() tea.Cmd {
 	field, _ := s.sheet.Field(s.at).(domain.MultiSelectField)
+	words := s.sheet.Words(s.at)
 	picked := s.sheet.values(field.Path)
 	options := make([]widget.Pick, 0, len(field.Options))
 	for _, o := range field.Options {
-		pick := widget.Pick{Label: cmp.Or(o.Label, o.Value), Value: o.Value, Tag: o.Badge, Picked: slices.Contains(picked, o.Value)}
+		pick := widget.Pick{Label: optionLabel(o, words), Value: o.Value, Tag: badgeOf(o), Picked: slices.Contains(picked, o.Value)}
 		if s.Tone != nil {
 			pick.Tone = s.Tone(o)
 		}
 		options = append(options, pick)
 	}
 
-	s.picks = widget.NewMultiSelect(options, field.Empty)
+	s.picks = widget.NewMultiSelect(options, words.Empty)
 	return nil
 }
 

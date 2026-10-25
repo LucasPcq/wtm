@@ -7,6 +7,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -105,16 +106,16 @@ func TestTheEnvStrategiesAreTheChoices(t *testing.T) {
 	assert.Equal(t, []project.EnvStrategy{provision.EnvFromConfig, project.EnvExample, project.EnvMain, project.EnvParent}, w.questions(t, create.Request{}).EnvFrom.Options)
 }
 
-func TestTheBranchOptionsSayWhichAlreadyExist(t *testing.T) {
+func TestTheBranchOptionsTagWhichAlreadyExist(t *testing.T) {
 	w := newWorld(t, seed{Linked: []string{"linked"}})
 
 	questions := w.questions(t, create.Request{})
 
 	assert.Equal(t, []domain.Option{
-		{Value: existing, Badge: "existing"},
-		{Value: "linked", Badge: "worktree exists"},
-		{Value: "main", Badge: "worktree exists"},
-		{Value: remote, Badge: "on origin"},
+		{Value: existing, Tag: domain.TagLocal},
+		{Value: "linked", Tag: domain.TagCheckedOut},
+		{Value: "main", Tag: domain.TagCheckedOut},
+		{Value: remote, Tag: domain.TagRemote},
 	}, questions.Branches.Options)
 }
 
@@ -125,13 +126,13 @@ func TestTheSourcePickerListsEveryBranchButThoseBeingCreated(t *testing.T) {
 
 	assert.Equal(t, "main", questions.From.Pinned)
 	assert.Equal(t, []string{"main", "origin/" + remote}, valuesOf(questions.From.Options))
-	assert.Equal(t, "1 ahead, 1 behind", questions.From.Options[0].Badge)
+	assert.Equal(t, &worktree.Origin{Ahead: 1, Behind: 1, State: worktree.Diverged}, questions.From.Options[0].Origin)
 }
 
-func TestTheSourceBadgesSayWhereABranchStandsAgainstOrigin(t *testing.T) {
+func TestTheSourceOptionsSayWhereABranchStandsAgainstOrigin(t *testing.T) {
 	behind := newWorld(t, seed{Behind: true})
 
-	assert.Equal(t, domain.Option{Value: "main", Label: "main (default)", Badge: "1 behind"}, behind.questions(t, create.Request{Branches: []string{branchName}}).From.Options[1])
+	assert.Equal(t, domain.Option{Value: "main", Base: true, Origin: &worktree.Origin{Behind: 1, State: worktree.Behind}}, behind.questions(t, create.Request{Branches: []string{branchName}}).From.Options[1])
 }
 
 func TestTheQuestionsCarryTheProblemsOfTheRequest(t *testing.T) {
@@ -349,9 +350,7 @@ func TestEachFieldOfTheFormAnswersTheRequestBack(t *testing.T) {
 func TestTheFormExistsBeforeAnyRead(t *testing.T) {
 	form := create.Questions{}.Form()
 
-	flags, usages := form.Flags()
-	assert.Equal(t, map[string]string{"branches": "<branches>", "from": "--from", "env_from": "--env-from", "isolation": "--isolation", "fast_forward": "--ff", "if_not_exists": "--if-not-exists", "remember": "--remember"}, flags)
-	assert.Equal(t, "The answers to always use in this repository: env_from, isolation, fast_forward (repeatable)", usages["remember"])
+	assert.Len(t, form.Fields, 6)
 	assert.Equal(t, []string{"env_from", "isolation", "fast_forward"}, form.Rememberable())
 }
 
@@ -406,11 +405,11 @@ func TestEachAnswerReadsBackAsAnswerTakesIt(t *testing.T) {
 	assert.Equal(t, req, got)
 }
 
-func TestTheConfigDefaultIsTheFirstEnvOptionNamingTheConfiguredStrategy(t *testing.T) {
-	form := newWorld(t, seed{}).questions(t, create.Request{Branches: []string{branchName}}).Form()
+func TestTheConfigDefaultIsTheFirstEnvOptionAndTheConfiguredStrategyIsKept(t *testing.T) {
+	questions := newWorld(t, seed{}).questions(t, create.Request{Branches: []string{branchName}})
 
-	field, found := fieldAt(form, "env_from").(domain.SelectField)
+	field, found := fieldAt(questions.Form(), "env_from").(domain.SelectField)
 	require.True(t, found)
-	assert.Equal(t, domain.Option{Value: "config", Label: "config default (main)", Short: "config default"}, field.Options[0])
 	assert.Equal(t, []string{"config", "example", "main", "parent"}, valuesOf(field.Options))
+	assert.Equal(t, project.EnvMain, questions.Configured)
 }

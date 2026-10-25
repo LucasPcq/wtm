@@ -53,7 +53,7 @@ const (
 type stream = form.Stream[events.Request, events.Questions]
 
 // eventsFlags spells the failures.
-var eventsFlags = stream{}.Flags()
+var eventsFlags = stream{Words: words}.Flags()
 
 type eventsCommand struct {
 	io      uicli.Run
@@ -67,7 +67,7 @@ func New(streams *output.Streams, env uicli.Env, app events.UseCase, commandLine
 	exits := map[string]int{events.CodeSchemaNewer: uicli.ExitStreamNewer}
 	c := &eventsCommand{io: uicli.Run{Command: events.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: eventsFlags, Exits: exits}, app: app}
 	cmd := &cobra.Command{Use: events.Name, Short: eventsShort, Long: eventsLong, Example: eventsExample, Args: cobra.NoArgs, RunE: c.run}
-	stream{}.Bind(cmd, &c.io)
+	stream{Words: words}.Bind(cmd, &c.io)
 
 	return cmd
 }
@@ -79,7 +79,7 @@ func (c *eventsCommand) run(cmd *cobra.Command, args []string) error {
 	}
 	uicli.FailOnBrokenPipe()
 
-	req := stream{}.Request(cmd, args, c.io.Env)
+	req := stream{Words: words}.Request(cmd, args, c.io.Env)
 
 	// The reader leaving ends the stream as an interrupt would: wtm events | head -n 2 returns as soon as head does.
 	ctx, cancel := context.WithCancel(cmd.Context())

@@ -21,9 +21,10 @@ func (r Request) From(caller domain.Caller) Request {
 	return r
 }
 
+// The paths of the stream's fields, by which each surface words them.
 const (
-	pathRepo = "repo"
-	pathAll  = "all"
+	PathRepo = "repo"
+	PathAll  = "all"
 )
 
 // CodeRepoWithAll refuses --repo with --all: the one repository of the first is among every one of the second.
@@ -37,9 +38,9 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 	next := r
 	var err error
 	switch path {
-	case pathRepo:
+	case PathRepo:
 		next.Repo, err = domain.One[string](path, values)
-	case pathAll:
+	case PathAll:
 		next.All, err = domain.Yes(path, values)
 	default:
 		return r, domain.Unknown(path)
@@ -54,9 +55,9 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 // Values is the request's answer to the field at path, nil when it leaves the field to its default.
 func (r Request) Values(path string) []string {
 	switch path {
-	case pathRepo:
+	case PathRepo:
 		return domain.Spelled(r.Repo)
-	case pathAll:
+	case PathAll:
 		return domain.SaidYes(r.All)
 	}
 
@@ -69,17 +70,17 @@ func (r Request) Validate() error {
 		return nil
 	}
 
-	return domain.Invalid([]domain.FieldError{{Path: pathRepo, Code: CodeRepoWithAll, Template: "{path} watches one repository, all of them already: give one or the other", With: []string{pathAll}}})
+	return domain.Invalid([]domain.FieldError{{Path: PathRepo, Code: CodeRepoWithAll, Template: "{path} watches one repository, all of them already: give one or the other", With: []string{PathAll}}})
 }
 
 // relativeFromNowhere is the problem of a relative --repo from a caller in no directory to read it from: a surface's call naming none, or a command line whose working directory is gone.
 func relativeFromNowhere(repo string) error {
-	return domain.Invalid([]domain.FieldError{{Path: pathRepo, Code: CodeNotADirectory, Template: "{path} {value} is relative, and the caller stands in no directory to read it from", Params: domain.Params{"value": repo}}})
+	return domain.Invalid([]domain.FieldError{{Path: PathRepo, Code: CodeNotADirectory, Template: "{path} {value} is relative, and the caller stands in no directory to read it from", Params: domain.Params{"value": repo}}})
 }
 
 // notADirectory is the problem of a --repo that names no directory.
 func notADirectory(repo string) error {
-	return domain.Invalid([]domain.FieldError{{Path: pathRepo, Code: CodeNotADirectory, Template: "{path} {value} is not a directory", Params: domain.Params{"value": repo}}})
+	return domain.Invalid([]domain.FieldError{{Path: PathRepo, Code: CodeNotADirectory, Template: "{path} {value} is not a directory", Params: domain.Params{"value": repo}}})
 }
 
 // ----------------------------------------------------------------------------
@@ -91,11 +92,7 @@ type Questions struct{}
 // Form is the schema of the request: the repository to watch instead of the current one, or every one.
 func (Questions) Form() domain.Form {
 	return domain.Form{Fields: []domain.Field{
-		domain.TextField{
-			FieldSpec: domain.FieldSpec{Path: pathRepo, Flag: "--repo", Label: "Repository", Help: "Watch the repository holding this path instead of the current one"},
-		},
-		domain.ConfirmField{
-			FieldSpec: domain.FieldSpec{Path: pathAll, Flag: "--all", Label: "Every repository", Help: "Watch every repository wtm knows, whatever the current directory or $GIT_DIR"},
-		},
+		domain.TextField{FieldSpec: domain.FieldSpec{Path: PathRepo}},
+		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathAll}},
 	}}
 }
