@@ -210,6 +210,28 @@ func TestAWorktreeWhoseDirectoryIsGoneIsRemovedWithoutItsHooks(t *testing.T) {
 	assert.True(t, w.gone(t, plain))
 }
 
+// create's undo can remove a worktree and fail to delete its branch, then offers clean, forced: legacy said the branch was already absent and kept it.
+func TestABranchNoWorktreeHoldsIsDeletedWithItsRecordBehindTheSameChecks(t *testing.T) {
+	w := newWorld(t, seed{})
+	gittest.Git(t, w.main, "branch", "feat/left", "main")
+	w.record(t, "feat/left", worktree.Meta{SourceBranch: "main"})
+	gittest.Git(t, w.main, "branch", "feat/held", gittest.Output(t, w.main, "commit-tree", "main^{tree}", "-p", "main", "-m", "held"))
+
+	result, report := w.apply(t, removing("feat/left"))
+	_, refused := w.usecase.Run(t.Context(), removing("feat/held"), domain.RunOptions{DryRun: true})
+	forced, err := w.usecase.Run(t.Context(), clean.Request{Worktrees: []string{"feat/held"}, Force: true}, domain.RunOptions{})
+
+	assert.Equal(t, map[string]domain.Status{"feat/left": domain.StatusDone}, statuses(result.Items))
+	assert.Empty(t, gittest.Output(t, w.main, "branch", "--list", "feat/left"))
+	_, metaErr := w.meta.Load("feat/left")
+	assert.ErrorIs(t, metaErr, os.ErrNotExist)
+	assert.Empty(t, eventsOf[domain.WorktreeRemoved](report.All()), "no worktree went")
+	assert.Equal(t, map[string][]string{"worktree[0]": {"clean.unpushed"}}, fieldCodes(failureOf(t, refused).Fields))
+	require.NoError(t, err)
+	assert.Equal(t, map[string]domain.Status{"feat/held": domain.StatusDone}, statuses(forced.Result.Items))
+	assert.Empty(t, gittest.Output(t, w.main, "branch", "--list", "feat/held"))
+}
+
 func TestANameThatIsNoWorktreeIsAlreadyAbsent(t *testing.T) {
 	w := newWorld(t, seed{})
 

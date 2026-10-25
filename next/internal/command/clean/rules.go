@@ -46,11 +46,23 @@ func (f Facts) named(name string) (worktree.Worktree, bool) {
 	return f.Worktrees[at], true
 }
 
-// asked are the worktrees names asks that clean may remove, each once: the checks Observe reads.
+// subject is what name asks clean to remove: the worktree it names, else a local branch of that name no worktree holds, as a worktree with no path; and whether there is one.
+func (f Facts) subject(name string) (worktree.Worktree, bool) {
+	if w, ok := f.named(name); ok {
+		return w, true
+	}
+	if f.Local(name) && f.CheckedOutAt(name) == "" {
+		return worktree.Worktree{State: worktree.OnBranch{Branch: name}}, true
+	}
+
+	return worktree.Worktree{}, false
+}
+
+// asked are the worktrees, and the branches no worktree holds, that names asks clean to remove, each once: the checks Observe reads.
 func (f Facts) asked(names []string) []worktree.Worktree {
 	var found []worktree.Worktree
 	for _, name := range names {
-		w, ok := f.named(name)
+		w, ok := f.subject(name)
 		if ok && !w.Main && !slices.Contains(found, w) {
 			found = append(found, w)
 		}
@@ -91,7 +103,7 @@ func Blockers() []Blocker {
 	return []Blocker{BlockerLocked, BlockerDirty, BlockerUnpushed, BlockerOpenPullRequest, BlockerJobsRunning}
 }
 
-// A Removal is one worktree the plan removes: its name, its branch, deleted with it (none on no branch), its path, whether its directory is gone already, the on_clean hooks it runs first as they will run (none once its directory is gone), the phases of its removal, the namespaces its record names, which stay in their shared services, and what makes it unsafe to remove with what Force would lose.
+// A Removal is one worktree the plan removes: its name, its branch, deleted with it (none on no branch), its path (none for a branch no worktree holds, deleted alone), whether its directory is gone already, the on_clean hooks it runs first as they will run (none once its directory is gone), the phases of its removal, the namespaces its record names, which stay in their shared services, and what makes it unsafe to remove with what Force would lose.
 type Removal struct {
 	Worktree    string         `json:"worktree"`
 	Branch      string         `json:"branch,omitempty"`
@@ -111,14 +123,14 @@ type Removal struct {
 func (f Facts) entries(names []string) (removals []Removal, absent []string, problems []domain.FieldError) {
 	for index, name := range names {
 		path := entryPath(index)
-		switch w, found := f.named(name); {
+		switch w, found := f.subject(name); {
 		case strings.TrimSpace(name) == "":
 			problems = append(problems, domain.Required(path))
 		case slices.Contains(names[:index], name):
 			problems = append(problems, domain.FieldError{Path: path, Code: domain.CodeDistinct, Template: "{path}: {value} is given twice", Params: domain.Params{"value": name}})
 		case found && w.Main:
 			problems = append(problems, domain.FieldError{Path: path, Code: CodeMainWorktree, Template: "{value} is the main worktree: it is never removed", Params: domain.Params{"value": name}})
-		case found && slices.ContainsFunc(removals, func(r Removal) bool { return r.Path == w.Path }):
+		case found && slices.ContainsFunc(removals, func(r Removal) bool { return r.Worktree == w.Name() || w.Path != "" && r.Path == w.Path }):
 			problems = append(problems, domain.FieldError{Path: path, Code: domain.CodeDistinct, Template: "{path}: {value} names a worktree given already", Params: domain.Params{"value": name}})
 		case found:
 			removals = append(removals, f.removal(w, index))
@@ -164,7 +176,7 @@ func (f Facts) removal(w worktree.Worktree, entry int) Removal {
 
 // onClean are the on_clean hooks of removal, their variables expanded as they will run; none once its directory is gone, where they cannot run.
 func (f Facts) onClean(removal Removal) []project.Hook {
-	if removal.Missing {
+	if removal.Missing || removal.Path == "" {
 		return nil
 	}
 
@@ -365,11 +377,12 @@ func (r Request) Locks() []domain.Lock {
 // ----------------------------------------------------------------------------
 // The recap
 
-// The notes of the recap's values: a worktree removed although unsafe, a name that is no worktree, a child left on its removed parent.
+// The notes of the recap's values: a worktree removed although unsafe, a branch no worktree holds, deleted alone, a name that is no worktree, a child left on its removed parent.
 const (
-	NoteForced   = "forced"
-	NoteAbsent   = "absent"
-	NoteOrphaned = "orphaned"
+	NoteForced     = "forced"
+	NoteBranchOnly = "branch_only"
+	NoteAbsent     = "absent"
+	NoteOrphaned   = "orphaned"
 )
 
 // recap is the plan row by row: the worktrees removed, if any, each forced one with what it loses, the names that are no worktree, then the children left behind, reparented or orphaned.
@@ -397,6 +410,9 @@ func recappedRemovals(removals []Removal) []domain.RecapValue {
 	values := make([]domain.RecapValue, 0, len(removals))
 	for _, r := range removals {
 		value := domain.RecapValue{Value: r.Worktree, Text: r.Worktree}
+		if r.Path == "" {
+			value.Note, value.Text = NoteBranchOnly, r.Worktree+" (branch only: no worktree)"
+		}
 		if len(r.Blockers) > 0 {
 			lost := strings.Join(domain.Names(r.Blockers), ", ")
 			value.Note, value.Params, value.Text = NoteForced, domain.Params{"blockers": lost}, r.Worktree+" ("+lost+", forced)"

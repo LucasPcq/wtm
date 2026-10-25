@@ -232,7 +232,7 @@ func (u UseCase) check(ctx context.Context, worktrees []worktree.Worktree, check
 	for _, w := range worktrees {
 		var check Check
 		var err error
-		if !w.Prunable {
+		if !w.Prunable && w.Path != "" {
 			if check.Dirty, err = u.Git.Dirty(ctx, w.Path); err != nil {
 				return err
 			}
@@ -330,9 +330,13 @@ func (u UseCase) hookEnv(plan Plan, removal Removal, record worktree.Meta) (map[
 	return env.HookEnv(env.JobParams{Branch: removal.Branch, ProjectDir: plan.facts.MainPath, Ordinal: record.Ordinal, Isolation: isolation, Run: plan.facts.Run}, compose), nil
 }
 
-// removeWorktree removes the worktree, then its branch and its meta record, and reports it removed. A worktree git dropped while files it could not delete stay on disk (a container's, owned by root) is removed all the same, those files named in a warning.
+// removeWorktree removes the worktree, then its branch and its meta record, and reports it removed; a branch no worktree holds is deleted alone, with its record. A worktree git dropped while files it could not delete stay on disk (a container's, owned by root) is removed all the same, those files named in a warning.
 func (u UseCase) removeWorktree(ctx context.Context, plan Plan, removal Removal, report domain.Report) Item {
-	item := Item{Subject: removal.Worktree}
+	item := Item{Subject: removal.Worktree, Status: domain.StatusDone, Detail: &Detail{Path: removal.Path}}
+	if removal.Path == "" {
+		return u.deleteBranch(ctx, removal, item)
+	}
+
 	if err := u.Git.RemoveWorktree(ctx, removal.Path); err != nil {
 		if u.listed(ctx, removal.Path) {
 			item.Status, item.Err = domain.StatusFailed, failure("clean.remove_failed", "couldn't remove the worktree", err)
@@ -342,12 +346,18 @@ func (u UseCase) removeWorktree(ctx context.Context, plan Plan, removal Removal,
 	}
 
 	report(domain.WorktreeRemoved{Worktree: identity(removal, plan.facts.Records[removal.Branch])})
-	item.Status, item.Detail = domain.StatusDone, &Detail{Path: removal.Path}
 	if removal.Branch == "" {
 		return item
 	}
 
-	if err := u.Git.DeleteBranch(ctx, removal.Branch); err != nil {
+	return u.deleteBranch(ctx, removal, item)
+}
+
+// deleteBranch deletes the branch of removal and its meta record, once its worktree is gone or when it had none.
+func (u UseCase) deleteBranch(ctx context.Context, removal Removal, item Item) Item {
+	if err := u.Git.DeleteBranch(ctx, removal.Branch); err != nil && removal.Path == "" {
+		return Item{Subject: removal.Worktree, Status: domain.StatusFailed, Err: failure("clean.branch_kept", "couldn't delete the branch "+removal.Branch, err)}
+	} else if err != nil {
 		item.Status, item.Reason, item.Err = domain.StatusFailed, domain.ReasonIncomplete, failure("clean.branch_kept", "the worktree is removed but its branch "+removal.Branch+" is kept", err)
 		return item
 	}

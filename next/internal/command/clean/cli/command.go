@@ -16,7 +16,7 @@ const (
 	cleanShort = "Remove worktrees and their local branches"
 	cleanLong  = "Remove git worktrees, delete their local branches and their meta records. The remote branch is never touched.\n" +
 		"Without arguments, the wizard asks which worktrees to remove; several can be checked.\n" +
-		"A worktree on no branch is named by its path.\n" +
+		"A worktree on no branch is named by its path; a branch no worktree holds is deleted alone.\n" +
 		"\n" +
 		"A worktree that is locked, has uncommitted changes, holds commits no other branch nor remote\n" +
 		"holds, has an open pull request or runs jobs is unsafe: one unsafe worktree refuses the whole\n" +
