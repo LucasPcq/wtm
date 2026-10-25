@@ -29,26 +29,26 @@ src/
   routes/              thin: a path and the feature it renders
   lib/                 pure helpers: no React, nothing of the app
   test/                the test kit: render.tsx, server.ts (msw), fixtures.ts, setup.ts
-  main.tsx, routeTree.gen.ts
+  main.tsx             the entry; routeTree.gen.ts is generated beside it
 ```
 
 ### Inside a feature: one shape at every level
 
 ```
 features/worktrees/
-  worktrees-page.tsx         the feature's entry, at its root
-  components/  hooks/  utils/  store/
-  list/                      a sub-feature (list, tree, detail, create, shared)
-    list-view.tsx            its entry component, at its root
+  worktrees-page.tsx         the feature's entry, the only file at its root
+  components/  hooks/  utils/  store/    what the feature's own entry and two or more sub-features use
+  list/                      a sub-feature (list, tree, detail, create)
+    list-view.tsx            its entry component, the only file at its root
     components/              .tsx only; components/__tests__/ holds the component tests
-    hooks/                   use-*.ts only, never a __tests__/
-    utils/                   plain functions (rows, filters, words…); utils/__tests__/ their tests
-  store/ui-store.ts          a store, store/__tests__/ if it ever needs one
+    hooks/                   use-*.ts only, never a test
+    utils/                   plain functions (rows, steps, words…); utils/__tests__/ their tests
+  store/ui-store.ts          at the feature's root only
 ```
 
-- A file only one sub-feature uses stays in it; one two sub-features share goes in `shared/`, in the same shape.
-- **`__tests__/` sits inside the code folder it tests** (`components/`, `utils/`, `store/`), never at a sub-feature's root, never in `hooks/`: a hook is tested through a component that uses it, in `components/__tests__/`. A page-level test of an entry component goes in its sub-feature's `components/__tests__/`. Outside features the same holds: `api/queries/__tests__/`, `components/command-form/__tests__/`, `lib/__tests__/`.
-- The `unknown-folder` lint refuses anything else in a feature.
+- A file only one sub-feature uses stays in it; one that two sub-features, or the feature's entry and a sub-feature, use moves up to the feature's own `components/`, `hooks/` or `utils/`. There is no `shared/`.
+- **A test lives in the `__tests__/` of `components/` or `utils/`**, beside the code it tests: never at a root, never beside its code, never in `hooks/` (a hook is tested through a component that uses it, in `components/__tests__/`), never in `store/`. A page-level test of an entry component goes in its sub-feature's `components/__tests__/`. Outside features a test sits in a `__tests__/` too: `api/queries/__tests__/`, `components/command-form/__tests__/`, `lib/__tests__/`.
+- The `unknown-folder` lint refuses any other file or folder in a feature, and any test outside a `__tests__/`.
 
 - **Imports between folders go through `@/`; `./` stays for the same folder; `../` never.** Biome matches the raw import text and resolves nothing, so `@/features/x/…` is what lets the layer rules see where an import lands.
 - **A layer imports only what it may**: `api/` nothing of the app; `lib/` nothing of the app, no React; a route the router, features and Query's types; `components/` no feature; a feature its own folder, `components/`, `lib/`, `api/`, `hooks/`, never another feature or a route. Code moves to `components/` or `lib/` on the second feature that needs it, not before.
@@ -77,7 +77,7 @@ These are the owner's rules, and the reason behind each.
 - **No effects.** Derive while rendering; data and side effects go through TanStack Query, Router and Form; a DOM hook (a listener, a scroll) goes in a ref callback that returns its cleanup; an outside store goes through `useSyncExternalStore` or zustand. The lint refuses `useEffect`, `useLayoutEffect` and `useInsertionEffect` by any spelling.
 - **`useReducer` when several states move together** (a wizard's step and its remembered answers), one `useState` per independent value, never two that must stay in sync.
 - **A closed set is a union, and what each value shows is a `Record` over it**, so a new value fails the build: `conditionLook: Record<WorktreeCondition, …>`, `phaseLabel: Record<DomainPhase, string>`. Classes from a state go through `cva` variants or such a Record, never a free string built by hand.
-- **Reusable logic becomes a hook or a component.** `useRead(repo, command)` is a view's two reads, `useChoice` a viewer's choice per repository, `CommandLine` every follow-up to copy, `ChoicePopover` every show/hide chooser. Before writing a second copy of something, look in `shared/`, `hooks/` and `components/`.
+- **Reusable logic becomes a hook or a component.** `useRead(repo, command)` is a view's two reads, `useChoice` a viewer's choice per repository, `CommandLine` every follow-up to copy, `ChoicePopover` every show/hide chooser. Before writing a second copy of something, look in the feature's own `components/`, `hooks/` and `utils/`, then `src/components/`.
 - **shadcn only through its CLI or MCP** (`npx shadcn@latest add <name>`); wrap or compose it in your feature, never edit `components/ui/`. Plain shadcn, the logo, `--primary` as the signature colour, Inter, the system's theme.
 
 ## Where state lives
@@ -98,7 +98,7 @@ Never server data in zustand, never a choice of the viewer in Query, never `loca
 | -- | -- | -- |
 | what is wrong with a worktree and how to fix it | `status`'s `problems` (message and `fix`), in the detail | a check of your own (`if (detail.missing)`), a page banner |
 | a worktree's condition and what to do first | the read's `condition` and `actions`, ranked by the core | a ranking of your own (`if (missing) … else if (rebasing)`) |
-| one worktree over its live and GitHub reads | `overlaid(live, github)` (`shared/utils/condition.ts`), the one rule: a pull request GitHub says is merged wins over changed and clean, with that read; anything else is the live read | a second merge rule anywhere |
+| one worktree over its live and GitHub reads | `overlaid(live, github)` (`features/worktrees/utils/condition.ts`), the one rule: a pull request GitHub says is merged wins over changed and clean, with that read; anything else is the live read | a second merge rule anywhere |
 | a follow-up the web cannot run (clean, sync, go, reparent…) | `CommandLine` (the server spells it, `POST /api/command-line`), inline or as a block | a button that pretends to run it, or nothing |
 | a pull request, its checks | `githubQuery`, asked once per view on screen, when the detail opens, and after Fetch origin | `with_prs` on every event, a timer |
 | fresh data | the event stream invalidating `['repo', id]` | polling, `refetchInterval` on a read |

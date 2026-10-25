@@ -1,7 +1,7 @@
 import { Columns3, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ChoicePopover } from '@/features/worktrees/components/choice-popover'
 import { type ColumnId, columns, groups } from '@/features/worktrees/list/components/columns'
-import { ChoicePopover } from '@/features/worktrees/shared/components/choice-popover'
 
 export function ColumnsPanel({
   shown,

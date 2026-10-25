@@ -1,8 +1,8 @@
 import type { StatusReview } from '@/api/types.gen'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Checks } from '@/features/worktrees/components/checks'
 import { Section } from '@/features/worktrees/detail/components/section'
-import { Checks } from '@/features/worktrees/shared/components/checks'
-import { prState } from '@/features/worktrees/shared/utils/github'
+import { prState } from '@/features/worktrees/utils/github'
 
 export function ReviewSection({
   review,

@@ -42,7 +42,6 @@ export const narrowed = <Detail, Plan = never>(envelope: DomainEnvelope): Narrow
   })),
 })
 
-// a branch of the tree with no worktree of its own is none
 export const worktreeCount = ({ items }: Read<'list'> | Read<'tree'>) =>
   items.filter(({ detail }) => !(detail && 'virtual' in detail && detail.virtual)).length
 

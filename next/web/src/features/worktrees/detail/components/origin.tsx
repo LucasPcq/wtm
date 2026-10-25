@@ -1,5 +1,5 @@
 import type { StatusDetail } from '@/api/types.gen'
-import { CopyPath } from '@/features/worktrees/shared/components/copy-path'
+import { CopyPath } from '@/features/worktrees/components/copy-path'
 import { ago } from '@/lib/time'
 
 export function Origin({ detail, now }: { detail: StatusDetail; now: number }) {

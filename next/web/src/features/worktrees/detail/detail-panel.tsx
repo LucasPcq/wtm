@@ -16,9 +16,9 @@ import { ReviewSection } from '@/features/worktrees/detail/components/review-sec
 import { RunSection } from '@/features/worktrees/detail/components/run-section'
 import { SectionsChooser } from '@/features/worktrees/detail/components/sections-chooser'
 import { type SectionId, sectionIds } from '@/features/worktrees/detail/utils/sections'
-import { overlaid } from '@/features/worktrees/shared/utils/condition'
-import { unavailable } from '@/features/worktrees/shared/utils/github'
 import { useChoice } from '@/features/worktrees/store/ui-store'
+import { overlaid } from '@/features/worktrees/utils/condition'
+import { unavailable } from '@/features/worktrees/utils/github'
 
 export function DetailPanel({
   repo,

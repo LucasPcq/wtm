@@ -10,13 +10,13 @@ import {
   PopoverHeader,
   PopoverTitle,
 } from '@/components/ui/popover'
-import { searched } from '@/features/worktrees/list/utils/filters'
-import { CommandLine } from '@/features/worktrees/shared/components/command-line'
-import { Glyph } from '@/features/worktrees/shared/components/glyph'
-import { conditionLook } from '@/features/worktrees/shared/utils/condition'
+import { CommandLine } from '@/features/worktrees/components/command-line'
+import { Glyph } from '@/features/worktrees/components/glyph'
 import { ActionButton } from '@/features/worktrees/tree/components/action-button'
 import type { View } from '@/features/worktrees/tree/components/branch'
 import { type Node, reparent, sync } from '@/features/worktrees/tree/utils/nodes'
+import { conditionLook } from '@/features/worktrees/utils/condition'
+import { searched } from '@/features/worktrees/utils/filters'
 import { cn } from '@/lib/utils'
 
 export function NodeRow({ node, view }: { node: Node; view: View }) {

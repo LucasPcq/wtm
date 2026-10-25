@@ -11,10 +11,10 @@ import {
 import { CircleDot, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { ListDetail } from '@/api/types.gen'
-import type { Row } from '@/features/worktrees/list/utils/rows'
-import { Checks } from '@/features/worktrees/shared/components/checks'
-import { Glyph } from '@/features/worktrees/shared/components/glyph'
-import { conditionLook } from '@/features/worktrees/shared/utils/condition'
+import { Checks } from '@/features/worktrees/components/checks'
+import { Glyph } from '@/features/worktrees/components/glyph'
+import { type Row, unread } from '@/features/worktrees/list/utils/rows'
+import { conditionLook } from '@/features/worktrees/utils/condition'
 import { ago } from '@/lib/time'
 import { withoutScheme } from '@/lib/url'
 
@@ -47,9 +47,9 @@ export const branchColumn: ColumnDef<typeof features, Row> = {
     const alone = table.getVisibleLeafColumns().length === 1
 
     const subline = () => {
-      const { detail, error, status, underWay } = original
+      const { detail, error, underWay } = original
       if (alone && underWay) return underWay
-      if (!detail && alone) return status === 'cancelled' ? 'not read' : 'unreadable'
+      if (!detail && alone) return unread(original)
       if (!detail) return error?.message ?? ''
       if (detail.main) return 'main worktree'
       if (!detail.branch) return 'on no branch'
@@ -97,6 +97,8 @@ export const columns: Column[] = [
     size: 176,
     meta: { group: 'Git', hint: 'clean, changed, rebasing, missing' },
     cell: read(({ condition, pr }, detail) => {
+      if (!condition) return none
+
       const look = conditionLook[condition]
       const changed = (detail.changes?.changed ?? 0) + (detail.changes?.untracked ?? 0)
       const label = condition === 'changed' && changed > 0 ? `${changed} changed` : look.label

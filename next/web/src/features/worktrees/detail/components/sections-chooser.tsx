@@ -1,7 +1,7 @@
 import { SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ChoicePopover } from '@/features/worktrees/components/choice-popover'
 import { type SectionId, sectionIds, sectionTitle } from '@/features/worktrees/detail/utils/sections'
-import { ChoicePopover } from '@/features/worktrees/shared/components/choice-popover'
 
 export function SectionsChooser({ shown, onToggle }: { shown: SectionId[]; onToggle: (id: SectionId) => void }) {
   const hidden = sectionIds.length - shown.length

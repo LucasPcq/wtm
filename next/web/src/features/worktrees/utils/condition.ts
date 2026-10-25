@@ -1,6 +1,6 @@
 import { CircleCheck, CircleDashed, CircleSlash, CircleX, GitMerge, type LucideIcon, TriangleAlert } from 'lucide-react'
 import type { WorktreeCondition } from '@/api/types.gen'
-import type { Tone } from '@/features/worktrees/shared/components/glyph'
+import type { Tone } from '@/features/worktrees/components/glyph'
 
 // the one rule over the live and GitHub reads, for every view: a merge GitHub reports wins over changed and clean
 export function overlaid<Read extends { condition: WorktreeCondition }>(live: Read, github: Read | undefined): Read {

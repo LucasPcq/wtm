@@ -171,7 +171,7 @@ const spelled = ({ command, answers }: DomainFollowUp) => [
   ...(answers ?? []).flatMap((a) => (a.path === 'worktree' ? a.values : [`--${a.path}`, ...a.values])),
 ]
 
-export const handlers = [
+const handlers = [
   http.get('/api/version', () => HttpResponse.json({ version: 'test' })),
   http.get('/api/repos', () => HttpResponse.json([repo])),
   // the stream says nothing: a test reads the screen as the reads left it

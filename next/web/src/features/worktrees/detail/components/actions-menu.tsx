@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { copy } from '@/features/worktrees/shared/utils/copy'
+import { copy } from '@/features/worktrees/utils/copy'
 
 export function ActionsMenu({ actions }: { actions: DomainFollowUp[] }) {
   const lines = useQueries({ queries: actions.map(commandLineQuery) })

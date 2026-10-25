@@ -1,6 +1,6 @@
 import type { Read } from '@/api/queries/commands'
 import type { DomainFollowUp, TreeDetail, TreePR, WorktreeCondition } from '@/api/types.gen'
-import { overlaid } from '@/features/worktrees/shared/utils/condition'
+import { overlaid } from '@/features/worktrees/utils/condition'
 
 export type Node = {
   branch: string

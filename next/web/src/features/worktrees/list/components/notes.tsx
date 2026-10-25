@@ -1,6 +1,6 @@
 import { Info } from 'lucide-react'
 import type { DomainWarning } from '@/api/types.gen'
-import { sentence } from '@/features/worktrees/shared/utils/sentence'
+import { sentence } from '@/features/worktrees/utils/sentence'
 
 export function Notes({ warnings }: { warnings: DomainWarning[] }) {
   if (warnings.length === 0) return null

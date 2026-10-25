@@ -3,7 +3,7 @@ import type { DomainAnswered, DomainField, DomainFieldError } from '@/api/types.
 // A form's values are keyed by their field's path, escaped: the form library reads remember[0] or a.b as nested.
 // Each value is the answer as the catalogue takes it, an array of strings, but for a text list: its raw text, one
 // entry a line, split only when it is sent, so that a line being typed keeps its newline.
-export type Values = Record<string, string[]>
+type Values = Record<string, string[]>
 
 export const keyOf = (path: string) => encodeURIComponent(path).replaceAll('.', '%2E')
 

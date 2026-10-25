@@ -1,9 +1,9 @@
 import { useTable } from '@tanstack/react-table'
 import { CircleX, LoaderCircle } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Glyph } from '@/features/worktrees/components/glyph'
 import { branchColumn, type ColumnId, columnIds, columns, features } from '@/features/worktrees/list/components/columns'
-import type { Row } from '@/features/worktrees/list/utils/rows'
-import { Glyph } from '@/features/worktrees/shared/components/glyph'
+import { type Row, unread } from '@/features/worktrees/list/utils/rows'
 import { cn } from '@/lib/utils'
 
 const all = [branchColumn, ...columns]
@@ -51,7 +51,7 @@ export function WorktreeTable({ rows, shown, open }: { rows: Row[]; shown: Colum
             if (!detail)
               return (
                 <Glyph icon={CircleX} tone={status === 'cancelled' ? 'muted' : 'failed'}>
-                  {status === 'cancelled' ? 'not read' : 'unreadable'}
+                  {unread(row.original)}
                 </Glyph>
               )
             return lead && <table.FlexRender cell={lead} />

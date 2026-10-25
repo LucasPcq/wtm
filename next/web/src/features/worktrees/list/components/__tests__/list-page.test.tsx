@@ -138,3 +138,14 @@ test('clearing the search while typing is still to be sent keeps it cleared', as
   expect(router.state.location.search).toEqual({})
   expect((box as HTMLInputElement).value).toBe('')
 })
+
+// Back from ?q=abc to ?q=ab left "abc" in the box: only a search cleared reached it.
+test('the search box follows the address when it changes from elsewhere, back and forward included', async () => {
+  const { router } = await renderApp('/r/r1/worktrees?q=abc')
+  const box = (await screen.findByRole('textbox', { name: 'Search branches' })) as HTMLInputElement
+  expect(box.value).toBe('abc')
+
+  await act(() => router.navigate({ to: '/r/$repo/worktrees', params: { repo: 'r1' }, search: { q: 'ab' } }))
+
+  await waitFor(() => expect(box.value).toBe('ab'))
+})

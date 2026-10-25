@@ -3,7 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
-export type Choice<Id extends string> = { id: Id; label: string; hint?: string | undefined }
+type Choice<Id extends string> = { id: Id; label: string; hint?: string | undefined }
 
 export function ChoicePopover<Id extends string>({
   trigger,

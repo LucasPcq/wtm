@@ -5,7 +5,7 @@ import type { DomainFollowUp } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { copy } from '@/features/worktrees/shared/utils/copy'
+import { copy } from '@/features/worktrees/utils/copy'
 import { cn } from '@/lib/utils'
 
 export function CommandLine({ followUp, inline = false }: { followUp: DomainFollowUp; inline?: boolean }) {

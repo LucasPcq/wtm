@@ -5,6 +5,9 @@ or {
     $names <: contains `vi as $_`,
     $msg = "vi renamed hides it from the rules on mocks: import it as vi (web-front skill, test-doubles)."
   },
+  `import * as $_ from "vitest"` where {
+    $msg = "vitest imported whole hides vi from the rules on mocks: import vi by name (web-front skill, test-doubles)."
+  },
   `vitest.$method($_)` where {
     $method <: or {
       `mock`,

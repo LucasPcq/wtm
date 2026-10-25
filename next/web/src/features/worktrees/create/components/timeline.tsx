@@ -2,7 +2,7 @@ import { Check, LoaderCircle, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { type PhaseRun, type Progress, seconds } from '@/features/worktrees/create/utils/progress'
 import { phaseLabel } from '@/features/worktrees/create/utils/words'
-import { copy } from '@/features/worktrees/shared/utils/copy'
+import { copy } from '@/features/worktrees/utils/copy'
 import { cn } from '@/lib/utils'
 
 const marker: Record<PhaseRun['state'], ReactNode> = {

@@ -1,4 +1,4 @@
-import { type Filter, filters } from '@/features/worktrees/list/utils/filters'
+import { type Filter, filters } from '@/features/worktrees/utils/filters'
 
 export type WorktreesSearch = {
   view?: 'tree' | undefined

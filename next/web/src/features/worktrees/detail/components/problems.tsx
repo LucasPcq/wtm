@@ -1,8 +1,8 @@
 import { TriangleAlert } from 'lucide-react'
 import type { StatusProblem } from '@/api/types.gen'
-import { CommandLine } from '@/features/worktrees/shared/components/command-line'
-import { Glyph } from '@/features/worktrees/shared/components/glyph'
-import { sentence } from '@/features/worktrees/shared/utils/sentence'
+import { CommandLine } from '@/features/worktrees/components/command-line'
+import { Glyph } from '@/features/worktrees/components/glyph'
+import { sentence } from '@/features/worktrees/utils/sentence'
 
 export function Problems({ problems: [first, ...more] }: { problems: StatusProblem[] }) {
   if (!first) return null

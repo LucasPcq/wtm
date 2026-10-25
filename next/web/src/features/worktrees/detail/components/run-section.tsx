@@ -1,7 +1,7 @@
 import { CircleDot, CircleX } from 'lucide-react'
 import type { RunState, StatusDetail, StatusJob } from '@/api/types.gen'
+import { Glyph, type Tone } from '@/features/worktrees/components/glyph'
 import { Section } from '@/features/worktrees/detail/components/section'
-import { Glyph, type Tone } from '@/features/worktrees/shared/components/glyph'
 import { ago } from '@/lib/time'
 import { withoutScheme } from '@/lib/url'
 

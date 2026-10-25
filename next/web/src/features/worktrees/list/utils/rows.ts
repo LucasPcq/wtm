@@ -1,6 +1,6 @@
 import type { Read } from '@/api/queries/commands'
 import type { DomainError, DomainFollowUp, DomainItem, ListDetail, ListPR, WorktreeCondition } from '@/api/types.gen'
-import { overlaid } from '@/features/worktrees/shared/utils/condition'
+import { overlaid } from '@/features/worktrees/utils/condition'
 
 export type Row = {
   subject: string
@@ -9,7 +9,7 @@ export type Row = {
   error: DomainError | undefined
   pr: ListPR | null | undefined
   merged: boolean | undefined
-  condition: WorktreeCondition
+  condition: WorktreeCondition | undefined
   actions: DomainFollowUp[]
   underWay: string | undefined
   readAt: number
@@ -38,11 +38,13 @@ export function rowsOf({
       error,
       pr: read?.pr,
       merged: read?.merged,
-      // a worktree not read has no condition of its own: it reads as unreadable wherever its condition shows
-      condition: shown?.condition ?? 'unreadable',
+      condition: shown?.condition,
       actions: shown?.actions ?? [],
       underWay: underWay[subject],
       readAt,
     }
   })
 }
+
+// a read cancelled is said not read, one that failed unreadable
+export const unread = ({ status }: Row) => (status === 'cancelled' ? 'not read' : 'unreadable')

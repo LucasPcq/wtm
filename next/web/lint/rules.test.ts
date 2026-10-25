@@ -10,9 +10,9 @@ import { expect, onTestFinished, test } from 'vitest'
 type Rule = 'layers' | 'unknown-folder' | 'props' | 'test-doubles' | 'spy-module' | 'none'
 
 const cases: { path: string; source: string; rule: Rule }[] = [
-  { path: 'features/a/to-b.ts', source: "export { y } from '@/features/b/y'", rule: 'layers' },
-  { path: 'features/a/own.ts', source: "export { y } from '@/features/a/utils/y'", rule: 'none' },
-  { path: 'features/a/dotted.ts', source: "export { y } from '@/features/a/../b/y'", rule: 'layers' },
+  { path: 'features/a/utils/to-b.ts', source: "export { y } from '@/features/b/utils/y'", rule: 'layers' },
+  { path: 'features/a/utils/own.ts', source: "export { y } from '@/features/a/utils/y'", rule: 'none' },
+  { path: 'features/a/utils/dotted.ts', source: "export { y } from '@/features/a/../b/utils/y'", rule: 'layers' },
   { path: 'api/up.ts', source: "export { cn } from '@/lib/utils'", rule: 'layers' },
   { path: 'lib/react.ts', source: "export { useState } from 'react'", rule: 'layers' },
   { path: 'routes/x.tsx', source: "export { Centered } from '@/components/centered'", rule: 'layers' },
@@ -21,21 +21,35 @@ const cases: { path: string; source: string; rule: Rule }[] = [
     source: "import type { QueryClient } from '@tanstack/react-query'\nexport type Q = QueryClient",
     rule: 'none',
   },
+  { path: 'routes/z.tsx', source: "export { QueryClient } from '@tanstack/react-query'", rule: 'layers' },
   { path: 'components/into.ts', source: "export { x } from '@/features/a/x'", rule: 'layers' },
-  { path: 'features/a/kit.ts', source: "export { server } from '@/test/server'", rule: 'layers' },
-  { path: 'features/a/msw.ts', source: "export { http } from 'msw'", rule: 'layers' },
+  { path: 'features/a/utils/kit.ts', source: "export { server } from '@/test/server'", rule: 'layers' },
+  { path: 'features/a/utils/msw.ts', source: "export { http } from 'msw'", rule: 'layers' },
   {
-    path: 'features/a/stream.ts',
+    path: 'features/a/utils/stream.ts',
     source: "export { EventSourceParserStream } from 'eventsource-parser/stream'",
     rule: 'layers',
   },
   { path: 'stuff/x.ts', source: 'export const x = 1', rule: 'unknown-folder' },
   { path: 'loose.ts', source: 'export const x = 1', rule: 'unknown-folder' },
+  { path: 'features/a/helper.ts', source: 'export const x = 1', rule: 'unknown-folder' },
+  { path: 'features/a/b/helper.ts', source: 'export const x = 1', rule: 'unknown-folder' },
+  { path: 'features/a/b/b-view.tsx', source: 'export const x = 1', rule: 'none' },
   { path: 'features/a/components/not-tsx.ts', source: 'export const x = 1', rule: 'unknown-folder' },
+  { path: 'features/a/components/x.test.tsx', source: 'export const x = 1', rule: 'unknown-folder' },
+  { path: 'features/a/hooks/use-x.test.ts', source: 'export const x = 1', rule: 'unknown-folder' },
   { path: 'features/a/hooks/__tests__/use-x.test.ts', source: 'export const x = 1', rule: 'unknown-folder' },
+  { path: 'features/a/store/__tests__/x.test.ts', source: 'export const x = 1', rule: 'unknown-folder' },
+  { path: 'features/a/shared/components/x.tsx', source: 'export const x = 1', rule: 'unknown-folder' },
   { path: 'features/a/b/odd/x.ts', source: 'export const x = 1', rule: 'unknown-folder' },
   { path: 'features/a/b/hooks/use-y.ts', source: 'export const y = 1', rule: 'none' },
-  { path: '../vite.config.ts', source: 'export default {}', rule: 'none' },
+  { path: 'features/a/b/utils/__tests__/y.test.ts', source: 'export const y = 1', rule: 'none' },
+  { path: 'api/z.test.ts', source: 'export const z = 1', rule: 'unknown-folder' },
+  {
+    path: '../vite.config.ts',
+    source: "import { defineConfig } from 'vitest/config'\nexport default defineConfig({})",
+    rule: 'none',
+  },
   {
     path: 'features/a/components/one.tsx',
     source: 'export function One(props: { t: string }) {\n  return <b>{props.t}</b>\n}',
@@ -57,6 +71,17 @@ const cases: { path: string; source: string; rule: Rule }[] = [
     rule: 'props',
   },
   {
+    path: 'features/a/components/six.tsx',
+    source:
+      "import { memo } from 'react'\nexport const Six = memo(function Six(props: { t: string }) {\n  return <b>{props.t}</b>\n})",
+    rule: 'props',
+  },
+  {
+    path: 'features/a/components/seven.tsx',
+    source: 'export default function (props: { t: string }) {\n  return <b>{props.t}</b>\n}',
+    rule: 'props',
+  },
+  {
     path: 'features/a/components/five.tsx',
     source: 'export function Five({ t }: { t: string }) {\n  return <b>{t}</b>\n}',
     rule: 'none',
@@ -64,6 +89,11 @@ const cases: { path: string; source: string; rule: Rule }[] = [
   {
     path: 'features/a/components/__tests__/alias.test.tsx',
     source: "import { vi as v } from 'vitest'\nexport const x = v",
+    rule: 'test-doubles',
+  },
+  {
+    path: 'features/a/components/__tests__/whole.test.tsx',
+    source: "import * as vt from 'vitest'\nvt.vi.mock('@/api/fetch')",
     rule: 'test-doubles',
   },
   {
@@ -138,6 +168,6 @@ test('each case is refused by exactly its plugin, and a clean one by none', { ti
 
   for (const { path: at, rule } of cases) {
     const refused = [...(found.get(path.normalize(path.join('src', at))) ?? [])]
-    expect(refused, at).toEqual(rule === 'none' ? [] : [rule])
+    expect.soft(refused, at).toEqual(rule === 'none' ? [] : [rule])
   }
 })

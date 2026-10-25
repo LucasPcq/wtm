@@ -1,6 +1,6 @@
 import { CircleCheck, CircleX, LoaderCircle } from 'lucide-react'
 import type { WorktreeChecks } from '@/api/types.gen'
-import { Glyph } from '@/features/worktrees/shared/components/glyph'
+import { Glyph } from '@/features/worktrees/components/glyph'
 
 export function Checks({ checks: { failed, pending, passed } }: { checks: WorktreeChecks }) {
   if (failed > 0)

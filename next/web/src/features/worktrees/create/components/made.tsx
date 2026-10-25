@@ -1,8 +1,8 @@
 import { CircleCheck, CircleX } from 'lucide-react'
 import type { Applied } from '@/api/queries/commands'
-import { CommandLine } from '@/features/worktrees/shared/components/command-line'
-import { CopyPath } from '@/features/worktrees/shared/components/copy-path'
-import { sentence } from '@/features/worktrees/shared/utils/sentence'
+import { CommandLine } from '@/features/worktrees/components/command-line'
+import { CopyPath } from '@/features/worktrees/components/copy-path'
+import { sentence } from '@/features/worktrees/utils/sentence'
 
 export function Made({ envelope }: { envelope: Applied<'create'> }) {
   const { items, follow_ups: followUps } = envelope

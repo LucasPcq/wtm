@@ -10,7 +10,7 @@ export type PhaseRun = {
   log?: string
 }
 
-export type Unit = { subject: string; phases: PhaseRun[]; lines: string[]; status?: DomainItem['status'] }
+type Unit = { subject: string; phases: PhaseRun[]; lines: string[]; status?: DomainItem['status'] }
 
 export type Progress = {
   operation?: string

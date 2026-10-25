@@ -1,6 +1,6 @@
 import { Copy } from 'lucide-react'
-import { Path } from '@/features/worktrees/shared/components/path'
-import { copy } from '@/features/worktrees/shared/utils/copy'
+import { Path } from '@/features/worktrees/components/path'
+import { copy } from '@/features/worktrees/utils/copy'
 
 export function CopyPath({ path }: { path: string }) {
   return (

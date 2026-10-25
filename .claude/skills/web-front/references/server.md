@@ -24,11 +24,11 @@ Every envelope is typed by `narrowed()` in its `select`: an item's detail is the
 
 ## A worktree's condition
 
-Each read, live or GitHub's, publishes a worktree's `condition` (`no_worktree`, `unreadable`, `missing`, `rebasing`, `merged`, `changed`, `clean`, the first that applies, ranked in Go) and its `actions`, already ordered. The screen maps a condition to its look (`conditionLook`) and shows the first action. Over the two reads of one worktree there is one rule, `overlaid(live, github)` in `features/worktrees/shared/utils/condition.ts`, used by the list, the tree and the detail: it returns the GitHub read when that one says merged and the live one says changed or clean, the live read otherwise. The detail then shows the winning read's problems.
+Each read, live or GitHub's, publishes a worktree's `condition` (`no_worktree`, `unreadable`, `missing`, `rebasing`, `merged`, `changed`, `clean`, the first that applies, ranked in Go) and its `actions`, already ordered. The screen maps a condition to its look (`conditionLook`) and shows the first action. Over the two reads of one worktree there is one rule, `overlaid(live, github)` in `features/worktrees/utils/condition.ts`, used by the list, the tree and the detail: it returns the GitHub read when that one says merged and the live one says changed or clean, the live read otherwise. The detail then shows the winning read's problems.
 
 ## Follow-ups
 
-A follow-up the catalogue cannot run (clean, sync, go, reparent, run …) shows as its command line to copy: `CommandLine` (`features/worktrees/shared/components/command-line.tsx`), a block or `inline`; a menu of them, `ActionsMenu`. One the server cannot spell says so with what it meant (`No command line for this: …`), never disappears.
+A follow-up the catalogue cannot run (clean, sync, go, reparent, run …) shows as its command line to copy: `CommandLine` (`features/worktrees/components/command-line.tsx`), a block or `inline`; a menu of them, `ActionsMenu`. One the server cannot spell says so with what it meant (`No command line for this: …`), never disappears.
 
 ## Operations
 

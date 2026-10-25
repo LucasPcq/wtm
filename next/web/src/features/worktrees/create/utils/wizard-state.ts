@@ -1,8 +1,8 @@
 import type { DomainForm } from '@/api/types.gen'
 
-export type WizardState = { at: number; remember: string[] }
+type WizardState = { at: number; remember: string[] }
 
-export type WizardAction = { type: 'go'; to: number } | { type: 'remember'; path: string }
+type WizardAction = { type: 'go'; to: number } | { type: 'remember'; path: string }
 
 export const initialWizard = (form: DomainForm): WizardState => ({
   at: 0,

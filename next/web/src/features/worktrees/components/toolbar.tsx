@@ -6,7 +6,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { Kbd } from '@/components/ui/kbd'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { type Filter, filterLabel, filters } from '@/features/worktrees/list/utils/filters'
+import { type Filter, filterLabel, filters } from '@/features/worktrees/utils/filters'
 import type { WorktreesSearch } from '@/features/worktrees/utils/search'
 
 export function Toolbar({
@@ -23,12 +23,13 @@ export function Toolbar({
     void navigate({ search: (current) => ({ ...current, ...change }), replace: true })
   const ask = useDebouncer((q: string) => set({ q: q.trim() || undefined }), { wait: 250 })
 
-  // the box goes to the address once typing pauses; a search cleared from elsewhere (No match) empties it, and
-  // drops what was still to be sent, which would bring it back
+  // the box goes to the address once typing pauses; a search changed from elsewhere (Clear, back, forward) takes the
+  // box over, and drops what was still to be sent, which would bring the old one back
   const [box, setBox] = useState({ typed: search.q ?? '', asked: search.q })
   if (search.q !== box.asked) {
-    setBox({ typed: search.q === undefined ? '' : box.typed, asked: search.q })
-    if (search.q === undefined) ask.cancel()
+    const own = box.typed.trim() === (search.q ?? '')
+    setBox({ typed: own ? box.typed : (search.q ?? ''), asked: search.q })
+    if (!own) ask.cancel()
   }
 
   // / focuses the search from anywhere but a field, as the hint beside it says
