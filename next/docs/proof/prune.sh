@@ -69,6 +69,16 @@ PY
     "$legacy" create "$branch" --from main --yes </dev/null >/dev/null 2>&1
   done
   "$legacy" create feat/child --from feat/merged --yes </dev/null >/dev/null 2>&1
+  # legacy lists the candidates by creation time, to the second: one second apart each, in the order created, so
+  # its captures are the same on every run
+  python3 - feat/merged feat/moved feat/closed feat/gone feat/gone-work feat/dirty feat/locked feat/open feat/plain feat/bad feat/squash feat/child <<'PY'
+import json, sys
+for i, branch in enumerate(sys.argv[1:]):
+    path = ".git/wtm/worktrees/%s/meta.json" % branch.replace("/", "%2F")
+    meta = json.load(open(path))
+    meta["created_at"] = "2026-10-01T09:00:%02dZ" % i
+    json.dump(meta, open(path, "w"), indent=2)
+PY
   for branch in merged moved closed gone-work dirty locked open bad squash; do
     commit "$trees/feat-$branch" "$branch"
   done
