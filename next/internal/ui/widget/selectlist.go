@@ -121,13 +121,13 @@ func (l *SelectList) Update(msg tea.Msg) (Verdict, tea.Cmd) {
 	return Stay, nil
 }
 
-// filter handles a key while the filter takes typed text: a printable key narrows the options, backspace widens them, esc leaves the filter as typed.
+// filter handles a key while the filter takes typed text: text typed or pasted narrows the options, backspace widens them, esc leaves the filter as typed.
 func (l *SelectList) filter(key tea.KeyMsg) Verdict {
-	switch typed := key.String(); typed {
+	switch key.String() {
 	case "esc":
 		l.filtering = false
 	case "backspace":
-		l.query = l.query[:max(len(l.query)-1, 0)]
+		l.query = withoutLastRune(l.query)
 		l.filtering = l.query != ""
 		l.refilter()
 		l.snap()
@@ -141,7 +141,7 @@ func (l *SelectList) filter(key tea.KeyMsg) Verdict {
 	case "down":
 		l.move(1)
 	default:
-		if len(typed) == 1 && typed >= " " {
+		if typed := typedText(key); typed != "" {
 			l.query += typed
 			l.refilter()
 			l.snap()

@@ -99,13 +99,13 @@ func (m *MultiSelect) Update(msg tea.Msg) (Verdict, tea.Cmd) {
 	return Stay, nil
 }
 
-// filter handles a key while the filter takes typed text: a printable key narrows the options, space still picks, backspace widens them, esc leaves the filter as typed.
+// filter handles a key while the filter takes typed text: text typed or pasted narrows the options, space still picks, backspace widens them, esc leaves the filter as typed.
 func (m *MultiSelect) filter(key tea.KeyMsg) Verdict {
-	switch typed := key.String(); typed {
+	switch key.String() {
 	case "esc":
 		m.filtering = false
 	case "backspace":
-		m.query = m.query[:max(len(m.query)-1, 0)]
+		m.query = withoutLastRune(m.query)
 		m.filtering = m.query != ""
 		m.refilter()
 	case "enter":
@@ -118,7 +118,7 @@ func (m *MultiSelect) filter(key tea.KeyMsg) Verdict {
 	case "down":
 		m.move(1)
 	default:
-		if len(typed) == 1 && typed > " " {
+		if typed := typedText(key); typed != "" {
 			m.query += typed
 			m.refilter()
 		}
