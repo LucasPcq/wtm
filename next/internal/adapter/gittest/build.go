@@ -280,6 +280,14 @@ func buildRemote(t testing.TB, main string, built builder, seed FakeParams) {
 	}
 }
 
+// midwayMarks are the files git keeps while it is in the middle of an operation on a worktree's checkout, by operation.
+var midwayMarks = map[worktree.Operation]string{
+	worktree.OperationMerge:      "MERGE_HEAD",
+	worktree.OperationCherryPick: "CHERRY_PICK_HEAD",
+	worktree.OperationRevert:     "REVERT_HEAD",
+	worktree.OperationApply:      filepath.Join("rebase-apply", "applying"),
+}
+
 // buildWorktreeParams is one linked worktree to build in the repository at
 // Main; Root is the hash a detached worktree points at.
 type buildWorktreeParams struct {
@@ -290,8 +298,8 @@ type buildWorktreeParams struct {
 }
 
 // buildWorktree adds the worktree in its seeded state, a rebase faked by its
-// rebase-merge state, a bisect by its BISECT_START and a merge by its
-// MERGE_HEAD, locks it when seeded locked, then deletes its directory when the
+// rebase-merge state, a bisect by its BISECT_START and an operation midway by
+// the file git keeps for it (midwayMarks), locks it when seeded locked, then deletes its directory when the
 // seed lists it gone.
 func buildWorktree(t testing.TB, params buildWorktreeParams) {
 	t.Helper()
@@ -318,9 +326,12 @@ func buildWorktree(t testing.TB, params buildWorktreeParams) {
 		Git(t, params.Main, "worktree", "add", "-q", "--detach", path, params.Root)
 	}
 
-	if params.Worktree.Merging {
-		mergeHead := filepath.Join(Output(t, path, "rev-parse", "--absolute-git-dir"), "MERGE_HEAD")
-		if err := os.WriteFile(mergeHead, []byte(Output(t, path, "rev-parse", "HEAD")+"\n"), 0o644); err != nil {
+	if mark, ok := midwayMarks[params.Worktree.Midway]; ok {
+		marked := filepath.Join(Output(t, path, "rev-parse", "--absolute-git-dir"), mark)
+		if err := os.MkdirAll(filepath.Dir(marked), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(marked, []byte(Output(t, path, "rev-parse", "HEAD")+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

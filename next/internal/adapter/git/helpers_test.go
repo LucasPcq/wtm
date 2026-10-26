@@ -71,11 +71,11 @@ func rebase(t *testing.T, dir, backend string) {
 	require.Error(t, err, "the rebase was meant to stop on a conflict: %s", out)
 }
 
-// merge starts a merge of main, which must stop on a conflict.
-func merge(t *testing.T, dir string) {
+// stopped runs git with args in dir, which must stop on a conflict.
+func stopped(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	out, err := exec.Command("git", "-C", dir, "merge", "main").CombinedOutput()
-	require.Error(t, err, "the merge was meant to stop on a conflict: %s", out)
+	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
+	require.Error(t, err, "git %v was meant to stop on a conflict: %s", args, out)
 }
 
 func upstreamOf(t *testing.T, dir, name string) string {

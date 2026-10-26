@@ -3518,6 +3518,11 @@
         "unreadable",
         "missing",
         "rebasing",
+        "bisecting",
+        "merging",
+        "cherry_picking",
+        "reverting",
+        "applying",
         "merged",
         "changed",
         "clean"

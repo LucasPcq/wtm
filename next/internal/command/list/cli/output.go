@@ -82,13 +82,13 @@ func ahead(d list.Detail, st *output.Styles) string {
 	return st.Muted.Render(labelBase + " " + output.GlyphAhead + strconv.Itoa(d.CommitsAhead))
 }
 
-// state is the worktree's state, its glyph coloured: a gone directory, then a rebase in progress, ahead of uncommitted changes.
+// state is the worktree's state, its glyph coloured: a gone directory, then an operation git stopped in the middle of, ahead of uncommitted changes.
 func state(d list.Detail, st *output.Styles) string {
-	switch {
+	switch operation := d.Condition.Operation(); {
 	case d.Missing:
 		return st.Danger.Render(output.GlyphFailure) + " missing"
-	case d.Rebasing:
-		return st.Warning.Render(output.GlyphAttention) + " rebasing"
+	case operation != "":
+		return st.Warning.Render(output.GlyphAttention) + " " + output.OperationWord(operation)
 	case d.Dirty:
 		return st.Warning.Render(output.GlyphAttention) + " dirty"
 	}

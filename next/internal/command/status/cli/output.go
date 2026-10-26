@@ -264,8 +264,8 @@ func worktreeState(d status.Detail) string {
 	if d.Missing {
 		states = append(states, "missing")
 	}
-	if d.Rebasing {
-		states = append(states, "rebasing")
+	if operation := d.Condition.Operation(); operation != "" {
+		states = append(states, output.OperationWord(operation))
 	}
 	if d.Locked {
 		states = append(states, "locked")

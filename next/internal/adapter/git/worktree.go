@@ -19,7 +19,8 @@ var (
 
 // Worktrees returns the repository's worktrees, the main one first. A detached
 // worktree in the middle of a rebase, or of a bisect, is reported as rebasing
-// the branch it started from; one in the middle of a merge is marked merging.
+// the branch it started from; one in the middle of a merge, a cherry-pick, a
+// revert or a git am is marked so (Midway).
 func (r Repo) Worktrees(ctx context.Context) ([]worktree.Worktree, error) {
 	out, err := r.git(ctx, "worktree", "list", "--porcelain", "-z")
 	if err != nil {
@@ -28,11 +29,7 @@ func (r Repo) Worktrees(ctx context.Context) ([]worktree.Worktree, error) {
 
 	worktrees := parseWorktrees(string(out))
 	for i, w := range worktrees {
-		merging, err := merging(w.Path)
-		if err != nil {
-			return nil, err
-		}
-		worktrees[i].Merging = merging
+		worktrees[i].Midway = midway(w)
 
 		if _, detached := w.State.(worktree.Detached); !detached {
 			continue
@@ -269,23 +266,36 @@ func detachedState(path string) (worktree.State, error) {
 	return bisectState(adminDir)
 }
 
-// merging reports whether a merge is under way in the worktree at path: git
-// keeps MERGE_HEAD in its git directory until the merge is committed or
-// aborted. A worktree whose .git is gone merges nothing.
-func merging(path string) (bool, error) {
-	adminDir, err := adminDirOf(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return false, nil
+// midwayMarks are the files git keeps in a worktree's git directory while it is in the middle of an operation on its checkout, each until the operation is continued or aborted.
+var midwayMarks = []struct {
+	file      string
+	operation worktree.Operation
+}{
+	{"MERGE_HEAD", worktree.OperationMerge},
+	{"CHERRY_PICK_HEAD", worktree.OperationCherryPick},
+	{"REVERT_HEAD", worktree.OperationRevert},
+	{filepath.Join("rebase-apply", "applying"), worktree.OperationApply},
+}
+
+// midway is the operation git stopped in the middle of on w's checkout, ""
+// when none. A worktree that cannot be probed (its directory gone, its .git
+// unreadable or malformed) is in the middle of none: it is listed all the
+// same, and the reads that open it say why it does not read.
+func midway(w worktree.Worktree) worktree.Operation {
+	if _, bare := w.State.(worktree.Bare); bare || w.Prunable {
+		return ""
 	}
+	adminDir, err := adminDirOf(w.Path)
 	if err != nil {
-		return false, err
+		return ""
 	}
 
-	_, err = os.Stat(filepath.Join(adminDir, "MERGE_HEAD"))
-	if errors.Is(err, fs.ErrNotExist) {
-		return false, nil
+	for _, mark := range midwayMarks {
+		if _, err := os.Stat(filepath.Join(adminDir, mark.file)); err == nil {
+			return mark.operation
+		}
 	}
-	return err == nil, err
+	return ""
 }
 
 // bisectState is the state of a detached worktree whose git directory is

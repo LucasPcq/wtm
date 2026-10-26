@@ -90,6 +90,31 @@ test('a worktree whose read was cancelled is listed as not read, the others as t
   expect(screen.getByRole('link', { name: /feat\/billing from main/ })).toBeTruthy()
 })
 
+test('a worktree git stopped in the middle of a merge says merging, as a rebase says rebasing', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/list', () =>
+      HttpResponse.json(
+        envelope('list', [
+          listDetail('feat/merging', { parent: 'main', behind: 2, needs_sync: false, condition: 'merging' }),
+          listDetail('feat/rebasing', {
+            parent: 'main',
+            behind: 2,
+            needs_sync: false,
+            rebasing: true,
+            condition: 'rebasing',
+          }),
+        ]),
+      ),
+    ),
+  )
+
+  await renderApp('/r/r1/worktrees')
+
+  expect(await screen.findByText('merging')).toBeTruthy()
+  expect(screen.getByText('rebasing')).toBeTruthy()
+  expect(screen.queryByText(/2 behind/)).toBeNull()
+})
+
 // With Branch alone shown, a worktree not read had no cell left to say so.
 test('a worktree not read says so under its branch when no other column is shown', async () => {
   localStorage.setItem('wtm.ui', JSON.stringify({ state: { columns: { r1: [] }, sections: {} }, version: 0 }))

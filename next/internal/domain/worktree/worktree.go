@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Worktree is one worktree as git lists it: its path, whether it is the main one, what it has checked out and the commit it stands on (none on a branch with no commit yet, nor for the bare entry), whether it is locked, whether its directory is gone (git calls it prunable), and whether a merge is under way in it.
+// Worktree is one worktree as git lists it: its path, whether it is the main one, what it has checked out and the commit it stands on (none on a branch with no commit yet, nor for the bare entry), whether it is locked, whether its directory is gone (git calls it prunable), and the operation git stopped in the middle of on its checkout.
 type Worktree struct {
 	Path     string
 	Main     bool
@@ -16,7 +16,25 @@ type Worktree struct {
 	Head     string
 	Locked   bool
 	Prunable bool
-	Merging  bool
+	Midway   Operation // a merge, a cherry-pick, a revert or a git am; a rebase or a bisect is its State
+}
+
+// An Operation is what git stopped in the middle of in a worktree, to continue or abort there.
+type Operation string
+
+// The operations git stops in the middle of.
+const (
+	OperationRebase     Operation = "rebasing"
+	OperationBisect     Operation = "bisecting"
+	OperationMerge      Operation = "merging"
+	OperationCherryPick Operation = "cherry_picking"
+	OperationRevert     Operation = "reverting"
+	OperationApply      Operation = "applying" // git am
+)
+
+// Operations returns every Operation.
+func Operations() []Operation {
+	return []Operation{OperationRebase, OperationBisect, OperationMerge, OperationCherryPick, OperationRevert, OperationApply}
 }
 
 //go-sumtype:decl State
@@ -66,15 +84,22 @@ func (w Worktree) Branch() string {
 	return ""
 }
 
-// InProgress reports whether a rebase, a bisect or a merge is under way in the worktree: until it is finished or aborted, its branch does not stand where the work is, so nothing should move it onto its parent.
-func (w Worktree) InProgress() bool {
+// Operation returns what git stopped in the middle of in the worktree, "" when nothing.
+func (w Worktree) Operation() Operation {
 	switch w.State.(type) {
-	case Rebasing, Bisecting:
-		return true
+	case Rebasing:
+		return OperationRebase
+	case Bisecting:
+		return OperationBisect
 	case OnBranch, Detached, Bare:
 	}
 
-	return w.Merging
+	return w.Midway
+}
+
+// NeedsSync reports whether the worktree is to sync onto its parent, which has behind commits it lacks: never while git is in the middle of an operation in it, which leaves its branch where it was until it is continued or aborted.
+func (w Worktree) NeedsSync(behind *int) bool {
+	return behind != nil && *behind > 0 && w.Operation() == ""
 }
 
 // Holding returns the index of the deepest of list whose path holds the directory dir, dir itself or one of its parents, -1 when none does; an empty path or dir holds nothing.

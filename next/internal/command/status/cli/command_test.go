@@ -7,6 +7,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
@@ -133,6 +134,24 @@ func TestAllCountsTheWorktreesNotReadAmongThoseReadAndNeverSaysNothingToFixThen(
 
 	assert.Equal(t, uicli.ExitError, got.Code)
 	formtest.Golden(t, "status_all_partly_unread", got.Stdout)
+}
+
+func TestAnOperationGitStoppedInTheMiddleOfIsTheWorktreesStateAsARebaseIs(t *testing.T) {
+	for _, c := range []struct {
+		midway worktree.Operation
+		state  string
+	}{
+		{midway: worktree.OperationMerge, state: "merging"},
+		{midway: worktree.OperationCherryPick, state: "cherry-picking"},
+		{midway: worktree.OperationApply, state: "applying patches"},
+	} {
+		t.Run(string(c.midway), func(t *testing.T) {
+			got := runStatus(t, world{Midway: c.midway}, "feat/a")
+
+			require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+			assert.Regexp(t, `\n  state\s+`+c.state+`\n`, got.Stdout)
+		})
+	}
 }
 
 func TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleaned(t *testing.T) {

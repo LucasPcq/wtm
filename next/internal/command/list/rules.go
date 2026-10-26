@@ -142,7 +142,7 @@ func (f Facts) item(w worktree.Worktree, active bool) Item {
 		Parent:       parent,
 		Ahead:        state.ParentAhead,
 		Behind:       state.ParentBehind,
-		NeedsSync:    state.ParentBehind != nil && *state.ParentBehind > 0 && !w.InProgress(),
+		NeedsSync:    w.NeedsSync(state.ParentBehind),
 		Changes:      changesOf(state),
 		CreatedAt:    f.Records[w.Branch()].Created(),
 		LastCommitAt: f.lastCommit(w.Branch()),
@@ -152,14 +152,14 @@ func (f Facts) item(w worktree.Worktree, active bool) Item {
 		Services:     f.Services(w.Path),
 		URLs:         f.URLs(w.Path),
 	}
-	detail.Condition = conditionOf(detail)
+	detail.Condition = conditionOf(detail, w.Operation())
 	detail.Actions = Actions(detail)
 
 	return Item{Subject: w.Name(), Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(w.Branch())}
 }
 
-func conditionOf(detail Detail) worktree.Condition {
-	return worktree.ConditionOf(worktree.ConditionParams{Missing: detail.Missing, Rebasing: detail.Rebasing, Merged: detail.Merged, Dirty: detail.Dirty})
+func conditionOf(detail Detail, operation worktree.Operation) worktree.Condition {
+	return worktree.ConditionOf(worktree.ConditionParams{Missing: detail.Missing, Operation: operation, Merged: detail.Merged, Dirty: detail.Dirty})
 }
 
 // recordWarnings are the warnings of the record of branch when it exists but does not read, none otherwise.
@@ -304,7 +304,7 @@ func WithPullRequests(shown, from Outcome) Outcome {
 		}
 		detail := *item.Detail
 		detail.PR, detail.Merged = from.Items[at].Detail.PR, from.Items[at].Detail.Merged
-		detail.Condition = conditionOf(detail)
+		detail.Condition = conditionOf(detail, detail.Condition.Operation())
 		detail.Actions = Actions(detail)
 		merged.Items[i].Detail = &detail
 	}

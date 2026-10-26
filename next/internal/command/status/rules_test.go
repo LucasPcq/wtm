@@ -42,6 +42,7 @@ func TestNothingToFixIsNoProblemNotNull(t *testing.T) {
 	assert.Equal(t, []status.Problem{}, status.Problems(status.ProblemsParams{Branch: "main"}))
 }
 
-func TestAWorktreeMidwayThroughARebaseABisectOrAMergeIsNotToldToSync(t *testing.T) {
-	assert.Equal(t, []status.Problem{}, status.Problems(status.ProblemsParams{Branch: "feat/a", Parent: "main", Lacks: 2, InProgress: true}))
+func TestTheCommitsOfItsParentAreAProblemOnlyOfAWorktreeToSync(t *testing.T) {
+	assert.Equal(t, []status.Problem{}, status.Problems(status.ProblemsParams{Branch: "feat/a", Parent: "main", Lacks: 2}))
+	assert.Len(t, status.Problems(status.ProblemsParams{Branch: "feat/a", Parent: "main", Lacks: 2, Sync: true}), 1)
 }

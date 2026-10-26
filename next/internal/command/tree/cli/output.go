@@ -68,8 +68,8 @@ func badgesOf(item tree.Item) []badge {
 		badges = append(badges, badge{text: "interrupted", tone: toneFailure})
 	case d.Missing:
 		badges = append(badges, badge{text: "missing", tone: toneFailure})
-	case d.Rebasing:
-		badges = append(badges, badge{text: "rebasing", tone: toneAttention})
+	case d.Condition.Operation() != "":
+		badges = append(badges, badge{text: output.OperationWord(d.Condition.Operation()), tone: toneAttention})
 	case d.Dirty:
 		badges = append(badges, badge{text: "dirty", tone: toneAttention})
 	}

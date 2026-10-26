@@ -377,11 +377,11 @@ func TestARefreshFetchesOriginOnce(t *testing.T) {
 	assert.Equal(t, 1, fetches)
 }
 
-func TestAWorktreeMidwayThroughARebaseABisectOrAMergeNeedsNoSync(t *testing.T) {
+func TestAWorktreeGitStoppedInTheMiddleOfAnOperationNeedsNoSyncAndSaysWhich(t *testing.T) {
 	for name, ui := range map[string]worktree.Worktree{
 		"rebasing":  {Path: "/repo/.trees/feat/a-ui", State: worktree.Rebasing{Branch: "feat/a-ui"}},
 		"bisecting": {Path: "/repo/.trees/feat/a-ui", State: worktree.Bisecting{Branch: "feat/a-ui"}},
-		"merging":   {Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Merging: true},
+		"merging":   {Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Midway: worktree.OperationMerge},
 	} {
 		t.Run(name, func(t *testing.T) {
 			w := newWorld(seed{
@@ -401,6 +401,7 @@ func TestAWorktreeMidwayThroughARebaseABisectOrAMergeNeedsNoSync(t *testing.T) {
 			detail := detailOf(t, read, "feat/a-ui")
 			assert.Equal(t, ptr(1), detail.Behind, "the commits it lacks are still counted")
 			assert.False(t, detail.NeedsSync)
+			assert.Equal(t, worktree.Condition(name), detail.Condition)
 		})
 	}
 }

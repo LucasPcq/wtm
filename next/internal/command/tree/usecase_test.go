@@ -113,14 +113,14 @@ func TestAheadAndBehindAreCountedAgainstTheParent(t *testing.T) {
 	}
 }
 
-func TestAWorktreeMidwayThroughARebaseABisectOrAMergeNeedsNoSync(t *testing.T) {
+func TestAWorktreeGitStoppedInTheMiddleOfAnOperationNeedsNoSyncAndIsSentToFinishIt(t *testing.T) {
 	cases := map[string]struct {
 		ui      worktree.Worktree
 		actions []string
 	}{
 		"rebasing":  {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Rebasing{Branch: "feat/a-ui"}}, actions: []string{"go"}},
-		"bisecting": {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Bisecting{Branch: "feat/a-ui"}}},
-		"merging":   {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Merging: true}},
+		"bisecting": {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Bisecting{Branch: "feat/a-ui"}}, actions: []string{"go"}},
+		"merging":   {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Midway: worktree.OperationMerge}, actions: []string{"go"}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -138,6 +138,7 @@ func TestAWorktreeMidwayThroughARebaseABisectOrAMergeNeedsNoSync(t *testing.T) {
 			ui := detailOf(t, read, "feat/a-ui")
 			assert.Equal(t, count(1), ui.Behind, "the commits it lacks are still counted")
 			assert.False(t, ui.NeedsSync)
+			assert.Equal(t, worktree.Condition(name), ui.Condition)
 			var actions []string
 			for _, action := range ui.Actions {
 				actions = append(actions, action.Command)

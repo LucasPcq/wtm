@@ -18,6 +18,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 
 	"github.com/stretchr/testify/assert"
@@ -70,7 +71,7 @@ func TestEveryGoFollowUpIsARequestResolveTakes(t *testing.T) {
 		domain.Enter("feat/x"),
 		list.Actions(list.Detail{Branch: "feat/a"})[0],
 		list.Actions(list.Detail{Path: "/repo/.trees/detached"})[0],
-		tree.Actions(tree.Detail{Branch: "feat/a", Rebasing: true}, false)[0],
+		tree.Actions(tree.Detail{Branch: "feat/a", Condition: worktree.ConditionRebasing}, false)[0],
 	}
 	for _, followUp := range followUps {
 		require.Equal(t, domain.CommandGo, followUp.Command)
@@ -175,10 +176,10 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"isolation":   {followUp: *fixes[5].Fix, argv: []string{"wtm", "env", "feat/a", "--isolation", "isolated"}},
 		"run_start":   {followUp: *fixes[6].Fix, argv: []string{"wtm", "run", "start", "feat/a", "--job", "api", "--detach"}},
 		"shared":      {followUp: *fixes[7].Fix, argv: []string{"wtm", "run", "start", "main", "--job", "db", "--detach"}},
-		"tree_go":     {followUp: tree.Actions(tree.Detail{Branch: "feat/a", Rebasing: true}, false)[0], argv: []string{"wtm", "go", "feat/a"}},
+		"tree_go":     {followUp: tree.Actions(tree.Detail{Branch: "feat/a", Condition: worktree.ConditionRebasing}, false)[0], argv: []string{"wtm", "go", "feat/a"}},
 		"tree_clean":  {followUp: tree.Actions(tree.Detail{Branch: "feat/a"}, true)[0], argv: []string{"wtm-next", "clean", "feat/a"}},
 		"tree_sync":   {followUp: tree.Actions(tree.Detail{Branch: "feat/a", NeedsSync: true}, false)[0], argv: []string{"wtm", "sync", "feat/a"}},
-		"behind":      {followUp: *status.Problems(status.ProblemsParams{Branch: "feat/a", Parent: "feat/b", Lacks: 1})[0].Fix, argv: []string{"wtm", "sync", "feat/a"}},
+		"behind":      {followUp: *status.Problems(status.ProblemsParams{Branch: "feat/a", Parent: "feat/b", Lacks: 1, Sync: true})[0].Fix, argv: []string{"wtm", "sync", "feat/a"}},
 		"reparent":    {followUp: domain.FollowUp{Command: "reparent", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "to", Values: []string{"feat/b"}}}}, argv: []string{"wtm", "reparent", "feat/a", "--to", "feat/b"}},
 	}
 	for name, c := range cases {

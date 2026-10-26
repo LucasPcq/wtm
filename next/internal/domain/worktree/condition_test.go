@@ -11,11 +11,16 @@ func TestAWorktreeIsInTheFirstConditionThatApplies(t *testing.T) {
 		Params ConditionParams
 		Want   Condition
 	}{
-		"missing":  {ConditionParams{Missing: true, Rebasing: true}, ConditionMissing},
-		"rebasing": {ConditionParams{Rebasing: true, Merged: true}, ConditionRebasing},
-		"merged":   {ConditionParams{Merged: true, Dirty: true}, ConditionMerged},
-		"changed":  {ConditionParams{Dirty: true}, ConditionChanged},
-		"clean":    {ConditionParams{}, ConditionClean},
+		"missing":        {ConditionParams{Missing: true, Operation: OperationRebase}, ConditionMissing},
+		"rebasing":       {ConditionParams{Operation: OperationRebase, Merged: true}, ConditionRebasing},
+		"bisecting":      {ConditionParams{Operation: OperationBisect, Merged: true}, ConditionBisecting},
+		"merging":        {ConditionParams{Operation: OperationMerge, Dirty: true}, ConditionMerging},
+		"cherry_picking": {ConditionParams{Operation: OperationCherryPick}, ConditionCherryPicking},
+		"reverting":      {ConditionParams{Operation: OperationRevert}, ConditionReverting},
+		"applying":       {ConditionParams{Operation: OperationApply}, ConditionApplying},
+		"merged":         {ConditionParams{Merged: true, Dirty: true}, ConditionMerged},
+		"changed":        {ConditionParams{Dirty: true}, ConditionChanged},
+		"clean":          {ConditionParams{}, ConditionClean},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -23,4 +28,12 @@ func TestAWorktreeIsInTheFirstConditionThatApplies(t *testing.T) {
 		})
 	}
 	assert.Len(t, Conditions(), len(cases)+2, "each condition a read can rank has its case; no_worktree and unreadable are set by the read")
+}
+
+func TestAConditionNamesTheOperationGitStoppedInTheMiddleOf(t *testing.T) {
+	for _, operation := range Operations() {
+		assert.Equal(t, operation, Condition(operation).Operation())
+	}
+	assert.Empty(t, ConditionChanged.Operation())
+	assert.Empty(t, ConditionMissing.Operation())
 }
