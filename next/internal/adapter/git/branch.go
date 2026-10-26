@@ -26,6 +26,8 @@ func (r Repo) refName(ref worktree.Ref) (string, error) {
 		return headsPrefix + b.Name, nil
 	case worktree.RemoteBranch:
 		return remotePrefix + b.Name, nil
+	case worktree.Revision:
+		return b.Hash, nil
 	}
 	return "", errNoRef
 }

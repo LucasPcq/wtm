@@ -58,6 +58,8 @@ type Command[R Request[R], Q Questions, O Outcome] struct {
 	Skipped func(s *Session[R, Q, O], skip domain.Skip) string
 	// NewProgress draws the events of a run its own way, nil for [output.NewProgress], which draws one unit at a time.
 	NewProgress func(ctx context.Context, params output.ProgressParams) Progress
+	// Unattended refuses a request a run without the wizard cannot take as it is, nil for none: a default pick the wizard offers is never an unattended answer.
+	Unattended func(req R) error
 
 	io     *uicli.Run
 	yes    bool
@@ -324,6 +326,12 @@ func (c *Command[R, Q, O]) progress(ctx context.Context) Progress {
 func (c *Command[R, Q, O]) launch(ctx context.Context, app UseCase[R, Q, O], req R, report domain.Report) (Ran[R, O], error) {
 	if c.interactive() {
 		return c.Ask(ctx, AskParams[R, Q, O]{App: app, Request: req, Options: domain.RunOptions{DryRun: c.dryRun, CorrelationID: c.io.Env.CorrelationID, Report: report}, In: c.io.Streams.In, Out: c.io.Streams.Err})
+	}
+
+	if c.Unattended != nil {
+		if err := c.Unattended(req); err != nil {
+			return Ran[R, O]{Request: req}, err
+		}
 	}
 
 	outcome, err := app.Run(ctx, req, domain.RunOptions{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: domain.SurfaceCLI, CorrelationID: c.io.Env.CorrelationID, Report: report})

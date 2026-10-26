@@ -785,8 +785,8 @@ func (f *Fake) listed() []worktree.Worktree {
 	return worktrees
 }
 
-// historyOf returns the history of the local or fetched remote branch ref, and
-// whether it exists.
+// historyOf returns the history of the local or fetched remote branch ref, or
+// of a commit one of them holds, and whether it exists.
 func (f *Fake) historyOf(ref worktree.Ref) (history, bool) {
 	switch b := ref.(type) {
 	case worktree.LocalBranch:
@@ -795,6 +795,9 @@ func (f *Fake) historyOf(ref worktree.Ref) (history, bool) {
 	case worktree.RemoteBranch:
 		commits, ok := f.remote[b.Name]
 		return commits, ok
+	case worktree.Revision:
+		commits := f.upTo(b.Hash)
+		return commits, commits != nil
 	}
 	return nil, false
 }

@@ -58,11 +58,14 @@ func TestForceMovesADirtyWorktreeAndTheRecapSaysSo(t *testing.T) {
 	formtest.Golden(t, "forced", got.Stdout)
 }
 
-func TestNoWorktreeWithoutATerminalIsAUsageError(t *testing.T) {
-	got := runFastForward(t, newWorld())
+func TestNoWorktreeWithoutATerminalIsAUsageErrorNamingAll(t *testing.T) {
+	w := newWorld()
+
+	got := runFastForward(t, w, "--yes")
 
 	assert.Equal(t, uicli.ExitUsage, got.Code)
 	formtest.Golden(t, "no_worktree", got.Stderr)
+	assert.NotContains(t, w.git.Calls(), "Fetch ")
 }
 
 func TestEachEnvelopeOfFastForwardHasItsGolden(t *testing.T) {

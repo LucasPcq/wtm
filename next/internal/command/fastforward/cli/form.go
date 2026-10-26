@@ -25,7 +25,16 @@ func newForm(open func(ctx context.Context, dir string) (fastforward.UseCase, er
 		ApplyLabel: applyLabel,
 		Special:    special,
 		Skipped:    skipped,
+		Unattended: unattended,
 	}
+}
+
+// unattended refuses a run without the wizard that names no worktree and does not ask for every one: the worktrees the wizard picks by default are its to confirm, never an unattended answer.
+func unattended(req fastforward.Request) error {
+	if len(req.Worktrees) > 0 || req.All {
+		return nil
+	}
+	return domain.Invalid([]domain.FieldError{{Path: domain.PathWorktree, Code: domain.CodeRequired, Template: "{path} is required, or --all"}})
 }
 
 // applyLabel names the apply of the plan previewed by the worktrees it moves.
@@ -48,15 +57,13 @@ func applyLabel(previewed fastforward.Outcome) string {
 }
 
 // skipped words why a field of fast-forward's is not asked, where the wizard's words would say it of another command.
-func skipped(s *session, skip domain.Skip) string {
-	switch {
-	case skip == domain.SkipAll:
+func skipped(_ *session, skip domain.Skip) string {
+	switch skip {
+	case domain.SkipAll:
 		return "every worktree is asked"
-	case skip == domain.SkipFlagOnly && s.Request().All:
-		return "every worktree: --all, or the default pick confirmed as it was"
-	case skip == domain.SkipFlagOnly:
+	case domain.SkipFlagOnly:
 		return "only --all asks every worktree"
-	case skip == domain.SkipSafe:
+	case domain.SkipSafe:
 		return "no worktree named behind origin has uncommitted changes"
 	}
 	return ""

@@ -1,9 +1,8 @@
 $ wtm fast-forward; echo EXIT=$?
 
-┃  ✓ fast-forward: 1 done · 3 unchanged
+┃  ✓ fast-forward: 1 done
 ┃
 ┃  Fast-forward  feat/tty-behind (1 commit)
-┃  Up to date    main, feat/tty-ahead (ahead of origin), feat/tty-latest
 
 EXIT=0
 $

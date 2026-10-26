@@ -6,9 +6,11 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"go/ast"
+	"go/constant"
+	"go/importer"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"maps"
 	"net"
 	"net/http"
@@ -104,7 +106,7 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 
 	empty, err := c.Questions(t.Context(), api.Call{Dir: main})
 	require.NoError(t, err)
-	// a later answer's problem may wait on the subject's, as extract's files wait on their source
+	// a later answer's problem may wait on the subject's, as extract's files wait on their source; a subject the command picks by default (fast-forward's worktrees behind origin) is answered already
 	subject := m.answers[0].Path
 	assert.Equal(t, m.complete, len(domain.ProblemsOf(empty.Problems, subject)) == 0, "an empty request is not asked its %s, unless it is complete", subject)
 
@@ -476,6 +478,7 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[fastforward.Standing]():      {"Where a worktree stands for a fast-forward, the first that applies; only behind moves.", fastforward.Standings()},
 	reflect.TypeFor[fastforward.Blocker]():       {"What makes a worktree behind origin unsafe to fast-forward, a safety refusal only force lifts.", fastforward.Blockers()},
 	reflect.TypeFor[worktree.Divergence]():       {"Where a branch stands against origin's branch of the same name.", worktree.Divergences()},
+	reflect.TypeFor[worktree.Operation]():        {"What git stopped in the middle of in a worktree, to continue or abort there.", worktree.Operations()},
 	reflect.TypeFor[project.EnvStrategy]():       {"Where a worktree's .env files are copied from.", project.EnvStrategies()},
 	reflect.TypeFor[project.Isolation]():         {"How a worktree stands against its source.", project.Isolations()},
 	reflect.TypeFor[project.JobKind]():           {"Whether a job keeps running or runs to its end.", project.JobKinds()},
@@ -757,49 +760,23 @@ func post(t *testing.T, record webserver.Record, path, body string) *http.Respon
 // `X T = "x"` or converted as in `X = T("x")`.
 func declaredOf(t *testing.T, typ reflect.Type) []string {
 	t.Helper()
-	dir := filepath.Join("..", "..", strings.TrimPrefix(typ.PkgPath(), "github.com/LucasPcq/wtm/next/"))
-	names, err := filepath.Glob(filepath.Join(dir, "*.go"))
+	pkg, err := importer.ForCompiler(token.NewFileSet(), "source", nil).Import(typ.PkgPath())
 	require.NoError(t, err)
 
 	var values []string
-	for _, name := range names {
-		if strings.HasSuffix(name, "_test.go") {
+	for _, name := range pkg.Scope().Names() {
+		declared, ok := pkg.Scope().Lookup(name).(*types.Const)
+		if !ok || declared.Val().Kind() != constant.String {
 			continue
 		}
-		file, err := parser.ParseFile(token.NewFileSet(), name, nil, 0)
-		require.NoError(t, err)
-		ast.Inspect(file, func(node ast.Node) bool {
-			spec, ok := node.(*ast.ValueSpec)
-			if !ok {
-				return true
-			}
-			for _, value := range spec.Values {
-				if literal, ok := constantOf(spec.Type, value, typ.Name()); ok {
-					unquoted, err := strconv.Unquote(literal.Value)
-					require.NoError(t, err)
-					values = append(values, unquoted)
-				}
-			}
-			return false
-		})
+		named, ok := declared.Type().(*types.Named)
+		value := constant.StringVal(declared.Val())
+		// a zero constant ("") stands for none of the values, as worktree.NoOrigin does; an alias (DefaultEnvStrategy) is one of them already
+		if ok && named.Obj().Name() == typ.Name() && value != "" && !slices.Contains(values, value) {
+			values = append(values, value)
+		}
 	}
 	return values
-}
-
-func constantOf(declared ast.Expr, value ast.Expr, typ string) (*ast.BasicLit, bool) {
-	if ident, ok := declared.(*ast.Ident); ok && ident.Name == typ {
-		literal, ok := value.(*ast.BasicLit)
-		return literal, ok && literal.Kind == token.STRING
-	}
-	call, ok := value.(*ast.CallExpr)
-	if !ok || len(call.Args) != 1 {
-		return nil, false
-	}
-	if ident, ok := call.Fun.(*ast.Ident); !ok || ident.Name != typ {
-		return nil, false
-	}
-	literal, ok := call.Args[0].(*ast.BasicLit)
-	return literal, ok && literal.Kind == token.STRING
 }
 
 // stringsOf are the values of a slice of a string type, as strings.

@@ -17,13 +17,31 @@ func TestTheWizardDrawsItsKeyScreens(t *testing.T) {
 	d.looksLike("recap")
 }
 
-func TestTheDefaultPickConfirmedAsItWasIsEveryWorktree(t *testing.T) {
+func TestTheDefaultPickConfirmedAsItWasNamesNoneAndPlansOnlyWhatWasPicked(t *testing.T) {
 	d := open(t, sessionParams{App: newWorld().usecase()})
 
-	d.Keys("enter", "enter")
+	d.Keys("enter")
+
+	assert.Equal(t, fastforward.Request{}, d.s.Request())
+	var planned []string
+	for _, a := range d.s.Preview().Plan.Worktrees {
+		planned = append(planned, a.Worktree)
+	}
+	assert.Equal(t, []string{"main", behind, dirty}, planned, "the dirty one is kept, not moved")
+
+	d.Keys("enter")
 
 	require.Equal(t, form.Finished, d.Wizard.Ending())
-	assert.Equal(t, fastforward.Request{All: true}, d.s.Request())
+}
+
+func TestGoingBackToThePickerShowsTheDefaultPickAgain(t *testing.T) {
+	d := open(t, sessionParams{App: newWorld().usecase()})
+	d.Keys("enter")
+
+	d.Keys("esc")
+
+	assert.Equal(t, stepWorktrees, d.Wizard.Current())
+	d.looksLike("worktrees")
 }
 
 func TestAPickTheUserChangedNamesItsWorktrees(t *testing.T) {

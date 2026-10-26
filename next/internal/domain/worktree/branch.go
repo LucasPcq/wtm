@@ -10,7 +10,7 @@ type Branch struct {
 
 //go-sumtype:decl Ref
 
-// Ref is a branch a new branch can start from: a LocalBranch or a RemoteBranch.
+// Ref is where a branch can start from or be moved to: a LocalBranch, a RemoteBranch or a Revision.
 type Ref interface{ ref() }
 
 // LocalBranch is a local branch, by name.
@@ -19,8 +19,12 @@ type LocalBranch struct{ Name string }
 // RemoteBranch is a branch of origin, by its name without `origin/`.
 type RemoteBranch struct{ Name string }
 
+// Revision is one commit, by its hash.
+type Revision struct{ Hash string }
+
 func (LocalBranch) ref()  {}
 func (RemoteBranch) ref() {}
+func (Revision) ref()     {}
 
 // Losing is what deleting a branch and removing a worktree would lose: the commits of the local branch Branch, and of the commit Head a worktree stands on, that no local branch but Branch and those Going with them, nor any remote-tracking branch, holds. Either may be empty; one that names no commit (a branch with no commit yet) holds none.
 type Losing struct {
@@ -47,9 +51,9 @@ const (
 	Diverged Divergence = "diverged"
 )
 
-// Divergences returns every Divergence, NoOrigin first, which an Origin never holds: it is nil then.
+// Divergences returns every Divergence an Origin holds: NoOrigin is none, the Origin is nil then.
 func Divergences() []Divergence {
-	return []Divergence{NoOrigin, UpToDate, Behind, Ahead, Diverged}
+	return []Divergence{UpToDate, Behind, Ahead, Diverged}
 }
 
 // Branches is the repository's local branches and the branches of origin.

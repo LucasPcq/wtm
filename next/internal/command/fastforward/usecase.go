@@ -50,7 +50,7 @@ type Detail struct {
 // ----------------------------------------------------------------------------
 // Run
 
-// Run carries out the request under its operation: it takes the locks (none on a dry run, which plans once), plans under them, fingerprints the plan, stops on a dry run, refuses a stale plan and applies it between the operation's started and finished events. An error returned is a refusal before the apply, an unsafe worktree named among them; a failure during the apply is in the Outcome's Result.
+// Run carries out the request under its operation: it takes the locks (none on a dry run, which plans once), fetches origin, plans under them, fingerprints the plan, stops on a dry run, refuses a stale plan and applies it between the operation's started and finished events. An error returned is a refusal before the apply, an unsafe worktree named among them; a failure during the apply is in the Outcome's Result.
 func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (Outcome, error) {
 	// 1. Begin the operation, which takes the request's locks before anything is read, so the facts cannot change under the plan; a dry run takes none.
 	op, err := u.Operations.Begin(Name, req.Locks(), opts)
@@ -59,27 +59,33 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 	}
 	defer op.End()
 
-	// 2. Plan; a plan moving a worktree the request did not name, every worktree asked, is planned again once that lock is held.
+	// 2. Fetch origin once, so each worktree stands where origin has it now; a fetch that fails leaves the plan on origin as last fetched, said in a warning.
+	fetched := u.Git.Fetch(ctx)
+	if fetched != nil && ctx.Err() != nil {
+		return Outcome{Op: op.ID}, ctx.Err()
+	}
+
+	// 3. Plan; a plan moving a worktree the request did not name, one the command chose, is planned again once that lock is held.
 	plan, warnings, err := operation.PlanUnderLocks(ctx, op, func(ctx context.Context) (Plan, []domain.Warning, error) {
-		return u.Plan(ctx, req)
+		return u.Plan(ctx, req, fetched)
 	})
 	if err != nil {
 		return Outcome{Op: op.ID}, err
 	}
 
-	// 3. Fingerprint what would be applied; a dry run ends here with the plan and its fingerprint.
+	// 4. Fingerprint what would be applied; a dry run ends here with the plan and its fingerprint.
 	outcome := Outcome{Op: op.ID, Plan: plan, Warnings: warnings}
 	outcome.Fingerprint, err = operation.Fingerprint(plan.Fingerprinted())
 	if err != nil || opts.DryRun {
 		return outcome, err
 	}
 
-	// 4. A preview made on other facts, origin moved since among them, is refused rather than applied.
+	// 5. A preview made on other facts, origin moved since among them, is refused rather than applied.
 	if err := op.Expect(outcome.Fingerprint); err != nil {
 		return outcome, err
 	}
 
-	// 5. Apply between the started and finished events other processes listen to.
+	// 6. Apply between the started and finished events other processes listen to.
 	report := op.Started()
 	result := u.Apply(ctx, plan, report)
 	op.Finished(result.Failure())
@@ -92,19 +98,13 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 // ----------------------------------------------------------------------------
 // Plan
 
-// Plan decides what the request does to the repository as origin has it now, fetching origin first: the plan and its warnings, or the refusal that stops the request (a *domain.Error, field errors and unsafe worktrees with CodeUnsafe included).
-func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning, error) {
-	// Fetched before the snapshot, so where each branch stands is origin's now; a fetch that fails leaves the plan on origin as last fetched, said in a warning.
-	fetchErr := u.Git.Fetch(ctx)
-	if fetchErr != nil && ctx.Err() != nil {
-		return Plan{}, nil, ctx.Err()
-	}
-
+// Plan decides what the request does to the repository as origin was fetched last, fetched said why that fetch failed, nil when it did not: the plan and its warnings, or the refusal that stops the request (a *domain.Error, field errors and unsafe worktrees with CodeUnsafe included).
+func (u UseCase) Plan(ctx context.Context, req Request, fetched error) (Plan, []domain.Warning, error) {
 	facts, err := u.Observe(ctx, req)
 	if err != nil {
 		return Plan{}, nil, err
 	}
-	facts.FetchErr = fetchErr
+	facts.FetchErr = fetched
 
 	resolved, err := Resolve(facts, req)
 	if err != nil {
@@ -201,7 +201,8 @@ func (u UseCase) advance(ctx context.Context, plan Plan, a Advance, report domai
 	shielded, release := u.Shield(ctx)
 	defer release()
 	report(domain.PhaseStarted{Subject: a.Worktree, Phase: domain.PhaseFastForward})
-	forwarded := u.Provision.FastForward(shielded, provision.FastForwardParams{Subject: a.Worktree, CheckedOutAt: a.Path, Force: plan.Force})
+	// Onto the commit planned, which the fingerprint covers: origin's branch may have moved on since.
+	forwarded := u.Provision.FastForward(shielded, provision.FastForwardParams{Subject: a.Worktree, CheckedOutAt: a.Path, Force: plan.Force, Onto: a.To})
 	report(domain.PhaseFinished{Subject: a.Worktree, Phase: domain.PhaseFastForward, Failed: forwarded.Failed()})
 
 	if forwarded.Failed() {
@@ -222,10 +223,6 @@ func failure(a Advance, forwarded provision.FastForwarded) *domain.Error {
 		return &domain.Error{Kind: domain.KindConflict, Code: CodeBusy, Message: messageBusy, Params: params}
 	}
 
-	code, message := CodeFailed, messageFailed
-	if forwarded.Unfetched {
-		code, message = CodeFetchFailed, messageFetchFailed
-	}
 	params["cause"] = forwarded.Err.Error()
-	return domain.AsError(domain.AsErrorParams{Err: forwarded.Err, Code: code, Message: message, Params: params})
+	return domain.AsError(domain.AsErrorParams{Err: forwarded.Err, Code: CodeFailed, Message: messageFailed, Params: params})
 }

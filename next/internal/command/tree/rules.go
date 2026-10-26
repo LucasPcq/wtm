@@ -179,7 +179,7 @@ var finishing = map[worktree.Operation]string{
 // commandSync is the command that rebases a worktree onto its parent, answered by the worktree.
 const commandSync = "sync"
 
-// Actions is what the worktree of detail needs next, the first that applies: an operation git stopped in the middle of (a rebase, a bisect, a merge…) is finished in it, one its merged pull request cleans (worktree.Repository.Cleans) is cleaned, one behind origin is fast-forwarded, one behind its parent is synced onto it; none otherwise.
+// Actions is what the worktree of detail needs next, the first that applies: an operation git stopped in the middle of (a rebase, a bisect, a merge…) is finished in it, one its merged pull request cleans (worktree.Repository.Cleans) is cleaned; one whose directory is gone has nothing to move; one behind origin is fast-forwarded, one behind its parent is synced onto it; none otherwise.
 func Actions(detail Detail, cleans bool) []domain.FollowUp {
 	var command, message string
 	switch {
@@ -187,6 +187,8 @@ func Actions(detail Detail, cleans bool) []domain.FollowUp {
 		command, message = domain.CommandGo, "Go to the worktree to finish its "+finishing[detail.Condition.Operation()]
 	case cleans:
 		command, message = domain.CommandPrune, "Prune the worktree: its pull request is merged"
+	case detail.Missing:
+		return []domain.FollowUp{}
 	case detail.Origin != nil && detail.Origin.State == worktree.Behind:
 		command, message = domain.CommandFastForward, "Fast-forward the worktree: origin has commits it lacks"
 	case detail.NeedsSync:

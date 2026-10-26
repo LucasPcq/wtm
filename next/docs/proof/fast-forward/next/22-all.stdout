@@ -5,12 +5,12 @@
   Up to date    main, feat/ahead (ahead of origin), feat/behind, feat/dirty, feat/fp, feat/json, feat/quiet, feat/uptodate
   Left as is    feat/clash (uncommitted changes), feat/diverged (diverged from origin), feat/noremote (not on origin), feat/rebasing (an operation is under way)
 
-  ! feat/clash has uncommitted changes: left as it is
   ! feat/diverged has diverged from origin (1 ahead, 1 behind): left as it is
   ! origin has no branch feat/noremote: nothing to fast-forward it to
   ! feat/rebasing is in the middle of an operation (rebasing): left as it is
+  ! feat/clash is kept as it is: uncommitted changes
 
-  → wtm fast-forward feat/clash --force   fast-forward it anyway
   → wtm sync feat/diverged                     rebase it
   → wtm go feat/rebasing                       finish it in the worktree
+  → wtm fast-forward feat/clash --force   fast-forward them anyway
 

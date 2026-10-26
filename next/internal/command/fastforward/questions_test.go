@@ -33,12 +33,12 @@ func TestThePickerPicksTheWorktreesBehindOriginByDefault(t *testing.T) {
 	assert.Equal(t, domain.OriginDefault, worktrees.Origin)
 }
 
-func TestTheDefaultPickMovesWhatEveryWorktreeMoves(t *testing.T) {
+func TestTheDefaultPickIsWhatARequestNamingNoneMoves(t *testing.T) {
 	w := newWorld(t)
 	worktrees, ok := fieldOf(w.questions(t, fastforward.Request{}).Form(), domain.PathWorktree).(domain.MultiSelectField)
 	require.True(t, ok)
 
-	planned, _ := w.plan(t, fastforward.Request{All: true})
+	planned, _ := w.plan(t, fastforward.Request{})
 
 	assert.Equal(t, append(worktrees.Picked, stale), moving(planned), "stale is behind only once origin is fetched")
 }
@@ -50,13 +50,14 @@ func TestForceIsAskedOnlyWhenAWorktreeBehindOriginHasUncommittedChanges(t *testi
 	assert.Empty(t, fieldOf(w.questions(t, naming(behind, dirty)).Form(), fastforward.PathForce).Spec().Skip)
 	assert.Equal(t, []string{dirty}, []string{w.questions(t, naming(behind, dirty)).Unsafe[0].Worktree})
 	assert.Equal(t, domain.SkipSafe, fieldOf(w.questions(t, fastforward.Request{All: true}).Form(), fastforward.PathForce).Spec().Skip)
+	assert.Equal(t, domain.SkipSafe, fieldOf(w.questions(t, fastforward.Request{}).Form(), fastforward.PathForce).Spec().Skip)
 }
 
 func TestEveryWorktreeSkipsThePickerAndRefusesAName(t *testing.T) {
 	w := newWorld(t)
 
 	assert.Equal(t, domain.SkipAll, fieldOf(w.questions(t, fastforward.Request{All: true}).Form(), domain.PathWorktree).Spec().Skip)
-	assert.Equal(t, map[string][]string{fastforward.PathAll: {fastforward.CodeAllWithWorktree}}, fieldCodes(w.questions(t, fastforward.Request{All: true, Worktrees: []string{behind}}).Errors))
+	assert.Equal(t, map[string][]string{fastforward.PathAll: {fastforward.CodeAllAndNames}}, fieldCodes(w.questions(t, fastforward.Request{All: true, Worktrees: []string{behind}}).Errors))
 }
 
 func TestEachEntryItCannotTakeIsAProblemOfItsOwn(t *testing.T) {
@@ -74,14 +75,10 @@ func TestEachEntryItCannotTakeIsAProblemOfItsOwn(t *testing.T) {
 	}, fieldCodes(q.Errors))
 }
 
-func TestNothingAskedIsRequired(t *testing.T) {
+func TestNamingNoneIsNoProblemOfTheCore(t *testing.T) {
 	w := newWorld(t)
 
-	_, _, err := w.usecase.Plan(t.Context(), fastforward.Request{})
-
-	refused := failureOf(t, err)
-	assert.Equal(t, domain.KindInvalid, refused.Kind)
-	assert.Equal(t, map[string][]string{domain.PathWorktree: {domain.CodeRequired}}, fieldCodes(refused.Fields))
+	assert.Empty(t, w.questions(t, fastforward.Request{}).Errors)
 }
 
 func TestTheRequestRoundTripsThroughItsForm(t *testing.T) {

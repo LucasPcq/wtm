@@ -174,32 +174,6 @@
   "follow_ups": [],
   "warnings": [
     {
-      "code": "fast-forward.dirty",
-      "params": {
-        "worktree": "feat/dirty"
-      },
-      "message": "feat/dirty has uncommitted changes: left as it is",
-      "follow_up": {
-        "command": "fast-forward",
-        "answers": [
-          {
-            "path": "worktree",
-            "values": [
-              "feat/dirty"
-            ]
-          },
-          {
-            "path": "force",
-            "values": [
-              "true"
-            ]
-          }
-        ],
-        "code": "fast-forward.force",
-        "message": "fast-forward it anyway"
-      }
-    },
-    {
       "code": "fast-forward.diverged",
       "params": {
         "ahead": "1",
@@ -219,6 +193,33 @@
         ],
         "code": "fast-forward.sync",
         "message": "rebase it"
+      }
+    },
+    {
+      "code": "fast-forward.kept",
+      "params": {
+        "blockers": "dirty",
+        "worktree": "feat/dirty"
+      },
+      "message": "feat/dirty is kept as it is: uncommitted changes",
+      "follow_up": {
+        "command": "fast-forward",
+        "answers": [
+          {
+            "path": "worktree",
+            "values": [
+              "feat/dirty"
+            ]
+          },
+          {
+            "path": "force",
+            "values": [
+              "true"
+            ]
+          }
+        ],
+        "code": "fast-forward.force",
+        "message": "fast-forward them anyway"
       }
     }
   ]

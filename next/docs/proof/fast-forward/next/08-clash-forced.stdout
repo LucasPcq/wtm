@@ -3,7 +3,7 @@
 
   Fast-forward  feat/clash (1 commit; uncommitted changes, forced)
 
-  ✗ feat/clash  git refused to move the branch: git -C <SB>/acme.trees/feat-clash merge --ff-only refs/remotes/origin/feat/clash: error: The following untracked working tree files would be overwritten by merge:
+  ✗ feat/clash  git refused to move the branch: git -C <SB>/acme.trees/feat-clash merge --ff-only <SHA>: error: The following untracked working tree files would be overwritten by merge:
     	clash.txt
     Please move or remove them before you merge.
     Aborting

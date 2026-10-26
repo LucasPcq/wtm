@@ -62,8 +62,8 @@ func (f Facts) subject(name string) (worktree.Worktree, bool) {
 	return f.Worktrees[at], true
 }
 
-// behind are the worktrees every worktree asked would move as origin was last fetched, the main one first: the worktrees picked by default. One with uncommitted changes is left out, as the command leaves it when it chose it.
-func (f Facts) behind() []string {
+// picked are the worktrees picked by default, as origin was last fetched, the main one first: those behind it, but one with uncommitted changes, which the command keeps when it chose it.
+func (f Facts) picked() []string {
 	var names []string
 	for _, w := range f.onBranch() {
 		if check := f.Checks[w.Name()]; f.standing(w, check) == StandingBehind && !check.Dirty() {
@@ -86,13 +86,13 @@ func (f Facts) remoteTip(name string) string {
 // ----------------------------------------------------------------------------
 // The decision of each worktree
 
-// A Standing is where a worktree stands for a fast-forward, the first that applies: an operation git stopped in the middle of (a rebase, a bisect, a merge…), its directory gone, no branch of its name on origin, or its branch diverged from origin's, ahead of it, up to date, or behind it, the only standing that moves.
+// A Standing is where a worktree stands for a fast-forward, the first that applies: its directory gone, an operation git stopped in the middle of (a rebase, a bisect, a merge…), no branch of its name on origin, or its branch diverged from origin's, ahead of it, up to date, or behind it, the only standing that moves.
 type Standing string
 
 // The standings of a worktree.
 const (
-	StandingBusy     Standing = "busy"
 	StandingMissing  Standing = "missing"
+	StandingBusy     Standing = "busy"
 	StandingNoOrigin Standing = "no_origin"
 	StandingDiverged Standing = "diverged"
 	StandingAhead    Standing = "ahead"
@@ -102,7 +102,7 @@ const (
 
 // Standings returns every Standing.
 func Standings() []Standing {
-	return []Standing{StandingBusy, StandingMissing, StandingNoOrigin, StandingDiverged, StandingAhead, StandingUpToDate, StandingBehind}
+	return []Standing{StandingMissing, StandingBusy, StandingNoOrigin, StandingDiverged, StandingAhead, StandingUpToDate, StandingBehind}
 }
 
 // A Blocker is what makes a worktree behind origin unsafe to fast-forward: a safety refusal, which only Force lifts.
@@ -151,10 +151,10 @@ func (f Facts) advance(w worktree.Worktree, entry int) Advance {
 
 func (f Facts) standing(w worktree.Worktree, check Check) Standing {
 	switch {
-	case w.Operation() != "":
-		return StandingBusy
 	case w.Prunable || check.Missing:
 		return StandingMissing
+	case w.Operation() != "":
+		return StandingBusy
 	}
 
 	switch f.Standing(w.Branch()) {
@@ -178,10 +178,10 @@ func unsafe(advances []Advance) []Advance {
 // ----------------------------------------------------------------------------
 // Decide
 
-// Decide turns the facts and the resolved request into the plan and its warnings: each worktree behind origin moves, the others stay as they are. An unsafe worktree, unforced, refuses the whole request with CodeUnsafe when the request named it, and is left as it is when the request asked for every worktree: the command chose it, not the user.
+// Decide turns the facts and the resolved request into the plan and its warnings: each worktree behind origin moves, the others stay as they are. An unsafe worktree, unforced, refuses the whole request with CodeUnsafe when the request named it, and is kept as it is, its blockers and no phase, when the command chose it.
 func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	advances, _ := f.entries(req)
-	if blocked := unsafe(advances); len(blocked) > 0 && !req.Force && !req.All {
+	if blocked := unsafe(advances); len(blocked) > 0 && !req.Force && req.named() {
 		return Plan{}, nil, refusal(blocked, req)
 	}
 
@@ -204,13 +204,15 @@ const (
 	CodeForce  = Name + ".force"
 )
 
-// refusal refuses the request with CodeUnsafe: a problem per unsafe worktree, on its entry, followed by the request forced.
+// refusal refuses the request with CodeUnsafe: a problem per blocker of each unsafe worktree, on its entry, coded fast-forward.<blocker>, followed by the request forced.
 func refusal(blocked []Advance, req Request) *domain.Error {
-	fields := make([]domain.FieldError, 0, len(blocked))
+	var fields []domain.FieldError
 	names := make([]string, 0, len(blocked))
 	for _, a := range blocked {
 		names = append(names, a.Worktree)
-		fields = append(fields, domain.FieldError{Path: entryPath(a.entry), Code: CodeDirty, Template: "{value} has uncommitted changes", Params: domain.Params{"value": a.Worktree}})
+		for _, blocker := range a.Blockers {
+			fields = append(fields, domain.FieldError{Path: entryPath(a.entry), Code: Name + "." + string(blocker), Template: "{value} has " + blockerWords[blocker], Params: domain.Params{"value": a.Worktree}})
+		}
 	}
 
 	forced := Request{Worktrees: req.Worktrees, Force: true}
@@ -224,9 +226,17 @@ func refusal(blocked []Advance, req Request) *domain.Error {
 	}
 }
 
+// blockerWords say what each blocker is, after "has".
+var blockerWords = map[Blocker]string{BlockerDirty: "uncommitted changes"}
+
+// CodeDirty is the problem of a named worktree with uncommitted changes, and the failure of one that gained them since the plan; CodeKept warns of a worktree the command chose and kept for its blockers.
+const (
+	CodeDirty = Name + "." + string(BlockerDirty)
+	CodeKept  = Name + ".kept"
+)
+
 // The codes of the warnings of a worktree left as it is, and of a fetch that failed: each says why it is left, followed by what moves it on.
 const (
-	CodeDirty       = Name + ".dirty"
 	CodeDiverged    = Name + ".diverged"
 	CodeNoOrigin    = Name + ".no_origin"
 	CodeBusy        = Name + ".busy"
@@ -240,7 +250,7 @@ const (
 // commandSync rebases a worktree onto its parent: not migrated yet.
 const commandSync = "sync"
 
-// warnings are what the plan cannot see to or leaves as it is: the fetch that failed, then each worktree left, by why, with the command that moves it on.
+// warnings are what the plan cannot see to or leaves as it is: the fetch that failed, each worktree left, by why, with the command that moves it on, then each worktree kept (kept).
 func (f Facts) warnings(planned Plan) []domain.Warning {
 	var warnings []domain.Warning
 	if f.FetchErr != nil {
@@ -253,17 +263,38 @@ func (f Facts) warnings(planned Plan) []domain.Warning {
 		}
 	}
 
+	return append(warnings, kept(planned.Worktrees)...)
+}
+
+// kept warns of each worktree the command chose and kept for its blockers, the last followed by the one request that forces every one of them.
+func kept(advances []Advance) []domain.Warning {
+	var warnings []domain.Warning
+	var names []string
+	for _, a := range advances {
+		if a.moves() || len(a.Blockers) == 0 {
+			continue
+		}
+		reasons := make([]string, 0, len(a.Blockers))
+		for _, blocker := range a.Blockers {
+			reasons = append(reasons, blockerWords[blocker])
+		}
+		names = append(names, a.Worktree)
+		warnings = append(warnings, domain.Warning{Code: CodeKept, Message: a.Worktree + " is kept as it is: " + strings.Join(reasons, ", "), Params: domain.Params{"worktree": a.Worktree, "blockers": strings.Join(domain.Names(a.Blockers), ",")}})
+	}
+	if len(warnings) == 0 {
+		return nil
+	}
+
+	forced := domain.AnswersOf(Questions{}.Form(), Request{Worktrees: names, Force: true})
+	warnings[len(warnings)-1].FollowUp = &domain.FollowUp{Command: Name, Answers: forced, Code: CodeForce, Message: "fast-forward them anyway"}
 	return warnings
 }
 
-// leftWarning is the warning of a worktree the plan leaves as it is, and whether it has one: up to date or ahead, it has nothing to say.
+// leftWarning is the warning of a worktree the plan leaves as it is, and whether it has one: up to date or ahead, it has nothing to say, and one kept behind origin is warned of by kept.
 func leftWarning(a Advance) (domain.Warning, bool) {
 	params := domain.Params{"worktree": a.Worktree}
 	on := []domain.Answered{{Path: domain.PathWorktree, Values: []string{a.Worktree}}}
 	switch a.Standing {
-	case StandingBehind:
-		forced := domain.AnswersOf(Questions{}.Form(), Request{Worktrees: []string{a.Worktree}, Force: true})
-		return domain.Warning{Code: CodeDirty, Message: a.Worktree + " has uncommitted changes: left as it is", Params: params, FollowUp: &domain.FollowUp{Command: Name, Answers: forced, Code: CodeForce, Message: "fast-forward it anyway"}}, true
 	case StandingDiverged:
 		params["ahead"], params["behind"] = strconv.Itoa(a.Origin.Ahead), strconv.Itoa(a.Origin.Behind)
 		return domain.Warning{Code: CodeDiverged, Message: a.Worktree + " has diverged from origin (" + params["ahead"] + " ahead, " + params["behind"] + " behind): left as it is", Params: params, FollowUp: &domain.FollowUp{Command: commandSync, Answers: on, Code: CodeSync, Message: "rebase it"}}, true
@@ -275,7 +306,7 @@ func leftWarning(a Advance) (domain.Warning, bool) {
 		return domain.Warning{Code: CodeBusy, Message: a.Worktree + " is in the middle of an operation (" + string(a.Operation) + "): left as it is", Params: params, FollowUp: &enter}, true
 	case StandingMissing:
 		return domain.Warning{Code: CodeMissing, Message: a.Worktree + "'s directory is gone: left as it is", Params: params, FollowUp: &domain.FollowUp{Command: domain.CommandClean, Answers: on, Code: CodeClean, Message: "remove what is left of it"}}, true
-	case StandingAhead, StandingUpToDate:
+	case StandingBehind, StandingAhead, StandingUpToDate:
 	}
 
 	return domain.Warning{}, false
@@ -391,8 +422,7 @@ const CodeFailed = Name + ".failed"
 
 // The messages of a worktree that failed to move, one fixed line per code, the cause git gave in its params.
 const (
-	messageFailed      = "git refused to move the branch"
-	messageFetchFailed = "couldn't fetch the branch from origin"
-	messageDirty       = "the worktree has uncommitted changes"
-	messageBusy        = "the worktree is in the middle of a rebase or a bisect"
+	messageFailed = "git refused to move the branch"
+	messageDirty  = "the worktree has uncommitted changes"
+	messageBusy   = "the worktree is in the middle of an operation"
 )

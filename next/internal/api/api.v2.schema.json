@@ -2357,7 +2357,7 @@
           "type": "string"
         },
         "operation": {
-          "type": "string"
+          "$ref": "#/$defs/worktree.Operation"
         },
         "origin": {
           "anyOf": [
@@ -2473,8 +2473,8 @@
     "fastforward.Standing": {
       "description": "Where a worktree stands for a fast-forward, the first that applies; only behind moves.",
       "enum": [
-        "busy",
         "missing",
+        "busy",
         "no_origin",
         "diverged",
         "ahead",
@@ -4454,7 +4454,6 @@
     "worktree.Divergence": {
       "description": "Where a branch stands against origin's branch of the same name.",
       "enum": [
-        "",
         "up-to-date",
         "behind",
         "ahead",
@@ -4495,6 +4494,17 @@
         "env_strategy"
       ],
       "type": "object"
+    },
+    "worktree.Operation": {
+      "description": "What git stopped in the middle of in a worktree, to continue or abort there.",
+      "enum": [
+        "rebasing",
+        "bisecting",
+        "merging",
+        "cherry_picking",
+        "reverting",
+        "applying"
+      ]
     },
     "worktree.Origin": {
       "additionalProperties": false,

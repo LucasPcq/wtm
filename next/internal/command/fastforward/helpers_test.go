@@ -3,6 +3,7 @@ package fastforward_test
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -38,7 +39,7 @@ func (w world) questions(t *testing.T, req fastforward.Request) fastforward.Ques
 
 func (w world) plan(t *testing.T, req fastforward.Request) (fastforward.Plan, []domain.Warning) {
 	t.Helper()
-	planned, warnings, err := w.usecase.Plan(t.Context(), req)
+	planned, warnings, err := w.usecase.Plan(t.Context(), req, w.usecase.Git.Fetch(t.Context()))
 	require.NoError(t, err)
 	return planned, warnings
 }
@@ -56,6 +57,14 @@ func (w world) pushed(t *testing.T, name string) {
 	t.Helper()
 	commit := gittest.Output(t, w.main, "commit-tree", "origin/"+name+"^{tree}", "-p", "origin/"+name, "-m", "pushed since")
 	gittest.Git(t, w.main, "push", "-q", "origin", commit+":refs/heads/"+name)
+}
+
+// stopInARebase starts a rebase in the worktree of name that stops on its first commit, as one waiting for the user.
+func (w world) stopInARebase(t *testing.T, name string) {
+	t.Helper()
+	// the rebase stops on purpose, so git exits non-zero
+	_ = exec.Command("git", "-C", w.at(name), "-c", "user.email=dev@acme.dev", "-c", "user.name=Dev", "rebase", "-q", "--exec", "false", "--root").Run()
+	require.DirExists(t, gittest.Output(t, w.at(name), "rev-parse", "--git-path", "rebase-merge"))
 }
 
 // dirtied leaves an untracked file in the worktree of name.
@@ -117,6 +126,24 @@ func itemsOf(outcome fastforward.Outcome) map[string]fastforward.Item {
 	found := map[string]fastforward.Item{}
 	for _, item := range outcome.Result.Items {
 		found[item.Subject] = item
+	}
+	return found
+}
+
+func keptOf(warnings []domain.Warning) []domain.Warning {
+	var found []domain.Warning
+	for _, warning := range warnings {
+		if warning.Code == fastforward.CodeKept {
+			found = append(found, warning)
+		}
+	}
+	return found
+}
+
+func sortedSubjects(outcome fastforward.Outcome) []string {
+	var found []string
+	for _, item := range outcome.Result.Items {
+		found = append(found, item.Subject)
 	}
 	return found
 }

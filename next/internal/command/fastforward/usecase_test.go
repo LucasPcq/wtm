@@ -107,22 +107,37 @@ func TestANamedDirtyWorktreeBehindOriginRefusesTheRequestAndNamesEachOne(t *test
 	assert.Equal(t, before, w.tip(t, stale))
 }
 
-func TestADirtyWorktreeTheCommandSelectedIsLeftWithTheRequestThatForcesIt(t *testing.T) {
+func TestADirtyWorktreeTheCommandChoseIsKeptWithOneRequestForcingEveryOne(t *testing.T) {
 	w := newWorld(t)
+	w.dirtied(t, behind)
 
 	outcome, _ := w.run(t, fastforward.Request{All: true})
 
-	assert.Equal(t, domain.ReasonRuledOut, itemsOf(outcome)[dirty].Reason)
-	at := 0
-	for i, warning := range outcome.Warnings {
-		if warning.Code == fastforward.CodeDirty {
-			at = i
+	var kept []domain.Warning
+	for _, warning := range outcome.Warnings {
+		if warning.Code == fastforward.CodeKept {
+			kept = append(kept, warning)
 		}
 	}
-	forced := outcome.Warnings[at].FollowUp
-	require.NotNil(t, forced)
-	assert.Equal(t, fastforward.Name, forced.Command)
-	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{dirty}}, {Path: fastforward.PathForce, Values: []string{"true"}}}, forced.Answers)
+	require.Len(t, kept, 2)
+	assert.Equal(t, domain.Params{"worktree": behind, "blockers": "dirty"}, kept[0].Params)
+	assert.Nil(t, kept[0].FollowUp)
+	assert.Equal(t, fastforward.CodeForce, kept[1].FollowUp.Code)
+	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{behind, dirty}}, {Path: fastforward.PathForce, Values: []string{"true"}}}, kept[1].FollowUp.Answers)
+	for _, name := range []string{behind, dirty} {
+		assert.Equal(t, domain.ReasonRuledOut, itemsOf(outcome)[name].Reason, name)
+	}
+}
+
+func TestNamingNoneMovesTheWorktreesBehindOriginAndKeepsTheDirtyOnes(t *testing.T) {
+	w := newWorld(t)
+
+	outcome, _ := w.run(t, fastforward.Request{})
+
+	assert.Equal(t, []string{"main", behind, dirty, stale}, sortedSubjects(outcome))
+	assert.Equal(t, []string{"main", behind, stale}, moving(outcome.Plan))
+	assert.Equal(t, []fastforward.Blocker{fastforward.BlockerDirty}, outcome.Plan.Worktrees[2].Blockers)
+	assert.Equal(t, domain.ReasonRuledOut, itemsOf(outcome)[dirty].Reason)
 }
 
 func TestForceMovesADirtyWorktree(t *testing.T) {
@@ -180,7 +195,7 @@ func TestAFetchThatFailsIsAWarningAndThePlanStandsOnOriginAsLastFetched(t *testi
 
 func TestAWorktreeGitRefusesToMoveFailsAloneWithGitsOwnWords(t *testing.T) {
 	w := newWorld(t)
-	w.usecase.Provision.Git = refusingMerge{w.repo}
+	w.usecase.Provision.Git = refusingMerge{Repo: w.repo, path: w.at(behind)}
 
 	outcome, _ := w.run(t, naming(behind, "main"))
 
@@ -189,19 +204,34 @@ func TestAWorktreeGitRefusesToMoveFailsAloneWithGitsOwnWords(t *testing.T) {
 	assert.Equal(t, fastforward.CodeFailed, failed.Err.Code)
 	assert.Equal(t, "git refused to move the branch", failed.Err.Message)
 	assert.Equal(t, domain.Params{"branch": behind, "path": w.at(behind), "cause": errRefused.Error()}, failed.Err.Params)
-	assert.Equal(t, domain.StatusFailed, itemsOf(outcome)["main"].Status)
+	assert.Equal(t, domain.StatusDone, itemsOf(outcome)["main"].Status)
+	assert.True(t, w.moved(t, "main"))
 }
 
-func TestAFetchOfTheBranchThatFailsAtTheApplyIsSaidSo(t *testing.T) {
+func TestTheApplyLandsOnTheCommitPlannedThoughOriginMovedSince(t *testing.T) {
 	w := newWorld(t)
-	w.usecase.Provision.Git = unfetchable{w.repo}
+	planned, _ := w.plan(t, naming(behind))
+	w.pushed(t, behind)
 
-	outcome, _ := w.run(t, naming(behind))
+	result := w.usecase.Apply(t.Context(), planned, (&operationtest.Recorder{}).Add)
 
-	failed := itemsOf(outcome)[behind].Err
-	assert.Equal(t, fastforward.CodeFetchFailed, failed.Code)
-	assert.Equal(t, "couldn't fetch the branch from origin", failed.Message)
-	assert.Equal(t, errUnreachable.Error(), failed.Params["cause"])
+	assert.Equal(t, domain.StatusDone, result.Items[0].Status)
+	assert.Equal(t, planned.Worktrees[0].To, w.tip(t, behind))
+	assert.Equal(t, planned.Worktrees[0].To, result.Items[0].Detail.To)
+	assert.NotEqual(t, w.tip(t, behind), gittest.Output(t, w.main, "ls-remote", "origin", "refs/heads/"+behind)[:40])
+}
+
+func TestAWorktreeStartedInARebaseSinceThePlanFailsAloneAndSaysSo(t *testing.T) {
+	w := newWorld(t)
+	planned, _ := w.plan(t, naming(behind, "main"))
+	w.stopInARebase(t, behind)
+
+	result := w.usecase.Apply(t.Context(), planned, (&operationtest.Recorder{}).Add)
+
+	assert.Equal(t, domain.StatusFailed, result.Items[0].Status)
+	assert.Equal(t, fastforward.CodeBusy, result.Items[0].Err.Code)
+	assert.Equal(t, "the worktree is in the middle of an operation", result.Items[0].Err.Message)
+	assert.Equal(t, domain.StatusDone, result.Items[1].Status)
 }
 
 func TestAWorktreeDirtiedSinceThePlanFailsAloneAndSaysSo(t *testing.T) {

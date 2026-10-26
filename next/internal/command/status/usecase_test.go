@@ -431,6 +431,24 @@ func TestAMergedPullRequestAsksToCleanABranchBehindItsHeadButNotOneMovedOnOrApar
 	}
 }
 
+func TestABranchDivergedFromOriginIsNotOfferedAFastForward(t *testing.T) {
+	w := newWorld(seed{
+		Git: gittest.FakeParams{
+			Remote:    []string{"feat/a"},
+			Worktrees: []worktree.Worktree{linked("feat/a")},
+			Commits: map[worktree.Ref][]string{
+				worktree.LocalBranch{Name: "feat/a"}:  {"mine"},
+				worktree.RemoteBranch{Name: "feat/a"}: {"theirs"},
+			},
+		},
+	})
+
+	a := only(t, read(t, w, status.Request{Worktree: "feat/a"}))
+
+	assert.Equal(t, worktree.Diverged, a.Origin.State)
+	assert.NotContains(t, problemCodes(a.Problems), status.CodeBehindOrigin)
+}
+
 func TestGitHubIsAskedOfTheBranchesReadOnly(t *testing.T) {
 	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), linked("feat/b"), {Path: "/repo/.trees/detached", State: worktree.Detached{}}}}})
 

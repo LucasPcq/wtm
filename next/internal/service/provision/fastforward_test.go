@@ -35,6 +35,21 @@ func TestASourceCheckedOutIsMovedInItsWorktree(t *testing.T) {
 	assert.NotEqual(t, before, gittest.Output(t, u.linked, "rev-parse", "HEAD"))
 }
 
+func TestAFastForwardOntoACommitLandsThereWhateverOriginHasSince(t *testing.T) {
+	u := behindOrigin(t, upstreamSeed{Linked: true})
+	gittest.Git(t, u.main, "fetch", "-q", "origin")
+	onto := gittest.Output(t, u.main, "rev-parse", "origin/"+existing)
+	later := gittest.Output(t, u.main, "commit-tree", onto+"^{tree}", "-p", onto, "-m", "pushed since")
+	gittest.Git(t, u.main, "push", "-q", "origin", later+":refs/heads/"+existing)
+	gittest.Git(t, u.main, "update-ref", "refs/remotes/origin/"+existing, onto)
+
+	forwarded := u.service.FastForward(t.Context(), provision.FastForwardParams{Subject: existing, CheckedOutAt: u.linked, Onto: onto})
+
+	assert.Equal(t, provision.FastForwarded{}, forwarded)
+	assert.Equal(t, onto, gittest.Output(t, u.linked, "rev-parse", "HEAD"))
+	assert.Equal(t, onto, gittest.Output(t, u.main, "rev-parse", "origin/"+existing), "nothing is fetched again")
+}
+
 func TestASourceWithUncommittedChangesIsLeftWhereItIs(t *testing.T) {
 	u := behindOrigin(t, upstreamSeed{Linked: true, Dirty: true})
 	before := gittest.Output(t, u.linked, "rev-parse", "HEAD")
@@ -65,27 +80,24 @@ func TestASourceWorktreeStoppedInARebaseIsLeftWhereItIs(t *testing.T) {
 	assert.Equal(t, branch, gittest.Output(t, u.main, "rev-parse", existing))
 }
 
-func TestASourceWorktreeStoppedInAMergeIsLeftWhereItIs(t *testing.T) {
-	u := behindOrigin(t, upstreamSeed{Linked: true, Midway: worktree.MidwayCherryPick})
-	head := gittest.Output(t, u.linked, "rev-parse", "HEAD")
+func TestASourceWorktreeStoppedInAnyOperationIsLeftWhereItIs(t *testing.T) {
+	for _, midway := range worktree.Midways() {
+		t.Run(string(midway), func(t *testing.T) {
+			u := behindOrigin(t, upstreamSeed{Linked: true, Midway: midway})
+			head := gittest.Output(t, u.linked, "rev-parse", "HEAD")
 
-	forwarded := u.service.FastForward(t.Context(), provision.FastForwardParams{Subject: existing, CheckedOutAt: u.linked})
+			forwarded := u.service.FastForward(t.Context(), provision.FastForwardParams{Subject: existing, CheckedOutAt: u.linked})
 
-	assert.Equal(t, provision.FastForwarded{Busy: true}, forwarded)
-	assert.Equal(t, head, gittest.Output(t, u.linked, "rev-parse", "HEAD"))
+			assert.Equal(t, provision.FastForwarded{Busy: true}, forwarded)
+			assert.Equal(t, head, gittest.Output(t, u.linked, "rev-parse", "HEAD"))
+		})
+	}
 }
 
 func TestAFastForwardThatFailsCarriesItsCause(t *testing.T) {
-	cases := map[string]struct {
-		seed      upstreamSeed
-		unfetched bool
-	}{
-		"without_worktree": {},
-		"in_worktree":      {seed: upstreamSeed{Linked: true}, unfetched: true},
-	}
-	for name, c := range cases {
+	for name, seed := range map[string]upstreamSeed{"without_worktree": {}, "in_worktree": {Linked: true}} {
 		t.Run(name, func(t *testing.T) {
-			u := behindOrigin(t, c.seed)
+			u := behindOrigin(t, seed)
 			before := gittest.Output(t, u.main, "rev-parse", existing)
 			gittest.Git(t, u.main, "remote", "set-url", "origin", u.main+"/gone")
 
@@ -93,7 +105,6 @@ func TestAFastForwardThatFailsCarriesItsCause(t *testing.T) {
 
 			require.Error(t, forwarded.Err)
 			assert.False(t, forwarded.Dirty)
-			assert.Equal(t, c.unfetched, forwarded.Unfetched)
 			assert.Equal(t, before, gittest.Output(t, u.main, "rev-parse", existing))
 		})
 	}
@@ -113,7 +124,7 @@ func TestEachSubjectIsFastForwardedBetweenItsPhaseEventsAndThoseLeftBehindAreWar
 		}}},
 		"left_busy": {upstreamSeed{Linked: true, Rebasing: true}, nil, []domain.Warning{{
 			Code:    "create.ff_busy",
-			Message: "couldn't fast-forward " + existing + ": its worktree is in the middle of a rebase or a bisect — it starts from your local branch",
+			Message: "couldn't fast-forward " + existing + ": its worktree is in the middle of an operation — it starts from your local branch",
 			Params:  domain.Params{"branch": existing},
 		}}},
 	}

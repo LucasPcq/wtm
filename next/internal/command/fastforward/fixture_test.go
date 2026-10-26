@@ -130,13 +130,17 @@ func (l locks) Take(op domain.Operation) (operation.Hold, error) {
 	return l.Locks.Take(op)
 }
 
-// refusingMerge fast-forwards as git does but refuses every merge in a worktree, as git refuses one an untracked file stands in the way of.
+// refusingMerge fast-forwards as git does but refuses the merge in the worktree at path, as git refuses one an untracked file stands in the way of.
 type refusingMerge struct {
 	git.Repo
+	path string
 }
 
-func (refusingMerge) MergeFFOnly(context.Context, worktree.Merge) error {
-	return errRefused
+func (r refusingMerge) MergeFFOnly(ctx context.Context, merge worktree.Merge) error {
+	if merge.Path == r.path {
+		return errRefused
+	}
+	return r.Repo.MergeFFOnly(ctx, merge)
 }
 
 // unfetchable fetches nothing: origin cannot be reached.
@@ -148,6 +152,33 @@ func (unfetchable) Fetch(context.Context) error {
 	return errUnreachable
 }
 
-func (unfetchable) FetchRef(context.Context, string) error {
-	return errUnreachable
+// A seeded is one worktree of facts built by hand: its branch, where it stands against origin's (none when off origin), its uncommitted changes, its directory gone, and its state, on its branch by default.
+type seeded struct {
+	branch    string
+	offset    worktree.AheadBehind
+	offOrigin bool
+	changes   int
+	missing   bool
+	state     worktree.State
+	midway    worktree.Midway
+}
+
+// factsOf are facts as Observe would read them of worktrees, the first one the main worktree.
+func factsOf(worktrees ...seeded) fastforward.Facts {
+	facts := fastforward.Facts{Checks: map[string]fastforward.Check{}, Located: map[string]string{}}
+	facts.Divergence = map[string]worktree.AheadBehind{}
+	for i, s := range worktrees {
+		state := s.state
+		if state == nil {
+			state = worktree.OnBranch{Branch: s.branch}
+		}
+		facts.Worktrees = append(facts.Worktrees, worktree.Worktree{Path: "/repo/" + worktree.PathSegment(s.branch), Main: i == 0, State: state, Midway: s.midway})
+		facts.Branches.Local = append(facts.Branches.Local, worktree.Branch{Name: s.branch, Tip: s.branch + "-local"})
+		if !s.offOrigin {
+			facts.Branches.Remote = append(facts.Branches.Remote, worktree.Branch{Name: s.branch, Tip: s.branch + "-origin"})
+			facts.Divergence[s.branch] = s.offset
+		}
+		facts.Checks[s.branch] = fastforward.Check{Missing: s.missing, Changes: s.changes}
+	}
+	return facts
 }

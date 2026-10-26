@@ -11,7 +11,7 @@ import (
 // ----------------------------------------------------------------------------
 // The request
 
-// A Request is what the caller asks of fast-forward: the worktrees it names, each by its branch or its path, or every worktree; and whether a worktree with uncommitted changes is fast-forwarded all the same. The worktrees it names are the user's choice, every one is the command's: a named worktree it cannot move safely refuses the request, one it selected is left as it is. Caller is where the caller stands, from which a path is read; it is no field of the form: every surface sets it.
+// A Request is what the caller asks of fast-forward: the worktrees it names, each by its branch or its path, else those behind origin, or every worktree with All; and whether a worktree with uncommitted changes is fast-forwarded all the same. The worktrees it names are the user's choice, the others the command's: a named worktree it cannot move safely refuses the request, one the command chose is kept as it is. Caller is where the caller stands, from which a path is read; it is no field of the form: every surface sets it.
 type Request struct {
 	Worktrees []string      `json:"worktree"`
 	All       bool          `json:"all"`
@@ -78,13 +78,13 @@ type Questions struct {
 	Errors    []domain.FieldError
 }
 
-// Worktrees is the question of the worktrees to fast-forward: those given, else those behind origin as last fetched with no uncommitted changes, its default pick; and every worktree on a branch, the main one first, each with where it stands against origin as last fetched and its uncommitted changes.
+// Worktrees is the question of the worktrees to fast-forward: those given, else its default pick, the worktrees behind origin as last fetched but those with uncommitted changes, which the command keeps; and every worktree on a branch, the main one first, each with where it stands against origin as last fetched and its uncommitted changes.
 type Worktrees struct {
 	Picked  domain.Answer[[]string]
 	Options []domain.Option
 }
 
-// NewQuestions builds the questions for the request on the facts, as last fetched: the worktrees given, else those every worktree asked would move picked by default; the worktrees named behind origin with uncommitted changes, and whether to force them, asked only when there are some: every worktree asked leaves them as they are instead.
+// NewQuestions builds the questions for the request on the facts, as last fetched: the worktrees given, else the default pick; the worktrees named behind origin with uncommitted changes, and whether to force them, asked only when there are some: those the command chose are kept instead.
 func NewQuestions(f Facts, req Request) Questions {
 	advances, problems := f.entries(req)
 	questions := Questions{
@@ -92,12 +92,11 @@ func NewQuestions(f Facts, req Request) Questions {
 		All:       req.All,
 		Errors:    problems,
 	}
-	if !req.All {
+	if req.named() {
 		questions.Unsafe = unsafe(advances)
 	}
 	if len(req.Worktrees) == 0 && !req.All {
-		questions.Worktrees.Picked = domain.Answer[[]string]{Value: f.behind(), Origin: domain.OriginDefault}
-		questions.Errors = append(questions.Errors, domain.Required(domain.PathWorktree))
+		questions.Worktrees.Picked = domain.Answer[[]string]{Value: f.picked(), Origin: domain.OriginDefault}
 	}
 	questions.Force = confirm(req.Force, len(questions.Unsafe) == 0)
 
@@ -153,20 +152,27 @@ func Resolve(f Facts, req Request) (Request, error) {
 	return req, nil
 }
 
-// CodeAllWithWorktree refuses every worktree asked with some named; CodeDetached refuses a worktree on no branch, which has nothing to fast-forward.
+// named reports whether the request names its worktrees, the user's choice, rather than leaving them to the command.
+func (r Request) named() bool {
+	return len(r.Worktrees) > 0 && !r.All
+}
+
+// CodeAllAndNames refuses every worktree asked with some named; CodeDetached refuses a worktree on no branch, which has nothing to fast-forward.
 const (
-	CodeAllWithWorktree = Name + ".all_with_worktree"
-	CodeDetached        = Name + ".detached"
+	CodeAllAndNames = Name + ".all_and_names"
+	CodeDetached    = Name + ".detached"
 )
 
-// entries are the worktrees req asks, as advances in the order asked, every one on a branch the main first with All, and the problem of each entry it cannot take: blank, given twice, a worktree on no branch, a name that is no worktree, a name with All.
+// entries are the worktrees req asks, as advances: those it names in the order asked, else those behind origin, or every one on a branch with All, the main first; and the problem of each entry it cannot take: blank, given twice, a worktree on no branch, a name that is no worktree, a name with All.
 func (f Facts) entries(req Request) (advances []Advance, problems []domain.FieldError) {
-	if req.All {
-		if len(req.Worktrees) > 0 {
-			problems = append(problems, domain.FieldError{Path: PathAll, Code: CodeAllWithWorktree, Template: "{path} fast-forwards every worktree: name none with it"})
-		}
+	if req.All && len(req.Worktrees) > 0 {
+		problems = append(problems, domain.FieldError{Path: PathAll, Code: CodeAllAndNames, Template: "{path} fast-forwards every worktree: name none with it"})
+	}
+	if !req.named() {
 		for index, w := range f.onBranch() {
-			advances = append(advances, f.advance(w, index))
+			if advance := f.advance(w, index); req.All || advance.Standing == StandingBehind {
+				advances = append(advances, advance)
+			}
 		}
 		return advances, problems
 	}

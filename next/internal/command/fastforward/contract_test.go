@@ -22,7 +22,7 @@ func TestRunKeepsTheOperationContract(t *testing.T) {
 				w.pushed(t, behind)
 			},
 			Fail: func(*testing.T) {
-				w.usecase.Provision.Git = refusingMerge{w.repo}
+				w.usecase.Provision.Git = refusingMerge{Repo: w.repo, path: w.at(behind)}
 			},
 		}
 	})

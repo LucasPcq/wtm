@@ -113,8 +113,9 @@ func mutations() []mutation {
 			},
 		},
 		{
-			name:    "fast-forward",
-			answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/ff"}}},
+			name:     "fast-forward",
+			answers:  []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/ff"}}},
+			complete: true,
 			setup: func(t *testing.T, main string) {
 				gittest.Git(t, main, "worktree", "add", "-q", "-b", "feat/ff", filepath.Join(filepath.Dir(main), ".trees", "feat-ff"))
 				gittest.PushBranch(t, main, "feat/ff")
