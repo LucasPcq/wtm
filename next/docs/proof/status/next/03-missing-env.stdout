@@ -1,5 +1,5 @@
 
-  ! feat/b — 1 problem
+  ! feat/b — 2 problems
 
   path         <SB>/acme.trees/feat-b
   isolation    isolated
@@ -16,6 +16,8 @@
   web  stopped  port 23480
   api  stopped  port 23481
 
+  ! main has 2 commits it lacks
+  → wtm sync feat/b   sync it onto main
   ! apps/web/.env is missing
-  → wtm env feat/b
+  → wtm env feat/b   rebuild it
 

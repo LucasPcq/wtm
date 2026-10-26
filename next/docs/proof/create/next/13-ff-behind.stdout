@@ -8,5 +8,5 @@
   Fast-forward  main
   feat/ff       ../acme.trees/feat-ff · 3 ports settled (offset +110)
 
-  → wtm go feat/ff
+  → wtm go feat/ff   jump in
 

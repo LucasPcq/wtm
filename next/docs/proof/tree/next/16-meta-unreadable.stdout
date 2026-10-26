@@ -2,7 +2,7 @@
   main               origin ↑1
   ├─ feat/a          ↑2  ! dirty  ! needs sync
   ├─ feat/b          ↑1  ! locked  ! needs sync
-  ├─ feat/r          ↑1  ! rebasing  ! needs sync
+  ├─ feat/r          ↑1  ! rebasing
   └─ feat/gone       ✗ missing
   feat/a-ui          ↑4
   └─ feat/a-ui-form  ! needs sync

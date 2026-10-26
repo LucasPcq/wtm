@@ -140,7 +140,7 @@ scenario() {
   rm -f "$dir_out/.before" "$dir_out/.after"
 }
 
-# tty drives the picker in tmux from inside feat/a: the picker on it, enter reads it; then a picker left with esc.
+# tty drives the picker in tmux from inside feat/a: the picker on it, enter reads it; then a picker left with esc; then, from main, a name several worktrees match, which next picks among them and legacy refuses.
 tty() {
   local session=wtmstatus-$(basename "$root") here=$root/acme.trees/feat-a
   screen() { tmux capture-pane -p -t "$session" | cat -s; }
@@ -162,10 +162,12 @@ tty() {
   start() {
     tmux kill-session -t "$session" 2>/dev/null || true
     tmux new-session -d -s "$session" -x 100 -y 40 -c "$here" "zsh -f"
-    tmux send-keys -t "$session" "export HOME=$root/home PS1='$ ' && clear" Enter
+    tmux send-keys -t "$session" "export HOME=$root/home PATH=$root/bin:\$PATH PS1='$ ' && clear" Enter
     settle '$'
-    tmux send-keys -t "$session" "$bin status; echo EXIT=\$?" Enter
+    tmux send-keys -t "$session" "wtm status${1:+ $1}; echo EXIT=\$?" Enter
   }
+  # the side's binary is wtm on the shell's PATH: the line typed is the same on both sides, whatever the binary's path
+  ln -sf "$bin" "$root/bin/wtm"
   start
   capture 1-picker 'feat/old'
   tmux send-keys -t "$session" Enter
@@ -174,6 +176,15 @@ tty() {
   capture 3-again 'feat/old'
   tmux send-keys -t "$session" Escape
   capture 4-left 'EXIT='
+  here=$root/acme
+  start feat
+  if [[ $side == next ]]; then
+    capture 5-ambiguous 'feat/rb'
+    tmux send-keys -t "$session" Enter
+    capture 6-ambiguous-picked 'EXIT='
+  else
+    capture 5-ambiguous 'EXIT='
+  fi
   tmux kill-session -t "$session"
 }
 

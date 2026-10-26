@@ -1,0 +1,13 @@
+$ wtm status feat; echo EXIT=$?
+
+  Step 1/1 • Worktree
+
+  The worktree to read, by its branch, its path or part of its branch
+
+▌› feat/a
+   feat/b
+   feat/old
+   feat/rb
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

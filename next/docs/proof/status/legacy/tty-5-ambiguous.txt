@@ -1,0 +1,7 @@
+$ wtm status feat; echo EXIT=$?
+
+  ✗ worktree "feat" is ambiguous: matches feat/a, feat/b, feat/old, feat/rb
+
+EXIT=1
+$
+

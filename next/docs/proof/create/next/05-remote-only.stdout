@@ -7,5 +7,5 @@
   Isolation    isolated
   remote-only  ../acme.trees/remote-only · 3 ports settled (offset +60)
 
-  → wtm go remote-only
+  → wtm go remote-only   jump in
 

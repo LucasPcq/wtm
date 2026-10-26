@@ -1,5 +1,5 @@
 
-  ! feat/b — 2 problems
+  ! feat/b — 3 problems
 
   path         <SB>/acme.trees/feat-b
   isolation    isolated
@@ -18,7 +18,9 @@
   api  stopped  port 23481
 
   ! its pull request is merged
-  → wtm clean feat/b
+  → wtm-next clean feat/b   clean it up
+  ! main has 2 commits it lacks
+  → wtm sync feat/b   sync it onto main
   ! apps/web/.env is missing
-  → wtm env feat/b
+  → wtm env feat/b   rebuild it
 

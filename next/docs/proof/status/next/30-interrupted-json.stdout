@@ -102,7 +102,8 @@
             }
           ]
         },
-        "problems": []
+        "problems": [],
+        "condition": "clean"
       }
     },
     {
@@ -152,9 +153,22 @@
           {
             "code": "status.missing",
             "message": "its directory is gone",
-            "fix": null
+            "fix": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "<SB>/acme.trees/detached"
+                  ]
+                }
+              ],
+              "code": "status.missing",
+              "message": "remove what is left of it"
+            }
           }
-        ]
+        ],
+        "condition": "missing"
       }
     },
     {
@@ -264,7 +278,26 @@
             }
           ]
         },
-        "problems": []
+        "problems": [
+          {
+            "code": "status.behind",
+            "message": "main has 2 commits it lacks",
+            "fix": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "status.behind",
+              "message": "sync it onto main"
+            }
+          }
+        ],
+        "condition": "changed"
       }
     },
     {
@@ -327,10 +360,11 @@
                 }
               ],
               "code": "status.missing",
-              "message": ""
+              "message": "remove what is left of it"
             }
           }
-        ]
+        ],
+        "condition": "missing"
       }
     },
     {
@@ -417,6 +451,23 @@
         },
         "problems": [
           {
+            "code": "status.behind",
+            "message": "main has 2 commits it lacks",
+            "fix": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/old"
+                  ]
+                }
+              ],
+              "code": "status.behind",
+              "message": "sync it onto main"
+            }
+          },
+          {
             "code": "status.isolation_pending",
             "message": "predates the isolation choice: run up and run start refuse it",
             "fix": {
@@ -436,10 +487,11 @@
                 }
               ],
               "code": "status.isolation_pending",
-              "message": ""
+              "message": "isolate it"
             }
           }
-        ]
+        ],
+        "condition": "clean"
       }
     },
     {
@@ -541,7 +593,8 @@
             }
           ]
         },
-        "problems": []
+        "problems": [],
+        "condition": "rebasing"
       }
     }
   ],

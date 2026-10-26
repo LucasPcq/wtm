@@ -8,7 +8,7 @@ flowchart TD
   n2 --> n3
   n4["feat/b ↑1 ! locked ! needs sync"]
   n0 --> n4
-  n5["feat/r ↑1 ! rebasing ! needs sync"]
+  n5["feat/r ↑1 ! rebasing"]
   n0 --> n5
   n6["feat/gone ✗ missing"]
   n0 --> n6

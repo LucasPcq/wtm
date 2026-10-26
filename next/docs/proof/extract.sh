@@ -55,7 +55,7 @@ state() {
   git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt; do
     echo "## $(basename "$wt") status"
     git -C "$wt" status --porcelain=v1 --untracked-files=all
-    git -C "$wt" status --porcelain=v1 -z --untracked-files=all | tr '\0' '\n' | awk 'length($0) > 3 {print substr($0, 4)}' | sort -u | while read -r path; do
+    git -C "$wt" status --porcelain=v1 -z --untracked-files=all | tr '\0' '\n' | awk 'length($0) > 3 {print substr($0, 4)}' | LC_ALL=C sort -u | while read -r path; do
       [[ -f "$wt/$path" ]] && echo "   $path $(shasum "$wt/$path" | cut -c1-12)"
     done
   done

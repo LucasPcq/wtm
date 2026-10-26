@@ -30,3 +30,6 @@ src/routeTree.gen.ts
 # tsr generate's scratch
 .tanstack/
 
+# vitest's reporter output
+.vitest/
+

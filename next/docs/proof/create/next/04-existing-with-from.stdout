@@ -7,5 +7,5 @@
   Isolation  isolated
   feature    ../acme.trees/feature · 3 ports settled (offset +50)
 
-  → wtm go feature
+  → wtm go feature   jump in
 

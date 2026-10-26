@@ -1,5 +1,5 @@
 
-  = feat/a — nothing to fix
+  ! feat/a — 1 problem
 
   path         <SB>/acme.trees/feat-a
   isolation    isolated
@@ -15,4 +15,7 @@
   JOBS
   web  running  http://web.feat-a.acme.localhost:23462  up <AGE>
   api  running  http://api.feat-a.acme.localhost:23462  up <AGE>
+
+  ! main has 2 commits it lacks
+  → wtm sync feat/a   sync it onto main
 

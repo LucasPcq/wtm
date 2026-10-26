@@ -7,5 +7,5 @@
   Isolation  isolated
   feat/dry   ../acme.trees/feat-dry · 3 ports settled (offset +130)
 
-  → wtm go feat/dry
+  → wtm go feat/dry   jump in
 

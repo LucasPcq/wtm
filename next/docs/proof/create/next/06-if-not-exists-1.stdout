@@ -7,5 +7,5 @@
   Isolation  isolated
   feat/idem  ../acme.trees/feat-idem · 3 ports settled (offset +70)
 
-  → wtm go feat/idem
+  → wtm go feat/idem   jump in
 

@@ -63,7 +63,7 @@
  feat/json
  feat/local
  feat/login
-@@ -15,18 +16,17 @@
+@@ -15,19 +16,18 @@
     apps/api/new/deep/y.txt 9063a9f0e032
     apps/api/new/x.txt 6fcf9dfbd479
  ## feat-c status
@@ -81,10 +81,11 @@
  ## feat-login status
   M README.md
 -?? apps/api/env-a.txt
--   apps/api/env-a.txt 3f786850e387
     README.md 190b171b0321
+-   apps/api/env-a.txt 3f786850e387
  ## feat-misc status
  D  apps/web/package.json
+ R  scripts/dev.py -> scripts/serve.py
 @@ -58,6 +58,13 @@
    "ordinal": 7,
    "isolation": "isolated"
@@ -110,7 +111,7 @@
  feat/json
  feat/local
  feat/login
-@@ -15,18 +16,17 @@
+@@ -15,19 +16,18 @@
     apps/api/new/deep/y.txt 9063a9f0e032
     apps/api/new/x.txt 6fcf9dfbd479
  ## feat-c status
@@ -128,10 +129,11 @@
  ## feat-login status
   M README.md
 -?? apps/api/env-a.txt
--   apps/api/env-a.txt 3f786850e387
     README.md 190b171b0321
+-   apps/api/env-a.txt 3f786850e387
  ## feat-misc status
  D  apps/web/package.json
+ R  scripts/dev.py -> scripts/serve.py
 @@ -60,6 +60,13 @@
    "ordinal": 7,
    "isolation": "isolated"
@@ -158,7 +160,7 @@
  feat/json
  feat/local
  feat/login
-@@ -15,20 +17,20 @@
+@@ -15,21 +17,21 @@
     apps/api/new/deep/y.txt 9063a9f0e032
     apps/api/new/x.txt 6fcf9dfbd479
  ## feat-c status
@@ -180,11 +182,12 @@
   M README.md
 -?? apps/api/env-a.txt
 -?? apps/web/json.txt
+    README.md 190b171b0321
 -   apps/api/env-a.txt 3f786850e387
 -   apps/web/json.txt 3eedd8854d1e
-    README.md 190b171b0321
  ## feat-misc status
  D  apps/web/package.json
+ R  scripts/dev.py -> scripts/serve.py
 @@ -62,6 +64,20 @@
    "ordinal": 7,
    "isolation": "isolated"
@@ -218,7 +221,7 @@
  feat/json
  feat/local
  feat/login
-@@ -15,22 +17,22 @@
+@@ -15,23 +17,23 @@
     apps/api/new/deep/y.txt 9063a9f0e032
     apps/api/new/x.txt 6fcf9dfbd479
  ## feat-c status
@@ -241,12 +244,13 @@
 -?? apps/api/env-a.txt
  ?? apps/web/ignored.txt
 -?? apps/web/json.txt
+    README.md 190b171b0321
 -   apps/api/env-a.txt 3f786850e387
     apps/web/ignored.txt 397d543883c5
 -   apps/web/json.txt 3eedd8854d1e
-    README.md 190b171b0321
  ## feat-misc status
  D  apps/web/package.json
+ R  scripts/dev.py -> scripts/serve.py
 @@ -66,6 +68,20 @@
    "ordinal": 7,
    "isolation": "isolated"
@@ -280,7 +284,7 @@
  feat/json
  feat/local
  feat/login
-@@ -15,22 +17,22 @@
+@@ -15,23 +17,23 @@
     apps/api/new/deep/y.txt 9063a9f0e032
     apps/api/new/x.txt 6fcf9dfbd479
  ## feat-c status
@@ -303,12 +307,13 @@
 -?? apps/api/env-a.txt
  ?? apps/web/ignored.txt
 -?? apps/web/json.txt
+    README.md 190b171b0321
 -   apps/api/env-a.txt 3f786850e387
     apps/web/ignored.txt 397d543883c5
 -   apps/web/json.txt 3eedd8854d1e
-    README.md 190b171b0321
  ## feat-misc status
  D  apps/web/package.json
+ R  scripts/dev.py -> scripts/serve.py
 @@ -66,6 +68,20 @@
    "ordinal": 7,
    "isolation": "isolated"
@@ -342,7 +347,7 @@
  feat/json
  feat/local
  feat/login
-@@ -16,22 +18,22 @@
+@@ -16,23 +18,23 @@
     apps/api/new/deep/y.txt 9063a9f0e032
     apps/api/new/x.txt 6fcf9dfbd479
  ## feat-c status
@@ -365,12 +370,13 @@
 -?? apps/api/env-a.txt
  ?? apps/web/ignored.txt
 -?? apps/web/json.txt
+    README.md 190b171b0321
 -   apps/api/env-a.txt 3f786850e387
     apps/web/ignored.txt 397d543883c5
 -   apps/web/json.txt 3eedd8854d1e
-    README.md 190b171b0321
  ## feat-misc status
  D  apps/web/package.json
+ R  scripts/dev.py -> scripts/serve.py
 @@ -70,6 +72,20 @@
    "ordinal": 7,
    "isolation": "isolated"
@@ -414,7 +420,7 @@
  feat/json
  feat/local
  feat/login
-@@ -17,25 +19,25 @@
+@@ -17,26 +19,26 @@
     apps/api/new/deep/y.txt 9063a9f0e032
     apps/api/new/x.txt 6fcf9dfbd479
  ## feat-c status
@@ -440,12 +446,13 @@
 -?? apps/api/env-a.txt
  ?? apps/web/ignored.txt
 -?? apps/web/json.txt
+    README.md 190b171b0321
 -   apps/api/env-a.txt 3f786850e387
     apps/web/ignored.txt 397d543883c5
 -   apps/web/json.txt 3eedd8854d1e
-    README.md 190b171b0321
  ## feat-misc status
  D  apps/web/package.json
+ R  scripts/dev.py -> scripts/serve.py
 @@ -74,10 +76,24 @@
    "ordinal": 7,
    "isolation": "isolated"
@@ -493,7 +500,7 @@
  feat/json
  feat/local
  feat/login
-@@ -17,25 +19,25 @@
+@@ -17,26 +19,26 @@
     apps/api/new/deep/y.txt 9063a9f0e032
     apps/api/new/x.txt 6fcf9dfbd479
  ## feat-c status
@@ -519,12 +526,13 @@
 -?? apps/api/env-a.txt
  ?? apps/web/ignored.txt
 -?? apps/web/json.txt
+    README.md 190b171b0321
 -   apps/api/env-a.txt 3f786850e387
     apps/web/ignored.txt 397d543883c5
 -   apps/web/json.txt 3eedd8854d1e
-    README.md 190b171b0321
  ## feat-misc status
  D  apps/web/package.json
+ R  scripts/dev.py -> scripts/serve.py
 @@ -74,10 +76,24 @@
    "ordinal": 7,
    "isolation": "isolated"

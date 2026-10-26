@@ -35,30 +35,35 @@ Transfer-Encoding: chunked
 
 $ curl -s -i $U/
 HTTP/1.1 200 OK
+Accept-Ranges: bytes
+Cache-Control: no-cache
+Content-Length: 1048
 Content-Type: text/html; charset=utf-8
 Date: <T>
-Content-Length: 699
 
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>wtm</title>
-<style>
-  :root { color-scheme: dark light; font-family: ui-monospace, Menlo, monospace; }
-  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; }
-  main { max-width: 36rem; }
-  h1 { font-size: 1.25rem; margin: 0 0 .5rem; }
-  p { margin: .25rem 0; opacity: .8; line-height: 1.5; }
-</style>
-</head>
-<body>
-<main>
-  <h1>wtm</h1>
-  <p>The server runs, but this binary carries no web interface yet.</p>
-  <p>Its API answers under <code>/api</code>, with the token of this page's address.</p>
-</main>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <title>wtm</title>
+    <script>
+      // the theme follows the system's, before the first paint
+      const dark = matchMedia('(prefers-color-scheme: dark)')
+      const apply = () => document.documentElement.classList.toggle('dark', dark.matches)
+      apply()
+      dark.addEventListener('change', apply)
+    </script>
+    <script type="module" crossorigin src="/assets/index-DqDm9ZXf.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/state-page-5TI6OBpN.js">
+    <link rel="modulepreload" crossorigin href="/assets/fetch-BRbofaFX.js">
+    <link rel="modulepreload" crossorigin href="/assets/preload-helper-Ce2bKAcW.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-PHSAFhnG.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>
 

@@ -9,6 +9,6 @@
 
   ! feat/names  this project asks for named addresses: the run proxy is off on this machine, so ports were written instead
 
-  → wtm go feat/names
+  → wtm go feat/names      jump in
   → wtm run proxy status   reports what serves names
 

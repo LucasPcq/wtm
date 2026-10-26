@@ -16,14 +16,26 @@
         "active": true,
         "missing": false,
         "commits_ahead": 0,
+        "parent": "",
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "changes": {
+          "changed": 0,
+          "untracked": 0
+        },
         "created_at": null,
+        "last_commit_at": "<T>",
         "origin": {
           "ahead": 0,
           "behind": 0,
           "state": "up-to-date"
         },
         "pr": null,
+        "merged": false,
+        "condition": "clean",
         "services": [],
+        "urls": [],
         "actions": [
           {
             "command": "go",
@@ -93,14 +105,26 @@
         "active": false,
         "missing": false,
         "commits_ahead": 2,
+        "parent": "main",
+        "ahead": 2,
+        "behind": 0,
+        "needs_sync": false,
+        "changes": {
+          "changed": 0,
+          "untracked": 1
+        },
         "created_at": "<T>",
+        "last_commit_at": "<T>",
         "origin": {
           "ahead": 1,
           "behind": 0,
           "state": "ahead"
         },
         "pr": null,
+        "merged": false,
+        "condition": "changed",
         "services": [],
+        "urls": [],
         "actions": [
           {
             "command": "go",
@@ -183,10 +207,22 @@
         "active": false,
         "missing": false,
         "commits_ahead": 0,
+        "parent": "main",
+        "ahead": 0,
+        "behind": 0,
+        "needs_sync": false,
+        "changes": {
+          "changed": 0,
+          "untracked": 0
+        },
         "created_at": "<T>",
+        "last_commit_at": "<T>",
         "origin": null,
         "pr": null,
+        "merged": false,
+        "condition": "clean",
         "services": [],
+        "urls": [],
         "actions": [
           {
             "command": "go",
@@ -269,10 +305,19 @@
         "active": false,
         "missing": true,
         "commits_ahead": 0,
+        "parent": "main",
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "changes": null,
         "created_at": "<T>",
+        "last_commit_at": "<T>",
         "origin": null,
         "pr": null,
+        "merged": false,
+        "condition": "missing",
         "services": [],
+        "urls": [],
         "actions": [
           {
             "command": "clean",
@@ -303,10 +348,22 @@
         "active": false,
         "missing": false,
         "commits_ahead": 0,
+        "parent": "",
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "changes": {
+          "changed": 0,
+          "untracked": 0
+        },
         "created_at": null,
+        "last_commit_at": null,
         "origin": null,
         "pr": null,
+        "merged": false,
+        "condition": "clean",
         "services": [],
+        "urls": [],
         "actions": [
           {
             "command": "go",
@@ -337,10 +394,19 @@
         "active": false,
         "missing": true,
         "commits_ahead": 0,
+        "parent": "",
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "changes": null,
         "created_at": null,
+        "last_commit_at": "<T>",
         "origin": null,
         "pr": null,
+        "merged": false,
+        "condition": "missing",
         "services": [],
+        "urls": [],
         "actions": [
           {
             "command": "clean",
@@ -371,10 +437,22 @@
         "active": false,
         "missing": false,
         "commits_ahead": 0,
+        "parent": "",
+        "ahead": null,
+        "behind": null,
+        "needs_sync": false,
+        "changes": {
+          "changed": 0,
+          "untracked": 0
+        },
         "created_at": null,
+        "last_commit_at": null,
         "origin": null,
         "pr": null,
+        "merged": false,
+        "condition": "clean",
         "services": [],
+        "urls": [],
         "actions": [
           {
             "command": "go",

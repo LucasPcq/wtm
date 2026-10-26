@@ -1,133 +1,133 @@
 # a create of slow/a (its hook sleeps 20s) as a stream; DELETE its operation while the hook runs
-$ api -i -X DELETE $U/api/repos/$A/operations/083e64b7bad8f99d
+$ api -i -X DELETE $U/api/repos/$A/operations/<OP6>
 HTTP/1.1 202 Accepted
 Date: <T>
 Content-Length: 0
 
 
 $ tr -d '\r' <"$out/.cancel.h" | grep -i '^X-Wtm-Operation'
-X-Wtm-Operation: 083e64b7bad8f99d
+X-Wtm-Operation: <OP6>
 
 $ cat "$out/.cancel.body"
-data: {"v":2,"type":"operation.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"083e64b7bad8f99d","command":"create","surface":"web"}
+data: {"v":2,"type":"operation.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP6>","command":"create","surface":"web"}
 
-data: {"v":2,"type":"unit.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"083e64b7bad8f99d","subject":"slow/a"}
+data: {"v":2,"type":"unit.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP6>","subject":"slow/a"}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"083e64b7bad8f99d","subject":"slow/a","phase":"worktree"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP6>","subject":"slow/a","phase":"worktree"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"083e64b7bad8f99d","subject":"slow/a","phase":"worktree","failed":false}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP6>","subject":"slow/a","phase":"worktree","failed":false}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"083e64b7bad8f99d","subject":"slow/a","phase":"env"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP6>","subject":"slow/a","phase":"env"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"083e64b7bad8f99d","subject":"slow/a","phase":"env","failed":false}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP6>","subject":"slow/a","phase":"env","failed":false}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"083e64b7bad8f99d","subject":"slow/a","phase":"meta"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP6>","subject":"slow/a","phase":"meta"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"083e64b7bad8f99d","subject":"slow/a","phase":"meta","failed":false}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP6>","subject":"slow/a","phase":"meta","failed":false}
 
-data: {"v":2,"type":"worktree.created","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"083e64b7bad8f99d","worktree":{"branch":"slow/a","path":"<SB>/.trees/slow-a","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:32Z"}}
+data: {"v":2,"type":"worktree.created","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP6>","worktree":{"branch":"slow/a","path":"<SB>/.trees/slow-a","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"}}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"083e64b7bad8f99d","subject":"slow/a","phase":"on_create","log":"<SB>/A/.git/wtm/hooks/on_create-slow%2Fa.log"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP6>","subject":"slow/a","phase":"on_create","log":"<SB>/A/.git/wtm/hooks/on_create-slow%2Fa.log"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"083e64b7bad8f99d","subject":"slow/a","phase":"on_create","failed":true}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP6>","subject":"slow/a","phase":"on_create","failed":true}
 
-data: {"v":2,"type":"worktree.provisioned","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"083e64b7bad8f99d","worktree":{"branch":"slow/a","path":"<SB>/.trees/slow-a","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:32Z"},"ok":false,"hook":"case slow/a in slow/*) sleep 20;; esac"}
+data: {"v":2,"type":"worktree.provisioned","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP6>","worktree":{"branch":"slow/a","path":"<SB>/.trees/slow-a","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"},"ok":false,"hook":"case slow/a in slow/*) sleep 20;; esac"}
 
-data: {"v":2,"type":"unit.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"083e64b7bad8f99d","subject":"slow/a","status":"cancelled"}
+data: {"v":2,"type":"unit.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP6>","subject":"slow/a","status":"cancelled"}
 
-data: {"v":2,"type":"operation.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"083e64b7bad8f99d","command":"create","surface":"web","ok":false,"code":"unit.interrupted"}
+data: {"v":2,"type":"operation.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP6>","command":"create","surface":"web","ok":false,"code":"unit.interrupted"}
 
 event: envelope
-data: {"v":2,"command":"create","ok":false,"op":"8d4f3285ab223f0c","items":[{"subject":"slow/a","status":"cancelled","reason":"incomplete","error":{"kind":"cancelled","code":"unit.interrupted","message":"interrupted","params":{"phase":"on_create"}},"detail":{"path":"<SB>/.trees/slow-a","metadata":{"source_branch":"main","created_at":"2026-10-24T21:17:32Z","env_strategy":"example","isolation":"isolated"},"existing_branch":false}}],"plan":{"branches":[{"branch":"slow/a","path":"<SB>/.trees/slow-a","action":"create"}],"from":"main","env_from":"example","creates":1,"recap":[{"key":"branches","label":"Branches","path":"branches","values":[{"value":"slow/a","text":"slow/a"}]},{"key":"from","label":"From","path":"from","values":[{"value":"main","text":"main"}]},{"key":"env_from","label":"Env","path":"env_from","values":[{"value":"example","text":"example"}]}]},"follow_ups":[{"command":"go","answers":[{"path":"worktree","values":["slow/a"]}],"code":"create.go","message":"jump in"}],"warnings":[],"error":{"kind":"cancelled","code":"unit.interrupted","message":"interrupted","params":{"phase":"on_create"}}}
+data: {"v":2,"command":"create","ok":false,"op":"<OP7>","items":[{"subject":"slow/a","status":"cancelled","reason":"incomplete","error":{"kind":"cancelled","code":"unit.interrupted","message":"interrupted","params":{"phase":"on_create"}},"detail":{"path":"<SB>/.trees/slow-a","metadata":{"source_branch":"main","created_at":"<T>","env_strategy":"example","isolation":"isolated"},"existing_branch":false}}],"plan":{"branches":[{"branch":"slow/a","path":"<SB>/.trees/slow-a","action":"create","phases":["worktree","env","meta","on_create"]}],"from":"main","env_from":"example","on_create":["case {{branch}} in slow/*) sleep 20;; esac"],"creates":1,"recap":[{"key":"branches","label":"Branches","path":"branches","values":[{"value":"slow/a","text":"slow/a"}]},{"key":"from","label":"From","path":"from","values":[{"value":"main","text":"main"}]},{"key":"env_from","label":"Env","path":"env_from","values":[{"value":"example","text":"example"}]}]},"follow_ups":[{"command":"go","answers":[{"path":"worktree","values":["slow/a"]}],"code":"create.go","message":"jump in"}],"warnings":[],"error":{"kind":"cancelled","code":"unit.interrupted","message":"interrupted","params":{"phase":"on_create"}}}
 
 
 $ git -C $SB/A worktree list
-<SB>/A              8d5be14 [main]
-<SB>/.trees/feat-x  8d5be14 [feat/x]
-<SB>/.trees/slow-a  8d5be14 [slow/a]
+<SB>/A              1bf991e [main]
+<SB>/.trees/feat-x  1bf991e [feat/x]
+<SB>/.trees/slow-a  1bf991e [slow/a]
 
 # a create of slow/b; DELETE with ?force=true straight away
-$ api -i -X DELETE "$U/api/repos/$A/operations/b133d36b30a63a8a?force=true"
+$ api -i -X DELETE "$U/api/repos/$A/operations/<OP8>?force=true"
 HTTP/1.1 202 Accepted
 Date: <T>
 Content-Length: 0
 
 
 $ cat "$out/.force.body"
-data: {"v":2,"type":"operation.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"b133d36b30a63a8a","command":"create","surface":"web"}
+data: {"v":2,"type":"operation.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP8>","command":"create","surface":"web"}
 
-data: {"v":2,"type":"unit.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"b133d36b30a63a8a","subject":"slow/b"}
+data: {"v":2,"type":"unit.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP8>","subject":"slow/b"}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"b133d36b30a63a8a","subject":"slow/b","phase":"worktree"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP8>","subject":"slow/b","phase":"worktree"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"b133d36b30a63a8a","subject":"slow/b","phase":"worktree","failed":false}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP8>","subject":"slow/b","phase":"worktree","failed":false}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"b133d36b30a63a8a","subject":"slow/b","phase":"env"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP8>","subject":"slow/b","phase":"env"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"b133d36b30a63a8a","subject":"slow/b","phase":"env","failed":false}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP8>","subject":"slow/b","phase":"env","failed":false}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"b133d36b30a63a8a","subject":"slow/b","phase":"meta"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP8>","subject":"slow/b","phase":"meta"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"b133d36b30a63a8a","subject":"slow/b","phase":"meta","failed":false}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP8>","subject":"slow/b","phase":"meta","failed":false}
 
-data: {"v":2,"type":"worktree.created","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"b133d36b30a63a8a","worktree":{"branch":"slow/b","path":"<SB>/.trees/slow-b","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:34Z"}}
+data: {"v":2,"type":"worktree.created","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP8>","worktree":{"branch":"slow/b","path":"<SB>/.trees/slow-b","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"}}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"b133d36b30a63a8a","subject":"slow/b","phase":"on_create","log":"<SB>/A/.git/wtm/hooks/on_create-slow%2Fb.log"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP8>","subject":"slow/b","phase":"on_create","log":"<SB>/A/.git/wtm/hooks/on_create-slow%2Fb.log"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"b133d36b30a63a8a","subject":"slow/b","phase":"on_create","failed":true}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP8>","subject":"slow/b","phase":"on_create","failed":true}
 
-data: {"v":2,"type":"worktree.provisioned","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"b133d36b30a63a8a","worktree":{"branch":"slow/b","path":"<SB>/.trees/slow-b","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:34Z"},"ok":false,"hook":"case slow/b in slow/*) sleep 20;; esac"}
+data: {"v":2,"type":"worktree.provisioned","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP8>","worktree":{"branch":"slow/b","path":"<SB>/.trees/slow-b","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"},"ok":false,"hook":"case slow/b in slow/*) sleep 20;; esac"}
 
-data: {"v":2,"type":"unit.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"b133d36b30a63a8a","subject":"slow/b","status":"cancelled"}
+data: {"v":2,"type":"unit.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP8>","subject":"slow/b","status":"cancelled"}
 
-data: {"v":2,"type":"operation.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"b133d36b30a63a8a","command":"create","surface":"web","ok":false,"code":"unit.interrupted"}
+data: {"v":2,"type":"operation.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP8>","command":"create","surface":"web","ok":false,"code":"unit.interrupted"}
 
 event: envelope
-data: {"v":2,"command":"create","ok":false,"op":"25b2c262b8e2d4c5","items":[{"subject":"slow/b","status":"cancelled","reason":"incomplete","error":{"kind":"cancelled","code":"unit.interrupted","message":"interrupted","params":{"phase":"on_create"}},"detail":{"path":"<SB>/.trees/slow-b","metadata":{"source_branch":"main","created_at":"2026-10-24T21:17:34Z","env_strategy":"example","isolation":"isolated"},"existing_branch":false}}],"plan":{"branches":[{"branch":"slow/b","path":"<SB>/.trees/slow-b","action":"create"}],"from":"main","env_from":"example","creates":1,"recap":[{"key":"branches","label":"Branches","path":"branches","values":[{"value":"slow/b","text":"slow/b"}]},{"key":"from","label":"From","path":"from","values":[{"value":"main","text":"main"}]},{"key":"env_from","label":"Env","path":"env_from","values":[{"value":"example","text":"example"}]}]},"follow_ups":[{"command":"go","answers":[{"path":"worktree","values":["slow/b"]}],"code":"create.go","message":"jump in"}],"warnings":[],"error":{"kind":"cancelled","code":"unit.interrupted","message":"interrupted","params":{"phase":"on_create"}}}
+data: {"v":2,"command":"create","ok":false,"op":"<OP9>","items":[{"subject":"slow/b","status":"cancelled","reason":"incomplete","error":{"kind":"cancelled","code":"unit.interrupted","message":"interrupted","params":{"phase":"on_create"}},"detail":{"path":"<SB>/.trees/slow-b","metadata":{"source_branch":"main","created_at":"<T>","env_strategy":"example","isolation":"isolated"},"existing_branch":false}}],"plan":{"branches":[{"branch":"slow/b","path":"<SB>/.trees/slow-b","action":"create","phases":["worktree","env","meta","on_create"]}],"from":"main","env_from":"example","on_create":["case {{branch}} in slow/*) sleep 20;; esac"],"creates":1,"recap":[{"key":"branches","label":"Branches","path":"branches","values":[{"value":"slow/b","text":"slow/b"}]},{"key":"from","label":"From","path":"from","values":[{"value":"main","text":"main"}]},{"key":"env_from","label":"Env","path":"env_from","values":[{"value":"example","text":"example"}]}]},"follow_ups":[{"command":"go","answers":[{"path":"worktree","values":["slow/b"]}],"code":"create.go","message":"jump in"}],"warnings":[],"error":{"kind":"cancelled","code":"unit.interrupted","message":"interrupted","params":{"phase":"on_create"}}}
 
 
 $ git -C $SB/A worktree list
-<SB>/A              8d5be14 [main]
-<SB>/.trees/feat-x  8d5be14 [feat/x]
-<SB>/.trees/slow-a  8d5be14 [slow/a]
-<SB>/.trees/slow-b  8d5be14 [slow/b]
+<SB>/A              1bf991e [main]
+<SB>/.trees/feat-x  1bf991e [feat/x]
+<SB>/.trees/slow-a  1bf991e [slow/a]
+<SB>/.trees/slow-b  1bf991e [slow/b]
 
 # a create of slow/c whose client leaves (curl killed) while the hook runs: the operation goes on
-$ kill 96819
+$ kill $OPPID
 
 $ cat "$out/.leave.body"
-data: {"v":2,"type":"operation.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","command":"create","surface":"web"}
+data: {"v":2,"type":"operation.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","command":"create","surface":"web"}
 
-data: {"v":2,"type":"unit.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","subject":"slow/c"}
+data: {"v":2,"type":"unit.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","subject":"slow/c"}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","subject":"slow/c","phase":"worktree"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","subject":"slow/c","phase":"worktree"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","subject":"slow/c","phase":"worktree","failed":false}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","subject":"slow/c","phase":"worktree","failed":false}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","subject":"slow/c","phase":"env"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","subject":"slow/c","phase":"env"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","subject":"slow/c","phase":"env","failed":false}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","subject":"slow/c","phase":"env","failed":false}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","subject":"slow/c","phase":"meta"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","subject":"slow/c","phase":"meta"}
 
-data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","subject":"slow/c","phase":"meta","failed":false}
+data: {"v":2,"type":"phase.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","subject":"slow/c","phase":"meta","failed":false}
 
-data: {"v":2,"type":"worktree.created","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","worktree":{"branch":"slow/c","path":"<SB>/.trees/slow-c","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:36Z"}}
+data: {"v":2,"type":"worktree.created","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","worktree":{"branch":"slow/c","path":"<SB>/.trees/slow-c","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"}}
 
-data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","subject":"slow/c","phase":"on_create","log":"<SB>/A/.git/wtm/hooks/on_create-slow%2Fc.log"}
+data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","subject":"slow/c","phase":"on_create","log":"<SB>/A/.git/wtm/hooks/on_create-slow%2Fc.log"}
 
 
-$ grep '079362bff37889d9' "$out/.bus"
-data: {"v":2,"type":"operation.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","op_id":"46148fceae869518","command":"create","surface":"web"}
-data: {"v":2,"type":"worktree.created","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","op_id":"46148fceae869518","worktree":{"branch":"slow/c","path":"<SB>/.trees/slow-c","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:36Z"}}
-data: {"v":2,"type":"worktree.provisioned","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","op_id":"46148fceae869518","worktree":{"branch":"slow/c","path":"<SB>/.trees/slow-c","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:36Z"},"ok":true}
-data: {"v":2,"type":"unit.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","op_id":"46148fceae869518","subject":"slow/c","status":"done"}
-data: {"v":2,"type":"operation.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"079362bff37889d9","op_id":"46148fceae869518","command":"create","surface":"web","ok":true}
+$ grep '<OP10>' "$out/.bus"
+data: {"v":2,"type":"operation.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","op_id":"<OP11>","command":"create","surface":"web"}
+data: {"v":2,"type":"worktree.created","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","op_id":"<OP11>","worktree":{"branch":"slow/c","path":"<SB>/.trees/slow-c","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"}}
+data: {"v":2,"type":"worktree.provisioned","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","op_id":"<OP11>","worktree":{"branch":"slow/c","path":"<SB>/.trees/slow-c","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"},"ok":true}
+data: {"v":2,"type":"unit.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","op_id":"<OP11>","subject":"slow/c","status":"done"}
+data: {"v":2,"type":"operation.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","op_id":"<OP11>","command":"create","surface":"web","ok":true}
 
 $ git -C $SB/A worktree list
-<SB>/A              8d5be14 [main]
-<SB>/.trees/feat-x  8d5be14 [feat/x]
-<SB>/.trees/slow-a  8d5be14 [slow/a]
-<SB>/.trees/slow-b  8d5be14 [slow/b]
-<SB>/.trees/slow-c  8d5be14 [slow/c]
+<SB>/A              1bf991e [main]
+<SB>/.trees/feat-x  1bf991e [feat/x]
+<SB>/.trees/slow-a  1bf991e [slow/a]
+<SB>/.trees/slow-b  1bf991e [slow/b]
+<SB>/.trees/slow-c  1bf991e [slow/c]
 

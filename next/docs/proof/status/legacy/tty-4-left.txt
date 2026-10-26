@@ -1,4 +1,4 @@
-$ <BIN> status; echo EXIT=$?
+$ wtm status; echo EXIT=$?
 
 ┃  = Aborted.
 

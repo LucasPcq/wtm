@@ -5,14 +5,13 @@ $ wtmx create --ask; echo EXIT=$?
   ✓ Branches: feat/form, topic
   ✓ Source branch: main
 
-  How the .env files of the new worktrees are provisioned: config (config.toml's strategy), example
-  (from its template), main (copied from the main checkout) or parent (from the source's worktree);
-  defaults to config.toml's strategy
+  Where its .env files come from: config, example, main or parent; config.toml's strategy by
+  default
 
-   Use config default (main)
-   example — copy .env.example → .env
-▌› main — copy .env from the main checkout
-   parent — copy .env from source worktree
+   config default (main)
+   example — from .env.example
+▌› main — the main checkout's .env
+   parent — the source worktree's .env
 
    [x] Always use this answer in this repo
 

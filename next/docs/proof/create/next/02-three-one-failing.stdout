@@ -9,9 +9,9 @@
   feat/bad   ../acme.trees/feat-bad · 3 ports settled (offset +30)
   feat/c     ../acme.trees/feat-c · 3 ports settled (offset +40)
 
-  ✗ feat/bad  on_create failed: hook failed: exit status 3 · left incomplete
+  ✗ feat/bad  on_create failed: exit status 3 · left incomplete
 
-  → wtm go feat/a
-  → wtm go feat/bad
-  → wtm go feat/c
+  → wtm go feat/a     jump in
+  → wtm go feat/bad   jump in
+  → wtm go feat/c     jump in
 

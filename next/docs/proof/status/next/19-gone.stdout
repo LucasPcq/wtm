@@ -14,5 +14,5 @@
   api  stopped  port 23481
 
   ! its directory is gone
-  → wtm clean feat/b
+  → wtm-next clean feat/b   remove what is left of it
 

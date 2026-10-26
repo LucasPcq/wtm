@@ -6,7 +6,8 @@
 # left by its client, the event stream of a commit and a create, the guard's
 # refusals, the idle stop and a restart. Each step writes one transcript,
 # <out>/NN-name.txt: every command as `$ …`, then its output. The sandbox path,
-# the token, ids and timestamps are replaced by placeholders.
+# the token, repository ids, pids, operation ids, fingerprints, the version and
+# timestamps are replaced by placeholders.
 set -euo pipefail
 
 absolute() {
@@ -18,7 +19,7 @@ out=${2:?out dir}
 rm -rf "$out" && mkdir -p "$out" && out=$(cd "$out" && pwd)
 
 SB=$(mktemp -d /tmp/wtmuiXXXXX)
-export HOME=$SB/home PATH=$SB/bin:$PATH
+export HOME=$SB/home PATH=$SB/bin:$PATH GIT_AUTHOR_DATE=2026-10-16T12:00:00Z GIT_COMMITTER_DATE=2026-10-16T12:00:00Z
 G=$HOME/Library/Application\ Support/wtm
 mkdir -p "$HOME" "$SB/bin" && cp "$next" "$SB/bin/wtm-next"
 # the sandbox, its server and every background curl never outlive the run
@@ -66,7 +67,7 @@ show 'cd $SB/A && wtm-next ui --no-open --idle 40s'
 cd "$SB/A"
 TOKEN=$(jq -r .token "$G/web.json") PORT=$(jq -r .port "$G/web.json") PID1=$(jq -r .pid "$G/web.json")
 U=http://127.0.0.1:$PORT
-show 'ls -l "$G"'
+show 'ls -l "$G" | awk "{print \$1, \$NF}"'
 show 'cat "$G/web.json"'
 show 'ps -o pid=,command= -p $PID1'
 
@@ -117,7 +118,7 @@ show 'git -C $SB/A worktree list'
 note 'a create of slow/c whose client leaves (curl killed) while the hook runs: the operation goes on'
 op slow/c leave
 sleep 2
-show "kill $OPPID"; wait "$OPPID" 2>/dev/null || true
+show 'kill $OPPID'; wait "$OPPID" 2>/dev/null || true
 wait_for "$out/.bus" "$OP.*operation.finished|operation.finished.*$OP" 30 || true
 show 'cat "$out/.leave.body"'
 show "grep '$OP' \"\$out/.bus\""
@@ -129,15 +130,16 @@ show 'cat "$G/web.json" | jq -c "{pid, port}"'
 show 'cd $SB/B && wtm-next ui --no-open'
 show 'cat "$G/web.json" | jq -c "{pid, port}"'
 show 'api $U/api/repos | jq -c ".[] | {id, root}"'
+B=$(api "$U/api/repos" | jq -r '.[] | select(.root | endswith("/B")) | .id')
 
 section 05-events
 note "the stream of A; a commit in A's feat/x worktree, then a create from the command line"
 curl -s -H "X-Wtm-Token: $TOKEN" -N "$U/api/events?repo=$A" >"$out/.events" &
 EV=$!
 sleep 1
-show 'git -C $SB/.trees/feat-x -c user.name=x -c user.email=x@x commit -q --allow-empty -m x; date +%T'
+show 'git -C $SB/.trees/feat-x -c user.name=x -c user.email=x@x commit -q --allow-empty -m x'
 wait_for "$out/.events" '"worktree.changed"' 10 || true
-show 'date +%T; grep worktree.changed "$out/.events"'
+show 'grep worktree.changed "$out/.events"'
 show 'cd $SB/A && wtm-next create feat/y --yes'
 wait_for "$out/.events" 'operation.finished' 10 || true
 sleep 1
@@ -154,13 +156,13 @@ show 'curl -s -i $U/'
 
 section 07-idle
 show 'kill $(jobs -p) 2>/dev/null; jobs -r | wc -l'
-show 'kill -0 $PID1 && echo "server $PID1 running"; date +%T'
-sleep 46
-show 'date +%T; kill -0 $PID1 2>/dev/null || echo "server $PID1 gone"'
+show 'kill -0 $PID1 && echo "server $PID1 running"'
+show 'sleep 46; kill -0 $PID1 2>/dev/null || echo "server $PID1 gone"'
 show 'cat "$G/web.json" 2>&1 | jq -c "{pid, port}"'
 show 'cd $SB/A && wtm-next ui --no-open'
 show 'cat "$G/web.json" | jq -c "{pid, port}"'
 show 'kill -0 $(jq -r .pid "$G/web.json") && echo "new server $(jq -r .pid "$G/web.json") running"'
+PID2=$(jq -r .pid "$G/web.json")
 
 section 08-cleanup
 show 'curl -s -o /dev/null -w "stop %{http_code}\n" -X POST -H "X-Wtm-Token: $(jq -r .token "$G/web.json")" "http://127.0.0.1:$(jq -r .port "$G/web.json")/api/stop"; sleep 1; pgrep -f -- "$SB" || echo "no process left in the sandbox"'
@@ -171,7 +173,28 @@ sed -i '' -E \
   -e "s#$TOKEN#<TOKEN>#g" \
   -e 's#"token":"[0-9a-f]+"#"token":"<TOKEN>"#g' \
   -e 's#token=[0-9a-f]{64}#token=<TOKEN>#g' \
-  -e 's#"ts":"[^"]+"#"ts":"<T>"#g' \
+  -e "s#[[:<:]]${A:-<REPO_A>}[[:>:]]#<REPO_A>#g" \
+  -e "s#[[:<:]]${B:-<REPO_B>}[[:>:]]#<REPO_B>#g" \
+  -e "s#[[:<:]]${PID1:-<PID1>}[[:>:]]#<PID1>#g" \
+  -e "s#[[:<:]]${PID2:-<PID2>}[[:>:]]#<PID2>#g" \
+  -e 's#^ +(<PID[12]>)#\1#' \
+  -e 's#"(ts|created_at|last_commit_at)":"[^"]+"#"\1":"<T>"#g' \
+  -e 's#"version":"[^"]+"#"version":"<VERSION>"#g' \
   -e 's#^Date: .*#Date: <T>#' \
+  -e 's#[A-Z][a-z]{2} [ 0-9][0-9] [0-9]{2}:[0-9]{2} #<DATE> #' \
   "$out"/*.txt
+# operation ids and fingerprints numbered in order of first appearance, so a DELETE still names the operation it cancels
+python3 - "$out"/*.txt <<'PY'
+import re, sys
+names = {}
+def placeholder(match):
+    token = match.group(0)
+    kind = "FP" if len(token) == 24 else "OP"
+    if token not in names:
+        names[token] = "<%s%d>" % (kind, 1 + sum(n.startswith("<" + kind) for n in names.values()))
+    return names[token]
+for path in sys.argv[1:]:
+    text = open(path, newline="").read()
+    open(path, "w", newline="").write(re.sub(r"\b(?:[0-9a-f]{24}|[0-9a-f]{16})\b", placeholder, text))
+PY
 echo "$out"

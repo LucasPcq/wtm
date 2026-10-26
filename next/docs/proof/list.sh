@@ -132,10 +132,12 @@ tty() {
   start() {
     tmux kill-session -t "$session" 2>/dev/null || true
     tmux new-session -d -s "$session" -x 100 -y 30 -c "$here" "zsh -f"
-    tmux send-keys -t "$session" "export HOME=$root/home PS1='$ ' && clear" Enter
+    tmux send-keys -t "$session" "export HOME=$root/home PATH=$root/bin:\$PATH PS1='$ ' && clear" Enter
     settle '$'
-    tmux send-keys -t "$session" "$bin list; echo EXIT=\$?" Enter
+    tmux send-keys -t "$session" "wtm list; echo EXIT=\$?" Enter
   }
+  # the side's binary is wtm on the shell's PATH: the line typed is the same on both sides, whatever the binary's path
+  ln -sf "$bin" "$root/bin/wtm"
   start
   # the picker is ready once the pull requests had their say: GitHub is not connected in a sandbox
   capture 1-worktrees 'gh auth login'
@@ -202,7 +204,8 @@ run_side() {
   )
   sed -i '' -E \
     -e "s#(/private)?$root#<SB>#g" \
-    -e 's#"created_at": "[^"]*"#"created_at": "<T>"#g' \
+    -e 's#"(created_at|last_commit_at)": "[^"]*"#"\1": "<T>"#g' \
+    -e 's#(\.localhost):[0-9]+#\1:<PORT>#g' \
     -e 's#[0-9a-f]{40}#<SHA>#g' \
     -e "s#$bin#<BIN>#g" \
     -e 's#wtm-next list#wtm list#g' \

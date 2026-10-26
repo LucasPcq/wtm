@@ -26,12 +26,14 @@
       {
         "branch": "feat/json",
         "path": "<SB>/acme.trees/feat-json",
-        "action": "unchanged"
+        "action": "unchanged",
+        "phases": []
       }
     ],
     "from": "main",
     "env_from": "main",
     "isolation": "isolated",
+    "creates": 0,
     "recalled": [
       "env_from"
     ],
@@ -96,7 +98,7 @@
         }
       ],
       "code": "create.go",
-      "message": ""
+      "message": "jump in"
     }
   ],
   "warnings": []

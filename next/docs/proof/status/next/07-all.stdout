@@ -1,19 +1,27 @@
 
-  ! 6 worktrees · 2 need attention
+  ! 6 worktrees · 3 need attention
 
      WORKTREE                ISOLATION   PORTS         JOBS       ENV
      main                    isolated    base          2 stopped  2 files
      ../acme.trees/detached  isolated    not numbered  2 stopped  2 missing
-     feat/a                  isolated    +10           2 stopped  2 files
+  !  feat/a                  isolated    +10           2 stopped  2 files
   !  feat/b                  isolated    +20           2 stopped  1 missing
   !  feat/old                not chosen  —             2 stopped  2 files
      feat/rb                 isolated    +40           2 stopped  2 files
 
+  feat/a
+  ! main has 2 commits it lacks
+  → wtm sync feat/a   sync it onto main
+
   feat/b
+  ! main has 2 commits it lacks
+  → wtm sync feat/b   sync it onto main
   ! apps/web/.env is missing
-  → wtm env feat/b
+  → wtm env feat/b   rebuild it
 
   feat/old
+  ! main has 2 commits it lacks
+  → wtm sync feat/old   sync it onto main
   ! predates the isolation choice: run up and run start refuse it
-  → wtm env feat/old --isolation isolated
+  → wtm env feat/old --isolation isolated   isolate it
 

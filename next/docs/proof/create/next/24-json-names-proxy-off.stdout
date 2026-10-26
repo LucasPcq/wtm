@@ -97,12 +97,23 @@
       {
         "branch": "feat/jnames",
         "path": "<SB>/acme.trees/feat-jnames",
-        "action": "create"
+        "action": "create",
+        "phases": [
+          "worktree",
+          "env",
+          "meta",
+          "ordinal",
+          "ports",
+          "on_create"
+        ]
       }
     ],
     "from": "main",
     "env_from": "main",
     "isolation": "isolated",
+    "on_create": [
+      "case {{branch}} in feat/bad*) echo failing; exit 3;; feat/slow*) trap \"sleep 2\" INT; sleep 30;; *) echo set up {{branch}};; esac"
+    ],
     "creates": 1,
     "recalled": [
       "env_from"
@@ -167,7 +178,7 @@
         }
       ],
       "code": "create.go",
-      "message": ""
+      "message": "jump in"
     }
   ],
   "warnings": []

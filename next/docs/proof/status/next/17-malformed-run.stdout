@@ -1,5 +1,5 @@
 
-  = feat/a — nothing to fix
+  ! feat/a — 1 problem
 
   path         <SB>/acme.trees/feat-a
   isolation    isolated
@@ -10,5 +10,8 @@
   changes      1 staged · 1 modified · +3 −0
   last commit  <SHA> feat: wire the session · Acme Dev · <AGE> ago
   parent       main
+
+  ! main has 2 commits it lacks
+  → wtm sync feat/a   sync it onto main
   ! run.toml does not read: its jobs and ports are not shown: unknown keys in <SB>/acme/.git/wtm/run.toml: env_port.addressing
 

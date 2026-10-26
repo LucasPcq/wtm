@@ -1,4 +1,4 @@
-$ <BIN> list; echo EXIT=$?
+$ wtm list; echo EXIT=$?
 
   Step 1/2 • Worktree
 

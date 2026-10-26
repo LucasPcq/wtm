@@ -34,10 +34,10 @@ prepare() {
   rm -f "$global/repos.json"
 }
 
-# wait_for <file> <pattern>: until a line of file matches pattern, for 20 seconds at most.
+# wait_for <file> <pattern> [pid]: until a line of file matches pattern, or pid has ended, for 20 seconds at most.
 wait_for() {
   local tries=0
-  until grep -Eq "$2" "$1" 2>/dev/null; do
+  until grep -Eq "$2" "$1" 2>/dev/null || { [[ -n ${3:-} ]] && ! kill -0 "$3" 2>/dev/null; }; do
     ((tries++ < 200)) || { echo "events.sh: $1 never matched $2" >&2; return 1; }
     sleep 0.1
   done
@@ -60,18 +60,18 @@ stream() {
   if [[ " $* " == *" -q "* ]]; then
     sleep 3 # a quiet stream prints no ready line
   else
-    wait_for "$dir_out/$name.stdout" '"type":"ready"|watching for changes'
+    wait_for "$dir_out/$name.stdout" '"type":"ready"|watching for changes' "$pid"
   fi
   if [[ -n $branch ]]; then
     (cd "$root/acme" && "$bin" create "$branch" --yes </dev/null >/dev/null 2>&1)
     wait_for "$dir_out/$name.stdout" 'provisioned'
   fi
-  kill -INT "$pid"
+  kill -INT "$pid" 2>/dev/null || true # a stream that ended on its own error has nothing left to interrupt
   wait "$pid" || code=$?
   echo "$code" >"$dir_out/$name.exit"
 }
 
-# socket_reader <name> <dir> <args…>: runs the binary with args in dir, its stdout a socket whose reader leaves after the first byte, as a Node child's stdio does; records whether it ended within 3 seconds.
+# socket_reader <name> <dir> <args…>: runs the binary with args in dir, its stdout a socket whose reader leaves after the ready line, as a Node child's stdio does; records whether it ended within 3 seconds. Leaving before it would race legacy's write of that line.
 socket_reader() {
   local name=$1 dir=$2
   shift 2
@@ -80,7 +80,12 @@ import socket, subprocess, sys
 ours, theirs = socket.socketpair()
 child = subprocess.Popen(sys.argv[1:], stdin=subprocess.DEVNULL, stdout=theirs, stderr=subprocess.DEVNULL)
 theirs.close()
-ours.recv(1)
+seen = b""
+while b"\"type\":\"ready\"" not in seen:
+    chunk = ours.recv(4096)
+    if not chunk:
+        break
+    seen += chunk
 ours.close()
 try:
     print("ended with", child.wait(timeout=3))
@@ -143,7 +148,7 @@ run_side() {
     scenario 10-no-config "$root/bare" events
     scenario 11-no-config-json "$root/bare" events --output json
     lifecycle 13-all-repository-joins-and-leaves
-    (export WTM_PROJECT_DIR=$root/plain && stream 14-relative-repo-project-dir-elsewhere "$root" "" events --repo acme --output json) || true # legacy ends on an error before any ready line; its exit code is still recorded
+    (export WTM_PROJECT_DIR=$root/plain && stream 14-relative-repo-project-dir-elsewhere "$root" "" events --repo acme --output json)
     registry >"$dir_out/registry-after"
     if [[ $side == legacy ]]; then
       "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true

@@ -33,8 +33,8 @@ topic
 ## feat-login status
  M README.md
 ?? apps/web/ignored.txt
-   apps/web/ignored.txt 397d543883c5
    README.md 190b171b0321
+   apps/web/ignored.txt 397d543883c5
 ## feat-misc status
 D  apps/web/package.json
 R  scripts/dev.py -> scripts/serve.py
@@ -47,10 +47,10 @@ R  scripts/dev.py -> scripts/serve.py
 ?? apps/web/ignored.txt
 ?? apps/web/login.ts
 ?? apps/web/same.txt
+   README.md f7d677704592
    apps/web/ignored.txt 397d543883c5
    apps/web/login.ts 2baaedadd43f
    apps/web/same.txt 2c985b161217
-   README.md f7d677704592
 ## .git/wtm/worktrees/feat%2Fapi/meta.json
 {
   "source_branch": "main",
