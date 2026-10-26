@@ -80,12 +80,16 @@ import socket, subprocess, sys
 ours, theirs = socket.socketpair()
 child = subprocess.Popen(sys.argv[1:], stdin=subprocess.DEVNULL, stdout=theirs, stderr=subprocess.DEVNULL)
 theirs.close()
+ours.settimeout(20)
 seen = b""
-while b"\"type\":\"ready\"" not in seen:
-    chunk = ours.recv(4096)
-    if not chunk:
-        break
-    seen += chunk
+try:
+    while b"\"type\":\"ready\"" not in seen:
+        chunk = ours.recv(4096)
+        if not chunk:
+            break
+        seen += chunk
+except TimeoutError:
+    print("no ready line within 20 seconds")
 ours.close()
 try:
     print("ended with", child.wait(timeout=3))

@@ -175,13 +175,14 @@ sed -i '' -E \
   -e 's#token=[0-9a-f]{64}#token=<TOKEN>#g' \
   -e "s#[[:<:]]${A:-<REPO_A>}[[:>:]]#<REPO_A>#g" \
   -e "s#[[:<:]]${B:-<REPO_B>}[[:>:]]#<REPO_B>#g" \
-  -e "s#[[:<:]]${PID1:-<PID1>}[[:>:]]#<PID1>#g" \
-  -e "s#[[:<:]]${PID2:-<PID2>}[[:>:]]#<PID2>#g" \
-  -e 's#^ +(<PID[12]>)#\1#' \
-  -e 's#"(ts|created_at|last_commit_at)":"[^"]+"#"\1":"<T>"#g' \
+  -e "s#\"pid\":${PID1:-<PID1>}([,}])#\"pid\":<PID1>\1#g" \
+  -e "s#\"pid\":${PID2:-<PID2>}([,}])#\"pid\":<PID2>\1#g" \
+  -e "s#^ *${PID1:-<PID1>} #<PID1> #" \
+  -e "s#server ${PID1:-<PID1>} #server <PID1> #" \
+  -e "s#server ${PID2:-<PID2>} #server <PID2> #" \
+  -e 's#"(ts|created_at)":"[^"]+"#"\1":"<T>"#g' \
   -e 's#"version":"[^"]+"#"version":"<VERSION>"#g' \
   -e 's#^Date: .*#Date: <T>#' \
-  -e 's#[A-Z][a-z]{2} [ 0-9][0-9] [0-9]{2}:[0-9]{2} #<DATE> #' \
   "$out"/*.txt
 # operation ids and fingerprints numbered in order of first appearance, so a DELETE still names the operation it cancels
 python3 - "$out"/*.txt <<'PY'

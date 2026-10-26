@@ -128,8 +128,8 @@
           "web"
         ],
         "urls": [
-          "http://api.feat-a.acme.localhost:<PORT>",
-          "http://web.feat-a.acme.localhost:<PORT>"
+          "http://api.feat-a.acme.localhost:<PROXY_PORT>",
+          "http://web.feat-a.acme.localhost:<PROXY_PORT>"
         ],
         "actions": [
           {
