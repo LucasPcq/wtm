@@ -406,6 +406,12 @@
         "isolation": {
           "$ref": "#/$defs/project.Isolation"
         },
+        "on_create": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "recalled": {
           "items": {
             "type": "string"

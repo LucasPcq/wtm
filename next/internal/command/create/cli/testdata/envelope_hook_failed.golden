@@ -44,6 +44,9 @@
     ],
     "from": "main",
     "env_from": "example",
+    "on_create": [
+      "make setup"
+    ],
     "creates": 1,
     "recap": [
       {

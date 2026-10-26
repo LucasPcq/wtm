@@ -74,6 +74,16 @@ func TestThePlanSaysWhatBecomesOfEachBranch(t *testing.T) {
 	assert.Empty(t, warnings)
 }
 
+func TestThePlanShowsTheOnCreateHooksOnlyWhenAWorktreeRunsThem(t *testing.T) {
+	w := newWorld(t, seed{Config: hookedToml, Linked: []string{"linked"}})
+
+	creating, _ := w.plan(t, create.Request{Branches: []string{branchName}})
+	open, _ := w.plan(t, create.Request{Branches: []string{"linked"}, IfNotExists: true})
+
+	assert.Equal(t, []string{"echo ready"}, creating.OnCreate)
+	assert.Empty(t, open.OnCreate)
+}
+
 func TestThePlanNamesTheIsolationOnlyWhenTheRunIsolatesSomething(t *testing.T) {
 	isolating := newWorld(t, seed{Run: jobsToml})
 	bare := newWorld(t, seed{})
