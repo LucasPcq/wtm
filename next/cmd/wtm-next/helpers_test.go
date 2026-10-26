@@ -197,10 +197,11 @@ type shapes struct {
 	root    string // the directory the test's repository lives in
 }
 
-// varying are the values a run gives anew each time: hex ids (operations, fingerprints, commits, short commits) and times; lasted, how long something ran, written 0 to keep its type.
+// varying are the values a run gives anew each time: hex ids (operations, fingerprints, commits, short commits) and times; lasted, how long something ran, written 0 to keep its type; runLog, a log named after its operation.
 var (
 	varying = regexp.MustCompile(`"[0-9a-f]{7,}"|"\d{4}-\d\d-\d\dT[^"]+"`)
 	lasted  = regexp.MustCompile(`"duration_ms": \d+`)
+	runLog  = regexp.MustCompile(`/[0-9a-f]{7,}\.log"`)
 )
 
 // golden compares v, as JSON, with the golden of part, its repository's directory and the values a run gives anew written as placeholders.
@@ -210,6 +211,7 @@ func (s shapes) golden(part string, v any) {
 	require.NoError(s.t, err)
 	text := strings.ReplaceAll(string(data), s.root, "<root>")
 	text = lasted.ReplaceAllString(text, `"duration_ms": 0`)
+	text = runLog.ReplaceAllString(text, `/<id>.log"`)
 	text = varying.ReplaceAllStringFunc(text, func(value string) string {
 		if strings.Contains(value, "T") {
 			return `"<time>"`

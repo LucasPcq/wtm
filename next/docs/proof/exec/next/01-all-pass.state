@@ -40,8 +40,8 @@ main
   "isolation": "isolated"
 }
 ## exec logs
-detached-det.log
-feat%2Fa.log
-feat%2Fb.log
-feat%2Fc.log
-main.log
+./<SB>%2Facme.trees%2Fdet/<OP>.log
+./feat%2Fa/<OP>.log
+./feat%2Fb/<OP>.log
+./feat%2Fc/<OP>.log
+./main/<OP>.log

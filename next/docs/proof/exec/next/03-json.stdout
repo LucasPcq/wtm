@@ -11,7 +11,7 @@
         "path": "<SB>/acme.trees/feat-a",
         "exit_code": 0,
         "duration_ms": <DUR>,
-        "log": "<SB>/acme/.git/wtm/exec/feat%2Fa.log",
+        "log": "<SB>/acme/.git/wtm/exec/feat%2Fa/<OP>.log",
         "tail": [
           "ok"
         ]
@@ -51,7 +51,7 @@
         "path": "<SB>/acme.trees/feat-b",
         "exit_code": 3,
         "duration_ms": <DUR>,
-        "log": "<SB>/acme/.git/wtm/exec/feat%2Fb.log",
+        "log": "<SB>/acme/.git/wtm/exec/feat%2Fb/<OP>.log",
         "tail": [
           "boom"
         ]

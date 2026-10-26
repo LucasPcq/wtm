@@ -279,6 +279,16 @@ func TestTheHooksRunInTheWorktreeTheirOutputReportedAndLogged(t *testing.T) {
 	assert.FileExists(t, started[0].Log)
 }
 
+func TestAHookNeverTakesAPortOfRunTomlFromTheCallersEnvironment(t *testing.T) {
+	t.Setenv("PORT", "9999")
+	w := newWorld(t, seed{Config: withHook("echo port=${PORT-unset}")})
+	writeFile(t, filepath.Join(w.stateDir, "run.toml"), "[[job]]\nname = \"web\"\ncmd = \"pnpm dev\"\nports = { PORT = 3000 }\n")
+
+	_, report := w.apply(t, removing(plain))
+
+	assert.Contains(t, eventsOf[domain.Output](report.All()), domain.Output{Subject: plain, Line: "port=unset"})
+}
+
 func TestAWorktreeWhoseDirectoryIsGoneIsRemovedWithoutItsHooks(t *testing.T) {
 	w := newWorld(t, seed{Config: withHook("exit 3")})
 	require.NoError(t, os.RemoveAll(w.at(plain)))

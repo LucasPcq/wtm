@@ -189,6 +189,15 @@ func TestHooksReadTheRunEnvOnlyOfAWorktreeThatChoseAndAComposeStack(t *testing.T
 	}
 }
 
+func TestAWorktreeNeverInheritsWtmsVariablesNorThePortsRunDeclares(t *testing.T) {
+	run := project.Run{Jobs: []project.Job{{Name: "web", Ports: map[string]int{"PORT": 3000}}, {Name: "db", Ports: map[string]int{"DB_PORT": 5432}}}}
+
+	keys := NotInherited(run)
+
+	assert.Subset(t, keys, append(JobKeys(), "PORT", "DB_PORT"))
+	assert.Len(t, keys, len(JobKeys())+2)
+}
+
 func TestAHookEnvReadsEachComposeEnvFileOfItsWorktreeAndFailsWithTheirRead(t *testing.T) {
 	job := JobParams{Branch: "feat/a", ProjectDir: "/repo/acme", Ordinal: 1, Isolation: project.Isolated, Run: project.Run{Jobs: []project.Job{{Name: "db", Cmd: "docker compose up", Cwd: "infra"}}}}
 	var asked []string

@@ -72,6 +72,7 @@ func newWorld(t *testing.T) world {
 		EnvFiles:   store.EnvFiles{},
 		RunHooks:   shell.RunHooks,
 		Syntax:     shell.Syntax,
+		OpenLog:    shell.OpenRunLog,
 		StateDir:   stateDir,
 		CPUs:       8,
 		Now:        time.Now,

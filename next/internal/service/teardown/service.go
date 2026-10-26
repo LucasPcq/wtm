@@ -140,7 +140,7 @@ func (s Service) hooks(ctx context.Context, params RemoveParams) ([]domain.Warni
 		Hooks:   hooks,
 		WorkDir: removal.Path,
 		Env:     hookEnv,
-		Unset:   env.JobKeys(),
+		Unset:   env.NotInherited(facts.Run),
 		Output:  func(line string) { report(domain.Output{Subject: removal.Worktree, Line: line}) },
 		Log:     log,
 	})

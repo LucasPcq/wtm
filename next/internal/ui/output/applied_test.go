@@ -55,12 +55,14 @@ func TestAnItemThatDidNotEndDoneShowsTheLastLinesItPrintedAndItsLog(t *testing.T
 	for i := range 12 {
 		tail = append(tail, "line "+strconv.Itoa(i+1))
 	}
-	outcome := domain.Outcome[recappedPlan, excerptDetail]{Result: &domain.Result[excerptDetail]{Items: []domain.Unit[excerptDetail]{
-		{Subject: "feat/a", Status: domain.StatusDone, Detail: &excerptDetail{tail: []string{"fine"}, log: "/logs/feat-a.log"}},
-		{Subject: "feat/b", Status: domain.StatusFailed, Err: &domain.Error{Message: "exited 3"}, Detail: &excerptDetail{tail: tail, log: "/logs/feat-b.log"}},
+	outcome := domain.Outcome[recappedPlan, worktreeDetail]{Result: &domain.Result[worktreeDetail]{Items: []domain.Unit[worktreeDetail]{
+		{Subject: "feat/a", Status: domain.StatusDone},
+		{Subject: "feat/b", Status: domain.StatusFailed, Err: &domain.Error{Message: "exited 3"}},
 	}}}
+	excerpts := map[string]excerptOf{"feat/a": {tail: []string{"fine"}, log: "/logs/feat-a.log"}, "feat/b": {tail: tail, log: "/logs/feat-b.log"}}
+	excerpt := func(subject string) ([]string, string) { return excerpts[subject].tail, excerpts[subject].log }
 
-	got := rendered(func(w *bytes.Buffer) { DrawApplied(w, outcome, AppliedParams{Command: "exec"}) })
+	got := rendered(func(w *bytes.Buffer) { DrawApplied(w, outcome, AppliedParams{Command: "exec", Excerpt: excerpt}) })
 
 	assert.NotContains(t, got, "fine")
 	assert.NotContains(t, got, "line 2\n")

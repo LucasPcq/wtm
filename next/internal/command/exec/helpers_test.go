@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
@@ -51,6 +52,7 @@ func (w world) apply(t *testing.T, req exec.Request) (exec.Result, *operationtes
 func (w world) applyIn(ctx context.Context, t *testing.T, req exec.Request) (exec.Result, *operationtest.Recorder) {
 	t.Helper()
 	planned, _ := w.plan(t, req)
+	planned.Op = runs.next()
 	report := &operationtest.Recorder{}
 	return w.usecase.Apply(ctx, planned, report.Add), report
 }
@@ -146,4 +148,48 @@ func newCancellingRecorder(cancel context.CancelFunc) *operationtest.Recorder {
 		}
 	}
 	return report
+}
+
+// runs names each apply's operation, as Run would, so each one has a log of its own.
+var runs = &counter{}
+
+type counter struct {
+	mu sync.Mutex
+	n  int
+}
+
+func (c *counter) next() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.n++
+	return "op-" + strconv.Itoa(c.n)
+}
+
+// logsOf are the logs a worktree's runs left, by name.
+func (w world) logsOf(t *testing.T, name string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(w.logDir(name))
+	require.NoError(t, err)
+	var found []string
+	for _, entry := range entries {
+		found = append(found, entry.Name())
+	}
+	return found
+}
+
+// logDir is where the logs of the runs in the worktree of name go.
+func (w world) logDir(name string) string {
+	return filepath.Join(w.stateDir, "exec", worktree.StateSegment(name))
+}
+
+var errNoLog = errors.New("permission denied")
+
+// logOf is the log the phase of the worktree of subject named.
+func logOf(started []domain.PhaseStarted, subject string) string {
+	for _, phase := range started {
+		if phase.Subject == subject {
+			return phase.Log
+		}
+	}
+	return ""
 }

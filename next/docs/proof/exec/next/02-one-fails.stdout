@@ -7,7 +7,7 @@
 
   ✗ feat/b  exited 3
       boom
-  full output:  <SB>/acme/.git/wtm/exec/feat%2Fb.log
+  full output:  <SB>/acme/.git/wtm/exec/feat%2Fb/<OP>.log
 
   → wtm exec feat/b -- 'test "$(git branch --show-current)" != feat/b || { echo boom >&2; exit 3; }; echo ok'   run it again where it did not pass
 

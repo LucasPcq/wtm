@@ -9,7 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-// A HookChain is the hooks a new worktree runs, in order, and how they run: in WorkDir, with Env set and the Unset variables removed from the inherited environment, each line of output passed to Output and appended to the log file Log (none when empty).
+// A HookChain is the hooks a new worktree runs, in order, and how they run: in WorkDir, with Env set and the Unset variables removed from the inherited environment, each line of output passed to Output and appended to the log file Log (none when empty). Reap stops, once a hook returns, what it left running in the background, as a terminal's job control would not: exec's commands, never a hook, which may start a server on purpose.
 type HookChain struct {
 	Hooks   []project.Hook
 	WorkDir string
@@ -17,6 +17,7 @@ type HookChain struct {
 	Unset   []string
 	Output  func(line string)
 	Log     string
+	Reap    bool
 }
 
 // A HookFailure is a hook of a chain that failed: its command, its exit code when it ran to an exit, and the cause.

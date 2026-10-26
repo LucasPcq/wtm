@@ -71,3 +71,15 @@ func TestASubjectNotReadFailsUnderItsCommandsCodeUnlessTheReadWasInterrupted(t *
 	assert.ErrorIs(t, failed.Err, broken)
 	assert.Equal(t, Unit[struct{}]{Subject: "feat/a", Status: StatusCancelled, Reason: ReasonInterrupted}, cancelled)
 }
+
+func TestARunEndsOnItsFirstFailureAtTheSubjectItFailedAt(t *testing.T) {
+	result := &Result[struct{}]{Items: []Unit[struct{}]{
+		{Subject: "feat/a", Status: StatusDone},
+		{Subject: "feat/b", Status: StatusFailed, Err: &Error{Message: "exited 3"}},
+		{Subject: "feat/c", Status: StatusFailed, Err: &Error{Message: "exited 1"}},
+	}}
+
+	assert.Equal(t, "feat/b", Outcome[struct{}, struct{}]{Result: result}.FailedAt())
+	assert.Equal(t, "exited 3", Outcome[struct{}, struct{}]{Result: result}.Failure().Message)
+	assert.Empty(t, Outcome[struct{}, struct{}]{}.FailedAt())
+}

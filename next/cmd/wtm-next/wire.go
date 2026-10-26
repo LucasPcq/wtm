@@ -152,6 +152,7 @@ func wire(params wireParams) app {
 			EnvFiles:   store.EnvFiles{},
 			RunHooks:   shell.RunHooks,
 			Syntax:     shell.Syntax,
+			OpenLog:    shell.OpenRunLog,
 			StateDir:   params.StateDir,
 			CPUs:       runtime.NumCPU(),
 			Now:        time.Now,

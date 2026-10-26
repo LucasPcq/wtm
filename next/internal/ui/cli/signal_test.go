@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"errors"
 	"os"
 	"os/exec"
@@ -30,6 +31,29 @@ func TestAWriteToAStdoutWhoseReaderLeftFailsRatherThanKillTheProcess(t *testing.
 	require.NoError(t, err)
 	require.NoError(t, helper.Start())
 	require.NoError(t, stdout.Close())
+
+	require.NoError(t, helper.Wait())
+}
+
+// Closing the terminal sends SIGHUP: unhandled, it killed wtm and left every child, each in its own group, running.
+func TestAHangupCancelsTheRunAsAnInterruptDoes(t *testing.T) {
+	if os.Getenv(envHangupHelper) != "" {
+		ctx, stop := interruptible(Params{KillCancelled: func() {}, AwaitShields: func() {}})
+		defer stop()
+		_, _ = os.Stdout.Write([]byte("ready\n"))
+		<-ctx.Done()
+		os.Exit(0)
+	}
+
+	helper := exec.Command(os.Args[0], "-test.run=^TestAHangupCancelsTheRunAsAnInterruptDoes$")
+	helper.Env = append(os.Environ(), envHangupHelper+"=1")
+	stdout, err := helper.StdoutPipe()
+	require.NoError(t, err)
+	require.NoError(t, helper.Start())
+	_, err = bufio.NewReader(stdout).ReadString('\n')
+	require.NoError(t, err)
+
+	require.NoError(t, helper.Process.Signal(syscall.SIGHUP))
 
 	require.NoError(t, helper.Wait())
 }

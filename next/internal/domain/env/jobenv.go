@@ -29,6 +29,17 @@ func JobKeys() []string {
 	return []string{worktreeKey, branchKey, ordinalKey, portOffsetKey, projectKey, isolationKey, ComposeProjectKey}
 }
 
+// NotInherited returns the variables a worktree's hooks and commands never take from the caller's environment: those wtm itself sets (JobKeys), and every port run declares, which are the caller's worktree's, never theirs.
+func NotInherited(run project.Run) []string {
+	keys := JobKeys()
+	for _, job := range run.Jobs {
+		for name := range job.Ports {
+			keys = append(keys, name)
+		}
+	}
+	return keys
+}
+
 // JobParams describes the worktree a job runs in: its branch, the project's directory, the worktree's ordinal, the project's isolation and its run.toml.
 type JobParams struct {
 	Branch     string

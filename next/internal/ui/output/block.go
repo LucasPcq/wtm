@@ -57,7 +57,8 @@ func ErrorLine(w io.Writer, msg string) {
 	}
 }
 
-func loadingLine(w io.Writer, msg string) {
+// LoadingLine writes msg to w muted, as something under way.
+func LoadingLine(w io.Writer, msg string) {
 	muted := StylesOf(w).Muted
 	fmt.Fprintf(w, "%s%s %s\n", Indent, muted.Render(glyphProgress), muted.Render(msg))
 }
@@ -120,8 +121,8 @@ func NextStepLines(steps []NextStep, st *Styles) []string {
 	return lines
 }
 
-// blockWidth returns the columns a line of a block may fill on w, or a fallback width when the terminal's is unknown.
-func blockWidth(w io.Writer) int {
+// BlockWidth returns the columns a line of a block may fill on w, or a fallback width when the terminal's is unknown.
+func BlockWidth(w io.Writer) int {
 	cols := terminalWidth(w)
 	if cols <= 0 {
 		return hookFallbackWidth
@@ -129,7 +130,8 @@ func blockWidth(w io.Writer) int {
 	return max(cols-2*len(Indent), hookMinWidth)
 }
 
-func truncate(value string, width int) string {
+// Truncate cuts value to width columns, escape sequences aside, ending it with an ellipsis when cut.
+func Truncate(value string, width int) string {
 	return ansi.Truncate(value, width, ellipsis)
 }
 

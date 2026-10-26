@@ -23,5 +23,17 @@ func drawOutcome(w io.Writer, outcome exec.Outcome, view output.View) {
 		}
 	}
 
-	output.DrawApplied(w, outcome, output.AppliedParams{Command: exec.Name, View: view})
+	output.DrawApplied(w, outcome, output.AppliedParams{Command: exec.Name, View: view, Excerpt: excerpt(outcome)})
+}
+
+// excerpt is the last lines and the log of each target of outcome, by its name.
+func excerpt(outcome exec.Outcome) func(subject string) ([]string, string) {
+	return func(subject string) ([]string, string) {
+		for _, item := range outcome.Result.Items {
+			if item.Subject == subject && item.Detail != nil {
+				return item.Detail.Tail, item.Detail.Log
+			}
+		}
+		return nil, ""
+	}
 }

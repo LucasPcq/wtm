@@ -28,11 +28,12 @@ type Questions interface {
 	Form() domain.Form
 }
 
-// An Outcome is how a command's run ended, as [domain.Outcome] reports it: the fingerprint of the plan it previewed or applied, whether it applied it, the failure the apply ended on, and the envelope of the run.
+// An Outcome is how a command's run ended, as [domain.Outcome] reports it: the fingerprint of the plan it previewed or applied, whether it applied it, the failure the apply ended on and the subject it stopped at, and the envelope of the run.
 type Outcome interface {
 	PlanFingerprint() string
 	Applied() bool
 	Failure() *domain.Error
+	FailedAt() string
 	Envelope(params domain.EnvelopeParams) domain.Envelope
 }
 
@@ -371,7 +372,19 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 	}
 
 	output.Frame(stdout, func(w io.Writer) { c.Draw(w, ran.Outcome, c.io.View()) })
-	return c.io.Failed(ran.Outcome.Failure())
+	return c.io.Failed(c.quietlyNamed(ran.Outcome))
+}
+
+// quietlyNamed is the failure an apply ended on, led by the subject it stopped at when --quiet prints it alone: the outcome that names each subject is not drawn.
+func (c *Command[R, Q, O]) quietlyNamed(outcome O) *domain.Error {
+	failure, subject := outcome.Failure(), outcome.FailedAt()
+	if failure == nil || subject == "" || !c.io.Quiet {
+		return failure
+	}
+
+	named := *failure
+	named.Message = subject + ": " + failure.Message
+	return &named
 }
 
 // replanned is failure followed by the request run again as a dry run when it is a stale plan, as the envelope's follow_ups give it; failure itself otherwise.

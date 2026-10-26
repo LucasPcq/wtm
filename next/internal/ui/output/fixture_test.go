@@ -33,12 +33,8 @@ func (d worktreeDetail) Worktree() (string, env.Redacted) {
 	return d.path, env.Redacted{}
 }
 
-// excerptDetail is the detail of an item that keeps the last lines it printed and its log.
-type excerptDetail struct {
+// excerptOf is the last lines an item printed and its log.
+type excerptOf struct {
 	tail []string
 	log  string
-}
-
-func (d excerptDetail) Excerpt() ([]string, string) {
-	return d.tail, d.log
 }

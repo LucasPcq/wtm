@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"time"
 
@@ -91,6 +92,7 @@ func (w world) usecase() exec.UseCase {
 		EnvFiles:   w.store,
 		RunHooks:   fakeShell,
 		Syntax:     fakeSyntax,
+		OpenLog:    fakeLog,
 		StateDir:   "/repo/main/.git/wtm",
 		CPUs:       8,
 		Now:        func() time.Time { return startedAt },
@@ -127,3 +129,12 @@ func fakeSyntax(_ context.Context, line string) error {
 	}
 	return nil
 }
+
+// fakeLog opens each run's log nowhere, under the name the adapter gives it.
+func fakeLog(dir, run string) (string, io.WriteCloser, error) {
+	return dir + "/" + run + ".log", nopCloser{io.Discard}, nil
+}
+
+type nopCloser struct{ io.Writer }
+
+func (nopCloser) Close() error { return nil }

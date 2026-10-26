@@ -56,7 +56,7 @@ state() {
     grep -v created_at "$meta"
   done
   echo "## exec logs"
-  ls .git/wtm/exec 2>/dev/null || true
+  (cd .git/wtm/exec 2>/dev/null && find . -type f | sort) || true
 }
 
 run_side() {
@@ -91,9 +91,12 @@ run_side() {
     fp=$(sed -n 's/.*"fingerprint": "\([0-9a-f]*\)".*/\1/p' "$dir/17-json-dry-run.stdout")
     scenario 18-expect-fingerprint exec feat/a --expect-fingerprint "${fp:-none}" --yes -- true
   )
+  local escaped=${root//\//%2F}
   sed -i '' -E \
     -e "s#(/private)?$root#<SB>#g" \
+    -e "s#(%2Fprivate)?$escaped#<SB>#g" \
     -e 's#"op": "[0-9a-f]{16}"#"op": "<OP>"#g' \
+    -e 's#/[0-9a-f]{16}\.log#/<OP>.log#g' \
     -e 's#[0-9a-f]{24}#<FP>#g' \
     -e 's#\(([0-9.]+m?s)\)#(<DUR>)#g' \
     -e 's#exit ([0-9]+), [0-9.]+m?s\)#exit \1, <DUR>)#g' \
@@ -156,7 +159,8 @@ tty_side() {
     tmux send-keys -t "$session" Escape
     capture 5-left 'EXIT=19'
   )
-  sed -i '' -E -e "s#(/private)?$root#<SB>#g" -e 's#wtmx#wtm#g' -e 's#\(([0-9.]+m?s)\)#(<DUR>)#g' "$tty"/*
+  sed -i '' -E -e "s#(/private)?$root#<SB>#g" -e 's#wtmx#wtm#g' -e 's#\(([0-9.]+m?s)\)#(<DUR>)#g' \
+    -e 's#exit ([0-9]+), [0-9.]+m?s\)#exit \1, <DUR>)#g' -e 's#/[0-9a-f]{16}\.log#/<OP>.log#g' "$tty"/*
 }
 
 mkdir -p "$out"

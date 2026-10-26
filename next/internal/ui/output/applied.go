@@ -18,20 +18,16 @@ type Worktree interface {
 	Worktree() (path string, ports env.Redacted)
 }
 
-// An Excerpt is the detail of an item that keeps the last lines it printed and where the whole of them is: DrawApplied draws them under the item when it did not end done.
-type Excerpt interface {
-	Excerpt() (tail []string, log string)
-}
-
 // excerptLines is how many of an item's last lines its conclusion shows.
 const excerptLines = 10
 
-// AppliedParams is what DrawApplied draws an outcome as, beyond the outcome itself: the command it counts for, the note its tally adds, the note of the row of an item done without a change (create's "already open"), and the view it draws from.
+// AppliedParams is what DrawApplied draws an outcome as, beyond the outcome itself: the command it counts for, the note its tally adds, the note of the row of an item done without a change (create's "already open"), the view it draws from, and, when the command keeps them, the last lines an item printed and where the whole of them is (Excerpt, nil for none), drawn under an item that did not end done.
 type AppliedParams struct {
 	Command   string
 	Note      string
 	Unchanged string
 	View      View
+	Excerpt   func(subject string) (tail []string, log string)
 }
 
 // DrawApplied draws what the apply of a mutation did: the tally, the applied plan with a row per worktree that stands and the warnings of the items done then of the run, each item left unfinished followed by its own warnings, and the next steps, the result's, then each item's (what repairs what its failure left behind, then what its warnings offer), then what the run's warnings offer. An item's warning reads subject, then its message.
@@ -69,7 +65,7 @@ func DrawApplied[P RecappedPlan, D any](w io.Writer, outcome domain.Outcome[P, D
 		}
 	}
 
-	drawUnfinished(w, items)
+	drawUnfinished(w, items, params.Excerpt)
 
 	var next []NextStep
 	for _, followUp := range outcome.Result.FollowUps {
@@ -98,8 +94,8 @@ func worktreeRow(w io.Writer, subject string, reason domain.Reason, stands Workt
 	return PlanRow{Label: subject, Values: []string{ShownPath(Shown{Cwd: params.View.Cwd, Path: path}) + MutedNote(note, StylesOf(w))}}
 }
 
-// drawUnfinished draws each item that did not end done, but those the plan ruled out: its recap and its warnings say why already.
-func drawUnfinished[D any](w io.Writer, items []domain.Unit[D]) {
+// drawUnfinished draws each item that did not end done, with its excerpt when the command keeps one, but those the plan ruled out: its recap and its warnings say why already.
+func drawUnfinished[D any](w io.Writer, items []domain.Unit[D], excerpt func(subject string) ([]string, string)) {
 	unfinished := slices.DeleteFunc(slices.Clone(items), func(item domain.Unit[D]) bool {
 		return item.Status == domain.StatusDone || item.Reason == domain.ReasonRuledOut
 	})
@@ -108,8 +104,9 @@ func drawUnfinished[D any](w io.Writer, items []domain.Unit[D]) {
 	}
 	for _, item := range unfinished {
 		UnfinishedLine(w, Unfinished{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err})
-		if excerpt, ok := any(item.Detail).(Excerpt); ok && item.Detail != nil {
-			drawExcerpt(w, excerpt)
+		if excerpt != nil {
+			tail, log := excerpt(item.Subject)
+			drawExcerpt(w, tail, log)
 		}
 		for _, text := range itemWarnings(item) {
 			WarningLine(w, text)
@@ -117,10 +114,9 @@ func drawUnfinished[D any](w io.Writer, items []domain.Unit[D]) {
 	}
 }
 
-func drawExcerpt(w io.Writer, excerpt Excerpt) {
-	tail, log := excerpt.Excerpt()
+func drawExcerpt(w io.Writer, tail []string, log string) {
 	for _, line := range tail[max(len(tail)-excerptLines, 0):] {
-		Message(w, Indent+Indent+truncate(expandTabs(line), max(blockWidth(w)-2*len(Indent), hookMinWidth)))
+		Message(w, Indent+Indent+Truncate(expandTabs(line), max(BlockWidth(w)-2*len(Indent), hookMinWidth)))
 	}
 	if log != "" {
 		InfoLine(w, Info{Label: hookLogLabel, Value: log})

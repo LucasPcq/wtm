@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"io"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -38,6 +39,7 @@ type UseCase struct {
 	EnvFiles   EnvFiles
 	RunHooks   RunHooks
 	Syntax     Syntax
+	OpenLog    OpenLog
 	StateDir   string // wtm's state, where each target's log goes
 	CPUs       int    // how many commands run at once when the request does not say
 	Now        func() time.Time
@@ -62,11 +64,6 @@ type Detail struct {
 	Log        string   `json:"log,omitempty"`
 	Tail       []string `json:"tail"`
 	Output     string   `json:"output,omitempty"`
-}
-
-// Excerpt is what the conclusion shows of a target that did not pass: its last lines and its log.
-func (d Detail) Excerpt() ([]string, string) {
-	return d.Tail, d.Log
 }
 
 // ----------------------------------------------------------------------------
@@ -101,7 +98,8 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 		return outcome, err
 	}
 
-	// 5. Apply between the started and finished events other processes listen to.
+	// 5. Apply between the started and finished events other processes listen to; each target's log is named after the operation.
+	plan.Op = op.ID
 	report := op.Started()
 	result := u.Apply(ctx, plan, report)
 	op.Finished(result.Failure())
@@ -235,11 +233,8 @@ const (
 	CodeEnvUnavailable = Name + ".env_unavailable"
 )
 
-// logDir is where each target's log goes under wtm's state, overwritten by each run, named after its branch, or detachedLog and its directory's name on no branch.
-const (
-	logDir      = "exec"
-	detachedLog = "detached-"
-)
+// logDir is where the logs go under wtm's state: a directory per worktree, a log per run, named after its operation, the ended runs' removed by the next.
+const logDir = "exec"
 
 // run runs the command in one target between its unit's events, its output reported line by line and kept in its log; a target reached after a cancel is skipped.
 func (u UseCase) run(ctx context.Context, plan Plan, t Target, report domain.Report) (item Item) {
@@ -255,8 +250,13 @@ func (u UseCase) run(ctx context.Context, plan Plan, t Target, report domain.Rep
 	runEnv, warnings := u.runEnv(plan, t)
 	item.Warnings = warnings
 	detail := &Detail{Path: t.Path, Tail: []string{}}
+	log := io.Discard
 	if u.StateDir != "" {
-		detail.Log = filepath.Join(u.StateDir, logDir, worktree.StateSegment(cmp.Or(t.Branch, detachedLog+filepath.Base(t.Path)))+".log")
+		// A log that cannot be opened fails no run: the command runs without one, and none is named.
+		if path, opened, err := u.OpenLog(filepath.Join(u.StateDir, logDir, worktree.StateSegment(t.Worktree)), plan.Op); err == nil {
+			defer opened.Close()
+			detail.Log, log = path, opened
+		}
 	}
 	var lines tail
 	var whole strings.Builder
@@ -267,15 +267,16 @@ func (u UseCase) run(ctx context.Context, plan Plan, t Target, report domain.Rep
 		Hooks:   []project.Hook{{Cmd: plan.Command}},
 		WorkDir: t.Path,
 		Env:     runEnv,
-		Unset:   unset(plan.facts.Run),
+		Unset:   env.NotInherited(plan.facts.Run),
 		Output: func(line string) {
+			_, _ = io.WriteString(log, line+"\n")
 			lines.add(line)
 			if plan.Print {
 				whole.WriteString(line + "\n")
 			}
 			report(domain.Output{Subject: t.Worktree, Line: line})
 		},
-		Log: detail.Log,
+		Reap: true,
 	})
 	report(domain.PhaseFinished{Subject: t.Worktree, Phase: domain.PhaseExec, Failed: err != nil})
 
@@ -284,15 +285,16 @@ func (u UseCase) run(ctx context.Context, plan Plan, t Target, report domain.Rep
 	item.Detail = detail
 
 	var failure *env.HookFailure
-	exited := errors.As(err, &failure) && failure.ExitCode != nil
+	if errors.As(err, &failure) {
+		detail.ExitCode = failure.ExitCode
+	}
 	switch {
 	case err == nil:
 		item.Status, detail.ExitCode = domain.StatusDone, new(0)
 	case ctx.Err() != nil:
 		item.Status, item.Reason = domain.StatusCancelled, domain.ReasonInterrupted
-	case exited:
-		detail.ExitCode = failure.ExitCode
-		code := strconv.Itoa(*failure.ExitCode)
+	case detail.ExitCode != nil:
+		code := strconv.Itoa(*detail.ExitCode)
 		item.Status, item.Err = domain.StatusFailed, &domain.Error{Kind: domain.KindInternal, Code: CodeFailed, Message: "exited " + code, Params: domain.Params{"exit_code": code}}
 	default:
 		item.Status, item.Err = domain.StatusFailed, domain.AsError(domain.AsErrorParams{Err: err, Code: CodeStartFailed, Message: "couldn't run the command"})

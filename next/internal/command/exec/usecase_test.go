@@ -2,12 +2,14 @@ package exec_test
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +35,10 @@ func TestTheCommandRunsInEachTargetFromItsRootAsGitSpellsIt(t *testing.T) {
 		assert.Equal(t, 0, *item.Detail.ExitCode)
 	}
 	assert.Empty(t, result.FollowUps)
-	assert.Contains(t, eventsOf[domain.PhaseStarted](report.All()), domain.PhaseStarted{Subject: featA, Phase: domain.PhaseExec, Log: filepath.Join(w.stateDir, "exec", "feat%2Fa.log")})
+	started := eventsOf[domain.PhaseStarted](report.All())
+	require.Len(t, started, 2)
+	assert.Equal(t, domain.PhaseExec, started[0].Phase)
+	assert.Equal(t, result.Items[0].Detail.Log, logOf(started, featA))
 	assert.Contains(t, eventsOf[domain.Output](report.All()), domain.Output{Subject: featB, Line: w.at(featB)})
 	assert.Len(t, eventsOf[domain.UnitFinished](report.All()), 2)
 }
@@ -57,25 +62,53 @@ func TestACommandThatFailsInOneTargetFailsItAloneAndIsOfferedAgainThere(t *testi
 	assert.Equal(t, &retry, failed.Err.FollowUp, "a quiet run names where to run it again")
 }
 
-func TestEachTargetsOutputGoesToItsLogOverwrittenByTheNextRun(t *testing.T) {
+func TestEachRunHasALogOfItsOwnTheNextRunRemovingTheEndedOnes(t *testing.T) {
 	w := newWorld(t)
-	log := filepath.Join(w.stateDir, "exec", "feat%2Fa.log")
 
-	w.apply(t, running("echo first", featA))
-	result, _ := w.apply(t, running("echo second", featA))
+	first, _ := w.apply(t, running("echo first", featA))
+	second, _ := w.apply(t, running("echo second", featA))
 
-	assert.Equal(t, log, result.Items[0].Detail.Log)
-	written, err := os.ReadFile(log)
+	assert.NoFileExists(t, first.Items[0].Detail.Log, "an ended run's log goes with the next run")
+	assert.Equal(t, w.logDir(featA), filepath.Dir(second.Items[0].Detail.Log))
+	written, err := os.ReadFile(second.Items[0].Detail.Log)
 	require.NoError(t, err)
 	assert.Equal(t, "second\n", string(written))
 }
 
-func TestTheLogOfAWorktreeOnNoBranchIsNamedAfterItsDirectory(t *testing.T) {
+func TestARunNeverRemovesNorWritesTheLogOfARunStillGoing(t *testing.T) {
+	w := newWorld(t)
+	going, log, err := shell.OpenRunLog(w.logDir(featA), "op-going")
+	require.NoError(t, err)
+	_, _ = io.WriteString(log, "still going\n")
+
+	result, _ := w.apply(t, running("echo mine", featA))
+	require.NoError(t, log.Close())
+
+	written, err := os.ReadFile(going)
+	require.NoError(t, err)
+	assert.Equal(t, "still going\n", string(written))
+	assert.NotEqual(t, going, result.Items[0].Detail.Log)
+	assert.Len(t, w.logsOf(t, featA), 2)
+}
+
+func TestTheLogsOfAWorktreeOnNoBranchAreItsOwn(t *testing.T) {
 	w := newWorld(t)
 
 	result, _ := w.apply(t, running("true", w.at("detached")))
 
-	assert.Equal(t, filepath.Join(w.stateDir, "exec", "detached-wt-detached.log"), result.Items[0].Detail.Log)
+	assert.Equal(t, w.logDir(w.at("detached")), filepath.Dir(result.Items[0].Detail.Log))
+}
+
+func TestALogThatCannotBeOpenedIsNamedNowhereAndTheCommandRuns(t *testing.T) {
+	w := newWorld(t)
+	w.usecase.OpenLog = func(string, string) (string, io.WriteCloser, error) { return "", nil, errNoLog }
+
+	result, report := w.apply(t, running("echo ran", featA))
+
+	assert.Equal(t, domain.StatusDone, result.Items[0].Status)
+	assert.Empty(t, result.Items[0].Detail.Log)
+	assert.Empty(t, logOf(eventsOf[domain.PhaseStarted](report.All()), featA))
+	assert.Equal(t, []string{"ran"}, result.Items[0].Detail.Tail)
 }
 
 func TestTheCallersPortsAndWtmVariablesNeverReachATarget(t *testing.T) {

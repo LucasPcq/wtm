@@ -324,7 +324,7 @@ func (p *provisioning) runHooks(ctx context.Context, provisioned Provisioned) er
 		Hooks:   hooks,
 		WorkDir: p.Worktree.Path,
 		Env:     p.hookEnv(provisioned.ordinal()),
-		Unset:   env.JobKeys(),
+		Unset:   env.NotInherited(p.Project.Run),
 		Output:  func(line string) { p.Report(domain.Output{Subject: p.Worktree.Branch, Line: line}) },
 		Log:     p.hookLog,
 	})

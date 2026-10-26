@@ -40,7 +40,7 @@ main
   "isolation": "isolated"
 }
 ## exec logs
-feat%2Fa.log
-feat%2Fb.log
-feat%2Fc.log
-main.log
+./feat%2Fa.log
+./feat%2Fb.log
+./feat%2Fc.log
+./main.log

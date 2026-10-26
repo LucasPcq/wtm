@@ -12,7 +12,7 @@
     "type": "phase.started",
     "subject": "feat/old",
     "phase": "exec",
-    "log": "<root>/main/.git/wtm/exec/feat%2Fold.log"
+    "log": "<root>/main/.git/wtm/exec/feat%2Fold/<id>.log"
   },
   {
     "type": "phase.finished",

@@ -55,16 +55,20 @@ func runHook(ctx context.Context, hook project.Hook, chain env.HookChain, sink *
 	cmd.Stdout = &sink.stdout
 	cmd.Stderr = &sink.stderr
 	err := cmd.Run()
+	if chain.Reap && cmd.Process != nil {
+		reapGroup(cmd.Process.Pid)
+	}
 	switch {
 	// A hook that exited 0 but left a child holding its output open still succeeded.
 	case err == nil, errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState.Success():
 		return nil
-	case ctx.Err() != nil:
-		return &env.HookFailure{Cmd: hook.Cmd, Err: ctx.Err()}
 	}
 
-	// the caller names the hook that failed ("on_clean hook failed"): the failure carries only its cause
+	// the caller names the hook that failed ("on_clean hook failed"): the failure carries only its cause, a cancel's once cancelled
 	failure := &env.HookFailure{Cmd: hook.Cmd, Err: err}
+	if ctx.Err() != nil {
+		failure.Err = ctx.Err()
+	}
 	if code, exited := ExitCode(err); exited {
 		failure.ExitCode = &code
 	}

@@ -2,6 +2,7 @@ package exec
 
 import (
 	"context"
+	"io"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
@@ -22,6 +23,9 @@ type Meta interface {
 type EnvFiles interface {
 	Read(path string) ([]dotenv.Line, error)
 }
+
+// OpenLog opens the log of run, one run of the command in a worktree, under dir, which keeps a log per run: it returns its path and its writer, whose Close ends it.
+type OpenLog func(dir, run string) (string, io.WriteCloser, error)
 
 // RunHooks runs a chain of hooks, failing with an *env.HookFailure: exec runs its command as a chain of one.
 type RunHooks func(ctx context.Context, chain env.HookChain) error
