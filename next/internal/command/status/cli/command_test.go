@@ -138,12 +138,12 @@ func TestAllCountsTheWorktreesNotReadAmongThoseReadAndNeverSaysNothingToFixThen(
 
 func TestAnOperationGitStoppedInTheMiddleOfIsTheWorktreesStateAsARebaseIs(t *testing.T) {
 	for _, c := range []struct {
-		midway worktree.Operation
+		midway worktree.Midway
 		state  string
 	}{
-		{midway: worktree.OperationMerge, state: "merging"},
-		{midway: worktree.OperationCherryPick, state: "cherry-picking"},
-		{midway: worktree.OperationApply, state: "applying patches"},
+		{midway: worktree.MidwayMerge, state: "merging"},
+		{midway: worktree.MidwayCherryPick, state: "cherry-picking"},
+		{midway: worktree.MidwayApply, state: "applying patches"},
 	} {
 		t.Run(string(c.midway), func(t *testing.T) {
 			got := runStatus(t, world{Midway: c.midway}, "feat/a")

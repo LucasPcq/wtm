@@ -49,7 +49,6 @@ type Detail struct {
 	Main         bool   `json:"main"`
 	Dirty        bool   `json:"dirty"`
 	Locked       bool   `json:"locked"`
-	Rebasing     bool   `json:"rebasing"`
 	Active       bool   `json:"active"`        // the caller stands in it, the deepest worktree holding its directory
 	Missing      bool   `json:"missing"`       // its directory is gone: git calls it prunable
 	CommitsAhead int    `json:"commits_ahead"` // the commits it has that the base branch lacks
@@ -126,7 +125,6 @@ func (f Facts) item(w worktree.Worktree, active bool) Item {
 		return item
 	}
 
-	_, rebasing := w.State.(worktree.Rebasing)
 	parent, _ := f.Stack.Parent(w.Branch())
 	pr, hasPR := worktree.PullRequestOf(f.PullRequests, w.Branch())
 	detail := Detail{
@@ -135,7 +133,6 @@ func (f Facts) item(w worktree.Worktree, active bool) Item {
 		Main:         w.Main,
 		Dirty:        state.Dirty,
 		Locked:       w.Locked,
-		Rebasing:     rebasing,
 		Active:       active,
 		Missing:      state.Missing,
 		CommitsAhead: state.Ahead,

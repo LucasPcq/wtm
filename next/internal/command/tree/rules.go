@@ -48,7 +48,6 @@ type Detail struct {
 	NeedsSync bool `json:"needs_sync"` // its parent has commits it lacks and no rebase, bisect or merge is under way: a sync is due
 	Dirty     bool `json:"dirty"`
 	Locked    bool `json:"locked"`
-	Rebasing  bool `json:"rebasing"`
 	Missing   bool `json:"missing"` // its directory is gone
 	// Condition is the one fact of it that most changes what to do first, as this read knows it.
 	Condition worktree.Condition `json:"condition"`
@@ -117,7 +116,6 @@ func (f Facts) item(branch string) Item {
 		return item
 	}
 
-	_, detail.Rebasing = w.State.(worktree.Rebasing)
 	detail.Dirty, detail.Missing = state.Dirty, state.Missing
 	detail.Ahead, detail.Behind = state.Ahead, state.Behind
 	detail.NeedsSync = w.NeedsSync(state.Behind)

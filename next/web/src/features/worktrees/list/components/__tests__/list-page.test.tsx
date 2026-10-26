@@ -100,7 +100,6 @@ test('a worktree git stopped in the middle of a merge says merging, as a rebase 
             parent: 'main',
             behind: 2,
             needs_sync: false,
-            rebasing: true,
             condition: 'rebasing',
           }),
         ]),

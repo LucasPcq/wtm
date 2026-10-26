@@ -34,11 +34,11 @@ type world struct {
 	RunErr    error
 	JobsErr   error
 	PRsErr    error
-	Merged    bool               // feat/a's pull request is merged
-	Gone      bool               // the directories of feat/old and of the detached worktree are gone
-	Broken    bool               // feat/a does not read: git cannot tell its changes
-	Alone     bool               // the main worktree is the only one
-	Midway    worktree.Operation // what git stopped in the middle of in feat/a
+	Merged    bool            // feat/a's pull request is merged
+	Gone      bool            // the directories of feat/old and of the detached worktree are gone
+	Broken    bool            // feat/a does not read: git cannot tell its changes
+	Alone     bool            // the main worktree is the only one
+	Midway    worktree.Midway // what git stopped in the middle of in feat/a
 }
 
 func (w world) env() uicli.Env {

@@ -77,7 +77,7 @@ func TestALockedARebasingAndADetachedWorktreeAreSaidSo(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, detailOf(t, read, "locked").Locked)
-	assert.True(t, detailOf(t, read, "rebasing").Rebasing)
+	assert.Equal(t, worktree.ConditionRebasing, detailOf(t, read, "rebasing").Condition)
 	detached := detailOf(t, read, "/repo/.trees/detached")
 	assert.Empty(t, detached.Branch, "a worktree on no branch is named by its path")
 	assert.Zero(t, detached.CommitsAhead)
@@ -381,7 +381,7 @@ func TestAWorktreeGitStoppedInTheMiddleOfAnOperationNeedsNoSyncAndSaysWhich(t *t
 	for name, ui := range map[string]worktree.Worktree{
 		"rebasing":  {Path: "/repo/.trees/feat/a-ui", State: worktree.Rebasing{Branch: "feat/a-ui"}},
 		"bisecting": {Path: "/repo/.trees/feat/a-ui", State: worktree.Bisecting{Branch: "feat/a-ui"}},
-		"merging":   {Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Midway: worktree.OperationMerge},
+		"merging":   {Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Midway: worktree.MidwayMerge},
 	} {
 		t.Run(name, func(t *testing.T) {
 			w := newWorld(seed{

@@ -56,9 +56,12 @@ func TestAPollReadsEachWorktreesHeadCheckoutAndJobs(t *testing.T) {
 		Worktrees: []worktree.Worktree{
 			{Path: "/repo", Main: true, State: worktree.OnBranch{Branch: "main"}},
 			{Path: "/trees/a", State: worktree.Rebasing{Branch: "feat/a"}},
+			{Path: "/trees/b", State: worktree.Bisecting{Branch: "feat/b"}},
+			{Path: "/trees/m", State: worktree.OnBranch{Branch: "feat/m"}, Midway: worktree.MidwayMerge},
+			{Path: "/trees/c", State: worktree.OnBranch{Branch: "feat/c"}, Midway: worktree.MidwayCherryPick},
 			{Path: "/trees/detached", State: worktree.Detached{}},
 		},
-		Branches: worktree.Branches{Local: []worktree.Branch{{Name: "main", Tip: "m1"}, {Name: "feat/a", Tip: "a1"}}},
+		Branches: worktree.Branches{Local: []worktree.Branch{{Name: "main", Tip: "m1"}, {Name: "feat/a", Tip: "a1"}, {Name: "feat/b", Tip: "b1"}, {Name: "feat/m", Tip: "x1"}, {Name: "feat/c", Tip: "c1"}}},
 	}
 	jobs := []run.Job{{Name: "web", WorkDir: "/trees/a", State: run.Running}, {Name: "api", WorkDir: "/trees/a", State: run.Crashed}}
 
@@ -68,6 +71,9 @@ func TestAPollReadsEachWorktreesHeadCheckoutAndJobs(t *testing.T) {
 	assert.Equal(t, events.Polled{
 		"main":   {Head: "m1", Checkout: "branch", Jobs: []string{}},
 		"feat/a": {Head: "a1", Checkout: "rebasing", Jobs: []string{"api=crashed", "web=running"}},
+		"feat/b": {Head: "b1", Checkout: "bisecting", Jobs: []string{}},
+		"feat/m": {Head: "x1", Checkout: "merging", Jobs: []string{}},
+		"feat/c": {Head: "c1", Checkout: "cherry_picking", Jobs: []string{}},
 	}, polled)
 	assert.Nil(t, unknown["feat/a"].Jobs)
 }
@@ -91,6 +97,10 @@ func TestChangesNameWhatMovedInEachWorktree(t *testing.T) {
 		"checkout": {
 			now:     events.Polled{"feat/a": before["feat/a"], "feat/b": {Head: "b1", Checkout: "rebasing", Jobs: []string{}}},
 			changes: []events.Change{{Branch: "feat/b", Fields: []worktree.PolledField{worktree.PolledCheckout}}},
+		},
+		"merge_started": {
+			now:     events.Polled{"feat/a": {Head: "a1", Checkout: "merging", Jobs: []string{}}, "feat/b": before["feat/b"]},
+			changes: []events.Change{{Branch: "feat/a", Fields: []worktree.PolledField{worktree.PolledCheckout}}},
 		},
 		"jobs_unknown": {now: events.Polled{"feat/a": {Head: "a1", Checkout: "branch"}, "feat/b": before["feat/b"]}},
 		"appeared": {

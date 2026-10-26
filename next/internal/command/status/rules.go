@@ -62,7 +62,6 @@ type Detail struct {
 	Path      string             `json:"path"`
 	Main      bool               `json:"main"`
 	Locked    bool               `json:"locked"`
-	Rebasing  bool               `json:"rebasing"`
 	Missing   bool               `json:"missing"`    // its directory is gone: nothing of it is read
 	CreatedAt *time.Time         `json:"created_at"` // from its meta record, null without one
 	Parent    string             `json:"parent"`     // the branch it was created from, empty for a root
@@ -242,7 +241,6 @@ func (f Facts) item(w worktree.Worktree) Item {
 
 	branch := w.Branch()
 	record, recordErr := f.Records[branch], f.RecordErrs[branch]
-	_, rebasing := w.State.(worktree.Rebasing)
 	parent, _ := f.Stack.Parent(branch)
 	pending := recordErr == nil && f.pending(w)
 	offset := f.offset(w)
@@ -254,7 +252,6 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Path:      w.Path,
 		Main:      w.Main,
 		Locked:    w.Locked,
-		Rebasing:  rebasing,
 		Missing:   state.Missing,
 		CreatedAt: record.Created(),
 		Parent:    parent,

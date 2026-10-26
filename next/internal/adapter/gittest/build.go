@@ -280,12 +280,12 @@ func buildRemote(t testing.TB, main string, built builder, seed FakeParams) {
 	}
 }
 
-// midwayMarks are the files git keeps while it is in the middle of an operation on a worktree's checkout, by operation.
-var midwayMarks = map[worktree.Operation]string{
-	worktree.OperationMerge:      "MERGE_HEAD",
-	worktree.OperationCherryPick: "CHERRY_PICK_HEAD",
-	worktree.OperationRevert:     "REVERT_HEAD",
-	worktree.OperationApply:      filepath.Join("rebase-apply", "applying"),
+// midwayMarks are the files git keeps while it is in the middle of an operation on a worktree's checkout, by Midway; TestTheFakeAndGitAgreeOnEachMidway holds them to the adapter's.
+var midwayMarks = map[worktree.Midway]string{
+	worktree.MidwayMerge:      "MERGE_HEAD",
+	worktree.MidwayCherryPick: "CHERRY_PICK_HEAD",
+	worktree.MidwayRevert:     "REVERT_HEAD",
+	worktree.MidwayApply:      filepath.Join("rebase-apply", "applying"),
 }
 
 // buildWorktreeParams is one linked worktree to build in the repository at

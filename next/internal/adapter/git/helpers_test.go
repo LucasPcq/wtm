@@ -78,6 +78,22 @@ func stopped(t *testing.T, dir string, args ...string) {
 	require.Error(t, err, "git %v was meant to stop on a conflict: %s", args, out)
 }
 
+// merging, cherryPicking, reverting and applying stop git in the middle of a merge, a cherry-pick, a revert or a git am, on a conflict between feature checked out at where and main.
+func merging(t *testing.T, _, where string) { stopped(t, where, "merge", "main") }
+
+func cherryPicking(t *testing.T, _, where string) { stopped(t, where, "cherry-pick", "main") }
+
+func reverting(t *testing.T, _, where string) {
+	commitFile(t, where, "file", "feature again")
+	stopped(t, where, "revert", "--no-edit", "HEAD~1")
+}
+
+func applying(t *testing.T, repo, where string) {
+	patch := filepath.Join(gittest.TempDir(t), "main.patch")
+	require.NoError(t, os.WriteFile(patch, []byte(gittest.Output(t, repo, "format-patch", "-1", "main", "--stdout")+"\n"), 0o644))
+	stopped(t, where, "am", patch)
+}
+
 func upstreamOf(t *testing.T, dir, name string) string {
 	t.Helper()
 	out, err := exec.Command("git", "-C", dir, "config", "branch."+name+".merge").Output()

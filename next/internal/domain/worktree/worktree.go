@@ -16,25 +16,45 @@ type Worktree struct {
 	Head     string
 	Locked   bool
 	Prunable bool
-	Midway   Operation // a merge, a cherry-pick, a revert or a git am; a rebase or a bisect is its State
+	Midway   Midway
 }
 
-// An Operation is what git stopped in the middle of in a worktree, to continue or abort there.
+// A Midway is an operation git stopped in the middle of that leaves a worktree on its checkout: a merge, a cherry-pick, a revert or a git am; a rebase or a bisect is its State instead, and wins over a Midway (a rebase of merges writes MERGE_HEAD too).
+type Midway string
+
+// The operations a Midway names.
+const (
+	MidwayMerge      Midway = "merging"
+	MidwayCherryPick Midway = "cherry_picking"
+	MidwayRevert     Midway = "reverting"
+	MidwayApply      Midway = "applying" // git am
+)
+
+// Midways returns every Midway, in the order Operations lists them after a State's two.
+func Midways() []Midway {
+	return []Midway{MidwayMerge, MidwayCherryPick, MidwayRevert, MidwayApply}
+}
+
+// An Operation is what git stopped in the middle of in a worktree, to continue or abort there: its State's rebase or bisect, else its Midway.
 type Operation string
 
 // The operations git stops in the middle of.
 const (
 	OperationRebase     Operation = "rebasing"
 	OperationBisect     Operation = "bisecting"
-	OperationMerge      Operation = "merging"
-	OperationCherryPick Operation = "cherry_picking"
-	OperationRevert     Operation = "reverting"
-	OperationApply      Operation = "applying" // git am
+	OperationMerge                = Operation(MidwayMerge)
+	OperationCherryPick           = Operation(MidwayCherryPick)
+	OperationRevert               = Operation(MidwayRevert)
+	OperationApply                = Operation(MidwayApply)
 )
 
-// Operations returns every Operation.
+// Operations returns every Operation, those of a State first, then those of a Midway.
 func Operations() []Operation {
-	return []Operation{OperationRebase, OperationBisect, OperationMerge, OperationCherryPick, OperationRevert, OperationApply}
+	operations := []Operation{OperationRebase, OperationBisect}
+	for _, midway := range Midways() {
+		operations = append(operations, Operation(midway))
+	}
+	return operations
 }
 
 //go-sumtype:decl State
@@ -94,7 +114,7 @@ func (w Worktree) Operation() Operation {
 	case OnBranch, Detached, Bare:
 	}
 
-	return w.Midway
+	return Operation(w.Midway)
 }
 
 // NeedsSync reports whether the worktree is to sync onto its parent, which has behind commits it lacks: never while git is in the middle of an operation in it, which leaves its branch where it was until it is continued or aborted.

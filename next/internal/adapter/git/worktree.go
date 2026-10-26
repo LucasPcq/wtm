@@ -20,7 +20,10 @@ var (
 // Worktrees returns the repository's worktrees, the main one first. A detached
 // worktree in the middle of a rebase, or of a bisect, is reported as rebasing
 // the branch it started from; one in the middle of a merge, a cherry-pick, a
-// revert or a git am is marked so (Midway).
+// revert or a git am is marked so (Midway), unless a rebase or a bisect is
+// under way, which wins. A worktree that cannot be probed is listed all the
+// same, plainly detached or on its branch: the reads that open it say why it
+// does not read.
 func (r Repo) Worktrees(ctx context.Context) ([]worktree.Worktree, error) {
 	out, err := r.git(ctx, "worktree", "list", "--porcelain", "-z")
 	if err != nil {
@@ -29,17 +32,12 @@ func (r Repo) Worktrees(ctx context.Context) ([]worktree.Worktree, error) {
 
 	worktrees := parseWorktrees(string(out))
 	for i, w := range worktrees {
-		worktrees[i].Midway = midway(w)
-
-		if _, detached := w.State.(worktree.Detached); !detached {
-			continue
+		if _, detached := w.State.(worktree.Detached); detached {
+			worktrees[i].State = detachedState(w.Path)
 		}
-
-		state, err := detachedState(w.Path)
-		if err != nil {
-			return nil, err
+		if worktrees[i].Operation() == "" {
+			worktrees[i].Midway = midway(worktrees[i])
 		}
-		worktrees[i].State = state
 	}
 
 	return worktrees, nil
@@ -237,29 +235,24 @@ func parseWorktrees(out string) []worktree.Worktree {
 }
 
 // detachedState is what a detached worktree is doing: rebasing or bisecting the
-// branch its rebase or bisect state names, or plainly detached. A worktree whose .git is
-// gone, or whose rebase or bisect began on no branch, reads as detached.
-func detachedState(path string) (worktree.State, error) {
+// branch its rebase or bisect state names, or plainly detached. A worktree that
+// cannot be probed (its .git gone, unreadable or malformed), or whose rebase or
+// bisect began on no branch, reads as detached.
+func detachedState(path string) worktree.State {
 	adminDir, err := adminDirOf(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return worktree.Detached{}, nil
-	}
 	if err != nil {
-		return nil, err
+		return worktree.Detached{}
 	}
 
 	for _, rebase := range []string{"rebase-merge", "rebase-apply"} {
 		headName, err := os.ReadFile(filepath.Join(adminDir, rebase, "head-name"))
-		if errors.Is(err, fs.ErrNotExist) {
-			continue
-		}
 		if err != nil {
-			return nil, err
+			continue
 		}
 
 		// A rebase begun detached names "detached HEAD", not a branch.
 		if name, ok := strings.CutPrefix(strings.TrimSpace(string(headName)), headsPrefix); ok && name != "" {
-			return worktree.Rebasing{Branch: name}, nil
+			return worktree.Rebasing{Branch: name}
 		}
 	}
 
@@ -268,20 +261,18 @@ func detachedState(path string) (worktree.State, error) {
 
 // midwayMarks are the files git keeps in a worktree's git directory while it is in the middle of an operation on its checkout, each until the operation is continued or aborted.
 var midwayMarks = []struct {
-	file      string
-	operation worktree.Operation
+	file   string
+	midway worktree.Midway
 }{
-	{"MERGE_HEAD", worktree.OperationMerge},
-	{"CHERRY_PICK_HEAD", worktree.OperationCherryPick},
-	{"REVERT_HEAD", worktree.OperationRevert},
-	{filepath.Join("rebase-apply", "applying"), worktree.OperationApply},
+	{"MERGE_HEAD", worktree.MidwayMerge},
+	{"CHERRY_PICK_HEAD", worktree.MidwayCherryPick},
+	{"REVERT_HEAD", worktree.MidwayRevert},
+	{filepath.Join("rebase-apply", "applying"), worktree.MidwayApply},
 }
 
 // midway is the operation git stopped in the middle of on w's checkout, ""
-// when none. A worktree that cannot be probed (its directory gone, its .git
-// unreadable or malformed) is in the middle of none: it is listed all the
-// same, and the reads that open it say why it does not read.
-func midway(w worktree.Worktree) worktree.Operation {
+// when none, or when w cannot be probed.
+func midway(w worktree.Worktree) worktree.Midway {
 	if _, bare := w.State.(worktree.Bare); bare || w.Prunable {
 		return ""
 	}
@@ -292,7 +283,7 @@ func midway(w worktree.Worktree) worktree.Operation {
 
 	for _, mark := range midwayMarks {
 		if _, err := os.Stat(filepath.Join(adminDir, mark.file)); err == nil {
-			return mark.operation
+			return mark.midway
 		}
 	}
 	return ""
@@ -301,21 +292,18 @@ func midway(w worktree.Worktree) worktree.Operation {
 // bisectState is the state of a detached worktree whose git directory is
 // adminDir: bisecting the branch a bisect in progress started from, or
 // detached.
-func bisectState(adminDir string) (worktree.State, error) {
+func bisectState(adminDir string) worktree.State {
 	start, err := os.ReadFile(filepath.Join(adminDir, "BISECT_START"))
-	if errors.Is(err, fs.ErrNotExist) {
-		return worktree.Detached{}, nil
-	}
 	if err != nil {
-		return nil, err
+		return worktree.Detached{}
 	}
 
 	// git records the branch's short name, or the commit when the bisect began detached.
 	name := strings.TrimSpace(string(start))
 	if name == "" || isObjectID(name) {
-		return worktree.Detached{}, nil
+		return worktree.Detached{}
 	}
-	return worktree.Bisecting{Branch: name}, nil
+	return worktree.Bisecting{Branch: name}
 }
 
 // isObjectID reports whether s spells a full SHA-1 or SHA-256 object id.

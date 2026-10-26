@@ -2213,9 +2213,6 @@
             }
           ]
         },
-        "rebasing": {
-          "type": "boolean"
-        },
         "services": {
           "anyOf": [
             {
@@ -2249,7 +2246,6 @@
         "main",
         "dirty",
         "locked",
-        "rebasing",
         "active",
         "missing",
         "commits_ahead",
@@ -2689,9 +2685,6 @@
             }
           ]
         },
-        "rebasing": {
-          "type": "boolean"
-        },
         "review": {
           "anyOf": [
             {
@@ -2721,7 +2714,6 @@
         "path",
         "main",
         "locked",
-        "rebasing",
         "missing",
         "created_at",
         "parent",
@@ -3148,9 +3140,6 @@
             }
           ]
         },
-        "rebasing": {
-          "type": "boolean"
-        },
         "services": {
           "anyOf": [
             {
@@ -3180,7 +3169,6 @@
         "needs_sync",
         "dirty",
         "locked",
-        "rebasing",
         "missing",
         "condition",
         "cycle",

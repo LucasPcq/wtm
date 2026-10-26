@@ -32,6 +32,7 @@ func TestAWorktreeIsInTheFirstConditionThatApplies(t *testing.T) {
 
 func TestAConditionNamesTheOperationGitStoppedInTheMiddleOf(t *testing.T) {
 	for _, operation := range Operations() {
+		assert.Contains(t, Conditions(), Condition(operation), operation)
 		assert.Equal(t, operation, Condition(operation).Operation())
 	}
 	assert.Empty(t, ConditionChanged.Operation())

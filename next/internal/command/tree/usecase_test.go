@@ -120,7 +120,7 @@ func TestAWorktreeGitStoppedInTheMiddleOfAnOperationNeedsNoSyncAndIsSentToFinish
 	}{
 		"rebasing":  {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Rebasing{Branch: "feat/a-ui"}}, actions: []string{"go"}},
 		"bisecting": {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Bisecting{Branch: "feat/a-ui"}}, actions: []string{"go"}},
-		"merging":   {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Midway: worktree.OperationMerge}, actions: []string{"go"}},
+		"merging":   {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Midway: worktree.MidwayMerge}, actions: []string{"go"}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -211,7 +211,7 @@ func TestALockedARebasingAndADirtyWorktreeAreSaidSo(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, detailOf(t, read, "locked").Locked)
-	assert.True(t, detailOf(t, read, "rebasing").Rebasing)
+	assert.Equal(t, worktree.ConditionRebasing, detailOf(t, read, "rebasing").Condition)
 	assert.True(t, detailOf(t, read, "dirty").Dirty)
 }
 
