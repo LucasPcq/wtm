@@ -159,7 +159,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 //  2. origin's branch of each worktree fetched again, the gone ones dropped, when gone branches are asked for and the fetch is not skipped;
 //  3. at once: the jobs of the run daemon, the pull request of each worktree's branch, and the branches whose upstream origin deleted;
 //  4. which branches stand behind their finished pull request's head;
-//  5. what makes each worktree done with unsafe to remove, each one named when the request names some: its uncommitted changes, the commits no other branch holds but its merged pull request's head, its open pull request and its jobs up.
+//  5. what makes each worktree done with unsafe to remove, those named going together when the request names some: its uncommitted changes, the commits no other branch holds but its merged pull request's head, its open pull request and its jobs up.
 //
 // A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
@@ -209,13 +209,14 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	facts.JobsErr, facts.PRsErr, facts.PullRequests = answered.JobsErr, answered.PRsErr, answered.PullRequests
 	facts.Behind = repository.Behind(ctx, u.Git, repo, facts.PullRequests, linked)
 
-	// Worktrees removed together hold nothing for each other: a request naming some checks them against every other worktree, which stays.
-	checked := facts.Candidates(req)
+	// Every candidate is checked, for the picker and the plan; only those going hold nothing for each other: a request naming some checks against every other worktree, which stays.
+	candidates := facts.Candidates(req)
+	going := candidates
 	if len(req.Worktrees) > 0 {
-		checked = slices.DeleteFunc(checked, func(c Candidate) bool { return !slices.Contains(req.Worktrees, c.Worktree) })
+		going = slices.DeleteFunc(slices.Clone(candidates), func(c Candidate) bool { return !slices.Contains(req.Worktrees, c.Worktree) })
 	}
-	done := worktreesOf(repo, checked)
-	if facts.Checks, err = u.Teardown.Read(ctx, done); err != nil {
+	done := worktreesOf(repo, candidates)
+	if facts.Checks, err = u.Teardown.Read(ctx, teardown.ReadParams{Worktrees: done, Going: teardown.Branches(worktreesOf(repo, going))}); err != nil {
 		return Facts{}, err
 	}
 	facts.Settle(done, answered.Jobs, answered.PullRequests)

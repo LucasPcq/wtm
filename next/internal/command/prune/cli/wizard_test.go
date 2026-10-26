@@ -47,7 +47,9 @@ func TestNothingToPruneSkipsTheWorktreesStep(t *testing.T) {
 func TestTheDefaultPickConfirmedLeavesTheChoiceToTheCommand(t *testing.T) {
 	d := open(t, sessionParams{App: newWorld(seed{}).usecase()})
 
-	d.Keys("enter", "enter", "enter")
+	d.Keys("enter", "enter")
+	assert.Contains(t, d.Screen(), "feat/dirty is kept: unsafe to remove (dirty)", "the recap names what is left as it is")
+	d.Keys("enter")
 
 	require.Equal(t, form.Finished, d.Wizard.Ending())
 	assert.Nil(t, d.s.Request().Worktrees, "no worktree named: the command chose")
@@ -55,5 +57,15 @@ func TestTheDefaultPickConfirmedLeavesTheChoiceToTheCommand(t *testing.T) {
 	kept := d.s.Preview().Plan.Worktrees[0]
 	assert.Equal(t, dirty, kept.Worktree)
 	assert.Empty(t, kept.Phases)
-	assert.Contains(t, d.Screen()+d.s.Preview().Warnings[0].Code, prune.CodeKept)
+	assert.Contains(t, codes(d.s.Preview().Warnings), prune.CodeKept)
+}
+
+// The pick changed, then Esc back to the picker: the candidates not picked still show what makes them unsafe.
+func TestBackInThePickerEachCandidateStillShowsItsBlockers(t *testing.T) {
+	d := open(t, sessionParams{App: newWorld(seed{}).usecase()})
+
+	d.Keys("down", "space", "enter", "esc")
+
+	assert.Equal(t, stepWorktrees, d.Wizard.Current())
+	assert.Contains(t, d.Screen(), "feat/dirty — merged #14 · uncommitted changes")
 }

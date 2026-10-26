@@ -20,6 +20,7 @@ const (
 	child   = "feat/child"
 	local   = "feat/local"   // its commit only feat/stacked holds
 	stacked = "feat/stacked" // feat/local's commit, then one no other branch holds
+	alone   = "feat/alone"   // a branch no worktree holds
 )
 
 var errRefused = errors.New("refused")
@@ -33,9 +34,10 @@ type world struct {
 }
 
 type seed struct {
-	Gone     []string // worktrees whose directory was deleted behind git's back
-	Fail     map[string]error
-	RunHooks func(context.Context, env.HookChain) error
+	Gone      []string // worktrees whose directory was deleted behind git's back
+	Fail      map[string]error
+	StoreFail map[string]error
+	RunHooks  func(context.Context, env.HookChain) error
 }
 
 func at(branch string) string {
@@ -46,6 +48,7 @@ func newWorld(s seed) world {
 	git := gittest.NewFake(gittest.FakeParams{
 		Main:   "/repo/main",
 		Branch: "main",
+		Local:  []string{alone},
 		Worktrees: []worktree.Worktree{
 			{Path: at(plain), State: worktree.OnBranch{Branch: plain}},
 			{Path: at(parent), State: worktree.OnBranch{Branch: parent}},
@@ -64,7 +67,8 @@ func newWorld(s seed) world {
 		plain:  {SourceBranch: "main"},
 		parent: {SourceBranch: "main"},
 		child:  {SourceBranch: parent},
-	}})
+		alone:  {SourceBranch: "main"},
+	}, Fail: s.StoreFail})
 	hooks := &[]env.HookChain{}
 	runHooks := s.RunHooks
 	if runHooks == nil {
@@ -79,6 +83,18 @@ func newWorld(s seed) world {
 		hooks:   hooks,
 		service: teardown.Service{Git: git, Meta: store, EnvFiles: store, StateDir: "/repo/main/.git/wtm", Gone: repository.GoneIn(git), RunHooks: runHooks, Shield: func(ctx context.Context) (context.Context, func()) { return ctx, func() {} }},
 	}
+}
+
+// leaving removes the worktree from git's list but fails as git does when files it cannot delete stay on disk.
+type leaving struct {
+	*gittest.Fake
+}
+
+func (l leaving) RemoveWorktree(ctx context.Context, path string) error {
+	if err := l.Fake.RemoveWorktree(ctx, path); err != nil {
+		return err
+	}
+	return errRefused
 }
 
 func hookFails(context.Context, env.HookChain) error {

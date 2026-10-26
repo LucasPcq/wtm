@@ -19,7 +19,7 @@ export function matches(row: Row, filter: Filter): boolean {
     case 'needs_sync':
       return row.detail?.needs_sync ?? false
     case 'prunable':
-      return row.merged ?? false
+      return row.finished != null
   }
 }
 

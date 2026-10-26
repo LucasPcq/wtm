@@ -1,5 +1,13 @@
 import type { Read } from '@/api/queries/commands'
-import type { DomainError, DomainFollowUp, DomainItem, ListDetail, ListPR, WorktreeCondition } from '@/api/types.gen'
+import type {
+  DomainError,
+  DomainFollowUp,
+  DomainItem,
+  ListDetail,
+  ListFinished,
+  ListPR,
+  WorktreeCondition,
+} from '@/api/types.gen'
 import { overlaid } from '@/features/worktrees/utils/condition'
 
 export type Row = {
@@ -9,6 +17,7 @@ export type Row = {
   error: DomainError | undefined
   pr: ListPR | null | undefined
   merged: boolean | undefined
+  finished: ListFinished | null | undefined
   condition: WorktreeCondition | undefined
   actions: DomainFollowUp[]
   underWay: string | undefined
@@ -38,6 +47,7 @@ export function rowsOf({
       error,
       pr: read?.pr,
       merged: read?.merged,
+      finished: read?.finished,
       condition: shown?.condition,
       actions: shown?.actions ?? [],
       underWay: underWay[subject],

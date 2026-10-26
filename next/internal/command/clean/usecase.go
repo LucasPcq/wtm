@@ -186,7 +186,8 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	var gitErr error
 	asking := teardown.Branches(asked)
 	answered := repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, PullRequests: u.PullRequests, Branches: asking, WithPRs: len(asking) > 0}, func() {
-		facts.Checks, gitErr = u.Teardown.Read(ctx, asked)
+		// Worktrees removed together hold nothing for each other.
+		facts.Checks, gitErr = u.Teardown.Read(ctx, teardown.ReadParams{Worktrees: asked, Going: teardown.Branches(asked)})
 	})
 	if gitErr != nil {
 		return Facts{}, gitErr

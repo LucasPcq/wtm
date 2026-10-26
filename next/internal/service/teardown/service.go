@@ -29,15 +29,17 @@ type Service struct {
 // ----------------------------------------------------------------------------
 // The checks
 
-// Read reads, for each of worktrees, whether its directory is gone (a locked one git never calls prunable among them), its uncommitted changes while it is there, and the commits of its branch and of the commit it stands on no branch that stays holds, a commit on no branch or of a rebase under way among them, its directory gone or not. Worktrees removed together hold nothing for each other. What the run daemon and the forge say is Settle's.
-func (s Service) Read(ctx context.Context, worktrees []worktree.Worktree) (map[string]Check, error) {
-	var going []string
-	for _, w := range worktrees {
-		going = append(going, w.Branch())
-	}
+// ReadParams are the worktrees Read checks, and the branches going with them, which hold nothing for each other; every other branch stays.
+type ReadParams struct {
+	Worktrees []worktree.Worktree
+	Going     []string
+}
 
+// Read reads, for each worktree of params, whether its directory is gone (a locked one git never calls prunable among them), its uncommitted changes while it is there, and the commits of its branch and of the commit it stands on no branch that stays holds, a commit on no branch or of a rebase under way among them, its directory gone or not. What the run daemon and the forge say is Settle's.
+func (s Service) Read(ctx context.Context, params ReadParams) (map[string]Check, error) {
+	going := params.Going
 	checks := map[string]Check{}
-	for _, w := range worktrees {
+	for _, w := range params.Worktrees {
 		var check Check
 		var err error
 		if w.Path != "" {

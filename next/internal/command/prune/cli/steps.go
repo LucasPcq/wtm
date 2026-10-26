@@ -27,10 +27,13 @@ type worktreesStep struct {
 	at int
 }
 
-// Answer records the worktrees picked, or none when the default pick is confirmed as it was.
+// Answer records the worktrees picked, or none when the default pick is confirmed as it was; a step that is not the multi-select it expects answers as the engine's does.
 func (w *worktreesStep) Answer() string {
-	field, _ := w.s.Field(w.at).(domain.MultiSelectField)
-	picks, _ := w.Widget().(*widget.MultiSelect)
+	field, isField := w.s.Field(w.at).(domain.MultiSelectField)
+	picks, isPicks := w.Widget().(*widget.MultiSelect)
+	if !isField || !isPicks {
+		return w.MultiSelectStep.Answer()
+	}
 	picked := picks.Values()
 
 	if field.Origin == domain.OriginDefault && slices.Equal(picked, field.Picked) {

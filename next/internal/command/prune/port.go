@@ -13,7 +13,7 @@ type Git interface {
 	Locate(ctx context.Context, path string) (worktree.Location, error)
 	IsAncestor(ctx context.Context, ancestry worktree.Ancestry) (bool, error)
 	Gone(ctx context.Context) (map[string]bool, error)
-	// RefreshOrigin fetches origin's branch of each of branches, dropping those origin deleted. One opened command fetches once however often it plans (the wizard plans at each step): cmd/wtm-next wires it so, each later call answering how the first went.
+	// RefreshOrigin fetches origin's branch of each of branches, dropping those origin deleted. Prune calls it each time it plans; a caller may cache the first call's result for the life of one opened command.
 	RefreshOrigin(ctx context.Context, branches []string) error
 }
 

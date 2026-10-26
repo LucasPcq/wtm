@@ -23,7 +23,8 @@ func (w world) facts(t *testing.T, config project.Config, names ...string) teard
 			facts.Records[w2.Branch()] = record
 		}
 	}
-	facts.Checks, err = w.service.Read(t.Context(), w.worktrees(t, facts, names...))
+	checked := w.worktrees(t, facts, names...)
+	facts.Checks, err = w.service.Read(t.Context(), teardown.ReadParams{Worktrees: checked, Going: teardown.Branches(checked)})
 	require.NoError(t, err)
 	return facts
 }

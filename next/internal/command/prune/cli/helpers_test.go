@@ -42,3 +42,11 @@ func (d *driver) looksLike(name string) {
 	d.t.Helper()
 	formtest.Golden(d.t, "frame_"+name, d.Screen()+"\n")
 }
+
+func codes(warnings []domain.Warning) []string {
+	found := make([]string, 0, len(warnings))
+	for _, warning := range warnings {
+		found = append(found, warning.Code)
+	}
+	return found
+}

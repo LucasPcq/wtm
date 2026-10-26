@@ -1,6 +1,7 @@
 package prune_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
@@ -87,4 +88,15 @@ func TestAPathNotOfTheRequestIsRefused(t *testing.T) {
 	_, err := prune.Request{}.Answer("keep_data", []string{"true"})
 
 	assert.Equal(t, map[string][]string{"keep_data": {domain.CodeUnknown}}, fieldCodes(failureOf(t, err).Fields))
+}
+
+// Narrowed to the worktrees named, the checks left every other candidate without its blockers: back in the wizard's picker, feat/dirty read as safe.
+func TestEveryCandidateKeepsItsBlockersWhenSomeAreNamed(t *testing.T) {
+	w := newWorld(t, seed{})
+
+	questions := w.questions(t, pruning(merged))
+
+	at := slices.IndexFunc(questions.Candidates, func(c prune.Candidate) bool { return c.Worktree == dirty })
+	require.GreaterOrEqual(t, at, 0)
+	assert.Equal(t, []worktree.Blocker{worktree.BlockerDirty}, questions.Candidates[at].Blockers)
 }
