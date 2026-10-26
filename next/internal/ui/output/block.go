@@ -135,6 +135,13 @@ func Truncate(value string, width int) string {
 	return ansi.Truncate(value, width, ellipsis)
 }
 
+// EraseLines erases the last n lines drawn on w, the cursor left where the first of them began; none erases nothing.
+func EraseLines(w io.Writer, n int) {
+	if n > 0 {
+		fmt.Fprintf(w, ansiPrevLine+ansiClearBelow, n)
+	}
+}
+
 func expandTabs(line string) string {
 	return strings.ReplaceAll(line, "\t", strings.Repeat(" ", tabWidth))
 }

@@ -260,8 +260,7 @@ var escapes = regexp.MustCompile(`\x1b(\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(\x07|\
 type tail []string
 
 func (t *tail) add(line string) {
-	// A progress bar redraws its line with \r: only its last frame stays on screen; a CRLF line's \r ends it, redrawing nothing.
-	line = strings.TrimSuffix(line, "\r")
+	// A progress bar redraws its line with \r: only its last frame stays on screen.
 	if at := strings.LastIndexByte(line, '\r'); at >= 0 {
 		line = line[at+1:]
 	}

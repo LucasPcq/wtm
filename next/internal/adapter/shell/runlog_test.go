@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,4 +32,20 @@ func TestEachRunHasItsOwnLogAndTheNextRemovesTheEndedOnes(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "second\n", string(written), "a running one stays whole")
 	assert.FileExists(t, third)
+}
+
+func TestAPendingLogIsRemovedOnlyOnceStale(t *testing.T) {
+	dir := t.TempDir()
+	stale, young := filepath.Join(dir, ".op-dead-1"), filepath.Join(dir, ".op-going-2")
+	require.NoError(t, os.WriteFile(stale, nil, 0o644))
+	require.NoError(t, os.WriteFile(young, nil, 0o644))
+	old := time.Now().Add(-2 * pendingStale)
+	require.NoError(t, os.Chtimes(stale, old, old))
+
+	_, log, err := OpenRunLog(dir, "op-3")
+	require.NoError(t, err)
+	require.NoError(t, log.Close())
+
+	assert.NoFileExists(t, stale)
+	assert.FileExists(t, young, "a log being put in place now is no run's leftover")
 }

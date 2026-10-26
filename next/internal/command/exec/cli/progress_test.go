@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -64,4 +65,27 @@ func TestLiveTheUnitsRunningAreRowsErasedOnceTheRunEnds(t *testing.T) {
 	p.Close()
 
 	assert.Regexp(t, `^  › feat/a\n\x1b\[1F\x1b\[J  ✓ feat/a \(\d+ms\)\n$`, out.String())
+}
+
+func TestLiveTheRowsKeepTheirTimeWhileCancellingAndStopOnClose(t *testing.T) {
+	var out bytes.Buffer
+	ctx, cancel := context.WithCancel(t.Context())
+	p := newProgressEvery(ctx, output.ProgressParams{W: &out, Human: true, Live: true}, 10*time.Millisecond)
+	p.Report(domain.UnitStarted{Subject: "feat/a"})
+
+	cancel()
+	assert.Eventually(t, func() bool {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		return strings.Count(out.String(), "Cancelling") >= 3
+	}, 2*time.Second, 10*time.Millisecond, "the notice and the rows are redrawn while cancelling")
+	p.Close()
+	p.mu.Lock()
+	closed := out.Len()
+	p.mu.Unlock()
+	time.Sleep(50 * time.Millisecond)
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	assert.Equal(t, closed, out.Len(), "nothing is drawn once closed")
 }

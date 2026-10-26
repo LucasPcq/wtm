@@ -26,6 +26,7 @@ type progress struct {
 	started map[string]time.Time
 	painted int
 	run     context.Context
+	tick    time.Duration
 	done    chan struct{}
 	notice  string
 	closed  bool
@@ -33,7 +34,12 @@ type progress struct {
 
 // newProgress returns the progress of the run ctx runs; for a person it announces the cancellation as soon as ctx is cancelled, until Close.
 func newProgress(ctx context.Context, params output.ProgressParams) *progress {
-	p := &progress{w: params.W, human: params.Human, live: params.Human && params.Live, started: map[string]time.Time{}, run: ctx, done: make(chan struct{})}
+	return newProgressEvery(ctx, params, progressTick)
+}
+
+// newProgressEvery is newProgress redrawn, live, every tick.
+func newProgressEvery(ctx context.Context, params output.ProgressParams, tick time.Duration) *progress {
+	p := &progress{w: params.W, human: params.Human, live: params.Human && params.Live, started: map[string]time.Time{}, run: ctx, tick: tick, done: make(chan struct{})}
 
 	if params.Human {
 		go p.watch()
@@ -45,7 +51,7 @@ func newProgress(ctx context.Context, params output.ProgressParams) *progress {
 func (p *progress) watch() {
 	ticks := make(<-chan time.Time)
 	if p.live {
-		ticker := time.NewTicker(progressTick)
+		ticker := time.NewTicker(p.tick)
 		defer ticker.Stop()
 		ticks = ticker.C
 	}

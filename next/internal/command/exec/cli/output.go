@@ -28,11 +28,14 @@ func drawOutcome(w io.Writer, outcome exec.Outcome, view output.View) {
 
 // excerpt is the last lines and the log of each target of outcome, by its name.
 func excerpt(outcome exec.Outcome) func(subject string) ([]string, string) {
+	details := map[string]*exec.Detail{}
+	for _, item := range outcome.Result.Items {
+		details[item.Subject] = item.Detail
+	}
+
 	return func(subject string) ([]string, string) {
-		for _, item := range outcome.Result.Items {
-			if item.Subject == subject && item.Detail != nil {
-				return item.Detail.Tail, item.Detail.Log
-			}
+		if detail := details[subject]; detail != nil {
+			return detail.Tail, detail.Log
 		}
 		return nil, ""
 	}

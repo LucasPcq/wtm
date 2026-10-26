@@ -201,6 +201,16 @@ func TestAFailedHookExitsOneAndNamesTheBranch(t *testing.T) {
 	assert.NotContains(t, got.Stdout, "wtm clean")
 }
 
+func TestQuietOnAFailedApplyNamesTheBranchItStoppedAtOnce(t *testing.T) {
+	hooked := runCreate(t, newWorld(seed{OnCreate: []project.Hook{{Cmd: "make setup"}}, RunHooks: hookFails}), "-q", branchName)
+	half := runCreate(t, newWorld(seed{GitFails: map[string]error{"RemoveWorktree": errors.New("busy")}, StoreFails: map[string]error{"Update": errors.New("disk full")}}), "-q", branchName)
+
+	assert.Equal(t, uicli.ExitError, hooked.Code)
+	assert.Empty(t, hooked.Stdout+half.Stdout)
+	formtest.Golden(t, "quiet_hook_failed", hooked.Stderr)
+	formtest.Golden(t, "quiet_half_created", half.Stderr)
+}
+
 func TestTheProjectThatCannotBeOpenedIsTheFailure(t *testing.T) {
 	notARepo := &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodeNotARepository, Message: "/tmp is not a git repository"}
 

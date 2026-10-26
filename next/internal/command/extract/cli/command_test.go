@@ -225,6 +225,14 @@ func TestAFailedHookInTheCreatedTargetExitsOneAndNamesIt(t *testing.T) {
 	assert.Empty(t, w.git.Moves())
 }
 
+func TestQuietOnAFailedApplyNamesTheTargetItStoppedAtOnce(t *testing.T) {
+	got := runExtract(t, newWorld(seed{OnCreate: []project.Hook{{Cmd: "make setup"}}, RunHooks: hookFails}), "-q", source, "--files", "old.txt", "--to", split)
+
+	assert.Equal(t, uicli.ExitError, got.Code)
+	assert.Empty(t, got.Stdout)
+	formtest.Golden(t, "quiet_hook_failed", got.Stderr)
+}
+
 func TestATargetLeftHalfCreatedPointsAtTheCleanThatRemovesIt(t *testing.T) {
 	w := newWorld(seed{GitFails: map[string]error{"RemoveWorktree": errors.New("busy")}, StoreFails: map[string]error{"Update": errors.New("disk full")}})
 

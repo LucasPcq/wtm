@@ -136,13 +136,6 @@ func (v *hookView) clear() {
 	v.painted = 0
 }
 
-// EraseLines erases the last n lines drawn on w, the cursor left where the first of them began; none erases nothing.
-func EraseLines(w io.Writer, n int) {
-	if n > 0 {
-		fmt.Fprintf(w, ansiPrevLine+ansiClearBelow, n)
-	}
-}
-
 // cutSegment removes from buf its first line and returns it with the byte that ended it, '\n' or '\r'; it reports false, removing nothing, when buf holds no complete line.
 func cutSegment(buf *bytes.Buffer) (string, byte, bool) {
 	body := buf.Bytes()

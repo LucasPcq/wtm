@@ -12,7 +12,11 @@ import (
 func interruptible(params Params) (context.Context, func()) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	// Under nohup SIGHUP is ignored on purpose: handling it would take that back.
+	if !signal.Ignored(syscall.SIGHUP) {
+		signal.Notify(signals, syscall.SIGHUP)
+	}
 
 	go func() {
 		<-signals

@@ -306,14 +306,19 @@ func (c *Command[R, Q, O]) Launch(cmd *cobra.Command, args []string, conclude fu
 		return c.io.FailWith(domain.AsError(domain.AsErrorParams{Err: err}), nil)
 	}
 
-	var progress Progress = output.NewProgress(ctx, c.io.ProgressParams())
-	if c.NewProgress != nil {
-		progress = c.NewProgress(ctx, c.io.ProgressParams())
-	}
+	progress := c.progress(ctx)
 	ran, err := c.launch(ctx, app, req, progress.Report)
 	progress.Close()
 
 	return conclude(cmd, ran, err)
+}
+
+// progress is the progress of the run ctx runs: the command's own when it draws one, else output's, one unit at a time; only the one built watches for a cancel.
+func (c *Command[R, Q, O]) progress(ctx context.Context) Progress {
+	if c.NewProgress != nil {
+		return c.NewProgress(ctx, c.io.ProgressParams())
+	}
+	return output.NewProgress(ctx, c.io.ProgressParams())
 }
 
 func (c *Command[R, Q, O]) launch(ctx context.Context, app UseCase[R, Q, O], req R, report domain.Report) (Ran[R, O], error) {
@@ -375,10 +380,10 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 	return c.io.Failed(c.quietlyNamed(ran.Outcome))
 }
 
-// quietlyNamed is the failure an apply ended on, led by the subject it stopped at when --quiet prints it alone: the outcome that names each subject is not drawn.
+// quietlyNamed is the failure an apply ended on, led by the subject it stopped at when --quiet prints it alone and it does not name it already: the outcome that names each subject is not drawn.
 func (c *Command[R, Q, O]) quietlyNamed(outcome O) *domain.Error {
 	failure, subject := outcome.Failure(), outcome.FailedAt()
-	if failure == nil || subject == "" || !c.io.Quiet {
+	if failure == nil || subject == "" || !c.io.Quiet || strings.Contains(failure.Message, subject) {
 		return failure
 	}
 

@@ -49,6 +49,7 @@ const (
 var startedAt = time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
 
 type world struct {
+	shell  exec.RunHooks // fakeShell unless a test runs its own
 	git    *gittest.Fake
 	store  *storetest.Fake
 	config *configtest.Fake
@@ -86,11 +87,15 @@ func (w world) open(context.Context, string) (exec.UseCase, error) {
 }
 
 func (w world) usecase() exec.UseCase {
+	shell := w.shell
+	if shell == nil {
+		shell = fakeShell
+	}
 	return exec.UseCase{
 		Git:        w.git,
 		Meta:       w.store,
 		EnvFiles:   w.store,
-		RunHooks:   fakeShell,
+		RunHooks:   shell,
 		Syntax:     fakeSyntax,
 		OpenLog:    fakeLog,
 		StateDir:   "/repo/main/.git/wtm",

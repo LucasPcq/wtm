@@ -143,6 +143,15 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	}
 
 	items := make([]Item, len(plan.Targets))
+	// The logs stay flocked until the whole run ends: another run in one of these worktrees removes only the logs of runs that ended.
+	logs := make([]io.Closer, len(plan.Targets))
+	defer func() {
+		for _, log := range logs {
+			if log != nil {
+				_ = log.Close()
+			}
+		}
+	}()
 	slots := make(chan struct{}, plan.Jobs)
 	var wg sync.WaitGroup
 	for i, t := range plan.Targets {
@@ -156,7 +165,7 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 		}
 		wg.Go(func() {
 			defer func() { <-slots }()
-			items[i] = u.run(ctx, plan, t, serial)
+			items[i], logs[i] = u.run(ctx, plan, t, serial)
 		})
 	}
 	wg.Wait()
@@ -236,12 +245,12 @@ const (
 // logDir is where the logs go under wtm's state: a directory per worktree, a log per run, named after its operation, the ended runs' removed by the next.
 const logDir = "exec"
 
-// run runs the command in one target between its unit's events, its output reported line by line and kept in its log; a target reached after a cancel is skipped.
-func (u UseCase) run(ctx context.Context, plan Plan, t Target, report domain.Report) (item Item) {
+// run runs the command in one target between its unit's events, its output reported line by line and kept in its log, which it returns open for the caller to close; a target reached after a cancel is skipped.
+func (u UseCase) run(ctx context.Context, plan Plan, t Target, report domain.Report) (item Item, closer io.Closer) {
 	item.Subject = t.Worktree
 	if ctx.Err() != nil {
 		item.Status, item.Reason = domain.StatusSkipped, domain.ReasonNotReached
-		return item
+		return item, nil
 	}
 
 	report(domain.UnitStarted{Subject: t.Worktree})
@@ -254,8 +263,7 @@ func (u UseCase) run(ctx context.Context, plan Plan, t Target, report domain.Rep
 	if u.StateDir != "" {
 		// A log that cannot be opened fails no run: the command runs without one, and none is named.
 		if path, opened, err := u.OpenLog(filepath.Join(u.StateDir, logDir, worktree.StateSegment(t.Worktree)), plan.Op); err == nil {
-			defer opened.Close()
-			detail.Log, log = path, opened
+			detail.Log, log, closer = path, opened, opened
 		}
 	}
 	var lines tail
@@ -269,6 +277,8 @@ func (u UseCase) run(ctx context.Context, plan Plan, t Target, report domain.Rep
 		Env:     runEnv,
 		Unset:   env.NotInherited(plan.facts.Run),
 		Output: func(line string) {
+			// A CRLF line keeps its text: its \r ends it, it redraws nothing.
+			line = strings.TrimSuffix(line, "\r")
 			_, _ = io.WriteString(log, line+"\n")
 			lines.add(line)
 			if plan.Print {
@@ -299,7 +309,7 @@ func (u UseCase) run(ctx context.Context, plan Plan, t Target, report domain.Rep
 	default:
 		item.Status, item.Err = domain.StatusFailed, domain.AsError(domain.AsErrorParams{Err: err, Code: CodeStartFailed, Message: "couldn't run the command"})
 	}
-	return item
+	return item, closer
 }
 
 // runEnv is the run environment the command gets in t, the one its hooks get (its Compose project, its ports): nil when they read none or t has no ordinal, or with a warning when a compose env file cannot be read.

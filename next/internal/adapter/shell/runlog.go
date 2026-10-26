@@ -7,13 +7,15 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
 )
 
 const (
 	runLogExt     = ".log"
-	runLogPending = "." // a log being put in place, which no pruning removes
+	runLogPending = "."         // a log being put in place, which pruning leaves alone while it is young
+	pendingStale  = time.Minute // a pending log older than this was left by a run that died putting it in place
 )
 
 // OpenRunLog opens the log of run, one run of a command, as dir/<run>.log, and
@@ -42,7 +44,7 @@ func OpenRunLog(dir, run string) (string, io.WriteCloser, error) {
 	return path, file, nil
 }
 
-// prune removes each log of dir whose flock can be taken: no running command writes it.
+// prune removes each log of dir whose flock can be taken: no running command writes it; a pending one only once stale.
 func prune(dir string) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -51,7 +53,8 @@ func prune(dir string) {
 
 	for _, entry := range entries {
 		name := entry.Name()
-		if entry.IsDir() || strings.HasPrefix(name, runLogPending) || filepath.Ext(name) != runLogExt {
+		pending := strings.HasPrefix(name, runLogPending)
+		if entry.IsDir() || !pending && filepath.Ext(name) != runLogExt || pending && !stale(entry) {
 			continue
 		}
 		path := filepath.Join(dir, name)
@@ -64,6 +67,11 @@ func prune(dir string) {
 		}
 		_ = file.Close()
 	}
+}
+
+func stale(entry os.DirEntry) bool {
+	info, err := entry.Info()
+	return err == nil && time.Since(info.ModTime()) > pendingStale
 }
 
 // discard closes and removes a log that could not be put in place, and returns

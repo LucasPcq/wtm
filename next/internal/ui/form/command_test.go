@@ -128,6 +128,11 @@ func TestAnApplyIsDrawnByTheCommandAndEndsOnItsFailure(t *testing.T) {
 	assert.Equal(t, failed, refused.Err)
 }
 
+func TestQuietOnAFailedApplyNamesTheSubjectOnceWhereNothingElseDoes(t *testing.T) {
+	assert.Equal(t, "feat/b: exited 3", quietlyFailed(t, "feat/b", "exited 3"))
+	assert.Equal(t, "couldn't delete the branch feat/b", quietlyFailed(t, "feat/b", "couldn't delete the branch feat/b"))
+}
+
 func TestAStalePlanIsFollowedByTheDryRunThatPlansAgainQuietOrNot(t *testing.T) {
 	stale := &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodePlanStale, Message: "stale"}
 	ran := form.Ran[request, outcome]{Request: request{"branches": {"it's"}}}

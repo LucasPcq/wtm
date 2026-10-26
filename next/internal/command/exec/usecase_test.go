@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -89,6 +90,38 @@ func TestARunNeverRemovesNorWritesTheLogOfARunStillGoing(t *testing.T) {
 	assert.Equal(t, "still going\n", string(written))
 	assert.NotEqual(t, going, result.Items[0].Detail.Log)
 	assert.Len(t, w.logsOf(t, featA), 2)
+}
+
+func TestEachLogOfARunStaysUntilTheWholeRunEnds(t *testing.T) {
+	w := newWorld(t)
+	planned, _ := w.plan(t, exec.Request{Worktrees: []string{featA, featB}, Command: "true", Jobs: "1"})
+	planned.Op = "op-first"
+	report := &operationtest.Recorder{}
+	report.On = func(event domain.Event) {
+		if started, ok := event.(domain.PhaseStarted); ok && started.Subject == featB {
+			// another run in feat/a, once feat/a is done here and feat/b still running
+			_, log, err := shell.OpenRunLog(w.logDir(featA), "op-other")
+			require.NoError(t, err)
+			require.NoError(t, log.Close())
+		}
+	}
+
+	result := w.usecase.Apply(t.Context(), planned, report.Add)
+
+	assert.FileExists(t, result.Items[0].Detail.Log, "a log is removed only once its whole run ended")
+}
+
+func TestACRLFLineKeepsItsTextInTheTailAndTheLog(t *testing.T) {
+	w := newWorld(t)
+
+	result, _ := w.apply(t, exec.Request{Worktrees: []string{featA}, Command: `printf 'ok\r\n'`, Print: true})
+
+	detail := result.Items[0].Detail
+	assert.Equal(t, []string{"ok"}, detail.Tail)
+	assert.Equal(t, "ok\n", detail.Output)
+	written, err := os.ReadFile(detail.Log)
+	require.NoError(t, err)
+	assert.Equal(t, "ok\n", string(written))
 }
 
 func TestTheLogsOfAWorktreeOnNoBranchAreItsOwn(t *testing.T) {

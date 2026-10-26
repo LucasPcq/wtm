@@ -1,9 +1,12 @@
 package cli
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
@@ -15,6 +18,22 @@ import (
 func runExec(t *testing.T, w world, words ...string) formtest.Printed {
 	t.Helper()
 	return formtest.Run(t.Context(), func(streams *output.Streams) *cobra.Command {
+		return New(streams, w.env(), w.open, formtest.CommandLine)
+	}, append([]string{"exec"}, words...)...)
+}
+
+// runCancelled runs exec in w, on a terminal when live, cancelled as its command starts, which holds on until the cancel was announced.
+func runCancelled(t *testing.T, w world, live bool, words ...string) formtest.Printed {
+	t.Helper()
+	ctx, cancel := context.WithCancel(t.Context())
+	w.shell = func(run context.Context, chain env.HookChain) error {
+		cancel()
+		<-run.Done()
+		time.Sleep(200 * time.Millisecond)
+		return &env.HookFailure{Cmd: chain.Hooks[0].Cmd, Err: run.Err()}
+	}
+	return formtest.Run(ctx, func(streams *output.Streams) *cobra.Command {
+		streams.Err.SetTerminal(live)
 		return New(streams, w.env(), w.open, formtest.CommandLine)
 	}, append([]string{"exec"}, words...)...)
 }

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
@@ -66,6 +67,21 @@ func TestEachProblemOfTheRequestIsALineOfItsFailure(t *testing.T) {
 
 	assert.Equal(t, uicli.ExitUsage, got.Code)
 	formtest.Golden(t, "invalid", got.Stderr)
+}
+
+func TestACancelIsAnnouncedOnceLiveOrNot(t *testing.T) {
+	for name, live := range map[string]bool{"off_terminal": false, "live": true} {
+		t.Run(name, func(t *testing.T) {
+			got := runCancelled(t, newWorld(), live, featA, "--yes", "--", "sleep 30")
+
+			assert.Equal(t, uicli.ExitCancelled, got.Code)
+			assert.Contains(t, got.Stderr, "Cancelling — finishing feat/a; Ctrl+C again to stop now")
+			assert.NotContains(t, got.Stderr, "Cancelling — Ctrl+C again to stop now", "a second progress, which saw no target, announced the cancel too")
+			if !live {
+				assert.Equal(t, 1, strings.Count(got.Stderr, "Cancelling"), got.Stderr)
+			}
+		})
+	}
 }
 
 func TestEachEnvelopeOfExecHasItsGolden(t *testing.T) {
