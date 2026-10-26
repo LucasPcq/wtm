@@ -1,5 +1,5 @@
 import { useTable } from '@tanstack/react-table'
-import { CircleX, LoaderCircle } from 'lucide-react'
+import { CircleX, LoaderCircle, Minus } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Glyph } from '@/features/worktrees/components/glyph'
@@ -45,12 +45,22 @@ export function WorktreeTable({
         {table.getHeaderGroups().map((group) => (
           <TableRow key={group.id} className="hover:bg-transparent">
             <TableHead className="w-10 pl-5">
-              <Checkbox
-                aria-label="Select every worktree"
-                checked={all()}
-                disabled={selectable.length === 0}
-                onCheckedChange={() => onSelect(some === selectable.length ? [] : selectable)}
-              />
+              {/* shadcn's checkbox draws its check when only some are checked: a minus stands in for it */}
+              <span className="relative flex">
+                <Checkbox
+                  aria-label="Select every worktree"
+                  checked={all()}
+                  disabled={selectable.length === 0}
+                  onCheckedChange={() => onSelect(some === selectable.length ? [] : selectable)}
+                  className="data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary dark:data-[state=indeterminate]:bg-primary [&[data-state=indeterminate]_svg]:hidden"
+                />
+                {all() === 'indeterminate' && (
+                  <Minus
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 m-auto size-3.5 text-primary-foreground"
+                  />
+                )}
+              </span>
             </TableHead>
             {group.headers.map((header) => (
               <TableHead
