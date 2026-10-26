@@ -24,7 +24,7 @@ export function recapOf(progress: Progress<'clean'>): { groups: OutcomeGroup[]; 
   return {
     groups: [
       {
-        kind: 'failed' as const,
+        kind: 'failed',
         rows: items
           .filter((item) => item.status === 'failed')
           .map((item) => ({
@@ -37,7 +37,7 @@ export function recapOf(progress: Progress<'clean'>): { groups: OutcomeGroup[]; 
           })),
       },
       {
-        kind: 'check' as const,
+        kind: 'check',
         rows: warnings
           .filter((warning) => warning.code !== sharedWarnings.dataKept)
           .map((warning) => ({
@@ -48,7 +48,7 @@ export function recapOf(progress: Progress<'clean'>): { groups: OutcomeGroup[]; 
           })),
       },
       {
-        kind: 'done' as const,
+        kind: 'done',
         rows: items
           .filter((item) => item.status === 'done')
           .map((item) => ({

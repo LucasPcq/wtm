@@ -16,7 +16,7 @@ test('the main worktree has no box, the header checks every other one, and says 
   await user.click(every)
 
   expect(screen.queryByRole('checkbox', { name: 'Select main' })).toBeNull()
-  expect(within(bar()).getByText('3 selected')).toBeTruthy()
+  expect(within(bar()).getByText('5 selected')).toBeTruthy()
   await user.click(screen.getByRole('button', { name: 'Clear' }))
   expect(screen.queryByRole('toolbar', { name: 'Selection' })).toBeNull()
 })
@@ -43,5 +43,5 @@ test('a worktree a run is working on has no box', async () => {
   await user.click(await screen.findByRole('checkbox', { name: 'Select every worktree' }))
 
   expect(screen.queryByRole('checkbox', { name: 'Select feat/billing' })).toBeNull()
-  expect(within(bar()).getByText('2 selected')).toBeTruthy()
+  expect(within(bar()).getByText('4 selected')).toBeTruthy()
 })

@@ -40,7 +40,7 @@ export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswer
       {warnings.length > 0 && (
         <ul className="flex flex-col gap-2 text-sm">
           {warnings.map((warning) => (
-            <li key={warning.code} className="flex items-start gap-3">
+            <li key={`${warning.code}-${warning.message}`} className="flex items-start gap-3">
               <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-500" aria-hidden="true" />
               {sentence(warning.message)}
             </li>

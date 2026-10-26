@@ -67,7 +67,12 @@ export function ChildrenStep({
           <h3 className="text-xs font-medium text-muted-foreground">Where each goes</h3>
           <ItemList>
             {moves.map((move) => (
-              <Item key={move.branch} role="listitem" className="gap-3 rounded-none px-4 py-2.5">
+              <Item
+                key={move.branch}
+                role="listitem"
+                aria-label={move.branch}
+                className="gap-3 rounded-none px-4 py-2.5"
+              >
                 <span className="w-44 shrink-0 truncate font-medium">{move.branch}</span>
                 {reparent ? (
                   <span className="flex min-w-0 items-center gap-1.5">

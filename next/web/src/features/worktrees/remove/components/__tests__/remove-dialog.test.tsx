@@ -153,3 +153,19 @@ test('every worktree kept leaves nothing to remove', async () => {
   await user.hover(next)
   expect(await screen.findByRole('tooltip', { name: 'Every worktree is kept: nothing to remove' })).toBeTruthy()
 })
+
+test('children of several parents preview where each goes, moved onto the nearest that stays or left where they are', async () => {
+  const { user, dialog } = await selectAndRemove('feat/billing', 'feat/search')
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+
+  expect(await within(dialog).findByText("2 worktrees are stacked on worktrees you're removing.")).toBeTruthy()
+  const preview = within(dialog).getByRole('region', { name: 'Where each goes' })
+  const moved = within(preview).getByRole('listitem', { name: 'feat/search-docs' })
+  expect(within(moved).getByText('stays on feat/search')).toBeTruthy()
+
+  await user.click(within(dialog).getByRole('radio', { name: /Move each onto the nearest worktree that stays/ }))
+  expect(within(moved).getByText('feat/search')).toBeTruthy()
+  expect(within(moved).getByLabelText('onto')).toBeTruthy()
+  expect(within(moved).getByText('main')).toBeTruthy()
+  expect(within(preview).getAllByRole('listitem')).toHaveLength(2)
+})
