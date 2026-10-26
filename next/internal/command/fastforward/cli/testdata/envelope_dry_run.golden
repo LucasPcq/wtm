@@ -1,0 +1,46 @@
+{
+  "v": 2,
+  "command": "fast-forward",
+  "ok": true,
+  "op": "op-1",
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/behind",
+        "path": "/repo/wt-feat-behind",
+        "standing": "behind",
+        "origin": {
+          "ahead": 0,
+          "behind": 1,
+          "state": "behind"
+        },
+        "from": "root",
+        "to": "upstream",
+        "blockers": [],
+        "phases": [
+          "fast_forward"
+        ]
+      }
+    ],
+    "force": false,
+    "recap": [
+      {
+        "key": "fast_forward",
+        "label": "Fast-forward",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/behind",
+            "params": {
+              "commits": "1"
+            },
+            "text": "feat/behind (1 commit)"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "61f17cfda16aa3751bc9a954",
+  "follow_ups": [],
+  "warnings": []
+}

@@ -1,0 +1,9 @@
+[
+  {
+    "branch": "feat/json",
+    "status": "fast-forwarded from origin",
+    "old_tip": "<SHA>",
+    "new_tip": "<SHA>",
+    "behind": 1
+  }
+]

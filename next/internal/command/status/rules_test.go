@@ -38,6 +38,17 @@ func TestProblemsComeMergedThenEnvThenIsolationThenCrashedJobs(t *testing.T) {
 	}, messages)
 }
 
+func TestABranchBehindOriginIsFastForwardedBeforeItIsSynced(t *testing.T) {
+	problems := status.Problems(status.ProblemsParams{Branch: "feat/a", Merged: true, BehindOrigin: 2, Parent: "main", Lacks: 1, Sync: true})
+
+	var fixes []string
+	for _, problem := range problems {
+		fixes = append(fixes, problem.Code+" "+problem.Fix.Command)
+	}
+	assert.Equal(t, []string{"status.merged prune", "status.behind_origin fast-forward", "status.behind sync"}, fixes)
+	assert.Equal(t, "origin has 2 commits it lacks", problems[1].Message)
+}
+
 func TestNothingToFixIsNoProblemNotNull(t *testing.T) {
 	assert.Equal(t, []status.Problem{}, status.Problems(status.ProblemsParams{Branch: "main"}))
 }

@@ -1,0 +1,19 @@
+$ wtm fast-forward; echo EXIT=$?
+
+  Step 4/4 • Confirm
+
+  ✓ Worktrees: feat/tty-behind
+  · All — every worktree: --all, or the default pick confirmed as it was
+  · Force — no worktree named behind origin has uncommitted changes
+
+  ┃  Review & confirm
+  ┃
+  ┃  Fast-forward  feat/tty-behind (1 commit)
+  ┃  Up to date    main, feat/tty-ahead (ahead of origin), feat/tty-latest
+
+▌› Yes, fast-forward feat/tty-behind
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

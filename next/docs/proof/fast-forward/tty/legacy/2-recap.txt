@@ -1,0 +1,19 @@
+$ wtm fast-forward; echo EXIT=$?
+
+  Step 2/2 • Fast-forward from origin
+
+  ✓ Worktrees: main, feat/tty-behind, feat/tty-latest, feat/tty-ahead
+
+  ┃  Review & confirm
+  ┃
+  ┃  main is already up to date
+  ┃  feat/tty-behind ← origin/feat/tty-behind (1 commit)
+  ┃  feat/tty-latest is already up to date
+  ┃  feat/tty-ahead is already up to date
+
+▌▸ Yes, fast-forward
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

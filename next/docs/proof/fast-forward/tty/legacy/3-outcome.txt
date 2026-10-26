@@ -1,0 +1,8 @@
+$ wtm fast-forward; echo EXIT=$?
+
+┃  ✓ 1 fast-forwarded · 3 already up to date
+┃    feat/tty-behind
+
+EXIT=0
+$
+

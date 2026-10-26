@@ -1,0 +1,47 @@
+{
+  "v": 2,
+  "command": "fast-forward",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/json",
+      "status": "done",
+      "reason": "unchanged",
+      "detail": {}
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/json",
+        "path": "<SB>/acme.trees/feat-json",
+        "standing": "up_to_date",
+        "origin": {
+          "ahead": 0,
+          "behind": 0,
+          "state": "up-to-date"
+        },
+        "from": "<SHA>",
+        "blockers": [],
+        "phases": []
+      }
+    ],
+    "force": false,
+    "recap": [
+      {
+        "key": "up_to_date",
+        "label": "Up to date",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/json",
+            "text": "feat/json"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

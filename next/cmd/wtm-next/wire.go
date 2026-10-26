@@ -32,6 +32,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	execcli "github.com/LucasPcq/wtm/next/internal/command/exec/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
+	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
+	fastforwardcli "github.com/LucasPcq/wtm/next/internal/command/fastforward/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	prunecli "github.com/LucasPcq/wtm/next/internal/command/prune/cli"
@@ -58,15 +60,16 @@ type wireParams struct {
 
 // An app is every use case wired on one repository.
 type app struct {
-	Create  create.UseCase
-	Extract extract.UseCase
-	Clean   clean.UseCase
-	Prune   prune.UseCase
-	Exec    exec.UseCase
-	List    list.UseCase
-	Resolve resolve.UseCase
-	Status  status.UseCase
-	Tree    tree.UseCase
+	Create      create.UseCase
+	Extract     extract.UseCase
+	Clean       clean.UseCase
+	Prune       prune.UseCase
+	FastForward fastforward.UseCase
+	Exec        exec.UseCase
+	List        list.UseCase
+	Resolve     resolve.UseCase
+	Status      status.UseCase
+	Tree        tree.UseCase
 }
 
 // wire builds each adapter of the repository params locates once and injects it into every use case.
@@ -145,6 +148,13 @@ func wire(params wireParams) app {
 			Teardown:     teardowns,
 			Repository:   facts,
 			Operations:   operations,
+		},
+		FastForward: fastforward.UseCase{
+			Git:        repo,
+			Shield:     shell.Shield,
+			Repository: facts,
+			Operations: operations,
+			Provision:  provisions,
 		},
 		Exec: exec.UseCase{
 			Git:        repo,
@@ -237,13 +247,15 @@ func proxyStatus() domain.FollowUp {
 	return domain.FollowUp{Command: "run proxy status"}
 }
 
-// commandLine spells a follow-up as the command line runs it: one naming a migrated command another command gives (clean, prune, exec) from that command's schema; go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
+// commandLine spells a follow-up as the command line runs it: one naming a migrated command another command gives (clean, prune, fast-forward, exec) from that command's schema; go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
 func commandLine(followUp domain.FollowUp) []string {
 	switch followUp.Command {
 	case clean.Name:
 		return cleancli.Line(followUp)
 	case prune.Name:
 		return prunecli.Line(followUp)
+	case fastforward.Name:
+		return fastforwardcli.Line(followUp)
 	case exec.Name:
 		return execcli.Line(followUp)
 	}

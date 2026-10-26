@@ -1,0 +1,59 @@
+{
+  "v": 2,
+  "command": "fast-forward",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/dirty",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-dirty",
+        "from": "root",
+        "to": "upstream"
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/dirty",
+        "path": "/repo/wt-feat-dirty",
+        "standing": "behind",
+        "origin": {
+          "ahead": 0,
+          "behind": 1,
+          "state": "behind"
+        },
+        "from": "root",
+        "to": "upstream",
+        "blockers": [
+          "dirty"
+        ],
+        "phases": [
+          "fast_forward"
+        ]
+      }
+    ],
+    "force": true,
+    "recap": [
+      {
+        "key": "fast_forward",
+        "label": "Fast-forward",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/dirty",
+            "note": "forced",
+            "params": {
+              "commits": "1"
+            },
+            "text": "feat/dirty (1 commit; uncommitted changes, forced)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

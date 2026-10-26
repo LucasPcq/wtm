@@ -1,0 +1,46 @@
+{
+  "v": 2,
+  "command": "fast-forward",
+  "ok": false,
+  "op": "<OP>",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "refused",
+    "code": "fast-forward.unsafe",
+    "message": "nothing fast-forwarded: feat/clash can't be fast-forwarded safely",
+    "params": {
+      "worktrees": "feat/clash"
+    },
+    "follow_up": {
+      "command": "fast-forward",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/clash"
+          ]
+        },
+        {
+          "path": "force",
+          "values": [
+            "true"
+          ]
+        }
+      ],
+      "code": "fast-forward.force",
+      "message": "fast-forward anyway"
+    },
+    "fields": [
+      {
+        "path": "worktree[0]",
+        "code": "fast-forward.dirty",
+        "params": {
+          "value": "feat/clash"
+        },
+        "flag": "<worktree>[0]",
+        "message": "feat/clash has uncommitted changes"
+      }
+    ]
+  }
+}

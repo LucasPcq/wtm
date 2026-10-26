@@ -12,15 +12,18 @@ import (
 type FastForwardParams struct {
 	Subject      string // the local branch
 	CheckedOutAt string // the worktree it is checked out in; empty when it is in none
+	Force        bool   // fast-forward a worktree with uncommitted changes all the same
 }
 
 // FastForwarded is what FastForward did: Dirty when the branch's worktree had
 // changes and was left alone, Busy when it was stopped in a rebase or a bisect
-// and was left alone, Err when git failed.
+// and was left alone, Err when git failed, Unfetched when that was the fetch of
+// the branch before its worktree's merge.
 type FastForwarded struct {
-	Dirty bool
-	Busy  bool
-	Err   error
+	Dirty     bool
+	Busy      bool
+	Unfetched bool
+	Err       error
 }
 
 // Failed reports whether the branch was left where it was.
@@ -82,14 +85,14 @@ func (p FastForwardEachParams) notAdvanced(subject string, forwarded FastForward
 // the ref alone when no worktree has it checked out, else a fast-forward merge
 // in that worktree, which it skips when the worktree is not plainly on the
 // branch (mid-rebase or bisect: the merge would move its detached HEAD, not
-// the branch) or is dirty.
+// the branch; mid-merge or cherry-pick: git refuses) or is dirty, unless forced.
 func (s Service) FastForward(ctx context.Context, params FastForwardParams) FastForwarded {
 	if params.CheckedOutAt == "" {
 		return FastForwarded{Err: s.Git.FastForwardRef(ctx, params.Subject)}
 	}
 
 	if err := s.Git.FetchRef(ctx, params.Subject); err != nil {
-		return FastForwarded{Err: err}
+		return FastForwarded{Unfetched: true, Err: err}
 	}
 
 	busy, err := s.busy(ctx, params.CheckedOutAt)
@@ -98,7 +101,7 @@ func (s Service) FastForward(ctx context.Context, params FastForwardParams) Fast
 	}
 
 	dirty, err := s.Git.Dirty(ctx, params.CheckedOutAt)
-	if err != nil || dirty {
+	if err != nil || dirty && !params.Force {
 		return FastForwarded{Dirty: dirty, Err: err}
 	}
 
@@ -106,7 +109,8 @@ func (s Service) FastForward(ctx context.Context, params FastForwardParams) Fast
 }
 
 // busy reports whether the worktree at path has its branch in an operation
-// rather than checked out: any state but OnBranch.
+// rather than plainly checked out: any state but OnBranch, or an operation git
+// stopped in the middle of (a merge, a cherry-pick…).
 func (s Service) busy(ctx context.Context, path string) (bool, error) {
 	worktrees, err := s.Git.Worktrees(ctx)
 	if err != nil {
@@ -116,7 +120,7 @@ func (s Service) busy(ctx context.Context, path string) (bool, error) {
 	for _, listed := range worktrees {
 		if listed.Path == path {
 			_, onBranch := listed.State.(worktree.OnBranch)
-			return !onBranch, nil
+			return !onBranch || listed.Operation() != "", nil
 		}
 	}
 	return false, nil

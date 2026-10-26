@@ -252,15 +252,16 @@ type Action string
 
 // The actions on a worktree, in the order the picker offers them.
 const (
-	ActionGo      Action = "go"
-	ActionOpenPR  Action = "open_pr"
-	ActionRunUp   Action = "run_up"
-	ActionRunDown Action = "run_down"
-	ActionLogs    Action = "logs"
-	ActionClean   Action = "clean"
+	ActionGo          Action = "go"
+	ActionOpenPR      Action = "open_pr"
+	ActionRunUp       Action = "run_up"
+	ActionRunDown     Action = "run_down"
+	ActionLogs        Action = "logs"
+	ActionFastForward Action = "fast_forward"
+	ActionClean       Action = "clean"
 )
 
-// Offers are the actions a worktree offers: only clean when its directory is gone, only go when it is on no branch, open its pull request when it has one.
+// Offers are the actions a worktree offers: only clean when its directory is gone, only go when it is on no branch, open its pull request when it has one, fast-forward it when origin has its branch.
 func Offers(detail Detail) []Action {
 	switch {
 	case detail.Missing:
@@ -274,6 +275,9 @@ func Offers(detail Detail) []Action {
 		actions = append(actions, ActionOpenPR)
 	}
 	actions = append(actions, ActionRunUp, ActionRunDown, ActionLogs)
+	if detail.Origin != nil {
+		actions = append(actions, ActionFastForward)
+	}
 	if !detail.Main {
 		actions = append(actions, ActionClean)
 	}
@@ -286,12 +290,13 @@ const ParamNumber = "number"
 
 // byAction is what each action runs, the wtm command as its command line spells it after the program's name, none to open a pull request, and what it reads as in the picker and as the note of its follow-up.
 var byAction = map[Action]struct{ command, label string }{
-	ActionGo:      {domain.CommandGo, "Go to the worktree"},
-	ActionOpenPR:  {"", "Open the pull request"},
-	ActionRunUp:   {"run up", "Start the profile"},
-	ActionRunDown: {"run down", "Stop the profile"},
-	ActionLogs:    {"run logs", "View the logs"},
-	ActionClean:   {domain.CommandClean, "Clean (delete the worktree)"},
+	ActionGo:          {domain.CommandGo, "Go to the worktree"},
+	ActionOpenPR:      {"", "Open the pull request"},
+	ActionRunUp:       {"run up", "Start the profile"},
+	ActionRunDown:     {"run down", "Stop the profile"},
+	ActionLogs:        {"run logs", "View the logs"},
+	ActionFastForward: {domain.CommandFastForward, "Fast-forward from origin"},
+	ActionClean:       {domain.CommandClean, "Clean (delete the worktree)"},
 }
 
 // Actions are the follow-ups the worktree of detail offers, as Offers lists them.

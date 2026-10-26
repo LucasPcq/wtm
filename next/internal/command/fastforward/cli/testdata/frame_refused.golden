@@ -1,0 +1,15 @@
+
+  Step 4/4 • Cannot apply this plan
+
+  ✓ Worktrees: feat/behind, feat/dirty
+  · All — only --all asks every worktree
+  ✓ Force: not forced
+
+  ┃  Review & confirm
+  ┃
+  ┃  ✗ nothing fast-forwarded: feat/dirty can't be fast-forwarded safely
+  ┃      feat/dirty has uncommitted changes
+
+▌› No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back

@@ -20,6 +20,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./events.sh "$wtm" "$next" events
 ./clean.sh "$wtm" "$next" clean
 ./prune.sh "$wtm" "$next" prune
+./fast-forward.sh "$wtm" "$next" fast-forward
 ./exec.sh "$wtm" "$next" exec
 ./ui.sh "$next" ui
 git diff --stat .
@@ -411,6 +412,46 @@ The reference is the legacy `wtm prune` of 0.30.1. Its output differs by design 
   - 10 to 12: legacy has no worktree argument (exit 2). Next refuses a named unsafe worktree with `prune.unsafe` (exit 23, followed by the same request forced), a named one not done with as an invalid request (`feat/open is not done with: its pull request is still open`, exit 2), and removes a named unsafe one forced.
   - 13: legacy needs a terminal or `--yes` (exit 1); next runs unattended on the safe candidates (D5), as every next command.
   - The tty: legacy lets `feat/dirty` be checked, counts it in `Will prune 4 worktree(s)`, then skips it after the confirmation (B3, `! Skipped feat/dirty (dirty — pass --force)`); next asks a `Force` step naming it (`feat/dirty — uncommitted changes`) and its recap marks it forced. Each candidate reads why it is done with (`feat/merged — merged #1`, `feat/dirty — merged #4 · uncommitted changes`). Next's `Reparent children` puts `Leave them orphaned` first, legacy reparents by default.
+# Proof: `wtm fast-forward` (legacy `flow/fastforward`) vs `wtm-next fast-forward`
+
+The reference is the legacy `wtm fast-forward` of 0.30.1. Its output differs by design (next speaks the v2 envelope, fetches origin once before it plans and refuses a named worktree it cannot move safely with exit 23), so the proof compares what each leaves on disk and keeps both outputs side by side.
+
+- `fast-forward.sh <wtm> <wtm-next> fast-forward`: two identical sandboxes (the `docs/demos` "acme" project with a bare `origin` a teammate pushed to, unfetched; worktrees `feat/behind`, `feat/uptodate`, `feat/ahead` one commit past origin, `feat/diverged` both, `feat/dirty` behind with an untracked file, `feat/clash` behind with an untracked `clash.txt` origin's commit adds, `feat/rebasing` behind and stopped mid-rebase, `feat/noremote` never pushed, the branch `feat/loose` behind and checked out nowhere, and one worktree per other scenario), the same scenarios run by each binary; after each, the exit code, stdout, stderr and the state (each branch at origin's tip as origin has it or not, the worktrees, a rebase under way). Paths, op ids, commits and fingerprints are normalised. `fast-forward/states.diff` holds the differences. Then, in a fresh sandbox per side, fetched, the wizard in tmux at 100×40: `fast-forward/tty/legacy/` and `fast-forward/tty/next/`.
+  1. a worktree behind origin, `--yes`
+  2. one up to date
+  3. one ahead of origin
+  4. one diverged from origin
+  5. one origin does not have
+  6. one behind with uncommitted changes
+  7. the same, `--force --yes`
+  8. one whose untracked file origin's commit would overwrite, `--force --yes`
+  9. one behind, stopped in the middle of a rebase
+  10. a branch no worktree holds
+  11. a worktree given twice, `--output json`
+  12. a part of a branch's name
+  13. `--output json --yes`
+  14. `--output json` without `--yes`
+  15. a dirty worktree behind, `--output json --yes`
+  16. no worktree, without a terminal
+  17. `-q`
+  18. the alias `ff`, `--dry-run`
+  19. `--dry-run --output json` (next only)
+  20. `--expect-fingerprint` with that fingerprint (next only)
+  21. `--expect-fingerprint` with a stale fingerprint (next only)
+  22. `--all --yes`
+- The states are identical but for 20 to 22, where legacy refuses a flag it lacks or the whole run. The differences, all deliberate (the owner approved each, 2026-10-26):
+  - 9, a legacy bug: legacy runs `git merge --ff-only` on the rebase's detached HEAD and reports `✓ 1 fast-forwarded` though the branch did not move; next leaves a worktree in the middle of an operation (a rebase, a bisect, a merge, a cherry-pick…) as it is, `skipped`, its warning followed by `→ wtm go feat/rebasing   finish it in the worktree` (`TestAWorktreeInTheMiddleOfAnOperationIsLeftAsItIsAndNamesHowToFinishIt`; `provision.Service.FastForward` refuses a worktree stopped in a merge or a cherry-pick too, `TestASourceWorktreeStoppedInAMergeIsLeftWhereItIs`).
+  - 6, 15 and 22: legacy refuses a dirty worktree under `--yes` before anything moves (exit 1, text on stderr, nothing on stdout in JSON), naming only the first, and its wizard fails it as an item instead. Next refuses the request when the worktree is named, exit 23 (`fast-forward.unsafe`), one problem per dirty worktree on its entry (`fast-forward.dirty`) and the request forced as its follow-up; with `--all` (22), or the wizard's default pick confirmed as it was, the command chose it, so it is left as it is with the line that forces it, `→ wtm fast-forward feat/clash --force`, and the others move. The default pick leaves a dirty worktree out. A dirty worktree with nothing to move (up to date, ahead) is no refusal (legacy refused it).
+  - 3: legacy calls an ahead branch `already up to date`; next says `ahead of origin`, `done`/`unchanged`. Legacy's picker tags ahead and diverged branches `already up to date` too; next's options carry where each stands as last fetched (`1 ahead`, `1 ahead, 1 behind`, `1 behind`).
+  - 4 and 5: both skip, exit 0; next names why with what moves it on (`→ wtm sync feat/diverged   rebase it`), in every mode, where legacy hints at sync only in its wizard's recap.
+  - 8: both fail the item, exit 1; next's line is a fixed message per code, git's own words after it, and in JSON the message alone with git's words under `error.params.cause` (`fast-forward.failed`; `fast-forward.fetch_failed` when the fetch of the branch failed).
+  - 10 and 12: legacy matches a part of a branch's name (`ff uptodate` moves `feat/uptodate`) and refuses a branch no worktree holds with exit 11; next takes a worktree's branch or path only, as `clean`, and refuses any other name as an invalid request, exit 2.
+  - 11: legacy fast-forwards and reports the worktree twice; next refuses the second entry (`distinct`, exit 2).
+  - 14: legacy refuses `--output json` without `--yes` (exit 2); next runs it unattended, as every next command.
+  - 16: legacy exits 1; next exits 2, naming `<worktree>` as required.
+  - 18 to 21: legacy has no dry run nor fingerprint (exit 2).
+  - Next fetches origin once (`git fetch origin`) before it plans, a dry run included, where legacy fetched each branch as it checked it; a fetch that fails is a warning (`fast-forward.fetch_failed`) and the plan stands on origin as last fetched. Next takes each worktree's lock, and its first Ctrl+C lets the worktree being moved finish.
+  - The tty: legacy's picker checks nothing, tags each worktree before its name and lists them in no stable order (the script picks every one); next's checks those behind origin as last fetched, a dirty one left out, and confirmed as it was it is the command's choice: every worktree is asked, so the recap and the outcome list those up to date too. Next asks a `Force` step only when a named worktree is unsafe, then a recap whose button names what moves (`Yes, fast-forward feat/tty-behind`). Esc reads `✗ interrupted`, exit 19, as every next command.
 
 # Proof: `wtm exec` (legacy `flow/exec`) vs `wtm-next exec`
 

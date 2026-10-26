@@ -1,0 +1,13 @@
+
+  ! fast-forward: 2 done · 1 unchanged · 2 skipped
+
+  Fast-forward  main (1 commit), feat/behind (1 commit)
+  Up to date    feat/latest
+  Left as is    feat/dirty (uncommitted changes), feat/diverged (diverged from origin)
+
+  ! feat/dirty has uncommitted changes: left as it is
+  ! feat/diverged has diverged from origin (1 ahead, 1 behind): left as it is
+
+  → wtm-next fast-forward feat/dirty --force   fast-forward it anyway
+  → wtm sync feat/diverged                     rebase it
+

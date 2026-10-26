@@ -47,6 +47,11 @@ const (
 	Diverged Divergence = "diverged"
 )
 
+// Divergences returns every Divergence, NoOrigin first, which an Origin never holds: it is nil then.
+func Divergences() []Divergence {
+	return []Divergence{NoOrigin, UpToDate, Behind, Ahead, Diverged}
+}
+
 // Branches is the repository's local branches and the branches of origin.
 type Branches struct {
 	Local  []Branch

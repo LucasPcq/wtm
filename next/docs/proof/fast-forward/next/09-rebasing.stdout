@@ -1,0 +1,9 @@
+
+  ! fast-forward: 1 skipped
+
+  Left as is  feat/rebasing (an operation is under way)
+
+  ! feat/rebasing is in the middle of an operation (rebasing): left as it is
+
+  → wtm go feat/rebasing   finish it in the worktree
+

@@ -1,0 +1,63 @@
+=== 00-before: exit legacy , next 
+=== 01-behind: exit legacy 0, next 0
+=== 02-up-to-date: exit legacy 0, next 0
+=== 03-ahead: exit legacy 0, next 0
+=== 04-diverged: exit legacy 0, next 0
+=== 05-not-on-origin: exit legacy 0, next 0
+=== 06-dirty-refused: exit legacy 1, next 23
+=== 07-dirty-forced: exit legacy 0, next 0
+=== 08-clash-forced: exit legacy 1, next 1
+=== 09-rebasing: exit legacy 0, next 0
+=== 10-no-worktree: exit legacy 11, next 2
+=== 11-twice: exit legacy 0, next 2
+=== 12-part-of-a-branch: exit legacy 0, next 2
+=== 13-json: exit legacy 0, next 0
+=== 14-json-without-yes: exit legacy 2, next 0
+=== 15-json-refused: exit legacy 1, next 23
+=== 16-no-worktree-named: exit legacy 1, next 2
+=== 17-quiet: exit legacy 0, next 0
+=== 18-alias: exit legacy 2, next 0
+=== 19-json-dry-run: exit legacy 2, next 0
+=== 20-expect-fingerprint: exit legacy 2, next 0
+--- legacy/20-expect-fingerprint
++++ next/20-expect-fingerprint
+@@ -6,7 +6,7 @@
+ feat/dirty: at origin
+ feat/diverged: not at origin
+ feat/dry: not at origin
+-feat/fp: not at origin
++feat/fp: at origin
+ feat/json: at origin
+ feat/loose: not at origin
+ feat/noremote: not on origin
+=== 21-stale-fingerprint: exit legacy 2, next 25
+--- legacy/21-stale-fingerprint
++++ next/21-stale-fingerprint
+@@ -6,7 +6,7 @@
+ feat/dirty: at origin
+ feat/diverged: not at origin
+ feat/dry: not at origin
+-feat/fp: not at origin
++feat/fp: at origin
+ feat/json: at origin
+ feat/loose: not at origin
+ feat/noremote: not on origin
+=== 22-all: exit legacy 1, next 0
+--- legacy/22-all
++++ next/22-all
+@@ -1,12 +1,12 @@
+ ## branches against origin
+ feat/ahead: not at origin
+-feat/all: not at origin
++feat/all: at origin
+ feat/behind: at origin
+ feat/clash: not at origin
+ feat/dirty: at origin
+ feat/diverged: not at origin
+-feat/dry: not at origin
+-feat/fp: not at origin
++feat/dry: at origin
++feat/fp: at origin
+ feat/json: at origin
+ feat/loose: not at origin
+ feat/noremote: not on origin

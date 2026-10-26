@@ -28,6 +28,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/webserver"
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -472,6 +473,9 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[list.Finished]():             {"How a worktree's pull request has done with it: merged, or closed unmerged.", list.Finisheds()},
 	reflect.TypeFor[prune.Reason]():              {"Why a worktree is done with, as a code each surface words its own way.", prune.Reasons()},
 	reflect.TypeFor[worktree.Blocker]():          {"What makes a worktree unsafe to remove, a safety refusal only force lifts, as a code each surface words its own way.", worktree.Blockers()},
+	reflect.TypeFor[fastforward.Standing]():      {"Where a worktree stands for a fast-forward, the first that applies; only behind moves.", fastforward.Standings()},
+	reflect.TypeFor[fastforward.Blocker]():       {"What makes a worktree behind origin unsafe to fast-forward, a safety refusal only force lifts.", fastforward.Blockers()},
+	reflect.TypeFor[worktree.Divergence]():       {"Where a branch stands against origin's branch of the same name.", worktree.Divergences()},
 	reflect.TypeFor[project.EnvStrategy]():       {"Where a worktree's .env files are copied from.", project.EnvStrategies()},
 	reflect.TypeFor[project.Isolation]():         {"How a worktree stands against its source.", project.Isolations()},
 	reflect.TypeFor[project.JobKind]():           {"Whether a job keeps running or runs to its end.", project.JobKinds()},

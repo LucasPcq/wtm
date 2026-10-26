@@ -45,6 +45,15 @@ func TestASourceWithUncommittedChangesIsLeftWhereItIs(t *testing.T) {
 	assert.Equal(t, before, gittest.Output(t, u.linked, "rev-parse", "HEAD"))
 }
 
+func TestAForcedFastForwardMovesAWorktreeWithUncommittedChanges(t *testing.T) {
+	u := behindOrigin(t, upstreamSeed{Linked: true, Dirty: true})
+
+	forwarded := u.service.FastForward(t.Context(), provision.FastForwardParams{Subject: existing, CheckedOutAt: u.linked, Force: true})
+
+	assert.Equal(t, provision.FastForwarded{}, forwarded)
+	assert.Equal(t, gittest.Output(t, u.main, "rev-parse", "origin/"+existing), gittest.Output(t, u.linked, "rev-parse", "HEAD"))
+}
+
 func TestASourceWorktreeStoppedInARebaseIsLeftWhereItIs(t *testing.T) {
 	u := behindOrigin(t, upstreamSeed{Linked: true, Rebasing: true})
 	head, branch := gittest.Output(t, u.linked, "rev-parse", "HEAD"), gittest.Output(t, u.main, "rev-parse", existing)
@@ -56,10 +65,27 @@ func TestASourceWorktreeStoppedInARebaseIsLeftWhereItIs(t *testing.T) {
 	assert.Equal(t, branch, gittest.Output(t, u.main, "rev-parse", existing))
 }
 
+func TestASourceWorktreeStoppedInAMergeIsLeftWhereItIs(t *testing.T) {
+	u := behindOrigin(t, upstreamSeed{Linked: true, Midway: worktree.MidwayCherryPick})
+	head := gittest.Output(t, u.linked, "rev-parse", "HEAD")
+
+	forwarded := u.service.FastForward(t.Context(), provision.FastForwardParams{Subject: existing, CheckedOutAt: u.linked})
+
+	assert.Equal(t, provision.FastForwarded{Busy: true}, forwarded)
+	assert.Equal(t, head, gittest.Output(t, u.linked, "rev-parse", "HEAD"))
+}
+
 func TestAFastForwardThatFailsCarriesItsCause(t *testing.T) {
-	for name, seed := range map[string]upstreamSeed{"without_worktree": {}, "in_worktree": {Linked: true}} {
+	cases := map[string]struct {
+		seed      upstreamSeed
+		unfetched bool
+	}{
+		"without_worktree": {},
+		"in_worktree":      {seed: upstreamSeed{Linked: true}, unfetched: true},
+	}
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			u := behindOrigin(t, seed)
+			u := behindOrigin(t, c.seed)
 			before := gittest.Output(t, u.main, "rev-parse", existing)
 			gittest.Git(t, u.main, "remote", "set-url", "origin", u.main+"/gone")
 
@@ -67,6 +93,7 @@ func TestAFastForwardThatFailsCarriesItsCause(t *testing.T) {
 
 			require.Error(t, forwarded.Err)
 			assert.False(t, forwarded.Dirty)
+			assert.Equal(t, c.unfetched, forwarded.Unfetched)
 			assert.Equal(t, before, gittest.Output(t, u.main, "rev-parse", existing))
 		})
 	}

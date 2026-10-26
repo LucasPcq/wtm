@@ -1,0 +1,48 @@
+
+  Bring each worktree's branch up to its branch on origin, never merging: origin is fetched once,
+  then each worktree behind it moves in turn. A failure does not stop the others.
+  Without arguments, the wizard asks which worktrees to fast-forward, those behind origin
+  checked. A worktree is named by its branch or its path.
+
+  A worktree ahead of origin, diverged from it, not on origin, in the middle of a rebase, a
+  bisect or a merge, or whose directory is gone is left as it is, with what moves it on.
+
+  A worktree behind origin with uncommitted changes is unsafe: named, it refuses the whole run
+  before anything moves, unless --force; with --all, it is left as it is, with the line that
+  forces it. --force lifts that refusal only: it still asks to confirm, unless --yes.
+
+  Usage:
+    wtm-next fast-forward [worktree...] [flags]
+
+  Aliases:
+    fast-forward, ff
+
+  Examples:
+    # Pick the worktrees to fast-forward
+    wtm fast-forward
+
+    wtm fast-forward feat/login
+
+    # Every worktree, no prompts
+    wtm ff --all --yes
+
+    # See the plan first, then apply exactly that plan
+    wtm fast-forward feat/login --dry-run
+    wtm fast-forward feat/login --expect-fingerprint <hash>
+
+    # For a script or an agent, with the v2 JSON envelope
+    wtm fast-forward --all --yes --output json
+
+  Flags:
+        --all                         Fast-forward every worktree; one with uncommitted changes is left as it is unless --force
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+        --force                       Fast-forward a worktree that has uncommitted changes
+    -h, --help                        help for fast-forward
+        --output string               Output format: text or json (default "text")
+    -y, --yes                         Run unattended: no question, no confirmation (worktrees or --all required; a worktree named with uncommitted changes still refuses the run unless --force)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

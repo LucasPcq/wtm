@@ -1,0 +1,14 @@
+$ wtm fast-forward; echo EXIT=$?
+
+  Step 1/4 • Worktrees
+
+  The worktrees to fast-forward, by branch or by path; those behind origin as last fetched are
+  checked
+
+▌› [ ] main                                                                                current
+   [ ] feat/tty-ahead                                                                      1 ahead
+   [x] feat/tty-behind                                                                    1 behind
+   [ ] feat/tty-latest
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel
+

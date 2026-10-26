@@ -1,0 +1,24 @@
+{
+  "v": 2,
+  "command": "fast-forward",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "worktree[0]",
+        "code": "not_found",
+        "params": {
+          "value": "feat/nope"
+        },
+        "flag": "<worktree>[0]",
+        "message": "feat/nope names no worktree"
+      }
+    ]
+  }
+}

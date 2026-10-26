@@ -13,6 +13,7 @@ import (
 	eventscli "github.com/LucasPcq/wtm/next/internal/command/events/cli"
 	execcli "github.com/LucasPcq/wtm/next/internal/command/exec/cli"
 	extractcli "github.com/LucasPcq/wtm/next/internal/command/extract/cli"
+	fastforwardcli "github.com/LucasPcq/wtm/next/internal/command/fastforward/cli"
 	listcli "github.com/LucasPcq/wtm/next/internal/command/list/cli"
 	prunecli "github.com/LucasPcq/wtm/next/internal/command/prune/cli"
 	resolvecli "github.com/LucasPcq/wtm/next/internal/command/resolve/cli"
@@ -46,6 +47,7 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		extractcli.New(streams, env, openExtract, commandLine),
 		cleancli.New(streams, env, openClean, commandLine),
 		prunecli.New(streams, env, openPrune, commandLine),
+		fastforwardcli.New(streams, env, openFastForward, commandLine),
 		execcli.New(streams, env, openExec, commandLine),
 		listcli.New(streams, env, openList, commandLine),
 		resolvecli.New(streams, env, openResolve, commandLine),

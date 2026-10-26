@@ -1,0 +1,13 @@
+
+  Step 3/4 • Force
+
+  ✓ Worktrees: feat/behind, feat/dirty
+  · All — only --all asks every worktree
+
+  These worktrees have uncommitted changes:
+    feat/dirty
+
+▌› No
+   Yes, fast-forward them anyway
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel

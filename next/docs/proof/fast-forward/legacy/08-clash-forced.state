@@ -1,0 +1,47 @@
+## branches against origin
+feat/ahead: not at origin
+feat/all: not at origin
+feat/behind: at origin
+feat/clash: not at origin
+feat/dirty: at origin
+feat/diverged: not at origin
+feat/dry: not at origin
+feat/fp: not at origin
+feat/json: not at origin
+feat/loose: not at origin
+feat/noremote: not on origin
+feat/quiet: not at origin
+feat/rebasing: not at origin
+feat/uptodate: at origin
+main: at origin
+## worktrees
+<SB>/acme
+  refs/heads/main
+<SB>/acme.trees/feat-ahead
+  refs/heads/feat/ahead
+<SB>/acme.trees/feat-all
+  refs/heads/feat/all
+<SB>/acme.trees/feat-behind
+  refs/heads/feat/behind
+<SB>/acme.trees/feat-clash
+  refs/heads/feat/clash
+<SB>/acme.trees/feat-dirty
+  refs/heads/feat/dirty
+<SB>/acme.trees/feat-diverged
+  refs/heads/feat/diverged
+<SB>/acme.trees/feat-dry
+  refs/heads/feat/dry
+<SB>/acme.trees/feat-fp
+  refs/heads/feat/fp
+<SB>/acme.trees/feat-json
+  refs/heads/feat/json
+<SB>/acme.trees/feat-noremote
+  refs/heads/feat/noremote
+<SB>/acme.trees/feat-quiet
+  refs/heads/feat/quiet
+<SB>/acme.trees/feat-rebasing
+  detached
+<SB>/acme.trees/feat-uptodate
+  refs/heads/feat/uptodate
+## rebase under way
+feat/rebasing
