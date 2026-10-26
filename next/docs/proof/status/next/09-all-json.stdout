@@ -11,7 +11,6 @@
         "path": "<SB>/acme",
         "main": true,
         "locked": false,
-        "rebasing": false,
         "missing": false,
         "created_at": null,
         "parent": "",
@@ -102,7 +101,8 @@
             }
           ]
         },
-        "problems": []
+        "problems": [],
+        "condition": "clean"
       }
     },
     {
@@ -113,7 +113,6 @@
         "path": "<SB>/acme.trees/detached",
         "main": false,
         "locked": false,
-        "rebasing": false,
         "missing": false,
         "created_at": null,
         "parent": "",
@@ -193,7 +192,8 @@
             }
           ]
         },
-        "problems": []
+        "problems": [],
+        "condition": "clean"
       }
     },
     {
@@ -204,7 +204,6 @@
         "path": "<SB>/acme.trees/feat-a",
         "main": false,
         "locked": false,
-        "rebasing": false,
         "missing": false,
         "created_at": "<T>",
         "parent": "main",
@@ -303,7 +302,26 @@
             }
           ]
         },
-        "problems": []
+        "problems": [
+          {
+            "code": "status.behind",
+            "message": "main has 2 commits it lacks",
+            "fix": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "status.behind",
+              "message": "sync it onto main"
+            }
+          }
+        ],
+        "condition": "changed"
       }
     },
     {
@@ -314,7 +332,6 @@
         "path": "<SB>/acme.trees/feat-b",
         "main": false,
         "locked": false,
-        "rebasing": false,
         "missing": false,
         "created_at": "<T>",
         "parent": "main",
@@ -390,6 +407,23 @@
         },
         "problems": [
           {
+            "code": "status.behind",
+            "message": "main has 2 commits it lacks",
+            "fix": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "status.behind",
+              "message": "sync it onto main"
+            }
+          },
+          {
             "code": "status.env_missing",
             "message": "apps/web/.env is missing",
             "fix": {
@@ -403,10 +437,11 @@
                 }
               ],
               "code": "status.env_missing",
-              "message": ""
+              "message": "rebuild it"
             }
           }
-        ]
+        ],
+        "condition": "clean"
       }
     },
     {
@@ -417,7 +452,6 @@
         "path": "<SB>/acme.trees/feat-old",
         "main": false,
         "locked": false,
-        "rebasing": false,
         "missing": false,
         "created_at": "<T>",
         "parent": "main",
@@ -493,6 +527,23 @@
         },
         "problems": [
           {
+            "code": "status.behind",
+            "message": "main has 2 commits it lacks",
+            "fix": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/old"
+                  ]
+                }
+              ],
+              "code": "status.behind",
+              "message": "sync it onto main"
+            }
+          },
+          {
             "code": "status.isolation_pending",
             "message": "predates the isolation choice: run up and run start refuse it",
             "fix": {
@@ -512,10 +563,11 @@
                 }
               ],
               "code": "status.isolation_pending",
-              "message": ""
+              "message": "isolate it"
             }
           }
-        ]
+        ],
+        "condition": "clean"
       }
     },
     {
@@ -526,7 +578,6 @@
         "path": "<SB>/acme.trees/feat-rb",
         "main": false,
         "locked": false,
-        "rebasing": true,
         "missing": false,
         "created_at": "<T>",
         "parent": "main",
@@ -617,7 +668,8 @@
             }
           ]
         },
-        "problems": []
+        "problems": [],
+        "condition": "rebasing"
       }
     }
   ],

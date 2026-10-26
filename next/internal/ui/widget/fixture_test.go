@@ -16,3 +16,13 @@ func refusingBad(value string) error {
 	}
 	return nil
 }
+
+func branches() []Option {
+	return []Option{
+		{Label: "main", Value: "main"},
+		{Label: "feat/login", Value: "feat/login"},
+		{Label: "feat/logout", Value: "feat/logout"},
+		{Label: "fix/nav", Value: "fix/nav"},
+		{Label: "fix/café", Value: "fix/café"},
+	}
+}

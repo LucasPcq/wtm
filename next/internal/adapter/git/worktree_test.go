@@ -144,17 +144,19 @@ func TestARebaseBegunDetachedIsOnNoBranch(t *testing.T) {
 func TestWorktreesReadsTheBranchABisectStartedFrom(t *testing.T) {
 	cases := []struct {
 		name     string
+		linked   bool
 		detached bool
 		want     worktree.State
 	}{
-		{name: "from_branch", want: worktree.Bisecting{Branch: "feature"}},
-		{name: "from_detached_head", detached: true, want: worktree.Detached{}},
+		{name: "from_branch_linked", linked: true, want: worktree.Bisecting{Branch: "feature"}},
+		{name: "from_branch_main", want: worktree.Bisecting{Branch: "feature"}},
+		{name: "from_detached_head", linked: true, detached: true, want: worktree.Detached{}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			repo := newRepo(t)
 			gittest.CreateBranch(t, repo.Dir, "feature")
-			where := checkOutFeature(t, repo.Dir, true)
+			where := checkOutFeature(t, repo.Dir, c.linked)
 			good := head(t, where, "HEAD")
 			for _, content := range []string{"1", "2", "3"} {
 				commitFile(t, where, "file", content)
@@ -168,6 +170,122 @@ func TestWorktreesReadsTheBranchABisectStartedFrom(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, c.want, worktrees[len(worktrees)-1].State)
+		})
+	}
+}
+
+func TestWorktreesReadsTheOperationGitStoppedInTheMiddleOf(t *testing.T) {
+	cases := []struct {
+		name   string
+		linked bool
+		stop   func(t *testing.T, repo, where string)
+		want   worktree.Midway
+	}{
+		{name: "merge_linked", linked: true, stop: merging, want: worktree.MidwayMerge},
+		{name: "merge_main", stop: merging, want: worktree.MidwayMerge},
+		{name: "cherry_pick_linked", linked: true, stop: cherryPicking, want: worktree.MidwayCherryPick},
+		{name: "cherry_pick_main", stop: cherryPicking, want: worktree.MidwayCherryPick},
+		{name: "revert_linked", linked: true, stop: reverting, want: worktree.MidwayRevert},
+		{name: "revert_main", stop: reverting, want: worktree.MidwayRevert},
+		{name: "am_linked", linked: true, stop: applying, want: worktree.MidwayApply},
+		{name: "am_main", stop: applying, want: worktree.MidwayApply},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			repo := newRepo(t)
+			commitFile(t, repo.Dir, "file", "base")
+			gittest.CreateBranch(t, repo.Dir, "feature")
+			commitFile(t, repo.Dir, "file", "main")
+			where := checkOutFeature(t, repo.Dir, c.linked)
+			commitFile(t, where, "file", "feature")
+			c.stop(t, repo.Dir, where)
+
+			worktrees, err := repo.Worktrees(t.Context())
+
+			require.NoError(t, err)
+			for _, w := range worktrees {
+				if w.Path == where {
+					assert.Equal(t, worktree.Worktree{Path: where, Main: !c.linked, State: worktree.OnBranch{Branch: "feature"}, Head: head(t, where, "HEAD"), Midway: c.want}, w)
+					continue
+				}
+				assert.Empty(t, w.Midway, w.Path)
+			}
+		})
+	}
+}
+
+func TestAWorktreeThatCannotBeProbedIsListedInTheMiddleOfNothing(t *testing.T) {
+	broken := map[string]func(t *testing.T, path string){
+		"malformed_git_file": func(t *testing.T, path string) {
+			require.NoError(t, os.WriteFile(filepath.Join(path, ".git"), []byte("not a gitdir\n"), 0o644))
+		},
+		"unreadable_directory": func(t *testing.T, path string) {
+			require.NoError(t, os.Chmod(path, 0))
+			t.Cleanup(func() { _ = os.Chmod(path, 0o755) })
+		},
+	}
+	checkouts := map[string]struct {
+		add  []string
+		want worktree.State
+	}{
+		"on_branch": {add: []string{"-b", "feature"}, want: worktree.OnBranch{Branch: "feature"}},
+		"detached":  {add: []string{"--detach"}, want: worktree.Detached{}},
+	}
+	for name, breakIt := range broken {
+		for checkoutName, checkout := range checkouts {
+			t.Run(name+"_"+checkoutName, func(t *testing.T) {
+				repo := newRepo(t)
+				path := filepath.Join(gittest.TempDir(t), "feature")
+				gittest.Git(t, repo.Dir, append(append([]string{"worktree", "add", "-q"}, checkout.add...), path)...)
+				breakIt(t, path)
+
+				worktrees, err := repo.Worktrees(t.Context())
+
+				require.NoError(t, err)
+				require.Len(t, worktrees, 2)
+				assert.Equal(t, path, worktrees[1].Path)
+				assert.Equal(t, checkout.want, worktrees[1].State)
+				assert.Empty(t, worktrees[1].Midway)
+			})
+		}
+	}
+}
+
+func TestARebaseWinsOverTheMergeHeadOfAMergeItReplays(t *testing.T) {
+	repo := newRepo(t)
+	commitFile(t, repo.Dir, "file", "base")
+	gittest.CreateBranch(t, repo.Dir, "feature")
+	commitFile(t, repo.Dir, "file", "main")
+	where := checkOutFeature(t, repo.Dir, true)
+	commitFile(t, where, "file", "feature")
+	rebase(t, where, "--merge")
+	mergeHead := filepath.Join(gittest.Output(t, where, "rev-parse", "--absolute-git-dir"), "MERGE_HEAD")
+	require.NoError(t, os.WriteFile(mergeHead, []byte(head(t, repo.Dir, "main")+"\n"), 0o644))
+
+	worktrees, err := repo.Worktrees(t.Context())
+
+	require.NoError(t, err)
+	rebasing := worktrees[len(worktrees)-1]
+	assert.Equal(t, worktree.Rebasing{Branch: "feature"}, rebasing.State)
+	assert.Empty(t, rebasing.Midway)
+}
+
+func TestTheFakeAndGitAgreeOnEachMidway(t *testing.T) {
+	for _, midway := range worktree.Midways() {
+		t.Run(string(midway), func(t *testing.T) {
+			root := gittest.Symlinked(t)
+			linked := filepath.Join(root, "linked")
+			seed := gittest.FakeParams{
+				Main:      filepath.Join(root, "main"),
+				Branch:    "main",
+				Worktrees: []worktree.Worktree{{Path: linked, State: worktree.OnBranch{Branch: "linked"}, Midway: midway}},
+			}
+			for _, impl := range []port{gittest.Build(t, seed), gittest.NewFake(seed)} {
+				worktrees, err := impl.Worktrees(t.Context())
+
+				require.NoError(t, err)
+				assert.Equal(t, midway, worktrees[len(worktrees)-1].Midway)
+			}
 		})
 	}
 }
@@ -298,7 +416,7 @@ func TestTheFakeAndGitReadTheSameRepository(t *testing.T) {
 				Worktrees: []worktree.Worktree{
 					{Path: at("main"), Main: true, State: worktree.OnBranch{Branch: "main"}},
 					{Path: at("detached"), State: worktree.Detached{}},
-					{Path: at("dirty"), State: worktree.OnBranch{Branch: "dirty"}},
+					{Path: at("dirty"), State: worktree.OnBranch{Branch: "dirty"}, Midway: worktree.MidwayMerge},
 					{Path: at("gone"), State: worktree.OnBranch{Branch: "gone"}, Prunable: true},
 					{Path: at("linked"), State: worktree.OnBranch{Branch: "linked"}},
 					{Path: at("locked"), State: worktree.OnBranch{Branch: "locked"}, Locked: true},

@@ -88,12 +88,8 @@ type Poll struct {
 	Jobs     []string
 }
 
-// The checkouts a poll tells apart.
-const (
-	checkoutBranch    = "branch"
-	checkoutRebasing  = "rebasing"
-	checkoutBisecting = "bisecting"
-)
+// checkoutBranch is the checkout of a worktree on its branch with no operation under way; any other is the operation git stopped in the middle of.
+const checkoutBranch = "branch"
 
 // PollOf is what a poll reads of the worktrees and branches of snapshot, the jobs of the machine being jobs, or unknown when known is false.
 func PollOf(snapshot worktree.Snapshot, jobs []run.Job, known bool) Polled {
@@ -108,24 +104,13 @@ func PollOf(snapshot worktree.Snapshot, jobs []run.Job, known bool) Polled {
 		if branch == "" {
 			continue
 		}
-		poll := Poll{Head: tips[branch], Checkout: checkoutOf(w.State)}
+		poll := Poll{Head: tips[branch], Checkout: cmp.Or(string(w.Operation()), checkoutBranch)}
 		if known {
 			poll.Jobs = jobsIn(jobs, w.Path)
 		}
 		polled[branch] = poll
 	}
 	return polled
-}
-
-func checkoutOf(state worktree.State) string {
-	switch state.(type) {
-	case worktree.Rebasing:
-		return checkoutRebasing
-	case worktree.Bisecting:
-		return checkoutBisecting
-	case worktree.OnBranch, worktree.Detached, worktree.Bare:
-	}
-	return checkoutBranch
 }
 
 // jobsIn is each job of the worktree at dir with its state, sorted, empty and not nil when it has none.

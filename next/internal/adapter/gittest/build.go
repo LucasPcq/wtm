@@ -280,6 +280,14 @@ func buildRemote(t testing.TB, main string, built builder, seed FakeParams) {
 	}
 }
 
+// midwayMarks are the files git keeps while it is in the middle of an operation on a worktree's checkout, by Midway; TestTheFakeAndGitAgreeOnEachMidway holds them to the adapter's.
+var midwayMarks = map[worktree.Midway]string{
+	worktree.MidwayMerge:      "MERGE_HEAD",
+	worktree.MidwayCherryPick: "CHERRY_PICK_HEAD",
+	worktree.MidwayRevert:     "REVERT_HEAD",
+	worktree.MidwayApply:      filepath.Join("rebase-apply", "applying"),
+}
+
 // buildWorktreeParams is one linked worktree to build in the repository at
 // Main; Root is the hash a detached worktree points at.
 type buildWorktreeParams struct {
@@ -290,8 +298,9 @@ type buildWorktreeParams struct {
 }
 
 // buildWorktree adds the worktree in its seeded state, a rebase faked by its
-// rebase-merge state and a bisect by its BISECT_START, locks it when seeded
-// locked, then deletes its directory when the seed lists it gone.
+// rebase-merge state, a bisect by its BISECT_START and an operation midway by
+// the file git keeps for it (midwayMarks), locks it when seeded locked, then deletes its directory when the
+// seed lists it gone.
 func buildWorktree(t testing.TB, params buildWorktreeParams) {
 	t.Helper()
 	path := params.Worktree.Path
@@ -315,6 +324,16 @@ func buildWorktree(t testing.TB, params buildWorktreeParams) {
 		}
 	case worktree.Detached, worktree.Bare:
 		Git(t, params.Main, "worktree", "add", "-q", "--detach", path, params.Root)
+	}
+
+	if mark, ok := midwayMarks[params.Worktree.Midway]; ok {
+		marked := filepath.Join(Output(t, path, "rev-parse", "--absolute-git-dir"), mark)
+		if err := os.MkdirAll(filepath.Dir(marked), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(marked, []byte(Output(t, path, "rev-parse", "HEAD")+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	if params.Worktree.Locked {

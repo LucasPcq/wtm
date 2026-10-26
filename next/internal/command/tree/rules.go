@@ -45,10 +45,9 @@ type Detail struct {
 	// Ahead are the commits the branch has that its parent lacks, the base branch's for a root; Behind those of the parent it lacks, null for a root, which has none. Both null when not counted: the main worktree, a member of a cycle, a parent that is not a local branch.
 	Ahead     *int `json:"ahead"`
 	Behind    *int `json:"behind"`
-	NeedsSync bool `json:"needs_sync"` // its parent has commits it lacks: a rebase is due
+	NeedsSync bool `json:"needs_sync"` // its parent has commits it lacks and no rebase, bisect or merge is under way: a sync is due
 	Dirty     bool `json:"dirty"`
 	Locked    bool `json:"locked"`
-	Rebasing  bool `json:"rebasing"`
 	Missing   bool `json:"missing"` // its directory is gone
 	// Condition is the one fact of it that most changes what to do first, as this read knows it.
 	Condition worktree.Condition `json:"condition"`
@@ -117,10 +116,9 @@ func (f Facts) item(branch string) Item {
 		return item
 	}
 
-	_, detail.Rebasing = w.State.(worktree.Rebasing)
 	detail.Dirty, detail.Missing = state.Dirty, state.Missing
 	detail.Ahead, detail.Behind = state.Ahead, state.Behind
-	detail.NeedsSync = state.Behind != nil && *state.Behind > 0
+	detail.NeedsSync = w.NeedsSync(state.Behind)
 	detail.Cycle = f.Stack.InCycle(branch)
 	detail.Origin = f.OriginOf(branch)
 	pr, ok := worktree.PullRequestOf(f.PullRequests, branch)
@@ -129,7 +127,7 @@ func (f Facts) item(branch string) Item {
 	}
 	detail.Services = f.Services(w.Path)
 	cleans := f.Repository.Cleans(pr, w, f.Behind[branch])
-	detail.Condition = worktree.ConditionOf(worktree.ConditionParams{Missing: detail.Missing, Rebasing: detail.Rebasing, Merged: cleans, Dirty: detail.Dirty})
+	detail.Condition = worktree.ConditionOf(worktree.ConditionParams{Missing: detail.Missing, Operation: w.Operation(), Merged: cleans, Dirty: detail.Dirty})
 	detail.Actions = Actions(detail, cleans)
 
 	return Item{Subject: branch, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
@@ -168,15 +166,25 @@ func (f Facts) worktreeOf(branch string) worktree.Worktree {
 // ----------------------------------------------------------------------------
 // The actions
 
+// finishing names each operation git stops in the middle of as the action that sends a worktree to finish it says it.
+var finishing = map[worktree.Operation]string{
+	worktree.OperationRebase:     "rebase",
+	worktree.OperationBisect:     "bisect",
+	worktree.OperationMerge:      "merge",
+	worktree.OperationCherryPick: "cherry-pick",
+	worktree.OperationRevert:     "revert",
+	worktree.OperationApply:      "git am",
+}
+
 // commandSync is the command that rebases a worktree onto its parent, answered by the worktree.
 const commandSync = "sync"
 
-// Actions is what the worktree of detail needs next, the first that applies: a rebase in progress is finished in it, one its merged pull request cleans (worktree.Repository.Cleans) is cleaned, one behind its parent is synced onto it; none otherwise.
+// Actions is what the worktree of detail needs next, the first that applies: an operation git stopped in the middle of (a rebase, a bisect, a merge…) is finished in it, one its merged pull request cleans (worktree.Repository.Cleans) is cleaned, one behind its parent is synced onto it; none otherwise.
 func Actions(detail Detail, cleans bool) []domain.FollowUp {
 	var command, message string
 	switch {
-	case detail.Rebasing:
-		command, message = domain.CommandGo, "Go to the worktree to finish its rebase"
+	case detail.Condition.Operation() != "":
+		command, message = domain.CommandGo, "Go to the worktree to finish its "+finishing[detail.Condition.Operation()]
 	case cleans:
 		command, message = domain.CommandClean, "Clean the worktree: its pull request is merged"
 	case detail.NeedsSync:

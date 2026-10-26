@@ -21,7 +21,7 @@ mkdir -p "$out" && out=$(cd "$out" && pwd)
 repo=$(git rev-parse --show-toplevel)
 
 prepare() {
-  local root=$1 port=$((20000 + RANDOM % 9000))
+  local root=$1 port=$2
   WTM_DEMO_ROOT=$root WTM_DEMO_BIN=$legacy WTM_DEMO_WEB_PORT=$port WTM_DEMO_API_PORT=$((port + 1)) WTM_DEMO_PROXY_PORT=$((port + 2)) \
     "$repo/docs/demos/setup.sh" >/dev/null
   export HOME=$root/home
@@ -132,10 +132,12 @@ tty() {
   start() {
     tmux kill-session -t "$session" 2>/dev/null || true
     tmux new-session -d -s "$session" -x 100 -y 30 -c "$here" "zsh -f"
-    tmux send-keys -t "$session" "export HOME=$root/home PS1='$ ' && clear" Enter
+    tmux send-keys -t "$session" "export HOME=$root/home PATH=$root/bin:\$PATH PS1='$ ' && clear" Enter
     settle '$'
-    tmux send-keys -t "$session" "$bin list; echo EXIT=\$?" Enter
+    tmux send-keys -t "$session" "wtm list; echo EXIT=\$?" Enter
   }
+  # the side's binary is wtm on the shell's PATH: the line typed is the same on both sides, whatever the binary's path
+  ln -sf "$bin" "$root/bin/wtm"
   start
   # the picker is ready once the pull requests had their say: GitHub is not connected in a sandbox
   capture 1-worktrees 'gh auth login'
@@ -163,10 +165,11 @@ run_side() {
   # each run its own sandbox, as long as the others' paths, removed on exit
   root=$(mktemp -d /tmp/wtmXXXXX)
   roots+=("$root")
+  local port=$((20000 + RANDOM % 9000))
   dir_out=$out/$side
   rm -rf "$dir_out" && mkdir -p "$dir_out"
   (
-    prepare "$root"
+    prepare "$root" "$port"
     : >"$dir_out/unchanged.diff"
     scenario 01-text "$root/acme" list
     scenario 02-json "$root/acme" list --output json
@@ -202,7 +205,8 @@ run_side() {
   )
   sed -i '' -E \
     -e "s#(/private)?$root#<SB>#g" \
-    -e 's#"created_at": "[^"]*"#"created_at": "<T>"#g' \
+    -e 's#"(created_at|last_commit_at)": "[^"]*"#"\1": "<T>"#g' \
+    -e "s#:$((port + 2))([^0-9]|\$)#:<PROXY_PORT>\1#g" \
     -e 's#[0-9a-f]{40}#<SHA>#g' \
     -e "s#$bin#<BIN>#g" \
     -e 's#wtm-next list#wtm list#g' \

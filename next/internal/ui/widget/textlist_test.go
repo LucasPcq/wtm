@@ -3,6 +3,7 @@ package widget
 import (
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,4 +46,15 @@ func TestKeysTypedWhileAnEntryIsCheckedAreKeptInOrder(t *testing.T) {
 
 	assert.Equal(t, Done, settled(l, cmd))
 	assert.Equal(t, []string{"feat/a", "b"}, l.Entries())
+}
+
+func TestAnEntryTypedAtOnceThatSpellsAKeyIsTyped(t *testing.T) {
+	l := NewTextList(nil, func(EntryCheck) error { return nil }, func(string) string { return "" })
+
+	verdict, cmd := l.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("enter")})
+
+	assert.Equal(t, Stay, settled(l, cmd))
+	assert.Equal(t, Stay, verdict)
+	assert.Empty(t, l.Entries())
+	assert.Equal(t, "enter", l.input.Value())
 }

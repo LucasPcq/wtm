@@ -14,6 +14,32 @@ func TestAWorktreeIsOnTheBranchItHasCheckedOutOrIsRebasingOrBisecting(t *testing
 	assert.Empty(t, Worktree{State: Bare{}}.Branch())
 }
 
+func TestAWorktreeIsInTheMiddleOfItsRebaseItsBisectOrTheOperationGitStoppedIn(t *testing.T) {
+	assert.Equal(t, OperationRebase, Worktree{State: Rebasing{Branch: "feat/a"}}.Operation())
+	assert.Equal(t, OperationBisect, Worktree{State: Bisecting{Branch: "feat/a"}}.Operation())
+	assert.Equal(t, OperationCherryPick, Worktree{State: OnBranch{Branch: "feat/a"}, Midway: MidwayCherryPick}.Operation())
+	assert.Empty(t, Worktree{State: OnBranch{Branch: "feat/a"}}.Operation())
+	assert.Empty(t, Worktree{State: Detached{}}.Operation())
+	assert.Equal(t, OperationRebase, Worktree{State: Rebasing{Branch: "feat/a"}, Midway: MidwayMerge}.Operation(), "a rebase of merges writes MERGE_HEAD too: the rebase wins")
+}
+
+func TestAWorktreeBehindItsParentNeedsSyncUnlessGitStoppedInTheMiddleOfAnOperation(t *testing.T) {
+	behind, none := 2, 0
+	onBranch := Worktree{State: OnBranch{Branch: "feat/a"}}
+
+	assert.True(t, onBranch.NeedsSync(&behind))
+	assert.False(t, onBranch.NeedsSync(&none))
+	assert.False(t, onBranch.NeedsSync(nil))
+	for _, midway := range []Worktree{
+		{State: Rebasing{Branch: "feat/a"}},
+		{State: Bisecting{Branch: "feat/a"}},
+		{State: OnBranch{Branch: "feat/a"}, Midway: MidwayMerge},
+		{State: OnBranch{Branch: "feat/a"}, Midway: MidwayRevert},
+	} {
+		assert.False(t, midway.NeedsSync(&behind), midway.Operation())
+	}
+}
+
 func TestOnlyANewOrATrackingCheckoutCreatesItsBranch(t *testing.T) {
 	created, ok := CreatedBranch(NewBranch{Name: "topic", From: LocalBranch{Name: "main"}})
 	assert.True(t, ok)

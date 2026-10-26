@@ -11,7 +11,7 @@ $ wtmx extract; echo EXIT=$?
 ┃  Mode        move
 ┃  feat/moved  ../acme.trees/feat-moved · 3 ports settled (offset +180)
 ┃
-┃  → wtm go feat/moved
+┃  → wtm go feat/moved   jump in
 
 EXIT=0
 $

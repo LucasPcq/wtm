@@ -5,8 +5,10 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestANodeNeedsTheFirstActionThatApplies(t *testing.T) {
@@ -16,7 +18,7 @@ func TestANodeNeedsTheFirstActionThatApplies(t *testing.T) {
 		command string
 		code    string
 	}{
-		"rebasing_first":     {detail: tree.Detail{Branch: "feat/a", Rebasing: true, NeedsSync: true}, cleans: true, command: "go", code: "tree.go"},
+		"rebasing_first":     {detail: tree.Detail{Branch: "feat/a", Condition: worktree.ConditionRebasing, NeedsSync: true}, cleans: true, command: "go", code: "tree.go"},
 		"merged_before_sync": {detail: tree.Detail{Branch: "feat/a", NeedsSync: true}, cleans: true, command: "clean", code: "tree.clean"},
 		"needs_sync":         {detail: tree.Detail{Branch: "feat/a", NeedsSync: true}, command: "sync", code: "tree.sync"},
 		"nothing_due":        {detail: tree.Detail{Branch: "feat/a"}},
@@ -34,5 +36,15 @@ func TestANodeNeedsTheFirstActionThatApplies(t *testing.T) {
 			assert.Equal(t, c.code, actions[0].Code)
 			assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{c.detail.Branch}}}, actions[0].Answers)
 		})
+	}
+}
+
+func TestANodeGitStoppedInTheMiddleOfAnOperationIsSentToFinishIt(t *testing.T) {
+	for _, operation := range worktree.Operations() {
+		actions := tree.Actions(tree.Detail{Branch: "feat/a", Condition: worktree.Condition(operation), NeedsSync: true}, true)
+
+		require.Len(t, actions, 1, operation)
+		assert.Equal(t, "go", actions[0].Command, operation)
+		assert.NotRegexp(t, `its $`, actions[0].Message, operation)
 	}
 }

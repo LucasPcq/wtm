@@ -1,7 +1,13 @@
 // Package widget holds the inputs a form's wizard asks a step with: a select list, a multi-select, a text field, a text list, their styles.
 package widget
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"strings"
+	"unicode"
+	"unicode/utf8"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 // A Verdict is what a [Widget] makes of a message: the wizard keeps it, moves on, or goes back.
 type Verdict int
@@ -31,4 +37,22 @@ type Widget interface {
 	Update(msg tea.Msg) (Verdict, tea.Cmd)
 	View(size Size, st *Styles) string
 	Help() Help
+}
+
+// typedText returns the text key types, or pastes, its control characters dropped: a terminal hands several characters typed at once, or pasted, as one key.
+func typedText(key tea.KeyMsg) string {
+	if key.Alt || (key.Type != tea.KeyRunes && key.Type != tea.KeySpace) {
+		return ""
+	}
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, string(key.Runes))
+}
+
+func withoutLastRune(s string) string {
+	_, size := utf8.DecodeLastRuneInString(s)
+	return s[:len(s)-size]
 }

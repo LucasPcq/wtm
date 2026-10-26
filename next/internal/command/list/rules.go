@@ -49,7 +49,6 @@ type Detail struct {
 	Main         bool   `json:"main"`
 	Dirty        bool   `json:"dirty"`
 	Locked       bool   `json:"locked"`
-	Rebasing     bool   `json:"rebasing"`
 	Active       bool   `json:"active"`        // the caller stands in it, the deepest worktree holding its directory
 	Missing      bool   `json:"missing"`       // its directory is gone: git calls it prunable
 	CommitsAhead int    `json:"commits_ahead"` // the commits it has that the base branch lacks
@@ -57,7 +56,7 @@ type Detail struct {
 	// Ahead are the commits it has that its parent lacks, the base branch's for a root; Behind those of its parent it lacks, null for a root. Both null when not counted: the main worktree, a member of a cycle, a parent that is not a local branch.
 	Ahead        *int               `json:"ahead"`
 	Behind       *int               `json:"behind"`
-	NeedsSync    bool               `json:"needs_sync"`     // its parent has commits it lacks: a rebase is due
+	NeedsSync    bool               `json:"needs_sync"`     // its parent has commits it lacks and no rebase, bisect or merge is under way: a sync is due
 	Changes      *Changes           `json:"changes"`        // null when its directory is gone
 	CreatedAt    *time.Time         `json:"created_at"`     // from its meta record, null without one
 	LastCommitAt *time.Time         `json:"last_commit_at"` // when the commit its branch stands at was made, null on no branch
@@ -126,7 +125,6 @@ func (f Facts) item(w worktree.Worktree, active bool) Item {
 		return item
 	}
 
-	_, rebasing := w.State.(worktree.Rebasing)
 	parent, _ := f.Stack.Parent(w.Branch())
 	pr, hasPR := worktree.PullRequestOf(f.PullRequests, w.Branch())
 	detail := Detail{
@@ -135,14 +133,13 @@ func (f Facts) item(w worktree.Worktree, active bool) Item {
 		Main:         w.Main,
 		Dirty:        state.Dirty,
 		Locked:       w.Locked,
-		Rebasing:     rebasing,
 		Active:       active,
 		Missing:      state.Missing,
 		CommitsAhead: state.Ahead,
 		Parent:       parent,
 		Ahead:        state.ParentAhead,
 		Behind:       state.ParentBehind,
-		NeedsSync:    state.ParentBehind != nil && *state.ParentBehind > 0,
+		NeedsSync:    w.NeedsSync(state.ParentBehind),
 		Changes:      changesOf(state),
 		CreatedAt:    f.Records[w.Branch()].Created(),
 		LastCommitAt: f.lastCommit(w.Branch()),
@@ -152,14 +149,14 @@ func (f Facts) item(w worktree.Worktree, active bool) Item {
 		Services:     f.Services(w.Path),
 		URLs:         f.URLs(w.Path),
 	}
-	detail.Condition = conditionOf(detail)
+	detail.Condition = conditionOf(detail, w.Operation())
 	detail.Actions = Actions(detail)
 
 	return Item{Subject: w.Name(), Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(w.Branch())}
 }
 
-func conditionOf(detail Detail) worktree.Condition {
-	return worktree.ConditionOf(worktree.ConditionParams{Missing: detail.Missing, Rebasing: detail.Rebasing, Merged: detail.Merged, Dirty: detail.Dirty})
+func conditionOf(detail Detail, operation worktree.Operation) worktree.Condition {
+	return worktree.ConditionOf(worktree.ConditionParams{Missing: detail.Missing, Operation: operation, Merged: detail.Merged, Dirty: detail.Dirty})
 }
 
 // recordWarnings are the warnings of the record of branch when it exists but does not read, none otherwise.
@@ -304,7 +301,7 @@ func WithPullRequests(shown, from Outcome) Outcome {
 		}
 		detail := *item.Detail
 		detail.PR, detail.Merged = from.Items[at].Detail.PR, from.Items[at].Detail.Merged
-		detail.Condition = conditionOf(detail)
+		detail.Condition = conditionOf(detail, detail.Condition.Operation())
 		detail.Actions = Actions(detail)
 		merged.Items[i].Detail = &detail
 	}

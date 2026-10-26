@@ -52,12 +52,12 @@ func (t *Text) Update(msg tea.Msg) (Verdict, tea.Cmd) {
 		return Stay, nil
 	}
 
-	switch key.String() {
-	case "enter":
+	switch key.Type {
+	case tea.KeyEnter:
 		t.checking = true
 		check, value := t.check, t.Value()
 		return Stay, func() tea.Msg { return textChecked{err: check(value)} }
-	case "esc":
+	case tea.KeyEsc:
 		return Back, nil
 	}
 

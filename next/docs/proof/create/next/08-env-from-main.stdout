@@ -7,5 +7,5 @@
   Isolation  isolated
   feat/env   ../acme.trees/feat-env · 3 ports settled (offset +80)
 
-  → wtm go feat/env
+  → wtm go feat/env   jump in
 

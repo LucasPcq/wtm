@@ -10,6 +10,6 @@
   ! fast-forward ignored: topic already exists, so nothing is created
   ! isolation verbatim ignored: topic already exists and stays isolated
 
-  → wtm go topic
+  → wtm go topic                         jump in
   → wtm env topic --isolation verbatim   switch it to verbatim
 

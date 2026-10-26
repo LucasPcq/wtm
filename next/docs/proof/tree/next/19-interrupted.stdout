@@ -4,7 +4,7 @@
   │  └─ feat/a-ui          ↑2
   │     └─ feat/a-ui-form  ! needs sync
   ├─ feat/b                ↑1  ! locked  ! needs sync
-  ├─ feat/r                ↑1  ! rebasing  ! needs sync
+  ├─ feat/r                ↑1  ! rebasing
   └─ feat/gone             ✗ missing  ! locked
   cyc-1                    ! cycle
   cyc-2                    ! cycle

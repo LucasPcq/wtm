@@ -11,7 +11,6 @@
         "path": "<SB>/acme.trees/feat-a",
         "main": false,
         "locked": false,
-        "rebasing": false,
         "missing": false,
         "created_at": "<T>",
         "parent": "main",
@@ -110,7 +109,26 @@
             }
           ]
         },
-        "problems": []
+        "problems": [
+          {
+            "code": "status.behind",
+            "message": "main has 2 commits it lacks",
+            "fix": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "status.behind",
+              "message": "sync it onto main"
+            }
+          }
+        ],
+        "condition": "changed"
       }
     }
   ],

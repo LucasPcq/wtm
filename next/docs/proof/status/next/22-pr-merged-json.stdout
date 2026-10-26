@@ -11,7 +11,6 @@
         "path": "<SB>/acme.trees/feat-b",
         "main": false,
         "locked": false,
-        "rebasing": false,
         "missing": false,
         "created_at": "<T>",
         "parent": "main",
@@ -104,7 +103,24 @@
                 }
               ],
               "code": "status.merged",
-              "message": ""
+              "message": "clean it up"
+            }
+          },
+          {
+            "code": "status.behind",
+            "message": "main has 2 commits it lacks",
+            "fix": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "status.behind",
+              "message": "sync it onto main"
             }
           },
           {
@@ -121,10 +137,11 @@
                 }
               ],
               "code": "status.env_missing",
-              "message": ""
+              "message": "rebuild it"
             }
           }
-        ]
+        ],
+        "condition": "merged"
       }
     }
   ],

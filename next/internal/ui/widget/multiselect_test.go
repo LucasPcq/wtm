@@ -3,6 +3,8 @@ package widget
 import (
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -64,4 +66,23 @@ func TestTheViewScrollsToTheCursor(t *testing.T) {
 	pressed(m, "down", "down")
 
 	assert.Equal(t, "   [ ] b.txt                 untracked\n▌› [ ] notes.md", plain(m.View(Size{Width: 40, Height: 2}, plainStyles())))
+}
+
+func TestTextPastedInTheFilterNarrowsWhatAPicks(t *testing.T) {
+	m := NewMultiSelect(picks(), "")
+
+	pressed(m, "/")
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("txt"), Paste: true})
+	pressed(m, "esc", "a")
+
+	assert.Equal(t, []string{"a.txt", "b.txt"}, m.Values())
+}
+
+func TestASlashTypedAtOnceWithTextFiltersWhatAPicks(t *testing.T) {
+	m := NewMultiSelect(picks(), "")
+
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/txt")})
+	pressed(m, "esc", "a")
+
+	assert.Equal(t, []string{"a.txt", "b.txt"}, m.Values())
 }

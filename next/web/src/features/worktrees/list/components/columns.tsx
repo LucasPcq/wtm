@@ -95,7 +95,7 @@ export const columns: Column[] = [
     id: 'state',
     header: 'State',
     size: 176,
-    meta: { group: 'Git', hint: 'clean, changed, rebasing, missing' },
+    meta: { group: 'Git', hint: 'clean, changed, missing, or what git stopped midway' },
     cell: read(({ condition, pr }, detail) => {
       if (!condition) return none
 

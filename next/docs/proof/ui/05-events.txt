@@ -1,10 +1,8 @@
 # the stream of A; a commit in A's feat/x worktree, then a create from the command line
-$ git -C $SB/.trees/feat-x -c user.name=x -c user.email=x@x commit -q --allow-empty -m x; date +%T
-23:17:57
+$ git -C $SB/.trees/feat-x -c user.name=x -c user.email=x@x commit -q --allow-empty -m x
 
-$ date +%T; grep worktree.changed "$out/.events"
-23:18:01
-data: {"v":2,"type":"worktree.changed","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"worktree":{"branch":"feat/x","path":"<SB>/.trees/feat-x","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:31Z"},"changed":["head"]}
+$ grep worktree.changed "$out/.events"
+data: {"v":2,"type":"worktree.changed","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"worktree":{"branch":"feat/x","path":"<SB>/.trees/feat-x","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"},"changed":["head"]}
 
 $ cd $SB/A && wtm-next create feat/y --yes
 
@@ -19,20 +17,20 @@ $ cd $SB/A && wtm-next create feat/y --yes
 
 
 $ cat "$out/.events"
-data: {"v":2,"type":"snapshot","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"worktrees":[{"branch":"main","path":"<SB>/A","parent":"","ordinal":0,"isolation":"isolated","is_main":true,"created_at":""},{"branch":"feat/x","path":"<SB>/.trees/feat-x","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:31Z"},{"branch":"slow/a","path":"<SB>/.trees/slow-a","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:32Z"},{"branch":"slow/b","path":"<SB>/.trees/slow-b","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:34Z"},{"branch":"slow/c","path":"<SB>/.trees/slow-c","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:36Z"}]}
+data: {"v":2,"type":"snapshot","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"worktrees":[{"branch":"main","path":"<SB>/A","parent":"","ordinal":0,"isolation":"isolated","is_main":true,"created_at":""},{"branch":"feat/x","path":"<SB>/.trees/feat-x","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"},{"branch":"slow/a","path":"<SB>/.trees/slow-a","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"},{"branch":"slow/b","path":"<SB>/.trees/slow-b","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"},{"branch":"slow/c","path":"<SB>/.trees/slow-c","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"}]}
 
 data: {"v":2,"type":"ready","ts":"<T>"}
 
-data: {"v":2,"type":"worktree.changed","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"worktree":{"branch":"feat/x","path":"<SB>/.trees/feat-x","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:17:31Z"},"changed":["head"]}
+data: {"v":2,"type":"worktree.changed","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"worktree":{"branch":"feat/x","path":"<SB>/.trees/feat-x","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"},"changed":["head"]}
 
-data: {"v":2,"type":"operation.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"op_id":"a8bbd4ad7ef44229","command":"create","surface":"cli"}
+data: {"v":2,"type":"operation.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"op_id":"<OP12>","command":"create","surface":"cli"}
 
-data: {"v":2,"type":"worktree.created","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"op_id":"a8bbd4ad7ef44229","worktree":{"branch":"feat/y","path":"<SB>/.trees/feat-y","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:18:01Z"}}
+data: {"v":2,"type":"worktree.created","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"op_id":"<OP12>","worktree":{"branch":"feat/y","path":"<SB>/.trees/feat-y","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"}}
 
-data: {"v":2,"type":"worktree.provisioned","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"op_id":"a8bbd4ad7ef44229","worktree":{"branch":"feat/y","path":"<SB>/.trees/feat-y","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"2026-10-24T21:18:01Z"},"ok":true}
+data: {"v":2,"type":"worktree.provisioned","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"op_id":"<OP12>","worktree":{"branch":"feat/y","path":"<SB>/.trees/feat-y","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"},"ok":true}
 
-data: {"v":2,"type":"unit.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"op_id":"a8bbd4ad7ef44229","subject":"feat/y","status":"done"}
+data: {"v":2,"type":"unit.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"op_id":"<OP12>","subject":"feat/y","status":"done"}
 
-data: {"v":2,"type":"operation.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"op_id":"a8bbd4ad7ef44229","command":"create","surface":"cli","ok":true}
+data: {"v":2,"type":"operation.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"op_id":"<OP12>","command":"create","surface":"cli","ok":true}
 
 

@@ -77,7 +77,7 @@ func TestALockedARebasingAndADetachedWorktreeAreSaidSo(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, detailOf(t, read, "locked").Locked)
-	assert.True(t, detailOf(t, read, "rebasing").Rebasing)
+	assert.Equal(t, worktree.ConditionRebasing, detailOf(t, read, "rebasing").Condition)
 	detached := detailOf(t, read, "/repo/.trees/detached")
 	assert.Empty(t, detached.Branch, "a worktree on no branch is named by its path")
 	assert.Zero(t, detached.CommitsAhead)
@@ -375,6 +375,35 @@ func TestARefreshFetchesOriginOnce(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, fetches)
+}
+
+func TestAWorktreeGitStoppedInTheMiddleOfAnOperationNeedsNoSyncAndSaysWhich(t *testing.T) {
+	for name, ui := range map[string]worktree.Worktree{
+		"rebasing":  {Path: "/repo/.trees/feat/a-ui", State: worktree.Rebasing{Branch: "feat/a-ui"}},
+		"bisecting": {Path: "/repo/.trees/feat/a-ui", State: worktree.Bisecting{Branch: "feat/a-ui"}},
+		"merging":   {Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Midway: worktree.MidwayMerge},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(seed{
+				Git: gittest.FakeParams{
+					Worktrees: []worktree.Worktree{linked("feat/a"), ui},
+					Commits: map[worktree.Ref][]string{
+						worktree.LocalBranch{Name: "feat/a"}:    {"a1", "a2"},
+						worktree.LocalBranch{Name: "feat/a-ui"}: {"a1", "u1"},
+					},
+				},
+				Meta: map[string]worktree.Meta{"feat/a": {SourceBranch: "main"}, "feat/a-ui": {SourceBranch: "feat/a"}},
+			})
+
+			read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+			require.NoError(t, err)
+			detail := detailOf(t, read, "feat/a-ui")
+			assert.Equal(t, ptr(1), detail.Behind, "the commits it lacks are still counted")
+			assert.False(t, detail.NeedsSync)
+			assert.Equal(t, worktree.Condition(name), detail.Condition)
+		})
+	}
 }
 
 func TestAStackedWorktreeIsCountedAgainstItsParentAndARootAgainstTheBase(t *testing.T) {

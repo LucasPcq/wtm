@@ -1,6 +1,6 @@
-$ <BIN> status; echo EXIT=$?
+$ wtm status; echo EXIT=$?
 
-┃  = feat/a — nothing to fix
+┃  ! feat/a — 1 problem
 ┃
 ┃  path         <SB>/acme.trees/feat-a
 ┃  isolation    isolated
@@ -16,6 +16,9 @@ $ <BIN> status; echo EXIT=$?
 ┃  JOBS
 ┃  web  stopped  port 23470
 ┃  api  stopped  port 23471
+┃
+┃  ! main has 2 commits it lacks
+┃  → wtm sync feat/a   sync it onto main
 
 EXIT=0
 $

@@ -18,7 +18,6 @@
         "needs_sync": false,
         "dirty": false,
         "locked": false,
-        "rebasing": false,
         "missing": false,
         "condition": "clean",
         "cycle": false,

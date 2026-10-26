@@ -98,7 +98,7 @@ func TestWithNoWorktreeNamedTheOneHoldingTheDirectoryIsReadElseTheMainOne(t *tes
 			assert.Equal(t, c.read, got.Items[0].Subject)
 		})
 	}
-	assert.True(t, only(t, read(t, w, status.Request{Caller: domain.Caller{Cwd: "/repo/.trees/rebasing"}})).Rebasing, "a worktree mid-rebase is read on its branch, never refused as detached")
+	assert.True(t, only(t, read(t, w, status.Request{Caller: domain.Caller{Cwd: "/repo/.trees/rebasing"}})).Condition == worktree.ConditionRebasing, "a worktree mid-rebase is read on its branch, never refused as detached")
 }
 
 func TestAWorktreeIsNamedByItsBranchItsPathOrAPartOfItsBranch(t *testing.T) {
@@ -569,21 +569,27 @@ func TestAReadCancelledReportsItsWorktreeInterruptedAndWhatDidNotReadIsSaid(t *t
 	assert.Contains(t, half.Items[0].Warnings[0].Message, "its commits: no commit yet")
 }
 
-func TestAWorktreeBehindItsParentIsToldToSyncOntoIt(t *testing.T) {
+func TestAWorktreeBehindItsParentIsToldToSyncOntoItUnlessGitStoppedInTheMiddleOfAnOperation(t *testing.T) {
+	childOfA := map[string]worktree.Meta{"feat/a": {SourceBranch: "main"}, "feat/a-ui": {SourceBranch: "feat/a"}}
 	cases := map[string]struct {
 		meta  map[string]worktree.Meta
+		ui    worktree.Worktree
 		want  []string
 		lacks string
 	}{
-		"child_of_a_worktree": {meta: map[string]worktree.Meta{"feat/a": {SourceBranch: "main"}, "feat/a-ui": {SourceBranch: "feat/a"}}, want: []string{status.CodeBehind}, lacks: "feat/a has 2 commits it lacks"},
-		"root":                {want: []string{}},
-		"in_step":             {meta: map[string]worktree.Meta{"feat/a-ui": {SourceBranch: "feat/a-ui-base"}}, want: []string{}},
+		"child_of_a_worktree": {meta: childOfA, ui: linked("feat/a-ui"), want: []string{status.CodeBehind}, lacks: "feat/a has 2 commits it lacks"},
+		"root":                {ui: linked("feat/a-ui"), want: []string{}},
+		"in_step":             {meta: map[string]worktree.Meta{"feat/a-ui": {SourceBranch: "feat/a-ui-base"}}, ui: linked("feat/a-ui"), want: []string{}},
+		"rebasing":            {meta: childOfA, ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Rebasing{Branch: "feat/a-ui"}}, want: []string{}},
+		"bisecting":           {meta: childOfA, ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Bisecting{Branch: "feat/a-ui"}}, want: []string{}},
+		"merging":             {meta: childOfA, ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Midway: worktree.MidwayMerge}, want: []string{}},
+		"reverting":           {meta: childOfA, ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Midway: worktree.MidwayRevert}, want: []string{}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			w := newWorld(seed{
 				Git: gittest.FakeParams{
-					Worktrees: []worktree.Worktree{linked("feat/a"), linked("feat/a-ui")},
+					Worktrees: []worktree.Worktree{linked("feat/a"), c.ui},
 					Local:     []string{"feat/a-ui-base"},
 					Commits: map[worktree.Ref][]string{
 						worktree.LocalBranch{Name: "feat/a"}:         {"a1", "a2"},
@@ -613,9 +619,13 @@ func TestEachWorktreeCarriesItsConditionTheFirstThatApplies(t *testing.T) {
 	merged := linked("feat/merged")
 	w := newWorld(seed{
 		Git: gittest.FakeParams{
-			Worktrees: []worktree.Worktree{linked("feat/clean"), linked("feat/changed"), merged, linked("feat/gone")},
-			Changes:   map[string][]worktree.Change{"/repo/.trees/feat/changed": {{Path: "a.go", Status: worktree.ChangeUntracked}}, merged.Path: {{Path: "b.go", Status: worktree.ChangeUntracked}}},
-			Gone:      []string{"/repo/.trees/feat/gone"},
+			Worktrees: []worktree.Worktree{
+				linked("feat/clean"), linked("feat/changed"), merged, linked("feat/gone"),
+				{Path: "/repo/.trees/feat/bisect", State: worktree.Bisecting{Branch: "feat/bisect"}},
+				{Path: "/repo/.trees/feat/merging", State: worktree.OnBranch{Branch: "feat/merging"}, Midway: worktree.MidwayMerge},
+			},
+			Changes: map[string][]worktree.Change{"/repo/.trees/feat/changed": {{Path: "a.go", Status: worktree.ChangeUntracked}}, merged.Path: {{Path: "b.go", Status: worktree.ChangeUntracked}}},
+			Gone:    []string{"/repo/.trees/feat/gone"},
 		},
 		PRs: []worktree.PullRequest{{Number: 1, Branch: "feat/merged", Head: gittest.Root, State: worktree.PullRequestMerged}},
 	})
@@ -627,6 +637,8 @@ func TestEachWorktreeCarriesItsConditionTheFirstThatApplies(t *testing.T) {
 		"feat/changed": worktree.ConditionChanged,
 		"feat/merged":  worktree.ConditionMerged,
 		"feat/gone":    worktree.ConditionMissing,
+		"feat/bisect":  worktree.ConditionBisecting,
+		"feat/merging": worktree.ConditionMerging,
 	} {
 		assert.Equal(t, want, detailOf(t, got, branch).Condition, branch)
 	}

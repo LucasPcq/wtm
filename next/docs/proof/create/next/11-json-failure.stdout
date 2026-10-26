@@ -11,7 +11,7 @@
       "error": {
         "kind": "internal",
         "code": "unit.phase_failed",
-        "message": "on_create failed: hook failed: exit status 3",
+        "message": "on_create failed: exit status 3",
         "params": {
           "phase": "on_create"
         }
@@ -94,12 +94,23 @@
       {
         "branch": "feat/bad-json",
         "path": "<SB>/acme.trees/feat-bad-json",
-        "action": "create"
+        "action": "create",
+        "phases": [
+          "worktree",
+          "env",
+          "meta",
+          "ordinal",
+          "ports",
+          "on_create"
+        ]
       }
     ],
     "from": "main",
     "env_from": "example",
     "isolation": "isolated",
+    "on_create": [
+      "case {{branch}} in feat/bad*) echo failing; exit 3;; feat/slow*) trap \"sleep 2\" INT; sleep 30;; *) echo set up {{branch}};; esac"
+    ],
     "creates": 1,
     "recap": [
       {
@@ -160,14 +171,14 @@
         }
       ],
       "code": "create.go",
-      "message": ""
+      "message": "jump in"
     }
   ],
   "warnings": [],
   "error": {
     "kind": "internal",
     "code": "unit.phase_failed",
-    "message": "on_create failed: hook failed: exit status 3",
+    "message": "on_create failed: exit status 3",
     "params": {
       "phase": "on_create"
     }

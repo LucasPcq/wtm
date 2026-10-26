@@ -61,7 +61,7 @@ test("a worktree GitHub says is merged shows GitHub's read first, as the one rul
 })
 
 test('a rebase under way stays first, whatever GitHub says of the pull request', async () => {
-  serveStatus({ condition: 'rebasing', rebasing: true, problems: [] }, { condition: 'merged', problems: [merged] })
+  serveStatus({ condition: 'rebasing', problems: [] }, { condition: 'merged', problems: [merged] })
 
   const { detail } = await openDetail('feat/billing')
 

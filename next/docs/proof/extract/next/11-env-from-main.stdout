@@ -9,5 +9,5 @@
   Mode           move
   feat/env-main  ../acme.trees/feat-env-main · 3 ports settled (offset +80)
 
-  → wtm go feat/env-main
+  → wtm go feat/env-main   jump in
 

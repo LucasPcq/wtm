@@ -20,7 +20,6 @@
         "path": "<SB>/acme.trees/feat-a",
         "main": false,
         "locked": false,
-        "rebasing": false,
         "missing": false,
         "created_at": null,
         "parent": "",
@@ -117,7 +116,8 @@
             }
           ]
         },
-        "problems": []
+        "problems": [],
+        "condition": "changed"
       }
     }
   ],

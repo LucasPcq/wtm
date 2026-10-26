@@ -12,7 +12,7 @@ $ wtmx create feat/slow --yes; echo EXIT=$?
 ┃
 ┃  ! feat/slow  interrupted · left incomplete
 ┃
-┃  → wtm go feat/slow
+┃  → wtm go feat/slow   jump in
 
 EXIT=19
 $

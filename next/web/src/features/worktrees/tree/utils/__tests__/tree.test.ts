@@ -20,7 +20,7 @@ test('each node sits under its parent, a node whose parent is not in the read is
 test('a worktree GitHub says is merged shows merged and its clean, unless the live read says more urgent', () => {
   const live = read([
     node('feat/a', null, { actions: [action('sync', 'feat/a')] }),
-    node('feat/b', null, { condition: 'rebasing', rebasing: true, actions: [action('go', 'feat/b')] }),
+    node('feat/b', null, { condition: 'rebasing', actions: [action('go', 'feat/b')] }),
     node('feat/c', null),
   ])
   const github = read([

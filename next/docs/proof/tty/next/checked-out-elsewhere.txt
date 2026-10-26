@@ -2,7 +2,7 @@ $ wtmx create --ask; echo EXIT=$?
 
   Step 1/7 • Branches
 
-  The branches to create a worktree for; one that already exists is checked out as it is
+  One per line; a branch that exists is checked out as it is
 
 › feat/form
 
