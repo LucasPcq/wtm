@@ -1,9 +1,8 @@
 
-  ! fast-forward: 2 done · 8 unchanged · 4 skipped
+  ! fast-forward: 10 unchanged · 4 skipped
 
-  Fast-forward  feat/all (1 commit), feat/dry (1 commit)
-  Up to date    main, feat/ahead (ahead of origin), feat/behind, feat/dirty, feat/fp, feat/json, feat/quiet, feat/uptodate
-  Left as is    feat/clash (uncommitted changes), feat/diverged (diverged from origin), feat/noremote (not on origin), feat/rebasing (an operation is under way)
+  Up to date  main, feat/ahead (ahead of origin), feat/all, feat/behind, feat/dirty, feat/dry, feat/fp, feat/json, feat/quiet, feat/uptodate
+  Left as is  feat/clash (uncommitted changes), feat/diverged (diverged from origin), feat/noremote (not on origin), feat/rebasing (an operation is under way)
 
   ! feat/diverged has diverged from origin (1 ahead, 1 behind): left as it is
   ! origin has no branch feat/noremote: nothing to fast-forward it to

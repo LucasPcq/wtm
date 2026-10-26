@@ -134,14 +134,15 @@ run_side() {
     scenario 13-json fast-forward feat/json --yes --output json
     scenario 14-json-without-yes fast-forward feat/json --output json
     scenario 15-json-refused fast-forward feat/clash --yes --output json
-    scenario 16-no-worktree-named fast-forward
-    scenario 17-quiet -q fast-forward feat/quiet --yes
-    scenario 18-alias ff feat/dry --yes --dry-run
+    scenario 16-quiet -q fast-forward feat/quiet --yes
+    scenario 17-alias ff feat/dry --yes --dry-run
     # next only: legacy has no dry run nor fingerprint
-    scenario 19-json-dry-run fast-forward feat/fp --dry-run --output json
-    fp=$(sed -n 's/.*"fingerprint": "\([0-9a-f]*\)".*/\1/p' "$dir/19-json-dry-run.stdout")
-    scenario 20-expect-fingerprint fast-forward feat/fp --expect-fingerprint "${fp:-none}" --yes
-    scenario 21-stale-fingerprint fast-forward feat/dry --expect-fingerprint 0123456789abcdef01234567 --yes
+    scenario 18-json-dry-run fast-forward feat/fp --dry-run --output json
+    fp=$(sed -n 's/.*"fingerprint": "\([0-9a-f]*\)".*/\1/p' "$dir/18-json-dry-run.stdout")
+    scenario 19-expect-fingerprint fast-forward feat/fp --expect-fingerprint "${fp:-none}" --yes
+    scenario 20-stale-fingerprint fast-forward feat/dry --expect-fingerprint 0123456789abcdef01234567 --yes
+    # next moves what is behind: run late, so the scenarios before it keep their worktrees behind
+    scenario 21-no-worktree-named fast-forward
     scenario 22-all fast-forward --all --yes
   )
   sed -i '' -E \

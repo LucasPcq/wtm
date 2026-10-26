@@ -25,16 +25,7 @@ func newForm(open func(ctx context.Context, dir string) (fastforward.UseCase, er
 		ApplyLabel: applyLabel,
 		Special:    special,
 		Skipped:    skipped,
-		Unattended: unattended,
 	}
-}
-
-// unattended refuses a run without the wizard that names no worktree and does not ask for every one: the worktrees the wizard picks by default are its to confirm, never an unattended answer.
-func unattended(req fastforward.Request) error {
-	if len(req.Worktrees) > 0 || req.All {
-		return nil
-	}
-	return domain.Invalid([]domain.FieldError{{Path: domain.PathWorktree, Code: domain.CodeRequired, Template: "{path} is required, or --all"}})
 }
 
 // applyLabel names the apply of the plan previewed by the worktrees it moves.

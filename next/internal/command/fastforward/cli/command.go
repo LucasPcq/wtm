@@ -17,13 +17,14 @@ const (
 	fastForwardLong  = "Bring each worktree's branch up to its branch on origin, never merging: origin is fetched once,\n" +
 		"then each worktree behind it moves in turn. A failure does not stop the others.\n" +
 		"Without arguments, the wizard asks which worktrees to fast-forward, those behind origin\n" +
-		"checked. A worktree is named by its branch or its path.\n" +
+		"checked; unattended, those behind origin are fast-forwarded. A worktree is named by its\n" +
+		"branch or its path; --all asks for every worktree.\n" +
 		"\n" +
 		"A worktree ahead of origin, diverged from it, not on origin, in the middle of a rebase, a\n" +
 		"bisect or a merge, or whose directory is gone is left as it is, with what moves it on.\n" +
 		"\n" +
 		"A worktree behind origin with uncommitted changes is unsafe: named, it refuses the whole run\n" +
-		"before anything moves, unless --force; with --all, it is left as it is, with the line that\n" +
+		"before anything moves, unless --force; not named, it is kept as it is, with the line that\n" +
 		"forces it. --force lifts that refusal only: it still asks to confirm, unless --yes."
 	fastForwardExample = `  # Pick the worktrees to fast-forward
   wtm fast-forward
@@ -40,7 +41,7 @@ const (
   # For a script or an agent, with the v2 JSON envelope
   wtm fast-forward --all --yes --output json`
 
-	yesUsage = "Run unattended: no question, no confirmation (worktrees or --all required; a worktree named with uncommitted changes still refuses the run unless --force)"
+	yesUsage = "Run unattended: no question, no confirmation (without worktrees, those behind origin; a worktree named with uncommitted changes still refuses the run unless --force)"
 )
 
 type fastForwardCommand struct {

@@ -2,13 +2,14 @@
   Bring each worktree's branch up to its branch on origin, never merging: origin is fetched once,
   then each worktree behind it moves in turn. A failure does not stop the others.
   Without arguments, the wizard asks which worktrees to fast-forward, those behind origin
-  checked. A worktree is named by its branch or its path.
+  checked; unattended, those behind origin are fast-forwarded. A worktree is named by its
+  branch or its path; --all asks for every worktree.
 
   A worktree ahead of origin, diverged from it, not on origin, in the middle of a rebase, a
   bisect or a merge, or whose directory is gone is left as it is, with what moves it on.
 
   A worktree behind origin with uncommitted changes is unsafe: named, it refuses the whole run
-  before anything moves, unless --force; with --all, it is left as it is, with the line that
+  before anything moves, unless --force; not named, it is kept as it is, with the line that
   forces it. --force lifts that refusal only: it still asks to confirm, unless --yes.
 
   Usage:
@@ -41,7 +42,7 @@
         --force                       Fast-forward a worktree that has uncommitted changes
     -h, --help                        help for fast-forward
         --output string               Output format: text or json (default "text")
-    -y, --yes                         Run unattended: no question, no confirmation (worktrees or --all required; a worktree named with uncommitted changes still refuses the run unless --force)
+    -y, --yes                         Run unattended: no question, no confirmation (without worktrees, those behind origin; a worktree named with uncommitted changes still refuses the run unless --force)
 
   Global Flags:
     -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
