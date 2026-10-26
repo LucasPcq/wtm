@@ -479,6 +479,20 @@ func TestJobsUpRefuseTheRemovalUntilForcedThenAreNamed(t *testing.T) {
 	assert.Equal(t, []string{"clean.jobs_left"}, codes(warnings))
 }
 
+func TestAForcedWorktreeGitFailsToRemoveIsNotSaidRemovedWithItsJobs(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.usecase.Git = failingRemove{w.repo, w.at(plain)}
+	w.usecase.Jobs = func(context.Context) ([]run.Job, error) {
+		return []run.Job{{Name: "web", WorkDir: w.at(plain), Up: true}}, nil
+	}
+
+	outcome, err := w.usecase.Run(t.Context(), clean.Request{Worktrees: []string{plain}, Force: true}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusFailed, outcome.Result.Items[0].Status)
+	assert.NotContains(t, codes(outcome.Warnings), "clean.jobs_left")
+}
+
 func TestJobsTheDaemonCannotTellAreWarnedOfAndRefuseNothing(t *testing.T) {
 	w := newWorld(t, seed{JobErr: run.ErrUnknown})
 

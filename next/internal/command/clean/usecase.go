@@ -95,7 +95,7 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 	op.Finished(result.Failure())
 
 	outcome.Result = &result
-	outcome.Warnings = op.Warnings(append(outcome.Warnings, result.Warnings...))
+	outcome.Warnings = op.Warnings(append(ofRemoved(outcome.Warnings, result.Items), result.Warnings...))
 	return outcome, nil
 }
 

@@ -359,6 +359,14 @@ func (f Facts) warnings(planned Plan) []domain.Warning {
 	return warnings
 }
 
+// ofRemoved keeps, once the apply ran, the plan's warnings about a worktree only for those that went: one git failed to remove still has its jobs and its data where they were.
+func ofRemoved(warnings []domain.Warning, items []Item) []domain.Warning {
+	return slices.DeleteFunc(slices.Clone(warnings), func(warning domain.Warning) bool {
+		worktree, about := warning.Params["worktree"]
+		return about && !removedIn(items, worktree)
+	})
+}
+
 // ----------------------------------------------------------------------------
 // The plan
 
