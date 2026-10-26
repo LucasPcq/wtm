@@ -37,7 +37,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/registry"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
-	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
 const opIDBytes = 8
@@ -186,18 +185,15 @@ func proxyStatus() domain.FollowUp {
 	return domain.FollowUp{Command: "run proxy status"}
 }
 
-// commandLine spells a follow-up as the command line runs it: one naming a migrated command another command gives from that command's schema (migrated); go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
+// commandLine spells a follow-up as the command line runs it: one naming a migrated command another command gives (clean) from that command's schema; go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
 func commandLine(followUp domain.FollowUp) []string {
-	if line, ok := migrated[followUp.Command]; ok {
-		return line(followUp)
+	if followUp.Command == clean.Name {
+		return cleancli.Line(followUp)
 	}
 
 	argv, _ := spelled(followUp)
 	return argv
 }
-
-// migrated spells the follow-ups that name a command of wtm-next another command gives, each from its own schema.
-var migrated = map[string]output.CommandLine{clean.Name: cleancli.Line}
 
 // spelled is followUp's command line and what of it could not be spelled, which a test requires nothing of: an answer's path, or url for a follow-up with neither a command nor a pull request to open. The worktree is positional, the other answers and a dry run are flags.
 func spelled(followUp domain.FollowUp) (argv, unspelled []string) {

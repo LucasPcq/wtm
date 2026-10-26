@@ -2,6 +2,7 @@
 package clean
 
 import (
+	"cmp"
 	"context"
 	"path/filepath"
 	"slices"
@@ -94,7 +95,6 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 	op.Finished(result.Failure())
 
 	outcome.Result = &result
-	outcome.Plan = plan.applied()
 	outcome.Warnings = op.Warnings(append(outcome.Warnings, result.Warnings...))
 	return outcome, nil
 }
@@ -122,7 +122,7 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // ----------------------------------------------------------------------------
 // Apply
 
-// Apply carries out the plan, reporting each step: it removes each worktree in turn, a failure stopping none of the others, reports each name that is no worktree as already absent, then reparents the children of the worktrees removed, or warns of each one left orphaned; it ends on the step out of a worktree removed under the caller's feet. Once ctx is cancelled, the worktrees not yet started are skipped.
+// Apply carries out the plan, reporting each step: it removes each worktree in turn, a failure stopping none of the others, reports each name that is no worktree as already absent, then reparents the children of the worktrees removed onto the nearest one that stayed, or warns of each one left orphaned; it ends on the step out of a worktree removed under the caller's feet. Once ctx is cancelled, the worktrees not yet started are skipped.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	items := make([]Item, 0, len(plan.Worktrees)+len(plan.Absent))
 	for _, removal := range plan.Worktrees {
@@ -132,12 +132,15 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 		items = append(items, Item{Subject: name, Status: domain.StatusDone, Reason: domain.ReasonUnchanged})
 	}
 
-	moves := slices.DeleteFunc(slices.Clone(plan.Moves), func(move Move) bool { return !removedIn(items, move.From) })
-	if !plan.ReparentChildren {
-		return Result{Items: items, Warnings: orphaned(moves), FollowUps: plan.next(items)}
+	// The moves are decided again on what went: a worktree that failed to go is a parent that stays.
+	went := slices.DeleteFunc(slices.Clone(plan.Worktrees), func(r Removal) bool { return !removedIn(items, r.Worktree) })
+	moves := plan.facts.moves(went)
+	warnings := orphaned(moves)
+	if plan.ReparentChildren {
+		warnings = u.reparent(ctx, plan, moves, report)
 	}
 
-	return Result{Items: items, Warnings: u.reparent(ctx, plan, moves, report), FollowUps: plan.next(items)}
+	return Result{Items: items, Warnings: warnings, FollowUps: plan.next(items)}
 }
 
 // ----------------------------------------------------------------------------
@@ -156,7 +159,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 // ----------------------------------------------------------------------------
 // Observe
 
-// Observe reads what clean decides from: the project's config, the repository's snapshot, the meta record of each worktree, and, for each worktree req asks, what makes it unsafe to remove: its uncommitted changes, the commits no other branch holds, its open pull request (the forge asked only of the branches origin has) and its jobs up, the forge and the run daemon asked while git reads. A repository with no wtm config is refused with CodeConfigNotFound.
+// Observe reads what clean decides from: the project's config, the repository's snapshot, the meta record of each worktree and of each branch asked no worktree holds, and, for each worktree req asks, what makes it unsafe to remove: its uncommitted changes, the commits no other branch holds, its open pull request (the forge asked only of the branches origin has) and its jobs up, the forge and the run daemon asked while git reads. A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	repo, err := u.Repository.Observe(ctx, Name)
 	if err != nil {
@@ -167,14 +170,18 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	if facts.Located, err = u.locate(ctx, facts, req); err != nil {
 		return Facts{}, err
 	}
-	for _, w := range repo.Worktrees {
+	cwd, err := repository.Located(ctx, u.Git, req.Caller.Cwd, domain.Caller{})
+	if err != nil {
+		return Facts{}, err
+	}
+	facts.Cwd = cmp.Or(cwd, req.Caller.Cwd)
+	asked := facts.asked(req.Worktrees)
+	for _, w := range append(slices.Clone(repo.Worktrees), asked...) {
 		// A record that cannot be read is no parent to its children and no data kept: the worktree is removed all the same.
 		if record, err := u.Meta.Load(w.Branch()); w.Branch() != "" && err == nil {
 			facts.Records[w.Branch()] = record
 		}
 	}
-
-	asked := facts.asked(req.Worktrees)
 	if len(asked) == 0 {
 		return facts, nil
 	}
@@ -222,7 +229,7 @@ func (u UseCase) locate(ctx context.Context, facts Facts, req Request) (map[stri
 	return located, nil
 }
 
-// check reads, for each worktree, its uncommitted changes, none once its directory is gone, and the commits of its branch no branch that stays holds: worktrees removed together hold nothing for each other.
+// check reads, for each worktree, its uncommitted changes and the commits of its branch and of its HEAD no branch that stays holds, a commit on no branch or of a rebase under way among them; none of its directory once it is gone. Worktrees removed together hold nothing for each other.
 func (u UseCase) check(ctx context.Context, worktrees []worktree.Worktree, checks map[string]Check) error {
 	var going []string
 	for _, w := range worktrees {
@@ -232,13 +239,15 @@ func (u UseCase) check(ctx context.Context, worktrees []worktree.Worktree, check
 	for _, w := range worktrees {
 		var check Check
 		var err error
+		losing := worktree.Losing{Branch: w.Branch(), Going: going}
 		if !w.Prunable && w.Path != "" {
 			if check.Dirty, err = u.Git.Dirty(ctx, w.Path); err != nil {
 				return err
 			}
+			losing.Head = w.Path
 		}
-		if w.Branch() != "" {
-			if check.Unpushed, err = u.Git.Unpushed(ctx, w.Branch(), going); err != nil {
+		if losing.Branch != "" || losing.Head != "" {
+			if check.Unpushed, err = u.Git.Unpushed(ctx, losing); err != nil {
 				return err
 			}
 		}
@@ -280,8 +289,7 @@ func (u UseCase) remove(ctx context.Context, plan Plan, removal Removal, report 
 	report(domain.PhaseFinished{Subject: removal.Worktree, Phase: domain.PhaseRemove, Failed: removed.Status != domain.StatusDone})
 
 	removed.Warnings = append(item.Warnings, removed.Warnings...)
-	item = removed
-	return item
+	return removed
 }
 
 // hooks runs the on_clean hooks in the worktree, their variables expanded and the worktree's run environment set, between their phase's events; a worktree whose directory is gone runs none, with a warning.
@@ -339,7 +347,7 @@ func (u UseCase) removeWorktree(ctx context.Context, plan Plan, removal Removal,
 
 	if err := u.Git.RemoveWorktree(ctx, removal.Path); err != nil {
 		if u.listed(ctx, removal.Path) {
-			item.Status, item.Err = domain.StatusFailed, failure("clean.remove_failed", "couldn't remove the worktree", err)
+			item.Status, item.Detail, item.Err = domain.StatusFailed, nil, failure("clean.remove_failed", "couldn't remove the worktree", err)
 			return item
 		}
 		item.Warnings = append(item.Warnings, domain.Warning{Code: "clean.left_on_disk", Message: removal.Path + " is still on disk (" + err.Error() + "): delete what is left with sudo rm -rf " + removal.Path, Params: domain.Params{"path": removal.Path}})

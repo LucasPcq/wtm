@@ -426,24 +426,33 @@ func (f *Fake) RemoveWorktree(_ context.Context, path string) error {
 	return nil
 }
 
-// Unpushed counts the commits of the local branch name that no other local
-// branch but those going with it, nor any fetched remote branch, holds; it
-// fails when the branch is missing.
-func (f *Fake) Unpushed(_ context.Context, name string, going []string) (int, error) {
+// Unpushed counts the commits of the local branch losing.Branch, and of HEAD
+// in the worktree at losing.Head, that no other local branch but those going
+// with it, nor any fetched remote branch, holds, a commit both hold once; it
+// fails when the branch is missing. HEAD is its worktree's branch, else Root:
+// the fake commits on no branch.
+func (f *Fake) Unpushed(_ context.Context, losing worktree.Losing) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if err := f.enter("Unpushed", name); err != nil {
+	if err := f.enter("Unpushed", losing.Branch); err != nil {
 		return 0, err
 	}
 
-	of, ok := f.local[name]
-	if !ok {
-		return 0, fmt.Errorf("gittest: no branch %s", name)
+	var of history
+	if losing.Branch != "" {
+		commits, ok := f.local[losing.Branch]
+		if !ok {
+			return 0, fmt.Errorf("gittest: no branch %s", losing.Branch)
+		}
+		of = commits
+	}
+	if losing.Head != "" {
+		of = append(of, f.head(realPath(losing.Head))...)
 	}
 
 	held := map[string]bool{}
 	for other, commits := range f.local {
-		if other != name && !slices.Contains(going, other) {
+		if other != losing.Branch && !slices.Contains(losing.Going, other) {
 			for _, commit := range commits {
 				held[commit] = true
 			}
@@ -458,10 +467,21 @@ func (f *Fake) Unpushed(_ context.Context, name string, going []string) (int, er
 	count := 0
 	for _, commit := range of {
 		if !held[commit] {
+			held[commit] = true
 			count++
 		}
 	}
 	return count, nil
+}
+
+// head is the history of HEAD in the worktree at path: its branch's, else Root.
+func (f *Fake) head(path string) history {
+	at := f.worktreeAt(path)
+	if at >= 0 && f.worktrees[at].Branch() != "" {
+		return f.local[f.worktrees[at].Branch()]
+	}
+
+	return history{Root}
 }
 
 // DeleteBranch deletes the local branch name; it fails when the branch is

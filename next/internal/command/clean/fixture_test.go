@@ -156,3 +156,29 @@ func (l leavingFiles) RemoveWorktree(ctx context.Context, path string) error {
 	}
 	return errPermission
 }
+
+// failingRemove refuses to remove the worktree at path, which git still lists, as it does a worktree it cannot remove.
+type failingRemove struct {
+	git.Repo
+	path string
+}
+
+func (f failingRemove) RemoveWorktree(ctx context.Context, path string) error {
+	if path == f.path {
+		return errPermission
+	}
+	return f.Repo.RemoveWorktree(ctx, path)
+}
+
+// bare lists the main worktree as the entry of a bare repository, which has no working tree.
+type bare struct {
+	git.Repo
+}
+
+func (b bare) Snapshot(ctx context.Context) (worktree.Snapshot, error) {
+	snapshot, err := b.Repo.Snapshot(ctx)
+	if err == nil {
+		snapshot.Worktrees[0].State = worktree.Bare{}
+	}
+	return snapshot, err
+}

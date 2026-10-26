@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/command/clean"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/api"
@@ -182,7 +184,7 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			_, unspelled := spelled(c.followUp)
-			if _, ok := migrated[c.followUp.Command]; ok {
+			if c.followUp.Command == clean.Name {
 				unspelled = nil
 			}
 

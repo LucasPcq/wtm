@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/command/clean"
+
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
@@ -102,8 +104,7 @@ func TestEachFollowUpOfAMigratedCommandIsSpelledFromItsSchema(t *testing.T) {
 			continue
 		}
 
-		_, spelledFromSchema := migrated[followUp.Command]
-		require.True(t, spelledFromSchema, "%s has migrated: spell its follow-ups from its schema in migrated", followUp.Command)
+		require.Equal(t, clean.Name, followUp.Command, "%s has migrated: spell its follow-ups from its schema in commandLine", followUp.Command)
 		argv := commandLine(followUp)
 		assert.Equal(t, []string{cli.Program, followUp.Command}, argv[:min(2, len(argv))], "%s's follow-up %v does not fold into its request", followUp.Command, followUp.Answers)
 	}

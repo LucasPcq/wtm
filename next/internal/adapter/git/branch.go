@@ -140,20 +140,24 @@ func parseAheadBehind(out string) (worktree.AheadBehind, error) {
 	return worktree.AheadBehind{Ahead: ahead, Behind: behind}, nil
 }
 
-// Unpushed counts the commits of the local branch name that no other local
-// branch but those going with it, nor any remote-tracking branch, holds: what
-// deleting them would lose. It fails when the branch is missing.
-func (r Repo) Unpushed(ctx context.Context, name string, going []string) (int, error) {
-	of, err := r.refName(worktree.LocalBranch{Name: name})
-	if err != nil {
-		return 0, err
+// Unpushed counts what losing would lose, a commit both tips hold once. It
+// fails when the branch is missing.
+func (r Repo) Unpushed(ctx context.Context, losing worktree.Losing) (int, error) {
+	at, args := r, []string{"rev-list", "--count"}
+	if losing.Branch != "" {
+		args = append(args, headsPrefix+losing.Branch)
+	}
+	if losing.Head != "" {
+		at, args = r.at(losing.Head), append(args, "HEAD")
 	}
 
-	args := []string{"rev-list", "--count", of, "--not", "--exclude=" + name}
-	for _, other := range going {
-		args = append(args, "--exclude="+other)
+	args = append(args, "--not")
+	for _, other := range append([]string{losing.Branch}, losing.Going...) {
+		if other != "" {
+			args = append(args, "--exclude="+other)
+		}
 	}
-	out, err := r.git(ctx, append(args, "--branches", "--remotes", "--")...)
+	out, err := at.git(ctx, append(args, "--branches", "--remotes", "--")...)
 	if err != nil {
 		return 0, err
 	}

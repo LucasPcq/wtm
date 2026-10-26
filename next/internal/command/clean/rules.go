@@ -15,12 +15,13 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what clean decides from, as Observe read them: the project's config, its run.toml, the repository's snapshot, the meta record of each worktree on a branch, where each name asked as a path leads, what each worktree asked holds that makes it unsafe to remove, and why the run daemon or the forge could not be asked.
+// Facts are what clean decides from, as Observe read them: the project's config, its run.toml, the repository's snapshot, the meta record of each worktree on a branch, where each name asked as a path leads, where the caller stands, what each worktree asked holds that makes it unsafe to remove, and why the run daemon or the forge could not be asked.
 type Facts struct {
 	worktree.Repository
 	Records map[string]worktree.Meta // by branch
 	Located map[string]string        // the real path each name asked that is no worktree's name leads to, when something is there
 	Checks  map[string]Check         // by the name a worktree is asked by
+	Cwd     string                   // where the caller stands, through its symbolic links
 	JobsErr error                    // why the run daemon could not tell which jobs are up
 	PRsErr  error                    // why the forge could not be asked for open pull requests
 }
@@ -33,12 +34,9 @@ type Check struct {
 	Jobs        []string // its jobs up, sorted
 }
 
-// named returns the worktree asked by name, its branch or, on no branch, its path as git spells it, else the deepest holding the path name stands for, and whether there is one. Unlike worktree.Named, a part of a branch names none: run again once feat/login went, `clean feat/login` would otherwise remove feat/login-ui.
+// named returns the worktree of name, its branch or, on no branch, its path as git spells it, and whether there is one. Unlike worktree.Named, a part of a branch names none: run again once feat/login went, `clean feat/login` would otherwise remove feat/login-ui.
 func (f Facts) named(name string) (worktree.Worktree, bool) {
 	at := slices.IndexFunc(f.Worktrees, func(w worktree.Worktree) bool { return w.Name() == name })
-	if located, ok := f.Located[name]; at < 0 && ok {
-		at = worktree.Holding(f.Worktrees, located, func(w worktree.Worktree) string { return w.Path })
-	}
 	if at < 0 {
 		return worktree.Worktree{}, false
 	}
@@ -46,7 +44,7 @@ func (f Facts) named(name string) (worktree.Worktree, bool) {
 	return f.Worktrees[at], true
 }
 
-// subject is what name asks clean to remove: the worktree it names, else a local branch of that name no worktree holds, as a worktree with no path; and whether there is one.
+// subject is what name asks clean to remove, the first that holds: the worktree it names; a local branch of that name no worktree holds, as a worktree with no path; the worktree whose root the path name stands for leads to. A path inside a worktree names none: `clean docs` from a worktree's root would otherwise remove it.
 func (f Facts) subject(name string) (worktree.Worktree, bool) {
 	if w, ok := f.named(name); ok {
 		return w, true
@@ -55,7 +53,12 @@ func (f Facts) subject(name string) (worktree.Worktree, bool) {
 		return worktree.Worktree{State: worktree.OnBranch{Branch: name}}, true
 	}
 
-	return worktree.Worktree{}, false
+	located, ok := f.Located[name]
+	at := slices.IndexFunc(f.Worktrees, func(w worktree.Worktree) bool { return ok && w.Path == located })
+	if at < 0 {
+		return worktree.Worktree{}, false
+	}
+	return f.Worktrees[at], true
 }
 
 // asked are the worktrees, and the branches no worktree holds, that names asks clean to remove, each once: the checks Observe reads.
@@ -119,7 +122,7 @@ type Removal struct {
 	entry       int            // its index among the worktrees asked
 }
 
-// entries decides each worktree names asks: a Removal, a name that is no worktree (already absent, nothing to remove), or the problem of its entry: blank, given twice, or the main worktree.
+// entries decides each worktree names asks: a Removal, a name that is no worktree (already absent, nothing to remove), or the problem of its entry: blank, given twice, the main worktree or the base branch.
 func (f Facts) entries(names []string) (removals []Removal, absent []string, problems []domain.FieldError) {
 	for index, name := range names {
 		path := entryPath(index)
@@ -130,6 +133,8 @@ func (f Facts) entries(names []string) (removals []Removal, absent []string, pro
 			problems = append(problems, domain.FieldError{Path: path, Code: domain.CodeDistinct, Template: "{path}: {value} is given twice", Params: domain.Params{"value": name}})
 		case found && w.Main:
 			problems = append(problems, domain.FieldError{Path: path, Code: CodeMainWorktree, Template: "{value} is the main worktree: it is never removed", Params: domain.Params{"value": name}})
+		case found && w.Branch() == f.Config.Worktrees.BaseBranch:
+			problems = append(problems, domain.FieldError{Path: path, Code: CodeBaseBranch, Template: "{value} is the base branch: it is never removed", Params: domain.Params{"value": name}})
 		case found && slices.ContainsFunc(removals, func(r Removal) bool { return r.Worktree == w.Name() || w.Path != "" && r.Path == w.Path }):
 			problems = append(problems, domain.FieldError{Path: path, Code: domain.CodeDistinct, Template: "{path}: {value} names a worktree given already", Params: domain.Params{"value": name}})
 		case found:
@@ -142,8 +147,11 @@ func (f Facts) entries(names []string) (removals []Removal, absent []string, pro
 	return removals, absent, problems
 }
 
-// CodeMainWorktree refuses the main worktree, which clean never removes.
-const CodeMainWorktree = Name + ".main_worktree"
+// CodeMainWorktree refuses the main worktree and CodeBaseBranch the base branch, which clean never removes.
+const (
+	CodeMainWorktree = Name + ".main_worktree"
+	CodeBaseBranch   = Name + ".base_branch"
+)
 
 func (f Facts) removal(w worktree.Worktree, entry int) Removal {
 	check := f.Checks[w.Name()]
@@ -252,7 +260,7 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	if planned.Worktrees == nil {
 		planned.Worktrees = []Removal{}
 	}
-	if at := worktree.Holding(removals, req.Caller.Cwd, func(r Removal) string { return r.Path }); at >= 0 {
+	if at := worktree.Holding(removals, f.Cwd, func(r Removal) string { return r.Path }); at >= 0 {
 		planned.standing = removals[at].Worktree
 	}
 
@@ -359,8 +367,8 @@ func (p Plan) Locks() []domain.Lock {
 	for _, r := range p.Worktrees {
 		names = append(names, r.Worktree)
 	}
-	for _, move := range p.Moves {
-		if p.ReparentChildren {
+	if p.ReparentChildren {
+		for _, move := range p.Moves {
 			names = append(names, move.Branch)
 		}
 	}
@@ -454,20 +462,14 @@ const (
 	CodeReparent = Name + ".reparent"
 )
 
-// applied is the plan once applied, as Run reports it: its recap.
-func (p Plan) applied() Plan {
-	p.Recap = p.recap()
-	return p
-}
-
-// next is the step into the main worktree when the caller stood in a worktree removed.
+// next is the step into the main worktree when the caller stood in a worktree removed; none in a bare repository, which has no main checkout.
 func (p Plan) next(items []Item) []domain.FollowUp {
-	gone := slices.ContainsFunc(items, func(item Item) bool { return item.Subject == p.standing && item.Detail != nil })
-	if p.standing == "" || !gone || len(p.facts.Worktrees) == 0 {
+	checkouts := p.facts.MainFirst()
+	if p.standing == "" || !removedIn(items, p.standing) || len(checkouts) == 0 || !checkouts[0].Main {
 		return nil
 	}
 
-	main := domain.Enter(p.facts.Worktrees[0].Name())
+	main := domain.Enter(checkouts[0].Name())
 	main.Code, main.Message = CodeGo, "you stood in "+p.standing
 	return []domain.FollowUp{main}
 }

@@ -77,7 +77,7 @@ type Questions struct {
 	Errors    []domain.FieldError
 }
 
-// Worktrees is the question of the worktrees to remove: those given, and every worktree but the main one, by its branch or, on no branch, its path.
+// Worktrees is the question of the worktrees to remove: those given, and every worktree but the main one and the base branch's, by its branch or, on no branch, its path.
 type Worktrees struct {
 	Given   []string
 	Options []domain.Option
@@ -110,11 +110,11 @@ func (q Questions) Form() domain.Form {
 	}}
 }
 
-// worktreeOptions are the worktrees clean may remove: each but the main one, by its branch or, on no branch, its path, in git's order.
+// worktreeOptions are the worktrees clean may remove: each but the main one and the base branch's, by its branch or, on no branch, its path, in git's order.
 func (f Facts) worktreeOptions() []domain.Option {
 	var options []domain.Option
 	for _, w := range f.Worktrees {
-		if !w.Main {
+		if !w.Main && w.Branch() != f.Config.Worktrees.BaseBranch {
 			options = append(options, domain.Option{Value: w.Name(), Detached: w.Branch() == ""})
 		}
 	}

@@ -91,6 +91,21 @@ func TestCommitsTheBranchesRemovedTogetherHoldAreUnpushedToo(t *testing.T) {
 	assert.Equal(t, map[string][]string{"worktree[0]": {"clean.unpushed"}, "worktree[1]": {"clean.unpushed"}}, fieldCodes(failureOf(t, err).Fields))
 }
 
+// Only a branch's commits were counted: a commit made on no branch, or by a rebase under way, went with the worktree, unforced.
+func TestCommitsOnlyAWorktreesHeadHoldsAreUnpushed(t *testing.T) {
+	w := newWorld(t, seed{})
+	gittest.Git(t, w.at("detached"), "commit", "-q", "--allow-empty", "-m", "on no branch")
+	gittest.Git(t, w.at(plain), "checkout", "-q", "--detach")
+	gittest.Git(t, w.at(plain), "commit", "-q", "--allow-empty", "-m", "picked by the rebase")
+	writeFile(t, filepath.Join(gittest.Output(t, w.at(plain), "rev-parse", "--absolute-git-dir"), "rebase-merge", "head-name"), "refs/heads/"+plain+"\n")
+
+	_, err := w.usecase.Run(t.Context(), removing(w.at("detached"), plain), domain.RunOptions{DryRun: true})
+
+	refused := failureOf(t, err)
+	assert.Equal(t, map[string][]string{"worktree[0]": {"clean.unpushed"}, "worktree[1]": {"clean.unpushed"}}, fieldCodes(refused.Fields))
+	assert.Equal(t, "1", refused.Fields[1].Params["count"])
+}
+
 func TestOneWorktreeAskedByItsBranchAndItsPathIsAskedTwice(t *testing.T) {
 	w := newWorld(t, seed{})
 
@@ -133,6 +148,33 @@ func TestFilesLeftOnDiskAreNamedAndTheWorktreeCountsAsRemoved(t *testing.T) {
 	assert.Equal(t, domain.StatusDone, result.Items[0].Status)
 	assert.Equal(t, []string{"clean.left_on_disk"}, codes(result.Items[0].Warnings))
 	assert.Contains(t, result.Items[0].Warnings[0].Message, "sudo rm -rf "+w.at(plain))
+}
+
+// A worktree git failed to remove read as removed: its children were moved off a parent that stays, warned of as orphaned, and the caller standing in it told to step out.
+func TestAWorktreeGitFailsToRemoveIsNotReportedRemoved(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.usecase.Git = failingRemove{w.repo, w.at(parent)}
+
+	result, report := w.apply(t, removing(parent).From(domain.Caller{Cwd: w.at(parent)}))
+
+	assert.Equal(t, domain.StatusFailed, result.Items[0].Status)
+	assert.Nil(t, result.Items[0].Detail)
+	assert.Empty(t, result.Warnings)
+	assert.Empty(t, result.FollowUps)
+	assert.Empty(t, eventsOf[domain.WorktreeRemoved](report.All()))
+}
+
+// The nearest worktree that stays was taken from the plan: a grandparent that failed to go was skipped all the same, its grandchild moved past it.
+func TestAChildMovesOntoTheNearestWorktreeThatActuallyStayed(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.usecase.Git = failingRemove{w.repo, w.at(parent)}
+
+	result, _ := w.apply(t, clean.Request{Worktrees: []string{parent, child}, ReparentChildren: true})
+
+	assert.Equal(t, map[string]domain.Status{parent: domain.StatusFailed, child: domain.StatusDone}, statuses(result.Items))
+	record, err := w.meta.Load(grandchild)
+	require.NoError(t, err)
+	assert.Equal(t, parent, record.SourceBranch)
 }
 
 func TestTheChildrenLeftBehindAreNamedWithTheReparentThatMovesThem(t *testing.T) {
@@ -247,6 +289,19 @@ func TestARefusalNamesWhatItRefusesAndAForcedBranchAloneStaysOne(t *testing.T) {
 	assert.Equal(t, "feat/held (branch only: no worktree; unpushed, forced)", forced.Plan.Recap[0].Values[0].Text)
 }
 
+// The base branch, held by no worktree, read as a branch to delete: `clean main` deleted it, its children moved from main onto main.
+func TestTheBaseBranchIsNeverRemoved(t *testing.T) {
+	w := newWorld(t, seed{})
+	gittest.Git(t, w.main, "checkout", "-q", "-b", "trunk")
+
+	_, err := w.usecase.Run(t.Context(), clean.Request{Worktrees: []string{"main"}, Force: true}, domain.RunOptions{})
+
+	refused := failureOf(t, err)
+	assert.Equal(t, domain.KindInvalid, refused.Kind)
+	assert.Equal(t, map[string][]string{"worktree[0]": {clean.CodeBaseBranch}}, fieldCodes(refused.Fields))
+	assert.NotEmpty(t, gittest.Output(t, w.main, "branch", "--list", "main"))
+}
+
 func TestANameThatIsNoWorktreeIsAlreadyAbsent(t *testing.T) {
 	w := newWorld(t, seed{})
 
@@ -269,14 +324,38 @@ func TestAPartOfABranchNamesNoWorktreeToRemove(t *testing.T) {
 	assert.True(t, w.stands(t, plain))
 }
 
-func TestAPathInsideAWorktreeNamesIt(t *testing.T) {
+// A path inside a worktree named the worktree holding it: create's `→ wtm clean docs --force`, run from feat/a's root where every worktree has docs/, removed feat/a.
+func TestAPathInsideAWorktreeNamesNothing(t *testing.T) {
 	w := newWorld(t, seed{})
-	req := removing("wt-feat-plain/apps").From(domain.Caller{Cwd: w.root})
-	writeFile(t, filepath.Join(w.at(plain), "apps", "keep.txt"), "x")
+	writeFile(t, filepath.Join(w.at(plain), "docs", "keep.txt"), "x")
+	writeFile(t, filepath.Join(w.at(plain), "apps", "src", "keep.txt"), "x")
+	gittest.Git(t, w.at(plain), "add", ".")
+	gittest.Git(t, w.at(plain), "commit", "-q", "-m", "docs and src")
+	gittest.Git(t, w.at(plain), "push", "-q", "origin", plain)
 
-	_, err := w.usecase.Run(t.Context(), req, domain.RunOptions{DryRun: true})
+	fromRoot, err := w.usecase.Run(t.Context(), clean.Request{Worktrees: []string{"docs"}, Force: true}.From(domain.Caller{Cwd: w.at(plain)}), domain.RunOptions{})
+	require.NoError(t, err)
+	fromInside, err := w.usecase.Run(t.Context(), removing("src").From(domain.Caller{Cwd: filepath.Join(w.at(plain), "apps")}), domain.RunOptions{})
+	require.NoError(t, err)
 
-	assert.Equal(t, map[string][]string{"worktree[0]": {"clean.dirty"}}, fieldCodes(failureOf(t, err).Fields))
+	assert.Equal(t, []string{"docs"}, fromRoot.Plan.Absent)
+	assert.Equal(t, []string{"src"}, fromInside.Plan.Absent)
+	assert.True(t, w.stands(t, plain))
+}
+
+func TestAWorktreeIsNamedByItsRootHoweverItIsSpelled(t *testing.T) {
+	w := newWorld(t, seed{})
+	require.NoError(t, os.Symlink(w.at(plain), filepath.Join(w.root, "link")))
+
+	for name, req := range map[string]clean.Request{
+		"absolute": removing(w.at(plain)),
+		"dot":      removing(".").From(domain.Caller{Cwd: w.at(plain)}),
+		"symlink":  removing("link").From(domain.Caller{Cwd: w.root}),
+	} {
+		planned, _ := w.plan(t, req)
+		require.Len(t, planned.Worktrees, 1, name)
+		assert.Equal(t, plain, planned.Worktrees[0].Worktree, name)
+	}
 }
 
 func TestAWorktreeOnNoBranchIsRemovedByItsPath(t *testing.T) {
@@ -363,6 +442,18 @@ func TestTheDataAWorktreeHoldsInSharedServicesIsNamedAsKept(t *testing.T) {
 	assert.Equal(t, "acme_feat_plain", warnings[0].Params["namespaces"])
 }
 
+// Only the records of worktrees were read: a branch no worktree holds lost its record, and the data it named went unmentioned.
+func TestTheDataABranchNoWorktreeHoldsKeepsIsNamedToo(t *testing.T) {
+	w := newWorld(t, seed{})
+	gittest.Git(t, w.main, "branch", "feat/left", "main")
+	w.record(t, "feat/left", worktree.Meta{SourceBranch: "main", Namespaces: []string{"acme_feat_left"}})
+
+	_, warnings := w.plan(t, removing("feat/left"))
+
+	require.Equal(t, []string{"clean.data_kept"}, codes(warnings))
+	assert.Equal(t, "acme_feat_left", warnings[0].Params["namespaces"])
+}
+
 func TestACancelSkipsTheWorktreesNotStarted(t *testing.T) {
 	w := newWorld(t, seed{})
 	ctx, cancel := context.WithCancel(t.Context())
@@ -384,4 +475,27 @@ func TestARemovalUnderTheCallersFeetEndsOnTheMainWorktree(t *testing.T) {
 	require.Len(t, outcome.Result.FollowUps, 1)
 	assert.Equal(t, clean.CodeGo, outcome.Result.FollowUps[0].Code)
 	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{"main"}}}, outcome.Result.FollowUps[0].Answers)
+}
+
+// The first worktree git listed was taken for the main one: in a bare repository, the step out led to its entry, which has no working tree.
+func TestARemovalUnderTheCallersFeetInABareRepositoryStepsNowhere(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.usecase.Repository.Git = bare{w.repo}
+
+	result, _ := w.apply(t, removing(plain).From(domain.Caller{Cwd: w.at(plain)}))
+
+	assert.Equal(t, domain.StatusDone, result.Items[0].Status)
+	assert.Empty(t, result.FollowUps)
+}
+
+// The caller was compared as given: one standing in the worktree through a symbolic link was not told to step out.
+func TestARemovalUnderTheCallersFeetIsFoundThroughASymbolicLink(t *testing.T) {
+	w := newWorld(t, seed{})
+	link := filepath.Join(w.root, "link")
+	require.NoError(t, os.Symlink(w.at(plain), link))
+
+	result, _ := w.apply(t, removing(plain).From(domain.Caller{Cwd: link}))
+
+	require.Len(t, result.FollowUps, 1)
+	assert.Equal(t, clean.CodeGo, result.FollowUps[0].Code)
 }

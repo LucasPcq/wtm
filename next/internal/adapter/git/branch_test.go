@@ -165,7 +165,7 @@ func TestTheFakeAndGitCountWhatDeletingABranchWouldLose(t *testing.T) {
 		t.Run(impl.name, func(t *testing.T) {
 			lost := map[string]int{}
 			for _, name := range []string{"main", "feature", "unmerged", "linked", "diverged"} {
-				count, err := impl.port.Unpushed(t.Context(), name, nil)
+				count, err := impl.port.Unpushed(t.Context(), worktree.Losing{Branch: name})
 				require.NoError(t, err, name)
 				lost[name] = count
 			}
@@ -175,14 +175,32 @@ func TestTheFakeAndGitCountWhatDeletingABranchWouldLose(t *testing.T) {
 	}
 }
 
+func TestTheFakeAndGitCountWhatRemovingAWorktreeLosesFromItsHead(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			lost := map[string]int{}
+			for _, name := range []string{"linked", "detached", "rebasing"} {
+				count, err := impl.port.Unpushed(t.Context(), worktree.Losing{Head: filepath.Join(impl.root, name), Going: []string{name}})
+				require.NoError(t, err, name)
+				lost[name] = count
+			}
+			both, err := impl.port.Unpushed(t.Context(), worktree.Losing{Branch: "linked", Head: filepath.Join(impl.root, "linked")})
+			require.NoError(t, err)
+
+			assert.Equal(t, map[string]int{"linked": 1, "detached": 0, "rebasing": 0}, lost, "HEAD counts what its branch holds once the branch goes too")
+			assert.Equal(t, 1, both, "a commit the branch and HEAD both hold is counted once")
+		})
+	}
+}
+
 func TestTheFakeAndGitCountTheCommitsHeldOnlyByTheBranchesGoingTogether(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {
 			require.NoError(t, impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "topic"), Checkout: worktree.NewBranch{Name: "topic", From: worktree.LocalBranch{Name: "unmerged"}}}))
 
-			alone, err := impl.port.Unpushed(t.Context(), "unmerged", nil)
+			alone, err := impl.port.Unpushed(t.Context(), worktree.Losing{Branch: "unmerged"})
 			require.NoError(t, err)
-			together, err := impl.port.Unpushed(t.Context(), "unmerged", []string{"topic"})
+			together, err := impl.port.Unpushed(t.Context(), worktree.Losing{Branch: "unmerged", Going: []string{"topic"}})
 			require.NoError(t, err)
 
 			assert.Equal(t, 0, alone)
@@ -206,7 +224,7 @@ func TestTheFakeAndGitRefuseTheSameBranchChanges(t *testing.T) {
 			return impl.port.DeleteBranch(t.Context(), "nope")
 		}},
 		{name: "count_unpushed_of_missing_branch", call: func(t *testing.T, impl implementation) error {
-			_, err := impl.port.Unpushed(t.Context(), "remote-only", nil)
+			_, err := impl.port.Unpushed(t.Context(), worktree.Losing{Branch: "remote-only"})
 			return err
 		}},
 		{name: "count_unknown_ref", call: func(t *testing.T, impl implementation) error {
