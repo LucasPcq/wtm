@@ -1,0 +1,4 @@
+
+  ✗ exited 3
+  → wtm-next exec feat/b -- 'pnpm test'   run it again where it did not pass
+

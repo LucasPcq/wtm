@@ -188,3 +188,20 @@ func TestHooksReadTheRunEnvOnlyOfAWorktreeThatChoseAndAComposeStack(t *testing.T
 		})
 	}
 }
+
+func TestAHookEnvReadsEachComposeEnvFileOfItsWorktreeAndFailsWithTheirRead(t *testing.T) {
+	job := JobParams{Branch: "feat/a", ProjectDir: "/repo/acme", Ordinal: 1, Isolation: project.Isolated, Run: project.Run{Jobs: []project.Job{{Name: "db", Cmd: "docker compose up", Cwd: "infra"}}}}
+	var asked []string
+	read := func(path string) ([]dotenv.Line, error) {
+		asked = append(asked, path)
+		return dotenv.Parse([]byte("COMPOSE_PROJECT_NAME=mine\n")), nil
+	}
+
+	got, err := ReadHookEnv(job, "/repo/acme.trees/feat-a", read)
+	_, failed := ReadHookEnv(job, "/repo/acme.trees/feat-a", func(string) ([]dotenv.Line, error) { return nil, errUnreadable })
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"/repo/acme.trees/feat-a/infra/.env"}, asked)
+	assert.Equal(t, "mine", got[ComposeProjectKey])
+	assert.ErrorIs(t, failed, errUnreadable)
+}

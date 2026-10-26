@@ -1,0 +1,87 @@
+{
+  "v": 2,
+  "command": "exec",
+  "ok": true,
+  "op": "op-1",
+  "plan": {
+    "targets": [
+      {
+        "worktree": "main",
+        "branch": "main",
+        "path": "/repo/main"
+      },
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "/repo/wt-feat-a"
+      },
+      {
+        "worktree": "feat/b",
+        "branch": "feat/b",
+        "path": "/repo/wt-feat-b"
+      }
+    ],
+    "command": "pnpm test",
+    "jobs": 3,
+    "print": false,
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          },
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          },
+          {
+            "value": "feat/b",
+            "text": "feat/b"
+          }
+        ]
+      },
+      {
+        "key": "command",
+        "label": "Command",
+        "path": "command",
+        "values": [
+          {
+            "value": "pnpm test",
+            "text": "pnpm test"
+          }
+        ]
+      },
+      {
+        "key": "concurrency",
+        "label": "Concurrency",
+        "path": "jobs",
+        "values": [
+          {
+            "value": "3",
+            "text": "3"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "19b9d7930432847df6fc2871",
+  "follow_ups": [],
+  "warnings": [
+    {
+      "code": "exec.worktrees_gone",
+      "params": {
+        "worktrees": "feat/gone"
+      },
+      "message": "left out, their directory gone: feat/gone",
+      "follow_up": {
+        "command": "prune",
+        "code": "exec.prune",
+        "message": "drop them"
+      }
+    }
+  ]
+}

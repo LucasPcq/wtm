@@ -16,6 +16,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
+	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
@@ -36,6 +37,7 @@ var (
 	openExtract = opener(func(a app) extract.UseCase { return a.Extract })
 	openClean   = opener(func(a app) clean.UseCase { return a.Clean })
 	openPrune   = opener(func(a app) prune.UseCase { return a.Prune })
+	openExec    = opener(func(a app) exec.UseCase { return a.Exec })
 	openList    = opener(func(a app) list.UseCase { return a.List })
 	openResolve = opener(func(a app) resolve.UseCase { return a.Resolve })
 	openStatus  = opener(func(a app) status.UseCase { return a.Status })

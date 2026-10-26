@@ -1,0 +1,12 @@
+$ wtm exec; echo EXIT=$?
+
+  Step 1/6 • Worktrees
+
+  The worktrees to run the command in, by branch, or by path on no branch
+
+▌› [x] main                                                                                current
+   [ ] feat/a
+   [ ] feat/b
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel
+

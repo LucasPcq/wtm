@@ -1,0 +1,42 @@
+
+  Run one /bin/sh line in each worktree named, or in every one with --all, from the worktree's
+  root, several at once (--jobs, one per CPU by default). Everything after -- is the command.
+  Without worktrees or a command, the wizard asks for them; your current worktree is picked first.
+
+  Each command gets the environment of wtm-next, without the variables wtm sets in a worktree
+  nor the ports run.toml declares; in an isolated worktree whose jobs run docker compose, it gets
+  the worktree's own, as its hooks do. Its stdin is closed. Its output goes to a log under wtm's
+  state, overwritten by the next run; a worktree that fails shows its last lines and its log.
+
+  A failure does not stop the others: the run ends with the line that runs the command again
+  where it did not pass. The exit code is 1 when any failed, whatever each command's own code.
+
+  Usage:
+    wtm-next exec [worktree...] [-- <command>] [flags]
+
+  Examples:
+    # Pick the worktrees, then type the command
+    wtm exec
+
+    wtm exec feat/login feat/signup -- pnpm test
+
+    # Every worktree, two at a time, keeping each one's whole output
+    wtm exec --all --jobs 2 --print -- git status --short
+
+    # For a script or an agent, with the v2 JSON envelope
+    wtm exec --all --yes --output json -- make lint
+
+  Flags:
+        --all                         Run in every worktree, the main one included
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+    -h, --help                        help for exec
+        --jobs string                 How many worktrees run the command at once (default: one per CPU)
+        --output string               Output format: text or json (default "text")
+        --print                       Print each worktree's whole output, successes included
+    -y, --yes                         Run unattended: no question, no confirmation (worktrees or --all, and the command after --, required)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

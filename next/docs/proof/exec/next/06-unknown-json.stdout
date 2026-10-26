@@ -1,0 +1,24 @@
+{
+  "v": 2,
+  "command": "exec",
+  "ok": false,
+  "op": "<OP>",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "worktree[1]",
+        "code": "not_found",
+        "params": {
+          "value": "nope"
+        },
+        "flag": "<worktree>[1]",
+        "message": "nope names no worktree"
+      }
+    ]
+  }
+}

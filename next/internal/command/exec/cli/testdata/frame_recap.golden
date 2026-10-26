@@ -1,0 +1,20 @@
+
+  Step 6/6 • Confirm
+
+  ✓ Worktrees: feat/a, feat/b
+  ✓ Command: pnpm test
+  · All — set by its flag only
+  · Concurrency — set by its flag only
+  · Print — set by its flag only
+
+  ┃  Review & confirm
+  ┃
+  ┃  Worktrees    feat/a, feat/b
+  ┃  Command      pnpm test
+  ┃  Concurrency  2
+
+▌› Yes, run in 2 worktrees
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back

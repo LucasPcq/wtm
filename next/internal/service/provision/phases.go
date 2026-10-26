@@ -339,21 +339,15 @@ func (p *provisioning) hookEnv(ordinal *int) map[string]string {
 		return nil
 	}
 
-	var compose [][]dotenv.Line
-	for _, path := range env.ComposeEnvPaths(p.Project.Run) {
-		lines, err := p.Service.EnvFiles.Read(filepath.Join(p.Worktree.Path, path))
-		if err != nil {
-			p.warn(domain.Warning{
-				Code:    "provision.hook_env_unavailable",
-				Message: err.Error() + " — on_create hooks run without the worktree's environment",
-				Params:  domain.Params{"cause": err.Error()},
-			})
-			return nil
-		}
-		compose = append(compose, lines)
+	hookEnv, err := env.ReadHookEnv(p.jobParams(ordinal), p.Worktree.Path, p.Service.EnvFiles.Read)
+	if err != nil {
+		p.warn(domain.Warning{
+			Code:    "provision.hook_env_unavailable",
+			Message: err.Error() + " — on_create hooks run without the worktree's environment",
+			Params:  domain.Params{"cause": err.Error()},
+		})
+		return nil
 	}
-
-	hookEnv := env.HookEnv(p.jobParams(ordinal), compose)
 	if ordinal != nil {
 		return hookEnv
 	}

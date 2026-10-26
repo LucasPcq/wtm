@@ -1,0 +1,11 @@
+
+  ✓ exec: 5 done
+
+  Worktrees    main, <SB>/acme.trees/det, feat/a, feat/b, feat/c
+  Command      pwd
+  Concurrency  5
+
+  ! left out, their directory gone: feat/gone
+
+  → wtm prune   drop them
+

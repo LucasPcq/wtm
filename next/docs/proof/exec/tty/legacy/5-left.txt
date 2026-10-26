@@ -1,0 +1,7 @@
+$ wtm exec feat/a -- true; echo EXIT=$?
+
+┃  = Aborted.
+
+EXIT=19
+$
+

@@ -1,0 +1,15 @@
+
+  ✗ exec: 1 done · 1 failed
+
+  Worktrees    feat/a, feat/b
+  Command      pnpm test
+  Concurrency  2
+
+  ✗ feat/b  exited 3
+      > test
+      FAIL src/app.test.ts
+        expected 2, got 3
+  full output:  /repo/main/.git/wtm/exec/feat%2Fb.log
+
+  → wtm-next exec feat/b -- 'pnpm test'   run it again where it did not pass
+

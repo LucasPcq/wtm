@@ -67,7 +67,7 @@ func (p *picker) observe(context.Context) (func(), error) {
 
 // refresh reads every worktree again, with its pull request, once origin is fetched.
 func (p *picker) refresh(ctx context.Context) (func(), error) {
-	read, err := p.app.Run(ctx, list.Request{WithPRs: true, Fetch: true, Caller: p.caller}, domain.RunOptions{Surface: uicli.SurfaceTUI})
+	read, err := p.app.Run(ctx, list.Request{WithPRs: true, Fetch: true, Caller: p.caller}, domain.RunOptions{Surface: domain.SurfaceTUI})
 	return func() {
 		if err == nil {
 			p.read, p.withPRs = read, true
@@ -77,7 +77,7 @@ func (p *picker) refresh(ctx context.Context) (func(), error) {
 
 // later reads the pull requests and gives each worktree shown its own, unless a refresh brought them first: the read shown keeps what a refresh read since.
 func (p *picker) later(ctx context.Context) (func(), error) {
-	read, err := p.app.Run(ctx, list.Request{WithPRs: true, Caller: p.caller}, domain.RunOptions{Surface: uicli.SurfaceTUI})
+	read, err := p.app.Run(ctx, list.Request{WithPRs: true, Caller: p.caller}, domain.RunOptions{Surface: domain.SurfaceTUI})
 	return func() {
 		if err == nil && !p.withPRs {
 			p.read = list.WithPullRequests(p.read, read)

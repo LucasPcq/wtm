@@ -33,11 +33,12 @@ const (
 	PhaseMove        Phase = "move"         // extract moves its changes
 	PhaseOnClean     Phase = "on_clean"     // the project's on_clean hooks, before a worktree is removed
 	PhaseRemove      Phase = "remove"       // git removes the worktree, its branch and its meta record go
+	PhaseExec        Phase = "exec"         // a command exec runs in the worktree
 )
 
 // Phases returns every Phase, in the order a subject's work runs them.
 func Phases() []Phase {
-	return []Phase{PhaseFastForward, PhaseWorktree, PhaseEnv, PhaseMeta, PhaseOrdinal, PhasePorts, PhaseOnCreate, PhaseMove, PhaseOnClean, PhaseRemove}
+	return []Phase{PhaseFastForward, PhaseWorktree, PhaseEnv, PhaseMeta, PhaseOrdinal, PhasePorts, PhaseOnCreate, PhaseMove, PhaseOnClean, PhaseRemove, PhaseExec}
 }
 
 // PhaseStarted reports that a phase of a subject's work begins; Log is the file its output goes to, if any.
@@ -98,16 +99,16 @@ type WorktreeRemoved struct {
 
 // OperationStarted reports that an operation began, from which command and surface.
 type OperationStarted struct {
-	Command string `json:"command"`
-	Surface string `json:"surface"`
+	Command string  `json:"command"`
+	Surface Surface `json:"surface"`
 }
 
 // OperationFinished reports that an operation ended: OK, or the code of its failure.
 type OperationFinished struct {
-	Command string `json:"command"`
-	Surface string `json:"surface"`
-	OK      bool   `json:"ok"`
-	Code    string `json:"code,omitempty"`
+	Command string  `json:"command"`
+	Surface Surface `json:"surface"`
+	OK      bool    `json:"ok"`
+	Code    string  `json:"code,omitempty"`
 }
 
 // Snapshot is every worktree of a repository on a branch, as the stream opens on it: a reader resets what it knows of the repository from it.

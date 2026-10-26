@@ -46,6 +46,15 @@ func bound(t *testing.T, args ...string) (*form.Command[request, questions, outc
 	return command, cmd
 }
 
+// boundLines is the fake command that runs a line, its flags bound on its cobra command, which parsed args.
+func boundLines(t *testing.T, args ...string) (*form.Command[request, lines, outcome], *cobra.Command) {
+	t.Helper()
+	command, cmd := linesCommand(), &cobra.Command{Use: "run"}
+	command.Bind(cmd, &uicli.Run{})
+	require.NoError(t, cmd.ParseFlags(args))
+	return command, cmd
+}
+
 // concluded is how the fake command concludes ran and err, with the given --output, its stdout and the failure it returns.
 func concluded(t *testing.T, format string, ran form.Ran[request, outcome], err error) (string, error) {
 	t.Helper()

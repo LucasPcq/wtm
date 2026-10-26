@@ -112,6 +112,23 @@ func mutations() []mutation {
 				assert.Empty(t, gittest.Output(t, main, "branch", "--list", "feat/done"))
 			},
 		},
+		{
+			name:    "exec",
+			answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/old"}}, {Path: "command", Values: []string{"touch ran"}}},
+			setup: func(t *testing.T, main string) {
+				gittest.Git(t, main, "worktree", "add", "-q", "-b", "feat/old", filepath.Join(filepath.Dir(main), ".trees", "feat-old"))
+			},
+			// the command runs from its worktree's root: moved, it would run elsewhere
+			stale: func(t *testing.T, main string) {
+				gittest.Git(t, main, "worktree", "move", filepath.Join(filepath.Dir(main), ".trees", "feat-old"), filepath.Join(filepath.Dir(main), ".trees", "feat-moved"))
+			},
+			untouched: func(t *testing.T, main string) {
+				assert.NoFileExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-moved", "ran"))
+			},
+			applied: func(t *testing.T, main string) {
+				assert.FileExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-moved", "ran"))
+			},
+		},
 	}
 }
 
@@ -153,8 +170,8 @@ func eventsOfEachType() []domain.Event {
 		domain.WorktreeUpdated{Worktree: identity, Changed: []worktree.IdentityField{worktree.IdentityOrdinal}},
 		domain.WorktreeProvisioned{Worktree: identity, Hook: "make setup", ExitCode: new(2)},
 		domain.WorktreeRemoved{Worktree: identity},
-		domain.OperationStarted{Command: "create", Surface: "api"},
-		domain.OperationFinished{Command: "create", Surface: "api", Code: "unit.phase_failed"},
+		domain.OperationStarted{Command: "create", Surface: domain.SurfaceAPI},
+		domain.OperationFinished{Command: "create", Surface: domain.SurfaceAPI, Code: "unit.phase_failed"},
 		domain.Snapshot{},
 		domain.Ready{},
 		domain.RepoAdded{},

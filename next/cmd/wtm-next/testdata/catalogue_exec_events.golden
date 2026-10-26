@@ -1,0 +1,34 @@
+[
+  {
+    "type": "operation.started",
+    "command": "exec",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "feat/old"
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/old",
+    "phase": "exec",
+    "log": "<root>/main/.git/wtm/exec/feat%2Fold.log"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/old",
+    "phase": "exec",
+    "failed": false
+  },
+  {
+    "type": "unit.finished",
+    "subject": "feat/old",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "exec",
+    "surface": "api",
+    "ok": true
+  }
+]

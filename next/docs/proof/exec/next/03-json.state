@@ -1,0 +1,47 @@
+## branches
+feat/a
+feat/b
+feat/c
+feat/gone
+main
+## worktrees
+<SB>/acme
+<SB>/acme.trees/det
+<SB>/acme.trees/feat-a
+<SB>/acme.trees/feat-b
+<SB>/acme.trees/feat-c
+<SB>/acme.trees/feat-gone
+## .git/wtm/worktrees/feat%2Fa/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 1,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fb/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 2,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fc/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 3,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fgone/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 4,
+  "isolation": "isolated"
+}
+## exec logs
+detached-det.log
+feat%2Fa.log
+feat%2Fb.log
+feat%2Fc.log
+main.log

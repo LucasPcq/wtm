@@ -18,6 +18,14 @@ type Worktree interface {
 	Worktree() (path string, ports env.Redacted)
 }
 
+// An Excerpt is the detail of an item that keeps the last lines it printed and where the whole of them is: DrawApplied draws them under the item when it did not end done.
+type Excerpt interface {
+	Excerpt() (tail []string, log string)
+}
+
+// excerptLines is how many of an item's last lines its conclusion shows.
+const excerptLines = 10
+
 // AppliedParams is what DrawApplied draws an outcome as, beyond the outcome itself: the command it counts for, the note its tally adds, the note of the row of an item done without a change (create's "already open"), and the view it draws from.
 type AppliedParams struct {
 	Command   string
@@ -100,9 +108,22 @@ func drawUnfinished[D any](w io.Writer, items []domain.Unit[D]) {
 	}
 	for _, item := range unfinished {
 		UnfinishedLine(w, Unfinished{Subject: item.Subject, Status: item.Status, Reason: item.Reason, Err: item.Err})
+		if excerpt, ok := any(item.Detail).(Excerpt); ok && item.Detail != nil {
+			drawExcerpt(w, excerpt)
+		}
 		for _, text := range itemWarnings(item) {
 			WarningLine(w, text)
 		}
+	}
+}
+
+func drawExcerpt(w io.Writer, excerpt Excerpt) {
+	tail, log := excerpt.Excerpt()
+	for _, line := range tail[max(len(tail)-excerptLines, 0):] {
+		Message(w, Indent+Indent+truncate(expandTabs(line), max(blockWidth(w)-2*len(Indent), hookMinWidth)))
+	}
+	if log != "" {
+		InfoLine(w, Info{Label: hookLogLabel, Value: log})
 	}
 }
 

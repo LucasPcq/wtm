@@ -14,9 +14,13 @@
     "op_id": { "type": "string", "minLength": 1, "description": "The operation the event belongs to; absent outside an operation." }
   },
   "$defs": {
+    "surface": {
+      "description": "Where an operation was started from: the command line, a command's wizard, the web front, or a call of the catalogue that names none.",
+      "enum": ["cli", "tui", "web", "api"]
+    },
     "phase": {
       "description": "A phase of a subject's work, as phase.started and phase.finished name it: a closed set a surface names one by one.",
-      "enum": ["fast_forward", "worktree", "env", "meta", "ordinal", "ports", "on_create", "move", "on_clean", "remove"]
+      "enum": ["fast_forward", "worktree", "env", "meta", "ordinal", "ports", "on_create", "move", "on_clean", "remove", "exec"]
     },
     "repo": {
       "type": "object",
@@ -134,7 +138,7 @@
       "properties": {
         "type": { "const": "operation.started" },
         "command": { "type": "string", "minLength": 1, "description": "The command, as its command line spells it after the program's name." },
-        "surface": { "type": "string", "minLength": 1, "description": "Where it was run from: cli, api." }
+        "surface": { "$ref": "#/$defs/surface" }
       }
     },
     "operation.finished": {
@@ -144,7 +148,7 @@
       "properties": {
         "type": { "const": "operation.finished" },
         "command": { "type": "string", "minLength": 1, "description": "The command, as its command line spells it after the program's name." },
-        "surface": { "type": "string", "minLength": 1, "description": "Where it was run from: cli, api." },
+        "surface": { "$ref": "#/$defs/surface" },
         "ok": { "type": "boolean" },
         "code": { "type": "string", "minLength": 1, "description": "The code of the failure the operation ended on; absent when ok." }
       }

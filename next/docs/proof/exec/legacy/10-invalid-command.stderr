@@ -1,0 +1,4 @@
+
+  ✗ usage error: /bin/sh: -c: line 0: syntax error near unexpected token `then'
+    /bin/sh: -c: line 0: `if then'
+

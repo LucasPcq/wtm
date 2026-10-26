@@ -82,7 +82,7 @@ func (u useCase) Run(ctx context.Context, req request, opts domain.RunOptions) (
 	if ctx.Err() != nil {
 		return outcome{}, &domain.Error{Kind: domain.KindCancelled, Code: "greet.cancelled"}
 	}
-	return outcome{op: u.dir + ":" + req.Name + ":" + opts.Surface + ":" + opts.CorrelationID}, u.refusal
+	return outcome{op: u.dir + ":" + req.Name + ":" + string(opts.Surface) + ":" + opts.CorrelationID}, u.refusal
 }
 
 func greet(u useCase) api.Command {

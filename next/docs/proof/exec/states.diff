@@ -1,0 +1,199 @@
+=== 00-before: exit legacy , next 
+=== 01-all-pass: exit legacy 0, next 0
+--- legacy/01-all-pass
++++ next/01-all-pass
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 02-one-fails: exit legacy 1, next 1
+--- legacy/02-one-fails
++++ next/02-one-fails
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 03-json: exit legacy 1, next 1
+--- legacy/03-json
++++ next/03-json
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 04-print: exit legacy 1, next 1
+--- legacy/04-print
++++ next/04-print
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 05-quiet: exit legacy 1, next 1
+--- legacy/05-quiet
++++ next/05-quiet
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 06-unknown-json: exit legacy 11, next 2
+--- legacy/06-unknown-json
++++ next/06-unknown-json
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 07-no-selection: exit legacy 1, next 2
+--- legacy/07-no-selection
++++ next/07-no-selection
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 08-no-selection-no-tty: exit legacy 1, next 2
+--- legacy/08-no-selection-no-tty
++++ next/08-no-selection-no-tty
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 09-no-command: exit legacy 2, next 2
+--- legacy/09-no-command
++++ next/09-no-command
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 10-invalid-command: exit legacy 2, next 2
+--- legacy/10-invalid-command
++++ next/10-invalid-command
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 11-gone-named: exit legacy 11, next 2
+--- legacy/11-gone-named
++++ next/11-gone-named
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 12-all-gone-detached: exit legacy 0, next 0
+--- legacy/12-all-gone-detached
++++ next/12-all-gone-detached
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 13-caller-port: exit legacy 0, next 0
+--- legacy/13-caller-port
++++ next/13-caller-port
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 14-jobs-negative: exit legacy 2, next 2
+--- legacy/14-jobs-negative
++++ next/14-jobs-negative
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 15-given-twice: exit legacy 0, next 2
+--- legacy/15-given-twice
++++ next/15-given-twice
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 16-dry-run: exit legacy 2, next 0
+--- legacy/16-dry-run
++++ next/16-dry-run
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 17-json-dry-run: exit legacy 2, next 0
+--- legacy/17-json-dry-run
++++ next/17-json-dry-run
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log
+=== 18-expect-fingerprint: exit legacy 2, next 0
+--- legacy/18-expect-fingerprint
++++ next/18-expect-fingerprint
+@@ -40,6 +40,7 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
++detached-det.log
+ feat%2Fa.log
+ feat%2Fb.log
+ feat%2Fc.log

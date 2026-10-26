@@ -305,9 +305,6 @@ func (s *Server) call(w http.ResponseWriter, r *http.Request) (domain.Repo, api.
 	return repo, command, call, true
 }
 
-// surface is the surface the operations a server runs record.
-const surface = "web"
-
 // HeaderOperation is the response header that names the operation a POST of a command started: its correlation ID, the {id} that cancels it and the correlation_id of its events.
 const HeaderOperation = "X-Wtm-Operation"
 
@@ -328,7 +325,7 @@ func (s *Server) execute(w http.ResponseWriter, r *http.Request) {
 	defer s.untrack(id)
 
 	w.Header().Set(HeaderOperation, id)
-	options := domain.RunOptions{Surface: surface, CorrelationID: id, DryRun: call.DryRun, ExpectFingerprint: call.ExpectFingerprint}
+	options := domain.RunOptions{Surface: domain.SurfaceWeb, CorrelationID: id, DryRun: call.DryRun, ExpectFingerprint: call.ExpectFingerprint}
 	if !acceptsEvents(r) {
 		writeEnvelope(w, command.Execute(ctx, api.Call{Dir: repo.Root, Answers: call.Answers, Options: options}).Envelope)
 		return

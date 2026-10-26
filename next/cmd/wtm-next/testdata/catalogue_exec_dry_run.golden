@@ -1,0 +1,56 @@
+{
+  "v": 2,
+  "command": "exec",
+  "ok": true,
+  "op": "<id>",
+  "plan": {
+    "targets": [
+      {
+        "worktree": "feat/old",
+        "branch": "feat/old",
+        "path": "<root>/.trees/feat-old"
+      }
+    ],
+    "command": "touch ran",
+    "jobs": 1,
+    "print": false,
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/old",
+            "text": "feat/old"
+          }
+        ]
+      },
+      {
+        "key": "command",
+        "label": "Command",
+        "path": "command",
+        "values": [
+          {
+            "value": "touch ran",
+            "text": "touch ran"
+          }
+        ]
+      },
+      {
+        "key": "concurrency",
+        "label": "Concurrency",
+        "path": "jobs",
+        "values": [
+          {
+            "value": "1",
+            "text": "1"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<id>",
+  "follow_ups": [],
+  "warnings": []
+}

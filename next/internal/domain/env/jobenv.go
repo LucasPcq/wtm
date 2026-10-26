@@ -183,6 +183,19 @@ func HookEnv(job JobParams, composeEnv [][]dotenv.Line) map[string]string {
 	return env
 }
 
+// ReadHookEnv returns the variables a hook of the worktree at dir runs with (HookEnv), each compose .env file read by read; it fails with read's error.
+func ReadHookEnv(job JobParams, dir string, read func(path string) ([]dotenv.Line, error)) (map[string]string, error) {
+	var compose [][]dotenv.Line
+	for _, path := range ComposeEnvPaths(job.Run) {
+		lines, err := read(filepath.Join(dir, path))
+		if err != nil {
+			return nil, err
+		}
+		compose = append(compose, lines)
+	}
+	return HookEnv(job, compose), nil
+}
+
 // HooksReadRun reports whether the hooks' environment depends on run.toml: an isolation is set and some job runs docker compose.
 func HooksReadRun(run project.Run, isolation project.Isolation) bool {
 	return isolation != "" && len(composeDirs(run)) > 0

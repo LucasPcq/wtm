@@ -21,7 +21,7 @@
 ## What it does with the schema
 
 - `Bind(cmd, &run)`: registers each field's flag and usage from `Q{}.Form()` and its words, by its kind, plus `--remember` when a field is rememberable, `--ask`, `--yes`, `--output`, `--dry-run`, `--expect-fingerprint` (`uicli.FlagDryRun`, `uicli.FlagExpectFingerprint`).
-- `Launch(cmd, args, conclude)`: refuses an invalid `--output` or correlation ID, turns the command line into `R` and `domain.RunOptions`, opens the use case on the project's directory, runs the wizard when the user can see and answer it (`Streams.CanPrompt`, human output, no `--yes` nor `--expect-fingerprint`), else `UseCase.Run` with its progress; hands the `form.Ran{Request, Outcome}` and the error to `conclude`.
+- `Launch(cmd, args, conclude)`: refuses an invalid `--output` or correlation ID, turns the command line into `R` and `domain.RunOptions`, opens the use case on the project's directory, runs the wizard when the user can see and answer it (`Streams.CanPrompt`, human output, no `--yes` nor `--expect-fingerprint`), else `UseCase.Run` with its progress (`output.Progress`, one unit at a time, or the command's `NewProgress`: exec's `output.Parallel`, its targets at once); hands the `form.Ran{Request, Outcome}` and the error to `conclude`.
 - `Conclude(cmd, ran, err)`, in order: the JSON envelope (`Outcome.Envelope` with the request's answers, which a stale plan is followed up with as its replan); a refusal; the framed dry run from `Preview` with the line that applies it (`--expect-fingerprint <hash>`); the outcome from `Draw`; then the failure the apply ended on, which sets the exit code.
 - `Argv(command, req)`: spells the request back as a command line from `R.Values` (the apply line, the `--dry-run` replay).
 

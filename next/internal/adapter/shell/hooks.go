@@ -52,8 +52,8 @@ func runHook(ctx context.Context, hook project.Hook, chain env.HookChain, sink *
 	cmd := Command(ctx, shellBin, shellCommandFlag, hook.Cmd)
 	cmd.Dir = hookDir(hook, chain.WorkDir)
 	cmd.Env = hookEnv(chain)
-	cmd.Stdout = sink
-	cmd.Stderr = sink
+	cmd.Stdout = &sink.stdout
+	cmd.Stderr = &sink.stderr
 	err := cmd.Run()
 	switch {
 	// A hook that exited 0 but left a child holding its output open still succeeded.

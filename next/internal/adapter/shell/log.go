@@ -10,19 +10,29 @@ import (
 )
 
 // lines is the sink of a hook chain's output: it splits what the hooks write
-// into lines and hands each to emit and to the log file, opened on the first
-// hook that runs. It is safe for a hook's stdout and stderr to write at once.
+// on stdout and stderr into lines and hands each to emit and to the log file, opened
+// on the first hook that runs. Each stream keeps its own unfinished line, so a
+// line half written on stdout never merges with one written on stderr.
 type lines struct {
 	mu      sync.Mutex
 	emit    func(string)
 	logPath string
 	opened  bool
 	log     io.WriteCloser
-	buf     bytes.Buffer
+	stdout  stream
+	stderr  stream
+}
+
+// A stream is one output of a hook, stdout or stderr, writing into its sink.
+type stream struct {
+	sink *lines
+	buf  bytes.Buffer
 }
 
 func newLines(emit func(string), log string) *lines {
-	return &lines{emit: emit, logPath: log}
+	l := &lines{emit: emit, logPath: log}
+	l.stdout.sink, l.stderr.sink = l, l
+	return l
 }
 
 func (l *lines) openLog() {
@@ -56,33 +66,34 @@ func openLog(path string) io.WriteCloser {
 
 // Write sends every complete line of p, the rest of an earlier write before
 // it, and keeps an unfinished last line for the next write or flush.
-func (l *lines) Write(p []byte) (int, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.buf.Write(p)
+func (s *stream) Write(p []byte) (int, error) {
+	s.sink.mu.Lock()
+	defer s.sink.mu.Unlock()
+	s.buf.Write(p)
 
 	for {
-		line, err := l.buf.ReadString('\n')
+		line, err := s.buf.ReadString('\n')
 		if err != nil {
-			l.buf.Reset()
-			l.buf.WriteString(line)
+			s.buf.Reset()
+			s.buf.WriteString(line)
 			return len(p), nil
 		}
-		l.send(strings.TrimSuffix(line, "\n"))
+		s.sink.send(strings.TrimSuffix(line, "\n"))
 	}
 }
 
-// flush sends the unfinished last line a hook left, if any.
+// flush sends the unfinished last line a hook left on each stream, if any.
 func (l *lines) flush() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.buf.Len() == 0 {
-		return
+	for _, s := range []*stream{&l.stdout, &l.stderr} {
+		if s.buf.Len() == 0 {
+			continue
+		}
+		rest := s.buf.String()
+		s.buf.Reset()
+		l.send(rest)
 	}
-
-	rest := l.buf.String()
-	l.buf.Reset()
-	l.send(rest)
 }
 
 func (l *lines) send(line string) {

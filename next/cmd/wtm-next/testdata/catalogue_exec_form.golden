@@ -1,0 +1,40 @@
+{
+  "fields": [
+    {
+      "kind": "multi_select",
+      "path": "worktree",
+      "picked": [],
+      "options": []
+    },
+    {
+      "kind": "text",
+      "path": "command",
+      "value": ""
+    },
+    {
+      "kind": "confirm",
+      "path": "all",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "text",
+      "path": "jobs",
+      "skip": "flag_only",
+      "value": ""
+    },
+    {
+      "kind": "confirm",
+      "path": "print",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    }
+  ],
+  "problems": []
+}

@@ -1,0 +1,12 @@
+
+  exec · dry run, nothing applied
+  Worktrees    main, feat/a, feat/b
+  Command      pnpm test
+  Concurrency  3
+
+  ! left out, their directory gone: feat/gone
+
+  fingerprint  19b9d7930432847df6fc2871
+  → wtm-next exec --all --expect-fingerprint 19b9d7930432847df6fc2871 -- 'pnpm test'   apply this plan
+  → wtm prune   drop them
+

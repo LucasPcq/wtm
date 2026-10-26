@@ -340,3 +340,12 @@ func TestAHookThatBackgroundsAJobSucceedsWithoutWaitingForIt(t *testing.T) {
 	assert.Equal(t, []string{"started"}, out.all())
 	assert.Less(t, time.Since(begin), 5*time.Second)
 }
+
+func TestALineUnfinishedOnStdoutNeverMergesWithALineOfStderr(t *testing.T) {
+	out := &collected{}
+
+	err := RunHooks(t.Context(), env.HookChain{Hooks: []project.Hook{{Cmd: `printf "no newline"; sleep 0.1; echo red >&2`}}, WorkDir: t.TempDir(), Output: out.add})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"red", "no newline"}, out.all())
+}

@@ -2,6 +2,7 @@ package output
 
 import (
 	"bytes"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -47,6 +48,24 @@ func TestAnItemThePlanRuledOutIsCountedButNotDrawnAsUnfinished(t *testing.T) {
 	got := rendered(func(w *bytes.Buffer) { DrawApplied(w, outcome, AppliedParams{Command: "fast-forward"}) })
 
 	assert.Equal(t, "  ! fast-forward: 1 skipped\n\n  ! feat/a has uncommitted changes: left as it is\n", got)
+}
+
+func TestAnItemThatDidNotEndDoneShowsTheLastLinesItPrintedAndItsLog(t *testing.T) {
+	var tail []string
+	for i := range 12 {
+		tail = append(tail, "line "+strconv.Itoa(i+1))
+	}
+	outcome := domain.Outcome[recappedPlan, excerptDetail]{Result: &domain.Result[excerptDetail]{Items: []domain.Unit[excerptDetail]{
+		{Subject: "feat/a", Status: domain.StatusDone, Detail: &excerptDetail{tail: []string{"fine"}, log: "/logs/feat-a.log"}},
+		{Subject: "feat/b", Status: domain.StatusFailed, Err: &domain.Error{Message: "exited 3"}, Detail: &excerptDetail{tail: tail, log: "/logs/feat-b.log"}},
+	}}}
+
+	got := rendered(func(w *bytes.Buffer) { DrawApplied(w, outcome, AppliedParams{Command: "exec"}) })
+
+	assert.NotContains(t, got, "fine")
+	assert.NotContains(t, got, "line 2\n")
+	assert.Contains(t, got, "  ✗ feat/b  exited 3\n      line 3\n")
+	assert.Contains(t, got, "      line 12\n  full output:  /logs/feat-b.log\n")
 }
 
 func TestAnAppliedOutcomeWithNoItemDrawsItsTallyAndTheRunsWarnings(t *testing.T) {

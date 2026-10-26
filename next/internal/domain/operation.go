@@ -13,10 +13,26 @@ type Operation struct {
 	ID            string    `json:"op_id"`
 	PID           int       `json:"pid"`
 	Command       string    `json:"command"`
-	Surface       string    `json:"surface"`
+	Surface       Surface   `json:"surface"`
 	CorrelationID string    `json:"correlation_id,omitempty"`
 	StartedAt     time.Time `json:"started_at"`
 	Locks         []Lock    `json:"locks"`
+}
+
+// Surface is where an operation was started from, as its record and its events name it: a closed set, published as an enum so that each surface words it.
+type Surface string
+
+// The surfaces an operation starts from.
+const (
+	SurfaceCLI Surface = "cli" // the command line
+	SurfaceTUI Surface = "tui" // a command's wizard
+	SurfaceWeb Surface = "web" // the web front wtm-next ui serves
+	SurfaceAPI Surface = "api" // a call of the catalogue that names no surface
+)
+
+// Surfaces returns every Surface.
+func Surfaces() []Surface {
+	return []Surface{SurfaceCLI, SurfaceTUI, SurfaceWeb, SurfaceAPI}
 }
 
 // LockScope is what an operation lock covers: the whole repository, or one worktree.
@@ -99,11 +115,11 @@ func Replan(err *Error, command string, answers []Answered) []FollowUp {
 
 // RunOptions are how a surface runs an operation.
 type RunOptions struct {
-	DryRun            bool   // plan without taking locks, stop after the fingerprint
-	ExpectFingerprint string // refuse to apply a plan whose fingerprint differs; empty accepts any
-	Surface           string // the surface that started the operation (cli, ui…), recorded in its events
-	CorrelationID     string // ties the operation's events to the caller's own run; checked by [CorrelationProblem]
-	Report            Report // receives each event as it is published; may be nil
+	DryRun            bool    // plan without taking locks, stop after the fingerprint
+	ExpectFingerprint string  // refuse to apply a plan whose fingerprint differs; empty accepts any
+	Surface           Surface // the surface that started the operation, recorded in its events
+	CorrelationID     string  // ties the operation's events to the caller's own run; checked by [CorrelationProblem]
+	Report            Report  // receives each event as it is published; may be nil
 }
 
 // PlanStale reports whether err is the refusal of a plan the facts changed under.

@@ -1,0 +1,7 @@
+
+  ✗ the request is invalid
+    nope names no worktree
+    feat/gone's directory is gone: nothing to run in
+    -- <command>: /bin/sh: -c: line 0: syntax error near unexpected token `then'
+    --jobs takes a whole number, 0 or more, not -1
+

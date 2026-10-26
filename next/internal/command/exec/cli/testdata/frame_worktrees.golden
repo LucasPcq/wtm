@@ -1,0 +1,10 @@
+
+  Step 1/6 • Worktrees
+
+  The worktrees to run the command in, by branch, or by path on no branch
+
+▌› [ ] main                                                                                   main
+   [x] feat/a                                                                              current
+   [ ] feat/b
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel

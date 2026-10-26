@@ -28,7 +28,7 @@ func TestThePublishedSchemaIsTheOneTheGoTypesGive(t *testing.T) {
 }
 
 func TestEachPublishedEnumListsEveryConstantOfItsType(t *testing.T) {
-	published := map[reflect.Type]any{reflect.TypeFor[domain.Phase](): domain.Phases()}
+	published := map[reflect.Type]any{reflect.TypeFor[domain.Phase](): domain.Phases(), reflect.TypeFor[domain.Surface](): domain.Surfaces()}
 	for typ, e := range enums {
 		published[typ] = e.values
 	}
