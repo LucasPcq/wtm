@@ -12,7 +12,7 @@ export function Facts({ heading, facts }: { heading?: string | undefined; facts:
             <dt className="text-muted-foreground">{label}</dt>
             <dd className="min-w-0">
               {values.map((value) => (
-                <span key={value} className={cn('block', mono ? 'font-mono break-all' : 'text-pretty')}>
+                <span key={value} className={cn('block', mono ? 'font-mono break-words' : 'text-pretty')}>
                   {value}
                 </span>
               ))}
