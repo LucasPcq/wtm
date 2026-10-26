@@ -215,7 +215,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	return facts, nil
 }
 
-// locate resolves each name req asks that is no worktree's name as the path it stands for, from where the caller stands (repository.Located).
+// locate resolves each name req asks that is no worktree's name as the path it stands for, from where the caller stands (repository.Located), spelled as git spells the worktree root it is.
 func (u UseCase) locate(ctx context.Context, facts Facts, req Request) (map[string]string, error) {
 	located := map[string]string{}
 	for _, name := range req.Worktrees {
@@ -227,12 +227,36 @@ func (u UseCase) locate(ctx context.Context, facts Facts, req Request) (map[stri
 		if err != nil {
 			return nil, err
 		}
-		if path != "" {
-			located[name] = path
+		if path == "" {
+			continue
+		}
+		if located[name], err = u.root(ctx, facts.Worktrees, path); err != nil {
+			return nil, err
 		}
 	}
 
 	return located, nil
+}
+
+// root is path as git spells the worktree root it is, when it is one under another spelling (a disk that ignores case: git keeps a path as it was given), else path itself; only a path that matches no root as written is asked of the disk.
+func (u UseCase) root(ctx context.Context, worktrees []worktree.Worktree, path string) (string, error) {
+	if slices.ContainsFunc(worktrees, func(w worktree.Worktree) bool { return w.Path == path }) {
+		return path, nil
+	}
+	for _, w := range worktrees {
+		if w.Path == "" || w.Prunable {
+			continue
+		}
+		same, err := u.Git.Same(ctx, path, w.Path)
+		if err != nil {
+			return "", err
+		}
+		if same {
+			return w.Path, nil
+		}
+	}
+
+	return path, nil
 }
 
 // check reads, for each worktree, whether its directory is gone (a locked one git never calls prunable among them), its uncommitted changes while it is there, and the commits of its branch and of the commit it stands on no branch that stays holds, a commit on no branch or of a rebase under way among them, its directory gone or not. Worktrees removed together hold nothing for each other.

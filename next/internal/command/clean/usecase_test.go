@@ -409,6 +409,22 @@ func TestAWorktreeIsNamedByItsRootInAnotherCase(t *testing.T) {
 	assert.Equal(t, plain, planned.Worktrees[0].Worktree)
 }
 
+// git keeps a worktree's path as it was given: one added under ~/DEV where the disk says ~/dev, named by a path spelled as git has it, read as already absent once the path was respelled as the disk has it.
+func TestAWorktreeRegisteredInAnotherCaseIsNamedByGitsOwnPath(t *testing.T) {
+	w := newWorld(t, seed{})
+	require.NoError(t, os.MkdirAll(filepath.Join(w.root, "dev"), 0o755))
+	if _, err := os.Stat(filepath.Join(w.root, "DEV")); err != nil {
+		t.Skip("this filesystem tells case apart")
+	}
+	path := filepath.Join(w.root, "DEV", "wt-case")
+	gittest.Git(t, w.main, "worktree", "add", "-q", "--detach", path)
+
+	planned, _ := w.plan(t, removing(filepath.Join("DEV", "wt-case")).From(domain.Caller{Cwd: w.root}))
+
+	require.Len(t, planned.Worktrees, 1)
+	assert.Equal(t, path, planned.Worktrees[0].Path)
+}
+
 func TestAWorktreeOnNoBranchIsRemovedByItsPath(t *testing.T) {
 	w := newWorld(t, seed{})
 	path := w.at("detached")

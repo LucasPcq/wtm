@@ -86,43 +86,29 @@ func (r Repo) Locate(_ context.Context, path string) (worktree.Location, error) 
 	if err != nil {
 		return worktree.Location{}, err
 	}
-	return worktree.Location{Path: spelled(resolved), Exists: true}, nil
+	return worktree.Location{Path: resolved, Exists: true}, nil
 }
 
-// spelled is the existing path as the disk spells it: on one that ignores case,
-// as macOS's does, ../Feat-X reaches …/feat-x, which git spells in its own case.
-// Each part keeps its spelling unless an entry of its parent is the same file
-// under another case.
-func spelled(path string) string {
-	parent, name := filepath.Split(path)
-	if name == "" || parent == path {
-		return path
+// Same reports whether the paths a and b lead to the same file: on a disk that
+// ignores case, as macOS's does, ~/dev and ~/DEV are one directory, which git
+// may list in either spelling. A path where nothing is reads as no file.
+func (r Repo) Same(_ context.Context, a, b string) (bool, error) {
+	first, err := os.Stat(a)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
 	}
-	parent = spelled(filepath.Clean(parent))
-
-	given, err := os.Lstat(filepath.Join(parent, name))
 	if err != nil {
-		return filepath.Join(parent, name)
+		return false, err
 	}
-	entries, err := os.ReadDir(parent)
+	second, err := os.Stat(b)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
 	if err != nil {
-		return filepath.Join(parent, name)
-	}
-	for _, entry := range entries {
-		if entry.Name() == name {
-			return filepath.Join(parent, name)
-		}
-	}
-	for _, entry := range entries {
-		if !strings.EqualFold(entry.Name(), name) {
-			continue
-		}
-		if found, err := os.Lstat(filepath.Join(parent, entry.Name())); err == nil && os.SameFile(given, found) {
-			return filepath.Join(parent, entry.Name())
-		}
+		return false, err
 	}
 
-	return filepath.Join(parent, name)
+	return os.SameFile(first, second), nil
 }
 
 // RealPath returns path with its symlinks resolved, as git spells a worktree's

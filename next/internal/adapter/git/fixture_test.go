@@ -18,6 +18,7 @@ type port interface {
 	MainWorktree(ctx context.Context) (worktree.Worktree, error)
 	CommonDir(ctx context.Context) (string, error)
 	Locate(ctx context.Context, path string) (worktree.Location, error)
+	Same(ctx context.Context, a, b string) (bool, error)
 	Branches(ctx context.Context) (worktree.Branches, error)
 	CommitDates(ctx context.Context) (map[string]time.Time, error)
 	AheadBehind(ctx context.Context, name string) (worktree.AheadBehind, error)

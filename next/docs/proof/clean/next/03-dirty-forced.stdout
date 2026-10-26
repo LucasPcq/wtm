@@ -3,5 +3,5 @@
 
   Remove  feat/dirty (dirty, forced)
 
-  ! couldn't ask for open pull requests: pull requests unavailable: run `gh auth login`
+  ! couldn't ask for pull requests (pull requests unavailable: run `gh auth login`): open ones aren't checked, merged ones don't count as pushed
 

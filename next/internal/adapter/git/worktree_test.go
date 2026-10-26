@@ -518,3 +518,22 @@ func TestTheFakeLocatesARelativePathFromTheRepositoryDirectory(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, worktree.Location{Path: under(t, root)("taken"), Exists: true}, location)
 }
+
+func TestTheFakeAndGitTellTwoPathsToOneWorktree(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			same := map[string]bool{}
+			for name, pair := range map[string][2]string{
+				"itself":  {impl.at("linked"), impl.at("linked")},
+				"another": {impl.at("linked"), impl.at("dirty")},
+				"nothing": {impl.at("nope"), impl.at("nope")},
+			} {
+				found, err := impl.port.Same(t.Context(), pair[0], pair[1])
+				require.NoError(t, err, name)
+				same[name] = found
+			}
+
+			assert.Equal(t, map[string]bool{"itself": true, "another": false, "nothing": false}, same)
+		})
+	}
+}

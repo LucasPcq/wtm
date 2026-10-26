@@ -426,6 +426,19 @@ func (f *Fake) RemoveWorktree(_ context.Context, path string) error {
 	return nil
 }
 
+// Same reports whether a and b resolve to the same worktree or folder the fake
+// holds; the fake's disk tells case apart.
+func (f *Fake) Same(_ context.Context, a, b string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("Same", a); err != nil {
+		return false, err
+	}
+
+	resolved := realPath(a)
+	return resolved == realPath(b) && (f.worktreeAt(resolved) >= 0 || slices.Contains(f.folders, resolved) || slices.Contains(f.empty, resolved)), nil
+}
+
 // Unpushed counts the commits of the local branch losing.Branch, and of the
 // commit losing.Head, that no other local branch but those going with it, nor
 // any fetched remote branch, holds, a commit both hold once; a tip that names

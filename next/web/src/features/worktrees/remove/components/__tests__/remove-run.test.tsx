@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
 import { cleanPlan, heldRun } from '@/test/clean'
@@ -80,4 +80,37 @@ test('a run cancelled, then stopped, says it was cancelled', async () => {
 
   expect(await within(dialog).findByText('Cancelled the removal of feat/billing-ui')).toBeTruthy()
   expect(cancels).toEqual(['', '?force=true'])
+})
+
+test('a hidden run that partly failed is shown on the next Remove, and only what went leaves the selection', async () => {
+  const held = heldRun()
+  server.use(answeringClean(cleanPlan, held.respond))
+  const { user, dialog } = await selectAndRemove('feat/billing', 'feat/billing-ui')
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Remove 2 worktrees' }))
+  // the server named the operation: the run streams, and ending it reaches the page
+  await waitFor(() =>
+    expect(within(dialog).getByRole('button', { name: 'Cancel' }).hasAttribute('disabled')).toBe(false),
+  )
+  await user.click(within(dialog).getByRole('button', { name: 'Hide' }))
+  held.end({
+    ...envelope('clean', []),
+    ok: false,
+    items: [
+      { subject: 'feat/billing', status: 'done', detail: {} },
+      {
+        subject: 'feat/billing-ui',
+        status: 'failed',
+        error: { kind: 'failed', code: 'clean.remove_failed', message: "couldn't remove the worktree" },
+        detail: {},
+      },
+    ],
+  })
+
+  expect(await within(screen.getByRole('toolbar', { name: 'Selection' })).findByText('1 selected')).toBeTruthy()
+  const failed = await removeFromBar(user)
+  expect(await within(failed).findByText("Removed feat/billing, couldn't remove feat/billing-ui")).toBeTruthy()
+  await user.click(within(failed).getByRole('button', { name: 'Done' }))
+
+  expect(await within(await removeFromBar(user)).findByRole('heading', { name: 'Remove feat/billing-ui' })).toBeTruthy()
 })

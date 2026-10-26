@@ -14,11 +14,16 @@ export const useRuns = create<Record<string, Run | undefined>>(() => ({}))
 
 const keyOf = (repo: string, command: MutationCommand) => `${command}:${repo}`
 
-// a run that ended was read: the next one opens on its own subjects; one still running stays, one at a time
-export function dismissEnded(repo: string, command: MutationCommand) {
+// a run that ended well has nothing left to read: the next one opens on its own subjects; one still running, or one
+// that failed even in part, stays until it is read, one at a time
+export function dismissSucceeded(repo: string, command: MutationCommand) {
   const key = keyOf(repo, command)
-  if (useRuns.getState()[key]?.running === false) useRuns.setState({ [key]: undefined })
+  const run = useRuns.getState()[key]
+  if (run?.running === false && succeeded(run.progress.envelope)) useRuns.setState({ [key]: undefined })
 }
+
+export const succeeded = (envelope: Applied<MutationCommand> | undefined) =>
+  envelope?.ok === true && envelope.items.every((item) => item.status === 'done')
 
 export function useRun<C extends MutationCommand>(repo: string, command: C) {
   const client = useQueryClient()

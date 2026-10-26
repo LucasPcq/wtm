@@ -342,7 +342,7 @@ func (f Facts) warnings(planned Plan) []domain.Warning {
 		warnings = append(warnings, domain.Warning{Code: Name + domain.JobsUnknown, Message: run.UnknownMessage(f.JobsErr) + " — a job may still run in a worktree removed"})
 	}
 	if f.PRsErr != nil {
-		warnings = append(warnings, domain.Warning{Code: Name + domain.PRsUnavailable, Message: "couldn't ask for open pull requests: " + f.PRsErr.Error()})
+		warnings = append(warnings, domain.Warning{Code: Name + domain.PRsUnavailable, Message: "couldn't ask for pull requests (" + f.PRsErr.Error() + "): open ones aren't checked, merged ones don't count as pushed"})
 	}
 
 	for _, r := range planned.Worktrees {
