@@ -180,3 +180,21 @@ export const failedRun = (call: WebCall) => {
     ].join(''),
   )
 }
+
+// a removal whose first worktree fails and whose others go, under a warning of the whole run
+export const partlyFailedRun = (call: WebCall) => {
+  const [first = '', ...rest] = call.answers?.find((a) => a.path === 'worktree')?.values ?? []
+  const error = { kind: 'internal', code: 'clean.hook_failed', message: 'on_clean hook failed: exit status 1' }
+  return streamed(
+    `event: envelope\ndata: ${JSON.stringify({
+      ...envelope('clean', []),
+      ok: false,
+      items: [
+        { subject: first, status: 'failed', detail: {}, error },
+        ...rest.map((branch) => ({ subject: branch, status: 'done', detail: { path: `/acme.trees/${branch}` } })),
+      ],
+      warnings: [{ code: 'clean.jobs_unknown', message: "couldn't ask the run daemon which jobs are up" }],
+      error,
+    })}\n\n`,
+  )
+}

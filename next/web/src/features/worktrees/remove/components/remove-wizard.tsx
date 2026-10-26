@@ -16,7 +16,7 @@ import type { Start } from '@/features/worktrees/hooks/use-run'
 import { ChildrenStep } from '@/features/worktrees/remove/components/children-step'
 import { RemovalItem } from '@/features/worktrees/remove/components/removal-item'
 import { listed } from '@/features/worktrees/remove/utils/listed'
-import { requestOf, unitsOf, unsafe } from '@/features/worktrees/remove/utils/plan'
+import { plain, requestOf, unitsOf, unsafe } from '@/features/worktrees/remove/utils/plan'
 import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/remove/utils/wizard-state'
 import { sharedWarnings } from '@/features/worktrees/remove/utils/words'
 
@@ -176,7 +176,11 @@ export function RemoveWizard({
     <>
       <DialogHeader>
         <DialogTitle>{title()}</DialogTitle>
-        <DialogDescription>Each goes with its local branch and its record; the remote branch stays.</DialogDescription>
+        <DialogDescription>
+          {plain(removals)
+            ? 'Each goes with its local branch and its record; the remote branch stays.'
+            : 'Each goes with its record; its row says what becomes of its branch.'}
+        </DialogDescription>
       </DialogHeader>
 
       <DialogBand>

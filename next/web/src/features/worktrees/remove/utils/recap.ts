@@ -1,6 +1,5 @@
 import { sharedWarnings } from '@/features/worktrees/remove/utils/words'
-import { itemWarnings, type OutcomeGroup, outputOf, stoppedIn } from '@/features/worktrees/utils/outcome'
-import { phaseDuring } from '@/features/worktrees/utils/phases'
+import { itemWarnings, type OutcomeGroup, outputOf, stoppedMessage } from '@/features/worktrees/utils/outcome'
 import type { Progress } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
@@ -20,11 +19,6 @@ export function recapOf(progress: Progress<'clean'>): { groups: OutcomeGroup[]; 
           .join('; ')
       : ''
 
-  const stopped = (subject: string) => {
-    const phase = stoppedIn(unitOf(subject))?.phase
-    return phase ? `Cancelled during ${phaseDuring[phase]}` : 'Cancelled before it started'
-  }
-
   return {
     groups: [
       {
@@ -35,7 +29,10 @@ export function recapOf(progress: Progress<'clean'>): { groups: OutcomeGroup[]; 
             key: item.subject,
             tone: item.status === 'cancelled' ? ('muted' as const) : ('failed' as const),
             title: item.subject,
-            message: item.status === 'cancelled' ? stopped(item.subject) : item.error && sentence(item.error.message),
+            message:
+              item.status === 'cancelled'
+                ? stoppedMessage(unitOf(item.subject))
+                : item.error && sentence(item.error.message),
             output: outputOf(unitOf(item.subject)),
             followUp: item.error?.follow_up,
           })),

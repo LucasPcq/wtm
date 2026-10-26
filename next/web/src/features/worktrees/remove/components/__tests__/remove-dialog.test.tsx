@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
 import { cleanPlan } from '@/test/clean'
@@ -175,15 +175,37 @@ test('children of several parents preview where each goes, moved onto the neares
   expect(within(preview).getAllByRole('listitem')).toHaveLength(2)
 })
 
-test('a Next waiting on a choice says why to the keyboard too, and a press goes nowhere', async () => {
+test('a Next waiting on a choice says why to the keyboard too', async () => {
   const { user, dialog } = await selectAndRemove('fix/login')
   await within(dialog).findByRole('listitem', { name: 'fix/login' })
   const next = within(dialog).getByRole('button', { name: 'Next' })
 
-  next.focus()
+  for (let i = 0; i < 20 && document.activeElement !== next; i++) await user.tab()
+
+  expect(document.activeElement).toBe(next)
   expect(await screen.findByRole('tooltip', { name: 'Choose for fix/login first' })).toBeTruthy()
+})
+
+test('a press on a Next waiting for its plan goes nowhere, even once the plan lands', async () => {
+  let release = () => {}
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  server.use(
+    answeringClean(async (call) => {
+      if (!call.answers?.some((a) => a.path === 'force')) await held
+      return cleanPlan(call)
+    }),
+  )
+  const { user, dialog } = await selectAndRemove('feat/search-docs')
+  await within(dialog).findByRole('listitem', { name: 'feat/search-docs' })
+  const next = within(dialog).getByRole('button', { name: 'Next' })
+  expect(next.getAttribute('aria-disabled')).toBe('true')
 
   await user.click(next)
-  expect(within(dialog).getByRole('radio', { name: 'Keep it' })).toBeTruthy()
-  expect(within(dialog).queryByText(/is stacked on/)).toBeNull()
+  release()
+
+  await waitFor(() => expect(next.getAttribute('aria-disabled')).toBe('false'))
+  expect(within(dialog).getByRole('listitem', { name: 'feat/search-docs' })).toBeTruthy()
+  expect(within(dialog).queryByRole('button', { name: 'Remove feat/search-docs' })).toBeNull()
 })

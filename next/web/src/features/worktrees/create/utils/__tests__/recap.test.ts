@@ -100,3 +100,16 @@ test('a next step no item claims is said plainly among what went, never as a thi
     { key: 'create.next-start its profile', message: 'Start its profile', go: next },
   ])
 })
+
+test('a create cancelled before any step says so, as a removal does', () => {
+  const cancelled = narrowed<CreateDetail, CreatePlan>({
+    ...envelope('create', []),
+    ok: false,
+    items: [{ subject: 'feat/onboarding', status: 'cancelled', detail: {} }],
+  })
+  const units = [
+    { subject: 'feat/onboarding', phases: [{ phase: 'worktree' as const, state: 'todo' as const }], lines: [] },
+  ]
+
+  expect(recapOf({ units, envelope: cancelled })[0]?.rows[0]?.message).toBe('Cancelled before it started')
+})

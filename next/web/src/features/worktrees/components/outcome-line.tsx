@@ -16,17 +16,16 @@ const glyph: Record<OutcomeTone, LucideIcon> = {
   muted: CircleMinus,
 }
 
-// what explains a problem, its output or its fix, folds under its line until asked for
 export function OutcomeLine({ row }: { row: OutcomeRow }) {
   const [open, setOpen] = useState(false)
-  const Icon = row.tone && glyph[row.tone]
+  const Icon = glyph[row.tone ?? 'muted']
   const foldable = row.output !== undefined || row.followUp !== undefined
 
   return (
     <Collapsible asChild open={open} onOpenChange={setOpen}>
       <li className="flex flex-col gap-1">
         <div className="flex min-h-8 items-center gap-3 text-sm">
-          {Icon && row.tone ? (
+          {row.tone ? (
             <Icon className={cn(toneIcon({ tone: row.tone }), 'size-4')} aria-hidden="true" />
           ) : (
             <span className="size-4 shrink-0" />
@@ -37,7 +36,11 @@ export function OutcomeLine({ row }: { row: OutcomeRow }) {
           {row.followUp && !open && <CommandLine followUp={row.followUp} look="copy" />}
           {foldable && (
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label={`Details of ${row.title ?? row.message}`}>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Details of ${[row.title, row.message].filter(Boolean).join(': ')}`}
+              >
                 <ChevronRight
                   className={cn('transition-transform motion-reduce:transition-none', open && 'rotate-90')}
                 />

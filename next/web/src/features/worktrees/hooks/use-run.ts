@@ -79,7 +79,6 @@ export function useRun<C extends MutationCommand>(repo: string, command: C) {
 
 const doing: Record<MutationCommand, string> = { create: 'Creating', clean: 'Removing' }
 
-// the rows a run works on, each with what it is doing
 export function useUnderWay(repo: string): Record<string, string> {
   const runs = useRuns()
 

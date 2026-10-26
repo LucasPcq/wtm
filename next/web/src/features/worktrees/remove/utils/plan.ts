@@ -5,6 +5,9 @@ export type Choice = 'keep' | 'remove'
 
 export const unsafe = (removal: CleanRemoval) => (removal.blockers ?? []).length > 0
 
+// a worktree on no branch, or a branch with no worktree, is no "worktree with its branch"
+export const plain = (removals: CleanRemoval[]) => removals.every((removal) => removal.branch && removal.path)
+
 // the request the choices give: the worktrees not kept, forced when an unsafe one is removed anyway
 export function requestOf({
   removals,

@@ -1,5 +1,6 @@
 import type { DomainFollowUp, DomainItem } from '@/api/types.gen'
 import type { Tone } from '@/features/worktrees/components/glyph'
+import { phaseDuring } from '@/features/worktrees/utils/phases'
 import type { Unit } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
@@ -24,16 +25,19 @@ export type OutcomeRow = {
 
 export type OutcomeGroup = { kind: OutcomeKind; rows: OutcomeRow[] }
 
-// a subject's output, with the log of the step that failed: what explains its failure
 export const outputOf = (unit: Unit | undefined) => {
   if (!unit || unit.lines.length === 0) return undefined
   return { lines: unit.lines, log: unit.phases.find((run) => run.state === 'failed')?.log }
 }
 
-// the step a run was cancelled in: the one under way, else the last one started
-export const stoppedIn = (unit: Unit | undefined) =>
+const stoppedIn = (unit: Unit | undefined) =>
   unit?.phases.find((run) => run.state === 'now' || run.state === 'failed') ??
   unit?.phases.findLast((run) => run.startedAt !== undefined)
+
+export function stoppedMessage(unit: Unit | undefined) {
+  const phase = stoppedIn(unit)?.phase
+  return phase ? `Cancelled during ${phaseDuring[phase]}` : 'Cancelled before it started'
+}
 
 // an item's own warnings name it: two alike on two items stay two
 export const itemWarnings = (items: Pick<DomainItem, 'subject' | 'warnings'>[]): OutcomeRow[] =>

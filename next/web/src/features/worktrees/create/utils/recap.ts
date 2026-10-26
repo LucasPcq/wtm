@@ -1,5 +1,4 @@
-import { itemWarnings, type OutcomeGroup, outputOf, stoppedIn } from '@/features/worktrees/utils/outcome'
-import { phaseDuring } from '@/features/worktrees/utils/phases'
+import { itemWarnings, type OutcomeGroup, outputOf, stoppedMessage } from '@/features/worktrees/utils/outcome'
 import type { Progress } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
@@ -18,15 +17,12 @@ export function recapOf(progress: Progress<'create'>): OutcomeGroup[] {
 
   const problem = (item: (typeof items)[number]) => {
     const unit = unitOf(item.subject)
-    const phase = stoppedIn(unit)?.phase
     const cancelled = item.status === 'cancelled'
     return {
       key: item.subject,
       tone: cancelled ? ('muted' as const) : ('failed' as const),
       title: item.subject,
-      message: cancelled
-        ? phase && `Cancelled during ${phaseDuring[phase]}`
-        : item.error && sentence(item.error.message),
+      message: cancelled ? stoppedMessage(unit) : item.error && sentence(item.error.message),
       output: outputOf(unit),
       followUp: nextOf(item.subject),
     }

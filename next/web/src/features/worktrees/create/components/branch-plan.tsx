@@ -2,7 +2,6 @@ import type { CreateBranchPlan, CreatePlan } from '@/api/types.gen'
 import { Item, ItemTitle } from '@/components/ui/item'
 import { actionWords, envFromShort, isolationShort } from '@/features/worktrees/create/utils/words'
 
-// one branch the plan makes: its name, how it gets there, and the answers it is made with, in one line
 export function BranchPlan({ plan, branch }: { plan: CreatePlan; branch: CreateBranchPlan }) {
   const source = () => {
     switch (branch.action) {

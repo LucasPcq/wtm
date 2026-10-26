@@ -1,6 +1,5 @@
 import { CircleX } from 'lucide-react'
 
-// the run's own failure, before any item: a stale plan, a refusal
 export function RunFailure({ message }: { message: string | undefined }) {
   if (!message) return null
 

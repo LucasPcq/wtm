@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
-import { cleanPlan, failedRun, heldRun } from '@/test/clean'
+import { cleanPlan, failedRun, heldRun, partlyFailedRun } from '@/test/clean'
 import { envelope } from '@/test/fixtures'
 import { answeringClean, selectAndRemove } from '@/test/remove'
 import { server } from '@/test/server'
@@ -125,8 +125,26 @@ test('a removal that failed is one line, its output and log one click under it, 
   expect(within(dialog).getByText('on_clean hook failed: exit status 1')).toBeTruthy()
   expect(within(dialog).queryByText('Error response from daemon: permission denied')).toBeNull()
 
-  await user.click(within(dialog).getByRole('button', { name: 'Details of feat/billing-ui' }))
+  await user.click(
+    within(dialog).getByRole('button', { name: 'Details of feat/billing-ui: on_clean hook failed: exit status 1' }),
+  )
   expect(within(dialog).getByText('Error response from daemon: permission denied')).toBeTruthy()
   expect(within(dialog).getByRole('button', { name: "Copy the log's path" })).toBeTruthy()
   expect(within(dialog).getByRole('button', { name: /^2 steps/ })).toBeTruthy()
+})
+
+test('a finished removal names its groups in the order that needs the person first', async () => {
+  server.use(answeringClean(cleanPlan, partlyFailedRun))
+  const { user, dialog } = await selectAndRemove('feat/billing-ui', 'feat/search')
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await within(dialog).findByText(/is stacked on/)
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Remove 2 worktrees' }))
+
+  await within(dialog).findByRole('heading', { name: /couldn't remove feat\/billing-ui/ })
+  expect(
+    within(dialog)
+      .getAllByRole('heading', { level: 3 })
+      .map((heading) => heading.textContent),
+  ).toEqual(["Couldn't remove", 'To check', 'Removed'])
 })

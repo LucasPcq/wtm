@@ -60,7 +60,7 @@ func runHook(ctx context.Context, hook project.Hook, chain env.HookChain, sink *
 	case err == nil, errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState.Success():
 		return nil
 	case ctx.Err() != nil:
-		return &env.HookFailure{Cmd: hook.Cmd, Err: fmt.Errorf("hook stopped: %w", ctx.Err())}
+		return &env.HookFailure{Cmd: hook.Cmd, Err: ctx.Err()}
 	}
 
 	// the caller names the hook that failed ("on_clean hook failed"): the failure carries only its cause

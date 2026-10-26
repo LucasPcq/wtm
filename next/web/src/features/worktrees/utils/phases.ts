@@ -13,7 +13,6 @@ export const phaseLabel: Record<DomainPhase, string> = {
   remove: 'Remove the worktree',
 }
 
-// a phase as "during …" names it, when a run was cancelled in it
 export const phaseDuring: Record<DomainPhase, string> = {
   fast_forward: 'the fast-forward of the source branch',
   worktree: 'the add of the worktree',

@@ -9,6 +9,7 @@ import { RunOutcome } from '@/features/worktrees/components/run-outcome'
 import { RunSteps } from '@/features/worktrees/components/run-steps'
 import { RunningFooter } from '@/features/worktrees/components/running-footer'
 import { listed } from '@/features/worktrees/remove/utils/listed'
+import { plain } from '@/features/worktrees/remove/utils/plan'
 import { recapOf } from '@/features/worktrees/remove/utils/recap'
 import { outcomeWords } from '@/features/worktrees/remove/utils/words'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
@@ -38,10 +39,9 @@ export function RemoveProgress({
   // the run's own failure (a stale plan, a refusal); one the core repeats from an item shows on that item's line
   const refused = progress.refused ?? (items.some((item) => item.error) ? undefined : progress.envelope?.error?.message)
   const { groups, kept } = recapOf(progress)
-  // a worktree on no branch, or a branch with no worktree, is no "worktree with its branch": then only the count holds
-  const plain = (progress.envelope?.plan?.worktrees ?? [])
-    .filter((removal) => removed.includes(removal.worktree))
-    .every((removal) => removal.branch && removal.path)
+  const branched = plain(
+    (progress.envelope?.plan?.worktrees ?? []).filter((removal) => removed.includes(removal.worktree)),
+  )
 
   const title = () => {
     if (running) return progress.cancelling ? `Cancelling the removal of ${listed(names)}` : `Removing ${listed(names)}`
@@ -52,7 +52,7 @@ export function RemoveProgress({
   }
 
   const description = () => {
-    if (ok && !plain) return `${removed.length} removed.`
+    if (ok && !branched) return `${removed.length} removed.`
     if (ok)
       return names.length === 1
         ? 'Its local branch went with it; the remote branch stays.'
