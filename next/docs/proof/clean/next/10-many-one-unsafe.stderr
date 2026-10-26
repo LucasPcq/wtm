@@ -1,5 +1,5 @@
 
-  ✗ nothing removed: 1 worktree(s) can't be removed safely
+  ✗ nothing removed: feat/c can't be removed safely
     feat/c has uncommitted changes
   → wtm clean feat/a feat/c --force   remove anyway
 

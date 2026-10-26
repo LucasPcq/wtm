@@ -140,3 +140,14 @@
  {
    "source_branch": "main",
 === 25-stale-fingerprint: exit legacy 2, next 25
+=== 26-branch-without-worktree: exit legacy 0, next 0
+--- legacy/26-branch-without-worktree
++++ next/26-branch-without-worktree
+@@ -5,7 +5,6 @@
+ feat/child
+ feat/child2
+ feat/detached
+-feat/orphan
+ feat/unpushed
+ main
+ ## worktrees

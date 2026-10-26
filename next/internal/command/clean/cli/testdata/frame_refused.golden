@@ -7,7 +7,7 @@
 
   ┃  Review & confirm
   ┃
-  ┃  ✗ nothing removed: 1 worktree(s) can't be removed safely
+  ┃  ✗ nothing removed: feat/dirty can't be removed safely
   ┃      feat/dirty has uncommitted changes
 
 ▌› No, cancel

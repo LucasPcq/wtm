@@ -281,7 +281,7 @@ func refusal(blocked []Removal, req Request) *domain.Error {
 	return &domain.Error{
 		Kind:     domain.KindRefused,
 		Code:     CodeUnsafe,
-		Message:  "nothing removed: " + strconv.Itoa(len(blocked)) + " worktree(s) can't be removed safely",
+		Message:  "nothing removed: " + strings.Join(names, ", ") + " can't be removed safely",
 		Params:   domain.Params{"worktrees": strings.Join(names, ", ")},
 		Fields:   fields,
 		FollowUp: &domain.FollowUp{Command: Name, Answers: domain.AnswersOf(Questions{}.Form(), forced), Code: CodeForce, Message: "remove anyway"},
@@ -297,7 +297,10 @@ func (r Removal) problem(blocker Blocker) domain.FieldError {
 	case BlockerDirty:
 		problem.Template = "{value} has uncommitted changes"
 	case BlockerUnpushed:
-		problem.Template, problem.Params["count"] = "{value} has {count} commit(s) no other branch nor remote holds", strconv.Itoa(r.Unpushed)
+		problem.Template, problem.Params["count"] = "{value} has {count} commits no other branch nor remote holds", strconv.Itoa(r.Unpushed)
+		if r.Unpushed == 1 {
+			problem.Template = "{value} has 1 commit no other branch nor remote holds"
+		}
 	case BlockerOpenPullRequest:
 		problem.Template, problem.Params["url"] = "{value} has an open pull request: {url}", r.PullRequest
 	case BlockerJobsRunning:
@@ -412,12 +415,16 @@ func recappedRemovals(removals []Removal) []domain.RecapValue {
 	values := make([]domain.RecapValue, 0, len(removals))
 	for _, r := range removals {
 		value := domain.RecapValue{Value: r.Worktree, Text: r.Worktree}
+		var notes []string
 		if r.Path == "" {
-			value.Note, value.Text = NoteBranchOnly, r.Worktree+" (branch only: no worktree)"
+			value.Note, notes = NoteBranchOnly, append(notes, "branch only: no worktree")
 		}
 		if len(r.Blockers) > 0 {
 			lost := strings.Join(domain.Names(r.Blockers), ", ")
-			value.Note, value.Params, value.Text = NoteForced, domain.Params{"blockers": lost}, r.Worktree+" ("+lost+", forced)"
+			value.Note, value.Params, notes = NoteForced, domain.Params{"blockers": lost}, append(notes, lost+", forced")
+		}
+		if len(notes) > 0 {
+			value.Text += " (" + strings.Join(notes, "; ") + ")"
 		}
 		values = append(values, value)
 	}

@@ -232,6 +232,21 @@ func TestABranchNoWorktreeHoldsIsDeletedWithItsRecordBehindTheSameChecks(t *test
 	assert.Empty(t, gittest.Output(t, w.main, "branch", "--list", "feat/held"))
 }
 
+// The proof's hand run caught it: a branch alone was refused as "1 worktree(s)" with "1 commit(s)", and forced, its recap lost that it was a branch alone.
+func TestARefusalNamesWhatItRefusesAndAForcedBranchAloneStaysOne(t *testing.T) {
+	w := newWorld(t, seed{})
+	gittest.Git(t, w.main, "branch", "feat/held", gittest.Output(t, w.main, "commit-tree", "main^{tree}", "-p", "main", "-m", "held"))
+
+	_, err := w.usecase.Run(t.Context(), removing("feat/held", dirty), domain.RunOptions{DryRun: true})
+	forced, forcedErr := w.usecase.Run(t.Context(), clean.Request{Worktrees: []string{"feat/held"}, Force: true}, domain.RunOptions{DryRun: true})
+
+	refused := failureOf(t, err)
+	assert.Equal(t, "nothing removed: feat/held, "+dirty+" can't be removed safely", refused.Message)
+	assert.Equal(t, "feat/held has 1 commit no other branch nor remote holds", refused.Fields[0].Message("worktree"))
+	require.NoError(t, forcedErr)
+	assert.Equal(t, "feat/held (branch only: no worktree; unpushed, forced)", forced.Plan.Recap[0].Values[0].Text)
+}
+
 func TestANameThatIsNoWorktreeIsAlreadyAbsent(t *testing.T) {
 	w := newWorld(t, seed{})
 

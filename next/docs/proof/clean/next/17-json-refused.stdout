@@ -8,7 +8,7 @@
   "error": {
     "kind": "refused",
     "code": "clean.unsafe",
-    "message": "nothing removed: 1 worktree(s) can't be removed safely",
+    "message": "nothing removed: feat/c can't be removed safely",
     "params": {
       "worktrees": "feat/c"
     },

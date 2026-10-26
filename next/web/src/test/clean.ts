@@ -37,7 +37,7 @@ export const cleanPlan = (call: WebCall) => {
         error: {
           kind: 'refused',
           code: 'clean.unsafe',
-          message: `nothing removed: ${unsafe.length} worktree(s) can't be removed safely`,
+          message: `nothing removed: ${unsafe.join(', ')} can't be removed safely`,
           fields: unsafe.map((branch) => ({
             path: `worktree[${picked.indexOf(branch)}]`,
             code: 'clean.dirty',
