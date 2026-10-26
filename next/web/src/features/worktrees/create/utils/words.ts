@@ -1,4 +1,4 @@
-import type { CreateAction, CreateRequest, DomainField, DomainPhase, DomainSkip } from '@/api/types.gen'
+import type { CreateAction, CreateRequest, DomainField, DomainSkip } from '@/api/types.gen'
 import type { FieldWords, OptionWords } from '@/components/command-form/command-fields'
 import type { OutcomeKind } from '@/features/worktrees/utils/outcome'
 
@@ -101,18 +101,4 @@ export const outcomeWords: Record<OutcomeKind, string> = {
   failed: "Couldn't create",
   check: 'To check',
   done: 'Ready',
-}
-
-// a phase as "during …" names it, when a run was cancelled in it
-export const phaseDuring: Record<DomainPhase, string> = {
-  fast_forward: 'the fast-forward of the source branch',
-  worktree: 'the add of the worktree',
-  env: 'the copy of its .env files',
-  meta: 'its record',
-  ordinal: 'its numbering',
-  ports: 'the settling of its ports',
-  on_create: 'the on_create hooks',
-  move: 'the move of the changes',
-  on_clean: 'the on_clean hooks',
-  remove: 'the removal of the worktree',
 }

@@ -125,7 +125,7 @@ test('a removal that failed is one line, its output and log one click under it, 
   expect(within(dialog).getByText('on_clean hook failed: exit status 1')).toBeTruthy()
   expect(within(dialog).queryByText('Error response from daemon: permission denied')).toBeNull()
 
-  await user.click(within(dialog).getByRole('button', { name: 'Show the details' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Details of feat/billing-ui' }))
   expect(within(dialog).getByText('Error response from daemon: permission denied')).toBeTruthy()
   expect(within(dialog).getByRole('button', { name: "Copy the log's path" })).toBeTruthy()
   expect(within(dialog).getByRole('button', { name: /^2 steps/ })).toBeTruthy()

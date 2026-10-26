@@ -3,7 +3,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 export type ChoiceOption = { value: string; title: string; description?: string | undefined }
 
-// one choice among a few, each option its title and, under it, what it does: both wizards ask this way
 export function ChoiceOptions({
   id,
   label,

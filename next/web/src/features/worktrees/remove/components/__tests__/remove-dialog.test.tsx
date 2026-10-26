@@ -14,7 +14,7 @@ test('an unsafe worktree waits for a choice; kept, the others go through the chi
   const unsafe = await within(dialog).findByRole('listitem', { name: 'fix/login' })
   expect(within(unsafe).getByText('Uncommitted changes')).toBeTruthy()
   const next = within(dialog).getByRole('button', { name: 'Next' })
-  expect(next.hasAttribute('disabled')).toBe(true)
+  expect(next.getAttribute('aria-disabled')).toBe('true')
   await user.hover(next)
   expect(await screen.findByRole('tooltip', { name: 'Choose for fix/login first' })).toBeTruthy()
 
@@ -90,7 +90,12 @@ test("the detail's menu removes the worktree it shows, and a child left on it is
   expect(
     await within(dialog).findByRole('button', { name: 'Copy wtm reparent feat/billing-ui --to main' }),
   ).toBeTruthy()
-  await user.click(within(dialog).getByRole('button', { name: 'Show the details' }))
+  const fold = within(dialog).getByRole('button', {
+    name: 'Details of feat/billing-ui still points at the removed parent feat/billing',
+  })
+  expect(fold.getAttribute('aria-expanded')).toBe('false')
+  await user.click(fold)
+  expect(fold.getAttribute('aria-expanded')).toBe('true')
   expect(await within(dialog).findByText('wtm reparent feat/billing-ui --to main')).toBeTruthy()
 })
 
@@ -105,7 +110,7 @@ test('a plan that cannot be made says why instead of a Next that never wakes', a
   const { dialog } = await selectAndRemove('feat/billing-ui')
 
   expect(await within(dialog).findByText('git is busy')).toBeTruthy()
-  expect(within(dialog).getByRole('button', { name: 'Next' }).hasAttribute('disabled')).toBe(true)
+  expect(within(dialog).getByRole('button', { name: 'Next' }).getAttribute('aria-disabled')).toBe('true')
 })
 
 test('a worktree read again unsafe on a later step brings the wizard back to its choice', async () => {
@@ -149,7 +154,7 @@ test('every worktree kept leaves nothing to remove', async () => {
 
   expect(within(dialog).getByRole('heading', { name: 'Remove worktrees' })).toBeTruthy()
   const next = within(dialog).getByRole('button', { name: 'Next' })
-  expect(next.hasAttribute('disabled')).toBe(true)
+  expect(next.getAttribute('aria-disabled')).toBe('true')
   await user.hover(next)
   expect(await screen.findByRole('tooltip', { name: 'Every worktree is kept: nothing to remove' })).toBeTruthy()
 })
@@ -168,4 +173,17 @@ test('children of several parents preview where each goes, moved onto the neares
   expect(within(moved).getByLabelText('onto')).toBeTruthy()
   expect(within(moved).getByText('main')).toBeTruthy()
   expect(within(preview).getAllByRole('listitem')).toHaveLength(2)
+})
+
+test('a Next waiting on a choice says why to the keyboard too, and a press goes nowhere', async () => {
+  const { user, dialog } = await selectAndRemove('fix/login')
+  await within(dialog).findByRole('listitem', { name: 'fix/login' })
+  const next = within(dialog).getByRole('button', { name: 'Next' })
+
+  next.focus()
+  expect(await screen.findByRole('tooltip', { name: 'Choose for fix/login first' })).toBeTruthy()
+
+  await user.click(next)
+  expect(within(dialog).getByRole('radio', { name: 'Keep it' })).toBeTruthy()
+  expect(within(dialog).queryByText(/is stacked on/)).toBeNull()
 })

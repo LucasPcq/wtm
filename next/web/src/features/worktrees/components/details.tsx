@@ -3,7 +3,6 @@ import type { ReactNode } from 'react'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 
-// what most people never read, one deliberate click away: the hooks and folders of a plan, the steps of a run
 export function Details({
   label,
   summary,

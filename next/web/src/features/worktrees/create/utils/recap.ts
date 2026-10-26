@@ -1,14 +1,9 @@
-import { phaseDuring } from '@/features/worktrees/create/utils/words'
-import { type OutcomeGroup, outputOf } from '@/features/worktrees/utils/outcome'
-import type { Progress, Unit } from '@/features/worktrees/utils/progress'
+import { itemWarnings, type OutcomeGroup, outputOf, stoppedIn } from '@/features/worktrees/utils/outcome'
+import { phaseDuring } from '@/features/worktrees/utils/phases'
+import type { Progress } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
-const stoppedIn = (unit: Unit | undefined) =>
-  unit?.phases.find((run) => run.state === 'now' || run.state === 'failed') ??
-  unit?.phases.findLast((run) => run.startedAt !== undefined)
-
-// what a create that ended did, in the groups the dialog shows: each worktree ready with the step into it, each one
-// that failed or was cancelled with its output and that step, then the warnings
+// a next step no item claims is said plainly with what went: nothing failed, nothing to check
 export function recapOf(progress: Progress<'create'>): OutcomeGroup[] {
   const envelope = progress.envelope
   if (!envelope) return []
@@ -27,7 +22,7 @@ export function recapOf(progress: Progress<'create'>): OutcomeGroup[] {
     const cancelled = item.status === 'cancelled'
     return {
       key: item.subject,
-      tone: cancelled ? ('stopped' as const) : ('failed' as const),
+      tone: cancelled ? ('muted' as const) : ('failed' as const),
       title: item.subject,
       message: cancelled
         ? phase && `Cancelled during ${phaseDuring[phase]}`
@@ -51,25 +46,27 @@ export function recapOf(progress: Progress<'create'>): OutcomeGroup[] {
           message: sentence(warning.message),
           followUp: warning.follow_up,
         })),
-        ...loose.map((followUp) => ({
-          key: `${followUp.code}-${followUp.message}`,
-          tone: 'attention' as const,
-          message: sentence(followUp.message),
-          followUp,
-        })),
+        ...itemWarnings(items),
       ],
     },
     {
       kind: 'done',
-      rows: items
-        .filter((item) => item.status === 'done' || item.status === 'skipped')
-        .map((item) => ({
-          key: item.subject,
-          tone: 'ok' as const,
-          title: item.subject,
-          go: nextOf(item.subject),
-          path: item.detail?.path,
+      rows: [
+        ...items
+          .filter((item) => item.status === 'done' || item.status === 'skipped')
+          .map((item) => ({
+            key: item.subject,
+            tone: 'ok' as const,
+            title: item.subject,
+            go: nextOf(item.subject),
+            path: item.detail?.path,
+          })),
+        ...loose.map((followUp) => ({
+          key: `${followUp.code}-${followUp.message}`,
+          message: sentence(followUp.message),
+          go: followUp,
         })),
+      ],
     },
   ]
 }

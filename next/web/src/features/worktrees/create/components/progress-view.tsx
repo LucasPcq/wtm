@@ -1,9 +1,9 @@
-import { CircleX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress as Bar } from '@/components/ui/progress'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
+import { RunFailure } from '@/features/worktrees/components/run-failure'
 import { RunOutcome } from '@/features/worktrees/components/run-outcome'
 import { RunSteps } from '@/features/worktrees/components/run-steps'
 import { RunningFooter } from '@/features/worktrees/components/running-footer'
@@ -66,11 +66,8 @@ export function ProgressView({
       )}
 
       <DialogScroll>
-        {!running && failure && !(progress.envelope?.items ?? []).some((item) => item.error) && (
-          <p className="flex items-start gap-3 text-sm">
-            <CircleX className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
-            {failure}
-          </p>
+        {!running && (
+          <RunFailure message={(progress.envelope?.items ?? []).some((item) => item.error) ? undefined : failure} />
         )}
         {!running && <RunOutcome groups={recapOf(progress)} labels={outcomeWords} />}
         <RunSteps progress={progress} running={running} />

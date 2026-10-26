@@ -37,6 +37,8 @@ test('create shows a problem only once asked to go on, then confirms the plan, r
   await user.click(within(dialog).getByRole('button', { name: 'Create worktree' }))
 
   expect(await within(dialog).findByText('feat/new is ready')).toBeTruthy()
+  // a lone group of the outcome needs no name
+  expect(within(dialog).queryByRole('heading', { name: 'Ready' })).toBeNull()
   expect(within(dialog).getByText('/acme.trees/feat/new')).toBeTruthy()
   expect(within(dialog).getByText('wtm go feat/new')).toBeTruthy()
   // a run that went well folds its steps away, one click from them

@@ -76,3 +76,52 @@ test('the data a removed worktree keeps is nothing to act on: it goes with the s
     'feat/billing keeps its data in shared services: acme_feat_billing',
   ])
 })
+
+test('a removal cancelled in its hook stays with its output, said where it stopped', () => {
+  const cancelled = narrowed<CleanDetail, CleanPlan>({
+    ...envelope('clean', []),
+    ok: false,
+    items: [{ subject: 'spike/gui-poc', status: 'cancelled', reason: 'interrupted', detail: {} }],
+  })
+  const stopped = [
+    {
+      subject: 'spike/gui-poc',
+      phases: [{ phase: 'on_clean' as const, state: 'failed' as const, startedAt: '2026-10-26T12:00:00Z' }],
+      lines: ['stopping spike/gui-poc'],
+    },
+  ]
+
+  const [failed] = recapOf({ units: stopped, envelope: cancelled }).groups
+
+  expect(failed?.rows).toEqual([
+    {
+      key: 'spike/gui-poc',
+      tone: 'muted',
+      title: 'spike/gui-poc',
+      message: 'Cancelled during the on_clean hooks',
+      output: { lines: ['stopping spike/gui-poc'], log: undefined },
+      followUp: undefined,
+    },
+  ])
+})
+
+test("an item's warning names its worktree, and two alike stay two", () => {
+  const skipped = { code: 'clean.hooks_skipped', message: 'its directory is gone: the on_clean hooks did not run' }
+  const ended = narrowed<CleanDetail, CleanPlan>({
+    ...envelope('clean', []),
+    items: ['feat/a', 'feat/b'].map((subject) => ({
+      subject,
+      status: 'done' as const,
+      detail: { path: `/t/${subject}` },
+      warnings: [skipped],
+    })),
+  })
+
+  const check = recapOf({ units: [], envelope: ended }).groups.find((group) => group.kind === 'check')
+
+  expect(check?.rows.map((row) => [row.title, row.message])).toEqual([
+    ['feat/a', 'Its directory is gone: the on_clean hooks did not run'],
+    ['feat/b', 'Its directory is gone: the on_clean hooks did not run'],
+  ])
+  expect(new Set(check?.rows.map((row) => row.key)).size).toBe(2)
+})

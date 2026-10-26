@@ -1,4 +1,4 @@
-import { CircleX, ExternalLink, TriangleAlert } from 'lucide-react'
+import { CircleX, ExternalLink, type LucideIcon, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { CleanMove, CleanRemoval } from '@/api/types.gen'
 import { Item, ItemTitle } from '@/components/ui/item'
@@ -8,8 +8,13 @@ import { type Choice, unsafe } from '@/features/worktrees/remove/utils/plan'
 import { blockerWords, choiceWords, lostWords } from '@/features/worktrees/remove/utils/words'
 import { cn } from '@/lib/utils'
 
-// one worktree of a removal: on the first step, why it can't go safely and the choice to make; on Confirm, what it
-// loses and what becomes of its children
+// kept, an unsafe worktree no longer asks anything of the person: its glyph steps back with it
+const look: Record<'undecided' | 'kept' | 'forced', { icon: LucideIcon; className: string }> = {
+  undecided: { icon: TriangleAlert, className: 'text-amber-500' },
+  kept: { icon: TriangleAlert, className: 'text-muted-foreground' },
+  forced: { icon: CircleX, className: 'text-destructive' },
+}
+
 export function RemovalItem({
   removal,
   choice,
@@ -27,15 +32,15 @@ export function RemovalItem({
   const risky = unsafe(removal)
   const kept = choice === 'keep'
 
+  const state = () => {
+    if (!onChoice) return 'forced'
+    return kept ? 'kept' : 'undecided'
+  }
+
   const glyph = () => {
     if (!risky) return <span className="size-4 shrink-0" />
-    if (!onChoice) return <CircleX className="size-4 shrink-0 text-destructive" aria-hidden="true" />
-    return (
-      <TriangleAlert
-        className={cn('size-4 shrink-0', kept ? 'text-muted-foreground' : 'text-amber-500')}
-        aria-hidden="true"
-      />
-    )
+    const { icon: Icon, className } = look[state()]
+    return <Icon className={cn('size-4 shrink-0', className)} aria-hidden="true" />
   }
 
   const name = () => {

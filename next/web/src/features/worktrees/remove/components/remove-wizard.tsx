@@ -1,5 +1,4 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { TriangleAlert } from 'lucide-react'
 import { useReducer } from 'react'
 import { dryRunQuery } from '@/api/queries/commands'
 import { Button } from '@/components/ui/button'
@@ -11,6 +10,7 @@ import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { type Fact, Facts } from '@/features/worktrees/components/facts'
 import { ItemList } from '@/features/worktrees/components/item-list'
+import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { Stepper, type StepState } from '@/features/worktrees/components/stepper'
 import type { Start } from '@/features/worktrees/hooks/use-run'
 import { ChildrenStep } from '@/features/worktrees/remove/components/children-step'
@@ -19,7 +19,6 @@ import { listed } from '@/features/worktrees/remove/utils/listed'
 import { requestOf, unitsOf, unsafe } from '@/features/worktrees/remove/utils/plan'
 import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/remove/utils/wizard-state'
 import { sharedWarnings } from '@/features/worktrees/remove/utils/words'
-import { sentence } from '@/features/worktrees/utils/sentence'
 
 export function RemoveWizard({
   repo,
@@ -163,16 +162,7 @@ export function RemoveWizard({
             />
           ))}
         </ItemList>
-        {warnings.length > 0 && (
-          <ul className="flex flex-col gap-2 text-sm">
-            {warnings.map((warning) => (
-              <li key={`${warning.code}-${warning.message}`} className="flex items-start gap-3">
-                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-500" aria-hidden="true" />
-                {sentence(warning.message)}
-              </li>
-            ))}
-          </ul>
-        )}
+        <PlanWarnings warnings={warnings} />
         <Details label="Details" summary={summary}>
           {removing.map((removal) => (
             <Facts key={removal.worktree} heading={removal.worktree} facts={factsOf(removal)} />
@@ -228,24 +218,22 @@ export function RemoveWizard({
   )
 }
 
-// a disabled button fires no pointer event, so its tooltip hangs on a wrapper that does
+// aria-disabled, not disabled: a disabled button takes no focus nor pointer, so its reason would never show
 function NextButton({ disabled, why, onClick }: { disabled: boolean; why: string | undefined; onClick: () => void }) {
-  const button = (
-    <Button disabled={disabled} onClick={onClick}>
-      Next
-    </Button>
-  )
-  if (!disabled || !why) return button
-
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        {/* biome-ignore lint/a11y/noNoninteractiveTabindex: the reason shows to a keyboard as to a pointer */}
-        <span tabIndex={0} className="inline-flex">
-          {button}
-        </span>
+        <Button
+          aria-disabled={disabled}
+          className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+          onClick={() => {
+            if (!disabled) onClick()
+          }}
+        >
+          Next
+        </Button>
       </TooltipTrigger>
-      <TooltipContent>{why}</TooltipContent>
+      {disabled && why && <TooltipContent>{why}</TooltipContent>}
     </Tooltip>
   )
 }

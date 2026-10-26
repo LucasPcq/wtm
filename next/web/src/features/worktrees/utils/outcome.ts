@@ -1,16 +1,19 @@
-import type { DomainFollowUp } from '@/api/types.gen'
+import type { DomainFollowUp, DomainItem } from '@/api/types.gen'
+import type { Tone } from '@/features/worktrees/components/glyph'
 import type { Unit } from '@/features/worktrees/utils/progress'
+import { sentence } from '@/features/worktrees/utils/sentence'
 
 // what needs the person first comes first: what failed, then what to check, then what went
 export const outcomeOrder = ['failed', 'check', 'done'] as const
 
 export type OutcomeKind = (typeof outcomeOrder)[number]
 
-export type OutcomeTone = 'ok' | 'attention' | 'failed' | 'stopped'
+// a row with no tone is a plain next step: nothing went wrong, nothing to check
+export type OutcomeTone = Exclude<Tone, 'busy'>
 
 export type OutcomeRow = {
   key: string
-  tone: OutcomeTone
+  tone?: OutcomeTone
   title?: string
   message?: string | undefined
   go?: DomainFollowUp | undefined
@@ -26,3 +29,20 @@ export const outputOf = (unit: Unit | undefined) => {
   if (!unit || unit.lines.length === 0) return undefined
   return { lines: unit.lines, log: unit.phases.find((run) => run.state === 'failed')?.log }
 }
+
+// the step a run was cancelled in: the one under way, else the last one started
+export const stoppedIn = (unit: Unit | undefined) =>
+  unit?.phases.find((run) => run.state === 'now' || run.state === 'failed') ??
+  unit?.phases.findLast((run) => run.startedAt !== undefined)
+
+// an item's own warnings name it: two alike on two items stay two
+export const itemWarnings = (items: Pick<DomainItem, 'subject' | 'warnings'>[]): OutcomeRow[] =>
+  items.flatMap((item) =>
+    (item.warnings ?? []).map((warning) => ({
+      key: `${item.subject}-${warning.code}-${warning.message}`,
+      tone: 'attention' as const,
+      title: item.subject,
+      message: sentence(warning.message),
+      followUp: warning.follow_up,
+    })),
+  )

@@ -1,9 +1,10 @@
-import { CircleX, Database } from 'lucide-react'
+import { Database } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress as Bar } from '@/components/ui/progress'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
+import { RunFailure } from '@/features/worktrees/components/run-failure'
 import { RunOutcome } from '@/features/worktrees/components/run-outcome'
 import { RunSteps } from '@/features/worktrees/components/run-steps'
 import { RunningFooter } from '@/features/worktrees/components/running-footer'
@@ -37,10 +38,13 @@ export function RemoveProgress({
   // the run's own failure (a stale plan, a refusal); one the core repeats from an item shows on that item's line
   const refused = progress.refused ?? (items.some((item) => item.error) ? undefined : progress.envelope?.error?.message)
   const { groups, kept } = recapOf(progress)
+  // a worktree on no branch, or a branch with no worktree, is no "worktree with its branch": then only the count holds
+  const plain = (progress.envelope?.plan?.worktrees ?? [])
+    .filter((removal) => removed.includes(removal.worktree))
+    .every((removal) => removal.branch && removal.path)
 
   const title = () => {
-    if (running)
-      return progress.cancelling ? `Cancelling the removal of ${listed(names)}` : `Removing ${names.join(', ')}`
+    if (running) return progress.cancelling ? `Cancelling the removal of ${listed(names)}` : `Removing ${listed(names)}`
     if (cancelled) return `Cancelled the removal of ${listed(names)}`
     if (ok) return `Removed ${listed(names)}`
     if (removed.length === 0) return `Couldn't remove ${listed(failed)}`
@@ -48,6 +52,7 @@ export function RemoveProgress({
   }
 
   const description = () => {
+    if (ok && !plain) return `${removed.length} removed.`
     if (ok)
       return names.length === 1
         ? 'Its local branch went with it; the remote branch stays.'
@@ -70,12 +75,7 @@ export function RemoveProgress({
       )}
 
       <DialogScroll>
-        {!running && refused && (
-          <p className="flex items-start gap-3 text-sm">
-            <CircleX className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
-            {refused}
-          </p>
-        )}
+        {!running && <RunFailure message={refused} />}
         {!running && <RunOutcome groups={groups} labels={outcomeWords} />}
         <RunSteps progress={progress} running={running}>
           {kept.map((line) => (

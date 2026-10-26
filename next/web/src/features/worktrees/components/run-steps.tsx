@@ -15,6 +15,8 @@ export function RunSteps<C extends MutationCommand>({
   children?: ReactNode
 }) {
   if (running) return <Timeline units={progress.units} />
+  // refused before its apply, a run has no step to show
+  if (!progress.units.some((unit) => unit.phases.some((run) => run.state !== 'todo'))) return null
 
   const { total } = doneOf(progress)
   return (
