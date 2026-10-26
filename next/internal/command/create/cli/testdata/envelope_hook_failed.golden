@@ -11,7 +11,7 @@
       "error": {
         "kind": "internal",
         "code": "unit.phase_failed",
-        "message": "on_create failed: hook failed: exit status 3",
+        "message": "on_create failed: exit status 3",
         "params": {
           "phase": "on_create"
         }
@@ -103,7 +103,7 @@
   "error": {
     "kind": "internal",
     "code": "unit.phase_failed",
-    "message": "on_create failed: hook failed: exit status 3",
+    "message": "on_create failed: exit status 3",
     "params": {
       "phase": "on_create"
     }

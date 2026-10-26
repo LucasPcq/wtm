@@ -194,7 +194,7 @@ func (w world) usecase() extract.UseCase {
 }
 
 func hookFails(context.Context, env.HookChain) error {
-	return errors.New("hook failed: exit status 3")
+	return errors.New("exit status 3")
 }
 
 // previewing is a use case whose every preview has a fingerprint of its own and whose applies end on errs in turn.

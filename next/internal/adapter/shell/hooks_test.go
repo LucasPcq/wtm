@@ -43,12 +43,10 @@ func TestAFailedHookReturnsItsCommandAndExitCodeAndStopsTheChain(t *testing.T) {
 
 	var failure *env.HookFailure
 	require.ErrorAs(t, err, &failure)
-	assert.ErrorContains(t, err, "hook failed")
-	assert.NotContains(t, err.Error(), "hook stopped")
 	assert.Equal(t, "exit 3", failure.Cmd)
 	require.NotNil(t, failure.ExitCode)
 	assert.Equal(t, 3, *failure.ExitCode)
-	assert.Equal(t, "hook failed: exit status 3", err.Error())
+	assert.Equal(t, "exit status 3", err.Error(), "the caller says which hook failed: the failure is only its cause, or it reads twice")
 	assert.Empty(t, out.all())
 }
 

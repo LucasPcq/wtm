@@ -10,7 +10,7 @@
       "error": {
         "kind": "internal",
         "code": "clean.hook_failed",
-        "message": "on_clean hook failed: hook failed: exit status 2"
+        "message": "on_clean hook failed: exit status 2"
       },
       "detail": {}
     }
@@ -52,6 +52,6 @@
   "error": {
     "kind": "internal",
     "code": "clean.hook_failed",
-    "message": "on_clean hook failed: hook failed: exit status 2"
+    "message": "on_clean hook failed: exit status 2"
   }
 }

@@ -15,7 +15,7 @@ func TestATargetLeftIncompleteStandsAndSaysWhy(t *testing.T) {
 		Subject:  "feat/bad",
 		Status:   domain.StatusFailed,
 		Reason:   domain.ReasonIncomplete,
-		Err:      &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed: hook failed: exit status 3"},
+		Err:      &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed: exit status 3"},
 		Warnings: []domain.Warning{untouched("nothing was moved: the files are still in feat/login")},
 		Detail:   &extract.Detail{Path: "/repo.trees/feat-bad"},
 	})
@@ -31,7 +31,7 @@ func TestTheWarningsOfAnUnfinishedTargetFollowItsLine(t *testing.T) {
 	settle := domain.Warning{Code: "provision.ports_not_settled_run", Message: "run.toml: line 3 — ports not settled", FollowUp: &domain.FollowUp{Command: domain.CommandEnv, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/x"}}}, Code: "provision.settle_ports", Message: "settle the ports once run.toml is fixed"}}
 	outcome := unfinished(extract.Item{
 		Subject: "feat/x", Status: domain.StatusFailed, Reason: domain.ReasonIncomplete,
-		Err:      &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed: hook failed: exit status 3"},
+		Err:      &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed: exit status 3"},
 		Detail:   &extract.Detail{Path: "/repo.trees/feat-x", EnvPorts: env.Redacted{Entries: ports}},
 		Warnings: []domain.Warning{{Code: "provision.env_no_template", Message: "no template found for .env, skipping"}, {Code: "provision.env_ports_left_alone", Message: "Env ports left alone", Ports: ports}, settle, untouched("nothing was moved: the files are still in feat/login")},
 	})

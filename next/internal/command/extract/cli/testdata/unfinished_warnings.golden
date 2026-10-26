@@ -8,7 +8,7 @@
 
   ! couldn't fast-forward main: its worktree has uncommitted changes — the target starts from your local branch
 
-  ✗ feat/x  on_create failed: hook failed: exit status 3 · left incomplete
+  ✗ feat/x  on_create failed: exit status 3 · left incomplete
   ! feat/x  no template found for .env, skipping
   ! feat/x  Env ports left alone
     ── .env ────────────────────────────────

@@ -3,6 +3,6 @@
 
   Remove  feat/plain
 
-  ✗ feat/plain  on_clean hook failed: hook failed: exit status 2
+  ✗ feat/plain  on_clean hook failed: exit status 2
 
 --- stderr

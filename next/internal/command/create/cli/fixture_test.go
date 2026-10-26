@@ -166,7 +166,7 @@ func (w world) usecase() create.UseCase {
 }
 
 func hookFails(context.Context, env.HookChain) error {
-	return errors.New("hook failed: exit status 3")
+	return errors.New("exit status 3")
 }
 
 var meta = worktree.Meta{SourceBranch: "main", CreatedAt: "2026-10-16T12:00:00Z", EnvStrategy: project.EnvExample, Isolation: project.Isolated}
@@ -199,7 +199,7 @@ func twoCreated(trees string) create.Outcome {
 
 // mixed is an outcome with a branch of every kind: checked out behind origin with its env ports, already open, failed in its hook, cancelled, and skipped.
 func mixed(trees string) create.Outcome {
-	hook := &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed", Params: domain.Params{"phase": "on_create"}, Cause: errors.New("hook failed: exit status 3")}
+	hook := &domain.Error{Kind: domain.KindInternal, Code: "unit.phase_failed", Message: "on_create failed", Params: domain.Params{"phase": "on_create"}, Cause: errors.New("exit status 3")}
 	return create.Outcome{
 		Op: "op-2",
 		Plan: create.Plan{

@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var errHook = errors.New("hook failed: exit status 2")
+var errHook = errors.New("exit status 2")
 
 func runClean(t *testing.T, w world, words ...string) formtest.Printed {
 	t.Helper()
