@@ -110,7 +110,7 @@ func newWorld(t *testing.T, s seed) world {
 		Meta:         meta,
 		Jobs:         func(context.Context) ([]run.Job, error) { return s.Jobs, nil },
 		PullRequests: func(context.Context, []string) ([]worktree.PullRequest, error) { return w.prs, s.PRErr },
-		Teardown:     teardown.Service{Git: repo, Meta: meta, EnvFiles: store.EnvFiles{}, StateDir: stateDir, RunHooks: shell.RunHooks, Shield: shell.Shield},
+		Teardown:     teardown.Service{Git: repo, Meta: meta, EnvFiles: store.EnvFiles{}, StateDir: stateDir, Gone: repository.GoneIn(repo), RunHooks: shell.RunHooks, Shield: shell.Shield},
 		Repository:   repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main},
 		Operations: operation.Service{
 			Locker:    locks{oplock.Locks{StateDir: stateDir}},
@@ -174,4 +174,13 @@ type broken struct {
 
 func (broken) Gone(context.Context) (map[string]bool, error) {
 	return nil, errBroken
+}
+
+// uncountable fails to count what a removal would lose, as git does on a corrupt object.
+type uncountable struct {
+	git.Repo
+}
+
+func (uncountable) Unpushed(context.Context, worktree.Losing) (int, error) {
+	return 0, errBroken
 }

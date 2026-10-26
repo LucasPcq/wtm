@@ -42,6 +42,20 @@
         }
       },
       {
+        "worktree": "feat/dirty",
+        "branch": "feat/dirty",
+        "path": "<SB>/acme.trees/feat-dirty",
+        "phases": [],
+        "blockers": [
+          "dirty"
+        ],
+        "reason": "merged",
+        "pr": {
+          "number": 4,
+          "url": "https://github.com/acme/acme/pull/4"
+        }
+      },
+      {
         "worktree": "feat/gone",
         "branch": "feat/gone",
         "path": "<SB>/acme.trees/feat-gone",
@@ -54,6 +68,31 @@
         ],
         "blockers": [],
         "reason": "gone"
+      },
+      {
+        "worktree": "feat/gone-work",
+        "branch": "feat/gone-work",
+        "path": "<SB>/acme.trees/feat-gone-work",
+        "phases": [],
+        "blockers": [
+          "unpushed"
+        ],
+        "unpushed": 2,
+        "reason": "gone"
+      },
+      {
+        "worktree": "feat/locked",
+        "branch": "feat/locked",
+        "path": "<SB>/acme.trees/feat-locked",
+        "phases": [],
+        "blockers": [
+          "locked"
+        ],
+        "reason": "merged",
+        "pr": {
+          "number": 5,
+          "url": "https://github.com/acme/acme/pull/5"
+        }
       },
       {
         "worktree": "feat/merged",
@@ -89,65 +128,6 @@
         "pr": {
           "number": 8,
           "url": "https://github.com/acme/acme/pull/8"
-        }
-      }
-    ],
-    "kept": [
-      {
-        "worktree": "feat/dirty",
-        "branch": "feat/dirty",
-        "path": "<SB>/acme.trees/feat-dirty",
-        "hooks": [
-          "case feat/dirty in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/dirty;; esac"
-        ],
-        "phases": [
-          "on_clean",
-          "remove"
-        ],
-        "blockers": [
-          "dirty"
-        ],
-        "reason": "merged",
-        "pr": {
-          "number": 4,
-          "url": "https://github.com/acme/acme/pull/4"
-        }
-      },
-      {
-        "worktree": "feat/gone-work",
-        "branch": "feat/gone-work",
-        "path": "<SB>/acme.trees/feat-gone-work",
-        "hooks": [
-          "case feat/gone-work in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/gone-work;; esac"
-        ],
-        "phases": [
-          "on_clean",
-          "remove"
-        ],
-        "blockers": [
-          "unpushed"
-        ],
-        "unpushed": 2,
-        "reason": "gone"
-      },
-      {
-        "worktree": "feat/locked",
-        "branch": "feat/locked",
-        "path": "<SB>/acme.trees/feat-locked",
-        "hooks": [
-          "case feat/locked in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/locked;; esac"
-        ],
-        "phases": [
-          "on_clean",
-          "remove"
-        ],
-        "blockers": [
-          "locked"
-        ],
-        "reason": "merged",
-        "pr": {
-          "number": 5,
-          "url": "https://github.com/acme/acme/pull/5"
         }
       }
     ],

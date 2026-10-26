@@ -22,8 +22,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 )
 
-type session = form.Session[prune.Request, prune.Questions, prune.Outcome]
-
 type sessionParams struct {
 	App     form.UseCase[prune.Request, prune.Questions, prune.Outcome]
 	Request prune.Request
@@ -130,7 +128,7 @@ func (w world) usecase() prune.UseCase {
 		Meta:         w.store,
 		Jobs:         func(context.Context) ([]run.Job, error) { return nil, nil },
 		PullRequests: w.pullRequests,
-		Teardown:     teardown.Service{Git: w.git, Meta: w.store, EnvFiles: w.store, StateDir: "/repo/main/.git/wtm", RunHooks: runHooks, Shield: shell.Shield},
+		Teardown:     teardown.Service{Git: w.git, Meta: w.store, EnvFiles: w.store, StateDir: "/repo/main/.git/wtm", Gone: repository.GoneIn(w.git), RunHooks: runHooks, Shield: shell.Shield},
 		Repository:   repository.Service{Config: w.config, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}},
 		Operations: operation.Service{
 			Locker:    w.locks,

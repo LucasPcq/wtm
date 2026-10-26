@@ -22,6 +22,7 @@ func newForm(open func(ctx context.Context, dir string) (prune.UseCase, error)) 
 		Preview:    form.PreviewOf[prune.Plan, prune.Detail],
 		Draw:       drawOutcome,
 		ApplyLabel: applyLabel,
+		Special:    special,
 	}
 }
 

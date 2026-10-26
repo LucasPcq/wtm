@@ -6,7 +6,7 @@
 
   ! feat/dirty is kept: unsafe to remove (dirty)
 
-  fingerprint  078a240623e1c9aa721914ee
-  → wtm-next prune --expect-fingerprint 078a240623e1c9aa721914ee   apply this plan
+  fingerprint  a6f99993da3c6addd0e74932
+  → wtm-next prune --expect-fingerprint a6f99993da3c6addd0e74932   apply this plan
   → wtm-next prune feat/dirty --force   prune them anyway
 

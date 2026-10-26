@@ -352,7 +352,7 @@ func (s *TextStep) Answer() string {
 // ----------------------------------------------------------------------------
 // A multi-select
 
-// MultiSelectStep asks any of a field's options, those answered so far picked, else those the field picks by default, each tag in the Tone a command's own step gives it (muted otherwise); none picked is refused with the Empty problem of its words.
+// MultiSelectStep asks any of a field's options, those the field picks (the answer so far, else its default pick) picked, each tag in the Tone a command's own step gives it (muted otherwise); none picked is refused with the Empty problem of its words.
 type MultiSelectStep struct {
 	Asked
 	Tone  func(option domain.Option) widget.Tone
@@ -363,13 +363,9 @@ type MultiSelectStep struct {
 func (s *MultiSelectStep) Open() tea.Cmd {
 	field, _ := s.sheet.Field(s.at).(domain.MultiSelectField)
 	words := s.sheet.Words(s.at)
-	picked := s.sheet.values(field.Path)
-	if len(picked) == 0 {
-		picked = field.Picked
-	}
 	options := make([]widget.Pick, 0, len(field.Options))
 	for _, o := range field.Options {
-		pick := widget.Pick{Label: optionLabel(o, words), Value: o.Value, Tag: badgeOf(o), Picked: slices.Contains(picked, o.Value)}
+		pick := widget.Pick{Label: optionLabel(o, words), Value: o.Value, Tag: badgeOf(o), Picked: slices.Contains(field.Picked, o.Value)}
 		if s.Tone != nil {
 			pick.Tone = s.Tone(o)
 		}

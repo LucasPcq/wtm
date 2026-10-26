@@ -30,7 +30,7 @@
       "properties": {
         "subject": { "type": "string" },
         "status": { "enum": ["done", "failed", "skipped", "cancelled"] },
-        "reason": { "enum": ["unchanged", "incomplete", "interrupted", "not_reached"], "description": "What qualifies the status; absent when nothing does." },
+        "reason": { "enum": ["unchanged", "incomplete", "interrupted", "not_reached", "ruled_out"], "description": "What qualifies the status; absent when nothing does." },
         "error": { "$ref": "#/$defs/domain.Error" },
         "warnings": { "type": "array", "items": { "$ref": "#/$defs/domain.Warning" } },
         "detail": { "type": "object", "description": "What the command reports of the subject, {} when nothing. Each command's envelope says its shape." }

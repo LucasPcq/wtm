@@ -141,9 +141,14 @@ func (f Facts) onClean(removal Removal) []project.Hook {
 	return hooks
 }
 
+// Unsafe reports whether a blocker refuses the removal unless forced.
+func (r Removal) Unsafe() bool {
+	return len(r.Blockers) > 0
+}
+
 // Blocked are the removals a blocker refuses unless forced.
 func Blocked(removals []Removal) []Removal {
-	return slices.DeleteFunc(slices.Clone(removals), func(r Removal) bool { return len(r.Blockers) == 0 })
+	return slices.DeleteFunc(slices.Clone(removals), func(r Removal) bool { return !r.Unsafe() })
 }
 
 // Standing is the worktree among removals the caller stands in, empty when none.

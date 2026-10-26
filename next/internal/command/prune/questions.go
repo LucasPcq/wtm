@@ -118,9 +118,10 @@ type Questions struct {
 	Errors     []domain.FieldError
 }
 
-// Worktrees is the question of the worktrees to remove: those picked, and every worktree done with, by its branch; not asked when none is.
+// Worktrees is the question of the worktrees to remove: those picked, the request's or by default the command's, and every worktree done with, by its branch; not asked when none is.
 type Worktrees struct {
 	Picked  []string
+	Origin  domain.Origin
 	Options []domain.Option
 	Skip    domain.Skip
 }
@@ -130,7 +131,7 @@ func NewQuestions(f Facts, req Request) Questions {
 	candidates := f.Candidates(req)
 	picked, problems := f.picked(req, candidates)
 	questions := Questions{
-		Worktrees:  Worktrees{Picked: names(picked), Options: options(candidates)},
+		Worktrees:  Worktrees{Picked: names(picked), Origin: domain.OriginDefault, Options: options(candidates)},
 		Candidates: candidates,
 		Orphans:    f.Moves(removals(picked)),
 		Errors:     problems,
@@ -140,7 +141,7 @@ func NewQuestions(f Facts, req Request) Questions {
 		NoFetch:    flagOnly(req.NoFetch),
 	}
 	if len(req.Worktrees) > 0 {
-		questions.Unsafe = blocked(picked)
+		questions.Worktrees.Origin, questions.Unsafe = domain.OriginRequest, blocked(picked)
 	}
 	if len(candidates) == 0 && len(req.Worktrees) == 0 {
 		questions.Worktrees.Skip = domain.SkipNoCandidate
@@ -154,7 +155,7 @@ func NewQuestions(f Facts, req Request) Questions {
 // Form is the questions as the schema a surface renders: the worktrees, whether to reparent the children left behind, whether to force the unsafe ones, then the reasons and the fetch, which only their flags set. A zero Questions gives the schema the flags and --help are spelled from.
 func (q Questions) Form() domain.Form {
 	return domain.Form{Problems: q.Errors, Fields: []domain.Field{
-		domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: domain.PathWorktree, Skip: q.Worktrees.Skip}, Picked: q.Worktrees.Picked, Options: q.Worktrees.Options},
+		domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: domain.PathWorktree, Origin: q.Worktrees.Origin, Skip: q.Worktrees.Skip}, Picked: q.Worktrees.Picked, Options: q.Worktrees.Options},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathReparentChildren, Origin: q.Reparent.Origin, Skip: q.Reparent.Skip}, Value: q.Reparent.Value, NoFirst: true},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathForce, Origin: q.Force.Origin, Skip: q.Force.Skip}, Value: q.Force.Value, NoFirst: true},
 		flagField(PathMerged, q.Merged),

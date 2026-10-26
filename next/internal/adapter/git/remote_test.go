@@ -290,3 +290,17 @@ func TestRefreshingWithNoOriginChangesNothing(t *testing.T) {
 
 	require.NoError(t, repo.RefreshOrigin(t.Context(), []string{"main"}))
 }
+
+// A branch tracking a local branch read as gone once that branch was deleted: the child of a pruned parent, an active worktree, was pruned next.
+func TestABranchTrackingALocalBranchDeletedIsNotGoneOnOrigin(t *testing.T) {
+	repo, _ := newRepoWithOrigin(t)
+	gittest.CreateBranch(t, repo.Dir, "feat/parent")
+	gittest.Git(t, repo.Dir, "branch", "--track", "feat/child", "feat/parent")
+	gittest.Git(t, repo.Dir, "branch", "-D", "feat/parent")
+
+	gone, err := repo.Gone(t.Context())
+
+	require.NoError(t, err)
+	assert.Empty(t, gone)
+	assert.Contains(t, gittest.Output(t, repo.Dir, "for-each-ref", "--format=%(upstream:track)", "refs/heads/feat/child"), "gone", "git itself reads it gone")
+}

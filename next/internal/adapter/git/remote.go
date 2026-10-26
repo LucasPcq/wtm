@@ -58,19 +58,21 @@ func (r Repo) RefreshOrigin(ctx context.Context, branches []string) error {
 	return err
 }
 
-// Gone returns the local branches whose upstream is gone: they track a branch
-// of origin that is no longer fetched, deleted there since.
+// Gone returns the local branches whose upstream is gone on origin: they
+// track a branch of origin that is no longer fetched, deleted there since. A
+// branch tracking a local branch that was deleted is not gone on origin: git
+// reads it [gone] too, its remote ".".
 func (r Repo) Gone(ctx context.Context) (map[string]bool, error) {
-	out, err := r.git(ctx, "for-each-ref", "--format=%(upstream:track)%00%(refname)", strings.TrimSuffix(headsPrefix, "/"))
+	out, err := r.git(ctx, "for-each-ref", "--format=%(upstream:remotename)%00%(upstream:track)%00%(refname)", strings.TrimSuffix(headsPrefix, "/"))
 	if err != nil {
 		return nil, err
 	}
 
 	gone := map[string]bool{}
 	for line := range strings.Lines(string(out)) {
-		track, refname, _ := strings.Cut(strings.TrimSpace(line), "\x00")
-		if track == "[gone]" {
-			gone[strings.TrimPrefix(refname, headsPrefix)] = true
+		fields := strings.Split(strings.TrimSpace(line), "\x00")
+		if len(fields) == 3 && fields[0] == origin && fields[1] == "[gone]" {
+			gone[strings.TrimPrefix(fields[2], headsPrefix)] = true
 		}
 	}
 	return gone, nil

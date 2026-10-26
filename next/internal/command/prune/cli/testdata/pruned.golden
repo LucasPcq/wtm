@@ -1,5 +1,5 @@
 
-  ✓ prune: 2 done
+  ! prune: 2 done · 1 skipped
 
   Prune     feat/gone (deleted on origin), feat/merged (merged #12)
   Kept      feat/dirty (merged #14; dirty)

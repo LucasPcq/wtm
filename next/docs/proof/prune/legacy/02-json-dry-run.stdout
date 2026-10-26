@@ -1,16 +1,16 @@
 {
   "pruned": [
     {
-      "branch": "feat/merged",
-      "path": "<SB>/acme.trees/feat-merged",
-      "reason": "pr_merged",
+      "branch": "feat/closed",
+      "path": "<SB>/acme.trees/feat-closed",
+      "reason": "pr_closed",
       "is_dirty": false,
       "source_branch": "main"
     },
     {
-      "branch": "feat/closed",
-      "path": "<SB>/acme.trees/feat-closed",
-      "reason": "pr_closed",
+      "branch": "feat/merged",
+      "path": "<SB>/acme.trees/feat-merged",
+      "reason": "pr_merged",
       "is_dirty": false,
       "source_branch": "main"
     },

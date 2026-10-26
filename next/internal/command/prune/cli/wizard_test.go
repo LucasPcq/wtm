@@ -42,3 +42,18 @@ func TestNothingToPruneSkipsTheWorktreesStep(t *testing.T) {
 	assert.Equal(t, stepRecap, d.Wizard.Current())
 	assert.Contains(t, d.Screen(), "Worktrees — no worktree is done with")
 }
+
+// The default pick confirmed untouched read as worktrees named: feat/dirty, left out of it, vanished from the plan with its warning and its --force line.
+func TestTheDefaultPickConfirmedLeavesTheChoiceToTheCommand(t *testing.T) {
+	d := open(t, sessionParams{App: newWorld(seed{}).usecase()})
+
+	d.Keys("enter", "enter", "enter")
+
+	require.Equal(t, form.Finished, d.Wizard.Ending())
+	assert.Nil(t, d.s.Request().Worktrees, "no worktree named: the command chose")
+	require.NotNil(t, d.s.Preview())
+	kept := d.s.Preview().Plan.Worktrees[0]
+	assert.Equal(t, dirty, kept.Worktree)
+	assert.Empty(t, kept.Phases)
+	assert.Contains(t, d.Screen()+d.s.Preview().Warnings[0].Code, prune.CodeKept)
+}

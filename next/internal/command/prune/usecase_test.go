@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
@@ -21,7 +22,8 @@ func TestAPruneRemovesEveryWorktreeDoneWithThatIsSafe(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, outcome.Result)
-	assert.Equal(t, map[string]domain.Status{merged: domain.StatusDone, closed: domain.StatusDone, gone: domain.StatusDone}, statuses(outcome.Result.Items))
+	assert.Equal(t, map[string]domain.Status{merged: domain.StatusDone, closed: domain.StatusDone, gone: domain.StatusDone, goneWork: domain.StatusSkipped, dirty: domain.StatusSkipped}, statuses(outcome.Result.Items))
+	assert.Equal(t, domain.ReasonRuledOut, itemOf(t, outcome.Result.Items, dirty).Reason, "the command chose it: it is left as it is")
 	for _, name := range []string{merged, closed, gone} {
 		assert.True(t, w.gone(t, name), name)
 	}
@@ -48,7 +50,6 @@ func TestABranchMovedPastItsPullRequestIsNotDoneWith(t *testing.T) {
 	_, err := w.usecase.Run(t.Context(), pruning(moved), domain.RunOptions{DryRun: true})
 
 	assert.NotContains(t, namesOf(planned.Worktrees), moved)
-	assert.NotContains(t, namesOf(planned.Kept), moved)
 	refused := failureOf(t, err)
 	assert.Equal(t, domain.KindInvalid, refused.Kind)
 	assert.Equal(t, map[string][]string{"worktree[0]": {prune.CodeNotFinished}}, fieldCodes(refused.Fields))
@@ -62,8 +63,8 @@ func TestAGoneBranchHoldingCommitsNoOtherBranchHoldsIsKept(t *testing.T) {
 	outcome, err := w.usecase.Run(t.Context(), prune.Request{Gone: true}, domain.RunOptions{})
 
 	require.NoError(t, err)
-	assert.Equal(t, []string{goneWork}, namesOf(outcome.Plan.Kept))
-	assert.Equal(t, []worktree.Blocker{worktree.BlockerUnpushed}, outcome.Plan.Kept[0].Blockers)
+	assert.Equal(t, []string{goneWork}, keptOf(outcome.Plan))
+	assert.Equal(t, []worktree.Blocker{worktree.BlockerUnpushed}, itemOfPlan(t, outcome.Plan, goneWork).Blockers)
 	assert.True(t, w.stands(t, goneWork))
 	assert.True(t, w.gone(t, gone))
 }
@@ -74,13 +75,15 @@ func TestEachUnsafeWorktreeDoneWithIsKeptWithAWarningAndTheForcedRequest(t *test
 
 	planned, warnings := w.plan(t, prune.Request{})
 
-	assert.ElementsMatch(t, []string{goneWork, dirty}, namesOf(planned.Kept))
+	assert.ElementsMatch(t, []string{goneWork, dirty}, keptOf(planned))
+	assert.Empty(t, itemOfPlan(t, planned, dirty).Phases, "a worktree left as it is runs no phase")
+	assert.NotEmpty(t, itemOfPlan(t, planned, dirty).Blockers)
 	assert.Equal(t, []string{prune.CodeKept, prune.CodeKept}, codes(warnings))
 	assert.Nil(t, warnings[0].FollowUp)
 	forced := warnings[1].FollowUp
 	require.NotNil(t, forced)
 	assert.Equal(t, prune.CodeForce, forced.Code)
-	assert.Contains(t, forced.Answers, domain.Answered{Path: domain.PathWorktree, Values: namesOf(planned.Kept)})
+	assert.Contains(t, forced.Answers, domain.Answered{Path: domain.PathWorktree, Values: keptOf(planned)})
 	assert.Contains(t, forced.Answers, domain.Answered{Path: prune.PathForce, Values: []string{"true"}})
 }
 
@@ -175,7 +178,7 @@ func TestAFailingHookKeepsItsWorktreeStopsNoOtherAndEachHasItsItem(t *testing.T)
 
 	result, _ := w.apply(t, prune.Request{})
 
-	assert.Equal(t, map[string]domain.Status{merged: domain.StatusFailed, closed: domain.StatusDone, gone: domain.StatusDone}, statuses(result.Items))
+	assert.Equal(t, map[string]domain.Status{merged: domain.StatusFailed, closed: domain.StatusDone, gone: domain.StatusDone, goneWork: domain.StatusSkipped, dirty: domain.StatusSkipped}, statuses(result.Items))
 	require.NotNil(t, itemOf(t, result.Items, merged).Err)
 	assert.Equal(t, prune.CodeHookFailed, itemOf(t, result.Items, merged).Err.Code)
 	assert.True(t, w.stands(t, merged))
@@ -201,7 +204,7 @@ func TestAForgeThatCannotBeAskedIsWarnedOfByWhatItLeavesUndecided(t *testing.T) 
 	all, allWarnings := w.plan(t, prune.Request{})
 	_, goneWarnings := w.plan(t, prune.Request{Gone: true})
 
-	assert.Equal(t, []string{gone}, namesOf(all.Worktrees), "merged and closed match nothing")
+	assert.Equal(t, []string{gone}, prunedOf(all), "merged and closed match nothing")
 	assert.Equal(t, prune.Name+domain.PRsUnavailable, allWarnings[0].Code)
 	assert.Contains(t, allWarnings[0].Message, "merged and closed ones match nothing")
 	assert.NotContains(t, goneWarnings[0].Message, "merged and closed")
@@ -246,7 +249,7 @@ func TestJobsUpMakeAWorktreeUnsafeAndTheJobsTheDaemonCannotTellAreWarnedOf(t *te
 	w.usecase.Jobs = func(context.Context) ([]run.Job, error) { return nil, run.ErrUnknown }
 	_, warnings := w.plan(t, prune.Request{Merged: true})
 
-	assert.Contains(t, namesOf(planned.Kept), merged)
+	assert.Contains(t, keptOf(planned), merged)
 	assert.Contains(t, codes(warnings), prune.Name+domain.JobsUnknown)
 }
 
@@ -271,7 +274,8 @@ func TestACancelSkipsTheWorktreesNotStarted(t *testing.T) {
 
 	result := w.usecase.Apply(ctx, planned, func(domain.Event) {})
 
-	assert.Equal(t, map[string]domain.Status{merged: domain.StatusSkipped, closed: domain.StatusSkipped, gone: domain.StatusSkipped}, statuses(result.Items))
+	assert.Equal(t, map[string]domain.Status{merged: domain.StatusSkipped, closed: domain.StatusSkipped, gone: domain.StatusSkipped, goneWork: domain.StatusSkipped, dirty: domain.StatusSkipped}, statuses(result.Items))
+	assert.Equal(t, domain.ReasonInterrupted, itemOf(t, result.Items, merged).Reason)
 	assert.True(t, w.stands(t, merged))
 }
 
@@ -308,4 +312,29 @@ func TestWhyANamedWorktreeIsNotDoneWithClaimsOnlyWhatTheRunRead(t *testing.T) {
 	assert.Equal(t, "it has no merged or closed pull request", failureOf(t, mergedOnly).Fields[0].Params["why"])
 	assert.Equal(t, "it has no merged or closed pull request, and origin has not deleted its branch", failureOf(t, every).Fields[0].Params["why"])
 	assert.Equal(t, "its pull requests could not be asked, and origin has not deleted its branch", failureOf(t, unasked).Fields[0].Params["why"])
+}
+
+func TestAGitFailureWhileCheckingTheCandidatesRefusesTheRun(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.usecase.Teardown.Git = uncountable{w.repo}
+
+	_, err := w.usecase.Run(t.Context(), prune.Request{}, domain.RunOptions{})
+
+	require.ErrorIs(t, err, errBroken)
+	assert.True(t, w.stands(t, merged))
+}
+
+// Every candidate counted as going: feat/copy, named alone, was refused for a commit feat/gone-work, which stays, holds.
+func TestAWorktreeNamedIsCheckedAgainstTheWorktreesThatStay(t *testing.T) {
+	w := newWorld(t, seed{})
+	gittest.Git(t, w.main, "branch", "feat/copy", goneWork)
+	gittest.Git(t, w.main, "worktree", "add", "-q", w.at("feat/copy"), "feat/copy")
+	gittest.Git(t, w.main, "config", "branch.feat/copy.remote", "origin")
+	gittest.Git(t, w.main, "config", "branch.feat/copy.merge", "refs/heads/feat/copy")
+
+	outcome, err := w.usecase.Run(t.Context(), prune.Request{Worktrees: []string{"feat/copy"}, Gone: true}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]domain.Status{"feat/copy": domain.StatusDone}, statuses(outcome.Result.Items))
+	assert.True(t, w.stands(t, goneWork))
 }

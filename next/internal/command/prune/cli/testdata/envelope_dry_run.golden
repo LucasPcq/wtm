@@ -6,6 +6,20 @@
   "plan": {
     "worktrees": [
       {
+        "worktree": "feat/dirty",
+        "branch": "feat/dirty",
+        "path": "/repo/wt-feat-dirty",
+        "phases": [],
+        "blockers": [
+          "dirty"
+        ],
+        "reason": "merged",
+        "pr": {
+          "number": 14,
+          "url": "https://github.com/acme/web/pull/14"
+        }
+      },
+      {
         "worktree": "feat/gone",
         "branch": "feat/gone",
         "path": "/repo/wt-feat-gone",
@@ -27,24 +41,6 @@
         "pr": {
           "number": 12,
           "url": "https://github.com/acme/web/pull/12"
-        }
-      }
-    ],
-    "kept": [
-      {
-        "worktree": "feat/dirty",
-        "branch": "feat/dirty",
-        "path": "/repo/wt-feat-dirty",
-        "phases": [
-          "remove"
-        ],
-        "blockers": [
-          "dirty"
-        ],
-        "reason": "merged",
-        "pr": {
-          "number": 14,
-          "url": "https://github.com/acme/web/pull/14"
         }
       }
     ],
@@ -118,7 +114,7 @@
       }
     ]
   },
-  "fingerprint": "7d22a74a0341ee8a70660a40",
+  "fingerprint": "e63b830e4dd0f4b74ddf4be8",
   "follow_ups": [],
   "warnings": [
     {

@@ -7,6 +7,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
 // words are how the command line words each field of prune's form; the worktrees' options and the switches name what they decide on the questions observed: why each worktree is done with, the children that would move, the worktrees picked that are unsafe.
@@ -43,7 +44,7 @@ func candidateWords(q prune.Questions) map[string]form.OptionWords {
 	for _, c := range q.Candidates {
 		label := c.Worktree + " — " + reasonWords(c)
 		if len(c.Blockers) > 0 {
-			label += " · " + form.Blockers(c.Blockers)
+			label += " · " + output.Blockers(c.Blockers)
 		}
 		said[c.Worktree] = form.OptionWords{Label: label}
 	}
@@ -81,7 +82,7 @@ func forceHelp(q prune.Questions) string {
 
 	lines := []string{"These worktrees are unsafe to remove:"}
 	for _, c := range q.Unsafe {
-		lines = append(lines, "  "+c.Worktree+" — "+form.Blockers(c.Blockers))
+		lines = append(lines, "  "+c.Worktree+" — "+output.Blockers(c.Blockers))
 	}
 	return strings.Join(lines, "\n")
 }

@@ -28,6 +28,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/webserver"
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -462,6 +463,7 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[domain.Origin]():             {"Where a field's answer came from.", domain.Origins()},
 	reflect.TypeFor[domain.OptionTag]():          {"What sets an option apart, as a code each surface words its own way.", domain.OptionTags()},
 	reflect.TypeFor[create.Action]():             {"How a branch gets its worktree.", create.Actions()},
+	reflect.TypeFor[list.Finished]():             {"How a worktree's pull request has done with it: merged, or closed unmerged.", list.Finisheds()},
 	reflect.TypeFor[prune.Reason]():              {"Why a worktree is done with, as a code each surface words its own way.", prune.Reasons()},
 	reflect.TypeFor[worktree.Blocker]():          {"What makes a worktree unsafe to remove, a safety refusal only force lifts, as a code each surface words its own way.", worktree.Blockers()},
 	reflect.TypeFor[project.EnvStrategy]():       {"Where a worktree's .env files are copied from.", project.EnvStrategies()},

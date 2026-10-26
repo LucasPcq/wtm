@@ -896,7 +896,8 @@
             "unchanged",
             "incomplete",
             "interrupted",
-            "not_reached"
+            "not_reached",
+            "ruled_out"
           ]
         },
         "status": {
@@ -2059,7 +2060,7 @@
         "finished": {
           "anyOf": [
             {
-              "$ref": "#/$defs/worktree.PullRequestState"
+              "$ref": "#/$defs/list.Finished"
             },
             {
               "type": "null"
@@ -2171,6 +2172,13 @@
         "actions"
       ],
       "type": "object"
+    },
+    "list.Finished": {
+      "description": "How a worktree's pull request has done with it: merged, or closed unmerged.",
+      "enum": [
+        "merged",
+        "closed"
+      ]
     },
     "list.PR": {
       "additionalProperties": false,
@@ -2430,19 +2438,6 @@
         "force": {
           "type": "boolean"
         },
-        "kept": {
-          "anyOf": [
-            {
-              "items": {
-                "$ref": "#/$defs/prune.Candidate"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "moves": {
           "items": {
             "$ref": "#/$defs/teardown.Move"
@@ -2493,7 +2488,6 @@
       },
       "required": [
         "worktrees",
-        "kept",
         "reasons",
         "reparent_children",
         "force"

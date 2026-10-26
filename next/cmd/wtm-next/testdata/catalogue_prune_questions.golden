@@ -3,6 +3,7 @@
     {
       "kind": "multi_select",
       "path": "worktree",
+      "origin": "request",
       "picked": [
         "feat/done"
       ],

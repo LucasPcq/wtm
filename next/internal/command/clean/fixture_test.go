@@ -101,7 +101,7 @@ func newWorld(t *testing.T, s seed) world {
 			*w.asked = append(*w.asked, branches...)
 			return s.PRs, s.PRErr
 		},
-		Teardown:   teardown.Service{Git: repo, Meta: meta, EnvFiles: store.EnvFiles{}, StateDir: stateDir, RunHooks: shell.RunHooks, Shield: shell.Shield},
+		Teardown:   teardown.Service{Git: repo, Meta: meta, EnvFiles: store.EnvFiles{}, StateDir: stateDir, Gone: repository.GoneIn(repo), RunHooks: shell.RunHooks, Shield: shell.Shield},
 		Repository: repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main},
 		Operations: operation.Service{
 			Locker:    locks{oplock.Locks{StateDir: stateDir}},

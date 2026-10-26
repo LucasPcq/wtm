@@ -36,7 +36,6 @@
         }
       }
     ],
-    "kept": [],
     "moves": [
       {
         "branch": "feat/child",

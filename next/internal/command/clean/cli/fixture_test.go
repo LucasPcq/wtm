@@ -118,7 +118,7 @@ func (w world) usecase() clean.UseCase {
 		Meta:         w.store,
 		Jobs:         func(context.Context) ([]run.Job, error) { return nil, w.seed.JobsErr },
 		PullRequests: func(context.Context, []string) ([]worktree.PullRequest, error) { return nil, nil },
-		Teardown:     teardown.Service{Git: w.git, Meta: w.store, EnvFiles: w.store, StateDir: "/repo/main/.git/wtm", RunHooks: runHooks, Shield: shell.Shield},
+		Teardown:     teardown.Service{Git: w.git, Meta: w.store, EnvFiles: w.store, StateDir: "/repo/main/.git/wtm", Gone: repository.GoneIn(w.git), RunHooks: runHooks, Shield: shell.Shield},
 		Repository:   repository.Service{Config: w.config, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}},
 		Operations: operation.Service{
 			Locker:    w.locks,

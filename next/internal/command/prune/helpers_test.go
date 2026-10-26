@@ -115,6 +115,34 @@ func itemOf(t *testing.T, items []prune.Item, subject string) prune.Item {
 	return items[at]
 }
 
+func itemOfPlan(t *testing.T, planned prune.Plan, name string) prune.Candidate {
+	t.Helper()
+	at := slices.IndexFunc(planned.Worktrees, func(c prune.Candidate) bool { return c.Worktree == name })
+	require.GreaterOrEqual(t, at, 0, name)
+	return planned.Worktrees[at]
+}
+
+// keptOf are the worktrees the plan leaves as they are, prunedOf those it removes: a kept one has no phase.
+func keptOf(planned prune.Plan) []string {
+	var found []string
+	for _, c := range planned.Worktrees {
+		if len(c.Phases) == 0 {
+			found = append(found, c.Worktree)
+		}
+	}
+	return found
+}
+
+func prunedOf(planned prune.Plan) []string {
+	var found []string
+	for _, c := range planned.Worktrees {
+		if len(c.Phases) > 0 {
+			found = append(found, c.Worktree)
+		}
+	}
+	return found
+}
+
 func namesOf(candidates []prune.Candidate) []string {
 	found := make([]string, 0, len(candidates))
 	for _, c := range candidates {

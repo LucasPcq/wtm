@@ -16,7 +16,6 @@
         "reason": "gone"
       }
     ],
-    "kept": [],
     "reasons": [
       "merged",
       "closed",
@@ -41,7 +40,7 @@
       }
     ]
   },
-  "fingerprint": "fe542f060f5d844cb037add4",
+  "fingerprint": "01378c7171822343ae48b902",
   "follow_ups": [],
   "warnings": [
     {

@@ -1,7 +1,7 @@
 
   Would prune 6 worktree(s):
-  feat/merged     PR merged
   feat/closed     PR closed
+  feat/merged     PR merged
   feat/gone       remote branch gone
   feat/gone-work  remote branch gone
   feat/bad        PR merged

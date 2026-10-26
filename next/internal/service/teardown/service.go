@@ -21,8 +21,9 @@ type Service struct {
 	EnvFiles EnvFiles
 	StateDir string // wtm's state, where each worktree's hook log goes
 
-	RunHooks func(ctx context.Context, chain env.HookChain) error // runs the on_clean hooks, failing with an *env.HookFailure
-	Shield   func(ctx context.Context) (context.Context, func())  // a context the first cancel does not reach, and its release
+	Gone     func(ctx context.Context, w worktree.Worktree) (bool, error) // whether w's directory is gone (repository.Gone)
+	RunHooks func(ctx context.Context, chain env.HookChain) error         // runs the on_clean hooks, failing with an *env.HookFailure
+	Shield   func(ctx context.Context) (context.Context, func())          // a context the first cancel does not reach, and its release
 }
 
 // ----------------------------------------------------------------------------
@@ -40,7 +41,7 @@ func (s Service) Read(ctx context.Context, worktrees []worktree.Worktree) (map[s
 		var check Check
 		var err error
 		if w.Path != "" {
-			if check.Missing, err = s.gone(ctx, w); err != nil {
+			if check.Missing, err = s.Gone(ctx, w); err != nil {
 				return nil, err
 			}
 		}
@@ -58,20 +59,6 @@ func (s Service) Read(ctx context.Context, worktrees []worktree.Worktree) (map[s
 	}
 
 	return checks, nil
-}
-
-// gone reports whether the directory of w is gone: git calls it prunable, or nothing is there.
-func (s Service) gone(ctx context.Context, w worktree.Worktree) (bool, error) {
-	// git never lists a locked worktree prunable, even with its directory gone: the disk is asked.
-	if w.Prunable {
-		return true, nil
-	}
-	location, err := s.Git.Locate(ctx, w.Path)
-	if err != nil {
-		return false, err
-	}
-
-	return !location.Exists, nil
 }
 
 // ----------------------------------------------------------------------------

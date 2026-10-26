@@ -39,7 +39,7 @@ type UseCase struct {
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, or a refusal before the apply).
 type Outcome = domain.Outcome[Plan, Detail]
 
-// A Result is what the apply did: one Item per worktree the plan removes, in its order, and the warnings of the whole run.
+// A Result is what the apply did: one Item per worktree of the plan, in its order, and the warnings of the whole run.
 type Result = domain.Result[Detail]
 
 // An Item is what became of one worktree: its status and why, the error it failed on, its warnings, and its Detail once it is removed.
@@ -116,10 +116,14 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // ----------------------------------------------------------------------------
 // Apply
 
-// Apply carries out the plan, reporting each step: it removes each worktree in turn, a failure stopping none of the others, then reparents the children of the worktrees removed onto the nearest one that stayed, or warns of each one left orphaned; it ends on the step out of a worktree removed under the caller's feet. Once ctx is cancelled, the worktrees not yet started are skipped.
+// Apply carries out the plan, reporting each step: it removes each worktree in turn, a failure stopping none of the others, those it leaves as they are reported ruled out, then reparents the children of the worktrees removed onto the nearest one that stayed, or warns of each one left orphaned; it ends on the step out of a worktree removed under the caller's feet. Once ctx is cancelled, the worktrees not yet started are skipped.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	items := make([]Item, 0, len(plan.Worktrees))
 	for _, c := range plan.Worktrees {
+		if c.ruledOut() {
+			items = append(items, Item{Subject: c.Worktree, Status: domain.StatusSkipped, Reason: domain.ReasonRuledOut})
+			continue
+		}
 		removed := u.Teardown.Remove(ctx, teardown.RemoveParams{Command: Name, Facts: plan.facts.Facts, Removal: c.Removal, Report: report})
 		items = append(items, itemOf(c, removed))
 	}
@@ -155,7 +159,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 //  2. origin's branch of each worktree fetched again, the gone ones dropped, when gone branches are asked for and the fetch is not skipped;
 //  3. at once: the jobs of the run daemon, the pull request of each worktree's branch, and the branches whose upstream origin deleted;
 //  4. which branches stand behind their finished pull request's head;
-//  5. what makes each worktree done with unsafe to remove: its uncommitted changes, the commits no other branch holds but its merged pull request's head, its open pull request and its jobs up.
+//  5. what makes each worktree done with unsafe to remove, each one named when the request names some: its uncommitted changes, the commits no other branch holds but its merged pull request's head, its open pull request and its jobs up.
 //
 // A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
@@ -205,7 +209,12 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	facts.JobsErr, facts.PRsErr, facts.PullRequests = answered.JobsErr, answered.PRsErr, answered.PullRequests
 	facts.Behind = repository.Behind(ctx, u.Git, repo, facts.PullRequests, linked)
 
-	done := worktreesOf(repo, facts.Candidates(req))
+	// Worktrees removed together hold nothing for each other: a request naming some checks them against every other worktree, which stays.
+	checked := facts.Candidates(req)
+	if len(req.Worktrees) > 0 {
+		checked = slices.DeleteFunc(checked, func(c Candidate) bool { return !slices.Contains(req.Worktrees, c.Worktree) })
+	}
+	done := worktreesOf(repo, checked)
 	if facts.Checks, err = u.Teardown.Read(ctx, done); err != nil {
 		return Facts{}, err
 	}

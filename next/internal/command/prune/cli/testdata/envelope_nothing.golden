@@ -5,7 +5,6 @@
   "op": "op-1",
   "plan": {
     "worktrees": [],
-    "kept": [],
     "reasons": [
       "merged"
     ],

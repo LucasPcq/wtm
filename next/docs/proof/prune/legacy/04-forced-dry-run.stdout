@@ -1,8 +1,8 @@
 
   Would prune 9 worktree(s):
+  feat/closed     PR closed
   feat/merged     PR merged
   feat/moved      PR merged
-  feat/closed     PR closed
   feat/dirty      PR merged
   feat/gone       remote branch gone
   feat/gone-work  remote branch gone

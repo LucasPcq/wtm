@@ -103,6 +103,7 @@ func wire(params wireParams) app {
 		Meta:     meta,
 		EnvFiles: store.EnvFiles{},
 		StateDir: params.StateDir,
+		Gone:     repository.GoneIn(repo),
 		RunHooks: shell.RunHooks,
 		Shield:   shell.Shield,
 	}

@@ -482,11 +482,27 @@ func TestAPullRequestMergedOrClosedAtTheBranchTipMarksItsWorktreeFinished(t *tes
 	require.NoError(t, err)
 
 	assert.Nil(t, detailOf(t, without, "feat/a").Finished, "GitHub not asked: not known")
-	assert.Equal(t, new(worktree.PullRequestMerged), detailOf(t, with, "feat/a").Finished)
-	assert.Equal(t, new(worktree.PullRequestClosed), detailOf(t, with, "feat/b").Finished)
+	assert.Equal(t, new(list.FinishedMerged), detailOf(t, with, "feat/a").Finished)
+	assert.Equal(t, new(list.FinishedClosed), detailOf(t, with, "feat/b").Finished)
 	assert.False(t, detailOf(t, with, "feat/b").Merged)
 	assert.Nil(t, detailOf(t, with, "feat/moved").Finished, "a branch that moved past its pull request is not finished")
 	assert.Nil(t, detailOf(t, with, "feat/open").Finished)
+}
+
+// prune takes a merged worktree whose directory is gone, its hooks skipped: list's finished says so, where merged, which offers clean, does not.
+func TestAWorktreeWhoseDirectoryIsGoneIsFinishedButNotMerged(t *testing.T) {
+	merged := worktree.PullRequest{Number: 1, Branch: "feat/a", Head: gittest.Root, State: worktree.PullRequestMerged}
+	w := newWorld(seed{
+		Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}, Gone: []string{linked("feat/a").Path}},
+		PRs: []worktree.PullRequest{merged},
+	})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{WithPRs: true}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.True(t, detailOf(t, read, "feat/a").Missing)
+	assert.False(t, detailOf(t, read, "feat/a").Merged)
+	assert.Equal(t, new(list.FinishedMerged), detailOf(t, read, "feat/a").Finished)
 }
 
 func TestAnOpenPullRequestCarriesWhereItsReviewStands(t *testing.T) {

@@ -17,6 +17,7 @@ What every mutating command of `next/` promises its callers — people at a term
 - Unattended otherwise: a field with a default takes it, a required field without one is a refusal naming its flag — never a picker. `--output json` is unattended by nature.
 - `--yes` (`-y`), the confirmation axis: no question; each open decision takes its flag, else its remembered answer, else a documented safe default, never destructive.
 - `--force`, the safety axis: it only lifts a safety refusal (dirty, unpushed, locked). It never implies `--yes`.
+- A safety refusal depends on who chose the worktree: one the request names refuses the whole request (`KindRefused`, `<command>.unsafe`, a problem per blocker on its entry, the request forced as follow-up, `<command>.force`); one the command chose itself (no `worktree` answer: the wizard's default pick confirmed untouched, an unattended run naming none, fast-forward's `--all`) is left as it is, a plan entry with its blockers and no phase, `skipped` with `domain.ReasonRuledOut`, a warning per worktree, the last followed by one request forcing them all, and the others go on. The default pick leaves it out. `next/README.md`, "A worktree named, a worktree the command chose".
 - A remembered answer (`config.toml` `[wizard.remembered]`, written by "always use this answer" or `--remember <field>`) stands in for the flag not given; `--ask` sets the memory aside for one run.
 
 ## Dry run and fingerprint

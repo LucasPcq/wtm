@@ -63,11 +63,11 @@ type Detail struct {
 	Origin       *worktree.Origin `json:"origin"`         // null when origin has no branch of that name
 	PR           *PR              `json:"pr"`             // null without one, or when GitHub was not asked
 	Merged       bool             `json:"merged"`         // its pull request merged it and it has not moved since: cleaning it is due; false when GitHub was not asked
-	// Finished is the state of its pull request, merged or closed, once it has done with it: the branch has not moved since (worktree.Repository.Finished), so prune removes it; null when it has not, or when GitHub was not asked.
-	Finished  *worktree.PullRequestState `json:"finished"`
-	Condition worktree.Condition         `json:"condition"` // the one fact of it that most changes what to do first, as this read knows it
-	Services  []string                   `json:"services"`  // the jobs up in it, null when that cannot be told
-	URLs      []string                   `json:"urls"`      // the addresses of the jobs up in it, null when that cannot be told
+	// Finished is how its pull request has done with it, merged or closed while the branch has not moved since (worktree.Repository.Finished), so prune removes it, its directory gone or not (prune skips its hooks then); null when it has not, or when GitHub was not asked.
+	Finished  *Finished          `json:"finished"`
+	Condition worktree.Condition `json:"condition"` // the one fact of it that most changes what to do first, as this read knows it
+	Services  []string           `json:"services"`  // the jobs up in it, null when that cannot be told
+	URLs      []string           `json:"urls"`      // the addresses of the jobs up in it, null when that cannot be told
 	// Actions are what may be done next with it, as Offers lists them, each the command that does it and its answers.
 	Actions []domain.FollowUp `json:"actions"`
 }
@@ -158,13 +158,28 @@ func (f Facts) item(w worktree.Worktree, active bool) Item {
 	return Item{Subject: w.Name(), Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(w.Branch())}
 }
 
-// finished is the state of pr when it has done with w, nil otherwise.
-func (f Facts) finished(pr worktree.PullRequest, w worktree.Worktree) *worktree.PullRequestState {
+// A Finished is how a worktree's pull request has done with it: merged, or closed unmerged.
+type Finished string
+
+// The ways a pull request has done with its worktree.
+const (
+	FinishedMerged Finished = "merged"
+	FinishedClosed Finished = "closed"
+)
+
+// Finisheds returns every Finished.
+func Finisheds() []Finished {
+	return []Finished{FinishedMerged, FinishedClosed}
+}
+
+// finished is how pr has done with w, nil when it has not.
+func (f Facts) finished(pr worktree.PullRequest, w worktree.Worktree) *Finished {
 	if !f.Finished(pr, w, f.Behind[w.Branch()]) {
 		return nil
 	}
 
-	return &pr.State
+	finished := Finished(pr.State)
+	return &finished
 }
 
 func conditionOf(detail Detail, operation worktree.Operation) worktree.Condition {

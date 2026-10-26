@@ -7,9 +7,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-// Git is the repository as a removal reads and changes it: where a path leads, whether a worktree holds uncommitted changes, what removing worktrees and deleting branches together would lose, the worktrees still listed, and the removal of a worktree and of its branch.
+// Git is the repository as a removal reads and changes it: whether a worktree holds uncommitted changes, what removing worktrees and deleting branches together would lose, the worktrees still listed, and the removal of a worktree and of its branch.
 type Git interface {
-	Locate(ctx context.Context, path string) (worktree.Location, error)
 	Dirty(ctx context.Context, path string) (bool, error)
 	Unpushed(ctx context.Context, losing worktree.Losing) (int, error)
 	Worktrees(ctx context.Context) ([]worktree.Worktree, error)

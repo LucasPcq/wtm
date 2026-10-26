@@ -38,6 +38,17 @@ func TestAnAppliedOutcomeDrawsEachItemsWarningsBesideItsSubjectThenTheRuns(t *te
 `, got)
 }
 
+func TestAnItemThePlanRuledOutIsCountedButNotDrawnAsUnfinished(t *testing.T) {
+	outcome := domain.Outcome[recappedPlan, worktreeDetail]{
+		Warnings: []domain.Warning{{Code: "left", Message: "feat/a has uncommitted changes: left as it is"}},
+		Result:   &domain.Result[worktreeDetail]{Items: []domain.Unit[worktreeDetail]{{Subject: "feat/a", Status: domain.StatusSkipped, Reason: domain.ReasonRuledOut}}},
+	}
+
+	got := rendered(func(w *bytes.Buffer) { DrawApplied(w, outcome, AppliedParams{Command: "fast-forward"}) })
+
+	assert.Equal(t, "  ! fast-forward: 1 skipped\n\n  ! feat/a has uncommitted changes: left as it is\n", got)
+}
+
 func TestAnAppliedOutcomeWithNoItemDrawsItsTallyAndTheRunsWarnings(t *testing.T) {
 	outcome := domain.Outcome[recappedPlan, worktreeDetail]{Warnings: []domain.Warning{{Code: "run", Message: "of the run"}}, Result: &domain.Result[worktreeDetail]{}}
 

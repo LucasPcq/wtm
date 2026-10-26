@@ -1,4 +1,4 @@
-package form
+package output
 
 import (
 	"strings"

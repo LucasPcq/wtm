@@ -6,6 +6,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
 // words are how the command line words each field of clean's form; the switches name what they decide on the questions observed: the children that would move, the worktrees that are unsafe.
@@ -47,7 +48,7 @@ func forceHelp(q clean.Questions) string {
 
 	lines := []string{"These worktrees are unsafe to remove:"}
 	for _, removal := range q.Unsafe {
-		lines = append(lines, "  "+removal.Worktree+" — "+form.Blockers(removal.Blockers))
+		lines = append(lines, "  "+removal.Worktree+" — "+output.Blockers(removal.Blockers))
 	}
 	return strings.Join(lines, "\n")
 }
