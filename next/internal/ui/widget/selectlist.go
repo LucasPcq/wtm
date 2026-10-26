@@ -97,28 +97,46 @@ func (l *SelectList) Update(msg tea.Msg) (Verdict, tea.Cmd) {
 		return l.filter(key), nil
 	}
 
-	switch key.String() {
-	case "up", "k":
+	switch key.Type {
+	case tea.KeyUp:
 		l.move(-1)
-	case "down", "j":
+	case tea.KeyDown:
 		l.move(1)
-	case "enter":
+	case tea.KeyEnter:
 		if len(l.shown) > 0 {
 			return Done, nil
 		}
-	case "esc":
+	case tea.KeyEsc:
 		if l.query == "" {
 			return Back, nil
 		}
 		l.query = ""
 		l.refilter()
 		l.snap()
-	case "/":
-		l.filtering = true
-	case "tab":
+	case tea.KeyTab:
 		l.remember = l.toggle && !l.remember
+	case tea.KeyRunes:
+		return l.typed(key), nil
 	}
 	return Stay, nil
+}
+
+// typed handles text typed outside the filter: k and j move, and / starts the filter with what was typed after it at once.
+func (l *SelectList) typed(key tea.KeyMsg) Verdict {
+	if key.Alt {
+		return Stay
+	}
+
+	switch text := string(key.Runes); {
+	case text == "k":
+		l.move(-1)
+	case text == "j":
+		l.move(1)
+	case strings.HasPrefix(text, "/"):
+		l.filtering = true
+		return l.filter(tea.KeyMsg{Type: tea.KeyRunes, Runes: key.Runes[1:]})
+	}
+	return Stay
 }
 
 // filter handles a key while the filter takes typed text: text typed or pasted narrows the options, backspace widens them, esc leaves the filter as typed.

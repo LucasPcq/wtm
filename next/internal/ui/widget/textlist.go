@@ -64,14 +64,14 @@ func (l *TextList) Update(msg tea.Msg) (Verdict, tea.Cmd) {
 		return Stay, nil
 	}
 
-	switch key.String() {
-	case "tab":
+	switch key.Type {
+	case tea.KeyTab:
 		return Stay, l.add(false)
-	case "enter":
+	case tea.KeyEnter:
 		return Stay, l.add(true)
-	case "esc":
+	case tea.KeyEsc:
 		return Back, nil
-	case "backspace":
+	case tea.KeyBackspace:
 		if l.input.Value() == "" && len(l.entries) > 0 {
 			l.entries, l.err = l.entries[:len(l.entries)-1], nil
 			return Stay, nil

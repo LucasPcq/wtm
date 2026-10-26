@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,4 +53,13 @@ func TestAWidgetShowsItsErrorAsWritten(t *testing.T) {
 	textSettled(x, cmd)
 
 	assert.Contains(t, plain(x.View(Size{Width: 60}, plainStyles())), "✗ feat/other already has a worktree")
+}
+
+func TestTextTypedAtOnceThatSpellsAKeyIsTyped(t *testing.T) {
+	x := NewText("", refusingBad)
+
+	verdict, _ := x.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("esc")})
+
+	assert.Equal(t, Stay, verdict)
+	assert.Equal(t, "esc", x.Value())
 }

@@ -76,27 +76,45 @@ func (m *MultiSelect) Update(msg tea.Msg) (Verdict, tea.Cmd) {
 		return m.filter(key), nil
 	}
 
-	switch key.String() {
-	case "up", "k":
+	switch key.Type {
+	case tea.KeyUp:
 		m.move(-1)
-	case "down", "j":
+	case tea.KeyDown:
 		m.move(1)
-	case " ":
+	case tea.KeySpace:
 		m.toggle()
-	case "a":
-		m.pickAll()
-	case "enter":
+	case tea.KeyEnter:
 		return m.confirm(), nil
-	case "esc":
+	case tea.KeyEsc:
 		if m.query == "" {
 			return Back, nil
 		}
 		m.query = ""
 		m.refilter()
-	case "/":
-		m.filtering = true
+	case tea.KeyRunes:
+		return m.typed(key), nil
 	}
 	return Stay, nil
+}
+
+// typed handles text typed outside the filter: k and j move, a picks every option shown, and / starts the filter with what was typed after it at once.
+func (m *MultiSelect) typed(key tea.KeyMsg) Verdict {
+	if key.Alt {
+		return Stay
+	}
+
+	switch text := string(key.Runes); {
+	case text == "k":
+		m.move(-1)
+	case text == "j":
+		m.move(1)
+	case text == "a":
+		m.pickAll()
+	case strings.HasPrefix(text, "/"):
+		m.filtering = true
+		return m.filter(tea.KeyMsg{Type: tea.KeyRunes, Runes: key.Runes[1:]})
+	}
+	return Stay
 }
 
 // filter handles a key while the filter takes typed text: text typed or pasted narrows the options, space still picks, backspace widens them, esc leaves the filter as typed.

@@ -77,3 +77,12 @@ func TestTextPastedInTheFilterNarrowsWhatAPicks(t *testing.T) {
 
 	assert.Equal(t, []string{"a.txt", "b.txt"}, m.Values())
 }
+
+func TestASlashTypedAtOnceWithTextFiltersWhatAPicks(t *testing.T) {
+	m := NewMultiSelect(picks(), "")
+
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/txt")})
+	pressed(m, "esc", "a")
+
+	assert.Equal(t, []string{"a.txt", "b.txt"}, m.Values())
+}
