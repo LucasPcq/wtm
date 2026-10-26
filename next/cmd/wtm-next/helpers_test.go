@@ -22,6 +22,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -106,7 +107,7 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 
 	empty, err := c.Questions(t.Context(), api.Call{Dir: main})
 	require.NoError(t, err)
-	// a later answer's problem may wait on the subject's, as extract's files wait on their source; a subject the command picks by default (fast-forward's worktrees behind origin) is answered already
+	// a later answer's problem may wait on the subject's, as extract's files wait on their source
 	subject := m.answers[0].Path
 	assert.Equal(t, m.complete, len(domain.ProblemsOf(empty.Problems, subject)) == 0, "an empty request is not asked its %s, unless it is complete", subject)
 
@@ -758,9 +759,14 @@ func post(t *testing.T, record webserver.Record, path, body string) *http.Respon
 
 // declaredOf are the values of every constant of typ its package declares, read from its source: typed as in
 // `X T = "x"` or converted as in `X = T("x")`.
+// sourceImporter type-checks packages from source once for every enum: the standard library and the dependencies are checked a single time.
+var sourceImporter = sync.OnceValue(func() types.Importer {
+	return importer.ForCompiler(token.NewFileSet(), "source", nil)
+})
+
 func declaredOf(t *testing.T, typ reflect.Type) []string {
 	t.Helper()
-	pkg, err := importer.ForCompiler(token.NewFileSet(), "source", nil).Import(typ.PkgPath())
+	pkg, err := sourceImporter().Import(typ.PkgPath())
 	require.NoError(t, err)
 
 	var values []string
@@ -772,7 +778,7 @@ func declaredOf(t *testing.T, typ reflect.Type) []string {
 		named, ok := declared.Type().(*types.Named)
 		value := constant.StringVal(declared.Val())
 		// a zero constant ("") stands for none of the values, as worktree.NoOrigin does; an alias (DefaultEnvStrategy) is one of them already
-		if ok && named.Obj().Name() == typ.Name() && value != "" && !slices.Contains(values, value) {
+		if ok && named.Obj().Name() == typ.Name() && named.Obj().Pkg().Path() == typ.PkgPath() && value != "" && !slices.Contains(values, value) {
 			values = append(values, value)
 		}
 	}

@@ -113,12 +113,7 @@ func TestADirtyWorktreeTheCommandChoseIsKeptWithOneRequestForcingEveryOne(t *tes
 
 	outcome, _ := w.run(t, fastforward.Request{All: true})
 
-	var kept []domain.Warning
-	for _, warning := range outcome.Warnings {
-		if warning.Code == fastforward.CodeKept {
-			kept = append(kept, warning)
-		}
-	}
+	kept := keptOf(outcome.Warnings)
 	require.Len(t, kept, 2)
 	assert.Equal(t, domain.Params{"worktree": behind, "blockers": "dirty"}, kept[0].Params)
 	assert.Nil(t, kept[0].FollowUp)
@@ -134,7 +129,7 @@ func TestNamingNoneMovesTheWorktreesBehindOriginAndKeepsTheDirtyOnes(t *testing.
 
 	outcome, _ := w.run(t, fastforward.Request{})
 
-	assert.Equal(t, []string{"main", behind, dirty, stale}, sortedSubjects(outcome))
+	assert.Equal(t, []string{"main", behind, dirty, stale}, subjectsOf(outcome))
 	assert.Equal(t, []string{"main", behind, stale}, moving(outcome.Plan))
 	assert.Equal(t, []fastforward.Blocker{fastforward.BlockerDirty}, outcome.Plan.Worktrees[2].Blockers)
 	assert.Equal(t, domain.ReasonRuledOut, itemsOf(outcome)[dirty].Reason)

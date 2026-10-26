@@ -6,5 +6,5 @@
 
   ! feat/clash is kept as it is: uncommitted changes
 
-  → wtm fast-forward feat/clash --force   fast-forward them anyway
+  → wtm-next fast-forward feat/clash --force   fast-forward them anyway
 

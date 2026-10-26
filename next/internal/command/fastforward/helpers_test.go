@@ -64,7 +64,7 @@ func (w world) stopInARebase(t *testing.T, name string) {
 	t.Helper()
 	// the rebase stops on purpose, so git exits non-zero
 	_ = exec.Command("git", "-C", w.at(name), "-c", "user.email=dev@acme.dev", "-c", "user.name=Dev", "rebase", "-q", "--exec", "false", "--root").Run()
-	require.DirExists(t, gittest.Output(t, w.at(name), "rev-parse", "--git-path", "rebase-merge"))
+	require.DirExists(t, filepath.Join(gittest.Output(t, w.at(name), "rev-parse", "--absolute-git-dir"), "rebase-merge"))
 }
 
 // dirtied leaves an untracked file in the worktree of name.
@@ -140,7 +140,7 @@ func keptOf(warnings []domain.Warning) []domain.Warning {
 	return found
 }
 
-func sortedSubjects(outcome fastforward.Outcome) []string {
+func subjectsOf(outcome fastforward.Outcome) []string {
 	var found []string
 	for _, item := range outcome.Result.Items {
 		found = append(found, item.Subject)

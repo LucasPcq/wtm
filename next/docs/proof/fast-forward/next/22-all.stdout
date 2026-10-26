@@ -11,5 +11,5 @@
 
   → wtm sync feat/diverged                     rebase it
   → wtm go feat/rebasing                       finish it in the worktree
-  → wtm fast-forward feat/clash --force   fast-forward them anyway
+  → wtm-next fast-forward feat/clash --force   fast-forward them anyway
 

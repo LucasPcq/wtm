@@ -25,7 +25,7 @@ func TestANodeNeedsTheFirstActionThatApplies(t *testing.T) {
 		"merged_before_ff":   {detail: tree.Detail{Branch: "feat/a", Origin: behindOrigin}, cleans: true, command: "prune", code: "tree.prune"},
 		"ff_before_sync":     {detail: tree.Detail{Branch: "feat/a", NeedsSync: true, Origin: behindOrigin}, command: "fast-forward", code: "tree.fast-forward"},
 		"diverged_not_ff":    {detail: tree.Detail{Branch: "feat/a", Origin: &worktree.Origin{Ahead: 1, Behind: 2, State: worktree.Diverged}}},
-		"missing_not_moved":  {detail: tree.Detail{Branch: "feat/a", Missing: true, Condition: worktree.ConditionMissing, NeedsSync: true, Origin: behindOrigin}},
+		"missing_cleaned":    {detail: tree.Detail{Branch: "feat/a", Missing: true, Condition: worktree.ConditionMissing, NeedsSync: true, Origin: behindOrigin}, command: "clean", code: "tree.clean"},
 		"busy_not_ff":        {detail: tree.Detail{Branch: "feat/a", Condition: worktree.ConditionMerging, Origin: behindOrigin}, command: "go", code: "tree.go"},
 		"nothing_due":        {detail: tree.Detail{Branch: "feat/a"}},
 	}

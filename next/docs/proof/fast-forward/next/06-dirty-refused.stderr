@@ -1,5 +1,5 @@
 
   ✗ nothing fast-forwarded: feat/dirty can't be fast-forwarded safely
     feat/dirty has uncommitted changes
-  → wtm fast-forward feat/dirty --force   fast-forward anyway
+  → wtm-next fast-forward feat/dirty --force   fast-forward anyway
 

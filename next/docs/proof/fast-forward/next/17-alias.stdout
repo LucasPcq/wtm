@@ -2,5 +2,5 @@
   fast-forward · dry run, nothing applied
   Fast-forward  feat/dry (1 commit)
   fingerprint  <FP>
-  → wtm fast-forward feat/dry --expect-fingerprint <FP>   apply this plan
+  → wtm-next fast-forward feat/dry --expect-fingerprint <FP>   apply this plan
 

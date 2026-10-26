@@ -153,7 +153,6 @@ run_side() {
     -e 's#"(old|new)_tip": "[0-9a-f]+"#"\1_tip": "<SHA>"#g' \
     -e 's#[0-9a-f]{7}\.\.[0-9a-f]{7}#<SHA>..<SHA>#g' \
     -e 's#\(([0-9.]+m?s)\)#(<DUR>)#g' \
-    -e 's#wtm-next (fast-forward|ff)#wtm \1#g' \
     "$dir"/*
 }
 

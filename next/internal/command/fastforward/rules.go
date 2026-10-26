@@ -279,7 +279,7 @@ func kept(advances []Advance) []domain.Warning {
 			reasons = append(reasons, blockerWords[blocker])
 		}
 		names = append(names, a.Worktree)
-		warnings = append(warnings, domain.Warning{Code: CodeKept, Message: a.Worktree + " is kept as it is: " + strings.Join(reasons, ", "), Params: domain.Params{"worktree": a.Worktree, "blockers": strings.Join(domain.Names(a.Blockers), ",")}})
+		warnings = append(warnings, domain.Warning{Code: CodeKept, Message: a.Worktree + " is kept as it is: " + strings.Join(reasons, ", "), Params: domain.Params{"worktree": a.Worktree, "blockers": strings.Join(domain.Names(a.Blockers), ", ")}})
 	}
 	if len(warnings) == 0 {
 		return nil
@@ -417,7 +417,7 @@ func commits(n int) string {
 // ----------------------------------------------------------------------------
 // The outcome
 
-// CodeFailed is a worktree git refused to move; one whose fetch failed, or that gained uncommitted changes or an operation since the plan, fails with CodeFetchFailed, CodeDirty or CodeBusy.
+// CodeFailed is a worktree git refused to move; one that gained uncommitted changes or an operation since the plan fails with CodeDirty or CodeBusy.
 const CodeFailed = Name + ".failed"
 
 // The messages of a worktree that failed to move, one fixed line per code, the cause git gave in its params.

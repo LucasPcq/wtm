@@ -1,4 +1,4 @@
 
   ✗ the facts changed since the preview
-  → wtm fast-forward feat/dry --dry-run   the plan the facts give now
+  → wtm-next fast-forward feat/dry --dry-run   the plan the facts give now
 
