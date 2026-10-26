@@ -22,9 +22,10 @@ func TestWorktreesListsTheMainWorktreeFirstOnItsBranch(t *testing.T) {
 	worktrees, err := repo.Worktrees(t.Context())
 
 	require.NoError(t, err)
+	head := gittest.Output(t, repo.Dir, "rev-parse", "HEAD")
 	assert.Equal(t, []worktree.Worktree{
-		{Path: repo.Dir, Main: true, State: worktree.OnBranch{Branch: "main"}},
-		{Path: linked, State: worktree.OnBranch{Branch: "feature"}},
+		{Path: repo.Dir, Main: true, State: worktree.OnBranch{Branch: "main"}, Head: head},
+		{Path: linked, State: worktree.OnBranch{Branch: "feature"}, Head: head},
 	}, worktrees)
 }
 

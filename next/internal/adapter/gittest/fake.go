@@ -426,11 +426,10 @@ func (f *Fake) RemoveWorktree(_ context.Context, path string) error {
 	return nil
 }
 
-// Unpushed counts the commits of the local branch losing.Branch, and of HEAD
-// in the worktree at losing.Head, that no other local branch but those going
-// with it, nor any fetched remote branch, holds, a commit both hold once; it
-// fails when the branch is missing. HEAD is its worktree's branch, else Root:
-// the fake commits on no branch.
+// Unpushed counts the commits of the local branch losing.Branch, and of the
+// commit losing.Head, that no other local branch but those going with it, nor
+// any fetched remote branch, holds, a commit both hold once; a tip that names
+// no commit holds none.
 func (f *Fake) Unpushed(_ context.Context, losing worktree.Losing) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -438,16 +437,9 @@ func (f *Fake) Unpushed(_ context.Context, losing worktree.Losing) (int, error) 
 		return 0, err
 	}
 
-	var of history
-	if losing.Branch != "" {
-		commits, ok := f.local[losing.Branch]
-		if !ok {
-			return 0, fmt.Errorf("gittest: no branch %s", losing.Branch)
-		}
-		of = commits
-	}
+	of := slices.Clone(f.local[losing.Branch])
 	if losing.Head != "" {
-		of = append(of, f.head(realPath(losing.Head))...)
+		of = append(of, f.upTo(losing.Head)...)
 	}
 
 	held := map[string]bool{}
@@ -474,14 +466,32 @@ func (f *Fake) Unpushed(_ context.Context, losing worktree.Losing) (int, error) 
 	return count, nil
 }
 
-// head is the history of HEAD in the worktree at path: its branch's, else Root.
-func (f *Fake) head(path string) history {
-	at := f.worktreeAt(path)
-	if at >= 0 && f.worktrees[at].Branch() != "" {
-		return f.local[f.worktrees[at].Branch()]
+// head is the commit the worktree w stands on: its branch's tip, else Root, the
+// fake committing on no branch; none for the bare entry.
+func (f *Fake) head(w worktree.Worktree) string {
+	if _, bare := w.State.(worktree.Bare); bare {
+		return ""
 	}
+	if commits := f.local[w.Branch()]; len(commits) > 0 {
+		return commits[len(commits)-1]
+	}
+	return Root
+}
 
-	return history{Root}
+// upTo is the history ending on commit, as a branch holding it has it; none
+// when no branch holds it.
+func (f *Fake) upTo(commit string) history {
+	for _, commits := range f.local {
+		if at := slices.Index(commits, commit); at >= 0 {
+			return commits[:at+1]
+		}
+	}
+	for _, commits := range f.remote {
+		if at := slices.Index(commits, commit); at >= 0 {
+			return commits[:at+1]
+		}
+	}
+	return nil
 }
 
 // DeleteBranch deletes the local branch name; it fails when the branch is
@@ -713,6 +723,7 @@ func (f *Fake) listed() []worktree.Worktree {
 	worktrees := slices.Clone(f.worktrees)
 	for i, w := range worktrees {
 		worktrees[i].Prunable = slices.Contains(f.gone, w.Path) && !w.Locked
+		worktrees[i].Head = f.head(w)
 	}
 	slices.SortStableFunc(worktrees[1:], func(a, b worktree.Worktree) int { return strings.Compare(a.Path, b.Path) })
 	return worktrees

@@ -140,15 +140,15 @@ func parseAheadBehind(out string) (worktree.AheadBehind, error) {
 	return worktree.AheadBehind{Ahead: ahead, Behind: behind}, nil
 }
 
-// Unpushed counts what losing would lose, a commit both tips hold once. It
-// fails when the branch is missing.
+// Unpushed counts what losing would lose, a commit both tips hold once; a tip
+// that names no commit holds none.
 func (r Repo) Unpushed(ctx context.Context, losing worktree.Losing) (int, error) {
-	at, args := r, []string{"rev-list", "--count"}
+	args := []string{"rev-list", "--count", "--ignore-missing"}
 	if losing.Branch != "" {
 		args = append(args, headsPrefix+losing.Branch)
 	}
 	if losing.Head != "" {
-		at, args = r.at(losing.Head), append(args, "HEAD")
+		args = append(args, losing.Head)
 	}
 
 	args = append(args, "--not")
@@ -157,7 +157,7 @@ func (r Repo) Unpushed(ctx context.Context, losing worktree.Losing) (int, error)
 			args = append(args, "--exclude="+other)
 		}
 	}
-	out, err := at.git(ctx, append(args, "--branches", "--remotes", "--")...)
+	out, err := r.git(ctx, append(args, "--branches", "--remotes", "--")...)
 	if err != nil {
 		return 0, err
 	}

@@ -2,6 +2,7 @@ package git_test
 
 import (
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -175,20 +176,38 @@ func TestTheFakeAndGitCountWhatDeletingABranchWouldLose(t *testing.T) {
 	}
 }
 
-func TestTheFakeAndGitCountWhatRemovingAWorktreeLosesFromItsHead(t *testing.T) {
+func TestTheFakeAndGitCountWhatRemovingAWorktreeLosesFromTheCommitItStandsOn(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {
+			worktrees, err := impl.port.Worktrees(t.Context())
+			require.NoError(t, err)
+
 			lost := map[string]int{}
-			for _, name := range []string{"linked", "detached", "rebasing"} {
-				count, err := impl.port.Unpushed(t.Context(), worktree.Losing{Head: filepath.Join(impl.root, name), Going: []string{name}})
+			for _, w := range worktrees {
+				name := filepath.Base(w.Path)
+				if !slices.Contains([]string{"linked", "detached", "rebasing", "gone"}, name) {
+					continue
+				}
+				count, err := impl.port.Unpushed(t.Context(), worktree.Losing{Head: w.Head, Going: []string{name}})
 				require.NoError(t, err, name)
 				lost[name] = count
 			}
-			both, err := impl.port.Unpushed(t.Context(), worktree.Losing{Branch: "linked", Head: filepath.Join(impl.root, "linked")})
+			both, err := impl.port.Unpushed(t.Context(), worktree.Losing{Branch: "linked", Head: worktrees[slices.IndexFunc(worktrees, func(w worktree.Worktree) bool { return w.Branch() == "linked" })].Head})
 			require.NoError(t, err)
 
-			assert.Equal(t, map[string]int{"linked": 1, "detached": 0, "rebasing": 0}, lost, "HEAD counts what its branch holds once the branch goes too")
+			assert.Equal(t, map[string]int{"linked": 1, "detached": 0, "rebasing": 0, "gone": 0}, lost, "the commit a worktree stands on counts what its branch holds once the branch goes too, its directory gone or not")
 			assert.Equal(t, 1, both, "a commit the branch and HEAD both hold is counted once")
+		})
+	}
+}
+
+func TestTheFakeAndGitCountNothingForATipThatNamesNoCommit(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			count, err := impl.port.Unpushed(t.Context(), worktree.Losing{Branch: "remote-only"})
+
+			require.NoError(t, err)
+			assert.Equal(t, 0, count)
 		})
 	}
 }
@@ -222,10 +241,6 @@ func TestTheFakeAndGitRefuseTheSameBranchChanges(t *testing.T) {
 		}},
 		{name: "delete_missing_branch", call: func(t *testing.T, impl implementation) error {
 			return impl.port.DeleteBranch(t.Context(), "nope")
-		}},
-		{name: "count_unpushed_of_missing_branch", call: func(t *testing.T, impl implementation) error {
-			_, err := impl.port.Unpushed(t.Context(), worktree.Losing{Branch: "remote-only"})
-			return err
 		}},
 		{name: "count_unknown_ref", call: func(t *testing.T, impl implementation) error {
 			_, err := impl.port.AheadBehind(t.Context(), "unmerged")

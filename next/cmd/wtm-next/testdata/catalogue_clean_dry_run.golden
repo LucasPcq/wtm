@@ -33,5 +33,10 @@
   },
   "fingerprint": "<id>",
   "follow_ups": [],
-  "warnings": []
+  "warnings": [
+    {
+      "code": "clean.prs_unavailable",
+      "message": "couldn't ask for open pull requests: pull requests unavailable: run `gh auth login`"
+    }
+  ]
 }

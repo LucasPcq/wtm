@@ -26,8 +26,9 @@ type Facts struct {
 	PRsErr  error                    // why the forge could not be asked for open pull requests
 }
 
-// A Check is what a worktree holds that its removal would lose or cut short: uncommitted changes, commits no other branch holds, an open pull request, jobs up.
+// A Check is whether a worktree's directory is gone, and what it holds that its removal would lose or cut short: uncommitted changes, commits no other branch holds, an open pull request, jobs up.
 type Check struct {
+	Missing     bool
 	Dirty       bool
 	Unpushed    int
 	PullRequest string   // the page of its open pull request, empty when it has none
@@ -74,16 +75,22 @@ func (f Facts) asked(names []string) []worktree.Worktree {
 	return found
 }
 
-// pushed are the branches of worktrees origin has: a pull request is opened from a branch pushed, so the others have none to ask the forge about.
-func (f Facts) pushed(worktrees []worktree.Worktree) []string {
-	var branches []string
+// branches are the branches of worktrees, each asked of the forge: one origin no longer has may be a pull request merged and its branch deleted.
+func branches(worktrees []worktree.Worktree) []string {
+	var found []string
 	for _, w := range worktrees {
-		if w.Branch() != "" && f.Remote(w.Branch()) {
-			branches = append(branches, w.Branch())
+		if w.Branch() != "" {
+			found = append(found, w.Branch())
 		}
 	}
 
-	return branches
+	return found
+}
+
+// landed reports whether every commit of w is its merged pull request's: the head GitHub keeps is w's branch tip and the commit w stands on, so a branch squash- or rebase-merged, then deleted on origin, loses nothing; a commit made since, or a pull request still open, lands nothing.
+func (f Facts) landed(prs []worktree.PullRequest, w worktree.Worktree) bool {
+	pr, ok := worktree.PullRequestOf(prs, w.Branch())
+	return ok && f.Cleans(pr, w, false) && (w.Head == "" || w.Head == pr.Head)
 }
 
 // ----------------------------------------------------------------------------
@@ -155,7 +162,7 @@ const (
 
 func (f Facts) removal(w worktree.Worktree, entry int) Removal {
 	check := f.Checks[w.Name()]
-	removal := Removal{Worktree: w.Name(), Branch: w.Branch(), Path: w.Path, Missing: w.Prunable, Blockers: []Blocker{}, entry: entry}
+	removal := Removal{Worktree: w.Name(), Branch: w.Branch(), Path: w.Path, Missing: w.Prunable || check.Missing, Blockers: []Blocker{}, entry: entry}
 	add := func(blocker Blocker, holds bool) {
 		if holds {
 			removal.Blockers = append(removal.Blockers, blocker)
@@ -233,11 +240,11 @@ func (f Facts) moves(removals []Removal) []Move {
 	return moves
 }
 
-// survivor is the nearest parent of branch that is not removed, else the base branch; a cycle of removed parents ends on the base branch too.
+// survivor is the nearest parent of branch that is not removed and still exists, a branch or a worktree's, else the base branch; a cycle of removed parents ends on the base branch too.
 func (f Facts) survivor(branch string, removed map[string]bool) string {
 	seen := map[string]bool{}
 	for current := branch; current != "" && !seen[current]; current = f.Records[current].SourceBranch {
-		if !removed[current] {
+		if !removed[current] && (f.Local(current) || f.CheckedOutAt(current) != "") {
 			return current
 		}
 		seen[current] = true
@@ -322,6 +329,12 @@ func (r Removal) problem(blocker Blocker) domain.FieldError {
 // commandRunDown stops a worktree's jobs: the run module's, not migrated yet.
 const commandRunDown = "run down"
 
+// CodeJobsLeft warns of the jobs a forced removal leaves running, CodeDataKept of the namespaces a removed worktree keeps in shared services.
+const (
+	CodeJobsLeft = Name + ".jobs_left"
+	CodeDataKept = Name + ".data_kept"
+)
+
 // warnings are what the plan cannot see to or leaves behind: the jobs or pull requests that could not be asked, the jobs a forced removal leaves running, and the data each removed worktree keeps in shared services, which clean does not drop yet.
 func (f Facts) warnings(planned Plan) []domain.Warning {
 	var warnings []domain.Warning
@@ -335,11 +348,11 @@ func (f Facts) warnings(planned Plan) []domain.Warning {
 	for _, r := range planned.Worktrees {
 		params := domain.Params{"worktree": r.Worktree}
 		if len(r.Jobs) > 0 {
-			warnings = append(warnings, domain.Warning{Code: "clean.jobs_left", Message: r.Worktree + " is removed with its jobs still running: " + strings.Join(r.Jobs, ", "), Params: params})
+			warnings = append(warnings, domain.Warning{Code: CodeJobsLeft, Message: r.Worktree + " is removed with its jobs still running: " + strings.Join(r.Jobs, ", "), Params: params})
 		}
 		if len(r.Namespaces) > 0 {
 			params["namespaces"] = strings.Join(r.Namespaces, ", ")
-			warnings = append(warnings, domain.Warning{Code: "clean.data_kept", Message: r.Worktree + " keeps its data in shared services: " + params["namespaces"] + " (wtm-next does not drop it yet)", Params: params})
+			warnings = append(warnings, domain.Warning{Code: CodeDataKept, Message: r.Worktree + " keeps its data in shared services: " + params["namespaces"] + " (wtm-next does not drop it yet)", Params: params})
 		}
 	}
 
@@ -376,10 +389,23 @@ func (p Plan) Locks() []domain.Lock {
 	return domain.WorktreeLocks(names)
 }
 
-// Fingerprinted is what the plan's fingerprint covers: the plan, the on_clean hooks of each removal among it, its recap left out.
+// Fingerprinted is what the plan's fingerprint covers: the plan, the on_clean hooks of each removal among it, and what their environment reads of each removal's record (its ordinal and isolation, its ports and Compose project); its recap left out.
 func (p Plan) Fingerprinted() any {
 	p.Recapped = domain.Recapped{}
-	return p
+	type hookEnv struct {
+		Ordinal   int               `json:"ordinal"`
+		Isolation project.Isolation `json:"isolation"`
+	}
+	envs := map[string]hookEnv{}
+	for _, r := range p.Worktrees {
+		record := p.facts.Records[r.Branch]
+		envs[r.Worktree] = hookEnv{Ordinal: record.Ordinal, Isolation: record.Isolation.Effective()}
+	}
+
+	return struct {
+		Plan
+		HookEnvs map[string]hookEnv `json:"hook_envs"`
+	}{p, envs}
 }
 
 // Locks are the locks taken before planning: the repository shared, and each worktree asked exclusive.
@@ -456,9 +482,10 @@ func (p Plan) recappedMoves() []domain.RecapValue {
 // ----------------------------------------------------------------------------
 // The outcome
 
-// CodeGo is the step out of a worktree removed under the caller's feet, into the main one; CodeReparent the one that moves a child left orphaned.
+// CodeGo is the step out of a worktree removed under the caller's feet, into the main one; CodeOrphaned warns of a child left on its removed parent, and CodeReparent is the step that moves it.
 const (
 	CodeGo       = Name + ".go"
+	CodeOrphaned = Name + ".orphaned"
 	CodeReparent = Name + ".reparent"
 )
 
@@ -479,7 +506,7 @@ func orphaned(moves []Move) []domain.Warning {
 	warnings := make([]domain.Warning, 0, len(moves))
 	for _, move := range moves {
 		warnings = append(warnings, domain.Warning{
-			Code:     "clean.orphaned",
+			Code:     CodeOrphaned,
 			Message:  move.Branch + " still points at the removed parent " + move.From,
 			Params:   domain.Params{"branch": move.Branch, "from": move.From, "to": move.To},
 			FollowUp: &domain.FollowUp{Command: commandReparent, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{move.Branch}}, {Path: "to", Values: []string{move.To}}}, Code: CodeReparent, Message: "move it onto " + move.To},

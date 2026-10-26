@@ -86,7 +86,43 @@ func (r Repo) Locate(_ context.Context, path string) (worktree.Location, error) 
 	if err != nil {
 		return worktree.Location{}, err
 	}
-	return worktree.Location{Path: resolved, Exists: true}, nil
+	return worktree.Location{Path: spelled(resolved), Exists: true}, nil
+}
+
+// spelled is the existing path as the disk spells it: on one that ignores case,
+// as macOS's does, ../Feat-X reaches …/feat-x, which git spells in its own case.
+// Each part keeps its spelling unless an entry of its parent is the same file
+// under another case.
+func spelled(path string) string {
+	parent, name := filepath.Split(path)
+	if name == "" || parent == path {
+		return path
+	}
+	parent = spelled(filepath.Clean(parent))
+
+	given, err := os.Lstat(filepath.Join(parent, name))
+	if err != nil {
+		return filepath.Join(parent, name)
+	}
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		return filepath.Join(parent, name)
+	}
+	for _, entry := range entries {
+		if entry.Name() == name {
+			return filepath.Join(parent, name)
+		}
+	}
+	for _, entry := range entries {
+		if !strings.EqualFold(entry.Name(), name) {
+			continue
+		}
+		if found, err := os.Lstat(filepath.Join(parent, entry.Name())); err == nil && os.SameFile(given, found) {
+			return filepath.Join(parent, entry.Name())
+		}
+	}
+
+	return filepath.Join(parent, name)
 }
 
 // RealPath returns path with its symlinks resolved, as git spells a worktree's
@@ -182,6 +218,7 @@ func (r Repo) RemoveWorktree(ctx context.Context, path string) error {
 // parseWorktrees reads git worktree list --porcelain -z; the first worktree is
 // the main one and each starts detached until a branch or bare line says
 // otherwise. A locked or prunable line, with or without its reason, marks it so.
+// The HEAD of a branch with no commit yet is all zeros: it stands on none.
 func parseWorktrees(out string) []worktree.Worktree {
 	var worktrees []worktree.Worktree
 	var current *worktree.Worktree
@@ -192,6 +229,8 @@ func parseWorktrees(out string) []worktree.Worktree {
 			worktrees = append(worktrees, worktree.Worktree{Path: value, Main: len(worktrees) == 0, State: worktree.Detached{}})
 			current = &worktrees[len(worktrees)-1]
 		case current == nil:
+		case key == "HEAD" && strings.Trim(value, "0") != "":
+			current.Head = value
 		case key == "branch":
 			current.State = worktree.OnBranch{Branch: strings.TrimPrefix(value, headsPrefix)}
 		case key == "bare":

@@ -8,11 +8,12 @@ import (
 	"strings"
 )
 
-// Worktree is one worktree as git lists it: its path, whether it is the main one, what it has checked out, whether it is locked, and whether its directory is gone (git calls it prunable).
+// Worktree is one worktree as git lists it: its path, whether it is the main one, what it has checked out and the commit it stands on (none on a branch with no commit yet, nor for the bare entry), whether it is locked, and whether its directory is gone (git calls it prunable).
 type Worktree struct {
 	Path     string
 	Main     bool
 	State    State
+	Head     string
 	Locked   bool
 	Prunable bool
 }

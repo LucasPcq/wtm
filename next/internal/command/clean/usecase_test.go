@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
@@ -104,6 +105,43 @@ func TestCommitsOnlyAWorktreesHeadHoldsAreUnpushed(t *testing.T) {
 	refused := failureOf(t, err)
 	assert.Equal(t, map[string][]string{"worktree[0]": {"clean.unpushed"}, "worktree[1]": {"clean.unpushed"}}, fieldCodes(refused.Fields))
 	assert.Equal(t, "1", refused.Fields[1].Params["count"])
+}
+
+// HEAD was read in the worktree's directory: once it was gone, status's own fix, `clean <path>`, lost the commit only it held.
+func TestCommitsOnlyAGoneWorktreesHeadHoldsAreUnpushed(t *testing.T) {
+	w := newWorld(t, seed{})
+	gittest.Git(t, w.at("detached"), "commit", "-q", "--allow-empty", "-m", "on no branch")
+	gittest.Git(t, w.at(plain), "checkout", "-q", "--detach")
+	gittest.Git(t, w.at(plain), "commit", "-q", "--allow-empty", "-m", "picked by the rebase")
+	writeFile(t, filepath.Join(gittest.Output(t, w.at(plain), "rev-parse", "--absolute-git-dir"), "rebase-merge", "head-name"), "refs/heads/"+plain+"\n")
+	require.NoError(t, os.RemoveAll(w.at("detached")))
+	require.NoError(t, os.RemoveAll(w.at(plain)))
+
+	_, err := w.usecase.Run(t.Context(), removing(w.at("detached"), w.at(plain)), domain.RunOptions{DryRun: true})
+
+	assert.Equal(t, map[string][]string{"worktree[0]": {"clean.unpushed"}, "worktree[1]": {"clean.unpushed"}}, fieldCodes(failureOf(t, err).Fields))
+}
+
+// rev-list refused the branch of a worktree added with --orphan, which has no commit yet: it could not be removed, forced or not.
+func TestAWorktreeOnABranchWithNoCommitYetIsRemoved(t *testing.T) {
+	w := newWorld(t, seed{})
+	gittest.Git(t, w.main, "worktree", "add", "-q", "--orphan", "-b", "feat/unborn", w.at("feat/unborn"))
+
+	result, _ := w.apply(t, removing("feat/unborn"))
+
+	assert.Equal(t, map[string]domain.Status{"feat/unborn": domain.StatusDone}, statuses(result.Items))
+	assert.NoDirExists(t, w.at("feat/unborn"))
+}
+
+// git never calls a locked worktree prunable: its directory gone (a drive unmounted), its changes were read there and failed, forced or not.
+func TestALockedWorktreeWhoseDirectoryIsGoneIsRemovedForced(t *testing.T) {
+	w := newWorld(t, seed{})
+	require.NoError(t, os.RemoveAll(w.at(locked)))
+
+	result, _ := w.apply(t, clean.Request{Worktrees: []string{locked}, Force: true})
+
+	assert.Equal(t, map[string]domain.Status{locked: domain.StatusDone}, statuses(result.Items))
+	assert.True(t, w.gone(t, locked))
 }
 
 func TestOneWorktreeAskedByItsBranchAndItsPathIsAskedTwice(t *testing.T) {
@@ -358,6 +396,19 @@ func TestAWorktreeIsNamedByItsRootHoweverItIsSpelled(t *testing.T) {
 	}
 }
 
+// On a disk that ignores case, as macOS's does, a root spelled in another case was not git's spelling: already absent, exit 0.
+func TestAWorktreeIsNamedByItsRootInAnotherCase(t *testing.T) {
+	w := newWorld(t, seed{})
+	if _, err := os.Stat(strings.ToUpper(w.at(plain))); err != nil {
+		t.Skip("this filesystem tells case apart")
+	}
+
+	planned, _ := w.plan(t, removing("WT-FEAT-PLAIN").From(domain.Caller{Cwd: w.root}))
+
+	require.Len(t, planned.Worktrees, 1)
+	assert.Equal(t, plain, planned.Worktrees[0].Worktree)
+}
+
 func TestAWorktreeOnNoBranchIsRemovedByItsPath(t *testing.T) {
 	w := newWorld(t, seed{})
 	path := w.at("detached")
@@ -420,7 +471,7 @@ func TestJobsTheDaemonCannotTellAreWarnedOfAndRefuseNothing(t *testing.T) {
 	assert.Equal(t, []string{"clean.jobs_unknown"}, codes(warnings))
 }
 
-func TestAnOpenPullRequestRefusesTheRemovalAndOnlyPushedBranchesAreAsked(t *testing.T) {
+func TestAnOpenPullRequestRefusesTheRemovalAndEveryBranchIsAsked(t *testing.T) {
 	w := newWorld(t, seed{PRs: []worktree.PullRequest{{Branch: pushed, State: worktree.PullRequestOpen, URL: "https://github.com/acme/web/pull/7"}}})
 
 	_, err := w.usecase.Run(t.Context(), removing(plain, pushed), domain.RunOptions{DryRun: true})
@@ -429,7 +480,37 @@ func TestAnOpenPullRequestRefusesTheRemovalAndOnlyPushedBranchesAreAsked(t *test
 	require.Len(t, refused.Fields, 1)
 	assert.Equal(t, "clean.open_pull_request", refused.Fields[0].Code)
 	assert.Equal(t, "https://github.com/acme/web/pull/7", refused.Fields[0].Params["url"])
-	assert.Equal(t, []string{pushed}, *w.asked)
+	assert.ElementsMatch(t, []string{plain, pushed}, *w.asked, "a branch squash-merged then deleted on origin has its pull request too")
+}
+
+// The most common clean, a pull request squash-merged on GitHub and its branch deleted there, was refused: the commits GitHub keeps as the pull request's head counted as unpushed.
+func TestCommitsAMergedPullRequestHoldsAsItsHeadAreNotUnpushed(t *testing.T) {
+	for name, c := range map[string]struct {
+		later   bool
+		prErr   error
+		removed bool
+	}{
+		"merged_whole":      {removed: true},
+		"committed_since":   {later: true},
+		"forge_unavailable": {prErr: worktree.ErrPullRequestsUnavailable},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t, seed{})
+			prs := []worktree.PullRequest{{Branch: local, State: worktree.PullRequestMerged, Head: gittest.Output(t, w.main, "rev-parse", local)}}
+			w.usecase.PullRequests = func(context.Context, []string) ([]worktree.PullRequest, error) { return prs, c.prErr }
+			if c.later {
+				gittest.Git(t, w.at(local), "commit", "-q", "--allow-empty", "-m", "after the merge")
+			}
+
+			_, err := w.usecase.Run(t.Context(), removing(local), domain.RunOptions{DryRun: true})
+
+			if c.removed {
+				assert.NoError(t, err)
+				return
+			}
+			assert.Equal(t, map[string][]string{"worktree[0]": {"clean.unpushed"}}, fieldCodes(failureOf(t, err).Fields))
+		})
+	}
 }
 
 func TestTheDataAWorktreeHoldsInSharedServicesIsNamedAsKept(t *testing.T) {

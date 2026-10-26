@@ -4,6 +4,7 @@
   Remove    feat/parent
   Children  feat/child (left on feat/parent), feat/child2 (left on feat/parent)
 
+  ! couldn't ask for open pull requests: pull requests unavailable: run `gh auth login`
   ! feat/child still points at the removed parent feat/parent
   ! feat/child2 still points at the removed parent feat/parent
 

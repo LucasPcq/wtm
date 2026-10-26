@@ -35,12 +35,13 @@ const (
 
 var createdAt = time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
 
-// seed is what a world holds beyond its worktrees: its config.toml, the jobs the run daemon runs and the pull requests the forge knows.
+// seed is what a world holds beyond its worktrees: its config.toml, the jobs the run daemon runs, the pull requests the forge knows and why it cannot be asked.
 type seed struct {
 	Config string
 	Jobs   []run.Job
 	JobErr error
 	PRs    []worktree.PullRequest
+	PRErr  error
 }
 
 type world struct {
@@ -98,7 +99,7 @@ func newWorld(t *testing.T, s seed) world {
 		Jobs:     func(context.Context) ([]run.Job, error) { return s.Jobs, s.JobErr },
 		PullRequests: func(_ context.Context, branches []string) ([]worktree.PullRequest, error) {
 			*w.asked = append(*w.asked, branches...)
-			return s.PRs, nil
+			return s.PRs, s.PRErr
 		},
 		RunHooks:   shell.RunHooks,
 		Shield:     shell.Shield,

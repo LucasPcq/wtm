@@ -46,10 +46,44 @@ func TestAChildMovesPastEveryParentRemovedToTheBaseBranchAtTheEnd(t *testing.T) 
 	}
 }
 
+// An ancestor that no longer exists, neither a branch nor a worktree's, was the parent a child moved onto: reparented onto a gone branch.
+func TestAChildMovesPastAnAncestorThatIsGone(t *testing.T) {
+	facts := clean.Facts{
+		Repository: worktree.Repository{
+			Config: project.Config{Worktrees: project.Worktrees{BaseBranch: "main"}},
+			Snapshot: worktree.Snapshot{Worktrees: []worktree.Worktree{
+				{Path: "/main", Main: true, State: worktree.OnBranch{Branch: "main"}},
+				{Path: "/b", State: worktree.OnBranch{Branch: "feat/b"}},
+				{Path: "/c", State: worktree.OnBranch{Branch: "feat/c"}},
+			}},
+		},
+		Records: map[string]worktree.Meta{"feat/b": {SourceBranch: "feat/base"}, "feat/c": {SourceBranch: "feat/b"}},
+	}
+
+	planned, _, err := clean.Decide(facts, removing("feat/b"))
+
+	require.NoError(t, err)
+	assert.Equal(t, []clean.Move{{Branch: "feat/c", From: "feat/b", To: "main", Base: true}}, planned.Moves)
+}
+
 func TestTheFingerprintCoversTheHooksTheRemovalRuns(t *testing.T) {
 	w := newWorld(t, seed{})
 	before, _ := w.plan(t, removing(plain))
 	writeFile(t, w.stateDir+"/config.toml", withHook("true"))
+	after, _ := w.plan(t, removing(plain))
+
+	first, err := operation.Fingerprint(before.Fingerprinted())
+	require.NoError(t, err)
+	second, err := operation.Fingerprint(after.Fingerprinted())
+	require.NoError(t, err)
+	assert.NotEqual(t, first, second)
+}
+
+// The hooks run with the worktree's ports and Compose project, from its record's ordinal and isolation: a record changed after the preview ran them on other values than the plan showed.
+func TestTheFingerprintCoversWhatTheHooksEnvironmentReads(t *testing.T) {
+	w := newWorld(t, seed{Config: withHook("true")})
+	before, _ := w.plan(t, removing(plain))
+	w.record(t, plain, worktree.Meta{SourceBranch: "main", Ordinal: 7})
 	after, _ := w.plan(t, removing(plain))
 
 	first, err := operation.Fingerprint(before.Fingerprinted())

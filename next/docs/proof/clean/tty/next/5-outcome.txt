@@ -4,6 +4,8 @@ $ wtm clean; echo EXIT=$?
 ┃
 ┃  Remove    feat/tty-dirty (dirty, forced), feat/tty-parent
 ┃  Children  feat/tty-child → main
+┃
+┃  ! couldn't ask for open pull requests: pull requests unavailable: run `gh auth login`
 
 EXIT=0
 $

@@ -3,5 +3,7 @@
 
   Remove  feat/bad
 
+  ! couldn't ask for open pull requests: pull requests unavailable: run `gh auth login`
+
   ✗ feat/bad  on_clean hook failed: hook failed: exit status 3
 
