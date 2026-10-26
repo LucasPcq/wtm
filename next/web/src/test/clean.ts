@@ -25,10 +25,15 @@ export function cleanQuestionsOf(answers: DomainAnswered[] = []) {
   }
 }
 
-export const cleanPlan = (call: WebCall) => {
+const dirtyOnes = worktrees.filter((w) => w.dirty).map((w) => w.branch)
+
+// the plan's fingerprint: a run that expects another is refused as stale
+const fingerprint = 'c1'
+
+export const cleanPlan = (call: WebCall, dirty = dirtyOnes) => {
   const picked = call.answers?.find((a) => a.path === 'worktree')?.values ?? []
   const said = (path: string) => call.answers?.some((a) => a.path === path && a.values[0] === 'true') ?? false
-  const unsafe = picked.filter((branch) => worktrees.find((w) => w.branch === branch)?.dirty)
+  const unsafe = picked.filter((branch) => dirty.includes(branch))
   if (unsafe.length > 0 && !said('force'))
     return HttpResponse.json(
       {
@@ -53,7 +58,7 @@ export const cleanPlan = (call: WebCall) => {
   const children = worktrees.filter((w) => picked.includes(w.parent) && !picked.includes(w.branch))
   return HttpResponse.json({
     ...envelope('clean', []),
-    fingerprint: 'c1',
+    fingerprint,
     plan: {
       worktrees: picked.map((branch) => ({
         worktree: branch,
@@ -71,6 +76,15 @@ export const cleanPlan = (call: WebCall) => {
 }
 
 export const cleanRun = (call: WebCall) => {
+  if (call.expect_fingerprint !== fingerprint)
+    return streamed(
+      `event: envelope\ndata: ${JSON.stringify({
+        ...envelope('clean', []),
+        ok: false,
+        error: { kind: 'precondition', code: 'plan.stale', message: 'the facts changed since the preview' },
+      })}\n\n`,
+    )
+
   const picked = call.answers?.find((a) => a.path === 'worktree')?.values ?? []
   const reparent = call.answers?.some((a) => a.path === 'reparent_children') ?? false
   const orphans = reparent ? [] : worktrees.filter((w) => picked.includes(w.parent) && !picked.includes(w.branch))

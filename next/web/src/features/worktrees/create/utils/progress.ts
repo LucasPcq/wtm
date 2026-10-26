@@ -1,7 +1,5 @@
-import type { CreatePlan, DomainAnswered, DomainPhase } from '@/api/types.gen'
-import type { Unit } from '@/features/worktrees/utils/progress'
-
-export type Planned = { answers: DomainAnswered[]; fingerprint: string; plan: CreatePlan }
+import type { CreatePlan, DomainPhase } from '@/api/types.gen'
+import { todo, type Unit } from '@/features/worktrees/utils/progress'
 
 // a branch both fast-forwarded and opened (checked out behind origin) is one unit, its fast-forward first
 export function planned(plan: CreatePlan): Unit[] {
@@ -10,9 +8,5 @@ export function planned(plan: CreatePlan): Unit[] {
   for (const { branch, phases: opened } of plan.branches ?? [])
     if (opened && opened.length > 0) phases.set(branch, [...(phases.get(branch) ?? []), ...opened])
 
-  return [...phases].map(([subject, of]) => ({
-    subject,
-    phases: of.map((phase) => ({ phase, state: 'todo' as const })),
-    lines: [],
-  }))
+  return [...phases].map(([subject, of]) => todo(subject, of))
 }

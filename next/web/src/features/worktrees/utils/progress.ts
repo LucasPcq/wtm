@@ -12,6 +12,12 @@ export type PhaseRun = {
 
 export type Unit = { subject: string; phases: PhaseRun[]; lines: string[]; status?: DomainItem['status'] }
 
+export const todo = (subject: string, phases: DomainPhase[]): Unit => ({
+  subject,
+  phases: phases.map((phase) => ({ phase, state: 'todo' })),
+  lines: [],
+})
+
 export type Progress<C extends MutationCommand> = {
   operation?: string
   units: Unit[]

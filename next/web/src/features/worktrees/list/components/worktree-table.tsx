@@ -22,9 +22,14 @@ export function WorktreeTable({
   selected: string[]
   onSelect: (subjects: string[]) => void
 }) {
-  // the main worktree is never removed, nor checked
-  const selectable = rows.filter((row) => !row.detail?.main).map((row) => row.subject)
-  const all = selectable.length > 0 && selectable.every((subject) => selected.includes(subject))
+  // the main worktree is never removed, nor checked; nor is a worktree a run is working on
+  const checkable = (row: Row) => !row.detail?.main && !row.underWay
+  const selectable = rows.filter(checkable).map((row) => row.subject)
+  const some = selectable.filter((subject) => selected.includes(subject)).length
+  const all = () => {
+    if (some === 0) return false
+    return some === selectable.length ? true : 'indeterminate'
+  }
 
   const table = useTable({
     features,
@@ -42,9 +47,9 @@ export function WorktreeTable({
             <TableHead className="w-10 pl-5">
               <Checkbox
                 aria-label="Select every worktree"
-                checked={all}
+                checked={all()}
                 disabled={selectable.length === 0}
-                onCheckedChange={(on) => onSelect(on === true ? selectable : [])}
+                onCheckedChange={() => onSelect(some === selectable.length ? [] : selectable)}
               />
             </TableHead>
             {group.headers.map((header) => (
@@ -89,7 +94,7 @@ export function WorktreeTable({
               className={cn('relative h-14', underWay && 'opacity-70')}
             >
               <TableCell className="pl-5">
-                {!detail?.main && (
+                {checkable(row.original) && (
                   <Checkbox
                     aria-label={`Select ${row.id}`}
                     checked={selected.includes(row.id)}

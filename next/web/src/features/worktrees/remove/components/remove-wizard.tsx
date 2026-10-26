@@ -1,16 +1,16 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useReducer } from 'react'
 import { dryRunQuery } from '@/api/queries/commands'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { Stepper, type StepState } from '@/features/worktrees/components/stepper'
 import type { Start } from '@/features/worktrees/hooks/use-run'
 import { ChildrenStep } from '@/features/worktrees/remove/components/children-step'
 import { WorktreeCard } from '@/features/worktrees/remove/components/worktree-card'
-import { type Choice, requestOf, unitsOf, unsafe } from '@/features/worktrees/remove/utils/plan'
-
-type Step = 'worktrees' | 'children' | 'confirm'
+import { requestOf, unitsOf, unsafe } from '@/features/worktrees/remove/utils/plan'
+import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/remove/utils/wizard-state'
 
 export function RemoveWizard({
   repo,
@@ -23,9 +23,7 @@ export function RemoveWizard({
   onStart: (start: Start) => void
   onCancel: () => void
 }) {
-  const [step, setStep] = useState<Step>('worktrees')
-  const [choices, setChoices] = useState<Record<string, Choice>>({})
-  const [reparent, setReparent] = useState(false)
+  const [{ step: chosen, choices, reparent }, dispatch] = useReducer(wizardReducer, initialWizard)
 
   // forced, the review plans every worktree asked, the unsafe ones with what keeps them: the choices are the person's
   const review = useQuery(
@@ -36,6 +34,8 @@ export function RemoveWizard({
   )
   const removals = review.data?.plan?.worktrees ?? []
   const undecided = removals.filter((removal) => unsafe(removal) && !choices[removal.worktree])
+  // a worktree read again unsafe has its choice to make, whatever step the person reached
+  const step = undecided.length > 0 ? 'worktrees' : chosen
   const answers = requestOf({ removals, choices, reparent })
   const going = answers[0]?.values ?? []
   // a choice plans again: the plan shown stays until the next one lands
@@ -44,11 +44,12 @@ export function RemoveWizard({
     enabled: undecided.length === 0 && going.length > 0,
     placeholderData: keepPreviousData,
   })
-  const plan = planned.data?.error ? undefined : planned.data?.plan
+  const plan = planned.isError || planned.data?.error ? undefined : planned.data?.plan
   const moves = plan?.moves ?? []
   const fingerprint = planned.data?.fingerprint
   // the buttons never act on the plan a choice is replacing
   const fresh = plan !== undefined && !planned.isPlaceholderData
+  const unplanned = planned.isError ? planned.error.message : planned.data?.error?.message
   const safe = removals.filter((removal) => !unsafe(removal))
 
   const state = (of: Step): StepState => {
@@ -59,11 +60,11 @@ export function RemoveWizard({
   }
 
   const next = () => {
-    if (step === 'worktrees') return setStep(moves.length > 0 ? 'children' : 'confirm')
-    setStep('confirm')
+    if (step === 'worktrees') return dispatch({ type: 'go', to: moves.length > 0 ? 'children' : 'confirm' })
+    dispatch({ type: 'go', to: 'confirm' })
   }
 
-  const back = () => setStep(step === 'confirm' && moves.length > 0 ? 'children' : 'worktrees')
+  const back = () => dispatch({ type: 'go', to: step === 'confirm' && moves.length > 0 ? 'children' : 'worktrees' })
 
   const status = () => {
     if (undecided.length > 0)
@@ -96,15 +97,22 @@ export function RemoveWizard({
               key={removal.worktree}
               removal={removal}
               choice={choices[removal.worktree]}
-              onChoice={(choice) => setChoices({ ...choices, [removal.worktree]: choice })}
+              onChoice={(choice) => dispatch({ type: 'choose', worktree: removal.worktree, choice })}
             />
           ))}
         </div>
       )
 
-    if (step === 'children') return <ChildrenStep moves={moves} reparent={reparent} onReparent={setReparent} />
+    if (step === 'children')
+      return (
+        <ChildrenStep
+          moves={moves}
+          reparent={reparent}
+          onReparent={(to) => dispatch({ type: 'reparent', reparent: to })}
+        />
+      )
 
-    if (!plan) return <Skeleton className="h-40 w-full" />
+    if (!plan) return !unplanned && <Skeleton className="h-40 w-full" />
     return (
       <div className="flex flex-col gap-3">
         <h3 className="font-medium">
@@ -139,7 +147,10 @@ export function RemoveWizard({
         />
       </div>
 
-      <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">{body()}</div>
+      <DialogScroll>
+        {unplanned && <p className="text-sm text-destructive">{unplanned}</p>}
+        {body()}
+      </DialogScroll>
 
       <DialogFooter className="items-center">
         <Button variant="ghost" className="mr-auto" onClick={onCancel}>

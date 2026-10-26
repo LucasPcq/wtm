@@ -1,5 +1,5 @@
 import type { CleanPlan, CleanRemoval, DomainAnswered } from '@/api/types.gen'
-import type { Unit } from '@/features/worktrees/utils/progress'
+import { todo, type Unit } from '@/features/worktrees/utils/progress'
 
 export type Choice = 'keep' | 'remove'
 
@@ -26,8 +26,4 @@ export function requestOf({
 }
 
 export const unitsOf = (plan: CleanPlan): Unit[] =>
-  (plan.worktrees ?? []).map(({ worktree, phases }) => ({
-    subject: worktree,
-    phases: (phases ?? []).map((phase) => ({ phase, state: 'todo' as const })),
-    lines: [],
-  }))
+  (plan.worktrees ?? []).map(({ worktree, phases }) => todo(worktree, phases ?? []))

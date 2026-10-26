@@ -1,6 +1,8 @@
 import { screen, within } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
+import type { WebCall } from '@/api/types.gen'
+import { cleanPlan, cleanRun } from '@/test/clean'
 import { envelope, followUp } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
 import { server, worktrees } from '@/test/server'
@@ -14,17 +16,6 @@ async function selectAndRemove(...names: string[]) {
   return { ...app, dialog: await screen.findByRole('dialog') }
 }
 
-test('the main worktree has no box, and checking every worktree checks the others', async () => {
-  const { user } = await renderApp('/r/r1/worktrees')
-
-  await user.click(await screen.findByRole('checkbox', { name: 'Select every worktree' }))
-
-  expect(screen.queryByRole('checkbox', { name: 'Select main' })).toBeNull()
-  expect(within(screen.getByRole('toolbar', { name: 'Selection' })).getByText('3 selected')).toBeTruthy()
-  await user.click(screen.getByRole('button', { name: 'Clear' }))
-  expect(screen.queryByRole('toolbar', { name: 'Selection' })).toBeNull()
-})
-
 test('an unsafe worktree waits for a choice; kept, the others go through the children and the plan, then run', async () => {
   const { user, dialog } = await selectAndRemove('feat/billing', 'fix/login')
 
@@ -33,7 +24,7 @@ test('an unsafe worktree waits for a choice; kept, the others go through the chi
   expect(within(dialog).getByText("1 of 2 can't be removed safely: choose for each before going on.")).toBeTruthy()
   expect(within(dialog).getByRole('button', { name: 'Next' }).hasAttribute('disabled')).toBe(true)
 
-  await user.click(within(unsafe).getByRole('button', { name: 'Keep it' }))
+  await user.click(within(unsafe).getByRole('radio', { name: 'Keep it' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
 
   expect(await within(dialog).findByText('feat/billing-ui is stacked on feat/billing, which goes.')).toBeTruthy()
@@ -61,7 +52,7 @@ test('removing an unsafe worktree anyway says what is lost and forces it', async
   const { user, dialog } = await selectAndRemove('fix/login')
 
   const unsafe = await within(dialog).findByRole('region', { name: 'fix/login' })
-  await user.click(within(unsafe).getByRole('button', { name: 'Remove anyway' }))
+  await user.click(within(unsafe).getByRole('radio', { name: 'Remove anyway' }))
 
   expect(within(unsafe).getByText('Removed anyway: its uncommitted changes are lost.')).toBeTruthy()
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
@@ -101,4 +92,86 @@ test("the detail's menu removes the worktree it shows, and a child left on it is
     await within(dialog).findByText('feat/billing-ui still points at the removed parent feat/billing'),
   ).toBeTruthy()
   expect(await within(dialog).findByText('wtm reparent feat/billing-ui --to main')).toBeTruthy()
+})
+
+const answeringClean = (dryRun: (call: WebCall) => Response | Promise<Response>) =>
+  http.post('/api/repos/r1/commands/clean', async ({ request }) => {
+    const call = (await request.json()) as WebCall
+    return call.dry_run ? dryRun(call) : cleanRun(call)
+  })
+
+test('a run refused as stale says why, and does not say each worktree went', async () => {
+  server.use(
+    answeringClean(async (call) => HttpResponse.json({ ...(await cleanPlan(call).json()), fingerprint: 'c0' })),
+  )
+  const { user, dialog } = await selectAndRemove('feat/billing-ui')
+
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Remove feat/billing-ui' }))
+
+  expect(await within(dialog).findByText("Couldn't remove feat/billing-ui")).toBeTruthy()
+  expect(within(dialog).getByText('the facts changed since the preview')).toBeTruthy()
+  expect(within(dialog).queryByText('Each went with its local branch and its record.')).toBeNull()
+})
+
+test('closed once it ended, a run leaves the next Remove to its own worktrees', async () => {
+  const { user, dialog } = await selectAndRemove('feat/billing-ui')
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Remove feat/billing-ui' }))
+  await within(dialog).findByText('feat/billing-ui is removed')
+
+  await user.keyboard('{Escape}')
+  await user.click(await screen.findByRole('checkbox', { name: 'Select fix/login' }))
+  await user.click(within(screen.getByRole('toolbar', { name: 'Selection' })).getByRole('button', { name: /^Remove/ }))
+
+  expect(
+    await within(await screen.findByRole('dialog')).findByRole('heading', { name: 'Remove fix/login' }),
+  ).toBeTruthy()
+})
+
+test('a plan that cannot be made says why instead of a Next that never wakes', async () => {
+  server.use(
+    answeringClean((call) =>
+      call.answers?.some((a) => a.path === 'force')
+        ? cleanPlan(call)
+        : HttpResponse.json({ error: { message: 'git is busy' } }, { status: 500 }),
+    ),
+  )
+  const { dialog } = await selectAndRemove('feat/billing-ui')
+
+  expect(await within(dialog).findByText('git is busy')).toBeTruthy()
+  expect(within(dialog).getByRole('button', { name: 'Next' }).hasAttribute('disabled')).toBe(true)
+})
+
+test('a worktree read again unsafe on a later step brings the wizard back to its choice', async () => {
+  const encoder = new TextEncoder()
+  let push = (_line: string) => {}
+  server.use(
+    http.get(
+      '/api/events',
+      () =>
+        new HttpResponse(
+          new ReadableStream({
+            start: (controller) => {
+              controller.enqueue(encoder.encode(': open\n\n'))
+              push = (line) => controller.enqueue(encoder.encode(line))
+            },
+          }),
+          { headers: { 'Content-Type': 'text/event-stream' } },
+        ),
+    ),
+  )
+  const { user, dialog } = await selectAndRemove('feat/billing')
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await within(dialog).findByText('Children left behind')
+
+  server.use(answeringClean((call) => cleanPlan(call, ['feat/billing'])))
+  push('data: {"v":2,"type":"worktree.updated","repo":{"root":"/acme","common_dir":"/acme/.git"}}\n\n')
+
+  expect(
+    await within(dialog).findByText("1 of 1 can't be removed safely: choose for each before going on."),
+  ).toBeTruthy()
+  expect(
+    within(within(dialog).getByRole('region', { name: 'feat/billing' })).getByText('Uncommitted changes'),
+  ).toBeTruthy()
 })

@@ -9,7 +9,7 @@ import { ReadFailed } from '@/features/worktrees/components/read-failed'
 import type { ColumnId } from '@/features/worktrees/list/components/columns'
 import { WorktreeTable } from '@/features/worktrees/list/components/worktree-table'
 import type { Row } from '@/features/worktrees/list/utils/rows'
-import { matches, searched } from '@/features/worktrees/utils/filters'
+import { visibleRows } from '@/features/worktrees/utils/filters'
 import type { WorktreesSearch } from '@/features/worktrees/utils/search'
 
 export function ListView({
@@ -30,10 +30,8 @@ export function ListView({
   if (live.isPending) return <Loading />
   if (live.isError) return <ReadFailed message={live.error.message} />
 
-  const filter = search.filter ?? 'all'
-  const query = search.q ?? ''
-  const kept = rows.filter((row) => matches(row, filter) && searched(row.subject, query))
-  const narrowed = filter !== 'all' || query !== ''
+  const kept = visibleRows(rows, search)
+  const narrowed = (search.filter ?? 'all') !== 'all' || (search.q ?? '') !== ''
 
   return (
     <>

@@ -18,6 +18,7 @@ export function ActionsMenu({ actions }: { actions: DomainFollowUp[] }) {
   // clean runs here, through the catalogue: the others are still copied to the terminal
   const removal = actions.find((action) => action.command === 'clean')
   const copied = actions.filter((action) => action !== removal)
+  const removed = removal?.answers?.find((answer) => answer.path === 'worktree')?.values ?? []
   const lines = useQueries({ queries: copied.map(commandLineQuery) })
 
   return (
@@ -47,13 +48,10 @@ export function ActionsMenu({ actions }: { actions: DomainFollowUp[] }) {
             </DropdownMenuItem>
           )
         })}
-        {removal && (
+        {removed.length > 0 && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={() => openRemove(removal.answers?.find((answer) => answer.path === 'worktree')?.values ?? [])}
-            >
+            <DropdownMenuItem variant="destructive" onSelect={() => openRemove(removed)}>
               <Trash2 />
               Remove worktree…
             </DropdownMenuItem>

@@ -21,7 +21,7 @@ import { RemoveDialog } from '@/features/worktrees/remove/remove-dialog'
 import { useChoice } from '@/features/worktrees/store/ui-store'
 import { TreeView } from '@/features/worktrees/tree/tree-view'
 import { overlaid } from '@/features/worktrees/utils/condition'
-import { countsOf } from '@/features/worktrees/utils/filters'
+import { countsOf, visibleRows } from '@/features/worktrees/utils/filters'
 import { unavailable } from '@/features/worktrees/utils/github'
 import type { WorktreesSearch } from '@/features/worktrees/utils/search'
 import { repoName } from '@/lib/repo'
@@ -47,8 +47,9 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
       })
     : []
   const read = tree ? forest.live.data : list.live.data
-  // a worktree gone since it was checked leaves the selection
-  const selected = tree ? [] : selection.selected.filter((subject) => rows.some((row) => row.subject === subject))
+  // the selection is what the rows on screen check: a worktree gone, or filtered out of view, leaves it
+  const visible = visibleRows(rows, search)
+  const selected = tree ? [] : selection.selected.filter((subject) => visible.some((row) => row.subject === subject))
   const count = read ? worktreeCount(read) : 0
 
   const actions = () => {

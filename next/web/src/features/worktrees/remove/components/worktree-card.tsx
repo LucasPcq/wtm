@@ -1,11 +1,14 @@
-import { Check, CircleAlert } from 'lucide-react'
+import { CircleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { CleanMove, CleanRemoval } from '@/api/types.gen'
-import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Path } from '@/features/worktrees/components/path'
 import { type Choice, unsafe } from '@/features/worktrees/remove/utils/plan'
 import { blockerWords, lostWords } from '@/features/worktrees/remove/utils/words'
 import { cn } from '@/lib/utils'
+
+const choiceWords: Record<Choice, string> = { keep: 'Keep it', remove: 'Remove anyway' }
 
 export function WorktreeCard({
   removal,
@@ -92,21 +95,26 @@ export function WorktreeCard({
 
       {asked && (
         <div className="flex flex-col gap-2 border-t pt-3">
-          <fieldset className="grid grid-cols-2 gap-2">
-            <legend className="sr-only">What to do with {removal.worktree}</legend>
-            <Button variant="outline" aria-pressed={choice === 'keep'} onClick={() => onChoice('keep')}>
-              {choice === 'keep' && <Check />}
-              Keep it
-            </Button>
-            <Button
-              variant={choice === 'remove' ? 'destructive' : 'outline'}
-              aria-pressed={choice === 'remove'}
-              onClick={() => onChoice('remove')}
-            >
-              {choice === 'remove' && <Check />}
-              Remove anyway
-            </Button>
-          </fieldset>
+          <RadioGroup
+            aria-label={`What to do with ${removal.worktree}`}
+            value={choice ?? ''}
+            onValueChange={(value) => onChoice(value === 'remove' ? 'remove' : 'keep')}
+            className="grid grid-cols-2 gap-2"
+          >
+            {(['keep', 'remove'] as const).map((value) => (
+              <Label
+                key={value}
+                htmlFor={`${removal.worktree}-${value}`}
+                className={cn(
+                  'rounded-md border px-3 py-2 font-normal',
+                  choice === value && (value === 'remove' ? 'border-destructive text-destructive' : 'border-primary'),
+                )}
+              >
+                <RadioGroupItem id={`${removal.worktree}-${value}`} value={value} />
+                {choiceWords[value]}
+              </Label>
+            ))}
+          </RadioGroup>
           <p className={cn('text-xs', choice === 'remove' ? 'text-destructive' : 'text-muted-foreground')}>
             {choice === 'remove'
               ? `Removed anyway: ${blockers.map((blocker) => lostWords[blocker]).join(', ')}.`

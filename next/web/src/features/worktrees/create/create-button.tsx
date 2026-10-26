@@ -4,13 +4,12 @@ import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { questionsQuery } from '@/api/queries/commands'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
 import { ProgressView } from '@/features/worktrees/create/components/progress-view'
 import { Wizard } from '@/features/worktrees/create/components/wizard'
-import { planned } from '@/features/worktrees/create/utils/progress'
 import { useRun } from '@/features/worktrees/hooks/use-run'
-import { cn } from '@/lib/utils'
 
 export function CreateButton({ repo }: { repo: string }) {
   const [open, setOpen] = useState(false)
@@ -41,15 +40,7 @@ export function CreateButton({ repo }: { repo: string }) {
       )
 
     if (form.data)
-      return (
-        <Wizard
-          key={round}
-          repo={repo}
-          form={form.data}
-          onStart={({ answers, fingerprint, plan }) => run.start({ answers, fingerprint, units: planned(plan) })}
-          onCancel={() => setOpen(false)}
-        />
-      )
+      return <Wizard key={round} repo={repo} form={form.data} onStart={run.start} onCancel={() => setOpen(false)} />
 
     return (
       <>
@@ -68,17 +59,7 @@ export function CreateButton({ repo }: { repo: string }) {
         <Plus />
         Create worktree
       </Button>
-      <DialogContent
-        // a run keeps one size while its phases come and go, only its lists scroll; once it ended, the dialog eases
-        // to what it has left to say
-        className={cn(
-          'flex max-h-[90vh] flex-col gap-6 transition-[height] duration-300 ease-out [interpolate-size:allow-keywords] sm:max-w-xl motion-reduce:transition-none',
-          run.running && 'h-[min(36rem,85vh)]',
-        )}
-        showCloseButton={!run.running}
-      >
-        {content()}
-      </DialogContent>
+      <RunDialogContent running={run.running}>{content()}</RunDialogContent>
     </Dialog>
   )
 }
