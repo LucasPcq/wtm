@@ -123,22 +123,22 @@ func (l *SelectList) Update(msg tea.Msg) (Verdict, tea.Cmd) {
 
 // filter handles a key while the filter takes typed text: text typed or pasted narrows the options, backspace widens them, esc leaves the filter as typed.
 func (l *SelectList) filter(key tea.KeyMsg) Verdict {
-	switch key.String() {
-	case "esc":
+	switch key.Type {
+	case tea.KeyEsc:
 		l.filtering = false
-	case "backspace":
+	case tea.KeyBackspace:
 		l.query = withoutLastRune(l.query)
 		l.filtering = l.query != ""
 		l.refilter()
 		l.snap()
-	case "enter":
+	case tea.KeyEnter:
 		if len(l.shown) > 0 {
 			l.filtering = false
 			return Done
 		}
-	case "up":
+	case tea.KeyUp:
 		l.move(-1)
-	case "down":
+	case tea.KeyDown:
 		l.move(1)
 	default:
 		if typed := typedText(key); typed != "" {

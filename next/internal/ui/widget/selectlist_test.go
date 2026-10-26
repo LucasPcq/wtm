@@ -34,3 +34,13 @@ func TestBackspaceInTheFilterRemovesAWholeCharacter(t *testing.T) {
 	assert.Equal(t, "fix/café", l.Value())
 	assert.Contains(t, plain(l.View(Size{Width: 40}, plainStyles())), "/ é")
 }
+
+func TestTextTypedAtOnceThatSpellsAKeyIsFilteredNotPressed(t *testing.T) {
+	l := NewSelectList(SelectParams{Options: branches()})
+
+	l.Update(keyOf("/"))
+	l.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("esc")})
+
+	assert.True(t, l.Filtering())
+	assert.Contains(t, plain(l.View(Size{Width: 40}, plainStyles())), "/ esc")
+}
