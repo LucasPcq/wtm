@@ -1,25 +1,26 @@
-import { ChevronRight } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { MutationCommand } from '@/api/queries/commands'
-import { Button } from '@/components/ui/button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Details } from '@/features/worktrees/components/details'
 import { Timeline } from '@/features/worktrees/components/timeline'
 import { doneOf, type Progress, took } from '@/features/worktrees/utils/progress'
 
-// a run that went well folds its steps into one line; one under way, failed or cancelled shows them all
-export function RunSteps<C extends MutationCommand>({ progress, ok }: { progress: Progress<C>; ok: boolean }) {
-  if (!ok) return <Timeline units={progress.units} />
+// a run under way shows its steps; once it ended, the outcome comes first and the steps fold last, as its audit trail
+export function RunSteps<C extends MutationCommand>({
+  progress,
+  running,
+  children,
+}: {
+  progress: Progress<C>
+  running: boolean
+  children?: ReactNode
+}) {
+  if (running) return <Timeline units={progress.units} />
 
+  const { total } = doneOf(progress)
   return (
-    <Collapsible>
-      <CollapsibleTrigger asChild>
-        <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground [&[data-state=open]>svg]:rotate-90">
-          <ChevronRight className="transition-transform motion-reduce:transition-none" />
-          {[`${doneOf(progress).total} steps`, took(progress)].filter(Boolean).join(' · ')}
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="pt-3">
-        <Timeline units={progress.units} />
-      </CollapsibleContent>
-    </Collapsible>
+    <Details label={`${total} step${total === 1 ? '' : 's'}`} summary={took(progress)} quiet>
+      <Timeline units={progress.units} settled />
+      {children}
+    </Details>
   )
 }

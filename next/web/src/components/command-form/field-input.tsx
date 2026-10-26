@@ -1,8 +1,8 @@
 import type { DomainField } from '@/api/types.gen'
+import { ChoiceOptions } from '@/components/choice-options'
 import type { FieldWords } from '@/components/command-form/command-fields'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 
@@ -88,18 +88,16 @@ export function FieldInput({
     case 'confirm': {
       const options = field.no_first ? ['false', 'true'] : ['true', 'false']
       return (
-        <RadioGroup id={id} value={values[0] ?? ''} onValueChange={(value) => onChange([value])} aria-invalid={invalid}>
-          {options.map((value) => (
-            <label key={value} htmlFor={`${id}-${value}`} className="flex items-start gap-2 text-sm">
-              <RadioGroupItem id={`${id}-${value}`} value={value} className="mt-0.5" />
-              <span className="flex flex-col">
-                {title(value)}
-                {line(value) && <span className="text-xs text-muted-foreground">{line(value)}</span>}
-              </span>
-            </label>
-          ))}
+        <div className="flex flex-col gap-2">
+          <ChoiceOptions
+            id={id}
+            value={values[0] ?? ''}
+            options={options.map((value) => ({ value, title: title(value), description: line(value) }))}
+            onChange={(value) => onChange([value])}
+            invalid={invalid}
+          />
           {from && <span className="text-xs text-muted-foreground">{from}</span>}
-        </RadioGroup>
+        </div>
       )
     }
   }

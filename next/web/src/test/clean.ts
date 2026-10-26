@@ -159,3 +159,24 @@ export function heldRun() {
   }
   return { respond, end: (envelope: object) => end(envelope) }
 }
+
+// a removal whose on_clean hook fails: the worktree stays, its output and log say why
+export const failedRun = (call: WebCall) => {
+  const [branch = ''] = call.answers?.find((a) => a.path === 'worktree')?.values ?? []
+  const error = { kind: 'internal', code: 'clean.hook_failed', message: 'on_clean hook failed: exit status 1' }
+  return streamed(
+    [
+      line({ type: 'unit.started', subject: branch }),
+      line({ type: 'phase.started', subject: branch, phase: 'on_clean', log: '/state/hooks/clean.log' }),
+      line({ type: 'phase.output', subject: branch, line: 'Error response from daemon: permission denied' }),
+      line({ type: 'phase.finished', subject: branch, phase: 'on_clean', failed: true }),
+      line({ type: 'unit.finished', subject: branch, status: 'failed' }),
+      `event: envelope\ndata: ${JSON.stringify({
+        ...envelope('clean', []),
+        ok: false,
+        items: [{ subject: branch, status: 'failed', detail: {}, error }],
+        error,
+      })}\n\n`,
+    ].join(''),
+  )
+}

@@ -28,10 +28,12 @@ test('create shows a problem only once asked to go on, then confirms the plan, r
 
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
   // the confirmation reads the plan, not the command line's recap
-  const planned = await within(dialog).findByRole('region', { name: 'feat/new' })
-  expect(within(dialog).getByRole('heading', { name: 'Create feat/new' })).toBeTruthy()
-  expect(within(planned).getByText('Copied from .env.example.')).toBeTruthy()
-  expect(within(planned).getByText('Add the worktree · Run the on_create hooks')).toBeTruthy()
+  const planned = await within(dialog).findByRole('listitem', { name: 'feat/new' })
+  expect(within(planned).getByText(/\.env from \.env\.example/)).toBeTruthy()
+  // how it is made waits behind Details, one click away
+  expect(within(dialog).queryByText('Add the worktree, run the on_create hooks')).toBeNull()
+  await user.click(within(dialog).getByRole('button', { name: /^Details/ }))
+  expect(within(dialog).getByText('Add the worktree, run the on_create hooks')).toBeTruthy()
   await user.click(within(dialog).getByRole('button', { name: 'Create worktree' }))
 
   expect(await within(dialog).findByText('feat/new is ready')).toBeTruthy()
@@ -59,7 +61,7 @@ test('Next passes over a step the core asks nothing of once the branch is typed,
   await user.type(branches, 'feat/billing')
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
 
-  expect(await within(dialog).findByRole('heading', { name: 'Create feat/billing' })).toBeTruthy()
+  expect(await within(dialog).findByRole('listitem', { name: 'feat/billing' })).toBeTruthy()
   expect(within(dialog).getByText('Environment · not asked')).toBeTruthy()
 })
 

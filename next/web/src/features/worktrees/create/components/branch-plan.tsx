@@ -1,62 +1,36 @@
 import type { CreateBranchPlan, CreatePlan } from '@/api/types.gen'
-import { Path } from '@/features/worktrees/components/path'
-import { actionWords, envFrom, isolation } from '@/features/worktrees/create/utils/words'
-import { phaseLabel } from '@/features/worktrees/utils/phases'
+import { Item, ItemTitle } from '@/components/ui/item'
+import { actionWords, envFromShort, isolationShort } from '@/features/worktrees/create/utils/words'
 
-type Fact = { label: string; value: string; line?: string }
-
+// one branch the plan makes: its name, how it gets there, and the answers it is made with, in one line
 export function BranchPlan({ plan, branch }: { plan: CreatePlan; branch: CreateBranchPlan }) {
   const source = () => {
     switch (branch.action) {
       case 'create':
-        if (plan.from && plan.fast_forward?.includes(plan.from)) return `${plan.from}, fast-forwarded to origin first`
-        return plan.from ?? ''
-      case 'check_out':
-        return `${branch.branch}, as it is`
+        if (!plan.from) return undefined
+        return plan.fast_forward?.includes(plan.from)
+          ? `From ${plan.from}, updated from origin first`
+          : `From ${plan.from}`
       case 'resume':
-        return `origin/${branch.upstream ?? branch.branch}`
+        return `From origin/${branch.upstream ?? branch.branch}`
+      case 'check_out':
       case 'unchanged':
-        return ''
+        return undefined
     }
   }
 
-  const facts = (): Fact[] => {
-    if (branch.action === 'unchanged') return []
-
-    const env = envFrom[plan.env_from]
-    const facts: Fact[] = [
-      { label: 'Starts from', value: source() },
-      { label: '.env', value: env.title, line: env.description },
-    ]
-    if (plan.isolation) {
-      const chosen = isolation[plan.isolation]
-      facts.push({ label: 'Isolation', value: chosen.title, line: chosen.description })
-    }
-    facts.push({ label: 'Steps', value: (branch.phases ?? []).map((phase) => phaseLabel[phase]).join(' · ') })
-    return facts
-  }
+  const line =
+    branch.action === 'unchanged'
+      ? []
+      : [source(), plan.isolation && isolationShort[plan.isolation], envFromShort[plan.env_from]].filter(Boolean)
 
   return (
-    <section aria-label={branch.branch} className="flex flex-col gap-1 rounded-lg border p-3.5 text-sm">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="font-medium">{branch.branch}</span>
+    <Item role="listitem" aria-label={branch.branch} className="flex-col items-stretch gap-1 rounded-none px-4 py-3">
+      <div className="flex items-baseline gap-3">
+        <ItemTitle className="min-w-0 flex-1">{branch.branch}</ItemTitle>
         <span className="text-xs text-muted-foreground">{actionWords[branch.action]}</span>
       </div>
-      <Path path={branch.path} />
-
-      {facts().length > 0 && (
-        <dl className="mt-2 grid grid-cols-[6.5rem_1fr] gap-x-4 gap-y-1.5">
-          {facts().map(({ label, value, line }) => (
-            <div key={label} className="contents">
-              <dt className="text-muted-foreground">{label}</dt>
-              <dd className="text-pretty">
-                {value}
-                {line && <span className="block text-xs text-muted-foreground">{line}</span>}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      )}
-    </section>
+      {line.length > 0 && <p className="text-xs text-muted-foreground">{line.join(' · ')}</p>}
+    </Item>
   )
 }

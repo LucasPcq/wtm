@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 
-// the actions on a selection sit after the count; the destructive one always comes last, apart
+// the actions on a selection sit after the count; the destructive one always comes last
 export function SelectionBar({
   count,
   onClear,
@@ -19,7 +18,6 @@ export function SelectionBar({
         Clear
       </Button>
       <div className="flex-1" />
-      <Separator orientation="vertical" className="mx-1 data-[orientation=vertical]:h-5" />
       {destructive}
     </div>
   )

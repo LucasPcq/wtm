@@ -96,7 +96,8 @@ export function took({ units }: { units: Unit[] }): string {
   const starts = runs.flatMap((run) => (run.startedAt ? [Date.parse(run.startedAt)] : []))
   const ends = runs.flatMap((run) => (run.endedAt ? [Date.parse(run.endedAt)] : []))
   if (starts.length === 0 || ends.length === 0) return ''
-  return `${((Math.max(...ends) - Math.min(...starts)) / 1000).toFixed(1)} s`
+  const ms = Math.max(...ends) - Math.min(...starts)
+  return ms < 1000 ? '' : `${(ms / 1000).toFixed(1)} s`
 }
 
 // cancelled while it planned, a run ends on the error's kind alone, with no item

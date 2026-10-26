@@ -72,3 +72,10 @@ test('the whole run is timed from its first phase started to its last ended, acr
   ).toBe('8.0 s')
   expect(took({ units: [] })).toBe('')
 })
+
+test('a run that took under a second shows no time, as a phase does not', () => {
+  const quick = { phase: 'remove' as const, state: 'done' as const, startedAt: '2026-10-25T12:00:00Z' }
+  expect(
+    took({ units: [{ subject: 'feat/a', phases: [{ ...quick, endedAt: '2026-10-25T12:00:00.4Z' }], lines: [] }] }),
+  ).toBe('')
+})

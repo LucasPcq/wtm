@@ -1,6 +1,6 @@
 import { Check, LoaderCircle, X } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { copy } from '@/features/worktrees/utils/copy'
+import { StepOutput } from '@/features/worktrees/components/step-output'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
 import { type PhaseRun, seconds, type Unit } from '@/features/worktrees/utils/progress'
 import { cn } from '@/lib/utils'
@@ -12,7 +12,8 @@ const marker: Record<PhaseRun['state'], ReactNode> = {
   failed: <X className="size-3 text-destructive" />,
 }
 
-export function Timeline({ units }: { units: Unit[] }) {
+// once a run ended, its failed step's output is shown with the failure, not again among its steps
+export function Timeline({ units, settled = false }: { units: Unit[]; settled?: boolean }) {
   const named = units.length > 1
 
   return (
@@ -48,25 +49,8 @@ export function Timeline({ units }: { units: Unit[] }) {
                     </span>
                     <span className="text-xs text-muted-foreground tabular-nums">{seconds(run)}</span>
                   </div>
-                  {(run.state === 'now' || run.state === 'failed') && lines.length > 0 && (
-                    <div className="rounded-md bg-muted px-3 py-2">
-                      <pre
-                        // the output follows its last line, as a terminal does
-                        ref={(pre) => pre?.scrollTo({ top: pre.scrollHeight })}
-                        className="h-28 overflow-y-auto font-mono text-xs whitespace-pre-wrap text-muted-foreground"
-                      >
-                        {lines.join('\n')}
-                      </pre>
-                      {run.log && (
-                        <button
-                          type="button"
-                          className="mt-1 text-xs underline underline-offset-4"
-                          onClick={() => run.log && copy(run.log)}
-                        >
-                          Copy the log's path
-                        </button>
-                      )}
-                    </div>
+                  {(run.state === 'now' || (run.state === 'failed' && !settled)) && lines.length > 0 && (
+                    <StepOutput lines={lines} log={run.log} />
                   )}
                 </div>
               </li>

@@ -1,5 +1,6 @@
-import type { CreateAction, CreateRequest, DomainField, DomainSkip } from '@/api/types.gen'
+import type { CreateAction, CreateRequest, DomainField, DomainPhase, DomainSkip } from '@/api/types.gen'
 import type { FieldWords, OptionWords } from '@/components/command-form/command-fields'
+import type { OutcomeKind } from '@/features/worktrees/utils/outcome'
 
 // The core words its questions for the command line; the web says them its own way. Each record is exhaustive over
 // what the schema publishes, so a question, an option, a reason or a phase the core adds fails the build until it
@@ -20,6 +21,19 @@ export const envFrom: Options<'env_from'> = {
 export const isolation: Options<'isolation'> = {
   isolated: { title: 'Isolated', description: 'Its own ports and namespaces: it runs beside the others.' },
   verbatim: { title: 'Verbatim', description: 'The .env as copied: it runs in turn with the others.' },
+}
+
+// the answer as the Confirm step's one line says it, beside the others
+export const envFromShort: Record<ValuesOf<'env_from'>, string> = {
+  config: '.env from the project default',
+  example: '.env from .env.example',
+  main: ".env from the main checkout's",
+  parent: ".env from the source worktree's",
+}
+
+export const isolationShort: Record<ValuesOf<'isolation'>, string> = {
+  isolated: 'isolated',
+  verbatim: '.env kept verbatim',
 }
 
 const fastForward: Options<'fast_forward'> = {
@@ -81,4 +95,24 @@ export const actionWords: Record<CreateAction, string> = {
   check_out: 'Existing branch, as it is',
   resume: 'From origin, tracking it',
   unchanged: 'Already open, left as it is',
+}
+
+export const outcomeWords: Record<OutcomeKind, string> = {
+  failed: "Couldn't create",
+  check: 'To check',
+  done: 'Ready',
+}
+
+// a phase as "during …" names it, when a run was cancelled in it
+export const phaseDuring: Record<DomainPhase, string> = {
+  fast_forward: 'the fast-forward of the source branch',
+  worktree: 'the add of the worktree',
+  env: 'the copy of its .env files',
+  meta: 'its record',
+  ordinal: 'its numbering',
+  ports: 'the settling of its ports',
+  on_create: 'the on_create hooks',
+  move: 'the move of the changes',
+  on_clean: 'the on_clean hooks',
+  remove: 'the removal of the worktree',
 }

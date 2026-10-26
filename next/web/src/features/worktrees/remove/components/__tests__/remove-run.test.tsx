@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
-import { cleanPlan, heldRun } from '@/test/clean'
+import { cleanPlan, failedRun, heldRun } from '@/test/clean'
 import { envelope } from '@/test/fixtures'
 import { answeringClean, selectAndRemove } from '@/test/remove'
 import { server } from '@/test/server'
@@ -31,7 +31,7 @@ test('closed once it ended, a run leaves the next Remove to its own worktrees', 
   const { user, dialog } = await selectAndRemove('feat/billing-ui')
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Remove feat/billing-ui' }))
-  await within(dialog).findByText('feat/billing-ui is removed')
+  await within(dialog).findByRole('heading', { name: 'Removed feat/billing-ui' })
 
   await user.keyboard('{Escape}')
   await user.click(await screen.findByRole('checkbox', { name: 'Select fix/login' }))
@@ -113,4 +113,20 @@ test('a hidden run that partly failed is shown on the next Remove, and only what
   await user.click(within(failed).getByRole('button', { name: 'Done' }))
 
   expect(await within(await removeFromBar(user)).findByRole('heading', { name: 'Remove feat/billing-ui' })).toBeTruthy()
+})
+
+test('a removal that failed is one line, its output and log one click under it, its steps folded last', async () => {
+  server.use(answeringClean(cleanPlan, failedRun))
+  const { user, dialog } = await selectAndRemove('feat/billing-ui')
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Remove feat/billing-ui' }))
+
+  expect(await within(dialog).findByRole('heading', { name: "Couldn't remove feat/billing-ui" })).toBeTruthy()
+  expect(within(dialog).getByText('on_clean hook failed: exit status 1')).toBeTruthy()
+  expect(within(dialog).queryByText('Error response from daemon: permission denied')).toBeNull()
+
+  await user.click(within(dialog).getByRole('button', { name: 'Show the details' }))
+  expect(within(dialog).getByText('Error response from daemon: permission denied')).toBeTruthy()
+  expect(within(dialog).getByRole('button', { name: "Copy the log's path" })).toBeTruthy()
+  expect(within(dialog).getByRole('button', { name: /^2 steps/ })).toBeTruthy()
 })

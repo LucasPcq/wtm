@@ -53,22 +53,25 @@ export function CommandFields<P extends string>({
 
               return (
                 <Field data-invalid={errors.length > 0} className="gap-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <FieldLabel htmlFor={input.name}>{said.label}</FieldLabel>
-                    {rememberable && (
-                      <label
-                        htmlFor={`${input.name}-remember`}
-                        className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                      >
-                        <Checkbox
-                          id={`${input.name}-remember`}
-                          className="size-3.5"
-                          checked={remember.paths.includes(field.path)}
-                          onCheckedChange={() => remember.toggle(field.path)}
-                        />
-                        Remember
-                      </label>
-                    )}
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <FieldLabel htmlFor={input.name}>{said.label}</FieldLabel>
+                      {rememberable && (
+                        <label
+                          htmlFor={`${input.name}-remember`}
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                          <Checkbox
+                            id={`${input.name}-remember`}
+                            className="size-3.5"
+                            checked={remember.paths.includes(field.path)}
+                            onCheckedChange={() => remember.toggle(field.path)}
+                          />
+                          Remember
+                        </label>
+                      )}
+                    </div>
+                    <FieldDescription className="text-xs text-pretty">{said.help}</FieldDescription>
                   </div>
                   <FieldInput
                     field={field}
@@ -79,7 +82,6 @@ export function CommandFields<P extends string>({
                     onChange={(values) => input.handleChange(values)}
                     invalid={errors.length > 0}
                   />
-                  <FieldDescription className="text-sm text-pretty">{said.help}</FieldDescription>
                   <FieldError errors={errors} />
                 </Field>
               )

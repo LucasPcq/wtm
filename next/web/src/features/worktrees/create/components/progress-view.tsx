@@ -1,10 +1,14 @@
+import { CircleX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress as Bar } from '@/components/ui/progress'
+import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
+import { RunOutcome } from '@/features/worktrees/components/run-outcome'
 import { RunSteps } from '@/features/worktrees/components/run-steps'
 import { RunningFooter } from '@/features/worktrees/components/running-footer'
-import { Made } from '@/features/worktrees/create/components/made'
+import { recapOf } from '@/features/worktrees/create/utils/recap'
+import { outcomeWords } from '@/features/worktrees/create/utils/words'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
 import { current, doneOf, ending, type Progress } from '@/features/worktrees/utils/progress'
 import { cn } from '@/lib/utils'
@@ -55,12 +59,21 @@ export function ProgressView({
         <DialogTitle>{title()}</DialogTitle>
         <DialogDescription className={cn(ok && 'sr-only')}>{description()}</DialogDescription>
       </DialogHeader>
-      {running && <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />}
+      {running && (
+        <DialogBand>
+          <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />
+        </DialogBand>
+      )}
 
       <DialogScroll>
-        <RunSteps progress={progress} ok={ok} />
-        {!running && failure && <p className="text-sm text-destructive">{failure}</p>}
-        {!running && progress.envelope && <Made envelope={progress.envelope} />}
+        {!running && failure && !(progress.envelope?.items ?? []).some((item) => item.error) && (
+          <p className="flex items-start gap-3 text-sm">
+            <CircleX className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
+            {failure}
+          </p>
+        )}
+        {!running && <RunOutcome groups={recapOf(progress)} labels={outcomeWords} />}
+        <RunSteps progress={progress} running={running} />
       </DialogScroll>
 
       <DialogFooter className="items-center">

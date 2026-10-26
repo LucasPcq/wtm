@@ -1,16 +1,25 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { TriangleAlert } from 'lucide-react'
 import { useReducer } from 'react'
 import { dryRunQuery } from '@/api/queries/commands'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Details } from '@/features/worktrees/components/details'
+import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
+import { type Fact, Facts } from '@/features/worktrees/components/facts'
+import { ItemList } from '@/features/worktrees/components/item-list'
 import { Stepper, type StepState } from '@/features/worktrees/components/stepper'
 import type { Start } from '@/features/worktrees/hooks/use-run'
 import { ChildrenStep } from '@/features/worktrees/remove/components/children-step'
-import { WorktreeCard } from '@/features/worktrees/remove/components/worktree-card'
+import { RemovalItem } from '@/features/worktrees/remove/components/removal-item'
+import { listed } from '@/features/worktrees/remove/utils/listed'
 import { requestOf, unitsOf, unsafe } from '@/features/worktrees/remove/utils/plan'
 import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/remove/utils/wizard-state'
+import { sharedWarnings } from '@/features/worktrees/remove/utils/words'
+import { sentence } from '@/features/worktrees/utils/sentence'
 
 export function RemoveWizard({
   repo,
@@ -73,12 +82,45 @@ export function RemoveWizard({
 
   const back = () => dispatch({ type: 'go', to: step === 'confirm' && moves.length > 0 ? 'children' : 'worktrees' })
 
-  const status = () => {
-    if (undecided.length > 0)
-      return `${undecided.length} of ${removals.length} can't be removed safely: choose for each before going on.`
-    if (going.length === 0) return 'Every worktree is kept: nothing to remove.'
+  // a Next that can't be pressed says why, so the step needs no sentence of its own
+  const blocked = () => {
+    if (undecided.length > 0) return `Choose for ${listed(undecided.map((removal) => removal.worktree))} first`
+    if (review.data && going.length === 0) return 'Every worktree is kept: nothing to remove'
     return undefined
   }
+
+  const counted = review.data ? going : worktrees
+  const title = () => {
+    if (counted.length === 0) return 'Remove worktrees'
+    return counted.length === 1 ? `Remove ${counted[0]}` : `Remove ${counted.length} worktrees`
+  }
+
+  const removing = plan?.worktrees ?? []
+  const warnings = (planned.data?.warnings ?? []).filter(
+    (warning) => warning.code !== sharedWarnings.jobsLeft && warning.code !== sharedWarnings.dataKept,
+  )
+  const hooks = removing.flatMap((removal) => removal.hooks ?? []).length
+  const keeping = removing.filter((removal) => (removal.namespaces ?? []).length > 0).length
+  const summary = [
+    hooks > 0 && `${hooks} on_clean hook${hooks === 1 ? '' : 's'} run first`,
+    keeping > 0 && `data stays for ${keeping}`,
+  ]
+    .filter(Boolean)
+    .join(', ')
+
+  const factsOf = (removal: (typeof removing)[number]): Fact[] => [
+    ...(removal.path ? [{ label: 'Folder', values: [removal.path], mono: true }] : []),
+    ...((removal.hooks ?? []).length > 0 ? [{ label: 'on_clean', values: removal.hooks ?? [], mono: true }] : []),
+    ...((removal.namespaces ?? []).length > 0
+      ? [
+          {
+            label: 'Data',
+            values: [`${removal.namespaces?.join(', ')} stays in its services`],
+            line: 'wtm-next does not drop it yet',
+          },
+        ]
+      : []),
+  ]
 
   const body = () => {
     if (review.isPending) return <Skeleton className="h-40 w-full" />
@@ -87,27 +129,16 @@ export function RemoveWizard({
 
     if (step === 'worktrees')
       return (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-baseline gap-2">
-            <h3 className="flex-1 font-medium">
-              {removals.length === 1 ? `Remove ${removals[0]?.worktree}` : `Remove ${removals.length} worktrees`}
-            </h3>
-            {removals.length > 1 && removals.length !== safe.length && (
-              <span className="text-[13px] text-muted-foreground">
-                {safe.length} safe · {removals.length - safe.length} unsafe
-              </span>
-            )}
-          </div>
-          {status() && <p className="rounded-md bg-muted px-3 py-2.5 text-[13px]">{status()}</p>}
+        <ItemList label="Worktrees">
           {[...removals.filter(unsafe), ...safe].map((removal) => (
-            <WorktreeCard
+            <RemovalItem
               key={removal.worktree}
               removal={removal}
               choice={choices[removal.worktree]}
               onChoice={(choice) => dispatch({ type: 'choose', worktree: removal.worktree, choice })}
             />
           ))}
-        </div>
+        </ItemList>
       )
 
     if (step === 'children')
@@ -121,30 +152,44 @@ export function RemoveWizard({
 
     if (!plan) return !unplanned && <Skeleton className="h-40 w-full" />
     return (
-      <div className="flex flex-col gap-3">
-        <h3 className="font-medium">
-          {going.length === 1 ? `Remove ${going[0]}` : `Remove ${going.slice(0, -1).join(', ')} and ${going.at(-1)}`}
-        </h3>
-        {(plan.worktrees ?? []).map((removal) => (
-          <WorktreeCard
-            key={removal.worktree}
-            removal={removal}
-            moves={moves.filter((move) => move.from === removal.branch)}
-            reparent={reparent}
-          />
-        ))}
-      </div>
+      <>
+        <ItemList label="Worktrees">
+          {removing.map((removal) => (
+            <RemovalItem
+              key={removal.worktree}
+              removal={removal}
+              moves={moves.filter((move) => move.from === removal.branch)}
+              reparent={reparent}
+            />
+          ))}
+        </ItemList>
+        {warnings.length > 0 && (
+          <ul className="flex flex-col gap-2 text-sm">
+            {warnings.map((warning) => (
+              <li key={`${warning.code}-${warning.message}`} className="flex items-start gap-3">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-500" aria-hidden="true" />
+                {sentence(warning.message)}
+              </li>
+            ))}
+          </ul>
+        )}
+        <Details label="Details" summary={summary}>
+          {removing.map((removal) => (
+            <Facts key={removal.worktree} heading={removal.worktree} facts={factsOf(removal)} />
+          ))}
+        </Details>
+      </>
     )
   }
 
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Remove worktrees</DialogTitle>
+        <DialogTitle>{title()}</DialogTitle>
         <DialogDescription>Each goes with its local branch and its record; the remote branch stays.</DialogDescription>
       </DialogHeader>
 
-      <div className="border-b pb-4">
+      <DialogBand>
         <Stepper
           steps={[
             { title: 'Worktrees', state: state('worktrees') },
@@ -152,7 +197,7 @@ export function RemoveWizard({
             { title: 'Confirm', state: state('confirm') },
           ]}
         />
-      </div>
+      </DialogBand>
 
       <DialogScroll>
         {unplanned && <p className="text-sm text-destructive">{unplanned}</p>}
@@ -168,11 +213,7 @@ export function RemoveWizard({
             Back
           </Button>
         )}
-        {step !== 'confirm' && (
-          <Button disabled={!fresh} onClick={next}>
-            Next
-          </Button>
-        )}
+        {step !== 'confirm' && <NextButton disabled={!fresh} why={blocked()} onClick={next} />}
         {step === 'confirm' && (
           <Button
             variant="destructive"
@@ -184,5 +225,27 @@ export function RemoveWizard({
         )}
       </DialogFooter>
     </>
+  )
+}
+
+// a disabled button fires no pointer event, so its tooltip hangs on a wrapper that does
+function NextButton({ disabled, why, onClick }: { disabled: boolean; why: string | undefined; onClick: () => void }) {
+  const button = (
+    <Button disabled={disabled} onClick={onClick}>
+      Next
+    </Button>
+  )
+  if (!disabled || !why) return button
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {/* biome-ignore lint/a11y/noNoninteractiveTabindex: the reason shows to a keyboard as to a pointer */}
+        <span tabIndex={0} className="inline-flex">
+          {button}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{why}</TooltipContent>
+    </Tooltip>
   )
 }

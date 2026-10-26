@@ -10,32 +10,34 @@ import { server, worktrees } from '@/test/server'
 test('an unsafe worktree waits for a choice; kept, the others go through the children and the plan, then run', async () => {
   const { user, dialog } = await selectAndRemove('feat/billing', 'fix/login')
 
-  const unsafe = await within(dialog).findByRole('region', { name: 'fix/login' })
+  expect(await within(dialog).findByRole('heading', { name: 'Remove 2 worktrees' })).toBeTruthy()
+  const unsafe = await within(dialog).findByRole('listitem', { name: 'fix/login' })
   expect(within(unsafe).getByText('Uncommitted changes')).toBeTruthy()
-  expect(within(dialog).getByText("1 of 2 can't be removed safely: choose for each before going on.")).toBeTruthy()
-  expect(within(dialog).getByRole('button', { name: 'Next' }).hasAttribute('disabled')).toBe(true)
+  const next = within(dialog).getByRole('button', { name: 'Next' })
+  expect(next.hasAttribute('disabled')).toBe(true)
+  await user.hover(next)
+  expect(await screen.findByRole('tooltip', { name: 'Choose for fix/login first' })).toBeTruthy()
 
   await user.click(within(unsafe).getByRole('radio', { name: 'Keep it' }))
-  expect(within(unsafe).getByText('Kept: it stays as it is.')).toBeTruthy()
+  expect(await within(dialog).findByRole('heading', { name: 'Remove feat/billing' })).toBeTruthy()
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
 
-  expect(await within(dialog).findByText('feat/billing-ui is stacked on feat/billing, which goes.')).toBeTruthy()
-  const children = within(dialog).getByRole('region', { name: 'Under feat/billing' })
-  expect(within(children).getByText('stays on feat/billing, which goes')).toBeTruthy()
-  await user.click(within(dialog).getByRole('radio', { name: /Move it onto the nearest worktree that stays/ }))
-  expect(within(children).getByText('base branch')).toBeTruthy()
+  expect(
+    await within(dialog).findByText("feat/billing-ui is stacked on feat/billing, which you're removing."),
+  ).toBeTruthy()
+  await user.click(within(dialog).getByRole('radio', { name: 'Move it onto main' }))
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
 
-  const planned = await within(dialog).findByRole('region', { name: 'feat/billing' })
+  const planned = await within(dialog).findByRole('listitem', { name: 'feat/billing' })
   expect(within(planned).getByText('feat/billing-ui moves onto main')).toBeTruthy()
-  expect(within(planned).getByText('docker compose down')).toBeTruthy()
-  expect(within(dialog).queryByRole('region', { name: 'fix/login' })).toBeNull()
+  expect(within(dialog).queryByText('docker compose down')).toBeNull()
+  await user.click(within(dialog).getByRole('button', { name: /^Details/ }))
+  expect(within(dialog).getByText('docker compose down')).toBeTruthy()
+  expect(within(dialog).queryByRole('listitem', { name: 'fix/login' })).toBeNull()
   await user.click(within(dialog).getByRole('button', { name: 'Remove feat/billing' }))
 
-  expect(await within(dialog).findByText('feat/billing is removed')).toBeTruthy()
-  expect(
-    within(dialog).getByText('Removed, with its branch and its record; feat/billing-ui moved onto main.'),
-  ).toBeTruthy()
+  expect(await within(dialog).findByRole('heading', { name: 'Removed feat/billing' })).toBeTruthy()
+  expect(within(dialog).getByText('feat/billing-ui moved onto main')).toBeTruthy()
   expect(within(dialog).queryByText(/still points at the removed parent/)).toBeNull()
   expect(screen.queryByRole('toolbar', { name: 'Selection' })).toBeNull()
 })
@@ -43,16 +45,16 @@ test('an unsafe worktree waits for a choice; kept, the others go through the chi
 test('removing an unsafe worktree anyway says what is lost and forces it', async () => {
   const { user, dialog } = await selectAndRemove('fix/login')
 
-  const unsafe = await within(dialog).findByRole('region', { name: 'fix/login' })
+  const unsafe = await within(dialog).findByRole('listitem', { name: 'fix/login' })
   await user.click(within(unsafe).getByRole('radio', { name: 'Remove anyway' }))
 
-  expect(within(unsafe).getByText('Removed anyway: its uncommitted changes are lost.')).toBeTruthy()
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
-  const planned = await within(dialog).findByRole('region', { name: 'fix/login' })
+  const planned = await within(dialog).findByRole('listitem', { name: 'fix/login' })
   expect(within(planned).getByText('Removed anyway')).toBeTruthy()
+  expect(within(planned).getByText('Its uncommitted changes are lost.')).toBeTruthy()
   await user.click(within(dialog).getByRole('button', { name: 'Remove fix/login' }))
 
-  expect(await within(dialog).findByText('fix/login is removed')).toBeTruthy()
+  expect(await within(dialog).findByRole('heading', { name: 'Removed fix/login' })).toBeTruthy()
 })
 
 test("the detail's menu removes the worktree it shows, and a child left on it is named with its command", async () => {
@@ -85,6 +87,10 @@ test("the detail's menu removes the worktree it shows, and a child left on it is
   expect(
     await within(dialog).findByText('feat/billing-ui still points at the removed parent feat/billing'),
   ).toBeTruthy()
+  expect(
+    await within(dialog).findByRole('button', { name: 'Copy wtm reparent feat/billing-ui --to main' }),
+  ).toBeTruthy()
+  await user.click(within(dialog).getByRole('button', { name: 'Show the details' }))
   expect(await within(dialog).findByText('wtm reparent feat/billing-ui --to main')).toBeTruthy()
 })
 
@@ -106,24 +112,21 @@ test('a worktree read again unsafe on a later step brings the wizard back to its
   const events = liveEvents()
   const { user, dialog } = await selectAndRemove('feat/billing')
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
-  await within(dialog).findByText('Children left behind')
+  await within(dialog).findByText(/is stacked on/)
 
   server.use(answeringClean((call) => cleanPlan(call, ['feat/billing'])))
   events.changed()
 
-  expect(
-    await within(dialog).findByText("1 of 1 can't be removed safely: choose for each before going on."),
-  ).toBeTruthy()
-  expect(
-    within(within(dialog).getByRole('region', { name: 'feat/billing' })).getByText('Uncommitted changes'),
-  ).toBeTruthy()
+  const unsafe = await within(dialog).findByRole('listitem', { name: 'feat/billing' })
+  expect(within(unsafe).getByText('Uncommitted changes')).toBeTruthy()
+  expect(within(unsafe).getByRole('radio', { name: 'Keep it' })).toBeTruthy()
 })
 
 test('children all gone since leave the wizard nothing to ask about them', async () => {
   const events = liveEvents()
   const { user, dialog } = await selectAndRemove('feat/billing')
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
-  await within(dialog).findByText('Children left behind')
+  await within(dialog).findByText(/is stacked on/)
 
   server.use(
     answeringClean(async (call) => {
@@ -133,18 +136,20 @@ test('children all gone since leave the wizard nothing to ask about them', async
   )
   events.changed()
 
-  expect(await within(dialog).findByRole('heading', { name: 'Remove feat/billing' })).toBeTruthy()
+  expect(await within(dialog).findByRole('button', { name: 'Remove feat/billing' })).toBeTruthy()
   expect(within(dialog).queryByText(/stacked on/)).toBeNull()
-  expect(within(dialog).getByRole('button', { name: 'Remove feat/billing' })).toBeTruthy()
 })
 
 test('every worktree kept leaves nothing to remove', async () => {
   const { user, dialog } = await selectAndRemove('fix/login')
 
   await user.click(
-    within(await within(dialog).findByRole('region', { name: 'fix/login' })).getByRole('radio', { name: 'Keep it' }),
+    within(await within(dialog).findByRole('listitem', { name: 'fix/login' })).getByRole('radio', { name: 'Keep it' }),
   )
 
-  expect(within(dialog).getByText('Every worktree is kept: nothing to remove.')).toBeTruthy()
-  expect(within(dialog).getByRole('button', { name: 'Next' }).hasAttribute('disabled')).toBe(true)
+  expect(within(dialog).getByRole('heading', { name: 'Remove worktrees' })).toBeTruthy()
+  const next = within(dialog).getByRole('button', { name: 'Next' })
+  expect(next.hasAttribute('disabled')).toBe(true)
+  await user.hover(next)
+  expect(await screen.findByRole('tooltip', { name: 'Every worktree is kept: nothing to remove' })).toBeTruthy()
 })
