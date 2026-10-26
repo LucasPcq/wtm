@@ -41,6 +41,12 @@
               "values": [
                 "test \"$(git branch --show-current)\" != feat/b || { echo boom >&2; exit 3; }; echo ok"
               ]
+            },
+            {
+              "path": "jobs",
+              "values": [
+                "1"
+              ]
             }
           ],
           "code": "exec.retry",
@@ -72,7 +78,7 @@
       }
     ],
     "command": "test \"$(git branch --show-current)\" != feat/b || { echo boom >&2; exit 3; }; echo ok",
-    "jobs": 2,
+    "jobs": 1,
     "print": false,
     "recap": [
       {
@@ -107,8 +113,8 @@
         "path": "jobs",
         "values": [
           {
-            "value": "2",
-            "text": "2"
+            "value": "1",
+            "text": "1"
           }
         ]
       }
@@ -128,6 +134,12 @@
           "path": "command",
           "values": [
             "test \"$(git branch --show-current)\" != feat/b || { echo boom >&2; exit 3; }; echo ok"
+          ]
+        },
+        {
+          "path": "jobs",
+          "values": [
+            "1"
           ]
         }
       ],
@@ -156,6 +168,12 @@
           "path": "command",
           "values": [
             "test \"$(git branch --show-current)\" != feat/b || { echo boom >&2; exit 3; }; echo ok"
+          ]
+        },
+        {
+          "path": "jobs",
+          "values": [
+            "1"
           ]
         }
       ],

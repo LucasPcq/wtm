@@ -1,4 +1,4 @@
-$ wtm exec; echo EXIT=$?
+$ wtm exec --jobs 1; echo EXIT=$?
 
   Step 6/6 • Confirm
 
@@ -13,7 +13,7 @@ $ wtm exec; echo EXIT=$?
   ┃  Worktrees    main, feat/a, feat/b
   ┃  Command      test "$(git branch --show-current)" != feat/b || { echo boom >&2; exit 3; };
   ┃               echo ok
-  ┃  Concurrency  3
+  ┃  Concurrency  1
 
 ▌› Yes, run in 3 worktrees
   ────────────────────────────────────────────────────────────────────────────────────────────────

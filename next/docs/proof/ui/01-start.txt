@@ -1,5 +1,5 @@
 $ cd $SB/A && wtm-next ui --no-open --idle 40s
-http://127.0.0.1:4777/#repo=<REPO_A>&token=<TOKEN>
+http://127.0.0.1:<PORT>/#repo=<REPO_A>&token=<TOKEN>
 
 $ ls -l "$G" | awk "{print \$1, \$NF}"
 total 16
@@ -10,7 +10,7 @@ total 16
 -rw-r--r--@ web.lock
 
 $ cat "$G/web.json"
-{"pid":<PID1>,"port":4777,"version":"<VERSION>","token":"<TOKEN>"}
+{"pid":<PID1>,"port":<PORT>,"version":"<VERSION>","token":"<TOKEN>"}
 $ ps -o pid=,command= -p $PID1
 <PID1> <SB>/bin/wtm-next ui serve --idle 40s
 

@@ -8,13 +8,13 @@ $ sleep 46; kill -0 $PID1 2>/dev/null || echo "server $PID1 gone"
 server <PID1> gone
 
 $ cat "$G/web.json" 2>&1 | jq -c "{pid, port}"
-{"pid":<PID1>,"port":4777}
+{"pid":<PID1>,"port":<PORT>}
 
 $ cd $SB/A && wtm-next ui --no-open
-http://127.0.0.1:4777/#repo=<REPO_A>&token=<TOKEN>
+http://127.0.0.1:<PORT>/#repo=<REPO_A>&token=<TOKEN>
 
 $ cat "$G/web.json" | jq -c "{pid, port}"
-{"pid":<PID2>,"port":4777}
+{"pid":<PID2>,"port":<PORT>}
 
 $ kill -0 $(jq -r .pid "$G/web.json") && echo "new server $(jq -r .pid "$G/web.json") running"
 new server <PID2> running

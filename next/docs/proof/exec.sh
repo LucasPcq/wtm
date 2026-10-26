@@ -71,10 +71,10 @@ run_side() {
     prepare "$root"
     state >"$dir/00-before.state"
     scenario 01-all-pass exec --all --yes -- 'echo hi from $(git branch --show-current)'
-    scenario 02-one-fails exec feat/a feat/b feat/c --yes -- "$fails"
-    scenario 03-json exec feat/a feat/b --yes --output json -- "$fails"
-    scenario 04-print exec feat/a feat/b --yes --print -- "$fails"
-    scenario 05-quiet -q exec feat/a feat/b --yes -- "$fails"
+    scenario 02-one-fails exec --jobs 1 feat/a feat/b feat/c --yes -- "$fails"
+    scenario 03-json exec --jobs 1 feat/a feat/b --yes --output json -- "$fails"
+    scenario 04-print exec --jobs 1 feat/a feat/b --yes --print -- "$fails"
+    scenario 05-quiet -q exec --jobs 1 feat/a feat/b --yes -- "$fails"
     scenario 06-unknown-json exec feat/a nope --yes --output json -- true
     scenario 07-no-selection exec --yes -- true
     scenario 08-no-selection-no-tty exec -- true
@@ -86,7 +86,7 @@ run_side() {
     scenario 14-jobs-negative exec feat/a --jobs -1 --yes -- true
     scenario 15-given-twice exec feat/a feat/a --yes -- true
     # next only: legacy has no dry run nor fingerprint
-    scenario 16-dry-run exec feat/a feat/b --dry-run -- "$fails"
+    scenario 16-dry-run exec --jobs 1 feat/a feat/b --dry-run -- "$fails"
     scenario 17-json-dry-run exec feat/a --dry-run --output json -- true
     fp=$(sed -n 's/.*"fingerprint": "\([0-9a-f]*\)".*/\1/p' "$dir/17-json-dry-run.stdout")
     scenario 18-expect-fingerprint exec feat/a --expect-fingerprint "${fp:-none}" --yes -- true
@@ -103,6 +103,11 @@ run_side() {
     -e 's#"duration_ms": [0-9]+#"duration_ms": <DUR>#g' \
     -e 's#wtm-next exec#wtm exec#g' \
     "$dir"/*
+  # 01 and 12 run their worktrees at once: each ends on its line in whatever order they finish, sorted here; the others run one at a time.
+  local parallel
+  for parallel in "$dir"/01-*.stderr "$dir"/12-*.stderr; do
+    LC_ALL=C sort -o "$parallel" "$parallel"
+  done
 }
 
 # tty_side <side> <binary>: the wizard in tmux, in a sandbox of its own: the picker, the command, the recap, the
@@ -145,7 +150,8 @@ tty_side() {
       settle '$'
       tmux send-keys -t "$session" "wtmx $*; echo EXIT=\$?" Enter
     }
-    start exec
+    # one worktree at a time: the outcome's progress lines come in the order the worktrees run
+    start exec --jobs 1
     capture 1-worktrees 'Step 1'
     tmux send-keys -t "$session" Down Space Down Space Enter
     capture 2-command 'Step 2'

@@ -7,5 +7,5 @@
 
   ! left out, their directory gone: feat/gone
 
-  → wtm prune   drop them
+  → wtm-next prune   drop them
 

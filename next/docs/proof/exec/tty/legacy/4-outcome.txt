@@ -1,4 +1,4 @@
-$ wtm exec; echo EXIT=$?
+$ wtm exec --jobs 1; echo EXIT=$?
 
 ┃  ✗ test "$(git branch --show-current)" != feat/b || { echo boom >&2; exit 3; }; echo ok · 3 worktr
 ees: 1 failed

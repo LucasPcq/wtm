@@ -1,4 +1,4 @@
-$ wtm exec; echo EXIT=$?
+$ wtm exec --jobs 1; echo EXIT=$?
   ✓ main (<DUR>)
   ✓ feat/a (<DUR>)
   ✗ feat/b (<DUR>)
@@ -7,14 +7,14 @@ $ wtm exec; echo EXIT=$?
 ┃
 ┃  Worktrees    main, feat/a, feat/b
 ┃  Command      test "$(git branch --show-current)" != feat/b || { echo boom >&2; exit 3; }; echo ok
-┃  Concurrency  3
+┃  Concurrency  1
 ┃
 ┃  ✗ feat/b  exited 3
 ┃      boom
 ┃  full output:  <SB>/acme/.git/wtm/exec/feat%2Fb/<OP>.log
 ┃
-┃  → wtm-next exec feat/b -- 'test "$(git branch --show-current)" != feat/b || { echo boom >&2; exit
- 3; }; echo ok'   run it again where it did not pass
+┃  → wtm-next exec feat/b --jobs 1 -- 'test "$(git branch --show-current)" != feat/b || { echo boom
+>&2; exit 3; }; echo ok'   run it again where it did not pass
 
 EXIT=1
 $

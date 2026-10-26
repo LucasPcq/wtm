@@ -1,4 +1,4 @@
-$ wtm exec; echo EXIT=$?
+$ wtm exec --jobs 1; echo EXIT=$?
 
   Step 2/3 • Command to run
 
