@@ -6,8 +6,8 @@
 # left by its client, the event stream of a commit and a create, the guard's
 # refusals, the idle stop and a restart. Each step writes one transcript,
 # <out>/NN-name.txt: every command as `$ …`, then its output. The sandbox path,
-# the token, repository ids, pids, operation ids, fingerprints, the version and
-# timestamps are replaced by placeholders.
+# the token, repository ids, pids, operation ids, fingerprints, the version, the
+# hashes of the web's assets and timestamps are replaced by placeholders.
 set -euo pipefail
 
 absolute() {
@@ -183,6 +183,7 @@ sed -i '' -E \
   -e 's#"(ts|created_at)":"[^"]+"#"\1":"<T>"#g' \
   -e 's#"version":"[^"]+"#"version":"<VERSION>"#g' \
   -e 's#^Date: .*#Date: <T>#' \
+  -e 's#(/assets/[a-z0-9_-]+)-[A-Za-z0-9_-]{8}\.#\1-<HASH>.#g' \
   "$out"/*.txt
 # operation ids and fingerprints numbered in order of first appearance, so a DELETE still names the operation it cancels
 python3 - "$out"/*.txt <<'PY'

@@ -56,11 +56,11 @@ Date: <T>
       apply()
       dark.addEventListener('change', apply)
     </script>
-    <script type="module" crossorigin src="/assets/index-DqDm9ZXf.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/state-page-5TI6OBpN.js">
-    <link rel="modulepreload" crossorigin href="/assets/fetch-BRbofaFX.js">
-    <link rel="modulepreload" crossorigin href="/assets/preload-helper-Ce2bKAcW.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-PHSAFhnG.css">
+    <script type="module" crossorigin src="/assets/index-<HASH>.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/state-page-<HASH>.js">
+    <link rel="modulepreload" crossorigin href="/assets/fetch-<HASH>.js">
+    <link rel="modulepreload" crossorigin href="/assets/preload-helper-<HASH>.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-<HASH>.css">
   </head>
   <body>
     <div id="root"></div>
