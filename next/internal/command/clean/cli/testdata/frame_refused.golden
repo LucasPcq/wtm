@@ -1,0 +1,15 @@
+
+  Step 4/4 • Cannot apply this plan
+
+  ✓ Worktrees: feat/dirty
+  · Reparent children — no child worktree is left behind
+  ✓ Force: not forced
+
+  ┃  Review & confirm
+  ┃
+  ┃  ✗ nothing removed: feat/dirty can't be removed safely
+  ┃      feat/dirty has uncommitted changes
+
+▌› No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back

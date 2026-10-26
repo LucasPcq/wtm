@@ -1,0 +1,20 @@
+
+  › feat/a (1/2)
+
+  Hooks · On Clean · feat/a
+
+  → case feat/a in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/a;; esac
+
+tearing down feat/a
+
+  ✓ case feat/a in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/a;; esac (<DUR>)
+
+  › feat/b (2/2)
+
+  Hooks · On Clean · feat/b
+
+  → case feat/b in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/b;; esac
+
+tearing down feat/b
+
+  ✓ case feat/b in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/b;; esac (<DUR>)

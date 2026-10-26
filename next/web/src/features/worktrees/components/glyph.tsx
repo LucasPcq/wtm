@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 export type Tone = 'ok' | 'attention' | 'failed' | 'muted' | 'busy'
 
-const icon = cva('size-3.5 shrink-0', {
+export const toneIcon = cva('size-3.5 shrink-0', {
   variants: {
     tone: {
       ok: 'text-green-500',
@@ -32,7 +32,7 @@ export function Glyph({
     <span
       className={cn('inline-flex min-w-0 items-center gap-1.5', tone === 'busy' && 'text-muted-foreground', className)}
     >
-      <Icon className={icon({ tone })} aria-hidden="true" />
+      <Icon className={toneIcon({ tone })} aria-hidden="true" />
       <span className="truncate">{children}</span>
     </span>
   )

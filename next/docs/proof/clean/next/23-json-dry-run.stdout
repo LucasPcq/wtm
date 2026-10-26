@@ -1,0 +1,46 @@
+{
+  "v": 2,
+  "command": "clean",
+  "ok": true,
+  "op": "<OP>",
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/fp",
+        "branch": "feat/fp",
+        "path": "<SB>/acme.trees/feat-fp",
+        "hooks": [
+          "case feat/fp in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/fp;; esac"
+        ],
+        "phases": [
+          "on_clean",
+          "remove"
+        ],
+        "blockers": []
+      }
+    ],
+    "reparent_children": false,
+    "force": false,
+    "recap": [
+      {
+        "key": "remove",
+        "label": "Remove",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/fp",
+            "text": "feat/fp"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<FP>",
+  "follow_ups": [],
+  "warnings": [
+    {
+      "code": "clean.prs_unavailable",
+      "message": "couldn't ask for pull requests (pull requests unavailable: run `gh auth login`): open ones aren't checked, merged ones don't count as pushed"
+    }
+  ]
+}

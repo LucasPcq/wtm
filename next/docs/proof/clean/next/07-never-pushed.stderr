@@ -1,0 +1,5 @@
+
+  ✗ nothing removed: feat/local can't be removed safely
+    feat/local has 1 commit no other branch nor remote holds
+  → wtm clean feat/local --force   remove anyway
+

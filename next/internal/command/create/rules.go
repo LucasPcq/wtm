@@ -223,10 +223,24 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning) {
 		Isolation:   f.PlannedIsolation(answers.Isolation()),
 		FastForward: f.fastForwarded(req),
 		Remember:    req.Remember,
+		OnCreate:    f.onCreate(branches),
 		facts:       f,
 		settled:     answers,
 	}
 	return planned, append(f.divergedWarnings(req), f.fallbackWarnings(planned)...)
+}
+
+func (f Facts) onCreate(branches []BranchPlan) []string {
+	runs := slices.ContainsFunc(branches, func(b BranchPlan) bool { return slices.Contains(b.Phases, domain.PhaseOnCreate) })
+	if !runs {
+		return nil
+	}
+
+	commands := make([]string, 0, len(f.Config.OnCreate))
+	for _, hook := range f.Config.OnCreate {
+		commands = append(commands, hook.Cmd)
+	}
+	return commands
 }
 
 func (f Facts) fastForwarded(req Request) []string {
@@ -307,6 +321,7 @@ type Plan struct {
 	EnvFrom     project.EnvStrategy `json:"env_from"`
 	Isolation   project.Isolation   `json:"isolation,omitempty"`
 	FastForward []string            `json:"fast_forward,omitempty"`
+	OnCreate    []string            `json:"on_create,omitempty"` // the on_create hooks a new worktree runs, none when no worktree is made
 	Remember    []string            `json:"remember,omitempty"`
 	Creates     int                 `json:"creates"` // the worktrees the apply opens, one already open aside; out of the fingerprint, which the actions cover
 	domain.Recapped

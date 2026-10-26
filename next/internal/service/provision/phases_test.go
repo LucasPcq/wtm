@@ -320,7 +320,7 @@ func TestOnCreateRunsInTheNewWorktreeAndKeepsItsLog(t *testing.T) {
 
 	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
 	assert.Equal(t, []string{w.path(branchName), "from main on feat/x"}, report.lines())
-	assert.Equal(t, env.HookLogPath(env.HookLogPathParams{StateDir: w.stateDir, Branch: branchName}), report.logOf("on_create"))
+	assert.Equal(t, env.HookLogPath(env.HookLogPathParams{StateDir: w.stateDir, Branch: branchName, Hooks: env.OnCreateHooks}), report.logOf("on_create"))
 	assert.Contains(t, report.All(), domain.Output{Subject: branchName, Line: "from main on feat/x"})
 }
 
@@ -334,7 +334,7 @@ func TestAHookThatFailsLeavesTheWorktreeIncomplete(t *testing.T) {
 	assert.Equal(t, domain.ReasonIncomplete, outcome.Reason)
 	assert.Equal(t, "unit.phase_failed", outcome.Err.Code)
 	assert.Equal(t, domain.Params{"phase": "on_create"}, outcome.Err.Params)
-	assert.Equal(t, "on_create failed: hook failed: exit status 3", outcome.Err.Error())
+	assert.Equal(t, "on_create failed: exit status 3", outcome.Err.Error())
 	assert.DirExists(t, w.path(branchName))
 	provisioned, ok := report.worktreeEvents()[1].(domain.WorktreeProvisioned)
 	require.True(t, ok)

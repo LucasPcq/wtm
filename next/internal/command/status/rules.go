@@ -271,7 +271,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Env:       f.envOf(w, state),
 	}
 	detail.Condition = worktree.ConditionOf(worktree.ConditionParams{Missing: state.Missing, Rebasing: rebasing, Merged: merged, Dirty: len(state.Changes) > 0})
-	detail.Problems = Problems(ProblemsParams{Branch: branch, Gone: state.Missing, Merged: merged, Parent: parent, Lacks: state.Lacks, Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
+	detail.Problems = Problems(ProblemsParams{Branch: branch, Path: w.Path, Gone: state.Missing, Merged: merged, Parent: parent, Lacks: state.Lacks, Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
 
 	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
 	if len(state.Unread) > 0 {
@@ -587,9 +587,10 @@ type Missing struct {
 	From   Rebuild
 }
 
-// ProblemsParams are what a worktree has to fix: its branch, which every fix names, empty on none; whether its directory is gone, whether its merged pull request leaves it to be cleaned, the .env files it lacks, whether it has yet to choose its isolation, and its jobs.
+// ProblemsParams are what a worktree has to fix: its branch, which every fix names, empty on none; its path, by which clean names it on no branch; whether its directory is gone, whether its merged pull request leaves it to be cleaned, the .env files it lacks, whether it has yet to choose its isolation, and its jobs.
 type ProblemsParams struct {
 	Branch  string
+	Path    string
 	Gone    bool
 	Merged  bool
 	Parent  string
@@ -610,14 +611,10 @@ const (
 	pathDetach        = "detach"
 )
 
-// Problems are the problems of params, each with its fix: a gone directory alone, since only cleaning the worktree fixes it, with no fix on no branch, which clean cannot name; nothing else on no branch, since every fix names a branch; else a merged pull request first, since cleaning the worktree makes every other fix moot, then each missing .env file, then a pending isolation, then each crashed job, whose fix starts it again in the worktree that runs it, a shared job's owner.
+// Problems are the problems of params, each with its fix: a gone directory alone, since only cleaning the worktree fixes it, by its path on no branch; nothing else on no branch, since every fix names a branch; else a merged pull request first, since cleaning the worktree makes every other fix moot, then each missing .env file, then a pending isolation, then each crashed job, whose fix starts it again in the worktree that runs it, a shared job's owner.
 func Problems(params ProblemsParams) []Problem {
 	if params.Gone {
-		gone := Problem{Code: CodeMissing, Message: "its directory is gone"}
-		if params.Branch != "" {
-			gone.Fix = fix(CodeMissing, "remove what is left of it", domain.CommandClean, params.Branch)
-		}
-		return []Problem{gone}
+		return []Problem{{Code: CodeMissing, Message: "its directory is gone", Fix: fix(CodeMissing, "remove what is left of it", domain.CommandClean, cmp.Or(params.Branch, params.Path))}}
 	}
 
 	problems := []Problem{}

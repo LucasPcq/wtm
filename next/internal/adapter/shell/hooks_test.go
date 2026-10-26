@@ -43,12 +43,10 @@ func TestAFailedHookReturnsItsCommandAndExitCodeAndStopsTheChain(t *testing.T) {
 
 	var failure *env.HookFailure
 	require.ErrorAs(t, err, &failure)
-	assert.ErrorContains(t, err, "hook failed")
-	assert.NotContains(t, err.Error(), "hook stopped")
 	assert.Equal(t, "exit 3", failure.Cmd)
 	require.NotNil(t, failure.ExitCode)
 	assert.Equal(t, 3, *failure.ExitCode)
-	assert.Equal(t, "hook failed: exit status 3", err.Error())
+	assert.Equal(t, "exit status 3", err.Error(), "the caller says which hook failed: the failure is only its cause, or it reads twice")
 	assert.Empty(t, out.all())
 }
 
@@ -202,7 +200,7 @@ func TestWithoutEnvAHookInheritsTheProcessEnvironment(t *testing.T) {
 	assert.Equal(t, []string{"inherited"}, out.all())
 }
 
-func TestACancelledRunStopsTheHookInFlightAndNamesItStopped(t *testing.T) {
+func TestACancelledRunStopsTheHookInFlightWithTheCancelAsItsOnlyCause(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(200*time.Millisecond, cancel)
 	begin := time.Now()
@@ -212,9 +210,8 @@ func TestACancelledRunStopsTheHookInFlightAndNamesItStopped(t *testing.T) {
 	var failure *env.HookFailure
 	require.ErrorAs(t, err, &failure)
 	assert.Equal(t, "sleep 30", failure.Cmd)
-	assert.ErrorContains(t, err, "hook stopped")
 	assert.ErrorIs(t, err, context.Canceled)
-	assert.NotContains(t, err.Error(), "hook failed")
+	assert.Equal(t, "context canceled", err.Error(), "the caller says which hook stopped: the failure is only its cause, or it reads twice")
 	assert.NotContains(t, err.Error(), "exit status")
 	assert.Less(t, time.Since(begin), interruptGrace)
 }
@@ -234,7 +231,7 @@ func TestAnInterruptedHookKeepsItsOutputSoFar(t *testing.T) {
 		},
 	})
 
-	require.ErrorContains(t, err, "hook stopped")
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Equal(t, []string{"a", "b", "partial"}, out.all())
 }
 
@@ -293,7 +290,7 @@ func TestACancelledHookIsInterruptedBeforeItIsTerminated(t *testing.T) {
 		},
 	})
 
-	require.ErrorContains(t, err, "hook stopped")
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Equal(t, []string{"ready", "int"}, out.all())
 }
 
@@ -311,7 +308,7 @@ func TestACancelledHookTakesAGrandchildItStartedWithIt(t *testing.T) {
 	})
 	t.Cleanup(func() { _ = syscall.Kill(grandchild, syscall.SIGKILL) })
 
-	require.ErrorContains(t, err, "hook stopped")
+	require.ErrorIs(t, err, context.Canceled)
 	require.Positive(t, grandchild)
 	assert.Eventually(t, func() bool { return syscall.Kill(grandchild, 0) != nil }, 2*interruptGrace, 20*time.Millisecond)
 }

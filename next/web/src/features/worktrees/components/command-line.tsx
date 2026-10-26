@@ -8,12 +8,30 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { copy } from '@/features/worktrees/utils/copy'
 import { cn } from '@/lib/utils'
 
-export function CommandLine({ followUp, inline = false }: { followUp: DomainFollowUp; inline?: boolean }) {
-  const line = useQuery(commandLineQuery(followUp))
+// copy is the button alone: the fix in one click from a line that folds the command away
+type Look = 'block' | 'inline' | 'copy'
 
+export function CommandLine({ followUp, look = 'block' }: { followUp: DomainFollowUp; look?: Look }) {
+  const line = useQuery(commandLineQuery(followUp))
+  const inline = look === 'inline'
+  const text = line.data
+
+  const copyButton = (
+    <Button
+      variant="ghost"
+      size={inline ? 'icon-xs' : 'icon-sm'}
+      disabled={!text}
+      aria-label={text ? `Copy ${text}` : 'Copy the command'}
+      onClick={() => text && copy(text)}
+    >
+      <Copy />
+    </Button>
+  )
+
+  if (look === 'copy') return copyButton
   if (line.isPending) return <Skeleton className={inline ? 'h-7 w-36' : 'h-10 w-full'} />
 
-  if (line.isError || !line.data) {
+  if (line.isError || !text) {
     const why = line.isError ? ` (${line.error.message})` : ''
     return (
       <span className={cn('text-muted-foreground', inline ? 'text-xs' : 'block rounded-md bg-muted px-3 py-2 text-sm')}>
@@ -21,18 +39,6 @@ export function CommandLine({ followUp, inline = false }: { followUp: DomainFoll
       </span>
     )
   }
-
-  const text = line.data
-  const copyButton = (
-    <Button
-      variant="ghost"
-      size={inline ? 'icon-xs' : 'icon-sm'}
-      aria-label={`Copy ${text}`}
-      onClick={() => copy(text)}
-    >
-      <Copy />
-    </Button>
-  )
 
   if (!inline)
     return (

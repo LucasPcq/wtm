@@ -1,0 +1,46 @@
+{
+  "v": 2,
+  "command": "clean",
+  "ok": false,
+  "op": "<OP>",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "refused",
+    "code": "clean.unsafe",
+    "message": "nothing removed: feat/c can't be removed safely",
+    "params": {
+      "worktrees": "feat/c"
+    },
+    "follow_up": {
+      "command": "clean",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/c"
+          ]
+        },
+        {
+          "path": "force",
+          "values": [
+            "true"
+          ]
+        }
+      ],
+      "code": "clean.force",
+      "message": "remove anyway"
+    },
+    "fields": [
+      {
+        "path": "worktree[0]",
+        "code": "clean.dirty",
+        "params": {
+          "value": "feat/c"
+        },
+        "flag": "<worktree>[0]",
+        "message": "feat/c has uncommitted changes"
+      }
+    ]
+  }
+}

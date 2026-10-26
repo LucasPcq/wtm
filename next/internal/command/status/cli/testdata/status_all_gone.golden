@@ -9,6 +9,7 @@
 
   ../.trees/detached
   ! its directory is gone
+  → wtm clean /repo/.trees/detached   remove what is left of it
 
   feat/a
   ! main has 1 commit it lacks

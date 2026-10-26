@@ -1,0 +1,5 @@
+
+  ✓ Cleaned worktree and branch feat/parent
+  ! feat/child still points at the removed parent feat/parent — reparent it with `wtm reparent`
+  ! feat/child2 still points at the removed parent feat/parent — reparent it with `wtm reparent`
+

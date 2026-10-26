@@ -104,6 +104,7 @@ func seeded() *project.Config {
 		Worktrees:  project.Worktrees{BasePath: ".trees", BaseBranch: "develop"},
 		Env:        project.Env{Strategy: project.EnvMain, Files: []project.EnvFile{{Target: ".env"}}},
 		OnCreate:   []project.Hook{},
+		OnClean:    []project.Hook{{Cmd: "make down"}},
 		Remembered: map[string]string{project.RememberEnvStrategy: "main"},
 	}
 }

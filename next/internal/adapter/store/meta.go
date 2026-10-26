@@ -117,6 +117,17 @@ func (m Meta) Update(ctx context.Context, update worktree.MetaUpdate) (domain.Wr
 	})
 }
 
+// Delete removes the record of branch with the directory it sits in; a branch
+// with no record has nothing to remove.
+func (m Meta) Delete(branch string) error {
+	path, err := m.path(branch)
+	if err != nil {
+		return err
+	}
+
+	return os.RemoveAll(filepath.Dir(path))
+}
+
 // LockOrdinals runs do holding the project's ordinal lock, so two processes
 // never hand the same ordinal to two worktrees, and reports whether the lock
 // was held (do runs unlocked where it cannot be taken).

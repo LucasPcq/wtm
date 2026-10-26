@@ -1,0 +1,60 @@
+{
+  "v": 2,
+  "command": "clean",
+  "ok": true,
+  "op": "op-1",
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/parent",
+        "branch": "feat/parent",
+        "path": "/repo/wt-feat-parent",
+        "phases": [
+          "remove"
+        ],
+        "blockers": []
+      }
+    ],
+    "moves": [
+      {
+        "branch": "feat/child",
+        "from": "feat/parent",
+        "to": "main",
+        "base": true
+      }
+    ],
+    "reparent_children": true,
+    "force": false,
+    "recap": [
+      {
+        "key": "remove",
+        "label": "Remove",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/parent",
+            "text": "feat/parent"
+          }
+        ]
+      },
+      {
+        "key": "children",
+        "label": "Children",
+        "path": "reparent_children",
+        "values": [
+          {
+            "value": "feat/child",
+            "params": {
+              "from": "feat/parent",
+              "to": "main"
+            },
+            "text": "feat/child → main"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "dc29747291053943527313ce",
+  "follow_ups": [],
+  "warnings": []
+}

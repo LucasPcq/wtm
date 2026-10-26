@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { dryRunQuery } from '@/api/queries/commands'
 import type { DomainAnswered } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
-import type { Start } from '@/features/worktrees/create/hooks/use-create-run'
+import { planned } from '@/features/worktrees/create/utils/progress'
+import type { Start } from '@/features/worktrees/hooks/use-run'
 
 export function ApplyButton({
   repo,
@@ -25,7 +26,7 @@ export function ApplyButton({
   return (
     <Button
       disabled={!plan || !fingerprint}
-      onClick={() => plan && fingerprint && onStart({ answers, fingerprint, plan })}
+      onClick={() => plan && fingerprint && onStart({ answers, fingerprint, units: planned(plan) })}
     >
       {label()}
     </Button>

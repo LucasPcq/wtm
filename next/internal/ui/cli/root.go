@@ -44,11 +44,14 @@ func Main(params Params) int {
 	return code
 }
 
+// Program is the root command's name, the one a command line spells first.
+const Program = "wtm-next"
+
 // NewRoot returns the root command over streams, with --quiet, the framed help and commands registered on it.
 // It prints no error nor usage of its own: [Execute] renders them.
 func NewRoot(version string, streams *output.Streams, commands []*cobra.Command) *cobra.Command {
 	root := &cobra.Command{
-		Use:           "wtm-next",
+		Use:           Program,
 		Short:         "Git worktree manager, rebuilt as slices",
 		Version:       version,
 		SilenceErrors: true,

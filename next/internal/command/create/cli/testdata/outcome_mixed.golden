@@ -15,7 +15,7 @@
     DB  pg  no such key in this file
   ! couldn't fast-forward main: its worktree has uncommitted changes — it starts from your local branch
 
-  ✗ feat/c  on_create failed: hook failed: exit status 3 · left incomplete
+  ✗ feat/c  on_create failed: exit status 3 · left incomplete
   ! feat/c  no template found for .env, skipping
   ! feat/c  run.toml: line 3 — ports not settled
   ! feat/d  interrupted · left incomplete

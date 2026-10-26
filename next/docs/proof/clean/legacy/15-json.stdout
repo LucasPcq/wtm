@@ -1,0 +1,14 @@
+{
+  "results": [
+    {
+      "branch": "feat/json",
+      "path": "<SB>/acme.trees/feat-json",
+      "already_absent": false
+    }
+  ],
+  "failed": [],
+  "skipped": [],
+  "reparented": [],
+  "orphaned_children": [],
+  "namespaces": []
+}

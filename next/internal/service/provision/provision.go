@@ -140,7 +140,7 @@ func (s Service) Run(ctx context.Context, params Params) Outcome {
 	}
 
 	p := prepared(params)
-	p.Service, p.hookLog = s, env.HookLogPath(env.HookLogPathParams{StateDir: s.StateDir, Branch: params.Worktree.Branch})
+	p.Service, p.hookLog = s, env.HookLogPath(env.HookLogPathParams{StateDir: s.StateDir, Branch: params.Worktree.Branch, Hooks: env.OnCreateHooks})
 
 	if err := ctx.Err(); err != nil {
 		return p.outcome(Outcome{Status: domain.StatusCancelled, Reason: domain.ReasonInterrupted, Err: interrupted(err, nil)})

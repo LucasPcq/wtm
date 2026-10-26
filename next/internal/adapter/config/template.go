@@ -39,7 +39,7 @@ func render(saved savedProject) ([]byte, error) {
 		EnvStrategy: string(config.Env.Strategy),
 		EnvFiles:    config.Env.Files,
 		OnCreate:    config.OnCreate,
-		OnClean:     saved.OnClean,
+		OnClean:     config.OnClean,
 		Remembered:  config.Remembered,
 	}
 

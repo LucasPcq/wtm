@@ -32,25 +32,31 @@ func (f *HookFailure) Error() string { return f.Err.Error() }
 // Unwrap returns the cause, so errors.Is and errors.As see through the failure.
 func (f *HookFailure) Unwrap() error { return f.Err }
 
-// The log of a worktree's on_create hooks is hooks/on_create-<branch>.log under the state directory.
+// The log of a worktree's hooks is hooks/<hooks>-<branch>.log under the state directory.
 const (
-	logDir   = "hooks"
-	logPhase = "on_create"
-	logExt   = ".log"
+	logDir = "hooks"
+	logExt = ".log"
 )
 
-// HookLogPathParams names a branch's hook log: the project's state directory and the branch.
+// The lists of hooks config.toml declares, as their logs name them.
+const (
+	OnCreateHooks = "on_create"
+	OnCleanHooks  = "on_clean"
+)
+
+// HookLogPathParams names a branch's hook log: the project's state directory, the branch and the list of hooks it logs (OnCreateHooks, OnCleanHooks).
 type HookLogPathParams struct {
 	StateDir string
 	Branch   string
+	Hooks    string
 }
 
-// HookLogPath returns the path of the log the on_create hooks of the branch write to, with the branch escaped into one file name; it is empty when there is no state directory.
+// HookLogPath returns the path of the log the hooks of the branch write to, with the branch escaped into one file name; it is empty when there is no state directory.
 func HookLogPath(params HookLogPathParams) string {
 	if params.StateDir == "" {
 		return ""
 	}
-	return filepath.Join(params.StateDir, logDir, logPhase+"-"+worktree.StateSegment(params.Branch)+logExt)
+	return filepath.Join(params.StateDir, logDir, params.Hooks+"-"+worktree.StateSegment(params.Branch)+logExt)
 }
 
 // HookVars are the values a hook's {{worktree}}, {{branch}}, {{root}} and {{from_branch}} placeholders stand for.

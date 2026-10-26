@@ -1,0 +1,47 @@
+{
+  "v": 2,
+  "command": "clean",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "refused",
+    "code": "clean.unsafe",
+    "message": "nothing removed: feat/dirty can't be removed safely",
+    "params": {
+      "worktrees": "feat/dirty"
+    },
+    "follow_up": {
+      "command": "clean",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/plain",
+            "feat/dirty"
+          ]
+        },
+        {
+          "path": "force",
+          "values": [
+            "true"
+          ]
+        }
+      ],
+      "code": "clean.force",
+      "message": "remove anyway"
+    },
+    "fields": [
+      {
+        "path": "worktree[1]",
+        "code": "clean.dirty",
+        "params": {
+          "value": "feat/dirty"
+        },
+        "flag": "<worktree>[1]",
+        "message": "feat/dirty has uncommitted changes"
+      }
+    ]
+  }
+}

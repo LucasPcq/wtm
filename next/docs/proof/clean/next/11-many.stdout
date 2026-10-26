@@ -1,0 +1,7 @@
+
+  ✓ clean: 2 done
+
+  Remove  feat/a, feat/b
+
+  ! couldn't ask for pull requests (pull requests unavailable: run `gh auth login`): open ones aren't checked, merged ones don't count as pushed
+

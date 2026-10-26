@@ -22,6 +22,8 @@ import (
 	reposjson "github.com/LucasPcq/wtm/next/internal/adapter/registry"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
+	"github.com/LucasPcq/wtm/next/internal/command/clean"
+	cleancli "github.com/LucasPcq/wtm/next/internal/command/clean/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
@@ -50,6 +52,7 @@ type wireParams struct {
 type app struct {
 	Create  create.UseCase
 	Extract extract.UseCase
+	Clean   clean.UseCase
 	List    list.UseCase
 	Resolve resolve.UseCase
 	Status  status.UseCase
@@ -105,6 +108,18 @@ func wire(params wireParams) app {
 			Operations: operations,
 			Provision:  provisions,
 		},
+		Clean: clean.UseCase{
+			Git:          repo,
+			Meta:         meta,
+			EnvFiles:     store.EnvFiles{},
+			Jobs:         jobs,
+			PullRequests: gh.PullRequestsOf,
+			RunHooks:     shell.RunHooks,
+			Shield:       shell.Shield,
+			StateDir:     params.StateDir,
+			Repository:   facts,
+			Operations:   operations,
+		},
 		List: list.UseCase{
 			Git:          repo,
 			Meta:         meta,
@@ -144,18 +159,15 @@ func (p wireParams) repo() domain.Repo {
 	return domain.Repo{Root: p.MainPath, CommonDir: bus.Resolved(p.CommonDir)}
 }
 
-// pathForce is the answer that lifts a legacy command's safety refusals, spelled --force.
-const pathForce = "force"
-
-// The answers the legacy commands a follow-up names take as flags of their own name: a switch alone when said true (run start's --detach), the others followed by their value (env's --from and --isolation, run start's --job).
+// The answers the legacy commands a follow-up names take as flags of their own name: a switch alone when said true (run start's --detach), the others followed by their value (env's --from and --isolation, run start's --job, reparent's --to).
 var (
-	switches = []string{pathForce, "detach"}
+	switches = []string{"detach"}
 	valued   = []string{"from", domain.PathIsolation, "job", "to"}
 )
 
-// leftBehind is the repair of a branch an undo left behind, and of its worktree: clean, forced, in the legacy wtm until it migrates.
+// leftBehind is the repair of a branch an undo left behind, and of its worktree: clean, forced.
 func leftBehind(branch string) domain.FollowUp {
-	return domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: pathForce, Values: []string{"true"}}}}
+	return domain.FollowUp{Command: clean.Name, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: clean.PathForce, Values: []string{"true"}}}}
 }
 
 // initialize sets wtm up in a repository that has no config, in the legacy wtm until init migrates.
@@ -173,8 +185,12 @@ func proxyStatus() domain.FollowUp {
 	return domain.FollowUp{Command: "run proxy status"}
 }
 
-// commandLine spells a follow-up as the command line runs it: go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
+// commandLine spells a follow-up as the command line runs it: one naming a migrated command another command gives (clean) from that command's schema; go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
 func commandLine(followUp domain.FollowUp) []string {
+	if followUp.Command == clean.Name {
+		return cleancli.Line(followUp)
+	}
+
 	argv, _ := spelled(followUp)
 	return argv
 }

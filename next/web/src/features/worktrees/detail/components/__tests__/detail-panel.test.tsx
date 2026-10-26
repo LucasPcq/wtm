@@ -4,7 +4,7 @@ import { expect, test } from 'vitest'
 import type { WebCall } from '@/api/types.gen'
 import { envelope, followUp, statusDetail } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
-import { server } from '@/test/server'
+import { server, worktrees } from '@/test/server'
 
 const answers = async (request: Request) => {
   const call = (await request.json()) as WebCall
@@ -99,4 +99,26 @@ test('a GitHub read that failed says why in the review, not that there is no pul
   const review = await within(detail).findByRole('region', { name: 'Review' })
   expect(await within(review).findByText('the server went away')).toBeTruthy()
   expect(within(review).queryByText('No pull request.')).toBeNull()
+})
+
+test('a clean that names no worktree offers no removal', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/list', () =>
+      HttpResponse.json(
+        envelope(
+          'list',
+          worktrees.map((w) => ({
+            ...w,
+            actions: [{ command: 'clean', code: 'list.clean', message: 'Clean (delete the worktree)' }],
+          })),
+        ),
+      ),
+    ),
+  )
+  const { user } = await openDetail('feat/billing')
+
+  await user.click(await screen.findByRole('button', { name: 'More actions' }))
+
+  expect(await screen.findByRole('menu')).toBeTruthy()
+  expect(screen.queryByRole('menuitem', { name: 'Remove worktree…' })).toBeNull()
 })

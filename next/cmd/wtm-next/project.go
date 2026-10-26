@@ -13,6 +13,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	reposjson "github.com/LucasPcq/wtm/next/internal/adapter/registry"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
+	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
@@ -32,6 +33,7 @@ const (
 var (
 	openCreate  = opener(func(a app) create.UseCase { return a.Create })
 	openExtract = opener(func(a app) extract.UseCase { return a.Extract })
+	openClean   = opener(func(a app) clean.UseCase { return a.Clean })
 	openList    = opener(func(a app) list.UseCase { return a.List })
 	openResolve = opener(func(a app) resolve.UseCase { return a.Resolve })
 	openStatus  = opener(func(a app) status.UseCase { return a.Status })

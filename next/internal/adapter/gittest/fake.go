@@ -402,7 +402,7 @@ func (f *Fake) add(addition worktree.Addition) error {
 	return errors.New("gittest: no checkout given")
 }
 
-// RemoveWorktree forgets the linked worktree at path, dirty or gone; it fails
+// RemoveWorktree forgets the linked worktree at path, dirty, gone or locked; it fails
 // for the main worktree or a path that is none.
 func (f *Fake) RemoveWorktree(_ context.Context, path string) error {
 	f.mu.Lock()
@@ -423,6 +423,87 @@ func (f *Fake) RemoveWorktree(_ context.Context, path string) error {
 	f.worktrees = slices.Delete(f.worktrees, index, index+1)
 	f.dirty = slices.DeleteFunc(f.dirty, func(dirty string) bool { return dirty == resolved })
 	f.gone = slices.DeleteFunc(f.gone, func(gone string) bool { return gone == resolved })
+	return nil
+}
+
+// Same reports whether a and b resolve to the same worktree or folder the fake
+// holds; the fake's disk tells case apart.
+func (f *Fake) Same(_ context.Context, a, b string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("Same", a); err != nil {
+		return false, err
+	}
+
+	resolved := realPath(a)
+	return resolved == realPath(b) && (f.worktreeAt(resolved) >= 0 || slices.Contains(f.folders, resolved) || slices.Contains(f.empty, resolved)), nil
+}
+
+// Unpushed counts the commits of the local branch losing.Branch, and of the
+// commit losing.Head, that no other local branch but those going with it, nor
+// any fetched remote branch, holds, a commit both hold once; a tip that names
+// no commit holds none.
+func (f *Fake) Unpushed(_ context.Context, losing worktree.Losing) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("Unpushed", losing.Branch); err != nil {
+		return 0, err
+	}
+
+	of := slices.Clone(f.local[losing.Branch])
+	if losing.Head != "" {
+		of = append(of, f.upTo(losing.Head)...)
+	}
+
+	held := map[string]bool{}
+	for other, commits := range f.local {
+		if other != losing.Branch && !slices.Contains(losing.Going, other) {
+			for _, commit := range commits {
+				held[commit] = true
+			}
+		}
+	}
+	for _, commits := range f.remote {
+		for _, commit := range commits {
+			held[commit] = true
+		}
+	}
+
+	count := 0
+	for _, commit := range of {
+		if !held[commit] {
+			held[commit] = true
+			count++
+		}
+	}
+	return count, nil
+}
+
+// head is the commit the worktree w stands on: its branch's tip, else Root, the
+// fake committing on no branch; none for the bare entry.
+func (f *Fake) head(w worktree.Worktree) string {
+	if _, bare := w.State.(worktree.Bare); bare {
+		return ""
+	}
+	if commits := f.local[w.Branch()]; len(commits) > 0 {
+		return commits[len(commits)-1]
+	}
+	return Root
+}
+
+// upTo is the history ending on commit, as a branch holding it has it; none
+// when no branch holds it.
+func (f *Fake) upTo(commit string) history {
+	for _, commits := range f.local {
+		if at := slices.Index(commits, commit); at >= 0 {
+			return commits[:at+1]
+		}
+	}
+	for _, commits := range f.remote {
+		if at := slices.Index(commits, commit); at >= 0 {
+			return commits[:at+1]
+		}
+	}
 	return nil
 }
 
@@ -655,6 +736,7 @@ func (f *Fake) listed() []worktree.Worktree {
 	worktrees := slices.Clone(f.worktrees)
 	for i, w := range worktrees {
 		worktrees[i].Prunable = slices.Contains(f.gone, w.Path) && !w.Locked
+		worktrees[i].Head = f.head(w)
 	}
 	slices.SortStableFunc(worktrees[1:], func(a, b worktree.Worktree) int { return strings.Compare(a.Path, b.Path) })
 	return worktrees

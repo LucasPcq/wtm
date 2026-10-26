@@ -1,0 +1,57 @@
+{
+  "v": 2,
+  "command": "clean",
+  "ok": false,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/plain",
+      "status": "failed",
+      "error": {
+        "kind": "internal",
+        "code": "clean.hook_failed",
+        "message": "on_clean hook failed: exit status 2"
+      },
+      "detail": {}
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/plain",
+        "branch": "feat/plain",
+        "path": "/repo/wt-feat-plain",
+        "hooks": [
+          "make down"
+        ],
+        "phases": [
+          "on_clean",
+          "remove"
+        ],
+        "blockers": []
+      }
+    ],
+    "reparent_children": false,
+    "force": false,
+    "recap": [
+      {
+        "key": "remove",
+        "label": "Remove",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/plain",
+            "text": "feat/plain"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "internal",
+    "code": "clean.hook_failed",
+    "message": "on_clean hook failed: exit status 2"
+  }
+}

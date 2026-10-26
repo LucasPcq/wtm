@@ -18,6 +18,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./status.sh "$wtm" "$next" status
 ./tree.sh "$wtm" "$next" tree
 ./events.sh "$wtm" "$next" events
+./clean.sh "$wtm" "$next" clean
 git diff --stat .
 ```
 
@@ -145,7 +146,7 @@ The reference is the legacy `wtm list` of 0.30.1. `list` is a read: the proof ch
   - **The uniform text**: `main` for the main worktree (legacy `(parent)`), `• active` (legacy `● active`, missing from common monospace fonts), `! dirty`, `! rebasing`, `✓ clean` (legacy `⚠`), the columns aligned whatever the glyphs and a column empty in every row left out (legacy pads two columns too far after `●` and `↑`), a worktree whose directory is gone `✗ missing`, locked or not (legacy `✓ clean`), one on no branch named by its path from where the command runs (legacy: an empty name), the warnings under the table (3). The entry of a bare repository, which has no working tree, is not listed (legacy: an unnamed `(parent) ✓ clean` row).
   - **An argument is refused** (9): exit 2, where legacy listed and ignored it.
   - **`--fetch`**, which legacy lacks: the picker's refresh as a field of the request, so a surface other than the command line refreshes through the catalogue's answers alone (the owner's answers-only decision, LUC-355).
-  - **The picker** (`tty-*`): opens only when stdin, stdout and stderr are terminals and `--quiet` is off (legacy: stdin alone, so `wtm list | cat` drew its wizard into the pipe); its rows badged as the table's, the worktrees not read and the warnings under its title instead of a box; it lists the worktrees that offer an action: `Go to the worktree`, `Open the pull request` (only for a worktree with one, where legacy offered it to every worktree), `Start the profile`, `Stop the profile`, `View the logs`, `Clean (delete the worktree)` (not for the main worktree; only this for a missing one; none for a missing one on no branch, which `wtm clean` cannot name; only Go for one on no branch); the action chosen ends the run on its command line, `→ wtm go feat/a   Go to the worktree`, where legacy ran it (Go printed the path); leaving it exits 19 (legacy 0). `r` fetches origin, as legacy's (`git fetch origin`), and reads every worktree again with its pull request.
+  - **The picker** (`tty-*`): opens only when stdin, stdout and stderr are terminals and `--quiet` is off (legacy: stdin alone, so `wtm list | cat` drew its wizard into the pipe); its rows badged as the table's, the worktrees not read and the warnings under its title instead of a box; it lists the worktrees that offer an action: `Go to the worktree`, `Open the pull request` (only for a worktree with one, where legacy offered it to every worktree), `Start the profile`, `Stop the profile`, `View the logs`, `Clean (delete the worktree)` (not for the main worktree; only this for a missing one, by its path on no branch; only Go for one on no branch); the action chosen ends the run on its command line, `→ wtm go feat/a   Go to the worktree`, where legacy ran it (Go printed the path); leaving it exits 19 (legacy 0). `r` fetches origin, as legacy's (`git fetch origin`), and reads every worktree again with its pull request.
 
 # Proof: `wtm status` (legacy `flow/status`) vs `wtm-next status`
 
@@ -192,7 +193,7 @@ The reference is the legacy `wtm status` of 0.30.1. `status` is a read: the proo
   - **Every worktree is read, a detached one included** (5, 7, 9): bug 6, legacy offered a detached worktree in its picker then refused it (`worktree is on a detached HEAD`, exit 1), and `--all` left it out. It is named by its path (from where the command runs in the table), its picker row says `(detached)`, and it has nothing to fix: every fix names a branch.
   - **A worktree mid-rebase is read on its branch** (6): bug 7, legacy refused it from inside as detached.
   - **A worktree that cannot be read fails alone** (bug 8): with `--all`, one worktree that cannot be read is a failed item (`status.unreadable`), exit 1 after the others are drawn, where legacy failed the whole read; the headline counts it (`✗ … · 1 not read`) and never says `nothing to fix` then. A single worktree that cannot be read prints its error alone, exit 1.
-  - **A worktree whose directory is gone is missing, prunable or locked** (19, 20, 26, 27): `missing: true`, nothing of its directory read (`changes`, `commits`, `base` and `env.files` `null`), and one problem, `status.missing` (`its directory is gone`, `→ wtm clean feat/b`), exit 0, the verdict `list` and `tree` give it (`TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleanedLockedOrNot`); one on no branch raises the same problem with no fix (`fix: null`), since `wtm clean` takes a branch, as `list` offers it no action; legacy read it as if it were there, every `.env` missing. git never calls a locked worktree prunable, so the disk is asked. What of a worktree read does not read (its diffstat, commits or base gap, which a branch with no commit cannot tell) is a warning on its item, `status.partial`; a cancel interrupts it.
+  - **A worktree whose directory is gone is missing, prunable or locked** (19, 20, 26, 27): `missing: true`, nothing of its directory read (`changes`, `commits`, `base` and `env.files` `null`), and one problem, `status.missing` (`its directory is gone`, `→ wtm clean feat/b`), exit 0, the verdict `list` and `tree` give it (`TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleanedLockedOrNot`); one on no branch raises the same problem, its fix naming it by its path (`→ wtm clean /…/detached`), as `list` offers it clean (the captures of `list.sh` and `status.sh` predate it); legacy read it as if it were there, every `.env` missing. git never calls a locked worktree prunable, so the disk is asked. What of a worktree read does not read (its diffstat, commits or base gap, which a branch with no commit cannot tell) is a warning on its item, `status.partial`; a cancel interrupts it.
   - **A worktree that has not chosen its isolation has `isolation: null`** (10): bug 1, legacy's JSON said `isolated`.
   - **`run` reflects `run.toml`**: bug 2, legacy said `no run.toml` for a file declaring no job or profile; next shows its addressing whatever it declares. A malformed `run.toml` (17) is a warning, `status.run_invalid`, exit 0, `run: null`, where legacy failed (bug 3, exit 1, while other commands swallowed it).
   - **Only an unnumbered worktree has no offset** (bug 4): legacy showed `not numbered` for any error reading the worktree's env; next only for an ordinal not allocated or held first by another branch. A record that does not read is a warning on its item (`status.meta_unreadable`: its isolation, parent, env strategy and offset are not known), its isolation `null` and its ports `unknown`, and it raises no isolation problem, whose fix would write over a record it could not read (24, 25; legacy: `isolation not chosen` and the fix that rewrites it).
@@ -332,6 +333,52 @@ The reference is the legacy `wtm events` of 0.30.1. `events` is a stream: the pr
   - **The global stream relayed the events of a repository it had sent no snapshot of** (`TestTheGlobalStreamDropsTheEventsOfARepositoryItSentNoSnapshotOf`).
   - **The first wait before subscribing again was 400 ms**, now 200 ms, doubling to 5 s (`TestTheFirstWaitBeforeSubscribingAgainIsTheShortestThenItDoublesUpToALimit`).
   - **`--help` did not list what the stream carries**: it names every type (`events_help.golden`).
+
+# Proof: `wtm clean` (legacy `flow/clean`) vs `wtm-next clean`
+
+The reference is the legacy `wtm clean` of 0.30.1. Its output differs by design (next speaks the v2 envelope, plans before it acts and refuses an unsafe worktree with exit 23), so the proof compares what each leaves on disk and keeps both outputs side by side.
+
+- `clean.sh <wtm> <wtm-next> clean`: two identical sandboxes (the `docs/demos` "acme" project with a bare `origin` and an `on_clean` hook that fails on `feat/bad*`; worktrees `feat/plain`, `feat/dirty` with an untracked file, `feat/unpushed` pushed then one commit more, `feat/local` holding a commit no other branch holds, `feat/locked`, `feat/parent` with `feat/child` and `feat/child2`, `feat/p2` with `feat/c2`, `feat/c` with an untracked file, `feat/detached` on no branch, and one worktree per other scenario), the same scenarios run by each binary; after each, the exit code, stdout, stderr and the state (branches, worktrees and their locks, every `meta.json`, `repos.json`). Paths, op ids and fingerprints are normalised. After 7, 16, 21, 22 and 24, the worktree each left apart on purpose is removed on both sides, so each difference of state stays its own scenario's. `clean/states.diff` holds them. Then, in a fresh sandbox per side, the wizard in tmux at 100×40: `clean/tty/legacy/` and `clean/tty/next/`.
+  1. a worktree, `--yes`
+  2. a dirty worktree, `--yes`
+  3. the same, `--force --yes`
+  4. a worktree with an unpushed commit, `--yes`
+  5. a locked worktree, `--yes`
+  6. the same, `--force --yes`
+  7. a branch holding a commit no other branch nor remote holds, never pushed, `--yes`
+  8. a parent, its two children left orphaned
+  9. a parent, `--reparent-children`
+  10. two worktrees, one dirty, `--yes`
+  11. two worktrees, `--yes`
+  12. a name that is no worktree
+  13. `main`
+  14. a worktree whose `on_clean` hook fails
+  15. `--output json --yes`
+  16. `--output json` without `--yes`
+  17. a dirty worktree, `--output json --yes`
+  18. no worktree, without a terminal
+  19. `-q`
+  20. `--dry-run`
+  21. `--keep-data --yes`
+  22. a worktree on no branch, by its path
+  23. `--dry-run --output json` (next only)
+  24. `--expect-fingerprint` with that fingerprint (next only)
+  25. `--expect-fingerprint` with a stale fingerprint (next only)
+  26. a branch no worktree holds, as create's undo can leave one
+- The states are identical but for 7, 16, 21, 22, 24 and 26. The differences, all deliberate:
+  - 2, 4, 5, 10 and 17 are refused by both, nothing removed; next exits 23 (`clean.unsafe`, a safety refusal) where legacy exits 1, names what it refuses (`nothing removed: feat/dirty can't be removed safely`) and each reason on its line under the failure (`feat/dirty has uncommitted changes`, `feat/unpushed has 1 commit no other branch nor remote holds`, `feat/locked is locked`), and follows it with the same request forced, `→ wtm-next clean feat/dirty --force   remove anyway`. In JSON (17) each reason is a problem of its entry, `error.fields[]` (`worktree[0]`, `clean.dirty`), and the forced request is `error.follow_up` (`clean.force`); legacy prints its refusal as text on stderr and nothing on stdout.
+  - The sandbox has no `gh`: next asks the forge about every branch it removes (a pull request squash-merged then deleted on origin holds its commits), so each such removal warns `clean.prs_unavailable`, legacy nothing.
+  - 7, a legacy bug: legacy counts unpushed commits against `origin/<branch>`, none for a branch origin never had, so it ran the hook and removed the worktree, then `git branch -d` refused the unmerged branch: the worktree gone, its branch and `meta.json` left behind, exit 1. Next counts the commits no other branch nor remote holds, the branch's and those of the commit the worktree stands on (a commit on no branch, a rebase under way, its directory gone or not), and refuses the worktree before anything runs (exit 23); a branch whose merged pull request's head is its tip and the worktree's commit loses nothing, which GitHub keeps. Once the checks pass, next deletes the branch with `-D`, so a branch pushed but not merged locally goes whole too (legacy's `-d` refused it the same way).
+  - 12: both report the name as already absent, exit 0; next counts it `1 unchanged` with an `Already absent` row.
+  - 13: legacy warns `Cannot clean the parent worktree.` and exits 0; next refuses the entry, exit 2 (`clean.main_worktree`).
+  - 14: both keep the worktree, exit 1; the hook view is next's uniform `on_clean · <branch>`.
+  - 16: legacy refuses `--output json` without `--yes` (exit 2); next runs it unattended, as every next command.
+  - 18: legacy exits 1; next exits 2, naming `<worktree>` as required.
+  - 20 and 23 to 25: legacy has no dry run nor fingerprint (exit 2).
+  - 21: next has no `--keep-data` nor `--drop-data` until the run module migrates (LUC-339): it never drops a namespace and names the data kept (`clean.data_kept`); it refuses the flag (exit 2).
+  - 22: legacy takes only branches and says the path is already absent; next removes the worktree on no branch by its path, leaving the branch it was made from.
+  - 26, an owner decision: legacy says the branch is already absent and keeps it, so create's `→ wtm clean feat/x --force` repaired nothing after an undo that left the branch; next deletes a branch no worktree holds, with its record, behind the same checks (refused when it holds commits no other branch nor remote holds, unless `--force`).
+  - The tty: legacy's recap offers to delete the safe ones, to force all, or to cancel; next asks a `Force` step only when a worktree is unsafe, its help naming each reason (`feat/tty-dirty — uncommitted changes`), then a recap whose button names what goes (`Yes, remove 2 worktrees`). Next's `Reparent children` puts `Leave them orphaned` first (no by default), legacy `Reparent onto main (1)`. Leaving the wizard exits 19 on both.
 
 # Deliberate differences from legacy
 

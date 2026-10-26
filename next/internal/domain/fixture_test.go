@@ -19,6 +19,7 @@ var everyEvent = []Event{
 	WorktreeUpdated{Worktree: identity, Changed: []worktree.IdentityField{worktree.IdentityOrdinal}},
 	WorktreeChanged{Worktree: identity, Changed: []worktree.PolledField{worktree.PolledHead}},
 	WorktreeProvisioned{Worktree: identity, Hook: "make setup", ExitCode: new(3)},
+	WorktreeRemoved{Worktree: identity},
 	OperationStarted{Command: "create", Surface: "cli"},
 	OperationFinished{Command: "create", Surface: "cli", Code: "unit.phase_failed"},
 	Snapshot{Worktrees: []worktree.Identity{identity}},

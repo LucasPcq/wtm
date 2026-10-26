@@ -1,0 +1,13 @@
+
+  ✓ clean: 1 done
+
+  Remove    feat/parent
+  Children  feat/child (left on feat/parent), feat/child2 (left on feat/parent)
+
+  ! couldn't ask for pull requests (pull requests unavailable: run `gh auth login`): open ones aren't checked, merged ones don't count as pushed
+  ! feat/child still points at the removed parent feat/parent
+  ! feat/child2 still points at the removed parent feat/parent
+
+  → wtm reparent feat/child --to main    move it onto main
+  → wtm reparent feat/child2 --to main   move it onto main
+

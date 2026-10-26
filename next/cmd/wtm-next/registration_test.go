@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/command/clean"
+
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
@@ -85,23 +87,26 @@ func TestEachRequestThatCarriesItsCallerTakesItFromEverySurface(t *testing.T) {
 	assert.Positive(t, carrying, "status and events carry their caller")
 }
 
-func TestNoCommandAFollowUpNamesHasMigrated(t *testing.T) {
+func TestEachFollowUpOfAMigratedCommandIsSpelledFromItsSchema(t *testing.T) {
 	streams, _, _, _ := output.Test()
 	root := cli.NewRoot(version, streams, commands(streams, cli.Env{}))
-	named := []string{leftBehind("feat/a").Command, initialize().Command, settle("feat/a").Command, proxyStatus().Command}
-	for _, action := range list.Actions(list.Detail{Branch: "feat/a"}) {
-		named = append(named, action.Command)
-	}
-	named = append(named, tree.Actions(tree.Detail{Branch: "feat/a", Rebasing: true}, false)[0].Command, tree.Actions(tree.Detail{Branch: "feat/a"}, true)[0].Command, tree.Actions(tree.Detail{Branch: "feat/a", NeedsSync: true}, false)[0].Command)
+	followUps := []domain.FollowUp{leftBehind("feat/a"), *initialize(), settle("feat/a"), proxyStatus()}
+	followUps = append(followUps, list.Actions(list.Detail{Branch: "feat/a"})...)
+	followUps = append(followUps, tree.Actions(tree.Detail{Branch: "feat/a", Rebasing: true}, false)[0], tree.Actions(tree.Detail{Branch: "feat/a"}, true)[0], tree.Actions(tree.Detail{Branch: "feat/a", NeedsSync: true}, false)[0])
 	fixes := status.Problems(status.ProblemsParams{Branch: "feat/a", Merged: true, Missing: []status.Missing{{Target: ".env"}, {Target: ".env", From: status.FromNowhere}}, Jobs: []status.Job{{Name: "api", State: run.Crashed}}})
 	for _, problem := range fixes {
-		named = append(named, problem.Fix.Command)
+		followUps = append(followUps, *problem.Fix)
 	}
-	for _, command := range named {
-		require.NotEmpty(t, command)
-		_, listed := catalogue().Find(command)
+	for _, followUp := range followUps {
+		require.NotEmpty(t, followUp.Command)
+		_, listed := catalogue().Find(followUp.Command)
+		if !listed && !runs(root, strings.Fields(followUp.Command)) {
+			continue
+		}
 
-		assert.False(t, listed || runs(root, strings.Fields(command)), "%s has migrated: check the answers its follow-ups give against its schema and spell its command line from it in commandLine", command)
+		require.Equal(t, clean.Name, followUp.Command, "%s has migrated: spell its follow-ups from its schema in commandLine", followUp.Command)
+		argv := commandLine(followUp)
+		assert.Equal(t, []string{cli.Program, followUp.Command}, argv[:min(2, len(argv))], "%s's follow-up %v does not fold into its request", followUp.Command, followUp.Answers)
 	}
 }
 

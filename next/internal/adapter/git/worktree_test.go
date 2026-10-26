@@ -3,6 +3,7 @@ package git_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
@@ -21,9 +22,10 @@ func TestWorktreesListsTheMainWorktreeFirstOnItsBranch(t *testing.T) {
 	worktrees, err := repo.Worktrees(t.Context())
 
 	require.NoError(t, err)
+	head := gittest.Output(t, repo.Dir, "rev-parse", "HEAD")
 	assert.Equal(t, []worktree.Worktree{
-		{Path: repo.Dir, Main: true, State: worktree.OnBranch{Branch: "main"}},
-		{Path: linked, State: worktree.OnBranch{Branch: "feature"}},
+		{Path: repo.Dir, Main: true, State: worktree.OnBranch{Branch: "main"}, Head: head},
+		{Path: linked, State: worktree.OnBranch{Branch: "feature"}, Head: head},
 	}, worktrees)
 }
 
@@ -354,6 +356,18 @@ func TestTheFakeAndGitUndoAnAddOnANewBranchToWhereTheyStarted(t *testing.T) {
 	}
 }
 
+func TestTheFakeAndGitRemoveALockedWorktree(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			require.NoError(t, impl.port.RemoveWorktree(t.Context(), impl.at("locked")))
+
+			worktrees, err := impl.port.Worktrees(t.Context())
+			require.NoError(t, err)
+			assert.False(t, slices.ContainsFunc(worktrees, func(w worktree.Worktree) bool { return w.Path == impl.at("locked") }))
+		})
+	}
+}
+
 func TestTheFakeAndGitUndoAnAddOfAnExistingBranchKeepingTheBranch(t *testing.T) {
 	for _, impl := range implementations(t) {
 		t.Run(impl.name, func(t *testing.T) {
@@ -503,4 +517,23 @@ func TestTheFakeLocatesARelativePathFromTheRepositoryDirectory(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, worktree.Location{Path: under(t, root)("taken"), Exists: true}, location)
+}
+
+func TestTheFakeAndGitTellTwoPathsToOneWorktree(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			same := map[string]bool{}
+			for name, pair := range map[string][2]string{
+				"itself":  {impl.at("linked"), impl.at("linked")},
+				"another": {impl.at("linked"), impl.at("dirty")},
+				"nothing": {impl.at("nope"), impl.at("nope")},
+			} {
+				found, err := impl.port.Same(t.Context(), pair[0], pair[1])
+				require.NoError(t, err, name)
+				same[name] = found
+			}
+
+			assert.Equal(t, map[string]bool{"itself": true, "another": false, "nothing": false}, same)
+		})
+	}
 }

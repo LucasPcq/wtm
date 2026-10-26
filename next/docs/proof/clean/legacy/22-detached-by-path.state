@@ -1,0 +1,83 @@
+## branches
+feat/bad
+feat/c
+feat/c2
+feat/child
+feat/child2
+feat/detached
+feat/fp
+feat/unpushed
+main
+## worktrees
+<SB>/acme
+<SB>/acme.trees/feat-bad
+<SB>/acme.trees/feat-c
+<SB>/acme.trees/feat-c2
+<SB>/acme.trees/feat-child
+<SB>/acme.trees/feat-child2
+<SB>/acme.trees/feat-detached
+<SB>/acme.trees/feat-fp
+<SB>/acme.trees/feat-unpushed
+## .git/wtm/worktrees/feat%2Fbad/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 11,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fc/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 10,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fc2/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 20,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fchild/meta.json
+{
+  "source_branch": "feat/parent",
+  "env_strategy": "example",
+  "ordinal": 18,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fchild2/meta.json
+{
+  "source_branch": "feat/parent",
+  "env_strategy": "example",
+  "ordinal": 19,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fdetached/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 17,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Ffp/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 16,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Funpushed/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 3,
+  "isolation": "isolated"
+}
+## repos.json
+[
+  {
+    "common_dir": "<SB>/acme/.git",
+    "root": "<SB>/acme",
+  }
+]

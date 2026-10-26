@@ -1,0 +1,15 @@
+$ wtm clean; echo EXIT=$?
+
+  Step 3/4 • Force
+
+  ✓ Worktrees: feat/tty-dirty, feat/tty-parent
+  ✓ Reparent children: reparent
+
+  These worktrees are unsafe to remove:
+    feat/tty-dirty — uncommitted changes
+
+▌› No
+   Yes, remove them anyway
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

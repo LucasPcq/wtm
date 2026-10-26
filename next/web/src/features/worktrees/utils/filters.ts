@@ -25,6 +25,9 @@ export function matches(row: Row, filter: Filter): boolean {
 
 export const searched = (subject: string, query: string) => subject.toLowerCase().includes(query.trim().toLowerCase())
 
+export const visibleRows = (rows: Row[], { filter, q }: { filter?: Filter | undefined; q?: string | undefined }) =>
+  rows.filter((row) => matches(row, filter ?? 'all') && searched(row.subject, q ?? ''))
+
 export function countsOf(rows: Row[], githubAsked: boolean): Record<Filter, number | undefined> {
   const count = (filter: Filter) => rows.filter((row) => matches(row, filter)).length
   return {

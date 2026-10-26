@@ -1,0 +1,8 @@
+
+  ✓ clean: 1 done
+
+  Remove    feat/p2
+  Children  feat/c2 → main
+
+  ! couldn't ask for pull requests (pull requests unavailable: run `gh auth login`): open ones aren't checked, merged ones don't count as pushed
+

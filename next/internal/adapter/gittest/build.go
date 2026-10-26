@@ -142,7 +142,7 @@ type reader interface {
 	Branches(ctx context.Context) (worktree.Branches, error)
 }
 
-// StateOf reads repo's State, failing the test when it cannot.
+// StateOf reads repo's State, failing the test when it cannot; commits are named by the fake and hashed by git, so neither a worktree's head nor a branch's tip is kept.
 func StateOf(t testing.TB, repo reader) State {
 	t.Helper()
 	worktrees, err := repo.Worktrees(t.Context())
@@ -155,6 +155,9 @@ func StateOf(t testing.TB, repo reader) State {
 		t.Fatal(err)
 	}
 
+	for i := range worktrees {
+		worktrees[i].Head = ""
+	}
 	return State{Worktrees: worktrees, Branches: worktree.Branches{Local: untipped(branches.Local), Remote: untipped(branches.Remote)}}
 }
 

@@ -140,6 +140,31 @@ func parseAheadBehind(out string) (worktree.AheadBehind, error) {
 	return worktree.AheadBehind{Ahead: ahead, Behind: behind}, nil
 }
 
+// Unpushed counts what losing would lose, a commit both tips hold once; a tip
+// that names no commit holds none.
+func (r Repo) Unpushed(ctx context.Context, losing worktree.Losing) (int, error) {
+	args := []string{"rev-list", "--count", "--ignore-missing"}
+	if losing.Branch != "" {
+		args = append(args, headsPrefix+losing.Branch)
+	}
+	if losing.Head != "" {
+		args = append(args, losing.Head)
+	}
+
+	args = append(args, "--not")
+	for _, other := range append([]string{losing.Branch}, losing.Going...) {
+		if other != "" {
+			args = append(args, "--exclude="+other)
+		}
+	}
+	out, err := r.git(ctx, append(args, "--branches", "--remotes", "--")...)
+	if err != nil {
+		return 0, err
+	}
+
+	return strconv.Atoi(strings.TrimSpace(string(out)))
+}
+
 // DeleteBranch deletes the local branch name, merged or not.
 func (r Repo) DeleteBranch(ctx context.Context, name string) error {
 	_, err := r.git(ctx, "branch", "-D", "--", name)

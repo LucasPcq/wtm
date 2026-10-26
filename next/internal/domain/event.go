@@ -31,11 +31,13 @@ const (
 	PhasePorts       Phase = "ports"        // its ports settled in its .env files
 	PhaseOnCreate    Phase = "on_create"    // the project's on_create hooks
 	PhaseMove        Phase = "move"         // extract moves its changes
+	PhaseOnClean     Phase = "on_clean"     // the project's on_clean hooks, before a worktree is removed
+	PhaseRemove      Phase = "remove"       // git removes the worktree, its branch and its meta record go
 )
 
 // Phases returns every Phase, in the order a subject's work runs them.
 func Phases() []Phase {
-	return []Phase{PhaseFastForward, PhaseWorktree, PhaseEnv, PhaseMeta, PhaseOrdinal, PhasePorts, PhaseOnCreate, PhaseMove}
+	return []Phase{PhaseFastForward, PhaseWorktree, PhaseEnv, PhaseMeta, PhaseOrdinal, PhasePorts, PhaseOnCreate, PhaseMove, PhaseOnClean, PhaseRemove}
 }
 
 // PhaseStarted reports that a phase of a subject's work begins; Log is the file its output goes to, if any.
@@ -89,6 +91,11 @@ type WorktreeProvisioned struct {
 	ExitCode *int              `json:"exit_code,omitempty"`
 }
 
+// WorktreeRemoved reports that a worktree was removed, with its branch and its meta record: Worktree is its identity as it stood before.
+type WorktreeRemoved struct {
+	Worktree worktree.Identity `json:"worktree"`
+}
+
 // OperationStarted reports that an operation began, from which command and surface.
 type OperationStarted struct {
 	Command string `json:"command"`
@@ -136,6 +143,7 @@ func (WorktreeCreated) event()     {}
 func (WorktreeUpdated) event()     {}
 func (WorktreeChanged) event()     {}
 func (WorktreeProvisioned) event() {}
+func (WorktreeRemoved) event()     {}
 func (OperationStarted) event()    {}
 func (OperationFinished) event()   {}
 func (Snapshot) event()            {}
@@ -157,6 +165,7 @@ const (
 	EventWorktreeUpdated     = "worktree.updated"
 	EventWorktreeChanged     = "worktree.changed"
 	EventWorktreeProvisioned = "worktree.provisioned"
+	EventWorktreeRemoved     = "worktree.removed"
 	EventOperationStarted    = "operation.started"
 	EventOperationFinished   = "operation.finished"
 	EventSnapshot            = "snapshot"
@@ -186,6 +195,8 @@ func EventType(event Event) string {
 		return EventWorktreeChanged
 	case WorktreeProvisioned:
 		return EventWorktreeProvisioned
+	case WorktreeRemoved:
+		return EventWorktreeRemoved
 	case OperationStarted:
 		return EventOperationStarted
 	case OperationFinished:
@@ -217,6 +228,7 @@ var eventDecoders = map[string]func([]byte) (Event, error){
 	EventWorktreeUpdated:     decodeEvent[WorktreeUpdated],
 	EventWorktreeChanged:     decodeEvent[WorktreeChanged],
 	EventWorktreeProvisioned: decodeEvent[WorktreeProvisioned],
+	EventWorktreeRemoved:     decodeEvent[WorktreeRemoved],
 	EventOperationStarted:    decodeEvent[OperationStarted],
 	EventOperationFinished:   decodeEvent[OperationFinished],
 	EventSnapshot:            decodeEvent[Snapshot],

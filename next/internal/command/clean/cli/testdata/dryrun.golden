@@ -1,0 +1,8 @@
+
+  clean · dry run, nothing applied
+  Remove          feat/parent
+  Already absent  feat/nope (no worktree: nothing to remove)
+  Children        feat/child (left on feat/parent)
+  fingerprint  79429ee993d736d94ad76151
+  → wtm-next clean feat/parent feat/nope --expect-fingerprint 79429ee993d736d94ad76151   apply this plan
+

@@ -1,21 +1,27 @@
 import { useQuery } from '@tanstack/react-query'
+import { Trash2 } from 'lucide-react'
 import { worktreeCount } from '@/api/queries/commands'
 import { reposQuery } from '@/api/queries/repos'
 import { PageHeader } from '@/components/page-header'
+import { Button } from '@/components/ui/button'
+import { SelectionBar } from '@/features/worktrees/components/selection-bar'
 import { Toolbar } from '@/features/worktrees/components/toolbar'
 import { CreateButton } from '@/features/worktrees/create/create-button'
-import { useUnderWay } from '@/features/worktrees/create/hooks/use-create-run'
 import { DetailPanel } from '@/features/worktrees/detail/detail-panel'
 import { useRead } from '@/features/worktrees/hooks/use-read'
+import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
+import { useUnderWay } from '@/features/worktrees/hooks/use-run'
+import { useSelection } from '@/features/worktrees/hooks/use-selection'
 import { columnIds, defaultColumns } from '@/features/worktrees/list/components/columns'
 import { ColumnsPanel } from '@/features/worktrees/list/components/columns-panel'
 import { Notes } from '@/features/worktrees/list/components/notes'
 import { ListView } from '@/features/worktrees/list/list-view'
 import { rowsOf } from '@/features/worktrees/list/utils/rows'
+import { RemoveDialog } from '@/features/worktrees/remove/remove-dialog'
 import { useChoice } from '@/features/worktrees/store/ui-store'
 import { TreeView } from '@/features/worktrees/tree/tree-view'
 import { overlaid } from '@/features/worktrees/utils/condition'
-import { countsOf } from '@/features/worktrees/utils/filters'
+import { countsOf, visibleRows } from '@/features/worktrees/utils/filters'
 import { unavailable } from '@/features/worktrees/utils/github'
 import type { WorktreesSearch } from '@/features/worktrees/utils/search'
 import { repoName } from '@/lib/repo'
@@ -28,6 +34,7 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
   const root = useQuery(reposQuery).data?.find((known) => known.id === repo)?.root
   const columns = useChoice('columns', repo, columnIds, defaultColumns)
   const underWay = useUnderWay(repo)
+  const selection = useSelection(repo)
 
   const githubOut = unavailable(list.github.data?.warnings)
   const githubAsked = list.github.isSuccess && !githubOut
@@ -40,6 +47,9 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
       })
     : []
   const read = tree ? forest.live.data : list.live.data
+  // the selection is what the rows on screen check: a worktree gone, or filtered out of view, leaves it
+  const visible = visibleRows(rows, search)
+  const selected = tree ? [] : selection.selected.filter((subject) => visible.some((row) => row.subject === subject))
   const count = read ? worktreeCount(read) : 0
 
   const actions = () => {
@@ -57,13 +67,32 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
         description={read && root && `${count} ${count === 1 ? 'worktree' : 'worktrees'} in ${repoName(root)}`}
         action={<CreateButton repo={repo} />}
       />
-      <Toolbar
-        search={search}
-        {...(!tree && {
-          counts: countsOf(rows, githubAsked),
-          trailing: <ColumnsPanel shown={columns.shown} onToggle={columns.toggle} onReset={columns.reset} />,
-        })}
-      />
+      <RemoveDialog repo={repo} />
+      {selected.length > 0 ? (
+        <SelectionBar
+          count={selected.length}
+          onClear={selection.clear}
+          destructive={
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-destructive text-destructive hover:text-destructive"
+              onClick={() => openRemove(repo, selected)}
+            >
+              <Trash2 />
+              {selected.length === 1 ? 'Remove 1 worktree…' : `Remove ${selected.length} worktrees…`}
+            </Button>
+          }
+        />
+      ) : (
+        <Toolbar
+          search={search}
+          {...(!tree && {
+            counts: countsOf(rows, githubAsked),
+            trailing: <ColumnsPanel shown={columns.shown} onToggle={columns.toggle} onReset={columns.reset} />,
+          })}
+        />
+      )}
 
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col" aria-busy={!read}>
@@ -71,7 +100,14 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
             {tree ? (
               <TreeView repo={repo} search={search} underWay={underWay} />
             ) : (
-              <ListView live={list.live} rows={rows} shown={columns.shown} search={search} />
+              <ListView
+                live={list.live}
+                rows={rows}
+                shown={columns.shown}
+                search={search}
+                selected={selected}
+                onSelect={selection.set}
+              />
             )}
           </div>
           {/* below the rows, not after them: the notes stay put whatever the filters keep */}

@@ -17,7 +17,7 @@ func TestAWorktreeOffersWhatItsStateAllows(t *testing.T) {
 		"main":             {detail: list.Detail{Branch: "main", Main: true}, offers: []list.Action{list.ActionGo, list.ActionRunUp, list.ActionRunDown, list.ActionLogs}},
 		"detached":         {detail: list.Detail{Path: "/repo/.trees/x"}, offers: []list.Action{list.ActionGo}},
 		"missing":          {detail: list.Detail{Branch: "feat/gone", Missing: true}, offers: []list.Action{list.ActionClean}},
-		"missing_detached": {detail: list.Detail{Path: "/repo/.trees/x", Missing: true}},
+		"missing_detached": {detail: list.Detail{Path: "/repo/.trees/x", Missing: true}, offers: []list.Action{list.ActionClean}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -1,0 +1,13 @@
+
+  Step 3/4 • Force
+
+  ✓ Worktrees: feat/dirty, feat/parent
+  ✓ Reparent children: leave orphaned
+
+  These worktrees are unsafe to remove:
+    feat/dirty — uncommitted changes
+
+▌› No
+   Yes, remove them anyway
+
+  ↑↓ navigate • / filter • enter confirm • esc back

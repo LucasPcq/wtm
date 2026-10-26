@@ -87,7 +87,7 @@ These are the owner's rules, and the reason behind each.
 | anything the server says (reads, forms, dry runs, the event stream) | TanStack Query, through `src/api/queries/` |
 | what is linkable (view, filter, search, the worktree open) | the route's search params (`features/worktrees/utils/search.ts`) |
 | a viewer's own choices (columns, detail sections, other UI options) | a zustand store with `persist` (`features/worktrees/store/ui-store.ts`, key `wtm.ui`), per repository, the same in every tab |
-| an operation this page runs (create's progress) | a zustand store without persist (`create/hooks/use-create-run.ts`), read by the dialog and the list |
+| an operation this page runs (create's, clean's progress) | a zustand store without persist (`hooks/use-run.ts`), read by the dialog and the list |
 | what one component alone needs for a moment (a popover open, typing not yet sent) | `useState` / `useReducer` |
 
 Never server data in zustand, never a choice of the viewer in Query, never `localStorage` by hand. The persisted store's storage swallows a refused write (a private window): the choice then lives in memory until the page closes. A choice made in another tab reaches this one: the store's file listens to the `storage` event for its key and rehydrates (`persist.rehydrate()`), at module level, no effect.

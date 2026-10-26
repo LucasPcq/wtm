@@ -1,18 +1,12 @@
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import type { DomainAnswered, DomainField, DomainFollowUp, ListDetail, WebCall } from '@/api/types.gen'
-import { envelope, followUp, listDetail, statusDetail, treeDetail } from '@/test/fixtures'
+import { repo, worktrees } from '@/test/acme'
+import { cleanPlan, cleanQuestionsOf, cleanRun } from '@/test/clean'
+import { envelope, followUp, statusDetail, treeDetail } from '@/test/fixtures'
+import { line, streamed } from '@/test/stream'
 
-// The server the component tests talk to: the API of `wtm-next ui` over one repository, acme, with a stack (feat/billing,
-// feat/billing-ui behind it) and a worktree with a change (fix/login). A test changes what it answers with server.use.
-export const repo = { id: 'r1', root: '/acme', common_dir: '/acme/.git' }
-
-export const worktrees: ListDetail[] = [
-  listDetail('main', { main: true, parent: '', ahead: null, behind: null, path: '/acme' }),
-  listDetail('feat/billing', { ahead: 1 }),
-  listDetail('feat/billing-ui', { parent: 'feat/billing', behind: 1, needs_sync: true }),
-  listDetail('fix/login', { dirty: true, changes: { changed: 0, untracked: 1 } }),
-]
+export { line, repo, streamed, worktrees }
 
 const sync = (branch: string) =>
   followUp('sync', branch, { code: 'status.behind', message: 'sync it onto feat/billing' })
@@ -101,13 +95,6 @@ export function questionsOf(answers: DomainAnswered[] = []) {
   }
 }
 
-export const line = (event: object) => `data: ${JSON.stringify({ v: 2, ts: '2026-10-25T12:00:00Z', ...event })}\n\n`
-
-export const streamed = (body: string, operation: string | null = 'op-1') =>
-  new HttpResponse(body, {
-    headers: { 'Content-Type': 'text/event-stream', ...(operation && { 'X-Wtm-Operation': operation }) },
-  })
-
 const createRun = (branch: string) =>
   streamed(
     [
@@ -166,6 +153,9 @@ const handlers = [
   http.post('/api/command-line', async ({ request }) =>
     HttpResponse.json({ argv: spelled((await request.json()) as DomainFollowUp) }),
   ),
+  http.post('/api/repos/r1/commands/clean/questions', async ({ request }) =>
+    HttpResponse.json(cleanQuestionsOf(((await request.json()) as WebCall).answers)),
+  ),
   http.post('/api/repos/r1/commands/create/questions', async ({ request }) =>
     HttpResponse.json(questionsOf(((await request.json()) as WebCall).answers)),
   ),
@@ -183,6 +173,8 @@ const handlers = [
         )
       case 'create':
         return call.dry_run ? HttpResponse.json(plan(asked('branches') ?? '')) : createRun(asked('branches') ?? '')
+      case 'clean':
+        return call.dry_run ? cleanPlan(call) : cleanRun(call)
     }
     return HttpResponse.json({ error: { message: 'unknown command' } }, { status: 404 })
   }),

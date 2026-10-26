@@ -16,7 +16,7 @@
   "$defs": {
     "phase": {
       "description": "A phase of a subject's work, as phase.started and phase.finished name it: a closed set a surface names one by one.",
-      "enum": ["fast_forward", "worktree", "env", "meta", "ordinal", "ports", "on_create", "move"]
+      "enum": ["fast_forward", "worktree", "env", "meta", "ordinal", "ports", "on_create", "move", "on_clean", "remove"]
     },
     "repo": {
       "type": "object",
@@ -121,6 +121,12 @@
         "exit_code": { "type": "integer", "minimum": 0, "description": "The failing hook's exit status; absent when it was killed by a signal." }
       }
     },
+    "worktree.removed": {
+      "description": "A worktree was removed, with its branch and its meta record; a worktree on no branch has neither.",
+      "type": "object",
+      "required": ["type", "worktree"],
+      "properties": { "type": { "const": "worktree.removed" }, "worktree": { "$ref": "#/$defs/worktree" } }
+    },
     "operation.started": {
       "description": "An operation began.",
       "type": "object",
@@ -167,6 +173,7 @@
         { "$ref": "#/$defs/worktree.updated" },
         { "$ref": "#/$defs/worktree.changed" },
         { "$ref": "#/$defs/worktree.provisioned" },
+        { "$ref": "#/$defs/worktree.removed" },
         { "$ref": "#/$defs/operation.started" },
         { "$ref": "#/$defs/operation.finished" },
         { "$ref": "#/$defs/snapshot" },
@@ -186,6 +193,7 @@
     { "if": { "properties": { "type": { "const": "worktree.updated" } } }, "then": { "$ref": "#/$defs/worktree.updated", "required": ["repo"] } },
     { "if": { "properties": { "type": { "const": "worktree.changed" } } }, "then": { "$ref": "#/$defs/worktree.changed", "required": ["repo"] } },
     { "if": { "properties": { "type": { "const": "worktree.provisioned" } } }, "then": { "$ref": "#/$defs/worktree.provisioned", "required": ["repo"] } },
+    { "if": { "properties": { "type": { "const": "worktree.removed" } } }, "then": { "$ref": "#/$defs/worktree.removed", "required": ["repo"] } },
     { "if": { "properties": { "type": { "const": "operation.started" } } }, "then": { "$ref": "#/$defs/operation.started", "required": ["repo", "op_id"] } },
     { "if": { "properties": { "type": { "const": "operation.finished" } } }, "then": { "$ref": "#/$defs/operation.finished", "required": ["repo", "op_id"] } },
     { "if": { "properties": { "type": { "const": "snapshot" } } }, "then": { "$ref": "#/$defs/snapshot", "required": ["repo"] } },

@@ -1,0 +1,11 @@
+
+  Step 1/4 • Worktrees
+
+  The worktrees to remove, by branch, or by path on no branch
+
+▌› [ ] feat/child
+   [ ] feat/dirty
+   [ ] feat/parent
+   [ ] feat/plain
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel

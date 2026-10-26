@@ -22,6 +22,13 @@ type RemoteBranch struct{ Name string }
 func (LocalBranch) ref()  {}
 func (RemoteBranch) ref() {}
 
+// Losing is what deleting a branch and removing a worktree would lose: the commits of the local branch Branch, and of the commit Head a worktree stands on, that no local branch but Branch and those Going with them, nor any remote-tracking branch, holds. Either may be empty; one that names no commit (a branch with no commit yet) holds none.
+type Losing struct {
+	Branch string
+	Head   string
+	Going  []string
+}
+
 // AheadBehind counts the commits a local branch has that its origin branch lacks (Ahead), and the reverse (Behind).
 type AheadBehind struct {
 	Ahead  int

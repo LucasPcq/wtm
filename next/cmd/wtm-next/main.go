@@ -8,6 +8,7 @@ import (
 
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
+	cleancli "github.com/LucasPcq/wtm/next/internal/command/clean/cli"
 	createcli "github.com/LucasPcq/wtm/next/internal/command/create/cli"
 	eventscli "github.com/LucasPcq/wtm/next/internal/command/events/cli"
 	extractcli "github.com/LucasPcq/wtm/next/internal/command/extract/cli"
@@ -41,6 +42,7 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 	return []*cobra.Command{
 		createcli.New(streams, env, openCreate, commandLine),
 		extractcli.New(streams, env, openExtract, commandLine),
+		cleancli.New(streams, env, openClean, commandLine),
 		listcli.New(streams, env, openList, commandLine),
 		resolvecli.New(streams, env, openResolve, commandLine),
 		statuscli.New(streams, env, openStatus, commandLine),

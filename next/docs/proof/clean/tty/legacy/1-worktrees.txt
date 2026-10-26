@@ -1,0 +1,12 @@
+$ wtm clean; echo EXIT=$?
+
+  Step 1/4 • Select worktrees to clean
+
+  Space to toggle, a to select all, / to filter, enter to confirm, esc to cancel.
+
+▌ [ ] feat/tty-child
+  [ ] feat/tty-dirty
+  [ ] feat/tty-parent
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel
+

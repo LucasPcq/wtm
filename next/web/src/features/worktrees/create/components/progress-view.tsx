@@ -1,13 +1,16 @@
-import { ChevronRight, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress as Bar } from '@/components/ui/progress'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Made } from '@/features/worktrees/create/components/made'
-import { Timeline } from '@/features/worktrees/create/components/timeline'
-import { current, doneOf, ending, type Progress, took } from '@/features/worktrees/create/utils/progress'
-import { phaseLabel } from '@/features/worktrees/create/utils/words'
+import { DialogBand } from '@/features/worktrees/components/dialog-band'
+import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
+import { RunFailure } from '@/features/worktrees/components/run-failure'
+import { RunOutcome } from '@/features/worktrees/components/run-outcome'
+import { RunSteps } from '@/features/worktrees/components/run-steps'
+import { RunningFooter } from '@/features/worktrees/components/running-footer'
+import { recapOf } from '@/features/worktrees/create/utils/recap'
+import { outcomeWords } from '@/features/worktrees/create/utils/words'
+import { phaseLabel } from '@/features/worktrees/utils/phases'
+import { current, doneOf, ending, type Progress } from '@/features/worktrees/utils/progress'
 import { cn } from '@/lib/utils'
 
 export function ProgressView({
@@ -18,7 +21,7 @@ export function ProgressView({
   onAnother,
   onDone,
 }: {
-  progress: Progress
+  progress: Progress<'create'>
   running: boolean
   onHide: () => void
   onCancel: (force: boolean) => void
@@ -50,85 +53,43 @@ export function ProgressView({
     return done > 0 ? 'Finishing…' : 'Starting…'
   }
 
-  const stop = () => {
-    if (!progress.cancelling)
-      return (
-        <Button variant="outline" disabled={!progress.operation} onClick={() => onCancel(false)}>
-          <Square />
-          Cancel
-        </Button>
-      )
-
-    return (
-      <Button variant="destructive" disabled={progress.cancelling === 'forced'} onClick={() => onCancel(true)}>
-        Stop now
-      </Button>
-    )
-  }
-
-  const footer = () => {
-    if (!running)
-      return (
-        <>
-          <Button variant="outline" className="mr-auto" onClick={onAnother}>
-            Create another
-          </Button>
-          <Button onClick={() => onDone(ok ? branches[0] : undefined)}>Done</Button>
-        </>
-      )
-
-    return (
-      <>
-        <p className="mr-auto text-sm text-muted-foreground">
-          {progress.cancelling
-            ? 'Finishing the step under way, then it stops. What is done stays.'
-            : 'Closing this keeps it running.'}
-        </p>
-        <Button variant="ghost" onClick={onHide}>
-          Hide
-        </Button>
-        {stop()}
-      </>
-    )
-  }
-
   return (
     <>
       <DialogHeader>
         <DialogTitle>{title()}</DialogTitle>
         <DialogDescription className={cn(ok && 'sr-only')}>{description()}</DialogDescription>
       </DialogHeader>
-      {running && <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />}
+      {running && (
+        <DialogBand>
+          <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />
+        </DialogBand>
+      )}
 
-      {/* Radix lays the viewport's content out as a table, which never narrows: a long path would push the
-          commands out of sight instead of truncating */}
-      <ScrollArea className="min-h-0 flex-1 [&_[data-slot=scroll-area-viewport]>div]:!block">
-        <div className="flex flex-col gap-4 pr-3">
-          {ok ? (
-            <Collapsible>
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="-ml-2 text-muted-foreground [&[data-state=open]>svg]:rotate-90"
-                >
-                  <ChevronRight className="transition-transform motion-reduce:transition-none" />
-                  {[`${total} steps`, took(progress)].filter(Boolean).join(' · ')}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3">
-                <Timeline progress={progress} />
-              </CollapsibleContent>
-            </Collapsible>
-          ) : (
-            <Timeline progress={progress} />
-          )}
-          {!running && failure && <p className="text-sm text-destructive">{failure}</p>}
-          {!running && progress.envelope && <Made envelope={progress.envelope} />}
-        </div>
-      </ScrollArea>
+      <DialogScroll>
+        {!running && (
+          <RunFailure message={(progress.envelope?.items ?? []).some((item) => item.error) ? undefined : failure} />
+        )}
+        {!running && <RunOutcome groups={recapOf(progress)} labels={outcomeWords} />}
+        <RunSteps progress={progress} running={running} />
+      </DialogScroll>
 
-      <DialogFooter className="items-center">{footer()}</DialogFooter>
+      <DialogFooter className="items-center">
+        {running ? (
+          <RunningFooter
+            progress={progress}
+            stopping="Finishing the step under way, then it stops. What is done stays."
+            onHide={onHide}
+            onCancel={onCancel}
+          />
+        ) : (
+          <>
+            <Button variant="outline" className="mr-auto" onClick={onAnother}>
+              Create another
+            </Button>
+            <Button onClick={() => onDone(ok ? branches[0] : undefined)}>Done</Button>
+          </>
+        )}
+      </DialogFooter>
     </>
   )
 }

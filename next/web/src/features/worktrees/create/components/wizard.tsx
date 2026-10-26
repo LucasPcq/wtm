@@ -5,14 +5,16 @@ import { CommandFields } from '@/components/command-form/command-fields'
 import { useCommandForm } from '@/components/command-form/use-command-form'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DialogBand } from '@/features/worktrees/components/dialog-band'
+import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
+import { Stepper, type StepState } from '@/features/worktrees/components/stepper'
 import { ApplyButton } from '@/features/worktrees/create/components/apply-button'
 import { Confirm } from '@/features/worktrees/create/components/confirm'
 import { NotAsked } from '@/features/worktrees/create/components/not-asked'
-import { Stepper, type StepState } from '@/features/worktrees/create/components/stepper'
-import type { Start } from '@/features/worktrees/create/hooks/use-create-run'
 import { nextAsked, stepsOf } from '@/features/worktrees/create/utils/steps'
 import { initialWizard, wizardReducer } from '@/features/worktrees/create/utils/wizard-state'
 import { createWords } from '@/features/worktrees/create/utils/words'
+import type { Start } from '@/features/worktrees/hooks/use-run'
 
 export function Wizard({
   repo,
@@ -66,30 +68,32 @@ export function Wizard({
         <DialogDescription>Each branch gets its own folder, .env and ports.</DialogDescription>
       </DialogHeader>
 
-      <div className="border-b pb-4">
+      <DialogBand>
         <Stepper
           steps={[
             ...steps.map(({ title }, i) => ({ title, state: state(i) })),
             { title: 'Confirm', state: confirming ? 'now' : 'todo' },
           ]}
         />
-      </div>
+      </DialogBand>
 
-      {step && (
-        <div className="flex flex-col gap-6">
-          <CommandFields
-            form={form}
-            fields={step.asked}
-            words={createWords}
-            problems={problems}
-            remember={{ paths: remember, toggle: (path) => dispatch({ type: 'remember', path }) }}
-          />
-          {problems[''] && <p className="text-sm text-destructive">{problems['']}</p>}
-          <NotAsked fields={step.skipped} />
-        </div>
-      )}
+      <DialogScroll>
+        {step && (
+          <div className="flex flex-col gap-6">
+            <CommandFields
+              form={form}
+              fields={step.asked}
+              words={createWords}
+              problems={problems}
+              remember={{ paths: remember, toggle: (path) => dispatch({ type: 'remember', path }) }}
+            />
+            {problems[''] && <p className="text-sm text-destructive">{problems['']}</p>}
+            <NotAsked fields={step.skipped} />
+          </div>
+        )}
 
-      {confirming && <Confirm repo={repo} answers={request} />}
+        {confirming && <Confirm repo={repo} answers={request} />}
+      </DialogScroll>
 
       <DialogFooter className="items-center">
         <Button variant="ghost" className="mr-auto" onClick={onCancel}>

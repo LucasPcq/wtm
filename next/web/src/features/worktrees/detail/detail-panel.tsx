@@ -81,7 +81,7 @@ export function DetailPanel({
               </a>
             </Button>
           )}
-          {commands.length > 0 && <ActionsMenu actions={commands} />}
+          {commands.length > 0 && <ActionsMenu repo={repo} actions={commands} />}
           <Button variant="ghost" size="icon-sm" aria-label="Close the detail" asChild>
             <Link from="/r/$repo/worktrees" search={(search) => ({ ...search, worktree: undefined })}>
               <X />

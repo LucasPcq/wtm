@@ -1,0 +1,13 @@
+
+  Hooks · On Clean
+
+  → case feat/local in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/local;; esac
+
+tearing down feat/local
+
+  ✓ case feat/local in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/local;; esac (<DUR>)
+
+  ✗ delete branch: git branch -d: error: the branch 'feat/local' is not fully merged
+    hint: If you are sure you want to delete it, run 'git branch -D feat/local'
+    hint: Disable this message with "git config set advice.forceDeleteBranch false": exit status 1
+

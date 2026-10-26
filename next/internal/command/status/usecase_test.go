@@ -190,7 +190,7 @@ func TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleanedLockedOrNot(t *
 	assert.True(t, gone.Missing)
 	require.Len(t, gone.Problems, 1, "a gone worktree on no branch is a problem too")
 	assert.Equal(t, status.CodeMissing, gone.Problems[0].Code)
-	assert.Nil(t, gone.Problems[0].Fix, "clean takes a branch: no command fixes it")
+	assert.Equal(t, &domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{detached.Path}}}, Code: status.CodeMissing, Message: "remove what is left of it"}, gone.Problems[0].Fix, "clean removes a worktree on no branch by its path")
 	assert.NotContains(t, w.git.Calls(), "Changes "+locked.Path, "nothing of a gone directory is read")
 }
 

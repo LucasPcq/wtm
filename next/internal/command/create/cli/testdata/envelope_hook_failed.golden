@@ -11,7 +11,7 @@
       "error": {
         "kind": "internal",
         "code": "unit.phase_failed",
-        "message": "on_create failed: hook failed: exit status 3",
+        "message": "on_create failed: exit status 3",
         "params": {
           "phase": "on_create"
         }
@@ -44,6 +44,9 @@
     ],
     "from": "main",
     "env_from": "example",
+    "on_create": [
+      "make setup"
+    ],
     "creates": 1,
     "recap": [
       {
@@ -100,7 +103,7 @@
   "error": {
     "kind": "internal",
     "code": "unit.phase_failed",
-    "message": "on_create failed: hook failed: exit status 3",
+    "message": "on_create failed: exit status 3",
     "params": {
       "phase": "on_create"
     }

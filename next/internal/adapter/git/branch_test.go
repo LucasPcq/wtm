@@ -1,6 +1,8 @@
 package git_test
 
 import (
+	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -155,6 +157,73 @@ func TestTheFakeAndGitListTheLastCommitsOfAWorktreeNewestFirst(t *testing.T) {
 			assert.Equal(t, []string{"linked work", gittest.Root}, subjects)
 			require.NoError(t, oneErr)
 			assert.Len(t, one, 1)
+		})
+	}
+}
+
+func TestTheFakeAndGitCountWhatDeletingABranchWouldLose(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			lost := map[string]int{}
+			for _, name := range []string{"main", "feature", "unmerged", "linked", "diverged"} {
+				count, err := impl.port.Unpushed(t.Context(), worktree.Losing{Branch: name})
+				require.NoError(t, err, name)
+				lost[name] = count
+			}
+
+			assert.Equal(t, map[string]int{"main": 0, "feature": 0, "unmerged": 1, "linked": 1, "diverged": 1}, lost)
+		})
+	}
+}
+
+func TestTheFakeAndGitCountWhatRemovingAWorktreeLosesFromTheCommitItStandsOn(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			worktrees, err := impl.port.Worktrees(t.Context())
+			require.NoError(t, err)
+
+			lost := map[string]int{}
+			for _, w := range worktrees {
+				name := filepath.Base(w.Path)
+				if !slices.Contains([]string{"linked", "detached", "rebasing", "gone"}, name) {
+					continue
+				}
+				count, err := impl.port.Unpushed(t.Context(), worktree.Losing{Head: w.Head, Going: []string{name}})
+				require.NoError(t, err, name)
+				lost[name] = count
+			}
+			both, err := impl.port.Unpushed(t.Context(), worktree.Losing{Branch: "linked", Head: worktrees[slices.IndexFunc(worktrees, func(w worktree.Worktree) bool { return w.Branch() == "linked" })].Head})
+			require.NoError(t, err)
+
+			assert.Equal(t, map[string]int{"linked": 1, "detached": 0, "rebasing": 0, "gone": 0}, lost, "the commit a worktree stands on counts what its branch holds once the branch goes too, its directory gone or not")
+			assert.Equal(t, 1, both, "a commit the branch and HEAD both hold is counted once")
+		})
+	}
+}
+
+func TestTheFakeAndGitCountNothingForATipThatNamesNoCommit(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			count, err := impl.port.Unpushed(t.Context(), worktree.Losing{Branch: "remote-only"})
+
+			require.NoError(t, err)
+			assert.Equal(t, 0, count)
+		})
+	}
+}
+
+func TestTheFakeAndGitCountTheCommitsHeldOnlyByTheBranchesGoingTogether(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			require.NoError(t, impl.port.AddWorktree(t.Context(), worktree.Addition{Path: filepath.Join(impl.root, "topic"), Checkout: worktree.NewBranch{Name: "topic", From: worktree.LocalBranch{Name: "unmerged"}}}))
+
+			alone, err := impl.port.Unpushed(t.Context(), worktree.Losing{Branch: "unmerged"})
+			require.NoError(t, err)
+			together, err := impl.port.Unpushed(t.Context(), worktree.Losing{Branch: "unmerged", Going: []string{"topic"}})
+			require.NoError(t, err)
+
+			assert.Equal(t, 0, alone)
+			assert.Equal(t, 1, together)
 		})
 	}
 }

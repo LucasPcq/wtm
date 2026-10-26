@@ -11,6 +11,8 @@ var skipped = map[domain.Skip]string{
 	domain.SkipNothingIsolated: "run.toml declares nothing a worktree isolates",
 	domain.SkipNoConflict:      "nothing conflicts with the target",
 	domain.SkipAll:             "--all reads every worktree",
+	domain.SkipNoOrphan:        "no child worktree is left behind",
+	domain.SkipSafe:            "every worktree is safe to remove",
 }
 
 // Skipped is how the wizard's trail words why a step is not asked, empty when it has no words for it; a command may

@@ -1,0 +1,4 @@
+
+  ✗ nothing removed: feat/dirty can't be removed safely: feat/dirty has uncommitted changes
+  → wtm-next clean feat/dirty --force   remove anyway
+

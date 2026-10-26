@@ -1,7 +1,9 @@
 import { queryOptions } from '@tanstack/react-query'
-import { json } from '@/api/fetch'
+import { json, refusable } from '@/api/fetch'
 import type {
   ApiCommandName,
+  CleanDetail,
+  CleanPlan,
   CreateDetail,
   CreatePlan,
   DomainAnswered,
@@ -21,7 +23,7 @@ export const githubKey = (repo: string) => ['github', repo] as const
 type ReadDetail = { list: ListDetail; tree: TreeDetail; status: StatusDetail }
 export type ReadCommand = keyof ReadDetail
 
-type Mutation = { create: { plan: CreatePlan; detail: CreateDetail } }
+type Mutation = { create: { plan: CreatePlan; detail: CreateDetail }; clean: { plan: CleanPlan; detail: CleanDetail } }
 export type MutationCommand = keyof Mutation
 
 // the core sends {} for an item it did not read (failed, cancelled)
@@ -80,6 +82,7 @@ export const questionsQuery = (repo: string, command: ApiCommandName) =>
 export const dryRunQuery = <C extends MutationCommand>(repo: string, command: C, answers: DomainAnswered[]) =>
   queryOptions({
     queryKey: [...repoKey(repo), command, 'dry_run', answers],
-    queryFn: () => run(repo, command, { answers, dry_run: true }),
+    // a refusal (clean's unsafe worktrees) is the answer of a dry run, not its failure
+    queryFn: () => refusable(`/api/repos/${repo}/commands/${command}`, { answers, dry_run: true } satisfies WebCall),
     select: narrowed<Mutation[C]['detail'], Mutation[C]['plan']>,
   })
