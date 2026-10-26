@@ -236,11 +236,9 @@ const (
 	ActionClean   Action = "clean"
 )
 
-// Offers are the actions a worktree offers: only clean when its directory is gone, none when it is on no branch too (clean takes a branch), only go when it is on no branch, open its pull request when it has one.
+// Offers are the actions a worktree offers: only clean when its directory is gone, only go when it is on no branch, open its pull request when it has one.
 func Offers(detail Detail) []Action {
 	switch {
-	case detail.Missing && detail.Branch == "":
-		return nil
 	case detail.Missing:
 		return []Action{ActionClean}
 	case detail.Branch == "":

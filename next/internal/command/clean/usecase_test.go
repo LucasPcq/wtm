@@ -275,6 +275,19 @@ func TestAWorktreeOnNoBranchIsRemovedByItsPath(t *testing.T) {
 	assert.Len(t, eventsOf[domain.WorktreeRemoved](report.All()), 1)
 }
 
+// status offers this fix for a gone worktree on no branch: its path is what is left to name it by.
+func TestAWorktreeOnNoBranchWhoseDirectoryIsGoneIsRemovedByItsPath(t *testing.T) {
+	w := newWorld(t, seed{})
+	path := w.at("detached")
+	require.NoError(t, os.RemoveAll(path))
+
+	result, report := w.apply(t, removing(path))
+
+	assert.Equal(t, map[string]domain.Status{path: domain.StatusDone}, statuses(result.Items))
+	assert.NotContains(t, gittest.Output(t, w.main, "worktree", "list"), path)
+	assert.Len(t, eventsOf[domain.WorktreeRemoved](report.All()), 1)
+}
+
 // The proof caught it: a path through a symbolic link, or from where the caller stands, is not git's spelling of the worktree, which read as already absent.
 func TestAWorktreeOnNoBranchIsFoundByAPathFromWhereTheCallerStands(t *testing.T) {
 	w := newWorld(t, seed{})

@@ -109,7 +109,19 @@
           {
             "code": "status.missing",
             "message": "its directory is gone",
-            "fix": null
+            "fix": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "/repo/.trees/detached"
+                  ]
+                }
+              ],
+              "code": "status.missing",
+              "message": "remove what is left of it"
+            }
           }
         ],
         "condition": "missing"
