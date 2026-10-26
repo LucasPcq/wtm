@@ -88,7 +88,7 @@ try:
         if not chunk:
             break
         seen += chunk
-except TimeoutError:
+except socket.timeout:
     print("no ready line within 20 seconds")
 ours.close()
 try:
