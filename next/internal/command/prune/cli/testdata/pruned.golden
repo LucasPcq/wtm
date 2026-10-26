@@ -1,0 +1,13 @@
+
+  ✓ prune: 2 done
+
+  Prune     feat/gone (deleted on origin), feat/merged (merged #12)
+  Kept      feat/dirty (merged #14; dirty)
+  Children  feat/child (left on feat/merged)
+
+  ! feat/dirty is kept: unsafe to remove (dirty)
+  ! feat/child still points at the removed parent feat/merged
+
+  → wtm-next prune feat/dirty --force   prune them anyway
+  → wtm reparent feat/child --to main   move it onto main
+

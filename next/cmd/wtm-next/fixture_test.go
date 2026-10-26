@@ -25,10 +25,11 @@ func (r recorded) Open(op domain.Operation) domain.Report {
 	return func(domain.Event) {}
 }
 
-// A mutation is a command of the catalogue the contract drives through api alone, on a repository configured for wtm: the answers that change it, its subject's first, what it needs first, what makes its preview stale, what a refused apply leaves as it was, and what its apply leaves.
+// A mutation is a command of the catalogue the contract drives through api alone, on a repository configured for wtm: the answers that change it, its subject's first, whether its empty request is complete already (every field has a default), what it needs first, what makes its preview stale, what a refused apply leaves as it was, and what its apply leaves.
 type mutation struct {
 	name      string
 	answers   []domain.Answered
+	complete  bool
 	setup     func(t *testing.T, main string)
 	stale     func(t *testing.T, main string)
 	untouched func(t *testing.T, main string)
@@ -87,6 +88,28 @@ func mutations() []mutation {
 			applied: func(t *testing.T, main string) {
 				assert.NoDirExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-old"))
 				assert.Empty(t, gittest.Output(t, main, "branch", "--list", "feat/old"))
+			},
+		},
+		{
+			name:     "prune",
+			answers:  []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/done"}}, {Path: "gone", Values: []string{"true"}}},
+			complete: true,
+			// origin deleted the branch feat/done tracks: done with, for the one reason no forge is needed for
+			setup: func(t *testing.T, main string) {
+				gittest.Git(t, main, "worktree", "add", "-q", "-b", "feat/done", filepath.Join(filepath.Dir(main), ".trees", "feat-done"))
+				gittest.PushBranch(t, main, "feat/done")
+				gittest.Git(t, gittest.Output(t, main, "remote", "get-url", "origin"), "update-ref", "-d", "refs/heads/feat/done")
+			},
+			// an on_clean hook is part of what the plan runs
+			stale: func(t *testing.T, main string) {
+				writeConfig(t, main, "[hooks]\non_clean = [\"true\"]\n")
+			},
+			untouched: func(t *testing.T, main string) {
+				assert.DirExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-done"))
+			},
+			applied: func(t *testing.T, main string) {
+				assert.NoDirExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-done"))
+				assert.Empty(t, gittest.Output(t, main, "branch", "--list", "feat/done"))
 			},
 		},
 	}

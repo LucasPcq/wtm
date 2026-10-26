@@ -1,0 +1,21 @@
+$ wtm prune --merged; echo EXIT=$?
+
+┃  Hooks · On Clean · feat/merged
+┃  ✓ case feat/merged in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/merged;; esac (
+<DUR>)
+┃
+┃  Hooks · On Clean · feat/bad
+┃  ✗ case feat/bad in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/bad;; esac (<DUR>)
+┃    failing
+┃  full output:  <SB>/acme/.git/wtm/hooks/on_clean-feat%2Fbad.log
+
+┃  ✓ 1 pruned · 1 reparented · 1 skipped · 1 failed
+┃    feat/merged
+┃    feat/child → main
+┃  ! Skipped feat/dirty (dirty — pass --force)
+┃  ✗ stopped at feat/bad: on_clean: hook failed: exit status 3 — it and the worktrees after it were
+left as they were
+
+EXIT=1
+$
+

@@ -1,0 +1,14 @@
+
+  ✗ prune: 1 failed
+
+  Prune  feat/bad (merged #7)
+  Kept   feat/dirty (merged #4; dirty), feat/gone-work (deleted on origin; unpushed), feat/locked (merged #5; locked)
+
+  ! feat/dirty is kept: unsafe to remove (dirty)
+  ! feat/gone-work is kept: unsafe to remove (unpushed)
+  ! feat/locked is kept: unsafe to remove (locked)
+
+  ✗ feat/bad  on_clean hook failed: exit status 3
+
+  → wtm prune feat/dirty feat/gone-work feat/locked --force   prune them anyway
+

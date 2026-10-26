@@ -28,6 +28,7 @@
         "origin": null,
         "pr": null,
         "merged": false,
+        "finished": null,
         "condition": "clean",
         "services": [],
         "urls": [],

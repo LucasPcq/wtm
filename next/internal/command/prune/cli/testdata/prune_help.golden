@@ -1,0 +1,60 @@
+
+  Remove the worktrees done with, their local branches and their meta records. The remote branch is never touched.
+  A worktree is done with when its pull request merged or was closed while its branch stands at
+  the pull request's head (a commit made since keeps it), or when origin deleted the branch it
+  tracks. --merged, --closed and --gone pick among these reasons; none given asks for all three.
+  Origin is fetched first for --gone, unless --no-fetch. Never the main worktree nor the base branch.
+
+  Without arguments, every worktree done with that is safe to remove is pruned; the wizard lists
+  them all, the safe ones checked. Name worktrees to prune only those.
+
+  A worktree that is locked, has uncommitted changes, holds commits no other branch nor remote
+  holds, has an open pull request or runs jobs is unsafe. One not named is kept, and named with
+  the command that prunes it anyway; one named refuses the whole run before anything is removed,
+  unless --force. --force lifts that refusal only: it still asks to confirm, unless --yes.
+
+  Each worktree is removed in turn, its on_clean hooks first: a failing hook keeps it. A failure
+  does not stop the others. The children a removal leaves behind stay on their removed parent,
+  named with the `wtm reparent` that moves them, unless --reparent-children moves them onto the
+  nearest worktree that stays, else the base branch.
+
+  Until the run module moves to wtm-next, prune neither stops a worktree's jobs nor drops the
+  data it holds in shared services: jobs up make it unsafe, and the data kept is named.
+
+  Usage:
+    wtm-next prune [worktree...] [flags]
+
+  Examples:
+    # Prune every worktree done with that is safe to remove
+    wtm prune
+
+    # Only those whose pull request merged; their children move onto the nearest survivor
+    wtm prune --merged --reparent-children
+
+    # A worktree kept for being unsafe, pruned anyway
+    wtm prune feat/login --force
+
+    # See the plan first, then apply exactly that plan
+    wtm prune --dry-run
+    wtm prune --expect-fingerprint <hash>
+
+    # For a script or an agent, with the v2 JSON envelope
+    wtm prune --output json
+
+  Flags:
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+        --closed                      Prune the worktrees whose pull request was closed unmerged
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+        --force                       Prune a worktree that is locked, has uncommitted changes, unpushed commits, an open pull request or jobs running
+        --gone                        Prune the worktrees whose branch origin deleted
+    -h, --help                        help for prune
+        --merged                      Prune the worktrees whose pull request merged (none of --merged, --closed, --gone asks for all three)
+        --no-fetch                    Read origin's branches as last fetched, for --gone
+        --output string               Output format: text or json (default "text")
+        --reparent-children           Move the children a pruned worktree leaves behind onto its nearest surviving ancestor, else the base branch
+    -y, --yes                         Run unattended: no question, no confirmation (every worktree done with that is safe to remove unless worktrees are named; children stay orphaned unless --reparent-children; an unsafe worktree named still refuses the run unless --force)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

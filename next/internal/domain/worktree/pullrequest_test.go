@@ -47,18 +47,45 @@ func TestAMergedPullRequestCleansItsWorktreeAtOrBehindItsHeadAndNeverTheMainOneN
 	}
 }
 
-func TestOnlyAMergedPullRequestPastItsBranchTipAsksWhetherTheTipIsBehind(t *testing.T) {
+func TestAClosedPullRequestFinishesItsWorktreeAsAMergedOneDoes(t *testing.T) {
+	repo := Repository{Snapshot: Snapshot{Branches: Branches{Local: []Branch{{Name: "main", Tip: "m1"}, {Name: "feat/a", Tip: "a1"}}}}}
+	repo.Config.Worktrees.BaseBranch = "main"
+	onA := Worktree{State: OnBranch{Branch: "feat/a"}}
+	cases := map[string]struct {
+		pr       PullRequest
+		w        Worktree
+		behind   bool
+		finished bool
+	}{
+		"merged":        {pr: PullRequest{State: PullRequestMerged, Head: "a1"}, w: onA, finished: true},
+		"closed":        {pr: PullRequest{State: PullRequestClosed, Head: "a1"}, w: onA, finished: true},
+		"closed_behind": {pr: PullRequest{State: PullRequestClosed, Head: "a2"}, w: onA, behind: true, finished: true},
+		"closed_moved":  {pr: PullRequest{State: PullRequestClosed, Head: "a0"}, w: onA},
+		"open":          {pr: PullRequest{State: PullRequestOpen, Head: "a1"}, w: onA},
+		"none":          {w: onA},
+		"base_branch":   {pr: PullRequest{State: PullRequestClosed, Head: "m1"}, w: Worktree{State: OnBranch{Branch: "main"}}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.finished, repo.Finished(c.pr, c.w, c.behind))
+		})
+	}
+}
+
+func TestOnlyAFinishedPullRequestPastItsBranchTipAsksWhetherTheTipIsBehind(t *testing.T) {
 	repo := Repository{Snapshot: Snapshot{Branches: Branches{Local: []Branch{{Name: "main", Tip: "m1"}, {Name: "feat/a", Tip: "a1"}}}}}
 	repo.Config.Worktrees.BaseBranch = "main"
 	onA := Worktree{State: OnBranch{Branch: "feat/a"}}
 
-	ancestry, past := repo.MergedPast(PullRequest{State: PullRequestMerged, Head: "a2"}, onA)
-	_, atHead := repo.MergedPast(PullRequest{State: PullRequestMerged, Head: "a1"}, onA)
-	_, open := repo.MergedPast(PullRequest{State: PullRequestOpen, Head: "a2"}, onA)
-	_, base := repo.MergedPast(PullRequest{State: PullRequestMerged, Head: "m2"}, Worktree{State: OnBranch{Branch: "main"}})
+	ancestry, past := repo.FinishedPast(PullRequest{State: PullRequestMerged, Head: "a2"}, onA)
+	_, closed := repo.FinishedPast(PullRequest{State: PullRequestClosed, Head: "a2"}, onA)
+	_, atHead := repo.FinishedPast(PullRequest{State: PullRequestMerged, Head: "a1"}, onA)
+	_, open := repo.FinishedPast(PullRequest{State: PullRequestOpen, Head: "a2"}, onA)
+	_, base := repo.FinishedPast(PullRequest{State: PullRequestMerged, Head: "m2"}, Worktree{State: OnBranch{Branch: "main"}})
 
 	assert.True(t, past)
 	assert.Equal(t, Ancestry{Ancestor: "a1", Descendant: "a2"}, ancestry)
+	assert.True(t, closed)
 	assert.False(t, atHead, "a tip at the head needs no git call")
 	assert.False(t, open)
 	assert.False(t, base)

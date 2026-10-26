@@ -1,9 +1,8 @@
 package clean
 
 import (
-	"strconv"
-
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 )
 
 // ----------------------------------------------------------------------------
@@ -72,8 +71,8 @@ type Questions struct {
 	Worktrees Worktrees
 	Reparent  domain.Confirm
 	Force     domain.Confirm
-	Orphans   []Move
-	Unsafe    []Removal
+	Orphans   []teardown.Move
+	Unsafe    []teardown.Removal
 	Errors    []domain.FieldError
 }
 
@@ -88,8 +87,8 @@ func NewQuestions(f Facts, req Request) Questions {
 	removals, _, problems := f.entries(req.Worktrees)
 	questions := Questions{
 		Worktrees: Worktrees{Given: req.Worktrees, Options: f.worktreeOptions()},
-		Orphans:   f.moves(removals),
-		Unsafe:    unsafe(removals),
+		Orphans:   f.Moves(removals),
+		Unsafe:    teardown.Blocked(removals),
 		Errors:    problems,
 	}
 	questions.Reparent = confirm(req.ReparentChildren, len(questions.Orphans) == 0, domain.SkipNoOrphan)
@@ -145,8 +144,4 @@ func Resolve(f Facts, req Request) (Request, error) {
 	}
 
 	return req, nil
-}
-
-func entryPath(index int) string {
-	return domain.PathWorktree + "[" + strconv.Itoa(index) + "]"
 }

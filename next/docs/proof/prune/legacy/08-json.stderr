@@ -1,0 +1,18 @@
+
+  → case feat/gone in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/gone;; esac
+
+tearing down feat/gone
+
+  ✓ case feat/gone in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/gone;; esac (<DUR>)
+
+  → case feat/gone-work in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/gone-work;; esac
+
+tearing down feat/gone-work
+
+  ✓ case feat/gone-work in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/gone-work;; esac (<DUR>)
+
+  → case feat/bad in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/bad;; esac
+
+failing
+
+  ✗ case feat/bad in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/bad;; esac (<DUR>)

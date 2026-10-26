@@ -1,0 +1,17 @@
+{
+  "v": 2,
+  "command": "prune",
+  "ok": true,
+  "op": "op-1",
+  "plan": {
+    "worktrees": [],
+    "kept": [],
+    "reasons": [
+      "merged"
+    ],
+    "reparent_children": false,
+    "force": false
+  },
+  "follow_ups": [],
+  "warnings": []
+}

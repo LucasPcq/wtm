@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
+	"github.com/LucasPcq/wtm/next/internal/command/prune"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
@@ -168,7 +169,7 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"proxy":       {followUp: proxyStatus(), argv: []string{"wtm", "run", "proxy", "status"}},
 		"dry_run":     {followUp: dryRun, argv: []string{"wtm-next", "clean", "feat/x", "--force", "--dry-run"}},
 		"pr_url_only": {followUp: domain.FollowUp{URL: pr.URL}, argv: []string{"gh", "pr", "view", pr.URL, "--web"}},
-		"merged":      {followUp: *fixes[0].Fix, argv: []string{"wtm-next", "clean", "feat/a"}},
+		"merged":      {followUp: *fixes[0].Fix, argv: []string{"wtm-next", "prune", "feat/a"}},
 		"env":         {followUp: *fixes[1].Fix, argv: []string{"wtm", "env", "feat/a"}},
 		"env_example": {followUp: *fixes[2].Fix, argv: []string{"wtm", "env", "feat/a", "--from", "example"}},
 		"env_main":    {followUp: *fixes[3].Fix, argv: []string{"wtm", "env", "feat/a", "--from", "main"}},
@@ -177,7 +178,7 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"run_start":   {followUp: *fixes[6].Fix, argv: []string{"wtm", "run", "start", "feat/a", "--job", "api", "--detach"}},
 		"shared":      {followUp: *fixes[7].Fix, argv: []string{"wtm", "run", "start", "main", "--job", "db", "--detach"}},
 		"tree_go":     {followUp: tree.Actions(tree.Detail{Branch: "feat/a", Condition: worktree.ConditionRebasing}, false)[0], argv: []string{"wtm", "go", "feat/a"}},
-		"tree_clean":  {followUp: tree.Actions(tree.Detail{Branch: "feat/a"}, true)[0], argv: []string{"wtm-next", "clean", "feat/a"}},
+		"tree_prune":  {followUp: tree.Actions(tree.Detail{Branch: "feat/a"}, true)[0], argv: []string{"wtm-next", "prune", "feat/a"}},
 		"tree_sync":   {followUp: tree.Actions(tree.Detail{Branch: "feat/a", NeedsSync: true}, false)[0], argv: []string{"wtm", "sync", "feat/a"}},
 		"behind":      {followUp: *status.Problems(status.ProblemsParams{Branch: "feat/a", Parent: "feat/b", Lacks: 1, Sync: true})[0].Fix, argv: []string{"wtm", "sync", "feat/a"}},
 		"reparent":    {followUp: domain.FollowUp{Command: "reparent", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "to", Values: []string{"feat/b"}}}}, argv: []string{"wtm", "reparent", "feat/a", "--to", "feat/b"}},
@@ -185,7 +186,7 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			_, unspelled := spelled(c.followUp)
-			if c.followUp.Command == clean.Name {
+			if c.followUp.Command == clean.Name || c.followUp.Command == prune.Name {
 				unspelled = nil
 			}
 
@@ -209,4 +210,25 @@ func TestAFollowUpWithNothingToRunIsReported(t *testing.T) {
 
 	assert.Empty(t, argv)
 	assert.Equal(t, []string{"url"}, unspelled)
+}
+
+// The wizard plans at each step: each plan fetched origin again, a network call per step.
+func TestPruneFetchesOriginOnceHoweverOftenItPlans(t *testing.T) {
+	main := configured(t)
+	gittest.Git(t, main, "branch", "feat/done")
+	gittest.PushBranch(t, main, "feat/done")
+	params := wireParams{MainPath: main, StateDir: filepath.Join(main, ".git", "wtm"), CommonDir: filepath.Join(main, ".git")}
+	opened := wire(params).Prune.Git
+
+	require.NoError(t, opened.RefreshOrigin(t.Context(), []string{"feat/done"}))
+	gittest.Git(t, gittest.Output(t, main, "remote", "get-url", "origin"), "update-ref", "-d", "refs/heads/feat/done")
+	require.NoError(t, opened.RefreshOrigin(t.Context(), []string{"feat/done"}))
+	again, err := opened.Gone(t.Context())
+	require.NoError(t, err)
+	require.NoError(t, wire(params).Prune.Git.RefreshOrigin(t.Context(), []string{"feat/done"}))
+	reopened, err := opened.Gone(t.Context())
+	require.NoError(t, err)
+
+	assert.Empty(t, again, "origin is fetched once per command")
+	assert.Equal(t, map[string]bool{"feat/done": true}, reopened)
 }

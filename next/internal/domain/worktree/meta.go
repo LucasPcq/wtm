@@ -63,6 +63,24 @@ type Identity struct {
 	CreatedAt string            `json:"created_at"`
 }
 
+// IdentityParams are a worktree's branch, its path, and its record, which its identity reads.
+type IdentityParams struct {
+	Branch string
+	Path   string
+	Record Meta
+}
+
+// IdentityOf is the worktree of params as its events name it, from its record: no ordinal when the record has none.
+func IdentityOf(params IdentityParams) Identity {
+	record := params.Record
+	identity := Identity{Branch: params.Branch, Path: params.Path, Parent: record.SourceBranch, Isolation: record.Isolation.Effective(), CreatedAt: record.CreatedAt}
+	if record.Ordinal > 0 {
+		identity.Ordinal = &record.Ordinal
+	}
+
+	return identity
+}
+
 // A PolledField names what the event stream polls of a worktree and found changed.
 type PolledField string
 

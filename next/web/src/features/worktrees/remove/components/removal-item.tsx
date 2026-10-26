@@ -1,6 +1,6 @@
 import { CircleX, ExternalLink, type LucideIcon, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
-import type { CleanMove, CleanRemoval } from '@/api/types.gen'
+import type { TeardownMove, TeardownRemoval } from '@/api/types.gen'
 import { Item, ItemTitle } from '@/components/ui/item'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -22,10 +22,10 @@ export function RemovalItem({
   moves = [],
   reparent = false,
 }: {
-  removal: CleanRemoval
+  removal: TeardownRemoval
   choice?: Choice | undefined
   onChoice?: (choice: Choice) => void
-  moves?: CleanMove[]
+  moves?: TeardownMove[]
   reparent?: boolean
 }) {
   const blockers = removal.blockers ?? []

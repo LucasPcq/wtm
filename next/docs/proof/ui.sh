@@ -151,7 +151,7 @@ show 'curl -s -i $U/api/version'
 show 'curl -s -i -H "X-Wtm-Token: wrong" $U/api/version'
 show 'api -i -H "Origin: http://evil.example" $U/api/version'
 show 'api -i -H "Host: evil.example:$PORT" $U/api/version'
-show 'api -i $U/api/schema | head -5'
+show 'api -D - -o /dev/null $U/api/schema | head -5'
 show 'curl -s -i $U/'
 
 section 07-idle

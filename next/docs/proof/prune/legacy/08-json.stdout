@@ -1,0 +1,41 @@
+{
+  "pruned": [
+    {
+      "branch": "feat/gone",
+      "path": "<SB>/acme.trees/feat-gone",
+      "reason": "gone",
+      "is_dirty": false,
+      "source_branch": "main"
+    },
+    {
+      "branch": "feat/gone-work",
+      "path": "<SB>/acme.trees/feat-gone-work",
+      "reason": "gone",
+      "is_dirty": false,
+      "source_branch": "main"
+    }
+  ],
+  "reparented": [],
+  "orphaned": [],
+  "skipped": [
+    {
+      "branch": "feat/moved",
+      "reason": "unpushed"
+    },
+    {
+      "branch": "feat/dirty",
+      "reason": "dirty"
+    },
+    {
+      "branch": "feat/locked",
+      "reason": "locked"
+    }
+  ],
+  "dry_run": false,
+  "namespaces": [],
+  "failed": {
+    "branch": "feat/bad",
+    "path": "<SB>/acme.trees/feat-bad",
+    "error": "on_clean: case feat/bad in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/bad;; esac: hook failed: exit status 3"
+  }
+}

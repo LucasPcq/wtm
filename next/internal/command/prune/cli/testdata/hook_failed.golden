@@ -1,0 +1,9 @@
+
+  ✗ prune: 1 failed
+
+  Prune     feat/merged (merged #12)
+  Children  feat/child (left on feat/merged)
+
+  ✗ feat/merged  on_clean hook failed: exit status 2
+
+--- stderr

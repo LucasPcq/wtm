@@ -5,6 +5,8 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,7 +31,7 @@ func TestReparentIsAskedOnlyWhenAChildIsLeftBehind(t *testing.T) {
 
 	assert.Equal(t, domain.SkipNoOrphan, skipOf(alone.Form(), clean.PathReparentChildren))
 	assert.Empty(t, skipOf(parenting.Form(), clean.PathReparentChildren))
-	assert.Equal(t, []clean.Move{{Branch: child, From: parent, To: "main", Base: true}}, parenting.Orphans)
+	assert.Equal(t, []teardown.Move{{Branch: child, From: parent, To: "main", Base: true}}, parenting.Orphans)
 	assert.Empty(t, skipOf(given.Form(), clean.PathReparentChildren), "a flag given never makes its line disappear")
 	assert.Equal(t, domain.OriginRequest, given.Reparent.Origin)
 }
@@ -43,7 +45,7 @@ func TestForceIsAskedOnlyWhenAWorktreeIsUnsafe(t *testing.T) {
 	assert.Equal(t, domain.SkipSafe, skipOf(safe.Form(), clean.PathForce))
 	assert.Empty(t, skipOf(unsafe.Form(), clean.PathForce))
 	require.Len(t, unsafe.Unsafe, 1)
-	assert.Equal(t, []clean.Blocker{clean.BlockerDirty}, unsafe.Unsafe[0].Blockers)
+	assert.Equal(t, []worktree.Blocker{worktree.BlockerDirty}, unsafe.Unsafe[0].Blockers)
 	assert.False(t, unsafe.Force.Value)
 }
 

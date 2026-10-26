@@ -1,0 +1,25 @@
+{
+  "v": 2,
+  "command": "prune",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "worktree[0]",
+        "code": "prune.not_finished",
+        "params": {
+          "value": "feat/plain",
+          "why": "it has no merged or closed pull request, and origin has not deleted its branch"
+        },
+        "flag": "<worktree>[0]",
+        "message": "feat/plain is not done with: it has no merged or closed pull request, and origin has not deleted its branch"
+      }
+    ]
+  }
+}

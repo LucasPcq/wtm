@@ -180,7 +180,7 @@ func TestAllWithPRsAddsAReviewColumn(t *testing.T) {
 	formtest.Golden(t, "status_all_with_prs", got.Stdout)
 }
 
-func TestAMergedPullRequestIsShortAndItsCleanComesFirst(t *testing.T) {
+func TestAMergedPullRequestIsShortAndItsPruneComesFirst(t *testing.T) {
 	text := runStatus(t, world{Merged: true}, "feat/a", "--with-prs")
 	json := runStatus(t, world{Merged: true}, "feat/a", "--with-prs", "--output", "json")
 	all := runStatus(t, world{Merged: true}, "--all", "--with-prs")

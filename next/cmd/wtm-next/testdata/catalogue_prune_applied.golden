@@ -1,0 +1,63 @@
+{
+  "v": 2,
+  "command": "prune",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "feat/done",
+      "status": "done",
+      "detail": {
+        "path": "<root>/.trees/feat-done",
+        "reason": "gone"
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/done",
+        "branch": "feat/done",
+        "path": "<root>/.trees/feat-done",
+        "hooks": [
+          "true"
+        ],
+        "phases": [
+          "on_clean",
+          "remove"
+        ],
+        "blockers": [],
+        "reason": "gone"
+      }
+    ],
+    "kept": [],
+    "reasons": [
+      "gone"
+    ],
+    "reparent_children": false,
+    "force": false,
+    "recap": [
+      {
+        "key": "prune",
+        "label": "Prune",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/done",
+            "params": {
+              "reason": "gone"
+            },
+            "text": "feat/done (deleted on origin)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": [
+    {
+      "code": "prune.prs_unavailable",
+      "message": "couldn't ask for pull requests (pull requests unavailable: run `gh auth login`): open ones aren't checked, merged ones don't count as pushed"
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "fields": [
+    {
+      "kind": "multi_select",
+      "path": "worktree",
+      "picked": [
+        "feat/done"
+      ],
+      "options": [
+        {
+          "value": "feat/done"
+        }
+      ]
+    },
+    {
+      "kind": "confirm",
+      "path": "reparent_children",
+      "origin": "default",
+      "skip": "no_orphan",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "force",
+      "origin": "default",
+      "skip": "safe",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "merged",
+      "origin": "default",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "closed",
+      "origin": "default",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "gone",
+      "origin": "request",
+      "value": true,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "no_fetch",
+      "origin": "default",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    }
+  ],
+  "problems": []
+}

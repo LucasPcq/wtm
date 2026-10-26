@@ -19,6 +19,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./tree.sh "$wtm" "$next" tree
 ./events.sh "$wtm" "$next" events
 ./clean.sh "$wtm" "$next" clean
+./prune.sh "$wtm" "$next" prune
 ./ui.sh "$next" ui
 git diff --stat .
 ```
@@ -382,6 +383,33 @@ The reference is the legacy `wtm clean` of 0.30.1. Its output differs by design 
   - 22: legacy takes only branches and says the path is already absent; next removes the worktree on no branch by its path, leaving the branch it was made from.
   - 26, an owner decision: legacy says the branch is already absent and keeps it, so create's `→ wtm clean feat/x --force` repaired nothing after an undo that left the branch; next deletes a branch no worktree holds, with its record, behind the same checks (refused when it holds commits no other branch nor remote holds, unless `--force`).
   - The tty: legacy's recap offers to delete the safe ones, to force all, or to cancel; next asks a `Force` step only when a worktree is unsafe, its help naming each reason (`feat/tty-dirty — uncommitted changes`), then a recap whose button names what goes (`Yes, remove 2 worktrees`). Next's `Reparent children` puts `Leave them orphaned` first (no by default), legacy `Reparent onto main (1)`. Leaving the wizard exits 19 on both.
+
+# Proof: `wtm prune` (legacy `flow/prune`) vs `wtm-next prune`
+
+The reference is the legacy `wtm prune` of 0.30.1. Its output differs by design (next speaks the v2 envelope, plans before it acts, keeps an unsafe worktree it was not asked for and refuses one it was, exit 23), so the proof compares what each leaves on disk and keeps both outputs side by side.
+
+- `prune.sh <wtm> <wtm-next> prune`: two identical sandboxes (the `docs/demos` "acme" project with a bare `origin`, an `on_clean` hook that fails on `feat/bad*`, and a fake `gh`, signed in, that answers both binaries' query from the sandbox's `prs.json`: legacy's with its `--jq` applied, next's as GitHub's GraphQL answer). Its worktrees, each pushed: `feat/merged` (pull request 1 merged at its tip) with `feat/child` made from it, `feat/moved` (merged, one commit since), `feat/closed` (pull request 3 closed at its tip), `feat/gone` (origin deleted its branch), `feat/gone-work` (origin deleted its branch, then a commit only it holds), `feat/dirty` (merged, an untracked file), `feat/locked` (merged, locked), `feat/open` (pull request open), `feat/plain` (none), `feat/bad` (merged, its hook fails) and `feat/squash` (merged, its branch deleted on origin). The same scenarios run by each binary; after each, the exit code, stdout, stderr and the state (branches, remote branches, worktrees and their locks, every `meta.json`). Paths, commits, op ids, fingerprints and durations are normalised. `prune/states.diff` holds the differences. Then, in a fresh sandbox per side, the wizard of `prune --merged` in tmux at 100×40, `feat/dirty` checked: `prune/tty/legacy/` and `prune/tty/next/`.
+  1. `--dry-run`
+  2. `--dry-run --output json`
+  3. `--gone --dry-run`
+  4. `--dry-run --force`
+  5. `--closed --yes`
+  6. `--merged --dry-run --reparent-children`
+  7. `--merged --yes --reparent-children`, `feat/bad`'s hook failing
+  8. `--yes --output json`
+  9. `--yes` again
+  10. `feat/dirty --yes`, named (next only: legacy takes no worktree)
+  11. `feat/open --yes`, named
+  12. `feat/dirty --force --yes`, named
+  13. no `--yes`, without a terminal
+- The states are identical for 1 to 6. The differences, all deliberate:
+  - 1, 3 and 4, legacy bugs: legacy's `Would prune` lists `feat/gone-work`, a branch whose upstream is gone holding a commit no other branch holds (B2, which 8 then deletes with `git branch -D`, the commit lost), says it reparents `feat/child` without `--reparent-children` (B1), and its forced dry run lists `feat/dirty` as merged, nothing said of what forcing it loses (B7). Next keeps `feat/gone-work` (`Kept  feat/gone-work (deleted on origin; unpushed)`, `prune.kept`), recaps `feat/child (left on feat/merged)`, and marks each forced worktree with its blockers (`feat/dirty (merged #4; dirty, forced)`). Each unsafe worktree it keeps is a warning, the last followed by `→ wtm prune feat/dirty feat/gone-work feat/locked --force   prune them anyway`; legacy prints `Skipped … — pass --force`.
+  - `feat/moved` is no candidate for next (D1): its branch moved past its merged pull request's head, the rule of list's `merged` and the tree's action. Legacy lists it as skipped for its unpushed commit.
+  - 7, legacy stops at the first failure (D3, and B4: the worktrees after it are in no list of its report); next prunes `feat/merged` and `feat/squash` all the same, `feat/bad` failed under its own line, exit 1 on both.
+  - 8: legacy prunes `feat/gone-work`, its commit lost (B2); next keeps it.
+  - 10 to 12: legacy has no worktree argument (exit 2). Next refuses a named unsafe worktree with `prune.unsafe` (exit 23, followed by the same request forced), a named one not done with as an invalid request (`feat/open is not done with: its pull request is still open`, exit 2), and removes a named unsafe one forced.
+  - 13: legacy needs a terminal or `--yes` (exit 1); next runs unattended on the safe candidates (D5), as every next command.
+  - The tty: legacy lets `feat/dirty` be checked, counts it in `Will prune 4 worktree(s)`, then skips it after the confirmation (B3, `! Skipped feat/dirty (dirty — pass --force)`); next asks a `Force` step naming it (`feat/dirty — uncommitted changes`) and its recap marks it forced. Each candidate reads why it is done with (`feat/merged — merged #1`, `feat/dirty — merged #4 · uncommitted changes`). Next's `Reparent children` puts `Leave them orphaned` first, legacy reparents by default.
 
 # Proof: `wtm-next ui`, the local web server
 

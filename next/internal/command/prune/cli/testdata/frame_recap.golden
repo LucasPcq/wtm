@@ -1,0 +1,23 @@
+
+  Step 8/8 • Confirm
+
+  ✓ Worktrees: feat/dirty, feat/gone, feat/merged
+  ✓ Reparent children: leave orphaned
+  ✓ Force: forced
+  · Merged — set by its flag only
+  · Closed — set by its flag only
+  · Gone — set by its flag only
+  · No fetch — set by its flag only
+
+  ┃  Review & confirm
+  ┃
+  ┃  Prune     feat/dirty (merged #14; dirty, forced)
+  ┃            feat/gone (deleted on origin)
+  ┃            feat/merged (merged #12)
+  ┃  Children  feat/child (left on feat/merged)
+
+▌› Yes, prune 3 worktrees
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back

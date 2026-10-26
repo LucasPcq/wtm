@@ -13,6 +13,7 @@ var skipped = map[domain.Skip]string{
 	domain.SkipAll:             "--all reads every worktree",
 	domain.SkipNoOrphan:        "no child worktree is left behind",
 	domain.SkipSafe:            "every worktree is safe to remove",
+	domain.SkipNoCandidate:     "no worktree is done with",
 }
 
 // Skipped is how the wizard's trail words why a step is not asked, empty when it has no words for it; a command may

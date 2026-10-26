@@ -30,6 +30,7 @@ type Fake struct {
 	local     map[string]history
 	remote    map[string]history
 	origin    map[string]history
+	tracking  []string
 	folders   []string
 	empty     []string
 	dir       string
@@ -50,6 +51,8 @@ type FakeParams struct {
 	Branch    string                           // the branch checked out in the main worktree
 	Local     []string                         // more local branches, besides those the worktrees are on
 	Remote    []string                         // branches on origin and already fetched
+	Tracking  []string                         // local branches whose upstream is origin's branch of the same name
+	Deleted   []string                         // branches of Remote deleted on origin since they were fetched
 	Worktrees []worktree.Worktree              // linked worktrees
 	Gone      []string                         // worktrees whose directory was deleted behind git's back
 	Folders   []string                         // directories holding a file, where no worktree can go
@@ -79,6 +82,7 @@ func NewFake(params FakeParams) *Fake {
 		local:     map[string]history{},
 		remote:    map[string]history{},
 		origin:    map[string]history{},
+		tracking:  params.Tracking,
 		gone:      realPaths(params.Gone),
 		folders:   realPaths(params.Folders),
 		empty:     realPaths(params.Empty),
@@ -118,6 +122,10 @@ func NewFake(params FakeParams) *Fake {
 
 	for name, commits := range params.Origin {
 		f.origin[name] = append(history{Root}, commits...)
+	}
+
+	for _, name := range params.Deleted {
+		delete(f.origin, name)
 	}
 
 	return f
@@ -542,6 +550,41 @@ func (f *Fake) Fetch(context.Context) error {
 
 	maps.Copy(f.remote, f.origin)
 	return nil
+}
+
+// RefreshOrigin updates the remote branch of each of branches to origin's, and drops the remote branch of each origin no longer has.
+func (f *Fake) RefreshOrigin(_ context.Context, branches []string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("RefreshOrigin", strings.Join(branches, " ")); err != nil {
+		return err
+	}
+
+	for _, name := range branches {
+		if commits, ok := f.origin[name]; ok {
+			f.remote[name] = commits
+			continue
+		}
+		delete(f.remote, name)
+	}
+	return nil
+}
+
+// Gone returns the tracking branches whose remote branch is no longer fetched.
+func (f *Fake) Gone(context.Context) (map[string]bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("Gone", ""); err != nil {
+		return nil, err
+	}
+
+	gone := map[string]bool{}
+	for _, name := range f.tracking {
+		if _, fetched := f.remote[name]; !fetched {
+			gone[name] = true
+		}
+	}
+	return gone, nil
 }
 
 // FetchRef updates the remote branch name to origin's.

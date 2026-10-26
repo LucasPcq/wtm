@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 
+	"github.com/LucasPcq/wtm/next/internal/domain"
+
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
@@ -37,4 +39,9 @@ type Meta interface {
 // Ancestors tells whether a commit is another or one of its ancestors.
 type Ancestors interface {
 	IsAncestor(ctx context.Context, ancestry worktree.Ancestry) (bool, error)
+}
+
+// MetaWriter rewrites a worktree's meta record by its branch.
+type MetaWriter interface {
+	Update(ctx context.Context, update worktree.MetaUpdate) (domain.Written, error)
 }

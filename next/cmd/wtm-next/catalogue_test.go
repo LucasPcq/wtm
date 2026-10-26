@@ -20,7 +20,7 @@ func TestTheCatalogueListsEachCommandWithItsSchemaOutsideAnyRepository(t *testin
 		assert.NotEmpty(t, command.Form.Fields, command.Name)
 	}
 
-	assert.Equal(t, []string{"create", "extract", "clean", "list", "resolve", "status", "tree"}, names)
+	assert.Equal(t, []string{"create", "extract", "clean", "prune", "list", "resolve", "status", "tree"}, names)
 }
 
 func TestAnInvalidCallIsRefusedWithItsKind(t *testing.T) {

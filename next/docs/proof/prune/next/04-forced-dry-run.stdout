@@ -1,0 +1,7 @@
+
+  prune · dry run, nothing applied
+  Prune     feat/bad (merged #7), feat/closed (closed #3), feat/dirty (merged #4; dirty, forced), feat/gone (deleted on origin), feat/gone-work (deleted on origin; unpushed, forced), feat/locked (merged #5; locked, forced), feat/merged (merged #1), feat/squash (merged #8)
+  Children  feat/child (left on feat/merged)
+  fingerprint  <FP>
+  → wtm prune --force --expect-fingerprint <FP>   apply this plan
+

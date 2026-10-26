@@ -1,0 +1,7 @@
+
+  prune · dry run, nothing applied
+  Prune     feat/dirty (merged #14; dirty, forced), feat/gone (deleted on origin), feat/merged (merged #12)
+  Children  feat/child → main
+  fingerprint  571312c841e2ff595ef52dc6
+  → wtm-next prune --force --reparent-children --expect-fingerprint 571312c841e2ff595ef52dc6   apply this plan
+

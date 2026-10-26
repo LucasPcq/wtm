@@ -20,6 +20,7 @@ import (
 var (
 	errBranchHeld = errors.New("branch held")
 	errPermission = errors.New("permission denied")
+	errBroken     = errors.New("bad object")
 )
 
 func (w world) at(name string) string {

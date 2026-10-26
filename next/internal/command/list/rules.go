@@ -54,18 +54,20 @@ type Detail struct {
 	CommitsAhead int    `json:"commits_ahead"` // the commits it has that the base branch lacks
 	Parent       string `json:"parent"`        // the branch it was created from, empty for a root
 	// Ahead are the commits it has that its parent lacks, the base branch's for a root; Behind those of its parent it lacks, null for a root. Both null when not counted: the main worktree, a member of a cycle, a parent that is not a local branch.
-	Ahead        *int               `json:"ahead"`
-	Behind       *int               `json:"behind"`
-	NeedsSync    bool               `json:"needs_sync"`     // its parent has commits it lacks and no rebase, bisect or merge is under way: a sync is due
-	Changes      *Changes           `json:"changes"`        // null when its directory is gone
-	CreatedAt    *time.Time         `json:"created_at"`     // from its meta record, null without one
-	LastCommitAt *time.Time         `json:"last_commit_at"` // when the commit its branch stands at was made, null on no branch
-	Origin       *worktree.Origin   `json:"origin"`         // null when origin has no branch of that name
-	PR           *PR                `json:"pr"`             // null without one, or when GitHub was not asked
-	Merged       bool               `json:"merged"`         // its pull request merged it and it has not moved since: cleaning it is due; false when GitHub was not asked
-	Condition    worktree.Condition `json:"condition"`      // the one fact of it that most changes what to do first, as this read knows it
-	Services     []string           `json:"services"`       // the jobs up in it, null when that cannot be told
-	URLs         []string           `json:"urls"`           // the addresses of the jobs up in it, null when that cannot be told
+	Ahead        *int             `json:"ahead"`
+	Behind       *int             `json:"behind"`
+	NeedsSync    bool             `json:"needs_sync"`     // its parent has commits it lacks and no rebase, bisect or merge is under way: a sync is due
+	Changes      *Changes         `json:"changes"`        // null when its directory is gone
+	CreatedAt    *time.Time       `json:"created_at"`     // from its meta record, null without one
+	LastCommitAt *time.Time       `json:"last_commit_at"` // when the commit its branch stands at was made, null on no branch
+	Origin       *worktree.Origin `json:"origin"`         // null when origin has no branch of that name
+	PR           *PR              `json:"pr"`             // null without one, or when GitHub was not asked
+	Merged       bool             `json:"merged"`         // its pull request merged it and it has not moved since: cleaning it is due; false when GitHub was not asked
+	// Finished is the state of its pull request, merged or closed, once it has done with it: the branch has not moved since (worktree.Repository.Finished), so prune removes it; null when it has not, or when GitHub was not asked.
+	Finished  *worktree.PullRequestState `json:"finished"`
+	Condition worktree.Condition         `json:"condition"` // the one fact of it that most changes what to do first, as this read knows it
+	Services  []string                   `json:"services"`  // the jobs up in it, null when that cannot be told
+	URLs      []string                   `json:"urls"`      // the addresses of the jobs up in it, null when that cannot be told
 	// Actions are what may be done next with it, as Offers lists them, each the command that does it and its answers.
 	Actions []domain.FollowUp `json:"actions"`
 }
@@ -146,6 +148,7 @@ func (f Facts) item(w worktree.Worktree, active bool) Item {
 		Origin:       f.OriginOf(w.Branch()),
 		PR:           prOf(pr, hasPR),
 		Merged:       !state.Missing && f.Cleans(pr, w, f.Behind[w.Branch()]),
+		Finished:     f.finished(pr, w),
 		Services:     f.Services(w.Path),
 		URLs:         f.URLs(w.Path),
 	}
@@ -153,6 +156,15 @@ func (f Facts) item(w worktree.Worktree, active bool) Item {
 	detail.Actions = Actions(detail)
 
 	return Item{Subject: w.Name(), Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(w.Branch())}
+}
+
+// finished is the state of pr when it has done with w, nil otherwise.
+func (f Facts) finished(pr worktree.PullRequest, w worktree.Worktree) *worktree.PullRequestState {
+	if !f.Finished(pr, w, f.Behind[w.Branch()]) {
+		return nil
+	}
+
+	return &pr.State
 }
 
 func conditionOf(detail Detail, operation worktree.Operation) worktree.Condition {
@@ -300,7 +312,7 @@ func WithPullRequests(shown, from Outcome) Outcome {
 			continue
 		}
 		detail := *item.Detail
-		detail.PR, detail.Merged = from.Items[at].Detail.PR, from.Items[at].Detail.Merged
+		detail.PR, detail.Merged, detail.Finished = from.Items[at].Detail.PR, from.Items[at].Detail.Merged, from.Items[at].Detail.Finished
 		detail.Condition = conditionOf(detail, detail.Condition.Operation())
 		detail.Actions = Actions(detail)
 		merged.Items[i].Detail = &detail

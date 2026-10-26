@@ -186,7 +186,7 @@ func Actions(detail Detail, cleans bool) []domain.FollowUp {
 	case detail.Condition.Operation() != "":
 		command, message = domain.CommandGo, "Go to the worktree to finish its "+finishing[detail.Condition.Operation()]
 	case cleans:
-		command, message = domain.CommandClean, "Clean the worktree: its pull request is merged"
+		command, message = domain.CommandPrune, "Prune the worktree: its pull request is merged"
 	case detail.NeedsSync:
 		command, message = commandSync, "Sync the worktree: its parent has commits it lacks"
 	default:

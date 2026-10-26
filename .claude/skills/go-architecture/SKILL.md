@@ -14,7 +14,7 @@ next/
   cmd/wtm-next/        composition root: main.go (the commands), project.go (openers), catalogue.go (api), wire.go (adapters)
   internal/
     command/<name>/    one command: usecase.go, port.go, rules.go, questions.go, cli/
-    service/<name>/    what use cases share with I/O: operation, provision, repository, registry; <name>test kits
+    service/<name>/    what use cases share with I/O: operation, provision, repository, registry, teardown; <name>test kits
     domain/            the pure model and vocabulary; worktree/, project/, env/, dotenv/, run/ by subject
     adapter/<name>/    git, store, config, shell, oplock, events (the bus), registry, webserver, statefile, proxyport, daemon, github; <name>test fakes
     ui/                cli (root, exit codes, env), output (streams, frames, envelope), form (flags, wizard, conclusion), widget (a step's inputs), formtest (the cli tests' kit)

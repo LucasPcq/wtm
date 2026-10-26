@@ -1,0 +1,12 @@
+
+  prune · dry run, nothing applied
+  Prune     feat/gone (deleted on origin), feat/merged (merged #12)
+  Kept      feat/dirty (merged #14; dirty)
+  Children  feat/child (left on feat/merged)
+
+  ! feat/dirty is kept: unsafe to remove (dirty)
+
+  fingerprint  078a240623e1c9aa721914ee
+  → wtm-next prune --expect-fingerprint 078a240623e1c9aa721914ee   apply this plan
+  → wtm-next prune feat/dirty --force   prune them anyway
+

@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest'
-import type { CleanRemoval } from '@/api/types.gen'
+import type { TeardownRemoval } from '@/api/types.gen'
 import { requestOf, unitsOf } from '@/features/worktrees/remove/utils/plan'
 
-const removal = (worktree: string, blockers: CleanRemoval['blockers'] = []): CleanRemoval => ({
+const removal = (worktree: string, blockers: TeardownRemoval['blockers'] = []): TeardownRemoval => ({
   worktree,
   branch: worktree,
   path: `/t/${worktree}`,

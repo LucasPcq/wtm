@@ -1,0 +1,15 @@
+$ wtm prune --merged; echo EXIT=$?
+
+  Step 2/4 • Reparent children
+
+  ✓ Worktrees: feat/merged, feat/dirty, feat/bad, feat/squash
+
+  These children would otherwise be left orphaned:
+    • feat/child will rebase onto main instead of feat/merged
+
+▌▸ Reparent onto main (1)
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   Leave orphaned
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

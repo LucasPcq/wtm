@@ -1,0 +1,15 @@
+$ wtm prune --merged; echo EXIT=$?
+
+  Step 3/8 • Force
+
+  ✓ Worktrees: feat/bad, feat/dirty, feat/merged, feat/squash
+  ✓ Reparent children: leave orphaned
+
+  These worktrees are unsafe to remove:
+    feat/dirty — uncommitted changes
+
+▌› No
+   Yes, prune them anyway
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

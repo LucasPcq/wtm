@@ -1,6 +1,7 @@
 package git_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -246,4 +247,46 @@ func TestABranchNamedLikeATagIsFetchedAsABranch(t *testing.T) {
 	assert.Equal(t, pushed, head(t, repo.Dir, "refs/remotes/origin/tags/v1"))
 	assert.Equal(t, pushed, head(t, repo.Dir, "refs/heads/tags/v1"))
 	assert.Empty(t, gittest.Output(t, repo.Dir, "tag", "--list"))
+}
+
+func TestTheFakeAndGitTellABranchWhoseUpstreamIsGoneOnlyOnceFetched(t *testing.T) {
+	seeded := func(root string) gittest.FakeParams {
+		return gittest.FakeParams{
+			Main:     filepath.Join(root, "main"),
+			Branch:   "main",
+			Local:    []string{"kept", "deleted", "pruned", "untracked"},
+			Remote:   []string{"main", "kept", "deleted"},
+			Tracking: []string{"kept", "deleted", "pruned"},
+			Deleted:  []string{"deleted"},
+			Origin:   map[string][]string{"kept": {"kept upstream"}},
+		}
+	}
+	gitRoot, fakeRoot := gittest.Symlinked(t), gittest.Symlinked(t)
+	for name, impl := range map[string]interface {
+		port
+		Gone(ctx context.Context) (map[string]bool, error)
+		RefreshOrigin(ctx context.Context, branches []string) error
+	}{
+		"git":  gittest.Build(t, seeded(gitRoot)),
+		"fake": gittest.NewFake(seeded(fakeRoot)),
+	} {
+		t.Run(name, func(t *testing.T) {
+			before, err := impl.Gone(t.Context())
+			require.NoError(t, err)
+
+			require.NoError(t, impl.RefreshOrigin(t.Context(), []string{"kept", "deleted", "pruned", "untracked"}))
+
+			after, err := impl.Gone(t.Context())
+			require.NoError(t, err)
+			assert.Equal(t, map[string]bool{"pruned": true}, before, "a tracking ref still there is no gone upstream")
+			assert.Equal(t, map[string]bool{"pruned": true, "deleted": true}, after)
+			assert.Equal(t, worktree.AheadBehind{Behind: 1}, aheadBehind(t, impl, "kept"), "a branch origin has is fetched")
+		})
+	}
+}
+
+func TestRefreshingWithNoOriginChangesNothing(t *testing.T) {
+	repo := newRepo(t)
+
+	require.NoError(t, repo.RefreshOrigin(t.Context(), []string{"main"}))
 }
