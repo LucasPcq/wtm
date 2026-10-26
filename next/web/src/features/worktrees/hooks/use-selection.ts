@@ -13,5 +13,8 @@ export function useSelection(repo: string) {
     toggle: (subject: string) =>
       set(selected.includes(subject) ? selected.filter((s) => s !== subject) : [...selected, subject]),
     clear: () => set([]),
+    // read when it runs, not when it was made: rows checked since stay checked
+    drop: (subjects: string[]) =>
+      useSelections.setState((all) => ({ [repo]: (all[repo] ?? []).filter((subject) => !subjects.includes(subject)) })),
   }
 }

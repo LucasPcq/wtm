@@ -14,7 +14,7 @@ import {
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
 import { copy } from '@/features/worktrees/utils/copy'
 
-export function ActionsMenu({ actions }: { actions: DomainFollowUp[] }) {
+export function ActionsMenu({ repo, actions }: { repo: string; actions: DomainFollowUp[] }) {
   // clean runs here, through the catalogue: the others are still copied to the terminal
   const removal = actions.find((action) => action.command === 'clean')
   const copied = actions.filter((action) => action !== removal)
@@ -51,7 +51,7 @@ export function ActionsMenu({ actions }: { actions: DomainFollowUp[] }) {
         {removed.length > 0 && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onSelect={() => openRemove(removed)}>
+            <DropdownMenuItem variant="destructive" onSelect={() => openRemove(repo, removed)}>
               <Trash2 />
               Remove worktree…
             </DropdownMenuItem>

@@ -75,17 +75,23 @@ export const cleanPlan = (call: WebCall, dirty = dirtyOnes) => {
   })
 }
 
+const refusal = (error: object) =>
+  streamed(`event: envelope\ndata: ${JSON.stringify({ ...envelope('clean', []), ok: false, error })}\n\n`)
+
 export const cleanRun = (call: WebCall) => {
   if (call.expect_fingerprint !== fingerprint)
-    return streamed(
-      `event: envelope\ndata: ${JSON.stringify({
-        ...envelope('clean', []),
-        ok: false,
-        error: { kind: 'precondition', code: 'plan.stale', message: 'the facts changed since the preview' },
-      })}\n\n`,
-    )
+    return refusal({ kind: 'precondition', code: 'plan.stale', message: 'the facts changed since the preview' })
 
   const picked = call.answers?.find((a) => a.path === 'worktree')?.values ?? []
+  const forced = call.answers?.some((a) => a.path === 'force' && a.values[0] === 'true') ?? false
+  const unsafe = picked.filter((branch) => dirtyOnes.includes(branch))
+  if (unsafe.length > 0 && !forced)
+    return refusal({
+      kind: 'refused',
+      code: 'clean.unsafe',
+      message: `nothing removed: ${unsafe.join(', ')} can't be removed safely`,
+    })
+
   const reparent = call.answers?.some((a) => a.path === 'reparent_children') ?? false
   const orphans = reparent ? [] : worktrees.filter((w) => picked.includes(w.parent) && !picked.includes(w.branch))
   return streamed(
@@ -126,4 +132,30 @@ export const cleanRun = (call: WebCall) => {
       })}\n\n`,
     ].join(''),
   )
+}
+
+// a run that starts its first worktree, then waits for the test to end it with the envelope it gives
+export function heldRun() {
+  const encoder = new TextEncoder()
+  let end = (_envelope: object) => {}
+  const respond = (call: WebCall) => {
+    const subject = call.answers?.find((a) => a.path === 'worktree')?.values[0] ?? ''
+    return new HttpResponse(
+      new ReadableStream({
+        start: (controller) => {
+          controller.enqueue(
+            encoder.encode(
+              line({ type: 'unit.started', subject }) + line({ type: 'phase.started', subject, phase: 'on_clean' }),
+            ),
+          )
+          end = (envelope) => {
+            controller.enqueue(encoder.encode(`event: envelope\ndata: ${JSON.stringify(envelope)}\n\n`))
+            controller.close()
+          }
+        },
+      }),
+      { headers: { 'Content-Type': 'text/event-stream', 'X-Wtm-Operation': 'op-1' } },
+    )
+  }
+  return { respond, end: (envelope: object) => end(envelope) }
 }

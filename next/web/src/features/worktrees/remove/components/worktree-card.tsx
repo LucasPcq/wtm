@@ -32,6 +32,12 @@ export function WorktreeCard({
     return `${removal.branch}, deleted with it`
   }
 
+  const note = () => {
+    if (choice === 'remove') return `Removed anyway: ${blockers.map((blocker) => lostWords[blocker]).join(', ')}.`
+    if (choice === 'keep') return 'Kept: it stays as it is.'
+    return "Choose: it can't be removed safely."
+  }
+
   const badge = () => {
     if (!unsafe(removal)) return <span className="text-xs text-muted-foreground">Safe to remove</span>
     return (
@@ -115,11 +121,7 @@ export function WorktreeCard({
               </Label>
             ))}
           </RadioGroup>
-          <p className={cn('text-xs', choice === 'remove' ? 'text-destructive' : 'text-muted-foreground')}>
-            {choice === 'remove'
-              ? `Removed anyway: ${blockers.map((blocker) => lostWords[blocker]).join(', ')}.`
-              : "Choose: it can't be removed safely."}
-          </p>
+          <p className={cn('text-xs', choice === 'remove' ? 'text-destructive' : 'text-muted-foreground')}>{note()}</p>
         </div>
       )}
     </section>

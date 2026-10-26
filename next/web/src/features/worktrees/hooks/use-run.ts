@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { create } from 'zustand'
-import { type MutationCommand, repoKey } from '@/api/queries/commands'
+import { type Applied, type MutationCommand, repoKey } from '@/api/queries/commands'
 import { cancel as cancelOperation, runStreamed } from '@/api/queries/operations'
 import type { DomainAnswered } from '@/api/types.gen'
 import { advance, type Progress, type Unit } from '@/features/worktrees/utils/progress'
@@ -14,6 +14,12 @@ export const useRuns = create<Record<string, Run | undefined>>(() => ({}))
 
 const keyOf = (repo: string, command: MutationCommand) => `${command}:${repo}`
 
+// a run that ended was read: the next one opens on its own subjects; one still running stays, one at a time
+export function dismissEnded(repo: string, command: MutationCommand) {
+  const key = keyOf(repo, command)
+  if (useRuns.getState()[key]?.running === false) useRuns.setState({ [key]: undefined })
+}
+
 export function useRun<C extends MutationCommand>(repo: string, command: C) {
   const client = useQueryClient()
   const key = keyOf(repo, command)
@@ -25,8 +31,7 @@ export function useRun<C extends MutationCommand>(repo: string, command: C) {
       return now ? { [key]: { ...now, progress: change(now.progress as Progress<C>) } } : runs
     })
 
-  const start = async ({ answers, fingerprint, units }: Start) => {
-    useRuns.setState({ [key]: { progress: { units }, running: true } })
+  const answer = async ({ answers, fingerprint }: Start): Promise<Applied<C> | undefined> => {
     try {
       const envelope = await runStreamed({
         repo,
@@ -36,10 +41,18 @@ export function useRun<C extends MutationCommand>(repo: string, command: C) {
         line: (line) => update((progress) => advance(progress, line)),
       })
       update((progress) => ({ ...progress, envelope }))
+      return envelope
     } catch (error) {
       update((progress) => ({ ...progress, refused: error instanceof Error ? error.message : String(error) }))
+      return undefined
     }
+  }
+
+  const start = async (params: Start, ended?: (envelope: Applied<C> | undefined) => void) => {
+    useRuns.setState({ [key]: { progress: { units: params.units }, running: true } })
+    const envelope = await answer(params)
     useRuns.setState((runs) => ({ [key]: runs[key] && { ...runs[key], running: false } }))
+    ended?.(envelope)
     await client.invalidateQueries({ queryKey: repoKey(repo) })
   }
 
@@ -53,7 +66,7 @@ export function useRun<C extends MutationCommand>(repo: string, command: C) {
   return {
     progress: run?.progress as Progress<C> | undefined,
     running: run?.running ?? false,
-    start: (params: Start) => void start(params),
+    start: (params: Start, ended?: (envelope: Applied<C> | undefined) => void) => void start(params, ended),
     cancel,
     dismiss: () => useRuns.setState({ [key]: undefined }),
   }

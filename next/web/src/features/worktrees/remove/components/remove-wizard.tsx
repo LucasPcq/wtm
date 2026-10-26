@@ -34,8 +34,6 @@ export function RemoveWizard({
   )
   const removals = review.data?.plan?.worktrees ?? []
   const undecided = removals.filter((removal) => unsafe(removal) && !choices[removal.worktree])
-  // a worktree read again unsafe has its choice to make, whatever step the person reached
-  const step = undecided.length > 0 ? 'worktrees' : chosen
   const answers = requestOf({ removals, choices, reparent })
   const going = answers[0]?.values ?? []
   // a choice plans again: the plan shown stays until the next one lands
@@ -50,6 +48,15 @@ export function RemoveWizard({
   // the buttons never act on the plan a choice is replacing
   const fresh = plan !== undefined && !planned.isPlaceholderData
   const unplanned = planned.isError ? planned.error.message : planned.data?.error?.message
+
+  // the step is the one reached, unless the facts moved under it: a worktree read again unsafe has its choice to make,
+  // and children all gone leave nothing to ask
+  const stepOf = (): Step => {
+    if (undecided.length > 0) return 'worktrees'
+    if (chosen === 'children' && fresh && moves.length === 0) return 'confirm'
+    return chosen
+  }
+  const step = stepOf()
   const safe = removals.filter((removal) => !unsafe(removal))
 
   const state = (of: Step): StepState => {

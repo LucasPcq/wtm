@@ -77,7 +77,7 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
               variant="outline"
               size="sm"
               className="border-destructive text-destructive hover:text-destructive"
-              onClick={() => openRemove(selected)}
+              onClick={() => openRemove(repo, selected)}
             >
               <Trash2 />
               {selected.length === 1 ? 'Remove 1 worktree…' : `Remove ${selected.length} worktrees…`}
