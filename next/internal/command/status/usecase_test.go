@@ -569,21 +569,26 @@ func TestAReadCancelledReportsItsWorktreeInterruptedAndWhatDidNotReadIsSaid(t *t
 	assert.Contains(t, half.Items[0].Warnings[0].Message, "its commits: no commit yet")
 }
 
-func TestAWorktreeBehindItsParentIsToldToSyncOntoIt(t *testing.T) {
+func TestAWorktreeBehindItsParentIsToldToSyncOntoItUnlessMidwayThroughARebaseABisectOrAMerge(t *testing.T) {
+	childOfA := map[string]worktree.Meta{"feat/a": {SourceBranch: "main"}, "feat/a-ui": {SourceBranch: "feat/a"}}
 	cases := map[string]struct {
 		meta  map[string]worktree.Meta
+		ui    worktree.Worktree
 		want  []string
 		lacks string
 	}{
-		"child_of_a_worktree": {meta: map[string]worktree.Meta{"feat/a": {SourceBranch: "main"}, "feat/a-ui": {SourceBranch: "feat/a"}}, want: []string{status.CodeBehind}, lacks: "feat/a has 2 commits it lacks"},
-		"root":                {want: []string{}},
-		"in_step":             {meta: map[string]worktree.Meta{"feat/a-ui": {SourceBranch: "feat/a-ui-base"}}, want: []string{}},
+		"child_of_a_worktree": {meta: childOfA, ui: linked("feat/a-ui"), want: []string{status.CodeBehind}, lacks: "feat/a has 2 commits it lacks"},
+		"root":                {ui: linked("feat/a-ui"), want: []string{}},
+		"in_step":             {meta: map[string]worktree.Meta{"feat/a-ui": {SourceBranch: "feat/a-ui-base"}}, ui: linked("feat/a-ui"), want: []string{}},
+		"rebasing":            {meta: childOfA, ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Rebasing{Branch: "feat/a-ui"}}, want: []string{}},
+		"bisecting":           {meta: childOfA, ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Bisecting{Branch: "feat/a-ui"}}, want: []string{}},
+		"merging":             {meta: childOfA, ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Merging: true}, want: []string{}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			w := newWorld(seed{
 				Git: gittest.FakeParams{
-					Worktrees: []worktree.Worktree{linked("feat/a"), linked("feat/a-ui")},
+					Worktrees: []worktree.Worktree{linked("feat/a"), c.ui},
 					Local:     []string{"feat/a-ui-base"},
 					Commits: map[worktree.Ref][]string{
 						worktree.LocalBranch{Name: "feat/a"}:         {"a1", "a2"},

@@ -377,6 +377,34 @@ func TestARefreshFetchesOriginOnce(t *testing.T) {
 	assert.Equal(t, 1, fetches)
 }
 
+func TestAWorktreeMidwayThroughARebaseABisectOrAMergeNeedsNoSync(t *testing.T) {
+	for name, ui := range map[string]worktree.Worktree{
+		"rebasing":  {Path: "/repo/.trees/feat/a-ui", State: worktree.Rebasing{Branch: "feat/a-ui"}},
+		"bisecting": {Path: "/repo/.trees/feat/a-ui", State: worktree.Bisecting{Branch: "feat/a-ui"}},
+		"merging":   {Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Merging: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(seed{
+				Git: gittest.FakeParams{
+					Worktrees: []worktree.Worktree{linked("feat/a"), ui},
+					Commits: map[worktree.Ref][]string{
+						worktree.LocalBranch{Name: "feat/a"}:    {"a1", "a2"},
+						worktree.LocalBranch{Name: "feat/a-ui"}: {"a1", "u1"},
+					},
+				},
+				Meta: map[string]worktree.Meta{"feat/a": {SourceBranch: "main"}, "feat/a-ui": {SourceBranch: "feat/a"}},
+			})
+
+			read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+			require.NoError(t, err)
+			detail := detailOf(t, read, "feat/a-ui")
+			assert.Equal(t, ptr(1), detail.Behind, "the commits it lacks are still counted")
+			assert.False(t, detail.NeedsSync)
+		})
+	}
+}
+
 func TestAStackedWorktreeIsCountedAgainstItsParentAndARootAgainstTheBase(t *testing.T) {
 	w := newWorld(seed{
 		Git: gittest.FakeParams{

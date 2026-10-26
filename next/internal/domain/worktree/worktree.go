@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Worktree is one worktree as git lists it: its path, whether it is the main one, what it has checked out and the commit it stands on (none on a branch with no commit yet, nor for the bare entry), whether it is locked, and whether its directory is gone (git calls it prunable).
+// Worktree is one worktree as git lists it: its path, whether it is the main one, what it has checked out and the commit it stands on (none on a branch with no commit yet, nor for the bare entry), whether it is locked, whether its directory is gone (git calls it prunable), and whether a merge is under way in it.
 type Worktree struct {
 	Path     string
 	Main     bool
@@ -16,6 +16,7 @@ type Worktree struct {
 	Head     string
 	Locked   bool
 	Prunable bool
+	Merging  bool
 }
 
 //go-sumtype:decl State
@@ -63,6 +64,17 @@ func (w Worktree) Branch() string {
 	}
 
 	return ""
+}
+
+// InProgress reports whether a rebase, a bisect or a merge is under way in the worktree: until it is finished or aborted, its branch does not stand where the work is, so nothing should move it onto its parent.
+func (w Worktree) InProgress() bool {
+	switch w.State.(type) {
+	case Rebasing, Bisecting:
+		return true
+	case OnBranch, Detached, Bare:
+	}
+
+	return w.Merging
 }
 
 // Holding returns the index of the deepest of list whose path holds the directory dir, dir itself or one of its parents, -1 when none does; an empty path or dir holds nothing.

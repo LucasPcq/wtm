@@ -19,7 +19,7 @@ var (
 
 // Worktrees returns the repository's worktrees, the main one first. A detached
 // worktree in the middle of a rebase, or of a bisect, is reported as rebasing
-// the branch it started from.
+// the branch it started from; one in the middle of a merge is marked merging.
 func (r Repo) Worktrees(ctx context.Context) ([]worktree.Worktree, error) {
 	out, err := r.git(ctx, "worktree", "list", "--porcelain", "-z")
 	if err != nil {
@@ -28,6 +28,12 @@ func (r Repo) Worktrees(ctx context.Context) ([]worktree.Worktree, error) {
 
 	worktrees := parseWorktrees(string(out))
 	for i, w := range worktrees {
+		merging, err := merging(w.Path)
+		if err != nil {
+			return nil, err
+		}
+		worktrees[i].Merging = merging
+
 		if _, detached := w.State.(worktree.Detached); !detached {
 			continue
 		}
@@ -261,6 +267,25 @@ func detachedState(path string) (worktree.State, error) {
 	}
 
 	return bisectState(adminDir)
+}
+
+// merging reports whether a merge is under way in the worktree at path: git
+// keeps MERGE_HEAD in its git directory until the merge is committed or
+// aborted. A worktree whose .git is gone merges nothing.
+func merging(path string) (bool, error) {
+	adminDir, err := adminDirOf(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	_, err = os.Stat(filepath.Join(adminDir, "MERGE_HEAD"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	return err == nil, err
 }
 
 // bisectState is the state of a detached worktree whose git directory is

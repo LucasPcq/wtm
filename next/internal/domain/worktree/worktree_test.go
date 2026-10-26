@@ -14,6 +14,14 @@ func TestAWorktreeIsOnTheBranchItHasCheckedOutOrIsRebasingOrBisecting(t *testing
 	assert.Empty(t, Worktree{State: Bare{}}.Branch())
 }
 
+func TestARebaseABisectOrAMergeIsInProgress(t *testing.T) {
+	assert.True(t, Worktree{State: Rebasing{Branch: "feat/a"}}.InProgress())
+	assert.True(t, Worktree{State: Bisecting{Branch: "feat/a"}}.InProgress())
+	assert.True(t, Worktree{State: OnBranch{Branch: "feat/a"}, Merging: true}.InProgress())
+	assert.False(t, Worktree{State: OnBranch{Branch: "feat/a"}}.InProgress())
+	assert.False(t, Worktree{State: Detached{}}.InProgress())
+}
+
 func TestOnlyANewOrATrackingCheckoutCreatesItsBranch(t *testing.T) {
 	created, ok := CreatedBranch(NewBranch{Name: "topic", From: LocalBranch{Name: "main"}})
 	assert.True(t, ok)

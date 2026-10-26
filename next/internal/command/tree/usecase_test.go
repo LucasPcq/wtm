@@ -113,6 +113,40 @@ func TestAheadAndBehindAreCountedAgainstTheParent(t *testing.T) {
 	}
 }
 
+func TestAWorktreeMidwayThroughARebaseABisectOrAMergeNeedsNoSync(t *testing.T) {
+	cases := map[string]struct {
+		ui      worktree.Worktree
+		actions []string
+	}{
+		"rebasing":  {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Rebasing{Branch: "feat/a-ui"}}, actions: []string{"go"}},
+		"bisecting": {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Bisecting{Branch: "feat/a-ui"}}},
+		"merging":   {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Merging: true}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(seed{
+				Git: gittest.FakeParams{
+					Worktrees: []worktree.Worktree{linked("feat/a"), c.ui},
+					Commits:   commits(map[string][]string{"feat/a": {"a1", "a2"}, "feat/a-ui": {"a1", "u1"}}),
+				},
+				Meta: map[string]worktree.Meta{"feat/a": from("main", ""), "feat/a-ui": from("feat/a", "")},
+			})
+
+			read, err := w.usecase.Run(t.Context(), tree.Request{}, domain.RunOptions{})
+
+			require.NoError(t, err)
+			ui := detailOf(t, read, "feat/a-ui")
+			assert.Equal(t, count(1), ui.Behind, "the commits it lacks are still counted")
+			assert.False(t, ui.NeedsSync)
+			var actions []string
+			for _, action := range ui.Actions {
+				actions = append(actions, action.Command)
+			}
+			assert.Equal(t, c.actions, actions)
+		})
+	}
+}
+
 func TestARootBehindTheBaseBranchIsNotFlagged(t *testing.T) {
 	w := newWorld(seed{Git: gittest.FakeParams{
 		Worktrees: []worktree.Worktree{linked("loose")},

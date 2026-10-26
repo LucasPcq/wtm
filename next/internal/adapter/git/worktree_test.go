@@ -172,6 +172,22 @@ func TestWorktreesReadsTheBranchABisectStartedFrom(t *testing.T) {
 	}
 }
 
+func TestWorktreesReadsAMergeInProgress(t *testing.T) {
+	repo := newRepo(t)
+	commitFile(t, repo.Dir, "file", "base")
+	gittest.CreateBranch(t, repo.Dir, "feature")
+	commitFile(t, repo.Dir, "file", "main")
+	where := checkOutFeature(t, repo.Dir, true)
+	commitFile(t, where, "file", "feature")
+	merge(t, where)
+
+	worktrees, err := repo.Worktrees(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, worktree.Worktree{Path: where, State: worktree.OnBranch{Branch: "feature"}, Head: head(t, where, "HEAD"), Merging: true}, worktrees[len(worktrees)-1])
+	assert.False(t, worktrees[0].Merging)
+}
+
 func TestMainWorktreeIsTheFirstEvenSeenFromALinkedOne(t *testing.T) {
 	repo := newRepo(t)
 	linked := filepath.Join(gittest.TempDir(t), "feature")
@@ -298,7 +314,7 @@ func TestTheFakeAndGitReadTheSameRepository(t *testing.T) {
 				Worktrees: []worktree.Worktree{
 					{Path: at("main"), Main: true, State: worktree.OnBranch{Branch: "main"}},
 					{Path: at("detached"), State: worktree.Detached{}},
-					{Path: at("dirty"), State: worktree.OnBranch{Branch: "dirty"}},
+					{Path: at("dirty"), State: worktree.OnBranch{Branch: "dirty"}, Merging: true},
 					{Path: at("gone"), State: worktree.OnBranch{Branch: "gone"}, Prunable: true},
 					{Path: at("linked"), State: worktree.OnBranch{Branch: "linked"}},
 					{Path: at("locked"), State: worktree.OnBranch{Branch: "locked"}, Locked: true},

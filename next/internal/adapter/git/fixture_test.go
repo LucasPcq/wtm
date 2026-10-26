@@ -57,7 +57,7 @@ func implementations(t *testing.T) []implementation {
 }
 
 // seed is a repository under root with a worktree in every state git can
-// list, local branches ahead, behind and diverged from origin, and paths taken
+// list (one merging), local branches ahead, behind and diverged from origin, and paths taken
 // or free for a new worktree.
 func seed(root string) gittest.FakeParams {
 	return gittest.FakeParams{
@@ -67,7 +67,7 @@ func seed(root string) gittest.FakeParams {
 		Remote: []string{"main", "feature", "remote-only", "diverged"},
 		Worktrees: []worktree.Worktree{
 			{Path: filepath.Join(root, "linked"), State: worktree.OnBranch{Branch: "linked"}},
-			{Path: filepath.Join(root, "dirty"), State: worktree.OnBranch{Branch: "dirty"}},
+			{Path: filepath.Join(root, "dirty"), State: worktree.OnBranch{Branch: "dirty"}, Merging: true},
 			{Path: filepath.Join(root, "gone"), State: worktree.OnBranch{Branch: "gone"}},
 			{Path: filepath.Join(root, "detached"), State: worktree.Detached{}},
 			{Path: filepath.Join(root, "rebasing"), State: worktree.Rebasing{Branch: "rebasing"}},

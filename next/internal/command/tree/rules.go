@@ -45,7 +45,7 @@ type Detail struct {
 	// Ahead are the commits the branch has that its parent lacks, the base branch's for a root; Behind those of the parent it lacks, null for a root, which has none. Both null when not counted: the main worktree, a member of a cycle, a parent that is not a local branch.
 	Ahead     *int `json:"ahead"`
 	Behind    *int `json:"behind"`
-	NeedsSync bool `json:"needs_sync"` // its parent has commits it lacks: a rebase is due
+	NeedsSync bool `json:"needs_sync"` // its parent has commits it lacks and no rebase, bisect or merge is under way: a sync is due
 	Dirty     bool `json:"dirty"`
 	Locked    bool `json:"locked"`
 	Rebasing  bool `json:"rebasing"`
@@ -120,7 +120,7 @@ func (f Facts) item(branch string) Item {
 	_, detail.Rebasing = w.State.(worktree.Rebasing)
 	detail.Dirty, detail.Missing = state.Dirty, state.Missing
 	detail.Ahead, detail.Behind = state.Ahead, state.Behind
-	detail.NeedsSync = state.Behind != nil && *state.Behind > 0
+	detail.NeedsSync = state.Behind != nil && *state.Behind > 0 && !w.InProgress()
 	detail.Cycle = f.Stack.InCycle(branch)
 	detail.Origin = f.OriginOf(branch)
 	pr, ok := worktree.PullRequestOf(f.PullRequests, branch)

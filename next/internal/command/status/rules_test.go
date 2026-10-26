@@ -41,3 +41,7 @@ func TestProblemsComeMergedThenEnvThenIsolationThenCrashedJobs(t *testing.T) {
 func TestNothingToFixIsNoProblemNotNull(t *testing.T) {
 	assert.Equal(t, []status.Problem{}, status.Problems(status.ProblemsParams{Branch: "main"}))
 }
+
+func TestAWorktreeMidwayThroughARebaseABisectOrAMergeIsNotToldToSync(t *testing.T) {
+	assert.Equal(t, []status.Problem{}, status.Problems(status.ProblemsParams{Branch: "feat/a", Parent: "main", Lacks: 2, InProgress: true}))
+}
