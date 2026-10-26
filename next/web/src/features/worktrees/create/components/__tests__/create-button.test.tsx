@@ -39,6 +39,10 @@ test('create shows a problem only once asked to go on, then confirms the plan, r
   expect(await within(dialog).findByText('feat/new is ready')).toBeTruthy()
   // a lone group of the outcome needs no name
   expect(within(dialog).queryByRole('heading', { name: 'Ready' })).toBeNull()
+  // a worktree ready is one line; where it is and the step into it fold under it, with no copy on the line
+  expect(within(dialog).queryByText('/acme.trees/feat/new')).toBeNull()
+  expect(within(dialog).queryByRole('button', { name: 'Copy wtm go feat/new' })).toBeNull()
+  await user.click(within(dialog).getByRole('button', { name: 'Details of feat/new' }))
   expect(within(dialog).getByText('/acme.trees/feat/new')).toBeTruthy()
   expect(within(dialog).getByText('wtm go feat/new')).toBeTruthy()
   // a run that went well folds its steps away, one click from them
@@ -76,6 +80,7 @@ test('a next command the server cannot spell is said with what it meant, not hid
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Create worktree' }))
 
+  await user.click(await within(dialog).findByRole('button', { name: 'Details of feat/new' }))
   expect(await within(dialog).findByText('No command line for this: jump in')).toBeTruthy()
 })
 

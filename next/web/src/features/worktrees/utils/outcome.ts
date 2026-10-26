@@ -12,6 +12,7 @@ export type OutcomeKind = (typeof outcomeOrder)[number]
 // a row with no tone is a plain next step: nothing went wrong, nothing to check
 export type OutcomeTone = Exclude<Tone, 'busy'>
 
+// a fix (followUp) copies from the folded line; a next step (go) and a path only show once unfolded
 export type OutcomeRow = {
   key: string
   tone?: OutcomeTone

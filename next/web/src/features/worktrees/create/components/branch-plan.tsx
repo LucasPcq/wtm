@@ -24,12 +24,12 @@ export function BranchPlan({ plan, branch }: { plan: CreatePlan; branch: CreateB
       : [source(), plan.isolation && isolationShort[plan.isolation], envFromShort[plan.env_from]].filter(Boolean)
 
   return (
-    <Item role="listitem" aria-label={branch.branch} className="flex-col items-stretch gap-1 rounded-none px-4 py-3">
-      <div className="flex items-baseline gap-3">
-        <ItemTitle className="min-w-0 flex-1">{branch.branch}</ItemTitle>
-        <span className="text-xs text-muted-foreground">{actionWords[branch.action]}</span>
+    <Item role="listitem" aria-label={branch.branch} className="items-center gap-3 rounded-none px-4 py-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <ItemTitle className="min-w-0">{branch.branch}</ItemTitle>
+        {line.length > 0 && <p className="text-xs text-muted-foreground">{line.join(' · ')}</p>}
       </div>
-      {line.length > 0 && <p className="text-xs text-muted-foreground">{line.join(' · ')}</p>}
+      <span className="shrink-0 text-xs text-muted-foreground">{actionWords[branch.action]}</span>
     </Item>
   )
 }

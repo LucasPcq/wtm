@@ -19,7 +19,8 @@ const glyph: Record<OutcomeTone, LucideIcon> = {
 export function OutcomeLine({ row }: { row: OutcomeRow }) {
   const [open, setOpen] = useState(false)
   const Icon = glyph[row.tone ?? 'muted']
-  const foldable = row.output !== undefined || row.followUp !== undefined
+  const foldable =
+    row.output !== undefined || row.followUp !== undefined || row.go !== undefined || row.path !== undefined
 
   return (
     <Collapsible asChild open={open} onOpenChange={setOpen}>
@@ -32,7 +33,6 @@ export function OutcomeLine({ row }: { row: OutcomeRow }) {
           )}
           {row.title && <span className="shrink-0 font-medium">{row.title}</span>}
           <span className={cn('min-w-0 flex-1', row.title && 'text-muted-foreground')}>{row.message}</span>
-          {row.go && <CommandLine followUp={row.go} look="inline" />}
           {row.followUp && !open && <CommandLine followUp={row.followUp} look="copy" />}
           {foldable && (
             <CollapsibleTrigger asChild>
@@ -48,15 +48,16 @@ export function OutcomeLine({ row }: { row: OutcomeRow }) {
             </CollapsibleTrigger>
           )}
         </div>
-        {row.path && (
-          <div className="pl-7 text-xs">
-            <CopyPath path={row.path} />
-          </div>
-        )}
         {foldable && (
           <CollapsibleContent className="flex flex-col gap-2 pl-7">
+            {row.path && (
+              <div className="text-xs">
+                <CopyPath path={row.path} />
+              </div>
+            )}
             {row.output && <StepOutput lines={row.output.lines} log={row.output.log} />}
             {row.followUp && <CommandLine followUp={row.followUp} />}
+            {row.go && <CommandLine followUp={row.go} />}
           </CollapsibleContent>
         )}
       </li>
