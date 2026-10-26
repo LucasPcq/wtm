@@ -1,6 +1,7 @@
 package exec_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
@@ -53,7 +54,7 @@ func TestACommandTheShellRefusesSaysWhyInTheShellsWords(t *testing.T) {
 
 	questions := w.questions(t, running("if then", featA))
 
-	assert.Contains(t, questions.Errors[0].Params["reason"], "syntax error")
+	assert.Contains(t, strings.ToLower(questions.Errors[0].Params["reason"]), "syntax error", "bash and dash spell it with a capital or not")
 }
 
 func TestAllSkipsTheWorktreesAndOnlyTheirFlagsSetAllJobsAndPrint(t *testing.T) {
