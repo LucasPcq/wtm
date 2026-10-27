@@ -244,7 +244,21 @@
         "origin": null,
         "pr": null,
         "services": [],
-        "actions": []
+        "actions": [
+          {
+            "command": "clean",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/gone"
+                ]
+              }
+            ],
+            "code": "tree.clean",
+            "message": "Clean the worktree: remove what is left of it"
+          }
+        ]
       }
     },
     {

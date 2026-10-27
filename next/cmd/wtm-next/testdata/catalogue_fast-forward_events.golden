@@ -1,0 +1,33 @@
+[
+  {
+    "type": "operation.started",
+    "command": "fast-forward",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "feat/ff"
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/ff",
+    "phase": "fast_forward"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/ff",
+    "phase": "fast_forward",
+    "failed": false
+  },
+  {
+    "type": "unit.finished",
+    "subject": "feat/ff",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "fast-forward",
+    "surface": "api",
+    "ok": true
+  }
+]

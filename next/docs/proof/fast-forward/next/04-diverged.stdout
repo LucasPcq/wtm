@@ -1,0 +1,9 @@
+
+  ! fast-forward: 1 skipped
+
+  Left as is  feat/diverged (diverged from origin)
+
+  ! feat/diverged has diverged from origin (1 ahead, 1 behind): left as it is
+
+  → wtm sync feat/diverged   rebase it
+

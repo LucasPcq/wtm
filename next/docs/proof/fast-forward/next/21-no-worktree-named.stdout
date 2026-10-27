@@ -1,0 +1,10 @@
+
+  ! fast-forward: 2 done · 1 skipped
+
+  Fast-forward  feat/all (1 commit), feat/dry (1 commit)
+  Left as is    feat/clash (uncommitted changes)
+
+  ! feat/clash is kept as it is: uncommitted changes
+
+  → wtm-next fast-forward feat/clash --force   fast-forward them anyway
+

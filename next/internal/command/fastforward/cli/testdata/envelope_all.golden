@@ -1,0 +1,226 @@
+{
+  "v": 2,
+  "command": "fast-forward",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "path": "/repo/main",
+        "from": "root",
+        "to": "upstream"
+      }
+    },
+    {
+      "subject": "feat/behind",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-behind",
+        "from": "root",
+        "to": "upstream"
+      }
+    },
+    {
+      "subject": "feat/dirty",
+      "status": "skipped",
+      "reason": "ruled_out",
+      "detail": {}
+    },
+    {
+      "subject": "feat/diverged",
+      "status": "skipped",
+      "reason": "ruled_out",
+      "detail": {}
+    },
+    {
+      "subject": "feat/latest",
+      "status": "done",
+      "reason": "unchanged",
+      "detail": {}
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "main",
+        "path": "/repo/main",
+        "standing": "behind",
+        "origin": {
+          "ahead": 0,
+          "behind": 1,
+          "state": "behind"
+        },
+        "from": "root",
+        "to": "upstream",
+        "blockers": [],
+        "phases": [
+          "fast_forward"
+        ]
+      },
+      {
+        "worktree": "feat/behind",
+        "path": "/repo/wt-feat-behind",
+        "standing": "behind",
+        "origin": {
+          "ahead": 0,
+          "behind": 1,
+          "state": "behind"
+        },
+        "from": "root",
+        "to": "upstream",
+        "blockers": [],
+        "phases": [
+          "fast_forward"
+        ]
+      },
+      {
+        "worktree": "feat/dirty",
+        "path": "/repo/wt-feat-dirty",
+        "standing": "behind",
+        "origin": {
+          "ahead": 0,
+          "behind": 1,
+          "state": "behind"
+        },
+        "from": "root",
+        "to": "upstream",
+        "blockers": [
+          "dirty"
+        ],
+        "phases": []
+      },
+      {
+        "worktree": "feat/diverged",
+        "path": "/repo/wt-feat-diverged",
+        "standing": "diverged",
+        "origin": {
+          "ahead": 1,
+          "behind": 1,
+          "state": "diverged"
+        },
+        "from": "local work",
+        "blockers": [],
+        "phases": []
+      },
+      {
+        "worktree": "feat/latest",
+        "path": "/repo/wt-feat-latest",
+        "standing": "up_to_date",
+        "origin": {
+          "ahead": 0,
+          "behind": 0,
+          "state": "up-to-date"
+        },
+        "from": "root",
+        "blockers": [],
+        "phases": []
+      }
+    ],
+    "force": false,
+    "recap": [
+      {
+        "key": "fast_forward",
+        "label": "Fast-forward",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "main",
+            "params": {
+              "commits": "1"
+            },
+            "text": "main (1 commit)"
+          },
+          {
+            "value": "feat/behind",
+            "params": {
+              "commits": "1"
+            },
+            "text": "feat/behind (1 commit)"
+          }
+        ]
+      },
+      {
+        "key": "up_to_date",
+        "label": "Up to date",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/latest",
+            "text": "feat/latest"
+          }
+        ]
+      },
+      {
+        "key": "left",
+        "label": "Left as is",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/dirty",
+            "note": "dirty",
+            "text": "feat/dirty (uncommitted changes)"
+          },
+          {
+            "value": "feat/diverged",
+            "note": "diverged",
+            "text": "feat/diverged (diverged from origin)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": [
+    {
+      "code": "fast-forward.diverged",
+      "params": {
+        "ahead": "1",
+        "behind": "1",
+        "worktree": "feat/diverged"
+      },
+      "message": "feat/diverged has diverged from origin (1 ahead, 1 behind): left as it is",
+      "follow_up": {
+        "command": "sync",
+        "answers": [
+          {
+            "path": "worktree",
+            "values": [
+              "feat/diverged"
+            ]
+          }
+        ],
+        "code": "fast-forward.sync",
+        "message": "rebase it"
+      }
+    },
+    {
+      "code": "fast-forward.kept",
+      "params": {
+        "blockers": "dirty",
+        "worktree": "feat/dirty"
+      },
+      "message": "feat/dirty is kept as it is: uncommitted changes",
+      "follow_up": {
+        "command": "fast-forward",
+        "answers": [
+          {
+            "path": "worktree",
+            "values": [
+              "feat/dirty"
+            ]
+          },
+          {
+            "path": "force",
+            "values": [
+              "true"
+            ]
+          }
+        ],
+        "code": "fast-forward.force",
+        "message": "fast-forward them anyway"
+      }
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "v": 2,
+  "command": "fast-forward",
+  "ok": true,
+  "op": "<OP>",
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/fp",
+        "path": "<SB>/acme.trees/feat-fp",
+        "standing": "behind",
+        "origin": {
+          "ahead": 0,
+          "behind": 1,
+          "state": "behind"
+        },
+        "from": "<SHA>",
+        "to": "<SHA>",
+        "blockers": [],
+        "phases": [
+          "fast_forward"
+        ]
+      }
+    ],
+    "force": false,
+    "recap": [
+      {
+        "key": "fast_forward",
+        "label": "Fast-forward",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/fp",
+            "params": {
+              "commits": "1"
+            },
+            "text": "feat/fp (1 commit)"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<FP>",
+  "follow_ups": [],
+  "warnings": []
+}

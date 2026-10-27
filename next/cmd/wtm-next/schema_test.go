@@ -77,7 +77,10 @@ func TestEachEnvelopeGoldenOfACommandsCLIMatchesTheSchema(t *testing.T) {
 	for _, golden := range goldens {
 		name := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(golden))))
 		t.Run(name+"_"+strings.TrimSuffix(strings.TrimPrefix(filepath.Base(golden), "envelope_"), ".golden"), func(t *testing.T) {
-			assert.NoError(t, validates(t, defs(name+".envelope"), readFile(t, golden)))
+			// the envelope names its command, which a folder spells without its dash (fast-forward's is fastforward)
+			var envelope struct{ Command string }
+			require.NoError(t, json.Unmarshal(readFile(t, golden), &envelope))
+			assert.NoError(t, validates(t, defs(envelope.Command+".envelope"), readFile(t, golden)))
 		})
 	}
 }

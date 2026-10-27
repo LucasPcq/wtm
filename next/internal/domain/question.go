@@ -37,7 +37,7 @@ const (
 	SkipNoConflict      Skip = "no_conflict"      // nothing conflicts with the target
 	SkipAll             Skip = "all"              // every worktree is read
 	SkipNoOrphan        Skip = "no_orphan"        // no worktree removed leaves a child behind
-	SkipSafe            Skip = "safe"             // every worktree removed is safe to remove: nothing to force
+	SkipSafe            Skip = "safe"             // nothing asked is unsafe: nothing to force
 	SkipNoCandidate     Skip = "no_candidate"     // nothing to pick from: no worktree is done with
 )
 

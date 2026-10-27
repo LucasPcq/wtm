@@ -18,6 +18,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
+	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
@@ -33,15 +34,16 @@ const (
 
 // The openers of the use cases, each wired on the repository of the directory it is given.
 var (
-	openCreate  = opener(func(a app) create.UseCase { return a.Create })
-	openExtract = opener(func(a app) extract.UseCase { return a.Extract })
-	openClean   = opener(func(a app) clean.UseCase { return a.Clean })
-	openPrune   = opener(func(a app) prune.UseCase { return a.Prune })
-	openExec    = opener(func(a app) exec.UseCase { return a.Exec })
-	openList    = opener(func(a app) list.UseCase { return a.List })
-	openResolve = opener(func(a app) resolve.UseCase { return a.Resolve })
-	openStatus  = opener(func(a app) status.UseCase { return a.Status })
-	openTree    = opener(func(a app) tree.UseCase { return a.Tree })
+	openCreate      = opener(func(a app) create.UseCase { return a.Create })
+	openExtract     = opener(func(a app) extract.UseCase { return a.Extract })
+	openClean       = opener(func(a app) clean.UseCase { return a.Clean })
+	openPrune       = opener(func(a app) prune.UseCase { return a.Prune })
+	openFastForward = opener(func(a app) fastforward.UseCase { return a.FastForward })
+	openExec        = opener(func(a app) exec.UseCase { return a.Exec })
+	openList        = opener(func(a app) list.UseCase { return a.List })
+	openResolve     = opener(func(a app) resolve.UseCase { return a.Resolve })
+	openStatus      = opener(func(a app) status.UseCase { return a.Status })
+	openTree        = opener(func(a app) tree.UseCase { return a.Tree })
 )
 
 // opener returns the function that opens the use case useCase picks out of the app wired on the repository of a directory.

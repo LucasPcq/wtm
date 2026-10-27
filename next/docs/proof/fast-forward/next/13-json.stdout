@@ -1,0 +1,56 @@
+{
+  "v": 2,
+  "command": "fast-forward",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/json",
+      "status": "done",
+      "detail": {
+        "path": "<SB>/acme.trees/feat-json",
+        "from": "<SHA>",
+        "to": "<SHA>"
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/json",
+        "path": "<SB>/acme.trees/feat-json",
+        "standing": "behind",
+        "origin": {
+          "ahead": 0,
+          "behind": 1,
+          "state": "behind"
+        },
+        "from": "<SHA>",
+        "to": "<SHA>",
+        "blockers": [],
+        "phases": [
+          "fast_forward"
+        ]
+      }
+    ],
+    "force": false,
+    "recap": [
+      {
+        "key": "fast_forward",
+        "label": "Fast-forward",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/json",
+            "params": {
+              "commits": "1"
+            },
+            "text": "feat/json (1 commit)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

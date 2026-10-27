@@ -1,0 +1,7 @@
+$ wtm fast-forward feat/tty-latest; echo EXIT=$?
+
+┃  = Aborted.
+
+EXIT=19
+$
+

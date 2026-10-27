@@ -1,0 +1,56 @@
+{
+  "v": 2,
+  "command": "fast-forward",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "feat/ff",
+      "status": "done",
+      "detail": {
+        "path": "<root>/.trees/feat-ff",
+        "from": "<id>",
+        "to": "<id>"
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/ff",
+        "path": "<root>/.trees/feat-ff",
+        "standing": "behind",
+        "origin": {
+          "ahead": 0,
+          "behind": 2,
+          "state": "behind"
+        },
+        "from": "<id>",
+        "to": "<id>",
+        "blockers": [],
+        "phases": [
+          "fast_forward"
+        ]
+      }
+    ],
+    "force": false,
+    "recap": [
+      {
+        "key": "fast_forward",
+        "label": "Fast-forward",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/ff",
+            "params": {
+              "commits": "2"
+            },
+            "text": "feat/ff (2 commits)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

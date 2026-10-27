@@ -7,6 +7,7 @@
         "extract",
         "clean",
         "prune",
+        "fast-forward",
         "exec",
         "list",
         "resolve",
@@ -251,7 +252,7 @@
           "type": "integer"
         },
         "origin_state": {
-          "type": "string"
+          "$ref": "#/$defs/worktree.Divergence"
         },
         "path": {
           "type": "string"
@@ -1781,7 +1782,7 @@
           "type": "integer"
         },
         "origin_state": {
-          "type": "string"
+          "$ref": "#/$defs/worktree.Divergence"
         },
         "path": {
           "type": "string"
@@ -2229,6 +2230,257 @@
         ]
       },
       "type": "array"
+    },
+    "fast-forward.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "fast-forward"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/fastforward.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/fastforward.Plan"
+        }
+      }
+    },
+    "fast-forward.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "worktree"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "all"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "force"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "fastforward.Advance": {
+      "additionalProperties": false,
+      "properties": {
+        "blockers": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/fastforward.Blocker"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "from": {
+          "type": "string"
+        },
+        "operation": {
+          "$ref": "#/$defs/worktree.Operation"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/worktree.Origin"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "phases": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/domain.Phase"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standing": {
+          "$ref": "#/$defs/fastforward.Standing"
+        },
+        "to": {
+          "type": "string"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "path",
+        "standing",
+        "origin",
+        "from",
+        "blockers",
+        "phases"
+      ],
+      "type": "object"
+    },
+    "fastforward.Blocker": {
+      "description": "What makes a worktree behind origin unsafe to fast-forward, a safety refusal only force lifts.",
+      "enum": [
+        "dirty"
+      ]
+    },
+    "fastforward.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "fastforward.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "force": {
+          "type": "boolean"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "worktrees": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/fastforward.Advance"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "worktrees",
+        "force"
+      ],
+      "type": "object"
+    },
+    "fastforward.Standing": {
+      "description": "Where a worktree stands for a fast-forward, the first that applies; only behind moves.",
+      "enum": [
+        "missing",
+        "busy",
+        "no_origin",
+        "diverged",
+        "ahead",
+        "up_to_date",
+        "behind"
+      ]
     },
     "list.Changes": {
       "additionalProperties": false,
@@ -4199,6 +4451,15 @@
       ],
       "type": "object"
     },
+    "worktree.Divergence": {
+      "description": "Where a branch stands against origin's branch of the same name.",
+      "enum": [
+        "up-to-date",
+        "behind",
+        "ahead",
+        "diverged"
+      ]
+    },
     "worktree.Meta": {
       "additionalProperties": false,
       "properties": {
@@ -4234,6 +4495,17 @@
       ],
       "type": "object"
     },
+    "worktree.Operation": {
+      "description": "What git stopped in the middle of in a worktree, to continue or abort there.",
+      "enum": [
+        "rebasing",
+        "bisecting",
+        "merging",
+        "cherry_picking",
+        "reverting",
+        "applying"
+      ]
+    },
     "worktree.Origin": {
       "additionalProperties": false,
       "properties": {
@@ -4244,7 +4516,7 @@
           "type": "integer"
         },
         "state": {
-          "type": "string"
+          "$ref": "#/$defs/worktree.Divergence"
         }
       },
       "required": [

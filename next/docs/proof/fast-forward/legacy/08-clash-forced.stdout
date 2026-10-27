@@ -1,0 +1,8 @@
+
+  ✗ 1 failed
+  ✗ feat/clash — git merge --ff-only origin/feat/clash: error: The following untracked working tree files would be overwritten by merge:
+    	clash.txt
+    Please move or remove them before you merge.
+    Aborting
+    Updating <SHA>..<SHA>
+

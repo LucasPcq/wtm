@@ -88,6 +88,19 @@
             ],
             "code": "list.logs",
             "message": "View the logs"
+          },
+          {
+            "command": "fast-forward",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "main"
+                ]
+              }
+            ],
+            "code": "list.fast_forward",
+            "message": "Fast-forward from origin"
           }
         ]
       }
@@ -183,6 +196,19 @@
             ],
             "code": "list.logs",
             "message": "View the logs"
+          },
+          {
+            "command": "fast-forward",
+            "answers": [
+              {
+                "path": "worktree",
+                "values": [
+                  "feat/a"
+                ]
+              }
+            ],
+            "code": "list.fast_forward",
+            "message": "Fast-forward from origin"
           },
           {
             "command": "clean",

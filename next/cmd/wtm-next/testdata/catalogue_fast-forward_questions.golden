@@ -1,0 +1,46 @@
+{
+  "fields": [
+    {
+      "kind": "multi_select",
+      "path": "worktree",
+      "origin": "request",
+      "picked": [
+        "feat/ff"
+      ],
+      "options": [
+        {
+          "value": "main",
+          "tag": "current"
+        },
+        {
+          "value": "feat/ff",
+          "origin": {
+            "ahead": 0,
+            "behind": 0,
+            "state": "up-to-date"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "confirm",
+      "path": "all",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "force",
+      "origin": "default",
+      "skip": "safe",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    }
+  ],
+  "problems": []
+}

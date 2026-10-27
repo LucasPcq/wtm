@@ -1,0 +1,47 @@
+{
+  "v": 2,
+  "command": "fast-forward",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "refused",
+    "code": "fast-forward.unsafe",
+    "message": "nothing fast-forwarded: feat/dirty can't be fast-forwarded safely",
+    "params": {
+      "worktrees": "feat/dirty"
+    },
+    "follow_up": {
+      "command": "fast-forward",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/behind",
+            "feat/dirty"
+          ]
+        },
+        {
+          "path": "force",
+          "values": [
+            "true"
+          ]
+        }
+      ],
+      "code": "fast-forward.force",
+      "message": "fast-forward anyway"
+    },
+    "fields": [
+      {
+        "path": "worktree[1]",
+        "code": "fast-forward.dirty",
+        "params": {
+          "value": "feat/dirty"
+        },
+        "flag": "<worktree>[1]",
+        "message": "feat/dirty has uncommitted changes"
+      }
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+$ wtm fast-forward; echo EXIT=$?
+
+  Step 1/2 • Select worktrees to fast-forward
+
+  Space to toggle, a to select all, / to filter, enter to confirm, esc to cancel.
+
+▌ [ ] already up to date main
+  [ ] 1 commit behind feat/tty-behind
+  [ ] already up to date feat/tty-latest
+  [ ] already up to date feat/tty-ahead
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel
+

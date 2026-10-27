@@ -609,7 +609,7 @@ func TestASourceInTheMiddleOfARebaseIsNotFastForwardedAndSaysSo(t *testing.T) {
 
 	assert.Equal(t, []domain.Warning{{
 		Code:    "create.ff_busy",
-		Message: "couldn't fast-forward feature: its worktree is in the middle of a rebase or a bisect — it starts from your local branch",
+		Message: "couldn't fast-forward feature: its worktree is in the middle of an operation — it starts from your local branch",
 		Params:  domain.Params{"branch": existing},
 	}}, result.Warnings)
 	assert.Equal(t, domain.StatusDone, result.Items[0].Status, result.Items[0].Err)

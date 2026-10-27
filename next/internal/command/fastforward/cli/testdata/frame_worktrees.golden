@@ -1,0 +1,13 @@
+
+  Step 1/4 • Worktrees
+
+  The worktrees to fast-forward, by branch or by path; those behind origin as last fetched are
+  checked
+
+▌› [x] main                                                                                   main
+   [x] feat/behind                                                                        1 behind
+   [ ] feat/dirty                                                                         1 change
+   [ ] feat/diverged                                                             1 ahead, 1 behind
+   [ ] feat/latest
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel

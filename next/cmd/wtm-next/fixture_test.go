@@ -113,6 +113,26 @@ func mutations() []mutation {
 			},
 		},
 		{
+			name:     "fast-forward",
+			answers:  []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/ff"}}},
+			complete: true,
+			setup: func(t *testing.T, main string) {
+				gittest.Git(t, main, "worktree", "add", "-q", "-b", "feat/ff", filepath.Join(filepath.Dir(main), ".trees", "feat-ff"))
+				gittest.PushBranch(t, main, "feat/ff")
+				pushOnOrigin(t, main, "feat/ff")
+			},
+			// origin moved on since: the plan's tip is no longer the one to move to
+			stale: func(t *testing.T, main string) {
+				pushOnOrigin(t, main, "feat/ff")
+			},
+			untouched: func(t *testing.T, main string) {
+				assert.Equal(t, gittest.Output(t, main, "rev-parse", "main"), gittest.Output(t, main, "rev-parse", "feat/ff"))
+			},
+			applied: func(t *testing.T, main string) {
+				assert.Equal(t, gittest.Output(t, main, "rev-parse", "origin/feat/ff"), gittest.Output(t, main, "rev-parse", "feat/ff"))
+			},
+		},
+		{
 			name:    "exec",
 			answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/old"}}, {Path: "command", Values: []string{"touch ran"}}},
 			setup: func(t *testing.T, main string) {
@@ -130,6 +150,16 @@ func mutations() []mutation {
 			},
 		},
 	}
+}
+
+// pushOnOrigin moves origin's branch name on by one commit the repository at main has not fetched, as a teammate's push does.
+func pushOnOrigin(t *testing.T, main, name string) {
+	t.Helper()
+	parent := gittest.Output(t, main, "ls-remote", "origin", "refs/heads/"+name)[:40]
+	gittest.Git(t, main, "fetch", "-q", "origin", name)
+	commit := gittest.Output(t, main, "commit-tree", parent+"^{tree}", "-p", parent, "-m", "pushed")
+	gittest.Git(t, main, "push", "-q", "origin", commit+":refs/heads/"+name)
+	gittest.Git(t, main, "update-ref", "refs/remotes/origin/"+name, parent)
 }
 
 // reads are the commands of the catalogue that change nothing.

@@ -7,17 +7,17 @@ type Condition string
 
 // The conditions of a worktree, the first that applies.
 const (
-	ConditionNoWorktree    Condition = "no_worktree"    // a branch of the stack with no worktree
-	ConditionUnreadable    Condition = "unreadable"     // git could not read it
-	ConditionMissing       Condition = "missing"        // its directory is gone
-	ConditionRebasing      Condition = "rebasing"       // a rebase to finish
-	ConditionBisecting     Condition = "bisecting"      // a bisect to finish
-	ConditionMerging       Condition = "merging"        // a merge to finish
-	ConditionCherryPicking Condition = "cherry_picking" // a cherry-pick to finish
-	ConditionReverting     Condition = "reverting"      // a revert to finish
-	ConditionApplying      Condition = "applying"       // a git am to finish
-	ConditionMerged        Condition = "merged"         // its pull request merged it: only a read that asked GitHub knows it
-	ConditionChanged       Condition = "changed"        // uncommitted changes
+	ConditionNoWorktree    Condition = "no_worktree"                  // a branch of the stack with no worktree
+	ConditionUnreadable    Condition = "unreadable"                   // git could not read it
+	ConditionMissing       Condition = "missing"                      // its directory is gone
+	ConditionRebasing      Condition = Condition(OperationRebase)     // a rebase to finish
+	ConditionBisecting     Condition = Condition(OperationBisect)     // a bisect to finish
+	ConditionMerging       Condition = Condition(OperationMerge)      // a merge to finish
+	ConditionCherryPicking Condition = Condition(OperationCherryPick) // a cherry-pick to finish
+	ConditionReverting     Condition = Condition(OperationRevert)     // a revert to finish
+	ConditionApplying      Condition = Condition(OperationApply)      // a git am to finish
+	ConditionMerged        Condition = "merged"                       // its pull request merged it: only a read that asked GitHub knows it
+	ConditionChanged       Condition = "changed"                      // uncommitted changes
 	ConditionClean         Condition = "clean"
 )
 

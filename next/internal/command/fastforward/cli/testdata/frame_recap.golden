@@ -1,0 +1,19 @@
+
+  Step 4/4 • Confirm
+
+  ✓ Worktrees: main, feat/behind
+  · All — only --all asks every worktree
+  · Force — no worktree named behind origin has uncommitted changes
+
+  ┃  Review & confirm
+  ┃
+  ┃  Fast-forward  main (1 commit), feat/behind (1 commit)
+  ┃  Left as is    feat/dirty (uncommitted changes)
+  ┃
+  ┃  ! feat/dirty is kept as it is: uncommitted changes
+
+▌› Yes, fast-forward 2 worktrees
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back

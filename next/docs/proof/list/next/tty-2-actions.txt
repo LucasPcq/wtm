@@ -10,6 +10,7 @@ $ wtm list; echo EXIT=$?
    Start the profile
    Stop the profile
    View the logs
+   Fast-forward from origin
    Clean (delete the worktree)
 
   ↑↓ navigate • / filter • enter confirm • esc back

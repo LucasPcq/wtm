@@ -179,6 +179,7 @@ type upstreamSeed struct {
 	Linked   bool
 	Dirty    bool
 	Rebasing bool
+	Midway   worktree.Midway
 }
 
 // behindOrigin builds upstream, existing checked out in a linked worktree (dirty
@@ -200,6 +201,9 @@ func behindOrigin(t *testing.T, seed upstreamSeed) upstream {
 	}
 	if seed.Rebasing {
 		params.Worktrees[0].State = worktree.Rebasing{Branch: existing}
+	}
+	if seed.Midway != "" {
+		params.Worktrees[0].Midway = seed.Midway
 	}
 	if seed.Dirty {
 		params.Dirty = []string{linked}

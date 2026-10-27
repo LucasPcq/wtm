@@ -179,6 +179,7 @@ const (
 	CodeMissing          = Name + ".missing"
 	CodeMerged           = Name + ".merged"
 	CodeBehind           = Name + ".behind"
+	CodeBehindOrigin     = Name + ".behind_origin"
 	CodeEnvMissing       = Name + ".env_missing"
 	CodeIsolationPending = Name + ".isolation_pending"
 	CodeJobCrashed       = Name + ".job_crashed"
@@ -268,7 +269,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Env:       f.envOf(w, state),
 	}
 	detail.Condition = worktree.ConditionOf(worktree.ConditionParams{Missing: state.Missing, Operation: w.Operation(), Merged: merged, Dirty: len(state.Changes) > 0})
-	detail.Problems = Problems(ProblemsParams{Branch: branch, Path: w.Path, Gone: state.Missing, Merged: merged, Parent: parent, Lacks: state.Lacks, Sync: w.NeedsSync(&state.Lacks), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
+	detail.Problems = Problems(ProblemsParams{Branch: branch, Path: w.Path, Gone: state.Missing, Merged: merged, BehindOrigin: behindOrigin(detail.Origin), Parent: parent, Lacks: state.Lacks, Sync: w.NeedsSync(&state.Lacks), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
 
 	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
 	if len(state.Unread) > 0 {
@@ -584,18 +585,19 @@ type Missing struct {
 	From   Rebuild
 }
 
-// ProblemsParams are what a worktree has to fix: its branch, which every fix names, empty on none; its path, by which clean names it on no branch; whether its directory is gone, whether its merged pull request leaves it to be cleaned, the commits of its parent it lacks and whether it is to sync onto it (worktree.Worktree.NeedsSync), the .env files it lacks, whether it has yet to choose its isolation, and its jobs.
+// ProblemsParams are what a worktree has to fix: its branch, which every fix names, empty on none; its path, by which clean names it on no branch; whether its directory is gone, whether its merged pull request leaves it to be cleaned, the commits origin has that it lacks, the commits of its parent it lacks and whether it is to sync onto it (worktree.Worktree.NeedsSync), the .env files it lacks, whether it has yet to choose its isolation, and its jobs.
 type ProblemsParams struct {
-	Branch  string
-	Path    string
-	Gone    bool
-	Merged  bool
-	Parent  string
-	Lacks   int // the commits of Parent the worktree lacks
-	Sync    bool
-	Missing []Missing
-	Pending bool
-	Jobs    []Job
+	Branch       string
+	Path         string
+	Gone         bool
+	Merged       bool
+	BehindOrigin int // the commits origin's branch has that it lacks, while it lacks none of its own
+	Parent       string
+	Lacks        int // the commits of Parent the worktree lacks
+	Sync         bool
+	Missing      []Missing
+	Pending      bool
+	Jobs         []Job
 }
 
 // The commands and the answers of the fixes, as the legacy wtm runs them until they migrate.
@@ -609,7 +611,7 @@ const (
 	pathDetach        = "detach"
 )
 
-// Problems are the problems of params, each with its fix: a gone directory alone, since only cleaning the worktree fixes it, by its path on no branch; nothing else on no branch, since every fix names a branch; else a merged pull request first, since cleaning the worktree makes every other fix moot, then the commits its parent has when it is to sync onto it, then each missing .env file, then a pending isolation, then each crashed job, whose fix starts it again in the worktree that runs it, a shared job's owner.
+// Problems are the problems of params, each with its fix: a gone directory alone, since only cleaning the worktree fixes it, by its path on no branch; nothing else on no branch, since every fix names a branch; else a merged pull request first, since cleaning the worktree makes every other fix moot, then the commits origin has, fast-forwarded before a sync onto the parent rebases what origin would bring, then the commits its parent has when it is to sync onto it, then each missing .env file, then a pending isolation, then each crashed job, whose fix starts it again in the worktree that runs it, a shared job's owner.
 func Problems(params ProblemsParams) []Problem {
 	if params.Gone {
 		return []Problem{{Code: CodeMissing, Message: "its directory is gone", Fix: fix(CodeMissing, "remove what is left of it", domain.CommandClean, cmp.Or(params.Branch, params.Path))}}
@@ -621,6 +623,9 @@ func Problems(params ProblemsParams) []Problem {
 	}
 	if params.Merged {
 		problems = append(problems, Problem{Code: CodeMerged, Message: "its pull request is merged", Fix: mergedFix(params.Branch)})
+	}
+	if params.BehindOrigin > 0 {
+		problems = append(problems, Problem{Code: CodeBehindOrigin, Message: "origin has " + commits(params.BehindOrigin) + " it lacks", Fix: fix(CodeBehindOrigin, "fast-forward it", domain.CommandFastForward, params.Branch)})
 	}
 	if params.Sync {
 		problems = append(problems, Problem{Code: CodeBehind, Message: params.Parent + " has " + commits(params.Lacks) + " it lacks", Fix: fix(CodeBehind, "sync it onto "+params.Parent, commandSync, params.Branch)})
@@ -671,6 +676,14 @@ func missingProblem(subject string, missing Missing) Problem {
 // fix is the follow-up that runs command on the worktree subject with answers, saying what it does with message.
 func fix(code, message, command, subject string, answers ...domain.Answered) *domain.FollowUp {
 	return &domain.FollowUp{Command: command, Answers: append([]domain.Answered{{Path: domain.PathWorktree, Values: []string{subject}}}, answers...), Code: code, Message: message}
+}
+
+// behindOrigin is the commits origin has that its branch lacks, none unless that is all that sets them apart: a diverged branch is not fast-forwarded.
+func behindOrigin(origin *worktree.Origin) int {
+	if origin == nil || origin.State != worktree.Behind {
+		return 0
+	}
+	return origin.Behind
 }
 
 func commits(n int) string {

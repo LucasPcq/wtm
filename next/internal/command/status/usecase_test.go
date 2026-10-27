@@ -397,14 +397,14 @@ func TestAMergedPullRequestOfTheMainWorktreeOrTheBaseBranchIsNoProblem(t *testin
 }
 
 func TestAMergedPullRequestAsksToCleanABranchBehindItsHeadButNotOneMovedOnOrApart(t *testing.T) {
-	clean := []string{status.CodeMerged}
+	behind := []string{status.CodeBehindOrigin}
 	cases := map[string]struct {
 		head     string
 		problems []string
 	}{
-		"behind":       {head: "a2", problems: clean},
-		"moved_on":     {head: gittest.Root},
-		"never_pulled": {head: "a commit never fetched"},
+		"behind":       {head: "a2", problems: []string{status.CodeMerged, status.CodeBehindOrigin}},
+		"moved_on":     {head: gittest.Root, problems: behind},
+		"never_pulled": {head: "a commit never fetched", problems: behind},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -424,11 +424,29 @@ func TestAMergedPullRequestAsksToCleanABranchBehindItsHeadButNotOneMovedOnOrApar
 
 			assert.Equal(t, worktree.PullRequestMerged, a.Review.State)
 			assert.Equal(t, c.problems, problemCodes(a.Problems))
-			if c.problems != nil {
+			if c.problems[0] == status.CodeMerged {
 				assert.Equal(t, &domain.FollowUp{Command: domain.CommandPrune, Code: status.CodeMerged, Message: "prune it", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}, a.Problems[0].Fix)
 			}
 		})
 	}
+}
+
+func TestABranchDivergedFromOriginIsNotOfferedAFastForward(t *testing.T) {
+	w := newWorld(seed{
+		Git: gittest.FakeParams{
+			Remote:    []string{"feat/a"},
+			Worktrees: []worktree.Worktree{linked("feat/a")},
+			Commits: map[worktree.Ref][]string{
+				worktree.LocalBranch{Name: "feat/a"}:  {"mine"},
+				worktree.RemoteBranch{Name: "feat/a"}: {"theirs"},
+			},
+		},
+	})
+
+	a := only(t, read(t, w, status.Request{Worktree: "feat/a"}))
+
+	assert.Equal(t, worktree.Diverged, a.Origin.State)
+	assert.NotContains(t, problemCodes(a.Problems), status.CodeBehindOrigin)
 }
 
 func TestGitHubIsAskedOfTheBranchesReadOnly(t *testing.T) {

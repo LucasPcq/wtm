@@ -1,0 +1,9 @@
+$ wtm fast-forward; echo EXIT=$?
+
+┃  ✓ fast-forward: 1 done
+┃
+┃  Fast-forward  feat/tty-behind (1 commit)
+
+EXIT=0
+$
+

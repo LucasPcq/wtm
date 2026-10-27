@@ -1,0 +1,16 @@
+[
+  {
+    "branch": "feat/uptodate",
+    "status": "already up to date",
+    "old_tip": "<SHA>",
+    "new_tip": "<SHA>",
+    "behind": 0
+  },
+  {
+    "branch": "feat/uptodate",
+    "status": "already up to date",
+    "old_tip": "<SHA>",
+    "new_tip": "<SHA>",
+    "behind": 0
+  }
+]
