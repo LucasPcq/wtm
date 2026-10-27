@@ -93,17 +93,18 @@ func (s FieldSpec) Spec() FieldSpec {
 	return s
 }
 
-// SelectField asks one of its options; Pinned is the option listed first, Remembered the answer remembered for it, Remember whether this run's answer is to be, Refreshable whether its options are facts the user may read again while it is asked, Closed whether its options are every value it accepts, the same in every repository, so a surface may word each one its own way.
+// SelectField asks one of its options; Pinned is the option listed first, Remembered the answer remembered for it, Remember whether this run's answer is to be, Refreshable whether its options are facts the user may read again while it is asked, Closed whether its options are every value it accepts, the same in every repository, so a surface may word each one its own way; Refused are the values it leaves out of its options, each as the problem it would raise if given.
 type SelectField struct {
 	FieldSpec
-	Value        string   `json:"value"`
-	Options      []Option `json:"options"`
-	Pinned       string   `json:"pinned,omitempty"`
-	Remembered   string   `json:"remembered,omitempty"`
-	Rememberable bool     `json:"rememberable"`
-	Remember     bool     `json:"remember"`
-	Refreshable  bool     `json:"refreshable"`
-	Closed       bool     `json:"closed"`
+	Value        string       `json:"value"`
+	Options      []Option     `json:"options"`
+	Pinned       string       `json:"pinned,omitempty"`
+	Remembered   string       `json:"remembered,omitempty"`
+	Rememberable bool         `json:"rememberable"`
+	Remember     bool         `json:"remember"`
+	Refreshable  bool         `json:"refreshable"`
+	Closed       bool         `json:"closed"`
+	Refused      []FieldError `json:"refused,omitempty"`
 }
 
 // MultiSelectField asks any of its options.

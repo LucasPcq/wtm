@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/status"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 
 	"github.com/stretchr/testify/assert"
@@ -56,4 +57,31 @@ func TestNothingToFixIsNoProblemNotNull(t *testing.T) {
 func TestTheCommitsOfItsParentAreAProblemOnlyOfAWorktreeToSync(t *testing.T) {
 	assert.Equal(t, []status.Problem{}, status.Problems(status.ProblemsParams{Branch: "feat/a", Parent: "main", Lacks: 2}))
 	assert.Len(t, status.Problems(status.ProblemsParams{Branch: "feat/a", Parent: "main", Lacks: 2, Sync: true}), 1)
+}
+
+func TestAParentGoneOrACycleIsFixedByMovingOntoTheBaseBranch(t *testing.T) {
+	cases := map[string]struct {
+		params  status.ProblemsParams
+		code    status.ProblemCode
+		message string
+	}{
+		"parent_gone": {params: status.ProblemsParams{Branch: "feat/a", Parent: "feat/deleted", ParentGone: true, Onto: "main"}, code: status.CodeParentGone, message: "its parent feat/deleted no longer exists"},
+		"cycle":       {params: status.ProblemsParams{Branch: "feat/a", Cycle: true, Onto: "main"}, code: status.CodeCycle, message: "its parents lead back to it"},
+		"no_base":     {params: status.ProblemsParams{Branch: "feat/a", Cycle: true}},
+		"base_itself": {params: status.ProblemsParams{Branch: "main", Cycle: true, Onto: "main"}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			problems := status.Problems(c.params)
+
+			if c.code == "" {
+				assert.Empty(t, problems)
+				return
+			}
+			assert.Len(t, problems, 1)
+			assert.Equal(t, c.code, problems[0].Code)
+			assert.Equal(t, c.message, problems[0].Message)
+			assert.Equal(t, &domain.FollowUp{Command: domain.CommandReparent, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "to", Values: []string{"main"}}}, Code: string(c.code), Message: "move it onto main"}, problems[0].Fix)
+		})
+	}
 }

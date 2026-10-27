@@ -18,6 +18,8 @@ const calloutOf: Record<StatusProblemCode, { tone: Tone; icon: LucideIcon; conse
     consequence: 'Its branch and its record go with it; the remote branch stays.',
   },
   'status.merged': { tone: 'suggestion', icon: GitMerge, consequence: null },
+  'status.parent_gone': { tone: 'problem', icon: TriangleAlert, consequence: null },
+  'status.cycle': { tone: 'problem', icon: TriangleAlert, consequence: null },
   'status.behind_origin': { tone: 'suggestion', icon: FastForward, consequence: null },
   'status.behind': { tone: 'suggestion', icon: ArrowDownToLine, consequence: null },
   'status.env_missing': { tone: 'problem', icon: TriangleAlert, consequence: null },

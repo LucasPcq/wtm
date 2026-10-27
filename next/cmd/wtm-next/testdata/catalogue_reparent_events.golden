@@ -1,0 +1,37 @@
+[
+  {
+    "type": "operation.started",
+    "command": "reparent",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "feat/b"
+  },
+  {
+    "type": "worktree.updated",
+    "worktree": {
+      "branch": "feat/b",
+      "path": "<root>/.trees/feat-b",
+      "parent": "feat/a",
+      "ordinal": null,
+      "isolation": "isolated",
+      "is_main": false,
+      "created_at": ""
+    },
+    "changed": [
+      "parent"
+    ]
+  },
+  {
+    "type": "unit.finished",
+    "subject": "feat/b",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "reparent",
+    "surface": "api",
+    "ok": true
+  }
+]

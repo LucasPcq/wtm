@@ -2,6 +2,7 @@ package worktree
 
 import (
 	"cmp"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 // Stack is the repository's worktrees as a forest, each under the branch it was created from. A node is a live worktree on a branch; a parent with no live worktree, deleted or never managed, is a virtual root holding its children.
 type Stack struct {
 	parents  map[string]string
+	recorded map[string]string // every parent recorded, those of a cycle's members included
 	children map[string][]string
 	roots    []string
 	steps    map[string]bool
@@ -40,6 +42,7 @@ func StackOf(worktrees []Worktree, records map[string]Meta, base string) Stack {
 		}
 	}
 
+	stack.recorded = maps.Clone(stack.parents)
 	for branch := range stack.parents {
 		if members, loops := stack.cycleThrough(branch); loops {
 			stack.cycles[branch] = members
@@ -103,6 +106,29 @@ func (s Stack) Virtual(branch string) bool {
 func (s Stack) InCycle(branch string) bool {
 	_, loops := s.cycles[branch]
 	return loops
+}
+
+// Within returns the one of moving that branch is or sits under, following every parent recorded, a cycle's members and the base branch's included; "" when none: moving them onto branch closes a cycle exactly then. A cycle out of moving's reach ends the walk and refuses nothing, nor does a worktree on no branch, which is no node.
+func (s Stack) Within(branch string, moving []string) string {
+	seen := map[string]bool{}
+	for at, ok := branch, true; ok && !seen[at]; at, ok = s.recorded[at] {
+		if slices.Contains(moving, at) {
+			return at
+		}
+		seen[at] = true
+	}
+
+	return ""
+}
+
+// Ancestors returns the branches branch sits under, its parent first, up to its root.
+func (s Stack) Ancestors(branch string) []string {
+	var found []string
+	for parent, ok := s.parents[branch]; ok; parent, ok = s.parents[parent] {
+		found = append(found, parent)
+	}
+
+	return found
 }
 
 // Cascade returns roots and the branches under them to rebase, each parent before its children, level by level from the stack's roots whatever the order roots are given in: the main worktree, the base branch and virtual roots are never a step. A member of a cycle among roots refuses the cascade with a *CycleError (a cycle's members being roots, roots is the only way to reach one); a cycle out of reach does not, where the legacy sync refuses any cycle: whether it should is sync's migration to decide.

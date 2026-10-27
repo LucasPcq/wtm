@@ -8,6 +8,6 @@
   ! feat/child still points at the removed parent feat/parent
   ! feat/child2 still points at the removed parent feat/parent
 
-  → wtm reparent feat/child --to main    move it onto main
-  → wtm reparent feat/child2 --to main   move it onto main
+  → wtm-next reparent feat/child --to main    move it onto main
+  → wtm-next reparent feat/child2 --to main   move it onto main
 

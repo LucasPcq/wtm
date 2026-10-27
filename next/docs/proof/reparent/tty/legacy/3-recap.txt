@@ -1,0 +1,18 @@
+$ wtm reparent; echo EXIT=$?
+
+  Step 3/3 • Confirm & reparent
+
+  ✓ Worktrees: feat/b
+  ✓ New parent: main
+
+  ┃  Review & confirm
+  ┃
+  ┃  Worktree:    feat/b
+  ┃  Parent:      feat/a  →  main
+
+▌▸ Yes, reparent
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

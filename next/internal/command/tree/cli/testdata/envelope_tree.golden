@@ -26,6 +26,7 @@
         "missing": false,
         "condition": "clean",
         "cycle": false,
+        "parent_gone": false,
         "origin": {
           "ahead": 1,
           "behind": 0,
@@ -130,6 +131,11 @@
             "refused": "main_worktree"
           },
           {
+            "action": "reparent",
+            "follow_up": null,
+            "refused": "main_worktree"
+          },
+          {
             "action": "clean",
             "follow_up": null,
             "refused": "main_worktree"
@@ -157,6 +163,7 @@
         "missing": false,
         "condition": "changed",
         "cycle": false,
+        "parent_gone": false,
         "origin": {
           "ahead": 3,
           "behind": 0,
@@ -286,6 +293,23 @@
             "refused": null
           },
           {
+            "action": "reparent",
+            "follow_up": {
+              "command": "reparent",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "tree.reparent",
+              "message": "Change the parent"
+            },
+            "refused": null
+          },
+          {
             "action": "clean",
             "follow_up": {
               "command": "clean",
@@ -325,6 +349,7 @@
         "missing": false,
         "condition": "clean",
         "cycle": false,
+        "parent_gone": false,
         "origin": null,
         "pr": null,
         "services": [],
@@ -421,6 +446,23 @@
               ],
               "code": "tree.sync",
               "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "reparent",
+            "follow_up": {
+              "command": "reparent",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui"
+                  ]
+                }
+              ],
+              "code": "tree.reparent",
+              "message": "Change the parent"
             },
             "refused": null
           },
@@ -462,6 +504,7 @@
         "missing": false,
         "condition": "clean",
         "cycle": false,
+        "parent_gone": false,
         "origin": null,
         "pr": null,
         "services": [],
@@ -562,6 +605,23 @@
             "refused": null
           },
           {
+            "action": "reparent",
+            "follow_up": {
+              "command": "reparent",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui-copy"
+                  ]
+                }
+              ],
+              "code": "tree.reparent",
+              "message": "Change the parent"
+            },
+            "refused": null
+          },
+          {
             "action": "clean",
             "follow_up": {
               "command": "clean",
@@ -599,6 +659,7 @@
         "missing": false,
         "condition": "merged",
         "cycle": false,
+        "parent_gone": false,
         "origin": null,
         "pr": {
           "number": 9,
@@ -710,6 +771,23 @@
             "refused": null
           },
           {
+            "action": "reparent",
+            "follow_up": {
+              "command": "reparent",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "tree.reparent",
+              "message": "Change the parent"
+            },
+            "refused": null
+          },
+          {
             "action": "clean",
             "follow_up": {
               "command": "clean",
@@ -747,6 +825,7 @@
         "missing": false,
         "condition": "rebasing",
         "cycle": false,
+        "parent_gone": false,
         "origin": null,
         "pr": null,
         "services": [],
@@ -843,6 +922,23 @@
               ],
               "code": "tree.sync",
               "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "reparent",
+            "follow_up": {
+              "command": "reparent",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "rebasing"
+                  ]
+                }
+              ],
+              "code": "tree.reparent",
+              "message": "Change the parent"
             },
             "refused": null
           },
@@ -884,6 +980,7 @@
         "missing": true,
         "condition": "missing",
         "cycle": false,
+        "parent_gone": false,
         "origin": null,
         "pr": null,
         "services": [],
@@ -920,6 +1017,11 @@
           },
           {
             "action": "sync",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "reparent",
             "follow_up": null,
             "refused": "missing"
           },
@@ -961,6 +1063,7 @@
         "missing": false,
         "condition": "clean",
         "cycle": true,
+        "parent_gone": false,
         "origin": null,
         "pr": null,
         "services": [],
@@ -1057,6 +1160,23 @@
               ],
               "code": "tree.sync",
               "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "reparent",
+            "follow_up": {
+              "command": "reparent",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "y"
+                  ]
+                }
+              ],
+              "code": "tree.reparent",
+              "message": "Change the parent"
             },
             "refused": null
           },
@@ -1098,6 +1218,7 @@
         "missing": false,
         "condition": "clean",
         "cycle": true,
+        "parent_gone": false,
         "origin": null,
         "pr": null,
         "services": [],
@@ -1194,6 +1315,23 @@
               ],
               "code": "tree.sync",
               "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "reparent",
+            "follow_up": {
+              "command": "reparent",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "z"
+                  ]
+                }
+              ],
+              "code": "tree.reparent",
+              "message": "Change the parent"
             },
             "refused": null
           },
@@ -1237,6 +1375,7 @@
         "missing": false,
         "condition": "no_worktree",
         "cycle": false,
+        "parent_gone": false,
         "origin": null,
         "pr": null,
         "services": null,
@@ -1261,6 +1400,7 @@
         "missing": false,
         "condition": "clean",
         "cycle": false,
+        "parent_gone": true,
         "origin": null,
         "pr": null,
         "services": [],
@@ -1357,6 +1497,23 @@
               ],
               "code": "tree.sync",
               "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "reparent",
+            "follow_up": {
+              "command": "reparent",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/x"
+                  ]
+                }
+              ],
+              "code": "tree.reparent",
+              "message": "Change the parent"
             },
             "refused": null
           },

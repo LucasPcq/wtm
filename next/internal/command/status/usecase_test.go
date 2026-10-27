@@ -602,6 +602,8 @@ func TestAWorktreeBehindItsParentIsToldToSyncOntoItUnlessGitStoppedInTheMiddleOf
 		"bisecting":           {meta: childOfA, ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Bisecting{Branch: "feat/a-ui"}}, want: []string{}},
 		"merging":             {meta: childOfA, ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Midway: worktree.MidwayMerge}, want: []string{}},
 		"reverting":           {meta: childOfA, ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Midway: worktree.MidwayRevert}, want: []string{}},
+		"parent_gone":         {meta: map[string]worktree.Meta{"feat/a-ui": {SourceBranch: "feat/deleted"}}, ui: linked("feat/a-ui"), want: []string{string(status.CodeParentGone)}},
+		"cycle":               {meta: map[string]worktree.Meta{"feat/a": {SourceBranch: "feat/a-ui"}, "feat/a-ui": {SourceBranch: "feat/a"}}, ui: linked("feat/a-ui"), want: []string{string(status.CodeCycle)}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

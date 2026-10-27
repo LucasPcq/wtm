@@ -179,13 +179,15 @@ type ProblemCode string
 
 // ProblemCodes returns every ProblemCode, in the order Problems ranks them.
 func ProblemCodes() []ProblemCode {
-	return []ProblemCode{CodeMissing, CodeMerged, CodeBehindOrigin, CodeBehind, CodeEnvMissing, CodeIsolationPending, CodeJobCrashed}
+	return []ProblemCode{CodeMissing, CodeMerged, CodeParentGone, CodeCycle, CodeBehindOrigin, CodeBehind, CodeEnvMissing, CodeIsolationPending, CodeJobCrashed}
 }
 
 // The codes of status's problems.
 const (
 	CodeMissing          ProblemCode = "status.missing"
 	CodeMerged           ProblemCode = "status.merged"
+	CodeParentGone       ProblemCode = "status.parent_gone"
+	CodeCycle            ProblemCode = "status.cycle"
 	CodeBehindOrigin     ProblemCode = "status.behind_origin"
 	CodeBehind           ProblemCode = "status.behind"
 	CodeEnvMissing       ProblemCode = "status.env_missing"
@@ -281,7 +283,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Env:       f.envOf(w, state),
 	}
 	detail.Condition = worktree.ConditionOf(worktree.ConditionParams{Missing: state.Missing, Operation: w.Operation(), Merged: merged, Dirty: len(state.Changes) > 0})
-	detail.Problems = Problems(ProblemsParams{Branch: branch, Path: w.Path, Gone: state.Missing, Merged: merged, BehindOrigin: behindOrigin(detail.Origin), Parent: parent, Lacks: state.Lacks, Sync: w.NeedsSync(&state.Lacks), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
+	detail.Problems = Problems(ProblemsParams{Branch: branch, Path: w.Path, Gone: state.Missing, Merged: merged, BehindOrigin: behindOrigin(detail.Origin), Parent: parent, ParentGone: f.ParentGone(parent), Cycle: f.Stack.InCycle(branch), Onto: f.ExistingBase(), Lacks: state.Lacks, Sync: w.NeedsSync(&state.Lacks), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
 
 	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
 	if len(state.Unread) > 0 {
@@ -597,12 +599,15 @@ type Missing struct {
 	From   Rebuild
 }
 
-// ProblemsParams are what a worktree has to fix: its branch, which every fix names, empty on none; its path, by which clean names it on no branch; whether its directory is gone, whether its merged pull request leaves it to be cleaned, the commits origin has that it lacks, the commits of its parent it lacks and whether it is to sync onto it (worktree.Worktree.NeedsSync), the .env files it lacks, whether it has yet to choose its isolation, and its jobs.
+// ProblemsParams are what a worktree has to fix: its branch, which every fix names, empty on none; its path, by which clean names it on no branch; whether its directory is gone, whether its merged pull request leaves it to be cleaned, whether its parent is no branch any more or its parents lead back to it, and the base branch it then moves onto ("" when that is no branch either), the commits origin has that it lacks, the commits of its parent it lacks and whether it is to sync onto it (worktree.Worktree.NeedsSync), the .env files it lacks, whether it has yet to choose its isolation, and its jobs.
 type ProblemsParams struct {
 	Branch       string
 	Path         string
 	Gone         bool
 	Merged       bool
+	ParentGone   bool
+	Cycle        bool
+	Onto         string
 	BehindOrigin int // the commits origin's branch has that it lacks, while it lacks none of its own
 	Parent       string
 	Lacks        int // the commits of Parent the worktree lacks
@@ -623,7 +628,7 @@ const (
 	pathDetach        = "detach"
 )
 
-// Problems are the problems of params, each with its fix: a gone directory alone, since only cleaning the worktree fixes it, by its path on no branch; nothing else on no branch, since every fix names a branch; else a merged pull request first, since cleaning the worktree makes every other fix moot, then the commits origin has, fast-forwarded before a sync onto the parent rebases what origin would bring, then the commits its parent has when it is to sync onto it, then each missing .env file, then a pending isolation, then each crashed job, whose fix starts it again in the worktree that runs it, a shared job's owner.
+// Problems are the problems of params, each with its fix: a gone directory alone, since only cleaning the worktree fixes it, by its path on no branch; nothing else on no branch, since every fix names a branch; else a merged pull request first, since cleaning the worktree makes every other fix moot, then a parent gone or a cycle, which only a new parent fixes, then the commits origin has, fast-forwarded before a sync onto the parent rebases what origin would bring, then the commits its parent has when it is to sync onto it, then each missing .env file, then a pending isolation, then each crashed job, whose fix starts it again in the worktree that runs it, a shared job's owner.
 func Problems(params ProblemsParams) []Problem {
 	if params.Gone {
 		return []Problem{{Code: CodeMissing, Message: "its directory is gone", Fix: fix(CodeMissing, "remove what is left of it", domain.CommandClean, cmp.Or(params.Branch, params.Path))}}
@@ -635,6 +640,9 @@ func Problems(params ProblemsParams) []Problem {
 	}
 	if params.Merged {
 		problems = append(problems, Problem{Code: CodeMerged, Message: "its pull request is merged", Fix: mergedFix(params.Branch)})
+	}
+	if problem, ok := parentProblem(params); ok {
+		problems = append(problems, problem)
 	}
 	if params.BehindOrigin > 0 {
 		problems = append(problems, Problem{Code: CodeBehindOrigin, Message: "origin has " + commits(params.BehindOrigin) + " it lacks", Fix: fix(CodeBehindOrigin, "fast-forward it", domain.CommandFastForward, params.Branch)})
@@ -668,6 +676,25 @@ func Problems(params ProblemsParams) []Problem {
 	}
 
 	return problems
+}
+
+// parentProblem is the problem of a worktree sync cannot rebase, its parent gone or its parents leading back to it, fixed by moving it onto the base branch; none when it has neither, or no base branch to move onto.
+func parentProblem(params ProblemsParams) (Problem, bool) {
+	if params.Onto == "" || params.Onto == params.Branch {
+		return Problem{}, false
+	}
+
+	fixed := func(code ProblemCode, message string) (Problem, bool) {
+		return Problem{Code: code, Message: message, Fix: fix(code, "move it onto "+params.Onto, domain.CommandReparent, params.Branch, domain.Answered{Path: domain.PathTo, Values: []string{params.Onto}})}, true
+	}
+	switch {
+	case params.ParentGone:
+		return fixed(CodeParentGone, "its parent "+params.Parent+" no longer exists")
+	case params.Cycle:
+		return fixed(CodeCycle, "its parents lead back to it")
+	}
+
+	return Problem{}, false
 }
 
 func missingProblem(subject string, missing Missing) Problem {

@@ -1,0 +1,92 @@
+{
+  "v": 2,
+  "command": "reparent",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "path": "<SB>/acme.trees/feat-b",
+        "from": "main",
+        "to": "feat/a"
+      }
+    }
+  ],
+  "plan": {
+    "moves": [
+      {
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "from": "main",
+        "parent_gone": false,
+        "to": "feat/a"
+      }
+    ],
+    "to": "feat/a",
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/b",
+            "params": {
+              "from": "main",
+              "to": "feat/a"
+            },
+            "text": "feat/b (main → feat/a)"
+          }
+        ]
+      },
+      {
+        "key": "to",
+        "label": "New parent",
+        "path": "to",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "sync",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        }
+      ],
+      "code": "reparent.sync",
+      "message": "rebase onto the new parent"
+    },
+    {
+      "command": "reparent",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        },
+        {
+          "path": "to",
+          "values": [
+            "main"
+          ]
+        }
+      ],
+      "code": "reparent.undo",
+      "message": "move feat/b back onto main"
+    }
+  ],
+  "warnings": []
+}

@@ -22,6 +22,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./prune.sh "$wtm" "$next" prune
 ./fast-forward.sh "$wtm" "$next" fast-forward
 ./exec.sh "$wtm" "$next" exec
+./reparent.sh "$wtm" "$next" reparent
 ./ui.sh "$next" ui
 git diff --stat .
 ```
@@ -451,7 +452,7 @@ The reference is the legacy `wtm fast-forward` of 0.30.1. Its output differs by 
   - 21: legacy refuses a run naming no worktree without a terminal (exit 1); next fast-forwards the worktrees behind origin, its default pick, the dirty one kept (exit 0), an owner decision shared with prune.
   - 17 to 20: legacy has no dry run nor fingerprint (exit 2).
   - Next fetches origin once (`git fetch origin`) per run, before it plans, a dry run included, where legacy fetched each branch as it checked it; a fetch that fails is a warning (`fast-forward.fetch_failed`) and the plan stands on origin as last fetched. Each worktree then moves exactly to the commit the plan names, which the fingerprint covers, with no second fetch: a push to origin since the plan is left for the next run. Next takes each worktree's lock, and its first Ctrl+C lets the worktree being moved finish.
-  - The tty: legacy's picker checks nothing, tags each worktree before its name and lists them in no stable order (the script picks every one); next's checks those behind origin as last fetched, a dirty one left out, and confirmed as it was it is the command's choice: the request names none, and the plan is the worktrees behind origin, a dirty one kept. Next asks a `Force` step only when a named worktree is unsafe, then a recap whose button names what moves (`Yes, fast-forward feat/tty-behind`). Esc reads `✗ interrupted`, exit 19, as every next command.
+  - The tty: legacy's picker checks nothing, tags each worktree before its name and lists them in no stable order (the script picks every one); next's checks those behind origin as last fetched, a dirty one left out, and confirmed as it was it is the command's choice: the request names none, and the plan is the worktrees behind origin, a dirty one kept. Next asks a `Force` step only when a named worktree is unsafe, then a recap whose button names what moves (`Yes, fast-forward feat/tty-behind`). `fast-forward feat/tty-latest`, up to date: legacy asks to confirm a plan that moves nothing (left with esc, exit 19); next asks nothing and ends on `= fast-forward: 1 unchanged`, `Up to date  feat/tty-latest`, exit 0, as prune and reparent end a plan that changes nothing (4).
 
 # Proof: `wtm exec` (legacy `flow/exec`) vs `wtm-next exec`
 
@@ -484,6 +485,40 @@ The reference is the legacy `wtm exec` of 0.30.1. Its output differs by design (
   - 16 to 18: legacy has no dry run nor fingerprint (exit 2); next shows the plan, its fingerprint and the line that applies it.
   - Next runs under an operation: its locks are shared on the repository and each worktree, so a `clean` of a worktree is refused while a command runs in it (`lock.held`, exit 24), and the recap shows the concurrency capped to the worktrees (legacy: one per CPU, 12 for 2 worktrees). A command's children left in the background are stopped once it returns, as legacy did. Next never allocates an ordinal: an isolated worktree without one runs without its run environment, warned `exec.env_unnumbered`.
   - The tty: both pick the caller's worktree first and ask the command; legacy recaps `Concurrency: <CPUs>`, next the uniform recap, capped, with `Yes, run in 3 worktrees`. Leaving the wizard exits 19 on both.
+
+# Proof: `wtm reparent` (legacy `flow/reparent`) vs `wtm-next reparent`
+
+The reference is the legacy `wtm reparent` of 0.30.1. Its output differs by design (next speaks the v2 envelope, plans before it acts and refuses a request problem as a field error, exit 2), so the proof compares what each leaves on disk and keeps both outputs side by side.
+
+- `reparent.sh <wtm> <wtm-next> reparent`: two identical sandboxes (the `docs/demos` "acme" project with a bare `origin`), the stack `main → feat/a → feat/b → feat/c` and `feat/x` on `main` made by legacy's `create`, `raw` made by `git worktree add` (no record), a local `topic` no worktree holds and `remote-only`, a branch only origin has. The same scenarios run by each binary; after each, the exit code, stdout, stderr and the state (branches, worktrees, every `meta.json`). Paths, op ids and fingerprints are normalised. `reparent/states.diff` holds the differences. Then, in a fresh sandbox per side, the wizard in tmux at 100×40, `feat/b` moved onto `main`: `reparent/tty/legacy/` and `reparent/tty/next/`.
+  1. `feat/c --to main --dry-run`
+  2. `feat/c --to main --yes`
+  3. `feat/b feat/x --to main --yes`, `feat/x` already on `main`
+  4. `feat/b --to feat/a --yes --output json`
+  5. `feat/a --to feat/b --yes`, a cycle
+  6. the same, `--output json`
+  7. `main --to feat/a --yes`, the main worktree
+  8. `raw --to main --yes`, a worktree wtm did not create
+  9. `feat/c --to remote-only --yes`, a name only origin has
+  10. `feat/c --to origin/remote-only --yes`
+  11. `feat/c --yes`, no `--to`
+  12. `--to main --yes` from inside `feat/c`, no worktree named
+  13. `feat/c --to main --yes`, where 12 left the two sides apart
+  14. `feat/c --to feat/x --yes` with a detached worktree in the repository
+  15. the same, once it is removed
+  16. `feat/x --to topic --yes`, with `feat/a` and `feat/b` hand-edited into a cycle
+  17. `feat/a --to main --yes`, out of that cycle
+  18. `feat/x --to topic --yes`, where 16 left the two sides apart
+  19. `feat/x --to main --yes`, `base_branch = "feat/x"`
+- The states are identical but where next fixes a legacy bug. The differences, all deliberate:
+  - 1: legacy has no dry run nor fingerprint (exit 2).
+  - 3, legacy bugs: it rewrites `feat/x`'s record and says `✓ Reparented feat/x: main → main` (B4), and its follow-up is a bare `wtm sync` (B8). Next leaves `feat/x` as it is (`reparent: 1 done · 1 unchanged`, `feat/x (already on main)`) and follows up with `wtm sync feat/b` and the undo `wtm reparent feat/b --to feat/a`.
+  - 5 to 9, 11: next refuses each as an invalid request, exit 2, naming the field: `feat/b sits under feat/a: moving feat/a onto it would close a cycle` (legacy: `cycle detected in worktree parent chain at "feat/a"`, exit 1, B6), `main is the main worktree: it has no parent` (legacy: `worktree not found: main`, B10), `raw has no wtm record` (legacy: `worktree not found`, B3), `remote-only is no branch: pass a local branch or origin/<branch> to --to` (legacy exit 11), `--to is required` (legacy exit 1). 6 prints the envelope with the field error (`reparent.cycle`, params `value` and `under`); legacy prints text on stderr, stdout empty (B5).
+  - 12: next moves the worktree the caller stands in (Q1); legacy needs one named (exit 1). 13 then finds next's `feat/c` already on `main`.
+  - 14: one detached worktree makes legacy refuse every reparent, `cycle detected in worktree parent chain at ""` (B1); next moves `feat/c`.
+  - 16: a cycle elsewhere makes legacy refuse every reparent (B2); next moves `feat/x`. 17, moving a member out of the cycle, passes on both; next offers no undo back into it.
+  - 19: legacy reparents the base branch's worktree, a record `sync` never reads (B7); next refuses it, `feat/x is the base branch: sync never rebases it` (exit 2).
+  - The tty: next's worktrees read with their parent (`feat/b  on feat/a`) in git's order, `raw` not offered (legacy lists it sorted by name, then refuses it, B3); its parent step names what it leaves out and why (`Left out: feat/b (moved), feat/c (under feat/b)`, legacy `Branches that would close a parent cycle are not listed`) and offers `origin/remote-only` without legacy's separator and `remote` badge, as create's source step; its recap gives each worktree its move (`feat/b (feat/a → main)`, B9) and the button names it (`Yes, reparent feat/b`); its outcome is the uniform tally, recap and follow-ups.
 
 # Proof: `wtm-next ui`, the local web server
 

@@ -55,6 +55,21 @@ func TestTheTreeListsParentsBeforeTheirChildrenRootsMainFirst(t *testing.T) {
 	assert.False(t, detailOf(t, read, "feat/a").Cycle)
 }
 
+func TestAWorktreeWhoseParentBranchIsGoneIsSaidSo(t *testing.T) {
+	w := newWorld(seed{
+		Git:  gittest.FakeParams{Local: []string{"topic"}, Worktrees: []worktree.Worktree{linked("feat/x"), linked("feat/t"), linked("y"), linked("z")}},
+		Meta: map[string]worktree.Meta{"feat/x": from("gone", ""), "feat/t": from("topic", ""), "y": from("z", ""), "z": from("y", "")},
+	})
+
+	read, err := w.usecase.Run(t.Context(), tree.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	orphan, onBranch, looping := detailOf(t, read, "feat/x"), detailOf(t, read, "feat/t"), detailOf(t, read, "y")
+	assert.True(t, orphan.ParentGone)
+	assert.False(t, onBranch.ParentGone)
+	assert.False(t, looping.ParentGone, "a member of a cycle is drawn as a root: its parent is no fact of the tree")
+}
+
 func TestADetachedWorktreeIsNoNodeOfTheTree(t *testing.T) {
 	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{
 		{Path: "/repo/.trees/one", State: worktree.Detached{}},
@@ -371,6 +386,10 @@ func TestARecordThatDoesNotReadKeepsItsNodeAsARootAndIsAWarning(t *testing.T) {
 	assert.Contains(t, node.Warnings[0].Message, "the record of feat/a does not read")
 	assert.Nil(t, node.Detail.Parent, "a node whose parent is unknown stands as a root")
 	assert.True(t, node.Detail.Dirty, "its worktree is read")
+	refused := offerOf(t, node.Detail.Actions, worktree.ActionReparent).Refused
+	require.NotNil(t, refused)
+	assert.Equal(t, worktree.UnofferedUnreadable, *refused)
+	assert.Equal(t, worktree.UnofferedUnrecorded, *offerOf(t, detailOf(t, read, "loose").Actions, worktree.ActionReparent).Refused)
 }
 
 func TestARecordThatDoesNotReadIsAWarningOnANodeNotReadToo(t *testing.T) {

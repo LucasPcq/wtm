@@ -40,7 +40,8 @@
           }
         ]
       }
-    ]
+    ],
+    "empty": true
   },
   "follow_ups": [],
   "warnings": []

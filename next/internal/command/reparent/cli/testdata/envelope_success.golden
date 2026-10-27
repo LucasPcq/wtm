@@ -1,0 +1,121 @@
+{
+  "v": 2,
+  "command": "reparent",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-b",
+        "from": "feat/a",
+        "to": "main"
+      }
+    },
+    {
+      "subject": "feat/x",
+      "status": "done",
+      "reason": "unchanged",
+      "detail": {
+        "path": "/repo/wt-feat-x",
+        "from": "main",
+        "to": "main"
+      }
+    }
+  ],
+  "plan": {
+    "moves": [
+      {
+        "branch": "feat/b",
+        "path": "/repo/wt-feat-b",
+        "from": "feat/a",
+        "parent_gone": false,
+        "to": "main",
+        "children": [
+          "feat/c"
+        ]
+      },
+      {
+        "branch": "feat/x",
+        "path": "/repo/wt-feat-x",
+        "from": "main",
+        "parent_gone": false,
+        "to": "main"
+      }
+    ],
+    "to": "main",
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/b",
+            "params": {
+              "from": "feat/a",
+              "to": "main"
+            },
+            "text": "feat/b (feat/a → main)"
+          },
+          {
+            "value": "feat/x",
+            "note": "unchanged",
+            "params": {
+              "from": "main",
+              "to": "main"
+            },
+            "text": "feat/x (already on main)"
+          }
+        ]
+      },
+      {
+        "key": "to",
+        "label": "New parent",
+        "path": "to",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "sync",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        }
+      ],
+      "code": "reparent.sync",
+      "message": "rebase onto the new parent"
+    },
+    {
+      "command": "reparent",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        },
+        {
+          "path": "to",
+          "values": [
+            "feat/a"
+          ]
+        }
+      ],
+      "code": "reparent.undo",
+      "message": "move feat/b back onto feat/a"
+    }
+  ],
+  "warnings": []
+}

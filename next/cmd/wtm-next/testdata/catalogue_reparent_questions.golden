@@ -1,0 +1,57 @@
+{
+  "fields": [
+    {
+      "kind": "multi_select",
+      "path": "worktree",
+      "origin": "request",
+      "picked": [
+        "feat/b"
+      ],
+      "options": [
+        {
+          "value": "feat/a",
+          "parent": "main"
+        },
+        {
+          "value": "feat/b",
+          "parent": "main"
+        }
+      ]
+    },
+    {
+      "kind": "select",
+      "path": "to",
+      "origin": "request",
+      "value": "feat/a",
+      "options": [
+        {
+          "value": "feat/a"
+        },
+        {
+          "value": "main",
+          "base": true
+        }
+      ],
+      "pinned": "main",
+      "rememberable": false,
+      "remember": false,
+      "refreshable": true,
+      "closed": false,
+      "refused": [
+        {
+          "path": "to",
+          "code": "self_parent",
+          "params": {
+            "value": "feat/b"
+          },
+          "with": [
+            "worktree"
+          ],
+          "flag": "to",
+          "message": "feat/b cannot be its own parent: pass another value to to"
+        }
+      ]
+    }
+  ],
+  "problems": []
+}

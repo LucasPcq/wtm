@@ -37,6 +37,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	prunecli "github.com/LucasPcq/wtm/next/internal/command/prune/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/reparent"
+	reparentcli "github.com/LucasPcq/wtm/next/internal/command/reparent/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
@@ -66,6 +68,7 @@ type app struct {
 	Prune       prune.UseCase
 	FastForward fastforward.UseCase
 	Exec        exec.UseCase
+	Reparent    reparent.UseCase
 	List        list.UseCase
 	Resolve     resolve.UseCase
 	Status      status.UseCase
@@ -169,6 +172,12 @@ func wire(params wireParams) app {
 			Repository: facts,
 			Operations: operations,
 		},
+		Reparent: reparent.UseCase{
+			Git:        repo,
+			Meta:       meta,
+			Repository: facts,
+			Operations: operations,
+		},
 		List: list.UseCase{
 			Git:          repo,
 			Meta:         meta,
@@ -247,7 +256,7 @@ func proxyStatus() domain.FollowUp {
 	return domain.FollowUp{Command: "run proxy status"}
 }
 
-// commandLine spells a follow-up as the command line runs it: one naming a migrated command another command gives (clean, prune, fast-forward, exec) from that command's schema; go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
+// commandLine spells a follow-up as the command line runs it: one naming a migrated command another command gives (clean, prune, fast-forward, exec, reparent) from that command's schema; go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
 func commandLine(followUp domain.FollowUp) []string {
 	switch followUp.Command {
 	case clean.Name:
@@ -258,6 +267,8 @@ func commandLine(followUp domain.FollowUp) []string {
 		return fastforwardcli.Line(followUp)
 	case exec.Name:
 		return execcli.Line(followUp)
+	case reparent.Name:
+		return reparentcli.Line(followUp)
 	}
 
 	argv, _ := spelled(followUp)

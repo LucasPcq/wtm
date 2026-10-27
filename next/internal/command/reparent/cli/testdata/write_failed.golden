@@ -1,0 +1,9 @@
+
+  ✗ reparent: 1 failed
+
+  Worktrees   feat/c (feat/b → main)
+  New parent  main
+
+  ✗ feat/c  couldn't write the record of feat/c: no space left on device
+
+--- stderr

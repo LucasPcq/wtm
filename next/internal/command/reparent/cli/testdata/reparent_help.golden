@@ -1,0 +1,39 @@
+
+  Change the parent branch worktrees are rebased onto: the next `wtm sync` rebases them onto it.
+  Only the meta record changes: no branch, commit nor file moves. Their children follow them.
+  Without arguments, the worktree you stand in moves; the wizard asks which worktrees to move
+  and onto which branch, a local branch or origin/<branch>.
+
+  A worktree cannot sit under itself: a parent that is one of the worktrees moved, or sits under
+  one of them, is refused. Never the main worktree, the base branch's, one on no branch or one
+  wtm did not create. A worktree already on the parent is left as it is.
+
+  Usage:
+    wtm-next reparent [worktree...] [flags]
+
+  Examples:
+    # Move the worktree you stand in
+    wtm reparent --to main
+
+    # Several at once, no prompts
+    wtm reparent feat/b feat/c --to feat/a --yes
+
+    # See the plan first, then apply exactly that plan
+    wtm reparent feat/b --to main --dry-run
+    wtm reparent feat/b --to main --expect-fingerprint <hash>
+
+    # For a script or an agent, with the v2 JSON envelope
+    wtm reparent feat/b --to main --yes --output json
+
+  Flags:
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+    -h, --help                        help for reparent
+        --output string               Output format: text or json (default "text")
+        --to string                   The branch the worktrees are rebased onto from now on: a local branch, or origin/<branch>
+    -y, --yes                         Run unattended: no question, no confirmation (--to required; the worktree you stand in unless worktrees are named)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

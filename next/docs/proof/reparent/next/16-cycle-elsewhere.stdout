@@ -1,0 +1,9 @@
+
+  ✓ reparent: 1 done
+
+  Worktrees   feat/x (main → topic)
+  New parent  topic
+
+  → wtm sync feat/x                      rebase onto the new parent
+  → wtm reparent feat/x --to main   move feat/x back onto main
+

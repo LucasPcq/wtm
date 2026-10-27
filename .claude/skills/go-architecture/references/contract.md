@@ -25,7 +25,7 @@ What every mutating command of `next/` promises its callers — people at a term
 - `--dry-run` (`-n`) plans without a lock, an event or a change, and prints the plan, its warnings, its fingerprint and the line that applies exactly this plan (`… --expect-fingerprint <fp>`).
 - `--expect-fingerprint <fp>` applies only if the facts, read under the locks, still give that fingerprint; otherwise `plan.stale` (exit 25), with the `--dry-run` that plans again as a follow-up (`plan.replan`, `domain.Replan`).
 - The fingerprint covers what the plan does (which files, their status), not the files' bytes.
-- The wizard's recap is a dry run, applied with its fingerprint; a stale preview asks again.
+- The wizard's recap is a dry run, applied with its fingerprint; a stale preview asks again. A plan that changes nothing (`domain.Recapped.Empty`, set by the use case beside its recap, published in the plan) is not asked to be confirmed: the wizard finishes at the preview and the apply says nothing was to do (`Script.Empty`, from `Outcome.Empty`); unattended, it applies nothing and exits 0.
 
 ## Output
 

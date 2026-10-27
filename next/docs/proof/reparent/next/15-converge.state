@@ -1,0 +1,43 @@
+## branches
+feat/a
+feat/b
+feat/c
+feat/x
+main
+raw
+topic
+## worktrees
+<SB>/acme
+<SB>/acme.trees/feat-a
+<SB>/acme.trees/feat-b
+<SB>/acme.trees/feat-c
+<SB>/acme.trees/feat-x
+<SB>/acme.trees/raw
+## .git/wtm/worktrees/feat%2Fa/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 1,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fb/meta.json
+{
+  "source_branch": "feat/a",
+  "env_strategy": "example",
+  "ordinal": 2,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fc/meta.json
+{
+  "source_branch": "feat/x",
+  "env_strategy": "example",
+  "ordinal": 3,
+  "isolation": "isolated"
+}
+## .git/wtm/worktrees/feat%2Fx/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 4,
+  "isolation": "isolated"
+}

@@ -1,0 +1,13 @@
+$ wtm reparent; echo EXIT=$?
+
+  Step 1/3 • Worktrees
+
+  The worktrees to move, by branch; the one you stand in by default
+
+▌› [ ] feat/a  on main
+   [ ] feat/b  on feat/a
+   [ ] feat/c  on feat/b
+   [ ] feat/x  on main
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel
+

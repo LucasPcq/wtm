@@ -1,0 +1,49 @@
+{
+  "v": 2,
+  "command": "reparent",
+  "ok": true,
+  "op": "<id>",
+  "plan": {
+    "moves": [
+      {
+        "branch": "feat/b",
+        "path": "<root>/.trees/feat-b",
+        "from": "main",
+        "parent_gone": false,
+        "to": "feat/a"
+      }
+    ],
+    "to": "feat/a",
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/b",
+            "params": {
+              "from": "main",
+              "to": "feat/a"
+            },
+            "text": "feat/b (main → feat/a)"
+          }
+        ]
+      },
+      {
+        "key": "to",
+        "label": "New parent",
+        "path": "to",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<id>",
+  "follow_ups": [],
+  "warnings": []
+}

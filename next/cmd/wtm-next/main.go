@@ -16,6 +16,7 @@ import (
 	fastforwardcli "github.com/LucasPcq/wtm/next/internal/command/fastforward/cli"
 	listcli "github.com/LucasPcq/wtm/next/internal/command/list/cli"
 	prunecli "github.com/LucasPcq/wtm/next/internal/command/prune/cli"
+	reparentcli "github.com/LucasPcq/wtm/next/internal/command/reparent/cli"
 	resolvecli "github.com/LucasPcq/wtm/next/internal/command/resolve/cli"
 	statuscli "github.com/LucasPcq/wtm/next/internal/command/status/cli"
 	treecli "github.com/LucasPcq/wtm/next/internal/command/tree/cli"
@@ -49,6 +50,7 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		prunecli.New(streams, env, openPrune, commandLine),
 		fastforwardcli.New(streams, env, openFastForward, commandLine),
 		execcli.New(streams, env, openExec, commandLine),
+		reparentcli.New(streams, env, openReparent, commandLine),
 		listcli.New(streams, env, openList, commandLine),
 		resolvecli.New(streams, env, openResolve, commandLine),
 		statuscli.New(streams, env, openStatus, commandLine),

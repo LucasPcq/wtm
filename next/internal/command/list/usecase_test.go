@@ -44,12 +44,16 @@ func TestEachWorktreeIsReadTheMainOneFirstThenTheOldest(t *testing.T) {
 	assert.Empty(t, read.Warnings)
 	a := detailOf(t, read, "feat/a")
 	assert.Equal(t, list.Detail{
-		Branch: "feat/a", Path: "/repo/.trees/feat/a", Dirty: true, CommitsAhead: 2, Ahead: ptr(2), Changes: &list.Changes{Changed: 1, Untracked: 1},
+		Branch: "feat/a", Path: "/repo/.trees/feat/a", Record: worktree.RecordRead, Dirty: true, CommitsAhead: 2, Ahead: ptr(2), Changes: &list.Changes{Changed: 1, Untracked: 1},
 		CreatedAt: a.CreatedAt, LastCommitAt: &gittest.Committed, Origin: &worktree.Origin{Ahead: 2, State: worktree.Ahead},
 		Condition: worktree.ConditionChanged,
 		Services:  []string{"web"}, URLs: []string{"http://web.feat-a.acme.localhost"}, Actions: a.Actions,
 	}, a)
 	assert.Equal(t, created.Add(time.Hour), *a.CreatedAt)
+	assert.NotNil(t, offerOf(t, a.Actions, worktree.ActionReparent).FollowUp, "wtm recorded feat/a: it can change its parent")
+	refused := offerOf(t, detailOf(t, read, "feat/c").Actions, worktree.ActionReparent).Refused
+	require.NotNil(t, refused)
+	assert.Equal(t, worktree.UnofferedUnrecorded, *refused)
 	assert.True(t, detailOf(t, read, "main").Main)
 	assert.Equal(t, &worktree.Origin{State: worktree.UpToDate}, detailOf(t, read, "main").Origin)
 	assert.Nil(t, detailOf(t, read, "feat/c").CreatedAt, "a worktree without a meta record has no creation date")
@@ -175,6 +179,9 @@ func TestARecordThatDoesNotReadKeepsItsWorktreeAndIsAWarning(t *testing.T) {
 	require.Len(t, item.Warnings, 1)
 	assert.Equal(t, list.CodeMetaUnreadable, item.Warnings[0].Code)
 	assert.Nil(t, item.Detail.CreatedAt)
+	refused := offerOf(t, item.Detail.Actions, worktree.ActionReparent).Refused
+	require.NotNil(t, refused, "a record that does not read refuses reparent with why")
+	assert.Equal(t, worktree.UnofferedUnreadable, *refused)
 }
 
 func TestARecordThatDoesNotReadIsAWarningOnAWorktreeNotReadToo(t *testing.T) {

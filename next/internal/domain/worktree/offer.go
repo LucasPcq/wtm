@@ -12,12 +12,13 @@ const (
 	ActionLogs        Action = "logs"
 	ActionFastForward Action = "fast_forward"
 	ActionSync        Action = "sync"
+	ActionReparent    Action = "reparent"
 	ActionClean       Action = "clean"
 )
 
 // Actions returns every Action, in the order a read offers them.
 func Actions() []Action {
-	return []Action{ActionGo, ActionOpenPR, ActionRunUp, ActionRunDown, ActionLogs, ActionFastForward, ActionSync, ActionClean}
+	return []Action{ActionGo, ActionOpenPR, ActionRunUp, ActionRunDown, ActionLogs, ActionFastForward, ActionSync, ActionReparent, ActionClean}
 }
 
 // An Unoffered is why a worktree does not offer an action, as a code each surface words its own way.
@@ -31,11 +32,13 @@ const (
 	UnofferedBaseBranch    Unoffered = "base_branch"     // the base branch's worktree is never removed
 	UnofferedNoPullRequest Unoffered = "no_pull_request" // no pull request is known: there is none, or GitHub was not asked
 	UnofferedNotOnOrigin   Unoffered = "not_on_origin"   // origin has no branch of its name to fast-forward from
+	UnofferedUnrecorded    Unoffered = "unrecorded"      // wtm did not create it: it records no parent to change
+	UnofferedUnreadable    Unoffered = "meta_unreadable" // its meta record exists but does not read
 )
 
 // Unoffereds returns every Unoffered.
 func Unoffereds() []Unoffered {
-	return []Unoffered{UnofferedMissing, UnofferedNoBranch, UnofferedMainWorktree, UnofferedBaseBranch, UnofferedNoPullRequest, UnofferedNotOnOrigin}
+	return []Unoffered{UnofferedMissing, UnofferedNoBranch, UnofferedMainWorktree, UnofferedBaseBranch, UnofferedNoPullRequest, UnofferedNotOnOrigin, UnofferedUnrecorded, UnofferedUnreadable}
 }
 
 // OfferParams are what decides the actions a worktree offers.
@@ -46,6 +49,29 @@ type OfferParams struct {
 	Detached    bool
 	PullRequest bool // a pull request of its branch is known
 	OnOrigin    bool // origin has a branch of its name
+	Record      RecordState
+}
+
+// A RecordState is what a read knows of a worktree's meta record: none, one that reads, or one that exists but does not.
+type RecordState int
+
+// The states of a worktree's meta record.
+const (
+	RecordNone RecordState = iota
+	RecordRead
+	RecordUnreadable
+)
+
+// RecordOf is the state of the meta record of branch, as a read's records (by branch) and the errors of those that do not read say it.
+func RecordOf(records map[string]Meta, errs map[string]error, branch string) RecordState {
+	switch _, read := records[branch]; {
+	case read:
+		return RecordRead
+	case errs[branch] != nil:
+		return RecordUnreadable
+	}
+
+	return RecordNone
 }
 
 // Unoffer is why the worktree of p does not offer action, "" when it offers it.
@@ -67,6 +93,23 @@ func Unoffer(p OfferParams, action Action) Unoffered {
 		return UnofferedNotOnOrigin
 	case action == ActionSync && p.Main:
 		return UnofferedMainWorktree
+	case action == ActionReparent:
+		return unofferedReparent(p)
+	}
+
+	return ""
+}
+
+func unofferedReparent(p OfferParams) Unoffered {
+	switch {
+	case p.Main:
+		return UnofferedMainWorktree
+	case p.Base:
+		return UnofferedBaseBranch
+	case p.Record == RecordUnreadable:
+		return UnofferedUnreadable
+	case p.Record == RecordNone:
+		return UnofferedUnrecorded
 	}
 
 	return ""

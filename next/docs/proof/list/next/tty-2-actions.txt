@@ -12,6 +12,7 @@ $ wtm list; echo EXIT=$?
    View the logs
    Fast-forward from origin
    Sync onto its parent
+   Change the parent
    Clean (delete the worktree)
 
   ↑↓ navigate • / filter • enter confirm • esc back

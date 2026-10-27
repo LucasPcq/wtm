@@ -354,6 +354,11 @@ const (
 	NoteAhead  = "ahead"
 )
 
+// empty reports whether applying the plan changes nothing: no worktree the plan holds moves.
+func (p Plan) empty() bool {
+	return !slices.ContainsFunc(p.Worktrees, Advance.moves)
+}
+
 // recap is the plan row by row: the worktrees fast-forwarded with the commits each takes, the forced ones said so, those already up to date or ahead, then those left as they are, each with why.
 func (p Plan) recap() []domain.RecapRow {
 	var moved, current, left []domain.RecapValue

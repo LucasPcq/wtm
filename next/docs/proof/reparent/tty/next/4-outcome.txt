@@ -1,0 +1,13 @@
+$ wtm reparent; echo EXIT=$?
+
+┃  ✓ reparent: 1 done
+┃
+┃  Worktrees   feat/b (feat/a → main)
+┃  New parent  main
+┃
+┃  → wtm sync feat/b                        rebase onto the new parent
+┃  → wtm-next reparent feat/b --to feat/a   move feat/b back onto feat/a
+
+EXIT=0
+$
+

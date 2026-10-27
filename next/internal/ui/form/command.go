@@ -28,9 +28,10 @@ type Questions interface {
 	Form() domain.Form
 }
 
-// An Outcome is how a command's run ended, as [domain.Outcome] reports it: the fingerprint of the plan it previewed or applied, whether it applied it, the failure the apply ended on and the subject it stopped at, and the envelope of the run.
+// An Outcome is how a command's run ended, as [domain.Outcome] reports it: the fingerprint of the plan it previewed or applied, whether that plan changes nothing, whether it applied it, the failure the apply ended on and the subject it stopped at, and the envelope of the run.
 type Outcome interface {
 	PlanFingerprint() string
+	Empty() bool
 	Applied() bool
 	Failure() *domain.Error
 	FailedAt() string

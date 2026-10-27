@@ -1,0 +1,49 @@
+{
+  "v": 2,
+  "command": "reparent",
+  "ok": true,
+  "op": "op-1",
+  "plan": {
+    "moves": [
+      {
+        "branch": "feat/c",
+        "path": "/repo/wt-feat-c",
+        "from": "feat/b",
+        "parent_gone": false,
+        "to": "feat/a"
+      }
+    ],
+    "to": "feat/a",
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/c",
+            "params": {
+              "from": "feat/b",
+              "to": "feat/a"
+            },
+            "text": "feat/c (feat/b → feat/a)"
+          }
+        ]
+      },
+      {
+        "key": "to",
+        "label": "New parent",
+        "path": "to",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "7843b25b0024e02492bff81c",
+  "follow_ups": [],
+  "warnings": []
+}

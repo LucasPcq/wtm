@@ -1,0 +1,14 @@
+
+  Step 2/3 • New parent
+
+  ✓ Worktrees: feat/b
+
+  feat/b is rebased onto feat/a
+  Left out: feat/b (moved), feat/c (under feat/b)
+
+▌› main (default)
+   feat/a
+   feat/x
+   topic
+
+  ↑↓ navigate • / filter • r refresh • enter confirm • esc back

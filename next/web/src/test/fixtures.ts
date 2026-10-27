@@ -18,6 +18,7 @@ const commands: Record<WorktreeAction, string> = {
   logs: 'run logs',
   fast_forward: 'fast-forward',
   sync: 'sync',
+  reparent: 'reparent',
   clean: 'clean',
 }
 
@@ -39,7 +40,12 @@ export const offers = (
   })
 
 const mainOffers = (branch: string) =>
-  offers(branch, { open_pr: 'no_pull_request', sync: 'main_worktree', clean: 'main_worktree' })
+  offers(branch, {
+    open_pr: 'no_pull_request',
+    sync: 'main_worktree',
+    reparent: 'main_worktree',
+    clean: 'main_worktree',
+  })
 
 export const listDetail = (branch: string, over: Partial<ListDetail> = {}): ListDetail => ({
   actions: over.main ? mainOffers(branch) : offers(branch, { open_pr: 'no_pull_request' }),
@@ -83,6 +89,7 @@ export const treeDetail = (branch: string, over: Partial<TreeDetail> = {}): Tree
   needs_sync: false,
   origin: null,
   parent: 'main',
+  parent_gone: false,
   path: `/acme.trees/${branch.replace('/', '-')}`,
   pr: null,
   services: [],

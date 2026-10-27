@@ -338,6 +338,11 @@ func (r Request) Locks() []domain.Lock {
 // NoteKept notes a recap's value done with but kept for being unsafe; the others are teardown's.
 const NoteKept = "kept"
 
+// empty reports whether applying the plan changes nothing: every worktree the plan holds is kept, or it holds none.
+func (p Plan) empty() bool {
+	return !slices.ContainsFunc(p.Worktrees, func(c Candidate) bool { return !c.ruledOut() })
+}
+
 // recap is the plan row by row: the worktrees removed, each with why it is done with and, forced, what it loses; those kept, with what makes them unsafe; then the children left behind, reparented or orphaned.
 func (p Plan) recap() []domain.RecapRow {
 	var rows []domain.RecapRow

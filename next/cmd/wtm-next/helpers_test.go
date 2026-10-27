@@ -28,6 +28,7 @@ import (
 
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/adapter/webserver"
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
@@ -96,6 +97,24 @@ func writeConfig(t *testing.T, main, extra string) {
 	config, err := os.ReadFile(path)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(path, append(config, extra...), 0o644))
+}
+
+// recordParent writes the meta record of branch with parent as the branch it was created from.
+func recordParent(t *testing.T, main, branch, parent string) {
+	t.Helper()
+	_, err := store.Meta{StateDir: filepath.Join(main, ".git", "wtm")}.Update(t.Context(), worktree.MetaUpdate{Branch: branch, Change: func(meta *worktree.Meta) error {
+		meta.SourceBranch = parent
+		return nil
+	}})
+	require.NoError(t, err)
+}
+
+// parentOf is the parent the meta record of branch names.
+func parentOf(t *testing.T, main, branch string) string {
+	t.Helper()
+	meta, err := store.Meta{StateDir: filepath.Join(main, ".git", "wtm")}.Load(branch)
+	require.NoError(t, err)
+	return meta.SourceBranch
 }
 
 // keepsTheMutationContract drives m through the catalogue alone: its questions, their answers, a dry run, the same plan refused once stale with the replan that follows it up, that replan, then the apply held to its fingerprint.

@@ -1,0 +1,9 @@
+{
+  "reparented": [
+    {
+      "branch": "feat/b",
+      "old_parent": "main",
+      "new_parent": "feat/a"
+    }
+  ]
+}

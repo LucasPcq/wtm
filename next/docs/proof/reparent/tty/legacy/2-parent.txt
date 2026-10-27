@@ -1,0 +1,19 @@
+$ wtm reparent; echo EXIT=$?
+
+  Step 2/3 • Select the new parent
+
+  ✓ Worktrees: feat/b
+
+  feat/b is currently rebased onto feat/a
+  Branches that would close a parent cycle are not listed
+
+▌▸ main (default)
+   feat/a
+   feat/x
+   raw
+   topic
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   origin/remote-only                                                                       remote
+
+  ↑↓ navigate • / filter • r refresh • enter confirm • esc back
+

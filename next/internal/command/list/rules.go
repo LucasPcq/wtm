@@ -67,7 +67,8 @@ type Detail struct {
 	Services  []string           `json:"services"`  // the jobs up in it, null when that cannot be told
 	URLs      []string           `json:"urls"`      // the addresses of the jobs up in it, null when that cannot be told
 	// Actions are every action of it, each the follow-up that carries it out or why it is not offered.
-	Actions []repository.Offer `json:"actions"`
+	Actions []repository.Offer   `json:"actions"`
+	Record  worktree.RecordState `json:"-"` // its meta record, as its actions say what follows from it
 
 	base bool // it is on the base branch, which is never removed
 }
@@ -152,6 +153,7 @@ func (f Facts) item(w worktree.Worktree, active bool) Item {
 		Services:     f.Services(w.Path),
 		URLs:         f.URLs(w.Path),
 		base:         w.Branch() != "" && w.Branch() == f.Config.Worktrees.BaseBranch,
+		Record:       worktree.RecordOf(f.Records, f.RecordErrs, w.Branch()),
 	}
 	detail.Condition = conditionOf(detail, w.Operation())
 	detail.Actions = Actions(detail)
@@ -256,6 +258,7 @@ func Actions(detail Detail) []repository.Offer {
 		Path:     detail.Path,
 		Main:     detail.Main,
 		Base:     detail.base,
+		Record:   detail.Record,
 		Missing:  detail.Missing,
 		OnOrigin: detail.Origin != nil,
 	}

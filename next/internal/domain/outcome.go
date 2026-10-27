@@ -50,6 +50,12 @@ func (Outcome[P, D]) Types() (plan, detail reflect.Type) {
 	return reflect.TypeFor[P](), reflect.TypeFor[D]()
 }
 
+// Empty reports whether the plan changes nothing, as its Recapped says.
+func (o Outcome[P, D]) Empty() bool {
+	recapped, ok := any(o.Plan).(interface{ Recaps() Recapped })
+	return ok && recapped.Recaps().Empty
+}
+
 // Applied reports whether the run holds the Result of an apply.
 func (o Outcome[P, D]) Applied() bool {
 	return o.Result != nil

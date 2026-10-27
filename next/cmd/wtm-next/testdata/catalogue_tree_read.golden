@@ -21,6 +21,7 @@
         "missing": false,
         "condition": "clean",
         "cycle": false,
+        "parent_gone": false,
         "origin": null,
         "pr": null,
         "services": [],
@@ -105,6 +106,11 @@
           },
           {
             "action": "sync",
+            "follow_up": null,
+            "refused": "main_worktree"
+          },
+          {
+            "action": "reparent",
             "follow_up": null,
             "refused": "main_worktree"
           },
