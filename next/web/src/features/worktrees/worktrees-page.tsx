@@ -50,7 +50,6 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
   const selected = tree ? [] : selection.selected.filter((subject) => visible.some((row) => row.subject === subject))
   const count = read ? worktreeCount(read) : 0
 
-  // what each worktree on screen offers: the list's rows, or the tree's worktrees, the pull request's from GitHub
   const subjects = (): Subject[] => {
     if (!tree) return rows.map(({ subject, actions }) => ({ subject, offers: actions }))
 

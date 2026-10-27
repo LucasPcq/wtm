@@ -9,7 +9,6 @@ export const riskOf = (removal: TeardownRemoval) => (removal.blockers ?? []).joi
 // a worktree on no branch, or a branch with no worktree, is no "worktree with its branch"
 export const plain = (removals: TeardownRemoval[]) => removals.every((removal) => removal.branch && removal.path)
 
-// the request the checked worktrees give, forced when an unsafe one is among them
 export function requestOf({ going, reparent }: { going: TeardownRemoval[]; reparent: boolean }): DomainAnswered[] {
   return [
     { path: 'worktree', values: going.map((removal) => removal.worktree) },

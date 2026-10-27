@@ -5,7 +5,6 @@ import { useRunEntry } from '@/features/worktrees/hooks/use-run-entry'
 import { type MenuAction, menu, type Subject, selectionEntryOf } from '@/features/worktrees/utils/actions'
 import { cn } from '@/lib/utils'
 
-// the same buttons whatever is selected; narrow, each keeps its icon and its label moves to its tooltip
 const actions: MenuAction[] = ['fast_forward', 'exec', 'reparent']
 
 export function SelectionBar({

@@ -11,7 +11,6 @@ export const blockerWords: Record<WorktreeBlocker, (removal: TeardownRemoval) =>
   jobs_running: ({ jobs = [] }) => `Jobs running: ${jobs.join(', ')}`,
 }
 
-// what removing it anyway loses, said where it is decided: on the row once checked
 export const lostWords: Record<WorktreeBlocker, (removal: TeardownRemoval) => string> = {
   locked: () => 'Its lock is lifted.',
   dirty: () => 'Its uncommitted changes are lost.',

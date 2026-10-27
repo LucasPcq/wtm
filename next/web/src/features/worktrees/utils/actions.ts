@@ -13,12 +13,10 @@ import {
 } from 'lucide-react'
 import type { DomainFollowUp, RepositoryOffer, WorktreeAction, WorktreeUnoffered } from '@/api/types.gen'
 
-// the core offers or refuses its own actions; the others are commands the web gives no way in yet
 export type MenuAction = WorktreeAction | 'reparent' | 'exec'
 
 export type Section = 'Branch' | 'Run' | 'Open' | 'Remove'
 
-// web runs it here, copy copies its command line, link opens its address, later is not in the web yet
 type Runs = 'web' | 'copy' | 'link' | 'later'
 
 // the one list every surface draws, in its order: a key moved here moves in every menu
@@ -50,7 +48,6 @@ const unofferedWords: Record<WorktreeUnoffered, (worktree: string, action: MenuA
 export const notInTheWeb = 'Not in the web yet'
 const oneAtATime = 'One worktree at a time'
 
-// an entry of a menu: what it runs, or why it can't
 export type Entry = { action: MenuAction; followUp: DomainFollowUp } | { action: MenuAction; disabled: string }
 
 export function entryOf(worktree: string, offers: RepositoryOffer[], action: MenuAction): Entry {
@@ -78,7 +75,6 @@ export function selectionEntryOf(rows: Subject[], action: MenuAction): Entry {
   return { action, followUp: { ...first, answers: [{ path: 'worktree', values: offered.flatMap(subjectsOf) }] } }
 }
 
-// the rows an action leaves as they are, each with why
 export const leftOf = (rows: Subject[], action: MenuAction) =>
   rows.flatMap(({ subject, offers }) => {
     const entry = entryOf(subject, offers, action)

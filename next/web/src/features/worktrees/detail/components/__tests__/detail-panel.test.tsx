@@ -110,7 +110,6 @@ test('a rebase under way stays first, whatever GitHub says of the pull request',
 
   const { detail } = await openDetail('feat/billing')
 
-  // GitHub's read settled: the review says so, and the rule had both reads to choose from
   await within(detail).findByText('No pull request.')
   expect(within(detail).queryByText('Its pull request is merged')).toBeNull()
 })

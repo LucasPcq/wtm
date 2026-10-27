@@ -2,8 +2,7 @@ import type { ReactNode } from 'react'
 import { DialogContent } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
-// a run keeps one size while its phases come and go, only its lists scroll; once it ended, the dialog eases to what
-// it has left to say
+// a run keeps one size while its phases come and go; once it ended, the dialog eases to its content
 export function RunDialogContent({ running, children }: { running: boolean; children: ReactNode }) {
   return (
     <DialogContent

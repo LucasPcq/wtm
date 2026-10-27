@@ -41,7 +41,6 @@ export function DetailPanel({
 
   const item = live.data?.items[0]
   const detail = item?.detail
-  // one worktree the read could not read says why, rather than a blank panel
   const failed = !detail ? item?.error : undefined
   const asked = github.data?.items[0]?.detail
   const shown = detail && overlaid(detail, asked)

@@ -134,7 +134,6 @@ const plan = (branch: string) => ({
   },
 })
 
-// a stream that stays open, for a test that needs the page live
 export const liveEvents = http.get('/api/events', () => {
   let closing: ReturnType<typeof setTimeout>
   const stream = new ReadableStream({

@@ -4,7 +4,6 @@ import { ActionItems } from '@/features/worktrees/components/action-items'
 import { MoreMenu } from '@/features/worktrees/components/more-menu'
 import type { Subject } from '@/features/worktrees/utils/actions'
 
-// the row is the trigger of its context menu and draws its "⋯" where it wants it; a row under way offers neither
 export function RowMenu({
   repo,
   subject,
@@ -43,7 +42,6 @@ export function RowMenu({
       <ContextMenuTrigger
         asChild
         disabled={busy}
-        // the row its menu acts on keeps its hover look while the menu is open
         data-menu-open={open || context || undefined}
         // the keyboard's menu key opens the "⋯" menu, anchored on the row rather than where a pointer would be
         onKeyDown={(event) => {

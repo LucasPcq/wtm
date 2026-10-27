@@ -65,7 +65,6 @@ export function RemoveWizard({
     })
   const going = removals.filter(isChecked)
   const answers = requestOf({ going, reparent })
-  // a choice plans again: the plan shown stays until the next one lands
   const planned = useQuery({
     ...dryRunQuery(repo, 'clean', answers),
     enabled: going.length > 0,

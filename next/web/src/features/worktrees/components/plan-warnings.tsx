@@ -3,7 +3,6 @@ import type { DomainWarning } from '@/api/types.gen'
 import { CommandLine } from '@/features/worktrees/components/command-line'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
-// a technical problem of the whole plan, first in the body: the plan goes on without what it names
 export function PlanWarnings({ warnings }: { warnings: DomainWarning[] }) {
   if (warnings.length === 0) return null
 

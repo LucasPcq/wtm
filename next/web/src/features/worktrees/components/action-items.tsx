@@ -2,9 +2,9 @@ import { Copy } from 'lucide-react'
 import { Fragment } from 'react'
 import { ContextMenuItem, ContextMenuLabel, ContextMenuSeparator } from '@/components/ui/context-menu'
 import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { MenuEntry } from '@/features/worktrees/components/menu-entry'
 import { useRunEntry } from '@/features/worktrees/hooks/use-run-entry'
 import { menu, menuActions, type Section, type Subject, selectionEntryOf } from '@/features/worktrees/utils/actions'
-import { cn } from '@/lib/utils'
 
 type MenuKind = 'context' | 'dropdown'
 
@@ -15,11 +15,6 @@ const parts = {
 
 const sections: Section[] = ['Branch', 'Run', 'Open', 'Remove']
 
-// an item whose reason wraps to a second line keeps its icons on the label's line
-export const topIcons = 'items-start [&>svg]:mt-0.5'
-
-// a disabled item stays in place and says why on its second line; aria-disabled, not Radix's disabled, which the
-// keyboard skips: the reason would be out of its reach
 export function ActionItems({ kind, repo, rows }: { kind: MenuKind; repo: string; rows: Subject[] }) {
   const run = useRunEntry(repo)
   const { Item, Label, Separator } = parts[kind]
@@ -37,26 +32,19 @@ export function ActionItems({ kind, repo, rows }: { kind: MenuKind; repo: string
             .filter((action) => menu[action].section === section)
             .map((action) => {
               const entry = selectionEntryOf(rows, action)
-              const { label, icon: Icon, runs } = menu[action]
-              const off = 'disabled' in entry
+              const { label, icon, runs } = menu[action]
               return (
-                <Item
+                <MenuEntry
                   key={action}
-                  aria-disabled={off || undefined}
-                  variant={section === 'Remove' ? 'destructive' : 'default'}
-                  className={cn(topIcons, off && 'opacity-50')}
-                  onSelect={(event) => {
-                    if (off) return event.preventDefault()
-                    run(entry, rows)
-                  }}
+                  Item={Item}
+                  icon={icon}
+                  label={label}
+                  why={'disabled' in entry ? entry.disabled : undefined}
+                  destructive={section === 'Remove'}
+                  onSelect={() => run(entry, rows)}
                 >
-                  <Icon />
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    {label}
-                    {off && <span className="text-xs text-muted-foreground">{entry.disabled}</span>}
-                  </span>
                   {runs === 'copy' && <Copy aria-label="copies its command" className="text-muted-foreground" />}
-                </Item>
+                </MenuEntry>
               )
             })}
         </Fragment>

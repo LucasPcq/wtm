@@ -4,8 +4,7 @@ import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { type OutcomeGroup, type OutcomeKind, outcomeOrder, planWide } from '@/features/worktrees/utils/outcome'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
-// the run's warnings show as they did on its steps: one that names no worktree stays the plan's Alert, first; one
-// that names a worktree is a row to check
+// a warning naming no worktree stays the plan's Alert, as on the steps; one naming a worktree is a row to check
 export function RunOutcome({
   groups,
   labels,
@@ -35,7 +34,6 @@ export function RunOutcome({
         <div className="flex flex-col gap-6">
           {shown.map((group) => (
             <section key={group.kind} aria-label={labels[group.kind]} className="flex flex-col gap-1">
-              {/* a lone group needs no name */}
               {shown.length > 1 && <h3 className="text-xs font-medium text-muted-foreground">{labels[group.kind]}</h3>}
               <ul className="flex flex-col gap-1">
                 {group.rows.map((row) => (

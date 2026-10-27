@@ -3,11 +3,9 @@ import { EventSourceParserStream } from 'eventsource-parser/stream'
 import { HttpError, request } from '@/api/fetch'
 import type { WebRepos, WebWarning, WtmEventsV2 } from '@/api/types.gen'
 
-// an operation the bus says is under way, from any surface: the worktrees it started on, until it finishes; command
-// is empty for one whose start this stream did not see
 export type UnderWay = { repo: string | undefined; command: string; subjects: string[]; since: number }
 
-// the core's own cap on an operation: one whose process died never says it finished
+// a process that died never says its operation finished
 export const operationCap = 10 * 60_000
 
 export const current = (operations: Record<string, UnderWay>, now: number) =>

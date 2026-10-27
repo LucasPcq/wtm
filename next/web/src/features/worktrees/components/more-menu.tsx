@@ -27,7 +27,6 @@ export function MoreMenu({
   // a worktree that goes under way closes its menu for good: it would open again once the run ends
   if (disabled && own) setOwn(false)
 
-  // a worktree that goes under way closes its menu, even one open
   return (
     <DropdownMenu open={(open ?? own) && !disabled} onOpenChange={onOpenChange ?? setOwn}>
       <DropdownMenuTrigger asChild>

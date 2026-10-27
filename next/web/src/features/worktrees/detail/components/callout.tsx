@@ -11,8 +11,6 @@ import { cn } from '@/lib/utils'
 
 type Tone = 'problem' | 'failure' | 'suggestion'
 
-// a problem asks the person something, a failure says what broke, a suggestion is the next step once things went
-// well; a problem whose fix the web runs says what that fix does to the worktree
 const calloutOf: Record<StatusProblemCode, { tone: Tone; icon: LucideIcon; consequence: string | null }> = {
   'status.missing': {
     tone: 'problem',
@@ -33,7 +31,6 @@ const look: Record<Tone, { box: string; glyph: string }> = {
   suggestion: { box: 'border-border bg-muted/40', glyph: 'text-muted-foreground' },
 }
 
-// a fix whose command the web runs opens that command's dialog on the fix's worktrees; any other is copied
 const runsHere: Record<MutationCommand, { verb: string; open: (repo: string, fix: DomainFollowUp) => void } | null> = {
   clean: {
     verb: menu.clean.label,
@@ -42,7 +39,6 @@ const runsHere: Record<MutationCommand, { verb: string; open: (repo: string, fix
   create: null,
 }
 
-// the one thing to do now, the first of status's problems; the others fold under it
 export function Callout({ repo, problems: [first, ...more] }: { repo: string; problems: StatusProblem[] }) {
   if (!first) return null
 

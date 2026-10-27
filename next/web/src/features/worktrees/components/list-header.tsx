@@ -2,12 +2,10 @@ import { Search } from 'lucide-react'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { TriCheckbox } from '@/features/worktrees/components/tri-checkbox'
 
-// from this many rows a search sits above them: below it, the whole list fits and reading beats searching
-export const searchFrom = 8
+// below this many rows the whole list fits: reading beats searching
+const searchFrom = 8
 
-// the box acts on the rows the search shows: it checks only those it may check at once (bulk: never an unsafe one,
-// which one click must not force), and clears them all, clearing being the safe way; a checked row the search hides
-// stays checked, and the count says so
+// the box never checks an unsafe row (bulk): one click must not force it
 export function ListHeader({
   total,
   visible,

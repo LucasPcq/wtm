@@ -43,7 +43,6 @@ func codes(read list.Outcome) []string {
 
 func ptr(n int) *int { return &n }
 
-// offerOf is the offer of action among offers.
 func offerOf(t *testing.T, offers []repository.Offer, action worktree.Action) repository.Offer {
 	t.Helper()
 	at := slices.IndexFunc(offers, func(offer repository.Offer) bool { return offer.Action == action })

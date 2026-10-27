@@ -22,16 +22,13 @@ test('create shows a problem only once asked to go on, then confirms the plan, r
 
   await user.type(branches, 'feat/new')
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
-  // the web's own words, not the command line's; a question only a flag sets is not said to be skipped
   expect(await within(dialog).findByText('Env files')).toBeTruthy()
   expect(within(dialog).getByText('Project default')).toBeTruthy()
   expect(within(dialog).queryByText(/Not asked/)).toBeNull()
 
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
-  // the confirmation reads the plan, not the command line's recap
   const planned = await within(dialog).findByRole('listitem', { name: 'feat/new' })
   expect(within(planned).getByText(/\.env from \.env\.example/)).toBeTruthy()
-  // how it is made waits behind Details, one click away
   expect(within(dialog).queryByText('Add the worktree, run the on_create hooks')).toBeNull()
   await user.click(within(dialog).getByRole('button', { name: /^Details/ }))
   expect(within(dialog).getByText('Add the worktree, run the on_create hooks')).toBeTruthy()
@@ -39,15 +36,12 @@ test('create shows a problem only once asked to go on, then confirms the plan, r
 
   expect(await within(dialog).findByText('feat/new is ready.')).toBeTruthy()
   expect(within(dialog).getByRole('heading', { name: 'Create worktrees' })).toBeTruthy()
-  // a lone group of the outcome needs no name
   expect(within(dialog).queryByRole('heading', { name: 'Ready' })).toBeNull()
-  // a worktree ready is one line; where it is and the step into it fold under it, with no copy on the line
   expect(within(dialog).queryByText('/acme.trees/feat/new')).toBeNull()
   expect(within(dialog).queryByRole('button', { name: 'Copy wtm go feat/new' })).toBeNull()
   await user.click(within(dialog).getByRole('button', { name: 'Details of feat/new' }))
   expect(within(dialog).getByText('/acme.trees/feat/new')).toBeTruthy()
   expect(within(dialog).getByText('wtm go feat/new')).toBeTruthy()
-  // a run that went well folds its steps away, one click from them
   expect(within(dialog).queryByText('Run the on_create hooks')).toBeNull()
   await user.click(within(dialog).getByRole('button', { name: /2 steps/ }))
   expect(within(dialog).getByText('Run the on_create hooks')).toBeTruthy()
@@ -109,7 +103,6 @@ test('a create cancelled before it made anything says it was cancelled, not that
   expect(await within(dialog).findByText(/^0 of \d+ steps done\. What is done stays/)).toBeTruthy()
   expect(within(dialog).queryByText(/Couldn't create/)).toBeNull()
 
-  // nothing was made: Done opens no worktree
   await user.click(within(dialog).getByRole('button', { name: 'Done' }))
   expect(router.state.location.search).toEqual({})
 })

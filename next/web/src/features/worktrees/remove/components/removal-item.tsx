@@ -6,7 +6,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { unsafe } from '@/features/worktrees/remove/utils/plan'
 import { blockerWords, lostWords } from '@/features/worktrees/remove/utils/words'
 
-// the box means "in this run": an unsafe worktree says why it is risky, and once checked what removing it loses
 export function RemovalItem({
   removal,
   checked = true,

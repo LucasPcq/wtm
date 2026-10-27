@@ -21,7 +21,6 @@ const commands: Record<WorktreeAction, string> = {
   clean: 'clean',
 }
 
-// every action of a worktree as the core reports it: refused with its code, else with its follow-up
 export const offers = (
   worktree: string,
   refused: Partial<Record<WorktreeAction, WorktreeUnoffered>> = {},

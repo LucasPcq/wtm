@@ -88,7 +88,6 @@ test('a hidden run that partly failed is shown on the next Remove, and only what
   const { user, dialog } = await selectAndRemove('feat/billing', 'feat/billing-ui')
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Remove 2 worktrees' }))
-  // the server named the operation: the run streams, and ending it reaches the page
   await waitFor(() =>
     expect(within(dialog).getByRole('button', { name: 'Cancel' }).hasAttribute('disabled')).toBe(false),
   )
@@ -108,7 +107,6 @@ test('a hidden run that partly failed is shown on the next Remove, and only what
   })
 
   expect(await within(screen.getByRole('toolbar', { name: 'Selection' })).findByText('1 selected')).toBeTruthy()
-  // hidden, the run says how it ended in a toast, whose Details opens its outcome
   await user.click(await screen.findByRole('button', { name: 'Details' }))
   const failed = await screen.findByRole('dialog', { name: 'Remove worktrees' })
   expect(await within(failed).findByText('1 of 2 removed.')).toBeTruthy()
@@ -135,7 +133,6 @@ test('a removal that failed is one line, its output and log one click under it, 
   expect(within(dialog).getByRole('button', { name: /^2 steps/ })).toBeTruthy()
 })
 
-// the same Alert as on the plan's steps, never a row of "To check", which holds what names a worktree
 test('a finished removal says a warning of the whole run first, as its Alert, then the groups that need the person first', async () => {
   server.use(answeringClean(cleanPlan, partlyFailedRun))
   const { user, dialog } = await selectAndRemove('feat/billing-ui', 'feat/search')

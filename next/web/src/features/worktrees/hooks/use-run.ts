@@ -84,7 +84,6 @@ const doing: Record<MutationCommand, string> = { create: 'Creating', clean: 'Rem
 
 export const isMutation = (command: string): command is MutationCommand => Object.hasOwn(doing, command)
 
-// what this page runs says how far it got; what the bus says another surface runs, only what it does
 export function useUnderWay(repo: string): Record<string, string> {
   const runs = useRuns()
   const operations = useQuery({ ...eventsQuery, select: (live) => live.operations }).data ?? {}

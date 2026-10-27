@@ -40,7 +40,6 @@ export function stoppedMessage(unit: Unit | undefined) {
   return phase ? `Cancelled during ${phaseDuring[phase]}` : 'Cancelled before it started'
 }
 
-// a warning whose params name no worktree nor branch is about the whole plan
 export const planWide = (warning: DomainWarning) => !warning.params?.worktree && !warning.params?.branch
 
 // an item's own warnings name it: two alike on two items stay two

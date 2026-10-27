@@ -17,7 +17,6 @@ export function RemoveDialog({ repo }: { repo: string }) {
   const selection = useSelection(repo)
   const close = () => useRemoveDialog.setState({ open: false })
 
-  // a run that ends hidden says how it ended; Details opens its outcome
   const told = (envelope: Applied<'clean'> | undefined, asked: number) => {
     if (useRemoveDialog.getState().open) return
     const removed = (envelope?.items ?? []).filter((item) => item.status === 'done').length

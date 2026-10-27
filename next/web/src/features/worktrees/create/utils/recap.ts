@@ -2,7 +2,7 @@ import { itemWarnings, type OutcomeGroup, outputOf, stoppedMessage } from '@/fea
 import type { Progress } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
-// the run's own warnings are RunOutcome's; a next step no item claims is said plainly with what went: nothing failed, nothing to check
+// the run's warnings are RunOutcome's; a next step no item claims goes with what went
 export function recapOf(progress: Progress<'create'>): OutcomeGroup[] {
   const envelope = progress.envelope
   if (!envelope) return []

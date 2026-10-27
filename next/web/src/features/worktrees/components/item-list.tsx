@@ -1,8 +1,6 @@
 import { Children, Fragment, isValidElement, type ReactNode } from 'react'
 import { ItemGroup, ItemSeparator } from '@/components/ui/item'
 
-// the picker's header above the rows in one box; the rows the plan leaves as they are in a section of their own, a
-// sibling of the list in the body's column
 export function ItemList({
   label,
   header,

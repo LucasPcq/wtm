@@ -5,7 +5,6 @@ import { envelope, treeDetail } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
 import { liveEvents, server } from '@/test/server'
 
-// The reads each POST asks, by command, with GitHub or without
 function recordReads() {
   const asked: string[] = []
   server.events.on('request:start', async ({ request }) => {
