@@ -105,6 +105,7 @@ const (
 	CommandFastForward = "fast-forward"
 	CommandInit        = "init"
 	PathWorktree       = "worktree" // the worktree a follow-up acts on: its branch or, on no branch, its path
+	PathTo             = "to"       // the branch reparent moves a worktree onto
 )
 
 // Enter is the follow-up that enters worktree, by its branch or, on no branch, its path; its caller gives it a code.

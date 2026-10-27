@@ -9,6 +9,7 @@
         "branch": "feat/c",
         "path": "/repo/wt-feat-c",
         "from": "feat/b",
+        "parent_gone": false,
         "to": "feat/a"
       }
     ],
@@ -42,7 +43,7 @@
       }
     ]
   },
-  "fingerprint": "7ee9f8adab8aefc24ef6a1ac",
+  "fingerprint": "7843b25b0024e02492bff81c",
   "follow_ups": [],
   "warnings": []
 }

@@ -3262,6 +3262,9 @@
         "from": {
           "type": "string"
         },
+        "parent_gone": {
+          "type": "boolean"
+        },
         "path": {
           "type": "string"
         },
@@ -3273,6 +3276,7 @@
         "branch",
         "path",
         "from",
+        "parent_gone",
         "to"
       ],
       "type": "object"

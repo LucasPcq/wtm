@@ -20,9 +20,6 @@ func (r Request) From(caller domain.Caller) Request {
 	return r
 }
 
-// PathTo is the path of the new parent, by which each surface words it; the worktrees' is domain.PathWorktree, the path every follow-up that moves a worktree answers.
-const PathTo = "to"
-
 // Answer is the request with the field at path answered by values. A value the field cannot take leaves the request as it was.
 func (r Request) Answer(path string, values []string) (Request, error) {
 	next := r
@@ -30,7 +27,7 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 	switch path {
 	case domain.PathWorktree:
 		next.Worktrees = values
-	case PathTo:
+	case domain.PathTo:
 		next.To, err = domain.One[string](path, values)
 	default:
 		return r, domain.Unknown(path)
@@ -47,7 +44,7 @@ func (r Request) Values(path string) []string {
 	switch path {
 	case domain.PathWorktree:
 		return r.Worktrees
-	case PathTo:
+	case domain.PathTo:
 		return domain.Spelled(r.To)
 	}
 
@@ -83,21 +80,18 @@ type To struct {
 // NewQuestions builds the questions for the request on the facts: the worktrees picked, the moves they make, and the branches the new parent can be, those that would close a cycle with the worktrees given left out.
 func NewQuestions(f Facts, req Request) Questions {
 	picked, origin := f.picked(req)
-	moves, problems := f.entries(picked)
+	moves, problems := f.entries(picked, req.To)
 	questions := Questions{
 		Worktrees: Worktrees{Picked: picked, Origin: origin, Options: f.worktreeOptions()},
 		To:        f.to(req, branches(moves)),
 		Moves:     moves,
 		Errors:    problems,
 	}
-	for i := range questions.Moves {
-		questions.Moves[i].To = req.To
-	}
 	if len(picked) == 0 {
 		questions.Errors = append(questions.Errors, domain.Required(domain.PathWorktree))
 	}
 	if req.To == "" {
-		questions.Errors = append(questions.Errors, domain.Required(PathTo))
+		questions.Errors = append(questions.Errors, domain.Required(domain.PathTo))
 	}
 	if problem := f.problemOf(req.To, branches(moves)); problem != nil {
 		questions.Errors = append(questions.Errors, *problem)
@@ -110,7 +104,7 @@ func NewQuestions(f Facts, req Request) Questions {
 func (q Questions) Form() domain.Form {
 	return domain.Form{Problems: q.Errors, Fields: []domain.Field{
 		domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: domain.PathWorktree, Origin: q.Worktrees.Origin}, Picked: q.Worktrees.Picked, Options: q.Worktrees.Options},
-		domain.SelectField{FieldSpec: domain.FieldSpec{Path: PathTo, Origin: q.To.Origin}, Value: q.To.Value, Options: q.To.Options, Pinned: q.To.Pinned, Refreshable: true, Refused: q.To.Refused},
+		domain.SelectField{FieldSpec: domain.FieldSpec{Path: domain.PathTo, Origin: q.To.Origin}, Value: q.To.Value, Options: q.To.Options, Pinned: q.To.Pinned, Refreshable: true, Refused: q.To.Refused},
 	}}
 }
 
@@ -164,13 +158,12 @@ func (f Facts) to(req Request, moving []string) To {
 // ----------------------------------------------------------------------------
 // Resolve and validation
 
-// Resolve settles the request on the facts, the worktrees defaulting to the caller's; a request with problems is refused with all of them, by domain.Invalid.
-func Resolve(f Facts, req Request) (Request, error) {
+// Resolve settles the request on the facts as its questions, the worktrees defaulting to the caller's and each one's move; a request with problems is refused with all of them, by domain.Invalid.
+func Resolve(f Facts, req Request) (Questions, error) {
 	questions := NewQuestions(f, req)
 	if len(questions.Errors) > 0 {
-		return Request{}, domain.Invalid(questions.Errors)
+		return Questions{}, domain.Invalid(questions.Errors)
 	}
 
-	req.Worktrees = questions.Worktrees.Picked
-	return req, nil
+	return questions, nil
 }

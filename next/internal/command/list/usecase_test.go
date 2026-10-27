@@ -179,6 +179,7 @@ func TestARecordThatDoesNotReadKeepsItsWorktreeAndIsAWarning(t *testing.T) {
 	require.Len(t, item.Warnings, 1)
 	assert.Equal(t, list.CodeMetaUnreadable, item.Warnings[0].Code)
 	assert.Nil(t, item.Detail.CreatedAt)
+	assert.True(t, item.Detail.Recorded, "a record that does not read is a record still: reparent refuses it with why")
 }
 
 func TestARecordThatDoesNotReadIsAWarningOnAWorktreeNotReadToo(t *testing.T) {

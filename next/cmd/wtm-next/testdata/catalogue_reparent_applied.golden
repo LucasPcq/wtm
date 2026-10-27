@@ -20,6 +20,7 @@
         "branch": "feat/b",
         "path": "<root>/.trees/feat-b",
         "from": "topic",
+        "parent_gone": true,
         "to": "feat/a"
       }
     ],

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/reparent"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,4 +45,18 @@ func TestAPlanThatMovesNothingIsAppliedWithoutNamingAMove(t *testing.T) {
 
 	assert.Equal(t, stepRecap, d.Wizard.Current())
 	assert.Contains(t, d.Screen(), "Yes, apply")
+}
+
+func TestTheNewParentStepSaysTheParentLeftIsGone(t *testing.T) {
+	w := newWorld(seed{})
+	_, err := w.store.Update(t.Context(), worktree.MetaUpdate{Branch: featC, Change: func(meta *worktree.Meta) error {
+		meta.SourceBranch = "feat/deleted"
+		return nil
+	}})
+	require.NoError(t, err)
+
+	d := open(t, sessionParams{App: w.usecase(), Request: reparent.Request{Worktrees: []string{featC}}})
+
+	assert.Equal(t, stepTo, d.Wizard.Current())
+	assert.Contains(t, d.Screen(), "feat/c is rebased onto feat/deleted (gone)")
 }

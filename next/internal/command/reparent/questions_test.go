@@ -54,7 +54,7 @@ func TestANewParentUnderAWorktreeMovedIsACycleNamingWhichOne(t *testing.T) {
 
 	require.Len(t, q.Errors, 1)
 	assert.Equal(t, reparent.CodeCycle, q.Errors[0].Code)
-	assert.Equal(t, reparent.PathTo, q.Errors[0].Path)
+	assert.Equal(t, domain.PathTo, q.Errors[0].Path)
 	assert.Equal(t, domain.Params{"value": featC, "under": featA}, q.Errors[0].Params)
 }
 
@@ -80,7 +80,7 @@ func TestTheNewParentIsChecked(t *testing.T) {
 				assert.Empty(t, q.Errors)
 				return
 			}
-			assert.Equal(t, map[string][]string{reparent.PathTo: {c.code}}, fieldCodes(q.Errors))
+			assert.Equal(t, map[string][]string{domain.PathTo: {c.code}}, fieldCodes(q.Errors))
 		})
 	}
 }
@@ -121,4 +121,16 @@ func TestTheRequestRoundTripsThroughItsForm(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, req.Values(path), answered.Values(path), path)
 	}
+}
+
+func TestARecordThatDoesNotReadRefusesItsEntryWithItsCause(t *testing.T) {
+	w := newWorld(t)
+	writeFile(t, w.recordPath(t, featX), "{")
+
+	q := w.questions(t, moving("main", featX))
+
+	require.Len(t, q.Errors, 1)
+	assert.Equal(t, reparent.CodeMetaUnreadable, q.Errors[0].Code)
+	assert.Contains(t, q.Errors[0].Params["cause"], "unexpected end of JSON input")
+	assert.NotContains(t, valuesOf(q.Worktrees.Options), featX)
 }

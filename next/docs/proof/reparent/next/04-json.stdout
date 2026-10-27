@@ -20,6 +20,7 @@
         "branch": "feat/b",
         "path": "<SB>/acme.trees/feat-b",
         "from": "main",
+        "parent_gone": false,
         "to": "feat/a"
       }
     ],

@@ -6,15 +6,16 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/reparent"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestADetachedWorktreeInTheRepositoryRefusesNoMove(t *testing.T) {
 	w := newWorld(t)
-	req := moving("main", featC)
 
-	plan := reparent.Decide(w.facts(t, req), req)
+	plan, _, err := w.usecase.Plan(t.Context(), moving(featX, featC))
 
-	assert.Equal(t, []reparent.Move{{Branch: featC, Path: w.at(featC), From: featB, To: "main"}}, plan.Moves)
+	require.NoError(t, err)
+	assert.Equal(t, []reparent.Move{{Branch: featC, Path: w.at(featC), From: featB, To: featX}}, plan.Moves)
 }
 
 func TestACycleElsewhereRefusesNothingAndAMemberCanMoveOutOfIt(t *testing.T) {
@@ -27,15 +28,14 @@ func TestACycleElsewhereRefusesNothingAndAMemberCanMoveOutOfIt(t *testing.T) {
 
 	assert.Empty(t, elsewhere.Errors)
 	assert.Empty(t, out.Errors)
-	assert.Equal(t, map[string][]string{reparent.PathTo: {reparent.CodeCycle}}, fieldCodes(into.Errors))
+	assert.Equal(t, map[string][]string{domain.PathTo: {reparent.CodeCycle}}, fieldCodes(into.Errors))
 }
 
 func TestAMoveCarriesTheChildrenThatFollowIt(t *testing.T) {
 	w := newWorld(t)
-	req := moving("main", featA)
+	plan, _, err := w.usecase.Plan(t.Context(), moving("main", featA))
 
-	plan := reparent.Decide(w.facts(t, req), req)
-
+	require.NoError(t, err)
 	assert.Equal(t, []string{featB}, plan.Moves[0].Children)
 }
 
@@ -49,14 +49,14 @@ func TestTheRecapSaysWhereEachWorktreeComesFrom(t *testing.T) {
 		{Value: featB, Params: domain.Params{"from": featA, "to": "main"}, Text: "feat/b (feat/a → main)"},
 		{Value: featX, Note: reparent.NoteUnchanged, Params: domain.Params{"from": "main", "to": "main"}, Text: "feat/x (already on main)"},
 	}, plan.Recap[0].Values)
-	assert.Equal(t, reparent.PathTo, plan.Recap[1].Path)
+	assert.Equal(t, domain.PathTo, plan.Recap[1].Path)
 }
 
 func TestThePlanHoldsTheNewParentAndWhatItSitsUnderShared(t *testing.T) {
 	w := newWorld(t)
-	req := moving(featB, featC, featX)
+	plan, _, err := w.usecase.Plan(t.Context(), moving(featB, featC, featX))
 
-	plan := reparent.Decide(w.facts(t, req), req)
+	require.NoError(t, err)
 
 	assert.ElementsMatch(t, []domain.Lock{
 		{Scope: domain.ScopeRepo, Mode: domain.LockShared},

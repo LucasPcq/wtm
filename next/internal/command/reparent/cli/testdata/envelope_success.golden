@@ -30,6 +30,7 @@
         "branch": "feat/b",
         "path": "/repo/wt-feat-b",
         "from": "feat/a",
+        "parent_gone": false,
         "to": "main",
         "children": [
           "feat/c"
@@ -39,6 +40,7 @@
         "branch": "feat/x",
         "path": "/repo/wt-feat-x",
         "from": "main",
+        "parent_gone": false,
         "to": "main"
       }
     ],

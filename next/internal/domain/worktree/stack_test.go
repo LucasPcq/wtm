@@ -195,25 +195,29 @@ func TestWithinSaysWhichMovedBranchATargetSitsUnder(t *testing.T) {
 	stack := StackOf(worktrees, records, "main")
 	cases := map[string]struct {
 		branch string
-		roots  []string
+		moving []string
 		under  string
 	}{
-		"itself":          {branch: "b", roots: []string{"b"}, under: "b"},
-		"grandchild":      {branch: "c", roots: []string{"a"}, under: "a"},
-		"one_of_several":  {branch: "c", roots: []string{"x", "b"}, under: "b"},
-		"sibling":         {branch: "x", roots: []string{"a"}},
-		"above":           {branch: "main", roots: []string{"a"}},
-		"no_worktree":     {branch: "topic", roots: []string{"a"}},
-		"cycle_elsewhere": {branch: "p", roots: []string{"a"}},
-		"into_its_cycle":  {branch: "q", roots: []string{"p"}, under: "p"},
+		"itself":          {branch: "b", moving: []string{"b"}, under: "b"},
+		"grandchild":      {branch: "c", moving: []string{"a"}, under: "a"},
+		"one_of_several":  {branch: "c", moving: []string{"x", "b"}, under: "b"},
+		"sibling":         {branch: "x", moving: []string{"a"}},
+		"above":           {branch: "main", moving: []string{"a"}},
+		"no_worktree":     {branch: "topic", moving: []string{"a"}},
+		"cycle_elsewhere": {branch: "p", moving: []string{"a"}},
+		"into_its_cycle":  {branch: "q", moving: []string{"p"}, under: "p"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			under, ok := stack.Within(c.branch, c.roots)
-			assert.Equal(t, c.under, under)
-			assert.Equal(t, c.under != "", ok)
+			assert.Equal(t, c.under, stack.Within(c.branch, c.moving))
 		})
 	}
+}
+
+func TestWithinStopsAtTheBaseBranch(t *testing.T) {
+	stack := StackOf(live("develop", "feat/x"), map[string]Meta{"develop": from("feat/x"), "feat/x": from("main")}, "develop")
+
+	assert.Empty(t, stack.Within("develop", []string{"feat/x"}))
 }
 
 func TestAncestorsClimbToTheRoot(t *testing.T) {

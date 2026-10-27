@@ -99,12 +99,12 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 		return Plan{}, nil, err
 	}
 
-	resolved, err := Resolve(facts, req)
+	questions, err := Resolve(facts, req)
 	if err != nil {
 		return Plan{}, nil, err
 	}
 
-	planned := Decide(facts, resolved)
+	planned := Decide(facts, questions)
 	planned.Recap = planned.recap()
 	return planned, nil, nil
 }
@@ -149,14 +149,13 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	for _, w := range repo.Worktrees {
 		branches = append(branches, w.Branch())
 	}
-	// A record that does not read is no record: the worktree cannot be moved, as one wtm did not create.
-	records, _ := repository.Records(u.Meta, branches)
+	records, recordErrs := repository.Records(u.Meta, branches)
 	cwd, err := repository.Located(ctx, u.Git, req.Caller.Cwd, domain.Caller{})
 	if err != nil {
 		return Facts{}, err
 	}
 
-	return Facts{Repository: repo, Records: records, Stack: worktree.StackOf(repo.Worktrees, records, repo.Config.Worktrees.BaseBranch), Cwd: cmp.Or(cwd, req.Caller.Cwd)}, nil
+	return Facts{Repository: repo, Records: records, RecordErrs: recordErrs, Stack: worktree.StackOf(repo.Worktrees, records, repo.Config.Worktrees.BaseBranch), Cwd: cmp.Or(cwd, req.Caller.Cwd)}, nil
 }
 
 // ----------------------------------------------------------------------------
@@ -171,7 +170,7 @@ func (u UseCase) move(ctx context.Context, move Move, report domain.Report) Item
 		return Item{Subject: move.Branch, Status: domain.StatusSkipped, Reason: domain.ReasonInterrupted}
 	}
 	item := Item{Subject: move.Branch, Status: domain.StatusDone, Detail: &Detail{Path: move.Path, From: move.From, To: move.To}}
-	if move.unchanged() {
+	if move.Unchanged() {
 		item.Reason = domain.ReasonUnchanged
 		return item
 	}

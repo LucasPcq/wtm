@@ -89,7 +89,7 @@ func TestEachEnvelopeOfReparentHasItsGolden(t *testing.T) {
 }
 
 func TestAFollowUpNamingReparentIsSpelledFromItsSchema(t *testing.T) {
-	undo := domain.FollowUp{Command: reparent.Name, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{featC}}, {Path: reparent.PathTo, Values: []string{featB}}}}
+	undo := domain.FollowUp{Command: reparent.Name, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{featC}}, {Path: domain.PathTo, Values: []string{featB}}}}
 	wrong := domain.FollowUp{Command: reparent.Name, Answers: []domain.Answered{{Path: "force", Values: []string{"true"}}}}
 	assert.Equal(t, []string{"wtm-next", "reparent", featC, "--to", featB}, Line(undo))
 	assert.Nil(t, Line(wrong))

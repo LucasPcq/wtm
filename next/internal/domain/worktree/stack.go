@@ -12,6 +12,7 @@ import (
 type Stack struct {
 	parents  map[string]string
 	recorded map[string]string // every parent recorded, those of a cycle's members included
+	base     string
 	children map[string][]string
 	roots    []string
 	steps    map[string]bool
@@ -21,7 +22,7 @@ type Stack struct {
 
 // StackOf builds the stack of the live worktrees from records, the meta record of each branch, by their source branches; base is the base branch. It never fails: the main worktree is a root whatever its record says, and a main worktree on no branch is no node, its children then under a virtual root of the branch they name; the base branch keeps its recorded parent; a worktree with no record or no source branch is a root; and the members of a cycle are promoted to roots, the cycle recorded for Cascade to refuse. Siblings, and the roots after the main one, are ordered by creation time, then by name; the virtual roots come last, by name.
 func StackOf(worktrees []Worktree, records map[string]Meta, base string) Stack {
-	stack := Stack{parents: map[string]string{}, children: map[string][]string{}, steps: map[string]bool{}, cycles: map[string][]string{}, virtual: map[string]bool{}}
+	stack := Stack{base: base, parents: map[string]string{}, children: map[string][]string{}, steps: map[string]bool{}, cycles: map[string][]string{}, virtual: map[string]bool{}}
 	created := map[string]time.Time{}
 	main := ""
 	for _, w := range worktrees {
@@ -108,17 +109,20 @@ func (s Stack) InCycle(branch string) bool {
 	return loops
 }
 
-// Within returns the one of roots that branch is or sits under, following the parents recorded, a cycle's members included, and reports whether there is one: moving roots onto branch closes a cycle exactly then. A cycle out of roots' reach ends the walk and refuses nothing, nor does a worktree on no branch, which is no node.
-func (s Stack) Within(branch string, roots []string) (string, bool) {
+// Within returns the one of moving that branch is or sits under, following the parents recorded, a cycle's members included; "" when none: moving them onto branch closes a cycle exactly then. The walk ends at the base branch, which sync never rebases onto its recorded parent, and at a cycle out of moving's reach; a worktree on no branch is no node.
+func (s Stack) Within(branch string, moving []string) string {
 	seen := map[string]bool{}
 	for at, ok := branch, true; ok && !seen[at]; at, ok = s.recorded[at] {
-		if slices.Contains(roots, at) {
-			return at, true
+		if slices.Contains(moving, at) {
+			return at
+		}
+		if at == s.base {
+			return ""
 		}
 		seen[at] = true
 	}
 
-	return "", false
+	return ""
 }
 
 // Ancestors returns the branches branch sits under, its parent first, up to its root.

@@ -283,22 +283,13 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Env:       f.envOf(w, state),
 	}
 	detail.Condition = worktree.ConditionOf(worktree.ConditionParams{Missing: state.Missing, Operation: w.Operation(), Merged: merged, Dirty: len(state.Changes) > 0})
-	detail.Problems = Problems(ProblemsParams{Branch: branch, Path: w.Path, Gone: state.Missing, Merged: merged, BehindOrigin: behindOrigin(detail.Origin), Parent: parent, ParentGone: parent != "" && !f.Candidate(parent), Cycle: f.Stack.InCycle(branch), Onto: f.onto(), Lacks: state.Lacks, Sync: w.NeedsSync(&state.Lacks), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
+	detail.Problems = Problems(ProblemsParams{Branch: branch, Path: w.Path, Gone: state.Missing, Merged: merged, BehindOrigin: behindOrigin(detail.Origin), Parent: parent, ParentGone: parent != "" && !f.Candidate(parent), Cycle: f.Stack.InCycle(branch), Onto: f.ExistingBase(), Lacks: state.Lacks, Sync: w.NeedsSync(&state.Lacks), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
 
 	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
 	if len(state.Unread) > 0 {
 		item.Warnings = append(item.Warnings, domain.Warning{Code: CodePartial, Message: "couldn't read all of " + subject + ": " + strings.Join(state.Unread, "; "), Params: domain.Params{"path": w.Path}})
 	}
 	return item
-}
-
-// onto is the base branch, a worktree sync cannot rebase moves onto; "" when it is no branch.
-func (f Facts) onto() string {
-	if base := f.Config.Worktrees.BaseBranch; f.Candidate(base) {
-		return base
-	}
-
-	return ""
 }
 
 // recordWarnings are the warnings of the record of branch when it exists but does not read, none otherwise.
@@ -633,7 +624,6 @@ const (
 	commandRunStart   = "run start"
 	commandSync       = "sync"
 	pathFrom          = "from"
-	pathTo            = "to"
 	pathJob           = "job"
 	pathDetach        = "detach"
 )
@@ -695,7 +685,7 @@ func parentProblem(params ProblemsParams) (Problem, bool) {
 	}
 
 	fixed := func(code ProblemCode, message string) (Problem, bool) {
-		return Problem{Code: code, Message: message, Fix: fix(code, "move it onto "+params.Onto, domain.CommandReparent, params.Branch, domain.Answered{Path: pathTo, Values: []string{params.Onto}})}, true
+		return Problem{Code: code, Message: message, Fix: fix(code, "move it onto "+params.Onto, domain.CommandReparent, params.Branch, domain.Answered{Path: domain.PathTo, Values: []string{params.Onto}})}, true
 	}
 	switch {
 	case params.ParentGone:

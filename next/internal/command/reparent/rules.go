@@ -12,12 +12,13 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what reparent decides from, as Observe read them: the repository (its config and snapshot), the meta record of each worktree on a branch, the stack they make, and the worktree root the caller stands in, as git spells it.
+// Facts are what reparent decides from, as Observe read them: the repository (its config and snapshot), the meta record of each worktree on a branch and the error of one that exists but does not read, the stack they make, and the worktree root the caller stands in, as git spells it.
 type Facts struct {
 	worktree.Repository
-	Records map[string]worktree.Meta
-	Stack   worktree.Stack
-	Cwd     string
+	Records    map[string]worktree.Meta
+	RecordErrs map[string]error
+	Stack      worktree.Stack
+	Cwd        string
 }
 
 // named returns the worktree whose name is name, its branch or, on no branch, its path, and whether there is one.
@@ -49,31 +50,33 @@ func (f Facts) current() string {
 // ----------------------------------------------------------------------------
 // The decision of each worktree
 
-// A Move is one worktree moved onto a new parent: its branch and path, the parent it leaves (empty when it had none) and the one it goes to, and its children, which follow it.
+// A Move is one worktree moved onto a new parent: its branch and path, the parent it leaves (empty when it had none) and whether that parent is no branch any more, the one it goes to, and its children, which follow it.
 type Move struct {
-	Branch   string   `json:"branch"`
-	Path     string   `json:"path"`
-	From     string   `json:"from"`
-	To       string   `json:"to"`
-	Children []string `json:"children,omitempty"`
+	Branch     string   `json:"branch"`
+	Path       string   `json:"path"`
+	From       string   `json:"from"`
+	ParentGone bool     `json:"parent_gone"`
+	To         string   `json:"to"`
+	Children   []string `json:"children,omitempty"`
 }
 
-// unchanged reports whether the worktree already stands on the parent it moves to.
-func (m Move) unchanged() bool {
+// Unchanged reports whether the worktree already stands on the parent it moves to.
+func (m Move) Unchanged() bool {
 	return m.From == m.To
 }
 
-// The codes of a worktree reparent cannot move: the main worktree, the base branch's, one on no branch, one wtm did not create; and of a new parent under a worktree it moves.
+// The codes of a worktree reparent cannot move: the main worktree, the base branch's, one on no branch, one whose record does not read, one wtm did not create; and of a new parent under a worktree it moves.
 const (
-	CodeMainWorktree = Name + ".main_worktree"
-	CodeBaseBranch   = Name + ".base_branch"
-	CodeDetached     = Name + ".detached"
-	CodeUnrecorded   = Name + ".unrecorded"
-	CodeCycle        = Name + ".cycle"
+	CodeMainWorktree   = Name + ".main_worktree"
+	CodeBaseBranch     = Name + ".base_branch"
+	CodeDetached       = Name + ".detached"
+	CodeMetaUnreadable = Name + domain.MetaUnreadable
+	CodeUnrecorded     = Name + ".unrecorded"
+	CodeCycle          = Name + ".cycle"
 )
 
-// entries decides each worktree names asks to move: its move, or the problem of its entry: blank, given twice, no worktree, or a worktree reparent cannot move.
-func (f Facts) entries(names []string) (moves []Move, problems []domain.FieldError) {
+// entries decides each worktree names asks to move onto to: its move, or the problem of its entry: blank, given twice, no worktree, or a worktree reparent cannot move.
+func (f Facts) entries(names []string, to string) (moves []Move, problems []domain.FieldError) {
 	for index, name := range names {
 		path := domain.PathWorktree + "[" + strconv.Itoa(index) + "]"
 		problem := func(code, template string) domain.FieldError {
@@ -93,10 +96,15 @@ func (f Facts) entries(names []string) (moves []Move, problems []domain.FieldErr
 			problems = append(problems, problem(CodeDetached, "{value} is on no branch: only a branch has a parent"))
 		case w.Branch() == f.Config.Worktrees.BaseBranch:
 			problems = append(problems, problem(CodeBaseBranch, "{value} is the base branch: sync never rebases it"))
+		case f.RecordErrs[w.Branch()] != nil:
+			unread := problem(CodeMetaUnreadable, "couldn't read the record of {value}: {cause}")
+			unread.Params["cause"] = f.RecordErrs[w.Branch()].Error()
+			problems = append(problems, unread)
 		case !f.movable(w):
 			problems = append(problems, problem(CodeUnrecorded, "{value} has no wtm record: wtm did not create it"))
 		default:
-			moves = append(moves, Move{Branch: w.Branch(), Path: w.Path, From: f.Records[w.Branch()].SourceBranch, Children: f.Stack.Children(w.Branch())})
+			from := f.Records[w.Branch()].SourceBranch
+			moves = append(moves, Move{Branch: w.Branch(), Path: w.Path, From: from, ParentGone: from != "" && !f.Candidate(from), To: to, Children: f.Stack.Children(w.Branch())})
 		}
 	}
 
@@ -105,19 +113,21 @@ func (f Facts) entries(names []string) (moves []Move, problems []domain.FieldErr
 
 // problemOf is the problem of to as the new parent of the worktrees moving, nil when it has none or is not given: a branch that does not exist, one of them, or one under them, which would close a cycle.
 func (f Facts) problemOf(to string, moving []string) *domain.FieldError {
-	problem := domain.FieldError{Path: PathTo, Params: domain.Params{"value": to}}
-	switch under, cycles := f.Stack.Within(to, moving); {
+	problem := domain.FieldError{Path: domain.PathTo, Params: domain.Params{"value": to}}
+	switch {
 	case to == "":
 		return nil
 	case !f.Candidate(to):
 		problem.Code, problem.Template = domain.CodeNotFound, "{value} names no branch: pass a local branch or origin/<branch> to {path}"
 	case slices.Contains(moving, to):
 		problem.Code, problem.Template, problem.With = domain.CodeSelfParent, "{value} cannot be its own parent: pass another value to {path}", []string{domain.PathWorktree}
-	case cycles:
+	default:
+		under := f.Stack.Within(to, moving)
+		if under == "" {
+			return nil
+		}
 		problem.Code, problem.Template = CodeCycle, "{value} sits under {under}: moving {under} onto it would close a cycle"
 		problem.Params["under"] = under
-	default:
-		return nil
 	}
 
 	return &problem
@@ -135,14 +145,10 @@ func branches(moves []Move) []string {
 // ----------------------------------------------------------------------------
 // Decide
 
-// Decide turns the facts and the resolved request into the plan: the move of each worktree, those already on the new parent included.
-func Decide(f Facts, req Request) Plan {
-	moves, _ := f.entries(req.Worktrees)
-	for i := range moves {
-		moves[i].To = req.To
-	}
-
-	return Plan{Moves: moves, To: req.To, chain: append([]string{req.To}, f.Stack.Ancestors(req.To)...), facts: f}
+// Decide turns the facts and the resolved questions into the plan: the move of each worktree, those already on the new parent included.
+func Decide(f Facts, q Questions) Plan {
+	to := q.To.Value
+	return Plan{Moves: q.Moves, To: to, chain: append([]string{to}, f.Stack.Ancestors(to)...), facts: f}
 }
 
 // ----------------------------------------------------------------------------
@@ -189,7 +195,7 @@ func (p Plan) recap() []domain.RecapRow {
 	values := make([]domain.RecapValue, 0, len(p.Moves))
 	for _, move := range p.Moves {
 		value := domain.RecapValue{Value: move.Branch, Params: domain.Params{"from": move.From, "to": move.To}, Text: move.Branch + " (" + parentOf(move.From) + " → " + move.To + ")"}
-		if move.unchanged() {
+		if move.Unchanged() {
 			value.Note, value.Text = NoteUnchanged, move.Branch+" (already on "+move.To+")"
 		}
 		values = append(values, value)
@@ -197,7 +203,7 @@ func (p Plan) recap() []domain.RecapRow {
 
 	return []domain.RecapRow{
 		{Key: "worktrees", Label: "Worktrees", Path: domain.PathWorktree, Values: values},
-		{Key: "to", Label: "New parent", Path: PathTo, Values: domain.RecapValues([]string{p.To})},
+		{Key: "to", Label: "New parent", Path: domain.PathTo, Values: domain.RecapValues([]string{p.To})},
 	}
 }
 
@@ -218,10 +224,14 @@ const (
 	CodeUndo = Name + ".undo"
 )
 
+// Undo is the follow-up that moves branch back onto from, the parent it left.
+func Undo(branch, from string) domain.FollowUp {
+	return domain.FollowUp{Command: Name, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: domain.PathTo, Values: []string{from}}}, Code: CodeUndo, Message: "move " + branch + " back onto " + from}
+}
+
 // undoable reports whether branch can move back onto from: a branch still, and not under branch, as the parent of a cycle it was moved out of is.
 func (p Plan) undoable(branch, from string) bool {
-	_, cycles := p.facts.Stack.Within(from, []string{branch})
-	return p.facts.Candidate(from) && !cycles
+	return p.facts.Candidate(from) && p.facts.Stack.Within(from, []string{branch}) == ""
 }
 
 // commandSync rebases a worktree onto its parent: not migrated yet.
@@ -237,7 +247,7 @@ func (p Plan) next(items []Item) []domain.FollowUp {
 		}
 		moved = append(moved, item.Subject)
 		if from := item.Detail.From; p.undoable(item.Subject, from) {
-			undos = append(undos, domain.FollowUp{Command: domain.CommandReparent, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{item.Subject}}, {Path: PathTo, Values: []string{from}}}, Code: CodeUndo, Message: "move " + item.Subject + " back onto " + from})
+			undos = append(undos, Undo(item.Subject, from))
 		}
 	}
 	if len(moved) == 0 {

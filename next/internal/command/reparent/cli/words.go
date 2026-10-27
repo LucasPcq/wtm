@@ -14,7 +14,7 @@ func words(q reparent.Questions, field domain.Field) form.Words {
 	switch field.Spec().Path {
 	case domain.PathWorktree:
 		return form.Words{Flag: "<worktree>", Label: "Worktrees", Help: "The worktrees to move, by branch; the one you stand in by default", Empty: "Select at least one worktree", Options: worktreeWords(q.Worktrees.Options)}
-	case reparent.PathTo:
+	case domain.PathTo:
 		return form.Words{Flag: "--to", Label: "New parent", Help: toHelp(q)}
 	}
 
@@ -65,8 +65,11 @@ func leftOut(problem domain.FieldError) string {
 }
 
 func movedFrom(move reparent.Move) string {
-	if move.From == "" {
+	switch {
+	case move.From == "":
 		return move.Branch + " has no parent"
+	case move.ParentGone:
+		return move.Branch + " is rebased onto " + move.From + " (gone)"
 	}
 
 	return move.Branch + " is rebased onto " + move.From

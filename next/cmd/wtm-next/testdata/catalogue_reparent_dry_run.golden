@@ -9,6 +9,7 @@
         "branch": "feat/b",
         "path": "<root>/.trees/feat-b",
         "from": "main",
+        "parent_gone": false,
         "to": "feat/a"
       }
     ],

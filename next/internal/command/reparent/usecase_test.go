@@ -71,8 +71,8 @@ func TestTheSyncFollowUpNamesTheWorktreesMovedAndEachHasItsUndo(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []domain.FollowUp{
 		{Command: "sync", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{featB, featX, featA}}}, Code: reparent.CodeSync, Message: "rebase onto the new parent"},
-		{Command: reparent.Name, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{featB}}, {Path: reparent.PathTo, Values: []string{featA}}}, Code: reparent.CodeUndo, Message: "move feat/b back onto feat/a"},
-		{Command: reparent.Name, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{featX}}, {Path: reparent.PathTo, Values: []string{"main"}}}, Code: reparent.CodeUndo, Message: "move feat/x back onto main"},
+		{Command: reparent.Name, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{featB}}, {Path: domain.PathTo, Values: []string{featA}}}, Code: reparent.CodeUndo, Message: "move feat/b back onto feat/a"},
+		{Command: reparent.Name, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{featX}}, {Path: domain.PathTo, Values: []string{"main"}}}, Code: reparent.CodeUndo, Message: "move feat/x back onto main"},
 	}, outcome.Result.FollowUps)
 }
 
@@ -130,7 +130,7 @@ func TestACancelledApplySkipsTheWorktreesNotStarted(t *testing.T) {
 	assert.Equal(t, featA, w.parentOf(t, featB))
 }
 
-func TestAnotherOperationHoldingTheNewParentsChainMakesTheMoveWait(t *testing.T) {
+func TestAnotherOperationHoldingTheNewParentsChainRefusesTheMove(t *testing.T) {
 	w := newWorld(t)
 	held, err := w.lock(t, featA)
 	require.NoError(t, err)

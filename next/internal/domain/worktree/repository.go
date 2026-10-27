@@ -44,6 +44,15 @@ func (r Repository) NamedLive() []string {
 	return r.Live()
 }
 
+// ExistingBase returns the configured base branch when it is a branch, local or origin/<branch> origin has (Snapshot.Candidate): what a worktree whose parent is gone or loops moves onto; "" otherwise.
+func (r Repository) ExistingBase() string {
+	if base := r.Config.Worktrees.BaseBranch; r.Candidate(base) {
+		return base
+	}
+
+	return ""
+}
+
 // MissingBase returns the configured base branch, and reports whether it is missing: configured, yet no local branch of that name.
 func (r Repository) MissingBase() (string, bool) {
 	base := r.Config.Worktrees.BaseBranch
