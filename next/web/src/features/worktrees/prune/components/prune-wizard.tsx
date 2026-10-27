@@ -75,17 +75,17 @@ export function PruneWizard({
   })
 
   // a worktree named that is no longer done with since the review leaves the run, and says why under Left as they are
-  const finished = (planned.data?.error?.fields ?? []).flatMap(({ code, params }) =>
+  const noLonger = (planned.data?.error?.fields ?? []).flatMap(({ code, params }) =>
     code === notFinished && params?.value && goingNames.includes(params.value)
       ? [{ worktree: params.value, why: `No longer done with: ${params.why ?? ''}` }]
       : [],
   )
-  if (finished.length > 0) {
+  if (noLonger.length > 0) {
     check(
-      candidates.filter((candidate) => finished.some((one) => one.worktree === candidate.worktree)),
+      candidates.filter((candidate) => noLonger.some((one) => one.worktree === candidate.worktree)),
       false,
     )
-    setDropped([...dropped.filter((one) => !finished.some((now) => now.worktree === one.worktree)), ...finished])
+    setDropped([...dropped.filter((one) => !noLonger.some((now) => now.worktree === one.worktree)), ...noLonger])
   }
   const left = dropped.filter((one) => !goingNames.includes(one.worktree))
 
@@ -98,7 +98,7 @@ export function PruneWizard({
   // person checked it under that very risk: the two reads land in any order
   const consented = pruning.every((candidate) => !unsafe(candidate) || ticked(candidate)?.on)
   const fresh = plan !== undefined && !planned.isPlaceholderData && !planned.isFetching && consented
-  const unplanned = finished.length > 0 ? undefined : (planned.error?.message ?? planned.data?.error?.message)
+  const unplanned = noLonger.length > 0 ? undefined : (planned.error?.message ?? planned.data?.error?.message)
 
   // the step is the one reached, unless the facts moved under it: once the worktrees were confirmed, one that left the
   // run or joined it since (its risk changed) sends the wizard back to say it, unless the plan said why it left
@@ -150,20 +150,18 @@ export function PruneWizard({
     worktree: candidate.worktree,
     why: `Kept: ${(candidate.blockers ?? []).map((blocker) => blockerWords[blocker](candidate)).join(', ')}`,
   }))
-  const warnings = (nothing ? (review.data?.warnings ?? []) : (planned.data?.warnings ?? [])).filter(planWide)
+  // only the review fetched origin: its plan-wide warnings hold for every plan after it, the latest saying each one
+  const alerts = [...(review.data?.warnings ?? []), ...(step === 'confirm' ? (planned.data?.warnings ?? []) : [])]
+  const warnings = alerts
+    .filter(planWide)
+    .filter((one, i, all) => !all.slice(i + 1).some((later) => later.code === one.code))
 
   const body = () => {
     if (review.isPending) return <Skeleton className="h-40 w-full" />
     if (review.isError) return <p className="text-sm text-destructive">{review.error.message}</p>
     if (review.data.error) return <p className="text-sm text-destructive">{sentence(review.data.error.message)}</p>
 
-    if (nothing)
-      return (
-        <>
-          <PlanWarnings warnings={warnings} />
-          <NothingToPrune />
-        </>
-      )
+    if (nothing) return <NothingToPrune />
 
     if (step === 'worktrees')
       return (
@@ -212,7 +210,6 @@ export function PruneWizard({
     if (!plan) return !unplanned && <Skeleton className="h-40 w-full" />
     return (
       <>
-        <PlanWarnings warnings={warnings} />
         <ItemList label="Worktrees" left={leftRows([...keptRows, ...left])}>
           {pruning.map((candidate) => (
             <RemovalItem
@@ -250,6 +247,7 @@ export function PruneWizard({
 
       <DialogScroll>
         {unplanned && <p className="text-sm text-destructive">{sentence(unplanned)}</p>}
+        {step !== 'children' && <PlanWarnings warnings={warnings} />}
         {body()}
       </DialogScroll>
 

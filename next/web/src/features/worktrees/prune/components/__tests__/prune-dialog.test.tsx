@@ -154,3 +154,23 @@ test("the detail's callout prunes the merged worktree it shows, and that one onl
   expect(await within(dialog).findByText('1 of 1 selected')).toBeTruthy()
   expect(prune.answered(prune.calls[0], 'worktree')).toEqual(['feat/billing'])
 })
+
+// Only the review fetches origin: a fetch it failed was said nowhere once candidates were found.
+test("origin the review couldn't fetch is the plan's Alert on the worktrees and on Confirm", async () => {
+  const fetchFailed = {
+    code: 'prune.fetch_failed',
+    message: "couldn't fetch origin (network down): the branches it deleted are read as last fetched",
+  }
+  answeringPrune((call) =>
+    call.answers?.some((answer) => answer.path === 'no_fetch')
+      ? prunePlan(call)
+      : prunePlan(call, { warnings: [fetchFailed] }),
+  )
+  const { user, dialog } = await openFromTheHeader()
+
+  expect((await within(dialog).findByRole('alert')).textContent).toContain("Couldn't fetch origin")
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await within(dialog).findByRole('button', { name: 'Prune' })
+  expect(within(dialog).getByRole('alert').textContent).toContain("Couldn't fetch origin")
+})
