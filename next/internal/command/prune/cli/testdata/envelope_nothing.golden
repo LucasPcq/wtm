@@ -9,7 +9,8 @@
       "merged"
     ],
     "reparent_children": false,
-    "force": false
+    "force": false,
+    "empty": true
   },
   "follow_ups": [],
   "warnings": []

@@ -1,7 +1,0 @@
-$ wtm fast-forward feat/tty-latest; echo EXIT=$?
-
-┃  ✗ interrupted
-
-EXIT=19
-$
-

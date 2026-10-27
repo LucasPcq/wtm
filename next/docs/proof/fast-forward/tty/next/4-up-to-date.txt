@@ -1,0 +1,9 @@
+$ wtm fast-forward feat/tty-latest; echo EXIT=$?
+
+┃  = fast-forward: 1 unchanged
+┃
+┃  Up to date  feat/tty-latest
+
+EXIT=0
+$
+

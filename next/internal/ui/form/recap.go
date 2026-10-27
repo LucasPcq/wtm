@@ -32,8 +32,8 @@ func (w *Wizard) previewing() tea.Cmd {
 	})
 }
 
-// previewed installs the plan a preview computed and offers to apply it, or, when the preview failed, keeps its failure and offers only to cancel.
-func (w *Wizard) previewed(m previewMsg) {
+// previewed installs the plan a preview computed and offers to apply it, or finishes when it changes nothing; when the preview failed, it keeps its failure and offers only to cancel.
+func (w *Wizard) previewed(m previewMsg) tea.Cmd {
 	w.loading = ""
 	m.apply()
 
@@ -42,10 +42,15 @@ func (w *Wizard) previewed(m previewMsg) {
 		w.failure = failure
 	} else {
 		w.planned = true
+		if w.script.Empty != nil && w.script.Empty() {
+			w.ending = Finished
+			return tea.Quit
+		}
 		options = append([]widget.Option{{Label: w.applyLabel(), Value: applyValue}, {Separator: true}}, options...)
 	}
 
 	w.recap = widget.NewSelectList(widget.SelectParams{Options: options})
+	return nil
 }
 
 func (w *Wizard) applyLabel() string {

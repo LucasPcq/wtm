@@ -40,11 +40,12 @@ func TestTheWorktreeTheCallerStandsInIsPrePicked(t *testing.T) {
 	assert.Contains(t, d.Screen(), "feat/c is rebased onto feat/b")
 }
 
-func TestAPlanThatMovesNothingIsAppliedWithoutNamingAMove(t *testing.T) {
+func TestAPlanThatMovesNothingEndsWithoutAskingToConfirm(t *testing.T) {
 	d := open(t, sessionParams{App: newWorld(seed{}).usecase(), Request: reparent.Request{Worktrees: []string{featA, featX}, To: "main"}})
 
-	assert.Equal(t, stepRecap, d.Wizard.Current())
-	assert.Contains(t, d.Screen(), "Yes, apply")
+	assert.Equal(t, form.Finished, d.Wizard.Ending())
+	assert.NotContains(t, d.Screen(), "Yes, apply")
+	assert.True(t, d.s.Preview().Empty())
 }
 
 func TestTheNewParentStepSaysTheParentLeftIsGone(t *testing.T) {

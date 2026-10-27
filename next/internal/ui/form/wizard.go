@@ -39,6 +39,8 @@ type Script struct {
 	CommandLine output.CommandLine
 	// ApplyLabel names the recap's option that applies the plan Preview computed; nil offers "Yes, apply".
 	ApplyLabel func() string
+	// Empty reports whether the plan Preview computed changes nothing: the wizard then finishes without asking to confirm it, and its apply says nothing was to do; nil always asks.
+	Empty func() bool
 	// Apply carries out the request once the wizard has finished.
 	Apply func(ctx context.Context) error
 	// Stale reports whether err, an error of Apply, is a plan the facts changed under, which starts the wizard again.
@@ -159,8 +161,7 @@ func (w *Wizard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case observedMsg:
 		return w, w.observed(m)
 	case previewMsg:
-		w.previewed(m)
-		return w, nil
+		return w, w.previewed(m)
 	case laterMsg:
 		w.landed(m)
 		return w, nil

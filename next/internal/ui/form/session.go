@@ -70,6 +70,7 @@ func (s *Session[R, Q, O]) Script() Script {
 	if s.command.ApplyLabel != nil {
 		script.ApplyLabel = func() string { return s.command.ApplyLabel(*s.preview) }
 	}
+	script.Empty = func() bool { return (*s.preview).Empty() }
 
 	return script
 }

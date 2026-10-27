@@ -190,6 +190,11 @@ func (r Request) Locks() []domain.Lock {
 // NoteUnchanged notes a recap's worktree already on the new parent.
 const NoteUnchanged = "unchanged"
 
+// empty reports whether applying the plan changes nothing: every worktree already stands on the new parent.
+func (p Plan) empty() bool {
+	return !slices.ContainsFunc(p.Moves, func(m Move) bool { return !m.Unchanged() })
+}
+
 // recap is the plan row by row: each worktree with the parent it leaves and the one it goes to, then the new parent.
 func (p Plan) recap() []domain.RecapRow {
 	values := make([]domain.RecapValue, 0, len(p.Moves))

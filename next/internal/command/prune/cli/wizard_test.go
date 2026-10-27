@@ -36,11 +36,12 @@ func TestCheckingAnUnsafeWorktreeAsksForceAndTheRequestIsWhatWasAnswered(t *test
 	assert.NotEmpty(t, d.s.Preview().Fingerprint)
 }
 
-func TestNothingToPruneSkipsTheWorktreesStep(t *testing.T) {
+func TestNothingToPruneEndsWithoutAskingToConfirm(t *testing.T) {
 	d := open(t, sessionParams{App: newWorld(seed{NoPRs: true}).usecase(), Request: prune.Request{Merged: true}})
 
-	assert.Equal(t, stepRecap, d.Wizard.Current())
-	assert.Contains(t, d.Screen(), "Worktrees — no worktree is done with")
+	assert.Equal(t, form.Finished, d.Wizard.Ending())
+	assert.NotContains(t, d.Screen(), "Yes, apply")
+	assert.True(t, d.s.Preview().Empty())
 }
 
 // The default pick confirmed untouched read as worktrees named: feat/dirty, left out of it, vanished from the plan with its warning and its --force line.

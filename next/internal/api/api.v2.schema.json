@@ -37,6 +37,9 @@
           },
           "type": "array"
         },
+        "empty": {
+          "type": "boolean"
+        },
         "force": {
           "type": "boolean"
         },
@@ -287,6 +290,9 @@
         },
         "creates": {
           "type": "integer"
+        },
+        "empty": {
+          "type": "boolean"
         },
         "env_from": {
           "$ref": "#/$defs/project.EnvStrategy"
@@ -1537,6 +1543,9 @@
         "command": {
           "type": "string"
         },
+        "empty": {
+          "type": "boolean"
+        },
         "jobs": {
           "type": "integer"
         },
@@ -1828,6 +1837,9 @@
         },
         "creates": {
           "type": "integer"
+        },
+        "empty": {
+          "type": "boolean"
         },
         "env_from": {
           "$ref": "#/$defs/project.EnvStrategy"
@@ -2445,6 +2457,9 @@
     "fastforward.Plan": {
       "additionalProperties": false,
       "properties": {
+        "empty": {
+          "type": "boolean"
+        },
         "force": {
           "type": "boolean"
         },
@@ -2958,6 +2973,9 @@
     "prune.Plan": {
       "additionalProperties": false,
       "properties": {
+        "empty": {
+          "type": "boolean"
+        },
         "force": {
           "type": "boolean"
         },
@@ -3284,6 +3302,9 @@
     "reparent.Plan": {
       "additionalProperties": false,
       "properties": {
+        "empty": {
+          "type": "boolean"
+        },
         "moves": {
           "anyOf": [
             {

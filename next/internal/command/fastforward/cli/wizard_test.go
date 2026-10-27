@@ -71,3 +71,11 @@ func TestASafeRunDoesNotAskForce(t *testing.T) {
 	assert.Equal(t, stepRecap, d.Wizard.Current())
 	assert.Contains(t, d.Screen(), "· Force — no worktree named behind origin has uncommitted changes")
 }
+
+func TestNothingToFastForwardEndsWithoutAskingToConfirm(t *testing.T) {
+	d := open(t, sessionParams{App: newWorld().usecase(), Request: fastforward.Request{Worktrees: []string{latest}}})
+
+	assert.Equal(t, form.Finished, d.Wizard.Ending())
+	assert.NotContains(t, d.Screen(), "Yes, apply")
+	assert.True(t, d.s.Preview().Empty())
+}

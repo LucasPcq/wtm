@@ -227,9 +227,14 @@ tty_side() {
     tmux send-keys -t "$session" Enter
     capture 3-outcome 'EXIT=0'
     start fast-forward feat/tty-latest
-    settle 'No, cancel'
-    tmux send-keys -t "$session" Escape
-    capture 4-left 'EXIT=19'
+    if [[ $side == legacy ]]; then
+      # legacy asks to confirm a plan that changes nothing: left with esc
+      settle 'No, cancel'
+      tmux send-keys -t "$session" Escape
+      capture 4-up-to-date 'EXIT=19'
+    else
+      capture 4-up-to-date 'EXIT=0'
+    fi
   )
   sed -i '' -E -e "s#(/private)?$box#<SB>#g" -e 's#wtmx#wtm#g' -e 's#[0-9a-f]{7,40}\.\.[0-9a-f]{7,40}#<SHA>..<SHA>#g' "$tty"/*
 }
