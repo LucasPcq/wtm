@@ -9,23 +9,22 @@ import { ChildrenStep } from '@/features/worktrees/components/children-step'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { ItemList } from '@/features/worktrees/components/item-list'
-import { LeftItem } from '@/features/worktrees/components/left-item'
+import { type Left, LeftItem } from '@/features/worktrees/components/left-item'
 import { ListHeader } from '@/features/worktrees/components/list-header'
 import { NextButton } from '@/features/worktrees/components/next-button'
 import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { RemovalDetails } from '@/features/worktrees/components/removal-details'
 import { RemovalItem } from '@/features/worktrees/components/removal-item'
 import { Stepper, type StepState } from '@/features/worktrees/components/stepper'
-import type { Left } from '@/features/worktrees/hooks/use-remove-dialog'
 import type { Start } from '@/features/worktrees/hooks/use-run'
 import { NothingToPrune } from '@/features/worktrees/prune/components/nothing-to-prune'
 import { ReasonLine } from '@/features/worktrees/prune/components/reason-line'
-import { kept, requestOf } from '@/features/worktrees/prune/utils/plan'
+import { requestOf } from '@/features/worktrees/prune/utils/plan'
 import { notFinished } from '@/features/worktrees/prune/utils/words'
 import { blockerWords } from '@/features/worktrees/utils/blocker-words'
 import { searched } from '@/features/worktrees/utils/filters'
 import { planWide } from '@/features/worktrees/utils/outcome'
-import { riskOf, unitsOf, unsafe } from '@/features/worktrees/utils/removal'
+import { kept, riskOf, unitsOf, unsafe } from '@/features/worktrees/utils/removal'
 import { sentence } from '@/features/worktrees/utils/sentence'
 import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/utils/wizard-state'
 
@@ -44,14 +43,18 @@ export function PruneWizard({
   const [query, setQuery] = useState('')
   const [dropped, setDropped] = useState<Left[]>([])
 
-  // forced, the review lists every candidate with what makes it unsafe, and is the one read that fetches origin
-  const review = useQuery(
-    reviewQuery(repo, 'prune', [
-      ...(worktrees.length > 0 ? [{ path: 'worktree', values: worktrees }] : []),
-      { path: 'force', values: ['true'] },
-    ]),
-  )
-  const candidates = review.data?.plan?.worktrees ?? []
+  // forced, both list every candidate with what makes it unsafe; the review is the one read that fetches origin, and
+  // says what fetching found; the rows read origin as it left it, again on every event, so a risk shows on its row
+  const forcing = [
+    ...(worktrees.length > 0 ? [{ path: 'worktree', values: worktrees }] : []),
+    { path: 'force', values: ['true'] },
+  ]
+  const review = useQuery(reviewQuery(repo, 'prune', forcing))
+  const rows = useQuery({
+    ...dryRunQuery(repo, 'prune', [...forcing, { path: 'no_fetch', values: ['true'] }]),
+    enabled: review.isSuccess,
+  })
+  const candidates = rows.data?.plan?.worktrees ?? []
   // an unsafe worktree starts unchecked: none is touched unless asked for. A tick holds for the risk it was given
   // under, an untick whatever the risk: a worktree the person left out never comes back on its own
   const ticked = (candidate: PruneCandidate) => {
@@ -100,7 +103,8 @@ export function PruneWizard({
   // person checked it under that very risk: the two reads land in any order
   const consented = pruning.every((candidate) => !unsafe(candidate) || ticked(candidate)?.on)
   const fresh = plan !== undefined && !planned.isPlaceholderData && !planned.isFetching && consented
-  const unplanned = noLonger.length > 0 ? undefined : (planned.error?.message ?? planned.data?.error?.message)
+  const unplanned =
+    !settled || noLonger.length > 0 ? undefined : (planned.error?.message ?? planned.data?.error?.message)
 
   // the step is the one reached, unless the facts moved under it: once the worktrees were confirmed, one that left the
   // run or joined it since (its risk changed) sends the wizard back to say it, unless the plan said why it left
@@ -123,7 +127,7 @@ export function PruneWizard({
   const step = stepOf()
   const visible = candidates.filter((candidate) => searched(candidate.worktree, query))
   // shortcut: an empty review is read here as nothing to prune; once #245 lands, read the core's plan.empty instead
-  const nothing = review.data !== undefined && !review.data.error && candidates.length === 0
+  const nothing = rows.data !== undefined && !rows.data.error && candidates.length === 0
 
   const state = (of: Step): StepState => {
     const order: Step[] = ['worktrees', 'children', 'confirm']
@@ -142,7 +146,7 @@ export function PruneWizard({
 
   // a Next that can't be pressed says why, so the step needs no sentence of its own
   const blocked = () => {
-    if (review.isPending) return 'Reading GitHub and origin'
+    if (review.isPending || rows.isPending) return 'Reading GitHub and origin'
     return going.length === 0 ? 'Check a worktree to prune it' : undefined
   }
 
@@ -159,9 +163,10 @@ export function PruneWizard({
     .filter((one, i, all) => !all.slice(i + 1).some((later) => later.code === one.code))
 
   const body = () => {
-    if (review.isPending) return <Skeleton className="h-40 w-full" />
-    if (review.isError) return <p className="text-sm text-destructive">{review.error.message}</p>
-    if (review.data.error) return <p className="text-sm text-destructive">{sentence(review.data.error.message)}</p>
+    const failed =
+      review.error?.message ?? review.data?.error?.message ?? rows.error?.message ?? rows.data?.error?.message
+    if (failed) return <p className="text-sm text-destructive">{sentence(failed)}</p>
+    if (review.isPending || rows.isPending) return <Skeleton className="h-40 w-full" />
 
     if (nothing) return <NothingToPrune />
 
@@ -249,7 +254,7 @@ export function PruneWizard({
 
       <DialogScroll>
         {unplanned && <p className="text-sm text-destructive">{sentence(unplanned)}</p>}
-        {step !== 'children' && <PlanWarnings warnings={warnings} />}
+        <PlanWarnings warnings={warnings} />
         {body()}
       </DialogScroll>
 

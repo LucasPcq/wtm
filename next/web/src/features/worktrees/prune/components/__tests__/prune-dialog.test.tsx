@@ -1,33 +1,12 @@
-import { screen, within } from '@testing-library/react'
-import { HttpResponse, http } from 'msw'
+import { screen, waitFor, within } from '@testing-library/react'
+import { delay, HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
-import type { DomainAnswered, WebCall } from '@/api/types.gen'
 import { envelope, followUp, statusDetail } from '@/test/fixtures'
-import { candidates, prunePlan, pruneRun } from '@/test/prune'
+import { candidates, merged, prunePlan } from '@/test/prune'
+import { answeringPrune, openFromTheHeader } from '@/test/prune-dialog'
+import { liveEvents } from '@/test/remove'
 import { renderApp } from '@/test/render'
 import { server } from '@/test/server'
-
-// prune answered by the test, every call kept to read what the web asked
-function answeringPrune(dryRun: (call: WebCall) => Response = prunePlan) {
-  const calls: WebCall[] = []
-  server.use(
-    http.post('/api/repos/r1/commands/prune', async ({ request }) => {
-      const call = (await request.json()) as WebCall
-      calls.push(call)
-      return call.dry_run ? dryRun(call) : pruneRun(call)
-    }),
-  )
-  const answered = (call: WebCall | undefined, path: string) =>
-    call?.answers?.find((answer: DomainAnswered) => answer.path === path)?.values
-  return { calls, answered, applied: () => calls.find((call) => !call.dry_run) }
-}
-
-async function openFromTheHeader() {
-  const app = await renderApp('/r/r1/worktrees')
-  await app.user.click(await screen.findByRole('button', { name: 'Actions' }))
-  await app.user.click(await screen.findByRole('menuitem', { name: 'Prune' }))
-  return { ...app, dialog: await screen.findByRole('dialog', { name: 'Prune worktrees' }) }
-}
 
 test("from the header, the unsafe candidate starts unchecked; prune's own pick keeps it, said where it is and after", async () => {
   const prune = answeringPrune()
@@ -107,9 +86,9 @@ test('with nothing to prune, the dialog says the rule under the plan-wide warnin
 
 test('a worktree named that is no longer done with leaves the run, and Confirm says why', async () => {
   const prune = answeringPrune((call) =>
-    call.answers?.some((answer) => answer.path === 'force') && !call.answers.some((a) => a.path === 'no_fetch')
-      ? prunePlan(call)
-      : prunePlan(call, { found: candidates.filter((c) => c.worktree !== 'feat/billing') }),
+    call.answers?.some((answer) => answer.path === 'worktree')
+      ? prunePlan(call, { found: candidates.filter((c) => c.worktree !== 'feat/billing') })
+      : prunePlan(call),
   )
   const { user, dialog } = await openFromTheHeader()
 
@@ -170,6 +149,8 @@ test("origin the review couldn't fetch is the plan's Alert on the worktrees and 
 
   expect((await within(dialog).findByRole('alert')).textContent).toContain("Couldn't fetch origin")
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await within(dialog).findByText(/is stacked on feat\/billing/)
+  expect(within(dialog).getByRole('alert').textContent, 'the children step too').toContain("Couldn't fetch origin")
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
   await within(dialog).findByRole('button', { name: 'Prune' })
   expect(within(dialog).getByRole('alert').textContent).toContain("Couldn't fetch origin")
@@ -180,9 +161,9 @@ test("origin the review couldn't fetch is the plan's Alert on the worktrees and 
 test('a refusal kept from an earlier opening does not leave out a worktree done with again', async () => {
   let refusing = true
   answeringPrune((call) =>
-    refusing && call.answers?.some((answer) => answer.path === 'no_fetch')
+    refusing && call.answers?.some((answer) => answer.path === 'worktree')
       ? prunePlan(call, { found: candidates.filter((c) => c.worktree !== 'feat/billing') })
-      : prunePlan(call),
+      : delay(200).then(() => prunePlan(call)),
   )
   const { user, dialog } = await openFromTheHeader()
   await user.click(
@@ -191,6 +172,7 @@ test('a refusal kept from an earlier opening does not leave out a worktree done 
     }),
   )
   expect(await within(dialog).findByText(/^No longer finished/)).toBeTruthy()
+  expect(within(dialog).queryByText(/is not done with/), 'the refusal is said as the row left out').toBeNull()
   await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
   refusing = false
@@ -202,9 +184,40 @@ test('a refusal kept from an earlier opening does not leave out a worktree done 
       name: 'Prune feat/search-docs',
     }),
   )
-  await user.click(await within(again).findByRole('button', { name: 'Next' }))
-  await user.click(await within(again).findByRole('button', { name: 'Next' }))
+  expect(within(again).queryByText(/is not done with/), 'the kept refusal is not drawn while asked anew').toBeNull()
+  const next = async () => {
+    const button = await within(again).findByRole('button', { name: 'Next' })
+    await waitFor(() => expect(button.getAttribute('aria-disabled')).toBe('false'))
+    await user.click(button)
+  }
+  await next()
+  await next()
 
   expect(await within(again).findByRole('button', { name: 'Prune 2 worktrees' })).toBeTruthy()
+  expect(within(again).queryByText(/is not done with/)).toBeNull()
   expect(within(again).queryByText(/^No longer finished/)).toBeNull()
+})
+
+// The review was never read again: a worktree that turned unsafe after it still read safe, checked, on its row.
+test('a worktree that turns unsafe after the review shows its risk on its row, and starts unchecked', async () => {
+  const events = liveEvents()
+  let dirty = false
+  answeringPrune((call) =>
+    dirty && call.answers?.some((answer) => answer.path === 'no_fetch')
+      ? prunePlan(call, { found: candidates.map((c) => (c === merged ? { ...c, blockers: ['dirty'] } : c)) })
+      : prunePlan(call),
+  )
+  const { dialog } = await openFromTheHeader()
+  const box = async () =>
+    within(await within(dialog).findByRole('listitem', { name: 'feat/billing' })).getByRole('checkbox', {
+      name: 'Prune feat/billing',
+    })
+  expect((await box()).getAttribute('aria-checked')).toBe('true')
+
+  dirty = true
+  events.changed()
+
+  const row = await within(dialog).findByRole('listitem', { name: 'feat/billing' })
+  await waitFor(() => expect(within(row).getByText('Uncommitted changes')).toBeTruthy())
+  expect((await box()).getAttribute('aria-checked')).toBe('false')
 })

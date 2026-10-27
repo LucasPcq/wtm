@@ -17,13 +17,13 @@ export function PruneDialog({ repo }: { repo: string }) {
   const selection = useSelection(repo)
   const close = () => usePruneDialog.setState({ open: false })
 
-  const told = (envelope: Applied<'prune'> | undefined, asked: number) => {
+  // a run that did all it was asked but left something to do next (the kept ones' --force) says so in amber
+  const told = (envelope: Applied<'prune'> | undefined, { pruned, asked }: { pruned: number; asked: number }) => {
     if (usePruneDialog.getState().open) return
-    const pruned = (envelope?.items ?? []).filter((item) => item.status === 'done').length
-    if (succeeded(envelope)) return void toast.success(`${pruned} pruned.`)
-    toast.error(`${pruned} of ${asked} pruned.`, {
-      action: { label: 'Details', onClick: () => usePruneDialog.setState({ open: true }) },
-    })
+    const details = { action: { label: 'Details', onClick: () => usePruneDialog.setState({ open: true }) } }
+    if (!succeeded(envelope)) return void toast.error(`${pruned} of ${asked} pruned.`, details)
+    if (envelope?.warnings.some((warning) => warning.follow_up)) return void toast.warning(`${pruned} pruned.`, details)
+    toast.success(`${pruned} pruned.`)
   }
 
   const content = () => {
@@ -51,8 +51,9 @@ export function PruneDialog({ repo }: { repo: string }) {
         worktrees={worktrees}
         onStart={(start) =>
           run.start(start, (envelope) => {
-            told(envelope, start.units.length)
-            selection.drop((envelope?.items ?? []).filter((item) => item.status === 'done').map((item) => item.subject))
+            const pruned = (envelope?.items ?? []).filter((item) => item.status === 'done').map((item) => item.subject)
+            told(envelope, { pruned: pruned.length, asked: start.units.length })
+            selection.drop(pruned)
           })
         }
         onCancel={close}

@@ -87,6 +87,19 @@ func TestEachUnsafeWorktreeDoneWithIsKeptWithAWarningAndTheForcedRequest(t *test
 	assert.Contains(t, forced.Answers, domain.Answered{Path: prune.PathForce, Values: []string{"true"}})
 }
 
+// The web plans with no_fetch, and the request that prunes the kept ones anyway, typed in a terminal, did not read origin.
+func TestTheRequestThatPrunesTheKeptOnesAnywayReadsOriginAfresh(t *testing.T) {
+	w := newWorld(t, seed{})
+
+	_, warnings := w.plan(t, prune.Request{NoFetch: true})
+
+	forced := warnings[len(warnings)-1].FollowUp
+	require.NotNil(t, forced)
+	for _, answered := range forced.Answers {
+		assert.NotEqual(t, prune.PathNoFetch, answered.Path)
+	}
+}
+
 func TestForceWithNoWorktreeNamedPrunesTheUnsafeOnesToo(t *testing.T) {
 	w := newWorld(t, seed{})
 

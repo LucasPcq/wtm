@@ -262,8 +262,9 @@ func (f Facts) warnings(planned Plan, req Request) []domain.Warning {
 		lost := strings.Join(domain.Names(c.Blockers), ", ")
 		warning := domain.Warning{Code: CodeKept, Message: c.Worktree + " is kept: unsafe to remove (" + lost + ")", Params: domain.Params{"worktree": c.Worktree, "blockers": lost}}
 		if i == len(kept)-1 {
+			// typed in a terminal later, it reads origin afresh whatever this run did
 			forced := req
-			forced.Worktrees, forced.Force = names(kept), true
+			forced.Worktrees, forced.Force, forced.NoFetch = names(kept), true, false
 			warning.FollowUp = &domain.FollowUp{Command: Name, Answers: domain.AnswersOf(Questions{}.Form(), forced), Code: CodeForce, Message: "prune them anyway"}
 		}
 		warnings = append(warnings, warning)

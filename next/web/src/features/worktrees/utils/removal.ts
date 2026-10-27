@@ -9,8 +9,7 @@ export const riskOf = (removal: TeardownRemoval) => (removal.blockers ?? []).joi
 // a worktree on no branch, or a branch with no worktree, is no "worktree with its branch"
 export const plain = (removals: TeardownRemoval[]) => removals.every((removal) => removal.branch && removal.path)
 
-// a worktree the plan leaves as it is has no phase, and so no unit
+export const kept = (removal: TeardownRemoval) => (removal.phases ?? []).length === 0
+
 export const unitsOf = (plan: { worktrees: TeardownRemoval[] | null }): Unit[] =>
-  (plan.worktrees ?? []).flatMap(({ worktree, phases }) =>
-    (phases ?? []).length > 0 ? [todo(worktree, phases ?? [])] : [],
-  )
+  (plan.worktrees ?? []).flatMap((removal) => (kept(removal) ? [] : [todo(removal.worktree, removal.phases ?? [])]))

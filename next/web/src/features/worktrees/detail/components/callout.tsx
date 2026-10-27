@@ -6,7 +6,7 @@ import { CommandLine } from '@/features/worktrees/components/command-line'
 import { openPrune } from '@/features/worktrees/hooks/use-prune-dialog'
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
 import { isMutation } from '@/features/worktrees/hooks/use-run'
-import { menu, subjectsOf } from '@/features/worktrees/utils/actions'
+import { menu, pruneAction, subjectsOf } from '@/features/worktrees/utils/actions'
 import { sentence } from '@/features/worktrees/utils/sentence'
 import { cn } from '@/lib/utils'
 
@@ -40,7 +40,7 @@ const runsHere: Record<MutationCommand, { verb: string; open: (repo: string, fix
     open: (repo, fix) => openRemove(repo, { worktrees: subjectsOf(fix), left: [], prechecked: true }),
   },
   create: null,
-  prune: { verb: 'Prune', open: (repo, fix) => openPrune(repo, subjectsOf(fix)) },
+  prune: { verb: pruneAction.label, open: (repo, fix) => openPrune(repo, subjectsOf(fix)) },
 }
 
 export function Callout({ repo, problems: [first, ...more] }: { repo: string; problems: StatusProblem[] }) {
@@ -52,7 +52,7 @@ export function Callout({ repo, problems: [first, ...more] }: { repo: string; pr
   const command = fix?.command
   const here = command && isMutation(command) ? runsHere[command] : null
   const runs = here !== null
-  const remove = () => fix && here?.open(repo, fix)
+  const act = () => fix && here?.open(repo, fix)
 
   return (
     <section aria-label="To do" className={cn('flex flex-col gap-3 rounded-lg border p-4', box)}>
@@ -60,7 +60,7 @@ export function Callout({ repo, problems: [first, ...more] }: { repo: string; pr
         <Icon className={cn('size-4 shrink-0', glyph)} aria-hidden="true" />
         <h3 className="min-w-0 flex-1 text-sm font-medium">{sentence(first.message)}</h3>
         {runs && tone === 'suggestion' && (
-          <Button variant="outline" size="sm" onClick={remove}>
+          <Button variant="outline" size="sm" onClick={act}>
             {here.verb}
           </Button>
         )}
@@ -73,7 +73,7 @@ export function Callout({ repo, problems: [first, ...more] }: { repo: string; pr
       )}
       {fix && runs && tone !== 'suggestion' && (
         <>
-          <Button className="w-full" onClick={remove}>
+          <Button className="w-full" onClick={act}>
             {sentence(fix.message)}
           </Button>
           {consequence && <p className="text-xs text-muted-foreground">{consequence}</p>}

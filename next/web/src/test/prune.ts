@@ -95,6 +95,7 @@ export function prunePlan(
             answers: [
               { path: 'worktree', values: kept.map((one) => one.worktree) },
               { path: 'force', values: ['true'] },
+              ...(call.answers ?? []).filter((a) => !['worktree', 'force', 'no_fetch'].includes(a.path)),
             ],
             code: 'prune.force',
             message: 'prune them anyway',

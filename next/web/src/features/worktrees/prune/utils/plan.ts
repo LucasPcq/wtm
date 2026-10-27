@@ -1,9 +1,9 @@
 import type { DomainAnswered, PruneCandidate } from '@/api/types.gen'
 import { unsafe } from '@/features/worktrees/utils/removal'
 
-// the safe candidates, as checked when the dialog opened on none named, are prune's own pick: the request names none,
-// and prune keeps the unsafe ones with their warning; any other pick names the checked ones, forced only when the
-// person checked an unsafe one. Every plan reads origin as the review fetched it, and the apply holds to it.
+// opened on no worktree, a checked set equal to the default pick (every safe candidate, no unsafe one) is prune's own:
+// the request names none, and prune keeps the unsafe ones with their warning. Any other pick names the checked ones,
+// forced only when the person checked an unsafe one. Every plan reads origin as the review fetched it.
 export function requestOf({
   named,
   candidates,
@@ -25,6 +25,3 @@ export function requestOf({
     { path: 'no_fetch', values: ['true'] },
   ]
 }
-
-// a plan entry with no phase is a candidate prune leaves as it is
-export const kept = (candidate: PruneCandidate) => (candidate.phases ?? []).length === 0

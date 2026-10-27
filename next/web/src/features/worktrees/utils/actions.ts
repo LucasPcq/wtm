@@ -2,6 +2,7 @@ import {
   FastForward,
   FolderOpen,
   GitBranch,
+  GitBranchMinus,
   GitPullRequest,
   type LucideIcon,
   Play,
@@ -34,6 +35,9 @@ export const menu: Record<MenuAction, { section: Section; label: string; icon: L
 }
 
 export const menuActions = Object.keys(menu) as MenuAction[]
+
+// a repository action, not a worktree's: in no row menu, but worded and drawn the same wherever it appears
+export const pruneAction = { label: 'Prune', icon: GitBranchMinus }
 
 const unofferedWords: Record<WorktreeUnoffered, (worktree: string, action: MenuAction) => string> = {
   missing: () => 'Its folder is gone',

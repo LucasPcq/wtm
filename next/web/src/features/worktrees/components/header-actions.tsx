@@ -1,4 +1,4 @@
-import { ChevronDown, GitBranchMinus } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -10,7 +10,7 @@ import {
 import { MenuEntry } from '@/features/worktrees/components/menu-entry'
 import { openPrune } from '@/features/worktrees/hooks/use-prune-dialog'
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
-import { entryOf, menu, notInTheWeb, type Subject } from '@/features/worktrees/utils/actions'
+import { entryOf, menu, notInTheWeb, pruneAction, type Subject } from '@/features/worktrees/utils/actions'
 
 // reparent is not here: it needs a subject
 export function HeaderActions({ repo, rows }: { repo: string; rows: Subject[] }) {
@@ -27,8 +27,8 @@ export function HeaderActions({ repo, rows }: { repo: string; rows: Subject[] })
       <DropdownMenuContent align="end" className="w-64">
         <MenuEntry
           Item={DropdownMenuItem}
-          icon={GitBranchMinus}
-          label="Prune"
+          icon={pruneAction.icon}
+          label={pruneAction.label}
           why={undefined}
           onSelect={() => openPrune(repo, [])}
         />

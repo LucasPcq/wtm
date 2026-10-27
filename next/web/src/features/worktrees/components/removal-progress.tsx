@@ -47,8 +47,11 @@ export function RemovalProgress({
   const { done, total } = doneOf(progress)
   const { cancelled, failure } = ending(progress)
   const ok = !running && !failure && !cancelled
-  // the run's own failure (a stale plan, a refusal); one the core repeats from an item shows on that item's line
-  const refused = progress.refused ?? (items.some((item) => item.error) ? undefined : progress.envelope?.error?.message)
+  // the run's own failure (a stale plan, a refusal); one the core repeats from an item shows on that item's line, and a
+  // cancel is said by the items it stopped
+  const error = progress.envelope?.error
+  const refused =
+    progress.refused ?? (items.some((item) => item.error) || error?.kind === 'cancelled' ? undefined : error?.message)
   const { groups, warnings, kept } = recapOf(progress, words.dataKept)
   const branched = plain(
     (progress.envelope?.plan?.worktrees ?? []).filter((removal) => removed.includes(removal.worktree)),
