@@ -149,6 +149,26 @@ func mutations() []mutation {
 				assert.FileExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-moved", "ran"))
 			},
 		},
+		{
+			name:    "reparent",
+			answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/b"}}, {Path: "to", Values: []string{"feat/a"}}},
+			setup: func(t *testing.T, main string) {
+				for _, branch := range []string{"feat/a", "feat/b"} {
+					gittest.Git(t, main, "worktree", "add", "-q", "-b", branch, filepath.Join(filepath.Dir(main), ".trees", worktree.PathSegment(branch)))
+					recordParent(t, main, branch, "main")
+				}
+			},
+			// the parent it leaves is part of the plan
+			stale: func(t *testing.T, main string) {
+				recordParent(t, main, "feat/b", "topic")
+			},
+			untouched: func(t *testing.T, main string) {
+				assert.Equal(t, "topic", parentOf(t, main, "feat/b"))
+			},
+			applied: func(t *testing.T, main string) {
+				assert.Equal(t, "feat/a", parentOf(t, main, "feat/b"))
+			},
+		},
 	}
 }
 

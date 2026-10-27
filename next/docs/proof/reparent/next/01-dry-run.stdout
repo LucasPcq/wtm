@@ -1,0 +1,7 @@
+
+  reparent · dry run, nothing applied
+  Worktrees   feat/c (feat/b → main)
+  New parent  main
+  fingerprint  <FP>
+  → wtm reparent feat/c --to main --expect-fingerprint <FP>   apply this plan
+

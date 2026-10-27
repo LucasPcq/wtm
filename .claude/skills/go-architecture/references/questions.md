@@ -16,13 +16,13 @@ Pure (no port, no context), in three sections:
 
 | Kind | Asks |
 | -- | -- |
-| `SelectField` | one option; may be `Pinned`, `Refreshable` (r reads the options again), `Rememberable` |
+| `SelectField` | one option; may be `Pinned`, `Refreshable` (r reads the options again), `Rememberable`; `Refused` lists the values it leaves out of its options, each as the field error it would raise if given (reparent's parents that would close a cycle), so a surface says why before the request does |
 | `MultiSelectField` | any options |
 | `TextField` | one line |
 | `TextListField` | a list of entries, with the values the repository knows as `Options` |
 | `ConfirmField` | yes or no, valued `true`/`false`, no first when `NoFirst`; may be `Rememberable` |
 
-An option is a `domain.Option`: its `Value` and what the repository knows of it, facts a surface words its own way: `Tag` (a `domain.OptionTag` the schema publishes as an enum: local, checked out, only on origin, current, main), `Base` (the configured base branch), `Detached`, `Origin` (where the branch stands against origin's, a `worktree.Origin`), `Changes` (a count), `Change` (the `worktree.Change` it is). A closed select's options are its values alone (`domain.OptionsOf`). A new kind is a type in `domain/form.go`, its JSON `kind` in `fieldKind`, and a step in `ui/form`; go-sumtype then lists every switch that must handle it.
+An option is a `domain.Option`: its `Value` and what the repository knows of it, facts a surface words its own way: `Tag` (a `domain.OptionTag` the schema publishes as an enum: local, checked out, only on origin, current, main), `Base` (the configured base branch), `Detached`, `Parent` (the branch a worktree is rebased onto), `Origin` (where the branch stands against origin's, a `worktree.Origin`), `Changes` (a count), `Change` (the `worktree.Change` it is). A closed select's options are its values alone (`domain.OptionsOf`). A new kind is a type in `domain/form.go`, its JSON `kind` in `fieldKind`, and a step in `ui/form`; go-sumtype then lists every switch that must handle it.
 
 ## Adding a field
 

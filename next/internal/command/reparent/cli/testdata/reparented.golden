@@ -1,0 +1,9 @@
+
+  ✓ reparent: 1 done · 1 unchanged
+
+  Worktrees   feat/b (feat/a → main), feat/x (already on main)
+  New parent  main
+
+  → wtm sync feat/b                        rebase onto the new parent
+  → wtm-next reparent feat/b --to feat/a   move feat/b back onto feat/a
+

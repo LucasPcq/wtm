@@ -1,0 +1,75 @@
+=== 00-before: exit legacy , next 
+=== 01-dry-run: exit legacy 2, next 0
+=== 02-one: exit legacy 0, next 0
+=== 03-batch: exit legacy 0, next 0
+=== 04-json: exit legacy 0, next 0
+=== 05-cycle: exit legacy 1, next 2
+=== 06-cycle-json: exit legacy 1, next 2
+=== 07-main: exit legacy 1, next 2
+=== 08-unrecorded: exit legacy 1, next 2
+=== 09-remote-bare: exit legacy 11, next 2
+=== 10-remote: exit legacy 0, next 0
+=== 11-no-parent: exit legacy 1, next 2
+=== 12-from-inside: exit legacy 1, next 0
+--- legacy/12-from-inside
++++ next/12-from-inside
+@@ -29,7 +29,7 @@
+ }
+ ## .git/wtm/worktrees/feat%2Fc/meta.json
+ {
+-  "source_branch": "origin/remote-only",
++  "source_branch": "main",
+   "env_strategy": "example",
+   "ordinal": 3,
+   "isolation": "isolated"
+=== 13-converge: exit legacy 0, next 0
+=== 14-detached-elsewhere: exit legacy 1, next 0
+--- legacy/14-detached-elsewhere
++++ next/14-detached-elsewhere
+@@ -31,7 +31,7 @@
+ }
+ ## .git/wtm/worktrees/feat%2Fc/meta.json
+ {
+-  "source_branch": "main",
++  "source_branch": "feat/x",
+   "env_strategy": "example",
+   "ordinal": 3,
+   "isolation": "isolated"
+=== 15-converge: exit legacy 0, next 0
+=== 16-cycle-elsewhere: exit legacy 1, next 0
+--- legacy/16-cycle-elsewhere
++++ next/16-cycle-elsewhere
+@@ -36,7 +36,7 @@
+ }
+ ## .git/wtm/worktrees/feat%2Fx/meta.json
+ {
+-  "source_branch": "main",
++  "source_branch": "topic",
+   "env_strategy": "example",
+   "ordinal": 4,
+   "isolation": "isolated"
+=== 17-out-of-cycle: exit legacy 0, next 0
+--- legacy/17-out-of-cycle
++++ next/17-out-of-cycle
+@@ -36,7 +36,7 @@
+ }
+ ## .git/wtm/worktrees/feat%2Fx/meta.json
+ {
+-  "source_branch": "main",
++  "source_branch": "topic",
+   "env_strategy": "example",
+   "ordinal": 4,
+   "isolation": "isolated"
+=== 18-converge: exit legacy 0, next 0
+=== 19-base-branch: exit legacy 0, next 2
+--- legacy/19-base-branch
++++ next/19-base-branch
+@@ -36,7 +36,7 @@
+ }
+ ## .git/wtm/worktrees/feat%2Fx/meta.json
+ {
+-  "source_branch": "main",
++  "source_branch": "topic",
+   "env_strategy": "example",
+   "ordinal": 4,
+   "isolation": "isolated"

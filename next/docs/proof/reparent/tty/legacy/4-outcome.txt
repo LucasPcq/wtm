@@ -1,0 +1,8 @@
+$ wtm reparent; echo EXIT=$?
+
+┃  ✓ Reparented feat/b: feat/a → main
+┃  → wtm sync feat/b   rebase onto the new parent
+
+EXIT=0
+$
+

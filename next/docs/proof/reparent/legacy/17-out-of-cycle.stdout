@@ -1,0 +1,4 @@
+
+  ✓ Reparented feat/a: feat/b → main
+  → wtm sync feat/a   rebase onto the new parent
+

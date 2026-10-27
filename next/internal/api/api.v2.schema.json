@@ -9,6 +9,7 @@
         "prune",
         "fast-forward",
         "exec",
+        "reparent",
         "list",
         "resolve",
         "status",
@@ -984,6 +985,9 @@
         "origin": {
           "$ref": "#/$defs/worktree.Origin"
         },
+        "parent": {
+          "type": "string"
+        },
         "tag": {
           "$ref": "#/$defs/domain.OptionTag"
         },
@@ -1105,6 +1109,12 @@
         },
         "refreshable": {
           "type": "boolean"
+        },
+        "refused": {
+          "items": {
+            "$ref": "#/$defs/domain.FieldError"
+          },
+          "type": "array"
         },
         "remember": {
           "type": "boolean"
@@ -3217,6 +3227,173 @@
       },
       "type": "array"
     },
+    "reparent.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "reparent.Move": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "children": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "from": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch",
+        "path",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "reparent.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "moves": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/reparent.Move"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "moves",
+        "to"
+      ],
+      "type": "object"
+    },
+    "reparent.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "reparent"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/reparent.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/reparent.Plan"
+        }
+      }
+    },
+    "reparent.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "worktree"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "to"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
     "repository.Offer": {
       "additionalProperties": false,
       "properties": {
@@ -3713,6 +3890,8 @@
       "enum": [
         "status.missing",
         "status.merged",
+        "status.parent_gone",
+        "status.cycle",
         "status.behind_origin",
         "status.behind",
         "status.env_missing",
@@ -4075,6 +4254,9 @@
             }
           ]
         },
+        "parent_gone": {
+          "type": "boolean"
+        },
         "path": {
           "anyOf": [
             {
@@ -4127,6 +4309,7 @@
         "missing",
         "condition",
         "cycle",
+        "parent_gone",
         "origin",
         "pr",
         "services",
@@ -4400,6 +4583,7 @@
         "logs",
         "fast_forward",
         "sync",
+        "reparent",
         "clean"
       ]
     },
@@ -4601,7 +4785,8 @@
         "main_worktree",
         "base_branch",
         "no_pull_request",
-        "not_on_origin"
+        "not_on_origin",
+        "unrecorded"
       ]
     }
   },

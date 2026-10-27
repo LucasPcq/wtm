@@ -1,0 +1,72 @@
+{
+  "v": 2,
+  "command": "reparent",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "path": "<root>/.trees/feat-b",
+        "from": "topic",
+        "to": "feat/a"
+      }
+    }
+  ],
+  "plan": {
+    "moves": [
+      {
+        "branch": "feat/b",
+        "path": "<root>/.trees/feat-b",
+        "from": "topic",
+        "to": "feat/a"
+      }
+    ],
+    "to": "feat/a",
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/b",
+            "params": {
+              "from": "topic",
+              "to": "feat/a"
+            },
+            "text": "feat/b (topic → feat/a)"
+          }
+        ]
+      },
+      {
+        "key": "to",
+        "label": "New parent",
+        "path": "to",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "sync",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        }
+      ],
+      "code": "reparent.sync",
+      "message": "rebase onto the new parent"
+    }
+  ],
+  "warnings": []
+}

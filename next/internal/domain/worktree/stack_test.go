@@ -188,3 +188,36 @@ func TestAStackSaysWhichRootsAreVirtualAndWhichBranchesLoop(t *testing.T) {
 	assert.True(t, stack.InCycle("y"))
 	assert.False(t, stack.InCycle("b"))
 }
+
+func TestWithinSaysWhichMovedBranchATargetSitsUnder(t *testing.T) {
+	worktrees := append(live("a", "b", "c", "x", "p", "q"), Worktree{Path: "/trees/d", State: Detached{}})
+	records := map[string]Meta{"a": from("main"), "b": from("a"), "c": from("b"), "x": from("main"), "p": from("q"), "q": from("p")}
+	stack := StackOf(worktrees, records, "main")
+	cases := map[string]struct {
+		branch string
+		roots  []string
+		under  string
+	}{
+		"itself":          {branch: "b", roots: []string{"b"}, under: "b"},
+		"grandchild":      {branch: "c", roots: []string{"a"}, under: "a"},
+		"one_of_several":  {branch: "c", roots: []string{"x", "b"}, under: "b"},
+		"sibling":         {branch: "x", roots: []string{"a"}},
+		"above":           {branch: "main", roots: []string{"a"}},
+		"no_worktree":     {branch: "topic", roots: []string{"a"}},
+		"cycle_elsewhere": {branch: "p", roots: []string{"a"}},
+		"into_its_cycle":  {branch: "q", roots: []string{"p"}, under: "p"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			under, ok := stack.Within(c.branch, c.roots)
+			assert.Equal(t, c.under, under)
+			assert.Equal(t, c.under != "", ok)
+		})
+	}
+}
+
+func TestAncestorsClimbToTheRoot(t *testing.T) {
+	stack := StackOf(live("a", "b", "c"), map[string]Meta{"a": from("main"), "b": from("a"), "c": from("b")}, "main")
+	assert.Equal(t, []string{"b", "a", "main"}, stack.Ancestors("c"))
+	assert.Empty(t, stack.Ancestors("main"))
+}

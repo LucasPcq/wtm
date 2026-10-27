@@ -7,6 +7,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
+	"github.com/LucasPcq/wtm/next/internal/command/reparent"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
@@ -177,12 +178,12 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"run_start":   {followUp: *fixes[6].Fix, argv: []string{"wtm", "run", "start", "feat/a", "--job", "api", "--detach"}},
 		"shared":      {followUp: *fixes[7].Fix, argv: []string{"wtm", "run", "start", "main", "--job", "db", "--detach"}},
 		"behind":      {followUp: *status.Problems(status.ProblemsParams{Branch: "feat/a", Parent: "feat/b", Lacks: 1, Sync: true})[0].Fix, argv: []string{"wtm", "sync", "feat/a"}},
-		"reparent":    {followUp: domain.FollowUp{Command: "reparent", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "to", Values: []string{"feat/b"}}}}, argv: []string{"wtm", "reparent", "feat/a", "--to", "feat/b"}},
+		"reparent":    {followUp: domain.FollowUp{Command: "reparent", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "to", Values: []string{"feat/b"}}}}, argv: []string{"wtm-next", "reparent", "feat/a", "--to", "feat/b"}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			_, unspelled := spelled(c.followUp)
-			if c.followUp.Command == clean.Name || c.followUp.Command == prune.Name {
+			if c.followUp.Command == clean.Name || c.followUp.Command == prune.Name || c.followUp.Command == reparent.Name {
 				unspelled = nil
 			}
 

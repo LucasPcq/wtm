@@ -18,7 +18,7 @@ $ wtm prune --merged; echo EXIT=$?
 ┃
 ┃  ✗ feat/bad  on_clean hook failed: exit status 3
 ┃
-┃  → wtm reparent feat/child --to main   move it onto main
+┃  → wtm-next reparent feat/child --to main   move it onto main
 
 EXIT=1
 $

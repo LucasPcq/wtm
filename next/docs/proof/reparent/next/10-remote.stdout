@@ -1,0 +1,9 @@
+
+  ✓ reparent: 1 done
+
+  Worktrees   feat/c (main → origin/remote-only)
+  New parent  origin/remote-only
+
+  → wtm sync feat/c                      rebase onto the new parent
+  → wtm reparent feat/c --to main   move feat/c back onto main
+

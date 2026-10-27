@@ -1,0 +1,64 @@
+{
+  "v": 2,
+  "command": "reparent",
+  "ok": false,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/c",
+      "status": "failed",
+      "error": {
+        "kind": "internal",
+        "code": "reparent.write_failed",
+        "message": "couldn't write the record of feat/c: no space left on device"
+      },
+      "detail": {}
+    }
+  ],
+  "plan": {
+    "moves": [
+      {
+        "branch": "feat/c",
+        "path": "/repo/wt-feat-c",
+        "from": "feat/b",
+        "to": "main"
+      }
+    ],
+    "to": "main",
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/c",
+            "params": {
+              "from": "feat/b",
+              "to": "main"
+            },
+            "text": "feat/c (feat/b → main)"
+          }
+        ]
+      },
+      {
+        "key": "to",
+        "label": "New parent",
+        "path": "to",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "internal",
+    "code": "reparent.write_failed",
+    "message": "couldn't write the record of feat/c: no space left on device"
+  }
+}

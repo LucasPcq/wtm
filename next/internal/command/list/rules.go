@@ -67,7 +67,8 @@ type Detail struct {
 	Services  []string           `json:"services"`  // the jobs up in it, null when that cannot be told
 	URLs      []string           `json:"urls"`      // the addresses of the jobs up in it, null when that cannot be told
 	// Actions are every action of it, each the follow-up that carries it out or why it is not offered.
-	Actions []repository.Offer `json:"actions"`
+	Actions  []repository.Offer `json:"actions"`
+	Recorded bool               `json:"-"` // wtm created it: its record exists, read or not; its actions publish what it decides
 
 	base bool // it is on the base branch, which is never removed
 }
@@ -152,6 +153,7 @@ func (f Facts) item(w worktree.Worktree, active bool) Item {
 		Services:     f.Services(w.Path),
 		URLs:         f.URLs(w.Path),
 		base:         w.Branch() != "" && w.Branch() == f.Config.Worktrees.BaseBranch,
+		Recorded:     f.recorded(w.Branch()),
 	}
 	detail.Condition = conditionOf(detail, w.Operation())
 	detail.Actions = Actions(detail)
@@ -185,6 +187,12 @@ func (f Facts) finished(pr worktree.PullRequest, w worktree.Worktree) *Finished 
 
 func conditionOf(detail Detail, operation worktree.Operation) worktree.Condition {
 	return worktree.ConditionOf(worktree.ConditionParams{Missing: detail.Missing, Operation: operation, Merged: detail.Merged, Dirty: detail.Dirty})
+}
+
+// recorded reports whether wtm recorded branch: its record exists, read or not.
+func (f Facts) recorded(branch string) bool {
+	_, read := f.Records[branch]
+	return read || f.RecordErrs[branch] != nil
 }
 
 // recordWarnings are the warnings of the record of branch when it exists but does not read, none otherwise.
@@ -256,6 +264,7 @@ func Actions(detail Detail) []repository.Offer {
 		Path:     detail.Path,
 		Main:     detail.Main,
 		Base:     detail.base,
+		Recorded: detail.Recorded,
 		Missing:  detail.Missing,
 		OnOrigin: detail.Origin != nil,
 	}

@@ -43,6 +43,7 @@ const unofferedWords: Record<WorktreeUnoffered, (worktree: string, action: MenuA
   base_branch: () => "The base branch's worktree can't be removed",
   not_on_origin: () => 'Not on origin',
   no_pull_request: () => 'No pull request known',
+  unrecorded: () => 'Not made by wtm',
 }
 
 export const notInTheWeb = 'Not in the web yet'

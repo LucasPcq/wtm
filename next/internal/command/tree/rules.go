@@ -50,11 +50,12 @@ type Detail struct {
 	Locked    bool `json:"locked"`
 	Missing   bool `json:"missing"` // its directory is gone
 	// Condition is the one fact of it that most changes what to do first, as this read knows it.
-	Condition worktree.Condition `json:"condition"`
-	Cycle     bool               `json:"cycle"`    // its parents lead back to it: drawn as a root
-	Origin    *worktree.Origin   `json:"origin"`   // null when origin has no branch of that name
-	PR        *PR                `json:"pr"`       // null without one, or when GitHub was not asked
-	Services  []string           `json:"services"` // the jobs up in it, null when that cannot be told or it has no worktree
+	Condition  worktree.Condition `json:"condition"`
+	Cycle      bool               `json:"cycle"`       // its parents lead back to it: drawn as a root
+	ParentGone bool               `json:"parent_gone"` // its parent is no branch any more, local or on origin: sync has nothing to rebase it onto
+	Origin     *worktree.Origin   `json:"origin"`      // null when origin has no branch of that name
+	PR         *PR                `json:"pr"`          // null without one, or when GitHub was not asked
+	Services   []string           `json:"services"`    // the jobs up in it, null when that cannot be told or it has no worktree
 	// Actions are every action of its worktree, each the follow-up that carries it out or why it is not offered; none for a virtual root or an unreadable worktree.
 	Actions []repository.Offer `json:"actions"`
 }
@@ -120,6 +121,7 @@ func (f Facts) item(branch string) Item {
 	detail.Ahead, detail.Behind = state.Ahead, state.Behind
 	detail.NeedsSync = w.NeedsSync(state.Behind)
 	detail.Cycle = f.Stack.InCycle(branch)
+	detail.ParentGone = detail.Parent != nil && !f.Candidate(*detail.Parent)
 	detail.Origin = f.OriginOf(branch)
 	pr, ok := worktree.PullRequestOf(f.PullRequests, branch)
 	if ok {
@@ -128,7 +130,8 @@ func (f Facts) item(branch string) Item {
 	detail.Services = f.Services(w.Path)
 	cleans := f.Repository.Cleans(pr, w, f.Behind[branch])
 	detail.Condition = worktree.ConditionOf(worktree.ConditionParams{Missing: detail.Missing, Operation: w.Operation(), Merged: cleans, Dirty: detail.Dirty})
-	detail.Actions = Actions(ActionsParams{Detail: detail, Base: branch == f.Config.Worktrees.BaseBranch})
+	_, recorded := f.Records[branch]
+	detail.Actions = Actions(ActionsParams{Detail: detail, Base: branch == f.Config.Worktrees.BaseBranch, Recorded: recorded || f.RecordErrs[branch] != nil})
 
 	return Item{Subject: branch, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
 }
@@ -166,10 +169,11 @@ func (f Facts) worktreeOf(branch string) worktree.Worktree {
 // ----------------------------------------------------------------------------
 // The actions
 
-// ActionsParams are a node of a worktree and whether its branch is the base branch.
+// ActionsParams are a node of a worktree, whether its branch is the base branch, and whether wtm recorded it (its record read or not).
 type ActionsParams struct {
-	Detail Detail
-	Base   bool
+	Detail   Detail
+	Base     bool
+	Recorded bool
 }
 
 // Actions are every action of the worktree of p, each with its follow-up or why it does not offer it.
@@ -181,6 +185,7 @@ func Actions(p ActionsParams) []repository.Offer {
 		Path:     *detail.Path,
 		Main:     detail.Main,
 		Base:     p.Base,
+		Recorded: p.Recorded,
 		Missing:  detail.Missing,
 		OnOrigin: detail.Origin != nil,
 	}

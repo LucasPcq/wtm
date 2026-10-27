@@ -68,7 +68,7 @@ func OrphanedBy(command string, moves []Move) []domain.Warning {
 			Code:     command + Orphaned,
 			Message:  move.Branch + " still points at the removed parent " + move.From,
 			Params:   domain.Params{"branch": move.Branch, "from": move.From, "to": move.To},
-			FollowUp: &domain.FollowUp{Command: commandReparent, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{move.Branch}}, {Path: "to", Values: []string{move.To}}}, Code: command + Reparent, Message: "move it onto " + move.To},
+			FollowUp: &domain.FollowUp{Command: domain.CommandReparent, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{move.Branch}}, {Path: "to", Values: []string{move.To}}}, Code: command + Reparent, Message: "move it onto " + move.To},
 		})
 	}
 
@@ -81,9 +81,6 @@ func NotReparented(command string, move Move, err error) domain.Warning {
 	warning.Message += ": couldn't reparent it (" + err.Error() + ")"
 	return warning
 }
-
-// commandReparent changes the parent a worktree is rebased onto: not migrated yet.
-const commandReparent = "reparent"
 
 // RecappedMoves are moves as a recap row's values: each child with where it goes, or, unless reparented, left on its removed parent.
 func RecappedMoves(moves []Move, reparented bool) []domain.RecapValue {

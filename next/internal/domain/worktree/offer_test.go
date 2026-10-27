@@ -12,32 +12,36 @@ func TestAWorktreeOffersEachActionOrSaysWhyNot(t *testing.T) {
 		Want   map[Action]Unoffered
 	}{
 		"with_pr": {
-			OfferParams{PullRequest: true, OnOrigin: true},
+			OfferParams{PullRequest: true, OnOrigin: true, Recorded: true},
 			map[Action]Unoffered{},
 		},
 		"no_pr": {
-			OfferParams{OnOrigin: true},
+			OfferParams{OnOrigin: true, Recorded: true},
 			map[Action]Unoffered{ActionOpenPR: UnofferedNoPullRequest},
 		},
 		"not_on_origin": {
-			OfferParams{PullRequest: true},
+			OfferParams{PullRequest: true, Recorded: true},
 			map[Action]Unoffered{ActionFastForward: UnofferedNotOnOrigin},
 		},
 		"main": {
 			OfferParams{Main: true, PullRequest: true, OnOrigin: true},
-			map[Action]Unoffered{ActionSync: UnofferedMainWorktree, ActionClean: UnofferedMainWorktree},
+			map[Action]Unoffered{ActionSync: UnofferedMainWorktree, ActionReparent: UnofferedMainWorktree, ActionClean: UnofferedMainWorktree},
 		},
 		"base_branch": {
 			OfferParams{Base: true, PullRequest: true, OnOrigin: true},
-			map[Action]Unoffered{ActionClean: UnofferedBaseBranch},
+			map[Action]Unoffered{ActionReparent: UnofferedBaseBranch, ActionClean: UnofferedBaseBranch},
 		},
 		"missing": {
 			OfferParams{Missing: true, PullRequest: true, OnOrigin: true},
-			map[Action]Unoffered{ActionGo: UnofferedMissing, ActionOpenPR: UnofferedMissing, ActionRunUp: UnofferedMissing, ActionRunDown: UnofferedMissing, ActionLogs: UnofferedMissing, ActionFastForward: UnofferedMissing, ActionSync: UnofferedMissing},
+			map[Action]Unoffered{ActionGo: UnofferedMissing, ActionOpenPR: UnofferedMissing, ActionRunUp: UnofferedMissing, ActionRunDown: UnofferedMissing, ActionLogs: UnofferedMissing, ActionFastForward: UnofferedMissing, ActionSync: UnofferedMissing, ActionReparent: UnofferedMissing},
 		},
 		"detached": {
 			OfferParams{Detached: true},
-			map[Action]Unoffered{ActionOpenPR: UnofferedNoBranch, ActionRunUp: UnofferedNoBranch, ActionRunDown: UnofferedNoBranch, ActionLogs: UnofferedNoBranch, ActionFastForward: UnofferedNoBranch, ActionSync: UnofferedNoBranch},
+			map[Action]Unoffered{ActionOpenPR: UnofferedNoBranch, ActionRunUp: UnofferedNoBranch, ActionRunDown: UnofferedNoBranch, ActionLogs: UnofferedNoBranch, ActionFastForward: UnofferedNoBranch, ActionSync: UnofferedNoBranch, ActionReparent: UnofferedNoBranch},
+		},
+		"unrecorded": {
+			OfferParams{PullRequest: true, OnOrigin: true},
+			map[Action]Unoffered{ActionReparent: UnofferedUnrecorded},
 		},
 	}
 	for name, c := range cases {

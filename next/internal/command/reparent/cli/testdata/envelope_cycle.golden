@@ -1,0 +1,25 @@
+{
+  "v": 2,
+  "command": "reparent",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "to",
+        "code": "reparent.cycle",
+        "params": {
+          "under": "feat/a",
+          "value": "feat/c"
+        },
+        "flag": "--to",
+        "message": "feat/c sits under feat/a: moving feat/a onto it would close a cycle"
+      }
+    ]
+  }
+}

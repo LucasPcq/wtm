@@ -21,6 +21,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
+	"github.com/LucasPcq/wtm/next/internal/command/reparent"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
@@ -40,6 +41,7 @@ var (
 	openPrune       = opener(func(a app) prune.UseCase { return a.Prune })
 	openFastForward = opener(func(a app) fastforward.UseCase { return a.FastForward })
 	openExec        = opener(func(a app) exec.UseCase { return a.Exec })
+	openReparent    = opener(func(a app) reparent.UseCase { return a.Reparent })
 	openList        = opener(func(a app) list.UseCase { return a.List })
 	openResolve     = opener(func(a app) resolve.UseCase { return a.Resolve })
 	openStatus      = opener(func(a app) status.UseCase { return a.Status })
