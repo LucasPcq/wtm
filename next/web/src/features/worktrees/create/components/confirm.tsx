@@ -17,6 +17,14 @@ export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswer
 
   const { plan, warnings } = dry.data
   const branches = plan?.branches ?? []
+  // a warning about a branch goes on the row of that branch, or of the branches created from it
+  const warningsOf = (branch: (typeof branches)[number]) =>
+    warnings.filter(
+      (warning) =>
+        warning.params?.branch === branch.branch ||
+        (branch.action === 'create' && warning.params?.branch === plan?.from),
+    )
+  const alerts = warnings.filter((warning) => !branches.some((branch) => warningsOf(branch).includes(warning)))
   const made = branches.filter((branch) => branch.action !== 'unchanged')
   const steps = made.flatMap((branch) => branch.phases ?? []).length
   const hooks = plan?.on_create ?? []
@@ -30,11 +38,11 @@ export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswer
 
   return (
     <div className="flex flex-col gap-6">
-      <PlanWarnings warnings={warnings} />
+      <PlanWarnings warnings={alerts} />
       {plan && (
         <ItemList label="Branches">
           {branches.map((branch) => (
-            <BranchPlan key={branch.branch} plan={plan} branch={branch} />
+            <BranchPlan key={branch.branch} plan={plan} branch={branch} warnings={warningsOf(branch)} />
           ))}
         </ItemList>
       )}

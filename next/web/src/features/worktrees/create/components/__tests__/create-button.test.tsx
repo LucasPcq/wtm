@@ -161,3 +161,39 @@ test('a create hidden while it runs says it is ready in a toast once it ends', a
   expect(await screen.findByText('feat/new is ready.')).toBeTruthy()
   expect(screen.queryByRole('dialog')).toBeNull()
 })
+
+test('a warning is drawn where its subject is: a diverged source on the rows that start from it, one about no branch in the Alert', async () => {
+  const diverged = 'branch main has diverged from origin (1 ahead, 2 behind)'
+  const fallback = 'the "parent" env strategy needs the source branch checked out'
+  server.use(
+    http.post('/api/repos/r1/commands/create', async ({ request }) => {
+      const call = (await request.clone().json()) as { dry_run?: boolean }
+      if (!call.dry_run) return undefined
+      return HttpResponse.json({
+        ...envelope('create', []),
+        fingerprint: 'f1',
+        plan: {
+          branches: [{ branch: 'feat/new', path: '/acme.trees/feat/new', action: 'create', phases: ['worktree'] }],
+          creates: 1,
+          from: 'main',
+          env_from: 'example',
+          recap: [],
+        },
+        warnings: [
+          { code: 'create.source_diverged', message: diverged, params: { branch: 'main', ahead: '1', behind: '2' } },
+          { code: 'create.env_parent_fallback', message: fallback },
+        ],
+      })
+    }),
+  )
+  const { user, dialog, branches } = await openCreate()
+  await user.type(branches, 'feat/new')
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+
+  const row = await within(dialog).findByRole('listitem', { name: 'feat/new' })
+  expect(within(row).getByText(/has diverged from origin/)).toBeTruthy()
+  const alert = within(dialog).getByRole('alert')
+  expect(alert.textContent).toContain('needs the source branch checked out')
+  expect(alert.textContent).not.toContain('diverged')
+})

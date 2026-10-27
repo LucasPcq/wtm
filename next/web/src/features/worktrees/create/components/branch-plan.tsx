@@ -1,8 +1,18 @@
-import type { CreateBranchPlan, CreatePlan } from '@/api/types.gen'
+import { TriangleAlert } from 'lucide-react'
+import type { CreateBranchPlan, CreatePlan, DomainWarning } from '@/api/types.gen'
 import { Item, ItemTitle } from '@/components/ui/item'
 import { actionWords, envFromShort, isolationShort } from '@/features/worktrees/create/utils/words'
+import { sentence } from '@/features/worktrees/utils/sentence'
 
-export function BranchPlan({ plan, branch }: { plan: CreatePlan; branch: CreateBranchPlan }) {
+export function BranchPlan({
+  plan,
+  branch,
+  warnings = [],
+}: {
+  plan: CreatePlan
+  branch: CreateBranchPlan
+  warnings?: DomainWarning[]
+}) {
   const source = () => {
     switch (branch.action) {
       case 'create':
@@ -28,6 +38,12 @@ export function BranchPlan({ plan, branch }: { plan: CreatePlan; branch: CreateB
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <ItemTitle className="min-w-0">{branch.branch}</ItemTitle>
         {line.length > 0 && <p className="text-xs text-muted-foreground">{line.join(' · ')}</p>}
+        {warnings.map((warning) => (
+          <p key={warning.code + warning.message} className="flex items-center gap-1.5 text-xs">
+            <TriangleAlert className="size-3.5 shrink-0 text-amber-500" aria-hidden="true" />
+            {sentence(warning.message)}
+          </p>
+        ))}
       </div>
       <span className="shrink-0 text-xs text-muted-foreground">{actionWords[branch.action]}</span>
     </Item>

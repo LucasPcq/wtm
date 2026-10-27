@@ -4,7 +4,7 @@ import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { type OutcomeGroup, type OutcomeKind, outcomeOrder, planWide } from '@/features/worktrees/utils/outcome'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
-// a warning naming no worktree stays the plan's Alert, as on the steps; one naming a worktree is a row to check
+// a warning is drawn where its subject is: none, the plan's Alert, as on the steps; a worktree or branch, a row to check
 export function RunOutcome({
   groups,
   labels,

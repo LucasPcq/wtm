@@ -14,6 +14,7 @@ Everything is plain shadcn (Radix underneath) on Tailwind's base colours, with `
 | -- | -- |
 | two sections of a body | 24 |
 | a section's label and its content | 8 |
+| an outcome group's label and its rows | 4 |
 | the parts of a row | 12 |
 | a title and its second line | 4 |
 | a dialog's edge and its content | 24 |
@@ -150,7 +151,7 @@ Every multi-worktree list (Remove's, Prune's, the Fast-forward and Run pickers, 
 3. "To check": business follow-ups (left as they are, orphans, jobs left), each with its action (Reparent, Reparent all);
 4. the done group ("Pruned", "Fast-forwarded").
 
-A warning whose params name no worktree nor branch is plan-wide: it stays the same `wtm/Alert` on Done as on the steps, first; "To check" holds only what names a worktree (`RunOutcome` splits them). A lone group drops its label. Success contracts to a count in the description. A row folds: its folded line is the code's fixed message worded by the screen ("git refused to move the branch"); opened, it shows the output or `error.params.cause` verbatim, and the log's path when there is a log. Steps and folders sit in `wtm/Details`, folded.
+A warning is drawn where its subject is, on the steps and on Done: one whose params name no worktree nor branch is the plan's `wtm/Alert`, first, on both; one with a subject is a reason line on that row during the steps (`create.source_diverged` on its `BranchPlan`) and a "To check" row on Done (`RunOutcome` splits them). A lone group drops its label. Success contracts to a count in the description. A row folds: its folded line is the code's fixed message worded by the screen ("git refused to move the branch"); opened, it shows the output or `error.params.cause` verbatim, and the log's path when there is a log. Steps and folders sit in `wtm/Details`, folded.
 
 ## In Pencil
 
