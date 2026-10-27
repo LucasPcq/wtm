@@ -1,0 +1,21 @@
+{
+  "v": 2,
+  "command": "exec",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "command",
+        "code": "required",
+        "flag": "-- <command>",
+        "message": "-- <command> is required"
+      }
+    ]
+  }
+}

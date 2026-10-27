@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"io"
 	"slices"
 	"strings"
@@ -71,10 +70,10 @@ func (r *Run) Writers() (io.Writer, io.Writer) {
 	return r.Streams.Out, r.Streams.Err
 }
 
-// Progress starts the progress of the operation ctx runs on stderr, live when stderr can animate and --quiet is off.
-func (r *Run) Progress(ctx context.Context) *output.Progress {
+// ProgressParams is where the progress of an operation draws: on stderr, live when stderr can animate and --quiet is off.
+func (r *Run) ProgressParams() output.ProgressParams {
 	_, stderr := r.Writers()
-	return output.NewProgress(ctx, output.ProgressParams{W: stderr, Human: r.Human(), Live: !r.Quiet && r.Streams.CanAnimate()})
+	return output.ProgressParams{W: stderr, Human: r.Human(), Live: !r.Quiet && r.Streams.CanAnimate()}
 }
 
 // FailWith prints failure followed by next and by its follow-up, or the envelope that carries it with --output json, and returns the failure that sets the exit code; a machine format of the command's own prints it as text.

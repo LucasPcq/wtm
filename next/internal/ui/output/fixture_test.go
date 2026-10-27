@@ -32,3 +32,9 @@ type worktreeDetail struct{ path string }
 func (d worktreeDetail) Worktree() (string, env.Redacted) {
 	return d.path, env.Redacted{}
 }
+
+// excerptOf is the last lines an item printed and its log.
+type excerptOf struct {
+	tail []string
+	log  string
+}

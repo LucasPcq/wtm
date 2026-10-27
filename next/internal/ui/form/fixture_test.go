@@ -159,6 +159,7 @@ var fakeWords = map[string]form.Words{
 	"name":     {Flag: "--name", Label: "Name", Help: "The name"},
 	"worktree": {Flag: "<worktree>", Label: "Worktree", Help: "The worktree to read"},
 	"all":      {Flag: "--all", Label: "All", Help: "Every worktree"},
+	"command":  {Flag: "-- <command>", Label: "Command", Help: "The line to run"},
 }
 
 func wordsOf[Q any](_ Q, field domain.Field) form.Words {
@@ -208,6 +209,21 @@ func observed(t *testing.T, a *app, given request) *form.Session[request, questi
 	require.NoError(t, err)
 	apply()
 	return s
+}
+
+// lines are the questions of a fake command that runs a line in worktrees: the worktrees, positional, then the line, after --.
+type lines struct{}
+
+func (lines) Form() domain.Form {
+	return domain.Form{Fields: []domain.Field{
+		domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: "worktree"}},
+		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "all"}},
+		domain.TextField{FieldSpec: domain.FieldSpec{Path: "command"}},
+	}}
+}
+
+func linesCommand() *form.Command[request, lines, outcome] {
+	return &form.Command[request, lines, outcome]{Words: wordsOf[lines]}
 }
 
 // A read is what the fake read command found.

@@ -1,0 +1,7 @@
+$ wtm exec feat/a -- true; echo EXIT=$?
+
+┃  ✗ interrupted
+
+EXIT=19
+$
+

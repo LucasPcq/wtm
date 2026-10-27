@@ -1,0 +1,8 @@
+
+  exec · dry run, nothing applied
+  Worktrees    feat/a, feat/b
+  Command      test "$(git branch --show-current)" != feat/b || { echo boom >&2; exit 3; }; echo ok
+  Concurrency  1
+  fingerprint  <FP>
+  → wtm exec feat/a feat/b --jobs 1 --expect-fingerprint <FP> -- 'test "$(git branch --show-current)" != feat/b || { echo boom >&2; exit 3; }; echo ok'   apply this plan
+

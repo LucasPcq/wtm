@@ -11,6 +11,7 @@ export const phaseLabel: Record<DomainPhase, string> = {
   move: 'Move the changes',
   on_clean: 'Run the on_clean hooks',
   remove: 'Remove the worktree',
+  exec: 'Run the command',
 }
 
 export const phaseDuring: Record<DomainPhase, string> = {
@@ -24,4 +25,5 @@ export const phaseDuring: Record<DomainPhase, string> = {
   move: 'the move of the changes',
   on_clean: 'the on_clean hooks',
   remove: 'the removal of the worktree',
+  exec: 'the command',
 }

@@ -1,0 +1,5 @@
+
+  ✗ the request is invalid
+    -- <command>: /bin/sh: -c: line 0: syntax error near unexpected token `then'
+/bin/sh: -c: line 0: `if then'
+

@@ -1,0 +1,30 @@
+{
+  "command": "test \"$(git branch --show-current)\" != feat/b || { echo boom >&2; exit 3; }; echo ok",
+  "results": [
+    {
+      "branch": "feat/a",
+      "path": "<SB>/acme.trees/feat-a",
+      "status": "passed",
+      "exit_code": 0,
+      "duration_ms": <DUR>,
+      "log": "<SB>/acme/.git/wtm/exec/feat%2Fa.log",
+      "tail": [
+        "ok"
+      ]
+    },
+    {
+      "branch": "feat/b",
+      "path": "<SB>/acme.trees/feat-b",
+      "status": "failed",
+      "exit_code": 3,
+      "duration_ms": <DUR>,
+      "log": "<SB>/acme/.git/wtm/exec/feat%2Fb.log",
+      "tail": [
+        "boom"
+      ]
+    }
+  ],
+  "failed": [
+    "feat/b"
+  ]
+}

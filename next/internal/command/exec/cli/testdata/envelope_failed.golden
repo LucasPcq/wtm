@@ -1,0 +1,168 @@
+{
+  "v": 2,
+  "command": "exec",
+  "ok": false,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-a",
+        "exit_code": 0,
+        "duration_ms": 0,
+        "log": "/repo/main/.git/wtm/exec/feat%2Fa/op-1.log",
+        "tail": [
+          "ok"
+        ]
+      }
+    },
+    {
+      "subject": "feat/b",
+      "status": "failed",
+      "error": {
+        "kind": "internal",
+        "code": "exec.failed",
+        "message": "exited 3",
+        "params": {
+          "exit_code": "3"
+        },
+        "follow_up": {
+          "command": "exec",
+          "answers": [
+            {
+              "path": "worktree",
+              "values": [
+                "feat/b"
+              ]
+            },
+            {
+              "path": "command",
+              "values": [
+                "pnpm test"
+              ]
+            }
+          ],
+          "code": "exec.retry",
+          "message": "run it again where it did not pass"
+        }
+      },
+      "detail": {
+        "path": "/repo/wt-feat-b",
+        "exit_code": 3,
+        "duration_ms": 0,
+        "log": "/repo/main/.git/wtm/exec/feat%2Fb/op-1.log",
+        "tail": [
+          "> test",
+          "FAIL src/app.test.ts",
+          "  expected 2, got 3"
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "targets": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "/repo/wt-feat-a"
+      },
+      {
+        "worktree": "feat/b",
+        "branch": "feat/b",
+        "path": "/repo/wt-feat-b"
+      }
+    ],
+    "command": "pnpm test",
+    "jobs": 2,
+    "print": false,
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          },
+          {
+            "value": "feat/b",
+            "text": "feat/b"
+          }
+        ]
+      },
+      {
+        "key": "command",
+        "label": "Command",
+        "path": "command",
+        "values": [
+          {
+            "value": "pnpm test",
+            "text": "pnpm test"
+          }
+        ]
+      },
+      {
+        "key": "concurrency",
+        "label": "Concurrency",
+        "path": "jobs",
+        "values": [
+          {
+            "value": "2",
+            "text": "2"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "exec",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        },
+        {
+          "path": "command",
+          "values": [
+            "pnpm test"
+          ]
+        }
+      ],
+      "code": "exec.retry",
+      "message": "run it again where it did not pass"
+    }
+  ],
+  "warnings": [],
+  "error": {
+    "kind": "internal",
+    "code": "exec.failed",
+    "message": "exited 3",
+    "params": {
+      "exit_code": "3"
+    },
+    "follow_up": {
+      "command": "exec",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        },
+        {
+          "path": "command",
+          "values": [
+            "pnpm test"
+          ]
+        }
+      ],
+      "code": "exec.retry",
+      "message": "run it again where it did not pass"
+    }
+  }
+}

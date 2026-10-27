@@ -112,6 +112,13 @@ func (e *escalation) end() {
 	reap(e.pgid)
 }
 
+// reapGroup stops what is left of the group pgid once its leader returned, a member it started in the background; a group already empty is left alone.
+func reapGroup(pgid int) {
+	if groupAlive(pgid) {
+		reap(pgid)
+	}
+}
+
 // reap stops the members of a group its leader left behind: SIGTERM, then
 // SIGKILL if any is still alive after interruptGrace.
 func reap(pgid int) {

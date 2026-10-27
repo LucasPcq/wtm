@@ -1,0 +1,184 @@
+{
+  "v": 2,
+  "command": "exec",
+  "ok": false,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "path": "<SB>/acme.trees/feat-a",
+        "exit_code": 0,
+        "duration_ms": <DUR>,
+        "log": "<SB>/acme/.git/wtm/exec/feat%2Fa/<OP>.log",
+        "tail": [
+          "ok"
+        ]
+      }
+    },
+    {
+      "subject": "feat/b",
+      "status": "failed",
+      "error": {
+        "kind": "internal",
+        "code": "exec.failed",
+        "message": "exited 3",
+        "params": {
+          "exit_code": "3"
+        },
+        "follow_up": {
+          "command": "exec",
+          "answers": [
+            {
+              "path": "worktree",
+              "values": [
+                "feat/b"
+              ]
+            },
+            {
+              "path": "command",
+              "values": [
+                "test \"$(git branch --show-current)\" != feat/b || { echo boom >&2; exit 3; }; echo ok"
+              ]
+            },
+            {
+              "path": "jobs",
+              "values": [
+                "1"
+              ]
+            }
+          ],
+          "code": "exec.retry",
+          "message": "run it again where it did not pass"
+        }
+      },
+      "detail": {
+        "path": "<SB>/acme.trees/feat-b",
+        "exit_code": 3,
+        "duration_ms": <DUR>,
+        "log": "<SB>/acme/.git/wtm/exec/feat%2Fb/<OP>.log",
+        "tail": [
+          "boom"
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "targets": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "<SB>/acme.trees/feat-a"
+      },
+      {
+        "worktree": "feat/b",
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b"
+      }
+    ],
+    "command": "test \"$(git branch --show-current)\" != feat/b || { echo boom >&2; exit 3; }; echo ok",
+    "jobs": 1,
+    "print": false,
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          },
+          {
+            "value": "feat/b",
+            "text": "feat/b"
+          }
+        ]
+      },
+      {
+        "key": "command",
+        "label": "Command",
+        "path": "command",
+        "values": [
+          {
+            "value": "test \"$(git branch --show-current)\" != feat/b || { echo boom >&2; exit 3; }; echo ok",
+            "text": "test \"$(git branch --show-current)\" != feat/b || { echo boom >&2; exit 3; }; echo ok"
+          }
+        ]
+      },
+      {
+        "key": "concurrency",
+        "label": "Concurrency",
+        "path": "jobs",
+        "values": [
+          {
+            "value": "1",
+            "text": "1"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "exec",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        },
+        {
+          "path": "command",
+          "values": [
+            "test \"$(git branch --show-current)\" != feat/b || { echo boom >&2; exit 3; }; echo ok"
+          ]
+        },
+        {
+          "path": "jobs",
+          "values": [
+            "1"
+          ]
+        }
+      ],
+      "code": "exec.retry",
+      "message": "run it again where it did not pass"
+    }
+  ],
+  "warnings": [],
+  "error": {
+    "kind": "internal",
+    "code": "exec.failed",
+    "message": "exited 3",
+    "params": {
+      "exit_code": "3"
+    },
+    "follow_up": {
+      "command": "exec",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        },
+        {
+          "path": "command",
+          "values": [
+            "test \"$(git branch --show-current)\" != feat/b || { echo boom >&2; exit 3; }; echo ok"
+          ]
+        },
+        {
+          "path": "jobs",
+          "values": [
+            "1"
+          ]
+        }
+      ],
+      "code": "exec.retry",
+      "message": "run it again where it did not pass"
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "v": 2,
+  "command": "exec",
+  "ok": true,
+  "op": "<OP>",
+  "plan": {
+    "targets": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "<SB>/acme.trees/feat-a"
+      }
+    ],
+    "command": "true",
+    "jobs": 1,
+    "print": false,
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          }
+        ]
+      },
+      {
+        "key": "command",
+        "label": "Command",
+        "path": "command",
+        "values": [
+          {
+            "value": "true",
+            "text": "true"
+          }
+        ]
+      },
+      {
+        "key": "concurrency",
+        "label": "Concurrency",
+        "path": "jobs",
+        "values": [
+          {
+            "value": "1",
+            "text": "1"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<FP>",
+  "follow_ups": [],
+  "warnings": []
+}

@@ -37,8 +37,8 @@ func TestAWorktreeHeldByAnotherOperationIsAConflictNamingItsHolder(t *testing.T)
 	failure := refusal(t, err)
 	assert.Equal(t, domain.KindConflict, failure.Kind)
 	assert.Equal(t, "lock.held", failure.Code)
-	assert.Equal(t, "wt:feat/a is held by create (pid 4242)", failure.Message)
-	assert.Equal(t, domain.Params{"key": "wt:feat/a", "op": "op-1", "command": "create", "pid": "4242", "surface": "tui", "started_at": "2026-10-16T12:00:00Z"}, failure.Params)
+	assert.Equal(t, "feat/a is locked by create, started from tui (pid 4242)", failure.Message)
+	assert.Equal(t, domain.Params{"key": "wt:feat/a", "scope": "wt", "name": "feat/a", "op": "op-1", "command": "create", "pid": "4242", "surface": "tui", "started_at": "2026-10-16T12:00:00Z"}, failure.Params)
 	again, err := locks.Take(op("op-3", repoShared, featB))
 	require.NoError(t, err, "the refused operation kept feat/b")
 	again.Release()
@@ -53,8 +53,26 @@ func TestALockHeldWithoutARecordNamesAnUnknownHolder(t *testing.T) {
 
 	_, takeErr := locks.Take(op("op-1", repoShared))
 
-	assert.Equal(t, domain.Params{"key": "repo", "op": "unknown", "command": "unknown", "pid": "unknown"}, refusal(t, takeErr).Params)
+	failure := refusal(t, takeErr)
+	assert.Equal(t, domain.Params{"key": "repo", "scope": "repo", "name": "", "op": "unknown", "command": "unknown", "pid": "unknown", "surface": "unknown"}, failure.Params)
+	assert.Equal(t, "the repository is locked by another wtm", failure.Message)
 	assert.NoFileExists(t, filepath.Join(locks.StateDir, "locks", "ops", "op-1.json"))
+}
+
+func TestAWorktreeLockHeldWithoutARecordStillNamesItsWorktree(t *testing.T) {
+	locks := Locks{StateDir: t.TempDir()}
+	file, err := os.OpenFile(filepath.Join(mkdir(t, filepath.Join(locks.StateDir, "locks", "wt")), "feat%2Fa.lock"), os.O_CREATE|os.O_RDWR, 0o644)
+	require.NoError(t, err)
+	defer file.Close()
+	require.NoError(t, flockExclusive(file))
+
+	_, takeErr := locks.Take(op("op-1", repoShared, featA))
+
+	failure := refusal(t, takeErr)
+	assert.Equal(t, "wt", failure.Params["scope"])
+	assert.Equal(t, "feat/a", failure.Params["name"])
+	assert.Equal(t, "unknown", failure.Params["command"])
+	assert.Equal(t, "feat/a is locked by another wtm", failure.Message)
 }
 
 func TestGrowingTakesTheLocksMissingAndRecordsThemAll(t *testing.T) {

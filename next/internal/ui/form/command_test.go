@@ -78,6 +78,23 @@ func TestTheCommandLineSpellsThePositionalWordsThenTheFlagsSortedThenAsk(t *test
 	assert.Equal(t, `wtm-next fake feat/a 'it'\''s' --ff=false --files a.txt --files b.txt --from main --keep --name 'two words' --remember mode --ask`, output.Line(argv))
 }
 
+func TestTheWordsAfterTheDashAnswerTheTrailingFieldAsOneLine(t *testing.T) {
+	command, cmd := boundLines(t, "feat/a", "--all", "--", "pnpm", "test", "--watch")
+
+	req := command.RequestOf(cmd, cmd.Flags().Args())
+
+	assert.Equal(t, request{"worktree": {"feat/a"}, "all": {"true"}, "command": {"pnpm test --watch"}}, req)
+	assert.Nil(t, cmd.Flags().Lookup("command"), "the trailing field is no flag")
+}
+
+func TestTheTrailingFieldIsSpelledLastEveryFlagBeforeIt(t *testing.T) {
+	followUp := domain.FollowUp{Command: "run", Answers: []domain.Answered{{Path: "worktree", Values: []string{"feat/a"}}, {Path: "command", Values: []string{"pnpm test"}}}, DryRun: true}
+
+	argv := linesCommand().Spell("wtm-next run", followUp)
+
+	assert.Equal(t, `wtm-next run feat/a --dry-run -- 'pnpm test'`, output.Line(argv))
+}
+
 func TestAListEntryWithACommaReadsBackAsOneEntry(t *testing.T) {
 	req := request{"files": {"a,b.txt", `say "hi".txt`, "c.txt"}}
 	argv := fakeCommand().Argv("wtm-next fake", req)
@@ -109,6 +126,11 @@ func TestAnApplyIsDrawnByTheCommandAndEndsOnItsFailure(t *testing.T) {
 	var refused *uicli.Failed
 	require.ErrorAs(t, failure, &refused)
 	assert.Equal(t, failed, refused.Err)
+}
+
+func TestQuietOnAFailedApplyNamesTheSubjectOnceWhereNothingElseDoes(t *testing.T) {
+	assert.Equal(t, "feat/b: exited 3", quietlyFailed(t, "feat/b", "exited 3"))
+	assert.Equal(t, "couldn't delete the branch feat/b", quietlyFailed(t, "feat/b", "couldn't delete the branch feat/b"))
 }
 
 func TestAStalePlanIsFollowedByTheDryRunThatPlansAgainQuietOrNot(t *testing.T) {

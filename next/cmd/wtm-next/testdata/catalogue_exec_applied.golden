@@ -1,0 +1,68 @@
+{
+  "v": 2,
+  "command": "exec",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "feat/old",
+      "status": "done",
+      "detail": {
+        "path": "<root>/.trees/feat-moved",
+        "exit_code": 0,
+        "duration_ms": 0,
+        "log": "<root>/main/.git/wtm/exec/feat%2Fold/<id>.log",
+        "tail": []
+      }
+    }
+  ],
+  "plan": {
+    "targets": [
+      {
+        "worktree": "feat/old",
+        "branch": "feat/old",
+        "path": "<root>/.trees/feat-moved"
+      }
+    ],
+    "command": "touch ran",
+    "jobs": 1,
+    "print": false,
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/old",
+            "text": "feat/old"
+          }
+        ]
+      },
+      {
+        "key": "command",
+        "label": "Command",
+        "path": "command",
+        "values": [
+          {
+            "value": "touch ran",
+            "text": "touch ran"
+          }
+        ]
+      },
+      {
+        "key": "concurrency",
+        "label": "Concurrency",
+        "path": "jobs",
+        "values": [
+          {
+            "value": "1",
+            "text": "1"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

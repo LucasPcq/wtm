@@ -183,6 +183,8 @@ sed -i '' -E \
   -e 's#"(ts|created_at)":"[^"]+"#"\1":"<T>"#g' \
   -e 's#"version":"[^"]+"#"version":"<VERSION>"#g' \
   -e 's#^Date: .*#Date: <T>#' \
+  -e 's#127\.0\.0\.1:[0-9]+#127.0.0.1:<PORT>#g' \
+  -e 's#"port":[0-9]+#"port":<PORT>#g' \
   -e 's#(/assets/[a-z0-9_-]+)-[A-Za-z0-9_-]{8}\.#\1-<HASH>.#g' \
   "$out"/*.txt
 # operation ids and fingerprints numbered in order of first appearance, so a DELETE still names the operation it cancels

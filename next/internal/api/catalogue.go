@@ -11,9 +11,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
-// surfaceAPI is the surface an operation records when its call names none.
-const surfaceAPI = "api"
-
 // A Catalogue lists the commands a surface can run, in the order it shows them.
 type Catalogue []Command
 
@@ -131,7 +128,7 @@ func Bind[U any, Req Request[Req], Q Form, Out Outcome](name string, open func(c
 		}
 
 		opts := call.Options
-		opts.Surface = cmp.Or(opts.Surface, surfaceAPI)
+		opts.Surface = cmp.Or(opts.Surface, domain.SurfaceAPI)
 		outcome, err := run(useCase, ctx, req, opts)
 		return Response{Envelope: outcome.Envelope(domain.EnvelopeParams{Command: name, Err: domain.AsError(domain.AsErrorParams{Err: err}), Answers: domain.AnswersOf(form, req)})}
 	}

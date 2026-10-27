@@ -1,0 +1,50 @@
+{
+  "fields": [
+    {
+      "kind": "multi_select",
+      "path": "worktree",
+      "picked": [
+        "feat/old"
+      ],
+      "options": [
+        {
+          "value": "main",
+          "tag": "current"
+        },
+        {
+          "value": "feat/old"
+        }
+      ]
+    },
+    {
+      "kind": "text",
+      "path": "command",
+      "value": "touch ran"
+    },
+    {
+      "kind": "confirm",
+      "path": "all",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "text",
+      "path": "jobs",
+      "skip": "flag_only",
+      "value": ""
+    },
+    {
+      "kind": "confirm",
+      "path": "print",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    }
+  ],
+  "problems": []
+}

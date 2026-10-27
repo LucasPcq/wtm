@@ -28,11 +28,12 @@ type Questions interface {
 	Form() domain.Form
 }
 
-// An Outcome is how a command's run ended, as [domain.Outcome] reports it: the fingerprint of the plan it previewed or applied, whether it applied it, the failure the apply ended on, and the envelope of the run.
+// An Outcome is how a command's run ended, as [domain.Outcome] reports it: the fingerprint of the plan it previewed or applied, whether it applied it, the failure the apply ended on and the subject it stopped at, and the envelope of the run.
 type Outcome interface {
 	PlanFingerprint() string
 	Applied() bool
 	Failure() *domain.Error
+	FailedAt() string
 	Envelope(params domain.EnvelopeParams) domain.Envelope
 }
 
@@ -55,11 +56,19 @@ type Command[R Request[R], Q Questions, O Outcome] struct {
 	Special func(s *Session[R, Q, O], at int, field domain.Field) Step
 	// Skipped words why a step is not asked the command's own way, empty for the wizard's words.
 	Skipped func(s *Session[R, Q, O], skip domain.Skip) string
+	// NewProgress draws the events of a run its own way, nil for [output.NewProgress], which draws one unit at a time.
+	NewProgress func(ctx context.Context, params output.ProgressParams) Progress
 
 	io     *uicli.Run
 	yes    bool
 	dryRun bool
 	expect string
+}
+
+// A Progress draws the events of a run as they come, until Close.
+type Progress interface {
+	Report(event domain.Event)
+	Close()
 }
 
 // A Preview is what the recap and the dry run show of a plan not yet applied: its rows, each answer with its mark, its warnings and the fields answered from memory, which the recap's hint names.
@@ -160,7 +169,7 @@ func bound(schema []worded) []worded {
 	seen := map[string]bool{}
 	for _, field := range schema {
 		path := field.Spec().Path
-		if seen[path] || positional(field) {
+		if seen[path] || positional(field) || trailing(field) {
 			continue
 		}
 		seen[path] = true
@@ -173,6 +182,13 @@ func bound(schema []worded) []worded {
 func positional(field worded) bool {
 	return strings.HasPrefix(field.Flag, "<")
 }
+
+// trailing reports whether field is spelled after --, the rest of the command line as one value (exec's -- <command>).
+func trailing(field worded) bool {
+	return strings.HasPrefix(field.Flag, dash+" ")
+}
+
+const dash = "--"
 
 func flagName(field worded) string {
 	return strings.TrimPrefix(field.Flag, "--")
@@ -216,9 +232,19 @@ func folded[R Request[R]](answers []domain.Answered) R {
 // fieldAnswers are the answers cmd's flags and args give the fields of schema: each flag the user set answers its field, and the arguments the positional field.
 func fieldAnswers(cmd *cobra.Command, args []string, schema []worded) []domain.Answered {
 	var answers []domain.Answered
+	var after []string
+	if at := cmd.ArgsLenAtDash(); at >= 0 && slices.ContainsFunc(schema, trailing) {
+		args, after = args[:at], args[at:]
+	}
 	for _, field := range schema {
 		if positional(field) && len(args) > 0 {
 			answers = append(answers, domain.Answered{Path: field.Spec().Path, Values: arguments(field.Field, args)})
+			break
+		}
+	}
+	for _, field := range schema {
+		if rest := strings.TrimSpace(strings.Join(after, " ")); trailing(field) && rest != "" {
+			answers = append(answers, domain.Answered{Path: field.Spec().Path, Values: []string{rest}})
 			break
 		}
 	}
@@ -280,11 +306,19 @@ func (c *Command[R, Q, O]) Launch(cmd *cobra.Command, args []string, conclude fu
 		return c.io.FailWith(domain.AsError(domain.AsErrorParams{Err: err}), nil)
 	}
 
-	progress := c.io.Progress(ctx)
+	progress := c.progress(ctx)
 	ran, err := c.launch(ctx, app, req, progress.Report)
 	progress.Close()
 
 	return conclude(cmd, ran, err)
+}
+
+// progress is the progress of the run ctx runs: the command's own when it draws one, else output's, one unit at a time; only the one built watches for a cancel.
+func (c *Command[R, Q, O]) progress(ctx context.Context) Progress {
+	if c.NewProgress != nil {
+		return c.NewProgress(ctx, c.io.ProgressParams())
+	}
+	return output.NewProgress(ctx, c.io.ProgressParams())
 }
 
 func (c *Command[R, Q, O]) launch(ctx context.Context, app UseCase[R, Q, O], req R, report domain.Report) (Ran[R, O], error) {
@@ -292,7 +326,7 @@ func (c *Command[R, Q, O]) launch(ctx context.Context, app UseCase[R, Q, O], req
 		return c.Ask(ctx, AskParams[R, Q, O]{App: app, Request: req, Options: domain.RunOptions{DryRun: c.dryRun, CorrelationID: c.io.Env.CorrelationID, Report: report}, In: c.io.Streams.In, Out: c.io.Streams.Err})
 	}
 
-	outcome, err := app.Run(ctx, req, domain.RunOptions{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: uicli.SurfaceCLI, CorrelationID: c.io.Env.CorrelationID, Report: report})
+	outcome, err := app.Run(ctx, req, domain.RunOptions{DryRun: c.dryRun, ExpectFingerprint: c.expect, Surface: domain.SurfaceCLI, CorrelationID: c.io.Env.CorrelationID, Report: report})
 	return Ran[R, O]{Outcome: outcome, Request: req}, err
 }
 
@@ -343,7 +377,19 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 	}
 
 	output.Frame(stdout, func(w io.Writer) { c.Draw(w, ran.Outcome, c.io.View()) })
-	return c.io.Failed(ran.Outcome.Failure())
+	return c.io.Failed(c.quietlyNamed(ran.Outcome))
+}
+
+// quietlyNamed is the failure an apply ended on, led by the subject it stopped at when --quiet prints it alone and it does not name it already: the outcome that names each subject is not drawn.
+func (c *Command[R, Q, O]) quietlyNamed(outcome O) *domain.Error {
+	failure, subject := outcome.Failure(), outcome.FailedAt()
+	if failure == nil || subject == "" || !c.io.Quiet || strings.Contains(failure.Message, subject) {
+		return failure
+	}
+
+	named := *failure
+	named.Message = subject + ": " + failure.Message
+	return &named
 }
 
 // replanned is failure followed by the request run again as a dry run when it is a stale plan, as the envelope's follow_ups give it; failure itself otherwise.
@@ -379,20 +425,30 @@ func (c *Command[R, Q, O]) Spell(command string, followUp domain.FollowUp) []str
 
 	argv := c.Argv(command, req)
 	if followUp.DryRun {
-		argv = append(argv, "--"+uicli.FlagDryRun)
+		argv = withFlags(argv, "--"+uicli.FlagDryRun)
 	}
 	return argv
 }
 
 // applyLine is argv, the command line of the request, held to the fingerprint of the plan it previewed.
 func applyLine(argv []string, fingerprint string) string {
-	return output.Line(append(slices.Clone(argv), "--"+uicli.FlagExpectFingerprint, fingerprint))
+	return output.Line(withFlags(argv, "--"+uicli.FlagExpectFingerprint, fingerprint))
+}
+
+// withFlags is argv with flags added before its --, after which every word is the trailing field's.
+func withFlags(argv []string, flags ...string) []string {
+	at := slices.Index(argv, dash)
+	if at < 0 {
+		return append(slices.Clone(argv), flags...)
+	}
+
+	return slices.Concat(argv[:at], flags, argv[at:])
 }
 
 // ----------------------------------------------------------------------------
 // The command line
 
-// Argv spells command and req word by word, unquoted: the positional field's words, each flag given sorted by name, then --ask.
+// Argv spells command and req word by word, unquoted: the positional field's words, each flag given sorted by name, then --ask, then -- and the trailing field's value.
 func (c *Command[R, Q, O]) Argv(command string, req R) []string {
 	argv := strings.Fields(command)
 	for _, field := range c.schema() {
@@ -421,6 +477,11 @@ func (c *Command[R, Q, O]) Argv(command string, req R) []string {
 
 	if slices.Equal(req.Values(domain.PathAsk), []string{"true"}) {
 		argv = append(argv, "--"+domain.PathAsk)
+	}
+	for _, field := range c.schema() {
+		if values := req.Values(field.Spec().Path); trailing(field) && len(values) > 0 {
+			argv = append(argv, append([]string{dash}, values...)...)
+		}
 	}
 
 	return argv

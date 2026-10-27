@@ -34,3 +34,9 @@ func lost(streams *output.Streams, name string, env Env) *cobra.Command {
 
 // envBrokenPipeHelper turns the test binary into a helper that writes to a stdout whose reader left.
 const envBrokenPipeHelper = "WTM_NEXT_TEST_BROKEN_PIPE_HELPER"
+
+// envHangupHelper turns the test binary into a helper that waits for its run to be cancelled.
+const envHangupHelper = "WTM_NEXT_TEST_HANGUP_HELPER"
+
+// envNohupHelper turns the test binary into a helper that ignores SIGHUP, as under nohup, then checks its run still goes on.
+const envNohupHelper = "WTM_NEXT_TEST_NOHUP_HELPER"

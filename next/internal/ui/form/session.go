@@ -6,7 +6,6 @@ import (
 	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/LucasPcq/wtm/next/internal/ui/widget"
 )
@@ -243,7 +242,7 @@ func (s *Session[R, Q, O]) observe(ctx context.Context) (func(), error) {
 // previewPlan dry-runs the request as answered, for the recap to show the plan its apply will be held to.
 func (s *Session[R, Q, O]) previewPlan(ctx context.Context) (func(), error) {
 	opts := s.opts
-	opts.DryRun, opts.Surface, opts.Report = true, uicli.SurfaceTUI, nil
+	opts.DryRun, opts.Surface, opts.Report = true, domain.SurfaceTUI, nil
 	outcome, err := s.app.Run(ctx, s.req, opts)
 	if err != nil {
 		return func() { s.preview = nil }, err
@@ -255,7 +254,7 @@ func (s *Session[R, Q, O]) previewPlan(ctx context.Context) (func(), error) {
 // apply runs the request as answered, held to the fingerprint of the plan previewed unless on a dry run; a stale plan leaves the outcome alone, since the wizard starts again.
 func (s *Session[R, Q, O]) apply(ctx context.Context) error {
 	opts := s.opts
-	opts.Surface = uicli.SurfaceTUI
+	opts.Surface = domain.SurfaceTUI
 	if !opts.DryRun {
 		opts.ExpectFingerprint = (*s.preview).PlanFingerprint()
 	}

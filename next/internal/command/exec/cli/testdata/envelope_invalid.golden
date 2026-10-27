@@ -1,0 +1,24 @@
+{
+  "v": 2,
+  "command": "exec",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "command",
+        "code": "exec.command_invalid",
+        "params": {
+          "reason": "/bin/sh: -c: line 0: syntax error near unexpected token `then'"
+        },
+        "flag": "-- <command>",
+        "message": "-- <command>: /bin/sh: -c: line 0: syntax error near unexpected token `then'"
+      }
+    ]
+  }
+}

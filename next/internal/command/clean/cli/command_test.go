@@ -92,6 +92,14 @@ func TestQuietPrintsNothingButARefusal(t *testing.T) {
 	formtest.Golden(t, "quiet_unsafe", refused.Stderr)
 }
 
+func TestQuietOnAFailedApplyNamesTheWorktreeItStoppedAtOnce(t *testing.T) {
+	got := runClean(t, newWorld(seed{OnClean: []project.Hook{{Cmd: "make down"}}, RunHooks: hookFails}), "-q", plain, "--yes")
+
+	assert.Equal(t, uicli.ExitError, got.Code)
+	assert.Empty(t, got.Stdout)
+	formtest.Golden(t, "quiet_hook_failed", got.Stderr)
+}
+
 func TestEachEnvelopeOfCleanHasItsGolden(t *testing.T) {
 	for name, c := range map[string]struct {
 		Seed  seed

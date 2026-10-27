@@ -1,0 +1,12 @@
+$ wtm exec --jobs 1; echo EXIT=$?
+
+  Step 1/3 • Run in which worktrees?
+
+  Space to toggle, a to select all, / to filter, enter to confirm, esc to cancel.
+
+▌ [✓] main (base)
+  [ ] feat/a
+  [ ] feat/b
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel
+

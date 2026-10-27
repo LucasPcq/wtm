@@ -340,3 +340,52 @@ func TestAHookThatBackgroundsAJobSucceedsWithoutWaitingForIt(t *testing.T) {
 	assert.Equal(t, []string{"started"}, out.all())
 	assert.Less(t, time.Since(begin), 5*time.Second)
 }
+
+func TestALineUnfinishedOnStdoutNeverMergesWithALineOfStderr(t *testing.T) {
+	out := &collected{}
+
+	err := RunHooks(t.Context(), env.HookChain{Hooks: []project.Hook{{Cmd: `printf "no newline"; sleep 0.1; echo red >&2`}}, WorkDir: t.TempDir(), Output: out.add})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"red", "no newline"}, out.all())
+}
+
+func TestAReapingChainStopsWhatItsCommandLeftInTheBackground(t *testing.T) {
+	for name, reap := range map[string]bool{"reaped": true, "hook_kept": false} {
+		t.Run(name, func(t *testing.T) {
+			var grandchild int
+
+			err := RunHooks(t.Context(), env.HookChain{
+				Hooks:   []project.Hook{{Cmd: "sleep 30 >/dev/null 2>&1 & echo $!"}},
+				WorkDir: t.TempDir(),
+				Output:  func(line string) { grandchild, _ = strconv.Atoi(strings.TrimSpace(line)) },
+				Reap:    reap,
+			})
+			t.Cleanup(func() { _ = syscall.Kill(grandchild, syscall.SIGKILL) })
+
+			require.NoError(t, err)
+			require.Positive(t, grandchild)
+			if reap {
+				assert.Eventually(t, func() bool { return syscall.Kill(grandchild, 0) != nil }, 2*interruptGrace, 20*time.Millisecond)
+				return
+			}
+			assert.NoError(t, syscall.Kill(grandchild, 0), "a hook may start a server on purpose")
+		})
+	}
+}
+
+func TestACancelledHookThatExitsOnItsOwnKeepsItsExitCode(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+
+	err := RunHooks(ctx, env.HookChain{
+		Hooks:   []project.Hook{{Cmd: "trap 'exit 7' INT; echo ready; while :; do sleep 0.1; done"}},
+		WorkDir: t.TempDir(),
+		Output:  func(string) { cancel() },
+	})
+
+	var failure *env.HookFailure
+	require.ErrorAs(t, err, &failure)
+	assert.ErrorIs(t, err, context.Canceled)
+	require.NotNil(t, failure.ExitCode)
+	assert.Equal(t, 7, *failure.ExitCode)
+}

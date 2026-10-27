@@ -64,6 +64,17 @@ func (o Outcome[P, D]) Failure() *Error {
 	return o.Result.Failure()
 }
 
+// FailedAt is the subject the run's failure stopped at, empty when it ends on none: a line that says the failure alone names it.
+func (o Outcome[P, D]) FailedAt() string {
+	if o.Result == nil {
+		return ""
+	}
+	if at := o.Result.failedAt(); at >= 0 {
+		return o.Result.Items[at].Subject
+	}
+	return ""
+}
+
 // EnvelopeParams is what a run's envelope reports beside its outcome: the command that ran, its refusal if any, and its request as the answers of its fields, which the replan of a stale plan runs again.
 type EnvelopeParams struct {
 	Command string
@@ -100,15 +111,23 @@ type Result[D any] struct {
 
 // Failure is the error the run ends on: the first interruption, else the first failed subject, else nil.
 func (r Result[D]) Failure() *Error {
-	if at := slices.IndexFunc(r.Items, Unit[D].interrupted); at >= 0 {
+	at := r.failedAt()
+	switch {
+	case at < 0:
+		return nil
+	case r.Items[at].interrupted():
 		return cmp.Or(r.Items[at].Err, &Error{Kind: KindCancelled, Code: CodeInterrupted, Message: "interrupted"})
 	}
 
-	if at := slices.IndexFunc(r.Items, func(unit Unit[D]) bool { return unit.Status == StatusFailed }); at >= 0 {
-		return r.Items[at].Err
-	}
+	return r.Items[at].Err
+}
 
-	return nil
+// failedAt is the index of the item the run ends on, the first interruption else the first failed subject, -1 when none.
+func (r Result[D]) failedAt() int {
+	if at := slices.IndexFunc(r.Items, Unit[D].interrupted); at >= 0 {
+		return at
+	}
+	return slices.IndexFunc(r.Items, func(unit Unit[D]) bool { return unit.Status == StatusFailed })
 }
 
 // A Unit is what became of one subject: its status and why, the error it failed on, its warnings, and its Detail once there is something to report of it.

@@ -1,0 +1,14 @@
+$ wtm exec --jobs 1; echo EXIT=$?
+
+  Step 2/3 • Command to run
+
+  ✓ Worktrees: main, feat/a, feat/b
+
+  A /bin/sh line, run from each worktree's root
+
+❯
+
+  ✗ Type the command to run
+
+  enter confirm • esc back
+

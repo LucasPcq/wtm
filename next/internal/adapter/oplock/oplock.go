@@ -136,31 +136,31 @@ func closeAll(files []*os.File) {
 }
 
 // held returns the refusal of lock, held by another operation than asked,
-// naming that operation from its record when one claims the lock.
+// naming the locked subject and that operation from its record when one claims
+// the lock; a holder with no record (a legacy wtm, or a process gone) stays
+// unknown.
 func (l Locks) held(lock domain.Lock, asked domain.Operation) error {
 	key := lock.Key()
-	params := domain.Params{"key": key, "op": unknown, "command": unknown, "pid": unknown}
+	params := domain.Params{"key": key, "scope": string(lock.Scope), "name": lock.Name, "op": unknown, "command": unknown, "pid": unknown, "surface": unknown}
 	for _, holder := range running(filepath.Join(l.StateDir, locksDir, operationsDir)) {
 		if holder.ID == asked.ID || !slices.ContainsFunc(holder.Locks, func(lock domain.Lock) bool { return lock.Key() == key }) {
 			continue
 		}
-		params = domain.Params{
-			"key":        key,
-			"op":         holder.ID,
-			"command":    holder.Command,
-			"pid":        strconv.Itoa(holder.PID),
-			"surface":    holder.Surface,
-			"started_at": holder.StartedAt.Format(time.RFC3339),
-		}
+		params["op"], params["command"], params["pid"] = holder.ID, holder.Command, strconv.Itoa(holder.PID)
+		params["surface"], params["started_at"] = string(holder.Surface), holder.StartedAt.Format(time.RFC3339)
 		break
 	}
 
-	return &domain.Error{
-		Kind:    domain.KindConflict,
-		Code:    "lock.held",
-		Message: key + " is held by " + params["command"] + " (pid " + params["pid"] + ")",
-		Params:  params,
+	subject := "the repository"
+	if lock.Scope == domain.ScopeWorktree {
+		subject = lock.Name
 	}
+	message := subject + " is locked by another wtm"
+	if params["op"] != unknown {
+		message = subject + " is locked by " + params["command"] + ", started from " + params["surface"] + " (pid " + params["pid"] + ")"
+	}
+
+	return &domain.Error{Kind: domain.KindConflict, Code: "lock.held", Message: message, Params: params}
 }
 
 // holderPath returns where the record of operation id lives.

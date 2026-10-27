@@ -29,6 +29,17 @@ func JobKeys() []string {
 	return []string{worktreeKey, branchKey, ordinalKey, portOffsetKey, projectKey, isolationKey, ComposeProjectKey}
 }
 
+// NotInherited returns the variables a worktree's hooks and commands never take from the caller's environment: those wtm itself sets (JobKeys), and every port run declares, which are the caller's worktree's, never theirs.
+func NotInherited(run project.Run) []string {
+	keys := JobKeys()
+	for _, job := range run.Jobs {
+		for name := range job.Ports {
+			keys = append(keys, name)
+		}
+	}
+	return keys
+}
+
 // JobParams describes the worktree a job runs in: its branch, the project's directory, the worktree's ordinal, the project's isolation and its run.toml.
 type JobParams struct {
 	Branch     string
@@ -181,6 +192,19 @@ func HookEnv(job JobParams, composeEnv [][]dotenv.Line) map[string]string {
 		env[ComposeProjectKey] = name
 	}
 	return env
+}
+
+// ReadHookEnv returns the variables a hook of the worktree at dir runs with (HookEnv), each compose .env file read by read; it fails with read's error.
+func ReadHookEnv(job JobParams, dir string, read func(path string) ([]dotenv.Line, error)) (map[string]string, error) {
+	var compose [][]dotenv.Line
+	for _, path := range ComposeEnvPaths(job.Run) {
+		lines, err := read(filepath.Join(dir, path))
+		if err != nil {
+			return nil, err
+		}
+		compose = append(compose, lines)
+	}
+	return HookEnv(job, compose), nil
 }
 
 // HooksReadRun reports whether the hooks' environment depends on run.toml: an isolation is set and some job runs docker compose.

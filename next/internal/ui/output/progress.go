@@ -176,7 +176,7 @@ func (p *Progress) paint() {
 	}
 
 	p.erase()
-	loadingLine(p.w, truncate(p.line(), blockWidth(p.w)))
+	LoadingLine(p.w, Truncate(p.line(), BlockWidth(p.w)))
 	p.painted = true
 }
 

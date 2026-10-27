@@ -1,0 +1,11 @@
+
+  ✓ exec: 5 done
+
+  Worktrees    main, <SB>/acme.trees/det, feat/a, feat/b, feat/c
+  Command      echo hi from $(git branch --show-current)
+  Concurrency  5
+
+  ! left out, their directory gone: feat/gone
+
+  → wtm-next prune   drop them
+

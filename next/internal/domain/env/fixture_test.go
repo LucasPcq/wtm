@@ -1,10 +1,14 @@
 package env
 
 import (
+	"errors"
+
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
 const shopProject = "shop"
+
+var errUnreadable = errors.New("permission denied")
 
 func shopRun() project.Run {
 	return project.Run{Jobs: []project.Job{

@@ -1,0 +1,4 @@
+
+  ✗ feat/b: exited 3
+  → wtm exec feat/b --jobs 1 -- 'test "$(git branch --show-current)" != feat/b || { echo boom >&2; exit 3; }; echo ok'   run it again where it did not pass
+

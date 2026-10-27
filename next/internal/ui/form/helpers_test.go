@@ -46,6 +46,15 @@ func bound(t *testing.T, args ...string) (*form.Command[request, questions, outc
 	return command, cmd
 }
 
+// boundLines is the fake command that runs a line, its flags bound on its cobra command, which parsed args.
+func boundLines(t *testing.T, args ...string) (*form.Command[request, lines, outcome], *cobra.Command) {
+	t.Helper()
+	command, cmd := linesCommand(), &cobra.Command{Use: "run"}
+	command.Bind(cmd, &uicli.Run{})
+	require.NoError(t, cmd.ParseFlags(args))
+	return command, cmd
+}
+
 // concluded is how the fake command concludes ran and err, with the given --output, its stdout and the failure it returns.
 func concluded(t *testing.T, format string, ran form.Ran[request, outcome], err error) (string, error) {
 	t.Helper()
@@ -101,4 +110,22 @@ func launchedSubject(t *testing.T, q *form.Query[request, subjects, read], run *
 	require.NoError(t, cmd.ParseFlags(args))
 	cmd.SetContext(t.Context())
 	return q.Launch(cmd, cmd.Flags().Args())
+}
+
+// quietlyFailed is the failure a quiet text run of the fake command prints alone once it applied, failing at subject on message.
+func quietlyFailed(t *testing.T, subject, message string) string {
+	t.Helper()
+	streams, _, _, _ := output.Test()
+	command, cmd := fakeCommand(), &cobra.Command{Use: "fake"}
+	command.Draw = func(io.Writer, outcome, output.View) {}
+	run := &uicli.Run{Command: "fake", Streams: streams, Output: uicli.OutputText, Quiet: true, CommandLine: formtest.CommandLine}
+	command.Bind(cmd, run)
+	applied := outcome{Fingerprint: "print", Result: &domain.Result[struct{}]{Items: []domain.Unit[struct{}]{
+		{Subject: "feat/a", Status: domain.StatusDone},
+		{Subject: subject, Status: domain.StatusFailed, Err: &domain.Error{Kind: domain.KindInternal, Code: "fake.failed", Message: message}},
+	}}}
+
+	var failed *uicli.Failed
+	require.ErrorAs(t, command.Conclude(cmd, form.Ran[request, outcome]{Outcome: applied}, nil), &failed)
+	return failed.Err.Message
 }

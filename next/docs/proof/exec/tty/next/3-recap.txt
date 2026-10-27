@@ -1,0 +1,23 @@
+$ wtm exec --jobs 1; echo EXIT=$?
+
+  Step 6/6 • Confirm
+
+  ✓ Worktrees: main, feat/a, feat/b
+  ✓ Command: test "$(git branch --show-current)" != feat/b || { echo boom >&2; exit 3; }; echo ok
+  · All — set by its flag only
+  · Concurrency — set by its flag only
+  · Print — set by its flag only
+
+  ┃  Review & confirm
+  ┃
+  ┃  Worktrees    main, feat/a, feat/b
+  ┃  Command      test "$(git branch --show-current)" != feat/b || { echo boom >&2; exit 3; };
+  ┃               echo ok
+  ┃  Concurrency  1
+
+▌› Yes, run in 3 worktrees
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

@@ -1,0 +1,289 @@
+=== 00-before: exit legacy , next 
+=== 01-all-pass: exit legacy 0, next 0
+--- legacy/01-all-pass
++++ next/01-all-pass
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 02-one-fails: exit legacy 1, next 1
+--- legacy/02-one-fails
++++ next/02-one-fails
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 03-json: exit legacy 1, next 1
+--- legacy/03-json
++++ next/03-json
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 04-print: exit legacy 1, next 1
+--- legacy/04-print
++++ next/04-print
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 05-quiet: exit legacy 1, next 1
+--- legacy/05-quiet
++++ next/05-quiet
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 06-unknown-json: exit legacy 11, next 2
+--- legacy/06-unknown-json
++++ next/06-unknown-json
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 07-no-selection: exit legacy 1, next 2
+--- legacy/07-no-selection
++++ next/07-no-selection
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 08-no-selection-no-tty: exit legacy 1, next 2
+--- legacy/08-no-selection-no-tty
++++ next/08-no-selection-no-tty
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 09-no-command: exit legacy 2, next 2
+--- legacy/09-no-command
++++ next/09-no-command
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 10-invalid-command: exit legacy 2, next 2
+--- legacy/10-invalid-command
++++ next/10-invalid-command
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 11-gone-named: exit legacy 11, next 2
+--- legacy/11-gone-named
++++ next/11-gone-named
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 12-all-gone-detached: exit legacy 0, next 0
+--- legacy/12-all-gone-detached
++++ next/12-all-gone-detached
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 13-caller-port: exit legacy 0, next 0
+--- legacy/13-caller-port
++++ next/13-caller-port
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 14-jobs-negative: exit legacy 2, next 2
+--- legacy/14-jobs-negative
++++ next/14-jobs-negative
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 15-given-twice: exit legacy 0, next 2
+--- legacy/15-given-twice
++++ next/15-given-twice
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 16-dry-run: exit legacy 2, next 0
+--- legacy/16-dry-run
++++ next/16-dry-run
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 17-json-dry-run: exit legacy 2, next 0
+--- legacy/17-json-dry-run
++++ next/17-json-dry-run
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log
+=== 18-expect-fingerprint: exit legacy 2, next 0
+--- legacy/18-expect-fingerprint
++++ next/18-expect-fingerprint
+@@ -40,7 +40,8 @@
+   "isolation": "isolated"
+ }
+ ## exec logs
+-./feat%2Fa.log
+-./feat%2Fb.log
+-./feat%2Fc.log
+-./main.log
++./<SB>%2Facme.trees%2Fdet/<OP>.log
++./feat%2Fa/<OP>.log
++./feat%2Fb/<OP>.log
++./feat%2Fc/<OP>.log
++./main/<OP>.log

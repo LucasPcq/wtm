@@ -57,7 +57,7 @@ func TestTheSchemaRefusesWhatTheContractForbids(t *testing.T) {
 	}
 }
 
-func TestTheSchemasPhasesAreTheCoresEveryOne(t *testing.T) {
+func TestTheSchemasPhasesAndSurfacesAreTheCoresEveryOne(t *testing.T) {
 	data, err := os.ReadFile("events.v2.json")
 	require.NoError(t, err)
 	var doc struct {
@@ -65,9 +65,13 @@ func TestTheSchemasPhasesAreTheCoresEveryOne(t *testing.T) {
 			Phase struct {
 				Enum []domain.Phase `json:"enum"`
 			} `json:"phase"`
+			Surface struct {
+				Enum []domain.Surface `json:"enum"`
+			} `json:"surface"`
 		} `json:"$defs"`
 	}
 	require.NoError(t, json.Unmarshal(data, &doc))
 
 	assert.Equal(t, domain.Phases(), doc.Defs.Phase.Enum)
+	assert.Equal(t, domain.Surfaces(), doc.Defs.Surface.Enum)
 }

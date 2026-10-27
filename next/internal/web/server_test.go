@@ -158,6 +158,16 @@ func TestARefusalHasTheStatusOfItsKind(t *testing.T) {
 	}
 }
 
+func TestALockHeldNamesItsSubjectAndItsHolderInTheConflict(t *testing.T) {
+	holder := domain.Params{"key": "wt:feat/a", "scope": "wt", "name": "feat/a", "op": "op-1", "command": "clean", "pid": "4242", "surface": "cli", "started_at": "2026-10-26T12:00:00Z"}
+	refusing := greet(useCase{refusal: &domain.Error{Kind: domain.KindConflict, Code: "lock.held", Message: "feat/a is locked by clean, started from cli (pid 4242)", Params: holder}})
+
+	response := do(t, serving(t, Params{Catalogue: api.Catalogue{refusing}}), req{method: http.MethodPost, path: repoPath("/commands/greet"), body: `{"answers":[{"path":"name","values":["x"]}]}`})
+
+	assert.Equal(t, http.StatusConflict, response.StatusCode)
+	assert.Equal(t, holder, decoded[envelope](t, response).Error.Params)
+}
+
 func TestARunWithEventsStreamsEachAsALineThenItsEnvelope(t *testing.T) {
 	response := do(t, serving(t, Params{}), req{method: http.MethodPost, path: repoPath("/commands/greet"), body: `{"answers":[{"path":"name","values":["x"]}],"dry_run":false}`, headers: map[string]string{"Accept": "text/event-stream"}})
 

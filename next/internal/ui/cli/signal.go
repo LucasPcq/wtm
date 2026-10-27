@@ -7,12 +7,16 @@ import (
 	"syscall"
 )
 
-// interruptible returns a context the first SIGINT or SIGTERM cancels, and the function that stops listening.
+// interruptible returns a context the first SIGINT, SIGTERM or SIGHUP (the terminal closed) cancels, and the function that stops listening.
 // The second signal kills the children still stopping, waits for the shielded sections to finish and then dies of that signal; a third one dies at once.
 func interruptible(params Params) (context.Context, func()) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	// Under nohup SIGHUP is ignored on purpose: handling it would take that back.
+	if !signal.Ignored(syscall.SIGHUP) {
+		signal.Notify(signals, syscall.SIGHUP)
+	}
 
 	go func() {
 		<-signals

@@ -1,0 +1,5 @@
+
+  ✗ feat/x: could not remove the worktree, left behind: worktree: meta failed: disk full
+    busy
+  → wtm clean feat/x --force   branch feat/x is left half-created at /repo/.trees/feat-x
+

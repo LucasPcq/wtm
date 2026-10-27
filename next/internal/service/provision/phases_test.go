@@ -125,6 +125,18 @@ func TestANumberOnlyHooksNeededStillGivesTheComposeNameAndSaysThePortsAreMissing
 	assert.Equal(t, mainEnv+"COMPOSE_PROJECT_NAME=main-feat-x\n", written)
 }
 
+func TestAHookNeverTakesAPortOfRunTomlFromTheCallersEnvironment(t *testing.T) {
+	t.Setenv("pg", "9999")
+	w, _ := inMemory(t, seeds{GitFail: map[string]error{"Worktrees": errors.New("exit status 128")}})
+	require.NoError(t, os.MkdirAll(w.path(branchName), 0o755))
+	report := &recorder{}
+
+	outcome := w.service.Run(t.Context(), hooked(composed(w.params(report)), "echo pg=${pg-unset}"))
+
+	require.Equal(t, domain.StatusDone, outcome.Status, outcome.Err)
+	assert.Equal(t, []string{"pg=unset"}, report.lines())
+}
+
 func TestAComposeStackWhosePortsCannotBeSettledStillGetsItsProjectName(t *testing.T) {
 	for name, seed := range map[string]seeds{
 		"no_ordinal":       {GitFail: map[string]error{"Worktrees": errors.New("exit status 128")}},

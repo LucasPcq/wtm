@@ -85,8 +85,9 @@ type envelope struct {
 	OK    bool   `json:"ok"`
 	Op    string `json:"op"`
 	Error *struct {
-		Kind string `json:"kind"`
-		Code string `json:"code"`
+		Kind   string        `json:"kind"`
+		Code   string        `json:"code"`
+		Params domain.Params `json:"params"`
 	} `json:"error"`
 }
 

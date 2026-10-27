@@ -83,7 +83,7 @@ func (q *Query[R, Q, O]) Launch(cmd *cobra.Command, args []string) error {
 		return q.conclude(none, req, err)
 	}
 
-	opts := domain.RunOptions{Surface: uicli.SurfaceCLI, CorrelationID: q.io.Env.CorrelationID}
+	opts := domain.RunOptions{Surface: domain.SurfaceCLI, CorrelationID: q.io.Env.CorrelationID}
 	read, err := app.Run(ctx, req, opts)
 	// A subject refused as ambiguous is asked again among what it matches, then read.
 	if refused := ambiguous(err); refused != "" && q.interactive() {

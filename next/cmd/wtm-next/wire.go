@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -28,6 +29,8 @@ import (
 	cleancli "github.com/LucasPcq/wtm/next/internal/command/clean/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
+	"github.com/LucasPcq/wtm/next/internal/command/exec"
+	execcli "github.com/LucasPcq/wtm/next/internal/command/exec/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
@@ -59,6 +62,7 @@ type app struct {
 	Extract extract.UseCase
 	Clean   clean.UseCase
 	Prune   prune.UseCase
+	Exec    exec.UseCase
 	List    list.UseCase
 	Resolve resolve.UseCase
 	Status  status.UseCase
@@ -142,6 +146,19 @@ func wire(params wireParams) app {
 			Repository:   facts,
 			Operations:   operations,
 		},
+		Exec: exec.UseCase{
+			Git:        repo,
+			Meta:       meta,
+			EnvFiles:   store.EnvFiles{},
+			RunHooks:   shell.RunHooks,
+			Syntax:     shell.Syntax,
+			OpenLog:    shell.OpenRunLog,
+			StateDir:   params.StateDir,
+			CPUs:       runtime.NumCPU(),
+			Now:        time.Now,
+			Repository: facts,
+			Operations: operations,
+		},
 		List: list.UseCase{
 			Git:          repo,
 			Meta:         meta,
@@ -220,13 +237,15 @@ func proxyStatus() domain.FollowUp {
 	return domain.FollowUp{Command: "run proxy status"}
 }
 
-// commandLine spells a follow-up as the command line runs it: one naming a migrated command another command gives (clean, prune) from that command's schema; go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
+// commandLine spells a follow-up as the command line runs it: one naming a migrated command another command gives (clean, prune, exec) from that command's schema; go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
 func commandLine(followUp domain.FollowUp) []string {
 	switch followUp.Command {
 	case clean.Name:
 		return cleancli.Line(followUp)
 	case prune.Name:
 		return prunecli.Line(followUp)
+	case exec.Name:
+		return execcli.Line(followUp)
 	}
 
 	argv, _ := spelled(followUp)

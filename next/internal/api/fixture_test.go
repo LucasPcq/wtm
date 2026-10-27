@@ -62,7 +62,7 @@ func (u useCase) Questions(_ context.Context, req request) (questions, error) {
 }
 
 func (u useCase) Run(_ context.Context, req request, opts domain.RunOptions) (outcome, error) {
-	return outcome{op: u.dir + ":" + req.Name + ":" + opts.Surface}, u.refusal
+	return outcome{op: u.dir + ":" + req.Name + ":" + string(opts.Surface)}, u.refusal
 }
 
 func (r request) Values(path string) []string {

@@ -1,0 +1,13 @@
+
+  feat/a
+    ok
+
+  feat/b
+    ok
+
+  ✓ exec: 2 done
+
+  Worktrees    feat/a, feat/b
+  Command      echo hi
+  Concurrency  2
+

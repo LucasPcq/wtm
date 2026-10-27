@@ -2,11 +2,9 @@ package teardown
 
 import (
 	"context"
-	"path/filepath"
 	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
@@ -142,7 +140,7 @@ func (s Service) hooks(ctx context.Context, params RemoveParams) ([]domain.Warni
 		Hooks:   hooks,
 		WorkDir: removal.Path,
 		Env:     hookEnv,
-		Unset:   env.JobKeys(),
+		Unset:   env.NotInherited(facts.Run),
 		Output:  func(line string) { report(domain.Output{Subject: removal.Worktree, Line: line}) },
 		Log:     log,
 	})
@@ -159,16 +157,12 @@ func (s Service) hookEnv(params RemoveParams) (map[string]string, []domain.Warni
 		return nil, nil
 	}
 
-	var compose [][]dotenv.Line
-	for _, path := range env.ComposeEnvPaths(facts.Run) {
-		lines, err := s.EnvFiles.Read(filepath.Join(removal.Path, path))
-		if err != nil {
-			return nil, []domain.Warning{{Code: params.Command + HookEnvUnavailable, Message: err.Error() + " — on_clean hooks run without the worktree's environment", Params: domain.Params{"cause": err.Error()}}}
-		}
-		compose = append(compose, lines)
+	job := env.JobParams{Branch: removal.Branch, ProjectDir: facts.MainPath, Ordinal: record.Ordinal, Isolation: isolation, Run: facts.Run}
+	hookEnv, err := env.ReadHookEnv(job, removal.Path, s.EnvFiles.Read)
+	if err != nil {
+		return nil, []domain.Warning{{Code: params.Command + HookEnvUnavailable, Message: err.Error() + " — on_clean hooks run without the worktree's environment", Params: domain.Params{"cause": err.Error()}}}
 	}
-
-	return env.HookEnv(env.JobParams{Branch: removal.Branch, ProjectDir: facts.MainPath, Ordinal: record.Ordinal, Isolation: isolation, Run: facts.Run}, compose), nil
+	return hookEnv, nil
 }
 
 // removeWorktree removes the worktree, then its branch and its meta record, and reports it removed; a branch no worktree holds is deleted alone, with its record. A worktree git dropped while files it could not delete stay on disk (a container's, owned by root) is removed all the same, those files named in a warning.

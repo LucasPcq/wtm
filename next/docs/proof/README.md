@@ -20,6 +20,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./events.sh "$wtm" "$next" events
 ./clean.sh "$wtm" "$next" clean
 ./prune.sh "$wtm" "$next" prune
+./exec.sh "$wtm" "$next" exec
 ./ui.sh "$next" ui
 git diff --stat .
 ```
@@ -411,11 +412,43 @@ The reference is the legacy `wtm prune` of 0.30.1. Its output differs by design 
   - 13: legacy needs a terminal or `--yes` (exit 1); next runs unattended on the safe candidates (D5), as every next command.
   - The tty: legacy lets `feat/dirty` be checked, counts it in `Will prune 4 worktree(s)`, then skips it after the confirmation (B3, `! Skipped feat/dirty (dirty — pass --force)`); next asks a `Force` step naming it (`feat/dirty — uncommitted changes`) and its recap marks it forced. Each candidate reads why it is done with (`feat/merged — merged #1`, `feat/dirty — merged #4 · uncommitted changes`). Next's `Reparent children` puts `Leave them orphaned` first, legacy reparents by default.
 
+# Proof: `wtm exec` (legacy `flow/exec`) vs `wtm-next exec`
+
+The reference is the legacy `wtm exec` of 0.30.1. Its output differs by design (next speaks the v2 envelope, plans before it runs and refuses a request with its field errors), so the proof compares what each leaves on disk and keeps both outputs side by side.
+
+- `exec.sh <wtm> <wtm-next> exec`: two identical sandboxes (the `docs/demos` "acme" project; worktrees `feat/a`, `feat/b`, `feat/c`, `det` on no branch, and `feat/gone` whose directory was deleted), the same scenarios run by each binary, most with a command that exits 3 in `feat/b` alone, saying `boom` on stderr; after each, the exit code, stdout, stderr and the state (branches, worktrees, every `meta.json`, the exec logs). Paths, op ids, fingerprints and durations are normalised. Each scenario runs its worktrees one at a time (`--jobs 1`) but 1 and 12, which run them at once, their progress lines sorted, so a rerun captures the same bytes. `exec/states.diff` holds the differences. Then, in a fresh sandbox per side, the wizard in tmux at 100×40: `exec/tty/legacy/` and `exec/tty/next/`.
+  1. `--all`, a command that passes everywhere
+  2. three worktrees, the command failing in `feat/b`
+  3. the same in two, `--output json`
+  4. the same, `--print`
+  5. the same, `-q`
+  6. a name that is no worktree, `--output json`
+  7. no worktree, `--yes`
+  8. no worktree, without a terminal
+  9. no command
+  10. a command the shell refuses (`if then`)
+  11. the worktree whose directory is gone, by name
+  12. `--all` with a worktree gone and one on no branch
+  13. `PORT=9999` in the caller's environment, `--print -- 'echo "PORT=${PORT-unset}"'`
+  14. `--jobs -1`
+  15. a worktree named twice
+  16. `--dry-run` (next only)
+  17. `--dry-run --output json` (next only)
+  18. `--expect-fingerprint` with that fingerprint (next only)
+- The states differ only by the exec logs: legacy keeps one per branch, `exec/<branch>.log`, overwritten by each run; next a directory per worktree and a log per run, `exec/<worktree>/<op>.log`, the ended ones removed by the next run (two runs at once in one worktree keep theirs apart), the worktree on no branch included, which next runs in (12 and every `--all`). The differences, all deliberate (the spec's departures D1–D12, approved by the owner):
+  - 2 to 5: both run in every worktree, exit 1. Next tallies `✗ exec: 2 done · 1 failed`, recaps the plan, names the failed worktree with its last lines and its log (`full output:`), and ends on the command again where it did not pass, `→ wtm exec feat/b -- '…'` (`exec.retry`); legacy draws `✗ <command> · 3 worktrees: 1 failed` and its own block. Its progress on stderr is one line per worktree as it ends, as legacy's. In JSON (3) each worktree is an item (`status`, `error.code` `exec.failed` with `params.exit_code`, `detail{path, exit_code, duration_ms, log, tail}`), and `--print` keeps `tail` beside `output`; legacy prints `{command, results, failed}`. With `-q` (5) next prints `✗ feat/b: exited 3` and the line that runs it again there; legacy only `aborted — rerun without --quiet for the report`.
+  - 6 to 11, 14 and 15: next refuses each with the uniform field errors, exit 2, and the envelope under `--output json`; legacy prints text on stderr only, exits 11 for a name that is no worktree and for the worktree gone (`branch not found`), 1 for no worktree (two messages, with and without a terminal), and drops a name given twice silently (exit 0).
+  - 12: legacy leaves out the worktree on no branch and the one gone without a word; next runs in the first, named by its path, and warns of the second (`exec.worktrees_gone`, `→ wtm-next prune`).
+  - 13: legacy hands the caller's `PORT` to every worktree; next unsets the ports run.toml declares, and the variables wtm sets in a worktree: `PORT=unset`.
+  - 16 to 18: legacy has no dry run nor fingerprint (exit 2); next shows the plan, its fingerprint and the line that applies it.
+  - Next runs under an operation: its locks are shared on the repository and each worktree, so a `clean` of a worktree is refused while a command runs in it (`lock.held`, exit 24), and the recap shows the concurrency capped to the worktrees (legacy: one per CPU, 12 for 2 worktrees). A command's children left in the background are stopped once it returns, as legacy did. Next never allocates an ordinal: an isolated worktree without one runs without its run environment, warned `exec.env_unnumbered`.
+  - The tty: both pick the caller's worktree first and ask the command; legacy recaps `Concurrency: <CPUs>`, next the uniform recap, capped, with `Yes, run in 3 worktrees`. Leaving the wizard exits 19 on both.
+
 # Proof: `wtm-next ui`, the local web server
 
 Next only: legacy's `wtm ui` is a terminal dashboard, not a server.
 
-- `ui.sh <wtm-next> ui`: one sandbox with two repositories `A` and `B` (an `on_create` hook that sleeps on `slow/*`), its own HOME and fixed commit dates; the server started from `A` with `--no-open` and reused from `B`, every route called with curl, a create cancelled, forced and left by its client, the event stream of a commit and a create, the guard's refusals, the idle stop after 40 seconds and a restart, then `POST /api/stop`. Each step writes one transcript, `ui/NN-name.txt`: every command as `$ …`, then its output. The sandbox, the token, the repository ids (`<REPO_A>`, `<REPO_B>`), the two servers' pids (`<PID1>`, `<PID2>`), the version and timestamps are placeholders; operation ids and fingerprints are numbered in order of first appearance (`<OP1>`, `<FP1>`), so a `DELETE` still names the operation it cancels.
+- `ui.sh <wtm-next> ui`: one sandbox with two repositories `A` and `B` (an `on_create` hook that sleeps on `slow/*`), its own HOME and fixed commit dates; the server started from `A` with `--no-open` and reused from `B`, every route called with curl, a create cancelled, forced and left by its client, the event stream of a commit and a create, the guard's refusals, the idle stop after 40 seconds and a restart, then `POST /api/stop`. Each step writes one transcript, `ui/NN-name.txt`: every command as `$ …`, then its output. The sandbox, the token, the repository ids (`<REPO_A>`, `<REPO_B>`), the two servers' pids (`<PID1>`, `<PID2>`), the port they listen on (`<PORT>`: 4777, or another when a server outside the sandbox holds it), the version and timestamps are placeholders; operation ids and fingerprints are numbered in order of first appearance (`<OP1>`, `<FP1>`), so a `DELETE` still names the operation it cancels.
 
 # Deliberate differences from legacy
 

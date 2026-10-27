@@ -1,0 +1,7 @@
+
+  ✗ test "$(git branch --show-current)" != feat/b || { echo boom >&2; exit 3; }; echo ok · 3 worktrees: 1 failed
+    ✗ feat/b (exit 3, <DUR>)
+        boom
+      log  <SB>/acme/.git/wtm/exec/feat%2Fb.log
+    ✓ 2 passed
+

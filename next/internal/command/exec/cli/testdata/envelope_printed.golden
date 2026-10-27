@@ -1,0 +1,71 @@
+{
+  "v": 2,
+  "command": "exec",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-a",
+        "exit_code": 0,
+        "duration_ms": 0,
+        "log": "/repo/main/.git/wtm/exec/feat%2Fa/op-1.log",
+        "tail": [
+          "ok"
+        ],
+        "output": "ok\n"
+      }
+    }
+  ],
+  "plan": {
+    "targets": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "/repo/wt-feat-a"
+      }
+    ],
+    "command": "echo hi",
+    "jobs": 1,
+    "print": true,
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          }
+        ]
+      },
+      {
+        "key": "command",
+        "label": "Command",
+        "path": "command",
+        "values": [
+          {
+            "value": "echo hi",
+            "text": "echo hi"
+          }
+        ]
+      },
+      {
+        "key": "concurrency",
+        "label": "Concurrency",
+        "path": "jobs",
+        "values": [
+          {
+            "value": "1",
+            "text": "1"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

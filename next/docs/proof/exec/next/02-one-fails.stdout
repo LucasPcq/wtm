@@ -1,0 +1,13 @@
+
+  ✗ exec: 2 done · 1 failed
+
+  Worktrees    feat/a, feat/b, feat/c
+  Command      test "$(git branch --show-current)" != feat/b || { echo boom >&2; exit 3; }; echo ok
+  Concurrency  1
+
+  ✗ feat/b  exited 3
+      boom
+  full output:  <SB>/acme/.git/wtm/exec/feat%2Fb/<OP>.log
+
+  → wtm exec feat/b --jobs 1 -- 'test "$(git branch --show-current)" != feat/b || { echo boom >&2; exit 3; }; echo ok'   run it again where it did not pass
+

@@ -62,7 +62,7 @@ func (v *hookView) finish(label string, took time.Duration, failed bool) {
 	tail := v.tail
 	v.clear()
 
-	result := fmt.Sprintf("%s (%s)", label, duration(took))
+	result := fmt.Sprintf("%s (%s)", label, Duration(took))
 	if !failed {
 		SuccessLine(v.w, result)
 		return
@@ -70,7 +70,7 @@ func (v *hookView) finish(label string, took time.Duration, failed bool) {
 
 	ErrorLine(v.w, result)
 	for _, line := range tail {
-		Message(v.w, Indent+truncate(expandTabs(line), max(blockWidth(v.w)-len(Indent), hookMinWidth)))
+		Message(v.w, Indent+Truncate(expandTabs(line), max(BlockWidth(v.w)-len(Indent), hookMinWidth)))
 	}
 	if v.logPath != "" {
 		InfoLine(v.w, Info{Label: hookLogLabel, Value: v.logPath})
@@ -115,27 +115,24 @@ func (v *hookView) flush() {
 // repaint draws the view again where it stood, counting the rows it draws so that the next clear erases them all.
 func (v *hookView) repaint() {
 	v.clear()
-	width := blockWidth(v.w)
+	width := BlockWidth(v.w)
 
-	fmt.Fprintf(v.w, "%s%s\n", Indent, truncate(v.header, width))
+	fmt.Fprintf(v.w, "%s%s\n", Indent, Truncate(v.header, width))
 	v.painted++
 	if v.notice != "" {
-		Message(v.w, truncate(v.notice, width))
+		Message(v.w, Truncate(v.notice, width))
 		v.painted++
 	}
 
 	for _, line := range v.tail {
-		body := truncate(expandTabs(line), max(width-len(Indent), hookMinWidth))
+		body := Truncate(expandTabs(line), max(width-len(Indent), hookMinWidth))
 		fmt.Fprintf(v.w, "%s%s%s\n", Indent, Indent, StylesOf(v.w).Muted.Render(body))
 		v.painted++
 	}
 }
 
 func (v *hookView) clear() {
-	if v.painted == 0 {
-		return
-	}
-	fmt.Fprintf(v.w, ansiPrevLine+ansiClearBelow, v.painted)
+	EraseLines(v.w, v.painted)
 	v.painted = 0
 }
 
@@ -158,8 +155,8 @@ func cutSegment(buf *bytes.Buffer) (string, byte, bool) {
 	return segment, terminator, true
 }
 
-// duration returns d in milliseconds under a second, else in seconds to a tenth.
-func duration(d time.Duration) string {
+// Duration returns d in milliseconds under a second, else in seconds to a tenth.
+func Duration(d time.Duration) string {
 	if d < time.Second {
 		return fmt.Sprintf("%dms", d.Milliseconds())
 	}

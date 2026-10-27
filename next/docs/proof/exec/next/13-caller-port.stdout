@@ -1,0 +1,10 @@
+
+  feat/c
+    PORT=unset
+
+  ✓ exec: 1 done
+
+  Worktrees    feat/c
+  Command      echo "PORT=${PORT-unset}"
+  Concurrency  1
+
