@@ -1,8 +1,9 @@
 import { screen, within } from '@testing-library/react'
+import { HttpResponse } from 'msw'
 import { expect, test } from 'vitest'
 import { heldRun } from '@/test/clean'
 import { envelope, followUp } from '@/test/fixtures'
-import { prunePlan } from '@/test/prune'
+import { prunePlan, unsafeRefusal } from '@/test/prune'
 import { answeringPrune, openFromTheHeader } from '@/test/prune-dialog'
 
 // A run that pruned all it was asked, leaving the kept ones, toasted a red "1 of 1 pruned." and reopened on its Done.
@@ -61,4 +62,21 @@ test('a cancelled run says what was cancelled, with no failure of its own', asyn
 
   expect(await within(dialog).findByText(/pruned\. Those not started stay\.$/)).toBeTruthy()
   expect(within(dialog).queryByText(/^interrupted$/i)).toBeNull()
+})
+
+// A worktree that turned unsafe between the last plan and the apply refused the run, and the dialog ended on it.
+test('an apply refused because a worktree changed goes back to the worktrees, saying which changed', async () => {
+  answeringPrune(prunePlan, () => HttpResponse.json(unsafeRefusal(['feat/billing']), { status: 403 }))
+  const { user, dialog } = await openFromTheHeader()
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Prune' }))
+
+  expect(
+    await within(dialog).findByText(
+      'feat/billing changed since the plan, so nothing was pruned. Check the worktrees again.',
+    ),
+  ).toBeTruthy()
+  expect(await within(dialog).findByRole('listitem', { name: 'feat/billing' })).toBeTruthy()
+  expect(within(dialog).getByRole('button', { name: 'Next' })).toBeTruthy()
 })

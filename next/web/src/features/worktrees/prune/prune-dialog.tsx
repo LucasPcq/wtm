@@ -7,7 +7,8 @@ import { usePruneDialog } from '@/features/worktrees/hooks/use-prune-dialog'
 import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
 import { useSelection } from '@/features/worktrees/hooks/use-selection'
 import { PruneWizard } from '@/features/worktrees/prune/components/prune-wizard'
-import { pruneWords } from '@/features/worktrees/prune/utils/words'
+import { pruneWords, unsafeCode } from '@/features/worktrees/prune/utils/words'
+import { listed } from '@/features/worktrees/utils/listed'
 
 // one prune at a time: opened while one runs, or one that failed is still to be read, the dialog shows it; what went
 // leaves the selection
@@ -26,8 +27,16 @@ export function PruneDialog({ repo }: { repo: string }) {
     toast.success(`${pruned} pruned.`)
   }
 
+  // refused at its apply as unsafe, a worktree changed since the plan: nothing ran, and the wizard asks again on fresh
+  // rows, where the changed one shows its risk
+  const refusal = run.running ? undefined : run.progress?.envelope?.error
+  const changed = refusal?.code === unsafeCode ? refusal : undefined
+  const notice =
+    changed &&
+    `${listed((changed.fields ?? []).flatMap((field) => field.params?.value ?? [])) || 'A worktree'} changed since the plan, so nothing was pruned. Check the worktrees again.`
+
   const content = () => {
-    if (run.progress)
+    if (run.progress && !changed)
       return (
         <RemovalProgress
           words={pruneWords}
@@ -49,6 +58,7 @@ export function PruneDialog({ repo }: { repo: string }) {
         key={worktrees.join('\n')}
         repo={repo}
         worktrees={worktrees}
+        notice={notice}
         onStart={(start) =>
           run.start(start, (envelope) => {
             const pruned = (envelope?.items ?? []).filter((item) => item.status === 'done').map((item) => item.subject)
@@ -56,7 +66,10 @@ export function PruneDialog({ repo }: { repo: string }) {
             selection.drop(pruned)
           })
         }
-        onCancel={close}
+        onCancel={() => {
+          if (changed) run.dismiss()
+          close()
+        }}
       />
     )
   }

@@ -74,18 +74,20 @@ test('the connection reads the query of the stream', () => {
   )
 })
 
-test('back after a break, everything is read again but what GitHub answered, asked on demand only', async () => {
+test('back after a break, everything is read again but what GitHub answered and a review that fetches origin', async () => {
   const client = new QueryClient()
   client.setQueryData(['repos'], [repo])
   client.setQueryData(eventsQuery.queryKey, { operations: {} })
   client.setQueryData(['repo', 'r1', 'list', []], { ok: true })
   client.setQueryData(['github', 'r1', 'list', []], { ok: true })
+  client.setQueryData(['review', 'r1', 'prune', []], { ok: true })
   serve(200)
 
   await client.fetchQuery({ ...eventsQuery, staleTime: 0 })
 
   expect(client.getQueryState(['repo', 'r1', 'list', []])?.isInvalidated).toBe(true)
   expect(client.getQueryState(['github', 'r1', 'list', []])?.isInvalidated).toBe(false)
+  expect(client.getQueryState(['review', 'r1', 'prune', []])?.isInvalidated, 'a review fetches origin').toBe(false)
 })
 
 test('an operation of any surface holds the worktrees it started on until it finishes', () => {

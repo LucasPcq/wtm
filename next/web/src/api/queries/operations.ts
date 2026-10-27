@@ -27,6 +27,8 @@ export async function runStreamed<C extends MutationCommand>({
   })
   if (!response.ok || !response.body) {
     const refusal = (await response.json().catch(() => undefined)) as WebRefusal | DomainEnvelope | undefined
+    // the core's refusal before its apply, which names its command, is the run's envelope: its code says what to do next
+    if (refusal?.command) return narrowed(refusal)
     throw new HttpError(response.status, refusal?.error?.message ?? response.statusText)
   }
 

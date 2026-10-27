@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useReducer, useState } from 'react'
-import { dryRunQuery, reviewQuery } from '@/api/queries/commands'
+import { dryRunQuery, planQuery, reviewQuery } from '@/api/queries/commands'
 import type { PruneCandidate } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -10,20 +10,19 @@ import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { ItemList } from '@/features/worktrees/components/item-list'
 import { type Left, LeftItem } from '@/features/worktrees/components/left-item'
-import { ListHeader } from '@/features/worktrees/components/list-header'
 import { NextButton } from '@/features/worktrees/components/next-button'
 import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { RemovalDetails } from '@/features/worktrees/components/removal-details'
 import { RemovalItem } from '@/features/worktrees/components/removal-item'
 import { Stepper, type StepState } from '@/features/worktrees/components/stepper'
 import type { Start } from '@/features/worktrees/hooks/use-run'
+import { CandidateList } from '@/features/worktrees/prune/components/candidate-list'
 import { NothingToPrune } from '@/features/worktrees/prune/components/nothing-to-prune'
 import { ReasonLine } from '@/features/worktrees/prune/components/reason-line'
 import { leftOut } from '@/features/worktrees/prune/utils/left'
 import { requestOf } from '@/features/worktrees/prune/utils/plan'
 import { notFinished } from '@/features/worktrees/prune/utils/words'
 import { blockerWords } from '@/features/worktrees/utils/blocker-words'
-import { searched } from '@/features/worktrees/utils/filters'
 import { planWide } from '@/features/worktrees/utils/outcome'
 import { kept, riskOf, unitsOf, unsafe } from '@/features/worktrees/utils/removal'
 import { sentence } from '@/features/worktrees/utils/sentence'
@@ -32,30 +31,33 @@ import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/ut
 export function PruneWizard({
   repo,
   worktrees,
+  notice,
   onStart,
   onCancel,
 }: {
   repo: string
   worktrees: string[]
+  notice?: string | undefined
   onStart: (start: Start) => void
   onCancel: () => void
 }) {
   const [{ step: chosen, checked, confirmed, reparent }, dispatch] = useReducer(wizardReducer, initialWizard)
-  const [query, setQuery] = useState('')
   const [dropped, setDropped] = useState<Left[]>([])
 
   // forced, both list every candidate with what makes it unsafe; the review is the one read that fetches origin, and
-  // says what fetching found; the rows read origin as it left it, again on every event, so a risk shows on its row
-  const forcing = [
-    ...(worktrees.length > 0 ? [{ path: 'worktree', values: worktrees }] : []),
-    { path: 'force', values: ['true'] },
-  ]
-  const review = useQuery(reviewQuery(repo, 'prune', forcing))
+  // says what fetching found; the rows read origin as it left it, again on every event, so a risk shows on its row.
+  // The rows name no worktree: one opened on that stops being done with leaves them, rather than refusing them all
+  const force = { path: 'force', values: ['true'] }
+  const review = useQuery(
+    reviewQuery(repo, 'prune', [...(worktrees.length > 0 ? [{ path: 'worktree', values: worktrees }] : []), force]),
+  )
   const rows = useQuery({
-    ...dryRunQuery(repo, 'prune', [...forcing, { path: 'no_fetch', values: ['true'] }]),
+    ...dryRunQuery(repo, 'prune', [force, { path: 'no_fetch', values: ['true'] }]),
     enabled: review.isSuccess,
   })
-  const candidates = rows.data?.plan?.worktrees ?? []
+  const candidates = (rows.data?.plan?.worktrees ?? []).filter(
+    (candidate) => worktrees.length === 0 || worktrees.includes(candidate.worktree),
+  )
   // an unsafe worktree starts unchecked: none is touched unless asked for. A tick holds for the risk it was given
   // under, an untick whatever the risk: a worktree the person left out never comes back on its own
   const ticked = (candidate: PruneCandidate) => {
@@ -63,18 +65,21 @@ export function PruneWizard({
     return tick && (!tick.on || tick.risk === riskOf(candidate)) ? tick : undefined
   }
   const isChecked = (candidate: PruneCandidate) => ticked(candidate)?.on ?? !unsafe(candidate)
-  const check = (rows: PruneCandidate[], on: boolean) =>
+  const check = (some: PruneCandidate[], on: boolean) =>
     dispatch({
       type: 'check',
-      rows: rows.map((candidate) => ({ worktree: candidate.worktree, risk: riskOf(candidate) })),
+      rows: some.map((candidate) => ({ worktree: candidate.worktree, risk: riskOf(candidate) })),
       on,
     })
   const going = candidates.filter(isChecked)
   const goingNames = going.map((candidate) => candidate.worktree)
   const answers = requestOf({ named: worktrees, candidates, going, reparent })
+  // a plan is asked on the rows once read in this opening and settled: until then its key holds nothing, not the plan
+  // an earlier opening cached under the same read
+  const read = rows.isFetchedAfterMount && !rows.isFetching ? rows.dataUpdatedAt : 0
   const planned = useQuery({
-    ...dryRunQuery(repo, 'prune', answers),
-    enabled: going.length > 0,
+    ...planQuery(repo, 'prune', { answers, readAt: read }),
+    enabled: going.length > 0 && read > 0,
     placeholderData: keepPreviousData,
   })
 
@@ -95,7 +100,7 @@ export function PruneWizard({
   }
   const left = leftOut({
     dropped,
-    asked: rows.isFetching ? [] : [...new Set([...confirmed, ...Object.keys(checked).filter((w) => checked[w]?.on)])],
+    asked: [...new Set([...worktrees, ...confirmed, ...Object.keys(checked).filter((w) => checked[w]?.on)])],
     candidates: candidates.map((candidate) => candidate.worktree),
     going: goingNames,
   })
@@ -133,7 +138,6 @@ export function PruneWizard({
     return chosen
   }
   const step = stepOf()
-  const visible = candidates.filter((candidate) => searched(candidate.worktree, query))
   // forced, the rows keep none: a plan that changes nothing is one with no candidate
   const nothing = rows.data?.plan?.empty === true
 
@@ -158,8 +162,8 @@ export function PruneWizard({
     return going.length === 0 ? 'Check a worktree to prune it' : undefined
   }
 
-  const leftRows = (rows: Left[]) =>
-    rows.map(({ worktree, why }) => <LeftItem key={worktree} worktree={worktree} why={why} />)
+  const leftRows = (some: Left[]) =>
+    some.map(({ worktree, why }) => <LeftItem key={worktree} worktree={worktree} why={why} />)
   const keptRows = keeping.map((candidate) => ({
     worktree: candidate.worktree,
     why: `Kept: ${(candidate.blockers ?? []).map((blocker) => blockerWords[blocker](candidate)).join(', ')}`,
@@ -171,47 +175,19 @@ export function PruneWizard({
     .filter((one, i, all) => !all.slice(i + 1).some((later) => later.code === one.code))
 
   const body = () => {
+    // rows read once stay through a refetch that fails: an event never wipes the wizard
     const failed =
-      review.error?.message ?? review.data?.error?.message ?? rows.error?.message ?? rows.data?.error?.message
+      review.error?.message ??
+      review.data?.error?.message ??
+      (rows.data ? undefined : rows.error?.message) ??
+      rows.data?.error?.message
     if (failed) return <p className="text-sm text-destructive">{sentence(failed)}</p>
     if (review.isPending || rows.isPending) return <Skeleton className="h-40 w-full" />
 
     if (nothing) return <NothingToPrune />
 
     if (step === 'worktrees')
-      return (
-        <ItemList
-          label="Worktrees"
-          header={
-            <ListHeader
-              total={candidates.length}
-              visible={visible.map((candidate) => candidate.worktree)}
-              bulk={visible.filter((candidate) => !unsafe(candidate)).map((candidate) => candidate.worktree)}
-              checked={goingNames}
-              query={query}
-              onQuery={setQuery}
-              onCheck={(names, on) =>
-                check(
-                  visible.filter((candidate) => names.includes(candidate.worktree)),
-                  on,
-                )
-              }
-            />
-          }
-          left={leftRows(left)}
-        >
-          {visible.map((candidate) => (
-            <RemovalItem
-              key={candidate.worktree}
-              removal={candidate}
-              verb="Prune"
-              reason={<ReasonLine candidate={candidate} />}
-              checked={isChecked(candidate)}
-              onCheck={(on) => check([candidate], on)}
-            />
-          ))}
-        </ItemList>
-      )
+      return <CandidateList candidates={candidates} isChecked={isChecked} onCheck={check} left={left} />
 
     if (step === 'children')
       return (
@@ -261,6 +237,7 @@ export function PruneWizard({
       </DialogBand>
 
       <DialogScroll>
+        {notice && <p className="text-sm text-amber-500">{notice}</p>}
         {unplanned && <p className="text-sm text-destructive">{sentence(unplanned)}</p>}
         <PlanWarnings warnings={warnings} />
         {body()}

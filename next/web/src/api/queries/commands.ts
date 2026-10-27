@@ -93,6 +93,19 @@ export const dryRunQuery = <C extends MutationCommand>(repo: string, command: C,
     select: narrowed<Mutation[C]['detail'], Mutation[C]['plan']>,
   })
 
+// a plan chosen on reads is asked again only once they land, keyed on when: under the repository's key, an event would
+// ask it again on its old answers, before the reads it was chosen on change them
+export const planQuery = <C extends MutationCommand>(
+  repo: string,
+  command: C,
+  { answers, readAt }: { answers: DomainAnswered[]; readAt: number },
+) =>
+  queryOptions({
+    queryKey: ['plan', repo, command, answers, readAt],
+    queryFn: () => refusable(`/api/repos/${repo}/commands/${command}`, { answers, dry_run: true } satisfies WebCall),
+    select: narrowed<Mutation[C]['detail'], Mutation[C]['plan']>,
+  })
+
 // a review that fetches origin is asked once per opening: under the repository's key, every event would fetch again
 export const reviewQuery = <C extends MutationCommand>(repo: string, command: C, answers: DomainAnswered[]) =>
   queryOptions({

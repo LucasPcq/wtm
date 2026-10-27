@@ -9,3 +9,4 @@ export const pruneWords: RemovalWords = {
 }
 
 export const notFinished = 'prune.not_finished'
+export const unsafeCode = 'prune.unsafe'

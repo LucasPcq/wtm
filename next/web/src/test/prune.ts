@@ -66,6 +66,9 @@ export function prunePlan(
     )
 
   const force = said(call, 'force') ?? false
+  const unsafeNamed = found.filter((c) => names.includes(c.worktree) && (c.blockers ?? []).length > 0)
+  if (unsafeNamed.length > 0 && !force)
+    return HttpResponse.json(unsafeRefusal(unsafeNamed.map((c) => c.worktree)), { status: 403 })
   const picked = names.length > 0 ? found.filter((c) => names.includes(c.worktree)) : found
   const planned = picked.map((c) =>
     names.length === 0 && !force && (c.blockers ?? []).length > 0 ? { ...c, phases: [], hooks: [] } : c,
@@ -168,3 +171,21 @@ export function pruneRun(call: WebCall) {
     ].join(''),
   )
 }
+
+// the core's refusal of a request naming a worktree unsafe to remove without force, before anything runs
+export const unsafeRefusal = (worktrees: string[]) => ({
+  ...envelope('prune', []),
+  ok: false,
+  error: {
+    kind: 'refused',
+    code: 'prune.unsafe',
+    message: `nothing removed: ${worktrees.join(', ')} can't be removed safely`,
+    fields: worktrees.map((worktree, i) => ({
+      path: `worktree[${i}]`,
+      code: 'prune.dirty',
+      flag: '<worktree>',
+      params: { value: worktree },
+      message: `${worktree} has uncommitted changes`,
+    })),
+  },
+})
