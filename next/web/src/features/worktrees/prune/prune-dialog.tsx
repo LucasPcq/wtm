@@ -16,7 +16,19 @@ export function PruneDialog({ repo }: { repo: string }) {
   const { open, worktrees } = usePruneDialog()
   const run = useRun(repo, 'prune')
   const selection = useSelection(repo)
-  const close = () => usePruneDialog.setState({ open: false })
+  // refused at its apply as unsafe, a worktree changed since the plan: nothing ran, and the wizard asks again on fresh
+  // rows, where the changed one shows its risk; the run is read once the dialog closes, however it closes
+  const refusal = run.running ? undefined : run.progress?.envelope?.error
+  const changed = refusal?.code === unsafeCode ? refusal : undefined
+  const names = [...new Set((changed?.fields ?? []).flatMap((field) => field.params?.value ?? []))]
+  const notice = changed && {
+    code: changed.code,
+    message: `${listed(names) || 'A worktree'} changed since the plan, so nothing was pruned. Check the worktrees again.`,
+  }
+  const close = () => {
+    if (changed) run.dismiss()
+    usePruneDialog.setState({ open: false })
+  }
 
   // a run that did all it was asked but left something to do next (the kept ones' --force) says so in amber
   const told = (envelope: Applied<'prune'> | undefined, { pruned, asked }: { pruned: number; asked: number }) => {
@@ -26,14 +38,6 @@ export function PruneDialog({ repo }: { repo: string }) {
     if (envelope?.warnings.some((warning) => warning.follow_up)) return void toast.warning(`${pruned} pruned.`, details)
     toast.success(`${pruned} pruned.`)
   }
-
-  // refused at its apply as unsafe, a worktree changed since the plan: nothing ran, and the wizard asks again on fresh
-  // rows, where the changed one shows its risk
-  const refusal = run.running ? undefined : run.progress?.envelope?.error
-  const changed = refusal?.code === unsafeCode ? refusal : undefined
-  const notice =
-    changed &&
-    `${listed((changed.fields ?? []).flatMap((field) => field.params?.value ?? [])) || 'A worktree'} changed since the plan, so nothing was pruned. Check the worktrees again.`
 
   const content = () => {
     if (run.progress && !changed)
@@ -66,10 +70,7 @@ export function PruneDialog({ repo }: { repo: string }) {
             selection.drop(pruned)
           })
         }
-        onCancel={() => {
-          if (changed) run.dismiss()
-          close()
-        }}
+        onCancel={close}
       />
     )
   }

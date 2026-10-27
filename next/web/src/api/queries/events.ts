@@ -36,10 +36,12 @@ const refused = (error: unknown) => error instanceof HttpError && error.status =
 async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<Live> {
   const response = await request('/api/events', { signal })
   if (!response.ok || !response.body) throw new HttpError(response.status, 'the event stream was refused')
-  // back after a break: the lines in between are lost, so everything is read again, but GitHub, asked on demand only,
-  // and a review, which fetches origin once per opening
+  // back after a break: the lines in between are lost, so everything is read again, but GitHub, asked on demand only, a
+  // review, which fetches origin once per opening, and a plan, asked again only on the reads it was chosen on
   if (client.getQueryData(eventsQuery.queryKey))
-    client.invalidateQueries({ predicate: (q) => !['events', 'github', 'review'].includes(String(q.queryKey[0])) })
+    client.invalidateQueries({
+      predicate: (q) => !['events', 'github', 'review', 'plan'].includes(String(q.queryKey[0])),
+    })
   // shortcut: the bus names a worktree once its unit starts, never what the operation locked from its start, and an
   // operation under way across a reconnect is known again only at its next unit; a field naming the locked subjects
   // on operation.started would lift both

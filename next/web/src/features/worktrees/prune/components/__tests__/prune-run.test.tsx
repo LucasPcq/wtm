@@ -1,10 +1,10 @@
-import { screen, within } from '@testing-library/react'
-import { HttpResponse } from 'msw'
+import { screen, waitFor, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
 import { heldRun } from '@/test/clean'
 import { envelope, followUp } from '@/test/fixtures'
-import { prunePlan, unsafeRefusal } from '@/test/prune'
+import { gone, merged, prunePlan, unsafeRefusal } from '@/test/prune'
 import { answeringPrune, openFromTheHeader } from '@/test/prune-dialog'
+import { streamed } from '@/test/stream'
 
 // A run that pruned all it was asked, leaving the kept ones, toasted a red "1 of 1 pruned." and reopened on its Done.
 test("a hidden run that did all it was asked says so in amber with what's left, and the next Prune opens anew", async () => {
@@ -66,17 +66,34 @@ test('a cancelled run says what was cancelled, with no failure of its own', asyn
 
 // A worktree that turned unsafe between the last plan and the apply refused the run, and the dialog ended on it.
 test('an apply refused because a worktree changed goes back to the worktrees, saying which changed', async () => {
-  answeringPrune(prunePlan, () => HttpResponse.json(unsafeRefusal(['feat/billing']), { status: 403 }))
+  let changed = false
+  const billing = () => (changed ? { ...merged, blockers: ['dirty' as const, 'jobs_running' as const] } : merged)
+  answeringPrune(
+    (call) => prunePlan(call, { found: [billing(), gone] }),
+    () => {
+      changed = true
+      return streamed(`event: envelope\ndata: ${JSON.stringify(unsafeRefusal([billing()]))}\n\n`)
+    },
+  )
   const { user, dialog } = await openFromTheHeader()
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Prune' }))
 
+  const alert = await within(dialog).findByRole('alert')
+  expect(alert.textContent, 'one line, its worktree named once whatever its blockers').toBe(
+    'feat/billing changed since the plan, so nothing was pruned. Check the worktrees again.',
+  )
+  await waitFor(() => expect(within(dialog).getByText('Uncommitted changes')).toBeTruthy())
   expect(
-    await within(dialog).findByText(
-      'feat/billing changed since the plan, so nothing was pruned. Check the worktrees again.',
-    ),
-  ).toBeTruthy()
-  expect(await within(dialog).findByRole('listitem', { name: 'feat/billing' })).toBeTruthy()
-  expect(within(dialog).getByRole('button', { name: 'Next' })).toBeTruthy()
+    within(dialog).getByRole('checkbox', { name: 'Prune feat/billing' }).getAttribute('aria-checked'),
+    'the fresh rows show it changed, unchecked',
+  ).toBe('false')
+
+  await user.keyboard('{Escape}')
+  await user.click(await screen.findByRole('button', { name: 'Actions' }))
+  await user.click(await screen.findByRole('menuitem', { name: 'Prune' }))
+  const again = await screen.findByRole('dialog', { name: 'Prune worktrees' })
+  await within(again).findByRole('listitem', { name: 'feat/billing' })
+  expect(within(again).queryByText(/changed since the plan/), 'closed however, the refusal is read').toBeNull()
 })

@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useReducer, useState } from 'react'
 import { dryRunQuery, planQuery, reviewQuery } from '@/api/queries/commands'
-import type { PruneCandidate } from '@/api/types.gen'
+import type { DomainWarning, PruneCandidate } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -37,7 +37,7 @@ export function PruneWizard({
 }: {
   repo: string
   worktrees: string[]
-  notice?: string | undefined
+  notice?: DomainWarning | undefined
   onStart: (start: Start) => void
   onCancel: () => void
 }) {
@@ -237,9 +237,8 @@ export function PruneWizard({
       </DialogBand>
 
       <DialogScroll>
-        {notice && <p className="text-sm text-amber-500">{notice}</p>}
         {unplanned && <p className="text-sm text-destructive">{sentence(unplanned)}</p>}
-        <PlanWarnings warnings={warnings} />
+        <PlanWarnings warnings={notice ? [notice, ...warnings] : warnings} />
         {body()}
       </DialogScroll>
 

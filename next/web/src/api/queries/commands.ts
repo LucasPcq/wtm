@@ -70,7 +70,6 @@ export const githubQuery = <C extends ReadCommand>(repo: string, command: C, ans
     queryKey: [...githubKey(repo), command, answers],
     queryFn: () => run(repo, command, { answers: [...answers, withPRs] }),
     select: narrowed<ReadDetail[C]>,
-    staleTime: Infinity,
   })
 
 export const fetchOrigin = (repo: string) => run(repo, 'list', { answers: [{ path: 'fetch', values: ['true'] }] })
@@ -82,7 +81,6 @@ export const questionsQuery = (repo: string, command: ApiCommandName) =>
   queryOptions({
     queryKey: [...repoKey(repo), command, 'questions'],
     queryFn: () => questions(repo, command, []),
-    staleTime: Infinity,
   })
 
 export const dryRunQuery = <C extends MutationCommand>(repo: string, command: C, answers: DomainAnswered[]) =>
@@ -102,6 +100,9 @@ export const planQuery = <C extends MutationCommand>(
 ) =>
   queryOptions({
     queryKey: ['plan', repo, command, answers, readAt],
+    // its key carries the read: never stale, never kept past the opening that asked it
+    staleTime: Infinity,
+    gcTime: 0,
     queryFn: () => refusable(`/api/repos/${repo}/commands/${command}`, { answers, dry_run: true } satisfies WebCall),
     select: narrowed<Mutation[C]['detail'], Mutation[C]['plan']>,
   })
