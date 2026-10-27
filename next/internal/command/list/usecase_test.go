@@ -15,6 +15,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -242,24 +243,38 @@ func TestEachWorktreeReportsItsActionsAsCommandsWithTheirAnswers(t *testing.T) {
 
 	require.NoError(t, err)
 	actions := detailOf(t, read, "feat/a").Actions
-	require.Len(t, actions, 5)
-	assert.Equal(t, domain.FollowUp{
+	require.Len(t, actions, len(worktree.Actions()))
+	assert.Equal(t, worktree.ActionRunUp, actions[2].Action)
+	assert.Equal(t, &domain.FollowUp{
 		Command: "run up",
 		Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}},
 		Code:    "list.run_up",
 		Message: "Start the profile",
-	}, actions[1])
+	}, actions[2].FollowUp)
+}
+
+func TestAnActionAWorktreeDoesNotOfferSaysWhy(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("develop")}}, Base: "develop"})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	clean := offerOf(t, detailOf(t, read, "develop").Actions, worktree.ActionClean)
+	assert.Nil(t, clean.FollowUp)
+	assert.Equal(t, worktree.UnofferedBaseBranch, *clean.Refused)
+	assert.Equal(t, worktree.UnofferedMainWorktree, *offerOf(t, detailOf(t, read, "main").Actions, worktree.ActionClean).Refused)
 }
 
 func TestAPullRequestIsALinkToOpenNotACommand(t *testing.T) {
-	followUp := list.Actions(list.Detail{Branch: "feat/a", PR: &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12"}})[1]
+	offer := offerOf(t, list.Actions(list.Detail{Branch: "feat/a", PR: &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12"}}), worktree.ActionOpenPR)
 
-	assert.Equal(t, domain.FollowUp{URL: "https://github.com/acme/acme/pull/12", Code: "list.open_pr", Message: "Open the pull request", Params: domain.Params{list.ParamNumber: "12"}}, followUp)
+	assert.Equal(t, &domain.FollowUp{URL: "https://github.com/acme/acme/pull/12", Code: "list.open_pr", Message: "Open the pull request", Params: domain.Params{repository.ParamNumber: "12"}}, offer.FollowUp)
 }
 
 func TestAWorktreeOnNoBranchIsAnsweredByItsPath(t *testing.T) {
-	followUp := list.Actions(list.Detail{Path: "/repo/.trees/x"})[0]
+	followUp := offerOf(t, list.Actions(list.Detail{Path: "/repo/.trees/x"}), worktree.ActionGo).FollowUp
 
+	require.NotNil(t, followUp)
 	assert.Equal(t, "go", followUp.Command)
 	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{"/repo/.trees/x"}}}, followUp.Answers)
 }

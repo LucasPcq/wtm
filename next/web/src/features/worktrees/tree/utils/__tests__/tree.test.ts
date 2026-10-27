@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { nodesOf } from '@/features/worktrees/tree/utils/nodes'
-import { followUp as action, read as readOf, treeDetail } from '@/test/fixtures'
+import { read as readOf, treeDetail } from '@/test/fixtures'
 
 const node = (branch: string, parent: string | null, over: Parameters<typeof treeDetail>[1] = {}) =>
   treeDetail(branch, { parent, ...over })
@@ -17,20 +17,11 @@ test('each node sits under its parent, a node whose parent is not in the read is
   expect(roots[0]?.children[0]?.children.map((child) => child.branch)).toEqual(['feat/a-ui'])
 })
 
-test('a worktree GitHub says is merged shows merged and its clean, unless the live read says more urgent', () => {
-  const live = read([
-    node('feat/a', null, { actions: [action('sync', 'feat/a')] }),
-    node('feat/b', null, { condition: 'rebasing', actions: [action('go', 'feat/b')] }),
-    node('feat/c', null),
-  ])
-  const github = read([
-    node('feat/a', null, { condition: 'merged', actions: [action('clean', 'feat/a')] }),
-    node('feat/b', null, { condition: 'rebasing', actions: [action('go', 'feat/b')] }),
-  ])
+test('a worktree GitHub says is merged shows merged, unless the live read says more urgent', () => {
+  const live = read([node('feat/a', null), node('feat/b', null, { condition: 'rebasing' }), node('feat/c', null)])
+  const github = read([node('feat/a', null, { condition: 'merged' }), node('feat/b', null, { condition: 'rebasing' })])
 
   const [a, b, c] = nodesOf(live, github)
 
-  expect([a?.condition, a?.action?.command]).toEqual(['merged', 'clean'])
-  expect([b?.condition, b?.action?.command]).toEqual(['rebasing', 'go'])
-  expect([c?.condition, c?.action]).toEqual(['clean', undefined])
+  expect([a?.condition, b?.condition, c?.condition]).toEqual(['merged', 'rebasing', 'clean'])
 })

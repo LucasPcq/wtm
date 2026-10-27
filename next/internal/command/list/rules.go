@@ -1,9 +1,7 @@
 package list
 
 import (
-	"cmp"
 	"slices"
-	"strconv"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -68,8 +66,10 @@ type Detail struct {
 	Condition worktree.Condition `json:"condition"` // the one fact of it that most changes what to do first, as this read knows it
 	Services  []string           `json:"services"`  // the jobs up in it, null when that cannot be told
 	URLs      []string           `json:"urls"`      // the addresses of the jobs up in it, null when that cannot be told
-	// Actions are what may be done next with it, as Offers lists them, each the command that does it and its answers.
-	Actions []domain.FollowUp `json:"actions"`
+	// Actions are every action of it, each the follow-up that carries it out or why it is not offered.
+	Actions []repository.Offer `json:"actions"`
+
+	base bool // it is on the base branch, which is never removed
 }
 
 // Changes counts a worktree's uncommitted files: those git tracks that changed, and the untracked.
@@ -151,6 +151,7 @@ func (f Facts) item(w worktree.Worktree, active bool) Item {
 		Finished:     f.finished(pr, w),
 		Services:     f.Services(w.Path),
 		URLs:         f.URLs(w.Path),
+		base:         w.Branch() != "" && w.Branch() == f.Config.Worktrees.BaseBranch,
 	}
 	detail.Condition = conditionOf(detail, w.Operation())
 	detail.Actions = Actions(detail)
@@ -247,78 +248,27 @@ func (f Facts) warnings() []domain.Warning {
 // ----------------------------------------------------------------------------
 // The actions
 
-// An Action is what the user may do next with a worktree picked from the list.
-type Action string
-
-// The actions on a worktree, in the order the picker offers them.
-const (
-	ActionGo          Action = "go"
-	ActionOpenPR      Action = "open_pr"
-	ActionRunUp       Action = "run_up"
-	ActionRunDown     Action = "run_down"
-	ActionLogs        Action = "logs"
-	ActionFastForward Action = "fast_forward"
-	ActionClean       Action = "clean"
-)
-
-// Offers are the actions a worktree offers: only clean when its directory is gone, only go when it is on no branch, open its pull request when it has one, fast-forward it when origin has its branch.
-func Offers(detail Detail) []Action {
-	switch {
-	case detail.Missing:
-		return []Action{ActionClean}
-	case detail.Branch == "":
-		return []Action{ActionGo}
+// Actions are every action of the worktree of detail, each with its follow-up or why it does not offer it.
+func Actions(detail Detail) []repository.Offer {
+	params := repository.OffersParams{
+		Command:  Name,
+		Branch:   detail.Branch,
+		Path:     detail.Path,
+		Main:     detail.Main,
+		Base:     detail.base,
+		Missing:  detail.Missing,
+		OnOrigin: detail.Origin != nil,
 	}
-
-	actions := []Action{ActionGo}
 	if detail.PR != nil {
-		actions = append(actions, ActionOpenPR)
-	}
-	actions = append(actions, ActionRunUp, ActionRunDown, ActionLogs)
-	if detail.Origin != nil {
-		actions = append(actions, ActionFastForward)
-	}
-	if !detail.Main {
-		actions = append(actions, ActionClean)
+		params.PRNumber, params.PRURL = detail.PR.Number, detail.PR.URL
 	}
 
-	return actions
+	return repository.Offers(params)
 }
 
-// ParamNumber is the param of the action that opens a pull request: its number, beside its URL.
-const ParamNumber = "number"
-
-// byAction is what each action runs, the wtm command as its command line spells it after the program's name, none to open a pull request, and what it reads as in the picker and as the note of its follow-up.
-var byAction = map[Action]struct{ command, label string }{
-	ActionGo:          {domain.CommandGo, "Go to the worktree"},
-	ActionOpenPR:      {"", "Open the pull request"},
-	ActionRunUp:       {"run up", "Start the profile"},
-	ActionRunDown:     {"run down", "Stop the profile"},
-	ActionLogs:        {"run logs", "View the logs"},
-	ActionFastForward: {domain.CommandFastForward, "Fast-forward from origin"},
-	ActionClean:       {domain.CommandClean, "Clean (delete the worktree)"},
-}
-
-// Actions are the follow-ups the worktree of detail offers, as Offers lists them.
-func Actions(detail Detail) []domain.FollowUp {
-	actions := []domain.FollowUp{}
-	for _, action := range Offers(detail) {
-		actions = append(actions, followUpOf(action, detail))
-	}
-
-	return actions
-}
-
-// followUpOf is action on the worktree of detail as the follow-up that carries it out, with its code and its label: its wtm command and answers, or the URL of its pull request and its number.
-func followUpOf(action Action, detail Detail) domain.FollowUp {
-	followUp := domain.FollowUp{Code: Name + "." + string(action), Message: byAction[action].label}
-	if action == ActionOpenPR && detail.PR != nil {
-		followUp.URL, followUp.Params = detail.PR.URL, domain.Params{ParamNumber: strconv.Itoa(detail.PR.Number)}
-		return followUp
-	}
-
-	followUp.Command, followUp.Answers = byAction[action].command, []domain.Answered{{Path: domain.PathWorktree, Values: []string{cmp.Or(detail.Branch, detail.Path)}}}
-	return followUp
+// Offered are the follow-ups of the actions the worktree offers, in order.
+func (d Detail) Offered() []domain.FollowUp {
+	return repository.Offered(d.Actions)
 }
 
 // WithPullRequests is shown with the pull request of each worktree as from read it, whether it merged it, what each offers then, and the warnings of asking GitHub: what a read that did not ask for them becomes once they land.

@@ -25,6 +25,8 @@ data: {"v":2,"type":"worktree.changed","ts":"<T>","repo":{"root":"<SB>/A","commo
 
 data: {"v":2,"type":"operation.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"op_id":"<OP12>","command":"create","surface":"cli"}
 
+data: {"v":2,"type":"unit.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"op_id":"<OP12>","subject":"feat/y"}
+
 data: {"v":2,"type":"worktree.created","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"op_id":"<OP12>","worktree":{"branch":"feat/y","path":"<SB>/.trees/feat-y","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"}}
 
 data: {"v":2,"type":"worktree.provisioned","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"op_id":"<OP12>","worktree":{"branch":"feat/y","path":"<SB>/.trees/feat-y","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"},"ok":true}

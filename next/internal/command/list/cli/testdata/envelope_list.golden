@@ -38,69 +38,104 @@
         "urls": [],
         "actions": [
           {
-            "command": "go",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "main"
-                ]
-              }
-            ],
-            "code": "list.go",
-            "message": "Go to the worktree"
+            "action": "go",
+            "follow_up": {
+              "command": "go",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "main"
+                  ]
+                }
+              ],
+              "code": "list.go",
+              "message": "Go to the worktree"
+            },
+            "refused": null
           },
           {
-            "command": "run up",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "main"
-                ]
-              }
-            ],
-            "code": "list.run_up",
-            "message": "Start the profile"
+            "action": "open_pr",
+            "follow_up": null,
+            "refused": "no_pull_request"
           },
           {
-            "command": "run down",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "main"
-                ]
-              }
-            ],
-            "code": "list.run_down",
-            "message": "Stop the profile"
+            "action": "run_up",
+            "follow_up": {
+              "command": "run up",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "main"
+                  ]
+                }
+              ],
+              "code": "list.run_up",
+              "message": "Start the profile"
+            },
+            "refused": null
           },
           {
-            "command": "run logs",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "main"
-                ]
-              }
-            ],
-            "code": "list.logs",
-            "message": "View the logs"
+            "action": "run_down",
+            "follow_up": {
+              "command": "run down",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "main"
+                  ]
+                }
+              ],
+              "code": "list.run_down",
+              "message": "Stop the profile"
+            },
+            "refused": null
           },
           {
-            "command": "fast-forward",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "main"
-                ]
-              }
-            ],
-            "code": "list.fast_forward",
-            "message": "Fast-forward from origin"
+            "action": "logs",
+            "follow_up": {
+              "command": "run logs",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "main"
+                  ]
+                }
+              ],
+              "code": "list.logs",
+              "message": "View the logs"
+            },
+            "refused": null
+          },
+          {
+            "action": "fast_forward",
+            "follow_up": {
+              "command": "fast-forward",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "main"
+                  ]
+                }
+              ],
+              "code": "list.fast_forward",
+              "message": "Fast-forward from origin"
+            },
+            "refused": null
+          },
+          {
+            "action": "sync",
+            "follow_up": null,
+            "refused": "main_worktree"
+          },
+          {
+            "action": "clean",
+            "follow_up": null,
+            "refused": "main_worktree"
           }
         ]
       }
@@ -146,90 +181,135 @@
         "urls": [],
         "actions": [
           {
-            "command": "go",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/a"
-                ]
-              }
-            ],
-            "code": "list.go",
-            "message": "Go to the worktree"
+            "action": "go",
+            "follow_up": {
+              "command": "go",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "list.go",
+              "message": "Go to the worktree"
+            },
+            "refused": null
           },
           {
-            "url": "https://github.com/acme/acme/pull/9",
-            "code": "list.open_pr",
-            "message": "Open the pull request",
-            "params": {
-              "number": "9"
-            }
+            "action": "open_pr",
+            "follow_up": {
+              "url": "https://github.com/acme/acme/pull/9",
+              "code": "list.open_pr",
+              "message": "Open the pull request",
+              "params": {
+                "number": "9"
+              }
+            },
+            "refused": null
           },
           {
-            "command": "run up",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/a"
-                ]
-              }
-            ],
-            "code": "list.run_up",
-            "message": "Start the profile"
+            "action": "run_up",
+            "follow_up": {
+              "command": "run up",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "list.run_up",
+              "message": "Start the profile"
+            },
+            "refused": null
           },
           {
-            "command": "run down",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/a"
-                ]
-              }
-            ],
-            "code": "list.run_down",
-            "message": "Stop the profile"
+            "action": "run_down",
+            "follow_up": {
+              "command": "run down",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "list.run_down",
+              "message": "Stop the profile"
+            },
+            "refused": null
           },
           {
-            "command": "run logs",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/a"
-                ]
-              }
-            ],
-            "code": "list.logs",
-            "message": "View the logs"
+            "action": "logs",
+            "follow_up": {
+              "command": "run logs",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "list.logs",
+              "message": "View the logs"
+            },
+            "refused": null
           },
           {
-            "command": "fast-forward",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/a"
-                ]
-              }
-            ],
-            "code": "list.fast_forward",
-            "message": "Fast-forward from origin"
+            "action": "fast_forward",
+            "follow_up": {
+              "command": "fast-forward",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "list.fast_forward",
+              "message": "Fast-forward from origin"
+            },
+            "refused": null
           },
           {
-            "command": "clean",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/a"
-                ]
-              }
-            ],
-            "code": "list.clean",
-            "message": "Clean (delete the worktree)"
+            "action": "sync",
+            "follow_up": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "list.sync",
+              "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "clean",
+            "follow_up": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "list.clean",
+              "message": "Clean (delete the worktree)"
+            },
+            "refused": null
           }
         ]
       }
@@ -277,77 +357,123 @@
         "urls": [],
         "actions": [
           {
-            "command": "go",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/b"
-                ]
-              }
-            ],
-            "code": "list.go",
-            "message": "Go to the worktree"
+            "action": "go",
+            "follow_up": {
+              "command": "go",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "list.go",
+              "message": "Go to the worktree"
+            },
+            "refused": null
           },
           {
-            "url": "https://github.com/acme/acme/pull/12",
-            "code": "list.open_pr",
-            "message": "Open the pull request",
-            "params": {
-              "number": "12"
-            }
+            "action": "open_pr",
+            "follow_up": {
+              "url": "https://github.com/acme/acme/pull/12",
+              "code": "list.open_pr",
+              "message": "Open the pull request",
+              "params": {
+                "number": "12"
+              }
+            },
+            "refused": null
           },
           {
-            "command": "run up",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/b"
-                ]
-              }
-            ],
-            "code": "list.run_up",
-            "message": "Start the profile"
+            "action": "run_up",
+            "follow_up": {
+              "command": "run up",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "list.run_up",
+              "message": "Start the profile"
+            },
+            "refused": null
           },
           {
-            "command": "run down",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/b"
-                ]
-              }
-            ],
-            "code": "list.run_down",
-            "message": "Stop the profile"
+            "action": "run_down",
+            "follow_up": {
+              "command": "run down",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "list.run_down",
+              "message": "Stop the profile"
+            },
+            "refused": null
           },
           {
-            "command": "run logs",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/b"
-                ]
-              }
-            ],
-            "code": "list.logs",
-            "message": "View the logs"
+            "action": "logs",
+            "follow_up": {
+              "command": "run logs",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "list.logs",
+              "message": "View the logs"
+            },
+            "refused": null
           },
           {
-            "command": "clean",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/b"
-                ]
-              }
-            ],
-            "code": "list.clean",
-            "message": "Clean (delete the worktree)"
+            "action": "fast_forward",
+            "follow_up": null,
+            "refused": "not_on_origin"
+          },
+          {
+            "action": "sync",
+            "follow_up": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "list.sync",
+              "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "clean",
+            "follow_up": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "list.clean",
+              "message": "Clean (delete the worktree)"
+            },
+            "refused": null
           }
         ]
       }
@@ -383,17 +509,68 @@
         "urls": [],
         "actions": [
           {
-            "command": "go",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "/repo/.trees/detached"
-                ]
-              }
-            ],
-            "code": "list.go",
-            "message": "Go to the worktree"
+            "action": "go",
+            "follow_up": {
+              "command": "go",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "/repo/.trees/detached"
+                  ]
+                }
+              ],
+              "code": "list.go",
+              "message": "Go to the worktree"
+            },
+            "refused": null
+          },
+          {
+            "action": "open_pr",
+            "follow_up": null,
+            "refused": "no_branch"
+          },
+          {
+            "action": "run_up",
+            "follow_up": null,
+            "refused": "no_branch"
+          },
+          {
+            "action": "run_down",
+            "follow_up": null,
+            "refused": "no_branch"
+          },
+          {
+            "action": "logs",
+            "follow_up": null,
+            "refused": "no_branch"
+          },
+          {
+            "action": "fast_forward",
+            "follow_up": null,
+            "refused": "no_branch"
+          },
+          {
+            "action": "sync",
+            "follow_up": null,
+            "refused": "no_branch"
+          },
+          {
+            "action": "clean",
+            "follow_up": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "/repo/.trees/detached"
+                  ]
+                }
+              ],
+              "code": "list.clean",
+              "message": "Clean (delete the worktree)"
+            },
+            "refused": null
           }
         ]
       }
@@ -426,17 +603,56 @@
         "urls": [],
         "actions": [
           {
-            "command": "clean",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/gone"
-                ]
-              }
-            ],
-            "code": "list.clean",
-            "message": "Clean (delete the worktree)"
+            "action": "go",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "open_pr",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "run_up",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "run_down",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "logs",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "fast_forward",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "sync",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "clean",
+            "follow_up": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/gone"
+                  ]
+                }
+              ],
+              "code": "list.clean",
+              "message": "Clean (delete the worktree)"
+            },
+            "refused": null
           }
         ]
       }

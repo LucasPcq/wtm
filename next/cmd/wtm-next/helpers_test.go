@@ -34,6 +34,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
+	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
@@ -485,6 +486,9 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[project.JobKind]():           {"Whether a job keeps running or runs to its end.", project.JobKinds()},
 	reflect.TypeFor[run.State]():                 {"A job's state.", run.States()},
 	reflect.TypeFor[worktree.PullRequestState](): {"Where a pull request stands.", worktree.PullRequestStates()},
+	reflect.TypeFor[worktree.Action]():           {"An action on a worktree, one entry of the menu every surface shows of it.", worktree.Actions()},
+	reflect.TypeFor[worktree.Unoffered]():        {"Why a worktree does not offer an action, as a code each surface words its own way.", worktree.Unoffereds()},
+	reflect.TypeFor[status.ProblemCode]():        {"What a worktree's problem is, as a code each surface words its own way.", status.ProblemCodes()},
 	reflect.TypeFor[worktree.Condition]():        {"The one fact of a worktree that most changes what to do with it first, as one read knows it, the first that applies first.", worktree.Conditions()},
 }
 
@@ -677,7 +681,7 @@ func followUpsIn(document any) []map[string]any {
 			if followUp, ok := nested.(map[string]any); ok && (key == "follow_up" || key == "fix") {
 				found = append(found, followUp)
 			}
-			if list, ok := nested.([]any); ok && (key == "follow_ups" || key == "actions") {
+			if list, ok := nested.([]any); ok && key == "follow_ups" {
 				for _, entry := range list {
 					if followUp, ok := entry.(map[string]any); ok {
 						found = append(found, followUp)

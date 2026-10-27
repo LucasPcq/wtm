@@ -1,10 +1,13 @@
 import { NodeRow } from '@/features/worktrees/tree/components/node-row'
 import type { Node } from '@/features/worktrees/tree/utils/nodes'
+import type { Subject } from '@/features/worktrees/utils/actions'
 import { cn } from '@/lib/utils'
 
 export type Drop = { branch: string; parent: string }
 
 export type View = {
+  repo: string
+  subjects: Subject[]
   query: string
   open: string | undefined
   underWay: Record<string, string>

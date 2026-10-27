@@ -169,29 +169,41 @@ type EnvFile struct {
 
 // A Problem is something to fix in a worktree, and the command that fixes it.
 type Problem struct {
-	Code    string           `json:"code"`
+	Code    ProblemCode      `json:"code"`
 	Message string           `json:"message"`
 	Fix     *domain.FollowUp `json:"fix"` // null when no command fixes it
 }
 
-// The codes of status's problems, warnings and failures.
+// A ProblemCode is what a Problem is, as a code each surface words its own way.
+type ProblemCode string
+
+// ProblemCodes returns every ProblemCode, in the order Problems ranks them.
+func ProblemCodes() []ProblemCode {
+	return []ProblemCode{CodeMissing, CodeMerged, CodeBehindOrigin, CodeBehind, CodeEnvMissing, CodeIsolationPending, CodeJobCrashed}
+}
+
+// The codes of status's problems.
 const (
-	CodeMissing          = Name + ".missing"
-	CodeMerged           = Name + ".merged"
-	CodeBehind           = Name + ".behind"
-	CodeBehindOrigin     = Name + ".behind_origin"
-	CodeEnvMissing       = Name + ".env_missing"
-	CodeIsolationPending = Name + ".isolation_pending"
-	CodeJobCrashed       = Name + ".job_crashed"
-	CodeJobsUnknown      = Name + domain.JobsUnknown
-	CodePRsUnavailable   = Name + domain.PRsUnavailable
-	CodeRunInvalid       = Name + ".run_invalid"
-	CodeBaseMissing      = Name + ".base_missing"
-	CodeMetaUnreadable   = Name + domain.MetaUnreadable
-	CodePartial          = Name + ".partial"
-	CodeNoWorktree       = Name + ".no_worktree"
-	CodeUnreadable       = Name + domain.Unreadable
-	CodeAllWithWorktree  = Name + ".all_with_worktree"
+	CodeMissing          ProblemCode = "status.missing"
+	CodeMerged           ProblemCode = "status.merged"
+	CodeBehindOrigin     ProblemCode = "status.behind_origin"
+	CodeBehind           ProblemCode = "status.behind"
+	CodeEnvMissing       ProblemCode = "status.env_missing"
+	CodeIsolationPending ProblemCode = "status.isolation_pending"
+	CodeJobCrashed       ProblemCode = "status.job_crashed"
+)
+
+// The codes of status's warnings and failures.
+const (
+	CodeJobsUnknown     = Name + domain.JobsUnknown
+	CodePRsUnavailable  = Name + domain.PRsUnavailable
+	CodeRunInvalid      = Name + ".run_invalid"
+	CodeBaseMissing     = Name + ".base_missing"
+	CodeMetaUnreadable  = Name + domain.MetaUnreadable
+	CodePartial         = Name + ".partial"
+	CodeNoWorktree      = Name + ".no_worktree"
+	CodeUnreadable      = Name + domain.Unreadable
+	CodeAllWithWorktree = Name + ".all_with_worktree"
 )
 
 // ----------------------------------------------------------------------------
@@ -667,15 +679,15 @@ func missingProblem(subject string, missing Missing) Problem {
 		problem.Fix = fix(CodeEnvMissing, "rebuild it", commandEnv, subject, domain.Answered{Path: pathFrom, Values: []string{string(missing.From)}})
 	case FromNowhere:
 		problem.Message = missing.Target + " is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand"
-		problem.Fix = &domain.FollowUp{Command: commandConfigEdit, Code: CodeEnvMissing, Message: "declare where it comes from"}
+		problem.Fix = &domain.FollowUp{Command: commandConfigEdit, Code: string(CodeEnvMissing), Message: "declare where it comes from"}
 	}
 
 	return problem
 }
 
 // fix is the follow-up that runs command on the worktree subject with answers, saying what it does with message.
-func fix(code, message, command, subject string, answers ...domain.Answered) *domain.FollowUp {
-	return &domain.FollowUp{Command: command, Answers: append([]domain.Answered{{Path: domain.PathWorktree, Values: []string{subject}}}, answers...), Code: code, Message: message}
+func fix(code ProblemCode, message, command, subject string, answers ...domain.Answered) *domain.FollowUp {
+	return &domain.FollowUp{Command: command, Answers: append([]domain.Answered{{Path: domain.PathWorktree, Values: []string{subject}}}, answers...), Code: string(code), Message: message}
 }
 
 // behindOrigin is the commits origin has that its branch lacks, none unless that is all that sets them apart: a diverged branch is not fast-forwarded.

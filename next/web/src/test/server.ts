@@ -3,7 +3,7 @@ import { setupServer } from 'msw/node'
 import type { DomainAnswered, DomainField, DomainFollowUp, ListDetail, WebCall } from '@/api/types.gen'
 import { repo, worktrees } from '@/test/acme'
 import { cleanPlan, cleanQuestionsOf, cleanRun } from '@/test/clean'
-import { envelope, followUp, statusDetail, treeDetail } from '@/test/fixtures'
+import { envelope, followUp, offers, statusDetail, treeDetail } from '@/test/fixtures'
 import { line, streamed } from '@/test/stream'
 
 export { line, repo, streamed, worktrees }
@@ -25,11 +25,19 @@ const status = (branch: string, withPRs: boolean) =>
         : null,
   })
 
+// asked GitHub, feat/billing has its pull request, and so offers to open it
+const withPR = (detail: ListDetail): ListDetail =>
+  detail.branch === 'feat/billing'
+    ? {
+        ...detail,
+        pr: { number: 214, url: 'https://github.com/acme/acme/pull/214', state: 'open' },
+        actions: offers(detail.branch),
+      }
+    : detail
+
 const tree = (detail: ListDetail) =>
   treeDetail(detail.branch, {
-    actions: detail.needs_sync
-      ? [{ ...sync(detail.branch), code: 'tree.sync', message: 'Sync the worktree: its parent has commits it lacks' }]
-      : [],
+    actions: detail.actions,
     ahead: detail.ahead,
     behind: detail.behind,
     condition: detail.condition,
@@ -164,9 +172,11 @@ const handlers = [
     const asked = (path: string) => call.answers?.find((a) => a.path === path)?.values[0]
     switch (params.command) {
       case 'list':
-        return HttpResponse.json(envelope('list', worktrees))
+        return HttpResponse.json(envelope('list', asked('with_prs') === 'true' ? worktrees.map(withPR) : worktrees))
       case 'tree':
-        return HttpResponse.json(envelope('tree', worktrees.map(tree)))
+        return HttpResponse.json(
+          envelope('tree', (asked('with_prs') === 'true' ? worktrees.map(withPR) : worktrees).map(tree)),
+        )
       case 'status':
         return HttpResponse.json(
           envelope('status', [status(asked('worktree') ?? 'main', asked('with_prs') === 'true')]),

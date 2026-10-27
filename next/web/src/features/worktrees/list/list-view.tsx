@@ -19,6 +19,7 @@ export function ListView({
   search,
   selected,
   onSelect,
+  repo,
 }: {
   live: UseQueryResult<Read<'list'>>
   rows: Row[]
@@ -26,6 +27,7 @@ export function ListView({
   search: WorktreesSearch
   selected: string[]
   onSelect: (subjects: string[]) => void
+  repo: string
 }) {
   if (live.isPending) return <Loading />
   if (live.isError) return <ReadFailed message={live.error.message} />
@@ -36,7 +38,14 @@ export function ListView({
   return (
     <>
       {kept.length > 0 && (
-        <WorktreeTable rows={kept} shown={shown} open={search.worktree} selected={selected} onSelect={onSelect} />
+        <WorktreeTable
+          repo={repo}
+          rows={kept}
+          shown={shown}
+          open={search.worktree}
+          selected={selected}
+          onSelect={onSelect}
+        />
       )}
       {rows.length === 1 && !narrowed && <OnlyMain />}
       {kept.length === 0 && (rows.length > 1 || narrowed) && <NoMatch />}
@@ -57,16 +66,19 @@ function OnlyMain() {
 function NoMatch() {
   return (
     <div className="py-16">
-      <StatePage icon={<SearchX />} title="No worktree matches">
+      <StatePage
+        icon={<SearchX />}
+        title="No worktree matches"
+        action={
+          <Button variant="outline" asChild>
+            <Link from="/r/$repo/worktrees" search={(search) => ({ ...search, q: undefined, filter: undefined })}>
+              Clear the search and filters
+            </Link>
+          </Button>
+        }
+      >
         Nothing here matches the search and the filter.
       </StatePage>
-      <div className="flex justify-center">
-        <Button variant="outline" asChild>
-          <Link from="/r/$repo/worktrees" search={(search) => ({ ...search, q: undefined, filter: undefined })}>
-            Clear the search and filters
-          </Link>
-        </Button>
-      </div>
     </div>
   )
 }

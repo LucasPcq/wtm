@@ -16,10 +16,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
-	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
-	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 
 	"github.com/stretchr/testify/assert"
@@ -70,9 +69,8 @@ func TestEventsAreFiledUnderGitsCommonDirWhereverTheStateLives(t *testing.T) {
 func TestEveryGoFollowUpIsARequestResolveTakes(t *testing.T) {
 	followUps := []domain.FollowUp{
 		domain.Enter("feat/x"),
-		list.Actions(list.Detail{Branch: "feat/a"})[0],
-		list.Actions(list.Detail{Path: "/repo/.trees/detached"})[0],
-		tree.Actions(tree.Detail{Branch: "feat/a", Condition: worktree.ConditionRebasing}, false)[0],
+		repository.Offered(list.Actions(list.Detail{Branch: "feat/a"}))[0],
+		repository.Offered(list.Actions(list.Detail{Path: "/repo/.trees/detached"}))[0],
 	}
 	for _, followUp := range followUps {
 		require.Equal(t, domain.CommandGo, followUp.Command)
@@ -141,7 +139,7 @@ func TestTwoExecutionsInOneProcessKeepTheirOwnRepositoryAndCorrelationID(t *test
 
 func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 	pr := &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12"}
-	actions := list.Actions(list.Detail{Branch: "feat/a", Path: "/repo/.trees/feat-a", PR: pr})
+	actions := repository.Offered(list.Actions(list.Detail{Branch: "feat/a", Path: "/repo/.trees/feat-a", PR: pr}))
 	dryRun := leftBehind("feat/x")
 	dryRun.DryRun = true
 	fixes := status.Problems(status.ProblemsParams{
@@ -160,8 +158,9 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"run_up":      {followUp: actions[2], argv: []string{"wtm", "run", "up", "feat/a"}},
 		"run_down":    {followUp: actions[3], argv: []string{"wtm", "run", "down", "feat/a"}},
 		"logs":        {followUp: actions[4], argv: []string{"wtm", "run", "logs", "feat/a"}},
-		"clean":       {followUp: actions[5], argv: []string{"wtm-next", "clean", "feat/a"}},
-		"go_detached": {followUp: list.Actions(list.Detail{Path: "/repo/.trees/detached"})[0], argv: []string{"cd", "/repo/.trees/detached"}},
+		"sync":        {followUp: actions[5], argv: []string{"wtm", "sync", "feat/a"}},
+		"clean":       {followUp: actions[6], argv: []string{"wtm-next", "clean", "feat/a"}},
+		"go_detached": {followUp: repository.Offered(list.Actions(list.Detail{Path: "/repo/.trees/detached"}))[0], argv: []string{"cd", "/repo/.trees/detached"}},
 		"enter":       {followUp: domain.Enter("feat/notes"), argv: []string{"wtm", "go", "feat/notes"}},
 		"left_behind": {followUp: leftBehind("feat/x"), argv: []string{"wtm-next", "clean", "feat/x", "--force"}},
 		"init":        {followUp: *initialize(), argv: []string{"wtm", "init"}},
@@ -177,9 +176,6 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"isolation":   {followUp: *fixes[5].Fix, argv: []string{"wtm", "env", "feat/a", "--isolation", "isolated"}},
 		"run_start":   {followUp: *fixes[6].Fix, argv: []string{"wtm", "run", "start", "feat/a", "--job", "api", "--detach"}},
 		"shared":      {followUp: *fixes[7].Fix, argv: []string{"wtm", "run", "start", "main", "--job", "db", "--detach"}},
-		"tree_go":     {followUp: tree.Actions(tree.Detail{Branch: "feat/a", Condition: worktree.ConditionRebasing}, false)[0], argv: []string{"wtm", "go", "feat/a"}},
-		"tree_prune":  {followUp: tree.Actions(tree.Detail{Branch: "feat/a"}, true)[0], argv: []string{"wtm-next", "prune", "feat/a"}},
-		"tree_sync":   {followUp: tree.Actions(tree.Detail{Branch: "feat/a", NeedsSync: true}, false)[0], argv: []string{"wtm", "sync", "feat/a"}},
 		"behind":      {followUp: *status.Problems(status.ProblemsParams{Branch: "feat/a", Parent: "feat/b", Lacks: 1, Sync: true})[0].Fix, argv: []string{"wtm", "sync", "feat/a"}},
 		"reparent":    {followUp: domain.FollowUp{Command: "reparent", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "to", Values: []string{"feat/b"}}}}, argv: []string{"wtm", "reparent", "feat/a", "--to", "feat/b"}},
 	}

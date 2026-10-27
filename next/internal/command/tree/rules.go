@@ -55,8 +55,8 @@ type Detail struct {
 	Origin    *worktree.Origin   `json:"origin"`   // null when origin has no branch of that name
 	PR        *PR                `json:"pr"`       // null without one, or when GitHub was not asked
 	Services  []string           `json:"services"` // the jobs up in it, null when that cannot be told or it has no worktree
-	// Actions are what the node needs next, as Actions decides it: a command and its answers.
-	Actions []domain.FollowUp `json:"actions"`
+	// Actions are every action of its worktree, each the follow-up that carries it out or why it is not offered; none for a virtual root or an unreadable worktree.
+	Actions []repository.Offer `json:"actions"`
 }
 
 // PR is a branch's newest pull request.
@@ -97,7 +97,7 @@ func Tree(facts Facts) ([]Item, []domain.Warning) {
 
 // item is the node of branch: where it sits in the tree, then, for a worktree read, what it holds; a worktree that cannot be read keeps its place and fails alone.
 func (f Facts) item(branch string) Item {
-	detail := Detail{Branch: branch, Children: append([]string{}, f.Stack.Children(branch)...), Actions: []domain.FollowUp{}}
+	detail := Detail{Branch: branch, Children: append([]string{}, f.Stack.Children(branch)...), Actions: []repository.Offer{}}
 	if parent, ok := f.Stack.Parent(branch); ok {
 		detail.Parent = &parent
 	}
@@ -128,7 +128,7 @@ func (f Facts) item(branch string) Item {
 	detail.Services = f.Services(w.Path)
 	cleans := f.Repository.Cleans(pr, w, f.Behind[branch])
 	detail.Condition = worktree.ConditionOf(worktree.ConditionParams{Missing: detail.Missing, Operation: w.Operation(), Merged: cleans, Dirty: detail.Dirty})
-	detail.Actions = Actions(detail, cleans)
+	detail.Actions = Actions(ActionsParams{Detail: detail, Base: branch == f.Config.Worktrees.BaseBranch})
 
 	return Item{Subject: branch, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
 }
@@ -166,41 +166,27 @@ func (f Facts) worktreeOf(branch string) worktree.Worktree {
 // ----------------------------------------------------------------------------
 // The actions
 
-// finishing names each operation git stops in the middle of as the action that sends a worktree to finish it says it.
-var finishing = map[worktree.Operation]string{
-	worktree.OperationRebase:     "rebase",
-	worktree.OperationBisect:     "bisect",
-	worktree.OperationMerge:      "merge",
-	worktree.OperationCherryPick: "cherry-pick",
-	worktree.OperationRevert:     "revert",
-	worktree.OperationApply:      "git am",
+// ActionsParams are a node of a worktree and whether its branch is the base branch.
+type ActionsParams struct {
+	Detail Detail
+	Base   bool
 }
 
-// commandSync is the command that rebases a worktree onto its parent, answered by the worktree.
-const commandSync = "sync"
-
-// Actions is what the worktree of detail needs next, the first that applies: an operation git stopped in the middle of (a rebase, a bisect, a merge…) is finished in it, one its merged pull request leaves done with (worktree.Repository.Cleans) is pruned, one whose directory is gone cleaned; one behind origin is fast-forwarded, one behind its parent is synced onto it; none otherwise.
-func Actions(detail Detail, cleans bool) []domain.FollowUp {
-	var command, message string
-	switch {
-	case detail.Condition.Operation() != "":
-		command, message = domain.CommandGo, "Go to the worktree to finish its "+finishing[detail.Condition.Operation()]
-	case cleans:
-		command, message = domain.CommandPrune, "Prune the worktree: its pull request is merged"
-	case detail.Missing:
-		command, message = domain.CommandClean, "Clean the worktree: remove what is left of it"
-	case detail.Origin != nil && detail.Origin.State == worktree.Behind:
-		command, message = domain.CommandFastForward, "Fast-forward the worktree: origin has commits it lacks"
-	case detail.NeedsSync:
-		command, message = commandSync, "Sync the worktree: its parent has commits it lacks"
-	default:
-		return []domain.FollowUp{}
+// Actions are every action of the worktree of p, each with its follow-up or why it does not offer it.
+func Actions(p ActionsParams) []repository.Offer {
+	detail := p.Detail
+	params := repository.OffersParams{
+		Command:  Name,
+		Branch:   detail.Branch,
+		Path:     *detail.Path,
+		Main:     detail.Main,
+		Base:     p.Base,
+		Missing:  detail.Missing,
+		OnOrigin: detail.Origin != nil,
+	}
+	if detail.PR != nil {
+		params.PRNumber, params.PRURL = detail.PR.Number, detail.PR.URL
 	}
 
-	return []domain.FollowUp{{
-		Command: command,
-		Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{detail.Branch}}},
-		Code:    Name + "." + command,
-		Message: message,
-	}}
+	return repository.Offers(params)
 }

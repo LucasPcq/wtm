@@ -10,13 +10,11 @@ const removal = (worktree: string, blockers: TeardownRemoval['blockers'] = []): 
   blockers,
 })
 
-test('the request drops what is kept and forces only when an unsafe worktree is removed anyway', () => {
-  const removals = [removal('feat/a'), removal('feat/b', ['dirty']), removal('feat/c', ['locked'])]
+test('the request takes the checked worktrees and forces only when an unsafe one is among them', () => {
+  const [a, b] = [removal('feat/a'), removal('feat/b', ['dirty'])]
 
-  expect(requestOf({ removals, choices: { 'feat/b': 'keep', 'feat/c': 'keep' }, reparent: false })).toEqual([
-    { path: 'worktree', values: ['feat/a'] },
-  ])
-  expect(requestOf({ removals, choices: { 'feat/b': 'remove', 'feat/c': 'keep' }, reparent: true })).toEqual([
+  expect(requestOf({ going: [a], reparent: false })).toEqual([{ path: 'worktree', values: ['feat/a'] }])
+  expect(requestOf({ going: [a, b], reparent: true })).toEqual([
     { path: 'worktree', values: ['feat/a', 'feat/b'] },
     { path: 'force', values: ['true'] },
     { path: 'reparent_children', values: ['true'] },

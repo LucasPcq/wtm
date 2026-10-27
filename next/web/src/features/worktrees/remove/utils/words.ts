@@ -1,5 +1,4 @@
 import type { TeardownRemoval, WorktreeBlocker } from '@/api/types.gen'
-import type { Choice } from '@/features/worktrees/remove/utils/plan'
 import type { OutcomeKind } from '@/features/worktrees/utils/outcome'
 
 // The core words its refusals for the command line; the web says each reason its own way, over the blockers the
@@ -7,21 +6,22 @@ import type { OutcomeKind } from '@/features/worktrees/utils/outcome'
 export const blockerWords: Record<WorktreeBlocker, (removal: TeardownRemoval) => string> = {
   locked: () => 'Locked',
   dirty: () => 'Uncommitted changes',
-  unpushed: ({ unpushed = 0 }) => `${unpushed} commit${unpushed === 1 ? '' : 's'} no other branch nor remote holds`,
+  unpushed: ({ unpushed = 0 }) => `${unpushed} commit${unpushed === 1 ? '' : 's'} on no other branch`,
   open_pull_request: () => 'An open pull request',
   jobs_running: ({ jobs = [] }) => `Jobs running: ${jobs.join(', ')}`,
 }
 
-// what removing it anyway loses, said once, on the Confirm step
+// what removing it anyway loses, said where it is decided: on the row once checked
 export const lostWords: Record<WorktreeBlocker, (removal: TeardownRemoval) => string> = {
   locked: () => 'Its lock is lifted.',
   dirty: () => 'Its uncommitted changes are lost.',
-  unpushed: ({ unpushed = 0 }) => `Its ${unpushed} commit${unpushed === 1 ? '' : 's'} no other branch holds are lost.`,
+  unpushed: ({ unpushed = 0 }) =>
+    unpushed === 1
+      ? 'Its 1 commit on no other branch is lost.'
+      : `Its ${unpushed} commits on no other branch are lost.`,
   open_pull_request: () => 'Its pull request stays open on GitHub.',
   jobs_running: ({ jobs = [] }) => `Its jobs ${jobs.join(', ')} keep running.`,
 }
-
-export const choiceWords: Record<Choice, string> = { keep: 'Keep it', remove: 'Remove anyway' }
 
 export const outcomeWords: Record<OutcomeKind, string> = {
   failed: "Couldn't remove",

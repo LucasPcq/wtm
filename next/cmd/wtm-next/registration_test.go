@@ -12,10 +12,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
-	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
-	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/spf13/cobra"
@@ -93,8 +92,7 @@ func TestEachFollowUpOfAMigratedCommandIsSpelledFromItsSchema(t *testing.T) {
 	streams, _, _, _ := output.Test()
 	root := cli.NewRoot(version, streams, commands(streams, cli.Env{}))
 	followUps := []domain.FollowUp{leftBehind("feat/a"), *initialize(), settle("feat/a"), proxyStatus()}
-	followUps = append(followUps, list.Actions(list.Detail{Branch: "feat/a"})...)
-	followUps = append(followUps, tree.Actions(tree.Detail{Branch: "feat/a", Condition: worktree.ConditionRebasing}, false)[0], tree.Actions(tree.Detail{Branch: "feat/a"}, true)[0], tree.Actions(tree.Detail{Branch: "feat/a", NeedsSync: true}, false)[0])
+	followUps = append(followUps, repository.Offered(list.Actions(list.Detail{Branch: "feat/a"}))...)
 	fixes := status.Problems(status.ProblemsParams{Branch: "feat/a", Merged: true, Missing: []status.Missing{{Target: ".env"}, {Target: ".env", From: status.FromNowhere}}, Jobs: []status.Job{{Name: "api", State: run.Crashed}}})
 	for _, problem := range fixes {
 		followUps = append(followUps, *problem.Fix)

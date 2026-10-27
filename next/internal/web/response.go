@@ -36,9 +36,9 @@ var statusByKind = map[domain.Kind]int{
 	domain.KindInternal:     http.StatusInternalServerError,
 }
 
-// statusOf is the HTTP status of how a command ended: 200 when it succeeded, else the status of its error's kind, 500 for a kind it does not know.
+// statusOf is the HTTP status of how a command ended: 200 when it succeeded, or when it has items, a read's or an applied run's, even with one failed: each item says how it went; else the status of its error's kind, 500 for a kind it does not know. A cancelled run keeps 499.
 func statusOf(envelope domain.Envelope) int {
-	if envelope.Err == nil {
+	if envelope.Err == nil || len(envelope.Items) > 0 && envelope.Err.Kind != domain.KindCancelled {
 		return http.StatusOK
 	}
 

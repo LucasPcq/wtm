@@ -11,6 +11,7 @@ $ wtm list; echo EXIT=$?
    Stop the profile
    View the logs
    Fast-forward from origin
+   Sync onto its parent
    Clean (delete the worktree)
 
   ↑↓ navigate • / filter • enter confirm • esc back

@@ -1,9 +1,12 @@
 package tree_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/stretchr/testify/require"
 )
 
@@ -41,4 +44,12 @@ func codes(read tree.Outcome) []string {
 // count is n as a count of commits.
 func count(n int) *int {
 	return &n
+}
+
+// offerOf is the offer of action among offers.
+func offerOf(t *testing.T, offers []repository.Offer, action worktree.Action) repository.Offer {
+	t.Helper()
+	at := slices.IndexFunc(offers, func(offer repository.Offer) bool { return offer.Action == action })
+	require.GreaterOrEqual(t, at, 0, action)
+	return offers[at]
 }

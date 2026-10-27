@@ -1,49 +1,30 @@
-import { CircleX, ExternalLink, type LucideIcon, TriangleAlert } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { CircleX, ExternalLink, TriangleAlert } from 'lucide-react'
 import type { TeardownMove, TeardownRemoval } from '@/api/types.gen'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Item, ItemTitle } from '@/components/ui/item'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { type Choice, unsafe } from '@/features/worktrees/remove/utils/plan'
-import { blockerWords, choiceWords, lostWords } from '@/features/worktrees/remove/utils/words'
-import { cn } from '@/lib/utils'
+import { unsafe } from '@/features/worktrees/remove/utils/plan'
+import { blockerWords, lostWords } from '@/features/worktrees/remove/utils/words'
 
-// kept, an unsafe worktree no longer asks anything of the person: its glyph steps back with its line
-const look: Record<'undecided' | 'kept' | 'forced', { icon: LucideIcon; className: string }> = {
-  undecided: { icon: TriangleAlert, className: 'text-amber-500' },
-  kept: { icon: TriangleAlert, className: 'text-muted-foreground' },
-  forced: { icon: CircleX, className: 'text-destructive' },
-}
-
+// the box means "in this run": an unsafe worktree says why it is risky, and once checked what removing it loses
 export function RemovalItem({
   removal,
-  choice,
-  onChoice,
+  checked = true,
+  onCheck,
   moves = [],
   reparent = false,
 }: {
   removal: TeardownRemoval
-  choice?: Choice | undefined
-  onChoice?: (choice: Choice) => void
+  checked?: boolean
+  onCheck?: (on: boolean) => void
   moves?: TeardownMove[]
   reparent?: boolean
 }) {
   const blockers = removal.blockers ?? []
-  const risky = unsafe(removal)
-  const kept = choice === 'keep'
-
-  const state = () => {
-    if (!onChoice) return 'forced'
-    return kept ? 'kept' : 'undecided'
-  }
-
-  const glyph = () => {
-    const { icon: Icon, className } = look[state()]
-    return <Icon className={cn('size-3.5 shrink-0', className)} aria-hidden="true" />
-  }
+  const anyway = unsafe(removal) && checked
 
   const name = () => {
-    if (!onChoice || !removal.path) return removal.worktree
+    if (!onCheck || !removal.path) return removal.worktree
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -61,69 +42,44 @@ export function RemovalItem({
     return undefined
   }
 
-  const reasons = (): ReactNode[] =>
-    blockers.map((blocker) => (
-      <span key={blocker} className="flex items-center gap-1.5">
-        {glyph()}
-        {blockerWords[blocker](removal)}
-        {blocker === 'open_pull_request' && removal.pull_request && (
-          <a href={removal.pull_request} target="_blank" rel="noreferrer" aria-label="Open the pull request">
-            <ExternalLink className="size-3.5" />
-          </a>
-        )}
-      </span>
-    ))
-
-  const consequences = (): ReactNode[] => [
-    ...(risky
-      ? blockers.map((blocker) => (
-          <span key={blocker} className="flex items-center gap-1.5">
-            {glyph()}
-            {lostWords[blocker](removal)}
-          </span>
-        ))
-      : []),
-    ...moves.map((move) =>
-      reparent ? `${move.branch} moves onto ${move.to}` : `${move.branch} stays on ${move.from}, orphaned`,
-    ),
-  ]
-
-  const lines = onChoice ? reasons() : consequences()
   const odd = exception()
 
   return (
     <Item role="listitem" aria-label={removal.worktree} className="items-center gap-3 rounded-none px-4 py-3">
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <ItemTitle className={cn('min-w-0', kept && 'text-muted-foreground')}>{name()}</ItemTitle>
-        {(lines.length > 0 || odd) && (
-          <div className={cn('flex flex-col gap-1 text-xs', (!onChoice || kept) && 'text-muted-foreground')}>
-            {lines.map((line) => (typeof line === 'string' ? <span key={line}>{line}</span> : line))}
-            {odd && <span className="text-muted-foreground">{odd}</span>}
-          </div>
-        )}
-      </div>
-      {onChoice && risky && (
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          spacing={0}
-          aria-label={`What to do with ${removal.worktree}`}
-          value={choice ?? ''}
-          onValueChange={(value) => {
-            if (value === 'keep' || value === 'remove') onChoice(value)
-          }}
-        >
-          <ToggleGroupItem value="keep">{choiceWords.keep}</ToggleGroupItem>
-          <ToggleGroupItem
-            value="remove"
-            className="data-[state=on]:bg-destructive/15 data-[state=on]:text-destructive"
-          >
-            {choiceWords.remove}
-          </ToggleGroupItem>
-        </ToggleGroup>
+      {onCheck && (
+        <Checkbox
+          aria-label={`Remove ${removal.worktree}`}
+          checked={checked}
+          onCheckedChange={(on) => onCheck(on === true)}
+        />
       )}
-      {!onChoice && risky && <span className="shrink-0 text-xs text-muted-foreground">Removed anyway</span>}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <ItemTitle className="min-w-0">{name()}</ItemTitle>
+        <div className="flex flex-col gap-1 text-xs">
+          {blockers.map((blocker) => (
+            <span key={blocker} className="flex items-center gap-1.5">
+              {anyway ? (
+                <CircleX className="size-3.5 shrink-0 text-destructive" aria-hidden="true" />
+              ) : (
+                <TriangleAlert className="size-3.5 shrink-0 text-amber-500" aria-hidden="true" />
+              )}
+              {anyway ? lostWords[blocker](removal) : blockerWords[blocker](removal)}
+              {!anyway && blocker === 'open_pull_request' && removal.pull_request && (
+                <a href={removal.pull_request} target="_blank" rel="noreferrer" aria-label="Open the pull request">
+                  <ExternalLink className="size-3.5" />
+                </a>
+              )}
+            </span>
+          ))}
+          {moves.map((move) => (
+            <span key={move.branch} className="text-muted-foreground">
+              {reparent ? `${move.branch} moves onto ${move.to}` : `${move.branch} stays on ${move.from}, orphaned`}
+            </span>
+          ))}
+          {odd && <span className="text-muted-foreground">{odd}</span>}
+        </div>
+      </div>
+      {anyway && <span className="shrink-0 text-xs text-muted-foreground">anyway</span>}
     </Item>
   )
 }

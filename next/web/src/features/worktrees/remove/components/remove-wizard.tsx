@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { useReducer } from 'react'
+import { useReducer, useState } from 'react'
 import { dryRunQuery } from '@/api/queries/commands'
+import type { TeardownRemoval } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -10,28 +11,36 @@ import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { type Fact, Facts } from '@/features/worktrees/components/facts'
 import { ItemList } from '@/features/worktrees/components/item-list'
+import { LeftItem } from '@/features/worktrees/components/left-item'
+import { ListHeader } from '@/features/worktrees/components/list-header'
 import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { Stepper, type StepState } from '@/features/worktrees/components/stepper'
+import type { Left } from '@/features/worktrees/hooks/use-remove-dialog'
 import type { Start } from '@/features/worktrees/hooks/use-run'
 import { ChildrenStep } from '@/features/worktrees/remove/components/children-step'
 import { RemovalItem } from '@/features/worktrees/remove/components/removal-item'
-import { listed } from '@/features/worktrees/remove/utils/listed'
-import { plain, requestOf, unitsOf, unsafe } from '@/features/worktrees/remove/utils/plan'
+import { plain, requestOf, riskOf, unitsOf, unsafe } from '@/features/worktrees/remove/utils/plan'
 import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/remove/utils/wizard-state'
 import { sharedWarnings } from '@/features/worktrees/remove/utils/words'
+import { searched } from '@/features/worktrees/utils/filters'
 
 export function RemoveWizard({
   repo,
   worktrees,
+  left,
+  prechecked,
   onStart,
   onCancel,
 }: {
   repo: string
   worktrees: string[]
+  left: Left[]
+  prechecked: boolean
   onStart: (start: Start) => void
   onCancel: () => void
 }) {
-  const [{ step: chosen, choices, reparent }, dispatch] = useReducer(wizardReducer, initialWizard)
+  const [{ step: chosen, checked, confirmed, reparent }, dispatch] = useReducer(wizardReducer, initialWizard)
+  const [query, setQuery] = useState('')
 
   // forced, the review plans every worktree asked, the unsafe ones with what keeps them: the choices are the person's
   const review = useQuery(
@@ -41,31 +50,52 @@ export function RemoveWizard({
     ]),
   )
   const removals = review.data?.plan?.worktrees ?? []
-  const undecided = removals.filter((removal) => unsafe(removal) && !choices[removal.worktree])
-  const answers = requestOf({ removals, choices, reparent })
-  const going = answers[0]?.values ?? []
+  // an unsafe worktree starts unchecked: none is touched unless asked for. A tick holds for the risk it was given
+  // under, an untick whatever the risk: a worktree the person left out never comes back on its own
+  const ticked = (removal: TeardownRemoval) => {
+    const tick = checked[removal.worktree]
+    return tick && (!tick.on || tick.risk === riskOf(removal)) ? tick : undefined
+  }
+  const isChecked = (removal: TeardownRemoval) => ticked(removal)?.on ?? (prechecked && !unsafe(removal))
+  const check = (rows: TeardownRemoval[], on: boolean) =>
+    dispatch({
+      type: 'check',
+      rows: rows.map((removal) => ({ worktree: removal.worktree, risk: riskOf(removal) })),
+      on,
+    })
+  const going = removals.filter(isChecked)
+  const answers = requestOf({ going, reparent })
   // a choice plans again: the plan shown stays until the next one lands
   const planned = useQuery({
     ...dryRunQuery(repo, 'clean', answers),
-    enabled: undecided.length === 0 && going.length > 0,
+    enabled: going.length > 0,
     placeholderData: keepPreviousData,
   })
   const plan = planned.isError || planned.data?.error ? undefined : planned.data?.plan
   const moves = plan?.moves ?? []
   const fingerprint = planned.data?.fingerprint
-  // the buttons never act on the plan a choice is replacing
-  const fresh = plan !== undefined && !planned.isPlaceholderData
+  // the buttons never act on the plan a choice is replacing; nor force a worktree the plan finds unsafe unless the
+  // person checked it under that very risk: the two reads land in any order
+  const consented = (plan?.worktrees ?? []).every((removal) => !unsafe(removal) || ticked(removal)?.on)
+  const fresh = plan !== undefined && !planned.isPlaceholderData && !planned.isFetching && consented
   const unplanned = planned.isError ? planned.error.message : planned.data?.error?.message
 
-  // the step is the one reached, unless the facts moved under it: a worktree read again unsafe has its choice to make,
-  // and children all gone leave nothing to ask
+  // the step is the one reached, unless the facts moved under it: once the worktrees were confirmed, one that left the
+  // run or joined it since (its risk changed) sends the wizard back to say it; children all gone leave nothing to ask
+  const goingNames = going.map((removal) => removal.worktree)
+  const turned =
+    confirmed.length > 0 &&
+    (goingNames.some((worktree) => !confirmed.includes(worktree)) ||
+      removals.some((removal) => confirmed.includes(removal.worktree) && !goingNames.includes(removal.worktree)))
+  // back to the worktrees for good, not only on screen: only Next leaves them again, never a tick nor a read
+  if (turned && chosen !== 'worktrees') dispatch({ type: 'go', to: 'worktrees' })
   const stepOf = (): Step => {
-    if (undecided.length > 0) return 'worktrees'
+    if (turned) return 'worktrees'
     if (chosen === 'children' && fresh && moves.length === 0) return 'confirm'
     return chosen
   }
   const step = stepOf()
-  const safe = removals.filter((removal) => !unsafe(removal))
+  const visible = removals.filter((removal) => searched(removal.worktree, query))
 
   const state = (of: Step): StepState => {
     const order: Step[] = ['worktrees', 'children', 'confirm']
@@ -75,24 +105,21 @@ export function RemoveWizard({
   }
 
   const next = () => {
-    if (step === 'worktrees') return dispatch({ type: 'go', to: moves.length > 0 ? 'children' : 'confirm' })
+    if (step === 'worktrees')
+      return dispatch({
+        type: 'go',
+        to: moves.length > 0 ? 'children' : 'confirm',
+        confirmed: going.map((removal) => removal.worktree),
+      })
     dispatch({ type: 'go', to: 'confirm' })
   }
 
   const back = () => dispatch({ type: 'go', to: step === 'confirm' && moves.length > 0 ? 'children' : 'worktrees' })
 
   // a Next that can't be pressed says why, so the step needs no sentence of its own
-  const blocked = () => {
-    if (undecided.length > 0) return `Choose for ${listed(undecided.map((removal) => removal.worktree))} first`
-    if (review.data && going.length === 0) return 'Every worktree is kept: nothing to remove'
-    return undefined
-  }
+  const blocked = () => (review.data && going.length === 0 ? 'Check a worktree to remove it' : undefined)
 
-  const counted = review.data ? going : worktrees
-  const title = () => {
-    if (counted.length === 0) return 'Remove worktrees'
-    return counted.length === 1 ? `Remove ${counted[0]}` : `Remove ${counted.length} worktrees`
-  }
+  const leftRows = left.map(({ worktree, why }) => <LeftItem key={worktree} worktree={worktree} why={why} />)
 
   const removing = plan?.worktrees ?? []
   const warnings = (planned.data?.warnings ?? []).filter(
@@ -101,7 +128,7 @@ export function RemoveWizard({
   const hooks = removing.flatMap((removal) => removal.hooks ?? []).length
   const keeping = removing.filter((removal) => (removal.namespaces ?? []).length > 0).length
   const summary = [
-    hooks > 0 && `${hooks} on_clean hook${hooks === 1 ? '' : 's'} run first`,
+    hooks > 0 && (hooks === 1 ? '1 on_clean hook runs first' : `${hooks} on_clean hooks run first`),
     keeping > 0 && `data stays for ${keeping}`,
   ]
     .filter(Boolean)
@@ -128,13 +155,32 @@ export function RemoveWizard({
 
     if (step === 'worktrees')
       return (
-        <ItemList label="Worktrees">
-          {[...removals.filter(unsafe), ...safe].map((removal) => (
+        <ItemList
+          label="Worktrees"
+          header={
+            <ListHeader
+              total={removals.length}
+              visible={visible.map((removal) => removal.worktree)}
+              bulk={visible.filter((removal) => !unsafe(removal)).map((removal) => removal.worktree)}
+              checked={going.map((removal) => removal.worktree)}
+              query={query}
+              onQuery={setQuery}
+              onCheck={(names, on) =>
+                check(
+                  visible.filter((removal) => names.includes(removal.worktree)),
+                  on,
+                )
+              }
+            />
+          }
+          left={leftRows}
+        >
+          {visible.map((removal) => (
             <RemovalItem
               key={removal.worktree}
               removal={removal}
-              choice={choices[removal.worktree]}
-              onChoice={(choice) => dispatch({ type: 'choose', worktree: removal.worktree, choice })}
+              checked={isChecked(removal)}
+              onCheck={(on) => check([removal], on)}
             />
           ))}
         </ItemList>
@@ -152,7 +198,8 @@ export function RemoveWizard({
     if (!plan) return !unplanned && <Skeleton className="h-40 w-full" />
     return (
       <>
-        <ItemList label="Worktrees">
+        <PlanWarnings warnings={warnings} />
+        <ItemList label="Worktrees" left={leftRows}>
           {removing.map((removal) => (
             <RemovalItem
               key={removal.worktree}
@@ -162,7 +209,6 @@ export function RemoveWizard({
             />
           ))}
         </ItemList>
-        <PlanWarnings warnings={warnings} />
         <Details label="Details" summary={summary}>
           {removing.map((removal) => (
             <Facts key={removal.worktree} heading={removal.worktree} facts={factsOf(removal)} />
@@ -175,7 +221,7 @@ export function RemoveWizard({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{title()}</DialogTitle>
+        <DialogTitle>Remove worktrees</DialogTitle>
         <DialogDescription>
           {plain(removals)
             ? 'Each goes with its local branch and its record; the remote branch stays.'
@@ -214,7 +260,7 @@ export function RemoveWizard({
             disabled={!fresh || !fingerprint}
             onClick={() => plan && fingerprint && onStart({ answers, fingerprint, units: unitsOf(plan) })}
           >
-            {going.length === 1 ? `Remove ${going[0]}` : `Remove ${going.length} worktrees`}
+            {going.length === 1 ? 'Remove' : `Remove ${going.length} worktrees`}
           </Button>
         )}
       </DialogFooter>

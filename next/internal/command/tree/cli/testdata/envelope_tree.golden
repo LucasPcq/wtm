@@ -33,7 +33,108 @@
         },
         "pr": null,
         "services": [],
-        "actions": []
+        "actions": [
+          {
+            "action": "go",
+            "follow_up": {
+              "command": "go",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "main"
+                  ]
+                }
+              ],
+              "code": "tree.go",
+              "message": "Go to the worktree"
+            },
+            "refused": null
+          },
+          {
+            "action": "open_pr",
+            "follow_up": null,
+            "refused": "no_pull_request"
+          },
+          {
+            "action": "run_up",
+            "follow_up": {
+              "command": "run up",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "main"
+                  ]
+                }
+              ],
+              "code": "tree.run_up",
+              "message": "Start the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "run_down",
+            "follow_up": {
+              "command": "run down",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "main"
+                  ]
+                }
+              ],
+              "code": "tree.run_down",
+              "message": "Stop the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "logs",
+            "follow_up": {
+              "command": "run logs",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "main"
+                  ]
+                }
+              ],
+              "code": "tree.logs",
+              "message": "View the logs"
+            },
+            "refused": null
+          },
+          {
+            "action": "fast_forward",
+            "follow_up": {
+              "command": "fast-forward",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "main"
+                  ]
+                }
+              ],
+              "code": "tree.fast_forward",
+              "message": "Fast-forward from origin"
+            },
+            "refused": null
+          },
+          {
+            "action": "sync",
+            "follow_up": null,
+            "refused": "main_worktree"
+          },
+          {
+            "action": "clean",
+            "follow_up": null,
+            "refused": "main_worktree"
+          }
+        ]
       }
     },
     {
@@ -69,7 +170,139 @@
         "services": [
           "web"
         ],
-        "actions": []
+        "actions": [
+          {
+            "action": "go",
+            "follow_up": {
+              "command": "go",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "tree.go",
+              "message": "Go to the worktree"
+            },
+            "refused": null
+          },
+          {
+            "action": "open_pr",
+            "follow_up": {
+              "url": "https://github.com/acme/acme/pull/12",
+              "code": "tree.open_pr",
+              "message": "Open the pull request",
+              "params": {
+                "number": "12"
+              }
+            },
+            "refused": null
+          },
+          {
+            "action": "run_up",
+            "follow_up": {
+              "command": "run up",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "tree.run_up",
+              "message": "Start the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "run_down",
+            "follow_up": {
+              "command": "run down",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "tree.run_down",
+              "message": "Stop the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "logs",
+            "follow_up": {
+              "command": "run logs",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "tree.logs",
+              "message": "View the logs"
+            },
+            "refused": null
+          },
+          {
+            "action": "fast_forward",
+            "follow_up": {
+              "command": "fast-forward",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "tree.fast_forward",
+              "message": "Fast-forward from origin"
+            },
+            "refused": null
+          },
+          {
+            "action": "sync",
+            "follow_up": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "tree.sync",
+              "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "clean",
+            "follow_up": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "tree.clean",
+              "message": "Clean (delete the worktree)"
+            },
+            "refused": null
+          }
+        ]
       }
     },
     {
@@ -95,7 +328,120 @@
         "origin": null,
         "pr": null,
         "services": [],
-        "actions": []
+        "actions": [
+          {
+            "action": "go",
+            "follow_up": {
+              "command": "go",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui"
+                  ]
+                }
+              ],
+              "code": "tree.go",
+              "message": "Go to the worktree"
+            },
+            "refused": null
+          },
+          {
+            "action": "open_pr",
+            "follow_up": null,
+            "refused": "no_pull_request"
+          },
+          {
+            "action": "run_up",
+            "follow_up": {
+              "command": "run up",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui"
+                  ]
+                }
+              ],
+              "code": "tree.run_up",
+              "message": "Start the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "run_down",
+            "follow_up": {
+              "command": "run down",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui"
+                  ]
+                }
+              ],
+              "code": "tree.run_down",
+              "message": "Stop the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "logs",
+            "follow_up": {
+              "command": "run logs",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui"
+                  ]
+                }
+              ],
+              "code": "tree.logs",
+              "message": "View the logs"
+            },
+            "refused": null
+          },
+          {
+            "action": "fast_forward",
+            "follow_up": null,
+            "refused": "not_on_origin"
+          },
+          {
+            "action": "sync",
+            "follow_up": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui"
+                  ]
+                }
+              ],
+              "code": "tree.sync",
+              "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "clean",
+            "follow_up": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui"
+                  ]
+                }
+              ],
+              "code": "tree.clean",
+              "message": "Clean (delete the worktree)"
+            },
+            "refused": null
+          }
+        ]
       }
     },
     {
@@ -119,7 +465,120 @@
         "origin": null,
         "pr": null,
         "services": [],
-        "actions": []
+        "actions": [
+          {
+            "action": "go",
+            "follow_up": {
+              "command": "go",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui-copy"
+                  ]
+                }
+              ],
+              "code": "tree.go",
+              "message": "Go to the worktree"
+            },
+            "refused": null
+          },
+          {
+            "action": "open_pr",
+            "follow_up": null,
+            "refused": "no_pull_request"
+          },
+          {
+            "action": "run_up",
+            "follow_up": {
+              "command": "run up",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui-copy"
+                  ]
+                }
+              ],
+              "code": "tree.run_up",
+              "message": "Start the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "run_down",
+            "follow_up": {
+              "command": "run down",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui-copy"
+                  ]
+                }
+              ],
+              "code": "tree.run_down",
+              "message": "Stop the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "logs",
+            "follow_up": {
+              "command": "run logs",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui-copy"
+                  ]
+                }
+              ],
+              "code": "tree.logs",
+              "message": "View the logs"
+            },
+            "refused": null
+          },
+          {
+            "action": "fast_forward",
+            "follow_up": null,
+            "refused": "not_on_origin"
+          },
+          {
+            "action": "sync",
+            "follow_up": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui-copy"
+                  ]
+                }
+              ],
+              "code": "tree.sync",
+              "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "clean",
+            "follow_up": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui-copy"
+                  ]
+                }
+              ],
+              "code": "tree.clean",
+              "message": "Clean (delete the worktree)"
+            },
+            "refused": null
+          }
+        ]
       }
     },
     {
@@ -149,17 +608,123 @@
         "services": [],
         "actions": [
           {
-            "command": "prune",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/b"
-                ]
+            "action": "go",
+            "follow_up": {
+              "command": "go",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "tree.go",
+              "message": "Go to the worktree"
+            },
+            "refused": null
+          },
+          {
+            "action": "open_pr",
+            "follow_up": {
+              "url": "https://github.com/acme/acme/pull/9",
+              "code": "tree.open_pr",
+              "message": "Open the pull request",
+              "params": {
+                "number": "9"
               }
-            ],
-            "code": "tree.prune",
-            "message": "Prune the worktree: its pull request is merged"
+            },
+            "refused": null
+          },
+          {
+            "action": "run_up",
+            "follow_up": {
+              "command": "run up",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "tree.run_up",
+              "message": "Start the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "run_down",
+            "follow_up": {
+              "command": "run down",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "tree.run_down",
+              "message": "Stop the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "logs",
+            "follow_up": {
+              "command": "run logs",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "tree.logs",
+              "message": "View the logs"
+            },
+            "refused": null
+          },
+          {
+            "action": "fast_forward",
+            "follow_up": null,
+            "refused": "not_on_origin"
+          },
+          {
+            "action": "sync",
+            "follow_up": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "tree.sync",
+              "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "clean",
+            "follow_up": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "tree.clean",
+              "message": "Clean (delete the worktree)"
+            },
+            "refused": null
           }
         ]
       }
@@ -187,17 +752,116 @@
         "services": [],
         "actions": [
           {
-            "command": "go",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "rebasing"
-                ]
-              }
-            ],
-            "code": "tree.go",
-            "message": "Go to the worktree to finish its rebase"
+            "action": "go",
+            "follow_up": {
+              "command": "go",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "rebasing"
+                  ]
+                }
+              ],
+              "code": "tree.go",
+              "message": "Go to the worktree"
+            },
+            "refused": null
+          },
+          {
+            "action": "open_pr",
+            "follow_up": null,
+            "refused": "no_pull_request"
+          },
+          {
+            "action": "run_up",
+            "follow_up": {
+              "command": "run up",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "rebasing"
+                  ]
+                }
+              ],
+              "code": "tree.run_up",
+              "message": "Start the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "run_down",
+            "follow_up": {
+              "command": "run down",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "rebasing"
+                  ]
+                }
+              ],
+              "code": "tree.run_down",
+              "message": "Stop the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "logs",
+            "follow_up": {
+              "command": "run logs",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "rebasing"
+                  ]
+                }
+              ],
+              "code": "tree.logs",
+              "message": "View the logs"
+            },
+            "refused": null
+          },
+          {
+            "action": "fast_forward",
+            "follow_up": null,
+            "refused": "not_on_origin"
+          },
+          {
+            "action": "sync",
+            "follow_up": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "rebasing"
+                  ]
+                }
+              ],
+              "code": "tree.sync",
+              "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "clean",
+            "follow_up": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "rebasing"
+                  ]
+                }
+              ],
+              "code": "tree.clean",
+              "message": "Clean (delete the worktree)"
+            },
+            "refused": null
           }
         ]
       }
@@ -225,17 +889,56 @@
         "services": [],
         "actions": [
           {
-            "command": "clean",
-            "answers": [
-              {
-                "path": "worktree",
-                "values": [
-                  "feat/gone"
-                ]
-              }
-            ],
-            "code": "tree.clean",
-            "message": "Clean the worktree: remove what is left of it"
+            "action": "go",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "open_pr",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "run_up",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "run_down",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "logs",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "fast_forward",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "sync",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "clean",
+            "follow_up": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/gone"
+                  ]
+                }
+              ],
+              "code": "tree.clean",
+              "message": "Clean (delete the worktree)"
+            },
+            "refused": null
           }
         ]
       }
@@ -261,7 +964,120 @@
         "origin": null,
         "pr": null,
         "services": [],
-        "actions": []
+        "actions": [
+          {
+            "action": "go",
+            "follow_up": {
+              "command": "go",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "y"
+                  ]
+                }
+              ],
+              "code": "tree.go",
+              "message": "Go to the worktree"
+            },
+            "refused": null
+          },
+          {
+            "action": "open_pr",
+            "follow_up": null,
+            "refused": "no_pull_request"
+          },
+          {
+            "action": "run_up",
+            "follow_up": {
+              "command": "run up",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "y"
+                  ]
+                }
+              ],
+              "code": "tree.run_up",
+              "message": "Start the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "run_down",
+            "follow_up": {
+              "command": "run down",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "y"
+                  ]
+                }
+              ],
+              "code": "tree.run_down",
+              "message": "Stop the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "logs",
+            "follow_up": {
+              "command": "run logs",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "y"
+                  ]
+                }
+              ],
+              "code": "tree.logs",
+              "message": "View the logs"
+            },
+            "refused": null
+          },
+          {
+            "action": "fast_forward",
+            "follow_up": null,
+            "refused": "not_on_origin"
+          },
+          {
+            "action": "sync",
+            "follow_up": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "y"
+                  ]
+                }
+              ],
+              "code": "tree.sync",
+              "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "clean",
+            "follow_up": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "y"
+                  ]
+                }
+              ],
+              "code": "tree.clean",
+              "message": "Clean (delete the worktree)"
+            },
+            "refused": null
+          }
+        ]
       }
     },
     {
@@ -285,7 +1101,120 @@
         "origin": null,
         "pr": null,
         "services": [],
-        "actions": []
+        "actions": [
+          {
+            "action": "go",
+            "follow_up": {
+              "command": "go",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "z"
+                  ]
+                }
+              ],
+              "code": "tree.go",
+              "message": "Go to the worktree"
+            },
+            "refused": null
+          },
+          {
+            "action": "open_pr",
+            "follow_up": null,
+            "refused": "no_pull_request"
+          },
+          {
+            "action": "run_up",
+            "follow_up": {
+              "command": "run up",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "z"
+                  ]
+                }
+              ],
+              "code": "tree.run_up",
+              "message": "Start the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "run_down",
+            "follow_up": {
+              "command": "run down",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "z"
+                  ]
+                }
+              ],
+              "code": "tree.run_down",
+              "message": "Stop the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "logs",
+            "follow_up": {
+              "command": "run logs",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "z"
+                  ]
+                }
+              ],
+              "code": "tree.logs",
+              "message": "View the logs"
+            },
+            "refused": null
+          },
+          {
+            "action": "fast_forward",
+            "follow_up": null,
+            "refused": "not_on_origin"
+          },
+          {
+            "action": "sync",
+            "follow_up": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "z"
+                  ]
+                }
+              ],
+              "code": "tree.sync",
+              "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "clean",
+            "follow_up": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "z"
+                  ]
+                }
+              ],
+              "code": "tree.clean",
+              "message": "Clean (delete the worktree)"
+            },
+            "refused": null
+          }
+        ]
       }
     },
     {
@@ -335,7 +1264,120 @@
         "origin": null,
         "pr": null,
         "services": [],
-        "actions": []
+        "actions": [
+          {
+            "action": "go",
+            "follow_up": {
+              "command": "go",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/x"
+                  ]
+                }
+              ],
+              "code": "tree.go",
+              "message": "Go to the worktree"
+            },
+            "refused": null
+          },
+          {
+            "action": "open_pr",
+            "follow_up": null,
+            "refused": "no_pull_request"
+          },
+          {
+            "action": "run_up",
+            "follow_up": {
+              "command": "run up",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/x"
+                  ]
+                }
+              ],
+              "code": "tree.run_up",
+              "message": "Start the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "run_down",
+            "follow_up": {
+              "command": "run down",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/x"
+                  ]
+                }
+              ],
+              "code": "tree.run_down",
+              "message": "Stop the profile"
+            },
+            "refused": null
+          },
+          {
+            "action": "logs",
+            "follow_up": {
+              "command": "run logs",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/x"
+                  ]
+                }
+              ],
+              "code": "tree.logs",
+              "message": "View the logs"
+            },
+            "refused": null
+          },
+          {
+            "action": "fast_forward",
+            "follow_up": null,
+            "refused": "not_on_origin"
+          },
+          {
+            "action": "sync",
+            "follow_up": {
+              "command": "sync",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/x"
+                  ]
+                }
+              ],
+              "code": "tree.sync",
+              "message": "Sync onto its parent"
+            },
+            "refused": null
+          },
+          {
+            "action": "clean",
+            "follow_up": {
+              "command": "clean",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/x"
+                  ]
+                }
+              ],
+              "code": "tree.clean",
+              "message": "Clean (delete the worktree)"
+            },
+            "refused": null
+          }
+        ]
       }
     }
   ],

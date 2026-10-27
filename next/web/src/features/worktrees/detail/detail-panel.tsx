@@ -3,15 +3,16 @@ import { Link } from '@tanstack/react-router'
 import { ExternalLink, X } from 'lucide-react'
 import { Fragment, type ReactNode } from 'react'
 import { githubQuery, readQuery } from '@/api/queries/commands'
-import type { DomainFollowUp } from '@/api/types.gen'
+import type { RepositoryOffer } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ActionsMenu } from '@/features/worktrees/detail/components/actions-menu'
+import { CommandLine } from '@/features/worktrees/components/command-line'
+import { MoreMenu } from '@/features/worktrees/components/more-menu'
 import { ActivitySection } from '@/features/worktrees/detail/components/activity-section'
+import { Callout } from '@/features/worktrees/detail/components/callout'
 import { ChangesSection } from '@/features/worktrees/detail/components/changes-section'
 import { LinksSection } from '@/features/worktrees/detail/components/links-section'
 import { Origin } from '@/features/worktrees/detail/components/origin'
-import { Problems } from '@/features/worktrees/detail/components/problems'
 import { ReviewSection } from '@/features/worktrees/detail/components/review-section'
 import { RunSection } from '@/features/worktrees/detail/components/run-section'
 import { SectionsChooser } from '@/features/worktrees/detail/components/sections-chooser'
@@ -19,15 +20,18 @@ import { type SectionId, sectionIds } from '@/features/worktrees/detail/utils/se
 import { useChoice } from '@/features/worktrees/store/ui-store'
 import { overlaid } from '@/features/worktrees/utils/condition'
 import { unavailable } from '@/features/worktrees/utils/github'
+import { sentence } from '@/features/worktrees/utils/sentence'
 
 export function DetailPanel({
   repo,
   worktree,
-  actions,
+  offers,
+  busy,
 }: {
   repo: string
   worktree: string
-  actions: DomainFollowUp[]
+  offers: RepositoryOffer[]
+  busy: boolean
 }) {
   const answers = [{ path: 'worktree', values: [worktree] }]
   const live = useQuery(readQuery(repo, 'status', answers))
@@ -35,12 +39,14 @@ export function DetailPanel({
   const github = useQuery({ ...githubQuery(repo, 'status', answers), refetchOnMount: 'always' })
   const sections = useChoice('sections', repo, sectionIds, sectionIds)
 
-  const detail = live.data?.items[0]?.detail
+  const item = live.data?.items[0]
+  const detail = item?.detail
+  // one worktree the read could not read says why, rather than a blank panel
+  const failed = !detail ? item?.error : undefined
   const asked = github.data?.items[0]?.detail
   const shown = detail && overlaid(detail, asked)
   const pr = asked?.review
   const now = live.dataUpdatedAt
-  const commands = actions.filter((action) => !action.url)
 
   const section = (id: SectionId, of: NonNullable<typeof detail>): ReactNode => {
     switch (id) {
@@ -81,7 +87,9 @@ export function DetailPanel({
               </a>
             </Button>
           )}
-          {commands.length > 0 && <ActionsMenu repo={repo} actions={commands} />}
+          {offers.length > 0 && (
+            <MoreMenu repo={repo} subject={worktree} rows={[{ subject: worktree, offers }]} disabled={busy} />
+          )}
           <Button variant="ghost" size="icon-sm" aria-label="Close the detail" asChild>
             <Link from="/r/$repo/worktrees" search={(search) => ({ ...search, worktree: undefined })}>
               <X />
@@ -94,7 +102,13 @@ export function DetailPanel({
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 pb-6">
         {live.isPending && <Skeleton className="h-32 w-full" />}
         {live.isError && <p className="text-sm text-destructive">{live.error.message}</p>}
-        <Problems problems={shown?.problems ?? []} />
+        {failed && (
+          <div role="alert" className="flex flex-col gap-2 text-sm">
+            <p className="text-destructive">{sentence(failed.message)}</p>
+            {failed.follow_up && <CommandLine followUp={failed.follow_up} />}
+          </div>
+        )}
+        <Callout repo={repo} problems={shown?.problems ?? []} />
         {detail && sections.shown.map((id) => <Fragment key={id}>{section(id, detail)}</Fragment>)}
       </div>
 

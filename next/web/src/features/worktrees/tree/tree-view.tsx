@@ -5,16 +5,19 @@ import { ReadFailed } from '@/features/worktrees/components/read-failed'
 import { useRead } from '@/features/worktrees/hooks/use-read'
 import { Branch, type Drop, type View } from '@/features/worktrees/tree/components/branch'
 import { nodesOf } from '@/features/worktrees/tree/utils/nodes'
+import type { Subject } from '@/features/worktrees/utils/actions'
 import type { WorktreesSearch } from '@/features/worktrees/utils/search'
 
 export function TreeView({
   repo,
   search,
   underWay,
+  subjects,
 }: {
   repo: string
   search: WorktreesSearch
   underWay: Record<string, string>
+  subjects: Subject[]
 }) {
   const { live, github } = useRead(repo, 'tree')
   const [dropped, setDropped] = useState<Drop>()
@@ -23,6 +26,8 @@ export function TreeView({
   if (live.isError) return <ReadFailed message={live.error.message} />
 
   const view: View = {
+    repo,
+    subjects,
     query: search.q ?? '',
     open: search.worktree,
     underWay,

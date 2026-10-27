@@ -5,26 +5,34 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAWorktreeOffersWhatItsStateAllows(t *testing.T) {
 	cases := map[string]struct {
 		detail list.Detail
-		offers []list.Action
+		offers []worktree.Action
 	}{
-		"linked":           {detail: list.Detail{Branch: "feat/a"}, offers: []list.Action{list.ActionGo, list.ActionRunUp, list.ActionRunDown, list.ActionLogs, list.ActionClean}},
-		"with_pr":          {detail: list.Detail{Branch: "feat/a", PR: &list.PR{Number: 12}}, offers: []list.Action{list.ActionGo, list.ActionOpenPR, list.ActionRunUp, list.ActionRunDown, list.ActionLogs, list.ActionClean}},
-		"main":             {detail: list.Detail{Branch: "main", Main: true}, offers: []list.Action{list.ActionGo, list.ActionRunUp, list.ActionRunDown, list.ActionLogs}},
-		"on_origin":        {detail: list.Detail{Branch: "feat/a", Origin: &worktree.Origin{State: worktree.UpToDate}}, offers: []list.Action{list.ActionGo, list.ActionRunUp, list.ActionRunDown, list.ActionLogs, list.ActionFastForward, list.ActionClean}},
-		"main_on_origin":   {detail: list.Detail{Branch: "main", Main: true, Origin: &worktree.Origin{State: worktree.Behind, Behind: 1}}, offers: []list.Action{list.ActionGo, list.ActionRunUp, list.ActionRunDown, list.ActionLogs, list.ActionFastForward}},
-		"detached":         {detail: list.Detail{Path: "/repo/.trees/x"}, offers: []list.Action{list.ActionGo}},
-		"missing":          {detail: list.Detail{Branch: "feat/gone", Missing: true}, offers: []list.Action{list.ActionClean}},
-		"missing_detached": {detail: list.Detail{Path: "/repo/.trees/x", Missing: true}, offers: []list.Action{list.ActionClean}},
+		"linked":           {detail: list.Detail{Branch: "feat/a"}, offers: []worktree.Action{worktree.ActionGo, worktree.ActionRunUp, worktree.ActionRunDown, worktree.ActionLogs, worktree.ActionSync, worktree.ActionClean}},
+		"on_origin":        {detail: list.Detail{Branch: "feat/a", Origin: &worktree.Origin{State: worktree.UpToDate}}, offers: []worktree.Action{worktree.ActionGo, worktree.ActionRunUp, worktree.ActionRunDown, worktree.ActionLogs, worktree.ActionFastForward, worktree.ActionSync, worktree.ActionClean}},
+		"main_on_origin":   {detail: list.Detail{Branch: "main", Main: true, Origin: &worktree.Origin{State: worktree.Behind, Behind: 1}}, offers: []worktree.Action{worktree.ActionGo, worktree.ActionRunUp, worktree.ActionRunDown, worktree.ActionLogs, worktree.ActionFastForward}},
+		"with_pr":          {detail: list.Detail{Branch: "feat/a", PR: &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12"}, Origin: &worktree.Origin{State: worktree.UpToDate}}, offers: worktree.Actions()},
+		"main":             {detail: list.Detail{Branch: "main", Main: true}, offers: []worktree.Action{worktree.ActionGo, worktree.ActionRunUp, worktree.ActionRunDown, worktree.ActionLogs}},
+		"detached":         {detail: list.Detail{Path: "/repo/.trees/x"}, offers: []worktree.Action{worktree.ActionGo, worktree.ActionClean}},
+		"missing":          {detail: list.Detail{Branch: "feat/gone", Missing: true}, offers: []worktree.Action{worktree.ActionClean}},
+		"missing_detached": {detail: list.Detail{Path: "/repo/.trees/x", Missing: true}, offers: []worktree.Action{worktree.ActionClean}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, c.offers, list.Offers(c.detail))
+			var offered []worktree.Action
+			for _, offer := range list.Actions(c.detail) {
+				if offer.FollowUp != nil {
+					offered = append(offered, offer.Action)
+				}
+			}
+			assert.Equal(t, c.offers, offered)
+			assert.Len(t, repository.Offered(list.Actions(c.detail)), len(c.offers))
 		})
 	}
 }

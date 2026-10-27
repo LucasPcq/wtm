@@ -1,9 +1,10 @@
 import { screen, within } from '@testing-library/react'
 import { delay, HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
+import type { WebCall } from '@/api/types.gen'
 import { envelope } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
-import { questionsOf, server, streamed } from '@/test/server'
+import { line, questionsOf, server, streamed } from '@/test/server'
 
 async function openCreate() {
   const app = await renderApp('/r/r1/worktrees')
@@ -34,9 +35,10 @@ test('create shows a problem only once asked to go on, then confirms the plan, r
   expect(within(dialog).queryByText('Add the worktree, run the on_create hooks')).toBeNull()
   await user.click(within(dialog).getByRole('button', { name: /^Details/ }))
   expect(within(dialog).getByText('Add the worktree, run the on_create hooks')).toBeTruthy()
-  await user.click(within(dialog).getByRole('button', { name: 'Create worktree' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
-  expect(await within(dialog).findByText('feat/new is ready')).toBeTruthy()
+  expect(await within(dialog).findByText('feat/new is ready.')).toBeTruthy()
+  expect(within(dialog).getByRole('heading', { name: 'Create worktrees' })).toBeTruthy()
   // a lone group of the outcome needs no name
   expect(within(dialog).queryByRole('heading', { name: 'Ready' })).toBeNull()
   // a worktree ready is one line; where it is and the step into it fold under it, with no copy on the line
@@ -78,7 +80,7 @@ test('a next command the server cannot spell is said with what it meant, not hid
   await user.type(branches, 'feat/new')
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
-  await user.click(await within(dialog).findByRole('button', { name: 'Create worktree' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Create' }))
 
   await user.click(await within(dialog).findByRole('button', { name: 'Details of feat/new' }))
   expect(await within(dialog).findByText('No command line for this: jump in')).toBeTruthy()
@@ -102,9 +104,9 @@ test('a create cancelled before it made anything says it was cancelled, not that
   await user.type(branches, 'feat/new')
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
-  await user.click(await within(dialog).findByRole('button', { name: 'Create worktree' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Create' }))
 
-  expect(await within(dialog).findByText('Cancelled feat/new')).toBeTruthy()
+  expect(await within(dialog).findByText(/^0 of \d+ steps done\. What is done stays/)).toBeTruthy()
   expect(within(dialog).queryByText(/Couldn't create/)).toBeNull()
 
   // nothing was made: Done opens no worktree
@@ -134,4 +136,35 @@ test('an answer to older typing that lands last is dropped, the newer one stands
   await delay(900)
 
   expect(within(dialog).queryByText('an older answer')).toBeNull()
+})
+
+test('a create hidden while it runs says it is ready in a toast once it ends', async () => {
+  let end = () => {}
+  server.use(
+    http.post('/api/repos/r1/commands/create', async ({ request }) => {
+      if (((await request.clone().json()) as WebCall).dry_run) return undefined
+      const stream = new ReadableStream({
+        start: (controller) => {
+          controller.enqueue(new TextEncoder().encode(line({ type: 'unit.started', subject: 'feat/new' })))
+          end = () => {
+            const ended = { ...envelope('create', []), items: [{ subject: 'feat/new', status: 'done', detail: {} }] }
+            controller.enqueue(new TextEncoder().encode(`event: envelope\ndata: ${JSON.stringify(ended)}\n\n`))
+            controller.close()
+          }
+        },
+      })
+      return new HttpResponse(stream, { headers: { 'Content-Type': 'text/event-stream', 'X-Wtm-Operation': 'op-1' } })
+    }),
+  )
+  const { user, dialog, branches } = await openCreate()
+  await user.type(branches, 'feat/new')
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Create' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Hide' }))
+
+  end()
+
+  expect(await screen.findByText('feat/new is ready.')).toBeTruthy()
+  expect(screen.queryByRole('dialog')).toBeNull()
 })

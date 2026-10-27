@@ -3,7 +3,17 @@ import { EventSourceParserStream } from 'eventsource-parser/stream'
 import { HttpError, request } from '@/api/fetch'
 import type { WebRepos, WebWarning, WtmEventsV2 } from '@/api/types.gen'
 
-export type Live = { warning?: string }
+// an operation the bus says is under way, from any surface: the worktrees it started on, until it finishes; command
+// is empty for one whose start this stream did not see
+export type UnderWay = { repo: string | undefined; command: string; subjects: string[]; since: number }
+
+// the core's own cap on an operation: one whose process died never says it finished
+export const operationCap = 10 * 60_000
+
+export const current = (operations: Record<string, UnderWay>, now: number) =>
+  Object.values(operations).filter((operation) => now - operation.since < operationCap)
+
+export type Live = { warning?: string; operations: Record<string, UnderWay> }
 
 export const reconnectEvery = 2000
 
@@ -15,7 +25,7 @@ export const eventsQuery = queryOptions({
     streamFn: ({ client, signal }) => lines(client, signal),
     refetchMode: 'append',
     reducer: (_, live) => live,
-    initialValue: {},
+    initialValue: { operations: {} },
   }),
   retry: false,
   staleTime: Infinity,
@@ -31,7 +41,11 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
   // back after a break: the lines in between are lost, so everything is read again, but GitHub, asked on demand only
   if (client.getQueryData(eventsQuery.queryKey))
     client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'events' && q.queryKey[0] !== 'github' })
-  yield {}
+  // shortcut: the bus names a worktree once its unit starts, never what the operation locked from its start, and an
+  // operation under way across a reconnect is known again only at its next unit; a field naming the locked subjects
+  // on operation.started would lift both
+  let operations: Record<string, UnderWay> = {}
+  yield { operations }
 
   const reader = response.body
     .pipeThrough(new TextDecoderStream())
@@ -40,18 +54,48 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
   for (;;) {
     const { value, done } = await reader.read()
     if (done) return
-    if (value.event === 'warning') yield { warning: (JSON.parse(value.data) as WebWarning).message }
-    else if (!value.event) yield invalidate(client, JSON.parse(value.data) as WtmEventsV2)
+    if (value.event === 'warning') yield { warning: (JSON.parse(value.data) as WebWarning).message, operations }
+    else if (!value.event) {
+      const line = JSON.parse(value.data) as WtmEventsV2
+      const read = invalidate(client, line)
+      // a worktree stays under way until the read that no longer shows it lands: it would flash back in between
+      if (line.type === 'operation.finished') await read
+      operations = track(operations, line, repoOf(client, line))
+      yield { operations }
+    }
   }
 }
 
-function invalidate(client: QueryClient, line: WtmEventsV2): Live {
-  if (line.type === 'repo.added' || line.type === 'repo.removed') void client.invalidateQueries({ queryKey: ['repos'] })
-  else if (line.type.startsWith('worktree.') || line.type === 'operation.finished') {
-    const id = client.getQueryData<WebRepos>(['repos'])?.find((repo) => repo.common_dir === line.repo?.common_dir)?.id
-    void client.invalidateQueries({ queryKey: id ? ['repo', id] : ['repo'] })
+const repoOf = (client: QueryClient, line: WtmEventsV2) =>
+  client.getQueryData<WebRepos>(['repos'])?.find((repo) => repo.common_dir === line.repo?.common_dir)?.id
+
+function invalidate(client: QueryClient, line: WtmEventsV2) {
+  if (line.type === 'repo.added' || line.type === 'repo.removed')
+    return client.invalidateQueries({ queryKey: ['repos'] })
+  if (line.type.startsWith('worktree.') || line.type === 'operation.finished') {
+    const id = repoOf(client, line)
+    return client.invalidateQueries({ queryKey: id ? ['repo', id] : ['repo'] })
   }
-  return {}
+  return undefined
+}
+
+// the lock is held from the operation's start to its finish: a worktree stays under way past its own unit
+export function track(
+  operations: Record<string, UnderWay>,
+  line: WtmEventsV2,
+  repo: string | undefined,
+): Record<string, UnderWay> {
+  const op = line.op_id
+  if (!op) return operations
+  const known = operations[op] ?? { repo, command: '', subjects: [], since: Date.parse(line.ts) }
+
+  if (line.type === 'operation.started' && typeof line.command === 'string')
+    return { ...operations, [op]: { ...known, command: line.command } }
+  if (line.type === 'unit.started' && typeof line.subject === 'string')
+    return { ...operations, [op]: { ...known, subjects: [...known.subjects, line.subject] } }
+  if (line.type === 'operation.finished')
+    return Object.fromEntries(Object.entries(operations).filter(([id]) => id !== op))
+  return operations
 }
 
 export type Connection = 'connecting' | 'live' | 'reconnecting' | 'disconnected'

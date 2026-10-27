@@ -30,6 +30,7 @@ export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswer
 
   return (
     <div className="flex flex-col gap-6">
+      <PlanWarnings warnings={warnings} />
       {plan && (
         <ItemList label="Branches">
           {branches.map((branch) => (
@@ -37,7 +38,6 @@ export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswer
           ))}
         </ItemList>
       )}
-      <PlanWarnings warnings={warnings} />
       {made.length > 0 && (
         <Details label="Details" summary={summary}>
           {made.map((branch) => (

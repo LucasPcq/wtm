@@ -20,7 +20,7 @@ export function ApplyButton({
 
   const label = () => {
     if (!plan || plan.creates === 0) return 'Apply'
-    return plan.creates === 1 ? 'Create worktree' : `Create ${plan.creates} worktrees`
+    return plan.creates === 1 ? 'Create' : `Create ${plan.creates} worktrees`
   }
 
   return (

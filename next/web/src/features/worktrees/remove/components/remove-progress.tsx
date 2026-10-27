@@ -43,21 +43,14 @@ export function RemoveProgress({
     (progress.envelope?.plan?.worktrees ?? []).filter((removal) => removed.includes(removal.worktree)),
   )
 
-  const title = () => {
-    if (running) return progress.cancelling ? `Cancelling the removal of ${listed(names)}` : `Removing ${listed(names)}`
-    if (cancelled) return `Cancelled the removal of ${listed(names)}`
-    if (ok) return `Removed ${listed(names)}`
-    if (removed.length === 0) return `Couldn't remove ${listed(failed)}`
-    return `Removed ${listed(removed)}, couldn't remove ${listed(failed)}`
-  }
-
   const description = () => {
     if (ok && !branched) return `${removed.length} removed.`
     if (ok)
       return names.length === 1
-        ? 'Its local branch went with it; the remote branch stays.'
-        : 'Their local branches went with them; the remote branches stay.'
+        ? '1 removed. Its local branch went with it; the remote branch stays.'
+        : `${removed.length} removed. Their local branches went with them; the remote branches stay.`
     if (!running) return `${removed.length} of ${names.length} removed.${cancelled ? ' Those not started stay.' : ''}`
+    if (progress.cancelling) return `Cancelling the removal of ${listed(failed)}`
     if (now) return `Step ${now.index + 1} of ${now.total} · ${phaseLabel[now.run.phase]} of ${now.subject}`
     return done > 0 ? 'Finishing…' : 'Starting…'
   }
@@ -65,14 +58,10 @@ export function RemoveProgress({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{title()}</DialogTitle>
+        <DialogTitle>Remove worktrees</DialogTitle>
         <DialogDescription>{description()}</DialogDescription>
       </DialogHeader>
-      {running && (
-        <DialogBand>
-          <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />
-        </DialogBand>
-      )}
+      <DialogBand>{running && <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />}</DialogBand>
 
       <DialogScroll>
         {!running && <RunFailure message={refused} />}

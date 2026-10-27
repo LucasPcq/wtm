@@ -59,8 +59,8 @@ func TestAWorktreeIsReadWholeGitAndIsolation(t *testing.T) {
 		Run:       &status.Run{Addressing: project.AddressNames, Offset: &offset, Ports: status.PortsOffset},
 		Jobs:      []status.Job{{Name: "web", State: run.Crashed, URL: "http://web.feat-a.main.localhost:11080", Port: &port, ExitCode: &exit}},
 		Env:       status.Env{Files: []status.EnvFile{}},
-		Problems: []status.Problem{{Code: status.CodeBehind, Message: "main has 1 commit it lacks", Fix: &domain.FollowUp{Command: "sync", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}, Code: status.CodeBehind, Message: "sync it onto main"}}, {Code: status.CodeJobCrashed, Message: "web crashed (exit 1)", Fix: &domain.FollowUp{
-			Command: "run start", Code: status.CodeJobCrashed, Message: "start it again",
+		Problems: []status.Problem{{Code: status.CodeBehind, Message: "main has 1 commit it lacks", Fix: &domain.FollowUp{Command: "sync", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}, Code: string(status.CodeBehind), Message: "sync it onto main"}}, {Code: status.CodeJobCrashed, Message: "web crashed (exit 1)", Fix: &domain.FollowUp{
+			Command: "run start", Code: string(status.CodeJobCrashed), Message: "start it again",
 			Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "job", Values: []string{"web"}}, {Path: "detach", Values: []string{"true"}}},
 		}}},
 		Condition: worktree.ConditionChanged,
@@ -180,8 +180,8 @@ func TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleanedLockedOrNot(t *
 	for _, branch := range []string{"feat/locked", "feat/prunable"} {
 		d := detailOf(t, got, branch)
 		assert.True(t, d.Missing, branch)
-		assert.Equal(t, []string{status.CodeMissing}, problemCodes(d.Problems), branch)
-		assert.Equal(t, &domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}}, Code: status.CodeMissing, Message: "remove what is left of it"}, d.Problems[0].Fix)
+		assert.Equal(t, []string{string(status.CodeMissing)}, problemCodes(d.Problems), branch)
+		assert.Equal(t, &domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}}, Code: string(status.CodeMissing), Message: "remove what is left of it"}, d.Problems[0].Fix)
 		assert.Nil(t, d.Changes, branch)
 		assert.Nil(t, d.Commits, branch)
 		assert.Nil(t, d.Env.Files, branch)
@@ -189,8 +189,8 @@ func TestAWorktreeWhoseDirectoryIsGoneIsMissingAndToldToBeCleanedLockedOrNot(t *
 	gone := detailOf(t, got, detached.Path)
 	assert.True(t, gone.Missing)
 	require.Len(t, gone.Problems, 1, "a gone worktree on no branch is a problem too")
-	assert.Equal(t, status.CodeMissing, gone.Problems[0].Code)
-	assert.Equal(t, &domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{detached.Path}}}, Code: status.CodeMissing, Message: "remove what is left of it"}, gone.Problems[0].Fix, "clean removes a worktree on no branch by its path")
+	assert.Equal(t, status.ProblemCode(status.CodeMissing), gone.Problems[0].Code)
+	assert.Equal(t, &domain.FollowUp{Command: domain.CommandClean, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{detached.Path}}}, Code: string(status.CodeMissing), Message: "remove what is left of it"}, gone.Problems[0].Fix, "clean removes a worktree on no branch by its path")
 	assert.NotContains(t, w.git.Calls(), "Changes "+locked.Path, "nothing of a gone directory is read")
 }
 
@@ -200,7 +200,7 @@ func TestAWorktreeThatHasNotChosenItsIsolationHasNoneAndIsToldHowToChoose(t *tes
 	old := only(t, read(t, w, status.Request{Worktree: "feat/old"}))
 
 	assert.Nil(t, old.Isolation, "the legacy reported isolated for a worktree that never chose")
-	assert.Equal(t, []string{status.CodeIsolationPending}, problemCodes(old.Problems))
+	assert.Equal(t, []string{string(status.CodeIsolationPending)}, problemCodes(old.Problems))
 	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/old"}}, {Path: domain.PathIsolation, Values: []string{"isolated"}}}, old.Problems[0].Fix.Answers)
 	main := only(t, read(t, w, status.Request{}))
 	assert.Equal(t, project.Isolated, *main.Isolation, "the main worktree never chooses")
@@ -327,7 +327,7 @@ func TestAnInterruptedReadWarnsOfNothingItCouldNotAsk(t *testing.T) {
 
 func TestTheReviewIsTheNewestPullRequestAndAMergedOneAsksToCleanFirst(t *testing.T) {
 	const url = "https://github.com/acme/acme/pull/12"
-	clean := &domain.FollowUp{Command: domain.CommandPrune, Code: status.CodeMerged, Message: "prune it", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}
+	clean := &domain.FollowUp{Command: domain.CommandPrune, Code: string(status.CodeMerged), Message: "prune it", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}
 	cases := map[string]struct {
 		pr       []worktree.PullRequest
 		review   *status.Review
@@ -397,12 +397,12 @@ func TestAMergedPullRequestOfTheMainWorktreeOrTheBaseBranchIsNoProblem(t *testin
 }
 
 func TestAMergedPullRequestAsksToCleanABranchBehindItsHeadButNotOneMovedOnOrApart(t *testing.T) {
-	behind := []string{status.CodeBehindOrigin}
+	behind := []string{string(status.CodeBehindOrigin)}
 	cases := map[string]struct {
 		head     string
 		problems []string
 	}{
-		"behind":       {head: "a2", problems: []string{status.CodeMerged, status.CodeBehindOrigin}},
+		"behind":       {head: "a2", problems: []string{string(status.CodeMerged), string(status.CodeBehindOrigin)}},
 		"moved_on":     {head: gittest.Root, problems: behind},
 		"never_pulled": {head: "a commit never fetched", problems: behind},
 	}
@@ -424,8 +424,8 @@ func TestAMergedPullRequestAsksToCleanABranchBehindItsHeadButNotOneMovedOnOrApar
 
 			assert.Equal(t, worktree.PullRequestMerged, a.Review.State)
 			assert.Equal(t, c.problems, problemCodes(a.Problems))
-			if c.problems[0] == status.CodeMerged {
-				assert.Equal(t, &domain.FollowUp{Command: domain.CommandPrune, Code: status.CodeMerged, Message: "prune it", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}, a.Problems[0].Fix)
+			if c.problems[0] == string(status.CodeMerged) {
+				assert.Equal(t, &domain.FollowUp{Command: domain.CommandPrune, Code: string(status.CodeMerged), Message: "prune it", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}, a.Problems[0].Fix)
 			}
 		})
 	}
@@ -493,7 +493,7 @@ func TestAMissingEnvFileIsRebuiltFromWhereItCanBe(t *testing.T) {
 		},
 		"nowhere": {
 			strategy: project.EnvExample,
-			message:  ".env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand", fix: &domain.FollowUp{Command: "config edit", Code: status.CodeEnvMissing, Message: "declare where it comes from"},
+			message:  ".env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand", fix: &domain.FollowUp{Command: "config edit", Code: string(status.CodeEnvMissing), Message: "declare where it comes from"},
 		},
 	}
 	for name, c := range cases {
@@ -595,7 +595,7 @@ func TestAWorktreeBehindItsParentIsToldToSyncOntoItUnlessGitStoppedInTheMiddleOf
 		want  []string
 		lacks string
 	}{
-		"child_of_a_worktree": {meta: childOfA, ui: linked("feat/a-ui"), want: []string{status.CodeBehind}, lacks: "feat/a has 2 commits it lacks"},
+		"child_of_a_worktree": {meta: childOfA, ui: linked("feat/a-ui"), want: []string{string(status.CodeBehind)}, lacks: "feat/a has 2 commits it lacks"},
 		"root":                {ui: linked("feat/a-ui"), want: []string{}},
 		"in_step":             {meta: map[string]worktree.Meta{"feat/a-ui": {SourceBranch: "feat/a-ui-base"}}, ui: linked("feat/a-ui"), want: []string{}},
 		"rebasing":            {meta: childOfA, ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Rebasing{Branch: "feat/a-ui"}}, want: []string{}},
@@ -622,7 +622,7 @@ func TestAWorktreeBehindItsParentIsToldToSyncOntoItUnlessGitStoppedInTheMiddleOf
 
 			codes := []string{}
 			for _, problem := range ui.Problems {
-				codes = append(codes, problem.Code)
+				codes = append(codes, string(problem.Code))
 			}
 			assert.Equal(t, c.want, codes)
 			if c.lacks != "" {

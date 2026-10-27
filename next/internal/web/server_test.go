@@ -168,6 +168,29 @@ func TestALockHeldNamesItsSubjectAndItsHolderInTheConflict(t *testing.T) {
 	assert.Equal(t, holder, decoded[envelope](t, response).Error.Params)
 }
 
+func TestARunAnItemOfWhichFailedIsNoServerError(t *testing.T) {
+	failing := greet(useCase{failed: &domain.Error{Kind: domain.KindInternal, Code: "greet.failed", Message: "failed"}})
+
+	response := do(t, serving(t, Params{Catalogue: api.Catalogue{failing}}), req{method: http.MethodPost, path: repoPath("/commands/greet"), body: `{"answers":[{"path":"name","values":["x"]}]}`})
+
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	got := decoded[envelope](t, response)
+	assert.False(t, got.OK)
+	assert.Equal(t, "greet.failed", got.Error.Code)
+}
+
+// A read with one worktree it could not read answered 500: the page threw the whole read away for one row.
+func TestAReadAnItemOfWhichFailedIsNoServerErrorEither(t *testing.T) {
+	failing := greet(useCase{read: true, failed: &domain.Error{Kind: domain.KindInternal, Code: "greet.unreadable", Message: "unreadable"}})
+
+	response := do(t, serving(t, Params{Catalogue: api.Catalogue{failing}}), req{method: http.MethodPost, path: repoPath("/commands/greet"), body: `{"answers":[{"path":"name","values":["x"]}]}`})
+
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	got := decoded[envelope](t, response)
+	assert.False(t, got.OK)
+	assert.Equal(t, "greet.unreadable", got.Error.Code)
+}
+
 func TestARunWithEventsStreamsEachAsALineThenItsEnvelope(t *testing.T) {
 	response := do(t, serving(t, Params{}), req{method: http.MethodPost, path: repoPath("/commands/greet"), body: `{"answers":[{"path":"name","values":["x"]}],"dry_run":false}`, headers: map[string]string{"Accept": "text/event-stream"}})
 
