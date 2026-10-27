@@ -4,7 +4,14 @@ import { ContextMenuItem, ContextMenuLabel, ContextMenuSeparator } from '@/compo
 import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { MenuEntry } from '@/features/worktrees/components/menu-entry'
 import { useRunEntry } from '@/features/worktrees/hooks/use-run-entry'
-import { menu, menuActions, type Section, type Subject, selectionEntryOf } from '@/features/worktrees/utils/actions'
+import {
+  menu,
+  menuActions,
+  menuName,
+  type Section,
+  type Subject,
+  selectionEntryOf,
+} from '@/features/worktrees/utils/actions'
 
 type MenuKind = 'context' | 'dropdown'
 
@@ -21,9 +28,7 @@ export function ActionItems({ kind, repo, rows }: { kind: MenuKind; repo: string
 
   return (
     <>
-      <Label className="truncate font-normal">
-        {rows.length === 1 ? rows[0]?.subject : `${rows.length} selected worktrees`}
-      </Label>
+      <Label className="truncate font-normal">{menuName(rows)}</Label>
       {sections.map((section, i) => (
         <Fragment key={section}>
           {i > 0 && <Separator />}

@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ActionItems } from '@/features/worktrees/components/action-items'
-import type { Subject } from '@/features/worktrees/utils/actions'
+import { menuName, type Subject } from '@/features/worktrees/utils/actions'
 import { cn } from '@/lib/utils'
 
 export function MoreMenu({
@@ -40,7 +40,15 @@ export function MoreMenu({
           <Ellipsis />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent
+        align="end"
+        // named as its first label, not after its trigger, which Radix would name it by
+        aria-labelledby={undefined}
+        aria-label={menuName(rows)}
+        // React bubbles a right-click through the portal to the row's context menu, which would open over this one
+        onContextMenu={(event) => event.stopPropagation()}
+        className="w-64"
+      >
         <ActionItems kind="dropdown" repo={repo} rows={rows} />
       </DropdownMenuContent>
     </DropdownMenu>

@@ -89,6 +89,9 @@ type envelope struct {
 		Code   string        `json:"code"`
 		Params domain.Params `json:"params"`
 	} `json:"error"`
+	Items []struct {
+		Status string `json:"status"`
+	} `json:"items"`
 }
 
 // An sse is one server-sent event: its name, empty for a line, and its data.

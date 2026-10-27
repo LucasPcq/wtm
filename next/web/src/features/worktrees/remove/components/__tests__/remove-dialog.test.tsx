@@ -69,9 +69,8 @@ test("the detail's menu removes the worktree it shows, and a child left on it is
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Remove' }))
 
-  expect(
-    await within(dialog).findByText('feat/billing-ui still points at the removed parent feat/billing'),
-  ).toBeTruthy()
+  const toCheck = await within(dialog).findByRole('region', { name: 'To check' })
+  expect(within(toCheck).getByText('feat/billing-ui still points at the removed parent feat/billing')).toBeTruthy()
   expect(
     await within(dialog).findByRole('button', { name: 'Copy wtm reparent feat/billing-ui --to main' }),
   ).toBeTruthy()

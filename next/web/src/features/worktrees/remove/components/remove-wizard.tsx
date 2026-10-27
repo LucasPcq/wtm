@@ -21,8 +21,8 @@ import { ChildrenStep } from '@/features/worktrees/remove/components/children-st
 import { RemovalItem } from '@/features/worktrees/remove/components/removal-item'
 import { plain, requestOf, riskOf, unitsOf, unsafe } from '@/features/worktrees/remove/utils/plan'
 import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/remove/utils/wizard-state'
-import { sharedWarnings } from '@/features/worktrees/remove/utils/words'
 import { searched } from '@/features/worktrees/utils/filters'
+import { planWide } from '@/features/worktrees/utils/outcome'
 
 export function RemoveWizard({
   repo,
@@ -121,9 +121,7 @@ export function RemoveWizard({
   const leftRows = left.map(({ worktree, why }) => <LeftItem key={worktree} worktree={worktree} why={why} />)
 
   const removing = plan?.worktrees ?? []
-  const warnings = (planned.data?.warnings ?? []).filter(
-    (warning) => warning.code !== sharedWarnings.jobsLeft && warning.code !== sharedWarnings.dataKept,
-  )
+  const warnings = (planned.data?.warnings ?? []).filter(planWide)
   const hooks = removing.flatMap((removal) => removal.hooks ?? []).length
   const keeping = removing.filter((removal) => (removal.namespaces ?? []).length > 0).length
   const summary = [

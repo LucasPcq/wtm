@@ -7,6 +7,7 @@ import { Facts } from '@/features/worktrees/components/facts'
 import { ItemList } from '@/features/worktrees/components/item-list'
 import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { BranchPlan } from '@/features/worktrees/create/components/branch-plan'
+import { planWide } from '@/features/worktrees/utils/outcome'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
 
 export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswered[] }) {
@@ -21,10 +22,13 @@ export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswer
   const warningsOf = (branch: (typeof branches)[number]) =>
     warnings.filter(
       (warning) =>
-        warning.params?.branch === branch.branch ||
-        (branch.action === 'create' && warning.params?.branch === plan?.from),
+        !planWide(warning) &&
+        (warning.params?.branch === branch.branch ||
+          (branch.action === 'create' && warning.params?.branch === plan?.from)),
     )
   const alerts = warnings.filter((warning) => !branches.some((branch) => warningsOf(branch).includes(warning)))
+  // the parent strategy with no source worktree copies main's .env, as the plan's Alert says
+  const fellBack = warnings.some((warning) => warning.code === 'create.env_parent_fallback')
   const made = branches.filter((branch) => branch.action !== 'unchanged')
   const steps = made.flatMap((branch) => branch.phases ?? []).length
   const hooks = plan?.on_create ?? []
@@ -42,7 +46,13 @@ export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswer
       {plan && (
         <ItemList label="Branches">
           {branches.map((branch) => (
-            <BranchPlan key={branch.branch} plan={plan} branch={branch} warnings={warningsOf(branch)} />
+            <BranchPlan
+              key={branch.branch}
+              plan={plan}
+              branch={branch}
+              envFrom={fellBack ? 'main' : plan.env_from}
+              warnings={warningsOf(branch)}
+            />
           ))}
         </ItemList>
       )}

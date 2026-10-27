@@ -33,7 +33,7 @@ test('a node whose menu is open stays marked, and the menu opens on its branch',
 
   await user.pointer({ keys: '[MouseRight]', target: link })
 
-  const menu = await screen.findByRole('menu')
+  const menu = await screen.findByRole('menu', { name: 'feat/billing-ui' })
   expect(menu.firstElementChild?.textContent).toBe('feat/billing-ui')
   expect(link.closest('[data-menu-open]')).not.toBeNull()
   await user.keyboard('{Escape}')
@@ -64,7 +64,7 @@ test("the main worktree's menu keeps every action in place, those it can't take 
   expect(remove.getAttribute('aria-disabled')).toBe('true')
   expect(remove.textContent).toContain("The main worktree can't be removed")
   expect(within(menu).getByRole('menuitem', { name: /Open the pull request/ }).textContent).toContain(
-    'main has no pull request',
+    'No pull request known',
   )
   expect(within(menu).getByRole('menuitem', { name: /Reparent/ }).textContent).toContain('Not in the web yet')
 })

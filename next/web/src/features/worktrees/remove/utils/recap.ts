@@ -1,5 +1,5 @@
 import type { DomainWarning } from '@/api/types.gen'
-import { sharedWarnings } from '@/features/worktrees/remove/utils/words'
+import { dataKept } from '@/features/worktrees/remove/utils/words'
 import { itemWarnings, type OutcomeGroup, outputOf, stoppedMessage } from '@/features/worktrees/utils/outcome'
 import type { Progress } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'
@@ -58,9 +58,7 @@ export function recapOf(progress: Progress<'clean'>): {
           })),
       },
     ],
-    warnings: warnings.filter((warning) => warning.code !== sharedWarnings.dataKept),
-    kept: warnings
-      .filter((warning) => warning.code === sharedWarnings.dataKept)
-      .map((warning) => sentence(warning.message)),
+    warnings: warnings.filter((warning) => warning.code !== dataKept),
+    kept: warnings.filter((warning) => warning.code === dataKept).map((warning) => sentence(warning.message)),
   }
 }

@@ -197,3 +197,70 @@ test('a warning is drawn where its subject is: a diverged source on the rows tha
   expect(alert.textContent).toContain('needs the source branch checked out')
   expect(alert.textContent).not.toContain('diverged')
 })
+
+// With no source branch, a plan-wide warning matched every created row (undefined === undefined) and its Alert vanished.
+test('with no source branch, a plan-wide warning stays the Alert, and the row says where its .env really comes from', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/create', async ({ request }) => {
+      const call = (await request.clone().json()) as { dry_run?: boolean }
+      if (!call.dry_run) return undefined
+      return HttpResponse.json({
+        ...envelope('create', []),
+        fingerprint: 'f1',
+        plan: {
+          branches: [{ branch: 'feat/new', path: '/acme.trees/feat/new', action: 'create', phases: ['worktree'] }],
+          creates: 1,
+          env_from: 'parent',
+          recap: [],
+        },
+        warnings: [{ code: 'create.env_parent_fallback', message: 'without a worktree it comes from main' }],
+      })
+    }),
+  )
+  const { user, dialog, branches } = await openCreate()
+  await user.type(branches, 'feat/new')
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+
+  const row = await within(dialog).findByRole('listitem', { name: 'feat/new' })
+  expect(within(dialog).getByRole('alert').textContent).toContain('a worktree it comes from main')
+  expect(row.textContent).not.toContain('comes from main')
+  expect(row.textContent).toContain('.env from the main checkout')
+})
+
+test("Create's Done keeps a warning of the whole run as its Alert, and one about a branch under To check", async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/create', async ({ request }) => {
+      const call = (await request.clone().json()) as { dry_run?: boolean }
+      if (call.dry_run) return undefined
+      return streamed(
+        [
+          line({ type: 'unit.started', subject: 'feat/new' }),
+          line({ type: 'unit.finished', subject: 'feat/new', status: 'done' }),
+          `event: envelope\ndata: ${JSON.stringify({
+            ...envelope('create', []),
+            items: [{ subject: 'feat/new', status: 'done', detail: { path: '/acme.trees/feat/new' } }],
+            warnings: [
+              { code: 'locks.unavailable', message: 'ran without operation locks' },
+              {
+                code: 'create.source_diverged',
+                message: 'branch main has diverged from origin',
+                params: { branch: 'main' },
+              },
+            ],
+          })}\n\n`,
+        ].join(''),
+      )
+    }),
+  )
+  const { user, dialog, branches } = await openCreate()
+  await user.type(branches, 'feat/new')
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Create' }))
+
+  const toCheck = await within(dialog).findByRole('region', { name: 'To check' })
+  expect(within(toCheck).getByText(/has diverged from origin/)).toBeTruthy()
+  expect(within(toCheck).queryByText(/without operation locks/)).toBeNull()
+  expect(within(dialog).getByRole('alert').textContent).toContain('without operation locks')
+})

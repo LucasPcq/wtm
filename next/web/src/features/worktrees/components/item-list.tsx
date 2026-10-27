@@ -1,4 +1,4 @@
-import { Children, Fragment, isValidElement, type ReactNode } from 'react'
+import { Children, Fragment, isValidElement, type ReactNode, useId } from 'react'
 import { ItemGroup, ItemSeparator } from '@/components/ui/item'
 
 export function ItemList({
@@ -13,6 +13,7 @@ export function ItemList({
   children: ReactNode
 }) {
   const leftRows = Children.toArray(left).filter(isValidElement)
+  const leftHeading = useId()
 
   return (
     <>
@@ -20,8 +21,10 @@ export function ItemList({
         {children}
       </Box>
       {leftRows.length > 0 && (
-        <section aria-label="Left as they are" className="flex flex-col gap-2">
-          <h4 className="text-xs font-medium text-muted-foreground">Left as they are</h4>
+        <section aria-labelledby={leftHeading} className="flex flex-col gap-2">
+          <h3 id={leftHeading} className="text-xs font-medium text-muted-foreground">
+            Left as they are
+          </h3>
           <Box>{leftRows}</Box>
         </section>
       )}

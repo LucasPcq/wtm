@@ -91,7 +91,7 @@ test('a menu opened on a selected row acts on the selection, its one-worktree it
 
   await user.click(screen.getByRole('button', { name: 'Actions on fix/login' }))
 
-  const menu = await screen.findByRole('menu')
+  const menu = await screen.findByRole('menu', { name: '2 selected worktrees' })
   expect(within(menu).getByText('2 selected worktrees')).toBeTruthy()
   expect(within(menu).getByRole('menuitem', { name: /Go to the worktree/ }).textContent).toContain(
     'One worktree at a time',
@@ -128,7 +128,7 @@ test('a row whose pull request GitHub knows offers to open it, as it lands', asy
 
   const open = await screen.findByRole('menuitem', { name: /Open the pull request/ })
   await waitFor(() => expect(open.getAttribute('aria-disabled')).toBeNull())
-  expect(open.textContent).not.toContain('has no pull request')
+  expect(open.textContent).not.toContain('No pull request known')
 })
 
 // A menu opened before its worktree went under way stayed open, its Remove still there to press.

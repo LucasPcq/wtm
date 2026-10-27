@@ -7,10 +7,12 @@ import { sentence } from '@/features/worktrees/utils/sentence'
 export function BranchPlan({
   plan,
   branch,
+  envFrom,
   warnings = [],
 }: {
   plan: CreatePlan
   branch: CreateBranchPlan
+  envFrom: CreatePlan['env_from']
   warnings?: DomainWarning[]
 }) {
   const source = () => {
@@ -31,7 +33,7 @@ export function BranchPlan({
   const line =
     branch.action === 'unchanged'
       ? []
-      : [source(), plan.isolation && isolationShort[plan.isolation], envFromShort[plan.env_from]].filter(Boolean)
+      : [source(), plan.isolation && isolationShort[plan.isolation], envFromShort[envFrom]].filter(Boolean)
 
   return (
     <Item role="listitem" aria-label={branch.branch} className="items-center gap-3 rounded-none px-4 py-3">

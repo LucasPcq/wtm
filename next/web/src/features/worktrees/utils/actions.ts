@@ -42,7 +42,7 @@ const unofferedWords: Record<WorktreeUnoffered, (worktree: string, action: MenuA
     action === 'clean' ? "The main worktree can't be removed" : `${worktree} is the main worktree`,
   base_branch: () => "The base branch's worktree can't be removed",
   not_on_origin: () => 'Not on origin',
-  no_pull_request: (worktree) => `${worktree} has no pull request`,
+  no_pull_request: () => 'No pull request known',
 }
 
 export const notInTheWeb = 'Not in the web yet'
@@ -58,6 +58,9 @@ export function entryOf(worktree: string, offers: RepositoryOffer[], action: Men
 }
 
 export type Subject = { subject: string; offers: RepositoryOffer[] }
+
+export const menuName = (rows: Subject[]) =>
+  rows.length === 1 ? (rows[0]?.subject ?? '') : `${rows.length} selected worktrees`
 
 // on several worktrees, only what the web runs acts on them, on those that offer it; the rest names one worktree
 export function selectionEntryOf(rows: Subject[], action: MenuAction): Entry {

@@ -5,7 +5,8 @@ import { TriCheckbox } from '@/features/worktrees/components/tri-checkbox'
 // below this many rows the whole list fits: reading beats searching
 const searchFrom = 8
 
-// the box never checks an unsafe row (bulk): one click must not force it
+// the box never checks an unsafe row (bulk): one click must not force it; a checked row the search hides stays
+// checked, and the count says so
 export function ListHeader({
   total,
   visible,

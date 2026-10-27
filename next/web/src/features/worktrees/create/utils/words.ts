@@ -27,8 +27,8 @@ export const isolation: Options<'isolation'> = {
 export const envFromShort: Record<ValuesOf<'env_from'>, string> = {
   config: '.env from the project default',
   example: '.env from .env.example',
-  main: ".env from the main checkout's",
-  parent: ".env from the source worktree's",
+  main: '.env from the main checkout',
+  parent: '.env from the source worktree',
 }
 
 export const isolationShort: Record<ValuesOf<'isolation'>, string> = {

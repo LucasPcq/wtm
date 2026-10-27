@@ -2,7 +2,7 @@ import { type ReactElement, type ReactNode, useState } from 'react'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { ActionItems } from '@/features/worktrees/components/action-items'
 import { MoreMenu } from '@/features/worktrees/components/more-menu'
-import type { Subject } from '@/features/worktrees/utils/actions'
+import { menuName, type Subject } from '@/features/worktrees/utils/actions'
 
 export function RowMenu({
   repo,
@@ -52,7 +52,7 @@ export function RowMenu({
       >
         {children(more)}
       </ContextMenuTrigger>
-      <ContextMenuContent className="w-64">
+      <ContextMenuContent aria-label={menuName(rows)} className="w-64">
         <ActionItems kind="context" repo={repo} rows={rows} />
       </ContextMenuContent>
     </ContextMenu>

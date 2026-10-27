@@ -39,15 +39,19 @@ func (q questions) Form() domain.Form {
 	return domain.Form{Fields: []domain.Field{domain.TextField{FieldSpec: domain.FieldSpec{Path: "name"}, Value: q.asked}}}
 }
 
-// outcome reports what it ran with as its op, and, once applied, its one item failed with failed.
+// outcome reports what it ran with as its op, and, once applied, its one item failed with failed, or, cancelled, one item done and the next cancelled.
 type outcome struct {
-	op     string
-	failed *domain.Error
+	op        string
+	failed    *domain.Error
+	cancelled bool
 }
 
 func (o outcome) Envelope(params domain.EnvelopeParams) domain.Envelope {
 	ran := domain.Outcome[struct{}, struct{}]{Op: o.op}
-	if o.failed != nil {
+	switch {
+	case o.cancelled:
+		ran.Result = &domain.Result[struct{}]{Items: []domain.Unit[struct{}]{{Subject: "w", Status: domain.StatusDone}, {Subject: "x", Status: domain.StatusCancelled, Reason: domain.ReasonInterrupted}}}
+	case o.failed != nil:
 		ran.Result = &domain.Result[struct{}]{Items: []domain.Unit[struct{}]{{Subject: "x", Status: domain.StatusFailed, Err: o.failed}}}
 	}
 	return ran.Envelope(params)
@@ -89,7 +93,7 @@ func (u useCase) Run(ctx context.Context, req request, opts domain.RunOptions) (
 		u.ended <- ctx.Err()
 	}
 	if ctx.Err() != nil {
-		return outcome{}, &domain.Error{Kind: domain.KindCancelled, Code: "greet.cancelled"}
+		return outcome{cancelled: true}, &domain.Error{Kind: domain.KindCancelled, Code: "greet.cancelled"}
 	}
 	if u.read {
 		return outcome{failed: u.failed}, u.refusal

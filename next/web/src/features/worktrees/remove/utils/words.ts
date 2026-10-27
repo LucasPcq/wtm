@@ -28,5 +28,5 @@ export const outcomeWords: Record<OutcomeKind, string> = {
   done: 'Removed',
 }
 
-// the plan's warnings the Confirm step says elsewhere: the jobs on the row removed anyway, the data in its Details
-export const sharedWarnings = { jobsLeft: 'clean.jobs_left', dataKept: 'clean.data_kept' } as const
+// the data a removed worktree keeps goes with the steps, not in To check
+export const dataKept = 'clean.data_kept'

@@ -249,8 +249,10 @@ func TestDeleteCancelsTheOperationItNames(t *testing.T) {
 
 	assert.Equal(t, http.StatusAccepted, cancelled.StatusCode)
 	response := <-done
-	assert.Equal(t, statusClientClosed, response.StatusCode)
-	assert.Equal(t, "greet.cancelled", decoded[envelope](t, response).Error.Code)
+	assert.Equal(t, statusClientClosed, response.StatusCode, "cancelled keeps 499, however many items went before")
+	got := decoded[envelope](t, response)
+	assert.Equal(t, "greet.cancelled", got.Error.Code)
+	assert.Len(t, got.Items, 2)
 }
 
 func TestAForcedCancelKillsAsASecondInterruptDoes(t *testing.T) {

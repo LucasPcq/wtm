@@ -15,8 +15,6 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}', 'lint/*.test.ts'],
     environment: 'happy-dom',
     setupFiles: ['src/test/setup.ts'],
-    // a whole wizard run through the app takes 5 s alone on a busy machine, vitest's default timeout
-    testTimeout: 15_000,
   },
   server: {
     // Dev mode: the page comes from Vite, /api from the Go server of `wtm-next ui`.
