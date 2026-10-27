@@ -1,5 +1,6 @@
 import { cleanup } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll } from 'vitest'
+import { usePruneDialog } from '@/features/worktrees/hooks/use-prune-dialog'
 import { useRemoveDialog } from '@/features/worktrees/hooks/use-remove-dialog'
 import { useRuns } from '@/features/worktrees/hooks/use-run'
 import { useSelections } from '@/features/worktrees/hooks/use-selection'
@@ -15,6 +16,7 @@ afterEach(() => {
   useUi.setState(useUi.getInitialState(), true)
   useRuns.setState(useRuns.getInitialState(), true)
   useRemoveDialog.setState(useRemoveDialog.getInitialState(), true)
+  usePruneDialog.setState(usePruneDialog.getInitialState(), true)
   useSelections.setState(useSelections.getInitialState(), true)
 })
 afterAll(() => server.close())

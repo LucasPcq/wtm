@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { listed } from '@/features/worktrees/remove/utils/listed'
+import { listed } from '@/features/worktrees/utils/listed'
 
 test('names read as a sentence says them', () => {
   expect(listed([])).toBe('')

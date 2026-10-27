@@ -17,11 +17,11 @@ export function request(path: string, init: RequestInit = {}): Promise<Response>
   return fetch(path, { ...init, headers })
 }
 
-// a dry run the core refuses still answers with its envelope, whose error says what refused it and why
+// a dry run the core refuses, or whose answers it finds wrong, still answers with its envelope, whose error says why
 export async function refusable(path: string, body: unknown): Promise<DomainEnvelope> {
   const response = await request(path, { method: 'POST', body: JSON.stringify(body) })
   const read = (await response.json().catch(() => undefined)) as DomainEnvelope | WebRefusal | undefined
-  if (response.ok || (response.status === 403 && read && 'v' in read)) return read as DomainEnvelope
+  if (response.ok || ([400, 403].includes(response.status) && read && 'v' in read)) return read as DomainEnvelope
   throw new HttpError(response.status, read?.error?.message ?? response.statusText)
 }
 

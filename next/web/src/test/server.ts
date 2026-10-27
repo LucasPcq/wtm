@@ -4,6 +4,7 @@ import type { DomainAnswered, DomainField, DomainFollowUp, ListDetail, WebCall }
 import { repo, worktrees } from '@/test/acme'
 import { cleanPlan, cleanQuestionsOf, cleanRun } from '@/test/clean'
 import { envelope, followUp, offers, statusDetail, treeDetail } from '@/test/fixtures'
+import { prunePlan, pruneRun } from '@/test/prune'
 import { line, streamed } from '@/test/stream'
 
 export { line, repo, streamed, worktrees }
@@ -184,6 +185,8 @@ const handlers = [
         return call.dry_run ? HttpResponse.json(plan(asked('branches') ?? '')) : createRun(asked('branches') ?? '')
       case 'clean':
         return call.dry_run ? cleanPlan(call) : cleanRun(call)
+      case 'prune':
+        return call.dry_run ? prunePlan(call) : pruneRun(call)
     }
     return HttpResponse.json({ error: { message: 'unknown command' } }, { status: 404 })
   }),

@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { MenuEntry } from '@/features/worktrees/components/menu-entry'
+import { openPrune } from '@/features/worktrees/hooks/use-prune-dialog'
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
 import { entryOf, menu, notInTheWeb, type Subject } from '@/features/worktrees/utils/actions'
 
@@ -24,7 +25,13 @@ export function HeaderActions({ repo, rows }: { repo: string; rows: Subject[] })
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
-        <MenuEntry Item={DropdownMenuItem} icon={GitBranchMinus} label="Prune" why={notInTheWeb} />
+        <MenuEntry
+          Item={DropdownMenuItem}
+          icon={GitBranchMinus}
+          label="Prune"
+          why={undefined}
+          onSelect={() => openPrune(repo, [])}
+        />
         {(['fast_forward', 'exec'] as const).map((action) => (
           <MenuEntry
             key={action}

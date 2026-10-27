@@ -1,19 +1,24 @@
 import { CircleX, ExternalLink, TriangleAlert } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { TeardownMove, TeardownRemoval } from '@/api/types.gen'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Item, ItemTitle } from '@/components/ui/item'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { unsafe } from '@/features/worktrees/remove/utils/plan'
-import { blockerWords, lostWords } from '@/features/worktrees/remove/utils/words'
+import { blockerWords, lostWords } from '@/features/worktrees/utils/blocker-words'
+import { unsafe } from '@/features/worktrees/utils/removal'
 
 export function RemovalItem({
   removal,
+  verb = 'Remove',
+  reason,
   checked = true,
   onCheck,
   moves = [],
   reparent = false,
 }: {
   removal: TeardownRemoval
+  verb?: string
+  reason?: ReactNode
   checked?: boolean
   onCheck?: (on: boolean) => void
   moves?: TeardownMove[]
@@ -47,7 +52,7 @@ export function RemovalItem({
     <Item role="listitem" aria-label={removal.worktree} className="items-center gap-3 rounded-none px-4 py-3">
       {onCheck && (
         <Checkbox
-          aria-label={`Remove ${removal.worktree}`}
+          aria-label={`${verb} ${removal.worktree}`}
           checked={checked}
           onCheckedChange={(on) => onCheck(on === true)}
         />
@@ -55,6 +60,7 @@ export function RemovalItem({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <ItemTitle className="min-w-0">{name()}</ItemTitle>
         <div className="flex flex-col gap-1 text-xs">
+          {reason}
           {blockers.map((blocker) => (
             <span key={blocker} className="flex items-center gap-1.5">
               {anyway ? (

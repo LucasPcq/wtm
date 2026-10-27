@@ -1,12 +1,13 @@
 import { toast } from 'sonner'
 import type { Applied } from '@/api/queries/commands'
 import { Dialog } from '@/components/ui/dialog'
+import { RemovalProgress } from '@/features/worktrees/components/removal-progress'
 import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
 import { useRemoveDialog } from '@/features/worktrees/hooks/use-remove-dialog'
 import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
 import { useSelection } from '@/features/worktrees/hooks/use-selection'
-import { RemoveProgress } from '@/features/worktrees/remove/components/remove-progress'
 import { RemoveWizard } from '@/features/worktrees/remove/components/remove-wizard'
+import { removeWords } from '@/features/worktrees/remove/utils/words'
 
 // one removal at a time: opened while one runs, or one that failed is still to be read, the dialog shows it, and the
 // rows checked wait; a run that removed every worktree it was asked takes the rows it opened on out of the selection,
@@ -29,7 +30,8 @@ export function RemoveDialog({ repo }: { repo: string }) {
   const content = () => {
     if (run.progress)
       return (
-        <RemoveProgress
+        <RemovalProgress
+          words={removeWords}
           progress={run.progress}
           running={run.running}
           onHide={close}

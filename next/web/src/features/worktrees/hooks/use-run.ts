@@ -80,7 +80,7 @@ export function useRun<C extends MutationCommand>(repo: string, command: C) {
 
 export const clockEvery = 30_000
 
-const doing: Record<MutationCommand, string> = { create: 'Creating', clean: 'Removing' }
+const doing: Record<MutationCommand, string> = { create: 'Creating', clean: 'Removing', prune: 'Pruning' }
 
 export const isMutation = (command: string): command is MutationCommand => Object.hasOwn(doing, command)
 

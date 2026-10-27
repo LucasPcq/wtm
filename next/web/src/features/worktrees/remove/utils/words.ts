@@ -1,32 +1,9 @@
-import type { TeardownRemoval, WorktreeBlocker } from '@/api/types.gen'
-import type { OutcomeKind } from '@/features/worktrees/utils/outcome'
+import type { RemovalWords } from '@/features/worktrees/components/removal-progress'
 
-// The core words its refusals for the command line; the web says each reason its own way, over the blockers the
-// schema publishes, so a blocker the core adds fails the build until it has words.
-export const blockerWords: Record<WorktreeBlocker, (removal: TeardownRemoval) => string> = {
-  locked: () => 'Locked',
-  dirty: () => 'Uncommitted changes',
-  unpushed: ({ unpushed = 0 }) => `${unpushed} commit${unpushed === 1 ? '' : 's'} on no other branch`,
-  open_pull_request: () => 'An open pull request',
-  jobs_running: ({ jobs = [] }) => `Jobs running: ${jobs.join(', ')}`,
+export const removeWords: RemovalWords = {
+  title: 'Remove worktrees',
+  past: 'removed',
+  noun: 'removal',
+  outcome: { failed: "Couldn't remove", check: 'To check', done: 'Removed' },
+  dataKept: 'clean.data_kept',
 }
-
-export const lostWords: Record<WorktreeBlocker, (removal: TeardownRemoval) => string> = {
-  locked: () => 'Its lock is lifted.',
-  dirty: () => 'Its uncommitted changes are lost.',
-  unpushed: ({ unpushed = 0 }) =>
-    unpushed === 1
-      ? 'Its 1 commit on no other branch is lost.'
-      : `Its ${unpushed} commits on no other branch are lost.`,
-  open_pull_request: () => 'Its pull request stays open on GitHub.',
-  jobs_running: ({ jobs = [] }) => `Its jobs ${jobs.join(', ')} keep running.`,
-}
-
-export const outcomeWords: Record<OutcomeKind, string> = {
-  failed: "Couldn't remove",
-  check: 'To check',
-  done: 'Removed',
-}
-
-// the data a removed worktree keeps goes with the steps, not in To check
-export const dataKept = 'clean.data_kept'

@@ -11,6 +11,8 @@ import type {
   DomainForm,
   DomainItem,
   ListDetail,
+  PruneDetail,
+  PrunePlan,
   StatusDetail,
   TreeDetail,
   WebCall,
@@ -23,7 +25,11 @@ export const githubKey = (repo: string) => ['github', repo] as const
 type ReadDetail = { list: ListDetail; tree: TreeDetail; status: StatusDetail }
 export type ReadCommand = keyof ReadDetail
 
-type Mutation = { create: { plan: CreatePlan; detail: CreateDetail }; clean: { plan: CleanPlan; detail: CleanDetail } }
+type Mutation = {
+  create: { plan: CreatePlan; detail: CreateDetail }
+  clean: { plan: CleanPlan; detail: CleanDetail }
+  prune: { plan: PrunePlan; detail: PruneDetail }
+}
 export type MutationCommand = keyof Mutation
 
 // the core sends {} for an item it did not read (failed, cancelled)
@@ -85,4 +91,13 @@ export const dryRunQuery = <C extends MutationCommand>(repo: string, command: C,
     // a refusal (clean's unsafe worktrees) is the answer of a dry run, not its failure
     queryFn: () => refusable(`/api/repos/${repo}/commands/${command}`, { answers, dry_run: true } satisfies WebCall),
     select: narrowed<Mutation[C]['detail'], Mutation[C]['plan']>,
+  })
+
+// a review that fetches origin is asked once per opening: under the repository's key, every event would fetch again
+export const reviewQuery = <C extends MutationCommand>(repo: string, command: C, answers: DomainAnswered[]) =>
+  queryOptions({
+    ...dryRunQuery(repo, command, answers),
+    queryKey: ['review', repo, command, answers],
+    gcTime: 0,
+    refetchOnWindowFocus: false,
   })

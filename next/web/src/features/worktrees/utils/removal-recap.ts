@@ -1,11 +1,15 @@
 import type { DomainWarning } from '@/api/types.gen'
-import { dataKept } from '@/features/worktrees/remove/utils/words'
 import { itemWarnings, type OutcomeGroup, outputOf, stoppedMessage } from '@/features/worktrees/utils/outcome'
 import type { Progress } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
+export type Teardown = 'clean' | 'prune'
+
 // the data each worktree keeps is no thing to act on, so it goes with the steps rather than in "To check"
-export function recapOf(progress: Progress<'clean'>): {
+export function recapOf(
+  progress: Progress<Teardown>,
+  dataKept: string,
+): {
   groups: OutcomeGroup[]
   warnings: DomainWarning[]
   kept: string[]

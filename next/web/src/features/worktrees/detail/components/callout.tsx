@@ -3,6 +3,7 @@ import type { MutationCommand } from '@/api/queries/commands'
 import type { DomainFollowUp, StatusProblem, StatusProblemCode } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { CommandLine } from '@/features/worktrees/components/command-line'
+import { openPrune } from '@/features/worktrees/hooks/use-prune-dialog'
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
 import { isMutation } from '@/features/worktrees/hooks/use-run'
 import { menu, subjectsOf } from '@/features/worktrees/utils/actions'
@@ -39,6 +40,7 @@ const runsHere: Record<MutationCommand, { verb: string; open: (repo: string, fix
     open: (repo, fix) => openRemove(repo, { worktrees: subjectsOf(fix), left: [], prechecked: true }),
   },
   create: null,
+  prune: { verb: 'Prune', open: (repo, fix) => openPrune(repo, subjectsOf(fix)) },
 }
 
 export function Callout({ repo, problems: [first, ...more] }: { repo: string; problems: StatusProblem[] }) {
