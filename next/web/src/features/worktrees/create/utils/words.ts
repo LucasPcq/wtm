@@ -81,7 +81,7 @@ export const skipWords: Record<DomainSkip, string | null> = {
   flag_only: null,
   all: null,
   exists: 'the worktree exists, so nothing is created',
-  not_behind: 'the source branch is up to date with origin',
+  not_behind: 'the source branch is not behind origin',
   held: 'the source holds the changes being extracted',
   run_unread: "run.toml couldn't be read",
   nothing_isolated: 'run.toml declares nothing to isolate',
