@@ -113,3 +113,22 @@ func TestAnAheadWorktreeHasNothingToWarnOf(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, warnings)
 }
+
+func TestAPlanThatMovesNothingIsEmpty(t *testing.T) {
+	moving := fastforward.Advance{Worktree: behind, Phases: []domain.Phase{domain.PhaseFastForward}}
+	kept := fastforward.Advance{Worktree: dirty, Blockers: []fastforward.Blocker{fastforward.BlockerDirty}}
+	cases := map[string]struct {
+		plan  fastforward.Plan
+		empty bool
+	}{
+		"none":      {plan: fastforward.Plan{}, empty: true},
+		"kept_only": {plan: fastforward.Plan{Worktrees: []fastforward.Advance{kept}}, empty: true},
+		"mixed":     {plan: fastforward.Plan{Worktrees: []fastforward.Advance{moving, kept}}},
+		"forced":    {plan: fastforward.Plan{Force: true, Worktrees: []fastforward.Advance{{Worktree: dirty, Blockers: kept.Blockers, Phases: moving.Phases}}}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.empty, fastforward.PlanEmpty(c.plan))
+		})
+	}
+}

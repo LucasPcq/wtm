@@ -26,7 +26,7 @@ type OffersParams struct {
 	Base     bool
 	Missing  bool
 	OnOrigin bool
-	Recorded bool
+	Record   worktree.RecordState
 }
 
 // ParamNumber is the param of the follow-up that opens a pull request: its number, beside its URL.
@@ -47,7 +47,7 @@ var byAction = map[worktree.Action]struct{ command, label string }{
 
 // Offers is every action of the worktree of p, in worktree.Actions' order, each with its follow-up or why it is not offered.
 func Offers(p OffersParams) []Offer {
-	facts := worktree.OfferParams{Main: p.Main, Base: p.Base, Missing: p.Missing, Detached: p.Branch == "", PullRequest: p.PRURL != "", OnOrigin: p.OnOrigin, Recorded: p.Recorded}
+	facts := worktree.OfferParams{Main: p.Main, Base: p.Base, Missing: p.Missing, Detached: p.Branch == "", PullRequest: p.PRURL != "", OnOrigin: p.OnOrigin, Record: p.Record}
 	offers := make([]Offer, 0, len(byAction))
 	for _, action := range worktree.Actions() {
 		if refused := worktree.Unoffer(facts, action); refused != "" {

@@ -53,6 +53,11 @@ func (r Repository) ExistingBase() string {
 	return ""
 }
 
+// ParentGone reports whether parent, the branch a worktree records as its parent, is no branch any more, local or origin/<branch> origin has; false when it records none.
+func (r Repository) ParentGone(parent string) bool {
+	return parent != "" && !r.Candidate(parent)
+}
+
 // MissingBase returns the configured base branch, and reports whether it is missing: configured, yet no local branch of that name.
 func (r Repository) MissingBase() (string, bool) {
 	base := r.Config.Worktrees.BaseBranch

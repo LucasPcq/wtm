@@ -129,7 +129,7 @@ func (f Facts) worktreeOptions() []domain.Option {
 			continue
 		}
 		parent := f.Records[w.Branch()].SourceBranch
-		option := domain.Option{Value: w.Branch(), Parent: parent, Gone: f.gone(parent)}
+		option := domain.Option{Value: w.Branch(), Parent: parent, Gone: f.ParentGone(parent)}
 		if w.Branch() == current {
 			option.Tag = domain.TagCurrent
 		}

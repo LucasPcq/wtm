@@ -44,7 +44,7 @@ func TestEachWorktreeIsReadTheMainOneFirstThenTheOldest(t *testing.T) {
 	assert.Empty(t, read.Warnings)
 	a := detailOf(t, read, "feat/a")
 	assert.Equal(t, list.Detail{
-		Branch: "feat/a", Path: "/repo/.trees/feat/a", Recorded: true, Dirty: true, CommitsAhead: 2, Ahead: ptr(2), Changes: &list.Changes{Changed: 1, Untracked: 1},
+		Branch: "feat/a", Path: "/repo/.trees/feat/a", Record: worktree.RecordRead, Dirty: true, CommitsAhead: 2, Ahead: ptr(2), Changes: &list.Changes{Changed: 1, Untracked: 1},
 		CreatedAt: a.CreatedAt, LastCommitAt: &gittest.Committed, Origin: &worktree.Origin{Ahead: 2, State: worktree.Ahead},
 		Condition: worktree.ConditionChanged,
 		Services:  []string{"web"}, URLs: []string{"http://web.feat-a.acme.localhost"}, Actions: a.Actions,
@@ -179,7 +179,9 @@ func TestARecordThatDoesNotReadKeepsItsWorktreeAndIsAWarning(t *testing.T) {
 	require.Len(t, item.Warnings, 1)
 	assert.Equal(t, list.CodeMetaUnreadable, item.Warnings[0].Code)
 	assert.Nil(t, item.Detail.CreatedAt)
-	assert.True(t, item.Detail.Recorded, "a record that does not read is a record still: reparent refuses it with why")
+	refused := offerOf(t, item.Detail.Actions, worktree.ActionReparent).Refused
+	require.NotNil(t, refused, "a record that does not read refuses reparent with why")
+	assert.Equal(t, worktree.UnofferedUnreadable, *refused)
 }
 
 func TestARecordThatDoesNotReadIsAWarningOnAWorktreeNotReadToo(t *testing.T) {

@@ -386,6 +386,10 @@ func TestARecordThatDoesNotReadKeepsItsNodeAsARootAndIsAWarning(t *testing.T) {
 	assert.Contains(t, node.Warnings[0].Message, "the record of feat/a does not read")
 	assert.Nil(t, node.Detail.Parent, "a node whose parent is unknown stands as a root")
 	assert.True(t, node.Detail.Dirty, "its worktree is read")
+	refused := offerOf(t, node.Detail.Actions, worktree.ActionReparent).Refused
+	require.NotNil(t, refused)
+	assert.Equal(t, worktree.UnofferedUnreadable, *refused)
+	assert.Equal(t, worktree.UnofferedUnrecorded, *offerOf(t, detailOf(t, read, "loose").Actions, worktree.ActionReparent).Refused)
 }
 
 func TestARecordThatDoesNotReadIsAWarningOnANodeNotReadToo(t *testing.T) {

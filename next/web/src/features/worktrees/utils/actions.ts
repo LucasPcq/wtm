@@ -44,6 +44,7 @@ const unofferedWords: Record<WorktreeUnoffered, (worktree: string, action: MenuA
   not_on_origin: () => 'Not on origin',
   no_pull_request: () => 'No pull request known',
   unrecorded: () => 'Not made by wtm',
+  meta_unreadable: () => "Its record doesn't read",
 }
 
 export const notInTheWeb = 'Not in the web yet'

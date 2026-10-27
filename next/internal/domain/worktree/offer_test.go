@@ -12,15 +12,15 @@ func TestAWorktreeOffersEachActionOrSaysWhyNot(t *testing.T) {
 		Want   map[Action]Unoffered
 	}{
 		"with_pr": {
-			OfferParams{PullRequest: true, OnOrigin: true, Recorded: true},
+			OfferParams{PullRequest: true, OnOrigin: true, Record: RecordRead},
 			map[Action]Unoffered{},
 		},
 		"no_pr": {
-			OfferParams{OnOrigin: true, Recorded: true},
+			OfferParams{OnOrigin: true, Record: RecordRead},
 			map[Action]Unoffered{ActionOpenPR: UnofferedNoPullRequest},
 		},
 		"not_on_origin": {
-			OfferParams{PullRequest: true, Recorded: true},
+			OfferParams{PullRequest: true, Record: RecordRead},
 			map[Action]Unoffered{ActionFastForward: UnofferedNotOnOrigin},
 		},
 		"main": {
@@ -38,6 +38,10 @@ func TestAWorktreeOffersEachActionOrSaysWhyNot(t *testing.T) {
 		"detached": {
 			OfferParams{Detached: true},
 			map[Action]Unoffered{ActionOpenPR: UnofferedNoBranch, ActionRunUp: UnofferedNoBranch, ActionRunDown: UnofferedNoBranch, ActionLogs: UnofferedNoBranch, ActionFastForward: UnofferedNoBranch, ActionSync: UnofferedNoBranch, ActionReparent: UnofferedNoBranch},
+		},
+		"meta_unreadable": {
+			OfferParams{PullRequest: true, OnOrigin: true, Record: RecordUnreadable},
+			map[Action]Unoffered{ActionReparent: UnofferedUnreadable},
 		},
 		"unrecorded": {
 			OfferParams{PullRequest: true, OnOrigin: true},

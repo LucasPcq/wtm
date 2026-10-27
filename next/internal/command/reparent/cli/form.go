@@ -26,12 +26,10 @@ func newForm(open func(ctx context.Context, dir string) (reparent.UseCase, error
 	}
 }
 
-// applyLabel names the apply of the plan previewed by the worktrees it moves, those already on the new parent left out.
+// applyLabel names the apply of the plan previewed, which changes something (an empty one is not asked to be confirmed), by the worktrees it moves, those already on the new parent left out.
 func applyLabel(previewed reparent.Outcome) string {
 	moving := slices.DeleteFunc(slices.Clone(previewed.Plan.Moves), reparent.Move.Unchanged)
 	switch count := len(moving); count {
-	case 0:
-		return "Yes, apply"
 	case 1:
 		return "Yes, reparent " + moving[0].Branch
 	default:

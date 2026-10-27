@@ -283,7 +283,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 		Env:       f.envOf(w, state),
 	}
 	detail.Condition = worktree.ConditionOf(worktree.ConditionParams{Missing: state.Missing, Operation: w.Operation(), Merged: merged, Dirty: len(state.Changes) > 0})
-	detail.Problems = Problems(ProblemsParams{Branch: branch, Path: w.Path, Gone: state.Missing, Merged: merged, BehindOrigin: behindOrigin(detail.Origin), Parent: parent, ParentGone: parent != "" && !f.Candidate(parent), Cycle: f.Stack.InCycle(branch), Onto: f.ExistingBase(), Lacks: state.Lacks, Sync: w.NeedsSync(&state.Lacks), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
+	detail.Problems = Problems(ProblemsParams{Branch: branch, Path: w.Path, Gone: state.Missing, Merged: merged, BehindOrigin: behindOrigin(detail.Origin), Parent: parent, ParentGone: f.ParentGone(parent), Cycle: f.Stack.InCycle(branch), Onto: f.ExistingBase(), Lacks: state.Lacks, Sync: w.NeedsSync(&state.Lacks), Missing: f.missing(w, state), Pending: pending, Jobs: detail.Jobs})
 
 	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &detail, Warnings: f.recordWarnings(branch)}
 	if len(state.Unread) > 0 {

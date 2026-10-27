@@ -77,3 +77,20 @@ func TestTheRecapSaysTheParentLeftIsGone(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "feat/c (feat/deleted (gone) → main)", plan.Recap[0].Values[0].Text)
 }
+
+func TestAPlanWhoseWorktreesAreAllOnTheParentIsEmpty(t *testing.T) {
+	unchanged := reparent.Move{Branch: featX, From: "main", To: "main"}
+	moving := reparent.Move{Branch: featC, From: featB, To: "main"}
+	cases := map[string]struct {
+		plan  reparent.Plan
+		empty bool
+	}{
+		"unchanged_only": {plan: reparent.Plan{Moves: []reparent.Move{unchanged}}, empty: true},
+		"mixed":          {plan: reparent.Plan{Moves: []reparent.Move{moving, unchanged}}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.empty, reparent.PlanEmpty(c.plan))
+		})
+	}
+}

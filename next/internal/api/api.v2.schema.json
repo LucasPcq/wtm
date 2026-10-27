@@ -4814,7 +4814,8 @@
         "base_branch",
         "no_pull_request",
         "not_on_origin",
-        "unrecorded"
+        "unrecorded",
+        "meta_unreadable"
       ]
     }
   },

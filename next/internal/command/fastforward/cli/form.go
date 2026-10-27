@@ -28,7 +28,7 @@ func newForm(open func(ctx context.Context, dir string) (fastforward.UseCase, er
 	}
 }
 
-// applyLabel names the apply of the plan previewed by the worktrees it moves.
+// applyLabel names the apply of the plan previewed, which changes something (an empty one is not asked to be confirmed), by the worktrees it moves.
 func applyLabel(previewed fastforward.Outcome) string {
 	var moving []string
 	for _, a := range previewed.Plan.Worktrees {
@@ -38,8 +38,6 @@ func applyLabel(previewed fastforward.Outcome) string {
 	}
 
 	switch len(moving) {
-	case 0:
-		return "Yes, apply"
 	case 1:
 		return "Yes, fast-forward " + moving[0]
 	default:

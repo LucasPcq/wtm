@@ -71,3 +71,22 @@ func TestTheFingerprintCoversTheHooksAndWhatTheirEnvironmentReads(t *testing.T) 
 	}
 	assert.Len(t, fingerprints, 3)
 }
+
+func TestAPlanThatRemovesNothingIsEmpty(t *testing.T) {
+	removing := prune.Candidate{Removal: teardown.Removal{Worktree: merged, Phases: []domain.Phase{domain.PhaseRemove}}}
+	kept := prune.Candidate{Removal: teardown.Removal{Worktree: dirty, Blockers: []worktree.Blocker{worktree.BlockerDirty}}}
+	cases := map[string]struct {
+		plan  prune.Plan
+		empty bool
+	}{
+		"none":      {plan: prune.Plan{}, empty: true},
+		"kept_only": {plan: prune.Plan{Worktrees: []prune.Candidate{kept}}, empty: true},
+		"mixed":     {plan: prune.Plan{Worktrees: []prune.Candidate{removing, kept}}},
+		"forced":    {plan: prune.Plan{Force: true, Worktrees: []prune.Candidate{{Removal: teardown.Removal{Worktree: dirty, Blockers: kept.Blockers, Phases: removing.Phases}}}}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.empty, prune.PlanEmpty(c.plan))
+		})
+	}
+}

@@ -55,7 +55,7 @@ type Ending int
 // The endings of a wizard.
 const (
 	Asking    Ending = iota // the wizard has not ended
-	Finished                // every step is settled, and the recap confirmed unless on a dry run
+	Finished                // every step is settled, and the recap confirmed unless on a dry run or the plan changes nothing
 	Cancelled               // the user left: ctrl+c, esc on the first step asked, or "No, cancel" at the recap
 	Failed                  // a read of the repository failed: its error ends the run
 )

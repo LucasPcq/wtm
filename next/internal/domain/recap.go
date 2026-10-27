@@ -2,7 +2,7 @@ package domain
 
 import "slices"
 
-// Recapped is what a plan shows beside what it does: the fields answered from memory, as the request was resolved, its recap, the plan as every surface shows it, its answers marked as the run left them, and whether it changes nothing, set by the commands whose plan can leave the repository as it is (prune, fast-forward, reparent), so a surface ends on nothing to do rather than ask to confirm it. A plan embeds it; its fingerprint leaves it out, since it changes nothing the apply does.
+// Recapped is what a plan shows beside what it does: the fields answered from memory, as the request was resolved, its recap, the plan as every surface shows it, its answers marked as the run left them, and whether it changes nothing, set by a command whose plan can leave the repository as it is, so a surface ends on nothing to do rather than ask to confirm it. A plan embeds it; its fingerprint leaves it out, since it changes nothing the apply does.
 type Recapped struct {
 	Recalled []string   `json:"recalled,omitempty"`
 	Recap    []RecapRow `json:"recap,omitempty"`

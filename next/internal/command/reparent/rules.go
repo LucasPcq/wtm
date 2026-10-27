@@ -37,11 +37,6 @@ func (f Facts) movable(w worktree.Worktree) bool {
 	return !w.Main && w.Branch() != "" && w.Branch() != f.Config.Worktrees.BaseBranch && recorded
 }
 
-// gone reports whether parent, a branch a worktree records as its parent, is no branch any more.
-func (f Facts) gone(parent string) bool {
-	return parent != "" && !f.Candidate(parent)
-}
-
 // current is the branch of the worktree the caller stands in when reparent can move it, "" otherwise.
 func (f Facts) current() string {
 	at := worktree.Holding(f.Worktrees, f.Cwd, func(w worktree.Worktree) string { return w.Path })
@@ -109,7 +104,7 @@ func (f Facts) entries(names []string, to string) (moves []Move, problems []doma
 			problems = append(problems, problem(CodeUnrecorded, "{value} has no wtm record: wtm did not create it"))
 		default:
 			from := f.Records[w.Branch()].SourceBranch
-			moves = append(moves, Move{Branch: w.Branch(), Path: w.Path, From: from, ParentGone: f.gone(from), To: to, Children: f.Stack.Children(w.Branch())})
+			moves = append(moves, Move{Branch: w.Branch(), Path: w.Path, From: from, ParentGone: f.ParentGone(from), To: to, Children: f.Stack.Children(w.Branch())})
 		}
 	}
 

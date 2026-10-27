@@ -838,20 +838,8 @@
           },
           {
             "action": "reparent",
-            "follow_up": {
-              "command": "reparent",
-              "answers": [
-                {
-                  "path": "worktree",
-                  "values": [
-                    "feat/a-ui"
-                  ]
-                }
-              ],
-              "code": "tree.reparent",
-              "message": "Change the parent"
-            },
-            "refused": null
+            "follow_up": null,
+            "refused": "meta_unreadable"
           },
           {
             "action": "clean",

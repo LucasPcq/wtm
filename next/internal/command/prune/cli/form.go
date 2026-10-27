@@ -26,11 +26,9 @@ func newForm(open func(ctx context.Context, dir string) (prune.UseCase, error)) 
 	}
 }
 
-// applyLabel names the apply of the plan previewed by the worktrees it prunes.
+// applyLabel names the apply of the plan previewed, which changes something (an empty one is not asked to be confirmed), by the worktrees it prunes.
 func applyLabel(previewed prune.Outcome) string {
 	switch count := len(previewed.Plan.Worktrees); count {
-	case 0:
-		return "Yes, apply"
 	case 1:
 		return "Yes, prune " + previewed.Plan.Worktrees[0].Worktree
 	default:
