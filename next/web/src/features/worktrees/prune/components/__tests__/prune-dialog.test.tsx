@@ -118,7 +118,7 @@ test('a worktree named that is no longer done with leaves the run, and Confirm s
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
 
   const left = await within(dialog).findByRole('region', { name: 'Left as they are' })
-  expect(within(left).getByText("No longer done with: it has commits past its pull request's head")).toBeTruthy()
+  expect(within(left).getByText("No longer finished: it has commits past its pull request's head")).toBeTruthy()
   expect(within(dialog).getByRole('listitem', { name: 'feat/search-docs' })).toBeTruthy()
   await user.click(await within(dialog).findByRole('button', { name: 'Prune' }))
 
@@ -173,4 +173,38 @@ test("origin the review couldn't fetch is the plan's Alert on the worktrees and 
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
   await within(dialog).findByRole('button', { name: 'Prune' })
   expect(within(dialog).getByRole('alert').textContent).toContain("Couldn't fetch origin")
+})
+
+// A dialog opened again showed the refusal it had kept from the last time before asking anew, and unchecked a worktree
+// done with again, said "No longer finished".
+test('a refusal kept from an earlier opening does not leave out a worktree done with again', async () => {
+  let refusing = true
+  answeringPrune((call) =>
+    refusing && call.answers?.some((answer) => answer.path === 'no_fetch')
+      ? prunePlan(call, { found: candidates.filter((c) => c.worktree !== 'feat/billing') })
+      : prunePlan(call),
+  )
+  const { user, dialog } = await openFromTheHeader()
+  await user.click(
+    within(await within(dialog).findByRole('listitem', { name: 'feat/search-docs' })).getByRole('checkbox', {
+      name: 'Prune feat/search-docs',
+    }),
+  )
+  expect(await within(dialog).findByText(/^No longer finished/)).toBeTruthy()
+  await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+  refusing = false
+  await user.click(await screen.findByRole('button', { name: 'Actions' }))
+  await user.click(await screen.findByRole('menuitem', { name: 'Prune' }))
+  const again = await screen.findByRole('dialog', { name: 'Prune worktrees' })
+  await user.click(
+    within(await within(again).findByRole('listitem', { name: 'feat/search-docs' })).getByRole('checkbox', {
+      name: 'Prune feat/search-docs',
+    }),
+  )
+  await user.click(await within(again).findByRole('button', { name: 'Next' }))
+  await user.click(await within(again).findByRole('button', { name: 'Next' }))
+
+  expect(await within(again).findByRole('button', { name: 'Prune 2 worktrees' })).toBeTruthy()
+  expect(within(again).queryByText(/^No longer finished/)).toBeNull()
 })

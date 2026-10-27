@@ -74,10 +74,12 @@ export function PruneWizard({
     placeholderData: keepPreviousData,
   })
 
-  // a worktree named that is no longer done with since the review leaves the run, and says why under Left as they are
-  const noLonger = (planned.data?.error?.fields ?? []).flatMap(({ code, params }) =>
+  // a worktree named that is no longer done with since the review leaves the run, and says why under Left as they are;
+  // only on this plan's own answer, never on one kept from an earlier opening that is being asked again
+  const settled = !planned.isFetching && !planned.isPlaceholderData
+  const noLonger = (settled ? (planned.data?.error?.fields ?? []) : []).flatMap(({ code, params }) =>
     code === notFinished && params?.value && goingNames.includes(params.value)
-      ? [{ worktree: params.value, why: `No longer done with: ${params.why ?? ''}` }]
+      ? [{ worktree: params.value, why: `No longer finished: ${params.why ?? ''}` }]
       : [],
   )
   if (noLonger.length > 0) {
@@ -120,7 +122,7 @@ export function PruneWizard({
   }
   const step = stepOf()
   const visible = candidates.filter((candidate) => searched(candidate.worktree, query))
-  // shortcut: an empty review is read here as nothing to prune; once the core ends an empty plan itself (#245), read that
+  // shortcut: an empty review is read here as nothing to prune; once #245 lands, read the core's plan.empty instead
   const nothing = review.data !== undefined && !review.data.error && candidates.length === 0
 
   const state = (of: Step): StepState => {
