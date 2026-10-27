@@ -64,7 +64,7 @@ export function Wizard({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Create worktree</DialogTitle>
+        <DialogTitle>Create worktrees</DialogTitle>
         <DialogDescription>Each branch gets its own folder, .env and ports.</DialogDescription>
       </DialogHeader>
 

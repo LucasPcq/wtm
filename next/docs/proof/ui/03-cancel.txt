@@ -119,6 +119,7 @@ data: {"v":2,"type":"phase.started","ts":"<T>","repo":{"root":"<SB>/A","common_d
 
 $ grep '<OP10>' "$out/.bus"
 data: {"v":2,"type":"operation.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","op_id":"<OP11>","command":"create","surface":"web"}
+data: {"v":2,"type":"unit.started","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","op_id":"<OP11>","subject":"slow/c"}
 data: {"v":2,"type":"worktree.created","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","op_id":"<OP11>","worktree":{"branch":"slow/c","path":"<SB>/.trees/slow-c","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"}}
 data: {"v":2,"type":"worktree.provisioned","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","op_id":"<OP11>","worktree":{"branch":"slow/c","path":"<SB>/.trees/slow-c","parent":"main","ordinal":null,"isolation":"isolated","is_main":false,"created_at":"<T>"},"ok":true}
 data: {"v":2,"type":"unit.finished","ts":"<T>","repo":{"root":"<SB>/A","common_dir":"<SB>/A/.git"},"correlation_id":"<OP10>","op_id":"<OP11>","subject":"slow/c","status":"done"}

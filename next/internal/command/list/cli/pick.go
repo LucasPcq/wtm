@@ -134,7 +134,7 @@ func (s *worktreeStep) build() *widget.SelectList {
 	plain := output.StylesOf(io.Discard)
 	var options []widget.Option
 	for _, item := range s.p.read.Items {
-		if item.Detail != nil && len(item.Detail.Actions) > 0 {
+		if item.Detail != nil && len(item.Detail.Offered()) > 0 {
 			options = append(options, widget.Option{Label: shown(*item.Detail, s.p.caller.Cwd), Value: item.Subject, Badge: badge(cellsOf(*item.Detail, plain))})
 		}
 	}
@@ -185,7 +185,7 @@ func (s *actionStep) Standing() form.Standing { return form.Standing{Value: s.p.
 
 func (s *actionStep) Open() tea.Cmd {
 	var options []widget.Option
-	for _, action := range s.p.picked.Actions {
+	for _, action := range s.p.picked.Offered() {
 		options = append(options, widget.Option{Label: action.Message, Value: action.Code})
 	}
 	s.list = widget.NewSelectList(widget.SelectParams{Options: options})
@@ -195,9 +195,10 @@ func (s *actionStep) Open() tea.Cmd {
 func (s *actionStep) Widget() widget.Widget { return s.list }
 
 func (s *actionStep) Answer() string {
-	at := slices.IndexFunc(s.p.picked.Actions, func(action domain.FollowUp) bool { return action.Code == s.list.Value() })
+	offered := s.p.picked.Offered()
+	at := slices.IndexFunc(offered, func(action domain.FollowUp) bool { return action.Code == s.list.Value() })
 	if at >= 0 {
-		s.p.action = s.p.picked.Actions[at]
+		s.p.action = offered[at]
 	}
 	return s.p.action.Message
 }

@@ -1,8 +1,48 @@
 import type { Read, ReadCommand } from '@/api/queries/commands'
-import type { DomainEnvelope, DomainFollowUp, ListDetail, StatusDetail, TreeDetail } from '@/api/types.gen'
+import type {
+  DomainEnvelope,
+  DomainFollowUp,
+  ListDetail,
+  RepositoryOffer,
+  StatusDetail,
+  TreeDetail,
+  WorktreeAction,
+  WorktreeUnoffered,
+} from '@/api/types.gen'
+
+const commands: Record<WorktreeAction, string> = {
+  go: 'go',
+  open_pr: '',
+  run_up: 'run up',
+  run_down: 'run down',
+  logs: 'run logs',
+  fast_forward: 'fast-forward',
+  sync: 'sync',
+  clean: 'clean',
+}
+
+export const offers = (
+  worktree: string,
+  refused: Partial<Record<WorktreeAction, WorktreeUnoffered>> = {},
+): RepositoryOffer[] =>
+  (Object.keys(commands) as WorktreeAction[]).map((action) => {
+    const why = refused[action]
+    if (why) return { action, follow_up: null, refused: why }
+    return {
+      action,
+      follow_up:
+        action === 'open_pr'
+          ? { code: 'list.open_pr', message: 'Open the pull request', url: 'https://github.com/acme/acme/pull/1' }
+          : followUp(commands[action], worktree, { code: `list.${action}` }),
+      refused: null,
+    }
+  })
+
+const mainOffers = (branch: string) =>
+  offers(branch, { open_pr: 'no_pull_request', sync: 'main_worktree', clean: 'main_worktree' })
 
 export const listDetail = (branch: string, over: Partial<ListDetail> = {}): ListDetail => ({
-  actions: [],
+  actions: over.main ? mainOffers(branch) : offers(branch, { open_pr: 'no_pull_request' }),
   active: false,
   ahead: 0,
   behind: 0,
@@ -29,7 +69,7 @@ export const listDetail = (branch: string, over: Partial<ListDetail> = {}): List
 })
 
 export const treeDetail = (branch: string, over: Partial<TreeDetail> = {}): TreeDetail => ({
-  actions: [],
+  actions: over.main ? mainOffers(branch) : offers(branch, { open_pr: 'no_pull_request' }),
   ahead: 0,
   behind: 0,
   branch,
@@ -99,4 +139,19 @@ export const read = <C extends ReadCommand>(command: C, details: Read<C>['items'
   follow_ups: [],
   warnings: [],
   items: details.flatMap((detail) => (detail ? [{ subject: detail.branch, status: 'done', detail }] : [])),
+})
+
+// a read whose one item it could not read: the envelope answers, the item says why
+export const unreadable = (command: string, subject: string): DomainEnvelope => ({
+  ...envelope(command, []),
+  ok: false,
+  error: { kind: 'internal', code: `${command}.unreadable`, message: `couldn't read /acme.trees/${subject}` },
+  items: [
+    {
+      subject,
+      status: 'failed',
+      error: { kind: 'internal', code: `${command}.unreadable`, message: `couldn't read /acme.trees/${subject}` },
+      detail: {},
+    },
+  ],
 })

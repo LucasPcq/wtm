@@ -300,7 +300,7 @@ func spelled(followUp domain.FollowUp) (argv, unspelled []string) {
 
 // pullRequestLine opens the pull request a follow-up links to: by its number, else by its URL; nothing without either.
 func pullRequestLine(followUp domain.FollowUp) []string {
-	if number, err := strconv.Atoi(followUp.Params[list.ParamNumber]); err == nil {
+	if number, err := strconv.Atoi(followUp.Params[repository.ParamNumber]); err == nil {
 		return github.ViewCommand(number)
 	}
 	if followUp.URL == "" {

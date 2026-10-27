@@ -14,6 +14,7 @@ Everything is plain shadcn (Radix underneath) on Tailwind's base colours, with `
 | -- | -- |
 | two sections of a body | 24 |
 | a section's label and its content | 8 |
+| an outcome group's label and its rows | 4 |
 | the parts of a row | 12 |
 | a title and its second line | 4 |
 | a dialog's edge and its content | 24 |
@@ -42,7 +43,7 @@ Type does the ranking: a title is 14 medium foreground, a second line 12–13 mu
 - **The title is the command's name**, one line, the same at every step and through the run: Create worktrees, Remove worktrees, Prune worktrees, Fast-forward worktrees, Run a command, Change parent. The subject lives in the body.
 - **The description carries the state:** what the command does before the run, "Step 3 of 4 · Run the on_clean hooks" while it runs, one sentence of outcome at the end ("2 pruned.", "1 of 2 removed.").
 - **The band always ends on its rule**, empty or not: a `wtm/Stepper` before the run, a `wtm/Progress` during it, nothing after. The header never ends on a hole.
-- **The body, in this order:** a `wtm/Alert` for a technical problem of the whole plan; the main list; the **Left as they are** section (same list box, muted names: business states that keep a row out of the plan: diverged, ahead, mid-rebase, not on origin, already there, main, no longer finished); then `wtm/Details`, the one fold, always last.
+- **The body, in this order:** a `wtm/Alert` for a technical problem of the whole plan; the main list; the **Left as they are** section (its own label and list box, 24 below the main list, muted names: business states that keep a row out of the plan: diverged, ahead, mid-rebase, not on origin, already there, main, no longer finished); then `wtm/Details`, the one fold, always last.
 - **A technical problem never sits in a list, a business state never sits in an Alert.** A failed fetch, GitHub unavailable or a lock held is about the tool; diverged or mid-rebase is about the branch.
 
 ### Buttons
@@ -150,7 +151,7 @@ Every multi-worktree list (Remove's, Prune's, the Fast-forward and Run pickers, 
 3. "To check": business follow-ups (left as they are, orphans, jobs left), each with its action (Reparent, Reparent all);
 4. the done group ("Pruned", "Fast-forwarded").
 
-A lone group drops its label. Success contracts to a count in the description. A row folds: its folded line is the code's fixed message worded by the screen ("git refused to move the branch"); opened, it shows the output or `error.params.cause` verbatim, and the log's path when there is a log. Steps and folders sit in `wtm/Details`, folded.
+A warning is drawn where its subject is, on the steps and on Done: one whose params name no worktree nor branch is the plan's `wtm/Alert`, first, on both; one with a subject is a reason line on that row during the steps (`create.source_diverged` on its `BranchPlan`) and a "To check" row on Done (`RunOutcome` splits them). A lone group drops its label. Success contracts to a count in the description. A row folds: its folded line is the code's fixed message worded by the screen ("git refused to move the branch"); opened, it shows the output or `error.params.cause` verbatim, and the log's path when there is a log. Steps and folders sit in `wtm/Details`, folded.
 
 ## In Pencil
 

@@ -1,6 +1,7 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { create } from 'zustand'
 import { type Applied, type MutationCommand, repoKey } from '@/api/queries/commands'
+import { current, eventsQuery } from '@/api/queries/events'
 import { cancel as cancelOperation, runStreamed } from '@/api/queries/operations'
 import type { DomainAnswered } from '@/api/types.gen'
 import { advance, type Progress, type Unit } from '@/features/worktrees/utils/progress'
@@ -77,21 +78,42 @@ export function useRun<C extends MutationCommand>(repo: string, command: C) {
   }
 }
 
+export const clockEvery = 30_000
+
 const doing: Record<MutationCommand, string> = { create: 'Creating', clean: 'Removing' }
+
+export const isMutation = (command: string): command is MutationCommand => Object.hasOwn(doing, command)
 
 export function useUnderWay(repo: string): Record<string, string> {
   const runs = useRuns()
+  const operations = useQuery({ ...eventsQuery, select: (live) => live.operations }).data ?? {}
+  // the cap needs a clock: an operation whose process died sends nothing more, so the screen asks the time again
+  const now =
+    useQuery({
+      queryKey: ['now'],
+      queryFn: () => Date.now(),
+      refetchInterval: clockEvery,
+      enabled: current(operations, Date.now()).length > 0,
+    }).data ?? Date.now()
 
-  return Object.fromEntries(
-    (Object.keys(doing) as MutationCommand[]).flatMap((command) => {
-      const run = runs[keyOf(repo, command)]
-      if (!run?.running) return []
-      return run.progress.units
-        .filter((unit) => !unit.status)
-        .map((unit) => {
-          const done = unit.phases.filter((phase) => phase.state === 'done').length
-          return [unit.subject, `${doing[command]} · ${done}/${unit.phases.length}`]
-        })
-    }),
+  const elsewhere = current(operations, now).flatMap((operation) =>
+    operation.repo === repo
+      ? operation.subjects.map((subject) => [
+          subject,
+          isMutation(operation.command) ? doing[operation.command] : 'Busy',
+        ])
+      : [],
   )
+  const here = (Object.keys(doing) as MutationCommand[]).flatMap((command) => {
+    const run = runs[keyOf(repo, command)]
+    if (!run?.running) return []
+    return run.progress.units
+      .filter((unit) => !unit.status)
+      .map((unit) => {
+        const done = unit.phases.filter((phase) => phase.state === 'done').length
+        return [unit.subject, `${doing[command]} · ${done}/${unit.phases.length}`]
+      })
+  })
+
+  return Object.fromEntries([...elsewhere, ...here])
 }

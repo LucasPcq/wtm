@@ -1,13 +1,14 @@
 import type { Read } from '@/api/queries/commands'
 import type {
   DomainError,
-  DomainFollowUp,
   DomainItem,
   ListDetail,
   ListFinished,
   ListPR,
+  RepositoryOffer,
   WorktreeCondition,
 } from '@/api/types.gen'
+import { withPullRequest } from '@/features/worktrees/utils/actions'
 import { overlaid } from '@/features/worktrees/utils/condition'
 
 export type Row = {
@@ -19,7 +20,7 @@ export type Row = {
   merged: boolean | undefined
   finished: ListFinished | null | undefined
   condition: WorktreeCondition | undefined
-  actions: DomainFollowUp[]
+  actions: RepositoryOffer[]
   underWay: string | undefined
   readAt: number
 }
@@ -49,7 +50,7 @@ export function rowsOf({
       merged: read?.merged,
       finished: read?.finished,
       condition: shown?.condition,
-      actions: shown?.actions ?? [],
+      actions: withPullRequest(detail?.actions ?? [], read?.actions ?? undefined),
       underWay: underWay[subject],
       readAt,
     }

@@ -2,9 +2,9 @@ import { screen, within } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
 import type { WebCall } from '@/api/types.gen'
-import { envelope, followUp, statusDetail } from '@/test/fixtures'
+import { envelope, followUp, statusDetail, unreadable } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
-import { server, worktrees } from '@/test/server'
+import { server } from '@/test/server'
 
 const answers = async (request: Request) => {
   const call = (await request.json()) as WebCall
@@ -35,7 +35,7 @@ test("the detail's header links the worktree's pull request, as GitHub tells it 
 })
 
 const merged = {
-  code: 'status.merged',
+  code: 'status.merged' as const,
   message: 'its pull request is merged',
   fix: followUp('clean', 'feat/billing', { code: 'status.merged', message: 'clean it up' }),
 }
@@ -56,8 +56,53 @@ test("a worktree GitHub says is merged shows GitHub's read first, as the one rul
 
   const { detail } = await openDetail('feat/billing')
 
-  expect(await within(detail).findByText('Its pull request is merged')).toBeTruthy()
-  expect(await within(detail).findByText('wtm clean feat/billing')).toBeTruthy()
+  const callout = await within(detail).findByRole('region', { name: 'To do' })
+  expect(within(callout).getByText('Its pull request is merged')).toBeTruthy()
+  expect(within(callout).getByRole('button', { name: 'Remove' })).toBeTruthy()
+})
+
+test("a fix the web runs is the callout's button, and opens its dialog on that worktree", async () => {
+  const missing = {
+    code: 'status.missing' as const,
+    message: 'its directory is gone',
+    fix: followUp('clean', 'feat/billing', { code: 'status.missing', message: 'remove what is left of it' }),
+  }
+  serveStatus({ missing: true, problems: [missing] }, { missing: true, problems: [missing] })
+  const { user, detail } = await openDetail('feat/billing')
+
+  expect(await within(detail).findByText('Its branch and its record go with it; the remote branch stays.')).toBeTruthy()
+  await user.click(within(detail).getByRole('button', { name: 'Remove what is left of it' }))
+
+  const dialog = await screen.findByRole('dialog', { name: 'Remove worktrees' })
+  expect(await within(dialog).findByRole('listitem', { name: 'feat/billing' })).toBeTruthy()
+})
+
+test('a fix the web does not run yet is said, with its command to copy', async () => {
+  const crashed = {
+    code: 'status.job_crashed' as const,
+    message: 'worker crashed (exit 1)',
+    fix: followUp('run start', 'feat/billing', { code: 'status.job_crashed', message: 'start it again' }),
+  }
+  serveStatus({ problems: [crashed] }, { problems: [crashed] })
+
+  const { detail } = await openDetail('feat/billing')
+
+  expect(await within(detail).findByText('Start it again from a terminal.')).toBeTruthy()
+  expect(await within(detail).findByText('wtm run start feat/billing')).toBeTruthy()
+})
+
+test("the detail's menu is the same list, in the same order, as every other", async () => {
+  const { user, detail } = await openDetail('feat/billing')
+
+  await user.click(await within(detail).findByRole('button', { name: 'Actions on feat/billing' }))
+
+  const menu = await screen.findByRole('menu')
+  expect(
+    within(menu)
+      .getAllByText(/^(Branch|Run|Open)$/)
+      .map((label) => label.textContent),
+  ).toEqual(['Branch', 'Run', 'Open'])
+  expect(within(menu).getByRole('menuitem', { name: 'Remove' }).getAttribute('aria-disabled')).toBeNull()
 })
 
 test('a rebase under way stays first, whatever GitHub says of the pull request', async () => {
@@ -65,7 +110,6 @@ test('a rebase under way stays first, whatever GitHub says of the pull request',
 
   const { detail } = await openDetail('feat/billing')
 
-  // GitHub's read settled: the review says so, and the rule had both reads to choose from
   await within(detail).findByText('No pull request.')
   expect(within(detail).queryByText('Its pull request is merged')).toBeNull()
 })
@@ -101,24 +145,11 @@ test('a GitHub read that failed says why in the review, not that there is no pul
   expect(within(review).queryByText('No pull request.')).toBeNull()
 })
 
-test('a clean that names no worktree offers no removal', async () => {
-  server.use(
-    http.post('/api/repos/r1/commands/list', () =>
-      HttpResponse.json(
-        envelope(
-          'list',
-          worktrees.map((w) => ({
-            ...w,
-            actions: [{ command: 'clean', code: 'list.clean', message: 'Clean (delete the worktree)' }],
-          })),
-        ),
-      ),
-    ),
-  )
-  const { user } = await openDetail('feat/billing')
+// A status read with its worktree unreadable left the panel blank.
+test('a worktree the read could not read says why in its panel', async () => {
+  server.use(http.post('/api/repos/r1/commands/status', () => HttpResponse.json(unreadable('status', 'feat/billing'))))
 
-  await user.click(await screen.findByRole('button', { name: 'More actions' }))
+  const { detail } = await openDetail('feat/billing')
 
-  expect(await screen.findByRole('menu')).toBeTruthy()
-  expect(screen.queryByRole('menuitem', { name: 'Remove worktree…' })).toBeNull()
+  expect(await within(detail).findByText("Couldn't read /acme.trees/feat/billing")).toBeTruthy()
 })

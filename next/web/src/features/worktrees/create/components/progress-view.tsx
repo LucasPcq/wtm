@@ -11,7 +11,6 @@ import { recapOf } from '@/features/worktrees/create/utils/recap'
 import { outcomeWords } from '@/features/worktrees/create/utils/words'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
 import { current, doneOf, ending, type Progress } from '@/features/worktrees/utils/progress'
-import { cn } from '@/lib/utils'
 
 export function ProgressView({
   progress,
@@ -37,14 +36,9 @@ export function ProgressView({
   const { cancelled, failure } = ending(progress)
   const ok = !running && !failure && !cancelled
 
-  const title = () => {
-    if (running) return progress.cancelling ? `Cancelling ${names}` : `Creating ${names}`
-    if (cancelled) return `Cancelled ${names}`
-    if (failure) return `Couldn't create ${names}`
-    return `${names} ${branches.length === 1 ? 'is' : 'are'} ready`
-  }
-
   const description = () => {
+    if (ok) return `${names} ${branches.length === 1 ? 'is' : 'are'} ready.`
+    if (running && progress.cancelling) return `Cancelling ${names}`
     if (!running) {
       const succeeded = progress.units.flatMap((unit) => unit.phases).filter((run) => run.state === 'done').length
       return `${succeeded} of ${total} steps done.${cancelled ? ' What is done stays: clean it to remove it.' : ''}`
@@ -56,20 +50,18 @@ export function ProgressView({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{title()}</DialogTitle>
-        <DialogDescription className={cn(ok && 'sr-only')}>{description()}</DialogDescription>
+        <DialogTitle>Create worktrees</DialogTitle>
+        <DialogDescription>{description()}</DialogDescription>
       </DialogHeader>
-      {running && (
-        <DialogBand>
-          <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />
-        </DialogBand>
-      )}
+      <DialogBand>{running && <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />}</DialogBand>
 
       <DialogScroll>
         {!running && (
           <RunFailure message={(progress.envelope?.items ?? []).some((item) => item.error) ? undefined : failure} />
         )}
-        {!running && <RunOutcome groups={recapOf(progress)} labels={outcomeWords} />}
+        {!running && (
+          <RunOutcome groups={recapOf(progress)} labels={outcomeWords} warnings={progress.envelope?.warnings} />
+        )}
         <RunSteps progress={progress} running={running} />
       </DialogScroll>
 

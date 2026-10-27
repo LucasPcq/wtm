@@ -38,26 +38,19 @@ export function RemoveProgress({
   const ok = !running && !failure && !cancelled
   // the run's own failure (a stale plan, a refusal); one the core repeats from an item shows on that item's line
   const refused = progress.refused ?? (items.some((item) => item.error) ? undefined : progress.envelope?.error?.message)
-  const { groups, kept } = recapOf(progress)
+  const { groups, warnings, kept } = recapOf(progress)
   const branched = plain(
     (progress.envelope?.plan?.worktrees ?? []).filter((removal) => removed.includes(removal.worktree)),
   )
-
-  const title = () => {
-    if (running) return progress.cancelling ? `Cancelling the removal of ${listed(names)}` : `Removing ${listed(names)}`
-    if (cancelled) return `Cancelled the removal of ${listed(names)}`
-    if (ok) return `Removed ${listed(names)}`
-    if (removed.length === 0) return `Couldn't remove ${listed(failed)}`
-    return `Removed ${listed(removed)}, couldn't remove ${listed(failed)}`
-  }
 
   const description = () => {
     if (ok && !branched) return `${removed.length} removed.`
     if (ok)
       return names.length === 1
-        ? 'Its local branch went with it; the remote branch stays.'
-        : 'Their local branches went with them; the remote branches stay.'
+        ? '1 removed. Its local branch went with it; the remote branch stays.'
+        : `${removed.length} removed. Their local branches went with them; the remote branches stay.`
     if (!running) return `${removed.length} of ${names.length} removed.${cancelled ? ' Those not started stay.' : ''}`
+    if (progress.cancelling) return `Cancelling the removal of ${listed(failed)}`
     if (now) return `Step ${now.index + 1} of ${now.total} · ${phaseLabel[now.run.phase]} of ${now.subject}`
     return done > 0 ? 'Finishing…' : 'Starting…'
   }
@@ -65,18 +58,14 @@ export function RemoveProgress({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{title()}</DialogTitle>
+        <DialogTitle>Remove worktrees</DialogTitle>
         <DialogDescription>{description()}</DialogDescription>
       </DialogHeader>
-      {running && (
-        <DialogBand>
-          <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />
-        </DialogBand>
-      )}
+      <DialogBand>{running && <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />}</DialogBand>
 
       <DialogScroll>
         {!running && <RunFailure message={refused} />}
-        {!running && <RunOutcome groups={groups} labels={outcomeWords} />}
+        {!running && <RunOutcome groups={groups} labels={outcomeWords} warnings={warnings} />}
         <RunSteps progress={progress} running={running}>
           {kept.map((line) => (
             <p key={line} className="flex items-start gap-2 text-xs text-muted-foreground">

@@ -1,3 +1,5 @@
+import { toast } from 'sonner'
+import type { Applied } from '@/api/queries/commands'
 import { Dialog } from '@/components/ui/dialog'
 import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
 import { useRemoveDialog } from '@/features/worktrees/hooks/use-remove-dialog'
@@ -10,10 +12,19 @@ import { RemoveWizard } from '@/features/worktrees/remove/components/remove-wiza
 // rows checked wait; a run that removed every worktree it was asked takes the rows it opened on out of the selection,
 // kept ones included, one that removed some takes those out, and rows checked since stay
 export function RemoveDialog({ repo }: { repo: string }) {
-  const { open, worktrees } = useRemoveDialog()
+  const { open, worktrees, left, prechecked } = useRemoveDialog()
   const run = useRun(repo, 'clean')
   const selection = useSelection(repo)
   const close = () => useRemoveDialog.setState({ open: false })
+
+  const told = (envelope: Applied<'clean'> | undefined, asked: number) => {
+    if (useRemoveDialog.getState().open) return
+    const removed = (envelope?.items ?? []).filter((item) => item.status === 'done').length
+    if (succeeded(envelope)) return void toast.success(`${removed} removed.`)
+    toast.error(`${removed} of ${asked} removed.`, {
+      action: { label: 'Details', onClick: () => useRemoveDialog.setState({ open: true }) },
+    })
+  }
 
   const content = () => {
     if (run.progress)
@@ -37,9 +48,12 @@ export function RemoveDialog({ repo }: { repo: string }) {
         key={worktrees.join('\n')}
         repo={repo}
         worktrees={worktrees}
+        left={left}
+        prechecked={prechecked}
         onStart={(start) =>
           run.start(start, (envelope) => {
-            if (succeeded(envelope)) return selection.drop(worktrees)
+            told(envelope, start.units.length)
+            if (succeeded(envelope)) return selection.drop([...worktrees, ...left.map((one) => one.worktree)])
             selection.drop((envelope?.items ?? []).filter((item) => item.status === 'done').map((item) => item.subject))
           })
         }

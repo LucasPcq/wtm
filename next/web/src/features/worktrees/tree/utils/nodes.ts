@@ -7,7 +7,6 @@ export type Node = {
   detail: TreeDetail
   pr: TreePR | null | undefined
   condition: WorktreeCondition
-  action: DomainFollowUp | undefined
   children: Node[]
 }
 
@@ -23,7 +22,6 @@ export function nodesOf(live: Read<'tree'>, github: Read<'tree'> | undefined): N
       detail: item.detail,
       pr: read?.pr,
       condition: shown.condition,
-      action: shown.actions?.[0],
       children: [],
     })
   }

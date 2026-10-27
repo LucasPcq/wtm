@@ -23,8 +23,16 @@ const ended = narrowed<CleanDetail, CleanPlan>({
     force: true,
   },
   warnings: [
-    { code: 'clean.jobs_left', message: 'feat/billing is removed with its jobs still running: api, web' },
-    { code: 'clean.data_kept', message: 'feat/billing keeps its data in shared services: acme_feat_billing' },
+    {
+      code: 'clean.jobs_left',
+      message: 'feat/billing is removed with its jobs still running: api, web',
+      params: { worktree: 'feat/billing' },
+    },
+    {
+      code: 'clean.data_kept',
+      message: 'feat/billing keeps its data in shared services: acme_feat_billing',
+      params: { worktree: 'feat/billing', namespaces: 'acme_feat_billing' },
+    },
   ],
 })
 
@@ -36,8 +44,13 @@ const units = [
   },
 ]
 
-test('a failure keeps its output and log with it, a warning is to check, and what went says where its children went', () => {
-  const { groups } = recapOf({ units, envelope: ended })
+test("a failure keeps its output and log with it, the run's warnings go to the outcome, and what went says where its children went", () => {
+  const { groups, warnings } = recapOf({ units, envelope: ended })
+
+  expect(
+    warnings.map((warning) => warning.code),
+    'the data kept goes with the steps',
+  ).toEqual(['clean.jobs_left'])
 
   expect(groups).toEqual([
     {
@@ -53,17 +66,7 @@ test('a failure keeps its output and log with it, a warning is to check, and wha
         },
       ],
     },
-    {
-      kind: 'check',
-      rows: [
-        {
-          key: 'clean.jobs_left-feat/billing is removed with its jobs still running: api, web',
-          tone: 'attention',
-          message: 'feat/billing is removed with its jobs still running: api, web',
-          followUp: undefined,
-        },
-      ],
-    },
+    { kind: 'check', rows: [] },
     {
       kind: 'done',
       rows: [{ key: 'feat/billing', tone: 'ok', title: 'feat/billing', message: 'feat/billing-ui moved onto main' }],

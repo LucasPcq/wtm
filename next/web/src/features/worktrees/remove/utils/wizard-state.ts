@@ -1,23 +1,28 @@
-import type { Choice } from '@/features/worktrees/remove/utils/plan'
-
 export type Step = 'worktrees' | 'children' | 'confirm'
 
-type WizardState = { step: Step; choices: Record<string, Choice>; reparent: boolean }
+export type Tick = { on: boolean; risk: string }
+
+type WizardState = { step: Step; checked: Record<string, Tick>; confirmed: string[]; reparent: boolean }
 
 type WizardAction =
-  | { type: 'go'; to: Step }
-  | { type: 'choose'; worktree: string; choice: Choice }
+  | { type: 'go'; to: Step; confirmed?: string[] }
+  | { type: 'check'; rows: { worktree: string; risk: string }[]; on: boolean }
   | { type: 'reparent'; reparent: boolean }
 
-export const initialWizard: WizardState = { step: 'worktrees', choices: {}, reparent: false }
+export const initialWizard: WizardState = { step: 'worktrees', checked: {}, confirmed: [], reparent: false }
 
-// a choice is made on the worktrees: one that turned unsafe on a later step brings the wizard back to them
 export function wizardReducer(state: WizardState, action: WizardAction): WizardState {
   switch (action.type) {
     case 'go':
-      return { ...state, step: action.to }
-    case 'choose':
-      return { ...state, step: 'worktrees', choices: { ...state.choices, [action.worktree]: action.choice } }
+      return { ...state, step: action.to, confirmed: action.confirmed ?? state.confirmed }
+    case 'check':
+      return {
+        ...state,
+        checked: {
+          ...state.checked,
+          ...Object.fromEntries(action.rows.map(({ worktree, risk }) => [worktree, { on: action.on, risk }])),
+        },
+      }
     case 'reparent':
       return { ...state, reparent: action.reparent }
   }

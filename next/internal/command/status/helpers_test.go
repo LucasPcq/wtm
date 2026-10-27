@@ -51,14 +51,14 @@ func codes(warnings []domain.Warning) []string {
 func problemCodes(problems []status.Problem) []string {
 	var found []string
 	for _, problem := range problems {
-		found = append(found, problem.Code)
+		found = append(found, string(problem.Code))
 	}
 	return found
 }
 
 // fixOf is the fix of a missing .env file that runs command with answers.
 func fixOf(command string, answers ...domain.Answered) *domain.FollowUp {
-	return &domain.FollowUp{Command: command, Answers: answers, Code: status.CodeEnvMissing, Message: "rebuild it"}
+	return &domain.FollowUp{Command: command, Answers: answers, Code: string(status.CodeEnvMissing), Message: "rebuild it"}
 }
 
 // fieldCodes are the codes of problems, in order.

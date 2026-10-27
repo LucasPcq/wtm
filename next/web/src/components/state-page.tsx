@@ -7,11 +7,13 @@ export function StatePage({
   title,
   children,
   command,
+  action,
 }: {
   icon?: ReactNode
   title: string
   children: ReactNode
   command?: string
+  action?: ReactNode
 }) {
   return (
     <Empty className="gap-6">
@@ -28,9 +30,10 @@ export function StatePage({
           <EmptyDescription>{children}</EmptyDescription>
         </div>
       </EmptyHeader>
-      {command && (
+      {(command || action) && (
         <EmptyContent>
-          <code className="rounded-md bg-muted px-3 py-2 font-mono text-sm">{command}</code>
+          {command && <code className="rounded-md bg-muted px-3 py-2 font-mono text-sm">{command}</code>}
+          {action}
         </EmptyContent>
       )}
     </Empty>

@@ -1,8 +1,17 @@
-import { QueryClient } from '@tanstack/react-query'
+import { QueryClient, QueryObserver } from '@tanstack/react-query'
+import { waitFor } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
-import { beforeEach, expect, test } from 'vitest'
+import { beforeEach, expect, onTestFinished, test } from 'vitest'
 import { HttpError } from '@/api/fetch'
-import { connectionOf, eventsQuery, reconnectEvery } from '@/api/queries/events'
+import {
+  connectionOf,
+  current,
+  eventsQuery,
+  type Live,
+  operationCap,
+  reconnectEvery,
+  track,
+} from '@/api/queries/events'
 import { server } from '@/test/server'
 
 beforeEach(() => localStorage.setItem('wtm.token', 't'))
@@ -33,8 +42,8 @@ test('a line of a repository invalidates what it answers, and a warning shows un
   client.getQueryCache().subscribe(() => seen.push(client.getQueryData(eventsQuery.queryKey)))
   await client.fetchQuery(eventsQuery)
 
-  expect(seen).toContainEqual({ warning: 'the bus was lost' })
-  expect(client.getQueryData(eventsQuery.queryKey)).toEqual({})
+  expect(seen).toContainEqual({ warning: 'the bus was lost', operations: {} })
+  expect(client.getQueryData(eventsQuery.queryKey)).toEqual({ operations: {} })
   expect(client.getQueryState(['repo', 'r1', 'list', []])?.isInvalidated).toBe(true)
   expect(client.getQueryState(['repo', 'r2', 'list', []])?.isInvalidated).toBe(false)
 })
@@ -68,7 +77,7 @@ test('the connection reads the query of the stream', () => {
 test('back after a break, everything is read again but what GitHub answered, asked on demand only', async () => {
   const client = new QueryClient()
   client.setQueryData(['repos'], [repo])
-  client.setQueryData(eventsQuery.queryKey, {})
+  client.setQueryData(eventsQuery.queryKey, { operations: {} })
   client.setQueryData(['repo', 'r1', 'list', []], { ok: true })
   client.setQueryData(['github', 'r1', 'list', []], { ok: true })
   serve(200)
@@ -77,4 +86,75 @@ test('back after a break, everything is read again but what GitHub answered, ask
 
   expect(client.getQueryState(['repo', 'r1', 'list', []])?.isInvalidated).toBe(true)
   expect(client.getQueryState(['github', 'r1', 'list', []])?.isInvalidated).toBe(false)
+})
+
+test('an operation of any surface holds the worktrees it started on until it finishes', () => {
+  const ts = '2026-10-27T10:00:00Z'
+  const line = (type: string, more: Record<string, string> = {}) => ({
+    v: 2 as const,
+    type,
+    ts,
+    op_id: 'op-1',
+    ...more,
+  })
+
+  const started = track({}, line('operation.started', { command: 'clean', surface: 'cli' }), 'r1')
+  const working = track(started, line('unit.started', { subject: 'feat/a' }), 'r1')
+  const done = track(working, line('unit.finished', { subject: 'feat/a', status: 'done' }), 'r1')
+
+  expect(done).toEqual({ 'op-1': { repo: 'r1', command: 'clean', subjects: ['feat/a'], since: Date.parse(ts) } })
+  expect(track(done, line('operation.finished', { command: 'clean' }), 'r1')).toEqual({})
+  expect(track({}, { v: 2, type: 'unit.started', ts, subject: 'feat/a' }, 'r1')).toEqual({})
+})
+
+// An operation already running when the page opened, or across a reconnect, never showed its worktrees.
+test('a unit of an operation whose start the stream did not see is under way all the same, its command unknown', () => {
+  const unit = { v: 2 as const, type: 'unit.started', ts: '2026-10-27T10:00:00Z', op_id: 'op-2', subject: 'feat/b' }
+
+  expect(track({}, unit, 'r1')).toEqual({
+    'op-2': { repo: 'r1', command: '', subjects: ['feat/b'], since: Date.parse(unit.ts) },
+  })
+})
+
+// A process killed mid-operation never says it finished: its worktrees stayed greyed for good.
+test("an operation is under way no longer than the core's own cap", () => {
+  const since = Date.parse('2026-10-27T10:00:00Z')
+  const operations = { 'op-3': { repo: 'r1', command: 'clean', subjects: ['feat/c'], since } }
+
+  expect(current(operations, since + operationCap - 1)).toHaveLength(1)
+  expect(current(operations, since + operationCap)).toEqual([])
+})
+
+// operation.finished cleared the worktrees under way before the read without them landed: a removed row came back.
+test('an operation finished leaves its worktrees under way until the read after it lands', async () => {
+  const client = new QueryClient()
+  client.setQueryData(['repos'], [repo])
+  let reads = 0
+  const observer = new QueryObserver(client, {
+    queryKey: ['repo', 'r1', 'list', []],
+    queryFn: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      reads += 1
+      return reads
+    },
+  })
+  onTestFinished(observer.subscribe(() => {}))
+  await waitFor(() => expect(reads).toBe(1))
+  const of = '"ts":"2026-10-27T10:00:00Z","repo":{"root":"/acme","common_dir":"/acme/.git"},"op_id":"op-1"'
+  serve(
+    200,
+    `data: {"v":2,"type":"operation.started",${of},"command":"clean","surface":"cli"}\n\n` +
+      `data: {"v":2,"type":"unit.started",${of},"subject":"feat/a"}\n\n` +
+      `data: {"v":2,"type":"operation.finished",${of},"command":"clean","surface":"cli","ok":true}\n\n`,
+  )
+
+  const seen: { held: number; reads: number }[] = []
+  client.getQueryCache().subscribe(() => {
+    const live = client.getQueryData<Live>(eventsQuery.queryKey)
+    if (live) seen.push({ held: Object.keys(live.operations).length, reads })
+  })
+  await client.fetchQuery(eventsQuery)
+
+  const released = seen.findIndex((at, i) => at.held === 0 && seen.slice(0, i).some((before) => before.held > 0))
+  expect(seen[released]?.reads).toBe(2)
 })

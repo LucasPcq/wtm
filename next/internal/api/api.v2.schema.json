@@ -2505,7 +2505,7 @@
           "anyOf": [
             {
               "items": {
-                "$ref": "#/$defs/domain.FollowUp"
+                "$ref": "#/$defs/repository.Offer"
               },
               "type": "array"
             },
@@ -3217,6 +3217,40 @@
       },
       "type": "array"
     },
+    "repository.Offer": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/worktree.Action"
+        },
+        "follow_up": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/domain.FollowUp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "refused": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/worktree.Unoffered"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "action",
+        "follow_up",
+        "refused"
+      ],
+      "type": "object"
+    },
     "resolve.Detail": {
       "additionalProperties": false,
       "properties": {
@@ -3651,7 +3685,7 @@
       "additionalProperties": false,
       "properties": {
         "code": {
-          "type": "string"
+          "$ref": "#/$defs/status.ProblemCode"
         },
         "fix": {
           "anyOf": [
@@ -3673,6 +3707,18 @@
         "fix"
       ],
       "type": "object"
+    },
+    "status.ProblemCode": {
+      "description": "What a worktree's problem is, as a code each surface words its own way.",
+      "enum": [
+        "status.missing",
+        "status.merged",
+        "status.behind_origin",
+        "status.behind",
+        "status.env_missing",
+        "status.isolation_pending",
+        "status.job_crashed"
+      ]
     },
     "status.Review": {
       "additionalProperties": false,
@@ -3943,7 +3989,7 @@
           "anyOf": [
             {
               "items": {
-                "$ref": "#/$defs/domain.FollowUp"
+                "$ref": "#/$defs/repository.Offer"
               },
               "type": "array"
             },
@@ -4344,6 +4390,19 @@
       ],
       "type": "object"
     },
+    "worktree.Action": {
+      "description": "An action on a worktree, one entry of the menu every surface shows of it.",
+      "enum": [
+        "go",
+        "open_pr",
+        "run_up",
+        "run_down",
+        "logs",
+        "fast_forward",
+        "sync",
+        "clean"
+      ]
+    },
     "worktree.Blocker": {
       "description": "What makes a worktree unsafe to remove, a safety refusal only force lifts, as a code each surface words its own way.",
       "enum": [
@@ -4532,6 +4591,17 @@
         "open",
         "merged",
         "closed"
+      ]
+    },
+    "worktree.Unoffered": {
+      "description": "Why a worktree does not offer an action, as a code each surface words its own way.",
+      "enum": [
+        "missing",
+        "no_branch",
+        "main_worktree",
+        "base_branch",
+        "no_pull_request",
+        "not_on_origin"
       ]
     }
   },

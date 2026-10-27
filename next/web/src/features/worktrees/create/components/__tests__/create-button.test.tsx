@@ -1,9 +1,10 @@
 import { screen, within } from '@testing-library/react'
 import { delay, HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
+import type { WebCall } from '@/api/types.gen'
 import { envelope } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
-import { questionsOf, server, streamed } from '@/test/server'
+import { line, questionsOf, server, streamed } from '@/test/server'
 
 async function openCreate() {
   const app = await renderApp('/r/r1/worktrees')
@@ -21,31 +22,26 @@ test('create shows a problem only once asked to go on, then confirms the plan, r
 
   await user.type(branches, 'feat/new')
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
-  // the web's own words, not the command line's; a question only a flag sets is not said to be skipped
   expect(await within(dialog).findByText('Env files')).toBeTruthy()
   expect(within(dialog).getByText('Project default')).toBeTruthy()
   expect(within(dialog).queryByText(/Not asked/)).toBeNull()
 
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
-  // the confirmation reads the plan, not the command line's recap
   const planned = await within(dialog).findByRole('listitem', { name: 'feat/new' })
   expect(within(planned).getByText(/\.env from \.env\.example/)).toBeTruthy()
-  // how it is made waits behind Details, one click away
   expect(within(dialog).queryByText('Add the worktree, run the on_create hooks')).toBeNull()
   await user.click(within(dialog).getByRole('button', { name: /^Details/ }))
   expect(within(dialog).getByText('Add the worktree, run the on_create hooks')).toBeTruthy()
-  await user.click(within(dialog).getByRole('button', { name: 'Create worktree' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Create' }))
 
-  expect(await within(dialog).findByText('feat/new is ready')).toBeTruthy()
-  // a lone group of the outcome needs no name
+  expect(await within(dialog).findByText('feat/new is ready.')).toBeTruthy()
+  expect(within(dialog).getByRole('heading', { name: 'Create worktrees' })).toBeTruthy()
   expect(within(dialog).queryByRole('heading', { name: 'Ready' })).toBeNull()
-  // a worktree ready is one line; where it is and the step into it fold under it, with no copy on the line
   expect(within(dialog).queryByText('/acme.trees/feat/new')).toBeNull()
   expect(within(dialog).queryByRole('button', { name: 'Copy wtm go feat/new' })).toBeNull()
   await user.click(within(dialog).getByRole('button', { name: 'Details of feat/new' }))
   expect(within(dialog).getByText('/acme.trees/feat/new')).toBeTruthy()
   expect(within(dialog).getByText('wtm go feat/new')).toBeTruthy()
-  // a run that went well folds its steps away, one click from them
   expect(within(dialog).queryByText('Run the on_create hooks')).toBeNull()
   await user.click(within(dialog).getByRole('button', { name: /2 steps/ }))
   expect(within(dialog).getByText('Run the on_create hooks')).toBeTruthy()
@@ -78,7 +74,7 @@ test('a next command the server cannot spell is said with what it meant, not hid
   await user.type(branches, 'feat/new')
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
-  await user.click(await within(dialog).findByRole('button', { name: 'Create worktree' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Create' }))
 
   await user.click(await within(dialog).findByRole('button', { name: 'Details of feat/new' }))
   expect(await within(dialog).findByText('No command line for this: jump in')).toBeTruthy()
@@ -102,12 +98,11 @@ test('a create cancelled before it made anything says it was cancelled, not that
   await user.type(branches, 'feat/new')
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
-  await user.click(await within(dialog).findByRole('button', { name: 'Create worktree' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Create' }))
 
-  expect(await within(dialog).findByText('Cancelled feat/new')).toBeTruthy()
+  expect(await within(dialog).findByText(/^0 of \d+ steps done\. What is done stays/)).toBeTruthy()
   expect(within(dialog).queryByText(/Couldn't create/)).toBeNull()
 
-  // nothing was made: Done opens no worktree
   await user.click(within(dialog).getByRole('button', { name: 'Done' }))
   expect(router.state.location.search).toEqual({})
 })
@@ -134,4 +129,138 @@ test('an answer to older typing that lands last is dropped, the newer one stands
   await delay(900)
 
   expect(within(dialog).queryByText('an older answer')).toBeNull()
+})
+
+test('a create hidden while it runs says it is ready in a toast once it ends', async () => {
+  let end = () => {}
+  server.use(
+    http.post('/api/repos/r1/commands/create', async ({ request }) => {
+      if (((await request.clone().json()) as WebCall).dry_run) return undefined
+      const stream = new ReadableStream({
+        start: (controller) => {
+          controller.enqueue(new TextEncoder().encode(line({ type: 'unit.started', subject: 'feat/new' })))
+          end = () => {
+            const ended = { ...envelope('create', []), items: [{ subject: 'feat/new', status: 'done', detail: {} }] }
+            controller.enqueue(new TextEncoder().encode(`event: envelope\ndata: ${JSON.stringify(ended)}\n\n`))
+            controller.close()
+          }
+        },
+      })
+      return new HttpResponse(stream, { headers: { 'Content-Type': 'text/event-stream', 'X-Wtm-Operation': 'op-1' } })
+    }),
+  )
+  const { user, dialog, branches } = await openCreate()
+  await user.type(branches, 'feat/new')
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Create' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Hide' }))
+
+  end()
+
+  expect(await screen.findByText('feat/new is ready.')).toBeTruthy()
+  expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+test('a warning is drawn where its subject is: a diverged source on the rows that start from it, one about no branch in the Alert', async () => {
+  const diverged = 'branch main has diverged from origin (1 ahead, 2 behind)'
+  const fallback = 'the "parent" env strategy needs the source branch checked out'
+  server.use(
+    http.post('/api/repos/r1/commands/create', async ({ request }) => {
+      const call = (await request.clone().json()) as { dry_run?: boolean }
+      if (!call.dry_run) return undefined
+      return HttpResponse.json({
+        ...envelope('create', []),
+        fingerprint: 'f1',
+        plan: {
+          branches: [{ branch: 'feat/new', path: '/acme.trees/feat/new', action: 'create', phases: ['worktree'] }],
+          creates: 1,
+          from: 'main',
+          env_from: 'example',
+          recap: [],
+        },
+        warnings: [
+          { code: 'create.source_diverged', message: diverged, params: { branch: 'main', ahead: '1', behind: '2' } },
+          { code: 'create.env_parent_fallback', message: fallback },
+        ],
+      })
+    }),
+  )
+  const { user, dialog, branches } = await openCreate()
+  await user.type(branches, 'feat/new')
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+
+  const row = await within(dialog).findByRole('listitem', { name: 'feat/new' })
+  expect(within(row).getByText(/has diverged from origin/)).toBeTruthy()
+  const alert = within(dialog).getByRole('alert')
+  expect(alert.textContent).toContain('needs the source branch checked out')
+  expect(alert.textContent).not.toContain('diverged')
+})
+
+// With no source branch, a plan-wide warning matched every created row (undefined === undefined) and its Alert vanished.
+test('with no source branch, a plan-wide warning stays the Alert, and the row says where its .env really comes from', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/create', async ({ request }) => {
+      const call = (await request.clone().json()) as { dry_run?: boolean }
+      if (!call.dry_run) return undefined
+      return HttpResponse.json({
+        ...envelope('create', []),
+        fingerprint: 'f1',
+        plan: {
+          branches: [{ branch: 'feat/new', path: '/acme.trees/feat/new', action: 'create', phases: ['worktree'] }],
+          creates: 1,
+          env_from: 'parent',
+          recap: [],
+        },
+        warnings: [{ code: 'create.env_parent_fallback', message: 'without a worktree it comes from main' }],
+      })
+    }),
+  )
+  const { user, dialog, branches } = await openCreate()
+  await user.type(branches, 'feat/new')
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+
+  const row = await within(dialog).findByRole('listitem', { name: 'feat/new' })
+  expect(within(dialog).getByRole('alert').textContent).toContain('a worktree it comes from main')
+  expect(row.textContent).not.toContain('comes from main')
+  expect(row.textContent).toContain('.env from the main checkout')
+})
+
+test("Create's Done keeps a warning of the whole run as its Alert, and one about a branch under To check", async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/create', async ({ request }) => {
+      const call = (await request.clone().json()) as { dry_run?: boolean }
+      if (call.dry_run) return undefined
+      return streamed(
+        [
+          line({ type: 'unit.started', subject: 'feat/new' }),
+          line({ type: 'unit.finished', subject: 'feat/new', status: 'done' }),
+          `event: envelope\ndata: ${JSON.stringify({
+            ...envelope('create', []),
+            items: [{ subject: 'feat/new', status: 'done', detail: { path: '/acme.trees/feat/new' } }],
+            warnings: [
+              { code: 'locks.unavailable', message: 'ran without operation locks' },
+              {
+                code: 'create.source_diverged',
+                message: 'branch main has diverged from origin',
+                params: { branch: 'main' },
+              },
+            ],
+          })}\n\n`,
+        ].join(''),
+      )
+    }),
+  )
+  const { user, dialog, branches } = await openCreate()
+  await user.type(branches, 'feat/new')
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Create' }))
+
+  const toCheck = await within(dialog).findByRole('region', { name: 'To check' })
+  expect(within(toCheck).getByText(/has diverged from origin/)).toBeTruthy()
+  expect(within(toCheck).queryByText(/without operation locks/)).toBeNull()
+  expect(within(dialog).getByRole('alert').textContent).toContain('without operation locks')
 })

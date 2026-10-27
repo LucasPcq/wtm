@@ -27,8 +27,8 @@ export const isolation: Options<'isolation'> = {
 export const envFromShort: Record<ValuesOf<'env_from'>, string> = {
   config: '.env from the project default',
   example: '.env from .env.example',
-  main: ".env from the main checkout's",
-  parent: ".env from the source worktree's",
+  main: '.env from the main checkout',
+  parent: '.env from the source worktree',
 }
 
 export const isolationShort: Record<ValuesOf<'isolation'>, string> = {
@@ -81,7 +81,7 @@ export const skipWords: Record<DomainSkip, string | null> = {
   flag_only: null,
   all: null,
   exists: 'the worktree exists, so nothing is created',
-  not_behind: 'the source branch is up to date with origin',
+  not_behind: 'the source branch is not behind origin',
   held: 'the source holds the changes being extracted',
   run_unread: "run.toml couldn't be read",
   nothing_isolated: 'run.toml declares nothing to isolate',

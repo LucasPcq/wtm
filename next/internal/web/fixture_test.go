@@ -39,11 +39,22 @@ func (q questions) Form() domain.Form {
 	return domain.Form{Fields: []domain.Field{domain.TextField{FieldSpec: domain.FieldSpec{Path: "name"}, Value: q.asked}}}
 }
 
-// outcome reports what it ran with as its op.
-type outcome struct{ op string }
+// outcome reports what it ran with as its op, and, once applied, its one item failed with failed, or, cancelled, one item done and the next cancelled.
+type outcome struct {
+	op        string
+	failed    *domain.Error
+	cancelled bool
+}
 
 func (o outcome) Envelope(params domain.EnvelopeParams) domain.Envelope {
-	return domain.Outcome[struct{}, struct{}]{Op: o.op}.Envelope(params)
+	ran := domain.Outcome[struct{}, struct{}]{Op: o.op}
+	switch {
+	case o.cancelled:
+		ran.Result = &domain.Result[struct{}]{Items: []domain.Unit[struct{}]{{Subject: "w", Status: domain.StatusDone}, {Subject: "x", Status: domain.StatusCancelled, Reason: domain.ReasonInterrupted}}}
+	case o.failed != nil:
+		ran.Result = &domain.Result[struct{}]{Items: []domain.Unit[struct{}]{{Subject: "x", Status: domain.StatusFailed, Err: o.failed}}}
+	}
+	return ran.Envelope(params)
 }
 
 func (o outcome) Types() (reflect.Type, reflect.Type) {
@@ -54,6 +65,8 @@ func (o outcome) Types() (reflect.Type, reflect.Type) {
 type useCase struct {
 	dir     string
 	refusal error
+	failed  *domain.Error // the error its one item fails on, none when it succeeds
+	read    bool          // it reads: its outcome names no operation
 	started chan string
 	release chan struct{}
 	ended   chan error // receives its context's error as the run ends
@@ -80,9 +93,12 @@ func (u useCase) Run(ctx context.Context, req request, opts domain.RunOptions) (
 		u.ended <- ctx.Err()
 	}
 	if ctx.Err() != nil {
-		return outcome{}, &domain.Error{Kind: domain.KindCancelled, Code: "greet.cancelled"}
+		return outcome{cancelled: true}, &domain.Error{Kind: domain.KindCancelled, Code: "greet.cancelled"}
 	}
-	return outcome{op: u.dir + ":" + req.Name + ":" + string(opts.Surface) + ":" + opts.CorrelationID}, u.refusal
+	if u.read {
+		return outcome{failed: u.failed}, u.refusal
+	}
+	return outcome{op: u.dir + ":" + req.Name + ":" + string(opts.Surface) + ":" + opts.CorrelationID, failed: u.failed}, u.refusal
 }
 
 func greet(u useCase) api.Command {

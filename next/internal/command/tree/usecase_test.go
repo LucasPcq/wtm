@@ -13,6 +13,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,7 +48,7 @@ func TestTheTreeListsParentsBeforeTheirChildrenRootsMainFirst(t *testing.T) {
 	assert.Equal(t, "feat/a", *a1.Parent)
 	assert.Equal(t, "/repo/.trees/feat/a1", *a1.Path)
 	gone := detailOf(t, read, "gone")
-	assert.Equal(t, tree.Detail{Branch: "gone", Virtual: true, Condition: worktree.ConditionNoWorktree, Children: []string{"feat/x"}, Actions: []domain.FollowUp{}}, gone)
+	assert.Equal(t, tree.Detail{Branch: "gone", Virtual: true, Condition: worktree.ConditionNoWorktree, Children: []string{"feat/x"}, Actions: []repository.Offer{}}, gone)
 	assert.True(t, detailOf(t, read, "y").Cycle)
 	assert.Nil(t, detailOf(t, read, "y").Parent, "a member of a cycle is drawn as a root")
 	assert.Nil(t, detailOf(t, read, "y").Behind, "a member of a cycle has no parent to sync onto")
@@ -113,14 +114,13 @@ func TestAheadAndBehindAreCountedAgainstTheParent(t *testing.T) {
 	}
 }
 
-func TestAWorktreeGitStoppedInTheMiddleOfAnOperationNeedsNoSyncAndIsSentToFinishIt(t *testing.T) {
+func TestAWorktreeGitStoppedInTheMiddleOfAnOperationNeedsNoSync(t *testing.T) {
 	cases := map[string]struct {
-		ui      worktree.Worktree
-		actions []string
+		ui worktree.Worktree
 	}{
-		"rebasing":  {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Rebasing{Branch: "feat/a-ui"}}, actions: []string{"go"}},
-		"bisecting": {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Bisecting{Branch: "feat/a-ui"}}, actions: []string{"go"}},
-		"merging":   {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Midway: worktree.MidwayMerge}, actions: []string{"go"}},
+		"rebasing":  {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Rebasing{Branch: "feat/a-ui"}}},
+		"bisecting": {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.Bisecting{Branch: "feat/a-ui"}}},
+		"merging":   {ui: worktree.Worktree{Path: "/repo/.trees/feat/a-ui", State: worktree.OnBranch{Branch: "feat/a-ui"}, Midway: worktree.MidwayMerge}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -139,11 +139,6 @@ func TestAWorktreeGitStoppedInTheMiddleOfAnOperationNeedsNoSyncAndIsSentToFinish
 			assert.Equal(t, count(1), ui.Behind, "the commits it lacks are still counted")
 			assert.False(t, ui.NeedsSync)
 			assert.Equal(t, worktree.Condition(name), ui.Condition)
-			var actions []string
-			for _, action := range ui.Actions {
-				actions = append(actions, action.Command)
-			}
-			assert.Equal(t, c.actions, actions)
 		})
 	}
 }
@@ -161,7 +156,6 @@ func TestARootBehindTheBaseBranchIsNotFlagged(t *testing.T) {
 	assert.Equal(t, count(1), loose.Ahead, "a root is counted ahead of the base branch")
 	assert.Nil(t, loose.Behind, "a root has no parent to fall behind")
 	assert.False(t, loose.NeedsSync)
-	assert.Empty(t, loose.Actions)
 }
 
 func TestARootIsNotCountedWhenTheBaseBranchIsMissing(t *testing.T) {
@@ -305,14 +299,12 @@ func TestAMergedPullRequestCleansItsWorktreeAtOrBehindItsCommitAndNeverTheMainOn
 
 	require.NoError(t, err)
 	for _, branch := range []string{"feat/a", "feat/behind"} {
-		actions := detailOf(t, got, branch).Actions
-		require.Len(t, actions, 1, branch)
-		assert.Equal(t, domain.CommandPrune, actions[0].Command, branch)
-		assert.Equal(t, "tree.prune", actions[0].Code, branch)
+		assert.Equal(t, worktree.ConditionMerged, detailOf(t, got, branch).Condition, branch)
 	}
 	for _, branch := range []string{"main", "develop", "feat/moved", "feat/unknown"} {
-		assert.Empty(t, detailOf(t, got, branch).Actions, branch)
+		assert.NotEqual(t, worktree.ConditionMerged, detailOf(t, got, branch).Condition, branch)
 	}
+	assert.Equal(t, worktree.UnofferedBaseBranch, *offerOf(t, detailOf(t, got, "develop").Actions, worktree.ActionClean).Refused)
 }
 
 func TestWhatCannotBeAskedIsAWarningNotAFailure(t *testing.T) {

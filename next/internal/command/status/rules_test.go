@@ -43,7 +43,7 @@ func TestABranchBehindOriginIsFastForwardedBeforeItIsSynced(t *testing.T) {
 
 	var fixes []string
 	for _, problem := range problems {
-		fixes = append(fixes, problem.Code+" "+problem.Fix.Command)
+		fixes = append(fixes, string(problem.Code)+" "+problem.Fix.Command)
 	}
 	assert.Equal(t, []string{"status.merged prune", "status.behind_origin fast-forward", "status.behind sync"}, fixes)
 	assert.Equal(t, "origin has 2 commits it lacks", problems[1].Message)

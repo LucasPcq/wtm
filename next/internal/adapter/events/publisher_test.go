@@ -86,11 +86,21 @@ func TestAnUncorrelatedEventCarriesNoCorrelation(t *testing.T) {
 	assert.NotContains(t, decoded(t, payloadOf(t, daemon.next(t))), "correlation_id")
 }
 
-func TestProgressAndTheStreamsOwnLinesAreNeverPublished(t *testing.T) {
+func TestAUnitStartedIsPublishedSoAnotherSurfaceKnowsTheWorktreeIsUnderWay(t *testing.T) {
 	daemon := listen(t)
 	publisher := publisherOn(t, daemon)
 
 	publisher.Publish(domain.UnitStarted{Subject: "feat/a"})
+
+	line := decoded(t, payloadOf(t, daemon.next(t)))
+	assert.Equal(t, "unit.started", line["type"])
+	assert.Equal(t, "feat/a", line["subject"])
+}
+
+func TestProgressAndTheStreamsOwnLinesAreNeverPublished(t *testing.T) {
+	daemon := listen(t)
+	publisher := publisherOn(t, daemon)
+
 	publisher.Publish(domain.PhaseStarted{Subject: "feat/a", Phase: "on_create"})
 	publisher.Publish(domain.Output{Subject: "feat/a", Line: "installing"})
 	publisher.Publish(domain.PhaseFinished{Subject: "feat/a", Phase: "on_create"})

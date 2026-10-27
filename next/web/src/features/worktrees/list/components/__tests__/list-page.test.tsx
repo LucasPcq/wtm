@@ -14,6 +14,30 @@ test('a row opens its own worktree, not another', async () => {
   await waitFor(() => expect(router.state.location.search).toEqual({ worktree: 'feat/billing' }))
 })
 
+test('a row whose ⋯ menu is open stays marked until it closes, and the menu is named after its branch', async () => {
+  const { user } = await renderApp('/r/r1/worktrees')
+  const more = await screen.findByRole('button', { name: 'Actions on fix/login' })
+
+  await user.click(more)
+
+  const menu = await screen.findByRole('menu', { name: 'fix/login' })
+  expect(menu.firstElementChild?.textContent).toBe('fix/login')
+  expect(more.closest('tr')?.hasAttribute('data-menu-open')).toBe(true)
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(more.closest('tr')?.hasAttribute('data-menu-open')).toBe(false))
+})
+
+// A right-click inside the ⋯ menu reached the row through the portal: its context menu opened over the first.
+test('a right-click inside the ⋯ menu opens no second menu', async () => {
+  const { user } = await renderApp('/r/r1/worktrees')
+  await user.click(await screen.findByRole('button', { name: 'Actions on fix/login' }))
+
+  await user.pointer({ keys: '[MouseRight]', target: await screen.findByRole('menuitem', { name: /Sync/ }) })
+
+  // the menu behind a second one is aria-hidden: count it too
+  expect(screen.getAllByRole('menu', { hidden: true })).toHaveLength(1)
+})
+
 test('Needs sync keeps the worktrees behind their parent, the search narrows the list, and both clear', async () => {
   const { user } = await renderApp('/r/r1/worktrees')
   await screen.findByRole('link', { name: /fix\/login/ })

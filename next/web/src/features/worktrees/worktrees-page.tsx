@@ -1,15 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import { Trash2 } from 'lucide-react'
 import { worktreeCount } from '@/api/queries/commands'
 import { reposQuery } from '@/api/queries/repos'
 import { PageHeader } from '@/components/page-header'
-import { Button } from '@/components/ui/button'
+import { HeaderActions } from '@/features/worktrees/components/header-actions'
 import { SelectionBar } from '@/features/worktrees/components/selection-bar'
 import { Toolbar } from '@/features/worktrees/components/toolbar'
 import { CreateButton } from '@/features/worktrees/create/create-button'
 import { DetailPanel } from '@/features/worktrees/detail/detail-panel'
 import { useRead } from '@/features/worktrees/hooks/use-read'
-import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
 import { useUnderWay } from '@/features/worktrees/hooks/use-run'
 import { useSelection } from '@/features/worktrees/hooks/use-selection'
 import { columnIds, defaultColumns } from '@/features/worktrees/list/components/columns'
@@ -20,7 +18,7 @@ import { rowsOf } from '@/features/worktrees/list/utils/rows'
 import { RemoveDialog } from '@/features/worktrees/remove/remove-dialog'
 import { useChoice } from '@/features/worktrees/store/ui-store'
 import { TreeView } from '@/features/worktrees/tree/tree-view'
-import { overlaid } from '@/features/worktrees/utils/condition'
+import { type Subject, withPullRequest } from '@/features/worktrees/utils/actions'
 import { countsOf, visibleRows } from '@/features/worktrees/utils/filters'
 import { unavailable } from '@/features/worktrees/utils/github'
 import type { WorktreesSearch } from '@/features/worktrees/utils/search'
@@ -52,38 +50,35 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
   const selected = tree ? [] : selection.selected.filter((subject) => visible.some((row) => row.subject === subject))
   const count = read ? worktreeCount(read) : 0
 
-  const actions = () => {
-    if (!tree) return rows.find((row) => row.subject === search.worktree)?.actions ?? []
+  const subjects = (): Subject[] => {
+    if (!tree) return rows.map(({ subject, actions }) => ({ subject, offers: actions }))
 
-    const live = forest.live.data?.items.find((item) => item.subject === search.worktree)?.detail
-    const asked = forest.github.data?.items.find((item) => item.subject === search.worktree)?.detail
-    return (live && overlaid(live, asked).actions) ?? []
+    const asked = new Map(forest.github.data?.items.map((item) => [item.subject, item.detail]))
+    return (forest.live.data?.items ?? []).flatMap(({ subject, detail }) =>
+      detail && !detail.virtual && (detail.actions?.length ?? 0) > 0
+        ? [{ subject, offers: withPullRequest(detail.actions ?? [], asked.get(subject)?.actions ?? undefined) }]
+        : [],
+    )
   }
+  const shown = subjects()
+  // the selection's actions leave out the rows under way, as their menus do
+  const selectedRows = shown.filter(({ subject }) => selected.includes(subject) && underWay[subject] === undefined)
 
   return (
     <>
       <PageHeader
         title="Worktrees"
         description={read && root && `${count} ${count === 1 ? 'worktree' : 'worktrees'} in ${repoName(root)}`}
-        action={<CreateButton repo={repo} />}
+        action={
+          <div className="flex gap-2">
+            <HeaderActions repo={repo} rows={shown.filter(({ subject }) => underWay[subject] === undefined)} />
+            <CreateButton repo={repo} />
+          </div>
+        }
       />
       <RemoveDialog repo={repo} />
       {selected.length > 0 ? (
-        <SelectionBar
-          count={selected.length}
-          onClear={selection.clear}
-          destructive={
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-destructive text-destructive hover:text-destructive"
-              onClick={() => openRemove(repo, selected)}
-            >
-              <Trash2 />
-              {selected.length === 1 ? 'Remove 1 worktree…' : `Remove ${selected.length} worktrees…`}
-            </Button>
-          }
-        />
+        <SelectionBar repo={repo} count={selected.length} rows={selectedRows} onClear={selection.clear} />
       ) : (
         <Toolbar
           search={search}
@@ -98,7 +93,7 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
         <div className="flex min-w-0 flex-1 flex-col" aria-busy={!read}>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
             {tree ? (
-              <TreeView repo={repo} search={search} underWay={underWay} />
+              <TreeView repo={repo} search={search} underWay={underWay} subjects={shown} />
             ) : (
               <ListView
                 live={list.live}
@@ -107,6 +102,7 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
                 search={search}
                 selected={selected}
                 onSelect={selection.set}
+                repo={repo}
               />
             )}
           </div>
@@ -116,7 +112,13 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
           )}
         </div>
         {search.worktree && (
-          <DetailPanel key={search.worktree} repo={repo} worktree={search.worktree} actions={actions()} />
+          <DetailPanel
+            key={search.worktree}
+            repo={repo}
+            worktree={search.worktree}
+            offers={shown.find(({ subject }) => subject === search.worktree)?.offers ?? []}
+            busy={underWay[search.worktree] !== undefined}
+          />
         )}
       </div>
     </>

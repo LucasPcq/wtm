@@ -7,6 +7,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 
@@ -24,7 +25,7 @@ func TestThePickerAsksAWorktreeThenWhatToDoWithIt(t *testing.T) {
 	d.Keys("down", "enter")
 
 	assert.Equal(t, form.Finished, d.Wizard.Ending())
-	assert.Equal(t, []domain.FollowUp{{URL: "https://github.com/acme/acme/pull/12", Code: "list.open_pr", Message: "Open the pull request", Params: domain.Params{list.ParamNumber: "12"}}}, d.p.chosen().FollowUps)
+	assert.Equal(t, []domain.FollowUp{{URL: "https://github.com/acme/acme/pull/12", Code: "list.open_pr", Message: "Open the pull request", Params: domain.Params{repository.ParamNumber: "12"}}}, d.p.chosen().FollowUps)
 }
 
 func TestLeavingThePickerCancels(t *testing.T) {
@@ -76,7 +77,7 @@ func TestThePullRequestsLandingLaterAreGivenToTheReadShown(t *testing.T) {
 func TestAWorktreeShownOffersWhatItsRowShowsWhenThePullRequestsLand(t *testing.T) {
 	p := newPicker(t, world{}, list.Request{})
 	from := list.Outcome{Items: []list.Item{{Subject: "feat/b", Status: domain.StatusDone, Detail: &list.Detail{
-		Branch: "feat/b", Missing: true, PR: &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12", State: worktree.PullRequestOpen}, Actions: []domain.FollowUp{{Command: "clean", Code: "list.clean"}},
+		Branch: "feat/b", Missing: true, PR: &list.PR{Number: 12, URL: "https://github.com/acme/acme/pull/12", State: worktree.PullRequestOpen},
 	}}}}
 
 	merged := list.WithPullRequests(p.read, from)
@@ -85,10 +86,10 @@ func TestAWorktreeShownOffersWhatItsRowShowsWhenThePullRequestsLand(t *testing.T
 	shown := shownDetail(t, p, "feat/b")
 	assert.False(t, shown.Missing)
 	var codes []string
-	for _, action := range shown.Actions {
+	for _, action := range shown.Offered() {
 		codes = append(codes, action.Code)
 	}
-	assert.Equal(t, []string{"list.go", "list.open_pr", "list.run_up", "list.run_down", "list.logs", "list.clean"}, codes)
+	assert.Equal(t, []string{"list.go", "list.open_pr", "list.run_up", "list.run_down", "list.logs", "list.sync", "list.clean"}, codes)
 }
 
 func TestAPickSurvivesAReadThatNoLongerHasTheWorktree(t *testing.T) {

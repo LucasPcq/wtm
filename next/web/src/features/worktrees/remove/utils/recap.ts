@@ -1,10 +1,15 @@
-import { sharedWarnings } from '@/features/worktrees/remove/utils/words'
+import type { DomainWarning } from '@/api/types.gen'
+import { dataKept } from '@/features/worktrees/remove/utils/words'
 import { itemWarnings, type OutcomeGroup, outputOf, stoppedMessage } from '@/features/worktrees/utils/outcome'
 import type { Progress } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
 // the data each worktree keeps is no thing to act on, so it goes with the steps rather than in "To check"
-export function recapOf(progress: Progress<'clean'>): { groups: OutcomeGroup[]; kept: string[] } {
+export function recapOf(progress: Progress<'clean'>): {
+  groups: OutcomeGroup[]
+  warnings: DomainWarning[]
+  kept: string[]
+} {
   const envelope = progress.envelope
   const items = envelope?.items ?? []
   const plan = envelope?.plan
@@ -39,17 +44,7 @@ export function recapOf(progress: Progress<'clean'>): { groups: OutcomeGroup[]; 
       },
       {
         kind: 'check',
-        rows: [
-          ...warnings
-            .filter((warning) => warning.code !== sharedWarnings.dataKept)
-            .map((warning) => ({
-              key: `${warning.code}-${warning.message}`,
-              tone: 'attention' as const,
-              message: sentence(warning.message),
-              followUp: warning.follow_up,
-            })),
-          ...itemWarnings(items),
-        ],
+        rows: itemWarnings(items),
       },
       {
         kind: 'done',
@@ -63,8 +58,7 @@ export function recapOf(progress: Progress<'clean'>): { groups: OutcomeGroup[]; 
           })),
       },
     ],
-    kept: warnings
-      .filter((warning) => warning.code === sharedWarnings.dataKept)
-      .map((warning) => sentence(warning.message)),
+    warnings: warnings.filter((warning) => warning.code !== dataKept),
+    kept: warnings.filter((warning) => warning.code === dataKept).map((warning) => sentence(warning.message)),
   }
 }
