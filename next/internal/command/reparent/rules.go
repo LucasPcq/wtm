@@ -37,6 +37,11 @@ func (f Facts) movable(w worktree.Worktree) bool {
 	return !w.Main && w.Branch() != "" && w.Branch() != f.Config.Worktrees.BaseBranch && recorded
 }
 
+// gone reports whether parent, a branch a worktree records as its parent, is no branch any more.
+func (f Facts) gone(parent string) bool {
+	return parent != "" && !f.Candidate(parent)
+}
+
 // current is the branch of the worktree the caller stands in when reparent can move it, "" otherwise.
 func (f Facts) current() string {
 	at := worktree.Holding(f.Worktrees, f.Cwd, func(w worktree.Worktree) string { return w.Path })
@@ -104,7 +109,7 @@ func (f Facts) entries(names []string, to string) (moves []Move, problems []doma
 			problems = append(problems, problem(CodeUnrecorded, "{value} has no wtm record: wtm did not create it"))
 		default:
 			from := f.Records[w.Branch()].SourceBranch
-			moves = append(moves, Move{Branch: w.Branch(), Path: w.Path, From: from, ParentGone: from != "" && !f.Candidate(from), To: to, Children: f.Stack.Children(w.Branch())})
+			moves = append(moves, Move{Branch: w.Branch(), Path: w.Path, From: from, ParentGone: f.gone(from), To: to, Children: f.Stack.Children(w.Branch())})
 		}
 	}
 
@@ -145,10 +150,10 @@ func branches(moves []Move) []string {
 // ----------------------------------------------------------------------------
 // Decide
 
-// Decide turns the facts and the resolved questions into the plan: the move of each worktree, those already on the new parent included.
-func Decide(f Facts, q Questions) Plan {
-	to := q.To.Value
-	return Plan{Moves: q.Moves, To: to, chain: append([]string{to}, f.Stack.Ancestors(to)...), facts: f}
+// Decide turns the facts and the resolved request into the plan: the move of each worktree, those already on the new parent included.
+func Decide(f Facts, req Request) Plan {
+	moves, _ := f.entries(req.Worktrees, req.To)
+	return Plan{Moves: moves, To: req.To, chain: append([]string{req.To}, f.Stack.Ancestors(req.To)...), facts: f}
 }
 
 // ----------------------------------------------------------------------------
@@ -199,7 +204,7 @@ func (p Plan) empty() bool {
 func (p Plan) recap() []domain.RecapRow {
 	values := make([]domain.RecapValue, 0, len(p.Moves))
 	for _, move := range p.Moves {
-		value := domain.RecapValue{Value: move.Branch, Params: domain.Params{"from": move.From, "to": move.To}, Text: move.Branch + " (" + parentOf(move.From) + " → " + move.To + ")"}
+		value := domain.RecapValue{Value: move.Branch, Params: domain.Params{"from": move.From, "to": move.To}, Text: move.Branch + " (" + parentOf(move) + " → " + move.To + ")"}
 		if move.Unchanged() {
 			value.Note, value.Text = NoteUnchanged, move.Branch+" (already on "+move.To+")"
 		}
@@ -212,12 +217,16 @@ func (p Plan) recap() []domain.RecapRow {
 	}
 }
 
-func parentOf(branch string) string {
-	if branch == "" {
+// parentOf words the parent move leaves in the recap.
+func parentOf(move Move) string {
+	switch {
+	case move.From == "":
 		return "no parent"
+	case move.ParentGone:
+		return move.From + " (gone)"
 	}
 
-	return branch
+	return move.From
 }
 
 // ----------------------------------------------------------------------------

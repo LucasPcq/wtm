@@ -48,7 +48,7 @@ func TestAPlanThatMovesNothingEndsWithoutAskingToConfirm(t *testing.T) {
 	assert.True(t, d.s.Preview().Empty())
 }
 
-func TestTheNewParentStepSaysTheParentLeftIsGone(t *testing.T) {
+func TestThePickerAndTheNewParentStepSayTheParentLeftIsGone(t *testing.T) {
 	w := newWorld(seed{})
 	_, err := w.store.Update(t.Context(), worktree.MetaUpdate{Branch: featC, Change: func(meta *worktree.Meta) error {
 		meta.SourceBranch = "feat/deleted"
@@ -56,8 +56,10 @@ func TestTheNewParentStepSaysTheParentLeftIsGone(t *testing.T) {
 	}})
 	require.NoError(t, err)
 
+	picker := open(t, sessionParams{App: w.usecase()})
 	d := open(t, sessionParams{App: w.usecase(), Request: reparent.Request{Worktrees: []string{featC}}})
 
+	assert.Contains(t, picker.Screen(), "feat/c  on feat/deleted (gone)")
 	assert.Equal(t, stepTo, d.Wizard.Current())
 	assert.Contains(t, d.Screen(), "feat/c is rebased onto feat/deleted (gone)")
 }

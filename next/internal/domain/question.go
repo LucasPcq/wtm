@@ -59,6 +59,7 @@ type Option struct {
 	Base     bool             `json:"base,omitempty"`     // the configured base branch
 	Detached bool             `json:"detached,omitempty"` // a worktree on no branch, valued by its path
 	Parent   string           `json:"parent,omitempty"`   // the branch a worktree is rebased onto, empty when it has none
+	Gone     bool             `json:"gone,omitempty"`     // Parent is no branch any more
 	Origin   *worktree.Origin `json:"origin,omitempty"`   // where the branch stands against origin's, nil when origin has none
 	Changes  int              `json:"changes,omitempty"`  // the uncommitted changes the worktree holds
 	Change   *worktree.Change `json:"change,omitempty"`   // the uncommitted change it is

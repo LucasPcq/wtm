@@ -128,7 +128,8 @@ func (f Facts) worktreeOptions() []domain.Option {
 		if !f.movable(w) {
 			continue
 		}
-		option := domain.Option{Value: w.Branch(), Parent: f.Records[w.Branch()].SourceBranch}
+		parent := f.Records[w.Branch()].SourceBranch
+		option := domain.Option{Value: w.Branch(), Parent: parent, Gone: f.gone(parent)}
 		if w.Branch() == current {
 			option.Tag = domain.TagCurrent
 		}
@@ -158,12 +159,13 @@ func (f Facts) to(req Request, moving []string) To {
 // ----------------------------------------------------------------------------
 // Resolve and validation
 
-// Resolve settles the request on the facts as its questions, the worktrees defaulting to the caller's and each one's move; a request with problems is refused with all of them, by domain.Invalid.
-func Resolve(f Facts, req Request) (Questions, error) {
+// Resolve settles the request on the facts, the worktrees defaulting to the caller's; a request with problems is refused with all of them, by domain.Invalid.
+func Resolve(f Facts, req Request) (Request, error) {
 	questions := NewQuestions(f, req)
 	if len(questions.Errors) > 0 {
-		return Questions{}, domain.Invalid(questions.Errors)
+		return Request{}, domain.Invalid(questions.Errors)
 	}
 
-	return questions, nil
+	req.Worktrees = questions.Worktrees.Picked
+	return req, nil
 }

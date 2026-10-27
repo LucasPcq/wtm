@@ -25,7 +25,10 @@ func worktreeWords(options []domain.Option) map[string]form.OptionWords {
 	said := make(map[string]form.OptionWords, len(options))
 	for _, option := range options {
 		parent := "no parent"
-		if option.Parent != "" {
+		switch {
+		case option.Gone:
+			parent = "on " + option.Parent + " (gone)"
+		case option.Parent != "":
 			parent = "on " + option.Parent
 		}
 		said[option.Value] = form.OptionWords{Label: option.Value + "  " + parent}

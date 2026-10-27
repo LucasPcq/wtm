@@ -67,3 +67,13 @@ func TestThePlanHoldsTheNewParentAndWhatItSitsUnderShared(t *testing.T) {
 		{Scope: domain.ScopeWorktree, Name: "main", Mode: domain.LockShared},
 	}, plan.Locks())
 }
+
+func TestTheRecapSaysTheParentLeftIsGone(t *testing.T) {
+	w := newWorld(t)
+	w.recordParent(t, featC, "feat/deleted")
+
+	plan, _, err := w.usecase.Plan(t.Context(), moving("main", featC))
+
+	require.NoError(t, err)
+	assert.Equal(t, "feat/c (feat/deleted (gone) → main)", plan.Recap[0].Values[0].Text)
+}

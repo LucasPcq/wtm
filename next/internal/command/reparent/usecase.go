@@ -99,12 +99,12 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 		return Plan{}, nil, err
 	}
 
-	questions, err := Resolve(facts, req)
+	resolved, err := Resolve(facts, req)
 	if err != nil {
 		return Plan{}, nil, err
 	}
 
-	planned := Decide(facts, questions)
+	planned := Decide(facts, resolved)
 	planned.Recap, planned.Empty = planned.recap(), planned.empty()
 	return planned, nil, nil
 }

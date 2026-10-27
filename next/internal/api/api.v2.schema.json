@@ -988,6 +988,9 @@
         "detached": {
           "type": "boolean"
         },
+        "gone": {
+          "type": "boolean"
+        },
         "origin": {
           "$ref": "#/$defs/worktree.Origin"
         },

@@ -134,3 +134,22 @@ func TestARecordThatDoesNotReadRefusesItsEntryWithItsCause(t *testing.T) {
 	assert.Contains(t, q.Errors[0].Params["cause"], "unexpected end of JSON input")
 	assert.NotContains(t, valuesOf(q.Worktrees.Options), featX)
 }
+
+func TestTheBaseBranchsRecordedParentStillClosesACycle(t *testing.T) {
+	w := newWorld(t)
+	writeFile(t, w.stateDir+"/config.toml", "[worktrees]\nbase_path = \"../.trees\"\nbase_branch = \""+featA+"\"\n")
+	w.recordParent(t, featA, featX)
+
+	q := w.questions(t, moving(featA, featX))
+
+	assert.Equal(t, map[string][]string{domain.PathTo: {reparent.CodeCycle}}, fieldCodes(q.Errors))
+}
+
+func TestAWorktreeWhoseParentIsGoneSaysSoInThePicker(t *testing.T) {
+	w := newWorld(t)
+	w.recordParent(t, featC, "feat/deleted")
+
+	q := w.questions(t, reparent.Request{})
+
+	assert.Contains(t, q.Worktrees.Options, domain.Option{Value: featC, Parent: "feat/deleted", Gone: true})
+}

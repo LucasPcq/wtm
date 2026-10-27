@@ -37,7 +37,7 @@
               "from": "topic",
               "to": "feat/a"
             },
-            "text": "feat/b (topic → feat/a)"
+            "text": "feat/b (topic (gone) → feat/a)"
           }
         ]
       },

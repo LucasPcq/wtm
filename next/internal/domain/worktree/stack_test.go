@@ -214,12 +214,6 @@ func TestWithinSaysWhichMovedBranchATargetSitsUnder(t *testing.T) {
 	}
 }
 
-func TestWithinStopsAtTheBaseBranch(t *testing.T) {
-	stack := StackOf(live("develop", "feat/x"), map[string]Meta{"develop": from("feat/x"), "feat/x": from("main")}, "develop")
-
-	assert.Empty(t, stack.Within("develop", []string{"feat/x"}))
-}
-
 func TestAncestorsClimbToTheRoot(t *testing.T) {
 	stack := StackOf(live("a", "b", "c"), map[string]Meta{"a": from("main"), "b": from("a"), "c": from("b")}, "main")
 	assert.Equal(t, []string{"b", "a", "main"}, stack.Ancestors("c"))
