@@ -119,6 +119,7 @@ export const cleanRun = (call: WebCall) => {
         warnings: orphans.map((w) => ({
           code: 'clean.orphaned',
           message: `${w.branch} still points at the removed parent ${w.parent}`,
+          params: { branch: w.branch, from: w.parent, to: 'main' },
           follow_up: {
             command: 'reparent',
             answers: [

@@ -43,6 +43,8 @@ export function RowMenu({
       <ContextMenuTrigger
         asChild
         disabled={busy}
+        // the row its menu acts on keeps its hover look while the menu is open
+        data-menu-open={open || context || undefined}
         // the keyboard's menu key opens the "⋯" menu, anchored on the row rather than where a pointer would be
         onKeyDown={(event) => {
           if (busy || (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10'))) return

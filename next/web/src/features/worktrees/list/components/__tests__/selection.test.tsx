@@ -74,7 +74,8 @@ test('Remove on a selection takes what it can remove and leaves the main worktre
   const dialog = await screen.findByRole('dialog', { name: 'Remove worktrees' })
   expect(await within(dialog).findByRole('listitem', { name: 'feat/billing-ui' })).toBeTruthy()
   const left = within(dialog).getByRole('region', { name: 'Left as they are' })
-  expect(within(left).getByText("The main worktree can't be removed")).toBeTruthy()
+  expect(within(within(left).getByRole('list')).getByText("The main worktree can't be removed")).toBeTruthy()
+  expect(within(dialog).getByRole('list', { name: 'Worktrees' }).contains(left), 'a section of its own').toBe(false)
 
   // removed, the rows it opened on leave the selection, the one left as it is included
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))

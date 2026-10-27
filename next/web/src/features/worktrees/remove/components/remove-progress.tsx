@@ -38,7 +38,7 @@ export function RemoveProgress({
   const ok = !running && !failure && !cancelled
   // the run's own failure (a stale plan, a refusal); one the core repeats from an item shows on that item's line
   const refused = progress.refused ?? (items.some((item) => item.error) ? undefined : progress.envelope?.error?.message)
-  const { groups, kept } = recapOf(progress)
+  const { groups, warnings, kept } = recapOf(progress)
   const branched = plain(
     (progress.envelope?.plan?.worktrees ?? []).filter((removal) => removed.includes(removal.worktree)),
   )
@@ -65,7 +65,7 @@ export function RemoveProgress({
 
       <DialogScroll>
         {!running && <RunFailure message={refused} />}
-        {!running && <RunOutcome groups={groups} labels={outcomeWords} />}
+        {!running && <RunOutcome groups={groups} labels={outcomeWords} warnings={warnings} />}
         <RunSteps progress={progress} running={running}>
           {kept.map((line) => (
             <p key={line} className="flex items-start gap-2 text-xs text-muted-foreground">

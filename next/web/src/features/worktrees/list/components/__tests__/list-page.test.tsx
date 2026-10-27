@@ -14,6 +14,17 @@ test('a row opens its own worktree, not another', async () => {
   await waitFor(() => expect(router.state.location.search).toEqual({ worktree: 'feat/billing' }))
 })
 
+test('a row whose ⋯ menu is open stays marked, and the menu opens on its branch', async () => {
+  const { user } = await renderApp('/r/r1/worktrees')
+  const more = await screen.findByRole('button', { name: 'Actions on fix/login' })
+
+  await user.click(more)
+
+  const menu = await screen.findByRole('menu')
+  expect(menu.firstElementChild?.textContent).toBe('fix/login')
+  expect(more.closest('tr')?.hasAttribute('data-menu-open')).toBe(true)
+})
+
 test('Needs sync keeps the worktrees behind their parent, the search narrows the list, and both clear', async () => {
   const { user } = await renderApp('/r/r1/worktrees')
   await screen.findByRole('link', { name: /fix\/login/ })

@@ -135,7 +135,8 @@ test('a removal that failed is one line, its output and log one click under it, 
   expect(within(dialog).getByRole('button', { name: /^2 steps/ })).toBeTruthy()
 })
 
-test('a finished removal names its groups in the order that needs the person first', async () => {
+// the same Alert as on the plan's steps, never a row of "To check", which holds what names a worktree
+test('a finished removal says a warning of the whole run first, as its Alert, then the groups that need the person first', async () => {
   server.use(answeringClean(cleanPlan, partlyFailedRun))
   const { user, dialog } = await selectAndRemove('feat/billing-ui', 'feat/search')
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
@@ -144,9 +145,15 @@ test('a finished removal names its groups in the order that needs the person fir
   await user.click(await within(dialog).findByRole('button', { name: 'Remove 2 worktrees' }))
 
   await within(dialog).findByText('1 of 2 removed.')
+  const alert = within(dialog).getByRole('alert')
+  expect(alert.textContent).toContain("Couldn't ask the run daemon which jobs are up")
   expect(
     within(dialog)
       .getAllByRole('heading', { level: 3 })
       .map((heading) => heading.textContent),
-  ).toEqual(["Couldn't remove", 'To check', 'Removed'])
+  ).toEqual(["Couldn't remove", 'Removed'])
+  expect(
+    alert.compareDocumentPosition(within(dialog).getByRole('heading', { name: "Couldn't remove" })) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
 })

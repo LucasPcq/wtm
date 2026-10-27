@@ -1,7 +1,8 @@
 import { Children, Fragment, isValidElement, type ReactNode } from 'react'
 import { ItemGroup, ItemSeparator } from '@/components/ui/item'
 
-// one box: the picker's header above the rows, then the rows the plan leaves as they are, under their label
+// the picker's header above the rows in one box; the rows the plan leaves as they are in a section of their own, a
+// sibling of the list in the body's column
 export function ItemList({
   label,
   header,
@@ -13,8 +14,25 @@ export function ItemList({
   left?: ReactNode
   children: ReactNode
 }) {
-  const rows = Children.toArray(children).filter(isValidElement)
   const leftRows = Children.toArray(left).filter(isValidElement)
+
+  return (
+    <>
+      <Box label={label} header={header}>
+        {children}
+      </Box>
+      {leftRows.length > 0 && (
+        <section aria-label="Left as they are" className="flex flex-col gap-2">
+          <h4 className="text-xs font-medium text-muted-foreground">Left as they are</h4>
+          <Box>{leftRows}</Box>
+        </section>
+      )}
+    </>
+  )
+}
+
+function Box({ label, header, children }: { label?: string | undefined; header?: ReactNode; children: ReactNode }) {
+  const rows = Children.toArray(children).filter(isValidElement)
 
   return (
     // shadcn's group widens its gap when anything inside is size sm: rows touch here
@@ -31,13 +49,6 @@ export function ItemList({
           {row}
         </Fragment>
       ))}
-      {leftRows.length > 0 && (
-        <section aria-label="Left as they are" className="contents">
-          {rows.length > 0 && <ItemSeparator className="my-0" />}
-          <h4 className="px-4 pt-3 pb-1 text-xs font-medium text-muted-foreground">Left as they are</h4>
-          {leftRows}
-        </section>
-      )}
     </ItemGroup>
   )
 }

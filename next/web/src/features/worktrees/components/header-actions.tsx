@@ -7,6 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { topIcons } from '@/features/worktrees/components/action-items'
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
 import { entryOf, menu, notInTheWeb, type Subject } from '@/features/worktrees/utils/actions'
 import { cn } from '@/lib/utils'
@@ -28,7 +29,7 @@ export function HeaderActions({ repo, rows }: { repo: string; rows: Subject[] })
       <DropdownMenuItem
         aria-disabled={why !== undefined || undefined}
         variant={destructive ? 'destructive' : 'default'}
-        className={cn(why !== undefined && 'opacity-50')}
+        className={cn(topIcons, why !== undefined && 'opacity-50')}
         onSelect={(event) => {
           if (why !== undefined) return event.preventDefault()
           onSelect?.()

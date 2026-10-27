@@ -15,6 +15,9 @@ const parts = {
 
 const sections: Section[] = ['Branch', 'Run', 'Open', 'Remove']
 
+// an item whose reason wraps to a second line keeps its icons on the label's line
+export const topIcons = 'items-start [&>svg]:mt-0.5'
+
 // a disabled item stays in place and says why on its second line; aria-disabled, not Radix's disabled, which the
 // keyboard skips: the reason would be out of its reach
 export function ActionItems({ kind, repo, rows }: { kind: MenuKind; repo: string; rows: Subject[] }) {
@@ -23,7 +26,9 @@ export function ActionItems({ kind, repo, rows }: { kind: MenuKind; repo: string
 
   return (
     <>
-      {rows.length > 1 && <Label className="font-normal">{rows.length} selected worktrees</Label>}
+      <Label className="truncate font-normal">
+        {rows.length === 1 ? rows[0]?.subject : `${rows.length} selected worktrees`}
+      </Label>
       {sections.map((section, i) => (
         <Fragment key={section}>
           {i > 0 && <Separator />}
@@ -39,7 +44,7 @@ export function ActionItems({ kind, repo, rows }: { kind: MenuKind; repo: string
                   key={action}
                   aria-disabled={off || undefined}
                   variant={section === 'Remove' ? 'destructive' : 'default'}
-                  className={cn(off && 'opacity-50')}
+                  className={cn(topIcons, off && 'opacity-50')}
                   onSelect={(event) => {
                     if (off) return event.preventDefault()
                     run(entry, rows)

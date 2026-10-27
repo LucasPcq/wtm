@@ -2,12 +2,12 @@ import { itemWarnings, type OutcomeGroup, outputOf, stoppedMessage } from '@/fea
 import type { Progress } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
-// a next step no item claims is said plainly with what went: nothing failed, nothing to check
+// the run's own warnings are RunOutcome's; a next step no item claims is said plainly with what went: nothing failed, nothing to check
 export function recapOf(progress: Progress<'create'>): OutcomeGroup[] {
   const envelope = progress.envelope
   if (!envelope) return []
 
-  const { items, warnings, follow_ups: followUps } = envelope
+  const { items, follow_ups: followUps } = envelope
   const unitOf = (subject: string) => progress.units.find((unit) => unit.subject === subject)
   const nextOf = (subject: string) =>
     followUps.find((followUp) =>
@@ -35,15 +35,7 @@ export function recapOf(progress: Progress<'create'>): OutcomeGroup[] {
     },
     {
       kind: 'check',
-      rows: [
-        ...warnings.map((warning) => ({
-          key: `${warning.code}-${warning.message}`,
-          tone: 'attention' as const,
-          message: sentence(warning.message),
-          followUp: warning.follow_up,
-        })),
-        ...itemWarnings(items),
-      ],
+      rows: itemWarnings(items),
     },
     {
       kind: 'done',

@@ -111,7 +111,7 @@ export function WorktreeTable({
               {(more) => (
                 <TableRow
                   data-state={row.id === open || selected.includes(row.id) ? 'selected' : undefined}
-                  className={cn('group/row relative h-14', underWay && 'opacity-70')}
+                  className={cn('group/row relative h-14 data-menu-open:bg-muted/50', underWay && 'opacity-70')}
                 >
                   <TableCell className="pl-5">
                     {checkable(row.original) && (

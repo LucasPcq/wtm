@@ -59,7 +59,9 @@ export function ProgressView({
         {!running && (
           <RunFailure message={(progress.envelope?.items ?? []).some((item) => item.error) ? undefined : failure} />
         )}
-        {!running && <RunOutcome groups={recapOf(progress)} labels={outcomeWords} />}
+        {!running && (
+          <RunOutcome groups={recapOf(progress)} labels={outcomeWords} warnings={progress.envelope?.warnings} />
+        )}
         <RunSteps progress={progress} running={running} />
       </DialogScroll>
 

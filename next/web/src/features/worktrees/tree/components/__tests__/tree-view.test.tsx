@@ -28,6 +28,19 @@ test('a node shows its state, never its verbs: its actions are in its menu, a co
   expect(await screen.findByText('wtm sync feat/billing-ui')).toBeTruthy()
 })
 
+test('a node whose menu is open stays marked, and the menu opens on its branch', async () => {
+  const { user } = await renderApp('/r/r1/worktrees?view=tree')
+  const link = await screen.findByRole('link', { name: 'feat/billing-ui' })
+
+  await user.pointer({ keys: '[MouseRight]', target: link })
+
+  const menu = await screen.findByRole('menu')
+  expect(menu.firstElementChild?.textContent).toBe('feat/billing-ui')
+  expect(link.closest('[data-menu-open]')).not.toBeNull()
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(link.closest('[data-menu-open]')).toBeNull())
+})
+
 test("the main worktree's menu keeps every action in place, those it can't take disabled with why", async () => {
   const { user } = await renderApp('/r/r1/worktrees?view=tree')
 

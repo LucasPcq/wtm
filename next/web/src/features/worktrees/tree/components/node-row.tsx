@@ -61,7 +61,7 @@ export function NodeRow({ node, view }: { node: Node; view: View }) {
         dropRef(element)
       }}
       className={cn(
-        'group/row relative flex h-12 items-center gap-2.5 rounded-md px-2 hover:bg-muted/50',
+        'group/row relative flex h-12 items-center gap-2.5 rounded-md px-2 hover:bg-muted/50 data-menu-open:bg-muted/50',
         branch === view.open && 'bg-muted',
         isDropTarget && !isDragSource && 'bg-accent ring-1 ring-ring',
         (isDragSource || !found || underWay) && 'opacity-50',
