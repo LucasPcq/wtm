@@ -78,6 +78,7 @@ export function prunePlan(
     fingerprint,
     plan: {
       worktrees: planned,
+      empty: kept.length === planned.length,
       moves: children.map((w) => ({ branch: w.branch, from: w.parent, to: 'main', base: true })),
       reasons: ['merged', 'closed', 'gone'],
       reparent_children: said(call, 'reparent_children') ?? false,

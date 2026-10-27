@@ -126,8 +126,8 @@ export function PruneWizard({
   }
   const step = stepOf()
   const visible = candidates.filter((candidate) => searched(candidate.worktree, query))
-  // shortcut: an empty review is read here as nothing to prune; once #245 lands, read the core's plan.empty instead
-  const nothing = rows.data !== undefined && !rows.data.error && candidates.length === 0
+  // forced, the rows keep none: a plan that changes nothing is one with no candidate
+  const nothing = rows.data?.plan?.empty === true
 
   const state = (of: Step): StepState => {
     const order: Step[] = ['worktrees', 'children', 'confirm']
