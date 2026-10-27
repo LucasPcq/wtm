@@ -60,6 +60,19 @@ commit() {
   git -C "$1" -c user.email=dev@acme.dev -c user.name=Dev commit -qm "$2"
 }
 
+# spaced <branch>...: their worktrees' created_at one second apart, in that order: legacy lists worktrees by it, to
+# the second, so its captures are the same on every run.
+spaced() {
+  python3 - "$@" <<'PY'
+import json, sys
+for i, branch in enumerate(sys.argv[1:]):
+    path = ".git/wtm/worktrees/%s/meta.json" % branch.replace("/", "%2F")
+    meta = json.load(open(path))
+    meta["created_at"] = "2026-10-01T09:00:%02dZ" % i
+    json.dump(meta, open(path, "w"), indent=2)
+PY
+}
+
 prepare() {
   root=$1
   sandbox "$root" 24400
@@ -68,6 +81,7 @@ prepare() {
     branch "$name"
   done
   branch feat/noremote local
+  spaced feat/behind feat/uptodate feat/ahead feat/diverged feat/dirty feat/clash feat/rebasing feat/json feat/quiet feat/dry feat/fp feat/all feat/noremote
   git branch feat/loose main && git push -q origin feat/loose
   for name in feat/behind feat/diverged feat/dirty feat/rebasing feat/loose feat/json feat/quiet feat/dry feat/fp feat/all; do
     pushed "$name"
@@ -170,6 +184,7 @@ tty_side() {
     branch feat/tty-behind
     branch feat/tty-latest
     branch feat/tty-ahead
+    spaced feat/tty-behind feat/tty-latest feat/tty-ahead
     pushed feat/tty-behind
     commit "$box/acme.trees/feat-tty-ahead" ahead
     # the picker reads origin as last fetched: fetched here, so it shows the push
