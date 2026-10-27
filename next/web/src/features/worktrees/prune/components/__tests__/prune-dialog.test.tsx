@@ -244,3 +244,41 @@ test('a worktree the person asked for that leaves the candidates is said under L
   await waitFor(() => expect(within(left).getByRole('listitem', { name: 'feat/billing' })).toBeTruthy())
   expect(within(left).getByText('No longer finished')).toBeTruthy()
 })
+
+// While a plan was refused and the next one asked, the button counted the refused plan: "Prune 0 worktrees".
+test('the button never counts a plan refused or still asked', async () => {
+  const events = liveEvents()
+  let moved = false
+  answeringPrune((call) => {
+    const named = call.answers?.find((answer) => answer.path === 'worktree')?.values ?? []
+    const found = moved ? candidates.filter((c) => c !== merged) : candidates
+    if (moved && named.length === 1) return delay(300).then(() => prunePlan(call, { found }))
+    // the rows answer after the refused plan, as they did in the sandbox
+    if (moved && named.length === 0) return delay(100).then(() => prunePlan(call, { found }))
+    return prunePlan(call, { found: call.answers?.some((answer) => answer.path === 'no_fetch') ? found : candidates })
+  })
+  const { user, dialog } = await openFromTheHeader()
+  await user.click(
+    within(await within(dialog).findByRole('listitem', { name: 'feat/search-docs' })).getByRole('checkbox', {
+      name: 'Prune feat/search-docs',
+    }),
+  )
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await within(dialog).findByRole('button', { name: 'Prune 2 worktrees' })
+
+  // the wrong label lasted only while the next plan was asked: every label the button takes is kept
+  const seen = new Set<string>()
+  const watch = new MutationObserver(() => {
+    for (const button of within(dialog).queryAllByRole('button', { name: /^Prune/ })) seen.add(button.textContent ?? '')
+  })
+  watch.observe(dialog, { subtree: true, childList: true, characterData: true })
+  moved = true
+  events.changed()
+
+  const left = await within(dialog).findByRole('region', { name: 'Left as they are' })
+  await waitFor(() => expect(within(left).getByRole('listitem', { name: 'feat/billing' })).toBeTruthy())
+  expect(await within(dialog).findByRole('button', { name: 'Prune' })).toBeTruthy()
+  watch.disconnect()
+  expect([...seen], 'every label the button took while the plan was refused, then asked again').toEqual(['Prune'])
+})

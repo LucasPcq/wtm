@@ -109,6 +109,8 @@ export function PruneWizard({
   // person checked it under that very risk: the two reads land in any order
   const consented = pruning.every((candidate) => !unsafe(candidate) || ticked(candidate)?.on)
   const fresh = plan !== undefined && !planned.isPlaceholderData && !planned.isFetching && consented
+  // a label never counts a plan refused or still asked: the checked rows stand in for it
+  const count = fresh ? pruning.length : going.length
   const unplanned =
     !settled || noLonger.length > 0 ? undefined : (planned.error?.message ?? planned.data?.error?.message)
 
@@ -284,7 +286,7 @@ export function PruneWizard({
                 disabled={!fresh || !fingerprint}
                 onClick={() => plan && fingerprint && onStart({ answers, fingerprint, units: unitsOf(plan) })}
               >
-                {pruning.length === 1 ? 'Prune' : `Prune ${pruning.length} worktrees`}
+                {count === 1 ? 'Prune' : `Prune ${count} worktrees`}
               </Button>
             )}
           </>
