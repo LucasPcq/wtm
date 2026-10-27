@@ -1,0 +1,57 @@
+[
+  {
+    "type": "operation.started",
+    "command": "prune",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "feat/done"
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/done",
+    "phase": "on_clean",
+    "log": "<root>/main/.git/wtm/hooks/on_clean-feat%2Fdone.log"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/done",
+    "phase": "on_clean",
+    "failed": false
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/done",
+    "phase": "remove"
+  },
+  {
+    "type": "worktree.removed",
+    "worktree": {
+      "branch": "feat/done",
+      "path": "<root>/.trees/feat-done",
+      "parent": "",
+      "ordinal": null,
+      "isolation": "isolated",
+      "is_main": false,
+      "created_at": ""
+    }
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/done",
+    "phase": "remove",
+    "failed": false
+  },
+  {
+    "type": "unit.finished",
+    "subject": "feat/done",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "prune",
+    "surface": "api",
+    "ok": true
+  }
+]

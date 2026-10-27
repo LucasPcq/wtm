@@ -1,0 +1,32 @@
+{
+  "v": 2,
+  "command": "prune",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [
+    {
+      "command": "prune",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/merged"
+          ]
+        }
+      ],
+      "dry_run": true,
+      "code": "plan.replan",
+      "message": "the plan the facts give now"
+    }
+  ],
+  "warnings": [],
+  "error": {
+    "kind": "precondition",
+    "code": "plan.stale",
+    "message": "the facts changed since the preview",
+    "params": {
+      "expected": "0123456789abcdef01234567",
+      "found": "1a33f92a65ec5bafb5334c16"
+    }
+  }
+}

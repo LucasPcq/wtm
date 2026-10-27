@@ -1,0 +1,6 @@
+  on_clean · feat/bad
+failing
+  on_clean · feat/merged
+tearing down feat/merged
+  on_clean · feat/squash
+tearing down feat/squash

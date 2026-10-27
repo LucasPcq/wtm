@@ -1,0 +1,15 @@
+$ wtm prune --merged; echo EXIT=$?
+
+  Step 1/4 • Select worktrees to prune
+
+  Space to toggle, a to select all, / to filter, enter to confirm, esc to cancel.
+
+▌ [✓] merged feat/merged
+  [ ] unpushed feat/moved
+  [ ] dirty feat/dirty
+  [ ] locked feat/locked
+  [✓] merged feat/bad
+  [✓] merged feat/squash
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel
+

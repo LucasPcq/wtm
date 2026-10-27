@@ -463,6 +463,48 @@ func TestAPullRequestMergedAtTheBranchTipMarksItsWorktreeMergedOnlyWhenAsked(t *
 	assert.Equal(t, worktree.ConditionMerged, detailOf(t, with, "feat/a").Condition)
 }
 
+func TestAPullRequestMergedOrClosedAtTheBranchTipMarksItsWorktreeFinished(t *testing.T) {
+	merged := worktree.PullRequest{Number: 1, Branch: "feat/a", Head: gittest.Root, State: worktree.PullRequestMerged}
+	closed := worktree.PullRequest{Number: 2, Branch: "feat/b", Head: gittest.Root, State: worktree.PullRequestClosed}
+	moved := worktree.PullRequest{Number: 3, Branch: "feat/moved", Head: gittest.Root, State: worktree.PullRequestClosed}
+	open := worktree.PullRequest{Number: 4, Branch: "feat/open", Head: gittest.Root, State: worktree.PullRequestOpen}
+	w := newWorld(seed{
+		Git: gittest.FakeParams{
+			Worktrees: []worktree.Worktree{linked("feat/a"), linked("feat/b"), linked("feat/moved"), linked("feat/open")},
+			Commits:   map[worktree.Ref][]string{worktree.LocalBranch{Name: "feat/moved"}: {"m1"}},
+		},
+		PRs: []worktree.PullRequest{merged, closed, moved, open},
+	})
+
+	without, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+	require.NoError(t, err)
+	with, err := w.usecase.Run(t.Context(), list.Request{WithPRs: true}, domain.RunOptions{})
+	require.NoError(t, err)
+
+	assert.Nil(t, detailOf(t, without, "feat/a").Finished, "GitHub not asked: not known")
+	assert.Equal(t, new(list.FinishedMerged), detailOf(t, with, "feat/a").Finished)
+	assert.Equal(t, new(list.FinishedClosed), detailOf(t, with, "feat/b").Finished)
+	assert.False(t, detailOf(t, with, "feat/b").Merged)
+	assert.Nil(t, detailOf(t, with, "feat/moved").Finished, "a branch that moved past its pull request is not finished")
+	assert.Nil(t, detailOf(t, with, "feat/open").Finished)
+}
+
+// prune takes a merged worktree whose directory is gone, its hooks skipped: list's finished says so, where merged, which offers clean, does not.
+func TestAWorktreeWhoseDirectoryIsGoneIsFinishedButNotMerged(t *testing.T) {
+	merged := worktree.PullRequest{Number: 1, Branch: "feat/a", Head: gittest.Root, State: worktree.PullRequestMerged}
+	w := newWorld(seed{
+		Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}, Gone: []string{linked("feat/a").Path}},
+		PRs: []worktree.PullRequest{merged},
+	})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{WithPRs: true}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.True(t, detailOf(t, read, "feat/a").Missing)
+	assert.False(t, detailOf(t, read, "feat/a").Merged)
+	assert.Equal(t, new(list.FinishedMerged), detailOf(t, read, "feat/a").Finished)
+}
+
 func TestAnOpenPullRequestCarriesWhereItsReviewStands(t *testing.T) {
 	open := worktree.PullRequest{Number: 3, URL: "https://github.com/acme/acme/pull/3", Branch: "feat/a", State: worktree.PullRequestOpen, Title: "Add a", Draft: true, Checks: worktree.Checks{Passed: 2, Pending: 1}, Decision: "APPROVED"}
 	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}}, PRs: []worktree.PullRequest{open}})

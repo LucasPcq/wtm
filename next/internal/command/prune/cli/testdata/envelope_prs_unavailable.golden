@@ -1,0 +1,51 @@
+{
+  "v": 2,
+  "command": "prune",
+  "ok": true,
+  "op": "op-1",
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/gone",
+        "branch": "feat/gone",
+        "path": "/repo/wt-feat-gone",
+        "phases": [
+          "remove"
+        ],
+        "blockers": [],
+        "reason": "gone"
+      }
+    ],
+    "reasons": [
+      "merged",
+      "closed",
+      "gone"
+    ],
+    "reparent_children": false,
+    "force": false,
+    "recap": [
+      {
+        "key": "prune",
+        "label": "Prune",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/gone",
+            "params": {
+              "reason": "gone"
+            },
+            "text": "feat/gone (deleted on origin)"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "01378c7171822343ae48b902",
+  "follow_ups": [],
+  "warnings": [
+    {
+      "code": "prune.prs_unavailable",
+      "message": "couldn't ask for pull requests (pull requests unavailable): merged and closed ones match nothing, open ones aren't checked, merged ones don't count as pushed"
+    }
+  ]
+}

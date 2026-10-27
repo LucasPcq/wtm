@@ -4,17 +4,14 @@ package clean
 import (
 	"cmp"
 	"context"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
-	"github.com/LucasPcq/wtm/next/internal/domain/env"
-	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 )
 
 // ----------------------------------------------------------------------------
@@ -33,12 +30,9 @@ const CodeConfigInvalid = Name + domain.ConfigInvalid
 type UseCase struct {
 	Git          Git
 	Meta         Meta
-	EnvFiles     EnvFiles
 	Jobs         Jobs
 	PullRequests PullRequests
-	RunHooks     RunHooks
-	Shield       Shield
-	StateDir     string // wtm's state, where each worktree's hook log goes
+	Teardown     teardown.Service
 	Repository   repository.Service
 	Operations   operation.Service
 }
@@ -95,7 +89,7 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 	op.Finished(result.Failure())
 
 	outcome.Result = &result
-	outcome.Warnings = op.Warnings(append(ofRemoved(outcome.Warnings, result.Items), result.Warnings...))
+	outcome.Warnings = op.Warnings(append(teardown.OfRemoved(outcome.Warnings, result.Items), result.Warnings...))
 	return outcome, nil
 }
 
@@ -126,16 +120,16 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	items := make([]Item, 0, len(plan.Worktrees)+len(plan.Absent))
 	for _, removal := range plan.Worktrees {
-		items = append(items, u.remove(ctx, plan, removal, report))
+		removed := u.Teardown.Remove(ctx, teardown.RemoveParams{Command: Name, Facts: plan.facts.Facts, Removal: removal, Report: report})
+		items = append(items, itemOf(removal, removed))
 	}
 	for _, name := range plan.Absent {
 		items = append(items, Item{Subject: name, Status: domain.StatusDone, Reason: domain.ReasonUnchanged})
 	}
 
 	// The moves are decided again on what went: a worktree that failed to go is a parent that stays.
-	went := slices.DeleteFunc(slices.Clone(plan.Worktrees), func(r Removal) bool { return !removedIn(items, r.Worktree) })
-	moves := plan.facts.moves(went)
-	warnings := orphaned(moves)
+	moves := plan.facts.Moves(teardown.Went(plan.Worktrees, items))
+	warnings := teardown.OrphanedBy(Name, moves)
 	if plan.ReparentChildren {
 		warnings = u.reparent(ctx, plan, moves, report)
 	}
@@ -166,7 +160,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, err
 	}
 
-	facts := Facts{Repository: repo, Records: map[string]worktree.Meta{}, Checks: map[string]Check{}}
+	facts := Facts{Facts: teardown.Facts{Repository: repo, Records: map[string]worktree.Meta{}, Checks: map[string]teardown.Check{}}}
 	if facts.Located, err = u.locate(ctx, facts, req); err != nil {
 		return Facts{}, err
 	}
@@ -190,28 +184,20 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	}
 
 	var gitErr error
-	asking := branches(asked)
+	asking := teardown.Branches(asked)
 	answered := repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, PullRequests: u.PullRequests, Branches: asking, WithPRs: len(asking) > 0}, func() {
-		gitErr = u.check(ctx, asked, facts.Checks)
+		// Worktrees removed together hold nothing for each other.
+		facts.Checks, gitErr = u.Teardown.Read(ctx, teardown.ReadParams{Worktrees: asked, Going: teardown.Branches(asked)})
 	})
 	if gitErr != nil {
-		return Facts{}, repository.Interrupted(ctx, gitErr)
+		return Facts{}, gitErr
 	}
 	if answered.Interrupted {
 		return Facts{}, ctx.Err()
 	}
 
 	facts.JobsErr, facts.PRsErr = answered.JobsErr, answered.PRsErr
-	for _, w := range asked {
-		check := facts.Checks[w.Name()]
-		check.Jobs = run.UpIn(answered.Jobs, w.Path)
-		check.PullRequest = openPullRequest(answered.PullRequests, w.Branch())
-		if answered.PRsErr == nil && facts.landed(answered.PullRequests, w) {
-			check.Unpushed = 0
-		}
-		facts.Checks[w.Name()] = check
-	}
-
+	facts.Settle(asked, answered.Jobs, answered.PullRequests)
 	return facts, nil
 }
 
@@ -259,227 +245,39 @@ func (u UseCase) root(ctx context.Context, worktrees []worktree.Worktree, path s
 	return path, nil
 }
 
-// check reads, for each worktree, whether its directory is gone (a locked one git never calls prunable among them), its uncommitted changes while it is there, and the commits of its branch and of the commit it stands on no branch that stays holds, a commit on no branch or of a rebase under way among them, its directory gone or not. Worktrees removed together hold nothing for each other.
-func (u UseCase) check(ctx context.Context, worktrees []worktree.Worktree, checks map[string]Check) error {
-	var going []string
-	for _, w := range worktrees {
-		going = append(going, w.Branch())
-	}
-
-	for _, w := range worktrees {
-		var check Check
-		var err error
-		if w.Path != "" {
-			if check.Missing, err = repository.Gone(ctx, u.Git, w); err != nil {
-				return err
-			}
-		}
-		if w.Path != "" && !check.Missing {
-			if check.Dirty, err = u.Git.Dirty(ctx, w.Path); err != nil {
-				return err
-			}
-		}
-		if losing := (worktree.Losing{Branch: w.Branch(), Head: w.Head, Going: going}); losing.Branch != "" || losing.Head != "" {
-			if check.Unpushed, err = u.Git.Unpushed(ctx, losing); err != nil {
-				return err
-			}
-		}
-		checks[w.Name()] = check
-	}
-
-	return nil
-}
-
 // ----------------------------------------------------------------------------
 // The steps of Apply
 
 // The codes of what becomes of a removal: an on_clean hook that failed, the hooks skipped or run without the worktree's environment, a worktree git could not remove or whose files stay on disk, a branch or a record that could not be deleted.
 const (
-	CodeHookFailed         = Name + ".hook_failed"
-	CodeHooksSkipped       = Name + ".hooks_skipped"
-	CodeHookEnvUnavailable = Name + ".hook_env_unavailable"
-	CodeRemoveFailed       = Name + ".remove_failed"
-	CodeLeftOnDisk         = Name + ".left_on_disk"
-	CodeBranchKept         = Name + ".branch_kept"
-	CodeMetaKept           = Name + ".meta_kept"
+	CodeHookFailed         = Name + teardown.HookFailed
+	CodeHooksSkipped       = Name + teardown.HooksSkipped
+	CodeHookEnvUnavailable = Name + teardown.HookEnvUnavailable
+	CodeRemoveFailed       = Name + teardown.RemoveFailed
+	CodeLeftOnDisk         = Name + teardown.LeftOnDisk
+	CodeBranchKept         = Name + teardown.BranchKept
+	CodeMetaKept           = Name + teardown.MetaKept
 )
 
-// remove removes one worktree between its unit events: its on_clean hooks, which refuse its removal when one fails, then the worktree, its branch and its meta record, shielded from a cancel, then the event that names it gone. A worktree reached after a cancel is skipped.
-func (u UseCase) remove(ctx context.Context, plan Plan, removal Removal, report domain.Report) (item Item) {
-	item.Subject = removal.Worktree
-	if ctx.Err() != nil {
-		item.Status, item.Reason = domain.StatusSkipped, domain.ReasonInterrupted
-		return item
-	}
-
-	report(domain.UnitStarted{Subject: removal.Worktree})
-	defer func() { report(domain.UnitFinished{Subject: item.Subject, Status: item.Status}) }()
-
-	warnings, err := u.hooks(ctx, plan, removal, report)
-	item.Warnings = warnings
-	if err != nil {
-		item.Status, item.Err = domain.StatusFailed, failure(CodeHookFailed, "on_clean hook failed", err)
-		if ctx.Err() != nil {
-			item.Status, item.Reason = domain.StatusCancelled, domain.ReasonInterrupted
-		}
-		return item
-	}
-
-	// Shielded: a cancel half-way would strand a branch and a record with no worktree, and an event nobody publishes.
-	shielded, release := u.Shield(ctx)
-	defer release()
-	report(domain.PhaseStarted{Subject: removal.Worktree, Phase: domain.PhaseRemove})
-	removed := u.removeWorktree(shielded, plan, removal, report)
-	report(domain.PhaseFinished{Subject: removal.Worktree, Phase: domain.PhaseRemove, Failed: removed.Status != domain.StatusDone})
-
-	removed.Warnings = append(item.Warnings, removed.Warnings...)
-	return removed
-}
-
-// hooks runs the on_clean hooks in the worktree, their variables expanded and the worktree's run environment set, between their phase's events; a worktree whose directory is gone runs none, with a warning.
-func (u UseCase) hooks(ctx context.Context, plan Plan, removal Removal, report domain.Report) ([]domain.Warning, error) {
-	hooks := plan.facts.onClean(removal)
-	switch {
-	case len(hooks) == 0 && removal.Missing && len(plan.facts.Config.OnClean) > 0:
-		return []domain.Warning{{Code: CodeHooksSkipped, Message: "its directory is gone: the on_clean hooks did not run", Params: domain.Params{"path": removal.Path}}}, nil
-	case len(hooks) == 0:
-		return nil, nil
-	}
-
-	record := plan.facts.Records[removal.Branch]
-
-	log := env.HookLogPath(env.HookLogPathParams{StateDir: u.StateDir, Branch: removal.Branch, Hooks: env.OnCleanHooks})
-	hookEnv, warnings := u.hookEnv(plan, removal, record)
-	report(domain.PhaseStarted{Subject: removal.Worktree, Phase: domain.PhaseOnClean, Log: log})
-	err := u.RunHooks(ctx, env.HookChain{
-		Hooks:   hooks,
-		WorkDir: removal.Path,
-		Env:     hookEnv,
-		Unset:   env.JobKeys(),
-		Output:  func(line string) { report(domain.Output{Subject: removal.Worktree, Line: line}) },
-		Log:     log,
-	})
-	report(domain.PhaseFinished{Subject: removal.Worktree, Phase: domain.PhaseOnClean, Failed: err != nil})
-	return warnings, err
-}
-
-// hookEnv is the run environment the hooks get, as the worktree's own jobs get it (its Compose project, its ports): nil when they read none, or with a warning when a compose env file cannot be read.
-func (u UseCase) hookEnv(plan Plan, removal Removal, record worktree.Meta) (map[string]string, []domain.Warning) {
-	isolation := record.Isolation.Effective()
-	if !env.HooksReadRun(plan.facts.Run, isolation) {
-		return nil, nil
-	}
-
-	var compose [][]dotenv.Line
-	for _, path := range env.ComposeEnvPaths(plan.facts.Run) {
-		lines, err := u.EnvFiles.Read(filepath.Join(removal.Path, path))
-		if err != nil {
-			return nil, []domain.Warning{{Code: CodeHookEnvUnavailable, Message: err.Error() + " — on_clean hooks run without the worktree's environment", Params: domain.Params{"cause": err.Error()}}}
-		}
-		compose = append(compose, lines)
-	}
-
-	return env.HookEnv(env.JobParams{Branch: removal.Branch, ProjectDir: plan.facts.MainPath, Ordinal: record.Ordinal, Isolation: isolation, Run: plan.facts.Run}, compose), nil
-}
-
-// removeWorktree removes the worktree, then its branch and its meta record, and reports it removed; a branch no worktree holds is deleted alone, with its record. A worktree git dropped while files it could not delete stay on disk (a container's, owned by root) is removed all the same, those files named in a warning.
-func (u UseCase) removeWorktree(ctx context.Context, plan Plan, removal Removal, report domain.Report) Item {
-	item := Item{Subject: removal.Worktree, Status: domain.StatusDone, Detail: &Detail{Path: removal.Path}}
-	if removal.Path == "" {
-		return u.deleteBranch(ctx, plan, removal, item)
-	}
-
-	if err := u.Git.RemoveWorktree(ctx, removal.Path); err != nil {
-		if u.listed(ctx, removal.Path) {
-			item.Status, item.Detail, item.Err = domain.StatusFailed, nil, failure(CodeRemoveFailed, "couldn't remove the worktree", err)
-			return item
-		}
-		item.Warnings = append(item.Warnings, domain.Warning{Code: CodeLeftOnDisk, Message: removal.Path + " is still on disk (" + err.Error() + "): delete what is left with sudo rm -rf " + removal.Path, Params: domain.Params{"path": removal.Path}})
-	}
-
-	report(domain.WorktreeRemoved{Worktree: identity(removal, plan.facts.Records[removal.Branch])})
-	if removal.Branch == "" {
-		return item
-	}
-
-	return u.deleteBranch(ctx, plan, removal, item)
-}
-
-// deleteBranch deletes the branch of removal and its meta record, once its worktree is gone or when it had none; a branch with no commit yet has no ref to delete.
-func (u UseCase) deleteBranch(ctx context.Context, plan Plan, removal Removal, item Item) Item {
-	var err error
-	if plan.facts.Local(removal.Branch) {
-		err = u.Git.DeleteBranch(ctx, removal.Branch)
-	}
-	if err != nil && removal.Path == "" {
-		return Item{Subject: removal.Worktree, Status: domain.StatusFailed, Err: failure(CodeBranchKept, "couldn't delete the branch "+removal.Branch, err)}
-	} else if err != nil {
-		item.Status, item.Reason, item.Err = domain.StatusFailed, domain.ReasonIncomplete, failure(CodeBranchKept, "the worktree is removed but its branch "+removal.Branch+" is kept", err)
-		return item
-	}
-	if err := u.Meta.Delete(removal.Branch); err != nil {
-		item.Warnings = append(item.Warnings, domain.Warning{Code: CodeMetaKept, Message: "couldn't delete the meta record of " + removal.Branch + ": " + err.Error(), Params: domain.Params{"branch": removal.Branch}})
+// itemOf is what became of removal as clean reports it: where it was, once it went.
+func itemOf(removal teardown.Removal, removed teardown.Removed) Item {
+	item := Item{Subject: removal.Worktree, Status: removed.Status, Reason: removed.Reason, Err: removed.Err, Warnings: removed.Warnings}
+	if removed.Gone {
+		item.Detail = &Detail{Path: removal.Path}
 	}
 
 	return item
 }
 
-// listed reports whether git still lists a worktree at path; a list git cannot give counts as listed, so nothing is taken as removed that may not be.
-func (u UseCase) listed(ctx context.Context, path string) bool {
-	worktrees, err := u.Git.Worktrees(ctx)
-	return err != nil || slices.ContainsFunc(worktrees, func(w worktree.Worktree) bool { return w.Path == path })
-}
-
 // reparent records each child's new parent, reporting it updated; a child whose record cannot be written stays orphaned, with a warning.
-func (u UseCase) reparent(ctx context.Context, plan Plan, moves []Move, report domain.Report) []domain.Warning {
+func (u UseCase) reparent(ctx context.Context, plan Plan, moves []teardown.Move, report domain.Report) []domain.Warning {
 	var warnings []domain.Warning
 	for _, move := range moves {
-		var record worktree.Meta
-		_, err := u.Meta.Update(ctx, worktree.MetaUpdate{Branch: move.Branch, Change: func(meta *worktree.Meta) error {
-			meta.SourceBranch = move.To
-			record = *meta
-			return nil
-		}})
+		err := repository.Reparent(ctx, repository.ReparentParams{Meta: u.Meta, Branch: move.Branch, Path: plan.facts.ChildPath(move), To: move.To, Report: report})
 		if err != nil {
-			warning := orphaned([]Move{move})[0]
-			warning.Message += ": couldn't reparent it (" + err.Error() + ")"
-			warnings = append(warnings, warning)
-			continue
+			warnings = append(warnings, teardown.NotReparented(Name, move, err))
 		}
-
-		child, _ := plan.facts.named(move.Branch)
-		report(domain.WorktreeUpdated{Worktree: identity(Removal{Branch: move.Branch, Path: child.Path}, record), Changed: []worktree.IdentityField{worktree.IdentityParent}})
 	}
 
 	return warnings
-}
-
-// ----------------------------------------------------------------------------
-// Helpers
-
-// identity is the worktree of removal as its events name it, from its record.
-func identity(removal Removal, record worktree.Meta) worktree.Identity {
-	identity := worktree.Identity{Branch: removal.Branch, Path: removal.Path, Parent: record.SourceBranch, Isolation: record.Isolation.Effective(), CreatedAt: record.CreatedAt}
-	if record.Ordinal > 0 {
-		identity.Ordinal = &record.Ordinal
-	}
-
-	return identity
-}
-
-// openPullRequest is the page of the open pull request of branch among prs, empty when it has none.
-func openPullRequest(prs []worktree.PullRequest, branch string) string {
-	at := slices.IndexFunc(prs, func(pr worktree.PullRequest) bool {
-		return branch != "" && pr.Branch == branch && pr.State == worktree.PullRequestOpen
-	})
-	if at < 0 {
-		return ""
-	}
-
-	return prs[at].URL
-}
-
-// removedIn reports whether the worktree of branch was removed among items, its branch deleted or not.
-func removedIn(items []Item, branch string) bool {
-	return slices.ContainsFunc(items, func(item Item) bool { return item.Subject == branch && item.Detail != nil })
 }

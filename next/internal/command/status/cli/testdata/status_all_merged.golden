@@ -9,7 +9,7 @@
 
   feat/a
   ! its pull request is merged
-  → wtm clean feat/a   clean it up
+  → wtm prune feat/a   prune it
   ! main has 1 commit it lacks
   → wtm sync feat/a   sync it onto main
   ! web/.env is missing

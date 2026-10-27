@@ -278,6 +278,15 @@ func buildRemote(t testing.TB, main string, built builder, seed FakeParams) {
 	for _, name := range seed.Remote {
 		Git(t, main, "update-ref", remoteRef(name), built.tip(seed.Commits[worktree.RemoteBranch{Name: name}]))
 	}
+
+	for _, name := range seed.Deleted {
+		Git(t, bare, "update-ref", "-d", "refs/heads/"+name)
+	}
+
+	for _, name := range seed.Tracking {
+		Git(t, main, "config", "branch."+name+".remote", origin)
+		Git(t, main, "config", "branch."+name+".merge", "refs/heads/"+name)
+	}
 }
 
 // midwayMarks are the files git keeps while it is in the middle of an operation on a worktree's checkout, by Midway; TestTheFakeAndGitAgreeOnEachMidway holds them to the adapter's.

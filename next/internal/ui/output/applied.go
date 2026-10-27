@@ -90,8 +90,11 @@ func worktreeRow(w io.Writer, subject string, reason domain.Reason, stands Workt
 	return PlanRow{Label: subject, Values: []string{ShownPath(Shown{Cwd: params.View.Cwd, Path: path}) + MutedNote(note, StylesOf(w))}}
 }
 
+// drawUnfinished draws each item that did not end done, but those the plan ruled out: its recap and its warnings say why already.
 func drawUnfinished[D any](w io.Writer, items []domain.Unit[D]) {
-	unfinished := slices.DeleteFunc(slices.Clone(items), func(item domain.Unit[D]) bool { return item.Status == domain.StatusDone })
+	unfinished := slices.DeleteFunc(slices.Clone(items), func(item domain.Unit[D]) bool {
+		return item.Status == domain.StatusDone || item.Reason == domain.ReasonRuledOut
+	})
 	if len(unfinished) > 0 {
 		Blank(w)
 	}

@@ -149,7 +149,7 @@
         "services": [],
         "actions": [
           {
-            "command": "clean",
+            "command": "prune",
             "answers": [
               {
                 "path": "worktree",
@@ -158,8 +158,8 @@
                 ]
               }
             ],
-            "code": "tree.clean",
-            "message": "Clean the worktree: its pull request is merged"
+            "code": "tree.prune",
+            "message": "Prune the worktree: its pull request is merged"
           }
         ]
       }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,6 +30,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
+	"github.com/LucasPcq/wtm/next/internal/command/prune"
+	prunecli "github.com/LucasPcq/wtm/next/internal/command/prune/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
@@ -36,6 +40,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/LucasPcq/wtm/next/internal/service/registry"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
 
@@ -53,6 +58,7 @@ type app struct {
 	Create  create.UseCase
 	Extract extract.UseCase
 	Clean   clean.UseCase
+	Prune   prune.UseCase
 	List    list.UseCase
 	Resolve resolve.UseCase
 	Status  status.UseCase
@@ -92,6 +98,16 @@ func wire(params wireParams) app {
 		ProxyStatus: proxyStatus,
 	}
 
+	teardowns := teardown.Service{
+		Git:      repo,
+		Meta:     meta,
+		EnvFiles: store.EnvFiles{},
+		StateDir: params.StateDir,
+		Gone:     repository.GoneIn(repo),
+		RunHooks: shell.RunHooks,
+		Shield:   shell.Shield,
+	}
+
 	return app{
 		Create: create.UseCase{
 			Git:        repo,
@@ -111,12 +127,18 @@ func wire(params wireParams) app {
 		Clean: clean.UseCase{
 			Git:          repo,
 			Meta:         meta,
-			EnvFiles:     store.EnvFiles{},
 			Jobs:         jobs,
 			PullRequests: gh.PullRequestsOf,
-			RunHooks:     shell.RunHooks,
-			Shield:       shell.Shield,
-			StateDir:     params.StateDir,
+			Teardown:     teardowns,
+			Repository:   facts,
+			Operations:   operations,
+		},
+		Prune: prune.UseCase{
+			Git:          fetchedOnce{Repo: repo, once: &sync.Once{}, err: new(error)},
+			Meta:         meta,
+			Jobs:         jobs,
+			PullRequests: gh.PullRequestsOf,
+			Teardown:     teardowns,
 			Repository:   facts,
 			Operations:   operations,
 		},
@@ -147,6 +169,19 @@ func wire(params wireParams) app {
 			Repository:   facts,
 		},
 	}
+}
+
+// fetchedOnce is the repository as prune reads it, origin fetched once however often one opened command plans: the wizard plans at each of its steps, and a request naming no worktree plans again under the locks it finds.
+type fetchedOnce struct {
+	git.Repo
+	once *sync.Once
+	err  *error
+}
+
+// RefreshOrigin refreshes origin's branches the first time, and says again how that went every time after.
+func (f fetchedOnce) RefreshOrigin(ctx context.Context, branches []string) error {
+	f.once.Do(func() { *f.err = f.Repo.RefreshOrigin(ctx, branches) })
+	return *f.err
 }
 
 // facts reads the repository params locates, as every use case decides from it.
@@ -185,10 +220,13 @@ func proxyStatus() domain.FollowUp {
 	return domain.FollowUp{Command: "run proxy status"}
 }
 
-// commandLine spells a follow-up as the command line runs it: one naming a migrated command another command gives (clean) from that command's schema; go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
+// commandLine spells a follow-up as the command line runs it: one naming a migrated command another command gives (clean, prune) from that command's schema; go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
 func commandLine(followUp domain.FollowUp) []string {
-	if followUp.Command == clean.Name {
+	switch followUp.Command {
+	case clean.Name:
 		return cleancli.Line(followUp)
+	case prune.Name:
+		return prunecli.Line(followUp)
 	}
 
 	argv, _ := spelled(followUp)

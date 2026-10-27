@@ -26,7 +26,7 @@ Date: <T>
 Content-Length: 179
 
 {"v":2,"command":"","ok":false,"follow_ups":[],"warnings":[],"error":{"kind":"refused","code":"web.host_refused","message":"the server answers the loopback at its own port only"}}
-$ api -i $U/api/schema | head -5
+$ api -D - -o /dev/null $U/api/schema | head -5
 HTTP/1.1 200 OK
 Content-Type: application/schema+json
 Date: <T>

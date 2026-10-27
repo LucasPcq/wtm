@@ -1,0 +1,63 @@
+{
+  "v": 2,
+  "command": "prune",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/dirty",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-dirty",
+        "reason": "merged"
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/dirty",
+        "branch": "feat/dirty",
+        "path": "/repo/wt-feat-dirty",
+        "phases": [
+          "remove"
+        ],
+        "blockers": [
+          "dirty"
+        ],
+        "reason": "merged",
+        "pr": {
+          "number": 14,
+          "url": "https://github.com/acme/web/pull/14"
+        }
+      }
+    ],
+    "reasons": [
+      "merged",
+      "closed",
+      "gone"
+    ],
+    "reparent_children": false,
+    "force": true,
+    "recap": [
+      {
+        "key": "prune",
+        "label": "Prune",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/dirty",
+            "note": "forced",
+            "params": {
+              "blockers": "dirty",
+              "reason": "merged"
+            },
+            "text": "feat/dirty (merged #14; dirty, forced)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

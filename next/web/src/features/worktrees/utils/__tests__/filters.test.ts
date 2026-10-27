@@ -10,6 +10,7 @@ const row = (over: Partial<Row> = {}): Row => ({
   error: undefined,
   pr: undefined,
   merged: undefined,
+  finished: undefined,
   condition: 'clean',
   actions: [],
   underWay: undefined,
@@ -20,7 +21,7 @@ const row = (over: Partial<Row> = {}): Row => ({
 test('each filter keeps the rows the core says belong to it', () => {
   const running = row({ detail: listDetail('feat/a', { services: ['web'] }) })
   const behind = row({ detail: listDetail('feat/a', { needs_sync: true }) })
-  const merged = row({ merged: true })
+  const merged = row({ merged: true, finished: 'merged' })
   const all = [running, behind, merged, row()]
 
   expect(all.filter((r) => matches(r, 'running'))).toEqual([running])
@@ -28,6 +29,14 @@ test('each filter keeps the rows the core says belong to it', () => {
   expect(all.filter((r) => matches(r, 'prunable'))).toEqual([merged])
   expect(countsOf(all, true)).toEqual({ all: 4, running: 1, needs_sync: 1, prunable: 1 })
   expect(countsOf(all, false).prunable, 'not known before GitHub is asked').toBeUndefined()
+})
+
+// prune removes a worktree whose pull request was closed, or merged with its directory gone: merged says neither.
+test('prunable is what prune removes, as list says it has finished', () => {
+  const closed = row({ merged: false, finished: 'closed' })
+  const gone = row({ merged: false, finished: 'merged' })
+
+  expect([closed, gone, row({ merged: false })].filter((r) => matches(r, 'prunable'))).toEqual([closed, gone])
 })
 
 test('the search finds a branch by any part of it, whatever its case', () => {

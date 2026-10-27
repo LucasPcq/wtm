@@ -93,7 +93,7 @@
             "code": "status.merged",
             "message": "its pull request is merged",
             "fix": {
-              "command": "clean",
+              "command": "prune",
               "answers": [
                 {
                   "path": "worktree",
@@ -103,7 +103,7 @@
                 }
               ],
               "code": "status.merged",
-              "message": "clean it up"
+              "message": "prune it"
             }
           },
           {

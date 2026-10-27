@@ -1,0 +1,10 @@
+
+  Step 1/8 • Worktrees
+
+  The worktrees to prune, among those done with; none for every one safe to remove
+
+▌› [ ] feat/dirty — merged #14 · uncommitted changes
+   [x] feat/gone — deleted on origin
+   [x] feat/merged — merged #12
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel

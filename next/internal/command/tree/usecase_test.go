@@ -307,7 +307,8 @@ func TestAMergedPullRequestCleansItsWorktreeAtOrBehindItsCommitAndNeverTheMainOn
 	for _, branch := range []string{"feat/a", "feat/behind"} {
 		actions := detailOf(t, got, branch).Actions
 		require.Len(t, actions, 1, branch)
-		assert.Equal(t, domain.CommandClean, actions[0].Command, branch)
+		assert.Equal(t, domain.CommandPrune, actions[0].Command, branch)
+		assert.Equal(t, "tree.prune", actions[0].Code, branch)
 	}
 	for _, branch := range []string{"main", "develop", "feat/moved", "feat/unknown"} {
 		assert.Empty(t, detailOf(t, got, branch).Actions, branch)

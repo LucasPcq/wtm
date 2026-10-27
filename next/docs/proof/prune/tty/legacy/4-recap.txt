@@ -1,0 +1,21 @@
+$ wtm prune --merged; echo EXIT=$?
+
+  Step 4/4 • Confirm
+
+  ✓ Worktrees: feat/merged, feat/dirty, feat/bad, feat/squash
+  ✓ Reparent children: reparent
+
+  ┃  Review & confirm
+  ┃
+  ┃  Will prune 4 worktree(s): feat/merged, feat/dirty, feat/bad, feat/squash
+  ┃
+  ┃  Then reparent 1 child worktree(s) onto main.
+
+▌▸ Yes, prune
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   Yes, force prune (bypass safety checks)
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

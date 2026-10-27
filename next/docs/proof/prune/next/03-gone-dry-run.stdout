@@ -1,0 +1,11 @@
+
+  prune · dry run, nothing applied
+  Prune  feat/gone (deleted on origin), feat/squash (deleted on origin)
+  Kept   feat/gone-work (deleted on origin; unpushed)
+
+  ! feat/gone-work is kept: unsafe to remove (unpushed)
+
+  fingerprint  <FP>
+  → wtm prune --gone --expect-fingerprint <FP>   apply this plan
+  → wtm prune feat/gone-work --force --gone   prune them anyway
+

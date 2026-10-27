@@ -1,0 +1,154 @@
+{
+  "v": 2,
+  "command": "prune",
+  "ok": true,
+  "op": "op-1",
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/dirty",
+        "branch": "feat/dirty",
+        "path": "/repo/wt-feat-dirty",
+        "phases": [],
+        "blockers": [
+          "dirty"
+        ],
+        "reason": "merged",
+        "pr": {
+          "number": 14,
+          "url": "https://github.com/acme/web/pull/14"
+        }
+      },
+      {
+        "worktree": "feat/gone",
+        "branch": "feat/gone",
+        "path": "/repo/wt-feat-gone",
+        "phases": [
+          "remove"
+        ],
+        "blockers": [],
+        "reason": "gone"
+      },
+      {
+        "worktree": "feat/merged",
+        "branch": "feat/merged",
+        "path": "/repo/wt-feat-merged",
+        "phases": [
+          "remove"
+        ],
+        "blockers": [],
+        "reason": "merged",
+        "pr": {
+          "number": 12,
+          "url": "https://github.com/acme/web/pull/12"
+        }
+      }
+    ],
+    "moves": [
+      {
+        "branch": "feat/child",
+        "from": "feat/merged",
+        "to": "main",
+        "base": true
+      }
+    ],
+    "reasons": [
+      "merged",
+      "closed",
+      "gone"
+    ],
+    "reparent_children": true,
+    "force": false,
+    "recap": [
+      {
+        "key": "prune",
+        "label": "Prune",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/gone",
+            "params": {
+              "reason": "gone"
+            },
+            "text": "feat/gone (deleted on origin)"
+          },
+          {
+            "value": "feat/merged",
+            "params": {
+              "reason": "merged"
+            },
+            "text": "feat/merged (merged #12)"
+          }
+        ]
+      },
+      {
+        "key": "kept",
+        "label": "Kept",
+        "path": "force",
+        "values": [
+          {
+            "value": "feat/dirty",
+            "note": "kept",
+            "params": {
+              "blockers": "dirty",
+              "reason": "merged"
+            },
+            "text": "feat/dirty (merged #14; dirty)"
+          }
+        ]
+      },
+      {
+        "key": "children",
+        "label": "Children",
+        "path": "reparent_children",
+        "values": [
+          {
+            "value": "feat/child",
+            "params": {
+              "from": "feat/merged",
+              "to": "main"
+            },
+            "text": "feat/child → main"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "e63b830e4dd0f4b74ddf4be8",
+  "follow_ups": [],
+  "warnings": [
+    {
+      "code": "prune.kept",
+      "params": {
+        "blockers": "dirty",
+        "worktree": "feat/dirty"
+      },
+      "message": "feat/dirty is kept: unsafe to remove (dirty)",
+      "follow_up": {
+        "command": "prune",
+        "answers": [
+          {
+            "path": "worktree",
+            "values": [
+              "feat/dirty"
+            ]
+          },
+          {
+            "path": "reparent_children",
+            "values": [
+              "true"
+            ]
+          },
+          {
+            "path": "force",
+            "values": [
+              "true"
+            ]
+          }
+        ],
+        "code": "prune.force",
+        "message": "prune them anyway"
+      }
+    }
+  ]
+}

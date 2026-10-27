@@ -18,7 +18,7 @@
   api  stopped  port 23481
 
   ! its pull request is merged
-  → wtm-next clean feat/b   clean it up
+  → wtm-next prune feat/b   prune it
   ! main has 2 commits it lacks
   → wtm sync feat/b   sync it onto main
   ! apps/web/.env is missing

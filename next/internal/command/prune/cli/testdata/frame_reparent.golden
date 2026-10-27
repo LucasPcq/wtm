@@ -1,0 +1,12 @@
+
+  Step 2/8 • Reparent children
+
+  ✓ Worktrees: feat/dirty, feat/gone, feat/merged
+
+  These children would be left orphaned:
+    feat/child would rebase onto main instead of feat/merged
+
+▌› Leave them orphaned
+   Reparent them
+
+  ↑↓ navigate • / filter • enter confirm • esc back

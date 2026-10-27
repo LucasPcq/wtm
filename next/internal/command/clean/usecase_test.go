@@ -165,7 +165,7 @@ func TestABranchOriginHoldsIsRemovedWholeThoughNotMergedLocally(t *testing.T) {
 
 func TestABranchThatCannotBeDeletedLeavesItsWorktreeRemovedAndTheItemIncomplete(t *testing.T) {
 	w := newWorld(t, seed{})
-	w.usecase.Git = failingDelete{w.repo}
+	w.usecase.Teardown.Git = failingDelete{w.repo}
 
 	result, report := w.apply(t, removing(plain))
 
@@ -179,7 +179,7 @@ func TestABranchThatCannotBeDeletedLeavesItsWorktreeRemovedAndTheItemIncomplete(
 
 func TestFilesLeftOnDiskAreNamedAndTheWorktreeCountsAsRemoved(t *testing.T) {
 	w := newWorld(t, seed{})
-	w.usecase.Git = leavingFiles{w.repo}
+	w.usecase.Teardown.Git = leavingFiles{w.repo}
 
 	result, _ := w.apply(t, removing(plain))
 
@@ -191,7 +191,7 @@ func TestFilesLeftOnDiskAreNamedAndTheWorktreeCountsAsRemoved(t *testing.T) {
 // A worktree git failed to remove read as removed: its children were moved off a parent that stays, warned of as orphaned, and the caller standing in it told to step out.
 func TestAWorktreeGitFailsToRemoveIsNotReportedRemoved(t *testing.T) {
 	w := newWorld(t, seed{})
-	w.usecase.Git = failingRemove{w.repo, w.at(parent)}
+	w.usecase.Teardown.Git = failingRemove{w.repo, w.at(parent)}
 
 	result, report := w.apply(t, removing(parent).From(domain.Caller{Cwd: w.at(parent)}))
 
@@ -205,7 +205,7 @@ func TestAWorktreeGitFailsToRemoveIsNotReportedRemoved(t *testing.T) {
 // The nearest worktree that stays was taken from the plan: a grandparent that failed to go was skipped all the same, its grandchild moved past it.
 func TestAChildMovesOntoTheNearestWorktreeThatActuallyStayed(t *testing.T) {
 	w := newWorld(t, seed{})
-	w.usecase.Git = failingRemove{w.repo, w.at(parent)}
+	w.usecase.Teardown.Git = failingRemove{w.repo, w.at(parent)}
 
 	result, _ := w.apply(t, clean.Request{Worktrees: []string{parent, child}, ReparentChildren: true})
 
@@ -481,7 +481,7 @@ func TestJobsUpRefuseTheRemovalUntilForcedThenAreNamed(t *testing.T) {
 
 func TestAForcedWorktreeGitFailsToRemoveIsNotSaidRemovedWithItsJobsNorItsData(t *testing.T) {
 	w := newWorld(t, seed{})
-	w.usecase.Git = failingRemove{w.repo, w.at(plain)}
+	w.usecase.Teardown.Git = failingRemove{w.repo, w.at(plain)}
 	w.record(t, plain, worktree.Meta{SourceBranch: "main", Namespaces: []string{"acme_feat_plain"}})
 	w.usecase.Jobs = func(context.Context) ([]run.Job, error) {
 		return []run.Job{{Name: "web", WorkDir: w.at(plain), Up: true}}, nil
@@ -611,4 +611,15 @@ func TestARemovalUnderTheCallersFeetIsFoundThroughASymbolicLink(t *testing.T) {
 
 	require.Len(t, result.FollowUps, 1)
 	assert.Equal(t, clean.CodeGo, result.FollowUps[0].Code)
+}
+
+// A git failure while checking the worktrees was taken for no fact at all: every name read as already absent, exit 0.
+func TestAGitFailureWhileCheckingRefusesTheRunRatherThanFindingNothing(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.usecase.Teardown.Git = broken{w.repo}
+
+	_, err := w.usecase.Run(t.Context(), removing(plain), domain.RunOptions{})
+
+	require.ErrorIs(t, err, errBroken)
+	assert.True(t, w.stands(t, plain))
 }

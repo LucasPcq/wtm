@@ -17,6 +17,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 )
@@ -115,12 +116,9 @@ func (w world) usecase() clean.UseCase {
 	return clean.UseCase{
 		Git:          w.git,
 		Meta:         w.store,
-		EnvFiles:     w.store,
 		Jobs:         func(context.Context) ([]run.Job, error) { return nil, w.seed.JobsErr },
 		PullRequests: func(context.Context, []string) ([]worktree.PullRequest, error) { return nil, nil },
-		RunHooks:     runHooks,
-		Shield:       shell.Shield,
-		StateDir:     "/repo/main/.git/wtm",
+		Teardown:     teardown.Service{Git: w.git, Meta: w.store, EnvFiles: w.store, StateDir: "/repo/main/.git/wtm", Gone: repository.GoneIn(w.git), RunHooks: runHooks, Shield: shell.Shield},
 		Repository:   repository.Service{Config: w.config, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}},
 		Operations: operation.Service{
 			Locker:    w.locks,

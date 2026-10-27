@@ -1,12 +1,12 @@
-import type { CleanPlan, CleanRemoval, DomainAnswered } from '@/api/types.gen'
+import type { CleanPlan, DomainAnswered, TeardownRemoval } from '@/api/types.gen'
 import { todo, type Unit } from '@/features/worktrees/utils/progress'
 
 export type Choice = 'keep' | 'remove'
 
-export const unsafe = (removal: CleanRemoval) => (removal.blockers ?? []).length > 0
+export const unsafe = (removal: TeardownRemoval) => (removal.blockers ?? []).length > 0
 
 // a worktree on no branch, or a branch with no worktree, is no "worktree with its branch"
-export const plain = (removals: CleanRemoval[]) => removals.every((removal) => removal.branch && removal.path)
+export const plain = (removals: TeardownRemoval[]) => removals.every((removal) => removal.branch && removal.path)
 
 // the request the choices give: the worktrees not kept, forced when an unsafe one is removed anyway
 export function requestOf({
@@ -14,7 +14,7 @@ export function requestOf({
   choices,
   reparent,
 }: {
-  removals: CleanRemoval[]
+  removals: TeardownRemoval[]
   choices: Record<string, Choice>
   reparent: boolean
 }): DomainAnswered[] {

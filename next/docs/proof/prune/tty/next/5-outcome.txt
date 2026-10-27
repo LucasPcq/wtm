@@ -1,0 +1,25 @@
+$ wtm prune --merged; echo EXIT=$?
+  ✗ on_clean · feat/bad (<DUR>)
+    failing
+  full output:  <SB>/acme/.git/wtm/hooks/on_clean-feat%2Fbad.log
+  ✓ on_clean · feat/dirty (<DUR>)
+  ✓ on_clean · feat/merged (<DUR>)
+  ✓ on_clean · feat/squash (<DUR>)
+
+┃  ✗ prune: 3 done · 1 failed
+┃
+┃  Prune     feat/bad (merged #7)
+┃            feat/dirty (merged #4; dirty, forced)
+┃            feat/merged (merged #1)
+┃            feat/squash (merged #8)
+┃  Children  feat/child (left on feat/merged)
+┃
+┃  ! feat/child still points at the removed parent feat/merged
+┃
+┃  ✗ feat/bad  on_clean hook failed: exit status 3
+┃
+┃  → wtm reparent feat/child --to main   move it onto main
+
+EXIT=1
+$
+

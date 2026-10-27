@@ -1,0 +1,9 @@
+
+  ✓ 1 pruned · 1 reparented · 3 skipped · 1 failed
+    feat/merged
+    feat/child → main
+  ! Skipped feat/moved (unpushed commits — pass --force)
+  ! Skipped feat/dirty (dirty — pass --force)
+  ! Skipped feat/locked (locked — pass --force)
+  ✗ stopped at feat/bad: on_clean: case feat/bad in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/bad;; esac: hook failed: exit status 3 — it and the worktrees after it were left as they were
+

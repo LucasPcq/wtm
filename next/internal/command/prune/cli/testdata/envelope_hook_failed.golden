@@ -1,0 +1,94 @@
+{
+  "v": 2,
+  "command": "prune",
+  "ok": false,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/merged",
+      "status": "failed",
+      "error": {
+        "kind": "internal",
+        "code": "prune.hook_failed",
+        "message": "on_clean hook failed: exit status 2"
+      },
+      "detail": {}
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/merged",
+        "branch": "feat/merged",
+        "path": "/repo/wt-feat-merged",
+        "hooks": [
+          "make down"
+        ],
+        "phases": [
+          "on_clean",
+          "remove"
+        ],
+        "blockers": [],
+        "reason": "merged",
+        "pr": {
+          "number": 12,
+          "url": "https://github.com/acme/web/pull/12"
+        }
+      }
+    ],
+    "moves": [
+      {
+        "branch": "feat/child",
+        "from": "feat/merged",
+        "to": "main",
+        "base": true
+      }
+    ],
+    "reasons": [
+      "merged",
+      "closed",
+      "gone"
+    ],
+    "reparent_children": false,
+    "force": false,
+    "recap": [
+      {
+        "key": "prune",
+        "label": "Prune",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/merged",
+            "params": {
+              "reason": "merged"
+            },
+            "text": "feat/merged (merged #12)"
+          }
+        ]
+      },
+      {
+        "key": "children",
+        "label": "Children",
+        "path": "reparent_children",
+        "values": [
+          {
+            "value": "feat/child",
+            "note": "orphaned",
+            "params": {
+              "from": "feat/merged",
+              "to": "main"
+            },
+            "text": "feat/child (left on feat/merged)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "internal",
+    "code": "prune.hook_failed",
+    "message": "on_clean hook failed: exit status 2"
+  }
+}

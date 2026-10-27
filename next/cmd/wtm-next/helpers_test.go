@@ -27,8 +27,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/webserver"
 	"github.com/LucasPcq/wtm/next/internal/api"
-	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/command/list"
+	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
@@ -104,7 +105,7 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 	require.NoError(t, err)
 	// a later answer's problem may wait on the subject's, as extract's files wait on their source
 	subject := m.answers[0].Path
-	assert.NotEmpty(t, domain.ProblemsOf(empty.Problems, subject), "an empty request is not asked its %s", subject)
+	assert.Equal(t, m.complete, len(domain.ProblemsOf(empty.Problems, subject)) == 0, "an empty request is not asked its %s, unless it is complete", subject)
 
 	asked, err := c.Questions(t.Context(), api.Call{Dir: main, Answers: m.answers})
 	require.NoError(t, err)
@@ -462,7 +463,9 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[domain.Origin]():             {"Where a field's answer came from.", domain.Origins()},
 	reflect.TypeFor[domain.OptionTag]():          {"What sets an option apart, as a code each surface words its own way.", domain.OptionTags()},
 	reflect.TypeFor[create.Action]():             {"How a branch gets its worktree.", create.Actions()},
-	reflect.TypeFor[clean.Blocker]():             {"What makes a worktree unsafe to remove, a safety refusal only force lifts, as a code each surface words its own way.", clean.Blockers()},
+	reflect.TypeFor[list.Finished]():             {"How a worktree's pull request has done with it: merged, or closed unmerged.", list.Finisheds()},
+	reflect.TypeFor[prune.Reason]():              {"Why a worktree is done with, as a code each surface words its own way.", prune.Reasons()},
+	reflect.TypeFor[worktree.Blocker]():          {"What makes a worktree unsafe to remove, a safety refusal only force lifts, as a code each surface words its own way.", worktree.Blockers()},
 	reflect.TypeFor[project.EnvStrategy]():       {"Where a worktree's .env files are copied from.", project.EnvStrategies()},
 	reflect.TypeFor[project.Isolation]():         {"How a worktree stands against its source.", project.Isolations()},
 	reflect.TypeFor[project.JobKind]():           {"Whether a job keeps running or runs to its end.", project.JobKinds()},

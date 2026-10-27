@@ -1,0 +1,5 @@
+
+  ✗ nothing removed: feat/dirty can't be removed safely
+    feat/dirty has uncommitted changes
+  → wtm-next prune feat/merged feat/dirty --force   remove anyway
+

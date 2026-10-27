@@ -1,0 +1,70 @@
+{
+  "pruned": [
+    {
+      "branch": "feat/merged",
+      "path": "<SB>/acme.trees/feat-merged",
+      "reason": "pr_merged",
+      "is_dirty": false,
+      "source_branch": "main"
+    },
+    {
+      "branch": "feat/closed",
+      "path": "<SB>/acme.trees/feat-closed",
+      "reason": "pr_closed",
+      "is_dirty": false,
+      "source_branch": "main"
+    },
+    {
+      "branch": "feat/gone",
+      "path": "<SB>/acme.trees/feat-gone",
+      "reason": "gone",
+      "is_dirty": false,
+      "source_branch": "main"
+    },
+    {
+      "branch": "feat/gone-work",
+      "path": "<SB>/acme.trees/feat-gone-work",
+      "reason": "gone",
+      "is_dirty": false,
+      "source_branch": "main"
+    },
+    {
+      "branch": "feat/bad",
+      "path": "<SB>/acme.trees/feat-bad",
+      "reason": "pr_merged",
+      "is_dirty": false,
+      "source_branch": "main"
+    },
+    {
+      "branch": "feat/squash",
+      "path": "<SB>/acme.trees/feat-squash",
+      "reason": "pr_merged",
+      "is_dirty": false,
+      "source_branch": "main"
+    }
+  ],
+  "reparented": [
+    {
+      "branch": "feat/child",
+      "old_parent": "feat/merged",
+      "new_parent": "main"
+    }
+  ],
+  "orphaned": [],
+  "skipped": [
+    {
+      "branch": "feat/moved",
+      "reason": "unpushed"
+    },
+    {
+      "branch": "feat/dirty",
+      "reason": "dirty"
+    },
+    {
+      "branch": "feat/locked",
+      "reason": "locked"
+    }
+  ],
+  "dry_run": true,
+  "namespaces": []
+}

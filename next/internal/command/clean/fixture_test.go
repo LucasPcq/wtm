@@ -19,6 +19,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 )
 
 const (
@@ -93,17 +94,14 @@ func newWorld(t *testing.T, s seed) world {
 
 	ids := 0
 	w.usecase = clean.UseCase{
-		Git:      repo,
-		Meta:     meta,
-		EnvFiles: store.EnvFiles{},
-		Jobs:     func(context.Context) ([]run.Job, error) { return s.Jobs, s.JobErr },
+		Git:  repo,
+		Meta: meta,
+		Jobs: func(context.Context) ([]run.Job, error) { return s.Jobs, s.JobErr },
 		PullRequests: func(_ context.Context, branches []string) ([]worktree.PullRequest, error) {
 			*w.asked = append(*w.asked, branches...)
 			return s.PRs, s.PRErr
 		},
-		RunHooks:   shell.RunHooks,
-		Shield:     shell.Shield,
-		StateDir:   stateDir,
+		Teardown:   teardown.Service{Git: repo, Meta: meta, EnvFiles: store.EnvFiles{}, StateDir: stateDir, Gone: repository.GoneIn(repo), RunHooks: shell.RunHooks, Shield: shell.Shield},
 		Repository: repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main},
 		Operations: operation.Service{
 			Locker:    locks{oplock.Locks{StateDir: stateDir}},
@@ -182,4 +180,13 @@ func (b bare) Snapshot(ctx context.Context) (worktree.Snapshot, error) {
 		snapshot.Worktrees[0].State = worktree.Bare{}
 	}
 	return snapshot, err
+}
+
+// broken fails to count what a removal would lose, as git does on a corrupt object.
+type broken struct {
+	git.Repo
+}
+
+func (broken) Unpushed(context.Context, worktree.Losing) (int, error) {
+	return 0, errBroken
 }

@@ -9,12 +9,13 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAChildMovesPastEveryParentRemovedToTheBaseBranchAtTheEnd(t *testing.T) {
-	facts := clean.Facts{
+	facts := clean.Facts{Facts: teardown.Facts{
 		Repository: worktree.Repository{
 			Config: project.Config{Worktrees: project.Worktrees{BaseBranch: "main"}},
 			Snapshot: worktree.Snapshot{Worktrees: []worktree.Worktree{
@@ -26,14 +27,14 @@ func TestAChildMovesPastEveryParentRemovedToTheBaseBranchAtTheEnd(t *testing.T) 
 			}},
 		},
 		Records: map[string]worktree.Meta{"a": {SourceBranch: "main"}, "b": {SourceBranch: "a"}, "c": {SourceBranch: "b"}, "d": {SourceBranch: "a"}},
-	}
+	}}
 
 	cases := map[string]struct {
 		removed []string
-		moves   []clean.Move
+		moves   []teardown.Move
 	}{
-		"onto_grandparent": {removed: []string{"b"}, moves: []clean.Move{{Branch: "c", From: "b", To: "a"}}},
-		"past_two":         {removed: []string{"a", "b"}, moves: []clean.Move{{Branch: "d", From: "a", To: "main", Base: true}, {Branch: "c", From: "b", To: "main", Base: true}}},
+		"onto_grandparent": {removed: []string{"b"}, moves: []teardown.Move{{Branch: "c", From: "b", To: "a"}}},
+		"past_two":         {removed: []string{"a", "b"}, moves: []teardown.Move{{Branch: "d", From: "a", To: "main", Base: true}, {Branch: "c", From: "b", To: "main", Base: true}}},
 		"leaf":             {removed: []string{"c"}},
 	}
 	for name, c := range cases {
@@ -48,7 +49,7 @@ func TestAChildMovesPastEveryParentRemovedToTheBaseBranchAtTheEnd(t *testing.T) 
 
 // An ancestor that no longer exists, neither a branch nor a worktree's, was the parent a child moved onto: reparented onto a gone branch.
 func TestAChildMovesPastAnAncestorThatIsGone(t *testing.T) {
-	facts := clean.Facts{
+	facts := clean.Facts{Facts: teardown.Facts{
 		Repository: worktree.Repository{
 			Config: project.Config{Worktrees: project.Worktrees{BaseBranch: "main"}},
 			Snapshot: worktree.Snapshot{Worktrees: []worktree.Worktree{
@@ -58,12 +59,12 @@ func TestAChildMovesPastAnAncestorThatIsGone(t *testing.T) {
 			}},
 		},
 		Records: map[string]worktree.Meta{"feat/b": {SourceBranch: "feat/base"}, "feat/c": {SourceBranch: "feat/b"}},
-	}
+	}}
 
 	planned, _, err := clean.Decide(facts, removing("feat/b"))
 
 	require.NoError(t, err)
-	assert.Equal(t, []clean.Move{{Branch: "feat/c", From: "feat/b", To: "main", Base: true}}, planned.Moves)
+	assert.Equal(t, []teardown.Move{{Branch: "feat/c", From: "feat/b", To: "main", Base: true}}, planned.Moves)
 }
 
 func TestTheFingerprintCoversTheHooksTheRemovalRuns(t *testing.T) {
@@ -100,11 +101,11 @@ func TestTheRecapNamesWhatAForcedRemovalLosesAndWhereEachChildGoes(t *testing.T)
 
 	assert.Equal(t, []domain.RecapRow{
 		{Key: "remove", Label: "Remove", Path: domain.PathWorktree, Values: []domain.RecapValue{
-			{Value: dirty, Note: clean.NoteForced, Params: domain.Params{"blockers": "dirty"}, Text: dirty + " (dirty, forced)"},
+			{Value: dirty, Note: teardown.NoteForced, Params: domain.Params{"blockers": "dirty"}, Text: dirty + " (dirty, forced)"},
 			{Value: parent, Text: parent},
 		}},
 		{Key: "absent", Label: "Already absent", Path: domain.PathWorktree, Values: []domain.RecapValue{{Value: "feat/nope", Note: clean.NoteAbsent, Text: "feat/nope (no worktree: nothing to remove)"}}},
-		{Key: "children", Label: "Children", Path: clean.PathReparentChildren, Values: []domain.RecapValue{{Value: child, Note: clean.NoteOrphaned, Params: domain.Params{"from": parent, "to": "main"}, Text: child + " (left on " + parent + ")"}}},
+		{Key: "children", Label: "Children", Path: clean.PathReparentChildren, Values: []domain.RecapValue{{Value: child, Note: teardown.NoteOrphaned, Params: domain.Params{"from": parent, "to": "main"}, Text: child + " (left on " + parent + ")"}}},
 	}, planned.Recap)
 }
 

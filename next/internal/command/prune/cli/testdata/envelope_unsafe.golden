@@ -1,0 +1,46 @@
+{
+  "v": 2,
+  "command": "prune",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "refused",
+    "code": "prune.unsafe",
+    "message": "nothing removed: feat/dirty can't be removed safely",
+    "params": {
+      "worktrees": "feat/dirty"
+    },
+    "follow_up": {
+      "command": "prune",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/dirty"
+          ]
+        },
+        {
+          "path": "force",
+          "values": [
+            "true"
+          ]
+        }
+      ],
+      "code": "prune.force",
+      "message": "remove anyway"
+    },
+    "fields": [
+      {
+        "path": "worktree[0]",
+        "code": "prune.dirty",
+        "params": {
+          "value": "feat/dirty"
+        },
+        "flag": "<worktree>[0]",
+        "message": "feat/dirty has uncommitted changes"
+      }
+    ]
+  }
+}

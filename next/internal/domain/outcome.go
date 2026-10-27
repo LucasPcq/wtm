@@ -28,6 +28,7 @@ const (
 	ReasonIncomplete  Reason = "incomplete"  // failed or cancelled partway, its changes so far kept
 	ReasonInterrupted Reason = "interrupted" // cancelled, or skipped because the operation was cancelled first
 	ReasonNotReached  Reason = "not_reached" // skipped: the operation stopped before reaching it
+	ReasonRuledOut    Reason = "ruled_out"   // skipped: the plan left it as it is, its why in the plan and a warning
 )
 
 // An Outcome is what a mutating command's run did: the operation it ran under, the plan P and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, or a refusal before the apply). D is what the command reports of each subject.

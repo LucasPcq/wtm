@@ -50,23 +50,29 @@ func PullRequestOf(prs []PullRequest, branch string) (PullRequest, bool) {
 	return prs[at], true
 }
 
-// Cleans reports whether pr, once merged, leaves the worktree w to be cleaned: while w's branch stands at the commit pr merged, or behind it (behind: its tip is an ancestor of pr's head, as MergedPast asks), so a branch name reused or moved on since is not taken for merged, and one behind its pull request's head is; never the main worktree nor one on the base branch, which outlive any pull request.
+// Cleans reports whether pr, once merged, leaves the worktree w to be cleaned: Finished, for a merged pull request alone; list, status and tree read it.
 func (r Repository) Cleans(pr PullRequest, w Worktree, behind bool) bool {
-	tip, ok := r.mergedInto(pr, w)
+	return pr.State == PullRequestMerged && r.Finished(pr, w, behind)
+}
+
+// Finished reports whether pr, merged or closed, has done with the worktree w: while w's branch stands at the commit pr last stood at, or behind it (behind: its tip is an ancestor of pr's head, as FinishedPast asks), so a branch name reused or moved on since is not taken for finished, and one behind its pull request's head is; never the main worktree nor one on the base branch, which outlive any pull request.
+func (r Repository) Finished(pr PullRequest, w Worktree, behind bool) bool {
+	tip, ok := r.finishedAt(pr, w)
 	return ok && (tip == pr.Head || behind)
 }
 
-// MergedPast returns the ancestry Cleans needs to know of, and reports whether it does: whether w's branch tip is behind the head of its merged pull request pr, asked only when the tip is not that head.
-func (r Repository) MergedPast(pr PullRequest, w Worktree) (Ancestry, bool) {
-	tip, ok := r.mergedInto(pr, w)
+// FinishedPast returns the ancestry Finished needs to know of, and reports whether it does: whether w's branch tip is behind the head of its finished pull request pr, asked only when the tip is not that head.
+func (r Repository) FinishedPast(pr PullRequest, w Worktree) (Ancestry, bool) {
+	tip, ok := r.finishedAt(pr, w)
 	return Ancestry{Ancestor: tip, Descendant: pr.Head}, ok && tip != pr.Head
 }
 
-// mergedInto is the tip of w's branch, and whether pr is merged and w is a worktree it may leave to be cleaned: neither the main worktree nor one on the base branch, its branch's tip and pr's head both known.
-func (r Repository) mergedInto(pr PullRequest, w Worktree) (string, bool) {
+// finishedAt is the tip of w's branch, and whether pr is merged or closed and w is a worktree it may have done with: neither the main worktree nor one on the base branch, its branch's tip and pr's head both known.
+func (r Repository) finishedAt(pr PullRequest, w Worktree) (string, bool) {
 	branch := w.Branch()
 	tip := r.Tip(branch)
-	return tip, pr.State == PullRequestMerged && !w.Main && branch != r.Config.Worktrees.BaseBranch && tip != "" && pr.Head != ""
+	finished := pr.State == PullRequestMerged || pr.State == PullRequestClosed
+	return tip, finished && !w.Main && branch != r.Config.Worktrees.BaseBranch && tip != "" && pr.Head != ""
 }
 
 // ErrPullRequestsUnavailable is why the pull requests could not be listed, wrapped with what to do about it.

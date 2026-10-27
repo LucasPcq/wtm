@@ -6,20 +6,11 @@
         "create",
         "extract",
         "clean",
+        "prune",
         "list",
         "resolve",
         "status",
         "tree"
-      ]
-    },
-    "clean.Blocker": {
-      "description": "What makes a worktree unsafe to remove, a safety refusal only force lifts, as a code each surface words its own way.",
-      "enum": [
-        "locked",
-        "dirty",
-        "unpushed",
-        "open_pull_request",
-        "jobs_running"
       ]
     },
     "clean.Detail": {
@@ -31,29 +22,6 @@
       },
       "required": [
         "path"
-      ],
-      "type": "object"
-    },
-    "clean.Move": {
-      "additionalProperties": false,
-      "properties": {
-        "base": {
-          "type": "boolean"
-        },
-        "branch": {
-          "type": "string"
-        },
-        "from": {
-          "type": "string"
-        },
-        "to": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "branch",
-        "from",
-        "to"
       ],
       "type": "object"
     },
@@ -71,7 +39,7 @@
         },
         "moves": {
           "items": {
-            "$ref": "#/$defs/clean.Move"
+            "$ref": "#/$defs/teardown.Move"
           },
           "type": "array"
         },
@@ -94,7 +62,7 @@
           "anyOf": [
             {
               "items": {
-                "$ref": "#/$defs/clean.Removal"
+                "$ref": "#/$defs/teardown.Removal"
               },
               "type": "array"
             },
@@ -108,80 +76,6 @@
         "worktrees",
         "reparent_children",
         "force"
-      ],
-      "type": "object"
-    },
-    "clean.Removal": {
-      "additionalProperties": false,
-      "properties": {
-        "blockers": {
-          "anyOf": [
-            {
-              "items": {
-                "$ref": "#/$defs/clean.Blocker"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "branch": {
-          "type": "string"
-        },
-        "hooks": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "jobs": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "missing": {
-          "type": "boolean"
-        },
-        "namespaces": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "path": {
-          "type": "string"
-        },
-        "phases": {
-          "anyOf": [
-            {
-              "items": {
-                "$ref": "#/$defs/domain.Phase"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "pull_request": {
-          "type": "string"
-        },
-        "unpushed": {
-          "type": "integer"
-        },
-        "worktree": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "worktree",
-        "path",
-        "phases",
-        "blockers"
       ],
       "type": "object"
     },
@@ -1002,7 +896,8 @@
             "unchanged",
             "incomplete",
             "interrupted",
-            "not_reached"
+            "not_reached",
+            "ruled_out"
           ]
         },
         "status": {
@@ -1249,7 +1144,8 @@
         "no_conflict",
         "all",
         "no_orphan",
-        "safe"
+        "safe",
+        "no_candidate"
       ]
     },
     "domain.TextField": {
@@ -2161,6 +2057,16 @@
         "dirty": {
           "type": "boolean"
         },
+        "finished": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/list.Finished"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "last_commit_at": {
           "anyOf": [
             {
@@ -2259,12 +2165,20 @@
         "origin",
         "pr",
         "merged",
+        "finished",
         "condition",
         "services",
         "urls",
         "actions"
       ],
       "type": "object"
+    },
+    "list.Finished": {
+      "description": "How a worktree's pull request has done with it: merged, or closed unmerged.",
+      "enum": [
+        "merged",
+        "closed"
+      ]
     },
     "list.PR": {
       "additionalProperties": false,
@@ -2404,6 +2318,391 @@
         "service",
         "task"
       ]
+    },
+    "prune.Candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "blockers": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/worktree.Blocker"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "branch": {
+          "type": "string"
+        },
+        "hooks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "jobs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "missing": {
+          "type": "boolean"
+        },
+        "namespaces": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "path": {
+          "type": "string"
+        },
+        "phases": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/domain.Phase"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pr": {
+          "$ref": "#/$defs/prune.PR"
+        },
+        "pull_request": {
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/prune.Reason"
+        },
+        "unpushed": {
+          "type": "integer"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "path",
+        "phases",
+        "blockers",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "prune.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/prune.Reason"
+        }
+      },
+      "required": [
+        "path",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "prune.PR": {
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "number",
+        "url"
+      ],
+      "type": "object"
+    },
+    "prune.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "force": {
+          "type": "boolean"
+        },
+        "moves": {
+          "items": {
+            "$ref": "#/$defs/teardown.Move"
+          },
+          "type": "array"
+        },
+        "reasons": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/prune.Reason"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "reparent_children": {
+          "type": "boolean"
+        },
+        "worktrees": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/prune.Candidate"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "worktrees",
+        "reasons",
+        "reparent_children",
+        "force"
+      ],
+      "type": "object"
+    },
+    "prune.Reason": {
+      "description": "Why a worktree is done with, as a code each surface words its own way.",
+      "enum": [
+        "merged",
+        "closed",
+        "gone"
+      ]
+    },
+    "prune.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "prune"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/prune.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/prune.Plan"
+        }
+      }
+    },
+    "prune.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "worktree"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "reparent_children"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "force"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "merged"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "closed"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "gone"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "no_fetch"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
     },
     "resolve.Detail": {
       "additionalProperties": false,
@@ -3027,6 +3326,103 @@
       },
       "type": "array"
     },
+    "teardown.Move": {
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "type": "boolean"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "teardown.Removal": {
+      "additionalProperties": false,
+      "properties": {
+        "blockers": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/worktree.Blocker"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "branch": {
+          "type": "string"
+        },
+        "hooks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "jobs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "missing": {
+          "type": "boolean"
+        },
+        "namespaces": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "path": {
+          "type": "string"
+        },
+        "phases": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/domain.Phase"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pull_request": {
+          "type": "string"
+        },
+        "unpushed": {
+          "type": "integer"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "path",
+        "phases",
+        "blockers"
+      ],
+      "type": "object"
+    },
     "tree.Detail": {
       "additionalProperties": false,
       "properties": {
@@ -3434,6 +3830,16 @@
         "message"
       ],
       "type": "object"
+    },
+    "worktree.Blocker": {
+      "description": "What makes a worktree unsafe to remove, a safety refusal only force lifts, as a code each surface words its own way.",
+      "enum": [
+        "locked",
+        "dirty",
+        "unpushed",
+        "open_pull_request",
+        "jobs_running"
+      ]
     },
     "worktree.Change": {
       "additionalProperties": false,

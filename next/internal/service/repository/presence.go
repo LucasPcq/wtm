@@ -43,6 +43,11 @@ func Gone(ctx context.Context, git Locator, w worktree.Worktree) (bool, error) {
 	return !location.Exists, nil
 }
 
+// GoneIn is Gone through git, for a service handed it as a function.
+func GoneIn(git Locator) func(ctx context.Context, w worktree.Worktree) (bool, error) {
+	return func(ctx context.Context, w worktree.Worktree) (bool, error) { return Gone(ctx, git, w) }
+}
+
 // Located is the path a worktree's name stands for, read from where caller stands and resolved through its symbolic links by git; "" when the name is empty or nothing exists there, the name then being a branch or a part of one (worktree.Named).
 func Located(ctx context.Context, git Locator, name string, caller domain.Caller) (string, error) {
 	if name == "" {

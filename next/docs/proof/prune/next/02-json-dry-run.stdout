@@ -1,0 +1,293 @@
+{
+  "v": 2,
+  "command": "prune",
+  "ok": true,
+  "op": "<OP>",
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/bad",
+        "branch": "feat/bad",
+        "path": "<SB>/acme.trees/feat-bad",
+        "hooks": [
+          "case feat/bad in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/bad;; esac"
+        ],
+        "phases": [
+          "on_clean",
+          "remove"
+        ],
+        "blockers": [],
+        "reason": "merged",
+        "pr": {
+          "number": 7,
+          "url": "https://github.com/acme/acme/pull/7"
+        }
+      },
+      {
+        "worktree": "feat/closed",
+        "branch": "feat/closed",
+        "path": "<SB>/acme.trees/feat-closed",
+        "hooks": [
+          "case feat/closed in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/closed;; esac"
+        ],
+        "phases": [
+          "on_clean",
+          "remove"
+        ],
+        "blockers": [],
+        "reason": "closed",
+        "pr": {
+          "number": 3,
+          "url": "https://github.com/acme/acme/pull/3"
+        }
+      },
+      {
+        "worktree": "feat/dirty",
+        "branch": "feat/dirty",
+        "path": "<SB>/acme.trees/feat-dirty",
+        "phases": [],
+        "blockers": [
+          "dirty"
+        ],
+        "reason": "merged",
+        "pr": {
+          "number": 4,
+          "url": "https://github.com/acme/acme/pull/4"
+        }
+      },
+      {
+        "worktree": "feat/gone",
+        "branch": "feat/gone",
+        "path": "<SB>/acme.trees/feat-gone",
+        "hooks": [
+          "case feat/gone in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/gone;; esac"
+        ],
+        "phases": [
+          "on_clean",
+          "remove"
+        ],
+        "blockers": [],
+        "reason": "gone"
+      },
+      {
+        "worktree": "feat/gone-work",
+        "branch": "feat/gone-work",
+        "path": "<SB>/acme.trees/feat-gone-work",
+        "phases": [],
+        "blockers": [
+          "unpushed"
+        ],
+        "unpushed": 2,
+        "reason": "gone"
+      },
+      {
+        "worktree": "feat/locked",
+        "branch": "feat/locked",
+        "path": "<SB>/acme.trees/feat-locked",
+        "phases": [],
+        "blockers": [
+          "locked"
+        ],
+        "reason": "merged",
+        "pr": {
+          "number": 5,
+          "url": "https://github.com/acme/acme/pull/5"
+        }
+      },
+      {
+        "worktree": "feat/merged",
+        "branch": "feat/merged",
+        "path": "<SB>/acme.trees/feat-merged",
+        "hooks": [
+          "case feat/merged in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/merged;; esac"
+        ],
+        "phases": [
+          "on_clean",
+          "remove"
+        ],
+        "blockers": [],
+        "reason": "merged",
+        "pr": {
+          "number": 1,
+          "url": "https://github.com/acme/acme/pull/1"
+        }
+      },
+      {
+        "worktree": "feat/squash",
+        "branch": "feat/squash",
+        "path": "<SB>/acme.trees/feat-squash",
+        "hooks": [
+          "case feat/squash in feat/bad*) echo failing; exit 3;; *) echo tearing down feat/squash;; esac"
+        ],
+        "phases": [
+          "on_clean",
+          "remove"
+        ],
+        "blockers": [],
+        "reason": "merged",
+        "pr": {
+          "number": 8,
+          "url": "https://github.com/acme/acme/pull/8"
+        }
+      }
+    ],
+    "moves": [
+      {
+        "branch": "feat/child",
+        "from": "feat/merged",
+        "to": "main",
+        "base": true
+      }
+    ],
+    "reasons": [
+      "merged",
+      "closed",
+      "gone"
+    ],
+    "reparent_children": false,
+    "force": false,
+    "recap": [
+      {
+        "key": "prune",
+        "label": "Prune",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/bad",
+            "params": {
+              "reason": "merged"
+            },
+            "text": "feat/bad (merged #7)"
+          },
+          {
+            "value": "feat/closed",
+            "params": {
+              "reason": "closed"
+            },
+            "text": "feat/closed (closed #3)"
+          },
+          {
+            "value": "feat/gone",
+            "params": {
+              "reason": "gone"
+            },
+            "text": "feat/gone (deleted on origin)"
+          },
+          {
+            "value": "feat/merged",
+            "params": {
+              "reason": "merged"
+            },
+            "text": "feat/merged (merged #1)"
+          },
+          {
+            "value": "feat/squash",
+            "params": {
+              "reason": "merged"
+            },
+            "text": "feat/squash (merged #8)"
+          }
+        ]
+      },
+      {
+        "key": "kept",
+        "label": "Kept",
+        "path": "force",
+        "values": [
+          {
+            "value": "feat/dirty",
+            "note": "kept",
+            "params": {
+              "blockers": "dirty",
+              "reason": "merged"
+            },
+            "text": "feat/dirty (merged #4; dirty)"
+          },
+          {
+            "value": "feat/gone-work",
+            "note": "kept",
+            "params": {
+              "blockers": "unpushed",
+              "reason": "gone"
+            },
+            "text": "feat/gone-work (deleted on origin; unpushed)"
+          },
+          {
+            "value": "feat/locked",
+            "note": "kept",
+            "params": {
+              "blockers": "locked",
+              "reason": "merged"
+            },
+            "text": "feat/locked (merged #5; locked)"
+          }
+        ]
+      },
+      {
+        "key": "children",
+        "label": "Children",
+        "path": "reparent_children",
+        "values": [
+          {
+            "value": "feat/child",
+            "note": "orphaned",
+            "params": {
+              "from": "feat/merged",
+              "to": "main"
+            },
+            "text": "feat/child (left on feat/merged)"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<FP>",
+  "follow_ups": [],
+  "warnings": [
+    {
+      "code": "prune.kept",
+      "params": {
+        "blockers": "dirty",
+        "worktree": "feat/dirty"
+      },
+      "message": "feat/dirty is kept: unsafe to remove (dirty)"
+    },
+    {
+      "code": "prune.kept",
+      "params": {
+        "blockers": "unpushed",
+        "worktree": "feat/gone-work"
+      },
+      "message": "feat/gone-work is kept: unsafe to remove (unpushed)"
+    },
+    {
+      "code": "prune.kept",
+      "params": {
+        "blockers": "locked",
+        "worktree": "feat/locked"
+      },
+      "message": "feat/locked is kept: unsafe to remove (locked)",
+      "follow_up": {
+        "command": "prune",
+        "answers": [
+          {
+            "path": "worktree",
+            "values": [
+              "feat/dirty",
+              "feat/gone-work",
+              "feat/locked"
+            ]
+          },
+          {
+            "path": "force",
+            "values": [
+              "true"
+            ]
+          }
+        ],
+        "code": "prune.force",
+        "message": "prune them anyway"
+      }
+    }
+  ]
+}

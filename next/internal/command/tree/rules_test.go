@@ -19,7 +19,7 @@ func TestANodeNeedsTheFirstActionThatApplies(t *testing.T) {
 		code    string
 	}{
 		"rebasing_first":     {detail: tree.Detail{Branch: "feat/a", Condition: worktree.ConditionRebasing, NeedsSync: true}, cleans: true, command: "go", code: "tree.go"},
-		"merged_before_sync": {detail: tree.Detail{Branch: "feat/a", NeedsSync: true}, cleans: true, command: "clean", code: "tree.clean"},
+		"merged_before_sync": {detail: tree.Detail{Branch: "feat/a", NeedsSync: true}, cleans: true, command: "prune", code: "tree.prune"},
 		"needs_sync":         {detail: tree.Detail{Branch: "feat/a", NeedsSync: true}, command: "sync", code: "tree.sync"},
 		"nothing_due":        {detail: tree.Detail{Branch: "feat/a"}},
 	}

@@ -1,5 +1,5 @@
 import { MoveRight, TriangleAlert } from 'lucide-react'
-import type { CleanMove } from '@/api/types.gen'
+import type { TeardownMove } from '@/api/types.gen'
 import { ChoiceOptions } from '@/components/choice-options'
 import { Item } from '@/components/ui/item'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -10,7 +10,7 @@ export function ChildrenStep({
   reparent,
   onReparent,
 }: {
-  moves: CleanMove[]
+  moves: TeardownMove[]
   reparent: boolean
   onReparent: (on: boolean) => void
 }) {
@@ -33,7 +33,7 @@ export function ChildrenStep({
     ]
   }
 
-  const target = (move: CleanMove) => {
+  const target = (move: TeardownMove) => {
     if (!move.base) return <span>{move.to}</span>
     return (
       <Tooltip>

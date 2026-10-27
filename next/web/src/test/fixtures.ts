@@ -12,6 +12,7 @@ export const listDetail = (branch: string, over: Partial<ListDetail> = {}): List
   condition: over.dirty ? 'changed' : 'clean',
   created_at: '2026-10-25T11:00:00Z',
   dirty: false,
+  finished: null,
   last_commit_at: '2026-10-25T11:50:00Z',
   locked: false,
   main: false,

@@ -681,7 +681,7 @@ func commits(n int) string {
 }
 
 func mergedFix(branch string) *domain.FollowUp {
-	return fix(CodeMerged, "clean it up", domain.CommandClean, branch)
+	return fix(CodeMerged, "prune it", domain.CommandPrune, branch)
 }
 
 func crashed(job Job) string {

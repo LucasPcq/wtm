@@ -1,0 +1,15 @@
+
+  Would prune 9 worktree(s):
+  feat/merged     PR merged
+  feat/moved      PR merged
+  feat/closed     PR closed
+  feat/gone       remote branch gone
+  feat/gone-work  remote branch gone
+  feat/dirty      PR merged
+  feat/locked     PR merged
+  feat/bad        PR merged
+  feat/squash     PR merged
+
+  Reparent orphaned children onto their grandparent:
+  feat/child  feat/merged → main
+

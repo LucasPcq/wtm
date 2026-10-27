@@ -327,7 +327,7 @@ func TestAnInterruptedReadWarnsOfNothingItCouldNotAsk(t *testing.T) {
 
 func TestTheReviewIsTheNewestPullRequestAndAMergedOneAsksToCleanFirst(t *testing.T) {
 	const url = "https://github.com/acme/acme/pull/12"
-	clean := &domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Message: "clean it up", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}
+	clean := &domain.FollowUp{Command: domain.CommandPrune, Code: status.CodeMerged, Message: "prune it", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}
 	cases := map[string]struct {
 		pr       []worktree.PullRequest
 		review   *status.Review
@@ -425,7 +425,7 @@ func TestAMergedPullRequestAsksToCleanABranchBehindItsHeadButNotOneMovedOnOrApar
 			assert.Equal(t, worktree.PullRequestMerged, a.Review.State)
 			assert.Equal(t, c.problems, problemCodes(a.Problems))
 			if c.problems != nil {
-				assert.Equal(t, &domain.FollowUp{Command: domain.CommandClean, Code: status.CodeMerged, Message: "clean it up", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}, a.Problems[0].Fix)
+				assert.Equal(t, &domain.FollowUp{Command: domain.CommandPrune, Code: status.CodeMerged, Message: "prune it", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}}, a.Problems[0].Fix)
 			}
 		})
 	}

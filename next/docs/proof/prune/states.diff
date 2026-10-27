@@ -1,0 +1,371 @@
+=== 00-before: exit legacy , next 
+=== 01-dry-run: exit legacy 0, next 0
+=== 02-json-dry-run: exit legacy 0, next 0
+=== 03-gone-dry-run: exit legacy 0, next 0
+=== 04-forced-dry-run: exit legacy 0, next 0
+=== 05-closed: exit legacy 0, next 0
+=== 06-reparent-dry-run: exit legacy 0, next 0
+=== 07-merged-hook-fails: exit legacy 1, next 1
+--- legacy/07-merged-hook-fails
++++ next/07-merged-hook-fails
+@@ -8,7 +8,6 @@
+ feat/moved
+ feat/open
+ feat/plain
+-feat/squash
+ main
+ ## remote branches
+ origin
+@@ -32,7 +31,6 @@
+ <SB>/acme.trees/feat-moved
+ <SB>/acme.trees/feat-open
+ <SB>/acme.trees/feat-plain
+-<SB>/acme.trees/feat-squash
+ ## .git/wtm/worktrees/feat%2Fbad/meta.json
+ {
+   "source_branch": "main",
+@@ -96,10 +94,3 @@
+   "ordinal": 9,
+   "isolation": "isolated"
+ }
+-## .git/wtm/worktrees/feat%2Fsquash/meta.json
+-{
+-  "source_branch": "main",
+-  "env_strategy": "example",
+-  "ordinal": 11,
+-  "isolation": "isolated"
+-}
+=== 08-json: exit legacy 1, next 1
+--- legacy/08-json
++++ next/08-json
+@@ -2,11 +2,11 @@
+ feat/bad
+ feat/child
+ feat/dirty
++feat/gone-work
+ feat/locked
+ feat/moved
+ feat/open
+ feat/plain
+-feat/squash
+ main
+ ## remote branches
+ origin
+@@ -23,12 +23,12 @@
+ <SB>/acme.trees/feat-bad
+ <SB>/acme.trees/feat-child
+ <SB>/acme.trees/feat-dirty
++<SB>/acme.trees/feat-gone-work
+ <SB>/acme.trees/feat-locked
+   locked
+ <SB>/acme.trees/feat-moved
+ <SB>/acme.trees/feat-open
+ <SB>/acme.trees/feat-plain
+-<SB>/acme.trees/feat-squash
+ ## .git/wtm/worktrees/feat%2Fbad/meta.json
+ {
+   "source_branch": "main",
+@@ -50,6 +50,13 @@
+   "ordinal": 6,
+   "isolation": "isolated"
+ }
++## .git/wtm/worktrees/feat%2Fgone-work/meta.json
++{
++  "source_branch": "main",
++  "env_strategy": "example",
++  "ordinal": 5,
++  "isolation": "isolated"
++}
+ ## .git/wtm/worktrees/feat%2Flocked/meta.json
+ {
+   "source_branch": "main",
+@@ -78,10 +85,3 @@
+   "ordinal": 9,
+   "isolation": "isolated"
+ }
+-## .git/wtm/worktrees/feat%2Fsquash/meta.json
+-{
+-  "source_branch": "main",
+-  "env_strategy": "example",
+-  "ordinal": 11,
+-  "isolation": "isolated"
+-}
+=== 09-again: exit legacy 1, next 1
+--- legacy/09-again
++++ next/09-again
+@@ -2,11 +2,11 @@
+ feat/bad
+ feat/child
+ feat/dirty
++feat/gone-work
+ feat/locked
+ feat/moved
+ feat/open
+ feat/plain
+-feat/squash
+ main
+ ## remote branches
+ origin
+@@ -23,12 +23,12 @@
+ <SB>/acme.trees/feat-bad
+ <SB>/acme.trees/feat-child
+ <SB>/acme.trees/feat-dirty
++<SB>/acme.trees/feat-gone-work
+ <SB>/acme.trees/feat-locked
+   locked
+ <SB>/acme.trees/feat-moved
+ <SB>/acme.trees/feat-open
+ <SB>/acme.trees/feat-plain
+-<SB>/acme.trees/feat-squash
+ ## .git/wtm/worktrees/feat%2Fbad/meta.json
+ {
+   "source_branch": "main",
+@@ -50,6 +50,13 @@
+   "ordinal": 6,
+   "isolation": "isolated"
+ }
++## .git/wtm/worktrees/feat%2Fgone-work/meta.json
++{
++  "source_branch": "main",
++  "env_strategy": "example",
++  "ordinal": 5,
++  "isolation": "isolated"
++}
+ ## .git/wtm/worktrees/feat%2Flocked/meta.json
+ {
+   "source_branch": "main",
+@@ -78,10 +85,3 @@
+   "ordinal": 9,
+   "isolation": "isolated"
+ }
+-## .git/wtm/worktrees/feat%2Fsquash/meta.json
+-{
+-  "source_branch": "main",
+-  "env_strategy": "example",
+-  "ordinal": 11,
+-  "isolation": "isolated"
+-}
+=== 10-named-unsafe: exit legacy 2, next 23
+--- legacy/10-named-unsafe
++++ next/10-named-unsafe
+@@ -2,11 +2,11 @@
+ feat/bad
+ feat/child
+ feat/dirty
++feat/gone-work
+ feat/locked
+ feat/moved
+ feat/open
+ feat/plain
+-feat/squash
+ main
+ ## remote branches
+ origin
+@@ -23,12 +23,12 @@
+ <SB>/acme.trees/feat-bad
+ <SB>/acme.trees/feat-child
+ <SB>/acme.trees/feat-dirty
++<SB>/acme.trees/feat-gone-work
+ <SB>/acme.trees/feat-locked
+   locked
+ <SB>/acme.trees/feat-moved
+ <SB>/acme.trees/feat-open
+ <SB>/acme.trees/feat-plain
+-<SB>/acme.trees/feat-squash
+ ## .git/wtm/worktrees/feat%2Fbad/meta.json
+ {
+   "source_branch": "main",
+@@ -50,6 +50,13 @@
+   "ordinal": 6,
+   "isolation": "isolated"
+ }
++## .git/wtm/worktrees/feat%2Fgone-work/meta.json
++{
++  "source_branch": "main",
++  "env_strategy": "example",
++  "ordinal": 5,
++  "isolation": "isolated"
++}
+ ## .git/wtm/worktrees/feat%2Flocked/meta.json
+ {
+   "source_branch": "main",
+@@ -78,10 +85,3 @@
+   "ordinal": 9,
+   "isolation": "isolated"
+ }
+-## .git/wtm/worktrees/feat%2Fsquash/meta.json
+-{
+-  "source_branch": "main",
+-  "env_strategy": "example",
+-  "ordinal": 11,
+-  "isolation": "isolated"
+-}
+=== 11-named-not-done: exit legacy 2, next 2
+--- legacy/11-named-not-done
++++ next/11-named-not-done
+@@ -2,11 +2,11 @@
+ feat/bad
+ feat/child
+ feat/dirty
++feat/gone-work
+ feat/locked
+ feat/moved
+ feat/open
+ feat/plain
+-feat/squash
+ main
+ ## remote branches
+ origin
+@@ -23,12 +23,12 @@
+ <SB>/acme.trees/feat-bad
+ <SB>/acme.trees/feat-child
+ <SB>/acme.trees/feat-dirty
++<SB>/acme.trees/feat-gone-work
+ <SB>/acme.trees/feat-locked
+   locked
+ <SB>/acme.trees/feat-moved
+ <SB>/acme.trees/feat-open
+ <SB>/acme.trees/feat-plain
+-<SB>/acme.trees/feat-squash
+ ## .git/wtm/worktrees/feat%2Fbad/meta.json
+ {
+   "source_branch": "main",
+@@ -50,6 +50,13 @@
+   "ordinal": 6,
+   "isolation": "isolated"
+ }
++## .git/wtm/worktrees/feat%2Fgone-work/meta.json
++{
++  "source_branch": "main",
++  "env_strategy": "example",
++  "ordinal": 5,
++  "isolation": "isolated"
++}
+ ## .git/wtm/worktrees/feat%2Flocked/meta.json
+ {
+   "source_branch": "main",
+@@ -78,10 +85,3 @@
+   "ordinal": 9,
+   "isolation": "isolated"
+ }
+-## .git/wtm/worktrees/feat%2Fsquash/meta.json
+-{
+-  "source_branch": "main",
+-  "env_strategy": "example",
+-  "ordinal": 11,
+-  "isolation": "isolated"
+-}
+=== 12-named-forced: exit legacy 2, next 0
+--- legacy/12-named-forced
++++ next/12-named-forced
+@@ -1,12 +1,11 @@
+ ## branches
+ feat/bad
+ feat/child
+-feat/dirty
++feat/gone-work
+ feat/locked
+ feat/moved
+ feat/open
+ feat/plain
+-feat/squash
+ main
+ ## remote branches
+ origin
+@@ -22,13 +21,12 @@
+ <SB>/acme
+ <SB>/acme.trees/feat-bad
+ <SB>/acme.trees/feat-child
+-<SB>/acme.trees/feat-dirty
++<SB>/acme.trees/feat-gone-work
+ <SB>/acme.trees/feat-locked
+   locked
+ <SB>/acme.trees/feat-moved
+ <SB>/acme.trees/feat-open
+ <SB>/acme.trees/feat-plain
+-<SB>/acme.trees/feat-squash
+ ## .git/wtm/worktrees/feat%2Fbad/meta.json
+ {
+   "source_branch": "main",
+@@ -43,11 +41,11 @@
+   "ordinal": 12,
+   "isolation": "isolated"
+ }
+-## .git/wtm/worktrees/feat%2Fdirty/meta.json
++## .git/wtm/worktrees/feat%2Fgone-work/meta.json
+ {
+   "source_branch": "main",
+   "env_strategy": "example",
+-  "ordinal": 6,
++  "ordinal": 5,
+   "isolation": "isolated"
+ }
+ ## .git/wtm/worktrees/feat%2Flocked/meta.json
+@@ -78,10 +76,3 @@
+   "ordinal": 9,
+   "isolation": "isolated"
+ }
+-## .git/wtm/worktrees/feat%2Fsquash/meta.json
+-{
+-  "source_branch": "main",
+-  "env_strategy": "example",
+-  "ordinal": 11,
+-  "isolation": "isolated"
+-}
+=== 13-no-terminal: exit legacy 1, next 1
+--- legacy/13-no-terminal
++++ next/13-no-terminal
+@@ -1,12 +1,11 @@
+ ## branches
+ feat/bad
+ feat/child
+-feat/dirty
++feat/gone-work
+ feat/locked
+ feat/moved
+ feat/open
+ feat/plain
+-feat/squash
+ main
+ ## remote branches
+ origin
+@@ -22,13 +21,12 @@
+ <SB>/acme
+ <SB>/acme.trees/feat-bad
+ <SB>/acme.trees/feat-child
+-<SB>/acme.trees/feat-dirty
++<SB>/acme.trees/feat-gone-work
+ <SB>/acme.trees/feat-locked
+   locked
+ <SB>/acme.trees/feat-moved
+ <SB>/acme.trees/feat-open
+ <SB>/acme.trees/feat-plain
+-<SB>/acme.trees/feat-squash
+ ## .git/wtm/worktrees/feat%2Fbad/meta.json
+ {
+   "source_branch": "main",
+@@ -43,11 +41,11 @@
+   "ordinal": 12,
+   "isolation": "isolated"
+ }
+-## .git/wtm/worktrees/feat%2Fdirty/meta.json
++## .git/wtm/worktrees/feat%2Fgone-work/meta.json
+ {
+   "source_branch": "main",
+   "env_strategy": "example",
+-  "ordinal": 6,
++  "ordinal": 5,
+   "isolation": "isolated"
+ }
+ ## .git/wtm/worktrees/feat%2Flocked/meta.json
+@@ -78,10 +76,3 @@
+   "ordinal": 9,
+   "isolation": "isolated"
+ }
+-## .git/wtm/worktrees/feat%2Fsquash/meta.json
+-{
+-  "source_branch": "main",
+-  "env_strategy": "example",
+-  "ordinal": 11,
+-  "isolation": "isolated"
+-}

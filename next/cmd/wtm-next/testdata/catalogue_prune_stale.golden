@@ -1,0 +1,38 @@
+{
+  "v": 2,
+  "command": "prune",
+  "ok": false,
+  "op": "<id>",
+  "follow_ups": [
+    {
+      "command": "prune",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/done"
+          ]
+        },
+        {
+          "path": "gone",
+          "values": [
+            "true"
+          ]
+        }
+      ],
+      "dry_run": true,
+      "code": "plan.replan",
+      "message": "the plan the facts give now"
+    }
+  ],
+  "warnings": [],
+  "error": {
+    "kind": "precondition",
+    "code": "plan.stale",
+    "message": "the facts changed since the preview",
+    "params": {
+      "expected": "<id>",
+      "found": "<id>"
+    }
+  }
+}
