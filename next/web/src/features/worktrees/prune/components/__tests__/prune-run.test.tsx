@@ -33,6 +33,9 @@ test("a hidden run that did all it was asked says so in amber with what's left, 
 
   const told = await screen.findByText('1 pruned.')
   expect(told.closest('[data-type]')?.getAttribute('data-type')).toBe('warning')
+  expect(told.closest('[data-type]')?.className, 'its glyph in amber, the colour of something to do').toContain(
+    'text-amber-500',
+  )
   await user.click(await screen.findByRole('button', { name: 'Actions' }))
   await user.click(await screen.findByRole('menuitem', { name: 'Prune' }))
   const again = await screen.findByRole('dialog', { name: 'Prune worktrees' })

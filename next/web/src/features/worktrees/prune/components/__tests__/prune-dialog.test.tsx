@@ -221,3 +221,26 @@ test('a worktree that turns unsafe after the review shows its risk on its row, a
   await waitFor(() => expect(within(row).getByText('Uncommitted changes')).toBeTruthy())
   expect((await box()).getAttribute('aria-checked')).toBe('false')
 })
+
+// Read again on an event, the rows lost a worktree no longer done with before any plan refused it: it left the run
+// with no word.
+test('a worktree the person asked for that leaves the candidates is said under Left as they are', async () => {
+  const events = liveEvents()
+  let moved = false
+  answeringPrune((call) =>
+    moved && call.answers?.some((answer) => answer.path === 'no_fetch')
+      ? prunePlan(call, { found: candidates.filter((c) => c !== merged) })
+      : prunePlan(call),
+  )
+  const { user, dialog } = await openFromTheHeader()
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await within(dialog).findByRole('button', { name: 'Prune' })
+
+  moved = true
+  events.changed()
+
+  const left = await within(dialog).findByRole('region', { name: 'Left as they are' })
+  await waitFor(() => expect(within(left).getByRole('listitem', { name: 'feat/billing' })).toBeTruthy())
+  expect(within(left).getByText('No longer finished')).toBeTruthy()
+})

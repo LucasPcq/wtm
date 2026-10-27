@@ -19,6 +19,7 @@ import { Stepper, type StepState } from '@/features/worktrees/components/stepper
 import type { Start } from '@/features/worktrees/hooks/use-run'
 import { NothingToPrune } from '@/features/worktrees/prune/components/nothing-to-prune'
 import { ReasonLine } from '@/features/worktrees/prune/components/reason-line'
+import { leftOut } from '@/features/worktrees/prune/utils/left'
 import { requestOf } from '@/features/worktrees/prune/utils/plan'
 import { notFinished } from '@/features/worktrees/prune/utils/words'
 import { blockerWords } from '@/features/worktrees/utils/blocker-words'
@@ -92,7 +93,12 @@ export function PruneWizard({
     )
     setDropped([...dropped.filter((one) => !noLonger.some((now) => now.worktree === one.worktree)), ...noLonger])
   }
-  const left = dropped.filter((one) => !goingNames.includes(one.worktree))
+  const left = leftOut({
+    dropped,
+    asked: rows.isFetching ? [] : [...new Set([...confirmed, ...Object.keys(checked).filter((w) => checked[w]?.on)])],
+    candidates: candidates.map((candidate) => candidate.worktree),
+    going: goingNames,
+  })
 
   const plan = planned.isError || planned.data?.error ? undefined : planned.data?.plan
   const pruning = (plan?.worktrees ?? []).filter((candidate) => !kept(candidate))

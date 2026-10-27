@@ -26,7 +26,12 @@ export function Shell({ repo, children }: { repo: string | undefined; children: 
           children
         )}
       </SidebarInset>
-      <Toaster position="bottom-right" theme="system" />
+      {/* the glyph carries the colour: amber, something left to do */}
+      <Toaster
+        position="bottom-right"
+        theme="system"
+        toastOptions={{ classNames: { warning: '[&_[data-icon]]:text-amber-500' } }}
+      />
     </SidebarProvider>
   )
 }
