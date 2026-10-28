@@ -115,9 +115,29 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 	}
 
 	planned, warnings := Decide(facts, questions.Request())
+	if refused := u.newerNeighbours(planned); refused != nil {
+		return Plan{}, nil, refused
+	}
 	planned.Recalled = questions.Recalled()
 	planned.Recap, planned.Creates = planned.previewRecap(), planned.opens()
 	return planned, warnings, nil
+}
+
+// CodeMetaNewer refuses a request that would number a worktree past a record a newer wtm wrote.
+const CodeMetaNewer = Name + domain.MetaNewer
+
+// newerNeighbours refuses the plan, before anything is created, when a worktree it numbers would be numbered past a record a newer wtm wrote (CodeMetaNewer).
+func (u UseCase) newerNeighbours(plan Plan) *domain.Error {
+	for _, planned := range plan.Branches {
+		if planned.Action == ActionUnchanged {
+			continue
+		}
+		if refused := u.Provision.NewerNeighbours(provision.NewerNeighboursParams{Command: Name, Undone: "nothing created", Repository: plan.facts.Repository, Planned: plan.provisioned(planned)}); refused != nil {
+			return refused
+		}
+	}
+
+	return nil
 }
 
 // ----------------------------------------------------------------------------
@@ -201,7 +221,7 @@ func (u UseCase) item(ctx context.Context, plan Plan, planned BranchPlan, report
 	}
 
 	report(domain.UnitStarted{Subject: planned.Branch})
-	outcome := u.Provision.Run(ctx, provision.ParamsOf(plan.facts.Repository, provision.Planned{Branch: planned.Branch, Path: planned.Path, Placement: planned.placement(), From: plan.From, Answers: plan.settled}, report))
+	outcome := u.Provision.Run(ctx, provision.ParamsOf(plan.facts.Repository, plan.provisioned(planned), report))
 
 	item := Item{Subject: planned.Branch, Status: outcome.Status, Reason: outcome.Reason, Err: outcome.Err, Warnings: outcome.Warnings}
 	if outcome.Provisioned.Stands() {
