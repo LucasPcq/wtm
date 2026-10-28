@@ -96,13 +96,14 @@ type FollowUp struct {
 // CommandGo is the command a follow-up enters a worktree with: go, the shell function wtm shell-init installs, which cds into the path resolve prints; answered as resolve is, by PathWorktree.
 const CommandGo = "go"
 
-// The vocabulary a follow-up names a command with, for the commands whose follow-ups other commands give: clean removes a worktree, prune one done with, reparent changes the parent it is rebased onto, env settles its .env files, fast-forward brings its branch up to origin's, each answered by PathWorktree; init sets wtm up in a repository.
+// The vocabulary a follow-up names a command with, for the commands whose follow-ups other commands give: clean removes a worktree, prune one done with, reparent changes the parent it is rebased onto, env settles its .env files, fast-forward brings its branch up to origin's, exec runs a command in it, each answered by PathWorktree; init sets wtm up in a repository.
 const (
 	CommandClean       = "clean"
 	CommandPrune       = "prune"
 	CommandReparent    = "reparent"
 	CommandEnv         = "env"
 	CommandFastForward = "fast-forward"
+	CommandExec        = "exec"
 	CommandInit        = "init"
 	PathWorktree       = "worktree" // the worktree a follow-up acts on: its branch or, on no branch, its path
 	PathTo             = "to"       // the branch reparent moves a worktree onto

@@ -33,7 +33,7 @@ func TestAWorktreeOffersEachActionOrSaysWhyNot(t *testing.T) {
 		},
 		"missing": {
 			OfferParams{Missing: true, PullRequest: true, OnOrigin: true},
-			map[Action]Unoffered{ActionGo: UnofferedMissing, ActionOpenPR: UnofferedMissing, ActionRunUp: UnofferedMissing, ActionRunDown: UnofferedMissing, ActionLogs: UnofferedMissing, ActionFastForward: UnofferedMissing, ActionSync: UnofferedMissing, ActionReparent: UnofferedMissing},
+			map[Action]Unoffered{ActionGo: UnofferedMissing, ActionOpenPR: UnofferedMissing, ActionExec: UnofferedMissing, ActionRunUp: UnofferedMissing, ActionRunDown: UnofferedMissing, ActionLogs: UnofferedMissing, ActionFastForward: UnofferedMissing, ActionSync: UnofferedMissing, ActionReparent: UnofferedMissing},
 		},
 		"detached": {
 			OfferParams{Detached: true},

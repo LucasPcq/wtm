@@ -49,6 +49,23 @@
             "refused": "no_pull_request"
           },
           {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "main"
+                  ]
+                }
+              ],
+              "code": "tree.exec",
+              "message": "Run a command"
+            },
+            "refused": null
+          },
+          {
             "action": "run_up",
             "follow_up": {
               "command": "run up",

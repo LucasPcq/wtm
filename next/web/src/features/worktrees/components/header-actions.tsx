@@ -8,10 +8,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { MenuEntry } from '@/features/worktrees/components/menu-entry'
+import { openExec } from '@/features/worktrees/hooks/use-exec-dialog'
 import { openFastForward } from '@/features/worktrees/hooks/use-fast-forward-dialog'
 import { openPrune } from '@/features/worktrees/hooks/use-prune-dialog'
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
-import { entryOf, menu, noneWords, notInTheWeb, pruneAction, type Subject } from '@/features/worktrees/utils/actions'
+import { entryOf, menu, noneWords, pruneAction, type Subject } from '@/features/worktrees/utils/actions'
 
 // reparent is not here: it needs a subject
 export function HeaderActions({ repo, rows }: { repo: string; rows: Subject[] }) {
@@ -42,7 +43,13 @@ export function HeaderActions({ repo, rows }: { repo: string; rows: Subject[] })
           why={onOrigin ? undefined : noneWords.fast_forward}
           onSelect={() => openFastForward(repo, { worktrees: [], left: [], picking: true })}
         />
-        <MenuEntry Item={DropdownMenuItem} icon={menu.exec.icon} label={menu.exec.label} why={notInTheWeb} />
+        <MenuEntry
+          Item={DropdownMenuItem}
+          icon={menu.exec.icon}
+          label={menu.exec.label}
+          why={undefined}
+          onSelect={() => openExec(repo, { worktrees: [], left: [] })}
+        />
         <DropdownMenuSeparator />
         <MenuEntry
           Item={DropdownMenuItem}

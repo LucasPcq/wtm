@@ -42,14 +42,22 @@ export function stoppedMessage(unit: Unit | undefined) {
 
 export const planWide = (warning: DomainWarning) => !warning.params?.worktree && !warning.params?.branch
 
-// an item's own warnings name it: two alike on two items stay two
-export const itemWarnings = (items: Pick<DomainItem, 'subject' | 'warnings'>[]): OutcomeRow[] =>
+// an item's own warnings name it: two alike on two items stay two. A warning a screen words its own way keeps the core's
+// text behind its chevron
+export const itemWarnings = (
+  items: Pick<DomainItem, 'subject' | 'warnings'>[],
+  words?: (warning: DomainWarning) => string,
+): OutcomeRow[] =>
   items.flatMap((item) =>
-    (item.warnings ?? []).map((warning) => ({
-      key: `${item.subject}-${warning.code}-${warning.message}`,
-      tone: 'attention' as const,
-      title: item.subject,
-      message: sentence(warning.message),
-      followUp: warning.follow_up,
-    })),
+    (item.warnings ?? []).map((warning) => {
+      const message = words ? words(warning) : sentence(warning.message)
+      return {
+        key: `${item.subject}-${warning.code}-${warning.message}`,
+        tone: 'attention' as const,
+        title: item.subject,
+        message,
+        output: message === sentence(warning.message) ? undefined : { lines: [warning.message] },
+        followUp: warning.follow_up,
+      }
+    }),
   )

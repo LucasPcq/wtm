@@ -60,6 +60,23 @@
             "refused": "no_pull_request"
           },
           {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "main"
+                  ]
+                }
+              ],
+              "code": "list.exec",
+              "message": "Run a command"
+            },
+            "refused": null
+          },
+          {
             "action": "run_up",
             "follow_up": {
               "command": "run up",
@@ -206,6 +223,23 @@
             "action": "open_pr",
             "follow_up": null,
             "refused": "no_pull_request"
+          },
+          {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "list.exec",
+              "message": "Run a command"
+            },
+            "refused": null
           },
           {
             "action": "run_up",
@@ -382,6 +416,23 @@
             "refused": "no_pull_request"
           },
           {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "list.exec",
+              "message": "Run a command"
+            },
+            "refused": null
+          },
+          {
             "action": "run_up",
             "follow_up": {
               "command": "run up",
@@ -529,6 +580,11 @@
             "refused": "missing"
           },
           {
+            "action": "exec",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
             "action": "run_up",
             "follow_up": null,
             "refused": "missing"
@@ -631,6 +687,23 @@
             "refused": "no_branch"
           },
           {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "<SB>/acme.trees/detached"
+                  ]
+                }
+              ],
+              "code": "list.exec",
+              "message": "Run a command"
+            },
+            "refused": null
+          },
+          {
             "action": "run_up",
             "follow_up": null,
             "refused": "no_branch"
@@ -714,6 +787,11 @@
           },
           {
             "action": "open_pr",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
+            "action": "exec",
             "follow_up": null,
             "refused": "missing"
           },
@@ -818,6 +896,23 @@
             "action": "open_pr",
             "follow_up": null,
             "refused": "no_pull_request"
+          },
+          {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "orphan"
+                  ]
+                }
+              ],
+              "code": "list.exec",
+              "message": "Run a command"
+            },
+            "refused": null
           },
           {
             "action": "run_up",

@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { create } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 import { type Applied, type MutationCommand, repoKey } from '@/api/queries/commands'
 import { current, eventsQuery } from '@/api/queries/events'
 import { cancel as cancelOperation, runStreamed } from '@/api/queries/operations'
@@ -9,6 +10,9 @@ import { advance, type Progress, type Unit } from '@/features/worktrees/utils/pr
 export type Start = { answers: DomainAnswered[]; fingerprint: string; units: Unit[] }
 
 type Run = { progress: Progress<MutationCommand>; running: boolean }
+
+// refused is why a run ended on no envelope: its stream dropped, or the server refused it before it started
+type Ended<C extends MutationCommand> = (envelope: Applied<C> | undefined, refused: string | undefined) => void
 
 // a store, not a component's state: the dialog shows the run again when it opens again, and the list marks its rows
 export const useRuns = create<Record<string, Run | undefined>>(() => ({}))
@@ -56,11 +60,11 @@ export function useRun<C extends MutationCommand>(repo: string, command: C) {
     }
   }
 
-  const start = async (params: Start, ended?: (envelope: Applied<C> | undefined) => void) => {
+  const start = async (params: Start, ended?: Ended<C>) => {
     useRuns.setState({ [key]: { progress: { units: params.units }, running: true } })
     const envelope = await answer(params)
     useRuns.setState((runs) => ({ [key]: runs[key] && { ...runs[key], running: false } }))
-    ended?.(envelope)
+    ended?.(envelope, useRuns.getState()[key]?.progress.refused)
     await client.invalidateQueries({ queryKey: repoKey(repo) })
   }
 
@@ -86,7 +90,7 @@ export function useRun<C extends MutationCommand>(repo: string, command: C) {
   return {
     progress: run?.progress as Progress<C> | undefined,
     running: run?.running ?? false,
-    start: (params: Start, ended?: (envelope: Applied<C> | undefined) => void) => void start(params, ended),
+    start: (params: Start, ended?: Ended<C>) => void start(params, ended),
     claim,
     cancel,
     dismiss: () => useRuns.setState({ [key]: undefined }),
@@ -100,12 +104,31 @@ const doing: Record<MutationCommand, string> = {
   clean: 'Removing',
   'fast-forward': 'Fast-forwarding',
   prune: 'Pruning',
+  exec: 'Running a command',
 }
 
 export const isMutation = (command: string): command is MutationCommand => Object.hasOwn(doing, command)
 
+// a count of steps says something only of a worktree with several
+const labelOf = (command: MutationCommand, unit: Unit) => {
+  if (unit.phases.length < 2) return doing[command]
+  const done = unit.phases.filter((phase) => phase.state === 'done').length
+  return `${doing[command]} · ${done}/${unit.phases.length}`
+}
+
 export function useUnderWay(repo: string): Record<string, string> {
-  const runs = useRuns()
+  // only what the list shows: an output line changes no label, so it renders nothing of the list
+  const here = useRuns(
+    useShallow((runs) =>
+      Object.fromEntries(
+        (Object.keys(doing) as MutationCommand[]).flatMap((command) => {
+          const run = runs[keyOf(repo, command)]
+          if (!run?.running) return []
+          return run.progress.units.filter((unit) => !unit.status).map((unit) => [unit.subject, labelOf(command, unit)])
+        }),
+      ),
+    ),
+  )
   const operations = useQuery({ ...eventsQuery, select: (live) => live.operations }).data ?? {}
   // the cap needs a clock: an operation whose process died sends nothing more, so the screen asks the time again
   const now =
@@ -124,20 +147,5 @@ export function useUnderWay(repo: string): Record<string, string> {
         ])
       : [],
   )
-  const here = (Object.keys(doing) as MutationCommand[]).flatMap((command) => {
-    const run = runs[keyOf(repo, command)]
-    if (!run?.running) return []
-    return run.progress.units
-      .filter((unit) => !unit.status)
-      .map((unit) => {
-        const done = unit.phases.filter((phase) => phase.state === 'done').length
-        // a count only for several: one step has nothing to count
-        return [
-          unit.subject,
-          unit.phases.length > 1 ? `${doing[command]} · ${done}/${unit.phases.length}` : doing[command],
-        ]
-      })
-  })
-
-  return Object.fromEntries([...elsewhere, ...here])
+  return { ...Object.fromEntries(elsewhere), ...here }
 }

@@ -10,6 +10,8 @@ import type {
   DomainEnvelope,
   DomainForm,
   DomainItem,
+  ExecDetail,
+  ExecPlan,
   FastforwardDetail,
   FastforwardPlan,
   ListDetail,
@@ -32,6 +34,7 @@ type Mutation = {
   clean: { plan: CleanPlan; detail: CleanDetail }
   prune: { plan: PrunePlan; detail: PruneDetail }
   'fast-forward': { plan: FastforwardPlan; detail: FastforwardDetail }
+  exec: { plan: ExecPlan; detail: ExecDetail }
 }
 export type MutationCommand = keyof Mutation
 export type Planned<C extends MutationCommand> = Mutation[C]['plan']
@@ -81,10 +84,10 @@ export const fetchOrigin = (repo: string) => run(repo, 'list', { answers: [{ pat
 export const questions = (repo: string, command: ApiCommandName, answers: DomainAnswered[]) =>
   json<DomainForm>(`/api/repos/${repo}/commands/${command}/questions`, { answers } satisfies WebCall)
 
-export const questionsQuery = (repo: string, command: ApiCommandName) =>
+export const questionsQuery = (repo: string, command: ApiCommandName, answers: DomainAnswered[] = []) =>
   queryOptions({
-    queryKey: [...repoKey(repo), command, 'questions'],
-    queryFn: () => questions(repo, command, []),
+    queryKey: [...repoKey(repo), command, 'questions', answers],
+    queryFn: () => questions(repo, command, answers),
   })
 
 export const dryRunQuery = <C extends MutationCommand>(repo: string, command: C, answers: DomainAnswered[]) =>

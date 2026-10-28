@@ -7,6 +7,7 @@ $ wtm list; echo EXIT=$?
   What to do with feat/a
 
 ▌› Go to the worktree
+   Run a command
    Start the profile
    Stop the profile
    View the logs

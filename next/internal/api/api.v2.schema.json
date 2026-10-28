@@ -4630,6 +4630,7 @@
       "enum": [
         "go",
         "open_pr",
+        "exec",
         "run_up",
         "run_down",
         "logs",

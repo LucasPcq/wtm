@@ -251,13 +251,13 @@ func TestEachWorktreeReportsItsActionsAsCommandsWithTheirAnswers(t *testing.T) {
 	require.NoError(t, err)
 	actions := detailOf(t, read, "feat/a").Actions
 	require.Len(t, actions, len(worktree.Actions()))
-	assert.Equal(t, worktree.ActionRunUp, actions[2].Action)
+	assert.Equal(t, worktree.ActionRunUp, actions[3].Action)
 	assert.Equal(t, &domain.FollowUp{
 		Command: "run up",
 		Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}},
 		Code:    "list.run_up",
 		Message: "Start the profile",
-	}, actions[2].FollowUp)
+	}, actions[3].FollowUp)
 }
 
 func TestAnActionAWorktreeDoesNotOfferSaysWhy(t *testing.T) {
