@@ -80,7 +80,7 @@ export function ReparentWizard({
   const why = () => {
     if (review.isFetching) return 'Planning'
     if (review.data?.error) return refusalOf(review.data.error)
-    if (going.length > 0) return undefined
+    if (!plan?.empty) return undefined
     const [only] = moves
     if (moves.length === 1 && only) return `${only.branch} is already on ${only.to}`
     return `Each is already on ${to}`

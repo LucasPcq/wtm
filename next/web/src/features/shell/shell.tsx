@@ -30,7 +30,8 @@ export function Shell({ repo, children }: { repo: string | undefined; children: 
       <Toaster
         position="bottom-right"
         theme="system"
-        toastOptions={{ classNames: { warning: '[&_[data-icon]]:text-amber-500' } }}
+        // a modal dialog takes the pointer from the page: a toast keeps it, so its Undo answers over the dialog
+        toastOptions={{ style: { pointerEvents: 'auto' }, classNames: { warning: '[&_[data-icon]]:text-amber-500' } }}
       />
     </SidebarProvider>
   )

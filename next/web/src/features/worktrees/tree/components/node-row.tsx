@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 export function NodeRow({ node, view }: { node: Node; view: View }) {
   const { branch, detail, pr, condition } = node
   const underWay = view.underWay[branch]
-  const movable = view.movable.includes(branch) && underWay === undefined
+  const movable = view.movable.includes(branch)
   // a clone follows the pointer: the row stays in its place, dimmed, where it is dragged from
   const {
     ref: dragRef,
@@ -24,7 +24,7 @@ export function NodeRow({ node, view }: { node: Node; view: View }) {
     isDragSource,
   } = useDraggable({
     id: branch,
-    disabled: !movable,
+    disabled: !movable || underWay !== undefined,
     plugins: [Feedback.configure({ feedback: 'clone' })],
   })
   const { ref: dropRef, isDropTarget } = useDroppable({ id: branch })
@@ -78,14 +78,21 @@ export function NodeRow({ node, view }: { node: Node; view: View }) {
       )}
     >
       {movable ? (
+        // kept while under way, so a keyboard drop keeps its focus
         <button
           type="button"
-          ref={handleRef}
+          ref={(element) => {
+            handleRef(element)
+            if (!element || view.refocus !== branch) return
+            element.focus()
+            view.focused()
+          }}
           aria-label={`Move ${branch} under another branch`}
+          aria-disabled={underWay !== undefined}
           // where it may land is asked before the drag starts
           onPointerEnter={() => view.prefetch(branch)}
           onFocus={() => view.prefetch(branch)}
-          className="relative z-10 -ml-1 cursor-grab rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="relative z-10 -ml-1 cursor-grab rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-disabled:cursor-not-allowed"
         >
           <GripVertical className="size-4" />
         </button>

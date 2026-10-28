@@ -1,23 +1,21 @@
-import { CircleCheck, CircleMinus, CircleX, LoaderCircle, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress as Bar } from '@/components/ui/progress'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
-import { type Tone, toneIcon } from '@/features/worktrees/components/glyph'
 import { RunFailure } from '@/features/worktrees/components/run-failure'
 import { RunOutcome } from '@/features/worktrees/components/run-outcome'
 import { RunningFooter } from '@/features/worktrees/components/running-footer'
+import { RunningUnits, type UnitState } from '@/features/worktrees/components/running-units'
 import { recapOf } from '@/features/worktrees/fast-forward/utils/recap'
 import { outcomeWords } from '@/features/worktrees/fast-forward/utils/words'
-import { doneOf, ending, type PhaseRun, type Progress } from '@/features/worktrees/utils/progress'
-import { cn } from '@/lib/utils'
+import { doneOf, ending, type Progress } from '@/features/worktrees/utils/progress'
 
-const stateLook: Record<PhaseRun['state'], { icon: LucideIcon; tone: Tone; words: string }> = {
-  todo: { icon: CircleMinus, tone: 'muted', words: 'waiting' },
-  now: { icon: LoaderCircle, tone: 'busy', words: 'fast-forwarding' },
-  done: { icon: CircleCheck, tone: 'ok', words: 'fast-forwarded' },
-  failed: { icon: CircleX, tone: 'failed', words: 'failed' },
+const stateWords: Record<UnitState, string> = {
+  todo: 'waiting',
+  now: 'fast-forwarding',
+  done: 'fast-forwarded',
+  failed: 'failed',
 }
 
 export function FastForwardProgress({
@@ -59,18 +57,12 @@ export function FastForwardProgress({
 
       <DialogScroll>
         {running ? (
-          <ul aria-label="Worktrees" className="flex flex-col gap-1">
-            {progress.units.map(({ subject, phases }) => {
-              const { icon: Icon, tone, words } = stateLook[phases[0]?.state ?? 'todo']
-              return (
-                <li key={subject} className="flex min-h-8 items-center gap-3 text-sm">
-                  <Icon className={cn(toneIcon({ tone }), 'size-4')} aria-hidden="true" />
-                  <span className="font-medium">{subject}</span>
-                  <span className="text-muted-foreground">{words}</span>
-                </li>
-              )
+          <RunningUnits
+            rows={progress.units.map(({ subject, phases }) => {
+              const state = phases[0]?.state ?? 'todo'
+              return { subject, state, words: stateWords[state] }
             })}
-          </ul>
+          />
         ) : (
           <>
             {/* cancelled, the description says so: the cancel's own error is no failure */}

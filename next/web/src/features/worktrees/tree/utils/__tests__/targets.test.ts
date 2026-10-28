@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { targetOf } from '@/features/worktrees/tree/utils/targets'
+import { dropOn, targetOf } from '@/features/worktrees/tree/utils/targets'
 import { reparentQuestionsOf } from '@/test/reparent'
 
 // feat/billing dragged: feat/billing-ui sits under it, main is its parent
@@ -20,8 +20,20 @@ test('a branch reparent does not know is no branch any more: a deleted root says
   expect(target('feat/gone', 'deleted')).toEqual({ kind: 'refused', why: 'feat/gone is deleted' })
 })
 
-test('until the questions land, every target waits', () => {
+test('until the questions land, every target waits but its current parent, known already', () => {
   expect(targetOf({ branch: 'fix/login', form: undefined, parent: 'main', condition: 'clean' })).toEqual({
     kind: 'pending',
+  })
+  expect(targetOf({ branch: 'main', form: undefined, parent: 'main', condition: 'clean' })).toEqual({
+    kind: 'parent',
+  })
+})
+
+test('a drop runs on a target that takes it or one not yet known, does nothing on its parent, says why when refused', () => {
+  expect(dropOn({ kind: 'valid' })).toBe('run')
+  expect(dropOn({ kind: 'pending' })).toBe('run')
+  expect(dropOn({ kind: 'parent' })).toBe('none')
+  expect(dropOn({ kind: 'refused', why: 'feat/billing-ui sits under feat/billing' })).toEqual({
+    refused: 'feat/billing-ui sits under feat/billing',
   })
 })

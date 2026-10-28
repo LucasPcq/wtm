@@ -1,8 +1,9 @@
 import { screen, waitFor, within } from '@testing-library/react'
+import { HttpResponse, http } from 'msw'
 import { expect, onTestFinished, test } from 'vitest'
 import type { WebCall } from '@/api/types.gen'
 import { renderApp } from '@/test/render'
-import { answeringReparent, reparentRun } from '@/test/reparent'
+import { answeringReparent, reparentPlan, reparentRun } from '@/test/reparent'
 import { server } from '@/test/server'
 
 function recorded() {
@@ -126,4 +127,25 @@ test('Back from Confirm keeps the parent chosen; one worktree has no step of its
 
   await waitFor(() => expect(within(dialog).getByRole('combobox').textContent).toContain('main'))
   expect(within(dialog).queryByRole('button', { name: 'Back' })).toBeNull()
+})
+
+test('a plan gone stale by the apply is refused, and the dialog says why', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/reparent', async ({ request }) => {
+      const call = (await request.json()) as WebCall
+      if (call.dry_run) return reparentPlan(call)
+      return HttpResponse.json(
+        { error: { kind: 'conflict', code: 'plan.stale', message: 'the plan is stale: plan again' } },
+        { status: 412 },
+      )
+    }),
+  )
+  const { user, dialog } = await fromMenu('feat/billing')
+
+  await user.click(await within(dialog).findByRole('combobox'))
+  await user.click(await screen.findByRole('option', { name: 'fix/login' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Reparent' }))
+
+  expect(await within(dialog).findByText('the plan is stale: plan again')).toBeTruthy()
 })

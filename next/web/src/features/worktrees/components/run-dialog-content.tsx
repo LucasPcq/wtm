@@ -13,6 +13,10 @@ export function RunDialogContent({ running, children }: { running: boolean; chil
         running && 'h-[min(36rem,85vh)]',
       )}
       showCloseButton={!running}
+      // a toast's button (Undo) is clicked over the dialog: it keeps the dialog open
+      onInteractOutside={(event) => {
+        if (event.target instanceof Element && event.target.closest('[data-sonner-toaster]')) event.preventDefault()
+      }}
     >
       {children}
     </DialogContent>

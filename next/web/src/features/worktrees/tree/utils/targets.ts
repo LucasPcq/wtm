@@ -16,12 +16,21 @@ export function targetOf({
   parent: string | undefined
   condition: WorktreeCondition
 }): Target {
+  // the parent is known before where it may land: a drop back on it does nothing, however quick
+  if (branch === parent) return { kind: 'parent' }
   const to = form?.fields.find((field) => field.path === 'to')
   if (to?.kind !== 'select') return { kind: 'pending' }
-  if (branch === parent) return { kind: 'parent' }
   if (to.options.some((option) => option.value === branch)) return { kind: 'valid' }
 
   const refusal = (to.refused ?? []).find((error) => error.params?.value === branch)
   if (refusal) return { kind: 'refused', why: `${branch} ${refusedWhy(refusal)}` }
   return { kind: 'refused', why: condition === 'deleted' ? `${branch} is deleted` : `${branch} is no branch` }
+}
+
+// a drop runs the move on a target that takes it, and on one not known yet: its dry run refuses what the answer would
+// have; it does nothing on the current parent, and a refused one says why
+export function dropOn(target: Target): 'run' | 'none' | { refused: string } {
+  if (target.kind === 'valid' || target.kind === 'pending') return 'run'
+  if (target.kind === 'parent') return 'none'
+  return { refused: target.why }
 }

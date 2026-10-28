@@ -59,8 +59,12 @@ test("the callout's fix runs at once, and its toast's Undo moves the worktree ba
   expect(screen.getByRole('button', { name: 'Copy wtm sync' })).toBeTruthy()
   await user.click(screen.getByRole('button', { name: 'Undo' }))
 
-  expect(await screen.findByText('feat/search-docs is on feat/search')).toBeTruthy()
-  expect(runs.map((call) => call.answers)).toEqual([
+  const undone = (await screen.findByText('feat/search-docs is on feat/search')).closest('[data-sonner-toast]')
+  // the undo's toast has its own Undo, which moves it again
+  await user.click(within(undone as HTMLElement).getByRole('button', { name: 'Undo' }))
+  expect(await screen.findByText('feat/search-docs is on main')).toBeTruthy()
+  await waitFor(() => expect(runs).toHaveLength(3))
+  expect(runs.slice(0, 2).map((call) => call.answers)).toEqual([
     [
       { path: 'worktree', values: ['feat/search-docs'] },
       { path: 'to', values: ['main'] },
@@ -85,7 +89,8 @@ test('a move its dry run refuses ends on an error toast saying why, whose Detail
   await user.click(screen.getByRole('button', { name: 'Details' }))
   const dialog = await screen.findByRole('dialog', { name: 'Change parent' })
   expect(await within(dialog).findByText('feat/billing-ui sits under feat/billing')).toBeTruthy()
-  await waitFor(() => expect(runs).toEqual([]))
+  // the dry run refused it: nothing was applied
+  expect(runs).toEqual([])
 })
 
 test('a failed outcome closed once read no longer stands in the way of the next move', async () => {

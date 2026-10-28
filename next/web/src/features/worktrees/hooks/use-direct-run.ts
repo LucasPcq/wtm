@@ -7,7 +7,7 @@ import { todo, type Unit } from '@/features/worktrees/utils/progress'
 
 type ToastAction = { label: string; onClick: () => void }
 
-// action and cancel are sonner's two buttons: a success's Undo and the next step to copy
+// cancel and action are Sonner's two buttons, drawn in that order: a success's Undo, then the next step to copy
 export type Told = {
   tone: 'success' | 'error' | 'info'
   title: string

@@ -1,6 +1,7 @@
 import { DragDropProvider, KeyboardSensor, PointerSensor } from '@dnd-kit/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { questionsQuery } from '@/api/queries/commands'
 import { Loading } from '@/features/worktrees/components/loading'
 import { ReadFailed } from '@/features/worktrees/components/read-failed'
@@ -8,7 +9,7 @@ import { useRead } from '@/features/worktrees/hooks/use-read'
 import { useReparentNow } from '@/features/worktrees/hooks/use-reparent-now'
 import { Branch, type View } from '@/features/worktrees/tree/components/branch'
 import { nodesOf } from '@/features/worktrees/tree/utils/nodes'
-import { targetOf } from '@/features/worktrees/tree/utils/targets'
+import { dropOn, targetOf } from '@/features/worktrees/tree/utils/targets'
 import type { Subject } from '@/features/worktrees/utils/actions'
 import { requestOf } from '@/features/worktrees/utils/reparent'
 import type { WorktreesSearch } from '@/features/worktrees/utils/search'
@@ -31,6 +32,8 @@ export function TreeView({
   const { live, github } = useRead(repo, 'tree')
   const reparentNow = useReparentNow(repo)
   const [dragging, setDragging] = useState<string>()
+  // the grip a keyboard drop came from: the row is drawn again under its new parent, and focus goes back to it
+  const [refocus, setRefocus] = useState<string>()
   // which nodes move, and where each may land, are reparent's questions: the Tree decides none of it
   const movable = useQuery(questionsQuery(repo, 'reparent'))
   const parents = useQuery({ ...parentsOf(repo, dragging ?? ''), enabled: dragging !== undefined })
@@ -52,7 +55,10 @@ export function TreeView({
     underWay,
     movable: options.map((option) => option.value),
     target: dragging === undefined ? undefined : (node) => target(node.branch, node.condition),
-    prefetch: (branch) => void client.prefetchQuery(parentsOf(repo, branch)),
+    // asked again only past a while: an event asks it again anyway
+    prefetch: (branch) => void client.prefetchQuery({ ...parentsOf(repo, branch), staleTime: 30_000 }),
+    refocus,
+    focused: () => setRefocus(undefined),
   }
   const nodes = nodesOf(live.data, github.data)
   const conditionOf = (branch: string) =>
@@ -68,11 +74,13 @@ export function TreeView({
       onDragEnd={({ canceled, operation }) => {
         setDragging(undefined)
         const branch = operation.source?.id
+        if (typeof branch === 'string') setRefocus(branch)
         const to = operation.target?.id
         if (canceled || typeof branch !== 'string' || typeof to !== 'string' || branch === to) return
-        // a drop before the questions landed runs all the same: its dry run refuses what they would have
-        const { kind } = target(to, conditionOf(to))
-        if (kind !== 'valid' && kind !== 'pending') return
+        const drop = dropOn(target(to, conditionOf(to)))
+        // said aloud too: a screen reader hears no tooltip
+        if (typeof drop === 'object') return void toast.info(drop.refused)
+        if (drop === 'none') return
         void reparentNow([
           {
             command: 'reparent',

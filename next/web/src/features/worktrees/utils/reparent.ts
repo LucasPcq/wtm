@@ -7,10 +7,11 @@ export const requestOf = ({ worktrees, to }: { worktrees: string[]; to: string }
 ]
 
 // the new parents reparent refuses for the worktrees it moves, as the picker words them beside the branch
-type Refusal = 'self_parent' | 'reparent.cycle'
+type Refusal = 'self_parent' | 'reparent.cycle' | 'not_found'
 
 const refusalWords: Record<Refusal, (params: Record<string, string>) => string> = {
   self_parent: () => "the worktree you're moving",
+  not_found: () => 'no longer exists',
   'reparent.cycle': (params) => `sits under ${params.under}`,
 }
 

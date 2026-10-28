@@ -44,33 +44,50 @@ test('the runs one after the other are synced with one command naming them all',
 })
 
 test('one toast says what the runs did: one worktree, several onto one parent, onto several', () => {
-  expect(toldOf([ran([['a', 'f', 'main']])]).title).toBe('a is on main')
-  expect(toldOf([ran([['a', 'f', 'main']]), ran([['b', 'g', 'main']])]).title).toBe('2 worktrees moved onto main')
-  expect(toldOf([ran([['a', 'f', 'main']]), ran([['b', 'g', 'x']])]).title).toBe('2 worktrees moved')
+  expect(toldOf([ran([['a', 'f', 'main']])], { worktrees: ['a'] }).title).toBe('a is on main')
+  expect(toldOf([ran([['a', 'f', 'main']]), ran([['b', 'g', 'main']])], { worktrees: ['b'] }).title).toBe(
+    '2 worktrees moved onto main',
+  )
+  expect(toldOf([ran([['a', 'f', 'main']]), ran([['b', 'g', 'x']])], { worktrees: ['b'] }).title).toBe(
+    '2 worktrees moved',
+  )
 })
 
-test('a run that failed says which worktree it could not move and why', () => {
-  const failed: Applied<'reparent'> = {
-    ...ran([]),
-    ok: false,
-    items: [
-      {
-        subject: 'b',
-        status: 'failed',
-        detail: undefined,
-        error: { kind: 'internal', code: 'reparent.write_failed', message: 'x', params: { cause: 'denied' } },
-      },
-    ],
-  }
-  expect(toldOf([ran([['a', 'f', 'main']]), failed])).toEqual({
+const failedRun: Applied<'reparent'> = {
+  ...ran([['c', 'f', 'main']]),
+  ok: false,
+  items: [
+    { subject: 'c', status: 'done', detail: { path: '/c', from: 'f', to: 'main' } },
+    {
+      subject: 'b',
+      status: 'failed',
+      detail: undefined,
+      error: { kind: 'internal', code: 'reparent.write_failed', message: 'x', params: { cause: 'denied' } },
+    },
+  ],
+}
+
+test('a run that failed names what it could not move, and what moved all the same', () => {
+  expect(toldOf([ran([['a', 'f', 'main']]), failedRun], { worktrees: ['b', 'c'] })).toEqual({
     tone: 'error',
     title: "Couldn't reparent b",
-    description: "couldn't write its record",
+    description: "Couldn't write its record. a and c moved onto main.",
   })
 })
 
-test('a run refused before it started says why, as the server said it', () => {
-  expect(toldOf([], 'feat/billing is locked by clean, started from the terminal').description).toBe(
-    'feat/billing is locked by clean, started from the terminal',
-  )
+test('a run refused before it applied names its own worktrees and says why, as the server said it', () => {
+  expect(toldOf([ran([['a', 'f', 'main']])], { worktrees: ['b'], refused: 'the plan is stale' })).toEqual({
+    tone: 'error',
+    title: "Couldn't reparent b",
+    description: 'The plan is stale. a moved onto main.',
+  })
+})
+
+test('a run refused with no item, a lock held, names its own worktrees', () => {
+  const held: Applied<'reparent'> = {
+    ...ran([]),
+    ok: false,
+    error: { kind: 'conflict', code: 'lock.held', message: 'b is locked by clean' },
+  }
+  expect(toldOf([held], { worktrees: ['b'] }).title).toBe("Couldn't reparent b")
 })

@@ -4,8 +4,8 @@ import { worktrees } from '@/test/acme'
 import { envelope } from '@/test/fixtures'
 import { line, streamed } from '@/test/stream'
 
-// reparent over acme, as the core decides it: main is never moved, a worktree is refused as its own parent, and so is
-// a branch under one it moves (a cycle); the record of a worktree in failing does not write
+// reparent over acme, as the core decides it: main is never moved, a parent that is no branch is refused, a worktree
+// as its own parent too, and a branch under one it moves (a cycle); the record of a worktree in failing does not write
 const asked = (answers: DomainAnswered[] | undefined, path: string) =>
   answers?.find((a) => a.path === path)?.values ?? []
 
@@ -22,6 +22,14 @@ const under = (branch: string, moving: string[]): string | undefined => {
 }
 
 function refusalOf(to: string, moving: string[]): DomainFieldError | undefined {
+  if (to && !worktrees.some((w) => w.branch === to))
+    return {
+      path: 'to',
+      code: 'not_found',
+      flag: '--to',
+      params: { value: to },
+      message: `${to} names no branch: pass a local branch or origin/<branch> to --to`,
+    }
   if (moving.includes(to))
     return {
       path: 'to',
@@ -177,13 +185,43 @@ export const answeringReparent = (run: (call: WebCall) => Response = reparentRun
   }),
 ]
 
-// a fake that remembers what it moved: a second run (an undo) plans from where the first left each worktree
-export function rememberingReparent() {
+// a fake that remembers what it moved: a second run (an undo) plans from where the first left each worktree; the
+// record of a worktree in failing does not write, and a run waits for held, when given, before it answers
+export function rememberingReparent({ failing = [], held }: { failing?: string[]; held?: Promise<void> } = {}) {
   const moved: Moved = new Map()
   return [
     http.post('/api/repos/r1/commands/reparent', async ({ request }) => {
       const call = (await request.json()) as WebCall
-      return call.dry_run ? reparentPlan(call, moved) : reparentRun([], moved)(call)
+      if (call.dry_run) return reparentPlan(call, moved)
+      await held
+      return reparentRun(failing, moved)(call)
     }),
   ]
+}
+
+// clean's run that removes the worktrees asked and leaves each child given on its removed parent, its move onto to
+// the follow-up, as the core warns of them
+export const cleanLeaving = (children: { branch: string; from: string; to: string }[]) => (call: WebCall) => {
+  const picked = asked(call.answers, 'worktree')
+  return streamed(
+    `event: envelope\ndata: ${JSON.stringify({
+      ...envelope('clean', []),
+      items: picked.map((branch) => ({ subject: branch, status: 'done', detail: { path: `/acme.trees/${branch}` } })),
+      plan: { worktrees: [], moves: [], reparent_children: false, force: false },
+      warnings: children.map(({ branch, from, to }) => ({
+        code: 'clean.orphaned',
+        message: `${branch} still points at the removed parent ${from}`,
+        params: { branch, from, to },
+        follow_up: {
+          command: 'reparent',
+          answers: [
+            { path: 'worktree', values: [branch] },
+            { path: 'to', values: [to] },
+          ],
+          code: 'clean.reparent',
+          message: `move it onto ${to}`,
+        },
+      })),
+    })}\n\n`,
+  )
 }

@@ -11,6 +11,7 @@ import { RunOutcome } from '@/features/worktrees/components/run-outcome'
 import { RunSteps } from '@/features/worktrees/components/run-steps'
 import { RunningFooter } from '@/features/worktrees/components/running-footer'
 import { useReparentNow } from '@/features/worktrees/hooks/use-reparent-now'
+import { useRun } from '@/features/worktrees/hooks/use-run'
 import { listed } from '@/features/worktrees/utils/listed'
 import type { Act, OutcomeKind } from '@/features/worktrees/utils/outcome'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
@@ -59,10 +60,12 @@ export function RemovalProgress({
     progress.refused ?? (items.some((item) => item.error) || error?.kind === 'cancelled' ? undefined : error?.message)
   const { groups, warnings, kept } = recapOf(progress, words.dataKept)
   const reparentNow = useReparentNow(repo)
+  const reparenting = useRun(repo, 'reparent').running
   const act: Act = {
     command: 'reparent',
     label: 'Reparent',
     all: 'Reparent all onto the nearest that stays',
+    busy: reparenting,
     run: (followUps) => void reparentNow(followUps),
   }
   // never asked here: the view on screen reads, and a child moved leaves "To check" once its read lands

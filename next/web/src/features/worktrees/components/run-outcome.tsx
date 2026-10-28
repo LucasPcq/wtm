@@ -51,7 +51,7 @@ export function RunOutcome({
               {group.kind === 'check' && act && acted.length > 1 ? (
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-xs font-medium text-muted-foreground">{labels[group.kind]}</h3>
-                  <Button variant="outline" size="sm" onClick={() => act.run(acted)}>
+                  <Button variant="outline" size="sm" disabled={act.busy} onClick={() => act.run(acted)}>
                     {act.all}
                   </Button>
                 </div>
@@ -60,7 +60,7 @@ export function RunOutcome({
               )}
               <ul className="flex flex-col gap-1">
                 {group.rows.map((row) => (
-                  <OutcomeLine key={row.key} row={row} label={act?.label} />
+                  <OutcomeLine key={row.key} row={row} label={act?.label} busy={act?.busy ?? false} />
                 ))}
               </ul>
             </section>

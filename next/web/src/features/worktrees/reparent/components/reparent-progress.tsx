@@ -1,27 +1,23 @@
-import { CircleCheck, CircleMinus, CircleX, LoaderCircle, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress as Bar } from '@/components/ui/progress'
 import { CommandLine } from '@/features/worktrees/components/command-line'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
-import { type Tone, toneIcon } from '@/features/worktrees/components/glyph'
 import { RunFailure } from '@/features/worktrees/components/run-failure'
 import { RunOutcome } from '@/features/worktrees/components/run-outcome'
 import { RunningFooter } from '@/features/worktrees/components/running-footer'
+import { RunningUnits, type UnitState } from '@/features/worktrees/components/running-units'
 import { moved, syncOf } from '@/features/worktrees/reparent/utils/plan'
 import { failureOf, moveWords, outcomeWords, title } from '@/features/worktrees/reparent/utils/words'
 import type { OutcomeRow } from '@/features/worktrees/utils/outcome'
 import { ending, type Progress } from '@/features/worktrees/utils/progress'
-import { cn } from '@/lib/utils'
 
-type UnitState = 'todo' | 'now' | 'done' | 'failed'
-
-const stateLook: Record<UnitState, { icon: LucideIcon; tone: Tone; words: string }> = {
-  todo: { icon: CircleMinus, tone: 'muted', words: 'waiting' },
-  now: { icon: LoaderCircle, tone: 'busy', words: 'recording its new parent' },
-  done: { icon: CircleCheck, tone: 'ok', words: 'reparented' },
-  failed: { icon: CircleX, tone: 'failed', words: 'failed' },
+const stateWords: Record<UnitState, string> = {
+  todo: 'waiting',
+  now: 'recording its new parent',
+  done: 'reparented',
+  failed: 'failed',
 }
 
 export function ReparentProgress({
@@ -83,20 +79,13 @@ export function ReparentProgress({
 
       <DialogScroll>
         {running ? (
-          <ul aria-label="Worktrees" className="flex flex-col gap-1">
-            {progress.units.map(({ subject }, i) => {
+          <RunningUnits
+            rows={progress.units.map(({ subject }, i) => {
               const state = stateOf(i)
-              const { icon: Icon, tone, words } = stateLook[state]
               const move = moveOf(subject)
-              return (
-                <li key={subject} className="flex min-h-8 items-center gap-3 text-sm">
-                  <Icon className={cn(toneIcon({ tone }), 'size-4')} aria-hidden="true" />
-                  <span className="font-medium">{subject}</span>
-                  <span className="text-muted-foreground">{state === 'done' && move ? moveWords(move) : words}</span>
-                </li>
-              )
+              return { subject, state, words: state === 'done' && move ? moveWords(move) : stateWords[state] }
             })}
-          </ul>
+          />
         ) : (
           <>
             {!cancelled && <RunFailure message={refused} />}

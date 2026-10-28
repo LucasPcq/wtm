@@ -44,31 +44,43 @@ export const failureOf = (error: DomainError | undefined) => {
   return failureWords[error.code] ?? sentence(error.message)
 }
 
-// the toasts of worktrees reparented at once, one run per new parent
-export function toldOf(envelopes: Applied<'reparent'>[], refused?: string): Omit<Told, 'action' | 'cancel'> {
-  const last = envelopes.at(-1)
-  const went = moved(envelopes)
+// what moved, said in one line: "a and c moved onto main"
+const movedWords = (went: ReturnType<typeof moved>) => {
   const parents = [...new Set(went.flatMap((item) => (item.detail ? [item.detail.to] : [])))]
-  const [only] = went
+  const names = listed(went.map((item) => item.subject))
+  return parents.length === 1 ? `${names} moved onto ${parents[0]}` : `${names} moved`
+}
+
+// the toast of worktrees reparented at once, one run per new parent: envelopes are the runs that ended, the last this
+// one unless it was refused before any envelope (refused); worktrees are its own
+export function toldOf(
+  envelopes: Applied<'reparent'>[],
+  { worktrees, refused }: { worktrees: string[]; refused?: string | undefined },
+): Omit<Told, 'action' | 'cancel'> {
+  const last = refused === undefined ? envelopes.at(-1) : undefined
+  const went = moved(envelopes)
   const failed = last?.items.find((item) => item.status === 'failed')
 
   if (last?.error?.kind === 'cancelled' || last?.items.some((item) => item.reason === 'interrupted'))
     return { tone: 'info', title: 'Reparent cancelled', description: `${went.length} moved before it stopped` }
   if (!last || failed || !last.ok) {
-    const subjects = (last?.items ?? []).filter((item) => item.status !== 'done').map((item) => item.subject)
+    const stuck = (last?.items ?? []).filter((item) => item.status !== 'done').map((item) => item.subject)
+    const why = failureOf(failed?.error ?? last?.error) ?? refused ?? 'It stopped before it ran'
     return {
       tone: 'error',
-      title: `Couldn't reparent ${listed(subjects) || 'the worktrees'}`,
-      description: failureOf(failed?.error ?? last?.error) ?? refused ?? 'It stopped before it ran',
+      title: `Couldn't reparent ${listed(stuck.length > 0 ? stuck : worktrees)}`,
+      description: went.length > 0 ? `${sentence(why)}. ${movedWords(went)}.` : sentence(why),
     }
   }
 
+  const [only] = went
   if (went.length === 1 && only?.detail)
     return {
       tone: 'success',
       title: `${only.subject} is on ${only.detail.to}`,
       description: 'It rebases onto it on its next sync.',
     }
+  const parents = [...new Set(went.flatMap((item) => (item.detail ? [item.detail.to] : [])))]
   const [parent] = parents
   if (parents.length === 1)
     return {

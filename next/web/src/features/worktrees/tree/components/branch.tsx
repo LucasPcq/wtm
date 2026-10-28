@@ -14,6 +14,8 @@ export type View = {
   // undefined while nothing is dragged
   target: ((node: Node) => Target) | undefined
   prefetch: (branch: string) => void
+  refocus: string | undefined
+  focused: () => void
 }
 
 export function Branch({ node, view, child = false }: { node: Node; view: View; child?: boolean }) {
