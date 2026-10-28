@@ -349,6 +349,17 @@ func (f *Fake) Dirty(_ context.Context, path string) (bool, error) {
 // ----------------------------------------------------------------------------
 // Changing worktrees and branches
 
+// SetDirty makes the worktree at path hold uncommitted changes or none, as an edit from a terminal would.
+func (f *Fake) SetDirty(path string, dirty bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	resolved := realPath(path)
+	f.dirty = slices.DeleteFunc(f.dirty, func(d string) bool { return d == resolved })
+	if dirty {
+		f.dirty = append(f.dirty, resolved)
+	}
+}
+
 // AddWorktree adds a worktree on its checkout's branch, refusing as git does a
 // branch that exists or is checked out, a missing start point and a taken
 // path. Like git.Repo, it deletes a branch it created when the add fails.

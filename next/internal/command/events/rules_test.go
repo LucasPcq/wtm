@@ -51,7 +51,7 @@ func TestTheFirstWaitBeforeSubscribingAgainIsTheShortestThenItDoublesUpToALimit(
 	assert.Equal(t, 200*time.Millisecond, backoff.Next(true), "an attempt that reached ready starts the waits over")
 }
 
-func TestAPollReadsEachWorktreesHeadCheckoutAndJobs(t *testing.T) {
+func TestAPollReadsEachWorktreesHeadCheckoutJobsAndWhetherItIsDirty(t *testing.T) {
 	snapshot := worktree.Snapshot{
 		Worktrees: []worktree.Worktree{
 			{Path: "/repo", Main: true, State: worktree.OnBranch{Branch: "main"}},
@@ -65,23 +65,27 @@ func TestAPollReadsEachWorktreesHeadCheckoutAndJobs(t *testing.T) {
 	}
 	jobs := []run.Job{{Name: "web", WorkDir: "/trees/a", State: run.Running}, {Name: "api", WorkDir: "/trees/a", State: run.Crashed}}
 
-	polled := events.PollOf(snapshot, jobs, true)
-	unknown := events.PollOf(snapshot, nil, false)
+	// feat/c's dirty read failed
+	dirty := map[string]bool{"/repo": false, "/trees/a": true, "/trees/b": false, "/trees/m": true}
+
+	polled := events.PollOf(snapshot, jobs, true, dirty)
+	unknown := events.PollOf(snapshot, nil, false, nil)
 
 	assert.Equal(t, events.Polled{
-		"main":   {Head: "m1", Checkout: "branch", Jobs: []string{}},
-		"feat/a": {Head: "a1", Checkout: "rebasing", Jobs: []string{"api=crashed", "web=running"}},
-		"feat/b": {Head: "b1", Checkout: "bisecting", Jobs: []string{}},
-		"feat/m": {Head: "x1", Checkout: "merging", Jobs: []string{}},
+		"main":   {Head: "m1", Checkout: "branch", Jobs: []string{}, Dirty: new(false)},
+		"feat/a": {Head: "a1", Checkout: "rebasing", Jobs: []string{"api=crashed", "web=running"}, Dirty: new(true)},
+		"feat/b": {Head: "b1", Checkout: "bisecting", Jobs: []string{}, Dirty: new(false)},
+		"feat/m": {Head: "x1", Checkout: "merging", Jobs: []string{}, Dirty: new(true)},
 		"feat/c": {Head: "c1", Checkout: "cherry_picking", Jobs: []string{}},
 	}, polled)
 	assert.Nil(t, unknown["feat/a"].Jobs)
+	assert.Nil(t, unknown["feat/a"].Dirty)
 }
 
 func TestChangesNameWhatMovedInEachWorktree(t *testing.T) {
 	before := events.Polled{
-		"feat/a": {Head: "a1", Checkout: "branch", Jobs: []string{}},
-		"feat/b": {Head: "b1", Checkout: "branch", Jobs: []string{}},
+		"feat/a": {Head: "a1", Checkout: "branch", Jobs: []string{}, Dirty: new(false)},
+		"feat/b": {Head: "b1", Checkout: "branch", Jobs: []string{}, Dirty: new(true)},
 	}
 
 	for name, c := range map[string]struct {
@@ -91,21 +95,30 @@ func TestChangesNameWhatMovedInEachWorktree(t *testing.T) {
 	}{
 		"nothing": {now: before},
 		"head_and_jobs": {
-			now:     events.Polled{"feat/a": {Head: "a2", Checkout: "branch", Jobs: []string{"web=running"}}, "feat/b": before["feat/b"]},
+			now:     events.Polled{"feat/a": {Head: "a2", Checkout: "branch", Jobs: []string{"web=running"}, Dirty: new(false)}, "feat/b": before["feat/b"]},
 			changes: []events.Change{{Branch: "feat/a", Fields: []worktree.PolledField{worktree.PolledHead, worktree.PolledJobs}}},
 		},
 		"checkout": {
-			now:     events.Polled{"feat/a": before["feat/a"], "feat/b": {Head: "b1", Checkout: "rebasing", Jobs: []string{}}},
+			now:     events.Polled{"feat/a": before["feat/a"], "feat/b": {Head: "b1", Checkout: "rebasing", Jobs: []string{}, Dirty: new(true)}},
 			changes: []events.Change{{Branch: "feat/b", Fields: []worktree.PolledField{worktree.PolledCheckout}}},
 		},
 		"merge_started": {
-			now:     events.Polled{"feat/a": {Head: "a1", Checkout: "merging", Jobs: []string{}}, "feat/b": before["feat/b"]},
+			now:     events.Polled{"feat/a": {Head: "a1", Checkout: "merging", Jobs: []string{}, Dirty: new(false)}, "feat/b": before["feat/b"]},
 			changes: []events.Change{{Branch: "feat/a", Fields: []worktree.PolledField{worktree.PolledCheckout}}},
 		},
-		"jobs_unknown": {now: events.Polled{"feat/a": {Head: "a1", Checkout: "branch"}, "feat/b": before["feat/b"]}},
+		"turned_dirty": {
+			now:     events.Polled{"feat/a": {Head: "a1", Checkout: "branch", Jobs: []string{}, Dirty: new(true)}, "feat/b": before["feat/b"]},
+			changes: []events.Change{{Branch: "feat/a", Fields: []worktree.PolledField{worktree.PolledDirty}}},
+		},
+		"turned_clean": {
+			now:     events.Polled{"feat/a": before["feat/a"], "feat/b": {Head: "b1", Checkout: "branch", Jobs: []string{}, Dirty: new(false)}},
+			changes: []events.Change{{Branch: "feat/b", Fields: []worktree.PolledField{worktree.PolledDirty}}},
+		},
+		"jobs_unknown":  {now: events.Polled{"feat/a": {Head: "a1", Checkout: "branch", Dirty: new(false)}, "feat/b": before["feat/b"]}},
+		"dirty_unknown": {now: events.Polled{"feat/a": {Head: "a1", Checkout: "branch", Jobs: []string{}}, "feat/b": before["feat/b"]}},
 		"appeared": {
 			now:     events.Polled{"feat/a": before["feat/a"], "feat/b": before["feat/b"], "feat/c": {}},
-			changes: []events.Change{{Branch: "feat/c", Fields: []worktree.PolledField{worktree.PolledHead, worktree.PolledCheckout, worktree.PolledJobs}}},
+			changes: []events.Change{{Branch: "feat/c", Fields: []worktree.PolledField{worktree.PolledHead, worktree.PolledCheckout, worktree.PolledJobs, worktree.PolledDirty}}},
 		},
 		"went_away": {now: events.Polled{"feat/a": before["feat/a"]}, gone: []string{"feat/b"}},
 	} {
@@ -118,10 +131,10 @@ func TestChangesNameWhatMovedInEachWorktree(t *testing.T) {
 	}
 }
 
-func TestJobsUnknownAreCarriedFromTheLastPoll(t *testing.T) {
-	before := events.Polled{"feat/a": {Head: "a1", Jobs: []string{"web=running"}}}
+func TestJobsAndDirtyUnknownAreCarriedFromTheLastPoll(t *testing.T) {
+	before := events.Polled{"feat/a": {Head: "a1", Jobs: []string{"web=running"}, Dirty: new(true)}}
 
 	carried := events.Carried(before, events.Polled{"feat/a": {Head: "a2"}})
 
-	assert.Equal(t, events.Polled{"feat/a": {Head: "a2", Jobs: []string{"web=running"}}}, carried)
+	assert.Equal(t, events.Polled{"feat/a": {Head: "a2", Jobs: []string{"web=running"}, Dirty: new(true)}}, carried)
 }

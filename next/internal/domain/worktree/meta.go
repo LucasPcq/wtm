@@ -84,11 +84,12 @@ func IdentityOf(params IdentityParams) Identity {
 // A PolledField names what the event stream polls of a worktree and found changed.
 type PolledField string
 
-// The fields of a worktree the event stream polls: its branch's tip, what it has checked out (a branch, a rebase, a bisect), and its jobs and their states.
+// The fields of a worktree the event stream polls: its branch's tip, what it has checked out (a branch, a rebase, a bisect), its jobs and their states, and whether it holds uncommitted changes.
 const (
 	PolledHead     PolledField = "head"
 	PolledCheckout PolledField = "checkout"
 	PolledJobs     PolledField = "jobs"
+	PolledDirty    PolledField = "dirty"
 )
 
 // An IdentityField names a field of an [Identity] an update changed, as the events spell it.

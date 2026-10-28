@@ -3,6 +3,9 @@ package events_test
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -445,6 +448,151 @@ func TestJobsTheDaemonCannotTellChangeNothing(t *testing.T) {
 	jobs.set([]run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true, State: run.Running}}, nil)
 
 	r.quiet(t)
+}
+
+func TestAWorktreeTurningDirtyThenCleanIsSentAsTheWorktreeChanged(t *testing.T) {
+	app, git := newRepo("/repo", "feat/a").living()
+	u := useCase(newBus(), &known{}, opening(app))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+	r.quiet(t)
+
+	git.SetDirty("/repo/.trees/feat/a", true)
+	changed := r.next(t)
+	assert.Contains(t, changed, `"branch":"feat/a"`)
+	assert.Contains(t, changed, `"changed":["dirty"]`)
+
+	git.SetDirty("/repo/.trees/feat/a", false)
+	assert.Contains(t, r.next(t), `"changed":["dirty"]`)
+	r.quiet(t)
+}
+
+// A git status per worktree is costly: the poll reads it every fourth time, the legacy dashboard's 20 seconds; a poll that does not read it changes nothing.
+func TestAPollReadsWhetherAWorktreeIsDirtyEveryFourthPollOnly(t *testing.T) {
+	log := &callLog{}
+	app, git := newRepo("/repo", "feat/a").living()
+	u := useCase(newBus(), &known{}, openingWith(app, recorded{Fake: git, log: log}))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+
+	git.SetDirty("/repo/.trees/feat/a", true)
+	assert.Contains(t, r.next(t), `"changed":["dirty"]`)
+	r.quiet(t)
+
+	polls := pollsIn(log.all())
+	require.Greater(t, len(polls), 5)
+	// the last poll may still be under way
+	for i, calls := range polls[:len(polls)-1] {
+		dirty := slices.ContainsFunc(calls, func(call string) bool { return strings.HasPrefix(call, "Dirty") })
+		assert.Equal(t, (i+1)%4 == 0, dirty, "poll %d: %v", i+1, calls)
+	}
+}
+
+// A worktree created between two reads of the dirtiness would start unknown, and its first change be taken for its first read.
+func TestAWorktreeNewToThePollHasItsDirtinessReadAtOnce(t *testing.T) {
+	log := &callLog{}
+	app, git := newRepo("/repo").living()
+	u := useCase(newBus(), &known{}, openingWith(app, recorded{Fake: git, log: log}))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+
+	require.NoError(t, git.AddWorktree(t.Context(), worktree.Addition{Path: "/repo/.trees/feat/b", Checkout: worktree.NewBranch{Name: "feat/b", From: worktree.LocalBranch{Name: "main"}}}))
+	assert.Contains(t, r.next(t), `"changed":["head","checkout","jobs","dirty"]`)
+	git.SetDirty("/repo/.trees/feat/b", true)
+
+	changed := r.next(t)
+	assert.Contains(t, changed, `"branch":"feat/b"`)
+	assert.Contains(t, changed, `"changed":["dirty"]`)
+	// the poll that found feat/b read it with the branch tips, not on a dirty pass that happened to follow
+	readsB := func(call string) bool { return strings.HasPrefix(call, "Dirty ") && strings.HasSuffix(call, "feat/b") }
+	for _, calls := range pollsIn(log.all()) {
+		if i := slices.IndexFunc(calls, readsB); i >= 0 {
+			assert.Equal(t, 1, i, "the poll that found feat/b: %v", calls)
+			break
+		}
+	}
+}
+
+// A dirty read that fails is unknown, never clean: the worktree dirty at the snapshot, cleaned while git cannot tell, sends nothing.
+func TestAWorktreeWhoseDirtyReadFailsChangesNothing(t *testing.T) {
+	app := newRepo("/repo", "feat/a")
+	app.Git.Dirty = []string{"/repo/.trees/feat/a"}
+	app, git := app.living()
+	failing := &atomic.Bool{}
+	u := useCase(newBus(), &known{}, openingWith(app, recorded{Fake: git, failing: failing}))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+
+	failing.Store(true)
+	git.SetDirty("/repo/.trees/feat/a", false)
+
+	r.quiet(t)
+}
+
+// The dirty reads of a poll take a while: one may catch an operation of wtm halfway, a stash of sync dirty until it pops, and what the operation changed is its own events' even once it finished.
+func TestAnOperationStartedDuringTheDirtyReadsDropsThem(t *testing.T) {
+	app, git := newRepo("/repo", "feat/a", "feat/c").living()
+	bus := newBus()
+	var armed atomic.Bool
+	var sub subscription
+	before := func(path string) {
+		switch {
+		case !armed.Load():
+		case strings.HasSuffix(path, "feat/a"):
+			git.SetDirty("/repo/.trees/feat/a", true)
+		case strings.HasSuffix(path, "feat/c"):
+			armed.Store(false)
+			git.SetDirty("/repo/.trees/feat/a", false)
+			sub.Lines <- published(t, app.Repo, domain.OperationStarted{Command: "sync", Surface: "cli"})
+			sub.Lines <- published(t, app.Repo, domain.UnitFinished{Subject: "feat/a", Status: domain.StatusDone})
+			sub.Lines <- published(t, app.Repo, domain.OperationFinished{Command: "sync", Surface: "cli", OK: true})
+		}
+	}
+	u := useCase(bus, &known{}, openingWith(app, recorded{Fake: git, log: &callLog{}, before: before}))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	sub = bus.subscribed(t)
+	r.nextType(t)
+	r.nextType(t)
+
+	armed.Store(true)
+
+	assert.Equal(t, "operation.started", r.nextType(t))
+	assert.Equal(t, "unit.finished", r.nextType(t))
+	assert.Equal(t, "operation.finished", r.nextType(t))
+	r.quiet(t)
+}
+
+func TestTheDirtinessAnOperationLeftOnABranchItNamedIsNeverSentAsPolled(t *testing.T) {
+	app, git := newRepo("/repo", "feat/a").living()
+	bus := newBus()
+	u := useCase(bus, &known{}, opening(app))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	sub := bus.subscribed(t)
+	r.nextType(t)
+	r.nextType(t)
+
+	sub.Lines <- published(t, app.Repo, domain.OperationStarted{Command: "sync", Surface: "cli"})
+	assert.Equal(t, "operation.started", r.nextType(t))
+	git.SetDirty("/repo/.trees/feat/a", true)
+	sub.Lines <- published(t, app.Repo, domain.UnitFinished{Subject: "feat/a", Status: domain.StatusFailed})
+	sub.Lines <- published(t, app.Repo, domain.OperationFinished{Command: "sync", Surface: "cli"})
+
+	assert.Equal(t, "unit.finished", r.nextType(t))
+	assert.Equal(t, "operation.finished", r.nextType(t))
+	r.quiet(t)
+
+	git.SetDirty("/repo/.trees/feat/a", false)
+	assert.Contains(t, r.next(t), `"changed":["dirty"]`)
 }
 
 func TestAWorktreeRemovedFromATerminalResetsTheStreamOnAFreshSnapshot(t *testing.T) {

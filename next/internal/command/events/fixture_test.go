@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
@@ -182,6 +183,44 @@ func (r *reader) out() events.Out {
 }
 
 var errBusGone = errors.New("connect to the event bus: no such file")
+
+// A recorded is a git that logs the calls a poll counts on: each poll reads the branch tips once, then the dirtiness of a worktree, by its path, when it reads it, after listing the worktrees again on a dirty pass. Its dirty reads fail while failing is set, and run before, with the path read, when it is given.
+type recorded struct {
+	*gittest.Fake
+	log     *callLog
+	failing *atomic.Bool
+	before  func(path string)
+}
+
+func (g recorded) Worktrees(ctx context.Context) ([]worktree.Worktree, error) {
+	g.log.add("Worktrees")
+	return g.Fake.Worktrees(ctx)
+}
+
+func (g recorded) Branches(ctx context.Context) (worktree.Branches, error) {
+	g.log.add("Branches")
+	return g.Fake.Branches(ctx)
+}
+
+func (g recorded) Dirty(ctx context.Context, path string) (bool, error) {
+	g.log.add("Dirty " + path)
+	if g.before != nil {
+		g.before(path)
+	}
+	if g.failing != nil && g.failing.Load() {
+		return false, errors.New("git status failed")
+	}
+	return g.Fake.Dirty(ctx, path)
+}
+
+// openingWith opens r as opening does, its poll reading git.
+func openingWith(r repo, git events.Git) events.Open {
+	return func(ctx context.Context, dir string) (events.Source, error) {
+		source, err := opening(r)(ctx, dir)
+		source.Git = git
+		return source, err
+	}
+}
 
 // A machine is the jobs the run daemon runs, which a test changes, or err when it cannot tell.
 type machine struct {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
 // Jobs lists the jobs the run daemon knows, never starting it; it fails with run.ErrUnknown when it cannot tell which are up.
@@ -24,8 +25,9 @@ type Bus interface {
 // repository.
 type Open func(ctx context.Context, dir string) (Source, error)
 
-// Git is what a poll reads of a repository, lighter than a snapshot: its worktrees and the tips of its branches.
+// Git is what a poll reads of a repository, lighter than a snapshot: its worktrees, whether each is there and dirty, and the tips of its branches.
 type Git interface {
+	repository.Prober
 	Worktrees(ctx context.Context) ([]worktree.Worktree, error)
 	Branches(ctx context.Context) (worktree.Branches, error)
 }

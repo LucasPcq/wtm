@@ -134,3 +134,17 @@ func codeOf(t *testing.T, err error) string {
 	require.True(t, ok, "%v", err)
 	return failure.Code
 }
+
+// pollsIn splits the calls a recorded git logged into the calls of each poll, each starting with the branch tips; the snapshot's reads before the first poll are left out.
+func pollsIn(calls []string) [][]string {
+	var polls [][]string
+	for _, call := range calls {
+		if call == "Branches" {
+			polls = append(polls, nil)
+		}
+		if len(polls) > 0 {
+			polls[len(polls)-1] = append(polls[len(polls)-1], call)
+		}
+	}
+	return polls
+}
