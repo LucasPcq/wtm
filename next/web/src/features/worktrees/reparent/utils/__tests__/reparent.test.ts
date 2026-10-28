@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import type { Applied } from '@/api/queries/commands'
 import type { DomainFollowUp } from '@/api/types.gen'
-import { byParent, syncOf } from '@/features/worktrees/reparent/utils/plan'
+import { byParent, syncOf, unreported } from '@/features/worktrees/reparent/utils/plan'
 import { toldOf } from '@/features/worktrees/reparent/utils/words'
 
 const move = (worktree: string, to: string): DomainFollowUp => ({
@@ -90,4 +90,17 @@ test('a run refused with no item, a lock held, names its own worktrees', () => {
     error: { kind: 'conflict', code: 'lock.held', message: 'b is locked by clean' },
   }
   expect(toldOf([held], { worktrees: ['b'] }).title).toBe("Couldn't reparent b")
+})
+
+test('a chain ending at a run that told nothing says what the runs before it and this one did', () => {
+  const a = ran([['a', 'f', 'main']])
+  const b = ran([['b', 'g', 'x']])
+  // the dialog open on b showed only b
+  expect(unreported({ ran: [a], envelope: b, told: false, goesOn: false })).toEqual([a, b])
+  // b never applied: a still says what it moved
+  expect(unreported({ ran: [a], envelope: undefined, told: false, goesOn: false })).toEqual([a])
+  // a toast said it, or the chain goes on, or nothing ran before
+  expect(unreported({ ran: [a], envelope: b, told: true, goesOn: false })).toEqual([])
+  expect(unreported({ ran: [a], envelope: b, told: false, goesOn: true })).toEqual([])
+  expect(unreported({ ran: [], envelope: b, told: false, goesOn: false })).toEqual([])
 })

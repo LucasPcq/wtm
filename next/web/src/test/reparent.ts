@@ -199,29 +199,30 @@ export function rememberingReparent({ failing = [], held }: { failing?: string[]
   ]
 }
 
-// clean's run that removes the worktrees asked and leaves each child given on its removed parent, its move onto to
-// the follow-up, as the core warns of them
-export const cleanLeaving = (children: { branch: string; from: string; to: string }[]) => (call: WebCall) => {
-  const picked = asked(call.answers, 'worktree')
-  return streamed(
-    `event: envelope\ndata: ${JSON.stringify({
-      ...envelope('clean', []),
-      items: picked.map((branch) => ({ subject: branch, status: 'done', detail: { path: `/acme.trees/${branch}` } })),
-      plan: { worktrees: [], moves: [], reparent_children: false, force: false },
-      warnings: children.map(({ branch, from, to }) => ({
-        code: 'clean.orphaned',
-        message: `${branch} still points at the removed parent ${from}`,
-        params: { branch, from, to },
-        follow_up: {
-          command: 'reparent',
-          answers: [
-            { path: 'worktree', values: [branch] },
-            { path: 'to', values: [to] },
-          ],
-          code: 'clean.reparent',
-          message: `move it onto ${to}`,
-        },
-      })),
-    })}\n\n`,
-  )
-}
+// clean's or prune's run that removes the worktrees asked and leaves each child given on its removed parent, its move
+// onto to the follow-up, as the core warns of them
+export const leavingOrphans =
+  (command: 'clean' | 'prune', children: { branch: string; from: string; to: string }[]) => (call: WebCall) => {
+    const picked = asked(call.answers, 'worktree')
+    return streamed(
+      `event: envelope\ndata: ${JSON.stringify({
+        ...envelope(command, []),
+        items: picked.map((branch) => ({ subject: branch, status: 'done', detail: { path: `/acme.trees/${branch}` } })),
+        plan: { worktrees: [], moves: [], reparent_children: false, force: false },
+        warnings: children.map(({ branch, from, to }) => ({
+          code: `${command}.orphaned`,
+          message: `${branch} still points at the removed parent ${from}`,
+          params: { branch, from, to },
+          follow_up: {
+            command: 'reparent',
+            answers: [
+              { path: 'worktree', values: [branch] },
+              { path: 'to', values: [to] },
+            ],
+            code: `${command}.reparent`,
+            message: `move it onto ${to}`,
+          },
+        })),
+      })}\n\n`,
+    )
+  }

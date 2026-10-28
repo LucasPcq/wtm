@@ -6,7 +6,7 @@ import type { DomainFollowUp } from '@/api/types.gen'
 import { type Told, useDirectRun } from '@/features/worktrees/hooks/use-direct-run'
 import { openReparent, useReparentDialog } from '@/features/worktrees/hooks/use-reparent-dialog'
 import { dismissEnded, succeeded } from '@/features/worktrees/hooks/use-run'
-import { byParent, syncOf, undosOf, unitsOf } from '@/features/worktrees/reparent/utils/plan'
+import { byParent, syncOf, undosOf, unitsOf, unreported } from '@/features/worktrees/reparent/utils/plan'
 import { refusalOf, toldOf } from '@/features/worktrees/reparent/utils/words'
 import { copy } from '@/features/worktrees/utils/copy'
 import { listed } from '@/features/worktrees/utils/listed'
@@ -80,11 +80,17 @@ export function useReparentNow(repo: string) {
         },
         onDetails: (held) => openReparent(repo, { worktrees: held, left: [], picking: false }),
       })
-      // stopped before this run applied (a choice to make, a refusal, another run under way): what moved before still
-      // says so, with its Undo
-      if (!envelope && !told && ran.length > 0) {
-        const said = toldOf(ran, { worktrees: [] })
-        toast[said.tone](said.title, { description: said.description, ...buttons(ran, true), duration: 10_000 })
+      // a chain that ends here and told nothing (stopped before this run applied, or the dialog open on it) still says
+      // what moved, with its Undo
+      const goesOn = envelope !== undefined && !last && succeeded(envelope)
+      const untold = unreported({ ran, envelope, told, goesOn })
+      if (untold.length > 0) {
+        const said = toldOf(untold, { worktrees })
+        toast[said.tone](said.title, {
+          description: said.description,
+          ...buttons(untold, said.tone === 'success'),
+          duration: 10_000,
+        })
       }
       if (!envelope) return
       ran.push(envelope)

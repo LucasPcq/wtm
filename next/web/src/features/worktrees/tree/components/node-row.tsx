@@ -2,13 +2,14 @@ import { Feedback } from '@dnd-kit/dom'
 import { useDraggable, useDroppable } from '@dnd-kit/react'
 import { Link } from '@tanstack/react-router'
 import { Ban, CircleDot, GripVertical, LoaderCircle, TriangleAlert } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { type ReactNode, useCallback } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Glyph } from '@/features/worktrees/components/glyph'
 import { RowMenu } from '@/features/worktrees/components/row-menu'
 import type { View } from '@/features/worktrees/tree/components/branch'
 import type { Node } from '@/features/worktrees/tree/utils/nodes'
+import { landedHere } from '@/features/worktrees/tree/utils/targets'
 import { conditionLook } from '@/features/worktrees/utils/condition'
 import { searched } from '@/features/worktrees/utils/filters'
 import { cn } from '@/lib/utils'
@@ -28,6 +29,20 @@ export function NodeRow({ node, view }: { node: Node; view: View }) {
     plugins: [Feedback.configure({ feedback: 'clone' })],
   })
   const { ref: dropRef, isDropTarget } = useDroppable({ id: branch })
+
+  // stable while the row has not landed: dnd-kit's handle is registered once, and focus moves once the read draws the
+  // row under its new parent, where the drop sent it
+  const landed = landedHere(view.moving, { branch, parent: detail.parent })
+  const { landed: done } = view
+  const gripRef = useCallback(
+    (element: HTMLButtonElement | null) => {
+      handleRef(element)
+      if (!element || !landed) return
+      element.focus()
+      done()
+    },
+    [handleRef, landed, done],
+  )
 
   const found = searched(branch, view.query)
   const look = conditionLook[condition]
@@ -81,12 +96,7 @@ export function NodeRow({ node, view }: { node: Node; view: View }) {
         // kept while under way, so a keyboard drop keeps its focus
         <button
           type="button"
-          ref={(element) => {
-            handleRef(element)
-            if (!element || view.refocus !== branch) return
-            element.focus()
-            view.focused()
-          }}
+          ref={gripRef}
           aria-label={`Move ${branch} under another branch`}
           aria-disabled={underWay !== undefined}
           // where it may land is asked before the drag starts

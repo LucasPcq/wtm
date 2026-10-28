@@ -2,8 +2,10 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { expect, onTestFinished, test } from 'vitest'
 import type { DomainAnswered, WebCall } from '@/api/types.gen'
 import { cleanPlan } from '@/test/clean'
+import { prunePlan } from '@/test/prune'
+import { answeringPrune, openFromTheHeader } from '@/test/prune-dialog'
 import { answeringClean, selectAndRemove } from '@/test/remove'
-import { cleanLeaving, rememberingReparent } from '@/test/reparent'
+import { leavingOrphans, rememberingReparent } from '@/test/reparent'
 import { server } from '@/test/server'
 
 const runsOf = () => {
@@ -29,7 +31,7 @@ async function leftOrphans(searchTo: string) {
   server.use(
     answeringClean(
       cleanPlan,
-      cleanLeaving([
+      leavingOrphans('clean', [
         { branch: 'feat/billing-ui', from: 'feat/billing', to: 'main' },
         { branch: 'feat/search-docs', from: 'feat/search', to: searchTo },
       ]),
@@ -54,7 +56,8 @@ test('Reparent all over two parents is two runs, one after the other, one toast,
   expect(runs).toEqual([move('feat/billing-ui', 'main'), move('feat/search-docs', 'fix/login')])
   await user.click(screen.getByRole('button', { name: 'Undo' }))
 
-  expect(await screen.findByText('2 worktrees moved')).toBeTruthy()
+  // the first toast still shows: the undo's is a second one
+  await waitFor(() => expect(screen.getAllByText('2 worktrees moved')).toHaveLength(2))
   await waitFor(() => expect(runs).toHaveLength(4))
   expect(runs.slice(2)).toEqual([move('feat/billing-ui', 'feat/billing'), move('feat/search-docs', 'feat/search')])
 })
@@ -91,6 +94,34 @@ test("while a reparent runs, To check's Reparent buttons wait: one run at a time
   let release = () => {}
   server.use(...rememberingReparent({ held: new Promise<void>((resolve) => (release = resolve)) }))
   const { user, toCheck } = await leftOrphans('fix/login')
+
+  await user.click(
+    within(toCheck).getByRole('button', {
+      name: 'Reparent: feat/billing-ui still points at the removed parent feat/billing',
+    }),
+  )
+
+  const all = within(toCheck).getByRole('button', { name: 'Reparent all onto the nearest that stays' })
+  await waitFor(() => expect(all.hasAttribute('disabled')).toBe(true))
+  release()
+  expect(await screen.findByText('feat/billing-ui is on main')).toBeTruthy()
+})
+
+test("Prune's To check waits the same while a reparent runs: the two share it", async () => {
+  let release = () => {}
+  server.use(...rememberingReparent({ held: new Promise<void>((resolve) => (release = resolve)) }))
+  answeringPrune(
+    prunePlan,
+    leavingOrphans('prune', [
+      { branch: 'feat/billing-ui', from: 'feat/billing', to: 'main' },
+      { branch: 'feat/search-docs', from: 'feat/search', to: 'main' },
+    ]),
+  )
+  const { user, dialog } = await openFromTheHeader()
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Prune' }))
+  const toCheck = await within(dialog).findByRole('region', { name: 'To check' })
 
   await user.click(
     within(toCheck).getByRole('button', {

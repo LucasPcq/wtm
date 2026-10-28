@@ -62,9 +62,8 @@ test("the callout's fix runs at once, and its toast's Undo moves the worktree ba
   const undone = (await screen.findByText('feat/search-docs is on feat/search')).closest('[data-sonner-toast]')
   // the undo's toast has its own Undo, which moves it again
   await user.click(within(undone as HTMLElement).getByRole('button', { name: 'Undo' }))
-  expect(await screen.findByText('feat/search-docs is on main')).toBeTruthy()
   await waitFor(() => expect(runs).toHaveLength(3))
-  expect(runs.slice(0, 2).map((call) => call.answers)).toEqual([
+  expect(runs.map((call) => call.answers)).toEqual([
     [
       { path: 'worktree', values: ['feat/search-docs'] },
       { path: 'to', values: ['main'] },
@@ -73,7 +72,12 @@ test("the callout's fix runs at once, and its toast's Undo moves the worktree ba
       { path: 'worktree', values: ['feat/search-docs'] },
       { path: 'to', values: ['feat/search'] },
     ],
+    [
+      { path: 'worktree', values: ['feat/search-docs'] },
+      { path: 'to', values: ['main'] },
+    ],
   ])
+  await waitFor(() => expect(screen.getAllByText('feat/search-docs is on main')).toHaveLength(2))
 })
 
 test('a move its dry run refuses ends on an error toast saying why, whose Details opens the dialog on it', async () => {
@@ -115,4 +119,35 @@ test('a failed outcome closed once read no longer stands in the way of the next 
 
   expect(await screen.findByText('feat/search-docs is on main')).toBeTruthy()
   expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+test("a record a newer wtm wrote refuses the move before it runs: the dialog says so with the core's words", async () => {
+  const runs = runsOf()
+  server.use(
+    proposes('feat/search-docs', 'main'),
+    http.post('/api/repos/r1/commands/reparent', () =>
+      HttpResponse.json(
+        {
+          ...envelope('reparent', []),
+          ok: false,
+          error: {
+            kind: 'precondition',
+            code: 'reparent.meta_newer',
+            message: 'feat/search-docs was recorded by a newer wtm: upgrade wtm; nothing moved',
+          },
+        },
+        { status: 412 },
+      ),
+    ),
+  )
+  const { user } = await renderApp('/r/r1/worktrees?worktree=feat%2Fsearch-docs')
+
+  const callout = await screen.findByRole('region', { name: 'To do' })
+  await user.click(await within(callout).findByRole('button', { name: 'Reparent onto main' }))
+
+  const dialog = await screen.findByRole('dialog', { name: 'Change parent' })
+  expect(
+    await within(dialog).findByText('feat/search-docs was recorded by a newer wtm: upgrade wtm; nothing moved'),
+  ).toBeTruthy()
+  expect(runs).toEqual([])
 })

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { dropOn, targetOf } from '@/features/worktrees/tree/utils/targets'
+import { dropOn, landedHere, targetOf } from '@/features/worktrees/tree/utils/targets'
 import { reparentQuestionsOf } from '@/test/reparent'
 
 // feat/billing dragged: feat/billing-ui sits under it, main is its parent
@@ -36,4 +36,12 @@ test('a drop runs on a target that takes it or one not yet known, does nothing o
   expect(dropOn({ kind: 'refused', why: 'feat/billing-ui sits under feat/billing' })).toEqual({
     refused: 'feat/billing-ui sits under feat/billing',
   })
+})
+
+test('a dropped row has landed only once the read draws it under the parent it was dropped on', () => {
+  const moving = { branch: 'feat/billing', to: 'fix/login' }
+  expect(landedHere(moving, { branch: 'feat/billing', parent: 'main' })).toBe(false)
+  expect(landedHere(moving, { branch: 'feat/billing', parent: 'fix/login' })).toBe(true)
+  expect(landedHere(moving, { branch: 'fix/login', parent: 'main' })).toBe(false)
+  expect(landedHere(undefined, { branch: 'feat/billing', parent: 'fix/login' })).toBe(false)
 })

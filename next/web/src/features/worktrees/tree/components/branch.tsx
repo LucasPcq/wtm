@@ -1,6 +1,6 @@
 import { NodeRow } from '@/features/worktrees/tree/components/node-row'
 import type { Node } from '@/features/worktrees/tree/utils/nodes'
-import type { Target } from '@/features/worktrees/tree/utils/targets'
+import type { Moving, Target } from '@/features/worktrees/tree/utils/targets'
 import type { Subject } from '@/features/worktrees/utils/actions'
 import { cn } from '@/lib/utils'
 
@@ -14,8 +14,8 @@ export type View = {
   // undefined while nothing is dragged
   target: ((node: Node) => Target) | undefined
   prefetch: (branch: string) => void
-  refocus: string | undefined
-  focused: () => void
+  moving: Moving | undefined
+  landed: () => void
 }
 
 export function Branch({ node, view, child = false }: { node: Node; view: View; child?: boolean }) {

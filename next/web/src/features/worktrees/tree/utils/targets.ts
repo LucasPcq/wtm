@@ -34,3 +34,9 @@ export function dropOn(target: Target): 'run' | 'none' | { refused: string } {
   if (target.kind === 'parent') return 'none'
   return { refused: target.why }
 }
+
+export type Moving = { branch: string; to: string }
+
+// a row has landed once the read draws it under the parent it was dropped on
+export const landedHere = (moving: Moving | undefined, { branch, parent }: { branch: string; parent: string | null }) =>
+  moving?.branch === branch && moving.to === parent

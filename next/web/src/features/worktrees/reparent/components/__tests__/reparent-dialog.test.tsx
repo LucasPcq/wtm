@@ -149,3 +149,24 @@ test('a plan gone stale by the apply is refused, and the dialog says why', async
 
   expect(await within(dialog).findByText('the plan is stale: plan again')).toBeTruthy()
 })
+
+test("Reparent waits on the core's word that the plan changes nothing, not on a rule of the web's own", async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/reparent', async ({ request }) => {
+      const call = (await request.json()) as WebCall
+      const planned = (await reparentPlan(call).json()) as { plan: object }
+      return HttpResponse.json({ ...planned, plan: { ...planned.plan, empty: true } })
+    }),
+  )
+  const { user, dialog } = await fromMenu('feat/billing')
+
+  await user.click(await within(dialog).findByRole('combobox'))
+  await user.click(await screen.findByRole('option', { name: 'fix/login' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+
+  // the move reads main → fix/login, yet the core says the plan is empty
+  expect(await within(dialog).findByText('main → fix/login')).toBeTruthy()
+  await waitFor(() =>
+    expect(within(dialog).getByRole('button', { name: 'Reparent' }).getAttribute('aria-disabled')).toBe('true'),
+  )
+})
