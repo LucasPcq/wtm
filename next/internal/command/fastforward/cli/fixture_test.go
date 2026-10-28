@@ -29,6 +29,7 @@ const (
 	stepWorktrees = iota
 	stepAll
 	stepForce
+	stepNoFetch
 	stepRecap
 )
 

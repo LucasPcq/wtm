@@ -59,8 +59,11 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 	}
 	defer op.End()
 
-	// 2. Fetch origin once, so each worktree stands where origin has it now; a fetch that fails leaves the plan on origin as last fetched, said in a warning.
-	fetched := u.Git.Fetch(ctx)
+	// 2. Fetch origin once, so each worktree stands where origin has it now, unless the request reads it as last fetched; a fetch that fails leaves the plan on origin as last fetched, said in a warning.
+	var fetched error
+	if !req.NoFetch {
+		fetched = u.Git.Fetch(ctx)
+	}
 	if fetched != nil && ctx.Err() != nil {
 		return Outcome{Op: op.ID}, ctx.Err()
 	}

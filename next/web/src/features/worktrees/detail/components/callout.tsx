@@ -6,6 +6,7 @@ import { CommandLine } from '@/features/worktrees/components/command-line'
 import { openPrune } from '@/features/worktrees/hooks/use-prune-dialog'
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
 import { isMutation } from '@/features/worktrees/hooks/use-run'
+import { type RunEntry, useRunEntry } from '@/features/worktrees/hooks/use-run-entry'
 import { menu, pruneAction, subjectsOf } from '@/features/worktrees/utils/actions'
 import { sentence } from '@/features/worktrees/utils/sentence'
 import { cn } from '@/lib/utils'
@@ -34,16 +35,25 @@ const look: Record<Tone, { box: string; glyph: string }> = {
   suggestion: { box: 'border-border bg-muted/40', glyph: 'text-muted-foreground' },
 }
 
-const runsHere: Record<MutationCommand, { verb: string; open: (repo: string, fix: DomainFollowUp) => void } | null> = {
+// the fix the web runs, as the menus run it: Remove and Prune open their dialog, Fast-forward runs at once
+const runsHere: Record<
+  MutationCommand,
+  { verb: string; open: (repo: string, fix: DomainFollowUp, runEntry: RunEntry) => void } | null
+> = {
   clean: {
     verb: menu.clean.label,
     open: (repo, fix) => openRemove(repo, { worktrees: subjectsOf(fix), left: [], prechecked: true }),
+  },
+  'fast-forward': {
+    verb: menu.fast_forward.label,
+    open: (_repo, fix, runEntry) => runEntry({ action: 'fast_forward', followUp: fix }, []),
   },
   create: null,
   prune: { verb: pruneAction.label, open: (repo, fix) => openPrune(repo, subjectsOf(fix)) },
 }
 
 export function Callout({ repo, problems: [first, ...more] }: { repo: string; problems: StatusProblem[] }) {
+  const runEntry = useRunEntry(repo)
   if (!first) return null
 
   const { tone, icon: Icon, consequence } = calloutOf[first.code]
@@ -52,7 +62,7 @@ export function Callout({ repo, problems: [first, ...more] }: { repo: string; pr
   const command = fix?.command
   const here = command && isMutation(command) ? runsHere[command] : null
   const runs = here !== null
-  const act = () => fix && here?.open(repo, fix)
+  const act = () => fix && here?.open(repo, fix, runEntry)
 
   return (
     <section aria-label="To do" className={cn('flex flex-col gap-3 rounded-lg border p-4', box)}>

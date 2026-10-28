@@ -3,6 +3,7 @@ import { setupServer } from 'msw/node'
 import type { DomainAnswered, DomainField, DomainFollowUp, ListDetail, WebCall } from '@/api/types.gen'
 import { repo, worktrees } from '@/test/acme'
 import { cleanPlan, cleanQuestionsOf, cleanRun } from '@/test/clean'
+import { ffPlan, ffQuestions, ffRun } from '@/test/fast-forward'
 import { envelope, followUp, offers, statusDetail, treeDetail } from '@/test/fixtures'
 import { prunePlan, pruneRun } from '@/test/prune'
 import { line, streamed } from '@/test/stream'
@@ -164,6 +165,7 @@ const handlers = [
   http.post('/api/repos/r1/commands/clean/questions', async ({ request }) =>
     HttpResponse.json(cleanQuestionsOf(((await request.json()) as WebCall).answers)),
   ),
+  http.post('/api/repos/r1/commands/fast-forward/questions', () => HttpResponse.json(ffQuestions())),
   http.post('/api/repos/r1/commands/create/questions', async ({ request }) =>
     HttpResponse.json(questionsOf(((await request.json()) as WebCall).answers)),
   ),
@@ -187,6 +189,8 @@ const handlers = [
         return call.dry_run ? cleanPlan(call) : cleanRun(call)
       case 'prune':
         return call.dry_run ? prunePlan(call) : pruneRun(call)
+      case 'fast-forward':
+        return call.dry_run ? ffPlan(call) : ffRun(call)
     }
     return HttpResponse.json({ error: { message: 'unknown command' } }, { status: 404 })
   }),

@@ -50,7 +50,7 @@ func TestAPickTheUserChangedNamesItsWorktrees(t *testing.T) {
 	d.Keys("space", "enter")
 
 	assert.Equal(t, fastforward.Request{Worktrees: []string{behind}}, d.s.Request())
-	assert.Contains(t, d.Screen(), "· All — only --all asks every worktree")
+	assert.Contains(t, d.Screen(), "· All — set by its flag only")
 }
 
 func TestANamedDirtyWorktreeAsksToForceItAsTheUnattendedRunRefuses(t *testing.T) {

@@ -41,6 +41,7 @@
         --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
         --force                       Fast-forward a worktree that has uncommitted changes
     -h, --help                        help for fast-forward
+        --no-fetch                    Read origin's branches as last fetched
         --output string               Output format: text or json (default "text")
     -y, --yes                         Run unattended: no question, no confirmation (without worktrees, those behind origin; a worktree named with uncommitted changes still refuses the run unless --force)
 

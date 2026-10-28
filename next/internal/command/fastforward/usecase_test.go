@@ -295,3 +295,28 @@ func TestOriginMovedSinceTheDryRunMakesItsPlanStale(t *testing.T) {
 
 	assert.True(t, domain.PlanStale(err))
 }
+
+func TestNoFetchPlansOnOriginAsLastFetched(t *testing.T) {
+	w := newWorld(t)
+	before := w.tip(t, stale)
+	req := naming(stale)
+	req.NoFetch = true
+
+	outcome, _ := w.run(t, req)
+
+	assert.Equal(t, fastforward.StandingUpToDate, outcome.Plan.Worktrees[0].Standing)
+	assert.Equal(t, before, w.tip(t, stale))
+}
+
+func TestTheForcedFollowUpsLeaveNoFetchOut(t *testing.T) {
+	w := newWorld(t)
+	noFetch := domain.Answered{Path: fastforward.PathNoFetch, Values: []string{"true"}}
+
+	_, err := w.usecase.Run(t.Context(), fastforward.Request{Worktrees: []string{dirty}, NoFetch: true}, domain.RunOptions{})
+	outcome, _ := w.run(t, fastforward.Request{All: true, NoFetch: true})
+
+	assert.NotContains(t, failureOf(t, err).FollowUp.Answers, noFetch)
+	kept := keptOf(outcome.Warnings)
+	require.NotEmpty(t, kept)
+	assert.NotContains(t, kept[len(kept)-1].FollowUp.Answers, noFetch)
+}

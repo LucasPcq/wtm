@@ -18,6 +18,8 @@ func words(q fastforward.Questions, field domain.Field) form.Words {
 			"true":  {Label: "Every worktree", Short: "every worktree"},
 			"false": {Label: "Those named", Short: "those named"},
 		}}
+	case fastforward.PathNoFetch:
+		return form.Words{Flag: "--no-fetch", Label: "No fetch", Help: "Read origin's branches as last fetched"}
 	case fastforward.PathForce:
 		return form.Words{Flag: "--force", Label: "Force", Help: forceHelp(q.Unsafe), Options: map[string]form.OptionWords{
 			"true":  {Label: "Yes, fast-forward them anyway", Short: "forced"},

@@ -10,6 +10,8 @@ import type {
   DomainEnvelope,
   DomainForm,
   DomainItem,
+  FastforwardDetail,
+  FastforwardPlan,
   ListDetail,
   PruneDetail,
   PrunePlan,
@@ -29,8 +31,10 @@ type Mutation = {
   create: { plan: CreatePlan; detail: CreateDetail }
   clean: { plan: CleanPlan; detail: CleanDetail }
   prune: { plan: PrunePlan; detail: PruneDetail }
+  'fast-forward': { plan: FastforwardPlan; detail: FastforwardDetail }
 }
 export type MutationCommand = keyof Mutation
+export type Planned<C extends MutationCommand> = Mutation[C]['plan']
 
 // the core sends {} for an item it did not read (failed, cancelled)
 type Narrowed<Detail, Plan> = Omit<DomainEnvelope, 'plan' | 'items'> & {
@@ -38,7 +42,7 @@ type Narrowed<Detail, Plan> = Omit<DomainEnvelope, 'plan' | 'items'> & {
   items: (Omit<DomainItem, 'detail'> & { detail: Detail | undefined })[]
 }
 export type Read<C extends ReadCommand> = Narrowed<ReadDetail[C], never>
-export type Applied<C extends MutationCommand> = Narrowed<Mutation[C]['detail'], Mutation[C]['plan']>
+export type Applied<C extends MutationCommand> = Narrowed<Mutation[C]['detail'], Planned<C>>
 
 // typed once, here, so that no component casts
 export const narrowed = <Detail, Plan = never>(envelope: DomainEnvelope): Narrowed<Detail, Plan> => ({

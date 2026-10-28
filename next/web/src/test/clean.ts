@@ -136,7 +136,7 @@ export const cleanRun = (call: WebCall) => {
 }
 
 // a run that starts its first worktree, then waits for the test to end it with the envelope it gives
-export function heldRun() {
+export function heldRun(phase = 'on_clean') {
   const encoder = new TextEncoder()
   let end = (_envelope: object) => {}
   const respond = (call: WebCall) => {
@@ -145,9 +145,7 @@ export function heldRun() {
       new ReadableStream({
         start: (controller) => {
           controller.enqueue(
-            encoder.encode(
-              line({ type: 'unit.started', subject }) + line({ type: 'phase.started', subject, phase: 'on_clean' }),
-            ),
+            encoder.encode(line({ type: 'unit.started', subject }) + line({ type: 'phase.started', subject, phase })),
           )
           end = (envelope) => {
             controller.enqueue(encoder.encode(`event: envelope\ndata: ${JSON.stringify(envelope)}\n\n`))
