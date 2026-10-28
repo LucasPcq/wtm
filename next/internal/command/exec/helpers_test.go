@@ -193,3 +193,11 @@ func logOf(started []domain.PhaseStarted, subject string) string {
 	}
 	return ""
 }
+
+// rawRecord writes content as the record of name, byte for byte: one that does not decode, or one a newer wtm wrote.
+func (w world) rawRecord(t *testing.T, name, content string) {
+	t.Helper()
+	dir, ok := worktree.MetaDir(worktree.MetaDirParams{StateDir: w.stateDir, Branch: name})
+	require.True(t, ok)
+	writeFile(t, filepath.Join(dir, "meta.json"), content)
+}

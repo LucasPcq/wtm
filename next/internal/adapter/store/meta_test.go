@@ -133,25 +133,36 @@ func TestAnUnreadableRecordIsRebuilt(t *testing.T) {
 	assert.Equal(t, worktree.Meta{Ordinal: 4}, got)
 }
 
-func TestARecordAtANewerSchemaIsReadButNeverRewritten(t *testing.T) {
+func TestARecordAtANewerSchemaIsNeitherReadNorRewrittenNorDeleted(t *testing.T) {
 	stateDir := t.TempDir()
 	content := `{"schema": 99, "source_branch": "main"}`
 	writeMeta(t, stateDir, "feat/a", content)
 	meta := Meta{StateDir: stateDir}
 
-	got, loadErr := meta.Load("feat/a")
-	_, err := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(m *worktree.Meta) error {
+	_, loadErr := meta.Load("feat/a")
+	_, updateErr := meta.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(m *worktree.Meta) error {
 		m.Ordinal = 1
 		return nil
 	}})
+	deleteErr := meta.Delete("feat/a")
 
-	require.NoError(t, loadErr)
-	assert.Equal(t, 99, got.Schema)
-	var newer *domain.SchemaNewer
-	require.ErrorAs(t, err, &newer)
-	assert.Equal(t, 99, newer.Found)
-	assert.Equal(t, 1, newer.Supported)
+	for _, err := range []error{loadErr, updateErr, deleteErr} {
+		var newer *domain.SchemaNewer
+		require.ErrorAs(t, err, &newer)
+		assert.Equal(t, 99, newer.Found)
+		assert.Equal(t, 1, newer.Supported)
+	}
 	assert.Equal(t, content, readFile(t, metaPath(t, stateDir, "feat/a")))
+}
+
+func TestARecordThatDoesNotDecodeIsDeletedAllTheSame(t *testing.T) {
+	stateDir := t.TempDir()
+	writeMeta(t, stateDir, "feat/a", "{not json")
+	meta := Meta{StateDir: stateDir}
+
+	require.NoError(t, meta.Delete("feat/a"))
+
+	assert.NoDirExists(t, filepath.Dir(metaPath(t, stateDir, "feat/a")))
 }
 
 func TestAChangeThatFailsWritesNothing(t *testing.T) {

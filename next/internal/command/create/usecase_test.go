@@ -749,3 +749,23 @@ func TestAWorktreeWithNoEnvFileStillRecapsItsStrategy(t *testing.T) {
 
 	assert.True(t, slices.ContainsFunc(planned.Recap, func(row domain.RecapRow) bool { return row.Key == domain.PathEnvFrom }), planned.Recap)
 }
+
+func TestANeighbourWhoseRecordANewerWtmWroteRefusesTheRunBeforeAnythingIsCreated(t *testing.T) {
+	w := newWorld(t, seed{Linked: []string{other}, Run: jobsToml})
+	dir, ok := worktree.MetaDir(worktree.MetaDirParams{StateDir: w.stateDir, Branch: other})
+	require.True(t, ok)
+	writeFile(t, filepath.Join(dir, "meta.json"), `{"schema": 99, "ordinal": 1}`)
+	planned := decided(t, w.facts(t, branchName), create.Request{Branches: []string{branchName}})
+	require.Contains(t, planned.Branches[0].Phases, domain.PhaseOrdinal, "the plan numbers the worktree")
+
+	_, err := w.usecase.Run(t.Context(), create.Request{Branches: []string{branchName}}, domain.RunOptions{})
+
+	refused := failureOf(t, err)
+	assert.Equal(t, create.CodeMetaNewer, refused.Code)
+	assert.Equal(t, domain.KindPrecondition, refused.Kind)
+	assert.Contains(t, refused.Message, other)
+	var newer *domain.SchemaNewer
+	assert.ErrorAs(t, err, &newer)
+	assert.NoDirExists(t, filepath.Join(w.trees, worktree.PathSegment(branchName)))
+	assert.Empty(t, gittest.Output(t, w.main, "branch", "--list", branchName))
+}

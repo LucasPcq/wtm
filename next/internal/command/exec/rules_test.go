@@ -49,6 +49,28 @@ func TestTheConcurrencyNeverExceedsTheTargets(t *testing.T) {
 	}
 }
 
+func TestATargetWhoseRecordDoesNotReadIsWarnedOfWhyItRunsWithoutItsEnvironment(t *testing.T) {
+	cases := map[string]struct {
+		Record string
+		Cause  string
+	}{
+		"corrupt": {Record: "{not json", Cause: "invalid character"},
+		"newer":   {Record: `{"schema": 99, "ordinal": 3, "isolation": "isolated"}`, Cause: "is at schema 99, newer than the 1 this wtm writes"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t)
+			w.rawRecord(t, featA, c.Record)
+
+			_, warnings := w.plan(t, running("true", featA, numbered))
+
+			require.Equal(t, []string{exec.CodeMetaUnreadable}, codes(warnings))
+			assert.Equal(t, featA, warnings[0].Params["branch"])
+			assert.Contains(t, warnings[0].Message, c.Cause)
+		})
+	}
+}
+
 func TestAnIsolatedWorktreeWithNoOrdinalIsWarnedOfAndNothingIsAllocated(t *testing.T) {
 	w := newWorld(t)
 

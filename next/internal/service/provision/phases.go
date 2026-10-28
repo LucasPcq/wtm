@@ -36,11 +36,13 @@ func (p *provisioning) hooksReadRun() bool {
 }
 
 // number gives the worktree a free ordinal. Failing to find one stops the run
-// only when ctx is cancelled; otherwise the worktree stays unnumbered, with a
-// warning when its ports needed the ordinal.
+// when ctx is cancelled or a record a newer wtm wrote holds an ordinal this wtm
+// cannot know (one that turned newer since the plan, which NewerNeighbours
+// refuses); otherwise the worktree stays unnumbered, with a warning when its
+// ports needed the ordinal.
 func (p *provisioning) number(ctx context.Context, provisioned *Provisioned) error {
 	ordinal, err := p.allocate(ctx)
-	if err != nil && ctx.Err() != nil {
+	if _, newer := errors.AsType[*domain.SchemaNewer](err); newer || (err != nil && ctx.Err() != nil) {
 		return err
 	}
 
@@ -104,6 +106,37 @@ func (p *provisioning) taken(ctx context.Context) ([]int, error) {
 		taken = append(taken, meta.Ordinal)
 	}
 	return taken, nil
+}
+
+// NewerNeighboursParams are the command planning, what its refusal leaves undone ("nothing created"), and the new worktree it plans in Repository.
+type NewerNeighboursParams struct {
+	Command    string
+	Undone     string
+	Repository worktree.Repository
+	Planned    Planned
+}
+
+// NewerNeighbours refuses, with <command>.meta_newer before anything is made, a planned worktree that is numbered when a record its numbering reads was written by a newer wtm: the ordinal that record holds is not known, so none can be given. Nil when the worktree is not numbered or no such record is newer; a record that does not read otherwise is left to the numbering, which warns of it.
+func (s Service) NewerNeighbours(params NewerNeighboursParams) *domain.Error {
+	p := prepared(ParamsOf(params.Repository, params.Planned, nil))
+	p.Service = s
+	if !p.needsOrdinal() {
+		return nil
+	}
+
+	holders, err := p.holders(params.Repository.Worktrees)
+	if err != nil {
+		return nil
+	}
+	refusal := domain.MetaNewerParams{Code: params.Command + domain.MetaNewer, Undone: params.Undone}
+	for _, branch := range holders {
+		_, err := s.Meta.Load(branch)
+		if newer, ok := errors.AsType[*domain.SchemaNewer](err); ok {
+			refusal.Worktrees, refusal.Records = append(refusal.Worktrees, branch), append(refusal.Records, newer)
+		}
+	}
+
+	return domain.MetaNewerRefusal(refusal)
 }
 
 // holders returns the branches whose record may hold another worktree's

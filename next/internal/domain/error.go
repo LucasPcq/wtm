@@ -43,6 +43,9 @@ const (
 	PRsUnavailable = ".prs_unavailable"
 )
 
+// MetaNewer is the suffix, after a command's name, of the code that refuses to write a meta record a newer wtm wrote (exit 22): clean, prune and reparent refuse a request that would delete or rewrite one.
+const MetaNewer = ".meta_newer"
+
 // Params holds the named values a message or a code carries, for the JSON envelope and for templates.
 type Params map[string]string
 
@@ -203,5 +206,28 @@ type SchemaNewer struct {
 
 // Error names the file, its schema and the one this wtm writes, and asks for an upgrade.
 func (e *SchemaNewer) Error() string {
-	return fmt.Sprintf("%s is at schema %d, newer than the %d this wtm writes: upgrade wtm to change it", e.Path, e.Found, e.Supported)
+	return fmt.Sprintf("%s is at schema %d, newer than the %d this wtm writes: upgrade wtm to use it", e.Path, e.Found, e.Supported)
+}
+
+// MetaNewerParams are the code of a refusal, what it leaves undone ("nothing removed"), and the worktrees it refuses with the record a newer wtm wrote of each, in the same order.
+type MetaNewerParams struct {
+	Code      string
+	Undone    string
+	Worktrees []string
+	Records   []*SchemaNewer
+}
+
+// MetaNewerRefusal refuses a request that would write the record of each of p.Worktrees, which a newer wtm wrote: KindPrecondition, caused by each record's *SchemaNewer, which the CLI exits 22 on; nil when p names none.
+func MetaNewerRefusal(p MetaNewerParams) *Error {
+	if len(p.Worktrees) == 0 {
+		return nil
+	}
+
+	causes := make([]string, 0, len(p.Records))
+	errs := make([]error, 0, len(p.Records))
+	for _, record := range p.Records {
+		causes, errs = append(causes, record.Error()), append(errs, record)
+	}
+	names := strings.Join(p.Worktrees, ", ")
+	return &Error{Kind: KindPrecondition, Code: p.Code, Message: p.Undone + ": a newer wtm wrote the record of " + names + ": " + strings.Join(causes, "; "), Params: Params{"worktrees": names}, Cause: errors.Join(errs...)}
 }

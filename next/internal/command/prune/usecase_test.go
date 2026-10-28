@@ -351,3 +351,63 @@ func TestAWorktreeNamedIsCheckedAgainstTheWorktreesThatStay(t *testing.T) {
 	assert.Equal(t, map[string]domain.Status{"feat/copy": domain.StatusDone}, statuses(outcome.Result.Items))
 	assert.True(t, w.stands(t, goneWork))
 }
+
+func TestANamedWorktreeWhoseRecordANewerWtmWroteRefusesThePruneEvenForced(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.rawRecord(t, merged, newerRecord)
+
+	for _, force := range []bool{false, true} {
+		_, err := w.usecase.Run(t.Context(), prune.Request{Worktrees: []string{merged, gone}, Force: force}, domain.RunOptions{})
+
+		refused := failureOf(t, err)
+		assert.Equal(t, prune.CodeMetaNewer, refused.Code)
+		assert.Equal(t, domain.KindPrecondition, refused.Kind)
+		assert.Contains(t, refused.Message, merged)
+		var newer *domain.SchemaNewer
+		assert.ErrorAs(t, err, &newer)
+	}
+	assert.DirExists(t, w.at(merged))
+	assert.True(t, w.stands(t, gone))
+}
+
+func TestAWorktreeTheCommandChoseWhoseRecordANewerWtmWroteIsLeftAsItIsWithAWarning(t *testing.T) {
+	for name, force := range map[string]bool{"unforced": false, "forced": true} {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t, seed{})
+			w.rawRecord(t, merged, newerRecord)
+
+			assert.NotContains(t, w.questions(t, prune.Request{Force: force}).Worktrees.Picked, merged)
+			outcome, err := w.usecase.Run(t.Context(), prune.Request{Force: force}, domain.RunOptions{})
+
+			require.NoError(t, err)
+			require.NotNil(t, outcome.Result)
+			item := itemOf(t, outcome.Result.Items, merged)
+			assert.Equal(t, domain.StatusSkipped, item.Status)
+			assert.Equal(t, domain.ReasonRuledOut, item.Reason)
+			assert.DirExists(t, w.at(merged))
+			assert.True(t, w.gone(t, gone), "the others go on")
+			newer := warningsOf(outcome.Warnings, prune.CodeMetaNewer)
+			require.Len(t, newer, 1)
+			assert.Equal(t, merged, newer[0].Params["worktree"])
+			assert.Nil(t, newer[0].FollowUp, "forcing cannot lift it")
+			for _, kept := range warningsOf(outcome.Warnings, prune.CodeKept) {
+				assert.NotEqual(t, merged, kept.Params["worktree"])
+				if kept.FollowUp != nil {
+					for _, answered := range kept.FollowUp.Answers {
+						assert.NotContains(t, answered.Values, merged)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestAWorktreeDoneWithWhoseRecordDoesNotDecodeIsPrunedAllTheSame(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.rawRecord(t, merged, "{not json")
+
+	_, err := w.usecase.Run(t.Context(), pruning(merged), domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.True(t, w.gone(t, merged))
+}

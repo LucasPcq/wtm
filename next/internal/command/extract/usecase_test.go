@@ -563,3 +563,22 @@ func TestARunTomlThatDoesNotParseKeepsTheIsolationRow(t *testing.T) {
 	require.GreaterOrEqual(t, at, 0, planned.Recap)
 	assert.Equal(t, []domain.RecapValue{{Value: "isolated", Note: provision.NoteRunUnreadable, Text: "isolated (run.toml unreadable)"}}, planned.Recap[at].Values)
 }
+
+func TestANeighbourWhoseRecordANewerWtmWroteRefusesANewTargetBeforeAnythingIsCreatedOrMoved(t *testing.T) {
+	w := newWorld(t, seed{Config: envToml, Run: jobsToml + "\n[[env_port]]\nfile = \".env\"\nkey = \"PORT\"\njob = \"web\"\nport = \"PORT\"\n"})
+	writeFile(t, filepath.Join(w.main, ".env"), "PORT=3000\n")
+	dir, ok := worktree.MetaDir(worktree.MetaDirParams{StateDir: w.stateDir, Branch: other})
+	require.True(t, ok)
+	writeFile(t, filepath.Join(dir, "meta.json"), `{"schema": 99, "ordinal": 1}`)
+	w.change(t, source, "a.txt", "a\n")
+
+	_, err := w.usecase.Run(t.Context(), extract.Request{Source: source, Files: []string{"a.txt"}, To: split}, domain.RunOptions{})
+
+	refused := failureOf(t, err)
+	assert.Equal(t, extract.CodeMetaNewer, refused.Code)
+	assert.Equal(t, domain.KindPrecondition, refused.Kind)
+	var newer *domain.SchemaNewer
+	assert.ErrorAs(t, err, &newer)
+	assert.NoDirExists(t, w.path(split))
+	assert.Equal(t, "a\n", readFile(t, filepath.Join(w.at(source), "a.txt")))
+}

@@ -4,6 +4,7 @@ package clean
 import (
 	"cmp"
 	"context"
+	"errors"
 	"slices"
 	"strings"
 
@@ -160,7 +161,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, err
 	}
 
-	facts := Facts{Facts: teardown.Facts{Repository: repo, Records: map[string]worktree.Meta{}, Checks: map[string]teardown.Check{}}}
+	facts := Facts{Facts: teardown.Facts{Repository: repo, Records: map[string]worktree.Meta{}, Newer: map[string]*domain.SchemaNewer{}, Checks: map[string]teardown.Check{}}}
 	if facts.Located, err = u.locate(ctx, facts, req); err != nil {
 		return Facts{}, err
 	}
@@ -174,9 +175,13 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		if w.Branch() == "" {
 			continue
 		}
-		// A record that cannot be read is no parent to its children and no data kept: the worktree is removed all the same.
-		if record, err := u.Meta.Load(w.Branch()); err == nil {
+		// A record that cannot be read is no parent to its children and no data kept: the worktree is removed all the same, unless a newer wtm wrote it.
+		record, err := u.Meta.Load(w.Branch())
+		if err == nil {
 			facts.Records[w.Branch()] = record
+		}
+		if newer, ok := errors.AsType[*domain.SchemaNewer](err); ok {
+			facts.Newer[w.Branch()] = newer
 		}
 	}
 	if len(asked) == 0 {

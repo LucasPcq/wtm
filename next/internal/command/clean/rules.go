@@ -99,6 +99,9 @@ const (
 // Decide turns the facts and the resolved request into the plan and its warnings. A worktree a blocker makes unsafe refuses the whole request, before anything is removed, with CodeUnsafe, unless the request forces it.
 func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	removals, absent, _ := f.entries(req.Worktrees)
+	if refused := f.NewerRefusal(Name, removals); refused != nil {
+		return Plan{}, nil, refused
+	}
 	if blocked := teardown.Blocked(removals); len(blocked) > 0 && !req.Force {
 		forced := Request{Worktrees: req.Worktrees, ReparentChildren: req.ReparentChildren, Force: true}
 		return Plan{}, nil, teardown.Refusal(teardown.RefusalParams{Command: Name, Blocked: blocked, Forced: domain.AnswersOf(Questions{}.Form(), forced)})
@@ -111,6 +114,9 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 
 	return planned, f.warnings(planned), nil
 }
+
+// CodeMetaNewer refuses a request that would remove a worktree whose record a newer wtm wrote, forced or not.
+const CodeMetaNewer = Name + domain.MetaNewer
 
 // CodeUnsafe refuses a request that would remove a worktree a blocker makes unsafe; CodeForce is its follow-up, the same request forced, and CodeStopJobs the one that stops a worktree's jobs.
 const (

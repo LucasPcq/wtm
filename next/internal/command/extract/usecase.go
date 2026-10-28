@@ -28,6 +28,7 @@ const (
 	CodeConfigInvalid  = Name + domain.ConfigInvalid  // a config.toml that does not parse or validate
 	CodeConflict       = "extract.conflict"           // the changes conflict with the target and the request does not resolve them
 	CodeHalfMoved      = "extract.half_moved"         // the changes reached the target but could not be removed from the source
+	CodeMetaNewer      = Name + domain.MetaNewer      // a new target would be numbered past a record a newer wtm wrote
 )
 
 // A UseCase moves changes between the worktrees of one repository: the ports it reaches the repository through and the services it shares with the other commands.
@@ -136,9 +137,25 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 	}
 
 	planned, warnings, err := Decide(facts, DecideParams{Given: req, Resolved: resolved, Conflicts: conflicts})
+	if err != nil {
+		return planned, warnings, err
+	}
+	if refused := u.newerNeighbours(planned); refused != nil {
+		return Plan{}, nil, refused
+	}
 	planned.Recalled = questions.Recalled()
 	planned.Recap = planned.previewRecap()
 	return planned, warnings, err
+}
+
+// newerNeighbours refuses the plan, before anything is created or moved, when the target it creates would be numbered past a record a newer wtm wrote (CodeMetaNewer).
+func (u UseCase) newerNeighbours(plan Plan) *domain.Error {
+	// A source with nothing to extract plans no target.
+	if plan.Target.Branch == "" || !plan.Target.creates() {
+		return nil
+	}
+
+	return u.Provision.NewerNeighbours(provision.NewerNeighboursParams{Command: Name, Undone: "nothing moved", Repository: plan.facts.Repository, Planned: plan.provisioned()})
 }
 
 // ----------------------------------------------------------------------------
@@ -265,7 +282,7 @@ func (u UseCase) target(ctx context.Context, plan Plan, report domain.Report) It
 		return Item{Subject: plan.Target.Branch, Status: domain.StatusDone, Detail: detail(plan.Target.Path, plan.facts.recordedIsolation(plan.Target.Branch))}
 	}
 
-	outcome := u.Provision.Run(ctx, provision.ParamsOf(plan.facts.Repository, provision.Planned{Branch: plan.Target.Branch, Path: plan.Target.Path, Placement: plan.Target.placement(), From: plan.From, Answers: plan.settled}, report))
+	outcome := u.Provision.Run(ctx, provision.ParamsOf(plan.facts.Repository, plan.provisioned(), report))
 
 	item := Item{Subject: plan.Target.Branch, Status: outcome.Status, Reason: outcome.Reason, Err: outcome.Err, Warnings: outcome.Warnings}
 	if outcome.Provisioned.Stands() {

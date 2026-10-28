@@ -15,14 +15,15 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what exec decides from, as Observe read them: the project's config, its run.toml, the repository's snapshot, the meta record of each worktree on a branch, the worktrees whose directory is gone, where the caller stands, the CPUs a run uses at most by default, and what the shell says of the command (nil when it parses, or when none is given).
+// Facts are what exec decides from, as Observe read them: the project's config, its run.toml, the repository's snapshot, the meta record of each worktree on a branch and why one that exists does not read, the worktrees whose directory is gone, where the caller stands, the CPUs a run uses at most by default, and what the shell says of the command (nil when it parses, or when none is given).
 type Facts struct {
 	worktree.Repository
-	Records map[string]worktree.Meta // by branch
-	Gone    map[string]bool          // by path
-	Cwd     string                   // where the caller stands, through its symbolic links
-	CPUs    int
-	Syntax  error
+	Records    map[string]worktree.Meta // by branch
+	RecordErrs map[string]error         // by branch
+	Gone       map[string]bool          // by path
+	Cwd        string                   // where the caller stands, through its symbolic links
+	CPUs       int
+	Syntax     error
 }
 
 // standing are the worktree the caller stands in, as the form picks it first; none when the caller stands in none.
@@ -91,7 +92,7 @@ func target(w worktree.Worktree) Target {
 // ----------------------------------------------------------------------------
 // Decide
 
-// Decide turns the facts and the resolved request into the plan and its warnings: the worktrees named, or every one that stands; the concurrency, never more than the targets; the worktrees --all leaves out because their directory is gone, and each target that runs without its run environment for want of an ordinal.
+// Decide turns the facts and the resolved request into the plan and its warnings: the worktrees named, or every one that stands; the concurrency, never more than the targets; the worktrees --all leaves out because their directory is gone, and each target that runs without its run environment for want of an ordinal or of a record that reads.
 func Decide(f Facts, req Request) (Plan, []domain.Warning) {
 	targets, _ := f.entries(req.Worktrees)
 	var warnings []domain.Warning
@@ -113,6 +114,10 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning) {
 	}
 
 	for _, t := range planned.Targets {
+		if err := f.RecordErrs[t.Branch]; err != nil {
+			warnings = append(warnings, domain.Warning{Code: CodeMetaUnreadable, Message: "couldn't read the record of " + t.Branch + ": the command runs without its ports and Compose project: " + err.Error(), Params: domain.Params{"branch": t.Branch}})
+			continue
+		}
 		if record := f.Records[t.Branch]; f.readsRun(t) && record.Ordinal == 0 {
 			warnings = append(warnings, domain.Warning{Code: CodeEnvUnnumbered, Message: t.Worktree + " has no ordinal: the command runs without its ports and Compose project", Params: domain.Params{"worktree": t.Worktree}})
 		}
@@ -121,11 +126,12 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning) {
 	return planned, warnings
 }
 
-// The codes of the warnings of a plan: worktrees --all leaves out, their directory gone, with the command that drops them, and a target that runs without its run environment, its ordinal missing.
+// The codes of the warnings of a plan: worktrees --all leaves out, their directory gone, with the command that drops them, and a target that runs without its run environment, its ordinal missing or its record unreadable.
 const (
-	CodeWorktreesGone = Name + ".worktrees_gone"
-	CodePrune         = Name + ".prune"
-	CodeEnvUnnumbered = Name + ".env_unnumbered"
+	CodeWorktreesGone  = Name + ".worktrees_gone"
+	CodePrune          = Name + ".prune"
+	CodeEnvUnnumbered  = Name + ".env_unnumbered"
+	CodeMetaUnreadable = Name + domain.MetaUnreadable
 )
 
 // commandPrune drops the worktrees whose directory is gone: not migrated yet.

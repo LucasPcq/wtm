@@ -147,6 +147,11 @@ type Target struct {
 	Upstream string `json:"upstream,omitempty"`
 }
 
+// provisioned is the target as provision makes it, with the plan's source and answers.
+func (p Plan) provisioned() provision.Planned {
+	return provision.Planned{Branch: p.Target.Branch, Path: p.Target.Path, Placement: p.Target.placement(), From: p.From, Answers: p.settled}
+}
+
 func (t Target) creates() bool {
 	return t.Action != ActionExisting
 }

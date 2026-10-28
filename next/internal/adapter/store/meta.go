@@ -42,7 +42,9 @@ func (m Meta) path(branch string) (string, error) {
 }
 
 // Load returns the record of branch. A missing record is an error wrapping
-// os.ErrNotExist; a record that does not decode is the JSON error.
+// os.ErrNotExist; a record that does not decode is the JSON error; a record
+// written by a newer wtm is a *domain.SchemaNewer, since what its fields mean
+// is not known.
 func (m Meta) Load(branch string) (worktree.Meta, error) {
 	path, err := m.path(branch)
 	if err != nil {
@@ -54,7 +56,15 @@ func (m Meta) Load(branch string) (worktree.Meta, error) {
 		return worktree.Meta{}, err
 	}
 
-	return decodeMeta(data)
+	meta, err := decodeMeta(data)
+	if err != nil {
+		return worktree.Meta{}, err
+	}
+	if err := refusal(path, meta); err != nil {
+		return worktree.Meta{}, err
+	}
+
+	return meta, nil
 }
 
 // List returns the branches that have a record directory, none when the state
@@ -118,11 +128,21 @@ func (m Meta) Update(ctx context.Context, update worktree.MetaUpdate) (domain.Wr
 }
 
 // Delete removes the record of branch with the directory it sits in; a branch
-// with no record has nothing to remove.
+// with no record has nothing to remove, and one that does not decode is
+// removed all the same. A record written by a newer wtm is refused with a
+// *domain.SchemaNewer.
 func (m Meta) Delete(branch string) error {
 	path, err := m.path(branch)
 	if err != nil {
 		return err
+	}
+
+	if data, err := os.ReadFile(path); err == nil {
+		if meta, err := decodeMeta(data); err == nil {
+			if err := refusal(path, meta); err != nil {
+				return err
+			}
+		}
 	}
 
 	return os.RemoveAll(filepath.Dir(path))
@@ -144,11 +164,15 @@ func storedMeta(path string, current []byte) (worktree.Meta, error) {
 		return worktree.Meta{}, nil
 	}
 
-	if err := statefile.Refusal(statefile.Schema{Path: path, Found: stored.Schema, Supported: metaSchema}); err != nil {
+	if err := refusal(path, stored); err != nil {
 		return worktree.Meta{}, err
 	}
 
 	return stored, nil
+}
+
+func refusal(path string, meta worktree.Meta) error {
+	return statefile.Refusal(statefile.Schema{Path: path, Found: meta.Schema, Supported: metaSchema})
 }
 
 func decodeMeta(data []byte) (worktree.Meta, error) {

@@ -54,6 +54,7 @@ type seed struct {
 	OnClean  []project.Hook
 	RunHooks func(ctx context.Context, chain env.HookChain) error
 	JobsErr  error
+	Newer    []string // the branches whose record a newer wtm wrote
 }
 
 type world struct {
@@ -85,16 +86,26 @@ func newWorld(s seed) world {
 			},
 			Dirty: []string{pathOf(dirty)},
 		}),
-		store: storetest.NewFake(storetest.FakeParams{Meta: map[string]worktree.Meta{
+		store: storetest.NewFake(storetest.FakeParams{Meta: atNewer(s.Newer, map[string]worktree.Meta{
 			plain:  {SourceBranch: "main"},
 			parent: {SourceBranch: "main"},
 			child:  {SourceBranch: parent},
 			dirty:  {SourceBranch: "main"},
-		}}),
+		})}),
 		config: configtest.NewFake(configtest.FakeParams{Config: config}),
 		locks:  &operationtest.Locks{},
 		seed:   s,
 	}
+}
+
+// atNewer is meta with the record of each of branches at a schema a newer wtm writes.
+func atNewer(branches []string, meta map[string]worktree.Meta) map[string]worktree.Meta {
+	for _, branch := range branches {
+		record := meta[branch]
+		record.Schema = 99
+		meta[branch] = record
+	}
+	return meta
 }
 
 func (w world) env() uicli.Env {

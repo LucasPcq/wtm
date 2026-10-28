@@ -633,3 +633,30 @@ func TestAGitFailureWhileCheckingRefusesTheRunRatherThanFindingNothing(t *testin
 	require.ErrorIs(t, err, errBroken)
 	assert.True(t, w.stands(t, plain))
 }
+
+func TestAWorktreeWhoseRecordANewerWtmWroteIsRefusedEvenForced(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.rawRecord(t, plain, newerRecord)
+
+	for _, force := range []bool{false, true} {
+		_, err := w.usecase.Run(t.Context(), clean.Request{Worktrees: []string{plain, pushed}, Force: force}, domain.RunOptions{})
+
+		refused := failureOf(t, err)
+		assert.Equal(t, clean.CodeMetaNewer, refused.Code)
+		assert.Contains(t, refused.Message, plain)
+		var newer *domain.SchemaNewer
+		assert.ErrorAs(t, err, &newer)
+	}
+	assert.DirExists(t, w.at(plain))
+	assert.True(t, w.stands(t, pushed))
+}
+
+func TestAWorktreeWhoseRecordDoesNotDecodeIsRemovedAllTheSame(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.rawRecord(t, plain, "{not json")
+
+	_, err := w.usecase.Run(t.Context(), removing(plain), domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.True(t, w.gone(t, plain))
+}

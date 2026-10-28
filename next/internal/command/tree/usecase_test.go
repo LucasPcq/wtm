@@ -392,6 +392,20 @@ func TestARecordThatDoesNotReadKeepsItsNodeAsARootAndIsAWarning(t *testing.T) {
 	assert.Equal(t, worktree.UnofferedUnrecorded, *offerOf(t, detailOf(t, read, "loose").Actions, worktree.ActionReparent).Refused)
 }
 
+func TestARecordANewerWtmWroteLeavesItsNodeARootAndSaysWhy(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a"), linked("feat/b")}}, Meta: map[string]worktree.Meta{"feat/a": {SourceBranch: "main"}, "feat/b": {Schema: 99, SourceBranch: "feat/a"}}})
+
+	read, err := w.usecase.Run(t.Context(), tree.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	node := read.Items[slices.IndexFunc(read.Items, func(item tree.Item) bool { return item.Subject == "feat/b" })]
+	assert.Equal(t, domain.StatusDone, node.Status)
+	require.Len(t, node.Warnings, 1)
+	assert.Equal(t, tree.CodeMetaUnreadable, node.Warnings[0].Code)
+	assert.Contains(t, node.Warnings[0].Message, "is at schema 99, newer than the 1 this wtm writes: upgrade wtm to use it")
+	assert.Nil(t, node.Detail.Parent, "nothing is shown from a record whose meaning this wtm does not know")
+}
+
 func TestARecordThatDoesNotReadIsAWarningOnANodeNotReadToo(t *testing.T) {
 	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}, Fail: map[string]error{"Dirty": errors.New("broken index")}}, Unreadable: []string{"feat/a"}})
 

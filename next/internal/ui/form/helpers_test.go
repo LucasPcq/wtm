@@ -129,3 +129,15 @@ func quietlyFailed(t *testing.T, subject, message string) string {
 	require.ErrorAs(t, command.Conclude(cmd, form.Ran[request, outcome]{Outcome: applied}, nil), &failed)
 	return failed.Err.Message
 }
+
+// trailLine is the line of screen that starts with prefix.
+func trailLine(t *testing.T, screen, prefix string) string {
+	t.Helper()
+	for line := range strings.Lines(screen) {
+		if strings.HasPrefix(line, prefix) {
+			return strings.TrimSuffix(line, "\n")
+		}
+	}
+	require.Failf(t, "no trail line", "no line starts with %q in:\n%s", prefix, screen)
+	return ""
+}

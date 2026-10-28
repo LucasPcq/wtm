@@ -178,3 +178,16 @@ func fieldOf(form domain.Form, path string) domain.Field {
 	}
 	return form.Fields[at]
 }
+
+// rawRecord writes content as the record of name, byte for byte: one a newer wtm wrote, or one that does not decode.
+func (w world) rawRecord(t *testing.T, name, content string) {
+	t.Helper()
+	dir, ok := worktree.MetaDir(worktree.MetaDirParams{StateDir: w.stateDir, Branch: name})
+	require.True(t, ok)
+	writeFile(t, filepath.Join(dir, "meta.json"), content)
+}
+
+// warningsOf are the warnings of code among warnings.
+func warningsOf(warnings []domain.Warning, code string) []domain.Warning {
+	return slices.DeleteFunc(slices.Clone(warnings), func(w domain.Warning) bool { return w.Code != code })
+}

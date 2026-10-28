@@ -154,3 +154,11 @@ func skipOf(form domain.Form, path string) domain.Skip {
 	}
 	return form.Fields[at].Spec().Skip
 }
+
+// rawRecord writes content as the record of name, byte for byte: one a newer wtm wrote, or one that does not decode.
+func (w world) rawRecord(t *testing.T, name, content string) {
+	t.Helper()
+	dir, ok := worktree.MetaDir(worktree.MetaDirParams{StateDir: w.stateDir, Branch: name})
+	require.True(t, ok)
+	writeFile(t, filepath.Join(dir, "meta.json"), content)
+}

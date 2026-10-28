@@ -371,6 +371,11 @@ func (r Request) Locks() []domain.Lock {
 }
 
 // placement is the branch's action as the domain places it, for its checkout and its standing.
+// provisioned is planned as provision makes it, with the plan's source and answers.
+func (p Plan) provisioned(planned BranchPlan) provision.Planned {
+	return provision.Planned{Branch: planned.Branch, Path: planned.Path, Placement: planned.placement(), From: p.From, Answers: p.settled}
+}
+
 func (b BranchPlan) placement() worktree.Placed {
 	return worktree.Placed{Start: b.Action.start(), Upstream: b.Upstream}
 }
