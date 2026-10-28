@@ -184,12 +184,17 @@ func (r *reader) out() events.Out {
 
 var errBusGone = errors.New("connect to the event bus: no such file")
 
-// A recorded is a git that logs the calls a poll counts on: each poll reads the branch tips once, then a worktree's dirtiness when it reads it. Its dirty reads fail while failing is set, and run before, with the path read, when it is given.
+// A recorded is a git that logs the calls a poll counts on: each poll reads the branch tips once, then the dirtiness of a worktree, by its path, when it reads it, after listing the worktrees again on a dirty pass. Its dirty reads fail while failing is set, and run before, with the path read, when it is given.
 type recorded struct {
 	*gittest.Fake
 	log     *callLog
 	failing *atomic.Bool
 	before  func(path string)
+}
+
+func (g recorded) Worktrees(ctx context.Context) ([]worktree.Worktree, error) {
+	g.log.add("Worktrees")
+	return g.Fake.Worktrees(ctx)
 }
 
 func (g recorded) Branches(ctx context.Context) (worktree.Branches, error) {
@@ -198,7 +203,7 @@ func (g recorded) Branches(ctx context.Context) (worktree.Branches, error) {
 }
 
 func (g recorded) Dirty(ctx context.Context, path string) (bool, error) {
-	g.log.add("Dirty")
+	g.log.add("Dirty " + path)
 	if g.before != nil {
 		g.before(path)
 	}

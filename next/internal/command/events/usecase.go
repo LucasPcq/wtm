@@ -180,7 +180,11 @@ func (s *stream) oneRepository(ctx context.Context, source Source) error {
 
 	return s.relay(ctx, relayParams{
 		Lines: lines,
-		Recheck: func(ctx context.Context, drain func() error) error {
+		Recheck: func(ctx context.Context, drain func() (bool, error)) error {
+			// an operation the bus announced while the last recheck ran holds this poll back
+			if open, err := drain(); err != nil || !open {
+				return err
+			}
 			// only a lost config is worth the full read that names it; any other failure waits for the next poll
 			if _, _, err := source.Repository.Config.Load(); errors.Is(err, project.ErrConfigNotFound) {
 				return s.stillThere(ctx, source)
@@ -238,7 +242,11 @@ func (s *stream) everyRepository(ctx context.Context) error {
 	return s.relay(ctx, relayParams{
 		Lines: lines,
 		// A repository that goes away is announced by the prune, and its repo.removed reaches this stream like any line; one the poll cannot read waits for it.
-		Recheck: func(ctx context.Context, drain func() error) error {
+		Recheck: func(ctx context.Context, drain func() (bool, error)) error {
+			// an operation the bus announced while the last recheck ran holds this poll back
+			if open, err := drain(); err != nil || !open {
+				return err
+			}
 			_, _ = s.Registry.Prune(ctx)
 			jobs, known := s.jobs(ctx)
 			commonDirs := slices.Sorted(maps.Keys(watched))
@@ -431,8 +439,8 @@ func (s *stream) read(ctx context.Context, params pollParams) (Polled, error) {
 	return Carried(params.Watch.polled, PollOf(worktree.Snapshot{Worktrees: worktrees, Branches: branches}, params.Jobs, params.Known, byPath(worktrees, reads))), nil
 }
 
-// pollDirty reads whether each worktree of the repository watched is dirty, one at a time, on every dirtyEvery-th poll, and sends what flipped. The reads take a while: the lines the bus carried meanwhile are drained first, and an operation of wtm started among them, finished or not, drops the reads: one may have caught it halfway, and what it changed is its own events'. It returns the error that kept it from reading, or the reader's.
-func (s *stream) pollDirty(ctx context.Context, watched *watch, drain func() error) error {
+// pollDirty reads whether each worktree of the repository watched is dirty, one at a time, on every dirtyEvery-th poll, and sends what flipped. The reads take a while: the lines the bus carried meanwhile are drained first, and an operation of wtm started among them, finished or not, drops the reads, as the bus ending the subscription does: one may have caught it halfway, and what it changed is its own events'. It returns the error that kept it from reading, or the reader's.
+func (s *stream) pollDirty(ctx context.Context, watched *watch, drain func() (bool, error)) error {
 	if watched.polls%dirtyEvery != 0 || watched.busy(s.Now()) {
 		return nil
 	}
@@ -447,10 +455,11 @@ func (s *stream) pollDirty(ctx context.Context, watched *watch, drain func() err
 		reads[i] = dirtyOf(ctx, git, w)
 	}
 
-	if err := drain(); err != nil {
+	open, err := drain()
+	if err != nil {
 		return err
 	}
-	if watched.started != started {
+	if !open || watched.started != started {
 		return nil
 	}
 	now := maps.Clone(watched.polled)
@@ -624,7 +633,7 @@ func (s *stream) interrupted(ctx context.Context) error {
 // relayParams is a subscription relayed: its Lines, what to check every Recheck, given how to route the lines already waiting, and where each line decoded goes.
 type relayParams struct {
 	Lines   <-chan []byte
-	Recheck func(ctx context.Context, drain func() error) error
+	Recheck func(ctx context.Context, drain func() (bool, error)) error
 	Route   func(ctx context.Context, received Received) error
 }
 
@@ -632,7 +641,7 @@ type relayParams struct {
 func (s *stream) relay(ctx context.Context, params relayParams) error {
 	ticker := time.NewTicker(cmp.Or(s.Recheck, recheckEvery))
 	defer ticker.Stop()
-	drain := func() error { return s.drain(ctx, params) }
+	drain := func() (bool, error) { return s.drain(ctx, params) }
 	for {
 		select {
 		case <-ctx.Done():
@@ -652,19 +661,19 @@ func (s *stream) relay(ctx context.Context, params relayParams) error {
 	}
 }
 
-// drain hands each line already waiting on the subscription to its route, and returns once none waits.
-func (s *stream) drain(ctx context.Context, params relayParams) error {
+// drain hands each line already waiting on the subscription to its route, and returns once none waits, reporting whether the subscription is still open.
+func (s *stream) drain(ctx context.Context, params relayParams) (bool, error) {
 	for {
 		select {
 		case data, open := <-params.Lines:
 			if !open {
-				return nil
+				return false, nil
 			}
 			if err := s.handle(ctx, params, data); err != nil {
-				return err
+				return true, err
 			}
 		default:
-			return nil
+			return true, nil
 		}
 	}
 }

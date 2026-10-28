@@ -487,14 +487,16 @@ func TestAPollReadsWhetherAWorktreeIsDirtyEveryFourthPollOnly(t *testing.T) {
 	require.Greater(t, len(polls), 5)
 	// the last poll may still be under way
 	for i, calls := range polls[:len(polls)-1] {
-		assert.Equal(t, (i+1)%4 == 0, slices.Contains(calls, "Dirty"), "poll %d: %v", i+1, calls)
+		dirty := slices.ContainsFunc(calls, func(call string) bool { return strings.HasPrefix(call, "Dirty") })
+		assert.Equal(t, (i+1)%4 == 0, dirty, "poll %d: %v", i+1, calls)
 	}
 }
 
-// A worktree created between two reads of the dirtiness would start unknown, and its first change be taken for the first read.
+// A worktree created between two reads of the dirtiness would start unknown, and its first change be taken for its first read.
 func TestAWorktreeNewToThePollHasItsDirtinessReadAtOnce(t *testing.T) {
+	log := &callLog{}
 	app, git := newRepo("/repo").living()
-	u := useCase(newBus(), &known{}, opening(app))
+	u := useCase(newBus(), &known{}, openingWith(app, recorded{Fake: git, log: log}))
 	u.Recheck = 20 * time.Millisecond
 	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
 	r.nextType(t)
@@ -507,6 +509,14 @@ func TestAWorktreeNewToThePollHasItsDirtinessReadAtOnce(t *testing.T) {
 	changed := r.next(t)
 	assert.Contains(t, changed, `"branch":"feat/b"`)
 	assert.Contains(t, changed, `"changed":["dirty"]`)
+	// the poll that found feat/b read it with the branch tips, not on a dirty pass that happened to follow
+	readsB := func(call string) bool { return strings.HasPrefix(call, "Dirty ") && strings.HasSuffix(call, "feat/b") }
+	for _, calls := range pollsIn(log.all()) {
+		if i := slices.IndexFunc(calls, readsB); i >= 0 {
+			assert.Equal(t, 1, i, "the poll that found feat/b: %v", calls)
+			break
+		}
+	}
 }
 
 // A dirty read that fails is unknown, never clean: the worktree dirty at the snapshot, cleaned while git cannot tell, sends nothing.
@@ -580,6 +590,9 @@ func TestTheDirtinessAnOperationLeftOnABranchItNamedIsNeverSentAsPolled(t *testi
 	assert.Equal(t, "unit.finished", r.nextType(t))
 	assert.Equal(t, "operation.finished", r.nextType(t))
 	r.quiet(t)
+
+	git.SetDirty("/repo/.trees/feat/a", false)
+	assert.Contains(t, r.next(t), `"changed":["dirty"]`)
 }
 
 func TestAWorktreeRemovedFromATerminalResetsTheStreamOnAFreshSnapshot(t *testing.T) {
