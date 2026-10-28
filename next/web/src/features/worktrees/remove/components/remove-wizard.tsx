@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useReducer, useState } from 'react'
 import { dryRunQuery } from '@/api/queries/commands'
-import type { TeardownRemoval } from '@/api/types.gen'
+import type { DomainWarning, TeardownRemoval } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -28,6 +28,7 @@ export function RemoveWizard({
   worktrees,
   left,
   prechecked,
+  notice,
   onStart,
   onCancel,
 }: {
@@ -35,6 +36,7 @@ export function RemoveWizard({
   worktrees: string[]
   left: Left[]
   prechecked: boolean
+  notice?: DomainWarning | undefined
   onStart: (start: Start) => void
   onCancel: () => void
 }) {
@@ -120,7 +122,7 @@ export function RemoveWizard({
   const leftRows = left.map(({ worktree, why }) => <LeftItem key={worktree} worktree={worktree} why={why} />)
 
   const removing = plan?.worktrees ?? []
-  const warnings = (planned.data?.warnings ?? []).filter(planWide)
+  const warnings = step === 'confirm' ? (planned.data?.warnings ?? []).filter(planWide) : []
   const body = () => {
     if (review.isPending) return <Skeleton className="h-40 w-full" />
     if (review.isError) return <p className="text-sm text-destructive">{review.error.message}</p>
@@ -171,7 +173,6 @@ export function RemoveWizard({
     if (!plan) return !unplanned && <Skeleton className="h-40 w-full" />
     return (
       <>
-        <PlanWarnings warnings={warnings} />
         <ItemList label="Worktrees" left={leftRows}>
           {removing.map((removal) => (
             <RemovalItem
@@ -210,6 +211,7 @@ export function RemoveWizard({
 
       <DialogScroll>
         {unplanned && <p className="text-sm text-destructive">{unplanned}</p>}
+        <PlanWarnings warnings={notice ? [notice, ...warnings] : warnings} />
         {body()}
       </DialogScroll>
 

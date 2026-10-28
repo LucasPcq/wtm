@@ -5,6 +5,7 @@ import { cleanPlan, failedRun, heldRun, partlyFailedRun } from '@/test/clean'
 import { envelope } from '@/test/fixtures'
 import { answeringClean, selectAndRemove } from '@/test/remove'
 import { server } from '@/test/server'
+import { streamed } from '@/test/stream'
 
 const removeFromBar = async (user: { click: (element: Element) => Promise<void> }) => {
   await user.click(within(screen.getByRole('toolbar', { name: 'Selection' })).getByRole('button', { name: /^Remove/ }))
@@ -153,4 +154,55 @@ test('a finished removal says a warning of the whole run first, as its Alert, th
     alert.compareDocumentPosition(within(dialog).getByRole('heading', { name: "Couldn't remove" })) &
       Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy()
+})
+
+// A worktree that turned unsafe between the last plan and the apply refused the run, which read as a failed removal.
+test('an apply refused because a worktree changed goes back to the worktrees, saying which changed', async () => {
+  let changed = false
+  server.use(
+    answeringClean(
+      (call) => cleanPlan(call, changed ? ['fix/login', 'feat/billing-ui'] : ['fix/login']),
+      () => {
+        changed = true
+        return streamed(
+          `event: envelope\ndata: ${JSON.stringify({
+            ...envelope('clean', []),
+            ok: false,
+            error: {
+              kind: 'refused',
+              code: 'clean.unsafe',
+              message: "nothing removed: feat/billing-ui can't be removed safely",
+              fields: [
+                {
+                  path: 'worktree[0]',
+                  code: 'clean.dirty',
+                  flag: '<worktree>',
+                  params: { value: 'feat/billing-ui' },
+                  message: 'feat/billing-ui has uncommitted changes',
+                },
+              ],
+            },
+          })}\n\n`,
+        )
+      },
+    ),
+  )
+  const { user, dialog } = await selectAndRemove('feat/billing-ui')
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Remove' }))
+
+  const alert = await within(dialog).findByRole('alert')
+  expect(alert.textContent).toBe(
+    'feat/billing-ui changed since the plan, so nothing was removed. Check the worktrees again.',
+  )
+  expect(within(dialog).queryByText('Removed'), 'no outcome: nothing ran').toBeNull()
+  await waitFor(() => expect(within(dialog).getByText('Uncommitted changes')).toBeTruthy())
+  expect(
+    within(dialog).getByRole('checkbox', { name: 'Remove feat/billing-ui' }).getAttribute('aria-checked'),
+    'the fresh rows show it changed, unchecked',
+  ).toBe('false')
+
+  await user.keyboard('{Escape}')
+  await removeFromBar(user)
+  expect(within(await screen.findByRole('dialog')).queryByText(/changed since the plan/)).toBeNull()
 })

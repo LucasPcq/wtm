@@ -7,7 +7,8 @@ import { useRemoveDialog } from '@/features/worktrees/hooks/use-remove-dialog'
 import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
 import { useSelection } from '@/features/worktrees/hooks/use-selection'
 import { RemoveWizard } from '@/features/worktrees/remove/components/remove-wizard'
-import { removeWords } from '@/features/worktrees/remove/utils/words'
+import { removeWords, unsafeCode } from '@/features/worktrees/remove/utils/words'
+import { changedSincePlan } from '@/features/worktrees/utils/changed'
 
 // one removal at a time: opened while one runs, or one that failed is still to be read, the dialog shows it, and the
 // rows checked wait; a run that removed every worktree it was asked takes the rows it opened on out of the selection,
@@ -16,7 +17,12 @@ export function RemoveDialog({ repo }: { repo: string }) {
   const { open, worktrees, left, prechecked } = useRemoveDialog()
   const run = useRun(repo, 'clean')
   const selection = useSelection(repo)
-  const close = () => useRemoveDialog.setState({ open: false })
+  // the run a changed worktree refused is read once the dialog closes, however it closes
+  const notice = changedSincePlan(run, { code: unsafeCode, past: removeWords.past })
+  const close = () => {
+    if (notice) run.dismiss()
+    useRemoveDialog.setState({ open: false })
+  }
 
   const told = (envelope: Applied<'clean'> | undefined, asked: number) => {
     if (useRemoveDialog.getState().open) return
@@ -28,7 +34,7 @@ export function RemoveDialog({ repo }: { repo: string }) {
   }
 
   const content = () => {
-    if (run.progress)
+    if (run.progress && !notice)
       return (
         <RemovalProgress
           words={removeWords}
@@ -52,6 +58,7 @@ export function RemoveDialog({ repo }: { repo: string }) {
         worktrees={worktrees}
         left={left}
         prechecked={prechecked}
+        notice={notice}
         onStart={(start) =>
           run.start(start, (envelope) => {
             told(envelope, start.units.length)

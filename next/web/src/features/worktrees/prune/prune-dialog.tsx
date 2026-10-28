@@ -8,7 +8,7 @@ import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
 import { useSelection } from '@/features/worktrees/hooks/use-selection'
 import { PruneWizard } from '@/features/worktrees/prune/components/prune-wizard'
 import { pruneWords, unsafeCode } from '@/features/worktrees/prune/utils/words'
-import { listed } from '@/features/worktrees/utils/listed'
+import { changedSincePlan } from '@/features/worktrees/utils/changed'
 
 // one prune at a time: opened while one runs, or one that failed is still to be read, the dialog shows it; what went
 // leaves the selection
@@ -16,17 +16,10 @@ export function PruneDialog({ repo }: { repo: string }) {
   const { open, worktrees } = usePruneDialog()
   const run = useRun(repo, 'prune')
   const selection = useSelection(repo)
-  // refused at its apply as unsafe, a worktree changed since the plan: nothing ran, and the wizard asks again on fresh
-  // rows, where the changed one shows its risk; the run is read once the dialog closes, however it closes
-  const refusal = run.running ? undefined : run.progress?.envelope?.error
-  const changed = refusal?.code === unsafeCode ? refusal : undefined
-  const names = [...new Set((changed?.fields ?? []).flatMap((field) => field.params?.value ?? []))]
-  const notice = changed && {
-    code: changed.code,
-    message: `${listed(names) || 'A worktree'} changed since the plan, so nothing was pruned. Check the worktrees again.`,
-  }
+  // the run a changed worktree refused is read once the dialog closes, however it closes
+  const notice = changedSincePlan(run, { code: unsafeCode, past: pruneWords.past })
   const close = () => {
-    if (changed) run.dismiss()
+    if (notice) run.dismiss()
     usePruneDialog.setState({ open: false })
   }
 
@@ -40,7 +33,7 @@ export function PruneDialog({ repo }: { repo: string }) {
   }
 
   const content = () => {
-    if (run.progress && !changed)
+    if (run.progress && !notice)
       return (
         <RemovalProgress
           words={pruneWords}
