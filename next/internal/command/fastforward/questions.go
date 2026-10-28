@@ -11,11 +11,12 @@ import (
 // ----------------------------------------------------------------------------
 // The request
 
-// A Request is what the caller asks of fast-forward: the worktrees it names, each by its branch or its path, else those behind origin, or every worktree with All; and whether a worktree with uncommitted changes is fast-forwarded all the same. The worktrees it names are the user's choice, the others the command's: a named worktree it cannot move safely refuses the request, one the command chose is kept as it is. Caller is where the caller stands, from which a path is read; it is no field of the form: every surface sets it.
+// A Request is what the caller asks of fast-forward: the worktrees it names, each by its branch or its path, else those behind origin, or every worktree with All; whether a worktree with uncommitted changes is fast-forwarded all the same; and whether origin is read as last fetched, with NoFetch, as a surface that fetched it a moment ago plans again. The worktrees it names are the user's choice, the others the command's: a named worktree it cannot move safely refuses the request, one the command chose is kept as it is. Caller is where the caller stands, from which a path is read; it is no field of the form: every surface sets it.
 type Request struct {
 	Worktrees []string      `json:"worktree"`
 	All       bool          `json:"all"`
 	Force     bool          `json:"force"`
+	NoFetch   bool          `json:"no_fetch"`
 	Caller    domain.Caller `json:"-"`
 }
 
@@ -27,8 +28,9 @@ func (r Request) From(caller domain.Caller) Request {
 
 // The paths of fast-forward's own fields, by which each surface words them; the worktrees' is domain.PathWorktree.
 const (
-	PathAll   = "all"
-	PathForce = "force"
+	PathAll     = "all"
+	PathForce   = "force"
+	PathNoFetch = "no_fetch"
 )
 
 // Answer is the request with the field at path answered by values. A value the field cannot take leaves the request as it was.
@@ -42,6 +44,8 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 		next.All, err = domain.Yes(path, values)
 	case PathForce:
 		next.Force, err = domain.Yes(path, values)
+	case PathNoFetch:
+		next.NoFetch, err = domain.Yes(path, values)
 	default:
 		return r, domain.Unknown(path)
 	}
@@ -61,6 +65,8 @@ func (r Request) Values(path string) []string {
 		return domain.SaidYes(r.All)
 	case PathForce:
 		return domain.SaidYes(r.Force)
+	case PathNoFetch:
+		return domain.SaidYes(r.NoFetch)
 	}
 
 	return nil
@@ -74,6 +80,7 @@ type Questions struct {
 	Worktrees Worktrees
 	All       bool
 	Force     domain.Confirm
+	NoFetch   bool
 	Unsafe    []Advance
 	Errors    []domain.FieldError
 }
@@ -90,6 +97,7 @@ func NewQuestions(f Facts, req Request) Questions {
 	questions := Questions{
 		Worktrees: Worktrees{Picked: domain.Answer[[]string]{Value: req.Worktrees, Origin: domain.OriginRequest}, Options: f.worktreeOptions(req.Caller.Cwd)},
 		All:       req.All,
+		NoFetch:   req.NoFetch,
 		Errors:    problems,
 	}
 	if req.named() {
@@ -114,6 +122,7 @@ func (q Questions) Form() domain.Form {
 		domain.MultiSelectField{FieldSpec: worktrees, Picked: q.Worktrees.Picked.Value, Options: q.Worktrees.Options},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathAll, Skip: domain.SkipFlagOnly}, Value: q.All, NoFirst: true},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathForce, Origin: q.Force.Origin, Skip: q.Force.Skip}, Value: q.Force.Value, NoFirst: true},
+		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathNoFetch, Skip: domain.SkipFlagOnly}, Value: q.NoFetch},
 	}}
 }
 

@@ -29,6 +29,7 @@ export const answeringClean = (
 export function liveEvents() {
   const encoder = new TextEncoder()
   let push = () => {}
+  let broken = () => {}
   server.use(
     http.get(
       '/api/events',
@@ -37,6 +38,7 @@ export function liveEvents() {
           new ReadableStream({
             start: (controller) => {
               controller.enqueue(encoder.encode(': open\n\n'))
+              broken = () => controller.close()
               push = () =>
                 controller.enqueue(
                   encoder.encode(
@@ -49,5 +51,5 @@ export function liveEvents() {
         ),
     ),
   )
-  return { changed: () => push() }
+  return { changed: () => push(), broken: () => broken() }
 }

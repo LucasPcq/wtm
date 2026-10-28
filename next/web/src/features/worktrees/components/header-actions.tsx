@@ -8,13 +8,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { MenuEntry } from '@/features/worktrees/components/menu-entry'
+import { openFastForward } from '@/features/worktrees/hooks/use-fast-forward-dialog'
 import { openPrune } from '@/features/worktrees/hooks/use-prune-dialog'
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
-import { entryOf, menu, notInTheWeb, pruneAction, type Subject } from '@/features/worktrees/utils/actions'
+import { entryOf, menu, noneWords, notInTheWeb, pruneAction, type Subject } from '@/features/worktrees/utils/actions'
 
 // reparent is not here: it needs a subject
 export function HeaderActions({ repo, rows }: { repo: string; rows: Subject[] }) {
   const removable = rows.filter(({ subject, offers }) => 'followUp' in entryOf(subject, offers, 'clean'))
+  const onOrigin = rows.some(({ subject, offers }) => 'followUp' in entryOf(subject, offers, 'fast_forward'))
 
   return (
     <DropdownMenu>
@@ -32,21 +34,21 @@ export function HeaderActions({ repo, rows }: { repo: string; rows: Subject[] })
           why={undefined}
           onSelect={() => openPrune(repo, [])}
         />
-        {(['fast_forward', 'exec'] as const).map((action) => (
-          <MenuEntry
-            key={action}
-            Item={DropdownMenuItem}
-            icon={menu[action].icon}
-            label={menu[action].label}
-            why={notInTheWeb}
-          />
-        ))}
+        {/* the picker opens prechecked by the command: the worktrees behind origin */}
+        <MenuEntry
+          Item={DropdownMenuItem}
+          icon={menu.fast_forward.icon}
+          label={menu.fast_forward.label}
+          why={onOrigin ? undefined : noneWords.fast_forward}
+          onSelect={() => openFastForward(repo, { worktrees: [], left: [], picking: true })}
+        />
+        <MenuEntry Item={DropdownMenuItem} icon={menu.exec.icon} label={menu.exec.label} why={notInTheWeb} />
         <DropdownMenuSeparator />
         <MenuEntry
           Item={DropdownMenuItem}
           icon={menu.clean.icon}
           label={menu.clean.label}
-          why={removable.length > 0 ? undefined : 'No worktree can be removed'}
+          why={removable.length > 0 ? undefined : noneWords.clean}
           destructive
           onSelect={() =>
             openRemove(repo, { worktrees: removable.map(({ subject }) => subject), left: [], prechecked: false })

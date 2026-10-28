@@ -14,12 +14,15 @@ export function ItemList({
 }) {
   const leftRows = Children.toArray(left).filter(isValidElement)
   const leftHeading = useId()
+  const listed = header !== undefined || Children.toArray(children).some(isValidElement)
 
   return (
     <>
-      <Box label={label} header={header}>
-        {children}
-      </Box>
+      {listed && (
+        <Box label={label} header={header}>
+          {children}
+        </Box>
+      )}
       {leftRows.length > 0 && (
         <section aria-labelledby={leftHeading} className="flex flex-col gap-2">
           <h3 id={leftHeading} className="text-xs font-medium text-muted-foreground">

@@ -1,8 +1,8 @@
 
-  Step 3/4 • Force
+  Step 3/5 • Force
 
   ✓ Worktrees: feat/behind, feat/dirty
-  · All — only --all asks every worktree
+  · All — set by its flag only
 
   These worktrees have uncommitted changes:
     feat/dirty

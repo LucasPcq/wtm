@@ -1,10 +1,11 @@
 $ wtm fast-forward; echo EXIT=$?
 
-  Step 4/4 • Confirm
+  Step 5/5 • Confirm
 
   ✓ Worktrees: feat/tty-behind
-  · All — only --all asks every worktree
+  · All — set by its flag only
   · Force — no worktree named behind origin has uncommitted changes
+  · No fetch — set by its flag only
 
   ┃  Review & confirm
   ┃

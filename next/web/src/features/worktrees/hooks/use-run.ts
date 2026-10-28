@@ -64,6 +64,18 @@ export function useRun<C extends MutationCommand>(repo: string, command: C) {
     await client.invalidateQueries({ queryKey: repoKey(repo) })
   }
 
+  // a run taken before its plan is known, read from the store and not from the last render: a click that finds one
+  // under way, still planning, or failed and not yet read, starts no second and gets that run's subjects; a run
+  // cancelled was read in the toast that said so
+  const claim = (units: Unit[]): string[] | undefined => {
+    dismissSucceeded(repo, command)
+    const held = useRuns.getState()[key]
+    const told = held?.running === false && held.progress.envelope?.error?.kind === 'cancelled'
+    if (held && !told) return held.progress.units.map((unit) => unit.subject)
+    useRuns.setState({ [key]: { progress: { units }, running: true } })
+    return undefined
+  }
+
   const cancel = (force: boolean) => {
     const operation = run?.progress.operation
     if (!operation) return
@@ -75,6 +87,7 @@ export function useRun<C extends MutationCommand>(repo: string, command: C) {
     progress: run?.progress as Progress<C> | undefined,
     running: run?.running ?? false,
     start: (params: Start, ended?: (envelope: Applied<C> | undefined) => void) => void start(params, ended),
+    claim,
     cancel,
     dismiss: () => useRuns.setState({ [key]: undefined }),
   }
@@ -82,7 +95,12 @@ export function useRun<C extends MutationCommand>(repo: string, command: C) {
 
 export const clockEvery = 30_000
 
-const doing: Record<MutationCommand, string> = { create: 'Creating', clean: 'Removing', prune: 'Pruning' }
+const doing: Record<MutationCommand, string> = {
+  create: 'Creating',
+  clean: 'Removing',
+  'fast-forward': 'Fast-forwarding',
+  prune: 'Pruning',
+}
 
 export const isMutation = (command: string): command is MutationCommand => Object.hasOwn(doing, command)
 
@@ -113,7 +131,11 @@ export function useUnderWay(repo: string): Record<string, string> {
       .filter((unit) => !unit.status)
       .map((unit) => {
         const done = unit.phases.filter((phase) => phase.state === 'done').length
-        return [unit.subject, `${doing[command]} · ${done}/${unit.phases.length}`]
+        // a count only for several: one step has nothing to count
+        return [
+          unit.subject,
+          unit.phases.length > 1 ? `${doing[command]} · ${done}/${unit.phases.length}` : doing[command],
+        ]
       })
   })
 

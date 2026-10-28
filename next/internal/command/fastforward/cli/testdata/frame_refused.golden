@@ -1,9 +1,10 @@
 
-  Step 4/4 • Cannot apply this plan
+  Step 5/5 • Cannot apply this plan
 
   ✓ Worktrees: feat/behind, feat/dirty
-  · All — only --all asks every worktree
+  · All — set by its flag only
   ✓ Force: not forced
+  · No fetch — set by its flag only
 
   ┃  Review & confirm
   ┃
