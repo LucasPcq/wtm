@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
@@ -183,27 +184,35 @@ func (r *reader) out() events.Out {
 
 var errBusGone = errors.New("connect to the event bus: no such file")
 
-// A recorded is a git that logs the calls a poll counts on: a poll lists the worktrees once, and reads each worktree's dirtiness when it reads it.
+// A recorded is a git that logs the calls a poll counts on: each poll reads the branch tips once, then a worktree's dirtiness when it reads it. Its dirty reads fail while failing is set, and run before, with the path read, when it is given.
 type recorded struct {
 	*gittest.Fake
-	log *callLog
+	log     *callLog
+	failing *atomic.Bool
+	before  func(path string)
 }
 
-func (g recorded) Worktrees(ctx context.Context) ([]worktree.Worktree, error) {
-	g.log.add("Worktrees")
-	return g.Fake.Worktrees(ctx)
+func (g recorded) Branches(ctx context.Context) (worktree.Branches, error) {
+	g.log.add("Branches")
+	return g.Fake.Branches(ctx)
 }
 
 func (g recorded) Dirty(ctx context.Context, path string) (bool, error) {
 	g.log.add("Dirty")
+	if g.before != nil {
+		g.before(path)
+	}
+	if g.failing != nil && g.failing.Load() {
+		return false, errors.New("git status failed")
+	}
 	return g.Fake.Dirty(ctx, path)
 }
 
-// openingRecorded opens r as opening does, its poll's git logging to log.
-func openingRecorded(r repo, git *gittest.Fake, log *callLog) events.Open {
+// openingWith opens r as opening does, its poll reading git.
+func openingWith(r repo, git events.Git) events.Open {
 	return func(ctx context.Context, dir string) (events.Source, error) {
 		source, err := opening(r)(ctx, dir)
-		source.Git = recorded{Fake: git, log: log}
+		source.Git = git
 		return source, err
 	}
 }

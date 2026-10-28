@@ -135,11 +135,11 @@ func codeOf(t *testing.T, err error) string {
 	return failure.Code
 }
 
-// pollsIn splits the calls a recorded git logged into the calls of each poll, each starting with the worktree list; the snapshot's reads before the first poll are left out.
+// pollsIn splits the calls a recorded git logged into the calls of each poll, each starting with the branch tips; the snapshot's reads before the first poll are left out.
 func pollsIn(calls []string) [][]string {
 	var polls [][]string
 	for _, call := range calls {
-		if call == "Worktrees" {
+		if call == "Branches" {
 			polls = append(polls, nil)
 		}
 		if len(polls) > 0 {

@@ -180,13 +180,17 @@ func (s *stream) oneRepository(ctx context.Context, source Source) error {
 
 	return s.relay(ctx, relayParams{
 		Lines: lines,
-		Recheck: func(ctx context.Context) error {
+		Recheck: func(ctx context.Context, drain func() error) error {
 			// only a lost config is worth the full read that names it; any other failure waits for the next poll
 			if _, _, err := source.Repository.Config.Load(); errors.Is(err, project.ErrConfigNotFound) {
 				return s.stillThere(ctx, source)
 			}
 			jobs, known := s.jobs(ctx)
 			err := s.poll(ctx, pollParams{Watch: watched, Jobs: jobs, Known: known})
+			if _, ending := errors.AsType[ended](err); ending {
+				return err
+			}
+			err = s.pollDirty(ctx, watched, drain)
 			if _, ending := errors.AsType[ended](err); ending {
 				return err
 			}
@@ -234,11 +238,22 @@ func (s *stream) everyRepository(ctx context.Context) error {
 	return s.relay(ctx, relayParams{
 		Lines: lines,
 		// A repository that goes away is announced by the prune, and its repo.removed reaches this stream like any line; one the poll cannot read waits for it.
-		Recheck: func(ctx context.Context) error {
+		Recheck: func(ctx context.Context, drain func() error) error {
 			_, _ = s.Registry.Prune(ctx)
 			jobs, known := s.jobs(ctx)
-			for _, commonDir := range slices.Sorted(maps.Keys(watched)) {
+			commonDirs := slices.Sorted(maps.Keys(watched))
+			for _, commonDir := range commonDirs {
 				err := s.poll(ctx, pollParams{Watch: watched[commonDir], Jobs: jobs, Known: known})
+				if _, ending := errors.AsType[ended](err); ending {
+					return err
+				}
+			}
+			// the lines drained may take a repository away
+			for _, commonDir := range commonDirs {
+				if watched[commonDir] == nil {
+					continue
+				}
+				err := s.pollDirty(ctx, watched[commonDir], drain)
 				if _, ending := errors.AsType[ended](err); ending {
 					return err
 				}
@@ -283,12 +298,13 @@ type joinParams struct {
 	Watched map[string]*watch
 }
 
-// A watch is a repository the stream sent a snapshot of: how it reads it, what its last poll read, how many polls read it, the operations of wtm the bus says run on it, by their op id, with when each started, and the branches their events named, whose changes are theirs.
+// A watch is a repository the stream sent a snapshot of: how it reads it, what its last poll read, how many polls read it, the operations of wtm the bus says run on it, by their op id, with when each started, how many started in all, and the branches their events named, whose changes are theirs.
 type watch struct {
 	source     Source
 	polled     Polled
 	polls      int
 	operations map[string]time.Time
+	started    int
 	named      map[string]bool
 }
 
@@ -342,16 +358,14 @@ type pollParams struct {
 	Watch *watch
 	Jobs  []run.Job
 	Known bool
-	Dirty bool
 }
 
-// poll reads the worktrees and branch tips of the repository watched again, and whether each worktree is dirty every dirtyEvery polls, never while an operation of wtm runs on it, and sends what changed since the last read. It returns the error that kept it from reading, or the reader's.
+// poll reads the worktrees and branch tips of the repository watched again, never while an operation of wtm runs on it, and sends what changed since the last read. It returns the error that kept it from reading, or the reader's.
 func (s *stream) poll(ctx context.Context, params pollParams) error {
 	if params.Watch.busy(s.Now()) {
 		return nil
 	}
 	params.Watch.polls++
-	params.Dirty = params.Watch.polls%dirtyEvery == 0
 	now, err := s.read(ctx, params)
 	if err != nil {
 		return err
@@ -394,7 +408,7 @@ func (s *stream) send(ctx context.Context, watched *watch, now Polled) error {
 	return nil
 }
 
-// read is what a poll reads of the repository params watches, whether each worktree is dirty when params asks, one at a time, the jobs and the dirtiness it does not know taken from its last read.
+// read is what a poll reads of the repository params watches, whether a worktree new to it or named by an operation of wtm is dirty, the jobs and the dirtiness it does not know taken from its last read.
 func (s *stream) read(ctx context.Context, params pollParams) (Polled, error) {
 	git := params.Watch.source.Git
 	worktrees, err := git.Worktrees(ctx)
@@ -406,14 +420,49 @@ func (s *stream) read(ctx context.Context, params pollParams) (Polled, error) {
 		return nil, err
 	}
 
-	var reads []*bool
-	if params.Dirty {
-		for _, w := range worktrees {
-			reads = append(reads, dirtyOf(ctx, git, w))
+	// a worktree first read unknown would take its first change for its first read; one an operation named takes in what the operation changed
+	reads := make([]*bool, len(worktrees))
+	for i, w := range worktrees {
+		if _, seen := params.Watch.polled[w.Branch()]; !seen || params.Watch.named[w.Branch()] {
+			reads[i] = dirtyOf(ctx, git, w)
 		}
 	}
 
 	return Carried(params.Watch.polled, PollOf(worktree.Snapshot{Worktrees: worktrees, Branches: branches}, params.Jobs, params.Known, byPath(worktrees, reads))), nil
+}
+
+// pollDirty reads whether each worktree of the repository watched is dirty, one at a time, on every dirtyEvery-th poll, and sends what flipped. The reads take a while: the lines the bus carried meanwhile are drained first, and an operation of wtm started among them, finished or not, drops the reads: one may have caught it halfway, and what it changed is its own events'. It returns the error that kept it from reading, or the reader's.
+func (s *stream) pollDirty(ctx context.Context, watched *watch, drain func() error) error {
+	if watched.polls%dirtyEvery != 0 || watched.busy(s.Now()) {
+		return nil
+	}
+	started := watched.started
+	git := watched.source.Git
+	worktrees, err := git.Worktrees(ctx)
+	if err != nil {
+		return err
+	}
+	reads := make([]*bool, len(worktrees))
+	for i, w := range worktrees {
+		reads[i] = dirtyOf(ctx, git, w)
+	}
+
+	if err := drain(); err != nil {
+		return err
+	}
+	if watched.started != started {
+		return nil
+	}
+	now := maps.Clone(watched.polled)
+	for i, w := range worktrees {
+		poll, seen := now[w.Branch()]
+		if !seen || reads[i] == nil {
+			continue
+		}
+		poll.Dirty = reads[i]
+		now[w.Branch()] = poll
+	}
+	return s.send(ctx, watched, now)
 }
 
 // dirtyOf is whether the worktree w holds uncommitted changes, a missing one holding none; nil when it is on no branch or git could not tell.
@@ -449,6 +498,7 @@ func (s *stream) announced(ctx context.Context, watched *watch, line domain.Line
 			watched.operations = map[string]time.Time{}
 		}
 		watched.operations[line.OpID] = s.Now()
+		watched.started++
 	case finished:
 		delete(watched.operations, line.OpID)
 	}
@@ -571,48 +621,71 @@ func (s *stream) interrupted(ctx context.Context) error {
 // ----------------------------------------------------------------------------
 // The relay
 
-// relayParams is a subscription relayed: its Lines, what to check every Recheck, and where each line decoded goes.
+// relayParams is a subscription relayed: its Lines, what to check every Recheck, given how to route the lines already waiting, and where each line decoded goes.
 type relayParams struct {
 	Lines   <-chan []byte
-	Recheck func(ctx context.Context) error
+	Recheck func(ctx context.Context, drain func() error) error
 	Route   func(ctx context.Context, received Received) error
 }
 
-// relay hands each line of the subscription to its route until the bus ends it or ctx is done. A line of a newer version ends the stream; one of an older version, or one that cannot be decoded, is dropped with a warning.
+// relay hands each line of the subscription to its route until the bus ends it or ctx is done.
 func (s *stream) relay(ctx context.Context, params relayParams) error {
 	ticker := time.NewTicker(cmp.Or(s.Recheck, recheckEvery))
 	defer ticker.Stop()
+	drain := func() error { return s.drain(ctx, params) }
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
-			if err := params.Recheck(ctx); err != nil {
+			if err := params.Recheck(ctx, drain); err != nil {
 				return err
 			}
 		case data, open := <-params.Lines:
 			if !open {
 				return nil
 			}
-			// A line of a type this wtm does not know is relayed, its event nil.
-			line, err := domain.UnmarshalLine(data)
-			if line.V > domain.StreamVersion {
-				return ended{&domain.Error{Kind: domain.KindPrecondition, Code: CodeSchemaNewer, Message: "the event stream speaks a newer schema than this wtm: upgrade wtm"}}
-			}
-			if err != nil && !errors.Is(err, domain.ErrUnknownEventType) {
-				s.warn(fmt.Errorf("an event the bus carried could not be read, and was dropped: %w", err))
-				continue
-			}
-			// Whichever daemon holds the socket is the bus: a legacy one relays v1 lines, never translated.
-			if line.V < domain.StreamVersion {
-				s.warn(fmt.Errorf("a line of the event stream v%d was dropped: this wtm reads v%d alone", line.V, domain.StreamVersion))
-				continue
-			}
-			if err := params.Route(ctx, Received{Line: line, JSON: data}); err != nil {
+			if err := s.handle(ctx, params, data); err != nil {
 				return err
 			}
 		}
 	}
+}
+
+// drain hands each line already waiting on the subscription to its route, and returns once none waits.
+func (s *stream) drain(ctx context.Context, params relayParams) error {
+	for {
+		select {
+		case data, open := <-params.Lines:
+			if !open {
+				return nil
+			}
+			if err := s.handle(ctx, params, data); err != nil {
+				return err
+			}
+		default:
+			return nil
+		}
+	}
+}
+
+// handle hands one line of the subscription to its route. A line of a newer version ends the stream; one of an older version, or one that cannot be decoded, is dropped with a warning.
+func (s *stream) handle(ctx context.Context, params relayParams, data []byte) error {
+	// A line of a type this wtm does not know is relayed, its event nil.
+	line, err := domain.UnmarshalLine(data)
+	if line.V > domain.StreamVersion {
+		return ended{&domain.Error{Kind: domain.KindPrecondition, Code: CodeSchemaNewer, Message: "the event stream speaks a newer schema than this wtm: upgrade wtm"}}
+	}
+	if err != nil && !errors.Is(err, domain.ErrUnknownEventType) {
+		s.warn(fmt.Errorf("an event the bus carried could not be read, and was dropped: %w", err))
+		return nil
+	}
+	// Whichever daemon holds the socket is the bus: a legacy one relays v1 lines, never translated.
+	if line.V < domain.StreamVersion {
+		s.warn(fmt.Errorf("a line of the event stream v%d was dropped: this wtm reads v%d alone", line.V, domain.StreamVersion))
+		return nil
+	}
+	return params.Route(ctx, Received{Line: line, JSON: data})
 }
 
 // ----------------------------------------------------------------------------
