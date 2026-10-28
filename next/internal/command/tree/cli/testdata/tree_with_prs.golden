@@ -8,6 +8,6 @@
   └─ feat/gone             ✗ missing
   y                        ! cycle
   z                        ! cycle
-  feat/login               (no worktree)
+  feat/login               (branch deleted)
   └─ feat/x
 

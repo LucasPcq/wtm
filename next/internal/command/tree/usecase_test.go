@@ -48,7 +48,7 @@ func TestTheTreeListsParentsBeforeTheirChildrenRootsMainFirst(t *testing.T) {
 	assert.Equal(t, "feat/a", *a1.Parent)
 	assert.Equal(t, "/repo/.trees/feat/a1", *a1.Path)
 	gone := detailOf(t, read, "gone")
-	assert.Equal(t, tree.Detail{Branch: "gone", Virtual: true, Condition: worktree.ConditionNoWorktree, Children: []string{"feat/x"}, Actions: []repository.Offer{}}, gone)
+	assert.Equal(t, tree.Detail{Branch: "gone", Virtual: true, Condition: worktree.ConditionDeleted, Children: []string{"feat/x"}, Actions: []repository.Offer{}}, gone)
 	assert.True(t, detailOf(t, read, "y").Cycle)
 	assert.Nil(t, detailOf(t, read, "y").Parent, "a member of a cycle is drawn as a root")
 	assert.Nil(t, detailOf(t, read, "y").Behind, "a member of a cycle has no parent to sync onto")
@@ -68,6 +68,8 @@ func TestAWorktreeWhoseParentBranchIsGoneIsSaidSo(t *testing.T) {
 	assert.True(t, orphan.ParentGone)
 	assert.False(t, onBranch.ParentGone)
 	assert.False(t, looping.ParentGone, "a member of a cycle is drawn as a root: its parent is no fact of the tree")
+	assert.Equal(t, worktree.ConditionDeleted, detailOf(t, read, "gone").Condition)
+	assert.Equal(t, worktree.ConditionNoWorktree, detailOf(t, read, "topic").Condition, "a local branch no worktree holds is a parent still")
 }
 
 func TestADetachedWorktreeIsNoNodeOfTheTree(t *testing.T) {

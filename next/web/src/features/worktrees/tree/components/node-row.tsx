@@ -1,35 +1,38 @@
+import { Feedback } from '@dnd-kit/dom'
 import { useDraggable, useDroppable } from '@dnd-kit/react'
 import { Link } from '@tanstack/react-router'
-import { CircleDot, GripVertical, LoaderCircle } from 'lucide-react'
+import { Ban, CircleDot, GripVertical, LoaderCircle, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
-import {
-  Popover,
-  PopoverAnchor,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-} from '@/components/ui/popover'
-import { CommandLine } from '@/features/worktrees/components/command-line'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Glyph } from '@/features/worktrees/components/glyph'
 import { RowMenu } from '@/features/worktrees/components/row-menu'
 import type { View } from '@/features/worktrees/tree/components/branch'
-import { type Node, reparent, sync } from '@/features/worktrees/tree/utils/nodes'
+import type { Node } from '@/features/worktrees/tree/utils/nodes'
 import { conditionLook } from '@/features/worktrees/utils/condition'
 import { searched } from '@/features/worktrees/utils/filters'
 import { cn } from '@/lib/utils'
 
 export function NodeRow({ node, view }: { node: Node; view: View }) {
   const { branch, detail, pr, condition } = node
-  const movable = !detail.main && !detail.virtual
-  const { ref: dragRef, handleRef, isDragSource } = useDraggable({ id: branch, disabled: !movable })
+  const underWay = view.underWay[branch]
+  const movable = view.movable.includes(branch) && underWay === undefined
+  // a clone follows the pointer: the row stays in its place, dimmed, where it is dragged from
+  const {
+    ref: dragRef,
+    handleRef,
+    isDragSource,
+  } = useDraggable({
+    id: branch,
+    disabled: !movable,
+    plugins: [Feedback.configure({ feedback: 'clone' })],
+  })
   const { ref: dropRef, isDropTarget } = useDroppable({ id: branch })
 
   const found = searched(branch, view.query)
-  const underWay = view.underWay[branch]
-  const dropped = view.dropped?.parent === branch ? view.dropped : undefined
   const look = conditionLook[condition]
+  const target = isDragSource ? undefined : view.target?.(node)
+  const refused = isDropTarget && target?.kind === 'refused' ? target.why : undefined
 
   const meta = () => {
     if (detail.main) return 'main worktree'
@@ -44,11 +47,18 @@ export function NodeRow({ node, view }: { node: Node; view: View }) {
           {underWay}
         </Glyph>
       )
-    if (condition === 'no_worktree') return <span className="text-sm text-muted-foreground">{look.label}</span>
+    if (detail.virtual) return <span className="text-sm text-muted-foreground">{look.label}</span>
     return (
-      <Glyph icon={look.icon} tone={look.tone}>
-        {look.label}
-      </Glyph>
+      <>
+        <Glyph icon={look.icon} tone={look.tone}>
+          {look.label}
+        </Glyph>
+        {detail.parent_gone && (
+          <Glyph icon={TriangleAlert} tone="attention">
+            parent gone
+          </Glyph>
+        )}
+      </>
     )
   }
 
@@ -63,7 +73,7 @@ export function NodeRow({ node, view }: { node: Node; view: View }) {
       className={cn(
         'group/row relative flex h-12 items-center gap-2.5 rounded-md px-2 hover:bg-muted/50',
         branch === view.open ? 'bg-muted' : 'data-menu-open:bg-muted/50',
-        isDropTarget && !isDragSource && 'bg-accent ring-1 ring-ring',
+        isDropTarget && target?.kind === 'valid' && 'bg-accent ring-1 ring-ring',
         (isDragSource || !found || underWay) && 'opacity-50',
       )}
     >
@@ -72,6 +82,9 @@ export function NodeRow({ node, view }: { node: Node; view: View }) {
           type="button"
           ref={handleRef}
           aria-label={`Move ${branch} under another branch`}
+          // where it may land is asked before the drag starts
+          onPointerEnter={() => view.prefetch(branch)}
+          onFocus={() => view.prefetch(branch)}
           className="relative z-10 -ml-1 cursor-grab rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <GripVertical className="size-4" />
@@ -108,6 +121,16 @@ export function NodeRow({ node, view }: { node: Node; view: View }) {
         </Badge>
       )}
       <span className="relative z-10 ml-auto flex items-center gap-3">
+        {target?.kind === 'parent' && <span className="text-sm text-muted-foreground">current parent</span>}
+        {/* open while the dragged worktree is over it: a refused target says why before the drop */}
+        <Tooltip open={refused !== undefined}>
+          <TooltipTrigger asChild>
+            <span className={refused ? undefined : 'hidden'}>
+              <Ban className="size-4 text-muted-foreground" aria-hidden="true" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{refused}</TooltipContent>
+        </Tooltip>
         {detail.services && detail.services.length > 0 && (
           <Glyph icon={CircleDot} tone="ok" className="text-sm">
             {detail.services.length} up
@@ -118,31 +141,10 @@ export function NodeRow({ node, view }: { node: Node; view: View }) {
     </div>
   )
 
+  if (!offers) return row()
   return (
-    <Popover open={dropped !== undefined} onOpenChange={(open) => !open && view.dismiss()}>
-      {offers ? (
-        <RowMenu repo={view.repo} subject={branch} rows={[{ subject: branch, offers }]} busy={underWay !== undefined}>
-          {(more) => <PopoverAnchor asChild>{row(more)}</PopoverAnchor>}
-        </RowMenu>
-      ) : (
-        <PopoverAnchor asChild>{row()}</PopoverAnchor>
-      )}
-
-      {dropped && (
-        <PopoverContent align="start" className="flex w-[30rem] flex-col gap-3">
-          <PopoverHeader>
-            <PopoverTitle>
-              Change the parent of {dropped.branch} to {dropped.parent}
-            </PopoverTitle>
-            <PopoverDescription>
-              Reparent isn't in the web interface yet. Run these in a terminal: the first records the new parent, the
-              second rebases onto it.
-            </PopoverDescription>
-          </PopoverHeader>
-          <CommandLine followUp={reparent(dropped.branch, dropped.parent)} />
-          <CommandLine followUp={sync(dropped.branch)} />
-        </PopoverContent>
-      )}
-    </Popover>
+    <RowMenu repo={view.repo} subject={branch} rows={[{ subject: branch, offers }]} busy={underWay !== undefined}>
+      {(more) => row(more)}
+    </RowMenu>
   )
 }

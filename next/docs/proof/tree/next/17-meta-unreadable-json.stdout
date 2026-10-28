@@ -1485,7 +1485,7 @@
         "dirty": false,
         "locked": false,
         "missing": false,
-        "condition": "no_worktree",
+        "condition": "deleted",
         "cycle": false,
         "parent_gone": false,
         "origin": null,

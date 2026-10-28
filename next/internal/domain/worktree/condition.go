@@ -8,6 +8,7 @@ type Condition string
 // The conditions of a worktree, the first that applies.
 const (
 	ConditionNoWorktree    Condition = "no_worktree"                  // a branch of the stack with no worktree
+	ConditionDeleted       Condition = "deleted"                      // a parent of the stack that is no branch any more: its children lost it
 	ConditionUnreadable    Condition = "unreadable"                   // git could not read it
 	ConditionMissing       Condition = "missing"                      // its directory is gone
 	ConditionRebasing      Condition = Condition(OperationRebase)     // a rebase to finish
@@ -24,14 +25,14 @@ const (
 // Conditions returns every Condition, the first that applies first.
 func Conditions() []Condition {
 	return []Condition{
-		ConditionNoWorktree, ConditionUnreadable, ConditionMissing,
+		ConditionNoWorktree, ConditionDeleted, ConditionUnreadable, ConditionMissing,
 		ConditionRebasing, ConditionBisecting, ConditionMerging, ConditionCherryPicking, ConditionReverting, ConditionApplying,
 		ConditionMerged, ConditionChanged, ConditionClean,
 	}
 }
 
-// ConditionParams are what a read knows of a worktree it could read; a read sets ConditionNoWorktree and
-// ConditionUnreadable itself, since nothing else of such a worktree is known.
+// ConditionParams are what a read knows of a worktree it could read; a read sets ConditionNoWorktree, ConditionDeleted
+// and ConditionUnreadable itself, since nothing else of such a worktree is known.
 type ConditionParams struct {
 	Missing   bool
 	Operation Operation // what git stopped in the middle of, "" for nothing

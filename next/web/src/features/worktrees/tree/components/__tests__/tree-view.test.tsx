@@ -66,7 +66,9 @@ test("the main worktree's menu keeps every action in place, those it can't take 
   expect(within(menu).getByRole('menuitem', { name: /Open the pull request/ }).textContent).toContain(
     'No pull request known',
   )
-  expect(within(menu).getByRole('menuitem', { name: /Reparent/ }).textContent).toContain('Not in the web yet')
+  expect(within(menu).getByRole('menuitem', { name: /Reparent/ }).textContent).toContain(
+    'The main worktree has no parent',
+  )
 })
 
 test('the menu key on a focused node opens its menu', async () => {
@@ -146,4 +148,49 @@ test("a node offers to open its pull request once GitHub's read lands", async ()
 
   const open = await screen.findByRole('menuitem', { name: /Open the pull request/ })
   await waitFor(() => expect(open.getAttribute('aria-disabled')).toBeNull())
+})
+
+test('a node moves only when reparent can move it: its grip comes from reparent, never from the node', async () => {
+  // the base branch's worktree is no option: sync never rebases it
+  server.use(
+    http.post('/api/repos/r1/commands/reparent/questions', () =>
+      HttpResponse.json({
+        fields: [
+          { kind: 'multi_select', path: 'worktree', picked: [], options: [{ value: 'feat/billing', parent: 'main' }] },
+        ],
+        problems: [],
+      }),
+    ),
+  )
+  await renderApp('/r/r1/worktrees?view=tree')
+
+  expect(await screen.findByRole('button', { name: 'Move feat/billing under another branch' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Move feat/search under another branch' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Move main under another branch' })).toBeNull()
+})
+
+test('a parent branch deleted reads so, and the worktree it left says its parent is gone', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/tree', () =>
+      HttpResponse.json(
+        envelope('tree', [
+          treeDetail('main', { main: true, parent: null, children: [] }),
+          treeDetail('feat/search', {
+            virtual: true,
+            condition: 'deleted',
+            path: null,
+            parent: null,
+            actions: [],
+            children: ['feat/search-docs'],
+          }),
+          treeDetail('feat/search-docs', { parent: 'feat/search', parent_gone: true }),
+        ]),
+      ),
+    ),
+  )
+  await renderApp('/r/r1/worktrees?view=tree')
+
+  expect(await screen.findByText('branch deleted')).toBeTruthy()
+  const orphan = (await screen.findByRole('link', { name: 'feat/search-docs' })).parentElement as HTMLElement
+  expect(within(orphan).getByText('parent gone')).toBeTruthy()
 })

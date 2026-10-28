@@ -17,7 +17,7 @@ import (
 
 const mainPath = "/repo/main"
 
-// A world is a repository of every kind of node tree draws: a stack of three levels with a job up and commits ahead, a fan-out whose second branch lacks a commit of main and is locked, a parent with no worktree, a cycle, a rebasing worktree, one whose directory is gone and a detached one; Worktrees, when set, replaces them, on branches with no commit and no origin.
+// A world is a repository of every kind of node tree draws: a stack of three levels with a job up and commits ahead, a fan-out whose second branch lacks a commit of main and is locked, a parent branch deleted, a cycle, a rebasing worktree, one whose directory is gone and a detached one; Worktrees, when set, replaces them, on branches with no commit and no origin.
 type world struct {
 	ConfigErr  error
 	PRsErr     error

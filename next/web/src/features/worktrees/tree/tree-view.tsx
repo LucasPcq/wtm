@@ -1,12 +1,20 @@
 import { DragDropProvider, KeyboardSensor, PointerSensor } from '@dnd-kit/react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { questionsQuery } from '@/api/queries/commands'
 import { Loading } from '@/features/worktrees/components/loading'
 import { ReadFailed } from '@/features/worktrees/components/read-failed'
 import { useRead } from '@/features/worktrees/hooks/use-read'
-import { Branch, type Drop, type View } from '@/features/worktrees/tree/components/branch'
+import { useReparentNow } from '@/features/worktrees/hooks/use-reparent-now'
+import { Branch, type View } from '@/features/worktrees/tree/components/branch'
 import { nodesOf } from '@/features/worktrees/tree/utils/nodes'
+import { targetOf } from '@/features/worktrees/tree/utils/targets'
 import type { Subject } from '@/features/worktrees/utils/actions'
+import { requestOf } from '@/features/worktrees/utils/reparent'
 import type { WorktreesSearch } from '@/features/worktrees/utils/search'
+
+const parentsOf = (repo: string, worktree: string) =>
+  questionsQuery(repo, 'reparent', [{ path: 'worktree', values: [worktree] }])
 
 export function TreeView({
   repo,
@@ -19,11 +27,22 @@ export function TreeView({
   underWay: Record<string, string>
   subjects: Subject[]
 }) {
+  const client = useQueryClient()
   const { live, github } = useRead(repo, 'tree')
-  const [dropped, setDropped] = useState<Drop>()
+  const reparentNow = useReparentNow(repo)
+  const [dragging, setDragging] = useState<string>()
+  // which nodes move, and where each may land, are reparent's questions: the Tree decides none of it
+  const movable = useQuery(questionsQuery(repo, 'reparent'))
+  const parents = useQuery({ ...parentsOf(repo, dragging ?? ''), enabled: dragging !== undefined })
 
   if (live.isPending) return <Loading />
   if (live.isError) return <ReadFailed message={live.error.message} />
+
+  const worktreeField = movable.data?.fields.find((field) => field.path === 'worktree')
+  const options = worktreeField?.kind === 'multi_select' ? worktreeField.options : []
+  const parent = options.find((option) => option.value === dragging)?.parent
+  const target = (branch: string, condition: Parameters<typeof targetOf>[0]['condition']) =>
+    targetOf({ branch, form: parents.data, parent, condition })
 
   const view: View = {
     repo,
@@ -31,22 +50,41 @@ export function TreeView({
     query: search.q ?? '',
     open: search.worktree,
     underWay,
-    dropped,
-    dismiss: () => setDropped(undefined),
+    movable: options.map((option) => option.value),
+    target: dragging === undefined ? undefined : (node) => target(node.branch, node.condition),
+    prefetch: (branch) => void client.prefetchQuery(parentsOf(repo, branch)),
   }
+  const nodes = nodesOf(live.data, github.data)
+  const conditionOf = (branch: string) =>
+    live.data.items.find((item) => item.subject === branch)?.detail?.condition ?? 'no_worktree'
 
   return (
     <DragDropProvider
       sensors={[PointerSensor, KeyboardSensor]}
-      onDragEnd={({ canceled, operation }) => {
+      onDragStart={({ operation }) => {
         const branch = operation.source?.id
-        const parent = operation.target?.id
-        if (canceled || typeof branch !== 'string' || typeof parent !== 'string' || branch === parent) return
-        setDropped({ branch, parent })
+        if (typeof branch === 'string') setDragging(branch)
+      }}
+      onDragEnd={({ canceled, operation }) => {
+        setDragging(undefined)
+        const branch = operation.source?.id
+        const to = operation.target?.id
+        if (canceled || typeof branch !== 'string' || typeof to !== 'string' || branch === to) return
+        // a drop before the questions landed runs all the same: its dry run refuses what they would have
+        const { kind } = target(to, conditionOf(to))
+        if (kind !== 'valid' && kind !== 'pending') return
+        void reparentNow([
+          {
+            command: 'reparent',
+            answers: requestOf({ worktrees: [branch], to }),
+            code: 'web.reparent',
+            message: `move ${branch} onto ${to}`,
+          },
+        ])
       }}
     >
       <ul className="flex flex-col gap-4 px-5 py-4" aria-label="Worktrees as a tree">
-        {nodesOf(live.data, github.data).map((root) => (
+        {nodes.map((root) => (
           <Branch key={root.branch} node={root} view={view} />
         ))}
       </ul>

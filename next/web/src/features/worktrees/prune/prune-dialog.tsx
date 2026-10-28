@@ -36,6 +36,7 @@ export function PruneDialog({ repo }: { repo: string }) {
     if (run.progress && !notice)
       return (
         <RemovalProgress
+          repo={repo}
           words={pruneWords}
           progress={run.progress}
           running={run.running}

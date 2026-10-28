@@ -182,7 +182,7 @@ func (u UseCase) move(ctx context.Context, move Move, report domain.Report) Item
 	report(domain.UnitStarted{Subject: move.Branch})
 	err := repository.Reparent(ctx, repository.ReparentParams{Meta: u.Meta, Branch: move.Branch, Path: move.Path, To: move.To, Report: report})
 	if err != nil {
-		item = Item{Subject: move.Branch, Status: domain.StatusFailed, Err: domain.AsError(domain.AsErrorParams{Err: err, Code: CodeWriteFailed, Message: "couldn't write the record of " + move.Branch})}
+		item = Item{Subject: move.Branch, Status: domain.StatusFailed, Err: domain.AsError(domain.AsErrorParams{Err: err, Code: CodeWriteFailed, Message: "couldn't write the record of " + move.Branch, Params: domain.Params{"cause": err.Error()}})}
 	}
 	report(domain.UnitFinished{Subject: move.Branch, Status: item.Status})
 	return item

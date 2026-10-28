@@ -46,7 +46,10 @@ type badge struct {
 func badgesOf(item tree.Item) []badge {
 	d := item.Detail
 	var badges []badge
-	if d.Virtual {
+	switch {
+	case d.Condition == worktree.ConditionDeleted:
+		badges = append(badges, badge{text: "(branch deleted)", tone: toneMuted})
+	case d.Virtual:
 		badges = append(badges, badge{text: "(no worktree)", tone: toneMuted})
 	}
 	if len(d.Services) > 0 {

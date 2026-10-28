@@ -20,8 +20,16 @@ const calloutOf: Record<StatusProblemCode, { tone: Tone; icon: LucideIcon; conse
     consequence: 'Its branch and its record go with it; the remote branch stays.',
   },
   'status.merged': { tone: 'suggestion', icon: GitMerge, consequence: null },
-  'status.parent_gone': { tone: 'problem', icon: TriangleAlert, consequence: null },
-  'status.cycle': { tone: 'problem', icon: TriangleAlert, consequence: null },
+  'status.parent_gone': {
+    tone: 'problem',
+    icon: TriangleAlert,
+    consequence: 'It rebases onto its new parent on its next sync.',
+  },
+  'status.cycle': {
+    tone: 'problem',
+    icon: TriangleAlert,
+    consequence: 'It rebases onto its new parent on its next sync.',
+  },
   'status.behind_origin': { tone: 'suggestion', icon: FastForward, consequence: null },
   'status.behind': { tone: 'suggestion', icon: ArrowDownToLine, consequence: null },
   'status.env_missing': { tone: 'problem', icon: TriangleAlert, consequence: null },
@@ -35,7 +43,7 @@ const look: Record<Tone, { box: string; glyph: string }> = {
   suggestion: { box: 'border-border bg-muted/40', glyph: 'text-muted-foreground' },
 }
 
-// the fix the web runs, as the menus run it: Remove and Prune open their dialog, Fast-forward runs at once
+// the fix the web runs, as the menus run it: Remove and Prune open their dialog, Fast-forward and Reparent run at once
 const runsHere: Record<
   MutationCommand,
   { verb: string; open: (repo: string, fix: DomainFollowUp, runEntry: RunEntry) => void } | null
@@ -47,6 +55,10 @@ const runsHere: Record<
   'fast-forward': {
     verb: menu.fast_forward.label,
     open: (_repo, fix, runEntry) => runEntry({ action: 'fast_forward', followUp: fix }, []),
+  },
+  reparent: {
+    verb: menu.reparent.label,
+    open: (_repo, fix, runEntry) => runEntry({ action: 'reparent', followUp: fix }, []),
   },
   create: null,
   prune: { verb: pruneAction.label, open: (repo, fix) => openPrune(repo, subjectsOf(fix)) },

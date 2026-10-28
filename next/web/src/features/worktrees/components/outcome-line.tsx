@@ -16,7 +16,7 @@ const glyph: Record<OutcomeTone, LucideIcon> = {
   muted: CircleMinus,
 }
 
-export function OutcomeLine({ row }: { row: OutcomeRow }) {
+export function OutcomeLine({ row, label }: { row: OutcomeRow; label?: string | undefined }) {
   const [open, setOpen] = useState(false)
   const Icon = glyph[row.tone ?? 'muted']
   const foldable =
@@ -33,7 +33,12 @@ export function OutcomeLine({ row }: { row: OutcomeRow }) {
           )}
           {row.title && <span className="shrink-0 font-medium">{row.title}</span>}
           <span className={cn('min-w-0 flex-1', row.title && 'text-muted-foreground')}>{row.message}</span>
-          {row.followUp && !open && <CommandLine followUp={row.followUp} look="copy" />}
+          {row.act && (
+            <Button variant="outline" size="sm" aria-label={`${label}: ${row.message}`} onClick={row.act}>
+              {label}
+            </Button>
+          )}
+          {row.followUp && !row.act && !open && <CommandLine followUp={row.followUp} look="copy" />}
           {foldable && (
             <CollapsibleTrigger asChild>
               <Button

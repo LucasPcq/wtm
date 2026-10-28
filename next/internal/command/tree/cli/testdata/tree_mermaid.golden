@@ -14,6 +14,6 @@ flowchart TD
   n0 --> n6
   n7["y ! cycle"]
   n8["z ! cycle"]
-  n9["feat/login (no worktree)"]
+  n9["feat/login (branch deleted)"]
   n10["feat/x"]
   n9 --> n10

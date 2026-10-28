@@ -18,13 +18,13 @@ export type MenuAction = WorktreeAction | 'reparent'
 
 export type Section = 'Branch' | 'Run' | 'Open' | 'Remove'
 
-type Runs = 'web' | 'copy' | 'link' | 'later'
+type Runs = 'web' | 'copy' | 'link'
 
 // the one list every surface draws, in its order: a key moved here moves in every menu
 export const menu: Record<MenuAction, { section: Section; label: string; icon: LucideIcon; runs: Runs }> = {
   fast_forward: { section: 'Branch', label: 'Fast-forward', icon: FastForward, runs: 'web' },
   sync: { section: 'Branch', label: 'Sync', icon: RefreshCw, runs: 'copy' },
-  reparent: { section: 'Branch', label: 'Reparent', icon: GitBranch, runs: 'later' },
+  reparent: { section: 'Branch', label: 'Reparent', icon: GitBranch, runs: 'web' },
   exec: { section: 'Run', label: 'Run a command', icon: SquareTerminal, runs: 'web' },
   run_up: { section: 'Run', label: 'Start the profile', icon: Play, runs: 'copy' },
   run_down: { section: 'Run', label: 'Stop the profile', icon: Square, runs: 'copy' },
@@ -42,16 +42,20 @@ export const pruneAction = { label: 'Prune', icon: GitBranchMinus }
 const unofferedWords: Record<WorktreeUnoffered, (worktree: string, action: MenuAction) => string> = {
   missing: () => 'Its folder is gone',
   no_branch: () => 'On no branch',
-  main_worktree: (worktree, action) =>
-    action === 'clean' ? "The main worktree can't be removed" : `${worktree} is the main worktree`,
-  base_branch: () => "The base branch's worktree can't be removed",
+  main_worktree: (worktree, action) => {
+    if (action === 'clean') return "The main worktree can't be removed"
+    if (action === 'reparent') return 'The main worktree has no parent'
+    return `${worktree} is the main worktree`
+  },
+  base_branch: (_worktree, action) =>
+    action === 'reparent' ? 'Sync never rebases the base branch' : "The base branch's worktree can't be removed",
   not_on_origin: () => 'Not on origin',
   no_pull_request: () => 'No pull request known',
   unrecorded: () => 'Not made by wtm',
   meta_unreadable: () => "Its record doesn't read",
 }
 
-export const notInTheWeb = 'Not in the web yet'
+const notInTheWeb = 'Not in the web yet'
 
 // why the header's action that picks its own worktrees finds none on this page
 export const noneWords: Record<'clean' | 'fast_forward', string> = {
@@ -64,7 +68,7 @@ export type Entry = { action: MenuAction; followUp: DomainFollowUp } | { action:
 
 export function entryOf(worktree: string, offers: RepositoryOffer[], action: MenuAction): Entry {
   const offer = offers.find((one) => one.action === action)
-  if (menu[action].runs === 'later' || !offer) return { action, disabled: notInTheWeb }
+  if (!offer) return { action, disabled: notInTheWeb }
   if (offer.follow_up) return { action, followUp: offer.follow_up }
   return { action, disabled: offer.refused ? unofferedWords[offer.refused](worktree, action) : notInTheWeb }
 }
@@ -78,7 +82,6 @@ export const menuName = (rows: Subject[]) =>
 export function selectionEntryOf(rows: Subject[], action: MenuAction): Entry {
   const [only] = rows
   if (rows.length === 1 && only) return entryOf(only.subject, only.offers, action)
-  if (menu[action].runs === 'later') return { action, disabled: notInTheWeb }
   if (menu[action].runs !== 'web') return { action, disabled: oneAtATime }
 
   const offered = rows.flatMap(({ subject, offers }) => {
