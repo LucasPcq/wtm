@@ -113,7 +113,9 @@ export function ReparentProgress({
                             tone: 'failed',
                             title: item.subject,
                             message: failureOf(item.error),
-                            output: item.error ? { lines: [item.error.message] } : undefined,
+                            output: item.error
+                              ? { lines: [item.error.params?.cause ?? item.error.message] }
+                              : undefined,
                           }
                         : {
                             key: item.subject,

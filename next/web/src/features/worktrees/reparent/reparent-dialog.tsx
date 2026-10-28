@@ -9,7 +9,11 @@ import { ReparentWizard } from '@/features/worktrees/reparent/components/reparen
 export function ReparentDialog({ repo }: { repo: string }) {
   const { open, worktrees, left, picking, to } = useReparentDialog()
   const run = useRun(repo, 'reparent')
-  const close = () => useReparentDialog.setState({ open: false })
+  const close = () => {
+    // an outcome shown is read: closed, it no longer holds the next reparent back
+    if (run.progress && !run.running) run.dismiss()
+    useReparentDialog.setState({ open: false })
+  }
 
   const content = () => {
     if (run.progress)

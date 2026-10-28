@@ -34,13 +34,14 @@ export function refusalOf(error: DomainError | undefined) {
   return error ? sentence(error.message) : 'It stopped before it ran'
 }
 
-const failureWords: Record<string, (cause: string | undefined) => string> = {
-  'reparent.write_failed': (cause) => (cause ? `couldn't write its record: ${cause}` : "couldn't write its record"),
+// the folded line is the code's fixed words; its cause, verbatim, is in the fold
+const failureWords: Record<string, string> = {
+  'reparent.write_failed': "couldn't write its record",
 }
 
 export const failureOf = (error: DomainError | undefined) => {
   if (!error) return undefined
-  return failureWords[error.code]?.(error.params?.cause) ?? sentence(error.message)
+  return failureWords[error.code] ?? sentence(error.message)
 }
 
 // the toasts of worktrees reparented at once, one run per new parent

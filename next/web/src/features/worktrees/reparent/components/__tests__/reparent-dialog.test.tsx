@@ -108,7 +108,11 @@ test('a record that cannot be written fails alone, named with why', async () => 
 
   expect(await within(dialog).findByText('1 of 2 reparented.')).toBeTruthy()
   const failed = within(dialog).getByRole('region', { name: "Couldn't reparent" })
-  expect(within(failed).getByText("couldn't write its record: permission denied")).toBeTruthy()
+  expect(within(failed).getByText("couldn't write its record")).toBeTruthy()
+  await user.click(
+    within(failed).getByRole('button', { name: "Details of feat/billing-ui: couldn't write its record" }),
+  )
+  expect(within(failed).getByText('permission denied')).toBeTruthy()
   expect(within(dialog).getByText('wtm sync fix/login')).toBeTruthy()
 })
 

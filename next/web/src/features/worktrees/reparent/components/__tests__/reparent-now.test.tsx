@@ -4,7 +4,7 @@ import { expect, onTestFinished, test } from 'vitest'
 import type { WebCall } from '@/api/types.gen'
 import { envelope, statusDetail } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
-import { rememberingReparent } from '@/test/reparent'
+import { answeringReparent, rememberingReparent, reparentRun } from '@/test/reparent'
 import { server } from '@/test/server'
 
 const runsOf = () => {
@@ -86,4 +86,28 @@ test('a move its dry run refuses ends on an error toast saying why, whose Detail
   const dialog = await screen.findByRole('dialog', { name: 'Change parent' })
   expect(await within(dialog).findByText('feat/billing-ui sits under feat/billing')).toBeTruthy()
   await waitFor(() => expect(runs).toEqual([]))
+})
+
+test('a failed outcome closed once read no longer stands in the way of the next move', async () => {
+  server.use(proposes('feat/search-docs', 'main'), ...answeringReparent(reparentRun(['fix/login'])))
+  const { user } = await renderApp('/r/r1/worktrees?worktree=feat%2Fsearch-docs')
+
+  await user.click(await screen.findByRole('checkbox', { name: 'Select fix/login' }))
+  await user.click(await screen.findByRole('checkbox', { name: 'Select feat/billing-ui' }))
+  await user.click(within(screen.getByRole('toolbar', { name: 'Selection' })).getByRole('button', { name: 'Reparent' }))
+  const dialog = await screen.findByRole('dialog', { name: 'Change parent' })
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('combobox'))
+  await user.click(await screen.findByRole('option', { name: 'feat/search' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Reparent 2 worktrees' }))
+  expect(await within(dialog).findByText('1 of 2 reparented.')).toBeTruthy()
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+  const callout = await screen.findByRole('region', { name: 'To do' })
+  await user.click(within(callout).getByRole('button', { name: 'Reparent onto main' }))
+
+  expect(await screen.findByText('feat/search-docs is on main')).toBeTruthy()
+  expect(screen.queryByRole('dialog')).toBeNull()
 })

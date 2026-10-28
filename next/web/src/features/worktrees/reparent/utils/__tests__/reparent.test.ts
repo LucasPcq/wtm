@@ -65,7 +65,7 @@ test('a run that failed says which worktree it could not move and why', () => {
   expect(toldOf([ran([['a', 'f', 'main']]), failed])).toEqual({
     tone: 'error',
     title: "Couldn't reparent b",
-    description: "couldn't write its record: denied",
+    description: "couldn't write its record",
   })
 })
 

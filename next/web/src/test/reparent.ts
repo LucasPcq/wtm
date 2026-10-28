@@ -139,7 +139,7 @@ export const reparentRun =
         ]),
         `event: envelope\ndata: ${JSON.stringify({
           ...envelope('reparent', []),
-          ok: failing.length === 0,
+          ok: !going.some((move) => failing.includes(move.branch)),
           items,
           plan: { moves, to: moves[0]?.to ?? '', recap: [], empty: going.length === 0 },
           follow_ups:
