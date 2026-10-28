@@ -3,6 +3,7 @@ package events_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -443,6 +444,62 @@ func TestJobsTheDaemonCannotTellChangeNothing(t *testing.T) {
 	jobs.set(nil, run.ErrUnknown)
 	r.quiet(t)
 	jobs.set([]run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true, State: run.Running}}, nil)
+
+	r.quiet(t)
+}
+
+func TestAWorktreeTurningDirtyThenCleanIsSentAsTheWorktreeChanged(t *testing.T) {
+	app, git := newRepo("/repo", "feat/a").living()
+	u := useCase(newBus(), &known{}, opening(app))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+	r.quiet(t)
+
+	git.SetDirty("/repo/.trees/feat/a", true)
+	changed := r.next(t)
+	assert.Contains(t, changed, `"branch":"feat/a"`)
+	assert.Contains(t, changed, `"changed":["dirty"]`)
+
+	git.SetDirty("/repo/.trees/feat/a", false)
+	assert.Contains(t, r.next(t), `"changed":["dirty"]`)
+	r.quiet(t)
+}
+
+// A git status per worktree is costly: the poll reads it every fourth time, the legacy dashboard's 20 seconds; a poll that does not read it changes nothing.
+func TestAPollReadsWhetherAWorktreeIsDirtyEveryFourthPollOnly(t *testing.T) {
+	log := &callLog{}
+	app, git := newRepo("/repo", "feat/a").living()
+	u := useCase(newBus(), &known{}, openingRecorded(app, git, log))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+
+	git.SetDirty("/repo/.trees/feat/a", true)
+	assert.Contains(t, r.next(t), `"changed":["dirty"]`)
+	r.quiet(t)
+
+	polls := pollsIn(log.all())
+	require.Greater(t, len(polls), 5)
+	// the last poll may still be under way
+	for i, calls := range polls[:len(polls)-1] {
+		assert.Equal(t, (i+1)%4 == 0, slices.Contains(calls, "Dirty"), "poll %d: %v", i+1, calls)
+	}
+}
+
+func TestAWorktreeWhoseDirtyReadFailsChangesNothing(t *testing.T) {
+	app := newRepo("/repo", "feat/a")
+	app.Git.Fail = map[string]error{"Dirty": errors.New("git status failed")}
+	app, git := app.living()
+	u := useCase(newBus(), &known{}, opening(app))
+	u.Recheck = 20 * time.Millisecond
+	r, _ := watching(t, u, events.Request{Caller: domain.Caller{Dir: "/repo"}})
+	r.nextType(t)
+	r.nextType(t)
+
+	git.SetDirty("/repo/.trees/feat/a", true)
 
 	r.quiet(t)
 }

@@ -39,6 +39,9 @@ const CodeSchemaNewer = Name + ".schema_newer"
 // recheckEvery is how often a stream polls what it watches, when the use case says nothing: the legacy dashboard polled its jobs every 3 seconds and git every 20.
 const recheckEvery = 5 * time.Second
 
+// dirtyEvery is how many polls apart a poll reads whether each worktree is dirty, one at a time: a git status per worktree cost 2.3 CPU-seconds a poll on 20 worktrees of 4,600 files read 8 at once, 1 one at a time, and the legacy dashboard read git every 20 seconds.
+const dirtyEvery = 4
+
 // A UseCase streams the events of the repositories wtm knows: the bus it subscribes to, the registry of those repositories, how it opens one, the jobs of the run daemon, its clock, and how often it polls what it watches (Recheck, 5 seconds when zero): whether it is still there, and what changed in it with no operation of wtm. Jobs may be nil: the jobs are then never polled.
 type UseCase struct {
 	Bus      Bus
@@ -73,7 +76,7 @@ type Out struct {
 // ----------------------------------------------------------------------------
 // Watch
 
-// Watch streams the events req asks for to out until ctx is done: a snapshot of each repository watched, ready, then every change published on the bus, and every Recheck what a poll found changed with no operation of wtm: a worktree.changed per worktree whose head, checkout or jobs moved, a fresh snapshot when a worktree went away. When the bus goes away it subscribes again, after a backoff, and opens on fresh snapshots: nothing is replayed, so a reader takes every event as an upsert keyed by branch and every snapshot as a reset.
+// Watch streams the events req asks for to out until ctx is done: a snapshot of each repository watched, ready, then every change published on the bus, and every Recheck what a poll found changed with no operation of wtm: a worktree.changed per worktree whose head, checkout, jobs or dirtiness moved, a fresh snapshot when a worktree went away. When the bus goes away it subscribes again, after a backoff, and opens on fresh snapshots: nothing is replayed, so a reader takes every event as an upsert keyed by branch and every snapshot as a reset.
 // It returns nil once ctx is done after the stream started, ctx's error when it is done before; otherwise the refusal of req, or what ended the stream: a line of a newer version, a repository watched that lost its wtm config, or Emit's error.
 func (u UseCase) Watch(ctx context.Context, req Request, out Out) error {
 	// 1. Settle what the stream watches, refusing what no retry can change.
@@ -280,10 +283,11 @@ type joinParams struct {
 	Watched map[string]*watch
 }
 
-// A watch is a repository the stream sent a snapshot of: how it reads it, what its last poll read, the operations of wtm the bus says run on it, by their op id, with when each started, and the branches their events named, whose changes are theirs.
+// A watch is a repository the stream sent a snapshot of: how it reads it, what its last poll read, how many polls read it, the operations of wtm the bus says run on it, by their op id, with when each started, and the branches their events named, whose changes are theirs.
 type watch struct {
 	source     Source
 	polled     Polled
+	polls      int
 	operations map[string]time.Time
 	named      map[string]bool
 }
@@ -329,7 +333,8 @@ func (s *stream) snapshot(ctx context.Context, watched *watch) error {
 	}
 
 	jobs, known := s.jobs(ctx)
-	watched.polled = PollOf(facts.Snapshot, jobs, known)
+	reads := repository.Each(facts.Worktrees, func(w worktree.Worktree) *bool { return dirtyOf(ctx, watched.source.Git, w) })
+	watched.polled = PollOf(facts.Snapshot, jobs, known, byPath(facts.Worktrees, reads))
 	return s.emitLine(domain.Line{Repo: &watched.source.Repo, Event: domain.Snapshot{Worktrees: Identities(facts)}})
 }
 
@@ -337,13 +342,16 @@ type pollParams struct {
 	Watch *watch
 	Jobs  []run.Job
 	Known bool
+	Dirty bool
 }
 
-// poll reads the worktrees and branch tips of the repository watched again, never while an operation of wtm runs on it, and sends what changed since the last read. It returns the error that kept it from reading, or the reader's.
+// poll reads the worktrees and branch tips of the repository watched again, and whether each worktree is dirty every dirtyEvery polls, never while an operation of wtm runs on it, and sends what changed since the last read. It returns the error that kept it from reading, or the reader's.
 func (s *stream) poll(ctx context.Context, params pollParams) error {
 	if params.Watch.busy(s.Now()) {
 		return nil
 	}
+	params.Watch.polls++
+	params.Dirty = params.Watch.polls%dirtyEvery == 0
 	now, err := s.read(ctx, params)
 	if err != nil {
 		return err
@@ -386,7 +394,7 @@ func (s *stream) send(ctx context.Context, watched *watch, now Polled) error {
 	return nil
 }
 
-// read is what a poll reads of the repository params watches, the jobs it does not know taken from its last read.
+// read is what a poll reads of the repository params watches, whether each worktree is dirty when params asks, one at a time, the jobs and the dirtiness it does not know taken from its last read.
 func (s *stream) read(ctx context.Context, params pollParams) (Polled, error) {
 	git := params.Watch.source.Git
 	worktrees, err := git.Worktrees(ctx)
@@ -398,7 +406,37 @@ func (s *stream) read(ctx context.Context, params pollParams) (Polled, error) {
 		return nil, err
 	}
 
-	return Carried(params.Watch.polled, PollOf(worktree.Snapshot{Worktrees: worktrees, Branches: branches}, params.Jobs, params.Known)), nil
+	var reads []*bool
+	if params.Dirty {
+		for _, w := range worktrees {
+			reads = append(reads, dirtyOf(ctx, git, w))
+		}
+	}
+
+	return Carried(params.Watch.polled, PollOf(worktree.Snapshot{Worktrees: worktrees, Branches: branches}, params.Jobs, params.Known, byPath(worktrees, reads))), nil
+}
+
+// dirtyOf is whether the worktree w holds uncommitted changes, a missing one holding none; nil when it is on no branch or git could not tell.
+func dirtyOf(ctx context.Context, git Git, w worktree.Worktree) *bool {
+	if w.Branch() == "" {
+		return nil
+	}
+	presence, err := repository.Present(ctx, git, w)
+	if err != nil {
+		return nil
+	}
+	return new(presence.Dirty)
+}
+
+// byPath is each of reads, read of the worktree at its index, by the worktree's path, those unread left out.
+func byPath(worktrees []worktree.Worktree, reads []*bool) map[string]bool {
+	dirty := map[string]bool{}
+	for i, read := range reads {
+		if read != nil {
+			dirty[worktrees[i].Path] = *read
+		}
+	}
+	return dirty
 }
 
 // announced follows a line the bus carried for the repository watched: an operation of wtm holds the poll back from its start to its finish, the branches its events name are its own, and once the last one running finished, what the others changed meanwhile is sent.

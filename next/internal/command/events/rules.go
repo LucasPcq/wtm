@@ -81,18 +81,19 @@ func (f Facts) claim(w worktree.Worktree) int {
 // A Polled is what a poll reads of a repository: each worktree on a branch, by its branch.
 type Polled map[string]Poll
 
-// A Poll is what a poll reads of one worktree: its branch's tip, what it has checked out, and each of its jobs with its state, sorted; Jobs is nil when the run daemon could not tell.
+// A Poll is what a poll reads of one worktree: its branch's tip, what it has checked out, each of its jobs with its state, sorted, and whether it holds uncommitted changes; Jobs is nil when the run daemon could not tell, Dirty when git could not.
 type Poll struct {
 	Head     string
 	Checkout string
 	Jobs     []string
+	Dirty    *bool
 }
 
 // checkoutBranch is the checkout of a worktree on its branch with no operation under way; any other is the operation git stopped in the middle of.
 const checkoutBranch = "branch"
 
-// PollOf is what a poll reads of the worktrees and branches of snapshot, the jobs of the machine being jobs, or unknown when known is false.
-func PollOf(snapshot worktree.Snapshot, jobs []run.Job, known bool) Polled {
+// PollOf is what a poll reads of the worktrees and branches of snapshot, the jobs of the machine being jobs, or unknown when known is false, and whether each worktree is dirty by its path, unknown for a path dirty lacks.
+func PollOf(snapshot worktree.Snapshot, jobs []run.Job, known bool, dirty map[string]bool) Polled {
 	tips := map[string]string{}
 	for _, branch := range snapshot.Branches.Local {
 		tips[branch.Name] = branch.Tip
@@ -107,6 +108,9 @@ func PollOf(snapshot worktree.Snapshot, jobs []run.Job, known bool) Polled {
 		poll := Poll{Head: tips[branch], Checkout: cmp.Or(string(w.Operation()), checkoutBranch)}
 		if known {
 			poll.Jobs = jobsIn(jobs, w.Path)
+		}
+		if d, read := dirty[w.Path]; read {
+			poll.Dirty = new(d)
 		}
 		polled[branch] = poll
 	}
@@ -131,7 +135,7 @@ type Change struct {
 	Fields []worktree.PolledField
 }
 
-// Changes returns what changed from before to now: each worktree whose head, checkout or jobs changed, by branch, a worktree new to the poll having every field changed, and the branches of the worktrees that went away, for which a reader resets from a fresh snapshot. Jobs unknown before or now are not compared; they are taken as they were.
+// Changes returns what changed from before to now: each worktree whose head, checkout, jobs or dirtiness changed, by branch, a worktree new to the poll having every field changed, and the branches of the worktrees that went away, for which a reader resets from a fresh snapshot. Jobs or dirtiness unknown before or now are not compared; they are taken as they were.
 func Changes(before, now Polled) (changes []Change, gone []string) {
 	for _, branch := range slices.Sorted(maps.Keys(before)) {
 		if _, kept := now[branch]; !kept {
@@ -140,7 +144,7 @@ func Changes(before, now Polled) (changes []Change, gone []string) {
 	}
 
 	for _, branch := range slices.Sorted(maps.Keys(now)) {
-		fields := []worktree.PolledField{worktree.PolledHead, worktree.PolledCheckout, worktree.PolledJobs}
+		fields := []worktree.PolledField{worktree.PolledHead, worktree.PolledCheckout, worktree.PolledJobs, worktree.PolledDirty}
 		if was, seen := before[branch]; seen {
 			fields = polledFields(was, now[branch])
 		}
@@ -162,16 +166,22 @@ func polledFields(was, now Poll) []worktree.PolledField {
 	if was.Jobs != nil && now.Jobs != nil && !slices.Equal(was.Jobs, now.Jobs) {
 		fields = append(fields, worktree.PolledJobs)
 	}
+	if was.Dirty != nil && now.Dirty != nil && *was.Dirty != *now.Dirty {
+		fields = append(fields, worktree.PolledDirty)
+	}
 	return fields
 }
 
-// Carried is now with the jobs of each worktree unknown now taken as before knew them, so that a poll the run daemon could not answer changes nothing.
+// Carried is now with the jobs and the dirtiness of each worktree unknown now taken as before knew them, so that a poll the run daemon or git could not answer changes nothing.
 func Carried(before, now Polled) Polled {
 	for branch, poll := range now {
 		if poll.Jobs == nil {
 			poll.Jobs = before[branch].Jobs
-			now[branch] = poll
 		}
+		if poll.Dirty == nil {
+			poll.Dirty = before[branch].Dirty
+		}
+		now[branch] = poll
 	}
 	return now
 }

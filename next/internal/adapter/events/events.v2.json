@@ -110,7 +110,7 @@
       "properties": {
         "type": { "const": "worktree.changed" },
         "worktree": { "$ref": "#/$defs/worktree" },
-        "changed": { "type": "array", "minItems": 1, "items": { "enum": ["head", "checkout", "jobs"] } }
+        "changed": { "type": "array", "minItems": 1, "items": { "enum": ["head", "checkout", "jobs", "dirty"] } }
       }
     },
     "worktree.provisioned": {

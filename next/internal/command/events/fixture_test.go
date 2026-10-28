@@ -183,6 +183,31 @@ func (r *reader) out() events.Out {
 
 var errBusGone = errors.New("connect to the event bus: no such file")
 
+// A recorded is a git that logs the calls a poll counts on: a poll lists the worktrees once, and reads each worktree's dirtiness when it reads it.
+type recorded struct {
+	*gittest.Fake
+	log *callLog
+}
+
+func (g recorded) Worktrees(ctx context.Context) ([]worktree.Worktree, error) {
+	g.log.add("Worktrees")
+	return g.Fake.Worktrees(ctx)
+}
+
+func (g recorded) Dirty(ctx context.Context, path string) (bool, error) {
+	g.log.add("Dirty")
+	return g.Fake.Dirty(ctx, path)
+}
+
+// openingRecorded opens r as opening does, its poll's git logging to log.
+func openingRecorded(r repo, git *gittest.Fake, log *callLog) events.Open {
+	return func(ctx context.Context, dir string) (events.Source, error) {
+		source, err := opening(r)(ctx, dir)
+		source.Git = recorded{Fake: git, log: log}
+		return source, err
+	}
+}
+
 // A machine is the jobs the run daemon runs, which a test changes, or err when it cannot tell.
 type machine struct {
 	mu   sync.Mutex
