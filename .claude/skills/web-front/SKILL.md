@@ -24,7 +24,7 @@ Read `references/design.md` before designing or building any screen: the dialog 
 ```
 src/
   api/                 the server, and only here: fetch.ts, token.ts, types.gen.ts, queries/<resource>.ts
-  components/ui/       shadcn's code, added by its CLI or MCP, never edited
+  components/ui/       shadcn's code, added by its CLI or MCP, edited only for colour
   hooks/               shadcn's hooks (use-mobile)
   components/          what two features share (page header, state pages, logo, command-form/)
   features/<feature>/  one area, in the shape below
@@ -80,7 +80,7 @@ These are the owner's rules, and the reason behind each.
 - **`useReducer` when several states move together** (a wizard's step and its remembered answers), one `useState` per independent value, never two that must stay in sync.
 - **A closed set is a union, and what each value shows is a `Record` over it**, so a new value fails the build: `conditionLook: Record<WorktreeCondition, …>`, `phaseLabel: Record<DomainPhase, string>`. Classes from a state go through `cva` variants or such a Record, never a free string built by hand.
 - **Reusable logic becomes a hook or a component.** `useRead(repo, command)` is a view's two reads, `useChoice` a viewer's choice per repository, `CommandLine` every follow-up to copy, `ChoicePopover` every show/hide chooser. Before writing a second copy of something, look in the feature's own `components/`, `hooks/` and `utils/`, then `src/components/`.
-- **shadcn only through its CLI or MCP** (`npx shadcn@latest add <name>`); wrap or compose it in your feature, never edit `components/ui/`. Plain shadcn, the logo, `--primary` as the signature colour, Inter, the system's theme.
+- **shadcn only through its CLI or MCP** (`npx shadcn@latest add <name>`); wrap or compose it in your feature, never edit `components/ui/`, except its colour classes to follow `references/design.md`'s Colour (checkbox, radio group, tooltip: re-apply them after a `shadcn add --overwrite`). Plain shadcn, the logo, `--primary` as the signature colour, Inter, the system's theme.
 
 ## Where state lives
 

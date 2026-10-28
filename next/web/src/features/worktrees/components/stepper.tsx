@@ -4,6 +4,13 @@ import { cn } from '@/lib/utils'
 
 export type StepState = 'done' | 'now' | 'todo' | 'skipped'
 
+const stepLook: Record<StepState, string> = {
+  now: 'border-foreground bg-foreground text-background',
+  done: 'border-foreground text-foreground',
+  skipped: 'border-foreground text-foreground',
+  todo: 'text-muted-foreground',
+}
+
 export function Stepper({ steps }: { steps: { title: string; state: StepState }[] }) {
   return (
     <ol className="flex items-center gap-3" aria-label="Steps">
@@ -14,7 +21,7 @@ export function Stepper({ steps }: { steps: { title: string; state: StepState }[
             <span
               className={cn(
                 'flex size-6 items-center justify-center rounded-full border text-xs font-semibold',
-                step.state === 'todo' ? 'text-muted-foreground' : 'border-primary bg-primary text-primary-foreground',
+                stepLook[step.state],
               )}
             >
               {step.state === 'done' || step.state === 'skipped' ? <Check className="size-3.5" /> : i + 1}

@@ -20,13 +20,10 @@ export function TriCheckbox({
         checked={checked}
         disabled={disabled}
         onCheckedChange={onToggle}
-        className="data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary dark:data-[state=indeterminate]:bg-primary [&[data-state=indeterminate]_svg]:hidden"
+        className="data-[state=indeterminate]:border-foreground data-[state=indeterminate]:bg-foreground dark:data-[state=indeterminate]:bg-foreground [&[data-state=indeterminate]_svg]:hidden"
       />
       {checked === 'indeterminate' && (
-        <Minus
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 m-auto size-3.5 text-primary-foreground"
-        />
+        <Minus aria-hidden="true" className="pointer-events-none absolute inset-0 m-auto size-3.5 text-background" />
       )}
     </span>
   )

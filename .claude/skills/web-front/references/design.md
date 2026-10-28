@@ -108,6 +108,7 @@ One meaning per colour, always beside its word (`Glyph`):
 | grey | nothing to do: kept, skipped, unchanged, cancelled, not part of this run | circle-minus |
 | grey | a merged pull request (a state, not a judgement) | git-merge |
 | `--primary` | the one primary button, the progress bar | — |
+| foreground (neutral fill) | checked, selected option, current step | — |
 
 A glyph never changes colour to mean "resolved": it changes icon.
 
