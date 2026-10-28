@@ -52,14 +52,18 @@ test('Reparent all over two parents is two runs, one after the other, one toast,
 
   await user.click(within(toCheck).getByRole('button', { name: 'Reparent all onto the nearest that stays' }))
 
-  expect(await screen.findByText('2 worktrees moved')).toBeTruthy()
+  const moved = (await screen.findByText('2 worktrees moved')).closest('[data-sonner-toast]')
   expect(runs).toEqual([move('feat/billing-ui', 'main'), move('feat/search-docs', 'fix/login')])
   await user.click(screen.getByRole('button', { name: 'Undo' }))
 
-  // the first toast still shows: the undo's is a second one
-  await waitFor(() => expect(screen.getAllByText('2 worktrees moved')).toHaveLength(2))
   await waitFor(() => expect(runs).toHaveLength(4))
   expect(runs.slice(2)).toEqual([move('feat/billing-ui', 'feat/billing'), move('feat/search-docs', 'feat/search')])
+  // the newest toast is the undo's own, whether the first one still shows or not
+  await waitFor(() => {
+    const front = document.querySelector('[data-sonner-toast][data-front="true"]')
+    expect(front).not.toBe(moved)
+    expect(front?.textContent).toContain('2 worktrees moved')
+  })
 })
 
 test('a chain failing midway names what did not move, says what moved, and its Undo says what it undoes', async () => {

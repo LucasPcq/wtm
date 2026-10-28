@@ -53,7 +53,7 @@ test("the callout's fix runs at once, and its toast's Undo moves the worktree ba
   const callout = await screen.findByRole('region', { name: 'To do' })
   await user.click(await within(callout).findByRole('button', { name: 'Reparent onto main' }))
 
-  expect(await screen.findByText('feat/search-docs is on main')).toBeTruthy()
+  const moved = (await screen.findByText('feat/search-docs is on main')).closest('[data-sonner-toast]')
   expect(screen.getByText('It rebases onto it on its next sync.')).toBeTruthy()
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(screen.getByRole('button', { name: 'Copy wtm sync' })).toBeTruthy()
@@ -77,7 +77,12 @@ test("the callout's fix runs at once, and its toast's Undo moves the worktree ba
       { path: 'to', values: ['main'] },
     ],
   ])
-  await waitFor(() => expect(screen.getAllByText('feat/search-docs is on main')).toHaveLength(2))
+  // the newest toast is the second undo's own, whether the first one still shows or not
+  await waitFor(() => {
+    const front = document.querySelector('[data-sonner-toast][data-front="true"]')
+    expect(front).not.toBe(moved)
+    expect(front?.textContent).toContain('feat/search-docs is on main')
+  })
 })
 
 test('a move its dry run refuses ends on an error toast saying why, whose Details opens the dialog on it', async () => {
