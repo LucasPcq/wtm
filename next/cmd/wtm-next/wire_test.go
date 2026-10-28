@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
+	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/command/reparent"
 
@@ -156,11 +157,12 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 	}{
 		"go":                 {followUp: actions[0], argv: []string{"wtm", "go", "feat/a"}},
 		"open_pr":            {followUp: actions[1], argv: []string{"gh", "pr", "view", "12", "--web"}},
-		"run_up":             {followUp: actions[2], argv: []string{"wtm", "run", "up", "feat/a"}},
-		"run_down":           {followUp: actions[3], argv: []string{"wtm", "run", "down", "feat/a"}},
-		"logs":               {followUp: actions[4], argv: []string{"wtm", "run", "logs", "feat/a"}},
-		"sync":               {followUp: actions[5], argv: []string{"wtm", "sync", "feat/a"}},
-		"clean":              {followUp: actions[6], argv: []string{"wtm-next", "clean", "feat/a"}},
+		"exec":               {followUp: actions[2], argv: []string{"wtm-next", "exec", "feat/a"}},
+		"run_up":             {followUp: actions[3], argv: []string{"wtm", "run", "up", "feat/a"}},
+		"run_down":           {followUp: actions[4], argv: []string{"wtm", "run", "down", "feat/a"}},
+		"logs":               {followUp: actions[5], argv: []string{"wtm", "run", "logs", "feat/a"}},
+		"sync":               {followUp: actions[6], argv: []string{"wtm", "sync", "feat/a"}},
+		"clean":              {followUp: actions[7], argv: []string{"wtm-next", "clean", "feat/a"}},
 		"go_detached":        {followUp: repository.Offered(list.Actions(list.Detail{Path: "/repo/.trees/detached"}))[0], argv: []string{"cd", "/repo/.trees/detached"}},
 		"enter":              {followUp: domain.Enter("feat/notes"), argv: []string{"wtm", "go", "feat/notes"}},
 		"left_behind":        {followUp: leftBehind("feat/x"), argv: []string{"wtm-next", "clean", "feat/x", "--force"}},
@@ -185,7 +187,7 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			_, unspelled := spelled(c.followUp)
-			if c.followUp.Command == clean.Name || c.followUp.Command == prune.Name || c.followUp.Command == reparent.Name {
+			if c.followUp.Command == clean.Name || c.followUp.Command == prune.Name || c.followUp.Command == reparent.Name || c.followUp.Command == exec.Name {
 				unspelled = nil
 			}
 

@@ -177,11 +177,11 @@ func TestPrintKeepsTheWholeOutputAndTheTailItsLastLines(t *testing.T) {
 
 func TestEachTailLineIsWhatATerminalWouldShow(t *testing.T) {
 	w := newWorld(t)
-	lines := []string{`\033[1;31mred\033[0m`, `\033]8;;https://wtm.dev\033\\link\033]8;;\007`, `10%%\r50%%\r100%% done`, `\0337saved\0338`}
+	lines := []string{`\033[1;31mred\033[0m`, `\033]8;;https://wtm.dev\033\\link\033]8;;\007`, `10%%\r50%%\r100%% done`, `\0337saved\0338`, `\033(Bplain`}
 
 	result, _ := w.apply(t, running("printf '"+strings.Join(lines, `\n`)+`\n'`, featA))
 
-	assert.Equal(t, []string{"red", "link", "100% done", "saved"}, result.Items[0].Detail.Tail)
+	assert.Equal(t, []string{"red", "link", "100% done", "saved", "plain"}, result.Items[0].Detail.Tail)
 }
 
 func TestACancelStopsTheCommandsRunningAndReachesNoOther(t *testing.T) {

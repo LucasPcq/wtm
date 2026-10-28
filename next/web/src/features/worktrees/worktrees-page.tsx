@@ -7,6 +7,7 @@ import { SelectionBar } from '@/features/worktrees/components/selection-bar'
 import { Toolbar } from '@/features/worktrees/components/toolbar'
 import { CreateButton } from '@/features/worktrees/create/create-button'
 import { DetailPanel } from '@/features/worktrees/detail/detail-panel'
+import { ExecDialog } from '@/features/worktrees/exec/exec-dialog'
 import { FastForwardDialog } from '@/features/worktrees/fast-forward/fast-forward-dialog'
 import { useRead } from '@/features/worktrees/hooks/use-read'
 import { useUnderWay } from '@/features/worktrees/hooks/use-run'
@@ -81,6 +82,7 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
       <RemoveDialog repo={repo} />
       <PruneDialog repo={repo} />
       <FastForwardDialog repo={repo} />
+      <ExecDialog repo={repo} />
       {selected.length > 0 ? (
         <SelectionBar repo={repo} count={selected.length} rows={selectedRows} onClear={selection.clear} />
       ) : (

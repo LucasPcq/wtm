@@ -253,8 +253,8 @@ func (p Plan) retry(items []Item) *domain.FollowUp {
 // tailLines is how many of its last lines a target's detail keeps.
 const tailLines = 20
 
-// escapes are the terminal's escape sequences a line may hold: CSI (colours, cursor moves), OSC (titles, links) ended by BEL or ESC \, and the two-byte ones.
-var escapes = regexp.MustCompile(`\x1b(\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(\x07|\x1b\\)|[0-~])`)
+// escapes are the terminal's escape sequences a line may hold: CSI (colours, cursor moves), OSC (titles, links) ended by BEL or ESC \, and the short ones (ESC 7, a charset's ESC ( B).
+var escapes = regexp.MustCompile(`\x1b(\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(\x07|\x1b\\)|[ -/]*[0-~])`)
 
 // A tail keeps the last lines a command printed, each as a terminal would have left it.
 type tail []string

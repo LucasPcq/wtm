@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import type { DomainFollowUp, RepositoryOffer, WorktreeAction, WorktreeUnoffered } from '@/api/types.gen'
 
-export type MenuAction = WorktreeAction | 'reparent' | 'exec'
+export type MenuAction = WorktreeAction | 'reparent'
 
 export type Section = 'Branch' | 'Run' | 'Open' | 'Remove'
 
@@ -25,7 +25,7 @@ export const menu: Record<MenuAction, { section: Section; label: string; icon: L
   fast_forward: { section: 'Branch', label: 'Fast-forward', icon: FastForward, runs: 'web' },
   sync: { section: 'Branch', label: 'Sync', icon: RefreshCw, runs: 'copy' },
   reparent: { section: 'Branch', label: 'Reparent', icon: GitBranch, runs: 'later' },
-  exec: { section: 'Run', label: 'Run a command', icon: SquareTerminal, runs: 'later' },
+  exec: { section: 'Run', label: 'Run a command', icon: SquareTerminal, runs: 'web' },
   run_up: { section: 'Run', label: 'Start the profile', icon: Play, runs: 'copy' },
   run_down: { section: 'Run', label: 'Stop the profile', icon: Square, runs: 'copy' },
   logs: { section: 'Run', label: 'View the logs', icon: ScrollText, runs: 'copy' },

@@ -7,6 +7,7 @@ type Action string
 const (
 	ActionGo          Action = "go"
 	ActionOpenPR      Action = "open_pr"
+	ActionExec        Action = "exec"
 	ActionRunUp       Action = "run_up"
 	ActionRunDown     Action = "run_down"
 	ActionLogs        Action = "logs"
@@ -18,7 +19,7 @@ const (
 
 // Actions returns every Action, in the order a read offers them.
 func Actions() []Action {
-	return []Action{ActionGo, ActionOpenPR, ActionRunUp, ActionRunDown, ActionLogs, ActionFastForward, ActionSync, ActionReparent, ActionClean}
+	return []Action{ActionGo, ActionOpenPR, ActionExec, ActionRunUp, ActionRunDown, ActionLogs, ActionFastForward, ActionSync, ActionReparent, ActionClean}
 }
 
 // An Unoffered is why a worktree does not offer an action, as a code each surface words its own way.
@@ -83,7 +84,7 @@ func Unoffer(p OfferParams, action Action) Unoffered {
 	switch {
 	case p.Missing:
 		return UnofferedMissing
-	case action == ActionGo:
+	case action == ActionGo, action == ActionExec:
 		return ""
 	case p.Detached:
 		return UnofferedNoBranch

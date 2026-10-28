@@ -50,6 +50,7 @@ const runsHere: Record<
   },
   create: null,
   prune: { verb: pruneAction.label, open: (repo, fix) => openPrune(repo, subjectsOf(fix)) },
+  exec: null,
 }
 
 export function Callout({ repo, problems: [first, ...more] }: { repo: string; problems: StatusProblem[] }) {

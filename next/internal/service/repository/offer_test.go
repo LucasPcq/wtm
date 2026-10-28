@@ -35,5 +35,5 @@ func TestAPullRequestKnownIsALinkAndAWorktreeOnNoBranchIsNamedByItsPath(t *testi
 	assert.Equal(t, &domain.FollowUp{URL: "https://github.com/acme/acme/pull/12", Code: "tree.open_pr", Message: "Open the pull request", Params: domain.Params{repository.ParamNumber: "12"}}, offerOf(t, linked, worktree.ActionOpenPR).FollowUp)
 	assert.Equal(t, worktree.UnofferedNoBranch, *offerOf(t, detached, worktree.ActionOpenPR).Refused)
 	assert.Equal(t, []string{"/t/x"}, offerOf(t, detached, worktree.ActionClean).FollowUp.Answers[0].Values)
-	assert.Len(t, repository.Offered(detached), 2)
+	assert.Len(t, repository.Offered(detached), 3)
 }

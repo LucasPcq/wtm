@@ -5,6 +5,7 @@ import type { DomainFollowUp, ListDetail, TreeDetail } from '@/api/types.gen'
 import { noFetch, unitsOf } from '@/features/worktrees/fast-forward/utils/plan'
 import { toldOf } from '@/features/worktrees/fast-forward/utils/recap'
 import { useDirectRun } from '@/features/worktrees/hooks/use-direct-run'
+import { openExec } from '@/features/worktrees/hooks/use-exec-dialog'
 import { openFastForward, useFastForwardDialog } from '@/features/worktrees/hooks/use-fast-forward-dialog'
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
 import { type Entry, leftOf, menu, type Subject, subjectsOf } from '@/features/worktrees/utils/actions'
@@ -66,6 +67,8 @@ export function useRunEntry(repo: string) {
         return void (entry.followUp.url && window.open(entry.followUp.url, '_blank', 'noreferrer'))
       case 'web':
         if (entry.action === 'fast_forward') return fastForward(entry.followUp, rows)
+        if (entry.action === 'exec')
+          return openExec(repo, { worktrees: subjectsOf(entry.followUp), left: leftOf(rows, entry.action) })
         return openRemove(repo, {
           worktrees: subjectsOf(entry.followUp),
           left: leftOf(rows, entry.action),

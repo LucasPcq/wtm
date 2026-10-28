@@ -89,7 +89,7 @@ func TestAWorktreeShownOffersWhatItsRowShowsWhenThePullRequestsLand(t *testing.T
 	for _, action := range shown.Offered() {
 		codes = append(codes, action.Code)
 	}
-	assert.Equal(t, []string{"list.go", "list.open_pr", "list.run_up", "list.run_down", "list.logs", "list.sync", "list.reparent", "list.clean"}, codes)
+	assert.Equal(t, []string{"list.go", "list.open_pr", "list.exec", "list.run_up", "list.run_down", "list.logs", "list.sync", "list.reparent", "list.clean"}, codes)
 }
 
 func TestAPickSurvivesAReadThatNoLongerHasTheWorktree(t *testing.T) {

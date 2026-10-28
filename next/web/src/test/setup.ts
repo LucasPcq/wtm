@@ -1,6 +1,7 @@
 import { cleanup } from '@testing-library/react'
 import { toast } from 'sonner'
 import { afterAll, afterEach, beforeAll } from 'vitest'
+import { useExecDialog } from '@/features/worktrees/hooks/use-exec-dialog'
 import { useFastForwardDialog } from '@/features/worktrees/hooks/use-fast-forward-dialog'
 import { usePruneDialog } from '@/features/worktrees/hooks/use-prune-dialog'
 import { useRemoveDialog } from '@/features/worktrees/hooks/use-remove-dialog'
@@ -20,6 +21,7 @@ afterEach(() => {
   useRemoveDialog.setState(useRemoveDialog.getInitialState(), true)
   usePruneDialog.setState(usePruneDialog.getInitialState(), true)
   useFastForwardDialog.setState(useFastForwardDialog.getInitialState(), true)
+  useExecDialog.setState(useExecDialog.getInitialState(), true)
   useSelections.setState(useSelections.getInitialState(), true)
   // Sonner replays every toast still active to the next Toaster mounted: the next test's page
   toast.dismiss()

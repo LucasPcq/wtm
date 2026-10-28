@@ -13,6 +13,7 @@ import type {
 const commands: Record<WorktreeAction, string> = {
   go: 'go',
   open_pr: '',
+  exec: 'exec',
   run_up: 'run up',
   run_down: 'run down',
   logs: 'run logs',

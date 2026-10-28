@@ -36,6 +36,7 @@ const ParamNumber = "number"
 var byAction = map[worktree.Action]struct{ command, label string }{
 	worktree.ActionGo:          {domain.CommandGo, "Go to the worktree"},
 	worktree.ActionOpenPR:      {"", "Open the pull request"},
+	worktree.ActionExec:        {domain.CommandExec, "Run a command"},
 	worktree.ActionRunUp:       {"run up", "Start the profile"},
 	worktree.ActionRunDown:     {"run down", "Stop the profile"},
 	worktree.ActionLogs:        {"run logs", "View the logs"},

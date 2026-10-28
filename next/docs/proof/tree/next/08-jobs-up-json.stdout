@@ -58,6 +58,23 @@
             "refused": "no_pull_request"
           },
           {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "main"
+                  ]
+                }
+              ],
+              "code": "tree.exec",
+              "message": "Run a command"
+            },
+            "refused": null
+          },
+          {
             "action": "run_up",
             "follow_up": {
               "command": "run up",
@@ -196,6 +213,23 @@
             "action": "open_pr",
             "follow_up": null,
             "refused": "no_pull_request"
+          },
+          {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a"
+                  ]
+                }
+              ],
+              "code": "tree.exec",
+              "message": "Run a command"
+            },
+            "refused": null
           },
           {
             "action": "run_up",
@@ -367,6 +401,23 @@
             "refused": "no_pull_request"
           },
           {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui"
+                  ]
+                }
+              ],
+              "code": "tree.exec",
+              "message": "Run a command"
+            },
+            "refused": null
+          },
+          {
             "action": "run_up",
             "follow_up": {
               "command": "run up",
@@ -520,6 +571,23 @@
             "action": "open_pr",
             "follow_up": null,
             "refused": "no_pull_request"
+          },
+          {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/a-ui-form"
+                  ]
+                }
+              ],
+              "code": "tree.exec",
+              "message": "Run a command"
+            },
+            "refused": null
           },
           {
             "action": "run_up",
@@ -677,6 +745,23 @@
             "refused": "no_pull_request"
           },
           {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/b"
+                  ]
+                }
+              ],
+              "code": "tree.exec",
+              "message": "Run a command"
+            },
+            "refused": null
+          },
+          {
             "action": "run_up",
             "follow_up": {
               "command": "run up",
@@ -832,6 +917,23 @@
             "refused": "no_pull_request"
           },
           {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/r"
+                  ]
+                }
+              ],
+              "code": "tree.exec",
+              "message": "Run a command"
+            },
+            "refused": null
+          },
+          {
             "action": "run_up",
             "follow_up": {
               "command": "run up",
@@ -975,6 +1077,11 @@
             "refused": "missing"
           },
           {
+            "action": "exec",
+            "follow_up": null,
+            "refused": "missing"
+          },
+          {
             "action": "run_up",
             "follow_up": null,
             "refused": "missing"
@@ -1068,6 +1175,23 @@
             "action": "open_pr",
             "follow_up": null,
             "refused": "no_pull_request"
+          },
+          {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "cyc-1"
+                  ]
+                }
+              ],
+              "code": "tree.exec",
+              "message": "Run a command"
+            },
+            "refused": null
           },
           {
             "action": "run_up",
@@ -1223,6 +1347,23 @@
             "action": "open_pr",
             "follow_up": null,
             "refused": "no_pull_request"
+          },
+          {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "cyc-2"
+                  ]
+                }
+              ],
+              "code": "tree.exec",
+              "message": "Run a command"
+            },
+            "refused": null
           },
           {
             "action": "run_up",
@@ -1405,6 +1546,23 @@
             "action": "open_pr",
             "follow_up": null,
             "refused": "no_pull_request"
+          },
+          {
+            "action": "exec",
+            "follow_up": {
+              "command": "exec",
+              "answers": [
+                {
+                  "path": "worktree",
+                  "values": [
+                    "feat/login-ui"
+                  ]
+                }
+              ],
+              "code": "tree.exec",
+              "message": "Run a command"
+            },
+            "refused": null
           },
           {
             "action": "run_up",
