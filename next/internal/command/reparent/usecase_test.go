@@ -153,3 +153,21 @@ func TestThePlanIsRefusedOnceAParentChangedUnderIt(t *testing.T) {
 	assert.True(t, domain.PlanStale(err))
 	assert.Equal(t, featA, w.parentOf(t, featC))
 }
+
+func TestAWorktreeWhoseRecordANewerWtmWroteIsRefusedAsAWriteIs(t *testing.T) {
+	w := newWorld(t)
+	newer := `{"schema": 99, "source_branch": "main"}`
+	writeFile(t, w.recordPath(t, featX), newer)
+
+	_, err := w.usecase.Run(t.Context(), moving("main", featX), domain.RunOptions{})
+
+	refused := failureOf(t, err)
+	assert.Equal(t, reparent.CodeMetaNewer, refused.Code)
+	assert.Equal(t, domain.KindPrecondition, refused.Kind)
+	assert.Contains(t, refused.Message, featX)
+	var schema *domain.SchemaNewer
+	assert.ErrorAs(t, err, &schema)
+	content, readErr := os.ReadFile(w.recordPath(t, featX))
+	require.NoError(t, readErr)
+	assert.Equal(t, newer, string(content))
+}

@@ -186,3 +186,8 @@ func (w world) rawRecord(t *testing.T, name, content string) {
 	require.True(t, ok)
 	writeFile(t, filepath.Join(dir, "meta.json"), content)
 }
+
+// warningsOf are the warnings of code among warnings.
+func warningsOf(warnings []domain.Warning, code string) []domain.Warning {
+	return slices.DeleteFunc(slices.Clone(warnings), func(w domain.Warning) bool { return w.Code != code })
+}

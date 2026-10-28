@@ -66,20 +66,20 @@ func TestATrailLineWiderThanTheWizardEndsOnAnEllipsis(t *testing.T) {
 	long := strings.Repeat("feat/été-", 12)
 	cases := map[string]struct {
 		Standing form.Standing
-		Line     string
+		Prefix   string
 	}{
-		"answer": {Standing: form.Standing{Value: long, Given: true, Flag: "--first"}, Line: "  ✓ First: " + long},
-		"skip":   {Standing: form.Standing{Skip: domain.Skip(long)}, Line: "  · First — " + long},
+		"answer": {Standing: form.Standing{Value: long, Given: true, Flag: "--first"}, Prefix: "  ✓ First: "},
+		"skip":   {Standing: form.Standing{Skip: domain.Skip(long)}, Prefix: "  · First — "},
 	}
 	for name, c := range cases {
 		f := newFake()
 		f.first.standing = c.Standing
 		d := open(t, f.script())
 
-		line := trailLine(t, d.Screen(), c.Line[:12])
+		line := trailLine(t, d.Screen(), c.Prefix)
 		assert.Equal(t, size.Width, ansi.StringWidth(line), name)
 		assert.True(t, strings.HasSuffix(line, "…"), name)
-		assert.True(t, strings.HasPrefix(c.Line, strings.TrimSuffix(line, "…")), name)
+		assert.True(t, strings.HasPrefix(c.Prefix+long, strings.TrimSuffix(line, "…")), name)
 	}
 }
 

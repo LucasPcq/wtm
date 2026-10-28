@@ -26,7 +26,7 @@ func TestAWriteOverANewerFileIsRefusedWithItsSchema(t *testing.T) {
 	newer, ok := errors.AsType[*domain.SchemaNewer](err)
 	require.True(t, ok)
 	assert.Equal(t, domain.SchemaNewer{Path: "/repo/.git/wtm/run.toml", Found: 2, Supported: 1}, *newer)
-	assert.Equal(t, "/repo/.git/wtm/run.toml is at schema 2, newer than the 1 this wtm writes: upgrade wtm to change it", err.Error())
+	assert.Equal(t, "/repo/.git/wtm/run.toml is at schema 2, newer than the 1 this wtm writes: upgrade wtm to use it", err.Error())
 }
 
 func TestAWriteOverACurrentFileGoesAhead(t *testing.T) {

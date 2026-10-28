@@ -105,3 +105,21 @@ func TestAFollowUpNamingPruneIsSpelledFromItsSchema(t *testing.T) {
 	assert.Equal(t, []string{"wtm-next", "prune", dirty, "--force", "--gone", "--dry-run"}, Line(forced))
 	assert.Nil(t, Line(wrong))
 }
+
+func TestAWorktreeNamedWhoseRecordANewerWtmWroteIsRefusedWithTheStateFilesExitCode(t *testing.T) {
+	got := runPrune(t, newWorld(seed{Newer: []string{merged}}), merged, "--force")
+
+	assert.Equal(t, uicli.ExitStateSchemaNewer, got.Code)
+	assert.Contains(t, got.Stderr, "a newer wtm wrote the record of "+merged)
+}
+
+func TestAWorktreeTheCommandChoseWhoseRecordANewerWtmWroteIsKeptAndTheOthersGo(t *testing.T) {
+	w := newWorld(seed{Newer: []string{merged}})
+
+	got := runPrune(t, w)
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	assert.Contains(t, got.Stdout+got.Stderr, merged+" is kept: a newer wtm wrote its record")
+	assert.NotContains(t, w.git.Calls(), "DeleteBranch "+merged)
+	assert.Contains(t, w.git.Calls(), "DeleteBranch "+gone)
+}

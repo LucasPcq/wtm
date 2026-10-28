@@ -105,10 +105,10 @@ const (
 	CodeBaseBranch   = Name + ".base_branch"
 )
 
-// picked are the candidates the request picks, with the problems of its entries: those it names, each a candidate, else every one safe to remove, every one when forced.
+// picked are the candidates the request picks, with the problems of its entries: those it names, each a candidate, else every one safe to remove, every one when forced, but those whose record a newer wtm wrote.
 func (f Facts) picked(req Request, candidates []Candidate) ([]Candidate, []domain.FieldError) {
 	if len(req.Worktrees) == 0 {
-		return slices.DeleteFunc(slices.Clone(candidates), func(c Candidate) bool { return c.Unsafe() && !req.Force }), nil
+		return slices.DeleteFunc(slices.Clone(candidates), func(c Candidate) bool { return f.leaves(c, req) }), nil
 	}
 
 	var picked []Candidate
@@ -196,7 +196,7 @@ func (c Candidate) ruledOut() bool {
 // ----------------------------------------------------------------------------
 // Decide
 
-// Decide turns the facts and the resolved request into the plan and its warnings. A worktree the request names that a blocker makes unsafe refuses the whole request, before anything is removed, with CodeUnsafe, unless the request forces it. One the command chose itself, the request naming none, is left as it is unless forced: a plan entry with its blockers and no phase, an item ruled out on the apply, and a CodeKept warning.
+// Decide turns the facts and the resolved request into the plan and its warnings. A worktree the request names that a blocker makes unsafe refuses the whole request, before anything is removed, with CodeUnsafe, unless the request forces it; one whose record a newer wtm wrote refuses it with CodeMetaNewer, forced or not. One the command chose itself, the request naming none, is left as it is unless forced: a plan entry with its blockers and no phase, an item ruled out on the apply, and a CodeKept warning; one whose record a newer wtm wrote, forced or not, with a CodeMetaNewer warning instead.
 func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	candidates := f.Candidates(req)
 	picked, _ := f.picked(req, candidates)
@@ -213,7 +213,7 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	if len(req.Worktrees) == 0 {
 		worktrees = slices.Clone(candidates)
 		for i, c := range worktrees {
-			if c.Unsafe() && !req.Force {
+			if f.leaves(c, req) {
 				worktrees[i].Phases, worktrees[i].Hooks = []domain.Phase{}, nil
 			}
 		}
@@ -225,6 +225,11 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	return planned, f.warnings(planned, req), nil
 }
 
+// leaves reports whether the command, choosing the worktrees itself, leaves c as it is: unsafe and not forced, or its record a newer wtm's, which no force lifts.
+func (f Facts) leaves(c Candidate, req Request) bool {
+	return (c.Unsafe() && !req.Force) || f.Newer[c.Branch] != nil
+}
+
 func orEmpty(candidates []Candidate) []Candidate {
 	if candidates == nil {
 		return []Candidate{}
@@ -232,8 +237,8 @@ func orEmpty(candidates []Candidate) []Candidate {
 	return candidates
 }
 
-// CodeSchemaNewer refuses a request that would remove a worktree whose record a newer wtm wrote, forced or not.
-const CodeSchemaNewer = Name + teardown.SchemaNewer
+// CodeMetaNewer refuses a request naming a worktree whose record a newer wtm wrote, forced or not, and warns of one the command chose and leaves as it is.
+const CodeMetaNewer = Name + domain.MetaNewer
 
 // CodeUnsafe refuses a request naming a worktree a blocker makes unsafe; CodeForce is its follow-up, the same request forced, and that of the worktrees left as they are; CodeStopJobs is the one that stops a worktree's jobs.
 const (
@@ -263,6 +268,12 @@ func (f Facts) warnings(planned Plan, req Request) []domain.Warning {
 	}
 	warnings = append(warnings, f.Warnings(teardown.WarningsParams{Command: Name, Removals: removals(planned.removed()), Unasked: unasked})...)
 
+	for _, c := range planned.Worktrees {
+		if newer := f.Newer[c.Branch]; newer != nil {
+			warnings = append(warnings, domain.Warning{Code: CodeMetaNewer, Message: c.Worktree + " is kept: a newer wtm wrote its record and owns its removal: " + newer.Error(), Params: domain.Params{"worktree": c.Worktree}})
+		}
+	}
+
 	kept := planned.kept()
 	for i, c := range kept {
 		lost := strings.Join(domain.Names(c.Blockers), ", ")
@@ -282,7 +293,7 @@ func (f Facts) warnings(planned Plan, req Request) []domain.Warning {
 // ----------------------------------------------------------------------------
 // The plan
 
-// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the worktrees done with, each removed in its phases or, unsafe and chosen by the command, left as it is with no phase; the children left behind, the reasons asked, whether the children are reparented and whether the unsafe worktrees are forced; then the recap, which the fingerprint leaves out.
+// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the worktrees done with, each removed in its phases or, chosen by the command and unsafe or its record a newer wtm's, left as it is with no phase; the children left behind, the reasons asked, whether the children are reparented and whether the unsafe worktrees are forced; then the recap, which the fingerprint leaves out.
 type Plan struct {
 	Worktrees        []Candidate     `json:"worktrees"`
 	Moves            []teardown.Move `json:"moves,omitempty"`
@@ -294,13 +305,13 @@ type Plan struct {
 	standing string // the worktree removed the caller stands in, empty when none
 }
 
-// removed are the worktrees the plan removes, kept those it leaves as they are.
+// removed are the worktrees the plan removes, kept those it leaves as they are for being unsafe.
 func (p Plan) removed() []Candidate {
 	return slices.DeleteFunc(slices.Clone(p.Worktrees), Candidate.ruledOut)
 }
 
 func (p Plan) kept() []Candidate {
-	return slices.DeleteFunc(slices.Clone(p.Worktrees), func(c Candidate) bool { return !c.ruledOut() })
+	return slices.DeleteFunc(slices.Clone(p.Worktrees), func(c Candidate) bool { return !c.ruledOut() || p.facts.Newer[c.Branch] != nil })
 }
 
 // Locks are the locks the plan needs: the repository shared, and each worktree it removes and each child it reparents exclusive.

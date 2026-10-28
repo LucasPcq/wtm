@@ -133,3 +133,10 @@ func TestAFollowUpNamingCleanIsSpelledFromItsSchema(t *testing.T) {
 	assert.Equal(t, []string{"wtm-next", "clean", dirty, "--force", "--dry-run"}, Line(forced))
 	assert.Nil(t, Line(wrong))
 }
+
+func TestAWorktreeWhoseRecordANewerWtmWroteIsRefusedWithTheStateFilesExitCode(t *testing.T) {
+	got := runClean(t, newWorld(seed{Newer: []string{plain}}), plain, "--yes", "--force")
+
+	assert.Equal(t, uicli.ExitStateSchemaNewer, got.Code)
+	assert.Contains(t, got.Stderr, "a newer wtm wrote the record of "+plain)
+}

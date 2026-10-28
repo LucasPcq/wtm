@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/fs"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -206,7 +207,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, err
 	}
 
-	facts := Facts{Repository: repo, Records: map[string]worktree.Meta{}, Gone: map[string]bool{}, CPUs: u.CPUs}
+	facts := Facts{Repository: repo, Records: map[string]worktree.Meta{}, RecordErrs: map[string]error{}, Gone: map[string]bool{}, CPUs: u.CPUs}
 	for _, w := range repo.Checkouts() {
 		if facts.Gone[w.Path], err = repository.Gone(ctx, u.Git, w); err != nil {
 			return Facts{}, repository.Interrupted(ctx, err)
@@ -215,8 +216,12 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 			continue
 		}
 		// A record that cannot be read gives the command no run environment: it runs all the same.
-		if record, err := u.Meta.Load(w.Branch()); err == nil {
+		record, err := u.Meta.Load(w.Branch())
+		switch {
+		case err == nil:
 			facts.Records[w.Branch()] = record
+		case !errors.Is(err, fs.ErrNotExist):
+			facts.RecordErrs[w.Branch()] = err
 		}
 	}
 

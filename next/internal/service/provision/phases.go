@@ -36,11 +36,12 @@ func (p *provisioning) hooksReadRun() bool {
 }
 
 // number gives the worktree a free ordinal. Failing to find one stops the run
-// only when ctx is cancelled; otherwise the worktree stays unnumbered, with a
-// warning when its ports needed the ordinal.
+// when ctx is cancelled or a record a newer wtm wrote holds an ordinal this wtm
+// cannot know; otherwise the worktree stays unnumbered, with a warning when its
+// ports needed the ordinal.
 func (p *provisioning) number(ctx context.Context, provisioned *Provisioned) error {
 	ordinal, err := p.allocate(ctx)
-	if err != nil && ctx.Err() != nil {
+	if _, newer := errors.AsType[*domain.SchemaNewer](err); newer || (err != nil && ctx.Err() != nil) {
 		return err
 	}
 

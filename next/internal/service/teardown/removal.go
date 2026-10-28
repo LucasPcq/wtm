@@ -2,7 +2,6 @@
 package teardown
 
 import (
-	"errors"
 	"slices"
 	"strconv"
 	"strings"
@@ -172,29 +171,16 @@ const (
 	StopJobs = ".stop_jobs"
 )
 
-// SchemaNewer is the code, after a command's name, of a request refused for removing a worktree whose record a newer wtm wrote.
-const SchemaNewer = ".schema_newer"
-
-// NewerRefusal refuses a request that would remove a worktree among removals whose record a newer wtm wrote, forced or not, with <command>.schema_newer caused by each *domain.SchemaNewer: deleting the record is a write this wtm refuses, and what the teardown must undo is that wtm's to know. Nil when no record is newer.
+// NewerRefusal refuses a request that would remove a worktree among removals whose record a newer wtm wrote, forced or not, with <command>.meta_newer caused by each *domain.SchemaNewer: deleting the record is a write this wtm refuses, and what the teardown must undo is that wtm's to know. Nil when no record is newer.
 func (f Facts) NewerRefusal(command string, removals []Removal) *domain.Error {
-	var names, causes []string
-	var errs []error
+	refusal := domain.MetaNewerParams{Code: command + domain.MetaNewer, Undone: "nothing removed"}
 	for _, r := range removals {
 		if newer := f.Newer[r.Branch]; newer != nil {
-			names, causes, errs = append(names, r.Worktree), append(causes, newer.Error()), append(errs, newer)
+			refusal.Worktrees, refusal.Records = append(refusal.Worktrees, r.Worktree), append(refusal.Records, newer)
 		}
 	}
-	if len(names) == 0 {
-		return nil
-	}
 
-	return &domain.Error{
-		Kind:    domain.KindPrecondition,
-		Code:    command + SchemaNewer,
-		Message: "nothing removed: a newer wtm wrote the record of " + strings.Join(names, ", ") + " and owns its removal: " + strings.Join(causes, "; "),
-		Params:  domain.Params{"worktrees": strings.Join(names, ", ")},
-		Cause:   errors.Join(errs...),
-	}
+	return domain.MetaNewerRefusal(refusal)
 }
 
 // RefusalParams are the command refusing, the unsafe removals it refuses, and its request forced, the refusal's follow-up.

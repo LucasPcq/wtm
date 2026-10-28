@@ -115,8 +115,8 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	return planned, f.warnings(planned), nil
 }
 
-// CodeSchemaNewer refuses a request that would remove a worktree whose record a newer wtm wrote, forced or not.
-const CodeSchemaNewer = Name + teardown.SchemaNewer
+// CodeMetaNewer refuses a request that would remove a worktree whose record a newer wtm wrote, forced or not.
+const CodeMetaNewer = Name + domain.MetaNewer
 
 // CodeUnsafe refuses a request that would remove a worktree a blocker makes unsafe; CodeForce is its follow-up, the same request forced, and CodeStopJobs the one that stops a worktree's jobs.
 const (

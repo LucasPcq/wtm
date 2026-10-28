@@ -642,7 +642,7 @@ func TestAWorktreeWhoseRecordANewerWtmWroteIsRefusedEvenForced(t *testing.T) {
 		_, err := w.usecase.Run(t.Context(), clean.Request{Worktrees: []string{plain, pushed}, Force: force}, domain.RunOptions{})
 
 		refused := failureOf(t, err)
-		assert.Equal(t, clean.CodeSchemaNewer, refused.Code)
+		assert.Equal(t, clean.CodeMetaNewer, refused.Code)
 		assert.Contains(t, refused.Message, plain)
 		var newer *domain.SchemaNewer
 		assert.ErrorAs(t, err, &newer)

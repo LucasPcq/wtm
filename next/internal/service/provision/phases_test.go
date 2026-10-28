@@ -91,6 +91,23 @@ func TestANumberIsNeverGivenPastANeighbourWhoseRecordDoesNotRead(t *testing.T) {
 	assert.Equal(t, settled("what kept them"), outcome.Warnings[0].FollowUp)
 }
 
+func TestANumberIsNeverGivenPastANeighbourANewerWtmRecorded(t *testing.T) {
+	w, files := inMemory(t, seeds{
+		Worktrees: []worktree.Worktree{{Path: "/trees/a", State: worktree.OnBranch{Branch: "feat/a"}}},
+		Store:     storetest.FakeParams{Meta: map[string]worktree.Meta{"feat/a": {Schema: 99, Ordinal: 1}}},
+	})
+
+	outcome := w.service.Run(t.Context(), portLinked(w.params(&recorder{})))
+
+	assert.Equal(t, domain.StatusFailed, outcome.Status)
+	assert.Equal(t, domain.ReasonIncomplete, outcome.Reason)
+	var newer *domain.SchemaNewer
+	require.ErrorAs(t, outcome.Err, &newer)
+	assert.Zero(t, outcome.Provisioned.Meta.Ordinal)
+	recorded, _ := files.Meta(branchName)
+	assert.Zero(t, recorded.Ordinal)
+}
+
 func TestANumberThatCannotBeGivenLeavesThePortsAsCopiedAndSaysWhy(t *testing.T) {
 	w, _ := inMemory(t, seeds{GitFail: map[string]error{"Worktrees": errors.New("git worktree list: exit status 128")}})
 	report := &recorder{}

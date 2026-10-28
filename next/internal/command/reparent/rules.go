@@ -1,6 +1,7 @@
 package reparent
 
 import (
+	"errors"
 	"slices"
 	"strconv"
 	"strings"
@@ -74,6 +75,22 @@ const (
 	CodeUnrecorded     = Name + ".unrecorded"
 	CodeCycle          = Name + ".cycle"
 )
+
+// CodeMetaNewer refuses a request naming a worktree whose record a newer wtm wrote: moving it is a write this wtm refuses.
+const CodeMetaNewer = Name + domain.MetaNewer
+
+// newerRefusal refuses a request that would move, among names, a worktree whose record a newer wtm wrote, with CodeMetaNewer caused by each *domain.SchemaNewer; nil when none does.
+func (f Facts) newerRefusal(names []string) *domain.Error {
+	refusal := domain.MetaNewerParams{Code: CodeMetaNewer, Undone: "nothing moved"}
+	for _, name := range names {
+		w, found := f.named(name)
+		if newer, ok := errors.AsType[*domain.SchemaNewer](f.RecordErrs[w.Branch()]); found && ok {
+			refusal.Worktrees, refusal.Records = append(refusal.Worktrees, w.Branch()), append(refusal.Records, newer)
+		}
+	}
+
+	return domain.MetaNewerRefusal(refusal)
+}
 
 // entries decides each worktree names asks to move onto to: its move, or the problem of its entry: blank, given twice, no worktree, or a worktree reparent cannot move.
 func (f Facts) entries(names []string, to string) (moves []Move, problems []domain.FieldError) {

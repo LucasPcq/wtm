@@ -98,6 +98,10 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 	if err != nil {
 		return Plan{}, nil, err
 	}
+	picked, _ := facts.picked(req)
+	if refused := facts.newerRefusal(picked); refused != nil {
+		return Plan{}, nil, refused
+	}
 
 	resolved, err := Resolve(facts, req)
 	if err != nil {
