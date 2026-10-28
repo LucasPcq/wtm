@@ -90,8 +90,9 @@ func (f *Fake) Meta(branch string) (worktree.Meta, bool) {
 }
 
 // Load returns the record of branch as store.Meta.Load does: an error for a
-// branch that maps onto no directory, a record that does not read, or one that
-// is missing (wrapping os.ErrNotExist).
+// branch that maps onto no directory, a record that does not read, one that
+// is missing (wrapping os.ErrNotExist), or one a newer wtm wrote
+// (*domain.SchemaNewer).
 func (f *Fake) Load(branch string) (worktree.Meta, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -109,6 +110,9 @@ func (f *Fake) Load(branch string) (worktree.Meta, error) {
 	meta, ok := f.meta[branch]
 	if !ok {
 		return worktree.Meta{}, fmt.Errorf("storetest: no record of %s: %w", branch, os.ErrNotExist)
+	}
+	if err := refusal(branch, meta); err != nil {
+		return worktree.Meta{}, err
 	}
 	return meta, nil
 }
@@ -182,7 +186,7 @@ func (f *Fake) Update(_ context.Context, update worktree.MetaUpdate) (domain.Wri
 
 // Delete removes the record of branch, readable or not, as store.Meta.Delete
 // does: an error for a branch that maps onto no directory, nothing to do for
-// one with no record.
+// one with no record, a *domain.SchemaNewer for one a newer wtm wrote.
 func (f *Fake) Delete(branch string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -192,6 +196,11 @@ func (f *Fake) Delete(branch string) error {
 
 	if err := segmentOf(branch); err != nil {
 		return err
+	}
+	if meta, ok := f.meta[branch]; ok && !f.unreadable[branch] {
+		if err := refusal(branch, meta); err != nil {
+			return err
+		}
 	}
 
 	delete(f.meta, branch)
@@ -215,11 +224,15 @@ func (f *Fake) stored(branch string) (worktree.Meta, error) {
 		return worktree.Meta{}, nil
 	}
 
-	if err := statefile.Refusal(statefile.Schema{Path: branch, Found: stored.Schema, Supported: metaSchema}); err != nil {
+	if err := refusal(branch, stored); err != nil {
 		return worktree.Meta{}, err
 	}
 
 	return stored, nil
+}
+
+func refusal(branch string, meta worktree.Meta) error {
+	return statefile.Refusal(statefile.Schema{Path: branch, Found: meta.Schema, Supported: metaSchema})
 }
 
 // LockOrdinals runs do, reporting the lock as held; it does not exclude

@@ -2,6 +2,7 @@
 package teardown
 
 import (
+	"errors"
 	"slices"
 	"strconv"
 	"strings"
@@ -16,14 +17,15 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what a removal decides from: the repository, the meta record of each worktree on a branch, what each worktree checked holds that makes it unsafe to remove, where the caller stands, and why the run daemon or the forge could not be asked.
+// Facts are what a removal decides from: the repository, the meta record of each worktree on a branch, the records a newer wtm wrote, what each worktree checked holds that makes it unsafe to remove, where the caller stands, and why the run daemon or the forge could not be asked.
 type Facts struct {
 	worktree.Repository
-	Records map[string]worktree.Meta // by branch
-	Checks  map[string]Check         // by the name a worktree is checked by
-	Cwd     string                   // where the caller stands, through its symbolic links
-	JobsErr error                    // why the run daemon could not tell which jobs are up
-	PRsErr  error                    // why the forge could not be asked for open pull requests
+	Records map[string]worktree.Meta       // by branch
+	Newer   map[string]*domain.SchemaNewer // by branch, the records this wtm can neither read nor delete
+	Checks  map[string]Check               // by the name a worktree is checked by
+	Cwd     string                         // where the caller stands, through its symbolic links
+	JobsErr error                          // why the run daemon could not tell which jobs are up
+	PRsErr  error                          // why the forge could not be asked for open pull requests
 }
 
 // A Check is whether a worktree's directory is gone, and what it holds that its removal would lose or cut short: uncommitted changes, commits no other branch holds, an open pull request, jobs up.
@@ -169,6 +171,31 @@ const (
 	Force    = ".force"
 	StopJobs = ".stop_jobs"
 )
+
+// SchemaNewer is the code, after a command's name, of a request refused for removing a worktree whose record a newer wtm wrote.
+const SchemaNewer = ".schema_newer"
+
+// NewerRefusal refuses a request that would remove a worktree among removals whose record a newer wtm wrote, forced or not, with <command>.schema_newer caused by each *domain.SchemaNewer: deleting the record is a write this wtm refuses, and what the teardown must undo is that wtm's to know. Nil when no record is newer.
+func (f Facts) NewerRefusal(command string, removals []Removal) *domain.Error {
+	var names, causes []string
+	var errs []error
+	for _, r := range removals {
+		if newer := f.Newer[r.Branch]; newer != nil {
+			names, causes, errs = append(names, r.Worktree), append(causes, newer.Error()), append(errs, newer)
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+
+	return &domain.Error{
+		Kind:    domain.KindPrecondition,
+		Code:    command + SchemaNewer,
+		Message: "nothing removed: a newer wtm wrote the record of " + strings.Join(names, ", ") + " and owns its removal: " + strings.Join(causes, "; "),
+		Params:  domain.Params{"worktrees": strings.Join(names, ", ")},
+		Cause:   errors.Join(errs...),
+	}
+}
 
 // RefusalParams are the command refusing, the unsafe removals it refuses, and its request forced, the refusal's follow-up.
 type RefusalParams struct {

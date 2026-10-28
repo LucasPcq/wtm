@@ -15,19 +15,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAFakeRecordAtANewerSchemaIsNeverRewritten(t *testing.T) {
+func TestAFakeRecordAtANewerSchemaIsNeitherReadNorRewrittenNorDeleted(t *testing.T) {
 	fake := NewFake(FakeParams{Meta: map[string]worktree.Meta{"feat/a": {Schema: 99, SourceBranch: "main"}}})
 
-	_, err := fake.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(m *worktree.Meta) error {
+	_, loadErr := fake.Load("feat/a")
+	_, updateErr := fake.Update(t.Context(), worktree.MetaUpdate{Branch: "feat/a", Change: func(m *worktree.Meta) error {
 		m.Ordinal = 1
 		return nil
 	}})
+	deleteErr := fake.Delete("feat/a")
 
-	var refusal *domain.SchemaNewer
-	require.ErrorAs(t, err, &refusal)
+	for _, err := range []error{loadErr, updateErr, deleteErr} {
+		var refusal *domain.SchemaNewer
+		require.ErrorAs(t, err, &refusal)
+	}
 	meta, ok := fake.Meta("feat/a")
 	require.True(t, ok)
 	assert.Equal(t, worktree.Meta{Schema: 99, SourceBranch: "main"}, meta)
+}
+
+func TestAFakeRecordThatDoesNotReadIsDeletedAllTheSame(t *testing.T) {
+	fake := NewFake(FakeParams{Unreadable: []string{"feat/a"}})
+
+	require.NoError(t, fake.Delete("feat/a"))
+
+	branches, err := fake.List()
+	require.NoError(t, err)
+	assert.Empty(t, branches)
 }
 
 func TestAFakeCopiesAndEditsTheFilesItHolds(t *testing.T) {

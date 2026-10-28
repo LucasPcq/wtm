@@ -184,6 +184,20 @@ func TestARecordThatDoesNotReadKeepsItsWorktreeAndIsAWarning(t *testing.T) {
 	assert.Equal(t, worktree.UnofferedUnreadable, *refused)
 }
 
+func TestARecordANewerWtmWroteIsReadAsUnreadableAndSaysSo(t *testing.T) {
+	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}}, Meta: map[string]worktree.Meta{"feat/a": {Schema: 99, CreatedAt: "2026-10-28T12:00:00Z"}}})
+
+	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	item := read.Items[slices.IndexFunc(read.Items, func(item list.Item) bool { return item.Subject == "feat/a" })]
+	assert.Equal(t, domain.StatusDone, item.Status)
+	require.Len(t, item.Warnings, 1)
+	assert.Equal(t, list.CodeMetaUnreadable, item.Warnings[0].Code)
+	assert.Contains(t, item.Warnings[0].Message, "is at schema 99, newer than the 1 this wtm writes")
+	assert.Nil(t, item.Detail.CreatedAt, "nothing is shown from a record whose meaning this wtm does not know")
+}
+
 func TestARecordThatDoesNotReadIsAWarningOnAWorktreeNotReadToo(t *testing.T) {
 	w := newWorld(seed{Git: gittest.FakeParams{Worktrees: []worktree.Worktree{linked("feat/a")}, Fail: map[string]error{"Dirty": errors.New("broken index")}}, Unreadable: []string{"feat/a"}})
 

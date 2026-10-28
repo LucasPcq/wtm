@@ -3,6 +3,7 @@ package form_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,6 +60,35 @@ func TestASettledStepIsNotAskedAndSaysWhatSettledIt(t *testing.T) {
 		assert.Contains(t, d.Screen(), c.Line, name)
 		assert.Contains(t, d.Screen(), "esc cancel", name)
 	}
+}
+
+func TestATrailLineWiderThanTheWizardEndsOnAnEllipsis(t *testing.T) {
+	long := strings.Repeat("feat/été-", 12)
+	cases := map[string]struct {
+		Standing form.Standing
+		Line     string
+	}{
+		"answer": {Standing: form.Standing{Value: long, Given: true, Flag: "--first"}, Line: "  ✓ First: " + long},
+		"skip":   {Standing: form.Standing{Skip: domain.Skip(long)}, Line: "  · First — " + long},
+	}
+	for name, c := range cases {
+		f := newFake()
+		f.first.standing = c.Standing
+		d := open(t, f.script())
+
+		line := trailLine(t, d.Screen(), c.Line[:12])
+		assert.Equal(t, size.Width, ansi.StringWidth(line), name)
+		assert.True(t, strings.HasSuffix(line, "…"), name)
+		assert.True(t, strings.HasPrefix(c.Line, strings.TrimSuffix(line, "…")), name)
+	}
+}
+
+func TestATrailLineThatFitsIsDrawnWhole(t *testing.T) {
+	f := newFake()
+	f.first.standing = form.Standing{Value: "feat/été", Given: true, Flag: "--first"}
+	d := open(t, f.script())
+
+	assert.Equal(t, "  ✓ First: feat/été · --first", trailLine(t, d.Screen(), "  ✓ First"))
 }
 
 func TestAnErredStepIsAskedEvenWhenAFlagSettledIt(t *testing.T) {

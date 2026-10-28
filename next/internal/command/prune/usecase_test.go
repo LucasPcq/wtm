@@ -351,3 +351,30 @@ func TestAWorktreeNamedIsCheckedAgainstTheWorktreesThatStay(t *testing.T) {
 	assert.Equal(t, map[string]domain.Status{"feat/copy": domain.StatusDone}, statuses(outcome.Result.Items))
 	assert.True(t, w.stands(t, goneWork))
 }
+
+func TestAWorktreeDoneWithWhoseRecordANewerWtmWroteRefusesThePrune(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.rawRecord(t, merged, newerRecord)
+
+	for _, req := range []prune.Request{{}, {Force: true}, pruning(merged)} {
+		_, err := w.usecase.Run(t.Context(), req, domain.RunOptions{})
+
+		refused := failureOf(t, err)
+		assert.Equal(t, prune.CodeSchemaNewer, refused.Code)
+		assert.Contains(t, refused.Message, merged)
+		var newer *domain.SchemaNewer
+		assert.ErrorAs(t, err, &newer)
+	}
+	assert.DirExists(t, w.at(merged))
+	assert.True(t, w.stands(t, gone))
+}
+
+func TestAWorktreeDoneWithWhoseRecordDoesNotDecodeIsPrunedAllTheSame(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.rawRecord(t, merged, "{not json")
+
+	_, err := w.usecase.Run(t.Context(), pruning(merged), domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.True(t, w.gone(t, merged))
+}

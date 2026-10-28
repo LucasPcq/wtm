@@ -184,3 +184,6 @@ type uncountable struct {
 func (uncountable) Unpushed(context.Context, worktree.Losing) (int, error) {
 	return 0, errBroken
 }
+
+// newerRecord is a record a newer wtm wrote, at a schema this one does not know.
+const newerRecord = `{"schema": 99, "source_branch": "main"}`

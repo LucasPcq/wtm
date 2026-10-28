@@ -200,6 +200,9 @@ func (c Candidate) ruledOut() bool {
 func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	candidates := f.Candidates(req)
 	picked, _ := f.picked(req, candidates)
+	if refused := f.NewerRefusal(Name, removals(picked)); refused != nil {
+		return Plan{}, nil, refused
+	}
 	if unsafe := blocked(picked); len(unsafe) > 0 && !req.Force {
 		forced := req
 		forced.Force = true
@@ -228,6 +231,9 @@ func orEmpty(candidates []Candidate) []Candidate {
 	}
 	return candidates
 }
+
+// CodeSchemaNewer refuses a request that would remove a worktree whose record a newer wtm wrote, forced or not.
+const CodeSchemaNewer = Name + teardown.SchemaNewer
 
 // CodeUnsafe refuses a request naming a worktree a blocker makes unsafe; CodeForce is its follow-up, the same request forced, and that of the worktrees left as they are; CodeStopJobs is the one that stops a worktree's jobs.
 const (

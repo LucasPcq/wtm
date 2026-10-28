@@ -64,7 +64,7 @@ func (w *Wizard) breadcrumb() string {
 	return muted.Render(fmt.Sprintf("%sStep %d/%d", output.Indent, w.current+1, w.last())) + muted.Render(HelpSeparator) + w.styles.Accent.Render(title)
 }
 
-// summaries draws the trail: a line per step before the one asked, its answer and where it comes from, or why it does not apply.
+// summaries draws the trail: a line per step before the one asked, its answer and where it comes from, or why it does not apply, each cut to the wizard's width on an ellipsis.
 func (w *Wizard) summaries() string {
 	var lines []string
 	for s := range w.current {
@@ -72,9 +72,9 @@ func (w *Wizard) summaries() string {
 		label := w.script.Steps[s].Label()
 		switch {
 		case m.ruled != "":
-			lines = append(lines, w.styles.Muted.Render(output.Indent+"· "+label+" — "+m.ruled))
+			lines = append(lines, w.styles.Muted.Render(output.Truncate(output.Indent+"· "+label+" — "+m.ruled, w.size.Width)))
 		default:
-			lines = append(lines, w.styles.summary.Render(output.Indent+"✓ "+label+": "+m.line))
+			lines = append(lines, w.styles.summary.Render(output.Truncate(output.Indent+"✓ "+label+": "+m.line, w.size.Width)))
 		}
 	}
 	return strings.Join(lines, "\n")
