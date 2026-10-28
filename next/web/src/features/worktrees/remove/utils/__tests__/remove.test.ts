@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import type { TeardownRemoval } from '@/api/types.gen'
-import { requestOf, unitsOf } from '@/features/worktrees/remove/utils/plan'
+import { requestOf } from '@/features/worktrees/remove/utils/plan'
 
 const removal = (worktree: string, blockers: TeardownRemoval['blockers'] = []): TeardownRemoval => ({
   worktree,
@@ -18,18 +18,5 @@ test('the request takes the checked worktrees and forces only when an unsafe one
     { path: 'worktree', values: ['feat/a', 'feat/b'] },
     { path: 'force', values: ['true'] },
     { path: 'reparent_children', values: ['true'] },
-  ])
-})
-
-test('each worktree of the plan is a unit of its own phases, none started', () => {
-  expect(unitsOf({ worktrees: [removal('feat/a')], reparent_children: false, force: false })).toEqual([
-    {
-      subject: 'feat/a',
-      phases: [
-        { phase: 'on_clean', state: 'todo' },
-        { phase: 'remove', state: 'todo' },
-      ],
-      lines: [],
-    },
   ])
 })

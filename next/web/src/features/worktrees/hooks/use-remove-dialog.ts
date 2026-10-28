@@ -1,7 +1,6 @@
 import { create } from 'zustand'
+import type { Left } from '@/features/worktrees/components/left-item'
 import { dismissSucceeded } from '@/features/worktrees/hooks/use-run'
-
-export type Left = { worktree: string; why: string }
 
 export type RemoveAsk = { worktrees: string[]; left: Left[]; prechecked: boolean }
 

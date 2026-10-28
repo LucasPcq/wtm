@@ -15,6 +15,7 @@ export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswer
 
   if (dry.isPending) return <Skeleton className="h-40 w-full" />
   if (dry.isError) return <p className="text-sm text-destructive">{dry.error.message}</p>
+  if (dry.data.error) return <p className="text-sm text-destructive">{dry.data.error.message}</p>
 
   const { plan, warnings } = dry.data
   const branches = plan?.branches ?? []

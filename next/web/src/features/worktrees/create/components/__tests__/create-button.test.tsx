@@ -264,3 +264,28 @@ test("Create's Done keeps a warning of the whole run as its Alert, and one about
   expect(within(toCheck).queryByText(/without operation locks/)).toBeNull()
   expect(within(dialog).getByRole('alert').textContent).toContain('without operation locks')
 })
+
+// A dry run the core answered 400 came back as an envelope with no plan, and Confirm drew nothing.
+test('a plan the core refuses for its answers says why on Confirm, rather than an empty step', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/create', async ({ request }) => {
+      const call = (await request.clone().json()) as WebCall
+      if (!call.dry_run) return undefined
+      return HttpResponse.json(
+        {
+          ...envelope('create', []),
+          ok: false,
+          error: { kind: 'invalid', code: 'domain.invalid', message: 'branches[0]: feat/new.lock is no branch name' },
+        },
+        { status: 400 },
+      )
+    }),
+  )
+  const { user, dialog, branches } = await openCreate()
+
+  await user.type(branches, 'feat/new')
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+
+  expect(await within(dialog).findByText('branches[0]: feat/new.lock is no branch name')).toBeTruthy()
+})

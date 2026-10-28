@@ -15,6 +15,7 @@ import { ColumnsPanel } from '@/features/worktrees/list/components/columns-panel
 import { Notes } from '@/features/worktrees/list/components/notes'
 import { ListView } from '@/features/worktrees/list/list-view'
 import { rowsOf } from '@/features/worktrees/list/utils/rows'
+import { PruneDialog } from '@/features/worktrees/prune/prune-dialog'
 import { RemoveDialog } from '@/features/worktrees/remove/remove-dialog'
 import { useChoice } from '@/features/worktrees/store/ui-store'
 import { TreeView } from '@/features/worktrees/tree/tree-view'
@@ -77,6 +78,7 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
         }
       />
       <RemoveDialog repo={repo} />
+      <PruneDialog repo={repo} />
       {selected.length > 0 ? (
         <SelectionBar repo={repo} count={selected.length} rows={selectedRows} onClear={selection.clear} />
       ) : (

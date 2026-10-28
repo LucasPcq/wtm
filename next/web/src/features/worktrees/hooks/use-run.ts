@@ -23,8 +23,10 @@ export function dismissSucceeded(repo: string, command: MutationCommand) {
   if (run?.running === false && succeeded(run.progress.envelope)) useRuns.setState({ [key]: undefined })
 }
 
+// an item the plan left as it is was never asked: a run that did all it was asked succeeded
 export const succeeded = (envelope: Applied<MutationCommand> | undefined) =>
-  envelope?.ok === true && envelope.items.every((item) => item.status === 'done')
+  envelope?.ok === true &&
+  envelope.items.every((item) => item.status === 'done' || (item.status === 'skipped' && item.reason === 'ruled_out'))
 
 export function useRun<C extends MutationCommand>(repo: string, command: C) {
   const client = useQueryClient()
@@ -80,7 +82,7 @@ export function useRun<C extends MutationCommand>(repo: string, command: C) {
 
 export const clockEvery = 30_000
 
-const doing: Record<MutationCommand, string> = { create: 'Creating', clean: 'Removing' }
+const doing: Record<MutationCommand, string> = { create: 'Creating', clean: 'Removing', prune: 'Pruning' }
 
 export const isMutation = (command: string): command is MutationCommand => Object.hasOwn(doing, command)
 

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { narrowed } from '@/api/queries/commands'
 import type { CleanDetail, CleanPlan } from '@/api/types.gen'
-import { recapOf } from '@/features/worktrees/remove/utils/recap'
+import { recapOf } from '@/features/worktrees/utils/removal-recap'
 import { envelope } from '@/test/fixtures'
 
 const ended = narrowed<CleanDetail, CleanPlan>({
@@ -45,7 +45,7 @@ const units = [
 ]
 
 test("a failure keeps its output and log with it, the run's warnings go to the outcome, and what went says where its children went", () => {
-  const { groups, warnings } = recapOf({ units, envelope: ended })
+  const { groups, warnings } = recapOf({ units, envelope: ended }, 'clean.data_kept')
 
   expect(
     warnings.map((warning) => warning.code),
@@ -75,7 +75,7 @@ test("a failure keeps its output and log with it, the run's warnings go to the o
 })
 
 test('the data a removed worktree keeps is nothing to act on: it goes with the steps, not in "To check"', () => {
-  expect(recapOf({ units, envelope: ended }).kept).toEqual([
+  expect(recapOf({ units, envelope: ended }, 'clean.data_kept').kept).toEqual([
     'feat/billing keeps its data in shared services: acme_feat_billing',
   ])
 })
@@ -94,7 +94,7 @@ test('a removal cancelled in its hook stays with its output, said where it stopp
     },
   ]
 
-  const [failed] = recapOf({ units: stopped, envelope: cancelled }).groups
+  const [failed] = recapOf({ units: stopped, envelope: cancelled }, 'clean.data_kept').groups
 
   expect(failed?.rows).toEqual([
     {
@@ -120,7 +120,9 @@ test("an item's warning names its worktree, and two alike stay two", () => {
     })),
   })
 
-  const check = recapOf({ units: [], envelope: ended }).groups.find((group) => group.kind === 'check')
+  const check = recapOf({ units: [], envelope: ended }, 'clean.data_kept').groups.find(
+    (group) => group.kind === 'check',
+  )
 
   expect(check?.rows.map((row) => [row.title, row.message])).toEqual([
     ['feat/a', 'Its directory is gone: the on_clean hooks did not run'],

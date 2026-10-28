@@ -1,34 +1,34 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useReducer, useState } from 'react'
 import { dryRunQuery } from '@/api/queries/commands'
-import type { TeardownRemoval } from '@/api/types.gen'
+import type { DomainWarning, TeardownRemoval } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Details } from '@/features/worktrees/components/details'
+import { ChildrenStep } from '@/features/worktrees/components/children-step'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
-import { type Fact, Facts } from '@/features/worktrees/components/facts'
 import { ItemList } from '@/features/worktrees/components/item-list'
-import { LeftItem } from '@/features/worktrees/components/left-item'
+import { type Left, LeftItem } from '@/features/worktrees/components/left-item'
 import { ListHeader } from '@/features/worktrees/components/list-header'
+import { NextButton } from '@/features/worktrees/components/next-button'
 import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
+import { RemovalDetails } from '@/features/worktrees/components/removal-details'
+import { RemovalItem } from '@/features/worktrees/components/removal-item'
 import { Stepper, type StepState } from '@/features/worktrees/components/stepper'
-import type { Left } from '@/features/worktrees/hooks/use-remove-dialog'
 import type { Start } from '@/features/worktrees/hooks/use-run'
-import { ChildrenStep } from '@/features/worktrees/remove/components/children-step'
-import { RemovalItem } from '@/features/worktrees/remove/components/removal-item'
-import { plain, requestOf, riskOf, unitsOf, unsafe } from '@/features/worktrees/remove/utils/plan'
-import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/remove/utils/wizard-state'
+import { requestOf } from '@/features/worktrees/remove/utils/plan'
 import { searched } from '@/features/worktrees/utils/filters'
 import { planWide } from '@/features/worktrees/utils/outcome'
+import { plain, riskOf, unitsOf, unsafe } from '@/features/worktrees/utils/removal'
+import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/utils/wizard-state'
 
 export function RemoveWizard({
   repo,
   worktrees,
   left,
   prechecked,
+  notice,
   onStart,
   onCancel,
 }: {
@@ -36,6 +36,7 @@ export function RemoveWizard({
   worktrees: string[]
   left: Left[]
   prechecked: boolean
+  notice?: DomainWarning | undefined
   onStart: (start: Start) => void
   onCancel: () => void
 }) {
@@ -121,30 +122,7 @@ export function RemoveWizard({
   const leftRows = left.map(({ worktree, why }) => <LeftItem key={worktree} worktree={worktree} why={why} />)
 
   const removing = plan?.worktrees ?? []
-  const warnings = (planned.data?.warnings ?? []).filter(planWide)
-  const hooks = removing.flatMap((removal) => removal.hooks ?? []).length
-  const keeping = removing.filter((removal) => (removal.namespaces ?? []).length > 0).length
-  const summary = [
-    hooks > 0 && (hooks === 1 ? '1 on_clean hook runs first' : `${hooks} on_clean hooks run first`),
-    keeping > 0 && `data stays for ${keeping}`,
-  ]
-    .filter(Boolean)
-    .join(', ')
-
-  const factsOf = (removal: (typeof removing)[number]): Fact[] => [
-    ...(removal.path ? [{ label: 'Folder', values: [removal.path], mono: true }] : []),
-    ...((removal.hooks ?? []).length > 0 ? [{ label: 'on_clean', values: removal.hooks ?? [], mono: true }] : []),
-    ...((removal.namespaces ?? []).length > 0
-      ? [
-          {
-            label: 'Data',
-            values: [`${removal.namespaces?.join(', ')} stays in its services`],
-            line: 'wtm-next does not drop it yet',
-          },
-        ]
-      : []),
-  ]
-
+  const warnings = step === 'confirm' ? (planned.data?.warnings ?? []).filter(planWide) : []
   const body = () => {
     if (review.isPending) return <Skeleton className="h-40 w-full" />
     if (review.isError) return <p className="text-sm text-destructive">{review.error.message}</p>
@@ -195,7 +173,6 @@ export function RemoveWizard({
     if (!plan) return !unplanned && <Skeleton className="h-40 w-full" />
     return (
       <>
-        <PlanWarnings warnings={warnings} />
         <ItemList label="Worktrees" left={leftRows}>
           {removing.map((removal) => (
             <RemovalItem
@@ -206,11 +183,7 @@ export function RemoveWizard({
             />
           ))}
         </ItemList>
-        <Details label="Details" summary={summary}>
-          {removing.map((removal) => (
-            <Facts key={removal.worktree} heading={removal.worktree} facts={factsOf(removal)} />
-          ))}
-        </Details>
+        <RemovalDetails removals={removing} />
       </>
     )
   }
@@ -238,6 +211,7 @@ export function RemoveWizard({
 
       <DialogScroll>
         {unplanned && <p className="text-sm text-destructive">{unplanned}</p>}
+        <PlanWarnings warnings={notice ? [notice, ...warnings] : warnings} />
         {body()}
       </DialogScroll>
 
@@ -262,25 +236,5 @@ export function RemoveWizard({
         )}
       </DialogFooter>
     </>
-  )
-}
-
-// aria-disabled, not disabled: a disabled button takes no focus nor pointer, so its reason would never show
-function NextButton({ disabled, why, onClick }: { disabled: boolean; why: string | undefined; onClick: () => void }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          aria-disabled={disabled}
-          className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
-          onClick={() => {
-            if (!disabled) onClick()
-          }}
-        >
-          Next
-        </Button>
-      </TooltipTrigger>
-      {disabled && why && <TooltipContent>{why}</TooltipContent>}
-    </Tooltip>
   )
 }

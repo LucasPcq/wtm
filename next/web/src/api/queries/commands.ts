@@ -11,6 +11,8 @@ import type {
   DomainForm,
   DomainItem,
   ListDetail,
+  PruneDetail,
+  PrunePlan,
   StatusDetail,
   TreeDetail,
   WebCall,
@@ -23,7 +25,11 @@ export const githubKey = (repo: string) => ['github', repo] as const
 type ReadDetail = { list: ListDetail; tree: TreeDetail; status: StatusDetail }
 export type ReadCommand = keyof ReadDetail
 
-type Mutation = { create: { plan: CreatePlan; detail: CreateDetail }; clean: { plan: CleanPlan; detail: CleanDetail } }
+type Mutation = {
+  create: { plan: CreatePlan; detail: CreateDetail }
+  clean: { plan: CleanPlan; detail: CleanDetail }
+  prune: { plan: PrunePlan; detail: PruneDetail }
+}
 export type MutationCommand = keyof Mutation
 
 // the core sends {} for an item it did not read (failed, cancelled)
@@ -64,7 +70,6 @@ export const githubQuery = <C extends ReadCommand>(repo: string, command: C, ans
     queryKey: [...githubKey(repo), command, answers],
     queryFn: () => run(repo, command, { answers: [...answers, withPRs] }),
     select: narrowed<ReadDetail[C]>,
-    staleTime: Infinity,
   })
 
 export const fetchOrigin = (repo: string) => run(repo, 'list', { answers: [{ path: 'fetch', values: ['true'] }] })
@@ -76,7 +81,6 @@ export const questionsQuery = (repo: string, command: ApiCommandName) =>
   queryOptions({
     queryKey: [...repoKey(repo), command, 'questions'],
     queryFn: () => questions(repo, command, []),
-    staleTime: Infinity,
   })
 
 export const dryRunQuery = <C extends MutationCommand>(repo: string, command: C, answers: DomainAnswered[]) =>
@@ -85,4 +89,29 @@ export const dryRunQuery = <C extends MutationCommand>(repo: string, command: C,
     // a refusal (clean's unsafe worktrees) is the answer of a dry run, not its failure
     queryFn: () => refusable(`/api/repos/${repo}/commands/${command}`, { answers, dry_run: true } satisfies WebCall),
     select: narrowed<Mutation[C]['detail'], Mutation[C]['plan']>,
+  })
+
+// a plan chosen on reads is asked again only once they land, keyed on when: under the repository's key, an event would
+// ask it again on its old answers, before the reads it was chosen on change them
+export const planQuery = <C extends MutationCommand>(
+  repo: string,
+  command: C,
+  { answers, readAt }: { answers: DomainAnswered[]; readAt: number },
+) =>
+  queryOptions({
+    queryKey: ['plan', repo, command, answers, readAt],
+    // its key carries the read: never stale, never kept past the opening that asked it
+    staleTime: Infinity,
+    gcTime: 0,
+    queryFn: () => refusable(`/api/repos/${repo}/commands/${command}`, { answers, dry_run: true } satisfies WebCall),
+    select: narrowed<Mutation[C]['detail'], Mutation[C]['plan']>,
+  })
+
+// a review that fetches origin is asked once per opening: under the repository's key, every event would fetch again
+export const reviewQuery = <C extends MutationCommand>(repo: string, command: C, answers: DomainAnswered[]) =>
+  queryOptions({
+    ...dryRunQuery(repo, command, answers),
+    queryKey: ['review', repo, command, answers],
+    gcTime: 0,
+    refetchOnWindowFocus: false,
   })
