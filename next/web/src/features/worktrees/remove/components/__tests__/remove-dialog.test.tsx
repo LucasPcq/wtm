@@ -1,7 +1,9 @@
 import { screen, waitFor, within } from '@testing-library/react'
-import { HttpResponse } from 'msw'
-import { expect, test } from 'vitest'
+import { HttpResponse, http } from 'msw'
+import { expect, onTestFinished, test } from 'vitest'
+import type { WebCall } from '@/api/types.gen'
 import { cleanPlan } from '@/test/clean'
+import { envelope, listDetail } from '@/test/fixtures'
 import { answeringClean, liveEvents, selectAndRemove } from '@/test/remove'
 import { renderApp } from '@/test/render'
 import { server } from '@/test/server'
@@ -56,7 +58,7 @@ test('checking an unsafe worktree turns its reason into what is lost, tags it an
   expect(await within(dialog).findByText(/^1 removed\./)).toBeTruthy()
 })
 
-test("the detail's menu removes the worktree it shows, and a child left on it is named with its command", async () => {
+test("the detail's menu removes the worktree it shows, and a child left on it is reparented from its row at once", async () => {
   const { user } = await renderApp('/r/r1/worktrees?worktree=feat%2Fbilling')
 
   const detail = await screen.findByRole('complementary', { name: 'feat/billing' })
@@ -71,16 +73,20 @@ test("the detail's menu removes the worktree it shows, and a child left on it is
 
   const toCheck = await within(dialog).findByRole('region', { name: 'To check' })
   expect(within(toCheck).getByText('feat/billing-ui still points at the removed parent feat/billing')).toBeTruthy()
-  expect(
-    await within(dialog).findByRole('button', { name: 'Copy wtm reparent feat/billing-ui --to main' }),
-  ).toBeTruthy()
-  const fold = within(dialog).getByRole('button', {
-    name: 'Details of feat/billing-ui still points at the removed parent feat/billing',
-  })
-  expect(fold.getAttribute('aria-expanded')).toBe('false')
-  await user.click(fold)
-  expect(fold.getAttribute('aria-expanded')).toBe('true')
-  expect(await within(dialog).findByText('wtm reparent feat/billing-ui --to main')).toBeTruthy()
+  // once reparented, the read says the child is on main
+  server.use(
+    http.post('/api/repos/r1/commands/list', () =>
+      HttpResponse.json(envelope('list', [listDetail('feat/billing-ui', { parent: 'main' })])),
+    ),
+  )
+  await user.click(
+    within(toCheck).getByRole('button', {
+      name: 'Reparent: feat/billing-ui still points at the removed parent feat/billing',
+    }),
+  )
+
+  expect(await screen.findByText('feat/billing-ui is on main')).toBeTruthy()
+  await waitFor(() => expect(within(dialog).queryByRole('region', { name: 'To check' })).toBeNull())
 })
 
 test('a plan that cannot be made says why instead of a Next that never wakes', async () => {
@@ -190,4 +196,29 @@ test('a press on a Next waiting for its plan goes nowhere, even once the plan la
   await waitFor(() => expect(next.getAttribute('aria-disabled')).toBe('false'))
   expect(within(dialog).getByRole('listitem', { name: 'feat/search-docs' })).toBeTruthy()
   expect(within(dialog).queryByRole('button', { name: 'Remove' })).toBeNull()
+})
+
+test('children left on removed parents are reparented all at once, in one run onto their parent and one toast', async () => {
+  const runs: WebCall[] = []
+  server.events.on('request:start', async ({ request }) => {
+    if (!request.url.endsWith('/commands/reparent')) return
+    const call = (await request.clone().json()) as WebCall
+    if (!call.dry_run) runs.push(call)
+  })
+  onTestFinished(() => server.events.removeAllListeners())
+  const { user, dialog } = await selectAndRemove('feat/billing', 'feat/search')
+
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Remove 2 worktrees' }))
+  const toCheck = await within(dialog).findByRole('region', { name: 'To check' })
+  await user.click(within(toCheck).getByRole('button', { name: 'Reparent all onto the nearest that stays' }))
+
+  expect(await screen.findByText('2 worktrees moved onto main')).toBeTruthy()
+  expect(runs.map((call) => call.answers)).toEqual([
+    [
+      { path: 'worktree', values: ['feat/billing-ui', 'feat/search-docs'] },
+      { path: 'to', values: ['main'] },
+    ],
+  ])
 })

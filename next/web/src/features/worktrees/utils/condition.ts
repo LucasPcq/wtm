@@ -10,6 +10,7 @@ export function overlaid<Read extends { condition: WorktreeCondition }>(live: Re
 
 export const conditionLook: Record<WorktreeCondition, { icon: LucideIcon; tone: Tone; label: string }> = {
   no_worktree: { icon: CircleDashed, tone: 'muted', label: 'branch without a worktree' },
+  deleted: { icon: CircleSlash, tone: 'muted', label: 'branch deleted' },
   unreadable: { icon: CircleX, tone: 'failed', label: 'unreadable' },
   missing: { icon: CircleSlash, tone: 'failed', label: 'missing' },
   rebasing: { icon: TriangleAlert, tone: 'attention', label: 'rebasing' },

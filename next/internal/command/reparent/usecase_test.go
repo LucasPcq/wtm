@@ -109,6 +109,7 @@ func TestARecordThatCannotBeWrittenFailsAloneAndStopsNoOther(t *testing.T) {
 	assert.Equal(t, domain.StatusFailed, failed.Status)
 	require.NotNil(t, failed.Err)
 	assert.Equal(t, reparent.CodeWriteFailed, failed.Err.Code)
+	assert.NotEmpty(t, failed.Err.Params["cause"], "the surface shows why the record did not write")
 	assert.Equal(t, featA, w.parentOf(t, featB))
 	assert.Equal(t, domain.StatusDone, outcome.Result.Items[1].Status)
 	assert.Equal(t, topic, w.parentOf(t, featX))

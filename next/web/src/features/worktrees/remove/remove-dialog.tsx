@@ -37,6 +37,7 @@ export function RemoveDialog({ repo }: { repo: string }) {
     if (run.progress && !notice)
       return (
         <RemovalProgress
+          repo={repo}
           words={removeWords}
           progress={run.progress}
           running={run.running}

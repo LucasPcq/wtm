@@ -17,6 +17,8 @@ import type {
   ListDetail,
   PruneDetail,
   PrunePlan,
+  ReparentDetail,
+  ReparentPlan,
   StatusDetail,
   TreeDetail,
   WebCall,
@@ -35,6 +37,7 @@ type Mutation = {
   prune: { plan: PrunePlan; detail: PruneDetail }
   'fast-forward': { plan: FastforwardPlan; detail: FastforwardDetail }
   exec: { plan: ExecPlan; detail: ExecDetail }
+  reparent: { plan: ReparentPlan; detail: ReparentDetail }
 }
 export type MutationCommand = keyof Mutation
 export type Planned<C extends MutationCommand> = Mutation[C]['plan']

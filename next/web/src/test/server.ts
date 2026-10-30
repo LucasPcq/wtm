@@ -7,6 +7,7 @@ import { answeringExec } from '@/test/exec'
 import { ffPlan, ffQuestions, ffRun } from '@/test/fast-forward'
 import { envelope, followUp, offers, statusDetail, treeDetail } from '@/test/fixtures'
 import { prunePlan, pruneRun } from '@/test/prune'
+import { answeringReparent } from '@/test/reparent'
 import { line, streamed } from '@/test/stream'
 
 export { line, repo, streamed, worktrees }
@@ -168,6 +169,7 @@ const handlers = [
   ),
   http.post('/api/repos/r1/commands/fast-forward/questions', () => HttpResponse.json(ffQuestions())),
   ...answeringExec(),
+  ...answeringReparent(),
   http.post('/api/repos/r1/commands/create/questions', async ({ request }) =>
     HttpResponse.json(questionsOf(((await request.json()) as WebCall).answers)),
   ),

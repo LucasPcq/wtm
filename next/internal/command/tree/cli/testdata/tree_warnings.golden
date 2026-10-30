@@ -8,7 +8,7 @@
   └─ feat/gone             ✗ missing
   y                        ! cycle
   z                        ! cycle
-  feat/login               (no worktree)
+  feat/login               (branch deleted)
   └─ feat/x
   ! the run daemon is not running: which jobs are up is unknown
   ! pull requests unavailable: run `gh auth login`

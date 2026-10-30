@@ -1,5 +1,5 @@
 import type { Read } from '@/api/queries/commands'
-import type { DomainFollowUp, TreeDetail, TreePR, WorktreeCondition } from '@/api/types.gen'
+import type { TreeDetail, TreePR, WorktreeCondition } from '@/api/types.gen'
 import { overlaid } from '@/features/worktrees/utils/condition'
 
 export type Node = {
@@ -34,21 +34,3 @@ export function nodesOf(live: Read<'tree'>, github: Read<'tree'> | undefined): N
   }
   return roots
 }
-
-// What dropping a worktree on another asks, until reparent runs here: record the new parent, then rebase onto it.
-export const reparent = (branch: string, parent: string): DomainFollowUp => ({
-  command: 'reparent',
-  answers: [
-    { path: 'worktree', values: [branch] },
-    { path: 'to', values: [parent] },
-  ],
-  code: 'web.reparent',
-  message: `make ${parent} the parent of ${branch}`,
-})
-
-export const sync = (branch: string): DomainFollowUp => ({
-  command: 'sync',
-  answers: [{ path: 'worktree', values: [branch] }],
-  code: 'web.sync',
-  message: `rebase ${branch} onto its new parent`,
-})

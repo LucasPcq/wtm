@@ -105,6 +105,9 @@ func (f Facts) item(branch string) Item {
 	}
 	if f.Stack.Virtual(branch) {
 		detail.Virtual, detail.Condition = true, worktree.ConditionNoWorktree
+		if f.ParentGone(branch) {
+			detail.Condition = worktree.ConditionDeleted
+		}
 		return Item{Subject: branch, Status: domain.StatusDone, Detail: &detail}
 	}
 

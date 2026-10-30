@@ -22,6 +22,18 @@ export type OutcomeRow = {
   path?: string | undefined
   output?: { lines: string[]; log?: string | undefined } | undefined
   followUp?: DomainFollowUp | undefined
+  // a fix the web runs: a button in place of the command to copy
+  act?: (() => void) | undefined
+}
+
+// the follow-ups of one command the web runs at once: each its own button, and all of them at once,
+// busy while one of them runs: one run of the command at a time
+export type Act = {
+  command: string
+  label: string
+  all: string
+  busy: boolean
+  run: (followUps: DomainFollowUp[]) => void
 }
 
 export type OutcomeGroup = { kind: OutcomeKind; rows: OutcomeRow[] }

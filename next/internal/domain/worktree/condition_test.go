@@ -27,7 +27,7 @@ func TestAWorktreeIsInTheFirstConditionThatApplies(t *testing.T) {
 			assert.Equal(t, c.Want, ConditionOf(c.Params))
 		})
 	}
-	assert.Len(t, Conditions(), len(cases)+2, "each condition a read can rank has its case; no_worktree and unreadable are set by the read")
+	assert.Len(t, Conditions(), len(cases)+3, "each condition a read can rank has its case; no_worktree, deleted and unreadable are set by the read")
 }
 
 func TestAConditionNamesTheOperationGitStoppedInTheMiddleOf(t *testing.T) {

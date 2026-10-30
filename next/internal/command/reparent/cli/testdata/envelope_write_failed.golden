@@ -10,7 +10,10 @@
       "error": {
         "kind": "internal",
         "code": "reparent.write_failed",
-        "message": "couldn't write the record of feat/c: no space left on device"
+        "message": "couldn't write the record of feat/c: no space left on device",
+        "params": {
+          "cause": "no space left on device"
+        }
       },
       "detail": {}
     }
@@ -60,6 +63,9 @@
   "error": {
     "kind": "internal",
     "code": "reparent.write_failed",
-    "message": "couldn't write the record of feat/c: no space left on device"
+    "message": "couldn't write the record of feat/c: no space left on device",
+    "params": {
+      "cause": "no space left on device"
+    }
   }
 }

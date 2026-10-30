@@ -27,6 +27,12 @@ export function dismissSucceeded(repo: string, command: MutationCommand) {
   if (run?.running === false && succeeded(run.progress.envelope)) useRuns.setState({ [key]: undefined })
 }
 
+// a run read where it ended (its toast's Undo was clicked) has nothing left to show: the next one goes
+export function dismissEnded(repo: string, command: MutationCommand) {
+  const key = keyOf(repo, command)
+  if (useRuns.getState()[key]?.running === false) useRuns.setState({ [key]: undefined })
+}
+
 // an item the plan left as it is was never asked: a run that did all it was asked succeeded
 export const succeeded = (envelope: Applied<MutationCommand> | undefined) =>
   envelope?.ok === true &&
@@ -105,6 +111,7 @@ const doing: Record<MutationCommand, string> = {
   'fast-forward': 'Fast-forwarding',
   prune: 'Pruning',
   exec: 'Running a command',
+  reparent: 'Reparenting',
 }
 
 export const isMutation = (command: string): command is MutationCommand => Object.hasOwn(doing, command)

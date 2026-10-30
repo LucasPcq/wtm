@@ -8,6 +8,8 @@ import { useDirectRun } from '@/features/worktrees/hooks/use-direct-run'
 import { openExec } from '@/features/worktrees/hooks/use-exec-dialog'
 import { openFastForward, useFastForwardDialog } from '@/features/worktrees/hooks/use-fast-forward-dialog'
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
+import { openReparent } from '@/features/worktrees/hooks/use-reparent-dialog'
+import { useReparentNow } from '@/features/worktrees/hooks/use-reparent-now'
 import { type Entry, leftOf, menu, type Subject, subjectsOf } from '@/features/worktrees/utils/actions'
 import { copy } from '@/features/worktrees/utils/copy'
 
@@ -16,6 +18,7 @@ export type RunEntry = ReturnType<typeof useRunEntry>
 export function useRunEntry(repo: string) {
   const client = useQueryClient()
   const direct = useDirectRun(repo, 'fast-forward')
+  const reparentNow = useReparentNow(repo)
 
   // the copy starts in the click; its line is spelled by the server meanwhile
   const copyLine = (entry: Extract<Entry, { followUp: unknown }>) =>
@@ -57,6 +60,13 @@ export function useRunEntry(repo: string) {
     })
   }
 
+  // a move the core spelled, its new parent given (a callout's fix), runs at once; one worktree opens on its new
+  // parent, a selection on its worktrees
+  const reparent = (followUp: DomainFollowUp, rows: Subject[]) => {
+    if (followUp.answers?.some((answer) => answer.path === 'to')) return void reparentNow([followUp])
+    openReparent(repo, { worktrees: subjectsOf(followUp), left: leftOf(rows, 'reparent'), picking: rows.length > 1 })
+  }
+
   return (entry: Entry, rows: Subject[]) => {
     if (!('followUp' in entry)) return
 
@@ -67,6 +77,7 @@ export function useRunEntry(repo: string) {
         return void (entry.followUp.url && window.open(entry.followUp.url, '_blank', 'noreferrer'))
       case 'web':
         if (entry.action === 'fast_forward') return fastForward(entry.followUp, rows)
+        if (entry.action === 'reparent') return reparent(entry.followUp, rows)
         if (entry.action === 'exec')
           return openExec(repo, { worktrees: subjectsOf(entry.followUp), left: leftOf(rows, entry.action) })
         return openRemove(repo, {
@@ -74,8 +85,6 @@ export function useRunEntry(repo: string) {
           left: leftOf(rows, entry.action),
           prechecked: true,
         })
-      case 'later':
-        return
     }
   }
 }

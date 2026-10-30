@@ -1,4 +1,6 @@
+import { useQuery } from '@tanstack/react-query'
 import { Database } from 'lucide-react'
+import { readQuery } from '@/api/queries/commands'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress as Bar } from '@/components/ui/progress'
@@ -8,8 +10,10 @@ import { RunFailure } from '@/features/worktrees/components/run-failure'
 import { RunOutcome } from '@/features/worktrees/components/run-outcome'
 import { RunSteps } from '@/features/worktrees/components/run-steps'
 import { RunningFooter } from '@/features/worktrees/components/running-footer'
+import { useReparentNow } from '@/features/worktrees/hooks/use-reparent-now'
+import { useRun } from '@/features/worktrees/hooks/use-run'
 import { listed } from '@/features/worktrees/utils/listed'
-import type { OutcomeKind } from '@/features/worktrees/utils/outcome'
+import type { Act, OutcomeKind } from '@/features/worktrees/utils/outcome'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
 import { current, doneOf, ending, type Progress } from '@/features/worktrees/utils/progress'
 import { plain } from '@/features/worktrees/utils/removal'
@@ -25,6 +29,7 @@ export type RemovalWords = {
 }
 
 export function RemovalProgress({
+  repo,
   words,
   progress,
   running,
@@ -32,6 +37,7 @@ export function RemovalProgress({
   onCancel,
   onDone,
 }: {
+  repo: string
   words: RemovalWords
   progress: Progress<Teardown>
   running: boolean
@@ -53,6 +59,23 @@ export function RemovalProgress({
   const refused =
     progress.refused ?? (items.some((item) => item.error) || error?.kind === 'cancelled' ? undefined : error?.message)
   const { groups, warnings, kept } = recapOf(progress, words.dataKept)
+  const reparentNow = useReparentNow(repo)
+  const reparenting = useRun(repo, 'reparent').running
+  const act: Act = {
+    command: 'reparent',
+    label: 'Reparent',
+    all: 'Reparent all onto the nearest that stays',
+    busy: reparenting,
+    run: (followUps) => void reparentNow(followUps),
+  }
+  // never asked here: the view on screen reads, and a child moved leaves "To check" once its read lands
+  const list = useQuery({ ...readQuery(repo, 'list'), enabled: false })
+  const tree = useQuery({ ...readQuery(repo, 'tree'), enabled: false })
+  const parentNow = (branch: string) =>
+    [...(list.data?.items ?? []), ...(tree.data?.items ?? [])].find((item) => item.subject === branch)?.detail?.parent
+  const moved = ({ params }: (typeof warnings)[number]) =>
+    params?.branch !== undefined && params.to !== undefined && parentNow(params.branch) === params.to
+  const toCheck = warnings.filter((warning) => !moved(warning))
   const branched = plain(
     (progress.envelope?.plan?.worktrees ?? []).filter((removal) => removed.includes(removal.worktree)),
   )
@@ -80,7 +103,7 @@ export function RemovalProgress({
 
       <DialogScroll>
         {!running && <RunFailure message={refused} />}
-        {!running && <RunOutcome groups={groups} labels={words.outcome} warnings={warnings} />}
+        {!running && <RunOutcome groups={groups} labels={words.outcome} warnings={toCheck} act={act} />}
         <RunSteps progress={progress} running={running}>
           {kept.map((line) => (
             <p key={line} className="flex items-start gap-2 text-xs text-muted-foreground">
