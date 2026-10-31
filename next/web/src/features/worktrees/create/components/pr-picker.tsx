@@ -1,7 +1,7 @@
 import { useStore } from '@tanstack/react-form'
 import { useDebouncedValue } from '@tanstack/react-pacer'
 import { useQuery } from '@tanstack/react-query'
-import { CircleX, GitPullRequest, Search } from 'lucide-react'
+import { CircleX, GitPullRequest, Plus, Search } from 'lucide-react'
 import { useState } from 'react'
 import { pullRequestQuery } from '@/api/queries/commands'
 import type { DomainFieldError, DomainOption } from '@/api/types.gen'
@@ -155,6 +155,7 @@ export function PrPicker({
             </EmptyHeader>
             <EmptyContent>
               <Button variant="outline" size="sm" onClick={onNewBranch}>
+                <Plus />
                 New branch
               </Button>
             </EmptyContent>
@@ -185,8 +186,8 @@ export function PrPicker({
       </div>
 
       {errors.map((error) => (
-        <p key={error.code} role="alert" className="flex items-start gap-2 text-sm text-destructive">
-          <CircleX className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <p key={error.code} role="alert" className="flex items-start gap-2 text-sm">
+          <CircleX className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
           {refusalLine(error)}
         </p>
       ))}

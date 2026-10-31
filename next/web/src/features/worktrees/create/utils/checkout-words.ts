@@ -66,7 +66,7 @@ const actionTag: Record<CheckoutAction, { fetched: string; stale: string }> = {
 export const tagOf = (action: CheckoutAction, fetched: boolean) => actionTag[action][fetched ? 'fetched' : 'stale']
 
 // the line under a pull request's title: who, into what, and its state when it has one
-export const prLine = (pr: WorktreePullRequest) =>
+const prLine = (pr: WorktreePullRequest) =>
   [pr.author, pr.base && `into ${pr.base}`, pr.draft && 'draft', prState[pr.state]].filter(Boolean).join(' · ')
 
 // a tag that keeps a pull request from being chosen, and what its row says instead
@@ -134,7 +134,8 @@ type UnavailableWords = { title: string; description: string; next: string; comm
 const unavailableWords: Record<Unavailable, UnavailableWords> = {
   gh_missing: {
     title: "The GitHub CLI isn't installed",
-    description: "Pull requests are listed through GitHub's CLI. A new branch still works.",
+    description:
+      'wtm lists pull requests through gh. Install it from cli.github.com, then sign in. A new branch still works.',
     next: 'Install gh to list pull requests',
   },
   signed_out: {

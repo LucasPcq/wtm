@@ -90,7 +90,7 @@ export function Callout({ repo, problems: [first, ...more] }: { repo: string; pr
         )
       }
       below={
-        (fix || more.length > 0) && (
+        ((fix && !(runs && tone === 'suggestion')) || more.length > 0) && (
           <>
             {fix && !runs && <CommandLine followUp={fix} />}
             {fix && runs && tone !== 'suggestion' && (

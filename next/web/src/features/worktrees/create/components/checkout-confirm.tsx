@@ -12,14 +12,14 @@ import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { isRowWarning, rowWarningLine, tagOf } from '@/features/worktrees/create/utils/checkout-words'
 import { envFromShort, isolationShort } from '@/features/worktrees/create/utils/words'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
-import { sentence } from '@/features/worktrees/utils/sentence'
+import { refusalOf, sentence } from '@/features/worktrees/utils/sentence'
 
 export function CheckoutConfirm({ repo, answers }: { repo: string; answers: DomainAnswered[] }) {
   const dry = useQuery(reviewQuery(repo, 'checkout', answers))
 
   if (dry.isPending) return <Skeleton className="h-40 w-full" />
   if (dry.isError) return <Alert tone="red" description={sentence(dry.error.message)} />
-  if (dry.data.error) return <Alert tone="red" description={sentence(dry.data.error.message)} />
+  if (dry.data.error) return <Alert tone="red" description={refusalOf(dry.data.error)} />
 
   const { plan, warnings } = dry.data
   if (!plan) return null

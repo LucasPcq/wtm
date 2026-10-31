@@ -10,14 +10,14 @@ import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { BranchPlan } from '@/features/worktrees/create/components/branch-plan'
 import { planWide } from '@/features/worktrees/utils/outcome'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
-import { sentence } from '@/features/worktrees/utils/sentence'
+import { refusalOf, sentence } from '@/features/worktrees/utils/sentence'
 
 export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswered[] }) {
   const dry = useQuery(dryRunQuery(repo, 'create', answers))
 
   if (dry.isPending) return <Skeleton className="h-40 w-full" />
   if (dry.isError) return <Alert tone="red" description={sentence(dry.error.message)} />
-  if (dry.data.error) return <Alert tone="red" description={sentence(dry.data.error.message)} />
+  if (dry.data.error) return <Alert tone="red" description={refusalOf(dry.data.error)} />
 
   const { plan, warnings } = dry.data
   const branches = plan?.branches ?? []
