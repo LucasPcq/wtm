@@ -126,7 +126,7 @@ A glyph never changes colour to mean "resolved": it changes icon.
 
 Every multi-worktree list (Remove's, Prune's, the Fast-forward and Run pickers, Reparent's selection) has a `wtm/List Header` inside its box: a tri-state box acting on the visible rows, and "k of n selected".
 
-- **From 8 rows**, a `wtm/Search Field` sits above the header, inside the same box. Below 8, the whole list fits and reading beats searching.
+- **A `wtm/Search Field` always sits above the header**, inside the same box, whatever the number of rows.
 - A selected row the search hides stays selected: "2 of 9 selected · 2 hidden by the search". The header's box reflects the visible rows only.
 - The body scrolls (`max-h` 90vh); the header and footer stay.
 
