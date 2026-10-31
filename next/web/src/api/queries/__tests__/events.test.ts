@@ -204,4 +204,39 @@ test('an operation finished releases its worktrees within settleCap, and the str
   await waitFor(() => expect(held()).toEqual(['op-2']), { timeout: settleCap + 1000 })
   expect(Date.now() - started).toBeLessThan(settleCap + 1000)
   close()
+}, 15_000)
+
+// the detail's callout showed the state before the run once the row was released, its status read still on its way
+test("an operation finished waits for an open detail's status read too, beside the list's", async () => {
+  const client = new QueryClient()
+  client.setQueryData(['repos'], [repo])
+  let status = 0
+  const list = new QueryObserver(client, { queryKey: ['repo', 'r1', 'list', []], queryFn: () => 'list' })
+  const detail = new QueryObserver(client, {
+    queryKey: ['repo', 'r1', 'status', []],
+    queryFn: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      status += 1
+      return status
+    },
+  })
+  onTestFinished(list.subscribe(() => {}))
+  onTestFinished(detail.subscribe(() => {}))
+  await waitFor(() => expect(status).toBe(1))
+  const of = '"ts":"2026-10-27T10:00:00Z","repo":{"root":"/acme","common_dir":"/acme/.git"},"op_id":"op-1"'
+  serve(
+    200,
+    `data: {"v":2,"type":"unit.started",${of},"subject":"feat/a"}\n\n` +
+      `data: {"v":2,"type":"operation.finished",${of},"command":"sync","surface":"web","ok":true}\n\n`,
+  )
+
+  const seen: { held: number; status: number }[] = []
+  client.getQueryCache().subscribe(() => {
+    const live = client.getQueryData<Live>(eventsQuery.queryKey)
+    if (live) seen.push({ held: Object.keys(live.operations).length, status })
+  })
+  await client.fetchQuery(eventsQuery)
+
+  const released = seen.findIndex((at, i) => at.held === 0 && seen.slice(0, i).some((before) => before.held > 0))
+  expect(seen[released]?.status).toBe(2)
 })

@@ -84,6 +84,7 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
     if (value.event === 'warning') yield { warning: (JSON.parse(value.data) as WebWarning).message, operations }
     else if (!value.event) {
       const line = JSON.parse(value.data) as WtmEventsV2
+      const at = Date.now()
       void invalidate(client, line)
       // a worktree stays under way until the read that no longer shows it lands, it would flash back in between, but
       // never longer than settleCap, nor holding the lines after it
@@ -91,7 +92,7 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
         const repo = repoOf(client, line)
         settling.set(
           line.op_id,
-          settled(client, repo, Date.now()).then(() => line),
+          settled(client, repo, at).then(() => line),
         )
         continue
       }
@@ -101,15 +102,19 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
   }
 }
 
-export const settleCap = 2000
+export const settleCap = 10_000
 
-// the list or tree read of repo that lands after since, else settleCap: a review's fetch of origin is never waited on
+// the list or tree read of repo that lands after since, and the status read of an open detail with it, else settleCap: a
+// review's fetch of origin is never waited on
 function settled(client: QueryClient, repo: string | undefined, since: number): Promise<void> {
-  const landed = (query: Query) =>
-    query.queryKey[0] === 'repo' &&
-    query.queryKey[1] === repo &&
-    ['list', 'tree'].includes(String(query.queryKey[2])) &&
-    query.state.dataUpdatedAt > since
+  const of = (query: Query, commands: string[]) =>
+    query.queryKey[0] === 'repo' && query.queryKey[1] === repo && commands.includes(String(query.queryKey[2]))
+  const status = (query: Query) => of(query, ['status'])
+  let read = false
+  let detail = !client
+    .getQueryCache()
+    .getAll()
+    .some((query) => status(query) && query.getObserversCount() > 0)
   return new Promise((resolve) => {
     const done = () => {
       clearTimeout(timer)
@@ -118,7 +123,10 @@ function settled(client: QueryClient, repo: string | undefined, since: number): 
     }
     const timer = setTimeout(done, settleCap)
     const unsubscribe = client.getQueryCache().subscribe((event) => {
-      if (event.type === 'updated' && landed(event.query)) done()
+      if (event.type !== 'updated' || event.query.state.dataUpdatedAt < since) return
+      if (of(event.query, ['list', 'tree'])) read = true
+      if (status(event.query)) detail = true
+      if (read && detail) done()
     })
   })
 }
