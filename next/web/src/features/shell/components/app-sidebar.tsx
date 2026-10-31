@@ -113,7 +113,8 @@ function WorktreeCount({ repo }: { repo: string }) {
   return read && <SidebarMenuBadge>{worktreeCount(read)}</SidebarMenuBadge>
 }
 
-// as WorktreeCount: it counts what list's read, the one that lists the jobs, said last
+// shortcut: as WorktreeCount, it counts what list's read said last; on the tree view that read is off and the count
+// waits for it, until the jobs read (LUC-345) gives the page and this badge their own
 function JobsUp({ repo }: { repo: string }) {
   const list = useQuery({ ...readQuery(repo, 'list'), enabled: false })
   return list.data && <SidebarMenuBadge>{jobsUp(list.data)}</SidebarMenuBadge>

@@ -1,16 +1,15 @@
 import type { Applied } from '@/api/queries/commands'
 import type { DomainOption, RunupJobPlan, RunupJobStatus } from '@/api/types.gen'
-import type { OutcomeTone } from '@/features/worktrees/utils/outcome'
 import type { PhaseRun } from '@/features/worktrees/utils/progress'
 
-export const resultLook: Record<RunupJobStatus, { said: string; tone: OutcomeTone }> = {
-  started: { said: 'up', tone: 'ok' },
-  already_running: { said: 'already up', tone: 'ok' },
-  joined: { said: 'joined', tone: 'ok' },
-  done: { said: 'done', tone: 'ok' },
-  failed: { said: 'failed', tone: 'failed' },
-  crashed: { said: 'crashed', tone: 'failed' },
-  not_started: { said: 'not started', tone: 'muted' },
+export const resultWords: Record<RunupJobStatus, string> = {
+  started: 'up',
+  already_running: 'already up',
+  joined: 'joined',
+  done: 'done',
+  failed: 'failed',
+  crashed: 'crashed',
+  not_started: 'not started',
 }
 
 // a profile's jobs summed up to three and a count, as a menu row holds them

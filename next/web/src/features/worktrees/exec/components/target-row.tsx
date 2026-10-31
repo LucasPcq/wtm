@@ -1,26 +1,20 @@
-import { ChevronRight, CircleCheck, CircleDashed, CircleX, LoaderCircle, type LucideIcon } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { type Tone, toneIcon } from '@/features/worktrees/components/glyph'
+import { toneIcon } from '@/features/worktrees/components/glyph'
 import { StepOutput } from '@/features/worktrees/components/step-output'
 import { duration, elapsed, terminalLine } from '@/features/worktrees/exec/utils/output'
-import type { PhaseRun, Unit } from '@/features/worktrees/utils/progress'
+import { phaseLook } from '@/features/worktrees/utils/phase-look'
+import type { Unit } from '@/features/worktrees/utils/progress'
 import { cn } from '@/lib/utils'
-
-const look: Record<PhaseRun['state'], { icon: LucideIcon; tone: Tone }> = {
-  todo: { icon: CircleDashed, tone: 'muted' },
-  now: { icon: LoaderCircle, tone: 'busy' },
-  done: { icon: CircleCheck, tone: 'ok' },
-  failed: { icon: CircleX, tone: 'failed' },
-}
 
 // one worktree while the command runs: folded, its live output behind its chevron
 export function TargetRow({ unit, now, cancelling }: { unit: Unit; now: number; cancelling: boolean }) {
   const [open, setOpen] = useState(false)
   const run = unit.phases[0]
   const state = run?.state ?? 'todo'
-  const { icon: Icon, tone } = look[state]
+  const { icon: Icon, tone } = phaseLook[state]
 
   const said = () => {
     if (state === 'todo') return cancelling ? "won't start" : 'queued'
