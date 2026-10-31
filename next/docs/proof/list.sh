@@ -205,7 +205,7 @@ run_side() {
   )
   sed -i '' -E \
     -e "s#(/private)?$root#<SB>#g" \
-    -e 's#"(created_at|last_commit_at)": "[^"]*"#"\1": "<T>"#g' \
+    -e 's#"(created_at|last_commit_at|started_at)": "[^"]*"#"\1": "<T>"#g' \
     -e "s#:$((port + 2))([^0-9]|\$)#:<PROXY_PORT>\1#g" \
     -e 's#[0-9a-f]{40}#<SHA>#g' \
     -e "s#$bin#<BIN>#g" \
