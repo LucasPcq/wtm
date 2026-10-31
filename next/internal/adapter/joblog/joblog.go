@@ -49,17 +49,21 @@ type Log struct {
 }
 
 // Open opens the log file names, its directory made if needed: emptied, its
-// backups gone, unless file.Append. The directory and the file are its user's
-// alone, a legacy wtm's, made readable by others, narrowed as they open.
+// backups gone, unless file.Append. The file is its user's alone, a legacy
+// wtm's narrowed as it opens; a directory made for it too, and one a legacy
+// wtm made, which holds this job's log already. Any other directory a start
+// names keeps its mode: it may be shared on purpose.
 func Open(file run.LogFile) (*Log, error) {
 	path := Path(file.Dir, file.Job)
 	if path == "" {
 		return nil, errors.New("job " + strconv.Quote(file.Job) + " cannot be named as a log file")
 	}
-	if err := os.MkdirAll(file.Dir, dirMode); err != nil {
-		return nil, err
+	if _, err := os.Stat(path); err == nil {
+		if err := os.Chmod(file.Dir, dirMode); err != nil {
+			return nil, err
+		}
 	}
-	if err := os.Chmod(file.Dir, dirMode); err != nil {
+	if err := os.MkdirAll(file.Dir, dirMode); err != nil {
 		return nil, err
 	}
 	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND

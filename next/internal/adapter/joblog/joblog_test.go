@@ -110,3 +110,31 @@ func TestTheLastLinesOfABigLogAreReadFromItsEnd(t *testing.T) {
 	assert.Len(t, all, 20000, "more lines than its end holds reads the whole file")
 	assert.Equal(t, "line 0", all[0].Text)
 }
+
+func TestADirectoryThatHoldsNoLogOfTheJobKeepsItsMode(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "shared")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+
+	log, err := Open(run.LogFile{Dir: dir, Job: "web"})
+	require.NoError(t, err)
+	log.Close()
+
+	dirInfo, err := os.Stat(dir)
+	require.NoError(t, err)
+	fileInfo, err := os.Stat(filepath.Join(dir, "web.log"))
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o755), dirInfo.Mode().Perm(), "a directory a start names may be shared on purpose")
+	assert.Equal(t, os.FileMode(0o600), fileInfo.Mode().Perm())
+}
+
+func TestANewLogDirectoryIsItsUsersAlone(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "logs", "main")
+
+	log, err := Open(run.LogFile{Dir: dir, Job: "web"})
+	require.NoError(t, err)
+	log.Close()
+
+	info, err := os.Stat(dir)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o700), info.Mode().Perm())
+}
