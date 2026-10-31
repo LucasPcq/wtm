@@ -12,7 +12,7 @@ import (
 // ----------------------------------------------------------------------------
 // The request
 
-// A Request is what the caller asks of checkout, as given: the pull request by its number, its parent, the filter of the pull requests to pick from (Mine or Review), whether the pull request's branch is read as last fetched (NoFetch, as a surface that fetched it a moment ago asks again), and the questions of a new worktree; a field left empty takes its remembered answer, its configured value or its default when the request is resolved.
+// A Request is what the caller asks of checkout, as given: the pull request by its number, its parent, the filter of the pull requests to pick from (Mine or Review), whether the pull request's branch is read as last fetched (NoFetch, as a surface that fetched it a moment ago asks again: a stale remote-tracking branch is then taken as it stands, so it follows only a fetch of that branch that went through), and the questions of a new worktree; a field left empty takes its remembered answer, its configured value or its default when the request is resolved.
 type Request struct {
 	PR      int    `json:"pr"`
 	From    string `json:"from"`

@@ -161,17 +161,22 @@ func (pr listedPR) pullRequest() worktree.PullRequest {
 
 // signedIn returns the path of gh once it is found and signed in.
 func (g GitHub) signedIn(ctx context.Context) (string, error) {
-	// What failed matters less than what to do about it: the cause is left out.
 	binary, err := exec.LookPath(cmp.Or(g.Binary, cli))
 	if err != nil {
 		return "", worktree.ErrGitHubCLIMissing
 	}
 
-	if err := shell.Command(ctx, binary, "auth", "status").Run(); err != nil {
-		if ctx.Err() != nil {
+	cmd := shell.Command(ctx, binary, "auth", "status")
+	var said strings.Builder
+	cmd.Stdout, cmd.Stderr = &said, &said
+	if err := cmd.Run(); err != nil {
+		switch {
+		case ctx.Err() != nil:
 			return "", ctx.Err()
+		case signedOut(said.String()):
+			return "", worktree.ErrGitHubSignedOut
 		}
-		return "", worktree.ErrGitHubSignedOut
+		return "", fmt.Errorf("%w: gh auth status: %w: %s", worktree.ErrPullRequestsUnavailable, err, strings.TrimSpace(said.String()))
 	}
 
 	return binary, nil
@@ -198,6 +203,11 @@ func (g GitHub) run(ctx context.Context, binary, what string, args ...string) ([
 	}
 
 	return out, nil
+}
+
+// signedOut reports whether gh auth status says no account is signed in, or that a token must be renewed: either way it names gh auth login as the fix.
+func signedOut(said string) bool {
+	return strings.Contains(said, "gh auth login")
 }
 
 // notOnGitHub reports whether gh's stderr says the repository has no remote on GitHub: none at all, or none it knows the host of.

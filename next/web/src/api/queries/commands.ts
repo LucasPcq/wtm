@@ -108,6 +108,20 @@ export const checkoutFormQuery = (repo: string) =>
     refetchOnWindowFocus: false,
   })
 
+// a pull request looked up by its number, without fetching its branch: a number typed is shown, not yet chosen
+export const pullRequestQuery = (repo: string, number: string) =>
+  queryOptions({
+    queryKey: ['checkout-pr', repo, number],
+    queryFn: () =>
+      questions(repo, 'checkout', [
+        { path: 'pr', values: [number] },
+        { path: 'no_fetch', values: ['true'] },
+      ]),
+    staleTime: Infinity,
+    retry: false,
+    refetchOnWindowFocus: false,
+  })
+
 export const dryRunQuery = <C extends MutationCommand>(repo: string, command: C, answers: DomainAnswered[]) =>
   queryOptions({
     queryKey: [...repoKey(repo), command, 'dry_run', answers],

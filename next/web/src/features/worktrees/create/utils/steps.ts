@@ -6,6 +6,8 @@ export type StepKey = (typeof steps)[number]
 
 const stepTitle: Record<StepKey, string> = { branch: 'Branch', environment: 'Environment' }
 
+export const stepTitles = steps.map((key) => stepTitle[key])
+
 export const createSteps: Record<Question, StepKey> = {
   branches: 'branch',
   from: 'branch',
@@ -31,8 +33,6 @@ export function stepsBy<P extends string>(form: DomainForm, of: Record<P, StepKe
     }
   })
 }
-
-export const stepsOf = (form: DomainForm) => stepsBy(form, createSteps)
 
 export function nextAsked(steps: Step<string>[], from: number): number {
   const ahead = steps.findIndex((step, i) => i > from && step.asked.length > 0)

@@ -1,23 +1,25 @@
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, TriangleAlert } from 'lucide-react'
-import { dryRunQuery } from '@/api/queries/commands'
+import { reviewQuery } from '@/api/queries/commands'
 import type { DomainAnswered } from '@/api/types.gen'
 import { Item, ItemTitle } from '@/components/ui/item'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert } from '@/features/worktrees/components/alert'
 import { Details } from '@/features/worktrees/components/details'
 import { Facts } from '@/features/worktrees/components/facts'
 import { ItemList } from '@/features/worktrees/components/item-list'
 import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
-import { actionTag, isRowWarning, rowWarningLine } from '@/features/worktrees/create/utils/checkout-words'
+import { isRowWarning, rowWarningLine, tagOf } from '@/features/worktrees/create/utils/checkout-words'
 import { envFromShort, isolationShort } from '@/features/worktrees/create/utils/words'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
+import { sentence } from '@/features/worktrees/utils/sentence'
 
 export function CheckoutConfirm({ repo, answers }: { repo: string; answers: DomainAnswered[] }) {
-  const dry = useQuery(dryRunQuery(repo, 'checkout', answers))
+  const dry = useQuery(reviewQuery(repo, 'checkout', answers))
 
   if (dry.isPending) return <Skeleton className="h-40 w-full" />
-  if (dry.isError) return <p className="text-sm text-destructive">{dry.error.message}</p>
-  if (dry.data.error) return <p className="text-sm text-destructive">{dry.data.error.message}</p>
+  if (dry.isError) return <Alert tone="red" description={sentence(dry.error.message)} />
+  if (dry.data.error) return <Alert tone="red" description={sentence(dry.data.error.message)} />
 
   const { plan, warnings } = dry.data
   if (!plan) return null
@@ -27,6 +29,7 @@ export function CheckoutConfirm({ repo, answers }: { repo: string; answers: Doma
   // the parent strategy with no worktree of the parent copies main's .env, as the plan's Alert says
   const fellBack = warnings.some((warning) => warning.code === 'checkout.env_parent_fallback')
   const forwarded = plan.fast_forward?.includes(branch) ?? false
+  const fetched = !warnings.some((warning) => warning.code === 'checkout.fetch_failed')
   const line = [
     `From ${plan.from}`,
     plan.isolation && isolationShort[plan.isolation],
@@ -69,7 +72,7 @@ export function CheckoutConfirm({ repo, answers }: { repo: string; answers: Doma
             </a>
             <p className="text-xs text-muted-foreground">{line.join(' · ')}</p>
           </div>
-          <span className="shrink-0 text-xs text-muted-foreground">{actionTag[plan.action]}</span>
+          <span className="shrink-0 text-xs text-muted-foreground">{tagOf(plan.action, fetched)}</span>
         </Item>
       </ItemList>
       <Details label="Details" summary={summary}>

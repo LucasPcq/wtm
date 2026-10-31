@@ -58,10 +58,12 @@ export type PrFilter = (typeof prFilters)[number]
 
 export const prFilterLabel: Record<PrFilter, string> = { all: 'All', mine: 'Mine', review: 'To review' }
 
-export const actionTag: Record<CheckoutAction, string> = {
-  check_out: 'Existing branch',
-  resume: 'Fetched from origin',
+const actionTag: Record<CheckoutAction, { fetched: string; stale: string }> = {
+  check_out: { fetched: 'Existing branch', stale: 'Existing branch' },
+  resume: { fetched: 'Fetched from origin', stale: 'From origin, as last fetched' },
 }
+
+export const tagOf = (action: CheckoutAction, fetched: boolean) => actionTag[action][fetched ? 'fetched' : 'stale']
 
 // the line under a pull request's title: who, into what, and its state when it has one
 export const prLine = (pr: WorktreePullRequest) =>
@@ -92,7 +94,6 @@ type PrRefusal =
   | 'checkout.path_exists'
   | 'checkout.name_clash'
   | 'checkout.head_missing'
-  | 'checkout.pr_invalid'
   | 'not_found'
 
 const refusalWords: Record<PrRefusal, (params: Record<string, string>) => string> = {
@@ -101,7 +102,6 @@ const refusalWords: Record<PrRefusal, (params: Record<string, string>) => string
   'checkout.path_exists': (p) => `Its folder ${p.path} already exists.`,
   'checkout.name_clash': (p) => `${p.branch} would share its folder name with ${p.other}.`,
   'checkout.head_missing': (p) => `#${p.number}'s branch is gone from origin: there is nothing to check out.`,
-  'checkout.pr_invalid': (p) => `${p.value} isn't a pull request number.`,
   not_found: (p) => `GitHub has no pull request #${p.number}.`,
 }
 
@@ -153,9 +153,14 @@ const unavailableWords: Record<Unavailable, UnavailableWords> = {
 const isUnavailable = (reason: string | undefined): reason is Unavailable =>
   reason !== undefined && Object.hasOwn(unavailableWords, reason)
 
-// any other failure of gh says what the core says
-export function unavailableLine(refusal: DomainError | undefined, message: string): UnavailableWords {
-  const reason = refusal?.params?.reason
+// any other failure of gh says what the core says; a refusal that is not GitHub's is no GitHub Alert at all
+export function unavailableLine(refusal: DomainError | undefined, message: string): UnavailableWords | undefined {
+  if (refusal?.code !== 'checkout.github_unavailable') return undefined
+  const reason = refusal.params?.reason
   if (isUnavailable(reason)) return unavailableWords[reason]
   return { title: "Couldn't ask GitHub", description: sentence(message), next: "GitHub couldn't be asked" }
 }
+
+// what Next says while the form cannot be asked
+export const blockedBy = (refusal: DomainError | undefined, message: string) =>
+  unavailableLine(refusal, message)?.next ?? "Checkout can't start: see the error above"

@@ -10,9 +10,10 @@ import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { NextButton } from '@/features/worktrees/components/next-button'
 import { Stepper } from '@/features/worktrees/components/stepper'
 import { CheckoutWizard } from '@/features/worktrees/create/components/checkout-wizard'
-import { GitHubAlert } from '@/features/worktrees/create/components/github-alert'
+import { FormFailure } from '@/features/worktrees/create/components/form-failure'
 import { ParentPlaceholder } from '@/features/worktrees/create/components/parent-placeholder'
-import { unavailableLine } from '@/features/worktrees/create/utils/checkout-words'
+import { blockedBy } from '@/features/worktrees/create/utils/checkout-words'
+import { stepTitles } from '@/features/worktrees/create/utils/steps'
 import type { Start } from '@/features/worktrees/hooks/use-run'
 
 export function CheckoutPanel({
@@ -42,9 +43,10 @@ export function CheckoutPanel({
       />
     )
 
-  // GitHub could not be asked: no form at all, the step keeps its shape, and a new branch is the way on
+  // the form could not be asked (GitHub unavailable, the server's refusal): the step keeps its shape, and a new branch
+  // is the way on
   const refusal = form.error instanceof HttpError ? form.error.refusal : undefined
-  const why = form.isError ? unavailableLine(refusal, form.error.message).next : 'Asking GitHub for its pull requests'
+  const why = form.isError ? blockedBy(refusal, form.error.message) : 'Asking GitHub for its pull requests'
 
   return (
     <>
@@ -56,8 +58,7 @@ export function CheckoutPanel({
       <DialogBand>
         <Stepper
           steps={[
-            { title: 'Branch', state: 'now' },
-            { title: 'Environment', state: 'todo' },
+            ...stepTitles.map((title, i) => ({ title, state: i === 0 ? ('now' as const) : ('todo' as const) })),
             { title: 'Confirm', state: 'todo' },
           ]}
         />
@@ -66,7 +67,7 @@ export function CheckoutPanel({
       <DialogScroll>
         {startFrom}
         {form.isPending && <Skeleton className="h-48 w-full" />}
-        {form.isError && <GitHubAlert refusal={refusal} message={form.error.message} onNewBranch={onNewBranch} />}
+        {form.isError && <FormFailure error={form.error} onNewBranch={onNewBranch} />}
         <ParentPlaceholder />
       </DialogScroll>
 

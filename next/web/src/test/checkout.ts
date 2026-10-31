@@ -27,6 +27,7 @@ export const pullRequests = [
   pr({ number: 214, branch: 'feat/billing', title: 'Billing: invoice totals', author: 'dana' }),
   pr({ number: 205, branch: 'feat/old-onboarding', title: 'Old onboarding flow', author: 'lucas', state: 'closed' }),
   pr({ number: 198, branch: 'feat/search-v1', title: 'Search: first pass', author: 'dana', state: 'merged' }),
+  pr({ number: 21, branch: 'chore/lint', title: 'Lint the CLI', author: 'dana', state: 'merged' }),
 ]
 
 const held = ['fix/login-redirect', 'feat/billing']
@@ -36,6 +37,8 @@ export type GitHub = {
   // how far fix/rate-limit, a local branch here, is behind origin; none: only origin has it
   behind?: number
   reason?: 'gh_missing' | 'signed_out' | 'not_on_github'
+  // origin cannot be reached: a plan, which fetches, stands on origin as last fetched
+  offline?: boolean
   calls?: WebCall[]
 }
 
@@ -163,8 +166,8 @@ export function checkoutPlan(call: WebCall, github: GitHub = {}) {
   return HttpResponse.json({
     ...envelope('checkout', []),
     fingerprint: `c:${chosen.number}`,
-    warnings:
-      chosen.state === 'open'
+    warnings: [
+      ...(chosen.state === 'open'
         ? []
         : [
             {
@@ -172,7 +175,17 @@ export function checkoutPlan(call: WebCall, github: GitHub = {}) {
               message: `pull request #${chosen.number} is ${chosen.state}`,
               params: { number: String(chosen.number), state: chosen.state },
             },
-          ],
+          ]),
+      ...(github.offline
+        ? [
+            {
+              code: 'checkout.fetch_failed',
+              message: `couldn't fetch ${chosen.branch} from origin`,
+              params: { branch: chosen.branch, cause: 'unable to access origin' },
+            },
+          ]
+        : []),
+    ],
     plan: {
       action: local ? 'check_out' : 'resume',
       pull_request: chosen,

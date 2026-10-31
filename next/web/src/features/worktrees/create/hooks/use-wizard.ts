@@ -20,7 +20,7 @@ export function useWizard<P extends string>({
   form: DomainForm
   stepOf: Record<P, StepKey>
   extend?: (answers: DomainAnswered[]) => DomainAnswered[]
-  onAnswered?: (sent: DomainAnswered[]) => void
+  onAnswered?: (sent: DomainAnswered[], answered: DomainForm) => void
 }) {
   const commandForm = useCommandForm({
     repo,
@@ -52,7 +52,8 @@ export function useWizard<P extends string>({
   // Next asks the core with the answers as typed, not as last checked, and goes by the steps of that answer: a step
   // with problems shows them rather than a Next that cannot be pressed
   const next = async () => {
-    const answered = await check()
+    const answered = await check().catch(() => undefined)
+    if (!answered) return
     const fresh = stepsBy(answered, stepOf)
     const filed = problemsByKey(answered.fields, answered.problems)
     const here = fresh[at]
@@ -74,6 +75,7 @@ export function useWizard<P extends string>({
     ],
     remember: { paths: remember, toggle: (path: string) => dispatch({ type: 'remember', path }) },
     back: () => dispatch({ type: 'go', to: previous }),
-    next,
+    next: () => void next(),
+    ask: () => void check().catch(() => undefined),
   }
 }

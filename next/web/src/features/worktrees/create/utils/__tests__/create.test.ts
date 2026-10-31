@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import type { CreatePlan, DomainField, DomainForm, DomainSkip } from '@/api/types.gen'
 import { checkoutPlanned, planned } from '@/features/worktrees/create/utils/progress'
-import { stepsOf } from '@/features/worktrees/create/utils/steps'
+import { createSteps, stepsBy } from '@/features/worktrees/create/utils/steps'
 import { current, doneOf } from '@/features/worktrees/utils/progress'
 
 const text = (path: string, skip?: DomainSkip): DomainField => ({
@@ -17,7 +17,7 @@ test('each question goes in its step, a skipped one is listed apart, a field no 
     problems: [],
   }
 
-  const [branch, environment] = stepsOf(form)
+  const [branch, environment] = stepsBy(form, createSteps)
 
   expect(branch?.asked.map((f) => f.path)).toEqual(['branches'])
   expect(environment?.asked.map((f) => f.path)).toEqual([])

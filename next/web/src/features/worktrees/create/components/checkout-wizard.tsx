@@ -9,6 +9,7 @@ import { NextButton } from '@/features/worktrees/components/next-button'
 import { Stepper } from '@/features/worktrees/components/stepper'
 import { ApplyButton } from '@/features/worktrees/create/components/apply-button'
 import { CheckoutConfirm } from '@/features/worktrees/create/components/checkout-confirm'
+import { FormFailure } from '@/features/worktrees/create/components/form-failure'
 import { NotAsked } from '@/features/worktrees/create/components/not-asked'
 import { ParentPlaceholder } from '@/features/worktrees/create/components/parent-placeholder'
 import { PrPicker } from '@/features/worktrees/create/components/pr-picker'
@@ -34,23 +35,24 @@ export function CheckoutWizard({
   onCancel: () => void
   onNewBranch: () => void
 }) {
-  // a pull request's branch is fetched by the first ask that names it; every later one, the plan and the run read it
-  // as then, so a refresh of the dialog never fetches again
+  // a pull request's branch is fetched by the first ask that names it; the form's later asks read it as then, once that
+  // fetch went through without a refusal. The plan and the run fetch it again: a stale ref never reaches them
   const fetched = useRef(new Set<string>())
-  const { form, asked, problems, check, at, step, confirming, request, stepper, remember, back, next } = useWizard({
-    repo,
-    command: 'checkout',
-    form: initial,
-    stepOf: checkoutSteps,
-    extend: (answers) => {
-      const pr = prOf(answers)
-      return pr && fetched.current.has(pr) ? [...answers, noFetch] : answers
-    },
-    onAnswered: (sent) => {
-      const pr = prOf(sent)
-      if (pr) fetched.current.add(pr)
-    },
-  })
+  const { form, asked, problems, failure, ask, at, step, confirming, request, stepper, remember, back, next } =
+    useWizard({
+      repo,
+      command: 'checkout',
+      form: initial,
+      stepOf: checkoutSteps,
+      extend: (answers) => {
+        const pr = prOf(answers)
+        return pr && fetched.current.has(pr) ? [...answers, noFetch] : answers
+      },
+      onAnswered: (sent, answered) => {
+        const pr = prOf(sent)
+        if (pr && !answered.problems.some((problem) => problem.path === 'pr')) fetched.current.add(pr)
+      },
+    })
 
   const field = asked.fields.find((candidate) => candidate.path === 'pr')
   const options = field?.kind === 'select' ? field.options : []
@@ -79,18 +81,24 @@ export function CheckoutWizard({
       </DialogBand>
 
       <DialogScroll>
-        {step && at === 0 && (
+        {step && (
           <div className="flex flex-col gap-6">
-            {startFrom}
-            <PrPicker
-              form={form}
-              options={options}
-              chosen={chosen}
-              errors={refusals}
-              onAsk={() => void check()}
-              onNewBranch={onNewBranch}
-            />
-            {chosen ? (
+            {at === 0 && startFrom}
+            {failure && <FormFailure error={failure} onNewBranch={onNewBranch} />}
+            {at === 0 && (
+              <PrPicker
+                repo={repo}
+                form={form}
+                options={options}
+                chosen={chosen}
+                errors={refusals}
+                onAsk={ask}
+                onNewBranch={onNewBranch}
+              />
+            )}
+            {at === 0 && !chosen ? (
+              <ParentPlaceholder />
+            ) : (
               <CommandFields
                 form={form}
                 fields={step.asked.filter((asking) => asking.path !== 'pr')}
@@ -98,17 +106,9 @@ export function CheckoutWizard({
                 problems={problems}
                 remember={remember}
               />
-            ) : (
-              <ParentPlaceholder />
             )}
-          </div>
-        )}
-
-        {step && at > 0 && (
-          <div className="flex flex-col gap-6">
-            <CommandFields form={form} fields={step.asked} words={words} problems={problems} remember={remember} />
             {problems[''] && <p className="text-sm text-destructive">{problems['']}</p>}
-            <NotAsked fields={step.skipped} words={words} />
+            {(at > 0 || chosen) && <NotAsked fields={step.skipped} words={words} />}
           </div>
         )}
 

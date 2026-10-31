@@ -253,12 +253,16 @@ func TestEachReasonGHCannotBeAskedIsItsOwnError(t *testing.T) {
 	_, signedOutErr := github.GitHub{Dir: t.TempDir(), Binary: signedOut}.OpenPullRequests(t.Context(), worktree.AllPullRequests)
 	_, noForgeErr := github.GitHub{Dir: t.TempDir(), Binary: noForge}.PullRequest(t.Context(), 1)
 	_, failedErr := github.GitHub{Dir: t.TempDir(), Binary: refusingGH(t, "HTTP 502")}.PullRequest(t.Context(), 1)
+	_, authFailedErr := github.GitHub{Dir: t.TempDir(), Binary: authGH(t, 1, "error connecting to api.github.com", "{}")}.OpenPullRequests(t.Context(), worktree.AllPullRequests)
 
 	assert.ErrorIs(t, missingErr, worktree.ErrGitHubCLIMissing)
 	assert.ErrorIs(t, signedOutErr, worktree.ErrGitHubSignedOut)
 	assert.ErrorIs(t, noForgeErr, worktree.ErrNotOnGitHub)
 	require.ErrorIs(t, failedErr, worktree.ErrPullRequestsUnavailable)
+	require.ErrorIs(t, authFailedErr, worktree.ErrPullRequestsUnavailable)
+	assert.ErrorContains(t, authFailedErr, "error connecting to api.github.com")
 	for _, reason := range []error{worktree.ErrGitHubCLIMissing, worktree.ErrGitHubSignedOut, worktree.ErrNotOnGitHub} {
 		assert.NotErrorIs(t, failedErr, reason)
+		assert.NotErrorIs(t, authFailedErr, reason)
 	}
 }

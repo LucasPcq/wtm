@@ -101,7 +101,7 @@ export function DetailPanel({
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 pb-6">
         {live.isPending && <Skeleton className="h-32 w-full" />}
-        {live.isError && <p className="text-sm text-destructive">{live.error.message}</p>}
+        {live.isError && <Alert tone="red" description={live.error.message} />}
         {failed && (
           <Alert
             tone="red"

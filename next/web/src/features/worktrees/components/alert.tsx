@@ -33,23 +33,26 @@ export function Alert({
   const { box, icon: color, glyph } = look[tone]
   const Icon = icon ?? glyph
 
+  // explicit rows: shadcn's icon spans two, which leaves an empty row under an Alert of one line
   return (
     <Box
       className={cn(
-        'gap-y-1 px-4 py-3 text-foreground has-[>svg]:grid-cols-[auto_1fr_auto] has-[>svg]:gap-x-3',
+        'gap-y-1 px-4 py-3 text-foreground *:[svg]:row-span-1 has-[>svg]:grid-cols-[auto_1fr_auto] has-[>svg]:gap-x-3',
         box,
         className,
       )}
       {...props}
     >
-      <Icon className={cn('size-4', color)} aria-hidden="true" />
-      {title && <AlertTitle className="col-start-2 min-w-0">{title}</AlertTitle>}
+      <Icon className={cn('row-start-1 size-4', color)} aria-hidden="true" />
+      {title && <AlertTitle className="col-start-2 row-start-1 min-w-0">{title}</AlertTitle>}
       {description && (
-        <AlertDescription className={cn('col-start-2 min-w-0 text-pretty', !title && 'row-start-1')}>
+        <AlertDescription className={cn('col-start-2 min-w-0 text-pretty', title ? 'row-start-2' : 'row-start-1')}>
           {description}
         </AlertDescription>
       )}
-      {action && <div className="col-start-3 row-span-2 row-start-1 self-start">{action}</div>}
+      {action && (
+        <div className={cn('col-start-3 row-start-1 self-start', title && description && 'row-span-2')}>{action}</div>
+      )}
       {below && <div className="col-span-3 mt-2 flex flex-col gap-2">{below}</div>}
     </Box>
   )

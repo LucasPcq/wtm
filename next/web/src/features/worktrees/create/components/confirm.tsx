@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { dryRunQuery } from '@/api/queries/commands'
 import type { DomainAnswered } from '@/api/types.gen'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert } from '@/features/worktrees/components/alert'
 import { Details } from '@/features/worktrees/components/details'
 import { Facts } from '@/features/worktrees/components/facts'
 import { ItemList } from '@/features/worktrees/components/item-list'
@@ -9,13 +10,14 @@ import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { BranchPlan } from '@/features/worktrees/create/components/branch-plan'
 import { planWide } from '@/features/worktrees/utils/outcome'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
+import { sentence } from '@/features/worktrees/utils/sentence'
 
 export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswered[] }) {
   const dry = useQuery(dryRunQuery(repo, 'create', answers))
 
   if (dry.isPending) return <Skeleton className="h-40 w-full" />
-  if (dry.isError) return <p className="text-sm text-destructive">{dry.error.message}</p>
-  if (dry.data.error) return <p className="text-sm text-destructive">{dry.data.error.message}</p>
+  if (dry.isError) return <Alert tone="red" description={sentence(dry.error.message)} />
+  if (dry.data.error) return <Alert tone="red" description={sentence(dry.data.error.message)} />
 
   const { plan, warnings } = dry.data
   const branches = plan?.branches ?? []

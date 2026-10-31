@@ -16,15 +16,17 @@ import { type Start, succeeded, useRun } from '@/features/worktrees/hooks/use-ru
 
 export function CreateButton({ repo }: { repo: string }) {
   const [open, setShown] = useState(false)
+  const [from, setFrom] = useState<StartFromValue>('branch')
   // read when a run ends, after the render that started it: a ref, not the state of that render
   const shown = useRef(false)
   const setOpen = (on: boolean) => {
     shown.current = on
     setShown(on)
+    // each opening starts as Create does: a plain create never asks GitHub
+    if (on) setFrom('branch')
   }
   // a new round mounts a fresh wizard: Create another starts from nothing typed
   const [round, setRound] = useState(0)
-  const [from, setFrom] = useState<StartFromValue>('branch')
   const created = useRun(repo, 'create')
   // a pull request checked out is a worktree created: the same dialog, its run checkout's own
   const checkedOut = useRun(repo, 'checkout')

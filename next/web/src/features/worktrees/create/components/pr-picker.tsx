@@ -1,7 +1,9 @@
 import { useStore } from '@tanstack/react-form'
-import { useDebouncer } from '@tanstack/react-pacer'
+import { useDebouncedValue } from '@tanstack/react-pacer'
+import { useQuery } from '@tanstack/react-query'
 import { CircleX, GitPullRequest, Search } from 'lucide-react'
 import { useState } from 'react'
+import { pullRequestQuery } from '@/api/queries/commands'
 import type { DomainFieldError, DomainOption } from '@/api/types.gen'
 import { keyOf } from '@/components/command-form/answers'
 import type { CommandForm } from '@/components/command-form/use-command-form'
@@ -9,23 +11,21 @@ import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { CommandLine } from '@/features/worktrees/components/command-line'
-import { CopyCommand } from '@/features/worktrees/create/components/copy-command'
+import { PrRow } from '@/features/worktrees/create/components/pr-row'
 import {
   checkoutWords,
-  optionLine,
   type PrFilter,
   prFilterLabel,
   prFilters,
   refusalLine,
 } from '@/features/worktrees/create/utils/checkout-words'
-import { cn } from '@/lib/utils'
 
 const pr = keyOf('pr')
 const mine = keyOf('mine')
 const review = keyOf('review')
 
 export function PrPicker({
+  repo,
   form,
   options,
   chosen,
@@ -33,6 +33,7 @@ export function PrPicker({
   onAsk,
   onNewBranch,
 }: {
+  repo: string
   form: CommandForm
   options: DomainOption[]
   chosen: string | undefined
@@ -50,28 +51,32 @@ export function PrPicker({
 
   const typed = query.trim()
   const byNumber = /^\d+$/.test(typed)
+  const listed = options.find((option) => option.value === typed)
+  // a number no listed pull request is, once typing pauses, is looked up on GitHub, which finds a closed or merged one
+  // too; looked up, it is shown, never chosen nor fetched until the person picks it
+  const [paused] = useDebouncedValue(byNumber && !listed ? typed : '', { wait: 300 })
+  const lookup = useQuery({ ...pullRequestQuery(repo, paused), enabled: paused !== '' && paused === typed })
+  const lookedUp = lookup.data?.fields.find((field) => field.path === 'pr')
+  const found = lookedUp?.kind === 'select' ? lookedUp.options.find((option) => option.value === paused) : undefined
+  const unknown = lookup.data?.problems.find((problem) => problem.path === 'pr' && problem.code === 'not_found')
+
   const matches = (option: DomainOption) => {
     const of = option.pull_request
     if (!of || !typed) return true
     if (byNumber) return String(of.number).startsWith(typed)
     return (of.title ?? '').toLowerCase().includes(typed.toLowerCase())
   }
-  const shown = options.filter(matches)
+  const shown = [...options.filter(matches), ...(found && !listed && paused === typed ? [found] : [])]
   const base = options[0]?.pull_request?.url.replace(/^https?:\/\//, '').replace(/\/pull\/\d+$/, '')
 
   const choose = (value: string) => {
     form.setFieldValue(pr, [value])
     onAsk()
   }
-  const askNumber = useDebouncer(choose, { wait: 300 })
 
-  // a number no listed pull request starts with is asked of GitHub, which finds a closed or merged one too
-  const search = (text: string) => {
-    setQuery(text)
-    const number = text.trim()
-    if (/^\d+$/.test(number) && !options.some((option) => String(option.pull_request?.number).startsWith(number)))
-      return askNumber.maybeExecute(number)
-    askNumber.cancel()
+  const enter = () => {
+    const target = listed ?? (paused === typed ? found : undefined)
+    if (target && !target.problem) choose(target.value)
   }
 
   const pick = (to: PrFilter) => {
@@ -81,6 +86,13 @@ export function PrPicker({
   }
 
   const empty = options.length === 0 && !typed && filter === 'all'
+
+  const searchLine = () => {
+    if (!byNumber || paused !== typed) return undefined
+    if (unknown) return refusalLine(unknown)
+    if (lookup.isError) return lookup.error.message
+    return undefined
+  }
 
   return (
     <section className="flex flex-col gap-2" aria-label={label}>
@@ -100,7 +112,12 @@ export function PrPicker({
             aria-label="Search pull requests"
             placeholder="Search by title or number"
             value={query}
-            onChange={(e) => search(e.target.value)}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              enter()
+            }}
           />
         </InputGroup>
 
@@ -144,42 +161,25 @@ export function PrPicker({
           </Empty>
         )}
 
-        {!empty && shown.length === 0 && (
+        {searchLine() && <p className="px-4 py-3 text-sm text-muted-foreground">{searchLine()}</p>}
+
+        {!empty && shown.length === 0 && !searchLine() && (
           <p className="px-4 py-3 text-sm text-muted-foreground">No pull request matches.</p>
         )}
 
         {shown.length > 0 && (
           <ul className="flex flex-col p-1.5">
-            {shown.map((option) => {
-              const of = option.pull_request
-              if (!of) return null
-              const refused = option.problem !== undefined
-              const command = option.problem?.params?.command
-              const followUp = option.problem?.follow_up
-
-              return (
-                <li key={option.value} className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    aria-pressed={option.value === chosen}
-                    disabled={refused}
-                    onClick={() => choose(option.value)}
-                    className={cn(
-                      'flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-md px-2.5 py-2 text-left outline-none',
-                      'hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-pressed:bg-muted',
-                      'disabled:pointer-events-none disabled:text-muted-foreground',
-                    )}
-                  >
-                    <span className="w-full truncate text-sm">
-                      #{of.number} {of.title}
-                    </span>
-                    <span className="w-full truncate text-xs text-muted-foreground">{optionLine(option)}</span>
-                  </button>
-                  {command && <CopyCommand text={command} look="copy" />}
-                  {!command && followUp && <CommandLine followUp={followUp} look="copy" />}
-                </li>
-              )
-            })}
+            {shown.map((option) =>
+              option.pull_request ? (
+                <PrRow
+                  key={option.value}
+                  option={option}
+                  pr={option.pull_request}
+                  chosen={option.value === chosen}
+                  onChoose={() => choose(option.value)}
+                />
+              ) : null,
+            )}
           </ul>
         )}
       </div>

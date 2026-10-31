@@ -3,6 +3,7 @@ import type { DomainForm } from '@/api/types.gen'
 import { CommandFields } from '@/components/command-form/command-fields'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Alert } from '@/features/worktrees/components/alert'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { Stepper } from '@/features/worktrees/components/stepper'
@@ -13,6 +14,7 @@ import { useWizard } from '@/features/worktrees/create/hooks/use-wizard'
 import { createSteps } from '@/features/worktrees/create/utils/steps'
 import { createWords } from '@/features/worktrees/create/utils/words'
 import type { Start } from '@/features/worktrees/hooks/use-run'
+import { sentence } from '@/features/worktrees/utils/sentence'
 
 export function Wizard({
   repo,
@@ -27,7 +29,7 @@ export function Wizard({
   onStart: (start: Start) => void
   onCancel: () => void
 }) {
-  const { form, problems, at, step, confirming, request, stepper, remember, back, next } = useWizard({
+  const { form, problems, failure, at, step, confirming, request, stepper, remember, back, next } = useWizard({
     repo,
     command: 'create',
     form: initial,
@@ -49,6 +51,7 @@ export function Wizard({
         {step && (
           <div className="flex flex-col gap-6">
             {at === 0 && startFrom}
+            {failure && <Alert tone="red" description={sentence(failure.message)} />}
             <CommandFields
               form={form}
               fields={step.asked}

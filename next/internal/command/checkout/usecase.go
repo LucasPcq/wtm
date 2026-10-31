@@ -226,22 +226,26 @@ func unavailable(err error) error {
 	}
 
 	refusal := &domain.Error{Kind: domain.KindPrecondition, Code: CodeGitHubUnavailable, Message: err.Error()}
-	for reason, sentinel := range unavailableReasons {
-		if errors.Is(err, sentinel) {
-			refusal.Params = domain.Params{ParamReason: reason}
-		}
+	switch {
+	case errors.Is(err, worktree.ErrGitHubCLIMissing):
+		refusal.Params = domain.Params{ParamReason: ReasonGHMissing}
+	case errors.Is(err, worktree.ErrGitHubSignedOut):
+		refusal.Params = domain.Params{ParamReason: ReasonSignedOut}
+	case errors.Is(err, worktree.ErrNotOnGitHub):
+		refusal.Params = domain.Params{ParamReason: ReasonNotOnGitHub}
 	}
 	return refusal
 }
 
-// ParamReason names, on a CodeGitHubUnavailable refusal, why GitHub could not be asked when a person fixes it outside wtm: gh_missing, signed_out or not_on_github; it is absent for any other failure of gh.
+// ParamReason names, on a CodeGitHubUnavailable refusal, why GitHub could not be asked when a person fixes it outside wtm; it is absent for any other failure of gh.
 const ParamReason = "reason"
 
-var unavailableReasons = map[string]error{
-	"gh_missing":    worktree.ErrGitHubCLIMissing,
-	"signed_out":    worktree.ErrGitHubSignedOut,
-	"not_on_github": worktree.ErrNotOnGitHub,
-}
+// The reasons a CodeGitHubUnavailable refusal names.
+const (
+	ReasonGHMissing   = "gh_missing"
+	ReasonSignedOut   = "signed_out"
+	ReasonNotOnGitHub = "not_on_github"
+)
 
 // ----------------------------------------------------------------------------
 // The steps of Apply

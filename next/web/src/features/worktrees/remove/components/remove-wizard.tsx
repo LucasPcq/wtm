@@ -5,6 +5,7 @@ import type { DomainWarning, TeardownRemoval } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert } from '@/features/worktrees/components/alert'
 import { ChildrenStep } from '@/features/worktrees/components/children-step'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
@@ -125,8 +126,8 @@ export function RemoveWizard({
   const warnings = step === 'confirm' ? (planned.data?.warnings ?? []).filter(planWide) : []
   const body = () => {
     if (review.isPending) return <Skeleton className="h-40 w-full" />
-    if (review.isError) return <p className="text-sm text-destructive">{review.error.message}</p>
-    if (review.data.error) return <p className="text-sm text-destructive">{review.data.error.message}</p>
+    if (review.isError) return <Alert tone="red" description={review.error.message} />
+    if (review.data.error) return <Alert tone="red" description={review.data.error.message} />
 
     if (step === 'worktrees')
       return (
@@ -210,7 +211,7 @@ export function RemoveWizard({
       </DialogBand>
 
       <DialogScroll>
-        {unplanned && <p className="text-sm text-destructive">{unplanned}</p>}
+        {unplanned && <Alert tone="red" description={unplanned} />}
         <PlanWarnings warnings={notice ? [notice, ...warnings] : warnings} />
         {body()}
       </DialogScroll>

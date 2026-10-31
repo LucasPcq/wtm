@@ -185,9 +185,9 @@ func TestAPullRequestGitHubCannotBeAskedOfRefusesThePlan(t *testing.T) {
 
 func TestARefusalOfGitHubNamesTheReasonAPersonFixes(t *testing.T) {
 	reasons := map[error]domain.Params{
-		worktree.ErrGitHubCLIMissing:        {checkout.ParamReason: "gh_missing"},
-		worktree.ErrGitHubSignedOut:         {checkout.ParamReason: "signed_out"},
-		worktree.ErrNotOnGitHub:             {checkout.ParamReason: "not_on_github"},
+		worktree.ErrGitHubCLIMissing:        {checkout.ParamReason: checkout.ReasonGHMissing},
+		worktree.ErrGitHubSignedOut:         {checkout.ParamReason: checkout.ReasonSignedOut},
+		worktree.ErrNotOnGitHub:             {checkout.ParamReason: checkout.ReasonNotOnGitHub},
 		worktree.ErrPullRequestsUnavailable: nil,
 	}
 	for err, params := range reasons {
@@ -227,6 +227,15 @@ func TestABranchOriginDeletedSinceTheLastFetchIsNotTrackedButRefused(t *testing.
 	_, err := checkout.Resolve(w.facts(t, req), req)
 
 	assert.Equal(t, map[string]string{checkout.PathPR: checkout.CodeHeadMissing}, problems(err))
+}
+
+// NoFetch reads origin as last fetched, a stale remote-tracking branch included: a caller sends it only once a fetch of that branch went through.
+func TestNoFetchTakesAStaleRemoteBranchAsLastFetched(t *testing.T) {
+	w := newWorld(t)
+
+	planned, _ := w.plan(t, checkout.Request{PR: prDeleted, NoFetch: true})
+
+	assert.Equal(t, checkout.ActionResume, planned.Action)
 }
 
 func TestALocalBranchOriginDeletedIsCheckedOutAsItIsWithNothingToFastForward(t *testing.T) {
