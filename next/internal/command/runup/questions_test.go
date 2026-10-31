@@ -114,3 +114,15 @@ func TestARequestReadsBackAsTheAnswersItWasGiven(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, req, again)
 }
+
+// A shared service runs in main for every worktree: the profile a claimer started it under is not main's.
+func TestAWorktreeShowsTheProfileOfItsOwnJobsAlone(t *testing.T) {
+	w := newWorld(t)
+	w.up("db", "main", nil)
+	w.daemon.listed[0].Profile = "full"
+
+	questions := w.questions(t, starting("", featA))
+
+	assert.Empty(t, questions.Worktrees.Options[0].Profile)
+	assert.Equal(t, []string{"db"}, questions.Worktrees.Options[0].Up)
+}

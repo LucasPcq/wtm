@@ -14,7 +14,7 @@ const every = 200 * time.Millisecond
 // dialTimeout bounds one dial: a port on the loopback answers at once or not at all.
 const dialTimeout = 100 * time.Millisecond
 
-// Listening dials each of ports on the loopback until something answers on every one, within, or ctx ends, and reports which answered.
+// Listening dials each of ports on the loopback, IPv4 then IPv6, until something answers on every one, within, or ctx ends, and reports which answered.
 func Listening(ctx context.Context, ports []int, within time.Duration) map[int]bool {
 	answered := make(map[int]bool, len(ports))
 	ctx, cancel := context.WithTimeout(ctx, within)
@@ -36,12 +36,16 @@ func Listening(ctx context.Context, ports []int, within time.Duration) map[int]b
 	}
 }
 
+// loopbacks are the addresses a port is dialled on: a dev server on localhost listens on one or the other (Vite and Node on macOS on ::1 alone).
+var loopbacks = []string{"127.0.0.1", "::1"}
+
 func answers(ctx context.Context, port int) bool {
 	dialer := net.Dialer{Timeout: dialTimeout}
-	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-	if err != nil {
-		return false
+	for _, host := range loopbacks {
+		if conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port))); err == nil {
+			_ = conn.Close()
+			return true
+		}
 	}
-	_ = conn.Close()
-	return true
+	return false
 }

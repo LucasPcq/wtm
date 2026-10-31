@@ -93,7 +93,7 @@ func TestEachRequestThatCarriesItsCallerTakesItFromEverySurface(t *testing.T) {
 func TestEachFollowUpOfAMigratedCommandIsSpelledFromItsSchema(t *testing.T) {
 	streams, _, _, _ := output.Test()
 	root := cli.NewRoot(version, streams, commands(streams, cli.Env{}))
-	followUps := []domain.FollowUp{leftBehind("feat/a"), *initialize(), settle("feat/a"), proxyStatus(), *restartDaemon()}
+	followUps := []domain.FollowUp{leftBehind("feat/a"), *initialize(), settle("feat/a"), proxyStatus(), *daemonRestart()}
 	followUps = append(followUps, repository.Offered(list.Actions(list.Detail{Branch: "feat/a"}))...)
 	fixes := status.Problems(status.ProblemsParams{Branch: "feat/a", Merged: true, Missing: []status.Missing{{Target: ".env"}, {Target: ".env", From: status.FromNowhere}}, Jobs: []status.Job{{Name: "api", State: run.Crashed}}})
 	for _, problem := range fixes {

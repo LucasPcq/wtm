@@ -2,6 +2,7 @@ package runup_test
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -65,6 +66,13 @@ create = "createdb"
 remove = "dropdb"
 
 [[job]]
+name = "quiet"
+kind = "service"
+cmd = "quiet"
+ports = { QUIET_PORT = 7000 }
+probe = false
+
+[[job]]
 name = "turbo"
 kind = "service"
 cmd = "turbo dev"
@@ -82,6 +90,14 @@ jobs = ["migrate", "db", "api", "web"]
 [[profile]]
 name = "twice"
 jobs = ["turbo", "web"]
+
+[[profile]]
+name = "probed"
+jobs = ["api", "quiet"]
+
+[[profile]]
+name = "alone"
+jobs = ["api"]
 `
 )
 
@@ -94,6 +110,7 @@ type world struct {
 	meta     store.Meta
 	daemon   *daemon
 	silent   []int
+	onListen func() // runs as the ports are checked
 	usecase  runup.UseCase
 }
 
@@ -130,6 +147,9 @@ func newWorld(t *testing.T) *world {
 		EnvFiles: store.EnvFiles{},
 		Daemon:   w.daemon,
 		Listening: func(_ context.Context, ports []int, _ time.Duration) map[int]bool {
+			if w.onListen != nil {
+				w.onListen()
+			}
 			answered := map[int]bool{}
 			for _, port := range ports {
 				answered[port] = !slices.Contains(w.silent, port)
@@ -169,8 +189,12 @@ func (l locks) Take(op domain.Operation) (operation.Hold, error) {
 type daemon struct {
 	mu        sync.Mutex
 	listed    []run.Job
-	refuse    map[string]error    // by worktree path and job name, joined by a space
-	crash     map[string]bool     // likewise: listed crashed once started
+	refuse    map[string]error         // by worktree path and job name, joined by a space
+	crash     map[string]bool          // likewise: listed crashed once started
+	late      map[string]time.Duration // likewise: listed crashed that long after its start
+	crashAt   map[string]time.Time
+	stopErr   error
+	cut       map[string]bool     // likewise: taken, then the start cut short
 	lines     map[string][]string // likewise: what its start prints
 	skewed    *run.Skewed
 	ensureErr error
@@ -186,6 +210,11 @@ func key(workDir, name string) string {
 func (d *daemon) Jobs(context.Context) ([]run.Job, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	for i, job := range d.listed {
+		if at, late := d.crashAt[key(job.WorkDir, job.Name)]; late && time.Now().After(at) {
+			d.listed[i].Up, d.listed[i].State = false, run.Crashed
+		}
+	}
 	if d.skewed != nil {
 		return slices.Clone(d.listed), d.skewed
 	}
@@ -215,17 +244,40 @@ func (d *daemon) Start(_ context.Context, spec run.Spec, out func(run.Line)) (ru
 		job.State = run.Exited
 	}
 	listed := job
+	if after, late := d.late[at]; late {
+		if d.crashAt == nil {
+			d.crashAt = map[string]time.Time{}
+		}
+		d.crashAt[at] = time.Now().Add(after)
+	}
 	if d.crash[at] {
 		listed.Up, listed.State, listed.ExitCode, listed.LastLine = false, run.Crashed, new(1), &run.Line{At: startedAt, Text: "boom"}
 	}
 	d.listed = append(d.listed, listed)
+	if d.cut[at] {
+		return run.Job{}, context.Canceled
+	}
 	return job, nil
 }
 
 func (d *daemon) StopAll(_ context.Context, req run.StopAll) ([]run.StoppedJob, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.stopErr != nil {
+		return nil, d.stopErr
+	}
 	d.stopped = append(d.stopped, req.WorkDir)
 	d.listed = slices.DeleteFunc(d.listed, func(job run.Job) bool { return job.WorkDir == req.WorkDir })
 	return nil, nil
 }
+
+// unwritable is the meta store, whose every write fails.
+type unwritable struct {
+	store.Meta
+}
+
+func (unwritable) Update(context.Context, worktree.MetaUpdate) (domain.Written, error) {
+	return domain.Written{}, errUnwritable
+}
+
+var errUnwritable = errors.New("read-only file system")

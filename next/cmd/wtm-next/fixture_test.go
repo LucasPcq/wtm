@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/events"
@@ -311,3 +313,29 @@ func eventsOfEachType() []domain.Event {
 
 // seedJob is a run.toml of one task, which run up runs to its end.
 const seedJob = "[[job]]\nname = \"seed\"\nkind = \"task\"\ncmd = \"true\"\n"
+
+// restarting is a run daemon a restart is tried on: the jobs it lists, what the user answers, what the restart says, and how often it was stopped.
+type restarting struct {
+	jobs      []run.Job
+	in        string
+	out       bytes.Buffer
+	shutdowns int
+}
+
+// params are the restart of r, its daemon of skewed's build (this one's when nil).
+func (r *restarting) params(skewed *run.Skewed, ask, yes bool) restartParams {
+	return restartParams{
+		Jobs: func(context.Context) ([]run.Job, error) {
+			if skewed == nil {
+				return r.jobs, nil
+			}
+			return r.jobs, skewed
+		},
+		Shutdown: func(context.Context) error { r.shutdowns++; return nil },
+		Ensure:   func(context.Context) error { return nil },
+		In:       strings.NewReader(r.in),
+		Out:      &r.out,
+		CanAsk:   ask,
+		Yes:      yes,
+	}
+}

@@ -141,3 +141,50 @@ func TestWhyTheDaemonServesNoProxyIsInItsLog(t *testing.T) {
 	assert.Equal(t, "run proxy: invalid [proxy] port 99999 in config.toml — jobs keep their own ports\n", daemonLog(t, unreadable), "said once the log was emptied")
 	assert.Empty(t, daemonLog(t, moved), "a port taken moves the proxy to the next, silently")
 }
+
+func TestARestartLeavesADaemonOfThisBuildAlone(t *testing.T) {
+	r := &restarting{}
+
+	err := restartDaemon(t.Context(), r.params(nil, true, false))
+
+	require.NoError(t, err)
+	assert.Zero(t, r.shutdowns)
+	assert.Contains(t, r.out.String(), "nothing to restart")
+}
+
+func TestARestartSaysWhatStopsAndWhatIsKeptThenAsks(t *testing.T) {
+	skewed := &run.Skewed{Skew: run.SkewLegacy}
+	for name, c := range map[string]struct {
+		answer string
+		ask    bool
+		yes    bool
+		kind   domain.Kind
+		stops  int
+	}{
+		"confirmed":  {answer: "y\n", ask: true, stops: 1},
+		"declined":   {answer: "n\n", ask: true, kind: domain.KindCancelled},
+		"unattended": {kind: domain.KindInvalid},
+		"yes":        {yes: true, stops: 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := &restarting{jobs: []run.Job{
+				{Name: "web", WorkDir: "/wt/a", Up: true, Hold: run.HoldOwn},
+				{Name: "cache", WorkDir: "/wt/a", Up: true, Hold: run.HoldDetached},
+				{Name: "db", WorkDir: "/wt/b", Up: true, Hold: run.HoldClaim},
+			}, in: c.answer}
+
+			err := restartDaemon(t.Context(), r.params(skewed, c.ask, c.yes))
+
+			assert.Equal(t, c.stops, r.shutdowns)
+			assert.Contains(t, r.out.String(), "Stops:  web (/wt/a)")
+			assert.Contains(t, r.out.String(), "Kept:   cache (/wt/a), db (/wt/b)")
+			if c.kind == "" {
+				require.NoError(t, err)
+				return
+			}
+			refused, ok := errors.AsType[*domain.Error](err)
+			require.True(t, ok, err)
+			assert.Equal(t, c.kind, refused.Kind)
+		})
+	}
+}

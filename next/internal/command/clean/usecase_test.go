@@ -513,6 +513,14 @@ func TestJobsTheDaemonCannotTellAreWarnedOfAndRefuseNothing(t *testing.T) {
 	assert.Equal(t, []string{"clean.jobs_unknown"}, codes(warnings))
 }
 
+func TestADaemonOfAnotherBuildIsWarnedOfWithItsRestart(t *testing.T) {
+	w := newWorld(t, seed{JobErr: &run.Skewed{Skew: run.SkewLegacy}})
+
+	_, warnings := w.plan(t, removing(plain))
+
+	assert.Equal(t, []string{"clean.daemon_skew"}, codes(warnings))
+}
+
 func TestAnOpenPullRequestRefusesTheRemovalAndEveryBranchIsAsked(t *testing.T) {
 	w := newWorld(t, seed{PRs: []worktree.PullRequest{{Branch: pushed, State: worktree.PullRequestOpen, URL: "https://github.com/acme/web/pull/7"}}})
 

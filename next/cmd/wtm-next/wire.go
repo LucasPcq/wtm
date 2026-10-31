@@ -295,7 +295,7 @@ func (r refFetchedOnce) FetchRef(ctx context.Context, name string) error {
 
 // facts reads the repository params locates, as every use case decides from it.
 func (p wireParams) facts() repository.Service {
-	return repository.Service{Config: config.Project{StateDir: p.StateDir, GlobalPath: config.GlobalPath()}, Git: git.Repo{Dir: p.MainPath}, MainPath: p.MainPath, Init: initialize(), Restart: restartDaemon()}
+	return repository.Service{Config: config.Project{StateDir: p.StateDir, GlobalPath: config.GlobalPath()}, Git: git.Repo{Dir: p.MainPath}, MainPath: p.MainPath, Init: initialize(), Restart: daemonRestart()}
 }
 
 // repo is how the event bus and the registry name the repository params locates.
@@ -319,8 +319,8 @@ func initialize() *domain.FollowUp {
 	return &domain.FollowUp{Command: domain.CommandInit}
 }
 
-// restartDaemon hands the jobs of a run daemon of another build over to one of this build: run daemon restart.
-func restartDaemon() *domain.FollowUp {
+// daemonRestart is the follow-up that replaces a run daemon of another build by one of this build: run daemon restart.
+func daemonRestart() *domain.FollowUp {
 	return &domain.FollowUp{Command: commandRestartDaemon}
 }
 

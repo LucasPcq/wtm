@@ -47,7 +47,7 @@ func (f Facts) worktreeOptions() []domain.Option {
 	options := domain.WorktreeOptions(worktrees, domain.WorktreeQuery{Cwd: f.Cwd})
 	for i, w := range worktrees {
 		options[i].Up = nonEmptyNames(run.UpIn(f.Jobs, w.Path))
-		options[i].Profile = profileOf(f.up(w.Path))
+		options[i].Profile = f.profileOf(w.Path)
 	}
 	return options
 }
@@ -65,10 +65,10 @@ func nonEmptyNames(names []string) []string {
 	return names
 }
 
-// profileOf is the profile jobs were started under, when they say one.
-func profileOf(jobs []run.Job) string {
-	for _, job := range jobs {
-		if job.Profile != "" {
+// profileOf is the profile the jobs the worktree at path runs itself were started under, when they say one: a claim, and a shared service run there for every worktree, are another start's.
+func (f Facts) profileOf(path string) string {
+	for _, job := range f.up(path) {
+		if job.Profile != "" && job.Hold != run.HoldClaim && !f.shared(job.Name) {
 			return job.Profile
 		}
 	}
@@ -231,9 +231,9 @@ func (f Facts) ordinalOf(t Target) int {
 	return f.Records[t.Branch].Ordinal
 }
 
-// plan is how t starts jobs: each in order, a shared one joined from a worktree other than the main one, a service up left as it is, the others numbered, each waiting for the tasks before it; the ports from the environment its ordinal gives, none while it has none.
-func (f Facts) plan(t Target, jobs []project.Job) Target {
-	params := f.jobParams(t, f.ordinalOf(t))
+// plan is how t starts jobs: each in order, a shared one joined from a worktree other than the main one, a service up left as it is, the others numbered, each waiting for the tasks before it; the ports and namespaces from the environment ordinal gives, none while t is not numbered.
+func (f Facts) plan(t Target, jobs []project.Job, ordinal int) Target {
+	params := f.jobParams(t, ordinal)
 	jobEnv := env.HookEnv(params, nil)
 	up := run.UpIn(f.Jobs, t.Path)
 	main := f.mainBranch()
@@ -406,23 +406,31 @@ type clash struct {
 	HeldBy   string
 	HeldJob  string
 	Started  bool // HeldBy is another worktree of the request, whose start would bind it too: no exclusive start lifts it
+	Foreign  bool // HeldBy is a worktree of another repository, by its path, whose jobs no exclusive start stops
 }
 
-// clashes are the ports the targets would bind that a job holds in another worktree, or that two targets would both bind; shared jobs bind theirs once, and clash with nobody.
+// lifts reports whether stopping the other worktrees' jobs first frees the port.
+func (c clash) lifts() bool {
+	return !c.Started && !c.Foreign
+}
+
+// clashes are the ports the targets would bind that a job holds in another worktree, of this repository or another, or that two targets would both bind; this repository's shared jobs bind theirs once, and clash with nobody.
 func (f Facts) clashes(targets []Target) []clash {
-	type holder struct{ worktree, job string }
+	type holder struct {
+		worktree, job string
+		foreign       bool
+	}
 	held := map[int]holder{}
 	for _, job := range f.Jobs {
-		declared, ok := f.declared(job.Name)
-		if !job.Up || job.Hold == run.HoldClaim || (ok && declared.Scope == project.Shared) {
+		_, ours := f.atPath(job.WorkDir)
+		if !job.Up || job.Hold == run.HoldClaim || (ours && f.shared(job.Name)) {
 			continue
 		}
 		if slices.ContainsFunc(targets, func(t Target) bool { return t.Path == job.WorkDir }) {
 			continue
 		}
-		w := f.worktreeAt(job.WorkDir)
 		for _, port := range job.Ports {
-			held[port] = holder{worktree: w, job: job.Name}
+			held[port] = holder{worktree: f.worktreeAt(job.WorkDir), job: job.Name, foreign: !ours}
 		}
 	}
 
@@ -435,7 +443,7 @@ func (f Facts) clashes(targets []Target) []clash {
 			}
 			for _, port := range sortedPorts(job.Ports) {
 				if h, ok := held[port]; ok {
-					clashes = append(clashes, clash{Port: port, Worktree: t.Worktree, Job: job.Name, HeldBy: h.worktree, HeldJob: h.job})
+					clashes = append(clashes, clash{Port: port, Worktree: t.Worktree, Job: job.Name, HeldBy: h.worktree, HeldJob: h.job, Foreign: h.foreign})
 				}
 				if h, ok := starting[port]; ok && h.worktree != t.Worktree {
 					clashes = append(clashes, clash{Port: port, Worktree: t.Worktree, Job: job.Name, HeldBy: h.worktree, HeldJob: h.job, Started: true})
@@ -451,12 +459,21 @@ func sortedPorts(ports map[string]int) []int {
 	return slices.Sorted(maps.Values(ports))
 }
 
-// worktreeAt is the name of the worktree at path, the path itself when no worktree is there.
+// worktreeAt is the name of the worktree of this repository at path, the path itself when none is there.
 func (f Facts) worktreeAt(path string) string {
-	if at := slices.IndexFunc(f.Worktrees, func(w worktree.Worktree) bool { return w.Path == path }); at >= 0 {
-		return f.Worktrees[at].Name()
+	if w, ours := f.atPath(path); ours {
+		return w.Name()
 	}
 	return path
+}
+
+// atPath is the worktree of this repository at path, and whether there is one.
+func (f Facts) atPath(path string) (worktree.Worktree, bool) {
+	at := slices.IndexFunc(f.Worktrees, func(w worktree.Worktree) bool { return w.Path == path })
+	if at < 0 {
+		return worktree.Worktree{}, false
+	}
+	return f.Worktrees[at], true
 }
 
 // ----------------------------------------------------------------------------
@@ -468,26 +485,31 @@ type conflict struct {
 	Runner string
 }
 
-// conflicts are the jobs that would run twice once the start is done: one of the profile, or up in a target, that a runner among them starts too.
+// conflicts are the jobs that would run twice once the start is done, in one of targets: a job of the profile, or up there, that a runner of the profile, or up there, starts too, a pair at least one of which the start starts; a runner and its child both up already, which the profile leaves alone, are not this start's.
 func (f Facts) conflicts(targets []Target, jobs []project.Job) []conflict {
-	starting := map[string]bool{}
+	profile := map[string]bool{}
 	for _, job := range jobs {
-		starting[job.Name] = true
-	}
-	for _, t := range targets {
-		for _, name := range run.UpIn(f.Jobs, t.Path) {
-			starting[name] = true
-		}
+		profile[job.Name] = true
 	}
 
 	var conflicts []conflict
-	for _, runner := range f.Run.Jobs {
-		if !starting[runner.Name] {
-			continue
+	for _, t := range targets {
+		running := map[string]bool{}
+		for name := range profile {
+			running[name] = true
 		}
-		for _, child := range f.children(runner) {
-			if starting[child.Name] {
-				conflicts = append(conflicts, conflict{Job: child.Name, Runner: runner.Name})
+		for _, name := range run.UpIn(f.Jobs, t.Path) {
+			running[name] = true
+		}
+		for _, runner := range f.Run.Jobs {
+			if !running[runner.Name] {
+				continue
+			}
+			for _, child := range f.children(runner) {
+				pair := conflict{Job: child.Name, Runner: runner.Name}
+				if running[child.Name] && (profile[runner.Name] || profile[child.Name]) && !slices.Contains(conflicts, pair) {
+					conflicts = append(conflicts, pair)
+				}
 			}
 		}
 	}
@@ -526,7 +548,7 @@ func Decide(f Facts, req Request, params DecideParams) (Plan, []domain.Warning, 
 	exclusive := f.exclusive(req, targets).Value
 	planned := Plan{Profile: req.Profile, Exclusive: exclusive, Worktrees: []Target{}, Others: []Other{}, NoProbe: req.NoProbe, facts: f, asked: req}
 	for _, t := range targets {
-		planned.Worktrees = append(planned.Worktrees, f.plan(t, jobs))
+		planned.Worktrees = append(planned.Worktrees, f.plan(t, jobs, f.ordinalOf(t)))
 	}
 	if exclusive {
 		planned.Others = append(planned.Others, f.others(targets)...)
@@ -538,7 +560,7 @@ func Decide(f Facts, req Request, params DecideParams) (Plan, []domain.Warning, 
 	if conflicts := f.conflicts(targets, jobs); len(conflicts) > 0 {
 		return Plan{}, nil, conflictRefusal(conflicts)
 	}
-	if clashes := f.clashes(planned.Worktrees); len(clashes) > 0 && !(exclusive && !slices.ContainsFunc(clashes, func(c clash) bool { return c.Started })) {
+	if clashes := f.clashes(planned.Worktrees); len(clashes) > 0 && !(exclusive && !slices.ContainsFunc(clashes, func(c clash) bool { return !c.lifts() })) {
 		return Plan{}, nil, clashRefusal(clashes, req)
 	}
 	if risks := f.risks(targets, jobs); len(risks) > 0 && !req.Force {
@@ -563,7 +585,7 @@ func skewRefusal(skewed *run.Skewed, restart *domain.FollowUp) *domain.Error {
 	refusal := &domain.Error{Kind: domain.KindPrecondition, Code: CodeDaemonSkew, Message: "nothing started: " + skewed.Error(), Params: domain.Params{"skew": string(skewed.Skew), "daemon": skewed.Daemon}}
 	if restart != nil {
 		followUp := *restart
-		followUp.Code, followUp.Message = Name+".restart_daemon", "hand its jobs over to this wtm"
+		followUp.Code, followUp.Message = Name+".restart_daemon", "restart it: its services stop, its stacks are kept"
 		refusal.FollowUp = &followUp
 	}
 	return refusal
@@ -583,9 +605,13 @@ func clashRefusal(clashes []clash, req Request) *domain.Error {
 	lifted := true
 	for _, c := range clashes {
 		port := strconv.Itoa(c.Port)
-		lines = append(lines, port+" ("+c.HeldBy+"'s "+c.HeldJob+")")
-		fields = append(fields, domain.FieldError{Path: domain.PathWorktree, Code: CodePortClash, Template: "{worktree}'s {job} would bind {port}, which {held_by}'s {held_job} holds", Params: domain.Params{"worktree": c.Worktree, "job": c.Job, "port": port, "held_by": c.HeldBy, "held_job": c.HeldJob}})
-		lifted = lifted && !c.Started
+		holder := c.HeldBy + "'s " + c.HeldJob
+		if c.Foreign {
+			holder = c.HeldJob + " of another repository, in " + c.HeldBy
+		}
+		lines = append(lines, port+" ("+holder+")")
+		fields = append(fields, domain.FieldError{Path: domain.PathWorktree, Code: CodePortClash, Template: "{worktree}'s {job} would bind {port}, which " + holder + " holds", Params: domain.Params{"worktree": c.Worktree, "job": c.Job, "port": port, "held_by": c.HeldBy, "held_job": c.HeldJob}})
+		lifted = lifted && c.lifts()
 	}
 	refusal := &domain.Error{Kind: domain.KindRefused, Code: CodePortClash, Message: "nothing started: ports another worktree holds: " + strings.Join(lines, ", "), Fields: fields}
 	if lifted {
@@ -677,7 +703,7 @@ func (p Plan) Fingerprinted() any {
 // ----------------------------------------------------------------------------
 // The recap
 
-// recap is the plan row by row: the worktrees, the profile, the jobs each starts, in order, and the worktrees whose jobs stop first.
+// recap is the plan row by row: the worktrees, the profile, the jobs each worktree starts, in order, and the worktrees whose jobs stop first.
 func (p Plan) recap() []domain.RecapRow {
 	names := make([]string, 0, len(p.Worktrees))
 	for _, t := range p.Worktrees {
@@ -687,12 +713,16 @@ func (p Plan) recap() []domain.RecapRow {
 	if p.Profile != "" {
 		rows = append(rows, domain.RecapRow{Key: "profile", Label: "Profile", Path: PathProfile, Values: domain.RecapValues([]string{p.Profile})})
 	}
-	if len(p.Worktrees) > 0 {
+	for _, t := range p.Worktrees {
 		var jobs []string
-		for _, job := range p.Worktrees[0].Jobs {
+		for _, job := range t.Jobs {
 			jobs = append(jobs, jobWords(job))
 		}
-		rows = append(rows, domain.RecapRow{Key: "jobs", Label: "Jobs", Values: domain.RecapValues(jobs)})
+		row := domain.RecapRow{Key: "jobs", Label: "Jobs", Values: domain.RecapValues(jobs)}
+		if len(p.Worktrees) > 1 {
+			row.Key, row.Label = "jobs:"+t.Worktree, "Jobs in "+t.Worktree
+		}
+		rows = append(rows, row)
 	}
 	if len(p.Others) > 0 {
 		var stopped []string
@@ -702,6 +732,15 @@ func (p Plan) recap() []domain.RecapRow {
 		rows = append(rows, domain.RecapRow{Key: "stops", Label: "Stops first", Path: PathExclusive, Values: domain.RecapValues(stopped)})
 	}
 	return rows
+}
+
+// notStarted is the detail of t before its start: each job of its plan, none started.
+func (p Plan) notStarted(t Target) *Detail {
+	detail := &Detail{Path: t.Path, Profile: p.Profile, Jobs: make([]JobResult, 0, len(t.Jobs))}
+	for _, job := range t.Jobs {
+		detail.Jobs = append(detail.Jobs, JobResult{Name: job.Name, Kind: job.Kind, Status: JobNotStarted, Namespace: job.Namespace})
+	}
+	return detail
 }
 
 // unchanged reports whether the plan starts nothing and stops nothing: every job is up already.
@@ -733,18 +772,18 @@ type JobStatus string
 
 // The statuses of a job of the start.
 const (
-	JobStarted    JobStatus = "started"     // a service launched, or a stack its launcher brought up
-	JobUp         JobStatus = "up"          // a service already up, left as it is
-	JobJoined     JobStatus = "joined"      // a shared service the worktree holds
-	JobDone       JobStatus = "done"        // a task that ran to its end
-	JobFailed     JobStatus = "failed"      // a task that exited other than 0, or a job that could not start: the start of its worktree stops there
-	JobCrashed    JobStatus = "crashed"     // a service that started then ended before the start did
-	JobNotStarted JobStatus = "not_started" // a job the start of its worktree never reached
+	JobStarted        JobStatus = "started"         // a service launched, or a stack its launcher brought up
+	JobAlreadyRunning JobStatus = "already_running" // a service already up, left as it is
+	JobJoined         JobStatus = "joined"          // a shared service the worktree holds
+	JobDone           JobStatus = "done"            // a task that ran to its end
+	JobFailed         JobStatus = "failed"          // a task that exited other than 0, or a job that could not start: the start of its worktree stops there
+	JobCrashed        JobStatus = "crashed"         // a service that started then ended before the start did
+	JobNotStarted     JobStatus = "not_started"     // a job the start of its worktree never reached
 )
 
 // JobStatuses returns every JobStatus.
 func JobStatuses() []JobStatus {
-	return []JobStatus{JobStarted, JobUp, JobJoined, JobDone, JobFailed, JobCrashed, JobNotStarted}
+	return []JobStatus{JobStarted, JobAlreadyRunning, JobJoined, JobDone, JobFailed, JobCrashed, JobNotStarted}
 }
 
 // The codes of the follow-ups of a start: its jobs' output, the stop of what it left up, and the start again where it did not pass.
@@ -769,7 +808,7 @@ func (p Plan) applied(result Result) Plan {
 		}
 		var reached []string
 		for _, job := range item.Detail.Jobs {
-			if job.URL != "" && (job.Status == JobStarted || job.Status == JobUp) {
+			if job.URL != "" && (job.Status == JobStarted || job.Status == JobAlreadyRunning) {
 				reached = append(reached, job.Name+"  "+job.URL)
 			}
 		}
