@@ -89,7 +89,7 @@ func serveDaemon(ctx context.Context, params daemonParams) error {
 		Publish: relay.Publish,
 		Routes:  names,
 		// Probed on every answer, never cached: the redirection is installed and removed while the daemon runs.
-		Probe: proxy.Probe,
+		Probe: names.Probe,
 	})
 	return bus.Serve(ctx, bus.ServeParams{
 		SocketPath: socket,

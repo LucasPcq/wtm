@@ -376,10 +376,12 @@ func (r *routes) Add(address run.Address) {
 	r.served[address.Host] = address
 }
 
-func (r *routes) Remove(host string) {
+func (r *routes) Remove(address run.Address) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	delete(r.served, host)
+	if r.served[address.Host] == address {
+		delete(r.served, address.Host)
+	}
 }
 
 // table returns each host served, mapped to its port.

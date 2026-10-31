@@ -44,7 +44,7 @@ func (d *Daemon) withdrawLocked(j *job) {
 		return
 	}
 	for _, address := range j.record.Spec.Addresses() {
-		d.params.Routes.Remove(address.Host)
+		d.params.Routes.Remove(address)
 	}
 	j.served = false
 }

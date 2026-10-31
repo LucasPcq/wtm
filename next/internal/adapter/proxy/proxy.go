@@ -5,6 +5,7 @@ package proxy
 
 import (
 	"cmp"
+	"crypto/rand"
 	"fmt"
 	"net"
 	"net/http"
@@ -24,6 +25,7 @@ const (
 	span         = 16
 	probeHost    = "probe.wtm.localhost"
 	probeHeader  = "X-Wtm-Proxy"
+	tokenHeader  = "X-Wtm-Proxy-Token"
 	probeTimeout = 150 * time.Millisecond
 )
 
@@ -35,11 +37,13 @@ type Server struct {
 	addresses map[string]run.Address
 	http      *http.Server
 	port      int
+	// token is what its probe answers besides its port: any process may bind port 80 and echo a port, none can guess this.
+	token string
 }
 
 // New returns a proxy serving no name, on no port until Listen.
 func New() *Server {
-	return &Server{addresses: map[string]run.Address{}}
+	return &Server{addresses: map[string]run.Address{}, token: rand.Text()}
 }
 
 // Listen binds the first port from port, within 16, that is free and that a
@@ -59,7 +63,8 @@ func (s *Server) listen(port, span int) error {
 		if err != nil {
 			continue
 		}
-		server := &http.Server{Handler: http.HandlerFunc(s.route), ReadHeaderTimeout: 10 * time.Second}
+		// A connection kept alive with nothing on it goes: the daemon's descriptors are not a browser's to hold. A websocket, hijacked, is no longer the server's.
+		server := &http.Server{Handler: http.HandlerFunc(s.route), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
 		s.mu.Lock()
 		s.http = server
 		// The listener's, not at: 0 asks for any port, and only it knows which.
@@ -100,11 +105,14 @@ func (s *Server) Add(address run.Address) {
 	s.addresses[strings.ToLower(address.Host)] = address
 }
 
-// Remove stops serving host.
-func (s *Server) Remove(host string) {
+// Remove stops serving address, unless another job took its host over since.
+func (s *Server) Remove(address run.Address) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.addresses, strings.ToLower(host))
+	host := strings.ToLower(address.Host)
+	if served, found := s.addresses[host]; found && served.Job == address.Job && served.Port == address.Port {
+		delete(s.addresses, host)
+	}
 }
 
 func (s *Server) lookup(host string) (run.Address, bool) {
@@ -132,6 +140,7 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 	}
 	if host == probeHost {
 		w.Header().Set(probeHeader, strconv.Itoa(s.Port()))
+		w.Header().Set(tokenHeader, s.token)
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -145,6 +154,7 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 	target := &url.URL{Scheme: "http", Host: "localhost:" + strconv.Itoa(address.Port)}
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
+			// Rewrite has dropped what the client said of where it came from (Forwarded, X-Forwarded-*): written afresh.
 			pr.SetXForwarded()
 			pr.SetURL(target)
 			// The host the browser asked for is what it scopes cookies to: forwarded as it came, it keeps two worktrees' sessions apart.
@@ -158,9 +168,15 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 	proxy.ServeHTTP(w, r)
 }
 
-// unknown answers a host it serves nothing under with the names it serves.
+// unknown answers a host it serves nothing under with the names it serves,
+// only to a name of this machine: a page of another site whose name it
+// rebound to the loopback reaches the proxy too, and must not read them.
 func (s *Server) unknown(w http.ResponseWriter, host string) {
 	w.WriteHeader(http.StatusNotFound)
+	if !local(host) {
+		fmt.Fprint(w, "wtm: no job is published under this host\n")
+		return
+	}
 	fmt.Fprintf(w, "wtm: no job is published under %s\n\nRoutes wtm is currently serving:\n", host)
 	addresses := s.list()
 	if len(addresses) == 0 {
@@ -172,10 +188,21 @@ func (s *Server) unknown(w http.ResponseWriter, host string) {
 	}
 }
 
-// Probe returns the port the wtm proxy answering on port serves on, 0 when
-// none answers there: what tells a redirection reaching this proxy from one
-// left pointing at a port it no longer holds.
-func Probe(port int) int {
+// local reports whether host names this machine: localhost, a name under it,
+// or a loopback address.
+func local(host string) bool {
+	host = strings.ToLower(strings.Trim(host, "[]"))
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	return host == "localhost" || strings.HasSuffix(host, ".localhost")
+}
+
+// Probe returns the port this proxy serves on when it is what answers on
+// port, 0 otherwise: what tells a redirection reaching it from one left
+// pointing at a port it no longer holds, or from another process holding
+// port.
+func (s *Server) Probe(port int) int {
 	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:"+strconv.Itoa(port)+"/", nil)
 	if err != nil {
 		return 0
@@ -187,7 +214,7 @@ func Probe(port int) int {
 	}
 	defer resp.Body.Close()
 	served, err := strconv.Atoi(resp.Header.Get(probeHeader))
-	if err != nil {
+	if err != nil || resp.Header.Get(tokenHeader) != s.token {
 		return 0
 	}
 

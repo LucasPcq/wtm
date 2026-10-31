@@ -240,7 +240,7 @@ until [[ $(through web.main.acme.localhost | tail -1) == 200 ]]; do
 done
 through web.main.acme.localhost | normalise >"$out/38-proxied-by-name.txt"
 through docs.main.acme.localhost | normalise >"$out/39-proxied-unknown-host.txt"
-curl -s -o /dev/null -D - -H "Host: probe.wtm.localhost" "http://127.0.0.1:$proxy_port/" | tr -d '\r' | grep -i -e '^HTTP' -e '^X-Wtm-Proxy' | normalise >"$out/40-proxy-probe.txt"
+curl -s -o /dev/null -D - -H "Host: probe.wtm.localhost" "http://127.0.0.1:$proxy_port/" | tr -d '\r' | grep -i -e '^HTTP' -e '^X-Wtm-Proxy:' | normalise >"$out/40-proxy-probe.txt"
 ask 41-proxied-stop "{\"action\":\"stop\",\"name\":\"web\",\"work_dir\":\"$acme\"}"
 through web.main.acme.localhost | normalise >"$out/42-proxied-after-stop.txt"
 stop_daemon

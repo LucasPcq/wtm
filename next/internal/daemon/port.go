@@ -74,8 +74,9 @@ type Exists func(path string) bool
 type Routes interface {
 	// Add serves address, in place of one of the same host.
 	Add(address run.Address)
-	// Remove stops serving host.
-	Remove(host string)
+	// Remove stops serving address, unless another job took its host over
+	// since.
+	Remove(address run.Address)
 	// Port returns the port it serves on, 0 while it serves on none.
 	Port() int
 }

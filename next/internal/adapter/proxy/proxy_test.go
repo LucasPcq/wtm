@@ -34,7 +34,7 @@ func TestAnAddressAddedAgainReplacesItsPortAndOneRemovedIsNoLongerServed(t *test
 
 	server.Add(run.Address{Host: "web.feat.acme.localhost", Port: current, Job: "web"})
 	_, body := get(t, server, "web.feat.acme.localhost")
-	server.Remove("WEB.feat.acme.localhost")
+	server.Remove(run.Address{Host: "WEB.feat.acme.localhost", Port: current, Job: "web"})
 	gone, _ := get(t, server, "web.feat.acme.localhost")
 
 	assert.Equal(t, "new", body)
@@ -126,13 +126,31 @@ func TestAPortNoBrowserOpensIsSteppedOver(t *testing.T) {
 	assert.ErrorContains(t, err, "no port a browser opens from 6000 to 6000")
 }
 
-func TestTheProbeTellsTheProxyAnsweringOnAPortFromAnythingElse(t *testing.T) {
+func TestTheProbeTellsItsOwnProxyAnsweringOnAPortFromAnythingElse(t *testing.T) {
 	server := serve(t)
-	other := backend(t, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	spoof := backend(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-Wtm-Proxy", strconv.Itoa(server.Port()))
+		w.WriteHeader(http.StatusNoContent)
+	})
+	other := serve(t)
 
-	assert.Equal(t, server.Port(), Probe(server.Port()))
-	assert.Zero(t, Probe(other), "another server")
-	assert.Zero(t, Probe(closed(t)), "nothing")
+	assert.Equal(t, server.Port(), server.Probe(server.Port()))
+	assert.Zero(t, server.Probe(spoof), "a process echoing its port")
+	assert.Zero(t, server.Probe(other.Port()), "another wtm proxy")
+	assert.Zero(t, server.Probe(closed(t)), "nothing")
+}
+
+func TestAHostOfAnotherSiteIsNeverToldTheNamesServed(t *testing.T) {
+	server := serve(t, run.Address{Host: "web.feat.acme.localhost", Port: 3100, Job: "web", Worktree: "feat", Project: "acme"})
+
+	resp, foreign := get(t, server, "rebound.example.com")
+	_, loopback := get(t, server, "127.0.0.1:11080")
+	_, v6 := get(t, server, "[::1]:11080")
+
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	assert.Equal(t, "wtm: no job is published under this host\n", foreign, "a page of a site rebound to the loopback reads nothing")
+	assert.Contains(t, loopback, "web.feat.acme.localhost")
+	assert.Contains(t, v6, "web.feat.acme.localhost")
 }
 
 func TestAProxyServesNoPortBeforeItListensNorOnceClosed(t *testing.T) {
@@ -147,4 +165,36 @@ func TestAProxyServesNoPortBeforeItListensNorOnceClosed(t *testing.T) {
 	assert.Zero(t, before)
 	assert.Positive(t, listening)
 	assert.Zero(t, server.Port())
+}
+
+func TestAJobRemovesItsAddressNeverOneAnotherJobTookItsHostOver(t *testing.T) {
+	port := backend(t, func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "b") })
+	server := serve(t, run.Address{Host: "web.feat.acme.localhost", Port: 3100, Job: "a"})
+	server.Add(run.Address{Host: "web.feat.acme.localhost", Port: port, Job: "b"})
+
+	server.Remove(run.Address{Host: "web.feat.acme.localhost", Port: 3100, Job: "a"})
+
+	resp, body := get(t, server, "web.feat.acme.localhost")
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "b", body)
+}
+
+func TestWhatAClientSaysOfWhereItCameFromIsNeverForwarded(t *testing.T) {
+	port := backend(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, r.Header.Get("X-Forwarded-For")+"|"+r.Header.Get("Forwarded"))
+	})
+	server := serve(t, run.Address{Host: "web.feat.acme.localhost", Port: port, Job: "web"})
+	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:"+strconv.Itoa(server.Port())+"/", nil)
+	require.NoError(t, err)
+	req.Host = "web.feat.acme.localhost"
+	req.Header.Set("X-Forwarded-For", "203.0.113.7")
+	req.Header.Set("Forwarded", "for=203.0.113.7")
+
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	assert.Equal(t, "127.0.0.1|", string(body))
 }
