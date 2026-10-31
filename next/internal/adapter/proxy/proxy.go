@@ -37,7 +37,7 @@ type Server struct {
 	addresses map[string]run.Address
 	http      *http.Server
 	port      int
-	// token is what its probe answers besides its port: any process may bind port 80 and echo a port, none can guess this.
+	// token is what its probe answers besides its port, so an unrelated server on port 80, or a proxy of a daemon before, is never taken for this one. A process of this user may read it and echo it: such a process is outside what it guards against.
 	token string
 }
 
@@ -200,7 +200,7 @@ func local(host string) bool {
 
 // Probe returns the port this proxy serves on when it is what answers on
 // port, 0 otherwise: what tells a redirection reaching it from one left
-// pointing at a port it no longer holds, or from another process holding
+// pointing at a port it no longer holds, or from an unrelated server holding
 // port.
 func (s *Server) Probe(port int) int {
 	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:"+strconv.Itoa(port)+"/", nil)
