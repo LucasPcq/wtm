@@ -195,8 +195,11 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return facts, nil
 	}
 
-	// Fetched before the branches are read again, so where the branch stands against origin, and whether a fast-forward is asked, is what origin holds now, not as last fetched.
-	fetched := u.Git.FetchRef(ctx, pr.Branch)
+	// Fetched before the branches are read again, so where the branch stands against origin, and whether a fast-forward is asked, is what origin holds now, not as last fetched; a surface that fetched it a moment ago reads it as then, with NoFetch.
+	var fetched error
+	if !req.NoFetch {
+		fetched = u.Git.FetchRef(ctx, pr.Branch)
+	}
 	if facts.Snapshot, err = u.Git.Snapshot(ctx); err != nil {
 		return Facts{}, err
 	}
@@ -222,7 +225,22 @@ func unavailable(err error) error {
 		return domain.AsError(domain.AsErrorParams{Err: err, Code: CodeGitHubUnavailable, Message: err.Error()})
 	}
 
-	return &domain.Error{Kind: domain.KindPrecondition, Code: CodeGitHubUnavailable, Message: err.Error()}
+	refusal := &domain.Error{Kind: domain.KindPrecondition, Code: CodeGitHubUnavailable, Message: err.Error()}
+	for reason, sentinel := range unavailableReasons {
+		if errors.Is(err, sentinel) {
+			refusal.Params = domain.Params{ParamReason: reason}
+		}
+	}
+	return refusal
+}
+
+// ParamReason names, on a CodeGitHubUnavailable refusal, why GitHub could not be asked when a person fixes it outside wtm: gh_missing, signed_out or not_on_github; it is absent for any other failure of gh.
+const ParamReason = "reason"
+
+var unavailableReasons = map[string]error{
+	"gh_missing":    worktree.ErrGitHubCLIMissing,
+	"signed_out":    worktree.ErrGitHubSignedOut,
+	"not_on_github": worktree.ErrNotOnGitHub,
 }
 
 // ----------------------------------------------------------------------------

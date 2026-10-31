@@ -164,14 +164,14 @@ func (g GitHub) signedIn(ctx context.Context) (string, error) {
 	// What failed matters less than what to do about it: the cause is left out.
 	binary, err := exec.LookPath(cmp.Or(g.Binary, cli))
 	if err != nil {
-		return "", fmt.Errorf("%w: install gh, GitHub's CLI", worktree.ErrPullRequestsUnavailable)
+		return "", worktree.ErrGitHubCLIMissing
 	}
 
 	if err := shell.Command(ctx, binary, "auth", "status").Run(); err != nil {
 		if ctx.Err() != nil {
 			return "", ctx.Err()
 		}
-		return "", fmt.Errorf("%w: run `gh auth login`", worktree.ErrPullRequestsUnavailable)
+		return "", worktree.ErrGitHubSignedOut
 	}
 
 	return binary, nil
@@ -192,7 +192,7 @@ func (g GitHub) run(ctx context.Context, binary, what string, args ...string) ([
 	}
 	switch {
 	case err != nil && notOnGitHub(stderr.String()):
-		return out, fmt.Errorf("%w: origin is not a GitHub repository", worktree.ErrPullRequestsUnavailable)
+		return out, worktree.ErrNotOnGitHub
 	case err != nil:
 		return out, fmt.Errorf("%w: %s: %w: %s", worktree.ErrPullRequestsUnavailable, what, err, strings.TrimSpace(stderr.String()))
 	}

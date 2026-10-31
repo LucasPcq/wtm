@@ -97,6 +97,16 @@ func TestAFetchThatFailsIsAWarningAndThePlanStandsOnOriginAsLastFetched(t *testi
 	assert.Equal(t, []string{checkout.CodeFetchFailed}, codes(warnings))
 }
 
+func TestNoFetchReadsTheBranchAsLastFetched(t *testing.T) {
+	w := newWorld(t)
+	w.usecase.Git = unfetched{git.Repo{Dir: w.main}}
+
+	planned, warnings := w.plan(t, checkout.Request{PR: prRemote, NoFetch: true})
+
+	assert.Equal(t, checkout.ActionResume, planned.Action)
+	assert.Empty(t, warnings)
+}
+
 func TestAForkOrAPullRequestNotFoundIsNeitherFetchedNorPlanned(t *testing.T) {
 	w := newWorld(t)
 	w.usecase.Git = unfetched{git.Repo{Dir: w.main}}
@@ -171,6 +181,23 @@ func TestAPullRequestGitHubCannotBeAskedOfRefusesThePlan(t *testing.T) {
 
 	assert.Equal(t, checkout.CodeGitHubUnavailable, failureOf(t, err).Code)
 	assert.Equal(t, domain.KindPrecondition, failureOf(t, err).Kind)
+}
+
+func TestARefusalOfGitHubNamesTheReasonAPersonFixes(t *testing.T) {
+	reasons := map[error]domain.Params{
+		worktree.ErrGitHubCLIMissing:        {checkout.ParamReason: "gh_missing"},
+		worktree.ErrGitHubSignedOut:         {checkout.ParamReason: "signed_out"},
+		worktree.ErrNotOnGitHub:             {checkout.ParamReason: "not_on_github"},
+		worktree.ErrPullRequestsUnavailable: nil,
+	}
+	for err, params := range reasons {
+		w := newWorld(t)
+		w.usecase.PullRequests = github{asked: w.asked, err: err}.open
+
+		_, refused := w.usecase.Questions(t.Context(), checkout.Request{})
+
+		assert.Equal(t, params, failureOf(t, refused).Params, err.Error())
+	}
 }
 
 func TestNoPullRequestUnattendedIsRefusedWithoutAskingGitHub(t *testing.T) {

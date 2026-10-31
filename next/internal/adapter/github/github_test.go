@@ -243,3 +243,22 @@ func TestAPullRequestGHCannotReadSaysWhy(t *testing.T) {
 	_, noRemoteErr := github.GitHub{Dir: t.TempDir(), Binary: refusingGH(t, "no git remotes found")}.OpenPullRequests(t.Context(), worktree.AllPullRequests)
 	assert.EqualError(t, noRemoteErr, "pull requests unavailable: origin is not a GitHub repository")
 }
+
+func TestEachReasonGHCannotBeAskedIsItsOwnError(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "gh")
+	signedOut := fakeGH(t, 1, "{}")
+	noForge := refusingGH(t, "none of the git remotes configured for this repository point to a known GitHub host")
+
+	_, missingErr := github.GitHub{Dir: t.TempDir(), Binary: missing}.OpenPullRequests(t.Context(), worktree.AllPullRequests)
+	_, signedOutErr := github.GitHub{Dir: t.TempDir(), Binary: signedOut}.OpenPullRequests(t.Context(), worktree.AllPullRequests)
+	_, noForgeErr := github.GitHub{Dir: t.TempDir(), Binary: noForge}.PullRequest(t.Context(), 1)
+	_, failedErr := github.GitHub{Dir: t.TempDir(), Binary: refusingGH(t, "HTTP 502")}.PullRequest(t.Context(), 1)
+
+	assert.ErrorIs(t, missingErr, worktree.ErrGitHubCLIMissing)
+	assert.ErrorIs(t, signedOutErr, worktree.ErrGitHubSignedOut)
+	assert.ErrorIs(t, noForgeErr, worktree.ErrNotOnGitHub)
+	require.ErrorIs(t, failedErr, worktree.ErrPullRequestsUnavailable)
+	for _, reason := range []error{worktree.ErrGitHubCLIMissing, worktree.ErrGitHubSignedOut, worktree.ErrNotOnGitHub} {
+		assert.NotErrorIs(t, failedErr, reason)
+	}
+}

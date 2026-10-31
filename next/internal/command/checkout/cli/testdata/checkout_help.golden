@@ -36,6 +36,7 @@
     -h, --help                        help for checkout
         --isolation string            How it stands against its source: isolated or verbatim; run.toml's isolation by default
         --mine                        List only your pull requests
+        --no-fetch                    Read the pull request's branch as last fetched
         --output string               Output format: text or json (default "text")
         --remember stringArray        The answers to always use in this repository: env_from, isolation, fast_forward (repeatable)
         --review                      List only the pull requests waiting for your review

@@ -12,21 +12,23 @@ import (
 // ----------------------------------------------------------------------------
 // The request
 
-// A Request is what the caller asks of checkout, as given: the pull request by its number, its parent, the filter of the pull requests to pick from (Mine or Review), and the questions of a new worktree; a field left empty takes its remembered answer, its configured value or its default when the request is resolved.
+// A Request is what the caller asks of checkout, as given: the pull request by its number, its parent, the filter of the pull requests to pick from (Mine or Review), whether the pull request's branch is read as last fetched (NoFetch, as a surface that fetched it a moment ago asks again), and the questions of a new worktree; a field left empty takes its remembered answer, its configured value or its default when the request is resolved.
 type Request struct {
-	PR     int    `json:"pr"`
-	From   string `json:"from"`
-	Mine   bool   `json:"mine"`
-	Review bool   `json:"review"`
+	PR      int    `json:"pr"`
+	From    string `json:"from"`
+	Mine    bool   `json:"mine"`
+	Review  bool   `json:"review"`
+	NoFetch bool   `json:"no_fetch"`
 	provision.Given
 }
 
 // The paths of checkout's own fields, by which each surface words them; the questions of a new worktree name theirs in domain.
 const (
-	PathPR     = "pr"
-	PathFrom   = "from"
-	PathMine   = "mine"
-	PathReview = "review"
+	PathPR      = "pr"
+	PathFrom    = "from"
+	PathMine    = "mine"
+	PathReview  = "review"
+	PathNoFetch = "no_fetch"
 )
 
 // Answer is the request with the field at path answered by values, spelled as the field's Answer spells them; the path "remember" answers the fields whose answer is remembered. A value the field cannot take leaves the request as it was.
@@ -42,6 +44,8 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 		next.Mine, err = domain.Yes(path, values)
 	case PathReview:
 		next.Review, err = domain.Yes(path, values)
+	case PathNoFetch:
+		next.NoFetch, err = domain.Yes(path, values)
 	default:
 		next.Given, err = r.Given.Answer(path, values)
 	}
@@ -67,6 +71,8 @@ func (r Request) Values(path string) []string {
 		return domain.SaidYes(r.Mine)
 	case PathReview:
 		return domain.SaidYes(r.Review)
+	case PathNoFetch:
+		return domain.SaidYes(r.NoFetch)
 	}
 
 	return r.Given.Values(path)
@@ -107,10 +113,11 @@ func (r Request) filter() worktree.PullRequestFilter {
 
 // Questions is the request as a form: each question with its options, its answer so far and where that answer comes from, the questions of a new worktree with the fields whose answer is to be remembered, and the request's problems as field errors.
 type Questions struct {
-	PR     PR
-	From   From
-	Mine   domain.Confirm
-	Review domain.Confirm
+	PR      PR
+	From    From
+	Mine    domain.Confirm
+	Review  domain.Confirm
+	NoFetch bool
 	provision.Questions
 	Errors []domain.FieldError
 }
@@ -138,6 +145,7 @@ func NewQuestions(f Facts, req Request) Questions {
 		From:      from,
 		Mine:      flagOnly(req.Mine),
 		Review:    flagOnly(req.Review),
+		NoFetch:   req.NoFetch,
 		Questions: f.newWorktree(req),
 	}
 	questions.Errors = f.problems(questions)
@@ -159,6 +167,7 @@ func (q Questions) Form() domain.Form {
 	fields = append(fields,
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathMine, Origin: q.Mine.Origin, Skip: q.Mine.Skip}, Value: q.Mine.Value},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathReview, Origin: q.Review.Origin, Skip: q.Review.Skip}, Value: q.Review.Value},
+		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathNoFetch, Skip: domain.SkipFlagOnly}, Value: q.NoFetch},
 	)
 
 	return domain.Form{Problems: q.Errors, Fields: fields}
@@ -252,7 +261,7 @@ func resolve(f Facts, req Request) (Questions, error) {
 
 // Request is the request the questions answer.
 func (q Questions) Request() Request {
-	return Request{PR: q.PR.Value, From: q.From.Value, Mine: q.Mine.Value, Review: q.Review.Value, Given: q.Questions.Given()}
+	return Request{PR: q.PR.Value, From: q.From.Value, Mine: q.Mine.Value, Review: q.Review.Value, NoFetch: q.NoFetch, Given: q.Questions.Given()}
 }
 
 // CodeFiltersExclusive refuses both filters of the pull requests to pick from at once.
