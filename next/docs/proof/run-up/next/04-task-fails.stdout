@@ -1,0 +1,13 @@
+
+  ✗ run up: 1 failed
+
+  Worktrees  feat/a
+  Profile    broken
+  Jobs       fail, web (up)
+
+  ✗ feat/a  fail failed: run daemon: task fail exited with code 3
+      nope
+  full output:  <SB>/acme/.git/wtm/logs/feat%2Fa/fail.log
+
+  → wtm run up feat/a --profile broken   start it again where it did not pass
+

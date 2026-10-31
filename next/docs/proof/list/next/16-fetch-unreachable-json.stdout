@@ -79,7 +79,7 @@
           {
             "action": "run_up",
             "follow_up": {
-              "command": "run up",
+              "command": "run-up",
               "answers": [
                 {
                   "path": "worktree",
@@ -238,7 +238,7 @@
           {
             "action": "run_up",
             "follow_up": {
-              "command": "run up",
+              "command": "run-up",
               "answers": [
                 {
                   "path": "worktree",
@@ -429,7 +429,7 @@
           {
             "action": "run_up",
             "follow_up": {
-              "command": "run up",
+              "command": "run-up",
               "answers": [
                 {
                   "path": "worktree",
@@ -911,7 +911,7 @@
           {
             "action": "run_up",
             "follow_up": {
-              "command": "run up",
+              "command": "run-up",
               "answers": [
                 {
                   "path": "worktree",
@@ -1012,6 +1012,19 @@
     {
       "code": "list.fetch_failed",
       "message": "couldn't fetch origin: where each branch stands against it is as last fetched: git -C <SB>/acme fetch --quiet origin: fatal: '<SB>/nowhere.git' does not appear to be a git repository\nfatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists."
+    },
+    {
+      "code": "list.daemon_skew",
+      "params": {
+        "daemon": "dev",
+        "skew": "legacy"
+      },
+      "message": "the run daemon is the legacy wtm's: restart it to start jobs beside its own",
+      "follow_up": {
+        "command": "run daemon restart",
+        "code": "list.restart_daemon",
+        "message": "hand its jobs over to this wtm"
+      }
     }
   ]
 }

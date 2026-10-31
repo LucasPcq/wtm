@@ -145,6 +145,15 @@ func (p JobParams) ports() map[string]int {
 	return ports
 }
 
+// JobPorts returns the ports job binds in the worktree, by the names it declares them under: each its base, offset for the worktree unless the job is shared; what the job reads, whichever other job declares the same name.
+func (p JobParams) JobPorts(job project.Job) map[string]int {
+	ports := make(map[string]int, len(job.Ports))
+	for name, base := range job.Ports {
+		ports[name] = resolvedPort(resolvedPortParams{Base: base, Offset: p.Offset(), Shared: job.Scope == project.Shared})
+	}
+	return ports
+}
+
 // composeDirs returns the directories, relative to the worktree, of the jobs that run docker compose, each once, in the order of the jobs.
 func composeDirs(cfg project.Run) []string {
 	var dirs []string

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
@@ -16,22 +15,10 @@ import (
 const branchKey = "WTM_BRANCH"
 
 // Index is the daemon's index of the jobs up, the file at Path, in the legacy
-// wtm's format so a daemon of either takes over what the other left, byte for
-// byte: the keys of a job's config it does not read are kept from Load to the
-// Saves after it. Safe for concurrent use; not to be copied once used.
+// wtm's format so a daemon of either takes over what the other left. Safe for
+// concurrent use.
 type Index struct {
 	Path string
-
-	mu   sync.Mutex
-	kept map[jobKey]legacyKeys
-}
-
-// jobKey is a record of a job as Load read it: a later start of that job is
-// another record, which inherits none of its kept keys.
-type jobKey struct {
-	workDir string
-	name    string
-	started int64
 }
 
 // state is the file: its version and the jobs up.
@@ -46,6 +33,7 @@ type record struct {
 	Name      string            `json:"name"`
 	WorkDir   string            `json:"work_dir"`
 	Config    config            `json:"config"`
+	Profile   string            `json:"profile,omitempty"`
 	Env       map[string]string `json:"env,omitempty"`
 	Unset     []string          `json:"unset,omitempty"`
 	Routes    []route           `json:"routes,omitempty"`
@@ -106,12 +94,8 @@ func (i *Index) Load() []run.Record {
 		return nil
 	}
 
-	i.mu.Lock()
-	defer i.mu.Unlock()
-	i.kept = map[jobKey]legacyKeys{}
 	records := make([]run.Record, 0, len(file.Jobs))
 	for _, r := range file.Jobs {
-		i.kept[jobKey{workDir: r.WorkDir, name: r.Name, started: r.StartedAt.UnixNano()}] = r.Config.legacyKeys
 		records = append(records, r.runRecord())
 	}
 
@@ -122,13 +106,9 @@ func (i *Index) Load() []run.Record {
 // it: its record of what it started is left as it is.
 func (i *Index) Save(records []run.Record) error {
 	file := state{Version: run.IndexVersion, Jobs: make([]record, 0, len(records))}
-	i.mu.Lock()
 	for _, r := range records {
-		wire := recordOf(r)
-		wire.Config.legacyKeys = i.kept[jobKey{workDir: wire.WorkDir, name: wire.Name, started: wire.StartedAt.UnixNano()}]
-		file.Jobs = append(file.Jobs, wire)
+		file.Jobs = append(file.Jobs, recordOf(r))
 	}
-	i.mu.Unlock()
 	data, err := json.Marshal(file)
 	if err != nil {
 		return err
@@ -154,7 +134,7 @@ func (i *Index) Save(records []run.Record) error {
 }
 
 func recordOf(r run.Record) record {
-	wire := record{Name: r.Spec.Job.Name, WorkDir: r.Spec.WorkDir, Config: configOf(r.Spec.Job), Env: r.Spec.Env, Unset: r.Spec.Unset, LogDir: r.Spec.LogDir, Routes: routesOf(r.Spec.Routes), StartedAt: r.StartedAt, PID: r.PID, PGID: r.PGID, Joined: r.Claim, SharedDir: r.SharedDir, MainHolds: r.MainHolds}
+	wire := record{Name: r.Spec.Job.Name, WorkDir: r.Spec.WorkDir, Config: configOf(r.Spec.Job), Profile: r.Spec.Profile, Env: r.Spec.Env, Unset: r.Spec.Unset, LogDir: r.Spec.LogDir, Routes: routesOf(r.Spec.Routes), StartedAt: r.StartedAt, PID: r.PID, PGID: r.PGID, Joined: r.Claim, SharedDir: r.SharedDir, MainHolds: r.MainHolds}
 	if origin := r.Spec.Origin; origin != nil {
 		wire.Origin = &eventOrigin{CorrelationID: origin.CorrelationID}
 		wire.Origin.Repo.Root, wire.Origin.Repo.CommonDir = origin.Root, origin.CommonDir
@@ -164,7 +144,7 @@ func recordOf(r run.Record) record {
 }
 
 func (r record) runRecord() run.Record {
-	spec := run.Spec{Job: r.Config.job(), WorkDir: r.WorkDir, Env: r.Env, Unset: r.Unset, LogDir: r.LogDir, Routes: runRoutes(r.Routes)}
+	spec := run.Spec{Job: r.Config.job(), Profile: r.Profile, WorkDir: r.WorkDir, Env: r.Env, Unset: r.Unset, LogDir: r.LogDir, Routes: runRoutes(r.Routes)}
 	if r.Origin != nil {
 		spec.Origin = &run.Origin{Root: r.Origin.Repo.Root, CommonDir: r.Origin.Repo.CommonDir, Branch: r.Env[branchKey], CorrelationID: r.Origin.CorrelationID}
 	}

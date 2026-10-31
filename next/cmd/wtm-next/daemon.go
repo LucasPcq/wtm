@@ -22,6 +22,7 @@ import (
 	rundaemon "github.com/LucasPcq/wtm/next/internal/daemon"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
 // daemonCommand is the command line that runs the daemon in a process of its own.
@@ -158,4 +159,30 @@ func startDaemon() error {
 	}
 
 	return shell.Detached(shell.DetachedParams{Name: exe, Args: []string{daemonCommand}, Env: shell.Environ([]string{cli.CorrelationIDEnv}, nil), Log: daemon.LogPath(bus.SocketPath())})
+}
+
+// commandRestartDaemon is the follow-up that restarts the run daemon, as a follow-up names it.
+const commandRestartDaemon = "run daemon restart"
+
+// runDaemonCmd is run daemon, the commands on the run daemon itself: restart, which hands the jobs of a daemon of another build, or of the legacy wtm, over to one of this build.
+func runDaemonCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "daemon", Short: "Manage the run daemon", Args: cobra.NoArgs}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "restart",
+		Short: "Restart the run daemon, as this build",
+		Long:  "Stop the run daemon, whatever its build, and start one of this build. Every service it runs itself stops with it, a shared one included; its detached stacks (a service with a stop command, docker compose up -d) keep running and are handed over to the new one through its index. Start the others again with run up.",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			runs := runDaemon()
+			if err := runs.Shutdown(cmd.Context()); err != nil {
+				return err
+			}
+			if err := runs.Ensure(cmd.Context()); err != nil {
+				return err
+			}
+			output.SuccessLine(cmd.OutOrStdout(), "The run daemon restarted as wtm-next "+version)
+			return nil
+		},
+	})
+	return cmd
 }

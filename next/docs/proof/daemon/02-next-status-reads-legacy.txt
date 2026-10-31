@@ -2,4 +2,5 @@
   web  running  http://web.main.acme.localhost:<PROXY_PORT>  up <T>
   api  running  http://api.main.acme.localhost:<PROXY_PORT>  up <T>
   db   running                                        up <T>
+  ! the run daemon is the legacy wtm's: restart it to start jobs beside its own
 

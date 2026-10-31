@@ -38,6 +38,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
+	"github.com/LucasPcq/wtm/next/internal/command/runup"
+	runupcli "github.com/LucasPcq/wtm/next/internal/command/runup/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	synccommand "github.com/LucasPcq/wtm/next/internal/command/sync"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -502,6 +504,8 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[domain.OptionTag]():          {"What sets an option apart, as a code each surface words its own way.", domain.OptionTags()},
 	reflect.TypeFor[create.Action]():             {"How a branch gets its worktree.", create.Actions()},
 	reflect.TypeFor[checkout.Action]():           {"How a pull request's branch gets its worktree.", checkout.Actions()},
+	reflect.TypeFor[runup.Action]():              {"What a start does to one job of its profile.", runup.Actions()},
+	reflect.TypeFor[runup.JobStatus]():           {"What became of one job of a start.", runup.JobStatuses()},
 	reflect.TypeFor[list.Finished]():             {"How a worktree's pull request has done with it: merged, or closed unmerged.", list.Finisheds()},
 	reflect.TypeFor[prune.Reason]():              {"Why a worktree is done with, as a code each surface words its own way.", prune.Reasons()},
 	reflect.TypeFor[worktree.Blocker]():          {"What makes a worktree unsafe to remove, a safety refusal only force lifts, as a code each surface words its own way.", worktree.Blockers()},
@@ -835,13 +839,17 @@ func servingDaemon(t *testing.T) string {
 	return serving(t, daemonParams{})
 }
 
-// serving runs the daemon of params as servingDaemon does, its standard error to its log, as a daemon a client starts.
+// serving runs the daemon of params as servingDaemon does, on params.Socket when it names one, its standard error to its log, as a daemon a client starts.
 func serving(t *testing.T, params daemonParams) string {
 	t.Helper()
-	dir, err := os.MkdirTemp("", "wtm-next")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(dir) })
-	socket := filepath.Join(dir, "wtm.sock")
+	socket := params.Socket
+	if socket == "" {
+		dir, err := os.MkdirTemp("", "wtm-next")
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = os.RemoveAll(dir) })
+		socket = filepath.Join(dir, "wtm.sock")
+	}
+	require.NoError(t, os.MkdirAll(filepath.Dir(socket), 0o700))
 	log, err := os.OpenFile(daemon.LogPath(socket), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = log.Close() })
@@ -857,7 +865,7 @@ func serving(t *testing.T, params daemonParams) string {
 		<-served
 	})
 	require.Eventually(t, func() bool {
-		_, err := daemon.Daemon{SocketPath: socket}.Jobs(context.Background())
+		_, err := daemon.Daemon{SocketPath: socket, Version: version}.Jobs(context.Background())
 		_, statErr := os.Stat(socket)
 		return err == nil && statErr == nil
 	}, 5*time.Second, 10*time.Millisecond)
@@ -884,4 +892,35 @@ func daemonLog(t *testing.T, socket string) string {
 	log, err := os.ReadFile(daemon.LogPath(socket))
 	require.NoError(t, err)
 	return string(log)
+}
+
+// writeRun writes content as the run.toml of the repository whose main worktree is main.
+func writeRun(t *testing.T, main, content string) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(filepath.Join(main, ".git", "wtm", "run.toml"), []byte(content), 0o644))
+}
+
+// daemonJobs are the jobs the run daemon at the commands' socket lists.
+func daemonJobs(t *testing.T) []run.Job {
+	t.Helper()
+	jobs, err := daemon.Daemon{SocketPath: bus.SocketPath(), Version: version}.Jobs(t.Context())
+	require.NoError(t, err)
+	return jobs
+}
+
+// shortDir is a new directory under /tmp, removed once the test ends: a unix socket's path is capped at 104 bytes on macOS.
+func shortDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("/tmp", "wn")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return dir
+}
+
+// spelling is how the command line spells a command a follow-up names: run up for the catalogue's run-up.
+func spelling(command string) string {
+	if command == runup.Name {
+		return runupcli.Use
+	}
+	return command
 }

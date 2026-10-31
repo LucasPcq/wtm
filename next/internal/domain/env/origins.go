@@ -31,16 +31,28 @@ func jobHostLabel(job project.Job) string {
 	return cmp.Or(job.URL.Host, worktree.HostLabel(job.Name))
 }
 
-// routeHost returns the host name the proxy serves job under, one per worktree unless the job is shared, empty when the job publishes no url.
+// routeHost returns the host name the proxy serves job under in the worktree being settled.
 func (w settling) routeHost(job project.Job) string {
-	label := jobHostLabel(job)
+	return RouteHost(RouteHostParams{Job: job, Slug: w.Slug, Project: w.Project})
+}
+
+// RouteHostParams name a job's route: the Job, the Slug of the worktree it runs in, and the Project it belongs to.
+type RouteHostParams struct {
+	Job     project.Job
+	Slug    string
+	Project string
+}
+
+// RouteHost returns the host name the proxy serves a job under, <job>.<worktree>.<project>.localhost, one per worktree unless the job is shared (<job>.<project>.localhost); empty when the job publishes no url.
+func RouteHost(params RouteHostParams) string {
+	label := jobHostLabel(params.Job)
 	if label == "" {
 		return ""
 	}
-	if job.Scope == project.Shared {
-		return strings.Join([]string{label, worktree.HostLabel(w.Project), proxyTLD}, ".")
+	if params.Job.Scope == project.Shared {
+		return strings.Join([]string{label, worktree.HostLabel(params.Project), proxyTLD}, ".")
 	}
-	return strings.Join([]string{label, worktree.HostLabel(w.Slug), worktree.HostLabel(w.Project), proxyTLD}, ".")
+	return strings.Join([]string{label, worktree.HostLabel(params.Slug), worktree.HostLabel(params.Project), proxyTLD}, ".")
 }
 
 // linkOrigin returns the origin the proxy serves the link's port under, empty when the port is not the one its job publishes or the proxy serves no port.

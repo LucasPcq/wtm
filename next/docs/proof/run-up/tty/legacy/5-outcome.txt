@@ -1,0 +1,21 @@
+$ wtm run up; echo EXIT=$?
+
+┃   Jobs
+┃
+┃  Profile:      dev
+┃
+┃  main
+┃  Running:      api, web
+┃
+┃  Where to reach it
+┃    api  http://api.main.acme.localhost:24372
+┃    web  http://web.main.acme.localhost:24372
+┃
+┃  ! main's .env still spells ports — `wtm env main --addressing names` aligns it
+┃
+┃  → wtm run logs   attach to the output
+┃  → wtm run down   stop the jobs
+
+EXIT=0
+$
+

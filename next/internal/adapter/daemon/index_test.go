@@ -97,17 +97,17 @@ func TestAnIndexTakenOverIsWrittenBackByteForByte(t *testing.T) {
 	assert.Equal(t, legacy, string(data))
 }
 
-func TestALaterStartOfAJobInheritsNoneOfTheKeysItsOldRecordKept(t *testing.T) {
+func TestARecordKeepsItsJobsKeysAndProfileBothWays(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "jobs.json")
-	require.NoError(t, os.WriteFile(path, []byte(`{"version":2,"jobs":[{"name":"db","work_dir":"/wt/a","config":{"name":"db","kind":"service","cmd":"up","stop":"down","probe":false,"runs":["seed"]},"started_at":"2026-10-31T12:00:00Z"}]}`), 0o600))
 	index := &daemon.Index{Path: path}
-	restarted := index.Load()[0]
-	restarted.StartedAt = restarted.StartedAt.Add(time.Hour)
+	job := project.Job{Name: "web", Kind: project.Service, Cmd: "pnpm dev", NoProbe: true, BindsNoPort: true, Runs: []string{"api"}, Touches: []string{"db"}}
+	record := run.Record{Spec: run.Spec{Job: job, Profile: "dev", WorkDir: "/wt/a"}, StartedAt: time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC)}
 
-	require.NoError(t, index.Save([]run.Record{restarted}))
+	require.NoError(t, index.Save([]run.Record{record}))
 
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
-	assert.NotContains(t, string(data), "probe")
-	assert.NotContains(t, string(data), "seed")
+	assert.Contains(t, string(data), `"probe":false,"binds_no_port":true,"runs":["api"],"touches":["db"]`)
+	assert.Contains(t, string(data), `"profile":"dev"`)
+	assert.Equal(t, []run.Record{record}, index.Load())
 }

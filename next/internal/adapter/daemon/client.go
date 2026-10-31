@@ -69,7 +69,8 @@ func IndexPath(socket string) string {
 // Reads
 
 // Jobs returns the jobs the daemon knows, never starting it; a daemon of the
-// legacy wtm is read as it spells them. When none answers it reads its index:
+// legacy wtm is read as it spells them, and one of another build or of the
+// legacy wtm is said beside its jobs, a *run.Skewed. When none answers it reads its index:
 // detached stacks and claims run without a daemon, while a foreground service
 // left in it means a daemon died, and whether it is up cannot be told: it then
 // fails with run.ErrUnknown.
@@ -92,6 +93,9 @@ func (d Daemon) Jobs(ctx context.Context) ([]run.Job, error) {
 	jobs := make([]run.Job, 0, len(listing.Jobs))
 	for _, j := range listing.Jobs {
 		jobs = append(jobs, j.runJob(skew == run.SkewLegacy))
+	}
+	if skew != run.SkewNone {
+		return jobs, &run.Skewed{Skew: skew, Daemon: listing.Version}
 	}
 
 	return jobs, nil
@@ -121,8 +125,18 @@ func (d Daemon) indexed() ([]run.Job, error) {
 // Start starts the job spec asks for, handing out each line it prints while
 // the start runs (a task until it ends, a launcher until it exits), and
 // returns it as the daemon then lists it; a daemon of this build is made sure
-// of first ([Daemon.Ensure]). It fails with the daemon's [run.Error].
+// of first ([Daemon.Ensure]). A start that meets a daemon idling out
+// (run.CodeStopping) is made again once, on the daemon that follows it. It
+// fails with the daemon's [run.Error].
 func (d Daemon) Start(ctx context.Context, spec run.Spec, out func(run.Line)) (run.Job, error) {
+	job, err := d.start(ctx, spec, out)
+	if refused, ok := errors.AsType[*run.Error](err); ok && refused.Code == run.CodeStopping {
+		return d.start(ctx, spec, out)
+	}
+	return job, err
+}
+
+func (d Daemon) start(ctx context.Context, spec run.Spec, out func(run.Line)) (run.Job, error) {
 	if err := d.Ensure(ctx); err != nil {
 		return run.Job{}, err
 	}

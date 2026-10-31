@@ -1,0 +1,40 @@
+
+  Published names, unsettled .env
+  main's .env still spells ports — `wtm env main --addressing names` aligns it
+  esc dismisses this report
+  ╭────────────────────────╮ ╭───────────────────────────────────────────────────────────────────╮
+  │ JOBS                   │ │ web · main · running · http://web.main.acme.localhost:24372  live │
+  │                        │ │                                                                   │
+  │ main                   │ │  web v1.4.2  ready in 312 ms                                      │
+  │  ●  api             <UP> │ │  ➜  Local:   http://localhost:24370/                              │
+  │ ▸●  web             <UP> │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  │                        │ │                                                                   │
+  ╰────────────────────────╯ ╰───────────────────────────────────────────────────────────────────╯
+
+  ↑↓ job · / filter · pgup/pgdn scroll · enter focus · o open · a addresses · q detach 2/2 running

@@ -17,3 +17,4 @@ flowchart TD
   n9["feat/login (branch deleted)"]
   n10["feat/login-ui"]
   n9 --> n10
+  %% ! the run daemon is the legacy wtm's: restart it to start jobs beside its own

@@ -14,6 +14,7 @@ export const phaseLabel: Record<DomainPhase, string> = {
   exec: 'Run the command',
   rebase: 'Rebase onto its parent',
   push: 'Push to origin',
+  job: 'Start the job',
 }
 
 export const phaseDuring: Record<DomainPhase, string> = {
@@ -30,4 +31,5 @@ export const phaseDuring: Record<DomainPhase, string> = {
   exec: 'the command',
   rebase: 'the rebase onto its parent',
   push: 'the push to origin',
+  job: 'the start of the job',
 }

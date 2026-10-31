@@ -1,0 +1,18 @@
+
+  Profile dev
+
+  › [1/2] api
+  ✓ api started · http://api.main.acme.localhost:24352
+
+  › [2/2] web
+  ✓ web started · http://web.main.acme.localhost:24352
+
+  Where to reach it
+    api  http://api.main.acme.localhost:24352
+    web  http://web.main.acme.localhost:24352
+
+  ! main's .env still spells ports — `wtm env main --addressing names` aligns it
+
+  → wtm run logs   attach to the output
+  → wtm run down   stop the jobs
+

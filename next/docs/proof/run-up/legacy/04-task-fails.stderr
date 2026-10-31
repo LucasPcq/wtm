@@ -1,0 +1,8 @@
+  ✗ task fail failed (exit 3)
+
+  ! Profile aborted at step 1/2 (fail).
+  Not started:   web
+
+  → wtm run up   re-run once fixed
+  → wtm run down   stop what did start
+

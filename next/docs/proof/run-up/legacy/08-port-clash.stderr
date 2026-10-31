@@ -1,0 +1,6 @@
+
+  ✗ ports already bound by another worktree:
+    24350 — web in feat-v, bound by web in acme
+    24351 — api in feat-v, bound by api in acme
+    stop the other worktrees' jobs first with --exclusive, or give this worktree its own ports: wtm env <branch> --isolation isolated
+

@@ -200,7 +200,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	}
 
 	var goneErr error
-	answered := repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, PullRequests: u.PullRequests, Branches: branches, WithPRs: len(branches) > 0}, func() {
+	answered := repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, Restart: u.Repository.Restart, PullRequests: u.PullRequests, Branches: branches, WithPRs: len(branches) > 0}, func() {
 		if req.asks(ReasonGone) {
 			facts.Gone, goneErr = u.Git.Gone(ctx)
 		}

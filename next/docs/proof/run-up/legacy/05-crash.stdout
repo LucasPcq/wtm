@@ -1,0 +1,15 @@
+
+  Profile crash
+
+  › [1/2] api
+  ✓ api already running · http://api.feat-b.acme.localhost:24352
+
+  › [2/2] crashy
+  ✓ crashy started
+
+  Where to reach it
+    api  http://api.feat-b.acme.localhost:24352
+
+  → wtm run logs   attach to the output
+  → wtm run down   stop the jobs
+

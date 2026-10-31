@@ -1,0 +1,16 @@
+
+  ✗ run up: 1 failed
+
+  Worktrees  feat/b
+  Profile    crash
+  Jobs       api (up), crashy
+  feat/b     api  http://api.feat-b.acme.localhost:24352
+
+  ✗ feat/b  crashy crashed once started
+      boom
+  full output:  <SB>/acme/.git/wtm/logs/feat%2Fb/crashy.log
+
+  → wtm run up feat/b --profile crash   start it again where it did not pass
+  → wtm run logs feat/b                      follow feat/b's output
+  → wtm run down feat/b                      stop feat/b's jobs
+

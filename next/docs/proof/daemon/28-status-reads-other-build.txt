@@ -2,4 +2,5 @@
   web  running  port <WEB_PORT>  up <T>
   api  stopped  port <API_PORT>
   db   stopped
+  ! the run daemon is of another build (0.31.0-other): restart it to start jobs beside its own
 

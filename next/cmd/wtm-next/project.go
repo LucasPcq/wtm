@@ -24,6 +24,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/command/reparent"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
+	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	synccommand "github.com/LucasPcq/wtm/next/internal/command/sync"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
@@ -50,6 +51,7 @@ var (
 	openResolve     = opener(func(a app) resolve.UseCase { return a.Resolve })
 	openStatus      = opener(func(a app) status.UseCase { return a.Status })
 	openTree        = opener(func(a app) tree.UseCase { return a.Tree })
+	openRunUp       = opener(func(a app) runup.UseCase { return a.RunUp })
 )
 
 // opener returns the function that opens the use case useCase picks out of the app wired on the repository of a directory.

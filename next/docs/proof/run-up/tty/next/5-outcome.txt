@@ -1,0 +1,17 @@
+$ wtm run up; echo EXIT=$?
+  ✓ main · api (<DUR>)
+  ✓ main · web (<DUR>)
+
+┃  ✓ run up: 1 done
+┃
+┃  Worktrees  main
+┃  Profile    dev
+┃  Jobs       api, web
+┃  main       api http://api.main.acme.localhost:24372, web http://web.main.acme.localhost:24372
+┃
+┃  → wtm run logs main   follow main's output
+┃  → wtm run down main   stop main's jobs
+
+EXIT=0
+$
+

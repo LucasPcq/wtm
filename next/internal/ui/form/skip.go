@@ -17,6 +17,9 @@ var skipped = map[domain.Skip]string{
 	domain.SkipNoDescendant:    "no worktree asked has worktrees under it",
 	domain.SkipNoRebase:        "nothing is rebased",
 	domain.SkipNothingToPush:   "nothing would be pushed",
+	domain.SkipOneProfile:      "run.toml declares one profile or none",
+	domain.SkipAlone:           "no other worktree runs jobs",
+	domain.SkipConfigured:      "run.toml answers it",
 }
 
 // Skipped is how the wizard's trail words why a step is not asked, empty when it has no words for it; a command may

@@ -146,14 +146,14 @@ func bindFields(cmd *cobra.Command, schema []worded) map[string]string {
 
 	for _, field := range bound(schema) {
 		name, usage := flagName(field), usages[field.Spec().Path]
-		switch field := field.Field.(type) {
+		switch kind := field.Field.(type) {
 		case domain.ConfirmField:
-			flags.Bool(name, false, usage)
+			flags.BoolP(name, field.Shorthand, false, usage)
 		case domain.MultiSelectField, domain.TextListField:
 			flags.StringSlice(name, nil, usage)
 		case domain.SelectField:
 			flags.String(name, "", usage)
-			if accepted := accepting(field.Options); len(accepted) > 0 {
+			if accepted := accepting(kind.Options); len(accepted) > 0 {
 				_ = cmd.RegisterFlagCompletionFunc(name, cobra.FixedCompletions(accepted, cobra.ShellCompDirectiveNoFileComp))
 			}
 		case domain.TextField:
@@ -372,7 +372,8 @@ func (c *Command[R, Q, O]) Conclude(cmd *cobra.Command, ran Ran[R, O], err error
 	case !ran.Outcome.Applied():
 		previewed, fingerprint := c.Preview(ran.Outcome), ran.Outcome.PlanFingerprint()
 		output.Frame(stdout, func(w io.Writer) {
-			output.DryRun(w, output.DryRunParams{Command: c.io.Command, Rows: previewed.Rows, Warnings: previewed.Warnings, Fingerprint: fingerprint, Apply: applyLine(argv, fingerprint), CommandLine: c.io.CommandLine})
+			// The command as its command line spells it after the program: run up, not the catalogue's run-up.
+			output.DryRun(w, output.DryRunParams{Command: strings.TrimPrefix(cmd.CommandPath(), cmd.Root().Name()+" "), Rows: previewed.Rows, Warnings: previewed.Warnings, Fingerprint: fingerprint, Apply: applyLine(argv, fingerprint), CommandLine: c.io.CommandLine})
 		})
 		return nil
 	}

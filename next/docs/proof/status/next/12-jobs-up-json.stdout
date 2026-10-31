@@ -135,5 +135,19 @@
     }
   ],
   "follow_ups": [],
-  "warnings": []
+  "warnings": [
+    {
+      "code": "status.daemon_skew",
+      "params": {
+        "daemon": "dev",
+        "skew": "legacy"
+      },
+      "message": "the run daemon is the legacy wtm's: restart it to start jobs beside its own",
+      "follow_up": {
+        "command": "run daemon restart",
+        "code": "status.restart_daemon",
+        "message": "hand its jobs over to this wtm"
+      }
+    }
+  ]
 }

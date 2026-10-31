@@ -1,0 +1,233 @@
+{
+  "v": 2,
+  "command": "run-up",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "path": "<SB>/acme.trees/feat-b",
+        "profile": "full",
+        "jobs": [
+          {
+            "name": "migrate",
+            "kind": "task",
+            "status": "done",
+            "log": "<SB>/acme/.git/wtm/logs/feat%2Fb/migrate.log"
+          },
+          {
+            "name": "db",
+            "kind": "service",
+            "status": "joined",
+            "log": "<SB>/acme/.git/wtm/logs/main/db.log",
+            "namespace": "acme_feat-b"
+          },
+          {
+            "name": "cache",
+            "kind": "service",
+            "status": "started",
+            "log": "<SB>/acme/.git/wtm/logs/feat%2Fb/cache.log",
+            "ports": [
+              {
+                "name": "CACHE_PORT",
+                "port": 24374,
+                "listening": true
+              }
+            ]
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "status": "started",
+            "url": "http://api.feat-b.acme.localhost:24352",
+            "log": "<SB>/acme/.git/wtm/logs/feat%2Fb/api.log",
+            "ports": [
+              {
+                "name": "PORT",
+                "port": 24371,
+                "listening": true
+              }
+            ]
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "status": "started",
+            "url": "http://web.feat-b.acme.localhost:24352",
+            "log": "<SB>/acme/.git/wtm/logs/feat%2Fb/web.log",
+            "ports": [
+              {
+                "name": "PORT",
+                "port": 24370,
+                "listening": true
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "profile": "full",
+    "worktrees": [
+      {
+        "worktree": "feat/b",
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "numbered": true,
+        "jobs": [
+          {
+            "name": "migrate",
+            "kind": "task",
+            "action": "start",
+            "step": 1
+          },
+          {
+            "name": "db",
+            "kind": "service",
+            "action": "join",
+            "waits_for": [
+              "migrate"
+            ],
+            "shared_in": "main",
+            "namespace": "acme_feat-b"
+          },
+          {
+            "name": "cache",
+            "kind": "service",
+            "action": "start",
+            "step": 2,
+            "waits_for": [
+              "migrate"
+            ],
+            "ports": {
+              "CACHE_PORT": 24374
+            }
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "action": "start",
+            "step": 3,
+            "waits_for": [
+              "migrate"
+            ],
+            "ports": {
+              "PORT": 24371
+            }
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "action": "start",
+            "step": 4,
+            "waits_for": [
+              "migrate"
+            ],
+            "ports": {
+              "PORT": 24370
+            }
+          }
+        ]
+      }
+    ],
+    "exclusive": false,
+    "others": [],
+    "no_probe": false,
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/b",
+            "text": "feat/b"
+          }
+        ]
+      },
+      {
+        "key": "profile",
+        "label": "Profile",
+        "path": "profile",
+        "values": [
+          {
+            "value": "full",
+            "text": "full"
+          }
+        ]
+      },
+      {
+        "key": "jobs",
+        "label": "Jobs",
+        "values": [
+          {
+            "value": "migrate",
+            "text": "migrate"
+          },
+          {
+            "value": "db (joined, in main)",
+            "text": "db (joined, in main)"
+          },
+          {
+            "value": "cache",
+            "text": "cache"
+          },
+          {
+            "value": "api",
+            "text": "api"
+          },
+          {
+            "value": "web",
+            "text": "web"
+          }
+        ]
+      },
+      {
+        "key": "reach",
+        "label": "feat/b",
+        "values": [
+          {
+            "value": "api  http://api.feat-b.acme.localhost:24352",
+            "text": "api  http://api.feat-b.acme.localhost:24352"
+          },
+          {
+            "value": "web  http://web.feat-b.acme.localhost:24352",
+            "text": "web  http://web.feat-b.acme.localhost:24352"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "run logs",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        }
+      ],
+      "code": "run-up.logs",
+      "message": "follow feat/b's output"
+    },
+    {
+      "command": "run down",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        }
+      ],
+      "code": "run-up.down",
+      "message": "stop feat/b's jobs"
+    }
+  ],
+  "warnings": []
+}

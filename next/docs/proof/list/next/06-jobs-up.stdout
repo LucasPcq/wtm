@@ -6,4 +6,5 @@
   ../acme.trees/detached                                                ✓ clean
   locked-gone             ! locked                                      ✗ missing
   orphan                                                                ✓ clean
+  ! the run daemon is the legacy wtm's: restart it to start jobs beside its own
 
