@@ -1,4 +1,4 @@
-// Package github asks GitHub, through its CLI gh, for the pull request of each branch of a repository, its open one else its newest whatever its state, with its head commit, its checks and its review.
+// Package github asks GitHub, through its CLI gh, for the pull request of each branch of a repository, its open one else its newest whatever its state, with its head commit, its checks and its review; for its open pull requests; and for one pull request by its number.
 package github
 
 import (
@@ -75,6 +75,90 @@ func (g GitHub) PullRequestsOf(ctx context.Context, branches []string) ([]worktr
 	return found, errors.Join(errs...)
 }
 
+// openLimit is how many open pull requests are listed, the newest first, as the legacy picker lists them.
+const openLimit = 50
+
+// prJSON are the fields gh pr list and gh pr view read of a pull request.
+const prJSON = "number,url,state,headRefName,headRefOid,baseRefName,isCrossRepository,title,isDraft,author"
+
+// OpenPullRequests returns the repository's open pull requests, the newest first and at most openLimit, narrowed by filter, each with its branch, the branch it would merge into, its author, whether it is a draft and whether its branch is a fork's. Every failure wraps worktree.ErrPullRequestsUnavailable but an interrupted read, which is the context's error.
+func (g GitHub) OpenPullRequests(ctx context.Context, filter worktree.PullRequestFilter) ([]worktree.PullRequest, error) {
+	binary, err := g.signedIn(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	args := []string{"pr", "list", "--state", "open", "--limit", strconv.Itoa(openLimit), "--json", prJSON}
+	switch filter {
+	case worktree.MyPullRequests:
+		args = append(args, "--author", "@me")
+	case worktree.ReviewRequested:
+		args = append(args, "--search", "review-requested:@me")
+	case worktree.AllPullRequests:
+	}
+	out, err := g.run(ctx, binary, "gh pr list", args...)
+	if err != nil {
+		return nil, err
+	}
+
+	var listed []listedPR
+	if err := json.Unmarshal(out, &listed); err != nil {
+		return nil, fmt.Errorf("%w: gh pr list: unexpected output: %w", worktree.ErrPullRequestsUnavailable, err)
+	}
+	prs := make([]worktree.PullRequest, 0, len(listed))
+	for _, pr := range listed {
+		prs = append(prs, pr.pullRequest())
+	}
+
+	return prs, nil
+}
+
+// PullRequest returns the pull request number, whatever its state. A number the repository has none of is worktree.ErrPullRequestNotFound; every other failure wraps worktree.ErrPullRequestsUnavailable but an interrupted read, which is the context's error.
+func (g GitHub) PullRequest(ctx context.Context, number int) (worktree.PullRequest, error) {
+	binary, err := g.signedIn(ctx)
+	if err != nil {
+		return worktree.PullRequest{}, err
+	}
+
+	out, err := g.run(ctx, binary, "gh pr view", "pr", "view", strconv.Itoa(number), "--json", prJSON)
+	switch {
+	case err != nil && strings.Contains(err.Error(), "Could not resolve to a PullRequest"):
+		return worktree.PullRequest{}, fmt.Errorf("pull request #%d: %w", number, worktree.ErrPullRequestNotFound)
+	case err != nil:
+		return worktree.PullRequest{}, err
+	}
+
+	var viewed listedPR
+	if err := json.Unmarshal(out, &viewed); err != nil {
+		return worktree.PullRequest{}, fmt.Errorf("%w: gh pr view: unexpected output: %w", worktree.ErrPullRequestsUnavailable, err)
+	}
+
+	return viewed.pullRequest(), nil
+}
+
+// A listedPR is a pull request as gh pr list and gh pr view print it with prJSON.
+type listedPR struct {
+	Number            int    `json:"number"`
+	URL               string `json:"url"`
+	State             string `json:"state"`
+	HeadRefName       string `json:"headRefName"`
+	HeadRefOid        string `json:"headRefOid"`
+	BaseRefName       string `json:"baseRefName"`
+	IsCrossRepository bool   `json:"isCrossRepository"`
+	Title             string `json:"title"`
+	IsDraft           bool   `json:"isDraft"`
+	Author            struct {
+		Login string `json:"login"`
+	} `json:"author"`
+}
+
+func (pr listedPR) pullRequest() worktree.PullRequest {
+	return worktree.PullRequest{
+		Number: pr.Number, URL: pr.URL, Branch: pr.HeadRefName, Head: pr.HeadRefOid, State: worktree.PullRequestState(strings.ToLower(pr.State)),
+		Title: pr.Title, Draft: pr.IsDraft, Base: pr.BaseRefName, Author: pr.Author.Login, Fork: pr.IsCrossRepository,
+	}
+}
+
 // signedIn returns the path of gh once it is found and signed in.
 func (g GitHub) signedIn(ctx context.Context) (string, error) {
 	// What failed matters less than what to do about it: the cause is left out.
@@ -106,7 +190,10 @@ func (g GitHub) run(ctx context.Context, binary, what string, args ...string) ([
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	if err != nil {
+	switch {
+	case err != nil && strings.Contains(stderr.String(), "none of the git remotes configured for this repository point to a known GitHub host"):
+		return out, fmt.Errorf("%w: origin is not a GitHub repository", worktree.ErrPullRequestsUnavailable)
+	case err != nil:
 		return out, fmt.Errorf("%w: %s: %w: %s", worktree.ErrPullRequestsUnavailable, what, err, strings.TrimSpace(stderr.String()))
 	}
 

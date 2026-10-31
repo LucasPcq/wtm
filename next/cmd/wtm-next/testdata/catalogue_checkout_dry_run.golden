@@ -1,0 +1,79 @@
+{
+  "v": 2,
+  "command": "checkout",
+  "ok": true,
+  "op": "<id>",
+  "plan": {
+    "pull_request": {
+      "number": 7,
+      "url": "https://github.com/acme/acme/pull/7",
+      "branch": "feat/pr",
+      "state": "open",
+      "title": "Add a feature",
+      "base": "main",
+      "author": "alice"
+    },
+    "path": "<root>/.trees/feat-pr",
+    "action": "resume",
+    "upstream": "origin/feat/pr",
+    "phases": [
+      "worktree",
+      "env",
+      "meta"
+    ],
+    "from": "main",
+    "env_from": "example",
+    "recap": [
+      {
+        "key": "pr",
+        "label": "Pull request",
+        "path": "pr",
+        "values": [
+          {
+            "value": "7",
+            "text": "#7 Add a feature"
+          }
+        ]
+      },
+      {
+        "key": "branch",
+        "label": "Branch",
+        "values": [
+          {
+            "value": "feat/pr",
+            "note": "resumes",
+            "params": {
+              "upstream": "origin/feat/pr"
+            },
+            "text": "feat/pr (resumes origin/feat/pr)"
+          }
+        ]
+      },
+      {
+        "key": "parent",
+        "label": "Parent",
+        "path": "from",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "env_from",
+        "label": "Env",
+        "path": "env_from",
+        "values": [
+          {
+            "value": "example",
+            "text": "example"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<id>",
+  "follow_ups": [],
+  "warnings": []
+}

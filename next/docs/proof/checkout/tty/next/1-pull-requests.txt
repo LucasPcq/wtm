@@ -1,0 +1,19 @@
+$ wtm checkout --from main; echo EXIT=$?
+
+  Step 1/8 • Pull request
+
+  The open pull request whose branch to check out
+
+▌› #1     Add the remote feature                alice
+   #2     Local branch in sync                  me
+   #3     Local branch behind origin            bob                                       1 behind
+   #4     Local branch diverged from origin     bob                              1 ahead, 1 behind
+   #5     From a fork, on main                  stranger                                      fork
+   #6     Branch held by a worktree             alice                              worktree exists
+   #7     Branch deleted on origin              alice
+   #8     Stacked draft on feat/local           me · draft
+   #9     Merging into a branch only origin h…  alice
+   #11    Its own parent, asked                 me
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

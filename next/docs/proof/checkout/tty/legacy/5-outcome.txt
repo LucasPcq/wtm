@@ -1,0 +1,14 @@
+$ wtm checkout --from main; echo EXIT=$?
+
+┃  ✓ Checked out PR #2 (feat/local)
+┃
+┃  env   3 ports settled (offset +10)
+┃  path  <SB>/acme.trees/feat-local
+┃
+┃  feat/local is 1 commit(s) behind origin — the worktree starts from your local branch.
+┃
+┃  → wtm go feat/local
+
+EXIT=0
+$
+

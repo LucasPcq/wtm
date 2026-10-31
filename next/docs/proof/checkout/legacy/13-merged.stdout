@@ -1,0 +1,8 @@
+
+  ✓ Checked out PR #10 (feat/merged)
+
+  env   3 ports settled (offset +70)
+  path  <SB>/acme.trees/feat-merged
+
+  → wtm go feat/merged
+

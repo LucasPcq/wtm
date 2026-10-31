@@ -1,0 +1,18 @@
+$ wtm checkout --from main; echo EXIT=$?
+
+┃  ✓ checkout: 1 done
+┃
+┃  Pull request  #2 Local branch in sync
+┃  Branch        feat/local (existing)
+┃  Parent        main
+┃  Env           example
+┃  Isolation     isolated
+┃  feat/local    ../acme.trees/feat-local · 3 ports settled (offset +10)
+┃
+┃  ! feat/local  1 commit(s) behind origin — the worktree starts from your local branch.
+┃
+┃  → wtm go feat/local   jump in
+
+EXIT=0
+$
+

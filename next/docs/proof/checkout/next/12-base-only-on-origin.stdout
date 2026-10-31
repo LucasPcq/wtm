@@ -1,0 +1,12 @@
+
+  ✓ checkout: 1 done
+
+  Pull request     #9 Merging into a branch only origin has
+  Branch           feat/on-release (resumes origin/feat/on-release)
+  Parent           origin/release/1.0
+  Env              example
+  Isolation        isolated
+  feat/on-release  ../acme.trees/feat-on-release · 3 ports settled (offset +50)
+
+  → wtm go feat/on-release   jump in
+

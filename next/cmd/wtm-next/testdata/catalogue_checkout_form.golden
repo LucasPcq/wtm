@@ -1,0 +1,89 @@
+{
+  "fields": [
+    {
+      "kind": "select",
+      "path": "pr",
+      "value": "",
+      "options": [],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    },
+    {
+      "kind": "select",
+      "path": "from",
+      "value": "",
+      "options": [],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": true,
+      "closed": false
+    },
+    {
+      "kind": "select",
+      "path": "env_from",
+      "value": "",
+      "options": [
+        {
+          "value": "config"
+        },
+        {
+          "value": "example"
+        },
+        {
+          "value": "main"
+        },
+        {
+          "value": "parent"
+        }
+      ],
+      "rememberable": true,
+      "remember": false,
+      "refreshable": false,
+      "closed": true
+    },
+    {
+      "kind": "select",
+      "path": "isolation",
+      "value": "",
+      "options": [
+        {
+          "value": "isolated"
+        },
+        {
+          "value": "verbatim"
+        }
+      ],
+      "rememberable": true,
+      "remember": false,
+      "refreshable": false,
+      "closed": true
+    },
+    {
+      "kind": "confirm",
+      "path": "fast_forward",
+      "value": false,
+      "no_first": false,
+      "rememberable": true,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "mine",
+      "value": false,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "review",
+      "value": false,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    }
+  ],
+  "problems": []
+}

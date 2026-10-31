@@ -1,0 +1,118 @@
+{
+  "fields": [
+    {
+      "kind": "select",
+      "path": "pr",
+      "origin": "request",
+      "value": "7",
+      "options": [
+        {
+          "value": "7",
+          "pull_request": {
+            "number": 7,
+            "url": "https://github.com/acme/acme/pull/7",
+            "branch": "feat/pr",
+            "state": "open",
+            "title": "Add a feature",
+            "base": "main",
+            "author": "alice"
+          }
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    },
+    {
+      "kind": "select",
+      "path": "from",
+      "origin": "pull_request",
+      "value": "main",
+      "options": [
+        {
+          "value": "main",
+          "base": true
+        }
+      ],
+      "pinned": "main",
+      "rememberable": false,
+      "remember": false,
+      "refreshable": true,
+      "closed": false
+    },
+    {
+      "kind": "select",
+      "path": "env_from",
+      "origin": "default",
+      "value": "config",
+      "options": [
+        {
+          "value": "config"
+        },
+        {
+          "value": "example"
+        },
+        {
+          "value": "main"
+        },
+        {
+          "value": "parent"
+        }
+      ],
+      "rememberable": true,
+      "remember": false,
+      "refreshable": false,
+      "closed": true
+    },
+    {
+      "kind": "select",
+      "path": "isolation",
+      "origin": "default",
+      "skip": "nothing_isolated",
+      "value": "isolated",
+      "options": [
+        {
+          "value": "isolated"
+        },
+        {
+          "value": "verbatim"
+        }
+      ],
+      "rememberable": true,
+      "remember": false,
+      "refreshable": false,
+      "closed": true
+    },
+    {
+      "kind": "confirm",
+      "path": "fast_forward",
+      "skip": "not_behind",
+      "value": false,
+      "no_first": false,
+      "rememberable": true,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "mine",
+      "origin": "default",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "review",
+      "origin": "default",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    }
+  ],
+  "problems": []
+}

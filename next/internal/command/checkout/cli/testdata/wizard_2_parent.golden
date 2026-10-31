@@ -1,0 +1,12 @@
+
+  Step 2/8 • Parent branch
+
+  ✓ Pull request: #1
+
+  The parent wtm sync rebases it onto; the branch the pull request merges into by default
+
+▌› main (default)
+   feat/held
+   origin/feat/draft
+
+  ↑↓ navigate • / filter • r refresh • enter confirm • esc back

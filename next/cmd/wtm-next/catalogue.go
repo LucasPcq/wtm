@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/LucasPcq/wtm/next/internal/api"
+	"github.com/LucasPcq/wtm/next/internal/command/checkout"
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
@@ -23,6 +24,7 @@ func catalogue() api.Catalogue {
 	return api.Catalogue{
 		api.Bind(create.Name, openCreate, create.UseCase.Questions, create.UseCase.Run),
 		api.Bind(extract.Name, openExtract, extract.UseCase.Questions, extract.UseCase.Run),
+		api.Bind(checkout.Name, openCheckout, checkout.UseCase.Questions, checkout.UseCase.Run),
 		api.Bind(clean.Name, openClean, clean.UseCase.Questions, clean.UseCase.Run),
 		api.Bind(prune.Name, openPrune, prune.UseCase.Questions, prune.UseCase.Run),
 		api.Bind(fastforward.Name, openFastForward, fastforward.UseCase.Questions, fastforward.UseCase.Run),

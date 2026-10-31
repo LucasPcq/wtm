@@ -1,0 +1,14 @@
+
+  ✓ checkout: 1 done
+
+  Pull request  #3 Local branch behind origin
+  Branch        feat/behind (existing)
+  Parent        main
+  Env           example
+  Isolation     isolated
+  feat/behind   ../acme.trees/feat-behind · 3 ports settled (offset +30)
+
+  ! feat/behind  1 commit(s) behind origin — the worktree starts from your local branch.
+
+  → wtm go feat/behind   jump in
+

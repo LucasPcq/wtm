@@ -1,0 +1,8 @@
+
+  ✓ Checked out PR #1 (feat/remote)
+
+  env   3 ports settled (offset +10)
+  path  <SB>/acme.trees/feat-remote
+
+  → wtm go feat/remote
+

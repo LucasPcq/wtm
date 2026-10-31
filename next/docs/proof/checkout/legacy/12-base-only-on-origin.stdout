@@ -1,0 +1,8 @@
+
+  ✓ Checked out PR #9 (feat/on-release)
+
+  env   3 ports settled (offset +60)
+  path  <SB>/acme.trees/feat-on-release
+
+  → wtm go feat/on-release
+

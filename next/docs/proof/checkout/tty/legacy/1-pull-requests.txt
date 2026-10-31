@@ -1,0 +1,19 @@
+$ wtm checkout --from main; echo EXIT=$?
+
+  Step 1/6 • Select a pull request to checkout
+
+  Linked PRs are disabled — use `wtm go <branch>` to enter them
+
+▌▸ #1     Add the remote feature                    alice
+   #2     Local branch in sync                      me
+   #3     Local branch behind origin                bob
+   #4     Local branch diverged from origin         bob
+   #5     From a fork, on main                      stranger                                linked
+   #6     Branch held by a worktree                 alice                                   linked
+   #7     Branch deleted on origin                  alice
+   #8     Stacked draft on feat/local               me
+   #9     Merging into a branch only origin has     alice
+   #11    Its own parent, asked                     me
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

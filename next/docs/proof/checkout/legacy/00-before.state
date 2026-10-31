@@ -1,0 +1,12 @@
+## branches
+feat/behind origin/feat/behind
+feat/diverged origin/feat/diverged
+feat/held origin/feat/held
+feat/local origin/feat/local
+feat/own origin/feat/own
+main origin/main
+## worktrees
+<SB>/acme
+  refs/heads/main
+<SB>/held
+  refs/heads/feat/held

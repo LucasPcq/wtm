@@ -23,6 +23,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./fast-forward.sh "$wtm" "$next" fast-forward
 ./exec.sh "$wtm" "$next" exec
 ./reparent.sh "$wtm" "$next" reparent
+./checkout.sh "$wtm" "$next" checkout
 ./ui.sh "$next" ui
 other=$(mktemp -d)/wtm-next && (cd ../../.. && go build -ldflags "-X main.version=0.31.0-other" -o "$other" ./next/cmd/wtm-next)
 ./daemon.sh "$wtm" "$next" "$other" daemon
@@ -522,6 +523,39 @@ The reference is the legacy `wtm reparent` of 0.30.1. Its output differs by desi
   - 16: a cycle elsewhere makes legacy refuse every reparent (B2); next moves `feat/x`. 17, moving a member out of the cycle, passes on both; next offers no undo back into it.
   - 19: legacy reparents the base branch's worktree, a record `sync` never reads (B7); next refuses it, `feat/x is the base branch: sync never rebases it` (exit 2).
   - The tty: next's worktrees read with their parent (`feat/b  on feat/a`) in git's order, `raw` not offered (legacy lists it sorted by name, then refuses it, B3); its parent step names what it leaves out and why (`Left out: feat/b (moved), feat/c (under feat/b)`, legacy `Branches that would close a parent cycle are not listed`) and offers `origin/remote-only` without legacy's separator and `remote` badge, as create's source step; its recap gives each worktree its move (`feat/b (feat/a → main)`, B9) and the button names it (`Yes, reparent feat/b`); its outcome is the uniform tally, recap and follow-ups.
+
+# Proof: `wtm checkout` (legacy `flow/checkout`) vs `wtm-next checkout`
+
+The reference is the legacy `wtm checkout` of 0.30.1. Its output differs by design (next speaks the v2 envelope, plans before it acts and refuses a pull request it cannot check out as a field error of `<number>`, exit 2), so the proof compares what each leaves on disk and keeps both outputs side by side.
+
+- `checkout.sh <wtm> <wtm-next> checkout`: two identical sandboxes (the `docs/demos` "acme" project with a bare `origin` and a second clone that pushes to it) and a fake `gh`, signed in unless the sandbox holds `gh.signed-out`, that answers both binaries' `gh pr list` and `gh pr view` from the sandbox's `prs.json`. Its pull requests: 1 `feat/remote` (only origin has it), 2 `feat/local` (local, as origin has it), 3 `feat/behind` (local, a commit behind origin), 4 `feat/diverged` (local, a commit of its own and one of origin's), 5 a fork's `main`, 6 `feat/held` (checked out by a plain `git worktree`), 7 `feat/gone` (deleted on origin), 8 `feat/draft` (a draft into `feat/local`), 9 `feat/on-release` (into `release/1.0`, which only origin has), 10 `feat/merged` (merged), 11 `feat/own` (local). The same scenarios run by each binary; after each, the exit code, stdout, stderr and the state (branches with their upstream, worktrees, every `meta.json`). Paths, op ids, commits, fingerprints and durations are normalised. `checkout/states.diff` holds the differences. Then, in a fresh sandbox per side where origin's `feat/local` moved on since the last fetch, the wizard of `checkout --from main` in tmux at 100×40, pull request 2 picked and its branch kept as it is: `checkout/tty/legacy/` and `checkout/tty/next/`.
+  1. `1 --yes`
+  2. `2 --yes --output json`
+  3. `3 --yes`
+  4. `4 --yes --ff`
+  5. `5 --yes`, a fork
+  6. `6 --yes`, a branch a worktree holds
+  7. `7 --yes`, a branch origin deleted
+  8. `99 --yes`, no such pull request
+  9. `--yes`, no number
+  10. `abc`
+  11. `11 --yes --from feat/own`, the pull request's own branch as its parent
+  12. `9 --yes`
+  13. `10 --yes`, a merged pull request
+  14. `5 --yes --output json`
+  15. `--mine --review --yes`
+  16. `8 --yes`, gh signed out
+  17. `8 --dry-run` (next only)
+  18. `8 --yes`
+- The states are identical but where next fixes a legacy bug. The differences, all approved by the owner:
+  - 5 to 10, 15: next refuses each as an invalid request, exit 2, its problem on `<number>` (`pull request #5 is from a fork: wtm checks out only this repository's branches, …`, naming `gh pr checkout 5`, `branch feat/held of pull request #6 is checked out at <SB>/held` followed by `→ wtm go feat/held   jump in`, `branch feat/gone of pull request #7 is neither local nor on origin`, `<number>: no pull request #99`, `<number> is required`, `<number> must be a pull request number, not abc`) or on `--review` (`--review cannot be given with the filter of your own pull requests: pick one`). Legacy exits 1 for 5, 7, 8, 9 (B7) and 15, where it took `--review` alone (B9), 10 for 6, and dumps gh's command line for 8 (B6). 14 prints the envelope with the field error; legacy prints text on stderr, stdout empty (B8).
+  - 11, legacy bug B1: legacy checks `feat/own` out recording it as its own parent; next refuses `feat/own cannot be its own parent: pass another value to --from` (exit 2). The worktrees legacy makes after it are numbered one further.
+  - 12, Q5: next records the base only origin has as `origin/release/1.0`, as create's sources spell it; legacy records `release/1.0`, a branch the repository does not have (B2).
+  - 13, Q3: both check the merged pull request out; next warns `pull request #10 is merged` (legacy never reads the state, B5).
+  - 16: next refuses with exit 25 (`pull requests unavailable: run gh auth login`, `checkout.github_unavailable`, a precondition), legacy with exit 1.
+  - 17: legacy has no dry run nor fingerprint (exit 2).
+  - The output is the uniform tally, recap and follow-ups: legacy's `Reused your existing local branch` is the `(existing)` mark of the Branch row, a branch kept behind origin is the `!` warning `checkout.behind_origin` (legacy: a plain line, B11), and the plan's warnings come before the step into the worktree.
+  - The tty: next's picker tags the fork `fork` and the branch a worktree holds `worktree exists`, a draft `· draft`; legacy shows the fork named `main` as `linked` (B4). With `--from`, legacy reads origin as last fetched, since no branch list refreshed it, and skips the fast-forward (`source already up to date`) of a branch 1 commit behind (B3); next fetches the pull request's branch before it reads the repository, asks it, titled `Branch update` since it moves the pull request's own branch and not a source (legacy: `Source update`), and, kept, warns of it on the outcome. Next asks two steps more, its filters, shown set by their flag only. A pull request picked that cannot be checked out (a fork's, one a worktree holds) is refused at the recap, `Cannot apply this plan` with its problem and follow-up, where legacy disabled it in the list: the engine's select step does not check its field's problems.
 
 # Proof: `wtm-next ui`, the local web server
 

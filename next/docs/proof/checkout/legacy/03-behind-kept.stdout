@@ -1,0 +1,10 @@
+
+  ✓ Checked out PR #3 (feat/behind)
+
+  env   3 ports settled (offset +30)
+  path  <SB>/acme.trees/feat-behind
+
+  feat/behind is 1 commit(s) behind origin — the worktree starts from your local branch.
+
+  → wtm go feat/behind
+

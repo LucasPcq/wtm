@@ -1,0 +1,3 @@
+
+  ✗ PR #5 is from a fork — wtm doesn't check out fork PRs by design; use `gh pr checkout 5`
+

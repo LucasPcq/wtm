@@ -5,6 +5,7 @@
       "enum": [
         "create",
         "extract",
+        "checkout",
         "clean",
         "prune",
         "fast-forward",
@@ -15,6 +16,383 @@
         "status",
         "tree"
       ]
+    },
+    "checkout.Action": {
+      "description": "How a pull request's branch gets its worktree.",
+      "enum": [
+        "check_out",
+        "resume"
+      ]
+    },
+    "checkout.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "env_ports": {
+          "$ref": "#/$defs/env.Redacted"
+        },
+        "existing_branch": {
+          "type": "boolean"
+        },
+        "metadata": {
+          "$ref": "#/$defs/worktree.Meta"
+        },
+        "origin_ahead": {
+          "type": "integer"
+        },
+        "origin_behind": {
+          "type": "integer"
+        },
+        "origin_state": {
+          "$ref": "#/$defs/worktree.Divergence"
+        },
+        "path": {
+          "type": "string"
+        },
+        "upstream": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "metadata",
+        "existing_branch"
+      ],
+      "type": "object"
+    },
+    "checkout.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/checkout.Action"
+        },
+        "empty": {
+          "type": "boolean"
+        },
+        "env_from": {
+          "$ref": "#/$defs/project.EnvStrategy"
+        },
+        "fast_forward": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "from": {
+          "type": "string"
+        },
+        "isolation": {
+          "$ref": "#/$defs/project.Isolation"
+        },
+        "on_create": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "path": {
+          "type": "string"
+        },
+        "phases": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/domain.Phase"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pull_request": {
+          "$ref": "#/$defs/worktree.PullRequest"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "remember": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "upstream": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pull_request",
+        "path",
+        "action",
+        "phases",
+        "from",
+        "env_from"
+      ],
+      "type": "object"
+    },
+    "checkout.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "checkout"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/checkout.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/checkout.Plan"
+        }
+      }
+    },
+    "checkout.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "pr"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "from"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "env_from"
+              },
+              "values": {
+                "items": {
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "config",
+                    "example",
+                    "main",
+                    "parent"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "isolation"
+              },
+              "values": {
+                "items": {
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "isolated",
+                    "verbatim"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "fast_forward"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "mine"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "review"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "remember"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "env_from",
+                    "isolation",
+                    "fast_forward"
+                  ]
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "ask"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
     },
     "clean.Detail": {
       "additionalProperties": false,
@@ -997,6 +1375,12 @@
         "parent": {
           "type": "string"
         },
+        "problem": {
+          "$ref": "#/$defs/domain.FieldError"
+        },
+        "pull_request": {
+          "$ref": "#/$defs/worktree.PullRequest"
+        },
         "tag": {
           "$ref": "#/$defs/domain.OptionTag"
         },
@@ -1016,7 +1400,8 @@
         "checked_out",
         "remote",
         "current",
-        "main"
+        "main",
+        "fork"
       ]
     },
     "domain.Origin": {
@@ -1025,7 +1410,8 @@
         "request",
         "remembered",
         "config",
-        "default"
+        "default",
+        "pull_request"
       ]
     },
     "domain.Phase": {
@@ -4819,6 +5205,54 @@
       "required": [
         "ahead",
         "behind",
+        "state"
+      ],
+      "type": "object"
+    },
+    "worktree.PullRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "base": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "checks": {
+          "$ref": "#/$defs/worktree.Checks"
+        },
+        "decision": {
+          "type": "string"
+        },
+        "draft": {
+          "type": "boolean"
+        },
+        "fork": {
+          "type": "boolean"
+        },
+        "head": {
+          "type": "string"
+        },
+        "number": {
+          "type": "integer"
+        },
+        "state": {
+          "$ref": "#/$defs/worktree.PullRequestState"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "number",
+        "url",
+        "branch",
         "state"
       ],
       "type": "object"

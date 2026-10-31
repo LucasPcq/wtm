@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -232,4 +233,24 @@ func TestPruneFetchesOriginOnceHoweverOftenItPlans(t *testing.T) {
 
 	assert.Empty(t, again, "origin is fetched once per command")
 	assert.Equal(t, map[string]bool{"feat/done": true}, reopened)
+}
+
+func TestAnAskIsMadeOncePerKeyUnlessInterrupted(t *testing.T) {
+	calls := 0
+	ask := askedOnce(func(ctx context.Context, key int) (int, error) {
+		calls++
+		return key * 2, ctx.Err()
+	})
+	cancelled, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, interrupted := ask(cancelled, 1)
+	first, _ := ask(t.Context(), 1)
+	again, _ := ask(t.Context(), 1)
+	_, _ = ask(t.Context(), 2)
+
+	require.ErrorIs(t, interrupted, context.Canceled)
+	assert.Equal(t, 2, first)
+	assert.Equal(t, 2, again)
+	assert.Equal(t, 3, calls, "1 interrupted, 1 asked once, 2 asked once")
 }

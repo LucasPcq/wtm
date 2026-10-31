@@ -1,0 +1,19 @@
+$ wtm checkout --from main; echo EXIT=$?
+
+  Step 5/8 • Branch update
+
+  ✓ Pull request: #2
+  ✓ Parent branch: main · --from
+  ✓ Env strategy: config default
+  ✓ Isolation: isolated
+
+  Fast-forward the pull request's branch to origin first when it exists locally and is behind
+
+   Fast-forward feat/local to origin
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+▌› Keep it as-is
+
+   [ ] Always use this answer in this repo
+
+  ↑↓ navigate • tab always use • / filter • enter confirm • esc back
+
