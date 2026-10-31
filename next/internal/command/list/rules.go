@@ -70,6 +70,7 @@ type Detail struct {
 	Services  []string           `json:"services"`  // the jobs up in it, null when that cannot be told
 	URLs      []string           `json:"urls"`      // the addresses of the jobs up in it, null when that cannot be told
 	Jobs      []Job              `json:"jobs"`      // every job the run daemon holds in it, by name, null when that cannot be told
+	Profile   string             `json:"profile"`   // the profile the jobs it runs for itself were started under, empty when they say none
 	// Actions are every action of it, each the follow-up that carries it out or why it is not offered.
 	Actions []repository.Offer   `json:"actions"`
 	Record  worktree.RecordState `json:"-"` // its meta record, as its actions say what follows from it
@@ -81,7 +82,7 @@ type Detail struct {
 type Job struct {
 	Name      string          `json:"name"`
 	Kind      project.JobKind `json:"kind"`
-	State     run.State       `json:"state"`
+	State     run.State       `json:"state,omitempty"` // none for a claim: the job it holds runs in another worktree
 	Hold      run.Hold        `json:"hold"`
 	Profile   string          `json:"profile,omitempty"`
 	URL       string          `json:"url,omitempty"`
@@ -169,6 +170,7 @@ func (f Facts) item(w worktree.Worktree, active bool) Item {
 		Services:     f.Services(w.Path),
 		URLs:         f.URLs(w.Path),
 		Jobs:         f.jobs(w.Path),
+		Profile:      run.ProfileIn(f.Asked.Jobs, w.Path),
 		base:         w.Branch() != "" && w.Branch() == f.Config.Worktrees.BaseBranch,
 		Record:       worktree.RecordOf(f.Records, f.RecordErrs, w.Branch()),
 	}

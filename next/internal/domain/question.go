@@ -75,7 +75,9 @@ type Option struct {
 	PR        *worktree.PullRequest `json:"pull_request,omitempty"` // the pull request it is
 	Default   bool                  `json:"default,omitempty"`      // a profile run.toml marks as the one to start
 	Jobs      []string              `json:"jobs,omitempty"`         // a profile's jobs, in the order they start
-	Up        []string              `json:"up,omitempty"`           // the jobs up in a worktree, sorted
+	Up        []string              `json:"up,omitempty"`           // the jobs a worktree runs for itself that are up, sorted: neither its claims nor the shared services it runs for every worktree
+	Crashed   int                   `json:"crashed,omitempty"`      // the jobs a worktree runs for itself that crashed
+	Holds     []string              `json:"holds,omitempty"`        // the shared services a worktree runs for every worktree, up, sorted
 	Profile   string                `json:"profile,omitempty"`      // the profile a worktree's jobs up were started under, empty when they say none
 	RunningIn []string              `json:"running_in,omitempty"`   // the worktrees picked whose jobs up a profile started
 	Problem   *FieldError           `json:"problem,omitempty"`      // the problem picking it raises, nil when it raises none
