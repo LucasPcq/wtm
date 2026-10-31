@@ -241,5 +241,6 @@ func TestARestartUnderQuietSaysNothingOfWhatItDid(t *testing.T) {
 	require.NoError(t, restartDaemon(t.Context(), params))
 
 	assert.Empty(t, r.out.String())
+	assert.Empty(t, r.said.String(), "nothing is asked: nothing is said")
 	assert.Equal(t, 1, r.shutdowns)
 }
