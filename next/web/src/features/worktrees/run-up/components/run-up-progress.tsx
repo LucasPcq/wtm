@@ -61,8 +61,8 @@ export function RunUpProgress({
   })
 
   const description = () => {
-    if (running && progress.cancelling) return `Cancelling · ${done} of ${total} up`
-    if (running) return `Starting ${ran.profile} ${where(ran.worktrees)} · ${done} of ${total} up`
+    if (running && progress.cancelling) return `Cancelling · ${done} of ${total} started`
+    if (running) return `Starting ${ran.profile} ${where(ran.worktrees)} · ${done} of ${total} started`
     if (items.length === 0) return 'Nothing started.'
     if (cancelled) return 'Cancelled: what started keeps running.'
     if (failed > 0) return `${ran.profile} didn't start in ${failed} of ${items.length}.`

@@ -31,15 +31,20 @@ export function groupsOf({
     plan?.worktrees?.find((target) => target.worktree === worktree)?.jobs?.find((job) => job.name === name)
 
   return read.items.flatMap(({ subject, detail }) => {
-    const jobs = (detail?.jobs ?? [])
-      .filter((job) => job.hold !== 'claim')
-      .toSorted((a, b) => order[a.state] - order[b.state])
+    const listed = (detail?.jobs ?? []).filter((job) => job.hold !== 'claim')
     const unit = progress?.units.find((one) => one.subject === subject)
+    // a job of the start says where it stands until the read lists it as that start left it: not yet brought up, or
+    // listed stopped from a run before
     const coming = (unit?.phases ?? []).flatMap((run) => {
       const job = run.job && planOf(subject, run.job)
-      if (!run.job || !job || job.action === 'join' || jobs.some((listed) => listed.name === run.job)) return []
-      return [{ name: run.job, said: underWay(run, job, progress?.cancelling !== undefined) }]
+      if (!run.job || !job || job.action === 'join') return []
+      const now = listed.find((one) => one.name === run.job)
+      const stale = !now || now.state === 'stopped' || run.state === 'todo' || run.state === 'now'
+      return stale ? [{ name: run.job, said: underWay(run, job, progress?.cancelling !== undefined) }] : []
     })
+    const jobs = listed
+      .filter((job) => !coming.some((row) => row.name === job.name))
+      .toSorted((a, b) => order[a.state] - order[b.state])
     if (jobs.length === 0 && coming.length === 0) return []
 
     return [

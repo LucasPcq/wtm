@@ -60,12 +60,18 @@ export function underWay(run: PhaseRun, job: RunupJobPlan | undefined, cancellin
 export const where = (worktrees: string[]) =>
   worktrees.length === 1 ? `in ${worktrees[0]}` : `in ${worktrees.length} worktrees`
 
+// what the start's jobs became, counted: the services up, the shared ones joined, the tasks done
 export function startedWords(profile: string, envelope: Applied<'run-up'> | undefined) {
   const items = envelope?.items ?? []
   const jobs = items.flatMap((item) => item.detail?.jobs ?? [])
-  const up = jobs.filter((job) => job.status === 'started' || job.status === 'already_running').length
+  const count = (statuses: RunupJobStatus[]) => jobs.filter((job) => statuses.includes(job.status)).length
+  const said = [
+    [count(['started', 'already_running']), 'up'],
+    [count(['joined']), 'joined'],
+    [count(['done']), 'done'],
+  ] as const
   return {
     title: `${profile} started ${where(items.map((item) => item.subject))}`,
-    description: `${up} up${jobs.some((job) => job.status === 'joined') ? ' · shared services joined' : ''}`,
+    description: said.flatMap(([n, word]) => (n > 0 ? [`${n} ${word}`] : [])).join(' · '),
   }
 }

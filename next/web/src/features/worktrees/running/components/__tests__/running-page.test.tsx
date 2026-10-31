@@ -110,7 +110,7 @@ test('hidden while it starts, the run goes on in a toast that opens it again, th
   const start = await within(dialog).findByRole('button', { name: 'Start dev' })
   await waitFor(() => expect(start.getAttribute('aria-disabled')).toBe('false'))
   await user.click(start)
-  expect(await within(dialog).findByText('Starting dev in feat/search · 0 of 4 up')).toBeDefined()
+  expect(await within(dialog).findByText('Starting dev in feat/search · 0 of 4 started')).toBeDefined()
   await user.click(within(dialog).getByRole('button', { name: 'Hide' }))
 
   expect(await screen.findByText('Starting dev in feat/search')).toBeDefined()
@@ -135,4 +135,16 @@ test("a job that fails ends the worktree's start, said with its lines, and what 
 
   expect(await within(dialog).findByText("dev didn't start in 1 of 1.")).toBeDefined()
   expect(within(dialog).getByText('migrate failed: exit 1')).toBeDefined()
+})
+
+// From a worktree's menu, Confirm offered to start dev in a worktree that ran dev already.
+test('a worktree that runs the default profile already is asked which profile to start', async () => {
+  const { user } = await renderApp('/r/r1/worktrees')
+
+  await user.click(await screen.findByRole('button', { name: 'Actions on feat/billing' }))
+  await user.click(await screen.findByRole('menuitem', { name: 'Start a profile' }))
+
+  const dialog = await screen.findByRole('dialog', { name: 'Start a profile' })
+  expect(await within(dialog).findByText('dev', { selector: 'label' })).toBeDefined()
+  expect(within(dialog).getByText(/already running in feat\/billing/)).toBeDefined()
 })

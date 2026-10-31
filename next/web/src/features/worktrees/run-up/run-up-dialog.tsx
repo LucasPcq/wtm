@@ -92,5 +92,5 @@ function HiddenProgress({ repo }: { repo: string }) {
   const { progress } = useRun(repo, 'run-up')
   if (!progress) return null
   const { done, total } = doneOf(progress)
-  return `${done} of ${total} up`
+  return `${done} of ${total} started`
 }

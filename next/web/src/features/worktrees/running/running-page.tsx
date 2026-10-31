@@ -23,7 +23,9 @@ export function RunningPage({ repo }: { repo: string }) {
   const plan = useRunUpDialog((dialog) => dialog.ran.plan)
   const now = useQuery({ queryKey: ['now'], queryFn: () => Date.now(), refetchInterval: clockEvery }).data ?? 0
 
-  const groups = list.data ? groupsOf({ read: list.data, progress: running ? progress : undefined, plan }) : []
+  // past its end, a start's progress holds until the read after it lands: its groups would vanish in between
+  const overlay = running || list.isFetching ? progress : undefined
+  const groups = list.data ? groupsOf({ read: list.data, progress: overlay, plan }) : []
   const up = groups.reduce((count, group) => count + group.counts.running, 0)
   const crashed = groups.reduce((count, group) => count + group.counts.crashed, 0)
 
