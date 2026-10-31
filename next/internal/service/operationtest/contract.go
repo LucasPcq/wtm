@@ -145,7 +145,7 @@ func unfinished(events []domain.Event) []string {
 			open = append(open, fmt.Sprintf("phase %s of %s", e.Phase, e.Subject))
 		case domain.PhaseFinished:
 			open = finish(open, fmt.Sprintf("phase %s of %s", e.Phase, e.Subject))
-		case domain.Output, domain.WorktreeCreated, domain.WorktreeUpdated, domain.WorktreeChanged, domain.WorktreeProvisioned, domain.WorktreeRemoved, domain.OperationStarted, domain.OperationFinished, domain.Snapshot, domain.Ready, domain.RepoAdded, domain.RepoRemoved:
+		case domain.Output, domain.WorktreeCreated, domain.WorktreeUpdated, domain.WorktreeChanged, domain.WorktreeProvisioned, domain.WorktreeRemoved, domain.OperationStarted, domain.OperationFinished, domain.Snapshot, domain.Ready, domain.RepoAdded, domain.RepoRemoved, domain.JobStarted, domain.JobStopped, domain.JobCrashed, domain.JobExited:
 		}
 	}
 	return open

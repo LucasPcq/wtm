@@ -6,6 +6,7 @@ import (
 	"net"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -67,6 +68,27 @@ func TestTheDaemonIdlesOutWithNoSubscriberAndNoRequest(t *testing.T) {
 		require.FailNow(t, "the daemon did not idle out")
 	}
 	assert.NoFileExists(t, socket)
+}
+
+func TestADaemonBusyNeverIdlesOutAndStopsWhatItHostsBeforeItEnds(t *testing.T) {
+	socket := filepath.Join(socketDir(t), "wtm.sock")
+	var busy, stopped, ready atomic.Bool
+	busy.Store(true)
+
+	served := startServe(t.Context(), ServeParams{SocketPath: socket, Idle: 50 * time.Millisecond, Busy: busy.Load, Ready: func() { ready.Store(true) }, Stopping: func() { stopped.Store(true) }})
+	require.Eventually(t, Bus{SocketPath: socket}.answers, 2*time.Second, 10*time.Millisecond)
+	time.Sleep(300 * time.Millisecond)
+
+	require.True(t, ready.Load())
+	require.Empty(t, served, "the daemon idled out while busy")
+	busy.Store(false)
+	select {
+	case err := <-served:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "the daemon did not idle out once no longer busy")
+	}
+	assert.True(t, stopped.Load(), "what it hosts was not stopped")
 }
 
 func TestASubscriberKeepsTheDaemonUp(t *testing.T) {

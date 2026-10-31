@@ -1,0 +1,25 @@
+
+  ! job "db" declares stop, so its cmd is a launcher wtm waits on until it exits (like `docker compose up -d`) — if it keeps running, drop stop to run it in the foreground
+
+
+  Profile all
+
+  › [1/3] db
+db launched
+  ✓ db started
+
+  › [2/3] api
+  ✓ api started · http://api.main.acme.localhost:<PROXY_PORT>
+
+  › [3/3] web
+  ✓ web started · http://web.main.acme.localhost:<PROXY_PORT>
+
+  Where to reach it
+    api  http://api.main.acme.localhost:<PROXY_PORT>
+    web  http://web.main.acme.localhost:<PROXY_PORT>
+
+  ! main's .env still spells ports — `wtm env main --addressing names` aligns it
+
+  → wtm run logs   attach to the output
+  → wtm run down   stop the jobs
+

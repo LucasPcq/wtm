@@ -36,7 +36,7 @@ func TestEveryLineThePublisherWritesMatchesTheSchema(t *testing.T) {
 
 // Legacy v1 listed its types in a oneOf: a type it did not know failed the whole line.
 func TestALineOfATypeTheSchemaDoesNotListIsValidAgainstTheEnvelope(t *testing.T) {
-	assert.NoError(t, validates(t, schemaV2(t), `{"v":2,"type":"job.started","ts":"2026-10-16T12:00:00Z","repo":{"root":"/repo","common_dir":"/repo/.git"},"job":{"name":"web"}}`))
+	assert.NoError(t, validates(t, schemaV2(t), `{"v":2,"type":"job.restarted","ts":"2026-10-16T12:00:00Z","repo":{"root":"/repo","common_dir":"/repo/.git"},"job":{"name":"web"}}`))
 }
 
 func TestTheSchemaRefusesWhatTheContractForbids(t *testing.T) {

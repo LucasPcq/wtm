@@ -110,7 +110,7 @@ func (p *progress) Report(event domain.Event) {
 		p.running = slices.DeleteFunc(p.running, func(subject string) bool { return subject == e.Subject })
 		p.finished(e)
 		p.paint()
-	case domain.Output, domain.PhaseStarted, domain.PhaseFinished, domain.WorktreeCreated, domain.WorktreeUpdated, domain.WorktreeChanged, domain.WorktreeProvisioned, domain.WorktreeRemoved, domain.OperationStarted, domain.OperationFinished, domain.Snapshot, domain.Ready, domain.RepoAdded, domain.RepoRemoved:
+	case domain.Output, domain.PhaseStarted, domain.PhaseFinished, domain.WorktreeCreated, domain.WorktreeUpdated, domain.WorktreeChanged, domain.WorktreeProvisioned, domain.WorktreeRemoved, domain.OperationStarted, domain.OperationFinished, domain.Snapshot, domain.Ready, domain.RepoAdded, domain.RepoRemoved, domain.JobStarted, domain.JobStopped, domain.JobCrashed, domain.JobExited:
 	}
 }
 

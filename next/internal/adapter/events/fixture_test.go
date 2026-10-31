@@ -22,6 +22,7 @@ func fixedNow() time.Time {
 func carried() []domain.Event {
 	numbered := identity()
 	numbered.Ordinal = new(2)
+	job := domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/a", Path: "/repo/.trees/feat-a"}, Job: domain.EventJob{Name: "db", Kind: project.Service, Detached: true}}
 	return []domain.Event{
 		domain.Snapshot{Worktrees: []worktree.Identity{identity()}},
 		domain.Ready{},
@@ -35,5 +36,9 @@ func carried() []domain.Event {
 		domain.OperationStarted{Command: "create", Surface: "cli"},
 		domain.UnitFinished{Subject: "feat/a", Status: domain.StatusDone},
 		domain.OperationFinished{Command: "create", Surface: "cli", Code: "unit.phase_failed"},
+		domain.JobStarted{JobChange: job},
+		domain.JobStopped{JobChange: job},
+		domain.JobCrashed{JobChange: domain.JobChange{Worktree: job.Worktree, Job: job.Job, ExitCode: new(-1), LastLines: []string{"listen EADDRINUSE"}}},
+		domain.JobExited{JobChange: domain.JobChange{Worktree: job.Worktree, Job: domain.EventJob{Name: "migrate", Kind: project.Task}, ExitCode: new(0)}},
 	}
 }

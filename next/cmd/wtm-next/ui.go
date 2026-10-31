@@ -80,7 +80,7 @@ func uiCmd(env cli.Env) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return shell.Detached(browser(), []string{launch}, os.Environ())
+		return shell.Detached(shell.DetachedParams{Name: browser(), Args: []string{launch}, Env: os.Environ()})
 	}
 	cmd.AddCommand(serveCmd())
 	return cmd
@@ -297,7 +297,7 @@ func startServer(idle time.Duration) error {
 		return err
 	}
 
-	return shell.Detached(exe, []string{uiCommand, serveCommand, "--" + flagIdle, idle.String()}, shell.Environ([]string{cli.CorrelationIDEnv}, nil))
+	return shell.Detached(shell.DetachedParams{Name: exe, Args: []string{uiCommand, serveCommand, "--" + flagIdle, idle.String()}, Env: shell.Environ([]string{cli.CorrelationIDEnv}, nil)})
 }
 
 // listen listens on the loopback at webPort, or at a port the system picks when it is taken.

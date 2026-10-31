@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
@@ -816,4 +817,27 @@ func stringsOf(values any) []string {
 		found[i] = slice.Index(i).String()
 	}
 	return found
+}
+
+// servingDaemon runs the daemon, the run daemon and the bus, on a new socket in a short directory until the test ends, and returns its socket.
+func servingDaemon(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "wtm-next")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	socket := filepath.Join(dir, "wtm.sock")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	served := make(chan error, 1)
+	go func() { served <- serveDaemon(ctx, socket) }()
+	t.Cleanup(func() {
+		cancel()
+		<-served
+	})
+	require.Eventually(t, func() bool {
+		_, err := daemon.Daemon{SocketPath: socket}.Jobs(context.Background())
+		_, statErr := os.Stat(socket)
+		return err == nil && statErr == nil
+	}, 5*time.Second, 10*time.Millisecond)
+	return socket
 }

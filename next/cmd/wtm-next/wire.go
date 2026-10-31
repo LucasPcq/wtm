@@ -4,15 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
-	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
@@ -48,7 +45,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/registry"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/LucasPcq/wtm/next/internal/service/teardown"
-	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
 
 const opIDBytes = 8
@@ -90,7 +86,7 @@ func wire(params wireParams) app {
 	}
 
 	meta := store.Meta{StateDir: params.StateDir}
-	jobs := daemon.Daemon{SocketPath: bus.SocketPath()}.Jobs
+	jobs := runDaemon().Jobs
 	gh := github.GitHub{Dir: params.MainPath}
 
 	provisions := provision.Service{
@@ -369,7 +365,7 @@ func eventStream(params streamParams) events.UseCase {
 		Bus:      bus.Bus{SocketPath: params.Socket, Start: params.Start},
 		Registry: knownRepos(params.Registry, params.Socket),
 		Open:     openEvents,
-		Jobs:     daemon.Daemon{SocketPath: params.Socket}.Jobs,
+		Jobs:     daemon.Daemon{SocketPath: params.Socket, Version: version}.Jobs,
 		Now:      time.Now,
 	}
 }
@@ -389,26 +385,4 @@ func knownRepos(path, socket string) registry.Service {
 		Moved:       func() bool { return movedState() != "" },
 		Initialized: func(repo domain.Repo) bool { return config.Project{StateDir: stateDir(repo.CommonDir)}.Initialized() },
 	}
-}
-
-// daemonCommand is the command line that runs the bus's daemon in a process of its own.
-const daemonCommand = "daemon"
-
-// daemonIdle is how long the daemon waits with no subscriber and no request before it stops.
-const daemonIdle = 30 * time.Second
-
-// errDaemonInTest refuses to start a daemon from a test: the executable is the test binary, which would run the whole suite again as "daemon".
-var errDaemonInTest = errors.New("no event bus is started from a test")
-
-// startDaemon starts this binary's daemon in a session of its own, with this process's environment but its correlation ID, which belongs to the one command that started it.
-func startDaemon() error {
-	if testing.Testing() {
-		return errDaemonInTest
-	}
-	exe, err := os.Executable()
-	if err != nil {
-		return err
-	}
-
-	return shell.Detached(exe, []string{daemonCommand}, shell.Environ([]string{cli.CorrelationIDEnv}, nil))
 }

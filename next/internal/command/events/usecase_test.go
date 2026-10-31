@@ -106,7 +106,7 @@ func TestALineOfATypeThisWtmDoesNotKnowIsRelayedAsItCame(t *testing.T) {
 	sub := bus.subscribed(t)
 	r.nextType(t)
 	r.nextType(t)
-	job := `{"v":2,"type":"job.started","ts":"t","repo":{"root":"/repo","common_dir":"/repo/.git"},"job":{"name":"web"}}`
+	job := `{"v":2,"type":"job.restarted","ts":"t","repo":{"root":"/repo","common_dir":"/repo/.git"},"job":{"name":"web"}}`
 
 	sub.Lines <- []byte(job)
 

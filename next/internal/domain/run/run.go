@@ -9,7 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
-// A Job is one job the daemon knows: its name, the worktree it runs in, whether it is up (running, detached or joined), its kind, its State (empty for a Claim, which runs no process), whether it is a Claim a worktree holds on a shared job another worktree runs, its url, the code its process exited with (-1 when a signal killed it), when the daemon started it, and the main checkout a shared job runs in.
+// A Job is one job the daemon knows: its name, the worktree it runs in, whether it is up (running, detached or joined), its kind, its State (empty for a Claim, which runs no process), whether it is a Claim a worktree holds on a shared job another worktree runs, whether it is Detached (a stack its launcher left, no process of the daemon's), whether the daemon Reaped it (an orphan stopped as it started), the PID of a foreground service, its url, the ports it binds, the code its process exited with (-1 when a signal killed it), when the daemon started it (zero once it is no longer up), and the main checkout a shared job runs in.
 type Job struct {
 	Name      string
 	WorkDir   string
@@ -17,7 +17,11 @@ type Job struct {
 	Kind      project.JobKind
 	State     State
 	Claim     bool
+	Detached  bool
+	Reaped    bool
+	PID       int
 	URL       string
+	Ports     map[string]int
 	ExitCode  *int
 	StartedAt time.Time
 	SharedDir string

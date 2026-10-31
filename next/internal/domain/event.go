@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
@@ -151,6 +152,44 @@ func (Snapshot) event()            {}
 func (Ready) event()               {}
 func (RepoAdded) event()           {}
 func (RepoRemoved) event()         {}
+func (JobStarted) event()          {}
+func (JobStopped) event()          {}
+func (JobCrashed) event()          {}
+func (JobExited) event()           {}
+
+// JobChange is what a job event says: the worktree the job runs in (its branch and path: the run daemon reads no more of it), the job, and, for one that ended, its exit code and the last lines it printed.
+type JobChange struct {
+	Worktree  JobWorktree `json:"worktree"`
+	Job       EventJob    `json:"job"`
+	ExitCode  *int        `json:"exit_code,omitempty"`
+	LastLines []string    `json:"last_lines,omitempty"`
+}
+
+// JobWorktree is the worktree a job event is about, as its client named it to the run daemon.
+type JobWorktree struct {
+	Branch string `json:"branch"`
+	Path   string `json:"path"`
+}
+
+// EventJob is the job a job event is about: its name, its kind, its URL, and whether it is detached (a stack its launcher left running).
+type EventJob struct {
+	Name     string          `json:"name"`
+	Kind     project.JobKind `json:"kind"`
+	URL      string          `json:"url,omitempty"`
+	Detached bool            `json:"detached,omitempty"`
+}
+
+// JobStarted reports that the run daemon started a job: a foreground service is up, a detached launcher left its stack running, a task began.
+type JobStarted struct{ JobChange }
+
+// JobStopped reports that a job stopped because a client asked.
+type JobStopped struct{ JobChange }
+
+// JobCrashed reports that a service ended on its own, or a task failed, with its exit code (-1 for a signal) and its last lines.
+type JobCrashed struct{ JobChange }
+
+// JobExited reports that a task ran to its end with exit code 0.
+type JobExited struct{ JobChange }
 
 // Report receives the events of an operation as they happen.
 type Report func(Event)
@@ -173,6 +212,10 @@ const (
 	EventReady               = "ready"
 	EventRepoAdded           = "repo.added"
 	EventRepoRemoved         = "repo.removed"
+	EventJobStarted          = "job.started"
+	EventJobStopped          = "job.stopped"
+	EventJobCrashed          = "job.crashed"
+	EventJobExited           = "job.exited"
 )
 
 // EventType returns the type of event on the wire.
@@ -210,6 +253,14 @@ func EventType(event Event) string {
 		return EventRepoAdded
 	case RepoRemoved:
 		return EventRepoRemoved
+	case JobStarted:
+		return EventJobStarted
+	case JobStopped:
+		return EventJobStopped
+	case JobCrashed:
+		return EventJobCrashed
+	case JobExited:
+		return EventJobExited
 	}
 	return ""
 }
@@ -236,6 +287,10 @@ var eventDecoders = map[string]func([]byte) (Event, error){
 	EventReady:               decodeEvent[Ready],
 	EventRepoAdded:           decodeEvent[RepoAdded],
 	EventRepoRemoved:         decodeEvent[RepoRemoved],
+	EventJobStarted:          decodeEvent[JobStarted],
+	EventJobStopped:          decodeEvent[JobStopped],
+	EventJobCrashed:          decodeEvent[JobCrashed],
+	EventJobExited:           decodeEvent[JobExited],
 }
 
 // ErrUnknownEventType is the error of an event whose type this wtm does not know: a newer wtm's, which a reader ignores.

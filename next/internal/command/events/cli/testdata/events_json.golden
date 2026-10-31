@@ -8,4 +8,8 @@
 {"v":2,"type":"worktree.provisioned","ts":"2026-10-16T12:00:01Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"op_id":"op-1","worktree":{"branch":"feat/b","path":"/code/.trees/feat-b","parent":"main","ordinal":2,"isolation":"isolated","is_main":false,"created_at":"2026-10-16T12:00:00Z"},"ok":false,"hook":"make setup","exit_code":2}
 {"v":2,"type":"unit.finished","ts":"2026-10-16T12:00:01Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"op_id":"op-1","subject":"feat/b","status":"done"}
 {"v":2,"type":"operation.finished","ts":"2026-10-16T12:00:01Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"op_id":"op-1","command":"create","surface":"cli","ok":true}
-{"v":2,"type":"job.started","ts":"2026-10-16T12:00:02Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"job":{"name":"web"}}
+{"v":2,"type":"job.started","ts":"2026-10-16T12:00:01Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"op_id":"op-1","worktree":{"branch":"feat/b","path":"/code/.trees/feat-b"},"job":{"name":"web","kind":"service"}}
+{"v":2,"type":"job.crashed","ts":"2026-10-16T12:00:01Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"op_id":"op-1","worktree":{"branch":"feat/b","path":"/code/.trees/feat-b"},"job":{"name":"web","kind":"service"},"exit_code":1,"last_lines":["listen EADDRINUSE"]}
+{"v":2,"type":"job.stopped","ts":"2026-10-16T12:00:01Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"op_id":"op-1","worktree":{"branch":"feat/b","path":"/code/.trees/feat-b"},"job":{"name":"web","kind":"service"}}
+{"v":2,"type":"job.exited","ts":"2026-10-16T12:00:01Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"op_id":"op-1","worktree":{"branch":"feat/b","path":"/code/.trees/feat-b"},"job":{"name":"migrate","kind":"task"},"exit_code":0}
+{"v":2,"type":"job.restarted","ts":"2026-10-16T12:00:02Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"job":{"name":"web"}}
