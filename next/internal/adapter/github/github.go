@@ -191,13 +191,18 @@ func (g GitHub) run(ctx context.Context, binary, what string, args ...string) ([
 		return nil, ctx.Err()
 	}
 	switch {
-	case err != nil && strings.Contains(stderr.String(), "none of the git remotes configured for this repository point to a known GitHub host"):
+	case err != nil && notOnGitHub(stderr.String()):
 		return out, fmt.Errorf("%w: origin is not a GitHub repository", worktree.ErrPullRequestsUnavailable)
 	case err != nil:
 		return out, fmt.Errorf("%w: %s: %w: %s", worktree.ErrPullRequestsUnavailable, what, err, strings.TrimSpace(stderr.String()))
 	}
 
 	return out, nil
+}
+
+// notOnGitHub reports whether gh's stderr says the repository has no remote on GitHub: none at all, or none it knows the host of.
+func notOnGitHub(stderr string) bool {
+	return strings.Contains(stderr, "no git remotes found") || strings.Contains(stderr, "none of the git remotes configured for this repository point to a known GitHub host")
 }
 
 // prFields are the fields read of each pull request: the last commit's check runs and statuses come counted by state, which costs one context node.

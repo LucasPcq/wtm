@@ -4,6 +4,6 @@
   Branch        feat/remote (resumes origin/feat/remote)
   Parent        main
   Env           example
-  fingerprint  65c2877280daee80a2c0865e
-  → wtm-next checkout 1 --expect-fingerprint 65c2877280daee80a2c0865e   apply this plan
+  fingerprint  374104d08efd55580922bf5a
+  → wtm-next checkout 1 --expect-fingerprint 374104d08efd55580922bf5a   apply this plan
 

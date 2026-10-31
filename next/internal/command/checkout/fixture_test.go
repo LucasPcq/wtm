@@ -34,11 +34,14 @@ const (
 	prOnBase   = 8  // feat/remote, merging into release, a branch only origin has
 	prFresh    = 9  // feat/fresh: local, origin moved on since the last fetch
 	prMerged   = 10 // feat/remote, merged
+	prDeleted  = 11 // feat/deleted: fetched, then deleted on origin, its remote-tracking branch left
+	prStale    = 12 // feat/stale: local, fetched behind origin, then deleted on origin
 	prNone     = 99 // none
 )
 
 const (
 	mainEnv     = "PORT=3000\n"
+	jobsToml    = "[[job]]\nname = \"web\"\nkind = \"service\"\ncmd = \"npm start\"\nports = { PORT = 3000 }\n\n[[env_port]]\nfile = \".env\"\nkey = \"PORT\"\njob = \"web\"\nport = \"PORT\"\n"
 	projectToml = "[worktrees]\nbase_path = \"../.trees\"\nbase_branch = \"main\"\n\n[env]\nstrategy = \"main\"\n\n[[env.file]]\ntarget = \".env\"\n\n[hooks]\non_create = []\n"
 )
 
@@ -63,6 +66,8 @@ func pullRequests() []worktree.PullRequest {
 		open(prOnBase, "feat/remote", "release"),
 		open(prFresh, "feat/fresh", "main"),
 		merged,
+		open(prDeleted, "feat/deleted", "main"),
+		open(prStale, "feat/stale", "main"),
 	}
 }
 
@@ -83,8 +88,9 @@ func newWorld(t *testing.T) world {
 	repo := gittest.Build(t, gittest.FakeParams{
 		Main:      main,
 		Branch:    "main",
-		Local:     []string{"feat/local", "feat/behind", "feat/diverged", "feat/fresh"},
-		Remote:    []string{"main", "feat/remote", "feat/local", "feat/behind", "feat/diverged", "feat/held", "release"},
+		Local:     []string{"feat/local", "feat/behind", "feat/diverged", "feat/fresh", "feat/stale"},
+		Remote:    []string{"main", "feat/remote", "feat/local", "feat/behind", "feat/diverged", "feat/held", "release", "feat/deleted", "feat/stale"},
+		Deleted:   []string{"feat/deleted", "feat/stale"},
 		Worktrees: []worktree.Worktree{{Path: filepath.Join(root, "wt-held"), State: worktree.OnBranch{Branch: "feat/held"}}},
 		Commits: map[worktree.Ref][]string{
 			worktree.RemoteBranch{Name: "feat/remote"}:   {"remote work"},
@@ -93,6 +99,8 @@ func newWorld(t *testing.T) world {
 			worktree.LocalBranch{Name: "feat/diverged"}:  {"diverged work", "local only"},
 			worktree.RemoteBranch{Name: "feat/diverged"}: {"diverged work", "origin only"},
 			worktree.LocalBranch{Name: "feat/fresh"}:     {"fresh work"},
+			worktree.LocalBranch{Name: "feat/stale"}:     {"stale work"},
+			worktree.RemoteBranch{Name: "feat/stale"}:    {"stale work", "merged since"},
 		},
 		Origin: map[string][]string{"feat/fresh": {"fresh work", "pushed after the fetch"}},
 	})

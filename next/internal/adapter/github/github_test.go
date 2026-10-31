@@ -240,4 +240,6 @@ func TestAPullRequestGHCannotReadSaysWhy(t *testing.T) {
 	assert.EqualError(t, signedOutErr, "pull requests unavailable: run `gh auth login`")
 	assert.EqualError(t, listErr, "pull requests unavailable: run `gh auth login`")
 	assert.EqualError(t, noForgeErr, "pull requests unavailable: origin is not a GitHub repository")
+	_, noRemoteErr := github.GitHub{Dir: t.TempDir(), Binary: refusingGH(t, "no git remotes found")}.OpenPullRequests(t.Context(), worktree.AllPullRequests)
+	assert.EqualError(t, noRemoteErr, "pull requests unavailable: origin is not a GitHub repository")
 }

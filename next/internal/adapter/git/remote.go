@@ -2,6 +2,8 @@ package git
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -80,9 +82,14 @@ func (r Repo) Gone(ctx context.Context) (map[string]bool, error) {
 
 // FetchRef fetches the branch name from the remote, updating its remote-tracking
 // branch only. Branches are named in full so a tag of the same name, or a
-// branch named tags/..., is never fetched instead.
+// branch named tags/..., is never fetched instead. A branch the remote no longer
+// has wraps worktree.ErrNoRemoteBranch.
 func (r Repo) FetchRef(ctx context.Context, name string) error {
 	_, err := r.git(ctx, "fetch", origin, "--", headsPrefix+name)
+	if failed, ok := errors.AsType[*Error](err); ok && strings.Contains(failed.Stderr, "couldn't find remote ref") {
+		return fmt.Errorf("%w: %s: %w", worktree.ErrNoRemoteBranch, name, err)
+	}
+
 	return err
 }
 

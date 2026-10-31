@@ -63,7 +63,7 @@ func TestTheOpenPullRequestsAreTheOptionsAForkOrOneCheckedOutTagged(t *testing.T
 		require.NotNil(t, option.PR)
 		tags[option.Value] = option.Tag
 	}
-	assert.Len(t, options, 9, "a merged pull request is no option")
+	assert.Len(t, options, 11, "a merged pull request is no option")
 	assert.Equal(t, domain.TagFork, tags["5"], "a fork named like a branch a worktree holds is a fork first")
 	assert.Equal(t, domain.TagCheckedOut, tags["6"])
 	assert.Empty(t, tags["1"])

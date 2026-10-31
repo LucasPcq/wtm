@@ -78,7 +78,7 @@ prepare() {
   git push -q origin main:release/1.0
   git clone -q "$root/origin.git" "$root/other"
   local branch
-  for branch in remote local behind diverged held gone draft on-release merged own; do
+  for branch in remote local behind diverged held gone draft on-release merged own auto-deleted; do
     git -C "$root/other" checkout -q -b "feat/$branch" main
     commit "$root/other" "$branch"
     git -C "$root/other" push -q origin "feat/$branch"
@@ -94,6 +94,8 @@ prepare() {
   git worktree add -q "$root/held" feat/held
   git push -q origin --delete feat/gone
   git fetch -q --prune origin
+  # merged and deleted on origin since the last fetch, which kept its remote-tracking branch: no prune since
+  git -C "$root/other" push -q origin --delete feat/auto-deleted
   {
     echo "["
     pr 1 "Add the remote feature" alice feat/remote main false false && echo ","
@@ -106,7 +108,8 @@ prepare() {
     pr 8 "Stacked draft on feat/local" me feat/draft feat/local false true && echo ","
     pr 9 "Merging into a branch only origin has" alice feat/on-release release/1.0 false false && echo ","
     pr 10 "Merged already" alice feat/merged main false false MERGED && echo ","
-    pr 11 "Its own parent, asked" me feat/own main false false
+    pr 11 "Its own parent, asked" me feat/own main false false && echo ","
+    pr 12 "Merged, its branch deleted since the last fetch" alice feat/auto-deleted main false false MERGED
     echo "]"
   } >"$root/prs.json"
 }
@@ -179,6 +182,7 @@ run_side() {
     # next only: legacy has no dry run
     scenario 17-dry-run checkout 8 --dry-run
     scenario 18-stacked-draft checkout 8 --yes
+    scenario 19-deleted-since-fetched checkout 12 --yes
   )
   normalise "$root" "$dir"/*
 }

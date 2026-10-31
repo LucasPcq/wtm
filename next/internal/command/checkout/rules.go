@@ -292,9 +292,11 @@ func (p Plan) Locks() []domain.Lock {
 	return domain.WorktreeLocks([]string{p.PullRequest.Branch})
 }
 
-// Fingerprinted is what the plan's fingerprint covers: the plan with what the apply reads of the project to provision the worktree.
+// Fingerprinted is what the plan's fingerprint covers: the plan with what the apply reads of the project to provision the worktree, of the pull request only what the apply depends on (its number, branch, head, base and state), so an edit of its title or draft does not stale a preview.
 func (p Plan) Fingerprinted() any {
+	pr := p.PullRequest
 	p.Recapped = domain.Recapped{}
+	p.PullRequest = worktree.PullRequest{Number: pr.Number, Branch: pr.Branch, Head: pr.Head, Base: pr.Base, State: pr.State}
 	return provision.Fingerprinted(p, p.facts.Repository, p.settled)
 }
 

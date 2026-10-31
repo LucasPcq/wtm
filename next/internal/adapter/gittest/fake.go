@@ -608,7 +608,7 @@ func (f *Fake) FetchRef(_ context.Context, name string) error {
 
 	commits, ok := f.origin[name]
 	if !ok {
-		return fmt.Errorf("gittest: no remote branch %s", name)
+		return fmt.Errorf("%w: %s", worktree.ErrNoRemoteBranch, name)
 	}
 
 	f.remote[name] = commits

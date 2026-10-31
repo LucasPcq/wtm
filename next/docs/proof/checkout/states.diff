@@ -283,3 +283,47 @@
    "ordinal": 5,
    "isolation": "isolated"
  }
+=== 19-deleted-since-fetched: exit legacy 1, next 2
+--- legacy/19-deleted-since-fetched
++++ next/19-deleted-since-fetched
+@@ -24,8 +24,6 @@
+   refs/heads/feat/merged
+ <SB>/acme.trees/feat-on-release
+   refs/heads/feat/on-release
+-<SB>/acme.trees/feat-own
+-  refs/heads/feat/own
+ <SB>/acme.trees/feat-remote
+   refs/heads/feat/remote
+ <SB>/held
+@@ -48,7 +46,7 @@
+ {
+   "source_branch": "feat/local",
+   "env_strategy": "example",
+-  "ordinal": 8,
++  "ordinal": 7,
+   "isolation": "isolated"
+ }
+ ## .git/wtm/worktrees/feat%2Flocal/meta.json
+@@ -62,20 +60,13 @@
+ {
+   "source_branch": "main",
+   "env_strategy": "example",
+-  "ordinal": 7,
++  "ordinal": 6,
+   "isolation": "isolated"
+ }
+ ## .git/wtm/worktrees/feat%2Fon-release/meta.json
+ {
+-  "source_branch": "release/1.0",
++  "source_branch": "origin/release/1.0",
+   "env_strategy": "example",
+-  "ordinal": 6,
+-  "isolation": "isolated"
+-}
+-## .git/wtm/worktrees/feat%2Fown/meta.json
+-{
+-  "source_branch": "feat/own",
+-  "env_strategy": "example",
+   "ordinal": 5,
+   "isolation": "isolated"
+ }

@@ -191,3 +191,58 @@ func TestARepositoryWithoutWtmIsRefusedBeforeGitHubIsAsked(t *testing.T) {
 	assert.Equal(t, checkout.CodeConfigNotFound, failureOf(t, err).Code)
 	assert.Empty(t, *w.asked)
 }
+
+// Review round 1: a merged pull request's branch, auto-deleted on origin after a fetch without --prune, was resumed from its stale remote-tracking branch.
+func TestABranchOriginDeletedSinceTheLastFetchIsNotTrackedButRefused(t *testing.T) {
+	w := newWorld(t)
+	req := checkout.Request{PR: prDeleted}
+
+	_, err := checkout.Resolve(w.facts(t, req), req)
+
+	assert.Equal(t, map[string]string{checkout.PathPR: checkout.CodeHeadMissing}, problems(err))
+}
+
+func TestALocalBranchOriginDeletedIsCheckedOutAsItIsWithNothingToFastForward(t *testing.T) {
+	w := newWorld(t)
+
+	questions := w.questions(t, checkout.Request{PR: prStale})
+	planned, warnings := w.plan(t, checkout.Request{PR: prStale})
+
+	assert.Equal(t, domain.SkipNotBehind, questions.FastForward.Skip, "its stale remote-tracking branch says behind; origin has no such branch")
+	assert.Equal(t, checkout.ActionCheckOut, planned.Action)
+	assert.Empty(t, warnings, "no fetch_failed: the fetch said what it had to")
+}
+
+func TestAnEditOfThePullRequestsTitleLeavesThePreviewStanding(t *testing.T) {
+	w := newWorld(t)
+	preview, err := w.usecase.Run(t.Context(), checkout.Request{PR: prRemote}, domain.RunOptions{DryRun: true})
+	require.NoError(t, err)
+	prs := pullRequests()
+	prs[0].Title, prs[0].Draft = "Renamed", true
+	w.usecase.PullRequest = github{prs: prs, asked: w.asked}.pullRequest
+
+	outcome, err := w.usecase.Run(t.Context(), checkout.Request{PR: prRemote}, domain.RunOptions{ExpectFingerprint: preview.Fingerprint})
+
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusDone, outcome.Result.Items[0].Status)
+}
+
+func TestANeighbourWhoseRecordANewerWtmWroteRefusesTheRunBeforeAnythingIsCreated(t *testing.T) {
+	w := newWorld(t)
+	writeFile(t, filepath.Join(w.stateDir, "run.toml"), jobsToml)
+	dir, ok := worktree.MetaDir(worktree.MetaDirParams{StateDir: w.stateDir, Branch: "feat/held"})
+	require.True(t, ok)
+	writeFile(t, filepath.Join(dir, "meta.json"), `{"schema": 99, "ordinal": 1}`)
+	planned, _ := checkout.Decide(w.facts(t, checkout.Request{PR: prRemote}), checkout.Request{PR: prRemote, From: "main"})
+	require.Contains(t, planned.Phases, domain.PhaseOrdinal, "the plan numbers the worktree")
+
+	_, err := w.usecase.Run(t.Context(), checkout.Request{PR: prRemote}, domain.RunOptions{})
+
+	refused := failureOf(t, err)
+	assert.Equal(t, checkout.CodeMetaNewer, refused.Code)
+	assert.Equal(t, domain.KindPrecondition, refused.Kind)
+	var newer *domain.SchemaNewer
+	assert.ErrorAs(t, err, &newer)
+	assert.NoDirExists(t, w.path("feat/remote"))
+	assert.Empty(t, gittest.Output(t, w.main, "branch", "--list", "feat/remote"))
+}

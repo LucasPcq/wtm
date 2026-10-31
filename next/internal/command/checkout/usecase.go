@@ -4,6 +4,7 @@ package checkout
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
@@ -24,6 +25,9 @@ const CodeConfigNotFound = Name + domain.ConfigNotFound
 
 // CodeConfigInvalid refuses a repository whose config.toml does not parse or validate.
 const CodeConfigInvalid = Name + domain.ConfigInvalid
+
+// CodeMetaNewer refuses a request that would number the new worktree past a record a newer wtm wrote.
+const CodeMetaNewer = Name + domain.MetaNewer
 
 // CodeGitHubUnavailable refuses a request whose pull request GitHub could not be asked of: gh missing or signed out, or a repository GitHub does not hold.
 const CodeGitHubUnavailable = Name + ".github_unavailable"
@@ -192,9 +196,16 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	}
 
 	// Fetched before the branches are read again, so where the branch stands against origin, and whether a fast-forward is asked, is what origin holds now, not as last fetched.
-	facts.FetchErr = u.Git.FetchRef(ctx, pr.Branch)
+	fetched := u.Git.FetchRef(ctx, pr.Branch)
 	if facts.Snapshot, err = u.Git.Snapshot(ctx); err != nil {
 		return Facts{}, err
+	}
+	switch {
+	case errors.Is(fetched, worktree.ErrNoRemoteBranch):
+		// origin deleted the branch, a merged pull request's often: its remote-tracking branch, left as last fetched, is no branch to track nor to stand against
+		facts.Branches.Remote = slices.DeleteFunc(slices.Clone(facts.Branches.Remote), func(b worktree.Branch) bool { return b.Name == pr.Branch })
+	default:
+		facts.FetchErr = fetched
 	}
 
 	facts.Folder, err = u.Git.Locate(ctx, facts.PathOf(pr.Branch))
