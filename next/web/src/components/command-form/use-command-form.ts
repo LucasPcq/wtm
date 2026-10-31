@@ -10,10 +10,14 @@ export function useCommandForm({
   repo,
   command,
   form: initial,
+  extend = (answers) => answers,
+  onAnswered,
 }: {
   repo: string
   command: ApiCommandName
   form: DomainForm
+  extend?: (answers: DomainAnswered[]) => DomainAnswered[]
+  onAnswered?: (sent: DomainAnswered[]) => void
 }) {
   const [asked, setAsked] = useState(initial)
   // each call is numbered: an answer overtaken by a later call's is dropped, never kept over it
@@ -32,11 +36,13 @@ export function useCommandForm({
 
   // only the fields the person changed: a default or a remembered answer stays the core's to decide
   const answers = (): DomainAnswered[] =>
-    answersOf(asked.fields, form.state.values, (key) => form.getFieldMeta(key)?.isDirty ?? false)
+    extend(answersOf(asked.fields, form.state.values, (key) => form.getFieldMeta(key)?.isDirty ?? false))
 
   const check = async () => {
     const call = ++calls.current
-    const answered = await questions(repo, command, answers())
+    const sent = answers()
+    const answered = await questions(repo, command, sent)
+    onAnswered?.(sent)
     if (call === calls.current) setAsked(answered)
     return answered
   }

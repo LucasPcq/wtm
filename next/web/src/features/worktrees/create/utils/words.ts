@@ -1,4 +1,4 @@
-import type { CreateAction, CreateRequest, DomainField, DomainSkip } from '@/api/types.gen'
+import type { CreateAction, CreateRequest, DomainSkip } from '@/api/types.gen'
 import type { FieldWords, OptionWords } from '@/components/command-form/command-fields'
 import type { OutcomeKind } from '@/features/worktrees/utils/outcome'
 
@@ -71,10 +71,6 @@ export const createWords: Record<Question, FieldWords> = {
     options: ifNotExists,
   },
 }
-
-export type Asked = DomainField & { path: Question }
-
-export const isAsked = (field: DomainField): field is Asked => field.path in createWords
 
 // null for a reason that means nothing in a browser
 export const skipWords: Record<DomainSkip, string | null> = {

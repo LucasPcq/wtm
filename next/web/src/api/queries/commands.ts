@@ -2,6 +2,8 @@ import { queryOptions } from '@tanstack/react-query'
 import { json, refusable } from '@/api/fetch'
 import type {
   ApiCommandName,
+  CheckoutDetail,
+  CheckoutPlan,
   CleanDetail,
   CleanPlan,
   CreateDetail,
@@ -33,6 +35,7 @@ export type ReadCommand = keyof ReadDetail
 
 type Mutation = {
   create: { plan: CreatePlan; detail: CreateDetail }
+  checkout: { plan: CheckoutPlan; detail: CheckoutDetail }
   clean: { plan: CleanPlan; detail: CleanDetail }
   prune: { plan: PrunePlan; detail: PruneDetail }
   'fast-forward': { plan: FastforwardPlan; detail: FastforwardDetail }
@@ -91,6 +94,18 @@ export const questionsQuery = (repo: string, command: ApiCommandName, answers: D
   queryOptions({
     queryKey: [...repoKey(repo), command, 'questions', answers],
     queryFn: () => questions(repo, command, answers),
+  })
+
+// checkout's form asks GitHub: outside the repository's key, an event never asks it again, and a refusal (gh missing,
+// signed out) is its answer for this opening, not retried
+export const checkoutFormQuery = (repo: string) =>
+  queryOptions({
+    queryKey: ['checkout-form', repo],
+    queryFn: () => questions(repo, 'checkout', []),
+    gcTime: 0,
+    staleTime: Infinity,
+    retry: false,
+    refetchOnWindowFocus: false,
   })
 
 export const dryRunQuery = <C extends MutationCommand>(repo: string, command: C, answers: DomainAnswered[]) =>

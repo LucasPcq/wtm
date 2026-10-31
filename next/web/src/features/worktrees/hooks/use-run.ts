@@ -107,6 +107,7 @@ export const clockEvery = 30_000
 
 const doing: Record<MutationCommand, string> = {
   create: 'Creating',
+  checkout: 'Creating',
   clean: 'Removing',
   'fast-forward': 'Fast-forwarding',
   prune: 'Pruning',

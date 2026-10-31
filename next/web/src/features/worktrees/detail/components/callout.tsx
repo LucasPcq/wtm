@@ -57,6 +57,7 @@ const runsHere: Record<
     open: (_repo, fix, runEntry) => runEntry({ action: 'reparent', followUp: fix }, []),
   },
   create: null,
+  checkout: null,
   prune: { verb: pruneAction.label, open: (repo, fix) => openPrune(repo, subjectsOf(fix)) },
   exec: null,
 }

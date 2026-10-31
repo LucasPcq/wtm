@@ -1,6 +1,14 @@
-import { type Asked, createWords, skipWords } from '@/features/worktrees/create/utils/words'
+import type { DomainField } from '@/api/types.gen'
+import type { FieldWords } from '@/components/command-form/command-fields'
+import { skipWords } from '@/features/worktrees/create/utils/words'
 
-export function NotAsked({ fields }: { fields: Asked[] }) {
+export function NotAsked<P extends string>({
+  fields,
+  words,
+}: {
+  fields: (DomainField & { path: P })[]
+  words: Record<P, FieldWords>
+}) {
   const said = fields.flatMap((field) => {
     const reason = field.skip && skipWords[field.skip]
     return reason ? [{ path: field.path, reason }] : []
@@ -12,7 +20,7 @@ export function NotAsked({ fields }: { fields: Asked[] }) {
     <ul className="border-t pt-3 text-xs text-muted-foreground">
       {said.map(({ path, reason }) => (
         <li key={path}>
-          Not asked: {createWords[path].label}, {reason}.
+          Not asked: {words[path].label}, {reason}.
         </li>
       ))}
     </ul>

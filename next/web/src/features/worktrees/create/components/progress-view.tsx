@@ -20,7 +20,7 @@ export function ProgressView({
   onAnother,
   onDone,
 }: {
-  progress: Progress<'create'>
+  progress: Progress<'create' | 'checkout'>
   running: boolean
   onHide: () => void
   onCancel: (force: boolean) => void

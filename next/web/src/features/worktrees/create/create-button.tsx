@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
+import { CheckoutPanel } from '@/features/worktrees/create/components/checkout-panel'
 import { ProgressView } from '@/features/worktrees/create/components/progress-view'
+import { StartFrom, type StartFromValue } from '@/features/worktrees/create/components/start-from'
 import { Wizard } from '@/features/worktrees/create/components/wizard'
-import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
+import { type Start, succeeded, useRun } from '@/features/worktrees/hooks/use-run'
 
 export function CreateButton({ repo }: { repo: string }) {
   const [open, setShown] = useState(false)
@@ -22,9 +24,24 @@ export function CreateButton({ repo }: { repo: string }) {
   }
   // a new round mounts a fresh wizard: Create another starts from nothing typed
   const [round, setRound] = useState(0)
-  const run = useRun(repo, 'create')
-  const form = useQuery({ ...questionsQuery(repo, 'create'), enabled: open })
+  const [from, setFrom] = useState<StartFromValue>('branch')
+  const created = useRun(repo, 'create')
+  // a pull request checked out is a worktree created: the same dialog, its run checkout's own
+  const checkedOut = useRun(repo, 'checkout')
+  const run = checkedOut.progress ? checkedOut : created
+  const form = useQuery({ ...questionsQuery(repo, 'create'), enabled: open && from === 'branch' })
   const navigate = useNavigate({ from: '/r/$repo/worktrees' })
+
+  const startFrom = <StartFrom value={from} onChange={setFrom} />
+
+  const start = (runner: typeof created | typeof checkedOut) => (params: Start) =>
+    runner.start(params, (envelope) => {
+      if (shown.current) return
+      const opened = params.units.filter((unit) => unit.phases.some((phase) => phase.phase !== 'fast_forward'))
+      const names = opened.map((unit) => unit.subject).join(', ')
+      if (succeeded(envelope)) return void toast.success(`${names} ${opened.length === 1 ? 'is' : 'are'} ready.`)
+      toast.error(`Couldn't create ${names}`, { action: { label: 'Details', onClick: () => setOpen(true) } })
+    })
 
   const content = () => {
     if (run.progress)
@@ -46,22 +63,26 @@ export function CreateButton({ repo }: { repo: string }) {
         />
       )
 
+    if (from === 'pull_request')
+      return (
+        <CheckoutPanel
+          key={round}
+          repo={repo}
+          startFrom={startFrom}
+          onStart={start(checkedOut)}
+          onCancel={() => setOpen(false)}
+          onNewBranch={() => setFrom('branch')}
+        />
+      )
+
     if (form.data)
       return (
         <Wizard
           key={round}
           repo={repo}
           form={form.data}
-          onStart={(start) =>
-            run.start(start, (envelope) => {
-              if (shown.current) return
-              const created = start.units.filter((unit) => unit.phases.some((run) => run.phase !== 'fast_forward'))
-              const names = created.map((unit) => unit.subject).join(', ')
-              if (succeeded(envelope))
-                return void toast.success(`${names} ${created.length === 1 ? 'is' : 'are'} ready.`)
-              toast.error(`Couldn't create ${names}`, { action: { label: 'Details', onClick: () => setOpen(true) } })
-            })
-          }
+          startFrom={startFrom}
+          onStart={start(created)}
           onCancel={() => setOpen(false)}
         />
       )

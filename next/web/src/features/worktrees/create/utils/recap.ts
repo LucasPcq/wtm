@@ -3,7 +3,7 @@ import type { Progress } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
 // the run's warnings are RunOutcome's; a next step no item claims goes with what went
-export function recapOf(progress: Progress<'create'>): OutcomeGroup[] {
+export function recapOf(progress: Progress<'create' | 'checkout'>): OutcomeGroup[] {
   const envelope = progress.envelope
   if (!envelope) return []
 
