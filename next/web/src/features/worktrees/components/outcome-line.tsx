@@ -28,7 +28,11 @@ export function OutcomeLine({
   const [open, setOpen] = useState(false)
   const Icon = glyph[row.tone ?? 'muted']
   const foldable =
-    row.output !== undefined || row.followUp !== undefined || row.go !== undefined || row.path !== undefined
+    row.note !== undefined ||
+    row.output !== undefined ||
+    row.followUp !== undefined ||
+    row.go !== undefined ||
+    row.path !== undefined
 
   return (
     <Collapsible asChild open={open} onOpenChange={setOpen}>
@@ -45,11 +49,11 @@ export function OutcomeLine({
             <Button
               variant="outline"
               size="sm"
-              aria-label={`${label}: ${row.message}`}
+              aria-label={`${row.actLabel ?? label}: ${row.message}`}
               disabled={busy}
               onClick={row.act}
             >
-              {label}
+              {row.actLabel ?? label}
             </Button>
           )}
           {row.followUp && !row.act && !open && <CommandLine followUp={row.followUp} look="copy" />}
@@ -74,6 +78,7 @@ export function OutcomeLine({
                 <CopyPath path={row.path} />
               </div>
             )}
+            {row.note && <p className="text-xs text-pretty text-muted-foreground">{row.note}</p>}
             {row.output && <StepOutput lines={row.output.lines} log={row.output.log} />}
             {row.followUp && <CommandLine followUp={row.followUp} />}
             {row.go && <CommandLine followUp={row.go} />}

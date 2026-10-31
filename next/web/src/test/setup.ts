@@ -8,6 +8,7 @@ import { useRemoveDialog } from '@/features/worktrees/hooks/use-remove-dialog'
 import { useReparentDialog } from '@/features/worktrees/hooks/use-reparent-dialog'
 import { useRuns } from '@/features/worktrees/hooks/use-run'
 import { useSelections } from '@/features/worktrees/hooks/use-selection'
+import { useSyncDialog } from '@/features/worktrees/hooks/use-sync-dialog'
 import { useUi } from '@/features/worktrees/store/ui-store'
 import { server } from '@/test/server'
 
@@ -25,6 +26,7 @@ afterEach(() => {
   useExecDialog.setState(useExecDialog.getInitialState(), true)
   useReparentDialog.setState(useReparentDialog.getInitialState(), true)
   useSelections.setState(useSelections.getInitialState(), true)
+  useSyncDialog.setState(useSyncDialog.getInitialState(), true)
   // Sonner replays every toast still active to the next Toaster mounted: the next test's page
   toast.dismiss()
 })

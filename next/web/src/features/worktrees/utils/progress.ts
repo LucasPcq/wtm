@@ -10,12 +10,20 @@ export type PhaseRun = {
   log?: string
 }
 
-export type Unit = { subject: string; phases: PhaseRun[]; lines: string[]; status?: DomainItem['status'] }
+// onto: the branch a unit goes onto, for a command whose run says where each goes (sync)
+export type Unit = {
+  subject: string
+  phases: PhaseRun[]
+  lines: string[]
+  status?: DomainItem['status']
+  onto?: string
+}
 
-export const todo = (subject: string, phases: DomainPhase[]): Unit => ({
+export const todo = (subject: string, phases: DomainPhase[], onto?: string): Unit => ({
   subject,
   phases: phases.map((phase) => ({ phase, state: 'todo' })),
   lines: [],
+  ...(onto !== undefined && { onto }),
 })
 
 export type Progress<C extends MutationCommand> = {

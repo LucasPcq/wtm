@@ -52,7 +52,7 @@ test('one worktree from its menu opens on its new parent: the refused ones say w
   await user.click(within(dialog).getByRole('button', { name: 'Reparent' }))
 
   expect(await within(dialog).findByText('1 reparented. It rebases onto fix/login on its next sync.')).toBeTruthy()
-  expect(await within(dialog).findByText('wtm sync feat/billing')).toBeTruthy()
+  expect(await within(dialog).findByRole('button', { name: 'Sync it' })).toBeTruthy()
   expect(runs.runs()[0]?.answers).toEqual([
     { path: 'worktree', values: ['feat/billing'] },
     { path: 'to', values: ['fix/login'] },
@@ -114,7 +114,7 @@ test('a record that cannot be written fails alone, named with why', async () => 
     within(failed).getByRole('button', { name: "Details of feat/billing-ui: couldn't write its record" }),
   )
   expect(within(failed).getByText('permission denied')).toBeTruthy()
-  expect(within(dialog).getByText('wtm sync fix/login')).toBeTruthy()
+  expect(within(dialog).getByRole('button', { name: 'Sync it' })).toBeTruthy()
 })
 
 test('Back from Confirm keeps the parent chosen; one worktree has no step of its own to go back to', async () => {

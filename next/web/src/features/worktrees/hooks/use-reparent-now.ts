@@ -1,30 +1,19 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { commandLineQuery, shellLine } from '@/api/queries/command-line'
 import type { Applied } from '@/api/queries/commands'
 import type { DomainFollowUp } from '@/api/types.gen'
 import { type Told, useDirectRun } from '@/features/worktrees/hooks/use-direct-run'
 import { openReparent, useReparentDialog } from '@/features/worktrees/hooks/use-reparent-dialog'
 import { dismissEnded, succeeded } from '@/features/worktrees/hooks/use-run'
+import { openSync } from '@/features/worktrees/hooks/use-sync-dialog'
 import { byParent, syncOf, undosOf, unitsOf, unreported } from '@/features/worktrees/reparent/utils/plan'
 import { refusalOf, toldOf } from '@/features/worktrees/reparent/utils/words'
-import { copy } from '@/features/worktrees/utils/copy'
 import { listed } from '@/features/worktrees/utils/listed'
 import { requestOf } from '@/features/worktrees/utils/reparent'
 
 // a move the core spelled (a drop, a fix, a child left orphaned, an undo) runs at once: one run per new parent, one
 // after the other, and one toast for them all, with the undo of each and the sync of all
 export function useReparentNow(repo: string) {
-  const client = useQueryClient()
   const direct = useDirectRun(repo, 'reparent')
-
-  const copyLine = (followUp: DomainFollowUp) =>
-    copy(
-      client.fetchQuery(commandLineQuery(followUp)).then(({ argv }) => {
-        if (argv.length === 0) throw new Error(`No command line for this: ${followUp.message}`)
-        return shellLine(argv)
-      }),
-    )
 
   // Undo moves back what moved; on a failure it says how many moves it undoes, since the title names what did not move
   const buttons = (ran: Applied<'reparent'>[], success: boolean): Pick<Told, 'action' | 'cancel'> => {
@@ -44,7 +33,13 @@ export function useReparentNow(repo: string) {
               },
             }
           : undefined,
-      action: sync ? { label: 'Copy wtm sync', onClick: () => copyLine(sync) } : undefined,
+      // sync runs in the web: its dialog opens on the plan of the worktrees moved
+      action: sync
+        ? {
+            label: 'Sync',
+            onClick: () => openSync(repo, { answers: sync.answers ?? [], left: [], picking: false, deciding: false }),
+          }
+        : undefined,
     }
   }
 

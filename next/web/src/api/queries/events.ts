@@ -1,4 +1,9 @@
-import { type QueryClient, queryOptions, experimental_streamedQuery as streamedQuery } from '@tanstack/react-query'
+import {
+  type Query,
+  type QueryClient,
+  queryOptions,
+  experimental_streamedQuery as streamedQuery,
+} from '@tanstack/react-query'
 import { EventSourceParserStream } from 'eventsource-parser/stream'
 import { HttpError, request } from '@/api/fetch'
 import type { WebRepos, WebWarning, WtmEventsV2 } from '@/api/types.gen'
@@ -52,19 +57,78 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
     .pipeThrough(new TextDecoderStream())
     .pipeThrough(new EventSourceParserStream())
     .getReader()
+  // an operation finished settles while the reader goes on: each resolves to the line that releases it
+  const settling = new Map<string, Promise<WtmEventsV2>>()
+  let next = reader.read()
   for (;;) {
-    const { value, done } = await reader.read()
-    if (done) return
+    const arrived = await Promise.race([
+      next.then((read) => ({ read })),
+      ...[...settling.values()].map((released) => released.then((line) => ({ line }))),
+    ])
+    if ('line' in arrived) {
+      settling.delete(arrived.line.op_id ?? '')
+      operations = track(operations, arrived.line, repoOf(client, arrived.line))
+      yield { operations }
+      continue
+    }
+
+    next = reader.read()
+    const { value, done } = arrived.read
+    if (done) {
+      // the stream ended: what settles still releases, within settleCap
+      for (const line of await Promise.all(settling.values()))
+        operations = track(operations, line, repoOf(client, line))
+      if (settling.size > 0) yield { operations }
+      return
+    }
     if (value.event === 'warning') yield { warning: (JSON.parse(value.data) as WebWarning).message, operations }
     else if (!value.event) {
       const line = JSON.parse(value.data) as WtmEventsV2
-      const read = invalidate(client, line)
-      // a worktree stays under way until the read that no longer shows it lands: it would flash back in between
-      if (line.type === 'operation.finished') await read
+      const at = Date.now()
+      void invalidate(client, line)
+      // a worktree stays under way until the read that no longer shows it lands, it would flash back in between, but
+      // never longer than settleCap, nor holding the lines after it
+      if (line.type === 'operation.finished' && line.op_id) {
+        const repo = repoOf(client, line)
+        settling.set(
+          line.op_id,
+          settled(client, repo, at).then(() => line),
+        )
+        continue
+      }
       operations = track(operations, line, repoOf(client, line))
       yield { operations }
     }
   }
+}
+
+export const settleCap = 10_000
+
+// the list or tree read of repo that lands after since, and the status read of an open detail with it, else settleCap: a
+// review's fetch of origin is never waited on
+function settled(client: QueryClient, repo: string | undefined, since: number): Promise<void> {
+  const of = (query: Query, commands: string[]) =>
+    query.queryKey[0] === 'repo' && query.queryKey[1] === repo && commands.includes(String(query.queryKey[2]))
+  const status = (query: Query) => of(query, ['status'])
+  let read = false
+  let detail = !client
+    .getQueryCache()
+    .getAll()
+    .some((query) => status(query) && query.getObserversCount() > 0)
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer)
+      unsubscribe()
+      resolve()
+    }
+    const timer = setTimeout(done, settleCap)
+    const unsubscribe = client.getQueryCache().subscribe((event) => {
+      if (event.type !== 'updated' || event.query.state.dataUpdatedAt < since) return
+      if (of(event.query, ['list', 'tree'])) read = true
+      if (status(event.query)) detail = true
+      if (read && detail) done()
+    })
+  })
 }
 
 const repoOf = (client: QueryClient, line: WtmEventsV2) =>
