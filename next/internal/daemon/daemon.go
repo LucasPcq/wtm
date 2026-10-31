@@ -19,10 +19,7 @@ const (
 	stopGrace = 5 * time.Second
 	// lastLines is how much of its output a job.crashed carries.
 	lastLines = 10
-	// historyBytes is how much of a job's raw output a client attaching to its terminal is replayed: enough for a terminal to draw the screen again, escapes included.
-	historyBytes = 1 << 20
-	followQueue  = 1024
-	maxWindow    = 1<<16 - 1
+	maxWindow = 1<<16 - 1
 )
 
 // Params is what a [Daemon] reaches the world through: how it starts a
@@ -75,6 +72,7 @@ type job struct {
 	exitCode *int
 	process  Process
 	output   *output
+	terminal *terminal
 	last     *run.Line
 	previous *job
 	stopped  bool
@@ -112,9 +110,17 @@ func (d *Daemon) Adopt() {
 		groups = d.params.Orphans.Probe(started)
 	}
 
+	// Read before the lock: a log is a file, its last line is not worth holding every request for.
+	last := make([]*run.Line, len(records))
+	for i, record := range records {
+		if lines := d.readLog(run.LogFile{Dir: record.Spec.LogDir, Job: record.Spec.Job.Name}, 1); len(lines) > 0 {
+			last[i] = &lines[0]
+		}
+	}
+
 	var reap []int
 	d.mu.Lock()
-	for _, record := range records {
+	for i, record := range records {
 		decision := run.Reconcile(run.ReconcileParams{Record: record, Group: groups[record.PGID], WorkDirExists: d.params.Exists(record.Spec.WorkDir)})
 		k := keyOf(record.Spec)
 		if !decision.Keep || d.jobs[k] != nil {
@@ -123,11 +129,7 @@ func (d *Daemon) Adopt() {
 		if decision.Reaped {
 			reap = append(reap, record.PGID)
 		}
-		j := &job{record: record, state: decision.State, reaped: decision.Reaped, adopted: true, done: closed()}
-		if last := d.readLog(run.LogFile{Dir: record.Spec.LogDir, Job: record.Spec.Job.Name}, 1); len(last) > 0 {
-			j.last = &last[0]
-		}
-		d.jobs[k] = j
+		d.jobs[k] = &job{record: record, state: decision.State, reaped: decision.Reaped, adopted: true, last: last[i], done: closed()}
 	}
 	d.mu.Unlock()
 
@@ -178,6 +180,9 @@ func (d *Daemon) Start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 	j := &job{record: run.Record{Spec: spec, StartedAt: d.params.Now(), PID: process.PID(), PGID: process.PID()}, state: run.Running, process: process, output: output, done: make(chan struct{})}
 	if previous != nil && previous.up() && spec.Detached() {
 		j.previous = previous
+	}
+	if spec.Command(nil).Terminal {
+		j.terminal = newTerminal(process, j.done)
 	}
 	d.jobs[k] = j
 	d.mu.Unlock()
@@ -437,26 +442,33 @@ func (d *Daemon) Lines(ctx context.Context, req run.Tail, out func(run.Line)) (r
 		return d.view(j), nil
 	}
 
-	past, lines, stop, ended := j.output.follow(n, req.Follow)
+	past, f, stop, ended := j.output.follow(n, req.Follow)
 	defer stop()
 	for _, line := range past {
 		out(line)
 	}
-	for lines != nil {
+	for f != nil {
 		select {
-		case line, open := <-lines:
-			if !open {
-				ended, lines = true, nil
+		case line, open := <-f.lines:
+			if open {
+				out(line)
 				continue
 			}
-			out(line)
+			if f.behind.Load() {
+				return d.view(j), &run.Error{Code: run.CodeFollowerBehind, Message: fmt.Sprintf("the follower of %s fell %d lines behind", req.Name, followQueue)}
+			}
+			ended, f = true, nil
 		case <-ctx.Done():
 			return d.view(j), ctx.Err()
 		}
 	}
 	if ended {
 		// The process ended: what the listing says of it is settled once done is closed.
-		<-j.done
+		select {
+		case <-j.done:
+		case <-ctx.Done():
+			return d.view(j), ctx.Err()
+		}
 	}
 
 	return d.view(j), nil
@@ -474,8 +486,8 @@ func (d *Daemon) Attach(req run.Window) (run.Session, error) {
 	}
 	session := run.Session{}
 	session.History, session.Stream, session.Release = j.output.attach()
-	if j.record.Spec.Command(nil).Terminal {
-		session.Input = process
+	if j.terminal != nil {
+		session.Input = j.terminal
 		if fits(req) {
 			_ = process.Resize(req.Cols, req.Rows)
 		}
@@ -714,154 +726,4 @@ func closed() chan struct{} {
 	done := make(chan struct{})
 	close(done)
 	return done
-}
-
-// An output is what a job prints, as it comes: its last lines, cut and
-// timestamped, handed to the start's client while it waits (out), written to
-// its log and to each follower; its last raw bytes, handed to each client
-// attached to its terminal. A follower or a client attached that falls behind
-// is let go. Safe for its writer, its readers and its end at once.
-type output struct {
-	mu        sync.Mutex
-	now       func() time.Time
-	splitter  run.Splitter
-	lines     []run.Line
-	raw       []byte
-	log       Log
-	out       func(run.Line)
-	followers map[chan run.Line]struct{}
-	attached  map[chan []byte]struct{}
-	ended     bool
-}
-
-func newOutput(now func() time.Time) *output {
-	return &output{now: now, followers: map[chan run.Line]struct{}{}, attached: map[chan []byte]struct{}{}}
-}
-
-func (o *output) write(chunk []byte) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	o.raw = append(o.raw, chunk...)
-	if extra := len(o.raw) - historyBytes; extra > 0 {
-		o.raw = append([]byte(nil), o.raw[extra:]...)
-	}
-	for ch := range o.attached {
-		select {
-		case ch <- chunk:
-		default:
-			delete(o.attached, ch)
-			close(ch)
-		}
-	}
-	o.emit(o.splitter.Split(chunk, o.now()))
-}
-
-// end gives out the line held with no newline, ends every follower and client
-// attached, closes the log, and returns the texts of the last lines a
-// job.crashed carries.
-func (o *output) end() []string {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	o.emit(o.splitter.Flush(o.now()))
-	o.ended = true
-	// No client attaches to a job that ended: its raw history goes, its lines stay for a tail.
-	o.raw = nil
-	for ch := range o.followers {
-		close(ch)
-	}
-	for ch := range o.attached {
-		close(ch)
-	}
-	clear(o.followers)
-	clear(o.attached)
-	if o.log != nil {
-		o.log.Close()
-	}
-
-	last := []string{}
-	for _, line := range o.lines[max(0, len(o.lines)-lastLines):] {
-		last = append(last, line.Text)
-	}
-	return last
-}
-
-func (o *output) emit(lines []run.Line) {
-	if len(lines) == 0 {
-		return
-	}
-	o.lines = append(o.lines, lines...)
-	if extra := len(o.lines) - run.MaxTail; extra > 0 {
-		o.lines = append([]run.Line(nil), o.lines[extra:]...)
-	}
-	if o.log != nil {
-		o.log.Write(lines)
-	}
-	for _, line := range lines {
-		if o.out != nil {
-			o.out(line)
-		}
-		for ch := range o.followers {
-			select {
-			case ch <- line:
-			default:
-				delete(o.followers, ch)
-				close(ch)
-			}
-		}
-	}
-}
-
-func (o *output) lastLine() *run.Line {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	if len(o.lines) == 0 {
-		return nil
-	}
-	last := o.lines[len(o.lines)-1]
-	return &last
-}
-
-// follow returns the last n lines and, when live, the channel each new one
-// arrives on, closed when the job ends or the follower falls behind, with the
-// function that lets it go; whether the job has ended.
-func (o *output) follow(n int, live bool) ([]run.Line, chan run.Line, func(), bool) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	past := slices.Clone(o.lines[max(0, len(o.lines)-n):])
-	if !live || o.ended {
-		return past, nil, func() {}, o.ended
-	}
-	ch := make(chan run.Line, followQueue)
-	o.followers[ch] = struct{}{}
-	return past, ch, func() { o.drop(ch) }, false
-}
-
-// attach returns what the job printed last, raw, and the channel what it
-// prints next arrives on, with the function that lets it go.
-func (o *output) attach() ([]byte, chan []byte, func()) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	ch := make(chan []byte, followQueue)
-	if o.ended {
-		close(ch)
-	} else {
-		o.attached[ch] = struct{}{}
-	}
-	return slices.Clone(o.raw), ch, func() {
-		o.mu.Lock()
-		defer o.mu.Unlock()
-		if _, open := o.attached[ch]; open {
-			delete(o.attached, ch)
-			close(ch)
-		}
-	}
-}
-
-func (o *output) drop(ch chan run.Line) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	if _, open := o.followers[ch]; open {
-		delete(o.followers, ch)
-		close(ch)
-	}
 }

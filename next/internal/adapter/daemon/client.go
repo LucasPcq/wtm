@@ -252,7 +252,7 @@ func (d Daemon) Attach(ctx context.Context, req run.Window) (net.Conn, error) {
 		err = json.Unmarshal(head, &attached)
 	}
 	if err == nil {
-		err = attached.failure()
+		err = cmp.Or(d.skewed(attached), attached.failure())
 	}
 	if err != nil {
 		_ = conn.Close()
@@ -281,7 +281,18 @@ func (d Daemon) Resize(ctx context.Context, req run.Window) error {
 		return err
 	}
 
-	return resized.failure()
+	return cmp.Or(d.skewed(resized), resized.failure())
+}
+
+// skewed refuses the answer of a daemon of another protocol or build, as a
+// start does: a terminal is a job's, run that daemon's way; the legacy
+// daemon's attach is this one's, raw after one line, and is taken.
+func (d Daemon) skewed(a answer) error {
+	switch skew := run.SkewOf(a.stamp(), d.Version); skew {
+	case run.SkewProtocol, run.SkewBuild:
+		return &run.Error{Code: run.CodeSkew, Message: fmt.Sprintf("the run daemon is wtm %s (protocol %d), this is wtm %s", cmp.Or(a.Version, "of an older build"), a.Protocol, d.Version)}
+	}
+	return nil
 }
 
 // ----------------------------------------------------------------------------
@@ -516,7 +527,7 @@ func (d Daemon) exchange(ctx context.Context, params exchangeParams) (answer, er
 			return a, nil
 		}
 		if params.Out != nil {
-			params.Out(run.Line{At: a.At, Text: a.Text})
+			params.Out(run.Line{At: time.Time(a.At), Text: a.Text})
 		}
 	}
 }

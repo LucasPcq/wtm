@@ -3,6 +3,7 @@ package joblog
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -76,4 +77,36 @@ func TestAJobNameIsEscapedIntoOneFile(t *testing.T) {
 	assert.Empty(t, Path("", "web"))
 	_, err := Open(run.LogFile{Dir: t.TempDir(), Job: ".."})
 	assert.Error(t, err)
+}
+
+func TestALogIsItsUsersAloneAndALegacyOneIsNarrowedAsItOpens(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "logs")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "web.log"), []byte("legacy\n"), 0o644))
+
+	log, err := Open(run.LogFile{Dir: dir, Job: "web", Append: true})
+	require.NoError(t, err)
+	log.Close()
+
+	dirInfo, err := os.Stat(dir)
+	require.NoError(t, err)
+	fileInfo, err := os.Stat(filepath.Join(dir, "web.log"))
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o700), dirInfo.Mode().Perm())
+	assert.Equal(t, os.FileMode(0o600), fileInfo.Mode().Perm())
+}
+
+func TestTheLastLinesOfABigLogAreReadFromItsEnd(t *testing.T) {
+	dir := t.TempDir()
+	log, err := Open(run.LogFile{Dir: dir, Job: "web"})
+	require.NoError(t, err)
+	for i := range 20000 {
+		log.Write([]run.Line{{At: at, Text: "line " + strconv.Itoa(i)}})
+	}
+	log.Close()
+
+	assert.Equal(t, []string{"line 19998", "line 19999"}, texts(Last(run.LogFile{Dir: dir, Job: "web"}, 2)))
+	all := Last(run.LogFile{Dir: dir, Job: "web"}, 20000)
+	assert.Len(t, all, 20000, "more lines than its end holds reads the whole file")
+	assert.Equal(t, "line 0", all[0].Text)
 }

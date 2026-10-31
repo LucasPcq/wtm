@@ -111,7 +111,7 @@ func (s Server) start(req request, reply func(answer) error) {
 
 	// A client that left stops reading, not the job: its lines are dropped.
 	started, err := s.Jobs.Start(req.Spec.runSpec(), func(line run.Line) {
-		_ = reply(answer{Status: statusLine, At: line.At, Text: line.Text})
+		_ = reply(answer{Status: statusLine, At: stamp(line.At), Text: line.Text})
 	})
 	done := answer{Status: statusOK}
 	// A start refused before any job ran has no job to report.
@@ -135,7 +135,7 @@ func (s Server) lines(conn net.Conn, req request, reply func(answer) error) {
 
 	tail := run.Tail{Name: req.Name, WorkDir: req.WorkDir, Lines: req.Tail, Follow: req.Follow}
 	stood, err := s.Jobs.Lines(ctx, tail, func(line run.Line) {
-		if reply(answer{Status: statusLine, At: line.At, Text: line.Text}) != nil {
+		if reply(answer{Status: statusLine, At: stamp(line.At), Text: line.Text}) != nil {
 			cancel()
 		}
 	})

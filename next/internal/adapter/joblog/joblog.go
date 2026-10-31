@@ -4,6 +4,8 @@ package joblog
 import (
 	"bytes"
 	"errors"
+	"io"
+	"math"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -20,6 +22,11 @@ const (
 	backups   = 2
 	separator = "  "
 	ext       = ".log"
+	// tailRead is how much of the end of a log Last reads first: a few lines never cost the whole file.
+	tailRead = 64 << 10
+	// A job's output may hold what its user would not share: its logs are its user's alone.
+	dirMode  = 0o700
+	fileMode = 0o600
 )
 
 // Path returns the log of the job named job in dir, "" for a name no file can
@@ -42,13 +49,17 @@ type Log struct {
 }
 
 // Open opens the log file names, its directory made if needed: emptied, its
-// backups gone, unless file.Append.
+// backups gone, unless file.Append. The directory and the file are its user's
+// alone, a legacy wtm's, made readable by others, narrowed as they open.
 func Open(file run.LogFile) (*Log, error) {
 	path := Path(file.Dir, file.Job)
 	if path == "" {
 		return nil, errors.New("job " + strconv.Quote(file.Job) + " cannot be named as a log file")
 	}
-	if err := os.MkdirAll(file.Dir, 0o755); err != nil {
+	if err := os.MkdirAll(file.Dir, dirMode); err != nil {
+		return nil, err
+	}
+	if err := os.Chmod(file.Dir, dirMode); err != nil {
 		return nil, err
 	}
 	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND
@@ -58,8 +69,12 @@ func Open(file run.LogFile) (*Log, error) {
 			_ = os.Remove(backup(path, rank))
 		}
 	}
-	opened, err := os.OpenFile(path, flags, 0o644)
+	opened, err := os.OpenFile(path, flags, fileMode)
 	if err != nil {
+		return nil, err
+	}
+	if err := opened.Chmod(fileMode); err != nil {
+		_ = opened.Close()
 		return nil, err
 	}
 	info, err := opened.Stat()
@@ -108,7 +123,7 @@ func (l *Log) rotate() error {
 	if err := os.Rename(l.path, backup(l.path, 1)); err != nil {
 		return err
 	}
-	file, err := os.OpenFile(l.path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	file, err := os.OpenFile(l.path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, fileMode)
 	l.file, l.size = file, 0
 
 	return err
@@ -126,31 +141,59 @@ func (l *Log) Close() {
 
 // Last returns the last n lines of the log file names, oldest first, read
 // from its backup too when the file holds fewer: a line not stamped as this
-// package stamps it keeps no time.
+// package stamps it keeps no time. It reads the end of the file first, the
+// whole of it only when that end holds fewer than n lines.
 func Last(file run.LogFile, n int) []run.Line {
 	path := Path(file.Dir, file.Job)
 	if path == "" || n <= 0 {
 		return nil
 	}
-	lines := read(path)
-	if len(lines) < n {
-		lines = append(read(backup(path, 1)), lines...)
+	lines, whole := tail(path)
+	if len(lines) < n && !whole {
+		lines, whole = parsed(path, 0)
+	}
+	if len(lines) < n && whole {
+		older, _ := parsed(backup(path, 1), 0)
+		lines = append(older, lines...)
 	}
 
 	return lines[max(0, len(lines)-n):]
 }
 
-func read(path string) []run.Line {
-	data, err := os.ReadFile(path)
+// tail returns the lines of the last tailRead bytes of the file at path, and
+// whether they are the whole file.
+func tail(path string) ([]run.Line, bool) {
+	info, err := os.Stat(path)
 	if err != nil {
-		return nil
+		return nil, true
+	}
+	return parsed(path, max(0, info.Size()-tailRead))
+}
+
+// parsed returns the lines of the file at path from offset on, the line cut
+// at offset left out, and whether they are the whole file.
+func parsed(path string, offset int64) ([]run.Line, bool) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, true
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.NewSectionReader(file, offset, math.MaxInt64-offset))
+	if err != nil {
+		return nil, true
+	}
+	text := string(data)
+	if offset > 0 {
+		if _, rest, found := strings.Cut(text, "\n"); found {
+			text = rest
+		}
 	}
 	var lines []run.Line
-	for text := range strings.Lines(string(data)) {
-		lines = append(lines, parse(strings.TrimSuffix(text, "\n")))
+	for line := range strings.Lines(text) {
+		lines = append(lines, parse(strings.TrimSuffix(line, "\n")))
 	}
 
-	return lines
+	return lines, offset == 0
 }
 
 func parse(text string) run.Line {

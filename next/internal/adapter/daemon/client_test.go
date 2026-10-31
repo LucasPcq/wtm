@@ -327,7 +327,7 @@ func TestAnAttachedTerminalReadsTheJobAndTypesIntoIt(t *testing.T) {
 	daemonJobs := &jobs{}
 	socket, _ := servedConcurrently(t, daemonJobs)
 
-	conn, err := daemon.Daemon{SocketPath: socket}.Attach(t.Context(), run.Window{Name: "web", WorkDir: "/wt/a", Cols: 80, Rows: 24})
+	conn, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Attach(t.Context(), run.Window{Name: "web", WorkDir: "/wt/a", Cols: 80, Rows: 24})
 	require.NoError(t, err)
 	defer conn.Close()
 	_, err = conn.Write([]byte("q"))
@@ -343,7 +343,7 @@ func TestAnAttachedTerminalReadsTheJobAndTypesIntoIt(t *testing.T) {
 func TestAnAttachTheDaemonRefusesFailsWithItsCode(t *testing.T) {
 	socket, _ := served(t, &jobs{err: &run.Error{Code: run.CodeJobNotFound, Message: "no job web running in /wt/a"}}, "1.0")
 
-	_, err := daemon.Daemon{SocketPath: socket}.Attach(t.Context(), run.Window{Name: "web", WorkDir: "/wt/a"})
+	_, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Attach(t.Context(), run.Window{Name: "web", WorkDir: "/wt/a"})
 
 	var refusal *run.Error
 	require.ErrorAs(t, err, &refusal)
@@ -353,7 +353,7 @@ func TestAnAttachTheDaemonRefusesFailsWithItsCode(t *testing.T) {
 func TestAResizeTheDaemonRefusesFailsWithItsCode(t *testing.T) {
 	socket, _ := served(t, &jobs{err: &run.Error{Code: run.CodeNoTerminal, Message: "job migrate runs under no terminal"}}, "1.0")
 
-	err := daemon.Daemon{SocketPath: socket}.Resize(t.Context(), run.Window{Name: "migrate", WorkDir: "/wt/a", Cols: 80, Rows: 24})
+	err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Resize(t.Context(), run.Window{Name: "migrate", WorkDir: "/wt/a", Cols: 80, Rows: 24})
 
 	var refusal *run.Error
 	require.ErrorAs(t, err, &refusal)
@@ -363,7 +363,7 @@ func TestAResizeTheDaemonRefusesFailsWithItsCode(t *testing.T) {
 func TestAnAttachedTerminalKeepsReceivingPastAWritesDeadline(t *testing.T) {
 	socket, _ := servedConcurrently(t, &jobs{lateAfter: 1500 * time.Millisecond})
 
-	conn, err := daemon.Daemon{SocketPath: socket}.Attach(t.Context(), run.Window{Name: "web", WorkDir: "/wt/a"})
+	conn, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Attach(t.Context(), run.Window{Name: "web", WorkDir: "/wt/a"})
 	require.NoError(t, err)
 	defer conn.Close()
 	_, err = conn.Write([]byte("q"))
@@ -372,4 +372,18 @@ func TestAnAttachedTerminalKeepsReceivingPastAWritesDeadline(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "history|live|late", string(read), "what the job prints a while after the attach still arrives")
+}
+
+func TestAnAttachOrAResizeOfADaemonOfAnotherBuildIsRefused(t *testing.T) {
+	socket, _ := servedConcurrently(t, &jobs{})
+	skewed := daemon.Daemon{SocketPath: socket, Version: "2.0"}
+
+	_, attach := skewed.Attach(t.Context(), run.Window{Name: "web", WorkDir: "/wt/a"})
+	resize := skewed.Resize(t.Context(), run.Window{Name: "web", WorkDir: "/wt/a", Cols: 80, Rows: 24})
+
+	for _, err := range []error{attach, resize} {
+		var refusal *run.Error
+		require.ErrorAs(t, err, &refusal)
+		assert.Equal(t, run.CodeSkew, refusal.Code)
+	}
 }

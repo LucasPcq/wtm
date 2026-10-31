@@ -49,6 +49,8 @@ next/
 
 Share on the second user, not before: until a second command needs it, code stays in its slice.
 
+One exception to a pure domain: `run.Session` (`domain/run/stream.go`: a channel, an `io.Writer` and a `Release` func) is a client attached to a job's terminal, which the run daemon's core hands its server across the adapter boundary; neither may import the other, so the domain is the one place they share. Add no other such value.
+
 ## The rules
 
 Each rule names what enforces it: `[archlint]` (`tools/archlint`, rule `next` unless another is named), `[revive]`, `[staticcheck]`, `[sumtype]` (`go-sumtype`), `[test]` (a test fails), or `[review]` (nothing but a reviewer catches it: check it yourself).

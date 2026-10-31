@@ -1,7 +1,9 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -569,7 +571,7 @@ func TestAnAttachReplaysWhatTheJobPrintedThenStreamsAndTypesIntoItsTerminal(t *t
 
 	assert.Equal(t, "hello\n", string(session.History))
 	assert.Equal(t, "\x1b[2Jmore", string(<-session.Stream))
-	assert.Equal(t, "q", string(process.typed))
+	assert.Eventually(t, func() bool { process.mu.Lock(); defer process.mu.Unlock(); return string(process.typed) == "q" }, time.Second, time.Millisecond)
 	assert.Equal(t, [][2]int{{100, 30}}, process.sizes)
 	process.end(1)
 	_, open := <-session.Stream
@@ -606,4 +608,112 @@ func TestAResizeToASizeNoTerminalHasIsRefused(t *testing.T) {
 		assert.Equal(t, run.CodeInvalidRequest, refusal.Code)
 	}
 	assert.Empty(t, w.spawner.process("serve web").sizes)
+}
+
+func TestAFollowerThatFallsBehindIsLetGoWithItsCode(t *testing.T) {
+	w := newWorld(t, map[string]script{"serve web": prints("first")})
+	_, err := w.Start(service("web"), nil)
+	require.NoError(t, err)
+	require.Eventually(t, func() bool { return w.job(t, "web").LastLine != nil }, time.Second, time.Millisecond)
+	stuck, blocked := make(chan struct{}), make(chan struct{})
+	result := make(chan error)
+
+	go func() {
+		_, err := w.Lines(t.Context(), run.Tail{Name: "web", WorkDir: "/wt/a", Lines: 1, Follow: true}, func(run.Line) {
+			select {
+			case <-blocked:
+			default:
+				close(blocked)
+				<-stuck
+			}
+		})
+		result <- err
+	}()
+	<-blocked
+	w.spawner.process("serve web").print(strings.Repeat("chatty\n", followQueue+100))
+	close(stuck)
+
+	var behind *run.Error
+	require.ErrorAs(t, <-result, &behind)
+	assert.Equal(t, run.CodeFollowerBehind, behind.Code)
+	assert.True(t, w.job(t, "web").Up, "the job runs on")
+}
+
+func TestAClientAttachedThatFallsBehindIsLetGo(t *testing.T) {
+	w := newWorld(t, nil)
+	_, err := w.Start(service("web"), nil)
+	require.NoError(t, err)
+	session, err := w.Attach(run.Window{Name: "web", WorkDir: "/wt/a"})
+	require.NoError(t, err)
+	defer session.Release()
+	process := w.spawner.process("serve web")
+
+	for range followQueue + 1 {
+		process.print(".")
+	}
+
+	received := 0
+	for range session.Stream {
+		received++
+	}
+	assert.Equal(t, followQueue, received, "its stream ended once full, the job running on")
+	assert.True(t, w.job(t, "web").Up)
+}
+
+func TestTheRawHistoryIsKeptToItsCapThenDroppedWithTheJob(t *testing.T) {
+	o := newOutput(time.Now)
+
+	o.write(bytes.Repeat([]byte("x"), 2*historyBytes+1))
+	history, _, release := o.attach()
+	release()
+	o.end()
+
+	assert.Len(t, history, historyBytes)
+	assert.Nil(t, o.raw)
+}
+
+func TestTheLinesKeptAreCappedByTheirTextAsByTheirCount(t *testing.T) {
+	o := newOutput(time.Now)
+	long := strings.Repeat("y", 64<<10)
+
+	for range 40 {
+		o.write([]byte(long + "\n"))
+	}
+	past, _, _, _ := o.follow(run.MaxTail, false)
+
+	text := 0
+	for _, line := range past {
+		text += len(line.Text)
+	}
+	assert.LessOrEqual(t, text, 2*tailBytes)
+	assert.Less(t, len(past), 40, "long lines cost more than their count")
+	assert.Equal(t, long, o.lastLine().Text)
+}
+
+func TestAReaderLeavingWhileTheJobsEndSettlesEndsTheFollow(t *testing.T) {
+	w := newWorld(t, nil)
+	_, err := w.Start(service("web"), nil)
+	require.NoError(t, err)
+	ctx, leave := context.WithCancel(t.Context())
+	following := make(chan error)
+	go func() {
+		_, err := w.Lines(ctx, run.Tail{Name: "web", WorkDir: "/wt/a", Follow: true}, func(run.Line) {})
+		following <- err
+	}()
+	stall := make(chan struct{})
+	w.index.mu.Lock()
+	w.index.stall = stall
+	w.index.mu.Unlock()
+	defer close(stall)
+
+	w.spawner.process("serve web").end(1)
+	time.Sleep(20 * time.Millisecond)
+	leave()
+
+	select {
+	case err := <-following:
+		assert.ErrorIs(t, err, context.Canceled)
+	case <-time.After(2 * time.Second):
+		require.Fail(t, "the follow waited on the job's end after its reader left")
+	}
 }

@@ -169,6 +169,8 @@ func (o *orphans) Reap(pgids []int) {
 type index struct {
 	mu      sync.Mutex
 	records []run.Record
+	// stall, while set, holds each Save until it is closed: a job's end waiting on its index.
+	stall chan struct{}
 }
 
 func (i *index) Load() []run.Record {
@@ -178,6 +180,12 @@ func (i *index) Load() []run.Record {
 }
 
 func (i *index) Save(records []run.Record) error {
+	i.mu.Lock()
+	stall := i.stall
+	i.mu.Unlock()
+	if stall != nil {
+		<-stall
+	}
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.records = records

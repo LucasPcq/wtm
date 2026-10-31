@@ -24,7 +24,7 @@ func TestEveryAnswerIsStampedWithTheProtocolAndTheBuild(t *testing.T) {
 	assert.Equal(t, []map[string]any{{"status": "ok", "protocol": 2.0, "version": "1.0", "jobs": []any{map[string]any{
 		"name": "web", "kind": "service", "work_dir": "/wt/a", "state": "running", "hold": "own", "status": "running", "pid": 4242.0,
 		"started_at": "2026-10-31T12:00:00Z", "url": "http://localhost:3100", "ports": map[string]any{"PORT": 3100.0},
-		"last_line": map[string]any{"at": "2026-10-31T12:00:00Z", "text": "GET / 200"},
+		"last_line": map[string]any{"at": "2026-10-31T12:00:00.000Z", "text": "GET / 200"},
 	}}}}, answers)
 }
 
@@ -34,7 +34,7 @@ func TestAStartSendsEachLineThenHowItEnded(t *testing.T) {
 	answers := asked(t, socket, `{"action":"start","spec":{"job":{"name":"migrate","kind":"task","cmd":"make migrate"},"work_dir":"/wt/a"}}`)
 
 	assert.Len(t, answers, 2)
-	assert.Equal(t, map[string]any{"status": "line", "protocol": 2.0, "version": "1.0", "at": "2026-10-31T12:00:00Z", "text": "2 migrations"}, answers[0])
+	assert.Equal(t, map[string]any{"status": "line", "protocol": 2.0, "version": "1.0", "at": "2026-10-31T12:00:00.000Z", "text": "2 migrations"}, answers[0])
 	assert.Equal(t, "error", answers[1]["status"])
 	assert.Equal(t, run.CodeTaskFailed, answers[1]["code"])
 	assert.Equal(t, 3.0, answers[1]["exit_code"])

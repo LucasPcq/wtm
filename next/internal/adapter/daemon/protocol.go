@@ -3,6 +3,7 @@ package daemon
 
 import (
 	"cmp"
+	"encoding/json"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -42,18 +43,18 @@ type request struct {
 
 // answer is one line the daemon writes back.
 type answer struct {
-	Status   string    `json:"status"`
-	Protocol int       `json:"protocol,omitempty"`
-	Version  string    `json:"version,omitempty"`
-	PID      int       `json:"pid,omitempty"`
-	Code     string    `json:"code,omitempty"`
-	Message  string    `json:"message,omitempty"`
-	ExitCode *int      `json:"exit_code,omitempty"`
-	Jobs     []job     `json:"jobs,omitzero"`
-	Job      *job      `json:"job,omitempty"`
-	Outcome  string    `json:"outcome,omitempty"`
-	At       time.Time `json:"at,omitzero"`
-	Text     string    `json:"text,omitempty"`
+	Status   string `json:"status"`
+	Protocol int    `json:"protocol,omitempty"`
+	Version  string `json:"version,omitempty"`
+	PID      int    `json:"pid,omitempty"`
+	Code     string `json:"code,omitempty"`
+	Message  string `json:"message,omitempty"`
+	ExitCode *int   `json:"exit_code,omitempty"`
+	Jobs     []job  `json:"jobs,omitzero"`
+	Job      *job   `json:"job,omitempty"`
+	Outcome  string `json:"outcome,omitempty"`
+	At       stamp  `json:"at,omitzero"`
+	Text     string `json:"text,omitempty"`
 }
 
 // stamp is what an answer says of the daemon that wrote it.
@@ -93,14 +94,35 @@ type job struct {
 
 // line is a line a job printed, on the wire.
 type line struct {
-	At   time.Time `json:"at"`
-	Text string    `json:"text"`
+	At   stamp  `json:"at"`
+	Text string `json:"text"`
+}
+
+// stamp is the time of a line on the wire: RFC 3339, UTC, to the millisecond.
+type stamp time.Time
+
+const stampLayout = "2006-01-02T15:04:05.000Z07:00"
+
+// MarshalJSON writes the time as stampLayout spells it, in UTC.
+func (s stamp) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Time(s).UTC().Format(stampLayout))
+}
+
+// UnmarshalJSON reads a time RFC 3339 spells.
+func (s *stamp) UnmarshalJSON(data []byte) error {
+	var text string
+	if err := json.Unmarshal(data, &text); err != nil {
+		return err
+	}
+	at, err := time.Parse(time.RFC3339Nano, text)
+	*s = stamp(at)
+	return err
 }
 
 func jobOf(j run.Job) job {
 	wire := job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, SharedDir: j.SharedDir, State: string(j.State), Hold: string(j.Hold), Reaped: j.Reaped, PID: j.PID, StartedAt: j.StartedAt, ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports, Status: legacyStatus(j)}
 	if j.LastLine != nil {
-		wire.LastLine = &line{At: j.LastLine.At, Text: j.LastLine.Text}
+		wire.LastLine = &line{At: stamp(j.LastLine.At), Text: j.LastLine.Text}
 	}
 
 	return wire
@@ -132,7 +154,7 @@ func (j job) runJob(legacy bool) run.Job {
 	hold, state := run.Hold(j.Hold), run.State(j.State)
 	read := run.Job{Name: j.Name, WorkDir: j.WorkDir, Up: hold == run.HoldClaim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Hold: hold, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: j.StartedAt, SharedDir: j.SharedDir}
 	if j.LastLine != nil {
-		read.LastLine = &run.Line{At: j.LastLine.At, Text: j.LastLine.Text}
+		read.LastLine = &run.Line{At: time.Time(j.LastLine.At), Text: j.LastLine.Text}
 	}
 
 	return read
