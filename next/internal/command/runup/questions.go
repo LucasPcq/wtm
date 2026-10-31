@@ -124,7 +124,7 @@ func NewQuestions(f Facts, req Request) Questions {
 	questions := Questions{
 		Worktrees: Worktrees{Picked: picked, Origin: origin, Options: f.worktreeOptions()},
 		Profile:   f.profile(req),
-		Profiles:  f.profileOptions(),
+		Profiles:  f.profileOptions(targets),
 		Request:   req,
 		Errors:    problems,
 	}
@@ -204,11 +204,17 @@ func (f Facts) profile(req Request) domain.Choice[string] {
 	return choice
 }
 
-// profileOptions are the profiles run.toml declares, in its order, each with its jobs and whether it is the default.
-func (f Facts) profileOptions() []domain.Option {
+// profileOptions are the profiles run.toml declares, in its order, each with its jobs, whether it is the default and which of the targets run it now.
+func (f Facts) profileOptions(targets []Target) []domain.Option {
 	options := make([]domain.Option, 0, len(f.Run.Profiles))
 	for _, profile := range f.Run.Profiles {
-		options = append(options, domain.Option{Value: profile.Name, Default: profile.Default, Jobs: profile.Jobs})
+		option := domain.Option{Value: profile.Name, Default: profile.Default, Jobs: profile.Jobs}
+		for _, t := range targets {
+			if f.profileOf(t.Path) == profile.Name {
+				option.RunningIn = append(option.RunningIn, t.Worktree)
+			}
+		}
+		options = append(options, option)
 	}
 	return options
 }

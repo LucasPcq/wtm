@@ -77,6 +77,7 @@ type Option struct {
 	Jobs      []string              `json:"jobs,omitempty"`         // a profile's jobs, in the order they start
 	Up        []string              `json:"up,omitempty"`           // the jobs up in a worktree, sorted
 	Profile   string                `json:"profile,omitempty"`      // the profile a worktree's jobs up were started under, empty when they say none
+	RunningIn []string              `json:"running_in,omitempty"`   // the worktrees picked whose jobs up a profile started
 	Problem   *FieldError           `json:"problem,omitempty"`      // the problem picking it raises, nil when it raises none
 }
 
