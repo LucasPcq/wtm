@@ -73,7 +73,7 @@ const repoOf = (client: QueryClient, line: WtmEventsV2) =>
 function invalidate(client: QueryClient, line: WtmEventsV2) {
   if (line.type === 'repo.added' || line.type === 'repo.removed')
     return client.invalidateQueries({ queryKey: ['repos'] })
-  if (line.type.startsWith('worktree.') || line.type === 'operation.finished') {
+  if (line.type.startsWith('worktree.') || line.type.startsWith('job.') || line.type === 'operation.finished') {
     const id = repoOf(client, line)
     return client.invalidateQueries({ queryKey: id ? ['repo', id] : ['repo'] })
   }
