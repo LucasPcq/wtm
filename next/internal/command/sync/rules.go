@@ -1,7 +1,6 @@
 package sync
 
 import (
-	"cmp"
 	"slices"
 	"strconv"
 	"strings"
@@ -252,7 +251,10 @@ func (f Facts) decide(req Request) decided {
 	tips := map[string]string{} // the commit each branch rebased onto stands at as planned, when it does not rebase in this run
 	for i := range ontos {
 		f.decideOnto(&ontos[i], req)
-		moving[ontos[i].Branch], tips[ontos[i].Branch] = ontos[i].moves(), cmp.Or(ontos[i].To, ontos[i].From)
+		moving[ontos[i].Branch], tips[ontos[i].Branch] = ontos[i].moves(), ontos[i].From
+		if ontos[i].moves() {
+			tips[ontos[i].Branch] = ontos[i].To
+		}
 	}
 	left := map[string]bool{}
 	for i := range rebases {

@@ -62,12 +62,19 @@ func (r Repo) forkKept(ctx context.Context, merge, point, base string) (bool, er
 		return false, err
 	}
 
-	rewritten := map[string]bool{}
+	// counted, not a set: two skipped commits alike need two counterparts
+	rewritten := map[string]int{}
 	for line := range strings.Lines(string(onBase)) {
-		rewritten[line] = true
+		rewritten[line]++
 	}
 	lines := slices.Collect(strings.Lines(string(skipped)))
-	return len(lines) > 0 && !slices.ContainsFunc(lines, func(line string) bool { return !rewritten[line] }), nil
+	for _, line := range lines {
+		if rewritten[line] == 0 {
+			return false, nil
+		}
+		rewritten[line]--
+	}
+	return len(lines) > 0, nil
 }
 
 // Rebase replays, in the worktree at rebase.Path, its branch's commits after rebase.Upstream onto rebase.Onto. A rebase that stops on a conflict reports the files it stopped in and is aborted, the worktree back as it was, or left in progress with rebase.Keep; any other failure aborts it and is returned. With rebase.Autostash, a stash that no longer applies is kept in git's stash, which Stashed says.

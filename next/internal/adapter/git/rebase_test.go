@@ -2,6 +2,7 @@ package git_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -219,4 +220,29 @@ func TestTheFakeAndGitMoveABranchOnlyFromTheCommitItStandsAt(t *testing.T) {
 			assert.Equal(t, to, tip(t, impl.port, worktree.LocalBranch{Name: "feature"}))
 		})
 	}
+}
+
+// Two commits of the parent alike (author, author date, subject) both lost to a reset, one of them cherry-picked back: one counterpart covers one of them, never both.
+func TestTwoCommitsAlikeNeedTwoCounterpartsToBeSkipped(t *testing.T) {
+	repo, _ := newRepoWithOrigin(t)
+	for range 2 {
+		gittest.Git(t, repo.Dir, "commit", "-q", "--allow-empty", "-m", "wip", "--date", "2026-10-01T09:00:00Z")
+	}
+	first := head(t, repo.Dir, "HEAD~1")
+	child := filepath.Join(gittest.TempDir(t), "child")
+	gittest.Git(t, repo.Dir, "worktree", "add", "-q", "-b", "child", child, "main")
+	commitFile(t, child, "child.txt", "its own")
+	gittest.Git(t, repo.Dir, "reset", "-q", "--hard", "HEAD~2")
+	// committed later than the original, so the cherry-pick is a commit of its own, alike by author, date and subject
+	picked := exec.Command("git", "-C", repo.Dir, "cherry-pick", "--allow-empty", first)
+	picked.Env = append(os.Environ(), "GIT_COMMITTER_DATE=2026-10-02T09:00:00Z")
+	out, err := picked.CombinedOutput()
+	require.NoError(t, err, string(out))
+	require.NotEqual(t, first, head(t, repo.Dir, "main"))
+
+	fork, err := repo.ForkPoint(t.Context(), worktree.Span{Branch: "child", Base: "main"})
+
+	require.NoError(t, err)
+	assert.Equal(t, gittest.Output(t, repo.Dir, "merge-base", "main", "child"), fork.Commit)
+	assert.Equal(t, 3, fork.Own, "both wip commits and its own")
 }

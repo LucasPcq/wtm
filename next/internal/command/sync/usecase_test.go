@@ -163,6 +163,11 @@ func TestADirtyBaseBehindOriginIsKeptWithAWarning(t *testing.T) {
 	assert.Equal(t, []sync.Blocker{sync.BlockerDirty}, planned.Onto[0].Blockers)
 	assert.Empty(t, planned.Onto[0].Phases)
 	assert.Contains(t, codes(warnings), sync.CodeKept)
+
+	outcome := w.run(t, sync.Request{Worktrees: []string{solo}, NoFetch: true})
+
+	require.Equal(t, domain.StatusDone, itemsOf(outcome)[solo].Status, itemsOf(outcome)[solo].Err)
+	assert.Equal(t, w.tip(t, "main"), w.tip(t, solo+"~1"), "onto main as it stands, not origin's main it was kept from")
 }
 
 // B8: the legacy sync failed on a worktree whose directory is gone with git's own words.
