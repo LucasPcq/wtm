@@ -10,4 +10,5 @@
   cyc-2                    ! cycle
   feat/login               (branch deleted)
   └─ feat/login-ui
+  ! the run daemon is the legacy wtm's: restart it to start jobs beside its own
 

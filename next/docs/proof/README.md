@@ -28,6 +28,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./ui.sh "$next" ui
 other=$(mktemp -d)/wtm-next && (cd ../../.. && go build -ldflags "-X main.version=0.31.0-other" -o "$other" ./next/cmd/wtm-next)
 ./daemon.sh "$wtm" "$next" "$other" daemon
+./run-up.sh "$wtm" "$next" run-up
 git diff --stat .
 ```
 
@@ -614,7 +615,7 @@ Next only: legacy's `wtm ui` is a terminal dashboard, not a server.
 
 # Proof: the run daemon (legacy `service/process`) vs `wtm-next daemon`
 
-No `run` command runs on next yet (LUC-339): the proof drives the daemon raw over its socket with `daemon.py`, a request per line, in one sandbox, and records each answer (`daemon/NN-*.ndjson`). Every daemon it runs it starts itself, as a child it holds the handle of, and stops through the protocol or kills by that handle: it never signals a pid read from a file or an answer. Pids, times, ports, next's build (`<NEXT>`) and the sandbox path are normalised.
+The proof drives the daemon raw over its socket with `daemon.py`, a request per line, in one sandbox, and records each answer (`daemon/NN-*.ndjson`). Every daemon it runs it starts itself, as a child it holds the handle of, and stops through the protocol or kills by that handle: it never signals a pid read from a file or an answer. Pids, times, ports, next's build (`<NEXT>`) and the sandbox path are normalised.
 
 - `daemon.sh <wtm> <wtm-next> <wtm-next of another build> daemon`, on the "acme" project with a detached stack `db` (its launcher leaves a loop that runs while a marker file is there; its stop removes the marker):
   1. legacy `wtm run up --profile all` starts the legacy daemon with `db`, `api` and `web` (`01`); `wtm-next status` reads its jobs through the legacy daemon's own listing (`02`); its raw `list` and its `stop` of a job it does not know (`03`, `04`)
@@ -630,7 +631,7 @@ No `run` command runs on next yet (LUC-339): the proof drives the daemon raw ove
   - **One daemon** hosts the run daemon and the bus, on the legacy socket, lock and index; the index keeps legacy's format, version 2, so each daemon takes over the jobs the other left (`06` → `07`).
   - **The protocol is v2**: every answer stamped with `protocol`, `version` and `pid` (legacy: `version`, `daemon_pid`); an error carries a code (`daemon.job_running`, `daemon.task_failed`, `daemon.unknown_action`, `daemon.invalid_request`); a job says `state`, `hold` (`own`, `detached`, `claim`) and `reaped`, beside legacy's `status` word, which a legacy client counts the jobs a daemon holds by, its `started_at` only while it is up and its `pid` only for a process of the daemon's own; a task's output comes as lines (`line`, `at`, `text`) where legacy sent raw bytes in base64; `stop` answers its `outcome`; the proxy is the listing's `proxy` alone, where legacy put `proxy_port` and `proxy_public_port` on every answer, a start's and a task's included.
   - **A launcher and a stop command run through a pipe**, a dumb terminal that asks for colours (legacy: a terminal), so their output reads as plain lines; a foreground service still runs under a terminal of its own.
-  - **A client never signals a daemon**: a daemon of another build or of the legacy wtm holding no job is asked to `shutdown` and replaced, one holding jobs refused, `daemon.skew` or `daemon.legacy`, whose follow-up `run daemon restart` the `run` commands spell (LUC-339) (`adapter/daemon` `TestEnsureRefusesASkewedDaemonHoldingJobs`); legacy SIGTERMed the pid holding the socket when it refused `shutdown`. A read gives no skew warning yet (LUC-339).
+  - **A client never signals a daemon**: a daemon of another build or of the legacy wtm holding no job is asked to `shutdown` and replaced, one holding jobs refused, `daemon.skew` or `daemon.legacy`, whose follow-up is `run daemon restart` (`wtm-next run daemon restart`) (`adapter/daemon` `TestEnsureRefusesASkewedDaemonHoldingJobs`); legacy SIGTERMed the pid holding the socket when it refused `shutdown`. A read warns of a daemon of another build or of the legacy wtm (`<command>.daemon_skew`, followed by `run daemon restart`): `02` and `28` show `status`'s.
   - **Job events are v2** (`job.started`, `job.stopped`, `job.crashed`, `job.exited` in `events.v2.json`), published by the daemon in its own process (`cmd/wtm-next` `TestTheDaemonRunsStopsAndAnnouncesTheJobsItsClientsAsk`).
   - **New: a job's lines and terminal for the web and the run view** (LUC-361, LUC-339): `last_line` in the listing, `lines` (tail, then follow, then `ok` carrying the job, the shape the spec now states), `attach` and `resize`; legacy had `attach`/`resize` (raw, the same shape) and read logs from their files only. A line's `at` on the wire is UTC to the millisecond; the log file keeps legacy's UTC seconds, its files 0600 and a directory made for them, or a legacy one holding the job's log, 0700 (legacy: 0755, 0644); any other directory a start names keeps its mode.
   - **Shared jobs**, as legacy: claims as the reference count, the main checkout's hold, a namespace created per worktree with retries and noted in the service's log, `released` where legacy answered `released: true`; a claim announces its own `job.started` and `job.stopped`, and a shared job's events carry `held_by`.
@@ -642,6 +643,38 @@ No `run` command runs on next yet (LUC-339): the proof drives the daemon raw ove
   - **The client SIGTERMed whatever held the socket** when it refused `shutdown` (it killed `wtm-next daemon`): next names it and waits for it, `daemon.busy` (`TestEnsureWaitsForAProcessThatIsNoRunDaemonThenRefusesIt`). The legacy client keeps the bug: `internal/` is frozen.
   - **A job no longer up kept its start time**, so `run ps` drew a reaped job's uptime ticking: `started_at` only while up (`24`; `daemon` `TestAStartTimeIsGivenOnlyWhileTheJobIsUp`).
   - **A line that is no JSON got no answer** from next's bus: the run daemon refuses it, `daemon.invalid_request` (`18`; `TestARequestTheDaemonCannotReadIsRefusedWithItsCode`).
+
+# Proof: `wtm run up` (legacy `flow/run/up`) vs `wtm-next run up`
+
+The reference is the legacy `wtm run up` of 0.30.1. Its output differs by design (next speaks the v2 envelope, plans before it starts anything and refuses a request with its field errors), so the proof compares what each leaves on disk and keeps both outputs side by side.
+
+- `run-up.sh <wtm> <wtm-next> run-up`: two identical sandboxes, one after the other, each with its own HOME (so its own run daemon, socket and index), torn down before the next starts (every job stopped, the compose stack's `docker compose down` run, the daemon stopped): the `docs/demos` "acme" project widened with a task `migrate` whose `touches` reach `db`, a shared service `db` with a namespace whose create appends it to `~/namespaces.txt`, a compose stack `cache` (redis, `docker compose up -d` / `down`), a service `crashy` that exits 1 at once, a task `fail` that exits 3; profiles `dev` (default: api, web), `full`, `broken`, `crash`; worktrees `feat/a`, `feat/b` and `feat/v` (verbatim, sharing main's ports). After each scenario the exit code, stdout, stderr and the state (the daemon's index of the jobs up with each one's hold and profile, every meta.json's ordinal, namespaces and isolation, the jobs' logs, the namespaces made, the compose containers); `run-up/states.diff` holds the differences. Then, in a fresh sandbox per side with feat/b's jobs up, the wizard in tmux at 100×40: `run-up/tty/legacy/` (its live view, left with q) and `run-up/tty/next/` (the recap, then the outcome).
+  1. `dev` in feat/a, `-d`
+  2. the same again: every job up
+  3. `full` in feat/b, JSON: the task, the shared `db` joined (its namespace made and recorded), the stack, the services
+  4. `broken` in feat/a: the task fails
+  5. `crash` in feat/b: `crashy` exits once launched
+  6. `full` in feat/v: `migrate` changes its source's data
+  7. `dev` in main
+  8. `dev` in feat/v, whose ports main's jobs hold
+  9. an unknown profile
+  10. `--exclusive` with two worktrees
+  11. an unknown worktree, JSON
+  12. `--exclusive` in feat/v: the other worktrees' jobs stopped first
+  13. a dry run (next only)
+- The states differ only by:
+  - **the profile each job was started under**, kept in the index and listed by the daemon (Q4), which the legacy wtm neither writes nor reads;
+  - **feat/v's ordinal**: legacy numbers a verbatim worktree when it starts its jobs (`ordinal: 3`); next numbers only a worktree whose ports derive from an ordinal (isolated, with a port, a namespace or compose declared), and a verbatim worktree's ports are its source's;
+  - **the logs of jobs another profile ran**: legacy removes them before a start (`feat/b/migrate.log` gone at 5); next keeps them (a follow-up).
+- The differences, all deliberate (the spec's departures D1–D16, approved by the owner):
+  - **The uniform human output**: a line per job as it ends on stderr (`✓ feat/a · api (2ms)`), then the tally (`✓ run up: 1 done`, `= run up: 1 unchanged` when every job was up, 2), the recap (worktrees, profile, the jobs with `(up)` or `(joined, in main)`, each worktree's URLs), the anomalies named (a job that failed with its last lines and its log, a port nothing answers on), and the next steps: the start again where it did not pass with its worktree and profile (`run-up.retry`), `run logs` and `run down` of a worktree left with jobs up. Legacy prints each job's step, the task's raw output at column 0, `Where to reach it`, and `→ wtm run up` / `wtm run logs` / `wtm run down` naming no worktree nor profile.
+  - **JSON is the v2 envelope**: an item per worktree whose detail lists every job of the profile with its status (`started`, `up`, `joined`, `done`, `failed`, `crashed`, `not_started`), URL, log and ports (3); legacy prints an array of `{branch, path, profile, aborted, jobs}` leaving the jobs never reached out, and prints its refusals as text even with `--output json` (11).
+  - **A service that ends once launched fails its worktree** (`run-up.crashed`, exit 1, its last line in the detail; 5); legacy reports it `started`, exit 0. A crash past the moment the start checks is the events' and the live view's to show.
+  - **The refusals under the shared rules**: a job changing foreign data is refused 23 (`run-up.unsafe`, a `run-up.foreign_data` problem per job, followed by the request forced; 6), a port another worktree holds 23 (`run-up.port_clash`, followed by the start with `--exclusive`; 8), an unknown profile or `--exclusive` beside several worktrees 2 (9, 10), an unknown worktree 2 (11; legacy 1, its names matched as substrings); legacy exits 1, 14 for the profile.
+  - **A recap and a confirmation** before anything starts or stops, and `--dry-run` / `--expect-fingerprint` (13; the wizard in `tty/next/4-recap.txt`); legacy starts as soon as its last question is answered.
+  - **No live view yet**: next returns once the jobs are started, `-d` or not (the run view is LUC-339's last PR); legacy opens it (`tty/legacy/4-view.txt`) and recaps when it is left.
+  - **Reads warn of a daemon of another build**: list, tree and status now say `! the run daemon is the legacy wtm's: restart it to start jobs beside its own` (`<command>.daemon_skew`, followed by `run daemon restart`) where their proofs start jobs with the legacy wtm (list 06, 07, 13 to 16, its picker; tree 07, 08, 10, 16 to 18; status 11, 12; daemon 02, 28), and list's and tree's `run_up` action names `run-up`.
+  - **Not yet in next**: legacy's notice that main's `.env` still spells ports (`addressing`), its Next.js dev-origins hint, its removal of other profiles' logs, and its offer to silence a port nothing answers on by writing `probe = false` into run.toml (dropped: a silent port is the warning `run-up.port_silent`).
 
 # Deliberate differences from legacy
 

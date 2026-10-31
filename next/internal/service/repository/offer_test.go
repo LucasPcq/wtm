@@ -21,7 +21,7 @@ func TestEachActionIsOfferedWithItsFollowUpOrRefusedWithWhy(t *testing.T) {
 	}
 	assert.Equal(t, worktree.UnofferedMainWorktree, *offerOf(t, offers, worktree.ActionClean).Refused)
 	assert.Equal(t, &domain.FollowUp{
-		Command: "run up",
+		Command: domain.CommandRunUp,
 		Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"main"}}},
 		Code:    "list.run_up",
 		Message: "Start the profile",

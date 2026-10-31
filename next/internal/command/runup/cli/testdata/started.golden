@@ -1,0 +1,11 @@
+
+  ✓ run up: 1 done
+
+  Worktrees  feat/a
+  Profile    dev
+  Jobs       migrate, api, web
+  feat/a     api  http://api.feat-a.main.localhost:11080, web  http://web.feat-a.main.localhost:11080
+
+  → wtm run logs feat/a   follow feat/a's output
+  → wtm run down feat/a   stop feat/a's jobs
+

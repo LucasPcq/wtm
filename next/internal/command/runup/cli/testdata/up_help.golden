@@ -1,0 +1,45 @@
+
+  Start every job of a profile, in its order, in each worktree named, or in the one you stand in.
+  It starts --profile, else run.toml's default profile, else its only one; a run.toml with no
+  profile starts every job. Several worktrees start at once, each on its own: one that fails
+  leaves the others running, and the run exits 1.
+
+  A task runs to its end before the next job starts, and its failure stops that worktree's start;
+  a service is launched and left running. A shared service runs once, in the main checkout, and
+  each worktree holds it. Once the jobs are up, each port they declare is checked, and a service
+  that ended since fails the start (--no-probe and run.toml's port_probe_timeout skip the check).
+
+  When other worktrees run jobs, it asks whether to stop them first, unless --exclusive,
+  --parallel or run.toml's concurrency answers; --yes keeps them. A job whose touches reach data
+  the worktree does not own is refused unless --force.
+
+  Usage:
+    wtm-next run up [worktree...] [flags]
+
+  Examples:
+    # The default profile, in the worktree you stand in
+    wtm run up
+
+    # Two worktrees, another profile
+    wtm run up feat/login fix/typo --profile backend
+
+    # For a script or an agent, with the v2 JSON envelope
+    wtm run up feat/login --yes --output json
+
+  Flags:
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+    -d, --detach                      Return once the jobs are started (the command line shows no live view yet)
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --exclusive                   Stop the jobs the other worktrees run before starting (one worktree only)
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+        --force                       Start a job whose touches reach data the worktree does not own (its source's, or a shared service's with no namespace)
+    -h, --help                        help for up
+        --no-probe                    Skip the check that each declared port answers
+        --output string               Output format: text or json (default "text")
+        --parallel                    Keep the other worktrees' jobs running, whatever run.toml's concurrency says
+        --profile string              The profile of run.toml to start (default: the one marked default, or the only one)
+    -y, --yes                         Run unattended: no question, no confirmation (the worktree you stand in and run.toml's default profile unless given; the other worktrees' jobs keep running unless --exclusive)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

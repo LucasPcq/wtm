@@ -84,7 +84,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	facts.Stack = worktree.StackOf(repo.Worktrees, facts.Records, repo.Config.Worktrees.BaseBranch)
 	worktrees := facts.Checkouts()
 	var read []State
-	facts.Asked = repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, PullRequests: u.PullRequests, Branches: repo.Live(), WithPRs: req.WithPRs}, func() {
+	facts.Asked = repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, Restart: u.Repository.Restart, PullRequests: u.PullRequests, Branches: repo.Live(), WithPRs: req.WithPRs}, func() {
 		read = repository.Each(worktrees, func(w worktree.Worktree) State { return u.state(ctx, facts, w) })
 	})
 

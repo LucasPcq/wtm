@@ -57,6 +57,16 @@ func (p *provisioning) number(ctx context.Context, provisioned *Provisioned) err
 	return nil
 }
 
+// Number gives the worktree of branch the lowest ordinal no other worktree
+// holds and records it in its meta record, written when it has none, under the
+// ordinals' lock so two runs never pick the same one: a worktree wtm-next did
+// not create, numbered the first time something needs its ports.
+func (s Service) Number(ctx context.Context, branch string) (int, error) {
+	p := &provisioning{Service: s}
+	p.Worktree.Branch = branch
+	return p.allocate(ctx)
+}
+
 // allocate picks the lowest ordinal no other worktree holds and records it in
 // the worktree's meta.json, under the ordinals' lock so two runs cannot pick
 // the same one.

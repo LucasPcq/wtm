@@ -1,0 +1,50 @@
+[
+  {
+    "type": "operation.started",
+    "command": "run-up",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "main"
+  },
+  {
+    "type": "phase.started",
+    "subject": "main",
+    "phase": "job",
+    "job": "seed",
+    "log": "<root>/main/.git/wtm/logs/main/seed.log"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "main",
+    "phase": "job",
+    "job": "seed",
+    "failed": false
+  },
+  {
+    "type": "phase.started",
+    "subject": "main",
+    "phase": "job",
+    "job": "lint",
+    "log": "<root>/main/.git/wtm/logs/main/lint.log"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "main",
+    "phase": "job",
+    "job": "lint",
+    "failed": false
+  },
+  {
+    "type": "unit.finished",
+    "subject": "main",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "run-up",
+    "surface": "api",
+    "ok": true
+  }
+]

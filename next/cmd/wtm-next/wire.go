@@ -18,6 +18,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	"github.com/LucasPcq/wtm/next/internal/adapter/github"
 	"github.com/LucasPcq/wtm/next/internal/adapter/oplock"
+	"github.com/LucasPcq/wtm/next/internal/adapter/portprobe"
 	"github.com/LucasPcq/wtm/next/internal/adapter/proxyport"
 	reposjson "github.com/LucasPcq/wtm/next/internal/adapter/registry"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
@@ -38,6 +39,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/reparent"
 	reparentcli "github.com/LucasPcq/wtm/next/internal/command/reparent/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
+	"github.com/LucasPcq/wtm/next/internal/command/runup"
+	runupcli "github.com/LucasPcq/wtm/next/internal/command/runup/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	synccommand "github.com/LucasPcq/wtm/next/internal/command/sync"
 	synccli "github.com/LucasPcq/wtm/next/internal/command/sync/cli"
@@ -48,6 +51,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/registry"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/LucasPcq/wtm/next/internal/service/teardown"
+	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
 
 const opIDBytes = 8
@@ -74,6 +78,7 @@ type app struct {
 	Resolve     resolve.UseCase
 	Status      status.UseCase
 	Tree        tree.UseCase
+	RunUp       runup.UseCase
 }
 
 // wire builds each adapter of the repository params locates once and injects it into every use case.
@@ -91,7 +96,8 @@ func wire(params wireParams) app {
 	}
 
 	meta := store.Meta{StateDir: params.StateDir}
-	jobs := runDaemon().Jobs
+	runs := runDaemon()
+	jobs := runs.Jobs
 	gh := github.GitHub{Dir: params.MainPath}
 
 	provisions := provision.Service{
@@ -221,8 +227,24 @@ func wire(params wireParams) app {
 			PullRequests: gh.PullRequestsOf,
 			Repository:   facts,
 		},
+		RunUp: runup.UseCase{
+			Git:        repo,
+			Meta:       meta,
+			EnvFiles:   store.EnvFiles{},
+			Daemon:     runs,
+			Listening:  portprobe.Listening,
+			StateDir:   params.StateDir,
+			CommonDir:  bus.Resolved(params.CommonDir),
+			Settle:     runSettle,
+			Repository: facts,
+			Operations: operations,
+			Provision:  provisions,
+		},
 	}
 }
+
+// runSettle is how long run up waits, once its services are launched and no port check waits, for one that fails at once to end: a process that cannot bind its port exits within instants of its spawn, after the start that spawned it returned.
+const runSettle = time.Second
 
 // fetchedOnce is the repository as prune reads it, origin fetched once however often one opened command plans: the wizard plans at each of its steps, and a request naming no worktree plans again under the locks it finds.
 type fetchedOnce struct {
@@ -273,7 +295,7 @@ func (r refFetchedOnce) FetchRef(ctx context.Context, name string) error {
 
 // facts reads the repository params locates, as every use case decides from it.
 func (p wireParams) facts() repository.Service {
-	return repository.Service{Config: config.Project{StateDir: p.StateDir, GlobalPath: config.GlobalPath()}, Git: git.Repo{Dir: p.MainPath}, MainPath: p.MainPath, Init: initialize()}
+	return repository.Service{Config: config.Project{StateDir: p.StateDir, GlobalPath: config.GlobalPath()}, Git: git.Repo{Dir: p.MainPath}, MainPath: p.MainPath, Init: initialize(), Restart: restartDaemon()}
 }
 
 // repo is how the event bus and the registry name the repository params locates.
@@ -295,6 +317,11 @@ func leftBehind(branch string) domain.FollowUp {
 // initialize sets wtm up in a repository that has no config, in the legacy wtm until init migrates.
 func initialize() *domain.FollowUp {
 	return &domain.FollowUp{Command: domain.CommandInit}
+}
+
+// restartDaemon hands the jobs of a run daemon of another build over to one of this build: run daemon restart.
+func restartDaemon() *domain.FollowUp {
+	return &domain.FollowUp{Command: commandRestartDaemon}
 }
 
 // settle settles a worktree's env ports, in the legacy wtm until env migrates.
@@ -322,6 +349,10 @@ func commandLine(followUp domain.FollowUp) []string {
 		return execcli.Line(followUp)
 	case reparent.Name:
 		return reparentcli.Line(followUp)
+	case runup.Name:
+		return runupcli.Line(followUp)
+	case commandRestartDaemon:
+		return []string{cli.Program, "run", "daemon", "restart"}
 	}
 
 	argv, _ := spelled(followUp)

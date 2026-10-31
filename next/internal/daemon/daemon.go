@@ -735,6 +735,7 @@ func (j *job) viewLocked(public int) run.Job {
 	view := run.Job{
 		Name:      spec.Job.Name,
 		WorkDir:   spec.WorkDir,
+		Profile:   spec.Profile,
 		Up:        j.up(),
 		Kind:      spec.Job.Kind,
 		State:     j.state,

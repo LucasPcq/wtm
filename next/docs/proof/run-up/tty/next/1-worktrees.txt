@@ -1,0 +1,14 @@
+$ wtm run up; echo EXIT=$?
+
+  Step 1/8 • Worktrees
+
+  The worktrees to start the profile in, by branch, or by path on no branch (default: the one you
+  stand in)
+
+▌› [x] main                                                                                current
+   [ ] feat/a
+   [ ] feat/b — runs dev: api, web
+   [ ] feat/v
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel
+

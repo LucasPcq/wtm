@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
@@ -133,6 +134,27 @@ func mutations() []mutation {
 			applied: func(t *testing.T, main string) {
 				assert.NoDirExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-done"))
 				assert.Empty(t, gittest.Output(t, main, "branch", "--list", "feat/done"))
+			},
+		},
+		{
+			name:     runup.Name,
+			answers:  []domain.Answered{{Path: domain.PathWorktree, Values: []string{"main"}}},
+			complete: true,
+			// a task, which runs to its end, under a daemon of the test's own at the socket the commands reach, in a home short enough for it
+			setup: func(t *testing.T, main string) {
+				writeRun(t, main, seedJob)
+				t.Setenv("HOME", shortDir(t))
+				serving(t, daemonParams{Socket: events.SocketPath()})
+			},
+			// a job more in run.toml: the profile starts another
+			stale: func(t *testing.T, main string) {
+				writeRun(t, main, seedJob+"\n[[job]]\nname = \"lint\"\nkind = \"task\"\ncmd = \"true\"\n")
+			},
+			untouched: func(t *testing.T, _ string) {
+				assert.Empty(t, daemonJobs(t))
+			},
+			applied: func(t *testing.T, _ string) {
+				assert.Len(t, daemonJobs(t), 2)
 			},
 		},
 		{
@@ -286,3 +308,6 @@ func eventsOfEachType() []domain.Event {
 		domain.JobExited{JobChange: domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/a", Path: "/repo/.trees/feat-a"}, Job: domain.EventJob{Name: "migrate", Kind: project.Task, Hold: run.HoldOwn}, ExitCode: new(0)}},
 	}
 }
+
+// seedJob is a run.toml of one task, which run up runs to its end.
+const seedJob = "[[job]]\nname = \"seed\"\nkind = \"task\"\ncmd = \"true\"\n"

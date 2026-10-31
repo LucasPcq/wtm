@@ -88,6 +88,9 @@ export const skipWords: Record<DomainSkip, string | null> = {
   no_descendant: 'no worktree asked has worktrees under it',
   no_rebase: 'nothing is rebased',
   nothing_to_push: 'nothing would be pushed',
+  one_profile: 'run.toml declares one profile or none',
+  alone: 'no other worktree runs jobs',
+  configured: 'run.toml answers it',
 }
 
 export const actionWords: Record<CreateAction, string> = {

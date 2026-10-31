@@ -40,6 +40,34 @@ func TestAWorktreeGetsTheSmallestOrdinalNoLiveWorktreeHolds(t *testing.T) {
 	assert.Equal(t, "main", recorded.SourceBranch)
 }
 
+func TestAnExistingWorktreeIsNumberedPastItsNeighboursAndKeepsItsRecord(t *testing.T) {
+	w, files := inMemory(t, seeds{
+		Worktrees: []worktree.Worktree{
+			{Path: "/trees/a", State: worktree.OnBranch{Branch: "feat/a"}},
+			{Path: "/trees/b", State: worktree.OnBranch{Branch: "feat/b"}},
+		},
+		Store: storetest.FakeParams{Meta: map[string]worktree.Meta{"feat/a": {Ordinal: 1}, "feat/b": {SourceBranch: "main"}}},
+	})
+
+	ordinal, err := w.service.Number(t.Context(), "feat/b")
+
+	require.NoError(t, err)
+	assert.Equal(t, 2, ordinal)
+	recorded, _ := files.Meta("feat/b")
+	assert.Equal(t, worktree.Meta{SourceBranch: "main", Ordinal: 2}, recorded)
+}
+
+func TestAWorktreeWithNoRecordIsNumberedAndRecorded(t *testing.T) {
+	w, files := inMemory(t, seeds{Worktrees: []worktree.Worktree{{Path: "/trees/b", State: worktree.OnBranch{Branch: "feat/b"}}}})
+
+	ordinal, err := w.service.Number(t.Context(), "feat/b")
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, ordinal)
+	recorded, _ := files.Meta("feat/b")
+	assert.Equal(t, 1, recorded.Ordinal)
+}
+
 func TestTheProvisionedRecordCarriesItsOrdinal(t *testing.T) {
 	w, files := inMemory(t, seeds{Store: storetest.FakeParams{Meta: map[string]worktree.Meta{"feat/a": {Ordinal: 1}}}, Worktrees: []worktree.Worktree{{Path: "/trees/a", State: worktree.OnBranch{Branch: "feat/a"}}}})
 

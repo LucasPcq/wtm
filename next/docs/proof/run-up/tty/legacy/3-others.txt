@@ -1,0 +1,18 @@
+$ wtm run up; echo EXIT=$?
+
+  Step 3/3 • Other worktrees are running jobs
+
+  ✓ Worktrees: main
+  ✓ Profile: dev
+
+  feat-b (api, web). Each worktree has its own ports and resource names, so they can run side by
+  side — at the cost of running them all at once.
+
+▌▸ Keep them all running
+   Keep them all running — always for this project
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   Stop the other worktrees' jobs first
+   Stop the other worktrees' jobs first — always for this project
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

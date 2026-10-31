@@ -43,11 +43,14 @@ const (
 	SkipNoDescendant    Skip = "no_descendant"    // no worktree asked has worktrees under it
 	SkipNoRebase        Skip = "no_rebase"        // nothing is rebased: no conflict can stop it
 	SkipNothingToPush   Skip = "nothing_to_push"  // nothing would be pushed: no branch that may move is on origin
+	SkipOneProfile      Skip = "one_profile"      // run.toml declares one profile or none: there is no other to start
+	SkipAlone           Skip = "alone"            // no other worktree runs jobs: nothing to keep or stop
+	SkipConfigured      Skip = "configured"       // run.toml answers it
 )
 
 // Skips returns every Skip.
 func Skips() []Skip {
-	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe, SkipNoCandidate, SkipNoDescendant, SkipNoRebase, SkipNothingToPush}
+	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe, SkipNoCandidate, SkipNoDescendant, SkipNoRebase, SkipNothingToPush, SkipOneProfile, SkipAlone, SkipConfigured}
 }
 
 // Answer is the value a question settled on, and where that value came from.
@@ -70,6 +73,10 @@ type Option struct {
 	Changes   int                   `json:"changes,omitempty"`      // the uncommitted changes the worktree holds
 	Change    *worktree.Change      `json:"change,omitempty"`       // the uncommitted change it is
 	PR        *worktree.PullRequest `json:"pull_request,omitempty"` // the pull request it is
+	Default   bool                  `json:"default,omitempty"`      // a profile run.toml marks as the one to start
+	Jobs      []string              `json:"jobs,omitempty"`         // a profile's jobs, in the order they start
+	Up        []string              `json:"up,omitempty"`           // the jobs up in a worktree, sorted
+	Profile   string                `json:"profile,omitempty"`      // the profile a worktree's jobs up were started under, empty when they say none
 	Problem   *FieldError           `json:"problem,omitempty"`      // the problem picking it raises, nil when it raises none
 }
 

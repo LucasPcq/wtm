@@ -15,7 +15,8 @@
         "list",
         "resolve",
         "status",
-        "tree"
+        "tree",
+        "run-up"
       ]
     },
     "checkout.Action": {
@@ -1392,11 +1393,20 @@
         "changes": {
           "type": "integer"
         },
+        "default": {
+          "type": "boolean"
+        },
         "detached": {
           "type": "boolean"
         },
         "gone": {
           "type": "boolean"
+        },
+        "jobs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "operation": {
           "$ref": "#/$defs/worktree.Operation"
@@ -1410,11 +1420,20 @@
         "problem": {
           "$ref": "#/$defs/domain.FieldError"
         },
+        "profile": {
+          "type": "string"
+        },
         "pull_request": {
           "$ref": "#/$defs/worktree.PullRequest"
         },
         "tag": {
           "$ref": "#/$defs/domain.OptionTag"
+        },
+        "up": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "value": {
           "type": "string"
@@ -1587,7 +1606,10 @@
         "no_candidate",
         "no_descendant",
         "no_rebase",
-        "nothing_to_push"
+        "nothing_to_push",
+        "one_profile",
+        "alone",
+        "configured"
       ]
     },
     "domain.TextField": {
@@ -3979,6 +4001,205 @@
       },
       "type": "array"
     },
+    "run-up.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "run-up"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/runup.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/runup.Plan"
+        }
+      }
+    },
+    "run-up.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "worktree"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "profile"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "exclusive"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "force"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "parallel"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "no_probe"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "detach"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
     "run.State": {
       "description": "A job's state.",
       "enum": [
@@ -3988,6 +4209,301 @@
         "exited",
         "stopped"
       ]
+    },
+    "runup.Action": {
+      "description": "What a start does to one job of its profile.",
+      "enum": [
+        "start",
+        "up",
+        "join"
+      ]
+    },
+    "runup.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runup.JobResult"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "profile",
+        "jobs"
+      ],
+      "type": "object"
+    },
+    "runup.JobPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/runup.Action"
+        },
+        "kind": {
+          "$ref": "#/$defs/project.JobKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "ports": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "shared_in": {
+          "type": "string"
+        },
+        "step": {
+          "type": "integer"
+        },
+        "waits_for": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "action"
+      ],
+      "type": "object"
+    },
+    "runup.JobResult": {
+      "additionalProperties": false,
+      "properties": {
+        "exit_code": {
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/project.JobKind"
+        },
+        "lines": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "log": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "ports": {
+          "items": {
+            "$ref": "#/$defs/runup.Port"
+          },
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/runup.JobStatus"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "status"
+      ],
+      "type": "object"
+    },
+    "runup.JobStatus": {
+      "description": "What became of one job of a start.",
+      "enum": [
+        "started",
+        "up",
+        "joined",
+        "done",
+        "failed",
+        "crashed",
+        "not_started"
+      ]
+    },
+    "runup.Other": {
+      "additionalProperties": false,
+      "properties": {
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "path",
+        "jobs"
+      ],
+      "type": "object"
+    },
+    "runup.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "empty": {
+          "type": "boolean"
+        },
+        "exclusive": {
+          "type": "boolean"
+        },
+        "no_probe": {
+          "type": "boolean"
+        },
+        "others": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runup.Other"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "profile": {
+          "type": "string"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "worktrees": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runup.Target"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "profile",
+        "worktrees",
+        "exclusive",
+        "others",
+        "no_probe"
+      ],
+      "type": "object"
+    },
+    "runup.Port": {
+      "additionalProperties": false,
+      "properties": {
+        "listening": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "port",
+        "listening"
+      ],
+      "type": "object"
+    },
+    "runup.Target": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runup.JobPlan"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "main": {
+          "type": "boolean"
+        },
+        "numbered": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "path",
+        "numbered",
+        "jobs"
+      ],
+      "type": "object"
     },
     "status.Base": {
       "additionalProperties": false,

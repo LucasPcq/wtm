@@ -1,0 +1,1 @@
+  ! crashy exited right after starting (crashed, exit 1) — see `wtm run logs --job crashy`

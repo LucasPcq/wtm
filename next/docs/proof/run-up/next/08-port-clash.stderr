@@ -1,0 +1,6 @@
+
+  ✗ nothing started: ports another worktree holds: 24351 (main's api), 24350 (main's web)
+    feat/v's api would bind 24351, which main's api holds
+    feat/v's web would bind 24350, which main's web holds
+  → wtm run up feat/v --detach --exclusive --profile dev   stop the other worktrees' jobs first
+

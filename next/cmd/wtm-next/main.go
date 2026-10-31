@@ -18,6 +18,7 @@ import (
 	prunecli "github.com/LucasPcq/wtm/next/internal/command/prune/cli"
 	reparentcli "github.com/LucasPcq/wtm/next/internal/command/reparent/cli"
 	resolvecli "github.com/LucasPcq/wtm/next/internal/command/resolve/cli"
+	runupcli "github.com/LucasPcq/wtm/next/internal/command/runup/cli"
 	statuscli "github.com/LucasPcq/wtm/next/internal/command/status/cli"
 	synccli "github.com/LucasPcq/wtm/next/internal/command/sync/cli"
 	treecli "github.com/LucasPcq/wtm/next/internal/command/tree/cli"
@@ -59,7 +60,15 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		statuscli.New(streams, env, openStatus, commandLine),
 		treecli.New(streams, env, openTree, commandLine),
 		eventscli.New(streams, env, systemStream(), commandLine),
+		runCmd(runupcli.New(streams, env, openRunUp, commandLine), runDaemonCmd()),
 		uiCmd(env),
 		daemonCmd(),
 	}
+}
+
+// runCmd is run, the parent of the commands that start, watch and stop the jobs of run.toml.
+func runCmd(commands ...*cobra.Command) *cobra.Command {
+	cmd := &cobra.Command{Use: "run", Short: "Start, watch and stop the jobs of run.toml", Args: cobra.NoArgs}
+	cmd.AddCommand(commands...)
+	return cmd
 }
