@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -89,6 +90,15 @@ func TestADaemonBusyNeverIdlesOutAndStopsWhatItHostsBeforeItEnds(t *testing.T) {
 		require.FailNow(t, "the daemon did not idle out once no longer busy")
 	}
 	assert.True(t, stopped.Load(), "what it hosts was not stopped")
+}
+
+func TestOnlyItsOwnerMayConnectToTheDaemon(t *testing.T) {
+	socket, _ := serving(t, time.Minute)
+
+	info, err := os.Stat(socket)
+
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }
 
 func TestASubscriberKeepsTheDaemonUp(t *testing.T) {

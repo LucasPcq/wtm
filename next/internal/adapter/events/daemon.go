@@ -122,6 +122,10 @@ func Serve(ctx context.Context, params ServeParams) error {
 		return err
 	}
 	defer os.Remove(params.SocketPath)
+	// A request on it runs a command as this user: no one else may connect.
+	if err := os.Chmod(params.SocketPath, 0o600); err != nil {
+		return err
+	}
 
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
