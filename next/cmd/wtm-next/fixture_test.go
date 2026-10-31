@@ -318,23 +318,25 @@ const seedJob = "[[job]]\nname = \"seed\"\nkind = \"task\"\ncmd = \"true\"\n"
 type restarting struct {
 	jobs      []run.Job
 	in        string
-	out       bytes.Buffer
+	out       bytes.Buffer // what it says it did
+	said      bytes.Buffer // what it found, and its question
 	shutdowns int
 }
 
-// params are the restart of r, its daemon of skewed's build (this one's when nil).
-func (r *restarting) params(skewed *run.Skewed, ask, yes bool) restartParams {
+// params are the restart of r, its daemon's jobs read with err beside them (a *run.Skewed, a protocol's *run.Error, nil for this build's).
+func (r *restarting) params(err error, ask, yes bool) restartParams {
 	return restartParams{
 		Jobs: func(context.Context) ([]run.Job, error) {
-			if skewed == nil {
+			if err == nil {
 				return r.jobs, nil
 			}
-			return r.jobs, skewed
+			return r.jobs, err
 		},
 		Shutdown: func(context.Context) error { r.shutdowns++; return nil },
 		Ensure:   func(context.Context) error { return nil },
 		In:       strings.NewReader(r.in),
 		Out:      &r.out,
+		Err:      &r.said,
 		CanAsk:   ask,
 		Yes:      yes,
 	}

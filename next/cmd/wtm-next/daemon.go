@@ -190,7 +190,8 @@ func restartCmd(streams *output.Streams, daemon func() restartParams) *cobra.Com
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
 		failing := cli.Run{Command: commandRestartDaemon, Streams: streams}
 		p := daemon()
-		p.In, p.Out, p.CanAsk, p.Yes = streams.In, cmd.OutOrStdout(), streams.CanPrompt(), *yes
+		quiet, _ := cmd.Flags().GetBool(cli.FlagQuiet)
+		p.In, p.Out, p.Err, p.CanAsk, p.Yes, p.Quiet = streams.In, cmd.OutOrStdout(), cmd.ErrOrStderr(), streams.CanPrompt(), *yes, quiet
 		if failure := domain.AsError(domain.AsErrorParams{Err: restartDaemon(cmd.Context(), p)}); failure != nil {
 			return failing.FailWith(failure, nil)
 		}
@@ -199,15 +200,17 @@ func restartCmd(streams *output.Streams, daemon func() restartParams) *cobra.Com
 	return cmd
 }
 
-// restartParams are the daemon a restart replaces, through what reads its jobs, stops it and starts one of this build; where it asks and says; whether it can ask; and whether --yes answered. Its failures are *domain.Error, by kind: unattended without --yes invalid, declined cancelled.
+// restartParams are the daemon a restart replaces, through what reads its jobs, stops it and starts one of this build; where it asks, and says what it found (Err), where it says it restarted (Out, silent when Quiet); whether it can ask; and whether --yes answered. Its failures are *domain.Error, by kind: unattended without --yes invalid, declined cancelled.
 type restartParams struct {
 	Jobs     func(ctx context.Context) ([]run.Job, error)
 	Shutdown func(ctx context.Context) error
 	Ensure   func(ctx context.Context) error
 	In       io.Reader
 	Out      io.Writer
+	Err      io.Writer
 	CanAsk   bool
 	Yes      bool
+	Quiet    bool
 }
 
 // The codes of a restart not made: unattended without --yes, or declined.
@@ -216,35 +219,35 @@ const (
 	codeRestartDeclined    = "run.restart_declined"
 )
 
-// restartDaemon replaces a daemon of another build by one of this build, once the user saw what stops and agreed; a daemon of this build, or none, is left as it is, and one that died leaving jobs in its index is taken over by a new one.
+// restartDaemon replaces a daemon of another build or protocol by one of this build, once the user saw what stops and agreed; a daemon of this build, or none, is left as it is, and one that died leaving jobs in its index is followed by a new one.
 func restartDaemon(ctx context.Context, p restartParams) error {
 	jobs, err := p.Jobs(ctx)
 	skewed, isSkewed := errors.AsType[*run.Skewed](err)
+	refused, _ := errors.AsType[*run.Error](err)
+	protocol := refused != nil && refused.Code == run.CodeSkew
 	switch {
 	case errors.Is(err, run.ErrUnknown):
 		if err := p.Ensure(ctx); err != nil {
 			return err
 		}
-		output.Frame(p.Out, func(w io.Writer) {
-			output.SuccessLine(w, "A run daemon of this build took over the jobs its index held")
-		})
+		p.said("A run daemon of this build runs: the stacks and claims of its index are kept, the services a daemon that died left are stopped")
 		return nil
-	case err != nil && !isSkewed:
+	case err != nil && !isSkewed && !protocol:
 		return err
 	case err == nil:
-		output.Frame(p.Out, func(w io.Writer) {
-			output.Message(w, "The run daemon is of this build, or none runs: nothing to restart")
-		})
+		p.said("The run daemon is of this build, or none runs: nothing to restart")
 		return nil
 	}
 
-	stops, kept := restartReach(jobs)
-	daemon := "of another build (" + cmp.Or(skewed.Daemon, "older") + ")"
-	if skewed.Skew == run.SkewLegacy {
-		daemon = "the legacy wtm's"
-	}
-	output.Frame(p.Out, func(w io.Writer) {
-		output.Message(w, "The run daemon is "+daemon+".")
+	output.Frame(p.Err, func(w io.Writer) {
+		if protocol {
+			output.Message(w, "The run daemon speaks another protocol: its jobs can't be read.")
+			output.Message(w, "Stops:  every service it runs itself")
+			output.Message(w, "Kept:   its stacks, in its index")
+			return
+		}
+		stops, kept := restartReach(jobs)
+		output.Message(w, "The run daemon is "+daemonOf(skewed)+".")
 		output.Message(w, "Stops:  "+cmp.Or(strings.Join(stops, ", "), "nothing"))
 		output.Message(w, "Kept:   "+cmp.Or(strings.Join(kept, ", "), "nothing"))
 	})
@@ -252,7 +255,7 @@ func restartDaemon(ctx context.Context, p restartParams) error {
 		if !p.CanAsk {
 			return &domain.Error{Kind: domain.KindInvalid, Code: codeRestartUnconfirmed, Message: "nothing restarted: pass --yes to restart it unattended"}
 		}
-		fmt.Fprint(p.Out, "  Restart it? [y/N] ")
+		fmt.Fprint(p.Err, "  Restart it? [y/N] ")
 		answer, _ := bufio.NewReader(p.In).ReadString('\n')
 		if !strings.EqualFold(strings.TrimSpace(answer), "y") {
 			return &domain.Error{Kind: domain.KindCancelled, Code: codeRestartDeclined, Message: "nothing restarted"}
@@ -264,8 +267,24 @@ func restartDaemon(ctx context.Context, p restartParams) error {
 	if err := p.Ensure(ctx); err != nil {
 		return err
 	}
-	output.Frame(p.Out, func(w io.Writer) { output.SuccessLine(w, "The run daemon restarted as wtm-next "+version) })
+	p.said("The run daemon restarted as wtm-next " + version)
 	return nil
+}
+
+// said writes what the restart did on Out, framed, unless Quiet.
+func (p restartParams) said(done string) {
+	if p.Quiet {
+		return
+	}
+	output.Frame(p.Out, func(w io.Writer) { output.SuccessLine(w, done) })
+}
+
+// daemonOf names the daemon of skewed: the legacy wtm's, or of another build.
+func daemonOf(skewed *run.Skewed) string {
+	if skewed.Skew == run.SkewLegacy {
+		return "the legacy wtm's"
+	}
+	return "of another build (" + cmp.Or(skewed.Daemon, "older") + ")"
 }
 
 // restartReach are the jobs up a restart stops, the services the daemon runs itself, and those it keeps, the detached stacks and the holds on shared services, each by its name and worktree.

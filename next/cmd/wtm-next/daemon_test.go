@@ -179,8 +179,9 @@ func TestARestartSaysWhatStopsAndWhatIsKeptThenAsks(t *testing.T) {
 			err := restartDaemon(t.Context(), r.params(skewed, c.ask, c.yes))
 
 			assert.Equal(t, c.stops, r.shutdowns)
-			assert.Contains(t, r.out.String(), "Stops:  web (/wt/a)")
-			assert.Contains(t, r.out.String(), "Kept:   cache (/wt/a), db (/wt/b)")
+			assert.Contains(t, r.said.String(), "Stops:  web (/wt/a)")
+			assert.Contains(t, r.said.String(), "Kept:   cache (/wt/a), db (/wt/b)")
+			assert.NotContains(t, r.out.String(), "Stops", "what it found goes to stderr, beside its question")
 			if c.kind == "" {
 				require.NoError(t, err)
 				return
@@ -217,4 +218,28 @@ func TestARestartExitsWithItsFailuresCode(t *testing.T) {
 			assert.Equal(t, c.want, code)
 		})
 	}
+}
+
+// run up sends a daemon of another protocol here: its jobs cannot be read, and it is replaced all the same once agreed.
+func TestARestartReplacesADaemonOfAnotherProtocol(t *testing.T) {
+	r := &restarting{}
+	protocol := &run.Error{Code: run.CodeSkew, Message: "the run daemon speaks protocol 3, this wtm 2"}
+
+	err := restartDaemon(t.Context(), r.params(protocol, false, true))
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, r.shutdowns)
+	assert.Contains(t, r.said.String(), "its jobs can't be read")
+	assert.Contains(t, r.out.String(), "restarted")
+}
+
+func TestARestartUnderQuietSaysNothingOfWhatItDid(t *testing.T) {
+	r := &restarting{}
+	params := r.params(&run.Skewed{Skew: run.SkewLegacy}, false, true)
+	params.Quiet = true
+
+	require.NoError(t, restartDaemon(t.Context(), params))
+
+	assert.Empty(t, r.out.String())
+	assert.Equal(t, 1, r.shutdowns)
 }
