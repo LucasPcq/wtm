@@ -1,11 +1,12 @@
 import type { TeardownRemoval, WorktreeBlocker } from '@/api/types.gen'
+import { plural } from '@/lib/plural'
 
 // The core words its refusals for the command line; the web says each reason its own way, over the blockers the
 // schema publishes, so a blocker the core adds fails the build until it has words.
 export const blockerWords: Record<WorktreeBlocker, (removal: TeardownRemoval) => string> = {
   locked: () => 'Locked',
   dirty: () => 'Uncommitted changes',
-  unpushed: ({ unpushed = 0 }) => `${unpushed} commit${unpushed === 1 ? '' : 's'} on no other branch`,
+  unpushed: ({ unpushed = 0 }) => `${plural(unpushed, 'commit')} on no other branch`,
   open_pull_request: () => 'An open pull request',
   jobs_running: ({ jobs = [] }) => `Jobs running: ${jobs.join(', ')}`,
 }

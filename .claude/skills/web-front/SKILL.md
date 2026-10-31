@@ -17,7 +17,7 @@ Stack: React 19, Vite, TypeScript 7 (strict, `noUncheckedIndexedAccess`, `exactO
 4. **See it run**: `make ui-dev` against `wtm-next ui --no-open` in a sandbox (`wtm-sandbox` skill). In a sandbox, stop the server with `POST /api/stop` and its token, never by killing a pid.
 5. **`make ui`**, then commit the sources with the `dist/` it writes.
 
-Read `references/design.md` before designing or building any screen: the dialog anatomy, the actions model, colour, rows and pickers, callouts, empty states and outcomes, each with its `wtm/` component.
+Read `references/design.md` before designing or building any screen: the dialog anatomy, the actions model, colour, rows and pickers, alerts, Create's first step, empty states and outcomes, each with its `wtm/` component.
 
 ## Where code goes
 

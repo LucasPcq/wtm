@@ -5,6 +5,7 @@ import type { DomainWarning, PruneCandidate } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert } from '@/features/worktrees/components/alert'
 import { ChildrenStep } from '@/features/worktrees/components/children-step'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
@@ -181,7 +182,7 @@ export function PruneWizard({
       review.data?.error?.message ??
       (rows.data ? undefined : rows.error?.message) ??
       rows.data?.error?.message
-    if (failed) return <p className="text-sm text-destructive">{sentence(failed)}</p>
+    if (failed) return <Alert tone="red" description={sentence(failed)} />
     if (review.isPending || rows.isPending) return <Skeleton className="h-40 w-full" />
 
     if (nothing) return <NothingToPrune />
@@ -237,7 +238,7 @@ export function PruneWizard({
       </DialogBand>
 
       <DialogScroll>
-        {unplanned && <p className="text-sm text-destructive">{sentence(unplanned)}</p>}
+        {unplanned && <Alert tone="red" description={sentence(unplanned)} />}
         <PlanWarnings warnings={notice ? [notice, ...warnings] : warnings} />
         {body()}
       </DialogScroll>

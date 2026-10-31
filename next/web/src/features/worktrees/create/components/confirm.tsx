@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { dryRunQuery } from '@/api/queries/commands'
 import type { DomainAnswered } from '@/api/types.gen'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert } from '@/features/worktrees/components/alert'
 import { Details } from '@/features/worktrees/components/details'
 import { Facts } from '@/features/worktrees/components/facts'
 import { ItemList } from '@/features/worktrees/components/item-list'
@@ -9,13 +10,15 @@ import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { BranchPlan } from '@/features/worktrees/create/components/branch-plan'
 import { planWide } from '@/features/worktrees/utils/outcome'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
+import { refusalOf, sentence } from '@/features/worktrees/utils/sentence'
+import { plural } from '@/lib/plural'
 
 export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswered[] }) {
   const dry = useQuery(dryRunQuery(repo, 'create', answers))
 
   if (dry.isPending) return <Skeleton className="h-40 w-full" />
-  if (dry.isError) return <p className="text-sm text-destructive">{dry.error.message}</p>
-  if (dry.data.error) return <p className="text-sm text-destructive">{dry.data.error.message}</p>
+  if (dry.isError) return <Alert tone="red" description={sentence(dry.error.message)} />
+  if (dry.data.error) return <Alert tone="red" description={refusalOf(dry.data.error)} />
 
   const { plan, warnings } = dry.data
   const branches = plan?.branches ?? []
@@ -35,7 +38,7 @@ export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswer
   const hooks = plan?.on_create ?? []
   const hooked = (branch: (typeof made)[number]) => hooks.length > 0 && (branch.phases ?? []).includes('on_create')
   const summary = [
-    steps > 0 && `${steps} step${steps === 1 ? '' : 's'}`,
+    steps > 0 && plural(steps, 'step'),
     made.some(hooked) && `on_create hook${hooks.length === 1 ? '' : 's'}`,
   ]
     .filter(Boolean)

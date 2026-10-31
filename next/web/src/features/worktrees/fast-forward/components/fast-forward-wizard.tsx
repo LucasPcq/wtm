@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert } from '@/features/worktrees/components/alert'
 import { Details } from '@/features/worktrees/components/details'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
@@ -140,7 +141,7 @@ export function FastForwardWizard({
   const body = () => {
     if (!confirming) {
       if (form.isPending) return <Skeleton className="h-40 w-full" />
-      if (form.isError) return <p className="text-sm text-destructive">{form.error.message}</p>
+      if (form.isError) return <Alert tone="red" description={form.error.message} />
       return (
         <PickerStep
           options={options}
@@ -155,8 +156,8 @@ export function FastForwardWizard({
     }
 
     if (review.isPending) return <Skeleton className="h-32 w-full" />
-    if (review.isError) return <p className="text-sm text-destructive">{review.error.message}</p>
-    if (review.data.error) return <p className="text-sm text-destructive">{review.data.error.message}</p>
+    if (review.isError) return <Alert tone="red" description={review.error.message} />
+    if (review.data.error) return <Alert tone="red" description={review.data.error.message} />
 
     if (empty)
       return (
@@ -237,7 +238,7 @@ export function FastForwardWizard({
 
       <DialogScroll>
         {notice && <PlanWarnings warnings={[notice]} />}
-        {confirming && unplanned && <p className="text-sm text-destructive">{unplanned}</p>}
+        {confirming && unplanned && <Alert tone="red" description={unplanned} />}
         {body()}
       </DialogScroll>
 

@@ -1,5 +1,5 @@
 
-  Step 8/8 • Confirm
+  Step 9/9 • Confirm
 
   ✓ Pull request: #1
   ✓ Parent branch: main
@@ -8,6 +8,7 @@
   · Branch update — nothing to fast-forward: the branch is not a local one behind origin
   · Mine — set by its flag only
   · Review requested — set by its flag only
+  · No fetch — set by its flag only
 
   ┃  Review & confirm
   ┃

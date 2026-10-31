@@ -1,65 +1,40 @@
-import { useReducer } from 'react'
-import type { DomainAnswered, DomainForm } from '@/api/types.gen'
-import { keyOf, problemsByKey } from '@/components/command-form/answers'
+import type { ReactNode } from 'react'
+import type { DomainForm } from '@/api/types.gen'
 import { CommandFields } from '@/components/command-form/command-fields'
-import { useCommandForm } from '@/components/command-form/use-command-form'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Alert } from '@/features/worktrees/components/alert'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
-import { Stepper, type StepState } from '@/features/worktrees/components/stepper'
+import { Stepper } from '@/features/worktrees/components/stepper'
 import { ApplyButton } from '@/features/worktrees/create/components/apply-button'
 import { Confirm } from '@/features/worktrees/create/components/confirm'
 import { NotAsked } from '@/features/worktrees/create/components/not-asked'
-import { nextAsked, stepsOf } from '@/features/worktrees/create/utils/steps'
-import { initialWizard, wizardReducer } from '@/features/worktrees/create/utils/wizard-state'
+import { useWizard } from '@/features/worktrees/create/hooks/use-wizard'
+import { createSteps } from '@/features/worktrees/create/utils/steps'
 import { createWords } from '@/features/worktrees/create/utils/words'
 import type { Start } from '@/features/worktrees/hooks/use-run'
+import { sentence } from '@/features/worktrees/utils/sentence'
 
 export function Wizard({
   repo,
   form: initial,
+  startFrom,
   onStart,
   onCancel,
 }: {
   repo: string
   form: DomainForm
+  startFrom: ReactNode
   onStart: (start: Start) => void
   onCancel: () => void
 }) {
-  const { form, asked, answers, check, problems } = useCommandForm({ repo, command: 'create', form: initial })
-  const [{ at, remember }, dispatch] = useReducer(wizardReducer, initial, initialWizard)
-
-  const steps = stepsOf(asked)
-  const step = steps[at]
-  const confirming = at >= steps.length
-  const request: DomainAnswered[] = [
-    ...answers(),
-    ...(remember.length > 0 ? [{ path: 'remember', values: remember }] : []),
-  ]
-  const previous = Math.max(
-    steps.findLastIndex((candidate, i) => i < at && candidate.asked.length > 0),
-    0,
-  )
-
-  const state = (i: number): StepState => {
-    if (i === at) return 'now'
-    if (i > at) return 'todo'
-    return steps[i]?.asked.length === 0 ? 'skipped' : 'done'
-  }
-
-  // Next asks the core with the answers as typed, not as last checked, and goes by the steps of that answer: a step
-  // with problems shows them rather than a Next that cannot be pressed
-  const next = async () => {
-    const answered = await check()
-    const fresh = stepsOf(answered)
-    const filed = problemsByKey(answered.fields, answered.problems)
-    const here = fresh[at]
-    if (!here?.asked.some((field) => filed[keyOf(field.path)]))
-      return dispatch({ type: 'go', to: nextAsked(fresh, at) })
-
-    for (const field of here.asked) form.setFieldMeta(keyOf(field.path), (meta) => ({ ...meta, isTouched: true }))
-  }
+  const { form, problems, failure, at, step, confirming, request, stepper, remember, back, next } = useWizard({
+    repo,
+    command: 'create',
+    form: initial,
+    stepOf: createSteps,
+  })
 
   return (
     <>
@@ -69,26 +44,24 @@ export function Wizard({
       </DialogHeader>
 
       <DialogBand>
-        <Stepper
-          steps={[
-            ...steps.map(({ title }, i) => ({ title, state: state(i) })),
-            { title: 'Confirm', state: confirming ? 'now' : 'todo' },
-          ]}
-        />
+        <Stepper steps={stepper} />
       </DialogBand>
+
+      {at === 0 && startFrom}
 
       <DialogScroll>
         {step && (
           <div className="flex flex-col gap-6">
+            {failure && <Alert tone="red" description={sentence(failure.message)} />}
             <CommandFields
               form={form}
               fields={step.asked}
               words={createWords}
               problems={problems}
-              remember={{ paths: remember, toggle: (path) => dispatch({ type: 'remember', path }) }}
+              remember={remember}
             />
             {problems[''] && <p className="text-sm text-destructive">{problems['']}</p>}
-            <NotAsked fields={step.skipped} />
+            <NotAsked fields={step.skipped} words={createWords} />
           </div>
         )}
 
@@ -100,7 +73,7 @@ export function Wizard({
           Cancel
         </Button>
         {at > 0 && (
-          <Button variant="outline" onClick={() => dispatch({ type: 'go', to: previous })}>
+          <Button variant="outline" onClick={back}>
             Back
           </Button>
         )}
@@ -113,7 +86,7 @@ export function Wizard({
             )}
           </form.Subscribe>
         )}
-        {confirming && <ApplyButton repo={repo} answers={request} onStart={onStart} />}
+        {confirming && <ApplyButton repo={repo} command="create" answers={request} onStart={onStart} />}
       </DialogFooter>
     </>
   )

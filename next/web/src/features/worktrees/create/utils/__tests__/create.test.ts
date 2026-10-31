@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import type { CreatePlan, DomainField, DomainForm, DomainSkip } from '@/api/types.gen'
-import { planned } from '@/features/worktrees/create/utils/progress'
-import { stepsOf } from '@/features/worktrees/create/utils/steps'
+import { checkoutPlanned, planned } from '@/features/worktrees/create/utils/progress'
+import { createSteps, stepsBy } from '@/features/worktrees/create/utils/steps'
 import { current, doneOf } from '@/features/worktrees/utils/progress'
 
 const text = (path: string, skip?: DomainSkip): DomainField => ({
@@ -17,7 +17,7 @@ test('each question goes in its step, a skipped one is listed apart, a field no 
     problems: [],
   }
 
-  const [branch, environment] = stepsOf(form)
+  const [branch, environment] = stepsBy(form, createSteps)
 
   expect(branch?.asked.map((f) => f.path)).toEqual(['branches'])
   expect(environment?.asked.map((f) => f.path)).toEqual([])
@@ -45,15 +45,26 @@ test('the progress starts from the plan: what each branch will run, an open one 
 // A branch checked out as it is, behind origin and fast-forwarded first, was two units: its phases counted twice.
 test('a branch fast-forwarded then opened is one unit, its fast-forward first', () => {
   const progress = {
-    units: planned({
-      branches: [{ branch: 'feat/x', path: '/x', action: 'check_out', phases: ['worktree', 'env'] }],
-      creates: 1,
-      env_from: 'example',
-      fast_forward: ['feat/x'],
-    }),
+    units: planned({ branches: [{ branch: 'feat/x', phases: ['worktree', 'env'] }], fast_forward: ['feat/x'] }),
   }
 
   expect(progress.units.map((unit) => unit.subject)).toEqual(['feat/x'])
   expect(progress.units[0]?.phases.map((run) => run.phase)).toEqual(['fast_forward', 'worktree', 'env'])
   expect(doneOf(progress).total).toBe(3)
+})
+
+test("a pull request's branch is one unit, fast-forwarded first when the plan says so", () => {
+  const units = checkoutPlanned({
+    action: 'check_out',
+    env_from: 'example',
+    from: 'main',
+    path: '/t/fix-rate-limit',
+    phases: ['worktree', 'env'],
+    fast_forward: ['fix/rate-limit'],
+    pull_request: { number: 231, branch: 'fix/rate-limit', state: 'open', url: 'u' },
+  })
+
+  expect(units.map((unit) => [unit.subject, unit.phases.map((run) => run.phase)])).toEqual([
+    ['fix/rate-limit', ['fast_forward', 'worktree', 'env']],
+  ])
 })

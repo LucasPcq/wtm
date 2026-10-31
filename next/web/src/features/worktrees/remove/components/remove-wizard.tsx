@@ -5,6 +5,7 @@ import type { DomainWarning, TeardownRemoval } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert } from '@/features/worktrees/components/alert'
 import { ChildrenStep } from '@/features/worktrees/components/children-step'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
@@ -78,7 +79,10 @@ export function RemoveWizard({
   // person checked it under that very risk: the two reads land in any order
   const consented = (plan?.worktrees ?? []).every((removal) => !unsafe(removal) || ticked(removal)?.on)
   const fresh = plan !== undefined && !planned.isPlaceholderData && !planned.isFetching && consented
-  const unplanned = planned.isError ? planned.error.message : planned.data?.error?.message
+  // a plan's refusal speaks for the choices on screen only: not a placeholder's, not under the notice that already says
+  // why nothing was removed
+  const refused = planned.isError ? planned.error.message : planned.data?.error?.message
+  const unplanned = going.length === 0 || planned.isPlaceholderData || notice ? undefined : refused
 
   // the step is the one reached, unless the facts moved under it: once the worktrees were confirmed, one that left the
   // run or joined it since (its risk changed) sends the wizard back to say it; children all gone leave nothing to ask
@@ -125,8 +129,8 @@ export function RemoveWizard({
   const warnings = step === 'confirm' ? (planned.data?.warnings ?? []).filter(planWide) : []
   const body = () => {
     if (review.isPending) return <Skeleton className="h-40 w-full" />
-    if (review.isError) return <p className="text-sm text-destructive">{review.error.message}</p>
-    if (review.data.error) return <p className="text-sm text-destructive">{review.data.error.message}</p>
+    if (review.isError) return <Alert tone="red" description={review.error.message} />
+    if (review.data.error) return <Alert tone="red" description={review.data.error.message} />
 
     if (step === 'worktrees')
       return (
@@ -210,7 +214,7 @@ export function RemoveWizard({
       </DialogBand>
 
       <DialogScroll>
-        {unplanned && <p className="text-sm text-destructive">{unplanned}</p>}
+        {unplanned && <Alert tone="red" description={unplanned} />}
         <PlanWarnings warnings={notice ? [notice, ...warnings] : warnings} />
         {body()}
       </DialogScroll>

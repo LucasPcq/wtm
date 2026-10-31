@@ -9,11 +9,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// fakeGH writes a gh that answers auth status with authExit and any other call with answer, and returns its path.
+// fakeGH writes a gh that answers auth status with authExit, saying what gh says when signed out, and any other call with answer, and returns its path.
 func fakeGH(t *testing.T, authExit int, answer string) string {
 	t.Helper()
+	return authGH(t, authExit, "You are not logged into any GitHub hosts. To log in, run: gh auth login", answer)
+}
+
+// authGH writes a gh whose auth status prints said on its stderr and exits with authExit, and which answers any other call with answer.
+func authGH(t *testing.T, authExit int, said, answer string) string {
+	t.Helper()
 	path := filepath.Join(t.TempDir(), "gh")
-	script := "#!/bin/sh\nif [ \"$1\" = auth ]; then exit " + strconv.Itoa(authExit) + "; fi\ncat <<'JSON'\n" + answer + "\nJSON\n"
+	script := "#!/bin/sh\nif [ \"$1\" = auth ]; then echo '" + said + "' >&2; exit " + strconv.Itoa(authExit) + "; fi\ncat <<'JSON'\n" + answer + "\nJSON\n"
 	require.NoError(t, os.WriteFile(path, []byte(script), 0o755))
 	return path
 }

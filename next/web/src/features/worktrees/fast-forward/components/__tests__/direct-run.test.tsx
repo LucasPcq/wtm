@@ -108,6 +108,26 @@ test("the detail callout's Fast-forward runs at once", async () => {
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 })
 
+// A callout of one line drew an empty row under it: its fix and its consequence, both absent, still took their place.
+test('a callout whose action sits on its line has nothing under it', async () => {
+  server.use(behindOrigin)
+  await renderApp('/r/r1/worktrees?worktree=feat%2Fbilling-ui')
+
+  const callout = await screen.findByRole('region', { name: 'To do' })
+
+  expect([...callout.children].every((child) => child.tagName === 'svg' || child.textContent !== '')).toBe(true)
+})
+
+// A callout of one line laid its icon and action on the top of a row taller than its title: an empty band below.
+test('a callout of one line is one row, its icon, title and action centred on it', async () => {
+  server.use(behindOrigin)
+  await renderApp('/r/r1/worktrees?worktree=feat%2Fbilling-ui')
+
+  const callout = await screen.findByRole('region', { name: 'To do' })
+
+  expect(callout.children).toHaveLength(3)
+})
+
 test('a second click while the first runs opens it rather than run again', async () => {
   const runs: WebCall[] = []
   let release = () => {}

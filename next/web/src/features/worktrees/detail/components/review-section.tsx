@@ -1,18 +1,21 @@
 import type { StatusReview } from '@/api/types.gen'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Checks } from '@/features/worktrees/components/checks'
+import { GitHubAlert } from '@/features/worktrees/components/github-alert'
 import { Section } from '@/features/worktrees/detail/components/section'
-import { prState } from '@/features/worktrees/utils/github'
+import { type GitHubFact, prState } from '@/features/worktrees/utils/github'
 
 export function ReviewSection({
   review,
   pending,
-  warning,
+  unavailable,
+  failed,
   askedAt,
 }: {
   review: StatusReview | null | undefined
   pending: boolean
-  warning: string | undefined
+  unavailable: GitHubFact | undefined
+  failed: string | undefined
   askedAt: number
 }) {
   const meta = askedAt
@@ -21,7 +24,8 @@ export function ReviewSection({
 
   const body = () => {
     if (pending) return <Skeleton className="h-10 w-full" />
-    if (warning) return <p className="text-sm text-muted-foreground">{warning}</p>
+    if (unavailable) return <GitHubAlert fact={unavailable} fixBelow />
+    if (failed) return <p className="text-sm text-muted-foreground">{failed}</p>
     if (!review) return <p className="text-sm text-muted-foreground">No pull request.</p>
 
     const { url, number, title, state, draft, checks, decision } = review

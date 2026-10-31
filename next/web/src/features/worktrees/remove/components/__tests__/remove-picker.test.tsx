@@ -7,7 +7,7 @@ import { answeringClean, liveEvents, selectAndRemove } from '@/test/remove'
 import { renderApp } from '@/test/render'
 import { server, worktrees } from '@/test/server'
 
-test('from the header, Remove opens on every worktree it can remove, none checked, searched from eight rows', async () => {
+test('from the header, Remove opens on every worktree it can remove, none checked, with its search', async () => {
   const many = ['feat/a', 'feat/b', 'feat/c', 'feat/d'].map((branch) => listDetail(branch))
   server.use(
     http.post('/api/repos/r1/commands/list', () => HttpResponse.json(envelope('list', [...worktrees, ...many]))),
@@ -188,4 +188,23 @@ test('sent back to the worktrees, the wizard stays there when the row turns safe
   await waitFor(() => expect(within(dialog).queryByText('Uncommitted changes')).toBeNull())
   expect(within(dialog).getByRole('button', { name: 'Next' })).toBeTruthy()
   expect(within(dialog).queryByRole('button', { name: 'Remove' })).toBeNull()
+})
+
+// A short list had no search: the owner wants it there whatever the number of rows.
+test('a picker of two rows has its search all the same', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/list', () =>
+      HttpResponse.json(
+        envelope('list', [listDetail('main', { main: true }), listDetail('feat/a'), listDetail('feat/b')]),
+      ),
+    ),
+  )
+  const { user } = await renderApp('/r/r1/worktrees')
+
+  await user.click(await screen.findByRole('button', { name: 'Actions' }))
+  await user.click(await screen.findByRole('menuitem', { name: 'Remove' }))
+
+  const dialog = await screen.findByRole('dialog', { name: 'Remove worktrees' })
+  expect(await within(dialog).findByText('0 of 2 selected')).toBeTruthy()
+  expect(within(dialog).getByRole('textbox', { name: 'Search the worktrees' })).toBeTruthy()
 })

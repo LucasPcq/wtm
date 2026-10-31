@@ -2,6 +2,7 @@ import { ArrowDownToLine, CircleX, FastForward, GitMerge, type LucideIcon, Trian
 import type { MutationCommand } from '@/api/queries/commands'
 import type { DomainFollowUp, StatusProblem, StatusProblemCode } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
+import { Alert, type AlertTone } from '@/features/worktrees/components/alert'
 import { CommandLine } from '@/features/worktrees/components/command-line'
 import { openPrune } from '@/features/worktrees/hooks/use-prune-dialog'
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
@@ -9,7 +10,6 @@ import { isMutation } from '@/features/worktrees/hooks/use-run'
 import { type RunEntry, useRunEntry } from '@/features/worktrees/hooks/use-run-entry'
 import { menu, pruneAction, subjectsOf } from '@/features/worktrees/utils/actions'
 import { sentence } from '@/features/worktrees/utils/sentence'
-import { cn } from '@/lib/utils'
 
 type Tone = 'problem' | 'failure' | 'suggestion'
 
@@ -37,11 +37,7 @@ const calloutOf: Record<StatusProblemCode, { tone: Tone; icon: LucideIcon; conse
   'status.job_crashed': { tone: 'failure', icon: CircleX, consequence: null },
 }
 
-const look: Record<Tone, { box: string; glyph: string }> = {
-  problem: { box: 'border-amber-500/35 bg-amber-500/8', glyph: 'text-amber-500' },
-  failure: { box: 'border-destructive/35 bg-destructive/8', glyph: 'text-destructive' },
-  suggestion: { box: 'border-border bg-muted/40', glyph: 'text-muted-foreground' },
-}
+const toneOf: Record<Tone, AlertTone> = { problem: 'amber', failure: 'red', suggestion: 'muted' }
 
 // the fix the web runs, as the menus run it: Remove and Prune open their dialog, Fast-forward and Reparent run at once
 const runsHere: Record<
@@ -61,6 +57,7 @@ const runsHere: Record<
     open: (_repo, fix, runEntry) => runEntry({ action: 'reparent', followUp: fix }, []),
   },
   create: null,
+  checkout: null,
   prune: { verb: pruneAction.label, open: (repo, fix) => openPrune(repo, subjectsOf(fix)) },
   exec: null,
 }
@@ -69,8 +66,7 @@ export function Callout({ repo, problems: [first, ...more] }: { repo: string; pr
   const runEntry = useRunEntry(repo)
   if (!first) return null
 
-  const { tone, icon: Icon, consequence } = calloutOf[first.code]
-  const { box, glyph } = look[tone]
+  const { tone, icon, consequence } = calloutOf[first.code]
   const fix = first.fix ?? undefined
   const command = fix?.command
   const here = command && isMutation(command) ? runsHere[command] : null
@@ -78,45 +74,51 @@ export function Callout({ repo, problems: [first, ...more] }: { repo: string; pr
   const act = () => fix && here?.open(repo, fix, runEntry)
 
   return (
-    <section aria-label="To do" className={cn('flex flex-col gap-3 rounded-lg border p-4', box)}>
-      <div className="flex items-center gap-2">
-        <Icon className={cn('size-4 shrink-0', glyph)} aria-hidden="true" />
-        <h3 className="min-w-0 flex-1 text-sm font-medium">{sentence(first.message)}</h3>
-        {runs && tone === 'suggestion' && (
+    <Alert
+      role="region"
+      aria-label="To do"
+      tone={toneOf[tone]}
+      icon={icon}
+      title={sentence(first.message)}
+      description={fix && !runs && `${sentence(fix.message)} from a terminal.`}
+      action={
+        runs &&
+        tone === 'suggestion' && (
           <Button variant="outline" size="sm" onClick={act}>
             {here.verb}
           </Button>
-        )}
-      </div>
-      {fix && !runs && (
-        <>
-          <p className="text-sm text-muted-foreground">{sentence(fix.message)} from a terminal.</p>
-          <CommandLine followUp={fix} />
-        </>
-      )}
-      {fix && runs && tone !== 'suggestion' && (
-        <>
-          <Button className="w-full" onClick={act}>
-            {sentence(fix.message)}
-          </Button>
-          {consequence && <p className="text-xs text-muted-foreground">{consequence}</p>}
-        </>
-      )}
-      {more.length > 0 && (
-        <details className="text-sm">
-          <summary className="cursor-pointer text-muted-foreground">
-            {more.length} more {more.length === 1 ? 'problem' : 'problems'}
-          </summary>
-          <ul className="mt-3 flex flex-col gap-3">
-            {more.map((problem) => (
-              <li key={problem.code + problem.message} className="flex flex-col gap-2">
-                {sentence(problem.message)}
-                {problem.fix && <CommandLine followUp={problem.fix} />}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-    </section>
+        )
+      }
+      below={
+        ((fix && !(runs && tone === 'suggestion')) || more.length > 0) && (
+          <>
+            {fix && !runs && <CommandLine followUp={fix} />}
+            {fix && runs && tone !== 'suggestion' && (
+              <>
+                <Button className="w-full" onClick={act}>
+                  {sentence(fix.message)}
+                </Button>
+                {consequence && <p className="text-xs text-muted-foreground">{consequence}</p>}
+              </>
+            )}
+            {more.length > 0 && (
+              <details className="text-sm">
+                <summary className="cursor-pointer text-muted-foreground">
+                  {more.length} more {more.length === 1 ? 'problem' : 'problems'}
+                </summary>
+                <ul className="mt-3 flex flex-col gap-3">
+                  {more.map((problem) => (
+                    <li key={problem.code + problem.message} className="flex flex-col gap-2">
+                      {sentence(problem.message)}
+                      {problem.fix && <CommandLine followUp={problem.fix} />}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </>
+        )
+      }
+    />
   )
 }

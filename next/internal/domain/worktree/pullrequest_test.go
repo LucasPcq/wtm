@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -100,4 +101,16 @@ func TestOnlyAnOpenPullRequestHasAReviewInProgress(t *testing.T) {
 	}
 	pr.State = PullRequestOpen
 	assert.Equal(t, &Progress{Title: "Add a", Draft: true, Checks: Checks{Passed: 1}, Decision: "APPROVED"}, pr.Progress())
+}
+
+func TestEachReasonAPersonFixesIsNamedAndAnyOtherFailureNone(t *testing.T) {
+	assert.Equal(t, ReasonGHMissing, UnavailableReason(fmt.Errorf("list: %w", ErrGitHubCLIMissing)))
+	assert.Equal(t, ReasonSignedOut, UnavailableReason(ErrGitHubSignedOut))
+	assert.Equal(t, ReasonNotOnGitHub, UnavailableReason(ErrNotOnGitHub))
+	assert.Empty(t, UnavailableReason(fmt.Errorf("%w: HTTP 502", ErrPullRequestsUnavailable)))
+}
+
+func TestTheParamsOfGitHubUnavailableNameItsReasonOnlyWhenThereIsOne(t *testing.T) {
+	assert.Equal(t, map[string]string{ParamReason: ReasonSignedOut}, UnavailableParams(ErrGitHubSignedOut))
+	assert.Nil(t, UnavailableParams(fmt.Errorf("%w: HTTP 502", ErrPullRequestsUnavailable)))
 }

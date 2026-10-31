@@ -2,6 +2,7 @@ import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import type { DomainAnswered, DomainField, DomainFollowUp, ListDetail, WebCall } from '@/api/types.gen'
 import { repo, worktrees } from '@/test/acme'
+import { answeringCheckout } from '@/test/checkout'
 import { cleanPlan, cleanQuestionsOf, cleanRun } from '@/test/clean'
 import { answeringExec } from '@/test/exec'
 import { ffPlan, ffQuestions, ffRun } from '@/test/fast-forward'
@@ -170,6 +171,7 @@ const handlers = [
   http.post('/api/repos/r1/commands/fast-forward/questions', () => HttpResponse.json(ffQuestions())),
   ...answeringExec(),
   ...answeringReparent(),
+  ...answeringCheckout(),
   http.post('/api/repos/r1/commands/create/questions', async ({ request }) =>
     HttpResponse.json(questionsOf(((await request.json()) as WebCall).answers)),
   ),

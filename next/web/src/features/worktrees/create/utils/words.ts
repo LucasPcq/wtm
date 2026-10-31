@@ -1,4 +1,4 @@
-import type { CreateAction, CreateRequest, DomainField, DomainSkip } from '@/api/types.gen'
+import type { CreateAction, CreateRequest, DomainSkip } from '@/api/types.gen'
 import type { FieldWords, OptionWords } from '@/components/command-form/command-fields'
 import type { OutcomeKind } from '@/features/worktrees/utils/outcome'
 
@@ -72,16 +72,12 @@ export const createWords: Record<Question, FieldWords> = {
   },
 }
 
-export type Asked = DomainField & { path: Question }
-
-export const isAsked = (field: DomainField): field is Asked => field.path in createWords
-
 // null for a reason that means nothing in a browser
 export const skipWords: Record<DomainSkip, string | null> = {
   flag_only: null,
   all: null,
   exists: 'the worktree exists, so nothing is created',
-  not_behind: 'the source branch is not behind origin',
+  not_behind: 'there is nothing to fast-forward from origin',
   held: 'the source holds the changes being extracted',
   run_unread: "run.toml couldn't be read",
   nothing_isolated: 'run.toml declares nothing to isolate',
