@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -344,4 +345,63 @@ func (i *index) holding() int {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	return i.stalled
+}
+
+// routes is the proxy's table of names in memory.
+type routes struct {
+	mu     sync.Mutex
+	served map[string]run.Address
+	port   int
+}
+
+func (r *routes) Port() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.port
+}
+
+// listen has the proxy serve on port.
+func (r *routes) listen(port int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.port = port
+}
+
+func (r *routes) Add(address run.Address) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.served == nil {
+		r.served = map[string]run.Address{}
+	}
+	r.served[address.Host] = address
+}
+
+func (r *routes) Remove(host string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.served, host)
+}
+
+// table returns each host served, mapped to its port.
+func (r *routes) table() map[string]int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	table := map[string]int{}
+	for host, address := range r.served {
+		table[host] = address.Port
+	}
+	return table
+}
+
+// routed is spec served under the name of its job in the worktree feat-a of acme, on its port PORT.
+func routed(spec run.Spec) run.Spec {
+	spec.Env = maps.Clone(spec.Env)
+	if spec.Env == nil {
+		spec.Env = map[string]string{}
+	}
+	spec.Env["PORT"], spec.Env["WTM_WORKTREE"], spec.Env["WTM_PROJECT"] = "3100", "feat-a", "acme"
+	spec.Job.Ports = map[string]int{"PORT": 3000}
+	spec.Job.URL = &project.URL{Port: "PORT"}
+	spec.Routes = []run.Route{{Job: spec.Job.Name, Host: spec.Job.Name + ".feat-a.acme.localhost", Port: "PORT"}}
+	return spec
 }

@@ -4,6 +4,7 @@ package daemon
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -17,6 +18,8 @@ import (
 
 const (
 	stopGrace = 5 * time.Second
+	// stopLimit bounds a stack's stop command: compose takes its time to take a stack down, never minutes.
+	stopLimit = 5 * time.Minute
 	// lastLines is how much of its output a job.crashed carries.
 	lastLines = 10
 	maxWindow = 1<<16 - 1
@@ -26,9 +29,11 @@ const (
 // process, finds orphans, keeps its index, keeps each job's log and reads it
 // back, and tells whether a worktree is still there; where it publishes its
 // job events (nil publishes none); its clock (time.Now when nil); how long
-// a stopped job has to exit before it is killed (5 seconds when zero); and how
+// a stopped job has to exit before it is killed (5 seconds when zero); how
 // long a shared job's namespace create is retried, and how often (30 seconds,
-// every second, when zero).
+// every second, when zero); and the proxy (nil for none: each job answers on
+// its port) with how it finds the proxy behind port 80, asked on every answer
+// (nil finds none).
 type Params struct {
 	Spawn   Spawn
 	Orphans Orphans
@@ -42,8 +47,11 @@ type Params struct {
 
 	NamespaceBudget time.Duration
 	NamespaceRetry  time.Duration
-	// After is the timer a namespace's create attempt hangs against, time.After when nil.
+	// After is the timer a namespace's create attempt or a stop command hangs against, time.After when nil.
 	After func(time.Duration) <-chan time.Time
+
+	Routes Routes
+	Probe  Probe
 }
 
 // A Daemon holds the jobs of the machine. Its methods are safe for concurrent
@@ -90,6 +98,8 @@ type job struct {
 	stopped  bool
 	stopID   string
 	done     chan struct{}
+	// served marks a job whose names its proxy serves: only those are withdrawn, never the same names a newer job of its worktree serves.
+	served bool
 	// mainHold numbers the main checkout's holds of a shared job: a start lets go only of the one it took, never a newer one.
 	mainHold int
 	// unannounced marks a claim whose start has not announced it yet, nor will its release.
@@ -151,6 +161,9 @@ func (d *Daemon) Adopt() {
 		d.jobs[k] = &job{record: record, state: decision.State, reaped: decision.Reaped, adopted: true, last: last[i], done: closed()}
 	}
 	d.dropDanglingClaimsLocked()
+	for _, j := range d.jobs {
+		d.serveLocked(j)
+	}
 	d.mu.Unlock()
 
 	if len(reap) > 0 {
@@ -215,6 +228,9 @@ func (d *Daemon) start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 		j.terminal = newTerminal(process, j.done)
 	}
 	d.jobs[k] = j
+	if spec.Job.Kind == project.Service && !spec.Detached() {
+		d.serveLocked(j)
+	}
 	d.mu.Unlock()
 
 	switch {
@@ -258,16 +274,25 @@ func (d *Daemon) launch(j *job) (run.Job, error) {
 	stopped := j.stopped
 	k := keyOf(j.record.Spec)
 	switch {
+	// The stack given back is served: one a stopped launcher left up never was.
 	case stopped && j.previous != nil:
 		d.jobs[k] = j.previous
+		d.serveLocked(j.previous)
 	case stopped:
 	case code != 0:
 		j.exitCode = &code
 		delete(d.jobs, k)
 		if j.previous != nil {
 			d.jobs[k] = j.previous
+			d.serveLocked(j.previous)
 		}
 		d.dropDanglingClaimsLocked()
+	default:
+		// The stack it replaces may have served names this one no longer has.
+		if j.previous != nil {
+			d.withdrawLocked(j.previous)
+		}
+		d.serveLocked(j)
 	}
 	j.previous = nil
 	d.mu.Unlock()
@@ -302,6 +327,7 @@ func (d *Daemon) settle(j *job, code int) {
 		j.state = run.Crashed
 	}
 	state, stopID := j.state, j.stopID
+	d.withdrawLocked(j)
 	// A shared job that ended takes its claims with it, which its events name as they held it: a claim on nothing would refuse its worktree's next start.
 	held := d.heldLocked(j)
 	d.dropDanglingClaimsLocked()
@@ -395,23 +421,32 @@ func (d *Daemon) halt(j *job, correlation string) (run.Outcome, error) {
 }
 
 // stopStack runs a detached stack's stop command, then lists it stopped; a
-// stop command that fails leaves it up and indexed.
+// stop command that fails, or still runs after 5 minutes or once the daemon
+// stops, leaves it up and indexed: a start waiting on it never waits forever.
 func (d *Daemon) stopStack(j *job) error {
 	spec := j.record.Spec
-	process, err := d.params.Spawn(spec.StopCommand(nil))
-	code := -1
-	if err == nil {
-		code = process.Wait()
-	}
-	if code != 0 {
+	code, err := d.runUntil(spec.StopCommand(nil), stopLimit)
+	if err != nil || code != 0 {
 		d.mu.Lock()
 		j.stopped = false
+		// Left up, it is served, a launcher stopped before it served it included.
+		if d.jobs[keyOf(spec)] == j {
+			d.serveLocked(j)
+		}
 		d.mu.Unlock()
-		return &run.Error{Code: run.CodeStopFailed, Message: fmt.Sprintf("the stop command of %s failed (exit %d)", spec.Job.Name, code), ExitCode: &code}
+		why := fmt.Sprintf("failed (exit %d)", code)
+		switch {
+		case errors.Is(err, errDeadline) && d.isStopping():
+			why = "was stopped as the run daemon stopped"
+		case errors.Is(err, errDeadline):
+			why = fmt.Sprintf("was still running after %s, and was stopped", stopLimit)
+		}
+		return &run.Error{Code: run.CodeStopFailed, Message: fmt.Sprintf("the stop command of %s %s", spec.Job.Name, why), ExitCode: &code}
 	}
 
 	d.mu.Lock()
 	j.state = run.Stopped
+	d.withdrawLocked(j)
 	d.dropDanglingClaimsLocked()
 	d.mu.Unlock()
 	d.save()
@@ -655,12 +690,13 @@ func (d *Daemon) openLog(file run.LogFile) Log {
 // List returns the jobs the daemon knows in the worktree at workDir, every
 // worktree's when empty, by worktree then name.
 func (d *Daemon) List(workDir string) []run.Job {
+	public := d.Proxy().PublicPort
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	jobs := []run.Job{}
 	for k, j := range d.jobs {
 		if workDir == "" || k.workDir == workDir {
-			jobs = append(jobs, j.viewLocked())
+			jobs = append(jobs, j.viewLocked(public))
 		}
 	}
 	slices.SortFunc(jobs, func(a, b run.Job) int { return cmp.Or(cmp.Compare(a.WorkDir, b.WorkDir), cmp.Compare(a.Name, b.Name)) })
@@ -668,14 +704,15 @@ func (d *Daemon) List(workDir string) []run.Job {
 	return jobs
 }
 
-// Busy reports whether a process of the daemon's runs: while one does, the
-// daemon must not stop on its own.
+// Busy reports whether a process of the daemon's runs, or its proxy serves a
+// job's name: while one does, the daemon must not stop on its own, which
+// would take the name down while the stack behind it runs.
 func (d *Daemon) Busy() bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	for _, j := range d.jobs {
-		if j.process != nil {
+		if j.process != nil || j.served && d.params.Routes.Port() > 0 {
 			return true
 		}
 	}
@@ -684,14 +721,16 @@ func (d *Daemon) Busy() bool {
 }
 
 func (d *Daemon) view(j *job) run.Job {
+	public := d.Proxy().PublicPort
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	return j.viewLocked()
+	return j.viewLocked(public)
 }
 
-// viewLocked is the job as a client reads it; the daemon's lock is held.
-func (j *job) viewLocked() run.Job {
+// viewLocked is the job as a client reads it, its URL on the proxy's
+// publicPort; the daemon's lock is held.
+func (j *job) viewLocked(public int) run.Job {
 	spec := j.record.Spec
 	view := run.Job{
 		Name:      spec.Job.Name,
@@ -701,7 +740,7 @@ func (j *job) viewLocked() run.Job {
 		State:     j.state,
 		Hold:      j.record.Hold(),
 		Reaped:    j.reaped,
-		URL:       spec.URL(),
+		URL:       spec.URL(public),
 		Ports:     spec.Ports(),
 		ExitCode:  j.exitCode,
 		SharedDir: j.record.SharedDir,
@@ -786,7 +825,7 @@ func (d *Daemon) change(j *job, code *int) domain.JobChange {
 	spec := j.record.Spec
 	change := domain.JobChange{
 		Worktree: worktreeOf(j),
-		Job:      domain.EventJob{Name: spec.Job.Name, Kind: spec.Job.Kind, URL: spec.URL(), Hold: j.record.Hold()},
+		Job:      domain.EventJob{Name: spec.Job.Name, Kind: spec.Job.Kind, URL: spec.URL(d.Proxy().PublicPort), Hold: j.record.Hold()},
 		ExitCode: code,
 	}
 	if spec.Job.Scope == project.Shared && !j.record.Claim {

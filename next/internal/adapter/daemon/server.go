@@ -22,6 +22,7 @@ var errClientGone = errors.New("the client stopped reading")
 // Jobs is what the server asks of the run daemon it serves.
 type Jobs interface {
 	List(workDir string) []run.Job
+	Proxy() run.Proxy
 	Start(spec run.Spec, out func(run.Line)) (run.Job, error)
 	Stop(req run.Stop) (run.Outcome, error)
 	StopAll(req run.StopAll) ([]run.StoppedJob, error)
@@ -71,7 +72,8 @@ func (s Server) Serve(conn net.Conn, line []byte) {
 
 	switch req.Action {
 	case actionList:
-		_ = reply(answer{Status: statusOK, Jobs: jobsOf(s.Jobs.List(req.WorkDir))})
+		served := s.Jobs.Proxy()
+		_ = reply(answer{Status: statusOK, Jobs: jobsOf(s.Jobs.List(req.WorkDir)), Proxy: &proxy{Port: served.Port, PublicPort: served.PublicPort}})
 	case actionStart:
 		s.start(req, reply)
 	case actionStop:

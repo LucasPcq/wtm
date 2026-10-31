@@ -19,6 +19,7 @@ var web = run.Job{Name: "web", WorkDir: "/wt/a", Up: true, Kind: project.Service
 type jobs struct {
 	mu       sync.Mutex
 	listed   []run.Job
+	proxy    run.Proxy
 	lines    []string
 	err      error
 	outcome  run.Outcome
@@ -61,6 +62,10 @@ func (j *jobs) record(req any) {
 func (j *jobs) List(workDir string) []run.Job {
 	j.record("list " + workDir)
 	return j.listed
+}
+
+func (j *jobs) Proxy() run.Proxy {
+	return j.proxy
 }
 
 func (j *jobs) Start(spec run.Spec, out func(run.Line)) (run.Job, error) {

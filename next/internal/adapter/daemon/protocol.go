@@ -55,6 +55,13 @@ type answer struct {
 	Outcome  string `json:"outcome,omitempty"`
 	At       stamp  `json:"at,omitzero"`
 	Text     string `json:"text,omitempty"`
+	Proxy    *proxy `json:"proxy,omitempty"`
+}
+
+// proxy is the proxy a daemon serves named URLs on, in its listing.
+type proxy struct {
+	Port       int `json:"port"`
+	PublicPort int `json:"public_port"`
 }
 
 // stamp is what an answer says of the daemon that wrote it.
@@ -209,6 +216,7 @@ type spec struct {
 	Unset   []string          `json:"unset,omitempty"`
 	LogDir  string            `json:"log_dir,omitempty"`
 	Origin  *origin           `json:"origin,omitempty"`
+	Routes  []route           `json:"routes,omitempty"`
 	Shared  *shared           `json:"shared,omitempty"`
 }
 
@@ -227,7 +235,7 @@ type origin struct {
 }
 
 func specOf(s run.Spec) *spec {
-	wire := &spec{Job: configOf(s.Job), WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir}
+	wire := &spec{Job: configOf(s.Job), WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir, Routes: routesOf(s.Routes)}
 	if s.Origin != nil {
 		wire.Origin = &origin{Root: s.Origin.Root, CommonDir: s.Origin.CommonDir, Branch: s.Origin.Branch, CorrelationID: s.Origin.CorrelationID}
 	}
@@ -239,7 +247,7 @@ func specOf(s run.Spec) *spec {
 }
 
 func (s spec) runSpec() run.Spec {
-	runSpec := run.Spec{Job: s.Job.job(), WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir}
+	runSpec := run.Spec{Job: s.Job.job(), WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir, Routes: runRoutes(s.Routes)}
 	if s.Origin != nil {
 		runSpec.Origin = &run.Origin{Root: s.Origin.Root, CommonDir: s.Origin.CommonDir, Branch: s.Origin.Branch, CorrelationID: s.Origin.CorrelationID}
 	}

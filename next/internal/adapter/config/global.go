@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -52,6 +53,23 @@ func (g loadedGlobal) validate() error {
 		return nil
 	}
 	return errInvalidShell
+}
+
+// LoadGlobal reads and validates the global config at path; an empty path or
+// a missing file is an empty config, not an error.
+func LoadGlobal(path string) (project.Global, error) {
+	global, err := loadGlobal(path)
+	if err != nil {
+		return project.Global{}, fmt.Errorf("global config: %w", err)
+	}
+	if err := global.validate(); err != nil {
+		return project.Global{}, err
+	}
+	if err := global.Global.Proxy.Problem(); err != nil {
+		return project.Global{}, err
+	}
+
+	return global.Global, nil
 }
 
 // loadGlobal reads the global config at path; an empty path or a missing file

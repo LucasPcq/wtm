@@ -67,3 +67,19 @@ type Publish func(line domain.Line)
 
 // Exists reports whether the directory at path is there.
 type Exists func(path string) bool
+
+// Routes is the proxy: the table of names it serves, a job up having its
+// addresses added and a job that ends having them removed, and the port it
+// serves them on.
+type Routes interface {
+	// Add serves address, in place of one of the same host.
+	Add(address run.Address)
+	// Remove stops serving host.
+	Remove(host string)
+	// Port returns the port it serves on, 0 while it serves on none.
+	Port() int
+}
+
+// Probe returns the port the wtm proxy answering on port serves on, 0 when
+// none answers there.
+type Probe func(port int) int

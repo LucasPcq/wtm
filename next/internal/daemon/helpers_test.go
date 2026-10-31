@@ -17,12 +17,13 @@ type world struct {
 	index   *index
 	bus     *bus
 	logs    *logs
+	routes  *routes
 	gone    map[string]bool
 }
 
 func newWorld(t *testing.T, scripts map[string]script) *world {
 	t.Helper()
-	w := &world{spawner: newSpawner(scripts), orphans: &orphans{}, index: &index{}, bus: &bus{}, logs: newLogs(), gone: map[string]bool{}}
+	w := &world{spawner: newSpawner(scripts), orphans: &orphans{}, index: &index{}, bus: &bus{}, logs: newLogs(), routes: &routes{}, gone: map[string]bool{}}
 	w.Daemon = New(Params{
 		Spawn:   w.spawner.spawn,
 		Orphans: w.orphans,
@@ -36,6 +37,8 @@ func newWorld(t *testing.T, scripts map[string]script) *world {
 
 		NamespaceBudget: 50 * time.Millisecond,
 		NamespaceRetry:  time.Millisecond,
+
+		Routes: w.routes,
 	})
 	return w
 }
