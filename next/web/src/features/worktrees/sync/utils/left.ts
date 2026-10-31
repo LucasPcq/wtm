@@ -1,5 +1,5 @@
 import type { DomainFollowUp, DomainWarning, SyncPlan, SyncRebase } from '@/api/types.gen'
-import { moves, unsafe } from '@/features/worktrees/sync/utils/plan'
+import { leftOutWords, moves, unsafe } from '@/features/worktrees/sync/utils/plan'
 import { standingTone, standingWords } from '@/features/worktrees/sync/utils/words'
 import { changes } from '@/features/worktrees/utils/counts'
 import type { OutcomeRow } from '@/features/worktrees/utils/outcome'
@@ -55,23 +55,15 @@ export function leftRowsOf({
     }),
     ...(plan.left_out ?? []).map((worktree): OutcomeRow => {
       const rebase = review.find((row) => row.worktree === worktree)
-      const parent = rebase?.parent ?? ''
-      // its parent moves in this run: it stays on the old tip; else it stays with its parent, for the reason the review
-      // gives
-      const moving = (plan.worktrees ?? []).some((row) => row.worktree === parent && moves(row))
-      if (rebase && !moving && rebase.standing !== 'rebases')
+      const words = leftOutWords(plan, rebase, worktree)
+      if (rebase && !words)
         return {
           key: worktree,
           tone: standingTone[rebase.standing],
           title: worktree,
           message: standingWords[rebase.standing](rebase),
         }
-      return {
-        key: worktree,
-        tone: 'attention',
-        title: worktree,
-        message: `stays on ${parent}'s old tip · needs a sync after`,
-      }
+      return { key: worktree, tone: 'attention', title: worktree, message: words ?? '' }
     }),
   ]
 }

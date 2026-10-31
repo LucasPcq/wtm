@@ -8,7 +8,7 @@ import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { PlanRow } from '@/features/worktrees/sync/components/plan-row'
 import { PlanSentence } from '@/features/worktrees/sync/components/plan-sentence'
 import { leftRowsOf } from '@/features/worktrees/sync/utils/left'
-import { markedOf, moves, rootOf, unsafe } from '@/features/worktrees/sync/utils/plan'
+import { leftOutWords, markedOf, moves, rootOf, unsafe } from '@/features/worktrees/sync/utils/plan'
 import { phaseWords, sentenceWords } from '@/features/worktrees/sync/utils/words'
 import { commits } from '@/features/worktrees/utils/counts'
 import { listed } from '@/features/worktrees/utils/listed'
@@ -43,11 +43,14 @@ export function SyncConfirm({
   const under = marked.filter((rebase) => rebase.descendant).map((rebase) => rebase.worktree)
   const followers = running.filter((rebase) => under.includes(rebase.worktree))
   const kept = (plan.worktrees ?? []).filter((rebase) => rebase.descendant && !moves(rebase) && unsafe(rebase))
-  // the worktrees left behind by a parent that moves: one under a parent left as it is says its own reason in the list
-  const leftOut = (plan.left_out ?? []).filter((worktree) => {
-    const parent = review.find((rebase) => rebase.worktree === worktree)?.parent
-    return (plan.worktrees ?? []).some((rebase) => rebase.worktree === parent && moves(rebase))
-  })
+  // as Left as they are says them: those that need a sync after; one with its own reason says it in the list
+  const leftOut = (plan.left_out ?? []).filter((worktree) =>
+    leftOutWords(
+      plan,
+      review.find((rebase) => rebase.worktree === worktree),
+      worktree,
+    ),
+  )
 
   // the count rule: only a rebase takes a number; a worktree that only takes its own origin's commits, or only pushes,
   // has its glyph

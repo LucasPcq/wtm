@@ -189,3 +189,21 @@ test('a warning of a worktree shows once on Done, in To check, beside the worktr
   await within(dialog).findByRole('region', { name: 'Left as they are' })
   expect(within(dialog).getAllByText('Origin has commits on feat/search it never held: left as it is')).toHaveLength(1)
 })
+
+test('a run that stopped names the worktrees it left all the same, with no button: their sync waits for it', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/sync', async ({ request }) => {
+      const call = (await request.json()) as WebCall
+      return call.dry_run ? syncDryRun(call) : syncRun(call, { conflict: 'feat/billing' })
+    }),
+  )
+  const { user, dialog } = await fromMenu('feat/billing')
+  await user.click(await within(dialog).findByRole('button', { name: 'Back' }))
+  await user.click(await within(dialog).findByRole('switch', { name: 'Sync the 1 worktree under feat/billing' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Sync' }))
+
+  const left = await within(dialog).findByRole('region', { name: 'Left as they are' })
+  expect(within(left).getByText('needs a sync')).toBeTruthy()
+  expect(within(left).queryByRole('button', { name: /^Sync/ })).toBeNull()
+})

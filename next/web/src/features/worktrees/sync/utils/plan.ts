@@ -10,6 +10,21 @@ export const riskOf = (rebase: SyncRebase) => (rebase.blockers ?? []).join(',')
 
 export const moves = (row: { phases: unknown[] | null }) => (row.phases ?? []).length > 0
 
+// a branch's tip moves when it rebases or takes its own origin's commits; a push alone leaves it where it is
+export const tipMoves = (rebase: SyncRebase) =>
+  (rebase.phases ?? []).some((phase) => phase === 'rebase' || phase === 'fast_forward')
+
+// a worktree Descendants left out, for the reason the review gives: its parent's tip moves, it stays on the old
+// tip; its parent stays, it stays on it as it is; its own reason (a parent left) says itself
+export function leftOutWords(plan: SyncPlan, rebase: SyncRebase | undefined, worktree: string) {
+  const parent = rebase?.parent ?? ''
+  if (rebase && rebase.standing !== 'rebases') return undefined
+  const moving = (plan.worktrees ?? []).some((row) => row.worktree === parent && tipMoves(row))
+  return moving
+    ? `stays on ${parent}'s old tip · needs a sync after`
+    : `stays on ${parent || worktree} as it is · needs a sync after`
+}
+
 const rebases = (rebase: SyncRebase) => (rebase.phases ?? []).includes('rebase')
 
 // the count rule: the numbers, "k of n", the primary and "n synced" count rebases, never the fast-forward first

@@ -77,7 +77,8 @@ export function recapOf(
   const push = followUpOf('sync.push')
   const unpushed = push ? subjectsOf(push) : []
   const leftOut = followUpOf('sync.left_out')
-  const leftNames = leftOut ? subjectsOf(leftOut) : []
+  // after a run that stopped, the core offers no sync of them: the plan's left_out names them all the same
+  const leftNames = leftOut ? subjectsOf(leftOut) : (plan?.left_out ?? [])
   // a branch rebased onto shows here only when a cancel stopped it before it moved
   const failed = items.filter(
     (item) =>
@@ -120,15 +121,17 @@ export function recapOf(
             : []),
         ],
       },
-      ...(leftOut
+      ...(leftNames.length > 0
         ? [
             {
               kind: 'check' as const,
               label: 'Left as they are',
-              action: { label: leftActionWords(leftNames.length), run: () => run(leftOut.answers ?? []) },
+              ...(leftOut && {
+                action: { label: leftActionWords(leftNames.length), run: () => run(leftOut.answers ?? []) },
+              }),
               rows: leftNames.map((worktree) => ({
                 key: `left-${worktree}`,
-                tone: 'attention' as const,
+                tone: leftOut ? ('attention' as const) : ('muted' as const),
                 title: worktree,
                 message: 'needs a sync',
               })),

@@ -96,7 +96,7 @@ export function syncRun(
           },
         ]
       : []),
-    ...(plan.left_out.length > 0
+    ...(plan.left_out.length > 0 && !failing
       ? [
           {
             command: 'sync',

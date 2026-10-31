@@ -82,3 +82,35 @@ test('Descendants off, each worktree left is listed once, with the reason that h
   const runs = within(dialog).getByRole('region', { name: 'How it runs' })
   expect(within(runs).getByText('feat/billing-ui stays where it is; each needs a sync after.')).toBeTruthy()
 })
+
+test('a worktree left under a parent that only pushes stays on it as it is, on the list as in How it runs', async () => {
+  answering({ synced: ['feat/billing'] })
+  const { user, dialog } = await fromMenu('feat/billing')
+  await user.click(await within(dialog).findByRole('button', { name: 'Back' }))
+  await user.click(await within(dialog).findByRole('switch', { name: 'Sync the 1 worktree under feat/billing' }))
+  await user.click(within(dialog).getByRole('switch', { name: 'Push to origin' }))
+  await user.click(nextOf(dialog))
+
+  const left = await within(dialog).findByRole('region', { name: 'Left as they are' })
+  expect(within(left).getByText('stays on feat/billing as it is · needs a sync after')).toBeTruthy()
+  const runs = within(dialog).getByRole('region', { name: 'How it runs' })
+  expect(within(runs).getByText('feat/billing-ui stays where it is; each needs a sync after.')).toBeTruthy()
+})
+
+test("unchecking a dirty main clears its consent: a clean branch's box never brings it back forced", async () => {
+  const calls = recorded()
+  answering({ dirtyOnto: ['main'] })
+  const { user, dialog } = await fromSelection('feat/billing-ui', 'fix/login')
+  const main = await within(dialog).findByRole('checkbox', { name: 'Fast-forward main first' })
+  await user.click(main)
+  await user.click(main)
+
+  await user.click(within(dialog).getByRole('checkbox', { name: 'Fast-forward feat/billing first' }))
+
+  await waitFor(() => {
+    const last = calls.dryRuns().at(-1)?.answers ?? []
+    expect(last).not.toContainEqual({ path: 'ff_parents', values: ['false'] })
+    expect(last).not.toContainEqual({ path: 'force', values: ['true'] })
+  })
+  expect(main.getAttribute('data-state')).toBe('unchecked')
+})
