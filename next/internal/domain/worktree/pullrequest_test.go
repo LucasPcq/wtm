@@ -109,3 +109,8 @@ func TestEachReasonAPersonFixesIsNamedAndAnyOtherFailureNone(t *testing.T) {
 	assert.Equal(t, ReasonNotOnGitHub, UnavailableReason(ErrNotOnGitHub))
 	assert.Empty(t, UnavailableReason(fmt.Errorf("%w: HTTP 502", ErrPullRequestsUnavailable)))
 }
+
+func TestTheParamsOfGitHubUnavailableNameItsReasonOnlyWhenThereIsOne(t *testing.T) {
+	assert.Equal(t, map[string]string{ParamReason: ReasonSignedOut}, UnavailableParams(ErrGitHubSignedOut))
+	assert.Nil(t, UnavailableParams(fmt.Errorf("%w: HTTP 502", ErrPullRequestsUnavailable)))
+}

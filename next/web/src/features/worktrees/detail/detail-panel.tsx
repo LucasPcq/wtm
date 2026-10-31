@@ -57,7 +57,8 @@ export function DetailPanel({
           <ReviewSection
             review={pr}
             pending={github.isPending}
-            unavailable={github.isError ? { message: github.error.message } : unavailable(github.data?.warnings)}
+            unavailable={unavailable(github.data?.warnings)}
+            failed={github.isError ? github.error.message : undefined}
             askedAt={github.dataUpdatedAt}
           />
         )

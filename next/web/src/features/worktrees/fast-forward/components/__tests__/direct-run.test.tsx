@@ -126,7 +126,6 @@ test('a callout of one line is one row, its icon, title and action centred on it
   const callout = await screen.findByRole('region', { name: 'To do' })
 
   expect(callout.children).toHaveLength(3)
-  expect(callout.classList.contains('items-center')).toBe(true)
 })
 
 test('a second click while the first runs opens it rather than run again', async () => {

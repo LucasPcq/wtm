@@ -9,11 +9,13 @@ export function ReviewSection({
   review,
   pending,
   unavailable,
+  failed,
   askedAt,
 }: {
   review: StatusReview | null | undefined
   pending: boolean
   unavailable: GitHubFact | undefined
+  failed: string | undefined
   askedAt: number
 }) {
   const meta = askedAt
@@ -22,7 +24,8 @@ export function ReviewSection({
 
   const body = () => {
     if (pending) return <Skeleton className="h-10 w-full" />
-    if (unavailable) return <GitHubAlert fact={unavailable} />
+    if (unavailable) return <GitHubAlert fact={unavailable} fixBelow />
+    if (failed) return <p className="text-sm text-muted-foreground">{failed}</p>
     if (!review) return <p className="text-sm text-muted-foreground">No pull request.</p>
 
     const { url, number, title, state, draft, checks, decision } = review

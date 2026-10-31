@@ -123,6 +123,15 @@ func UnavailableReason(err error) string {
 	return ""
 }
 
+// UnavailableParams are the params of a refusal or a warning that GitHub could not be asked for err: its reason when a person fixes it outside wtm, under ParamReason; nil otherwise.
+func UnavailableParams(err error) map[string]string {
+	if reason := UnavailableReason(err); reason != "" {
+		return map[string]string{ParamReason: reason}
+	}
+
+	return nil
+}
+
 // ErrPullRequestNotFound is a pull request number the repository has none of.
 var ErrPullRequestNotFound = errors.New("pull request not found")
 

@@ -225,7 +225,7 @@ func unavailable(err error) error {
 		return domain.AsError(domain.AsErrorParams{Err: err, Code: CodeGitHubUnavailable, Message: err.Error()})
 	}
 
-	return &domain.Error{Kind: domain.KindPrecondition, Code: CodeGitHubUnavailable, Message: err.Error(), Params: domain.UnavailableParams(err)}
+	return &domain.Error{Kind: domain.KindPrecondition, Code: CodeGitHubUnavailable, Message: err.Error(), Params: worktree.UnavailableParams(err)}
 }
 
 // ----------------------------------------------------------------------------

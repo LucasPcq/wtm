@@ -11,7 +11,7 @@ import type {
 import type { FieldWords } from '@/components/command-form/command-fields'
 import type { StepKey } from '@/features/worktrees/create/utils/steps'
 import { createWords } from '@/features/worktrees/create/utils/words'
-import { type GitHubReason, githubWords, prState } from '@/features/worktrees/utils/github'
+import { githubWords, prState } from '@/features/worktrees/utils/github'
 import { sentence } from '@/features/worktrees/utils/sentence'
 import { plural } from '@/lib/plural'
 
@@ -126,15 +126,8 @@ export const isRowWarning = (warning: DomainWarning): warning is DomainWarning &
 export const rowWarningLine = (warning: DomainWarning & { code: RowWarning }) =>
   warningWords[warning.code](warning.params ?? {})
 
-// what Next says while the form cannot be asked: GitHub's reason, or any other refusal
-const nextWhy: Record<GitHubReason, string> = {
-  gh_missing: 'Install gh to list pull requests',
-  signed_out: 'Sign in to gh to list pull requests',
-  not_on_github: 'Pull requests need origin on GitHub',
-}
-
-export function blockedBy(refusal: DomainError | undefined) {
-  if (refusal?.code !== 'checkout.github_unavailable') return "Checkout can't start: see the error above"
-  const reason = githubWords(refusal).reason
-  return reason ? nextWhy[reason] : "GitHub couldn't be asked"
-}
+// what Next says while the form cannot be asked: GitHub's words, or any other refusal
+export const blockedBy = (refusal: DomainError | undefined) =>
+  refusal?.code === 'checkout.github_unavailable'
+    ? githubWords(refusal).next
+    : "Checkout can't start: see the error above"
