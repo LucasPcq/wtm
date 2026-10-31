@@ -159,7 +159,7 @@ func (d *Daemon) Start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 		return run.Job{}, &run.Error{Code: run.CodeLaunchFailed, Message: fmt.Sprintf("start job %s: %v", spec.Job.Name, err)}
 	}
 	j := &job{record: run.Record{Spec: spec, StartedAt: d.params.Now(), PID: process.PID(), PGID: process.PID()}, state: run.Running, process: process, done: make(chan struct{})}
-	if previous != nil && previous.up() {
+	if previous != nil && previous.up() && spec.Detached() {
 		j.previous = previous
 	}
 	d.jobs[k] = j
@@ -199,8 +199,10 @@ type launchParams struct {
 
 // launch waits for a detached launcher to exit: its stack is then up, with no
 // process of the daemon's; a launcher that failed gives the worktree back the
-// stack it had, if any, and so does a shutdown that stopped it, for the next
-// daemon. A stop a client sent has the last word.
+// stack it had, if any. A launcher stopped (by a shutdown, or by a client's
+// stop, which runs the stack's stop command next) leaves the stack up and
+// indexed: the one it had, else the one it may have started in part, for the
+// stop command or the next daemon to take down.
 func (d *Daemon) launch(params launchParams) (run.Job, error) {
 	j := params.Job
 	code := j.process.Wait()
@@ -211,10 +213,9 @@ func (d *Daemon) launch(params launchParams) (run.Job, error) {
 	stopped := j.stopped
 	k := keyOf(j.record.Spec)
 	switch {
-	case stopped && d.stopping && j.previous != nil:
+	case stopped && j.previous != nil:
 		d.jobs[k] = j.previous
 	case stopped:
-		j.state = run.Stopped
 	case code != 0:
 		j.exitCode = &code
 		delete(d.jobs, k)
@@ -312,9 +313,16 @@ func (d *Daemon) Stop(req run.Stop) (run.Outcome, error) {
 	case process != nil:
 		process.Stop(d.params.Grace)
 		<-done
-		// A launcher stopped may have started its stack, or be starting one again: its stop command takes it down, unless a shutdown leaves it to the next daemon.
-		if j.record.Hold() == run.HoldDetached && !d.isStopping() {
-			return run.OutcomeStopped, d.stopStack(j)
+		// A launcher stopped leaves its stack up, the one it had or the one it may have started: its stop command takes it down, unless a shutdown leaves it to the next daemon.
+		if j.record.Hold() != run.HoldDetached || d.isStopping() {
+			break
+		}
+		d.mu.Lock()
+		stack := d.jobs[k]
+		stack.stopped, stack.stopID = true, req.CorrelationID
+		d.mu.Unlock()
+		if err := d.stopStack(stack); err != nil {
+			return "", err
 		}
 	default:
 		if err := d.stopStack(j); err != nil {
@@ -325,7 +333,8 @@ func (d *Daemon) Stop(req run.Stop) (run.Outcome, error) {
 	return run.OutcomeStopped, nil
 }
 
-// stopStack runs a detached stack's stop command, then lists it stopped.
+// stopStack runs a detached stack's stop command, then lists it stopped; a
+// stop command that fails leaves it up and indexed.
 func (d *Daemon) stopStack(j *job) error {
 	spec := j.record.Spec
 	process, err := d.params.Spawn(spec.StopCommand(nil))

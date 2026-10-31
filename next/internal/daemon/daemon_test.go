@@ -350,3 +350,54 @@ func TestAStopDuringARelaunchStopsTheStackItself(t *testing.T) {
 	assert.Equal(t, run.Stopped, w.job(t, "db").State)
 	assert.Empty(t, w.index.names())
 }
+
+func TestAStopCommandThatFailsDuringARelaunchLeavesTheStackUpAndIndexed(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(2)})
+	_, err := w.Start(stack("db"), nil)
+	require.NoError(t, err)
+	delete(w.spawner.scripts, "up db")
+	go func() { _, _ = w.Start(stack("db"), nil) }()
+	require.Eventually(t, func() bool { return len(w.spawner.lines()) == 2 }, time.Second, time.Millisecond)
+
+	outcome, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+
+	var failure *run.Error
+	require.ErrorAs(t, err, &failure)
+	assert.Equal(t, run.CodeStopFailed, failure.Code)
+	assert.Empty(t, outcome)
+	assert.True(t, w.job(t, "db").Up)
+	assert.Equal(t, []string{"/wt/a:db"}, w.index.names())
+	w.spawner.scripts["down db"] = exits(0)
+	retried, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	require.NoError(t, err)
+	assert.Equal(t, run.OutcomeStopped, retried, "a stop tried again still reaches the stack")
+}
+
+func TestAServiceStartedWhereAStackWasIsIndexedAsItself(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0)})
+	_, err := w.Start(stack("db"), nil)
+	require.NoError(t, err)
+	foreground := stack("db")
+	foreground.Job.Stop, foreground.Job.Cmd = "", "postgres"
+
+	_, err = w.Start(foreground, nil)
+	require.NoError(t, err)
+
+	records := w.index.Load()
+	require.Len(t, records, 1)
+	assert.Equal(t, run.HoldOwn, records[0].Hold())
+	assert.Equal(t, "postgres", records[0].Spec.Job.Cmd)
+}
+
+func TestAShutdownDuringAStacksFirstLaunchLeavesItIndexed(t *testing.T) {
+	w := newWorld(t, nil)
+	launched := make(chan error)
+	go func() { _, err := w.Start(stack("db"), nil); launched <- err }()
+	require.Eventually(t, func() bool { return len(w.spawner.lines()) == 1 }, time.Second, time.Millisecond)
+
+	w.Shutdown()
+
+	require.NoError(t, <-launched)
+	assert.True(t, w.job(t, "db").Up, "the stack may be partly up: the next daemon's stop takes it down")
+	assert.Equal(t, []string{"/wt/a:db"}, w.index.names())
+}

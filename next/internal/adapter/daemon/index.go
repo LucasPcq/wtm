@@ -26,9 +26,12 @@ type Index struct {
 	kept map[jobKey]legacyKeys
 }
 
+// jobKey is a record of a job as Load read it: a later start of that job is
+// another record, which inherits none of its kept keys.
 type jobKey struct {
 	workDir string
 	name    string
+	started int64
 }
 
 // state is the file: its version and the jobs up.
@@ -92,7 +95,7 @@ func (i *Index) Load() []run.Record {
 	i.kept = map[jobKey]legacyKeys{}
 	records := make([]run.Record, 0, len(file.Jobs))
 	for _, r := range file.Jobs {
-		i.kept[jobKey{workDir: r.WorkDir, name: r.Name}] = r.Config.legacyKeys
+		i.kept[jobKey{workDir: r.WorkDir, name: r.Name, started: r.StartedAt.UnixNano()}] = r.Config.legacyKeys
 		records = append(records, r.runRecord())
 	}
 
@@ -106,7 +109,7 @@ func (i *Index) Save(records []run.Record) error {
 	i.mu.Lock()
 	for _, r := range records {
 		wire := recordOf(r)
-		wire.Config.legacyKeys = i.kept[jobKey{workDir: wire.WorkDir, name: wire.Name}]
+		wire.Config.legacyKeys = i.kept[jobKey{workDir: wire.WorkDir, name: wire.Name, started: wire.StartedAt.UnixNano()}]
 		file.Jobs = append(file.Jobs, wire)
 	}
 	i.mu.Unlock()
