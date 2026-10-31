@@ -28,7 +28,7 @@ Each read, live or GitHub's, publishes a worktree's `condition` (`no_worktree`, 
 
 ## Follow-ups
 
-A follow-up the catalogue cannot run (sync, go, run …) shows as its command line to copy: `CommandLine` (`features/worktrees/components/command-line.tsx`), a block or `inline`; a menu of them, `ActionsMenu`. One the server cannot spell says so with what it meant (`No command line for this: …`), never disappears.
+A follow-up the web does not run (go, run …) shows as its command line to copy: `CommandLine` (`features/worktrees/components/command-line.tsx`), a block or `inline`; a menu of them, `ActionsMenu`. One the server cannot spell says so with what it meant (`No command line for this: …`), never disappears.
 
 ## Operations
 
@@ -51,8 +51,14 @@ A mutation's run lives in one zustand store, keyed by command and repository (`u
 ## Reparent
 
 - **Steps** (`reparent/`): Worktrees (from a selection only, the rows that can't move under Left as they are with the list's `refused` words), New parent, Confirm. Every fact is a reparent question: `worktree`'s options carry each worktree's `parent` (and `gone`), `to`'s options are the parents it may take (the `pinned` base branch first) and `to.refused` the ones it refuses, as field errors worded in `reparent/utils/words.ts` (`self_parent`, `reparent.cycle` with its `under`). Confirm is the dry run's `moves`: one already on the parent goes under Left as they are, and an empty plan disables Reparent with why.
-- **At once** (`hooks/use-reparent-now.ts`): a move the core spelled with its `to` (a Tree drop, a callout's fix, a child left orphaned by Remove or Prune, an Undo) runs through the direct run, one run per new parent (`byParent`), one after the other, and one toast for them all: Undo runs the core's `reparent.undo` follow-ups the same way, "Copy wtm sync" the `reparent.sync` ones merged. A dry run that refuses (a cycle) ends on an error toast saying why, whose Details opens the dialog on Confirm.
+- **At once** (`hooks/use-reparent-now.ts`): a move the core spelled with its `to` (a Tree drop, a callout's fix, a child left orphaned by Remove or Prune, an Undo) runs through the direct run, one run per new parent (`byParent`), one after the other, and one toast for them all: Undo runs the core's `reparent.undo` follow-ups the same way, and "Sync" opens the sync dialog on the `reparent.sync` ones merged. A dry run that refuses (a cycle) ends on an error toast saying why, whose Details opens the dialog on Confirm.
 - **The Tree** asks reparent's questions with no answer for the nodes that move (their grip) and, from the grip's hover or focus, with the dragged worktree for where it may land (`tree/utils/targets.ts`): an option takes the drop, a refusal says why while hovered, the current parent is neutral, a branch reparent does not know is deleted. A drop before the answer lands runs all the same: its dry run refuses what the answer would have.
+
+## Sync
+
+- **One dialog** (`sync/`, `hooks/use-sync-dialog.ts`, `openSync(repo, { answers, left, picking, deciding })`): every entry hands it a follow-up's answers (a row's `sync <w>`, the callout's fix, reparent's `reparent.sync`, a run's `sync.push`, `sync.resolve`, `sync.resume`), the header none (`picking`, every stack). It never runs at once.
+- **One fetch per flow**: the review is a forced dry run over what step 1 shows (`all` from the header, else the worktrees named, their descendants with them), so each dirty worktree shows its risk; the plan is `planQuery` over the choices with `no_fetch`, keyed on the review's answer. Step 1 draws the review's rows (`utils/stack.ts`) with the plan's facts: who follows (`descendant`), who is left (`left_out`), which branch rebased onto moves. Left untouched, the header's precheck names no worktree, so the command picks and keeps a dirty one. Forced for one dirty worktree checked, the plan forces every dirty one: the primary waits until each that would move is checked.
+- **The run**: units in run order, the branches fast-forwarded first then each worktree (`unitsOf`, its `onto` for the running words). Each branch fast-forwarded first is an item of its own in the outcome (done with the commits it took, failed with `sync.ff_failed`, or interrupted), which Done's "Fast-forwarded" group reads. The words are Records over `SyncStanding`, `SyncBlocker` and the failure codes (`sync/utils/words.ts`).
 
 ## The event stream
 

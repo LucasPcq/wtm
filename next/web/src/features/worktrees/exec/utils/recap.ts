@@ -5,7 +5,7 @@ import { warningLine } from '@/features/worktrees/exec/utils/words'
 import {
   itemWarnings,
   type OutcomeGroup,
-  type OutcomeKind,
+  type OutcomeLabels,
   type OutcomeRow,
   planWide,
 } from '@/features/worktrees/utils/outcome'
@@ -39,7 +39,7 @@ const rowOf = (item: ExecItem): OutcomeRow => {
 // a warning on a worktree is a row to check, in the screen's words; the plan's own stay its Alert
 export function recapOf(envelope: Applied<'exec'> | undefined): {
   groups: OutcomeGroup[]
-  labels: Record<OutcomeKind, string>
+  labels: OutcomeLabels
   warnings: DomainWarning[]
 } {
   const items = envelope?.items ?? []

@@ -22,6 +22,8 @@ import type {
   ReparentDetail,
   ReparentPlan,
   StatusDetail,
+  SyncDetail,
+  SyncPlan,
   TreeDetail,
   WebCall,
 } from '@/api/types.gen'
@@ -41,6 +43,7 @@ type Mutation = {
   'fast-forward': { plan: FastforwardPlan; detail: FastforwardDetail }
   exec: { plan: ExecPlan; detail: ExecDetail }
   reparent: { plan: ReparentPlan; detail: ReparentDetail }
+  sync: { plan: SyncPlan; detail: SyncDetail }
 }
 export type MutationCommand = keyof Mutation
 export type Planned<C extends MutationCommand> = Mutation[C]['plan']

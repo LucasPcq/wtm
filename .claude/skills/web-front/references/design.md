@@ -46,6 +46,15 @@ Type does the ranking: a title is 14 medium foreground, a second line 12–13 mu
 - **The dialog's fixed header** holds the title, the stepper and Create's `wtm/Start From`; only the body under it scrolls.
 - **The body, in this order:** a `wtm/Alert` for a technical problem of the whole plan; the main list; the **Left as they are** section (its own label and list box, 24 below the main list, muted names: business states that keep a row out of the plan: diverged, ahead, mid-rebase, not on origin, already there, main, no longer finished); then `wtm/Details`, the one fold, always last.
 - **A technical problem never sits in a list, a business state never sits in an Alert.** A failed fetch, GitHub unavailable or a lock held is about the tool; diverged or mid-rebase is about the branch.
+- **A Confirm opened from a row has no Back**: its subject is given, and its choices sit on Confirm. Sync is the exception below.
+
+### Sync: decide, then read
+
+- **Step 1 (Worktrees) holds every choice; Confirm holds none.** Step 1 draws the stack as a tree (`wtm/Stack Row`: 20 px per level, an elbow to each child, one box column) under its search and `wtm/List Header`, then the three `wtm/Option Switch`es (Descendants, Push to origin, Leave a conflict to resolve). A box is real only where the core takes the answer: a worktree named, a dirty one checked anyway (sent forced), main's fast-forward first (`ff_parents`, one answer for every branch rebased onto, each line naming the others it moves with). A descendant's box is checked and disabled, "follows X", its tooltip saying how to leave it; a dirty one starts unchecked and amber.
+- **Confirm reads the plan**: "In this order" (`wtm/Plan Row`, numbered in run order), "Left as they are" (each with its reason, a reparent fix running in the dialog), "How it runs" (`wtm/Plan Sentence`: the descendants, the push, what a conflict does, a parent not fast-forwarded), then Details. A Confirm opened from a row has Back to step 1, where anything changes.
+- **The count rule**: main's fast-forward row has no number, only its glyph. The numbers, the running "k of n", the primary ("Sync 3 worktrees") and Done's "3 synced." count rebases.
+- **Its run lists are flat**: Confirm, running and Done rows have no indentation; the run order and each row's "onto X" carry the stack. Done keeps the house's groups (Couldn't sync, To check, Synced, then Fast-forwarded for the branches rebased onto).
+- **It opens** on Confirm from a row's menu, the detail's, the Tree's and the detail callout, on step 1 when the named worktree is dirty, and on step 1 from the header (every stack, the command's own pick checked) and the selection bar. Its follow-ups (Push them, Run again keeping the conflict, Sync the rest) open it again on Confirm with their plan: sync is never a direct run.
 
 ### Buttons
 
@@ -61,7 +70,7 @@ Type does the ranking: a title is 14 medium foreground, a second line 12–13 mu
 
 Every surface draws its actions from one canonical list, in this order, in sections labelled with `wtm/Menu Label` (`DropdownMenuLabel`):
 
-1. **Branch:** Fast-forward, Sync ⧉, Reparent.
+1. **Branch:** Fast-forward, Sync, Reparent.
 2. **Run:** Run a command, Start the profile ⧉, Stop the profile ⧉, View the logs ⧉.
 3. **Open:** Go to the worktree ⧉, Open the pull request.
 4. **Remove**, alone after a separator, in the destructive colour.
@@ -77,8 +86,8 @@ Every surface draws its actions from one canonical list, in this order, in secti
 
 | Surface | Holds | Component |
 | -- | -- | -- |
-| Page header | "Actions ▾", secondary, beside the one primary "Create worktree": Prune, Fast-forward, Run a command, then Remove. Each opens its dialog on a Worktrees picker prechecked by the core (Prune: the safe candidates; Fast-forward: the rows behind origin; Run, Remove: none). Reparent is absent: it needs a subject. | `wtm/Page Header`, `wtm/Menu` |
-| Selection bar | Always the same four: Fast-forward, Run a command, Reparent, a divider, Remove. | `wtm/Selection Bar` |
+| Page header | "Actions ▾", secondary, beside the one primary "Create worktree": Prune, Fast-forward, Sync, Run a command, then Remove. Each opens its dialog on a Worktrees picker prechecked by the core (Prune: the safe candidates; Fast-forward: the rows behind origin; Sync: the worktrees that need a sync; Run, Remove: none). Reparent is absent: it needs a subject. | `wtm/Page Header`, `wtm/Menu` |
+| Selection bar | Always the same five: Fast-forward, Sync, Run a command, Reparent, a divider, Remove. | `wtm/Selection Bar` |
 | Row context menu | Right-click on a row in List or Tree, or the row's "⋯" (shown on hover and focus). | `wtm/Menu` |
 | Detail menu | The "⋯" in the detail's header: the same menu for the open worktree. | `wtm/Menu` |
 | Detail callout | The one action of the moment, with a button that runs it. | `wtm/Alert` |

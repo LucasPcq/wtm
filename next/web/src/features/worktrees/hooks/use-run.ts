@@ -113,6 +113,7 @@ const doing: Record<MutationCommand, string> = {
   prune: 'Pruning',
   exec: 'Running a command',
   reparent: 'Reparenting',
+  sync: 'Syncing',
 }
 
 export const isMutation = (command: string): command is MutationCommand => Object.hasOwn(doing, command)

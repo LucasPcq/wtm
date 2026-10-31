@@ -5,7 +5,7 @@ import { useRunEntry } from '@/features/worktrees/hooks/use-run-entry'
 import { type MenuAction, menu, type Subject, selectionEntryOf } from '@/features/worktrees/utils/actions'
 import { cn } from '@/lib/utils'
 
-const actions: MenuAction[] = ['fast_forward', 'exec', 'reparent']
+const actions: MenuAction[] = ['fast_forward', 'sync', 'exec', 'reparent']
 
 export function SelectionBar({
   repo,

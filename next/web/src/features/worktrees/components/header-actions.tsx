@@ -12,10 +12,12 @@ import { openExec } from '@/features/worktrees/hooks/use-exec-dialog'
 import { openFastForward } from '@/features/worktrees/hooks/use-fast-forward-dialog'
 import { openPrune } from '@/features/worktrees/hooks/use-prune-dialog'
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
+import { openSync } from '@/features/worktrees/hooks/use-sync-dialog'
 import { entryOf, menu, noneWords, pruneAction, type Subject } from '@/features/worktrees/utils/actions'
 
 // reparent is not here: it needs a subject
-export function HeaderActions({ repo, rows }: { repo: string; rows: Subject[] }) {
+// needsSync: the read on screen says a worktree needs a sync
+export function HeaderActions({ repo, rows, needsSync }: { repo: string; rows: Subject[]; needsSync: boolean }) {
   const removable = rows.filter(({ subject, offers }) => 'followUp' in entryOf(subject, offers, 'clean'))
   const onOrigin = rows.some(({ subject, offers }) => 'followUp' in entryOf(subject, offers, 'fast_forward'))
 
@@ -42,6 +44,14 @@ export function HeaderActions({ repo, rows }: { repo: string; rows: Subject[] })
           label={menu.fast_forward.label}
           why={onOrigin ? undefined : noneWords.fast_forward}
           onSelect={() => openFastForward(repo, { worktrees: [], left: [], picking: true })}
+        />
+        {/* the tree opens with every stack, the command's own pick checked: the worktrees that need a sync */}
+        <MenuEntry
+          Item={DropdownMenuItem}
+          icon={menu.sync.icon}
+          label={menu.sync.label}
+          why={needsSync ? undefined : noneWords.sync}
+          onSelect={() => openSync(repo, { answers: [], left: [], picking: true, deciding: true })}
         />
         <MenuEntry
           Item={DropdownMenuItem}

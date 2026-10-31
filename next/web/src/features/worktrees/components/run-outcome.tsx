@@ -5,7 +5,7 @@ import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import {
   type Act,
   type OutcomeGroup,
-  type OutcomeKind,
+  type OutcomeLabels,
   outcomeOrder,
   planWide,
 } from '@/features/worktrees/utils/outcome'
@@ -19,7 +19,7 @@ export function RunOutcome({
   act,
 }: {
   groups: OutcomeGroup[]
-  labels: Record<OutcomeKind, string>
+  labels: OutcomeLabels
   warnings?: DomainWarning[] | undefined
   act?: Act | undefined
 }) {

@@ -4,10 +4,13 @@ import { phaseDuring } from '@/features/worktrees/utils/phases'
 import type { Unit } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
-// what needs the person first comes first: what failed, then what to check, then what went
-export const outcomeOrder = ['failed', 'check', 'done'] as const
+// what needs the person first comes first: what failed, then what to check, then what went, then what went along
+// with it (sync's branches fast-forwarded first)
+export const outcomeOrder = ['failed', 'check', 'done', 'along'] as const
 
 export type OutcomeKind = (typeof outcomeOrder)[number]
+
+export type OutcomeLabels = Record<Exclude<OutcomeKind, 'along'>, string> & { along?: string }
 
 // a row with no tone is a plain next step: nothing went wrong, nothing to check
 export type OutcomeTone = Exclude<Tone, 'busy'>
@@ -20,10 +23,13 @@ export type OutcomeRow = {
   message?: string | undefined
   go?: DomainFollowUp | undefined
   path?: string | undefined
+  // what to do, in prose, once the row opens
+  note?: string | undefined
   output?: { lines: string[]; log?: string | undefined } | undefined
   followUp?: DomainFollowUp | undefined
-  // a fix the web runs: a button in place of the command to copy
+  // a fix the web runs: a button in place of the command to copy, named by actLabel when the row names its own
   act?: (() => void) | undefined
+  actLabel?: string | undefined
 }
 
 // the follow-ups of one command the web runs at once: each its own button, and all of them at once,

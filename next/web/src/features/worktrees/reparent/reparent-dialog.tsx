@@ -2,6 +2,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
 import { useReparentDialog } from '@/features/worktrees/hooks/use-reparent-dialog'
 import { useRun } from '@/features/worktrees/hooks/use-run'
+import { openSync } from '@/features/worktrees/hooks/use-sync-dialog'
 import { ReparentProgress } from '@/features/worktrees/reparent/components/reparent-progress'
 import { ReparentWizard } from '@/features/worktrees/reparent/components/reparent-wizard'
 
@@ -26,6 +27,11 @@ export function ReparentDialog({ repo }: { repo: string }) {
           onDone={() => {
             run.dismiss()
             close()
+          }}
+          onSync={(answers) => {
+            run.dismiss()
+            close()
+            openSync(repo, { answers, left: [], picking: false, deciding: false })
           }}
         />
       )

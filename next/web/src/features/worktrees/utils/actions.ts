@@ -23,7 +23,7 @@ type Runs = 'web' | 'copy' | 'link'
 // the one list every surface draws, in its order: a key moved here moves in every menu
 export const menu: Record<MenuAction, { section: Section; label: string; icon: LucideIcon; runs: Runs }> = {
   fast_forward: { section: 'Branch', label: 'Fast-forward', icon: FastForward, runs: 'web' },
-  sync: { section: 'Branch', label: 'Sync', icon: RefreshCw, runs: 'copy' },
+  sync: { section: 'Branch', label: 'Sync', icon: RefreshCw, runs: 'web' },
   reparent: { section: 'Branch', label: 'Reparent', icon: GitBranch, runs: 'web' },
   exec: { section: 'Run', label: 'Run a command', icon: SquareTerminal, runs: 'web' },
   run_up: { section: 'Run', label: 'Start the profile', icon: Play, runs: 'copy' },
@@ -58,9 +58,10 @@ const unofferedWords: Record<WorktreeUnoffered, (worktree: string, action: MenuA
 const notInTheWeb = 'Not in the web yet'
 
 // why the header's action that picks its own worktrees finds none on this page
-export const noneWords: Record<'clean' | 'fast_forward', string> = {
+export const noneWords: Record<'clean' | 'fast_forward' | 'sync', string> = {
   clean: 'No worktree can be removed',
   fast_forward: 'No worktree is on origin',
+  sync: 'No worktree needs a sync',
 }
 const oneAtATime = 'One worktree at a time'
 

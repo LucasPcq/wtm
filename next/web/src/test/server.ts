@@ -10,6 +10,7 @@ import { envelope, followUp, offers, statusDetail, treeDetail } from '@/test/fix
 import { prunePlan, pruneRun } from '@/test/prune'
 import { answeringReparent } from '@/test/reparent'
 import { line, streamed } from '@/test/stream'
+import { answeringSync, syncDryRun, syncRun } from '@/test/sync'
 
 export { line, repo, streamed, worktrees }
 
@@ -171,6 +172,7 @@ const handlers = [
   http.post('/api/repos/r1/commands/fast-forward/questions', () => HttpResponse.json(ffQuestions())),
   ...answeringExec(),
   ...answeringReparent(),
+  ...answeringSync(),
   ...answeringCheckout(),
   http.post('/api/repos/r1/commands/create/questions', async ({ request }) =>
     HttpResponse.json(questionsOf(((await request.json()) as WebCall).answers)),
@@ -197,6 +199,8 @@ const handlers = [
         return call.dry_run ? prunePlan(call) : pruneRun(call)
       case 'fast-forward':
         return call.dry_run ? ffPlan(call) : ffRun(call)
+      case 'sync':
+        return call.dry_run ? syncDryRun(call) : syncRun(call)
     }
     return HttpResponse.json({ error: { message: 'unknown command' } }, { status: 404 })
   }),

@@ -14,11 +14,11 @@ import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { Facts } from '@/features/worktrees/components/facts'
 import { ItemList } from '@/features/worktrees/components/item-list'
 import type { Left } from '@/features/worktrees/components/left-item'
+import { LeftRow } from '@/features/worktrees/components/left-row'
 import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { ReasonButton } from '@/features/worktrees/components/reason-button'
 import { Stepper } from '@/features/worktrees/components/stepper'
 import { AdvanceItem } from '@/features/worktrees/fast-forward/components/advance-item'
-import { LeftAdvance } from '@/features/worktrees/fast-forward/components/left-advance'
 import { PickerStep } from '@/features/worktrees/fast-forward/components/picker-step'
 import {
   behind,
@@ -115,10 +115,10 @@ export function FastForwardWizard({
   const warningOf = (worktree: string) => review.data?.warnings.find((warning) => warning.params?.worktree === worktree)
   const leftRows = [
     ...leftAdvances.map((advance) => (
-      <LeftAdvance key={advance.worktree} row={leftRow(advance, warningOf(advance.worktree))} />
+      <LeftRow key={advance.worktree} row={leftRow(advance, warningOf(advance.worktree))} />
     )),
     ...left.map(({ worktree, why }) => (
-      <LeftAdvance key={worktree} row={{ key: worktree, tone: 'muted', title: worktree, message: why }} />
+      <LeftRow key={worktree} row={{ key: worktree, tone: 'muted', title: worktree, message: why }} />
     )),
   ]
   const empty = review.isSuccess && !review.data.error && review.data.plan?.empty === true
