@@ -60,6 +60,10 @@ const runsHere: Record<
   checkout: null,
   prune: { verb: pruneAction.label, open: (repo, fix) => openPrune(repo, subjectsOf(fix)) },
   exec: null,
+  'run-up': {
+    verb: menu.run_up.label,
+    open: (_repo, fix, runEntry) => runEntry({ action: 'run_up', followUp: fix }, []),
+  },
 }
 
 export function Callout({ repo, problems: [first, ...more] }: { repo: string; problems: StatusProblem[] }) {

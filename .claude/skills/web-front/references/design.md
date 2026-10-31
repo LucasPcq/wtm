@@ -169,6 +169,18 @@ Create's step 1 opens on `wtm/Start From`, `New branch | Pull request`, above it
 
 A warning is drawn where its subject is, on the steps and on Done: one whose params name no worktree nor branch is the plan's `wtm/Alert`, first, on both; one with a subject is a reason line on that row during the steps (`create.source_diverged` on its `BranchPlan`) and a "To check" row on Done (`RunOutcome` splits them). A lone group drops its label. Success contracts to a count in the description. A row folds: its folded line is the code's fixed message worded by the screen ("git refused to move the branch"); opened, it shows the output or `error.params.cause` verbatim, and the log's path when there is a log. Steps and folders sit in `wtm/Details`, folded.
 
+## Running
+
+The Running page (`features/worktrees/running/`, frames "Area — Running") lists the jobs per worktree; Start a profile (`features/worktrees/run-up/`) is its one primary. Its own rules, beside the ones above:
+
+- **One primary, one header.** Start a profile (primary, with its icon) in the page header, Stop jobs beside it (outline). A worktree's group carries its actions on the name's row, the rest in its "⋯" menu.
+- **A group is a worktree that holds jobs.** Its name (14 semibold), then the profile and counts on line 2 ("profile dev · 2 up · 1 crashed · 1 exited"); its job rows hang from a connector under it, a crash first. A claim on a shared service shows where the service runs, never in the claimer's group.
+- **A job row** is the detail's Run row: the glyph by state (circle-dot running, circle-x crashed, circle-minus exited or stopped, a spinner starting), the name 14 medium, the state on the right in 12 muted, the address in mono 12 under the name.
+- **A profile in a menu** is a submenu, "Start a profile ›": the default first, labelled "default"; the one the worktree runs disabled, labelled "running"; each with its jobs summed to three and a count; at most five, then "All N profiles…", which opens the dialog. A searchable list never sits in a menu: that is the dialog's picker.
+- **Start a profile** is a dialog of three steps: Worktrees (the picker, each row what it runs now), Profile (every profile, its search always shown, each with its jobs, "the default", "already running in …"), Confirm (no control: the shared services joined once, without a number; each worktree's jobs numbered across the run; How it runs, in sentences). From a worktree, or a profile picked in its menu, it opens on Confirm, on Profile when the core picks none.
+- **A start runs job by job**: one row per job, the shared services once on top, each row unfolding to its last lines, following; the bar counts the jobs up. Hidden, it goes on in a toast ("Starting dev in 2 worktrees", "3 of 8 up", Show), and the page greys the rows it brings up with where they stand ("waits for migrate") until the jobs read lists them; it ends on a toast ("dev started in 2 worktrees").
+- **Counts are the read's.** Until the jobs read gives its own counts and order, the page and the sidebar count list's `jobs` through one helper (`jobCounts`, `jobsUp` in `api/queries/commands.ts`).
+
 ## In Pencil
 
 - **Copy the `.pen` before any structural change** (a component's nodes, a slot): there is no other undo than the app's.

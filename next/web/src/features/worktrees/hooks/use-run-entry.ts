@@ -10,6 +10,7 @@ import { openFastForward, useFastForwardDialog } from '@/features/worktrees/hook
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
 import { openReparent } from '@/features/worktrees/hooks/use-reparent-dialog'
 import { useReparentNow } from '@/features/worktrees/hooks/use-reparent-now'
+import { openRunUp } from '@/features/worktrees/hooks/use-run-up-dialog'
 import { type Entry, leftOf, menu, type Subject, subjectsOf } from '@/features/worktrees/utils/actions'
 import { copy } from '@/features/worktrees/utils/copy'
 
@@ -80,6 +81,8 @@ export function useRunEntry(repo: string) {
         if (entry.action === 'reparent') return reparent(entry.followUp, rows)
         if (entry.action === 'exec')
           return openExec(repo, { worktrees: subjectsOf(entry.followUp), left: leftOf(rows, entry.action) })
+        if (entry.action === 'run_up')
+          return openRunUp(repo, { worktrees: subjectsOf(entry.followUp), left: leftOf(rows, entry.action) })
         return openRemove(repo, {
           worktrees: subjectsOf(entry.followUp),
           left: leftOf(rows, entry.action),
