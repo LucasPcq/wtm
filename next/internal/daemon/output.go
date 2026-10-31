@@ -26,14 +26,14 @@ const (
 // is let go. Its buffers are cut back to their caps once they doubled them,
 // never on each write. The log and the start's client are written outside its
 // lock, by the one goroutine that writes: a slow disk or client holds no
-// reader of the listing.
+// reader of the listing. The start's client is let go at the output's end.
 type output struct {
 	now  func() time.Time
 	log  Log
-	out  func(run.Line)
 	last atomic.Pointer[run.Line]
 
 	mu        sync.Mutex
+	out       func(run.Line)
 	splitter  run.Splitter
 	lines     []run.Line
 	text      int
@@ -92,13 +92,16 @@ func (o *output) end() []string {
 	clear(o.followers)
 	clear(o.attached)
 	o.raw = nil
+	out := o.out
+	// The start's client waited for this end: a line noted after it is the job's, not that client's.
+	o.out = nil
 	last := []string{}
 	for _, line := range o.lines[max(0, len(o.lines)-lastLines):] {
 		last = append(last, line.Text)
 	}
 	o.mu.Unlock()
 
-	o.hand(lines)
+	o.handTo(lines, out)
 	if o.log != nil {
 		o.log.Close()
 	}
@@ -141,19 +144,38 @@ func (o *output) keep(lines []run.Line) {
 	}
 }
 
-// hand writes lines to the log and the start's client; the lock is not held.
+// hand writes lines to the log and the start's client while it waits; the
+// lock is not held.
 func (o *output) hand(lines []run.Line) {
+	o.mu.Lock()
+	out := o.out
+	o.mu.Unlock()
+	o.handTo(lines, out)
+}
+
+// handTo writes lines to the log and to out (nil for none); the lock is not
+// held.
+func (o *output) handTo(lines []run.Line, out func(run.Line)) {
 	if len(lines) == 0 {
 		return
 	}
 	if o.log != nil {
 		o.log.Write(lines)
 	}
-	if o.out != nil {
+	if out != nil {
 		for _, line := range lines {
-			o.out(line)
+			out(line)
 		}
 	}
+}
+
+// note adds a line of wtm's own to the job's output, as if the job printed it.
+func (o *output) note(text string) {
+	lines := []run.Line{{At: o.now(), Text: text}}
+	o.mu.Lock()
+	o.keep(lines)
+	o.mu.Unlock()
+	o.hand(lines)
 }
 
 func (o *output) lastLine() *run.Line {

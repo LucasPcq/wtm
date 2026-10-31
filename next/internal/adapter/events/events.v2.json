@@ -171,6 +171,11 @@
       "required": ["branch", "path"],
       "properties": { "branch": { "type": "string" }, "path": { "type": "string", "minLength": 1 } }
     },
+    "held_by": {
+      "description": "The worktrees holding a shared job when the change happened: its main checkout when it holds it, and each worktree claiming it; absent for a job that is not shared or held by none.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/job_worktree" }
+    },
     "job": {
       "type": "object",
       "required": ["name", "kind", "hold"],
@@ -185,13 +190,13 @@
       "description": "The run daemon started a job: a foreground service is up, a detached launcher left its stack running, a task began. Published by the daemon itself.",
       "type": "object",
       "required": ["type", "worktree", "job"],
-      "properties": { "type": { "const": "job.started" }, "worktree": { "$ref": "#/$defs/job_worktree" }, "job": { "$ref": "#/$defs/job" } }
+      "properties": { "type": { "const": "job.started" }, "worktree": { "$ref": "#/$defs/job_worktree" }, "job": { "$ref": "#/$defs/job" }, "held_by": { "$ref": "#/$defs/held_by" } }
     },
     "job.stopped": {
       "description": "A job stopped because a client asked. Published by the run daemon itself.",
       "type": "object",
       "required": ["type", "worktree", "job"],
-      "properties": { "type": { "const": "job.stopped" }, "worktree": { "$ref": "#/$defs/job_worktree" }, "job": { "$ref": "#/$defs/job" } }
+      "properties": { "type": { "const": "job.stopped" }, "worktree": { "$ref": "#/$defs/job_worktree" }, "job": { "$ref": "#/$defs/job" }, "held_by": { "$ref": "#/$defs/held_by" } }
     },
     "job.crashed": {
       "description": "A service ended on its own, or a task failed. Published by the run daemon itself.",
@@ -202,7 +207,8 @@
         "worktree": { "$ref": "#/$defs/job_worktree" },
         "job": { "$ref": "#/$defs/job" },
         "exit_code": { "type": "integer", "minimum": -1, "description": "Its exit status, -1 when a signal killed it." },
-        "last_lines": { "type": "array", "items": { "type": "string" }, "description": "The last lines it printed, oldest first." }
+        "last_lines": { "type": "array", "items": { "type": "string" }, "description": "The last lines it printed, oldest first." },
+        "held_by": { "$ref": "#/$defs/held_by" }
       }
     },
     "job.exited": {
@@ -213,7 +219,8 @@
         "type": { "const": "job.exited" },
         "worktree": { "$ref": "#/$defs/job_worktree" },
         "job": { "$ref": "#/$defs/job" },
-        "exit_code": { "const": 0 }
+        "exit_code": { "const": 0 },
+        "held_by": { "$ref": "#/$defs/held_by" }
       }
     },
     "event": {

@@ -23,7 +23,7 @@ func TestEveryAnswerIsStampedWithTheProtocolAndTheBuild(t *testing.T) {
 
 	assert.Equal(t, []map[string]any{{"status": "ok", "protocol": 2.0, "version": "1.0", "jobs": []any{map[string]any{
 		"name": "web", "kind": "service", "work_dir": "/wt/a", "state": "running", "hold": "own", "status": "running", "pid": 4242.0,
-		"started_at": "2026-10-31T12:00:00Z", "url": "http://localhost:3100", "ports": map[string]any{"PORT": 3100.0},
+		"started_at": "2026-10-31T12:00:00.000Z", "url": "http://localhost:3100", "ports": map[string]any{"PORT": 3100.0},
 		"last_line": map[string]any{"at": "2026-10-31T12:00:00.000Z", "text": "GET / 200"},
 	}}}}, answers)
 }
@@ -170,4 +170,16 @@ func TestAResizeIsHandedTheSizeAndAnswered(t *testing.T) {
 
 	assert.Equal(t, "ok", answers[0]["status"])
 	assert.Equal(t, []any{run.Window{Name: "web", WorkDir: "/wt/a", Cols: 120, Rows: 40}}, daemonJobs.seen())
+}
+
+func TestASharedStartCarriesItsMainCheckout(t *testing.T) {
+	daemonJobs := &jobs{}
+	socket, _ := served(t, daemonJobs, "1.0")
+
+	asked(t, socket, `{"action":"start","spec":{"job":{"name":"db","kind":"service","cmd":"docker compose up -d","stop":"docker compose down","scope":"shared"},"work_dir":"/wt/a","shared":{"work_dir":"/repo","env":{"WTM_BRANCH":"main"},"log_dir":"/repo/.git/wtm/logs/main"}}}`)
+
+	spec, ok := daemonJobs.seen()[0].(run.Spec)
+	require.True(t, ok)
+	assert.Equal(t, &run.Shared{WorkDir: "/repo", Env: map[string]string{"WTM_BRANCH": "main"}, LogDir: "/repo/.git/wtm/logs/main"}, spec.Shared)
+	assert.Equal(t, project.Shared, spec.Job.Scope)
 }

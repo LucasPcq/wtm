@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -169,8 +170,9 @@ func (o *orphans) Reap(pgids []int) {
 type index struct {
 	mu      sync.Mutex
 	records []run.Record
-	// stall, while set, holds each Save until it is closed: a job's end waiting on its index.
-	stall chan struct{}
+	// stall, while set, holds each Save until it is closed: a job's end waiting on its index; stalled counts the Saves it holds.
+	stall   chan struct{}
+	stalled int
 }
 
 func (i *index) Load() []run.Record {
@@ -182,6 +184,9 @@ func (i *index) Load() []run.Record {
 func (i *index) Save(records []run.Record) error {
 	i.mu.Lock()
 	stall := i.stall
+	if stall != nil {
+		i.stalled++
+	}
 	i.mu.Unlock()
 	if stall != nil {
 		<-stall
@@ -282,3 +287,61 @@ func (m *memoryLog) Write(lines []run.Line) {
 }
 
 func (m *memoryLog) Close() {}
+
+// shared is the shared job name of the worktree at workDir, its main checkout /repo: a stack when stop is set, a foreground service otherwise.
+func shared(name, workDir, stop string) run.Spec {
+	slug := strings.ReplaceAll(strings.TrimPrefix(workDir, "/wt/"), "/", "_")
+	spec := run.Spec{
+		Job:     project.Job{Name: name, Kind: project.Service, Cmd: "up " + name, Stop: stop, Scope: project.Shared},
+		WorkDir: workDir,
+		Env:     map[string]string{"WTM_WORKTREE": slug, "WTM_BRANCH": "feat/" + slug, "WTM_ISOLATION": "isolated"},
+		Origin:  &run.Origin{Root: "/repo", CommonDir: "/repo/.git", Branch: "feat/" + slug},
+		Shared:  &run.Shared{WorkDir: "/repo", Env: map[string]string{"WTM_WORKTREE": "main", "WTM_BRANCH": "main"}},
+	}
+	if workDir == "/repo" {
+		spec.Env, spec.Origin.Branch = spec.Shared.Env, "main"
+	}
+	return spec
+}
+
+// failsFirst is a script that exits 1 the first times times it runs, saying why, then 0.
+func failsFirst(times int, why string) script {
+	var mu sync.Mutex
+	ran := 0
+	return func(p *fakeProcess, printed func(string)) {
+		mu.Lock()
+		ran++
+		failing := ran <= times
+		mu.Unlock()
+		if failing {
+			printed(why + "\n")
+			p.end(1)
+			return
+		}
+		p.end(0)
+	}
+}
+
+// holds is a script that runs until release is closed, then exits with code.
+func holds(release <-chan struct{}, code int) script {
+	return func(p *fakeProcess, _ func(string)) {
+		<-release
+		p.end(code)
+	}
+}
+
+// stalling holds every Save from now until the function it returns is called.
+func (i *index) stalling() func() {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	stall := make(chan struct{})
+	i.stall = stall
+	return func() { close(stall) }
+}
+
+// holding reports how many Saves the stall holds.
+func (i *index) holding() int {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return i.stalled
+}

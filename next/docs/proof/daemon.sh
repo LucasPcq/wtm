@@ -202,5 +202,22 @@ start_daemon "$other"
 started 27-other-build-start "{\"action\":\"start\",\"spec\":$(spec web service 'echo ready; exec sleep 300')}"
 "$next" status </dev/null 2>&1 | sed -n '/JOBS/,$p' | normalise >"$out/28-status-reads-other-build.txt"
 stop_daemon
+# 7. A shared job: it runs once, in the main checkout; each worktree claims it, its namespace created for it and noted in the service's log; the last to let go stops it.
+shared_marker=$root/cache.up
+mkdir -p "$root/wt-a" "$root/wt-b"
+shared_spec() { # shared_spec <worktree dir> <slug>
+  printf '{"job":{"name":"cache","kind":"service","cmd":"touch %s && echo cache up","stop":"rm -f %s && echo cache down","scope":"shared","namespace":{"name":"app_{worktree}","create":"echo created $WTM_NAMESPACE"}},"work_dir":"%s","env":{"WTM_WORKTREE":"%s","WTM_BRANCH":"feat/%s","WTM_ISOLATION":"isolated"},"shared":{"work_dir":"%s","env":{"WTM_WORKTREE":"main","WTM_BRANCH":"main"},"log_dir":"%s"}}' \
+    "$shared_marker" "$shared_marker" "$1" "$2" "$2" "$acme" "$logs"
+}
+start_daemon "$next"
+ask 29-shared-claimed-by-a "{\"action\":\"start\",\"spec\":$(shared_spec "$root/wt-a" a)}"
+ask 30-shared-claimed-by-b "{\"action\":\"start\",\"spec\":$(shared_spec "$root/wt-b" b)}"
+ask 31-shared-list '{"action":"list"}'
+ask 32-shared-lines-of-a-claim "{\"action\":\"lines\",\"name\":\"cache\",\"work_dir\":\"$root/wt-a\"}"
+ask 33-shared-released-by-a "{\"action\":\"stop\",\"name\":\"cache\",\"work_dir\":\"$root/wt-a\"}"
+ask 34-shared-stopped-by-b "{\"action\":\"stop\",\"name\":\"cache\",\"work_dir\":\"$root/wt-b\"}"
+echo "marker $( [[ -f $shared_marker ]] && echo present || echo removed)" >"$out/34-shared-marker.txt"
+normalise <"$global/jobs.json" >"$out/35-index-after-shared.json"
+stop_daemon
 sed -E -i '' "s#(/private)?$root#<SB>#g" "$out"/*.stdout "$out"/*.stderr
 echo "$out"

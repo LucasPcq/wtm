@@ -83,7 +83,7 @@ type job struct {
 	Hold      string         `json:"hold,omitempty"`
 	Reaped    bool           `json:"reaped,omitempty"`
 	PID       int            `json:"pid,omitempty"`
-	StartedAt time.Time      `json:"started_at,omitzero"`
+	StartedAt stamp          `json:"started_at,omitzero"`
 	ExitCode  *int           `json:"exit_code,omitempty"`
 	URL       string         `json:"url,omitempty"`
 	Ports     map[string]int `json:"ports,omitempty"`
@@ -120,7 +120,7 @@ func (s *stamp) UnmarshalJSON(data []byte) error {
 }
 
 func jobOf(j run.Job) job {
-	wire := job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, SharedDir: j.SharedDir, State: string(j.State), Hold: string(j.Hold), Reaped: j.Reaped, PID: j.PID, StartedAt: j.StartedAt, ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports, Status: legacyStatus(j)}
+	wire := job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, SharedDir: j.SharedDir, State: string(j.State), Hold: string(j.Hold), Reaped: j.Reaped, PID: j.PID, StartedAt: stamp(j.StartedAt), ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports, Status: legacyStatus(j)}
 	if j.LastLine != nil {
 		wire.LastLine = &line{At: stamp(j.LastLine.At), Text: j.LastLine.Text}
 	}
@@ -148,11 +148,11 @@ func legacyStatus(j run.Job) string {
 // of the legacy wtm when legacy.
 func (j job) runJob(legacy bool) run.Job {
 	if legacy {
-		return run.Job{Name: j.Name, WorkDir: j.WorkDir, Up: legacyUp(j.Status), Kind: project.JobKind(j.Kind), State: cmp.Or(run.State(j.State), legacyState(j.Status)), Hold: legacyHold(j.Status), PID: j.PID, URL: j.URL, ExitCode: j.ExitCode, StartedAt: j.StartedAt, SharedDir: j.SharedDir}
+		return run.Job{Name: j.Name, WorkDir: j.WorkDir, Up: legacyUp(j.Status), Kind: project.JobKind(j.Kind), State: cmp.Or(run.State(j.State), legacyState(j.Status)), Hold: legacyHold(j.Status), PID: j.PID, URL: j.URL, ExitCode: j.ExitCode, StartedAt: time.Time(j.StartedAt), SharedDir: j.SharedDir}
 	}
 
 	hold, state := run.Hold(j.Hold), run.State(j.State)
-	read := run.Job{Name: j.Name, WorkDir: j.WorkDir, Up: hold == run.HoldClaim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Hold: hold, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: j.StartedAt, SharedDir: j.SharedDir}
+	read := run.Job{Name: j.Name, WorkDir: j.WorkDir, Up: hold == run.HoldClaim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Hold: hold, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: time.Time(j.StartedAt), SharedDir: j.SharedDir}
 	if j.LastLine != nil {
 		read.LastLine = &run.Line{At: time.Time(j.LastLine.At), Text: j.LastLine.Text}
 	}
@@ -209,6 +209,14 @@ type spec struct {
 	Unset   []string          `json:"unset,omitempty"`
 	LogDir  string            `json:"log_dir,omitempty"`
 	Origin  *origin           `json:"origin,omitempty"`
+	Shared  *shared           `json:"shared,omitempty"`
+}
+
+// shared is the main checkout a shared job runs in, on the wire.
+type shared struct {
+	WorkDir string            `json:"work_dir"`
+	Env     map[string]string `json:"env,omitempty"`
+	LogDir  string            `json:"log_dir,omitempty"`
 }
 
 type origin struct {
@@ -223,6 +231,9 @@ func specOf(s run.Spec) *spec {
 	if s.Origin != nil {
 		wire.Origin = &origin{Root: s.Origin.Root, CommonDir: s.Origin.CommonDir, Branch: s.Origin.Branch, CorrelationID: s.Origin.CorrelationID}
 	}
+	if s.Shared != nil {
+		wire.Shared = &shared{WorkDir: s.Shared.WorkDir, Env: s.Shared.Env, LogDir: s.Shared.LogDir}
+	}
 
 	return wire
 }
@@ -231,6 +242,9 @@ func (s spec) runSpec() run.Spec {
 	runSpec := run.Spec{Job: s.Job.job(), WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir}
 	if s.Origin != nil {
 		runSpec.Origin = &run.Origin{Root: s.Origin.Root, CommonDir: s.Origin.CommonDir, Branch: s.Origin.Branch, CorrelationID: s.Origin.CorrelationID}
+	}
+	if s.Shared != nil {
+		runSpec.Shared = &run.Shared{WorkDir: s.Shared.WorkDir, Env: s.Shared.Env, LogDir: s.Shared.LogDir}
 	}
 
 	return runSpec

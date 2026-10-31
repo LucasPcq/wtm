@@ -158,12 +158,13 @@ func (JobStopped) event()          {}
 func (JobCrashed) event()          {}
 func (JobExited) event()           {}
 
-// JobChange is what a job event says: the worktree the job runs in (its branch and path: the run daemon reads no more of it), the job, and, for one that ended, its exit code and the last lines it printed.
+// JobChange is what a job event says: the worktree the job runs in (its branch and path: the run daemon reads no more of it), the job, for one that ended its exit code and the last lines it printed, and, for a shared job, the worktrees holding it.
 type JobChange struct {
-	Worktree  JobWorktree `json:"worktree"`
-	Job       EventJob    `json:"job"`
-	ExitCode  *int        `json:"exit_code,omitempty"`
-	LastLines []string    `json:"last_lines,omitempty"`
+	Worktree  JobWorktree   `json:"worktree"`
+	Job       EventJob      `json:"job"`
+	ExitCode  *int          `json:"exit_code,omitempty"`
+	LastLines []string      `json:"last_lines,omitempty"`
+	HeldBy    []JobWorktree `json:"held_by,omitempty"`
 }
 
 // JobWorktree is the worktree a job event is about, as its client named it to the run daemon.

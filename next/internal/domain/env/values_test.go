@@ -122,3 +122,34 @@ func TestANamespaceRefusesAnUnknownPlaceholderInItsNameOrItsEnv(t *testing.T) {
 		assert.ErrorContains(t, err, "{branch}")
 	}
 }
+
+func TestANamespaceIsCreatedForTheWorktreeItsJobEnvironmentNames(t *testing.T) {
+	job := project.Job{Name: "db", Namespace: &project.Namespace{Name: "app_{worktree}", Create: "createdb $WTM_NAMESPACE", Env: map[string]string{"PGDATABASE": "app_{worktree}_{ordinal}"}}}
+	jobEnv := map[string]string{"WTM_WORKTREE": "feat_a", "WTM_ORDINAL": "2", "WTM_ISOLATION": "isolated"}
+
+	namespace, ok, err := NamespaceFor(job, jobEnv)
+
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, NamespaceRun{Name: "app_feat_a", Env: map[string]string{"PGDATABASE": "app_feat_a_2", "WTM_NAMESPACE": "app_feat_a", "WTM_WORKTREE": "feat_a", "WTM_ORDINAL": "2"}}, namespace)
+}
+
+func TestNoNamespaceIsCreatedWithoutOneACreateOrUnderVerbatim(t *testing.T) {
+	with := project.Job{Name: "db", Namespace: &project.Namespace{Name: "app", Create: "createdb app"}}
+	cases := map[string]struct {
+		job    project.Job
+		jobEnv map[string]string
+	}{
+		"none":      {job: project.Job{Name: "db"}},
+		"no_create": {job: project.Job{Name: "db", Namespace: &project.Namespace{Name: "app"}}},
+		"verbatim":  {job: with, jobEnv: map[string]string{"WTM_ISOLATION": "verbatim"}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ok, err := NamespaceFor(c.job, c.jobEnv)
+
+			require.NoError(t, err)
+			assert.False(t, ok)
+		})
+	}
+}

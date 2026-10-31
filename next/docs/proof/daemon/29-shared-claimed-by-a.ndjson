@@ -1,0 +1,2 @@
+{"status":"line","protocol":2,"version":"<NEXT>","pid":<PID>,"at":"<T>","text":"cache up"}
+{"status":"ok","protocol":2,"version":"<NEXT>","pid":<PID>,"job":{"name":"cache","kind":"service","work_dir":"<SB>/wt-a","shared_dir":"<SB>/acme","hold":"claim","started_at":"<T>","status":"joined"}}

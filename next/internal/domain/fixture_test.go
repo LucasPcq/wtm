@@ -29,7 +29,7 @@ var everyEvent = []Event{
 	RepoAdded{},
 	RepoRemoved{},
 	JobStarted{JobChange: job},
-	JobStopped{JobChange: job},
+	JobStopped{JobChange: JobChange{Worktree: JobWorktree{Branch: "main", Path: "/trees/main"}, Job: job.Job, HeldBy: []JobWorktree{job.Worktree}}},
 	JobCrashed{JobChange: JobChange{Worktree: job.Worktree, Job: job.Job, ExitCode: new(1), LastLines: []string{"listen EADDRINUSE"}}},
 	JobExited{JobChange: JobChange{Worktree: job.Worktree, Job: EventJob{Name: "migrate", Kind: project.Task, Hold: run.HoldOwn}, ExitCode: new(0)}},
 }

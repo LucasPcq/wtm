@@ -33,6 +33,9 @@ func newWorld(t *testing.T, scripts map[string]script) *world {
 		Publish: w.bus.publish,
 		Now:     func() time.Time { return now },
 		Grace:   time.Millisecond,
+
+		NamespaceBudget: 50 * time.Millisecond,
+		NamespaceRetry:  time.Millisecond,
 	})
 	return w
 }
@@ -80,4 +83,34 @@ func (w *world) given(t *testing.T, j *job) {
 		defer w.mu.Unlock()
 		return w.jobs[key{workDir: "/wt/a", name: "db"}] == j
 	}, time.Second, time.Millisecond)
+}
+
+// waits hooks the daemon's shared starts and returns what waits until one of them waits on a job being stopped or launched.
+func (w *world) waits(t *testing.T) func() {
+	t.Helper()
+	waited := make(chan struct{}, 1)
+	w.waited = func() {
+		select {
+		case waited <- struct{}{}:
+		default:
+		}
+	}
+	return func() {
+		t.Helper()
+		select {
+		case <-waited:
+		case <-time.After(2 * time.Second):
+			require.FailNow(t, "no start waited")
+		}
+	}
+}
+
+// claimed starts the shared job db from the worktree at, a stack, and returns where its error arrives.
+func (w *world) claimed(at string) <-chan error {
+	result := make(chan error, 1)
+	go func() {
+		_, err := w.Start(shared("db", at, "down db"), nil)
+		result <- err
+	}()
+	return result
 }
