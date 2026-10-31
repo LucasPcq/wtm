@@ -558,7 +558,8 @@ func (s *stream) jobs(ctx context.Context) ([]run.Job, bool) {
 		return nil, false
 	}
 	jobs, err := s.Jobs(ctx)
-	return jobs, err == nil
+	_, skewed := errors.AsType[*run.Skewed](err)
+	return jobs, err == nil || skewed
 }
 
 // stillThere ends the stream of source once its repository has no wtm config any more; any other failure to read it waits for the next check.

@@ -186,15 +186,17 @@ value = "{namespace}"
 
 	require.NoError(t, err)
 	assert.Equal(t, project.Run{
-		Declared:        true,
-		PortOffsetBlock: 20,
+		Declared:         true,
+		PortOffsetBlock:  20,
+		PortProbeTimeout: 5,
+		Concurrency:      project.Parallel,
 		Jobs: []project.Job{
 			{
 				Name: "db", Kind: project.Service, Cmd: "docker compose up -d db", Stop: "docker compose stop db", Cwd: "infra",
-				Ports: map[string]int{"PG_PORT": 5432}, URL: &project.URL{Port: "PG_PORT", Host: "pg"}, Scope: project.Shared,
+				Ports: map[string]int{"PG_PORT": 5432}, URL: &project.URL{Port: "PG_PORT", Host: "pg"}, Scope: project.Shared, NoProbe: true, Runs: []string{}, Touches: []string{},
 				Namespace: &project.Namespace{Name: "app_{worktree}", Create: "createdb {namespace}", Remove: "dropdb {namespace}", Env: map[string]string{"PGDATABASE": "app_{worktree}"}},
 			},
-			{Name: "migrate", Kind: project.Task, Cmd: "pnpm migrate"},
+			{Name: "migrate", Kind: project.Task, Cmd: "pnpm migrate", Touches: []string{"db"}},
 		},
 		Profiles:   []project.Profile{{Name: "full", Jobs: []string{"db", "migrate"}, Default: true}},
 		EnvPorts:   []project.EnvPortLink{{File: ".env", Key: "DATABASE_URL", Job: "db", Port: "PG_PORT"}},
@@ -225,6 +227,8 @@ func TestAnInvalidRunTomlIsRefusedSayingWhy(t *testing.T) {
 	}{
 		{"unknown_addressing", "addressing = \"nope\"\n", `invalid run config: unknown addressing "nope" (expected "ports" or "names")`},
 		{"unknown_isolation", "isolation = \"keep\"\n", `invalid run config: unknown isolation "keep" (expected "isolated" or "verbatim")`},
+		{"unknown_concurrency", "concurrency = \"both\"\n", `invalid run config: unknown concurrency "both" (expected "parallel" or "exclusive")`},
+		{"shared_task", "[[job]]\nname = \"seed\"\nkind = \"task\"\ncmd = \"x\"\nscope = \"shared\"\n", `invalid run config: job "seed": scope = "shared" only means something on a service: a task runs to its end in each worktree`},
 		{"unknown_kind", "[[job]]\nname = \"api\"\nkind = \"servce\"\ncmd = \"pnpm dev\"\n", `invalid run config: job "api": unknown kind "servce" (expected service or task)`},
 		{"unknown_scope", "[[job]]\nname = \"db\"\ncmd = \"x\"\nscope = \"global\"\n", `invalid run config: job "db": unknown scope "global" (expected "shared")`},
 		{"namespace_on_per_worktree_job", "[[job]]\nname = \"db\"\ncmd = \"x\"\n\n[job.namespace]\nname = \"app_{worktree}\"\ncreate = \"createdb\"\n", `invalid run config: job "db": [job.namespace] only means something on a job with scope = "shared"`},

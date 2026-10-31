@@ -1,5 +1,7 @@
 package run
 
+import "cmp"
+
 // ProtocolVersion is the version of the protocol this wtm's run daemon speaks:
 // a daemon stamps it on every answer, and a client reads nothing of another.
 // The legacy wtm's daemon stamps none.
@@ -46,4 +48,21 @@ func SkewOf(stamp Stamp, version string) Skew {
 // stop the foreground services someone is working in.
 func Replaceable(skew Skew, up int) bool {
 	return skew != SkewNone && up == 0
+}
+
+// A Skewed is what a read of the jobs says of a daemon of another build, or of
+// the legacy wtm, that answered it: the jobs it lists are read all the same,
+// while a start beside the jobs it holds is refused until it is restarted.
+type Skewed struct {
+	Skew   Skew
+	Daemon string // the daemon's build, empty when it does not say
+}
+
+// Error says which daemon answered; its words name no build of the client, so they read the same from one build to the next.
+func (s *Skewed) Error() string {
+	daemon := "of another build (" + cmp.Or(s.Daemon, "older") + ")"
+	if s.Skew == SkewLegacy {
+		daemon = "the legacy wtm's"
+	}
+	return "the run daemon is " + daemon + ": restart it to start jobs beside its own"
 }

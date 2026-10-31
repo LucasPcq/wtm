@@ -1,0 +1,156 @@
+{
+  "v": 2,
+  "command": "run-up",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-a",
+        "profile": "dev",
+        "jobs": [
+          {
+            "name": "migrate",
+            "kind": "task",
+            "status": "done",
+            "log": "/repo/main/.git/wtm/logs/feat%2Fa/migrate.log"
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "status": "started",
+            "url": "http://api.feat-a.main.localhost:11080",
+            "log": "/repo/main/.git/wtm/logs/feat%2Fa/api.log",
+            "ports": [
+              {
+                "name": "PORT",
+                "port": 4010,
+                "listening": true
+              }
+            ]
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "status": "started",
+            "url": "http://web.feat-a.main.localhost:11080",
+            "log": "/repo/main/.git/wtm/logs/feat%2Fa/web.log",
+            "ports": [
+              {
+                "name": "PORT",
+                "port": 3010,
+                "listening": true
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "profile": "dev",
+    "worktrees": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "/repo/wt-feat-a",
+        "numbered": true,
+        "jobs": [
+          {
+            "name": "migrate",
+            "kind": "task",
+            "action": "start",
+            "step": 1
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "action": "start",
+            "step": 2,
+            "waits_for": [
+              "migrate"
+            ],
+            "ports": {
+              "PORT": 4010
+            }
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "action": "start",
+            "step": 3,
+            "waits_for": [
+              "migrate"
+            ],
+            "ports": {
+              "PORT": 3010
+            }
+          }
+        ]
+      }
+    ],
+    "exclusive": false,
+    "others": [],
+    "no_probe": false,
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          }
+        ]
+      },
+      {
+        "key": "profile",
+        "label": "Profile",
+        "path": "profile",
+        "values": [
+          {
+            "value": "dev",
+            "text": "dev"
+          }
+        ]
+      },
+      {
+        "key": "jobs",
+        "label": "Jobs",
+        "values": [
+          {
+            "value": "migrate",
+            "text": "migrate"
+          },
+          {
+            "value": "api",
+            "text": "api"
+          },
+          {
+            "value": "web",
+            "text": "web"
+          }
+        ]
+      },
+      {
+        "key": "reach",
+        "label": "feat/a",
+        "values": [
+          {
+            "value": "api  http://api.feat-a.main.localhost:11080",
+            "text": "api  http://api.feat-a.main.localhost:11080"
+          },
+          {
+            "value": "web  http://web.feat-a.main.localhost:11080",
+            "text": "web  http://web.feat-a.main.localhost:11080"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

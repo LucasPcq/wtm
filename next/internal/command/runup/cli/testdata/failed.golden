@@ -1,0 +1,15 @@
+
+  ✗ run up: 1 done · 1 failed
+
+  Worktrees       feat/a, feat/b
+  Profile         dev
+  Jobs in feat/a  migrate, api, web
+  Jobs in feat/b  migrate, api, web
+  feat/a          api  http://api.feat-a.main.localhost:11080, web  http://web.feat-a.main.localhost:11080
+
+  ✗ feat/b  migrate failed: run daemon: task migrate exited with code 3
+      error: relation users does not exist
+  full output:  /repo/main/.git/wtm/logs/feat%2Fb/migrate.log
+
+  → wtm-next run up feat/b --profile dev   start it again where it did not pass
+

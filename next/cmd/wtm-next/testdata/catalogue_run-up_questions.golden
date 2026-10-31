@@ -1,0 +1,78 @@
+{
+  "fields": [
+    {
+      "kind": "multi_select",
+      "path": "worktree",
+      "origin": "request",
+      "picked": [
+        "main"
+      ],
+      "options": [
+        {
+          "value": "main",
+          "tag": "current"
+        }
+      ]
+    },
+    {
+      "kind": "select",
+      "path": "profile",
+      "origin": "default",
+      "skip": "one_profile",
+      "value": "",
+      "options": [],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    },
+    {
+      "kind": "confirm",
+      "path": "exclusive",
+      "origin": "default",
+      "skip": "alone",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "force",
+      "origin": "default",
+      "skip": "safe",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "parallel",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "no_probe",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "detach",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    }
+  ],
+  "problems": []
+}

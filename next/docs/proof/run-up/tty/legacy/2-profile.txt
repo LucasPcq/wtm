@@ -1,0 +1,13 @@
+$ wtm run up; echo EXIT=$?
+
+  Step 2/3 • Start which profile?
+
+  ✓ Worktrees: main
+
+▌▸ dev — api, web                                                                          default
+   full — migrate, db, cache, api, web
+   broken — fail, web
+   crash — api, crashy
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

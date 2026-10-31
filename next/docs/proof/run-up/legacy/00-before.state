@@ -1,0 +1,12 @@
+## jobs up (the daemon's index)
+## .git/wtm/worktrees/feat%2Fa/meta.json
+  "ordinal": 1,
+  "isolation": "isolated"
+## .git/wtm/worktrees/feat%2Fb/meta.json
+  "ordinal": 2,
+  "isolation": "isolated"
+## .git/wtm/worktrees/feat%2Fv/meta.json
+  "isolation": "verbatim"
+## logs
+## namespaces made
+## compose containers

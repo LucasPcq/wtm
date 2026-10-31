@@ -24,7 +24,7 @@ func newForm(open func(ctx context.Context, dir string) (exec.UseCase, error)) *
 		Draw:       drawOutcome,
 		ApplyLabel: applyLabel,
 		NewProgress: func(ctx context.Context, params output.ProgressParams) form.Progress {
-			return newProgress(ctx, params)
+			return output.NewConcurrent(ctx, output.ConcurrentParams{ProgressParams: params, Rows: output.RowPerUnit})
 		},
 	}
 }

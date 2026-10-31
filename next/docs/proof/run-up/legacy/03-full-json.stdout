@@ -1,0 +1,65 @@
+[
+  {
+    "branch": "feat/b",
+    "path": "<SB>/acme.trees/feat-b",
+    "profile": "full",
+    "aborted": false,
+    "jobs": [
+      {
+        "name": "migrate",
+        "status": "done"
+      },
+      {
+        "name": "db",
+        "status": "joined",
+        "ports": [
+          {
+            "job": "db",
+            "name": "DB_PORT",
+            "port": 24353,
+            "status": "listening"
+          }
+        ],
+        "namespace": "acme_feat-b"
+      },
+      {
+        "name": "cache",
+        "status": "started",
+        "ports": [
+          {
+            "job": "cache",
+            "name": "CACHE_PORT",
+            "port": 24374,
+            "status": "listening"
+          }
+        ]
+      },
+      {
+        "name": "api",
+        "status": "started",
+        "ports": [
+          {
+            "job": "api",
+            "name": "PORT",
+            "port": 24371,
+            "status": "listening"
+          }
+        ],
+        "url": "http://api.feat-b.acme.localhost:24352"
+      },
+      {
+        "name": "web",
+        "status": "started",
+        "ports": [
+          {
+            "job": "web",
+            "name": "PORT",
+            "port": 24370,
+            "status": "listening"
+          }
+        ],
+        "url": "http://web.feat-b.acme.localhost:24352"
+      }
+    ]
+  }
+]

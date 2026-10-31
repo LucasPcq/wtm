@@ -1,0 +1,24 @@
+$ wtm run up; echo EXIT=$?
+
+  Step 8/8 • Confirm
+
+  ✓ Worktrees: main
+  ✓ Profile: dev
+  ✓ Other worktrees: kept running
+  · Foreign data — no job changes data its worktree does not own
+  · Parallel — set by its flag only
+  · No probe — set by its flag only
+  · Detach — set by its flag only
+
+  ┃  Review & confirm
+  ┃
+  ┃  Worktrees  main
+  ┃  Profile    dev
+  ┃  Jobs       api, web
+
+▌› Yes, start dev in main
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

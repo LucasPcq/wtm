@@ -190,7 +190,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 
 	var gitErr error
 	asking := teardown.Branches(asked)
-	answered := repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, PullRequests: u.PullRequests, Branches: asking, WithPRs: len(asking) > 0}, func() {
+	answered := repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, Restart: u.Repository.Restart, PullRequests: u.PullRequests, Branches: asking, WithPRs: len(asking) > 0}, func() {
 		// Worktrees removed together hold nothing for each other.
 		facts.Checks, gitErr = u.Teardown.Read(ctx, teardown.ReadParams{Worktrees: asked, Going: teardown.Branches(asked)})
 	})
@@ -202,6 +202,10 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	}
 
 	facts.JobsErr, facts.PRsErr = answered.JobsErr, answered.PRsErr
+	if answered.Skewed != nil {
+		skew := repository.SkewWarning(repository.SkewWarningParams{Command: Name, Skewed: answered.Skewed, Restart: u.Repository.Restart})
+		facts.Skew = &skew
+	}
 	facts.Settle(asked, answered.Jobs, answered.PullRequests)
 	return facts, nil
 }

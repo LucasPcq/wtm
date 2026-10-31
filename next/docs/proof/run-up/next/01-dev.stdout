@@ -1,0 +1,8 @@
+
+  ✓ run up: 1 done
+
+  Worktrees  feat/a
+  Profile    dev
+  Jobs       api, web
+  feat/a     api  http://api.feat-a.acme.localhost:24352, web  http://web.feat-a.acme.localhost:24352
+

@@ -3,6 +3,7 @@ $ wtm list; echo EXIT=$?
   Step 1/2 • Worktree
 
   Select a worktree
+  ! the run daemon is the legacy wtm's: restart it to start jobs beside its own
   ! pull requests unavailable: run `gh auth login`
 
 ▌› main                                                                    main  • active  ✓ clean

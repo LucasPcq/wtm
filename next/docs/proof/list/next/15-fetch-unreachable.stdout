@@ -10,4 +10,5 @@
     fatal: Could not read from remote repository.
     Please make sure you have the correct access rights
     and the repository exists.
+  ! the run daemon is the legacy wtm's: restart it to start jobs beside its own
 

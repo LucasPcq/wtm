@@ -20,7 +20,7 @@
     },
     "phase": {
       "description": "A phase of a subject's work, as phase.started and phase.finished name it: a closed set a surface names one by one.",
-      "enum": ["fast_forward", "worktree", "env", "meta", "ordinal", "ports", "on_create", "move", "on_clean", "remove", "exec", "rebase", "push"]
+      "enum": ["fast_forward", "worktree", "env", "meta", "ordinal", "ports", "on_create", "move", "on_clean", "remove", "exec", "rebase", "push", "job"]
     },
     "repo": {
       "type": "object",
@@ -57,6 +57,7 @@
         "type": { "const": "phase.started" },
         "subject": { "type": "string", "minLength": 1, "description": "What the unit works on: a branch." },
         "phase": { "$ref": "#/$defs/phase" },
+        "job": { "type": "string", "minLength": 1, "description": "The job of run.toml a job phase starts; absent for any other phase." },
         "log": { "type": "string", "minLength": 1, "description": "The file the phase's output goes to; absent when it has none." }
       }
     },
@@ -68,14 +69,15 @@
         "type": { "const": "phase.finished" },
         "subject": { "type": "string", "minLength": 1, "description": "What the unit works on: a branch." },
         "phase": { "$ref": "#/$defs/phase" },
+        "job": { "type": "string", "minLength": 1, "description": "The job of run.toml a job phase starts; absent for any other phase." },
         "failed": { "type": "boolean" }
       }
     },
     "phase.output": {
-      "description": "One line a phase printed: a hook's output.",
+      "description": "One line a phase printed: a hook's output, or a job's while it starts.",
       "type": "object",
       "required": ["type", "subject", "line"],
-      "properties": { "type": { "const": "phase.output" }, "subject": { "type": "string", "minLength": 1, "description": "What the unit works on: a branch." }, "line": { "type": "string" } }
+      "properties": { "type": { "const": "phase.output" }, "subject": { "type": "string", "minLength": 1, "description": "What the unit works on: a branch." }, "job": { "type": "string", "minLength": 1, "description": "The job of run.toml whose start printed the line; absent for any other phase." }, "line": { "type": "string" } }
     },
     "unit.finished": {
       "description": "The work on one subject of an operation ended.",

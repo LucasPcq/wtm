@@ -1,0 +1,284 @@
+{
+  "v": 2,
+  "command": "run-up",
+  "ok": false,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-a",
+        "profile": "dev",
+        "jobs": [
+          {
+            "name": "migrate",
+            "kind": "task",
+            "status": "done",
+            "log": "/repo/main/.git/wtm/logs/feat%2Fa/migrate.log"
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "status": "started",
+            "url": "http://api.feat-a.main.localhost:11080",
+            "log": "/repo/main/.git/wtm/logs/feat%2Fa/api.log",
+            "ports": [
+              {
+                "name": "PORT",
+                "port": 4010,
+                "listening": true
+              }
+            ]
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "status": "started",
+            "url": "http://web.feat-a.main.localhost:11080",
+            "log": "/repo/main/.git/wtm/logs/feat%2Fa/web.log",
+            "ports": [
+              {
+                "name": "PORT",
+                "port": 3010,
+                "listening": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/b",
+      "status": "failed",
+      "error": {
+        "kind": "internal",
+        "code": "run-up.job_failed",
+        "message": "migrate failed: run daemon: task migrate exited with code 3",
+        "params": {
+          "exit_code": "3",
+          "job": "migrate"
+        }
+      },
+      "detail": {
+        "path": "/repo/wt-feat-b",
+        "profile": "dev",
+        "jobs": [
+          {
+            "name": "migrate",
+            "kind": "task",
+            "status": "failed",
+            "log": "/repo/main/.git/wtm/logs/feat%2Fb/migrate.log",
+            "exit_code": 3,
+            "lines": [
+              "error: relation users does not exist"
+            ]
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "status": "not_started"
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "status": "not_started"
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "profile": "dev",
+    "worktrees": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "/repo/wt-feat-a",
+        "numbered": true,
+        "jobs": [
+          {
+            "name": "migrate",
+            "kind": "task",
+            "action": "start",
+            "step": 1
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "action": "start",
+            "step": 2,
+            "waits_for": [
+              "migrate"
+            ],
+            "ports": {
+              "PORT": 4010
+            }
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "action": "start",
+            "step": 3,
+            "waits_for": [
+              "migrate"
+            ],
+            "ports": {
+              "PORT": 3010
+            }
+          }
+        ]
+      },
+      {
+        "worktree": "feat/b",
+        "branch": "feat/b",
+        "path": "/repo/wt-feat-b",
+        "numbered": true,
+        "jobs": [
+          {
+            "name": "migrate",
+            "kind": "task",
+            "action": "start",
+            "step": 1
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "action": "start",
+            "step": 2,
+            "waits_for": [
+              "migrate"
+            ],
+            "ports": {
+              "PORT": 4020
+            }
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "action": "start",
+            "step": 3,
+            "waits_for": [
+              "migrate"
+            ],
+            "ports": {
+              "PORT": 3020
+            }
+          }
+        ]
+      }
+    ],
+    "exclusive": false,
+    "others": [],
+    "no_probe": false,
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          },
+          {
+            "value": "feat/b",
+            "text": "feat/b"
+          }
+        ]
+      },
+      {
+        "key": "profile",
+        "label": "Profile",
+        "path": "profile",
+        "values": [
+          {
+            "value": "dev",
+            "text": "dev"
+          }
+        ]
+      },
+      {
+        "key": "jobs:feat/a",
+        "label": "Jobs in feat/a",
+        "values": [
+          {
+            "value": "migrate",
+            "text": "migrate"
+          },
+          {
+            "value": "api",
+            "text": "api"
+          },
+          {
+            "value": "web",
+            "text": "web"
+          }
+        ]
+      },
+      {
+        "key": "jobs:feat/b",
+        "label": "Jobs in feat/b",
+        "values": [
+          {
+            "value": "migrate",
+            "text": "migrate"
+          },
+          {
+            "value": "api",
+            "text": "api"
+          },
+          {
+            "value": "web",
+            "text": "web"
+          }
+        ]
+      },
+      {
+        "key": "reach",
+        "label": "feat/a",
+        "values": [
+          {
+            "value": "api  http://api.feat-a.main.localhost:11080",
+            "text": "api  http://api.feat-a.main.localhost:11080"
+          },
+          {
+            "value": "web  http://web.feat-a.main.localhost:11080",
+            "text": "web  http://web.feat-a.main.localhost:11080"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "run-up",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        },
+        {
+          "path": "profile",
+          "values": [
+            "dev"
+          ]
+        }
+      ],
+      "code": "run-up.retry",
+      "message": "start it again where it did not pass"
+    }
+  ],
+  "warnings": [],
+  "error": {
+    "kind": "internal",
+    "code": "run-up.job_failed",
+    "message": "migrate failed: run daemon: task migrate exited with code 3",
+    "params": {
+      "exit_code": "3",
+      "job": "migrate"
+    }
+  }
+}

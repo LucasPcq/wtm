@@ -13,11 +13,12 @@ import (
 
 // Words are how the command line words one field of a command's form, which the core gives as data: the argument or flag that sets it (<branches>, --from), its name in the breadcrumb, the trail and its problems, what its answer decides (the wizard's description and the flag's usage), the problem of a multi-select answered with none, and how its options read, by value (a confirm's by true and false).
 type Words struct {
-	Flag    string
-	Label   string
-	Help    string
-	Empty   string
-	Options map[string]OptionWords
+	Flag      string
+	Shorthand string // a switch's one-letter flag, d for -d; none when empty
+	Label     string
+	Help      string
+	Empty     string
+	Options   map[string]OptionWords
 }
 
 // OptionWords are how an option reads in its list (Label, else as the facts of the option word it) and how the trail names it once picked (Short, else by its value).

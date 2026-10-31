@@ -16,10 +16,12 @@ import (
 // git) and the variables it never inherits from the daemon, the directory its
 // log is kept in (none keeps none), the Origin its events are published
 // under, none publishing none, the Routes its proxy serves it under while it
-// is up, and, for a job of shared scope, the Shared context of the main
-// checkout it runs in once for every worktree.
+// is up, for a job of shared scope the Shared context of the main checkout it
+// runs in once for every worktree, and the Profile of run.toml it was started
+// under (empty for a job started alone).
 type Spec struct {
 	Job     project.Job
+	Profile string
 	WorkDir string
 	Env     map[string]string
 	Unset   []string

@@ -20,9 +20,9 @@ import (
 func TestALegacyDaemonsJobsAreReadAsItSpellsThem(t *testing.T) {
 	socket, requests := serve(t, `{"status": "ok", "jobs": [{"name": "web", "status": "detached", "work_dir": "/wt/a"}, {"name": "api", "status": "stopped", "work_dir": "/wt/a"}, {"name": "db", "status": "attached", "work_dir": "/wt/b"}]}`)
 
-	jobs, err := daemon.Daemon{SocketPath: socket}.Jobs(t.Context())
+	jobs, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Jobs(t.Context())
 
-	require.NoError(t, err)
+	assert.Equal(t, &run.Skewed{Skew: run.SkewLegacy}, err)
 	assert.Equal(t, []run.Job{
 		{Name: "web", WorkDir: "/wt/a", Up: true, State: run.Running, Hold: run.HoldDetached},
 		{Name: "api", WorkDir: "/wt/a", State: run.Stopped, Hold: run.HoldOwn},
@@ -38,7 +38,7 @@ func TestALegacyJobIsReadWithHowItStandsAndAStateTheDaemonSaysWins(t *testing.T)
 
 	jobs, err := daemon.Daemon{SocketPath: socket}.Jobs(t.Context())
 
-	require.NoError(t, err)
+	require.ErrorAs(t, err, new(*run.Skewed))
 	exit := 1
 	assert.Equal(t, []run.Job{
 		{Name: "api", WorkDir: "/wt/a", Kind: project.Service, State: run.Crashed, Hold: run.HoldOwn, URL: "http://api.a.acme.localhost", ExitCode: &exit, StartedAt: time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC), SharedDir: "/repo"},
@@ -96,7 +96,7 @@ func TestADaemonOfThisProtocolIsReadAsItReports(t *testing.T) {
 
 	got, err := daemon.Daemon{SocketPath: socket, Version: "0.9"}.Jobs(t.Context())
 
-	require.NoError(t, err)
+	assert.Equal(t, &run.Skewed{Skew: run.SkewBuild, Daemon: "1.0"}, err, "a build skew is said beside the jobs")
 	claim.Ports = nil
 	assert.Equal(t, []run.Job{web, claim, reaped}, got, "a build skew changes nothing of a read")
 }
@@ -120,6 +120,29 @@ func TestAStartHandsOutTheLinesAndReturnsTheJobStarted(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, web, job)
 	assert.Equal(t, []run.Line{{At: started, Text: "ready"}}, lines)
+}
+
+func TestAStartThatMeetsADaemonStoppingIsMadeAgainOnce(t *testing.T) {
+	fake := &jobs{once: &run.Error{Code: run.CodeStopping, Message: "the run daemon is stopping"}}
+	socket, _ := served(t, fake, "1.0")
+	spec := run.Spec{Job: project.Job{Name: "web"}, Profile: "dev", WorkDir: "/wt/a"}
+
+	job, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Start(t.Context(), spec, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, web, job)
+	assert.Equal(t, []any{spec, spec}, starts(fake))
+}
+
+func TestAJobIsListedWithTheProfileItWasStartedUnder(t *testing.T) {
+	listed := web
+	listed.Profile = "dev"
+	socket, _ := served(t, &jobs{listed: []run.Job{listed}}, "1.0")
+
+	got, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Jobs(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, []run.Job{listed}, got)
 }
 
 func TestAStartTheDaemonRefusesFailsWithItsCodeAndExitCode(t *testing.T) {

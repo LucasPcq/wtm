@@ -18,4 +18,5 @@
 
   ! main has 2 commits it lacks
   → wtm-next sync feat/a   sync it onto main
+  ! the run daemon is the legacy wtm's: restart it to start jobs beside its own
 

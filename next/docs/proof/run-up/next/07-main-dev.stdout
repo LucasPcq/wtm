@@ -1,0 +1,8 @@
+
+  ✓ run up: 1 done
+
+  Worktrees  main
+  Profile    dev
+  Jobs       api, web
+  main       api  http://api.main.acme.localhost:24352, web  http://web.main.acme.localhost:24352
+
