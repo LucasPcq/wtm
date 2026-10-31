@@ -10,6 +10,7 @@ import {
   type Live,
   operationCap,
   reconnectEvery,
+  settleCap,
   track,
 } from '@/api/queries/events'
 import { server } from '@/test/server'
@@ -164,4 +165,43 @@ test('an operation finished leaves its worktrees under way until the read after 
 
   const released = seen.findIndex((at, i) => at.held === 0 && seen.slice(0, i).some((before) => before.held > 0))
   expect(seen[released]?.reads).toBe(2)
+})
+
+// operation.finished awaited every read of the repository, a review's fetch of origin included, holding the stream: a
+// row stayed "Syncing" long after its run, and every line after it waited.
+test('an operation finished releases its worktrees within settleCap, and the stream reads on meanwhile', async () => {
+  const client = new QueryClient()
+  client.setQueryData(['repos'], [repo])
+  const observer = new QueryObserver(client, {
+    queryKey: ['repo', 'r1', 'list', []],
+    queryFn: () => new Promise((resolve) => setTimeout(() => resolve('slow'), 60_000)),
+    initialData: 'first',
+  })
+  onTestFinished(observer.subscribe(() => {}))
+  const of = (op: string) =>
+    `"ts":"2026-10-27T10:00:00Z","repo":{"root":"/acme","common_dir":"/acme/.git"},"op_id":"${op}"`
+  let close = () => {}
+  server.use(
+    http.get('/api/events', () => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          const send = (text: string) => controller.enqueue(new TextEncoder().encode(text))
+          send(`data: {"v":2,"type":"unit.started",${of('op-1')},"subject":"feat/a"}\n\n`)
+          send(`data: {"v":2,"type":"operation.finished",${of('op-1')},"command":"sync","surface":"web","ok":true}\n\n`)
+          send(`data: {"v":2,"type":"unit.started",${of('op-2')},"subject":"feat/b"}\n\n`)
+          close = () => controller.close()
+        },
+      })
+      return new HttpResponse(body, { headers: { 'Content-Type': 'text/event-stream' } })
+    }),
+  )
+
+  const started = Date.now()
+  void client.fetchQuery(eventsQuery)
+  const held = () => Object.keys(client.getQueryData<Live>(eventsQuery.queryKey)?.operations ?? {})
+
+  await waitFor(() => expect(held()).toEqual(['op-1', 'op-2']))
+  await waitFor(() => expect(held()).toEqual(['op-2']), { timeout: settleCap + 1000 })
+  expect(Date.now() - started).toBeLessThan(settleCap + 1000)
+  close()
 })
