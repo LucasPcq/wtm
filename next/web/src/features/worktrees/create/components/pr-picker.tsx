@@ -1,6 +1,6 @@
 import { useStore } from '@tanstack/react-form'
 import { useDebouncer } from '@tanstack/react-pacer'
-import { GitPullRequest, Search } from 'lucide-react'
+import { CircleX, GitPullRequest, Search } from 'lucide-react'
 import { useState } from 'react'
 import type { DomainFieldError, DomainOption } from '@/api/types.gen'
 import { keyOf } from '@/components/command-form/answers'
@@ -70,7 +70,8 @@ export function PrPicker({
     setQuery(text)
     const number = text.trim()
     if (/^\d+$/.test(number) && !options.some((option) => String(option.pull_request?.number).startsWith(number)))
-      askNumber.maybeExecute(number)
+      return askNumber.maybeExecute(number)
+    askNumber.cancel()
   }
 
   const pick = (to: PrFilter) => {
@@ -86,7 +87,7 @@ export function PrPicker({
       <div className="flex flex-col gap-1">
         <h3 className="text-sm font-medium">{label}</h3>
         <p className="text-xs text-pretty text-muted-foreground">
-          {base ? `Open pull requests on ${base}. ${help}` : `Open pull requests. ${help}`}
+          {base ? `Open pull requests on ${base}; ${help}` : `Open pull requests; ${help}`}
         </p>
       </div>
 
@@ -103,7 +104,7 @@ export function PrPicker({
           />
         </InputGroup>
 
-        {!empty && (
+        {!empty && !typed && (
           <ToggleGroup
             type="single"
             variant="outline"
@@ -184,7 +185,8 @@ export function PrPicker({
       </div>
 
       {errors.map((error) => (
-        <p key={error.code} role="alert" className="text-sm text-destructive">
+        <p key={error.code} role="alert" className="flex items-start gap-2 text-sm text-destructive">
+          <CircleX className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           {refusalLine(error)}
         </p>
       ))}

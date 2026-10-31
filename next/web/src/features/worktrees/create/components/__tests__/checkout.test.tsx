@@ -74,7 +74,7 @@ test('a pull request the core refuses shows why, and Next says what to do', asyn
   await user.type(await within(dialog).findByRole('textbox', { name: 'Search pull requests' }), '198')
 
   expect(
-    await within(dialog).findByText("Its branch feat/search-v1 is gone from origin, and isn't here either."),
+    await within(dialog).findByText("#198's branch is gone from origin: there is nothing to check out."),
   ).toBeTruthy()
   const next = within(dialog).getByRole('button', { name: 'Next' })
   expect(next.getAttribute('aria-disabled')).toBe('true')
@@ -120,4 +120,16 @@ test('no open pull request is its own empty state, a new branch its way on', asy
   expect(await within(dialog).findByText('No open pull request')).toBeTruthy()
   await user.click(within(dialog).getByRole('button', { name: 'New branch' }))
   expect(await within(dialog).findByRole('textbox', { name: 'Branches' })).toBeTruthy()
+})
+
+// A number typed then erased before the pause was still asked: the field showed an error for a number no longer there.
+test('a number erased before the pause is not asked', async () => {
+  const { user, dialog, calls } = await openCheckout()
+  const search = await within(dialog).findByRole('textbox', { name: 'Search pull requests' })
+
+  await user.type(search, '20')
+  await user.clear(search)
+  await new Promise((resolve) => setTimeout(resolve, 500))
+
+  expect(calls.some((call) => call.answers?.some((a) => a.path === 'pr' && a.values[0] === '20'))).toBe(false)
 })

@@ -35,7 +35,7 @@ export const checkoutWords = (chosen: DomainOption | undefined): Record<Checkout
   const branch = chosen?.pull_request?.branch
   const behind = chosen?.origin?.behind ?? 0
   return {
-    pr: { label: 'Pull request', help: 'A number finds a closed or merged one too.' },
+    pr: { label: 'Pull request', help: 'a number finds a closed or merged one too.' },
     from: { label: 'Parent', help: 'The branch it syncs onto.' },
     fast_forward: {
       label: 'Source update',
@@ -100,7 +100,7 @@ const refusalWords: Record<PrRefusal, (params: Record<string, string>) => string
   'checkout.checked_out_elsewhere': (p) => `#${p.number} is already checked out in ${p.branch}.`,
   'checkout.path_exists': (p) => `Its folder ${p.path} already exists.`,
   'checkout.name_clash': (p) => `${p.branch} would share its folder name with ${p.other}.`,
-  'checkout.head_missing': (p) => `Its branch ${p.branch} is gone from origin, and isn't here either.`,
+  'checkout.head_missing': (p) => `#${p.number}'s branch is gone from origin: there is nothing to check out.`,
   'checkout.pr_invalid': (p) => `${p.value} isn't a pull request number.`,
   not_found: (p) => `GitHub has no pull request #${p.number}.`,
 }
@@ -133,7 +133,7 @@ type UnavailableWords = { title: string; description: string; next: string; comm
 
 const unavailableWords: Record<Unavailable, UnavailableWords> = {
   gh_missing: {
-    title: "gh isn't installed",
+    title: "The GitHub CLI isn't installed",
     description: "Pull requests are listed through GitHub's CLI. A new branch still works.",
     next: 'Install gh to list pull requests',
   },
