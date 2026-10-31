@@ -62,7 +62,7 @@ func (w world) open(context.Context, string) (list.UseCase, error) {
 		Git:  git,
 		Meta: meta,
 		Jobs: func(context.Context) ([]run.Job, error) {
-			return []run.Job{{Name: "web", WorkDir: "/repo/.trees/feat-a", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldOwn}}, w.JobsErr
+			return []run.Job{{Name: "web", WorkDir: "/repo/.trees/feat-a", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldOwn}, {Name: "db", WorkDir: "/repo/.trees/feat-a", Up: true, Kind: project.Service, Hold: run.HoldClaim, SharedDir: "/repo"}}, w.JobsErr
 		},
 		PullRequests: func(context.Context, []string) ([]worktree.PullRequest, error) { return prs, w.PRsErr },
 		Repository:   repository.Service{Config: configtest.NewFake(configtest.FakeParams{Config: &project.Config{Worktrees: project.Worktrees{BasePath: "../.trees", BaseBranch: "main"}}, Fail: map[string]error{"Load": w.ConfigErr}}), Git: git, MainPath: mainPath, Init: &domain.FollowUp{Command: domain.CommandInit}},

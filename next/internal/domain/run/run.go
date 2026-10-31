@@ -76,6 +76,21 @@ func UpIn(jobs []Job, dir string) []string {
 	return names
 }
 
+// Own reports whether a worktree runs job for itself: neither its claim on a shared job another worktree runs, nor a shared job it runs for every worktree.
+func Own(job Job) bool {
+	return job.Hold != HoldClaim && job.SharedDir == ""
+}
+
+// ProfileIn returns the profile the jobs up the worktree at dir runs for itself were started under, "" when none says one.
+func ProfileIn(jobs []Job, dir string) string {
+	for _, job := range jobs {
+		if job.Up && job.WorkDir == dir && Own(job) && job.Profile != "" {
+			return job.Profile
+		}
+	}
+	return ""
+}
+
 // URLsIn returns the URLs of the jobs up in the worktree at dir that have one, sorted, empty and not nil when none has.
 func URLsIn(jobs []Job, dir string) []string {
 	urls := []string{}

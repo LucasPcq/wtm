@@ -1393,6 +1393,9 @@
         "changes": {
           "type": "integer"
         },
+        "crashed": {
+          "type": "integer"
+        },
         "default": {
           "type": "boolean"
         },
@@ -1401,6 +1404,12 @@
         },
         "gone": {
           "type": "boolean"
+        },
+        "holds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "jobs": {
           "items": {
@@ -3146,6 +3155,9 @@
             }
           ]
         },
+        "profile": {
+          "type": "string"
+        },
         "services": {
           "anyOf": [
             {
@@ -3197,6 +3209,7 @@
         "services",
         "urls",
         "jobs",
+        "profile",
         "actions"
       ],
       "type": "object"
@@ -3215,7 +3228,7 @@
           "type": "integer"
         },
         "hold": {
-          "type": "string"
+          "$ref": "#/$defs/run.Hold"
         },
         "kind": {
           "$ref": "#/$defs/project.JobKind"
@@ -3240,7 +3253,6 @@
       "required": [
         "name",
         "kind",
-        "state",
         "hold"
       ],
       "type": "object"
@@ -4256,6 +4268,14 @@
         ]
       },
       "type": "array"
+    },
+    "run.Hold": {
+      "description": "What of a job the run daemon holds: its own process, a stack its launcher left, a claim on a shared job another worktree runs.",
+      "enum": [
+        "own",
+        "detached",
+        "claim"
+      ]
     },
     "run.State": {
       "description": "A job's state.",
