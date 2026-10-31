@@ -37,12 +37,11 @@ func TestTheIndexALegacyDaemonWroteIsTakenOver(t *testing.T) {
 func TestTheIndexKeepsWhatItSavesInTheLegacyFormat(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "jobs.json")
 	record := run.Record{
-		Spec:      run.Spec{Job: project.Job{Name: "db", Kind: project.Service, Cmd: "up", Stop: "down", Scope: project.Shared, Namespace: &project.Namespace{Name: "app_${WTM_WORKTREE}", Create: "createdb", Remove: "dropdb"}}, WorkDir: "/wt/a", Env: map[string]string{"WTM_BRANCH": "feat/a"}, Unset: []string{"PORT"}, Origin: &run.Origin{Root: "/repo", CommonDir: "/repo/.git", Branch: "feat/a", CorrelationID: "c1"}},
+		Spec:      run.Spec{Job: project.Job{Name: "db", Kind: project.Service, Cmd: "up", Stop: "down", Scope: project.Shared, Namespace: &project.Namespace{Name: "app_${WTM_WORKTREE}", Create: "createdb", Remove: "dropdb"}}, WorkDir: "/wt/a", Env: map[string]string{"WTM_BRANCH": "feat/a"}, Unset: []string{"PORT"}, LogDir: "/repo/.git/wtm/logs/feat-a", Origin: &run.Origin{Root: "/repo", CommonDir: "/repo/.git", Branch: "feat/a", CorrelationID: "c1"}},
 		StartedAt: time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC),
 		Claim:     true,
 		SharedDir: "/repo",
 		MainHolds: true,
-		LogDir:    "/repo/.git/wtm/logs/feat-a",
 		Routes:    []run.Route{{Job: "db", Host: "db.localhost", Port: "PORT"}},
 	}
 

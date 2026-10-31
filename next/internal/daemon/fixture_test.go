@@ -48,6 +48,9 @@ type fakeProcess struct {
 	exited chan struct{}
 	code   int
 	stops  []time.Duration
+	typed  []byte
+	sizes  [][2]int
+	print  func(string)
 	// afterStop runs once a stop ended the process, before Stop returns: what other clients do while the stopping one waits.
 	afterStop func()
 	mu        sync.Mutex
@@ -70,6 +73,20 @@ func (p *fakeProcess) Stop(grace time.Duration) {
 	if after != nil {
 		after()
 	}
+}
+
+func (p *fakeProcess) Write(b []byte) (int, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.typed = append(p.typed, b...)
+	return len(b), nil
+}
+
+func (p *fakeProcess) Resize(cols, rows int) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.sizes = append(p.sizes, [2]int{cols, rows})
+	return nil
 }
 
 func (p *fakeProcess) end(code int) {
@@ -98,11 +115,11 @@ func (s *spawner) spawn(command run.Command) (Process, error) {
 	if s.fail {
 		return nil, errSpawn
 	}
-	p := &fakeProcess{pid: 1000 + len(s.commands), exited: make(chan struct{})}
+	p := &fakeProcess{pid: 1000 + len(s.commands), exited: make(chan struct{}), print: func(text string) { command.Output([]byte(text)) }}
 	s.commands = append(s.commands, command)
 	s.processes[command.Line] = p
 	if do := s.scripts[command.Line]; do != nil {
-		go do(p, func(text string) { command.Output([]byte(text)) })
+		go do(p, p.print)
 	}
 	return p, nil
 }
@@ -152,6 +169,8 @@ func (o *orphans) Reap(pgids []int) {
 type index struct {
 	mu      sync.Mutex
 	records []run.Record
+	// stall, while set, holds each Save until it is closed: a job's end waiting on its index.
+	stall chan struct{}
 }
 
 func (i *index) Load() []run.Record {
@@ -161,6 +180,12 @@ func (i *index) Load() []run.Record {
 }
 
 func (i *index) Save(records []run.Record) error {
+	i.mu.Lock()
+	stall := i.stall
+	i.mu.Unlock()
+	if stall != nil {
+		<-stall
+	}
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.records = records
@@ -198,3 +223,62 @@ func (b *bus) events() []domain.Event {
 	}
 	return events
 }
+
+// prints is a script that prints lines then runs until it is stopped.
+func prints(lines ...string) script {
+	return func(_ *fakeProcess, printed func(string)) {
+		for _, line := range lines {
+			printed(line + "\n")
+		}
+	}
+}
+
+// logs is the logs of jobs in memory: each file opened, by its directory and job, with what was written to it.
+type logs struct {
+	mu     sync.Mutex
+	files  map[run.LogFile][]run.Line
+	opened []run.LogFile
+}
+
+func newLogs() *logs {
+	return &logs{files: map[run.LogFile][]run.Line{}}
+}
+
+func (l *logs) open(file run.LogFile) (Log, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.opened = append(l.opened, file)
+	key := run.LogFile{Dir: file.Dir, Job: file.Job}
+	if !file.Append {
+		l.files[key] = nil
+	}
+	return &memoryLog{logs: l, key: key}, nil
+}
+
+func (l *logs) read(file run.LogFile, n int) []run.Line {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	lines := l.files[run.LogFile{Dir: file.Dir, Job: file.Job}]
+	return slices.Clone(lines[max(0, len(lines)-n):])
+}
+
+func (l *logs) texts(dir, job string) []string {
+	var texts []string
+	for _, line := range l.read(run.LogFile{Dir: dir, Job: job}, run.MaxTail) {
+		texts = append(texts, line.Text)
+	}
+	return texts
+}
+
+type memoryLog struct {
+	logs *logs
+	key  run.LogFile
+}
+
+func (m *memoryLog) Write(lines []run.Line) {
+	m.logs.mu.Lock()
+	defer m.logs.mu.Unlock()
+	m.logs.files[m.key] = append(m.logs.files[m.key], lines...)
+}
+
+func (m *memoryLog) Close() {}

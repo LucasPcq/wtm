@@ -12,13 +12,15 @@ import (
 // A Spec is what a client asks the daemon to start: the Job of run.toml, the
 // worktree it runs in, the environment it runs with (every variable of the
 // worktree, its ports included, resolved by the client: the daemon is blind to
-// git) and the variables it never inherits from the daemon, and the Origin its
-// events are published under, none publishing none.
+// git) and the variables it never inherits from the daemon, the directory its
+// log is kept in (none keeps none), and the Origin its events are published
+// under, none publishing none.
 type Spec struct {
 	Job     project.Job
 	WorkDir string
 	Env     map[string]string
 	Unset   []string
+	LogDir  string
 	Origin  *Origin
 }
 
@@ -57,8 +59,8 @@ func (s Spec) Detached() bool {
 // take over: its Spec, when it started, the process and group a foreground
 // service runs as, whether it is a Claim on a shared job another worktree runs
 // (with the main checkout that runs it, SharedDir, and whether main asked for
-// it itself, MainHolds), and what a later part of the daemon keeps of it (its
-// log directory, the routes its proxy serves), carried as they were.
+// it itself, MainHolds), and the routes its proxy serves, carried as they
+// were until the proxy reads them.
 type Record struct {
 	Spec      Spec
 	StartedAt time.Time
@@ -67,7 +69,6 @@ type Record struct {
 	Claim     bool
 	SharedDir string
 	MainHolds bool
-	LogDir    string
 	Routes    []Route
 }
 

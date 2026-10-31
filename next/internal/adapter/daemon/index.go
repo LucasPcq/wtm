@@ -138,7 +138,7 @@ func (i *Index) Save(records []run.Record) error {
 }
 
 func recordOf(r run.Record) record {
-	wire := record{Name: r.Spec.Job.Name, WorkDir: r.Spec.WorkDir, Config: configOf(r.Spec.Job), Env: r.Spec.Env, Unset: r.Spec.Unset, LogDir: r.LogDir, StartedAt: r.StartedAt, PID: r.PID, PGID: r.PGID, Joined: r.Claim, SharedDir: r.SharedDir, MainHolds: r.MainHolds}
+	wire := record{Name: r.Spec.Job.Name, WorkDir: r.Spec.WorkDir, Config: configOf(r.Spec.Job), Env: r.Spec.Env, Unset: r.Spec.Unset, LogDir: r.Spec.LogDir, StartedAt: r.StartedAt, PID: r.PID, PGID: r.PGID, Joined: r.Claim, SharedDir: r.SharedDir, MainHolds: r.MainHolds}
 	for _, each := range r.Routes {
 		wire.Routes = append(wire.Routes, route{Job: each.Job, Host: each.Host, Port: each.Port})
 	}
@@ -151,7 +151,7 @@ func recordOf(r run.Record) record {
 }
 
 func (r record) runRecord() run.Record {
-	spec := run.Spec{Job: r.Config.job(), WorkDir: r.WorkDir, Env: r.Env, Unset: r.Unset}
+	spec := run.Spec{Job: r.Config.job(), WorkDir: r.WorkDir, Env: r.Env, Unset: r.Unset, LogDir: r.LogDir}
 	if r.Origin != nil {
 		spec.Origin = &run.Origin{Root: r.Origin.Repo.Root, CommonDir: r.Origin.Repo.CommonDir, Branch: r.Env[branchKey], CorrelationID: r.Origin.CorrelationID}
 	}
@@ -160,5 +160,5 @@ func (r record) runRecord() run.Record {
 		routes = append(routes, run.Route{Job: each.Job, Host: each.Host, Port: each.Port})
 	}
 
-	return run.Record{Spec: spec, StartedAt: r.StartedAt, PID: r.PID, PGID: r.PGID, Claim: r.Joined || r.Attached, SharedDir: r.SharedDir, MainHolds: r.MainHolds, LogDir: r.LogDir, Routes: routes}
+	return run.Record{Spec: spec, StartedAt: r.StartedAt, PID: r.PID, PGID: r.PGID, Claim: r.Joined || r.Attached, SharedDir: r.SharedDir, MainHolds: r.MainHolds, Routes: routes}
 }

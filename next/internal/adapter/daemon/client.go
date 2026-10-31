@@ -208,6 +208,94 @@ func (d Daemon) reach(ctx context.Context, params reachParams) (answer, error) {
 }
 
 // ----------------------------------------------------------------------------
+// Lines and terminals
+
+// Lines hands out the last lines of the job req names, then, when req.Follow,
+// each new one until the job ends or ctx is done, and returns the job as it
+// then stands; the daemon is never started for it. It fails with the daemon's
+// [run.Error], [run.CodeJobNotFound] for a job it does not know.
+func (d Daemon) Lines(ctx context.Context, req run.Tail, out func(run.Line)) (run.Job, error) {
+	timeout := stopTimeout
+	if req.Follow {
+		timeout = 0
+	}
+	answered, err := d.exchange(ctx, exchangeParams{Request: request{Action: actionLines, Name: req.Name, WorkDir: req.WorkDir, Tail: req.Lines, Follow: req.Follow}, Timeout: timeout, Out: out})
+	if err != nil {
+		return run.Job{}, err
+	}
+	job := run.Job{}
+	if answered.Job != nil {
+		job = answered.Job.runJob(false)
+	}
+
+	return job, answered.failure()
+}
+
+// Attach attaches to the terminal of the job req names, sized as req says:
+// what the returned connection reads is what the job printed last, then what
+// it prints, raw; what is written to it is typed into the job. Closing it
+// detaches; the job runs on.
+func (d Daemon) Attach(ctx context.Context, req run.Window) (net.Conn, error) {
+	conn, err := (&net.Dialer{}).DialContext(ctx, "unix", d.SocketPath)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errNoDaemon, err)
+	}
+	if err := json.NewEncoder(conn).Encode(request{Action: actionAttach, Name: req.Name, WorkDir: req.WorkDir, Cols: req.Cols, Rows: req.Rows}); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("ask the run daemon: %w", err)
+	}
+	// The answer is one line, the terminal's raw bytes after it: what the reader read past the line is the terminal's.
+	reader := bufio.NewReader(conn)
+	head, err := reader.ReadBytes('\n')
+	var attached answer
+	if err == nil {
+		err = json.Unmarshal(head, &attached)
+	}
+	if err == nil {
+		err = cmp.Or(d.skewed(attached), attached.failure())
+	}
+	if err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+
+	return terminal{Conn: conn, reader: reader}, nil
+}
+
+// terminal is a connection attached to a job's terminal, read through the
+// reader that read its answer.
+type terminal struct {
+	net.Conn
+	reader *bufio.Reader
+}
+
+func (t terminal) Read(p []byte) (int, error) {
+	return t.reader.Read(p)
+}
+
+// Resize sizes the terminal of the job req names, as a client drawing it
+// changes size.
+func (d Daemon) Resize(ctx context.Context, req run.Window) error {
+	resized, err := d.exchange(ctx, exchangeParams{Request: request{Action: actionResize, Name: req.Name, WorkDir: req.WorkDir, Cols: req.Cols, Rows: req.Rows}, Timeout: listTimeout})
+	if err != nil {
+		return err
+	}
+
+	return cmp.Or(d.skewed(resized), resized.failure())
+}
+
+// skewed refuses the answer of a daemon of another protocol or build, as a
+// start does: a terminal is a job's, run that daemon's way; the legacy
+// daemon's attach is this one's, raw after one line, and is taken.
+func (d Daemon) skewed(a answer) error {
+	switch skew := run.SkewOf(a.stamp(), d.Version); skew {
+	case run.SkewProtocol, run.SkewBuild:
+		return &run.Error{Code: run.CodeSkew, Message: fmt.Sprintf("the run daemon is wtm %s (protocol %d), this is wtm %s", cmp.Or(a.Version, "of an older build"), a.Protocol, d.Version)}
+	}
+	return nil
+}
+
+// ----------------------------------------------------------------------------
 // The daemon itself
 
 // Ensure makes sure a daemon of this build answers, as a command about to start
@@ -439,7 +527,7 @@ func (d Daemon) exchange(ctx context.Context, params exchangeParams) (answer, er
 			return a, nil
 		}
 		if params.Out != nil {
-			params.Out(run.Line{At: a.At, Text: a.Text})
+			params.Out(run.Line{At: time.Time(a.At), Text: a.Text})
 		}
 	}
 }

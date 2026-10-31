@@ -1,7 +1,9 @@
 package main
 
 import (
+	"io"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -54,4 +56,42 @@ func TestTheDaemonRunsStopsAndAnnouncesTheJobsItsClientsAsk(t *testing.T) {
 	index, err := os.ReadFile(daemon.IndexPath(socket))
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"version":2,"jobs":[]}`, string(index))
+}
+
+func TestTheDaemonKeepsAJobsLogAndHandsOutItsLinesAndItsTerminal(t *testing.T) {
+	socket := servingDaemon(t)
+	client := daemon.Daemon{SocketPath: socket, Version: version}
+	dir, logs := t.TempDir(), t.TempDir()
+	spec := run.Spec{Job: project.Job{Name: "echo", Kind: project.Service, Cmd: "stty -echo; echo ready; exec cat"}, WorkDir: dir, LogDir: logs}
+	_, err := client.Start(t.Context(), spec, nil)
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		jobs, err := client.Jobs(t.Context())
+		return err == nil && len(jobs) == 1 && jobs[0].LastLine != nil && jobs[0].LastLine.Text == "ready"
+	}, 5*time.Second, 20*time.Millisecond)
+
+	followed := make(chan string, 8)
+	go func() {
+		_, _ = client.Lines(t.Context(), run.Tail{Name: "echo", WorkDir: dir, Follow: true}, func(line run.Line) { followed <- line.Text })
+		close(followed)
+	}()
+	terminal, err := client.Attach(t.Context(), run.Window{Name: "echo", WorkDir: dir, Cols: 80, Rows: 24})
+	require.NoError(t, err)
+	defer terminal.Close()
+	_, err = terminal.Write([]byte("typed\n"))
+	require.NoError(t, err)
+
+	assert.Equal(t, "ready", <-followed)
+	assert.Equal(t, "typed", <-followed)
+	seen := make([]byte, 64)
+	n, err := io.ReadAtLeast(terminal, seen, len("ready"))
+	require.NoError(t, err)
+	assert.Contains(t, string(seen[:n]), "ready")
+	_, err = client.Stop(t.Context(), run.Stop{Name: "echo", WorkDir: dir})
+	require.NoError(t, err)
+	for range followed {
+	}
+	log, err := os.ReadFile(filepath.Join(logs, "echo.log"))
+	require.NoError(t, err)
+	assert.Regexp(t, `(?m)^\S+  ready\n\S+  typed\n$`, string(log))
 }

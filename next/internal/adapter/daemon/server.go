@@ -1,8 +1,10 @@
 package daemon
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"os"
 	"sync"
@@ -23,6 +25,9 @@ type Jobs interface {
 	Start(spec run.Spec, out func(run.Line)) (run.Job, error)
 	Stop(req run.Stop) (run.Outcome, error)
 	StopAll(req run.StopAll) ([]run.StoppedJob, error)
+	Lines(ctx context.Context, req run.Tail, out func(run.Line)) (run.Job, error)
+	Attach(req run.Window) (run.Session, error)
+	Resize(req run.Window) error
 }
 
 // A Server answers the requests of the run daemon's protocol for its Jobs,
@@ -34,10 +39,11 @@ type Server struct {
 	Stop    func()
 }
 
-// Serve answers the request line on conn, the connection it came from. A
-// client that stops reading is let go: a write it does not take within a
-// second fails, and every write after it is dropped, so a job's output never
-// waits on it.
+// Serve answers the request line on conn, the connection it came from, read
+// no further than that line: an attached client types into conn once it read
+// its answer. A client that stops reading is let go: a write it does not take
+// within a second fails, and every write after it is dropped, so a job's
+// output never waits on it.
 func (s Server) Serve(conn net.Conn, line []byte) {
 	encoder := json.NewEncoder(conn)
 	var writing sync.Mutex
@@ -80,6 +86,13 @@ func (s Server) Serve(conn net.Conn, line []byte) {
 			jobs = append(jobs, wire)
 		}
 		_ = reply(answerOf(err, answer{Status: statusOK, Jobs: jobs}))
+	case actionLines:
+		s.lines(conn, req, reply)
+	case actionAttach:
+		s.attach(conn, req, reply)
+	case actionResize:
+		err := s.Jobs.Resize(run.Window{Name: req.Name, WorkDir: req.WorkDir, Cols: req.Cols, Rows: req.Rows})
+		_ = reply(answerOf(err, answer{Status: statusOK}))
 	case actionShutdown:
 		_ = reply(answer{Status: statusOK, Message: "daemon stopping"})
 		s.Stop()
@@ -98,7 +111,7 @@ func (s Server) start(req request, reply func(answer) error) {
 
 	// A client that left stops reading, not the job: its lines are dropped.
 	started, err := s.Jobs.Start(req.Spec.runSpec(), func(line run.Line) {
-		_ = reply(answer{Status: statusLine, At: line.At, Text: line.Text})
+		_ = reply(answer{Status: statusLine, At: stamp(line.At), Text: line.Text})
 	})
 	done := answer{Status: statusOK}
 	// A start refused before any job ran has no job to report.
@@ -107,6 +120,77 @@ func (s Server) start(req request, reply func(answer) error) {
 		done.Job = &wire
 	}
 	_ = reply(answerOf(err, done))
+}
+
+// lines sends the lines of the job req names, then how it stands; a follow
+// ends when the job does, or once the client leaves.
+func (s Server) lines(conn net.Conn, req request, reply func(answer) error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	// A quiet job writes nothing a client gone would fail: its leaving is read on the connection.
+	go func() {
+		_, _ = io.Copy(io.Discard, conn)
+		cancel()
+	}()
+
+	tail := run.Tail{Name: req.Name, WorkDir: req.WorkDir, Lines: req.Tail, Follow: req.Follow}
+	stood, err := s.Jobs.Lines(ctx, tail, func(line run.Line) {
+		if reply(answer{Status: statusLine, At: stamp(line.At), Text: line.Text}) != nil {
+			cancel()
+		}
+	})
+	if ctx.Err() != nil {
+		return
+	}
+	done := answer{Status: statusOK}
+	if stood.Name != "" {
+		wire := jobOf(stood)
+		done.Job = &wire
+	}
+	_ = reply(answerOf(err, done))
+}
+
+// attach answers, then relays the job's terminal both ways on conn, raw:
+// what it printed last, what it prints, and what the client types, until the
+// job ends or the client leaves.
+func (s Server) attach(conn net.Conn, req request, reply func(answer) error) {
+	session, err := s.Jobs.Attach(run.Window{Name: req.Name, WorkDir: req.WorkDir, Cols: req.Cols, Rows: req.Rows})
+	if reply(answerOf(err, answer{Status: statusOK})) != nil || err != nil {
+		return
+	}
+	defer session.Release()
+
+	left := make(chan struct{})
+	go func() {
+		defer close(left)
+		input := session.Input
+		if input == nil {
+			input = io.Discard
+		}
+		_, _ = io.Copy(input, conn)
+	}()
+	// Each raw write gets its own deadline: the answer's would cut the terminal off a second after it opened.
+	write := func(p []byte) error {
+		_ = conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+		_, err := conn.Write(p)
+		return err
+	}
+	if write(session.History) != nil {
+		return
+	}
+	for {
+		select {
+		case chunk, open := <-session.Stream:
+			if !open {
+				return
+			}
+			if write(chunk) != nil {
+				return
+			}
+		case <-left:
+			return
+		}
+	}
 }
 
 // answerOf is the answer of a request that failed with err, ok otherwise.

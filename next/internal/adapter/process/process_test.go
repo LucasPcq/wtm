@@ -65,3 +65,25 @@ func TestWaitReturnsWhatAChildLeftInTheBackgroundAside(t *testing.T) {
 	assert.Less(t, time.Since(started), 3*time.Second)
 	assert.True(t, groupAlive(child.PID()), "the stack a launcher leaves runs on")
 }
+
+func TestWhatIsTypedReachesAServiceAndItsTerminalIsResized(t *testing.T) {
+	child, out := spawned(t, "read line; echo \"got $line\"; stty size", true)
+	require.NoError(t, child.Resize(100, 30))
+
+	_, err := child.Write([]byte("hello\n"))
+	require.NoError(t, err)
+
+	assert.Equal(t, 0, child.Wait())
+	assert.Contains(t, out.String(), "got hello")
+	assert.Contains(t, out.String(), "30 100")
+}
+
+func TestAChildThroughAPipeHasNoTerminalToTypeIntoNorResize(t *testing.T) {
+	child, _ := spawned(t, "sleep 30", false)
+
+	_, write := child.Write([]byte("q"))
+	resize := child.Resize(80, 24)
+
+	assert.ErrorIs(t, write, errNoTerminal)
+	assert.ErrorIs(t, resize, errNoTerminal)
+}

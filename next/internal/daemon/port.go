@@ -21,7 +21,27 @@ type Process interface {
 	// Stop stops its whole group, SIGTERM then SIGKILL past grace, and returns
 	// once it exited.
 	Stop(grace time.Duration)
+	// Write types p into its terminal; it fails for a process run under none.
+	Write(p []byte) (int, error)
+	// Resize sizes its terminal, cols by rows; it fails for a process run
+	// under none.
+	Resize(cols, rows int) error
 }
+
+// OpenLog opens the log of a job for writing.
+type OpenLog func(file run.LogFile) (Log, error)
+
+// A Log is a job's log open for writing.
+type Log interface {
+	// Write appends lines; a log that cannot be written stops writing.
+	Write(lines []run.Line)
+	// Close closes it.
+	Close()
+}
+
+// ReadLog returns the last n lines of a job's log, oldest first, none when it
+// has none.
+type ReadLog func(file run.LogFile, n int) []run.Line
 
 // Orphans probes and stops the process groups a daemon that died left behind.
 type Orphans interface {

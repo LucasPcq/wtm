@@ -64,6 +64,11 @@ for line in sys.stdin:
     print(json.dumps(doc, separators=(",", ":")))'
 }
 
+# started <step> <request>: asks as ask does, a service's start, recorded without its last line, which races the service's first print.
+started() {
+  python3 -I "$here/daemon.py" "$socket" "$2" | normalise | sed -E 's#,"last_line":\{[^}]*\}##' >"$out/$1.ndjson"
+}
+
 # ask <step> <request>: sends request to the daemon on the socket, records its answers.
 ask() {
   python3 -I "$here/daemon.py" "$socket" "$2" | normalise >"$out/$1.ndjson"
@@ -92,9 +97,10 @@ alive() {
   ps -p "$1" >/dev/null 2>&1 && echo alive || echo gone
 }
 
+logs=$acme/.git/wtm/logs/main
 spec() { # spec <name> <kind> <cmd> [stop]
-  printf '{"job":{"name":"%s","kind":"%s","cmd":"%s"%s},"work_dir":"%s","env":{"WTM_BRANCH":"main"},"origin":{"root":"%s","common_dir":"%s/.git","branch":"main"}}' \
-    "$1" "$2" "$3" "${4:+,\"stop\":\"$4\"}" "$acme" "$acme" "$acme"
+  printf '{"job":{"name":"%s","kind":"%s","cmd":"%s"%s},"work_dir":"%s","env":{"WTM_BRANCH":"main"},"log_dir":"%s","origin":{"root":"%s","common_dir":"%s/.git","branch":"main"}}' \
+    "$1" "$2" "$3" "${4:+,\"stop\":\"$4\"}" "$acme" "$logs" "$acme" "$acme"
 }
 
 # A detached stack: its launcher leaves a loop running until its marker goes, which its stop removes; no signal ever stops it.
@@ -139,20 +145,43 @@ echo "marker $( [[ -f $marker ]] && echo present || echo removed)" >"$out/08-mar
 
 # 4. Jobs started, listed, stopped and started again, and what it refuses.
 ask 09-start-task "{\"action\":\"start\",\"spec\":$(spec migrate task 'echo 2 migrations applied')}"
-ask 10-start-service "{\"action\":\"start\",\"spec\":$(spec web service 'echo ready; exec sleep 300')}"
-ask 11-start-same-again "{\"action\":\"start\",\"spec\":$(spec web service 'echo ready; exec sleep 300')}"
+started 10-start-service "{\"action\":\"start\",\"spec\":$(spec web service 'echo ready; exec sleep 300')}"
+started 11-start-same-again "{\"action\":\"start\",\"spec\":$(spec web service 'echo ready; exec sleep 300')}"
 ask 12-start-failing-task "{\"action\":\"start\",\"spec\":$(spec broken task 'echo no database >&2; exit 3')}"
 ask 13-list '{"action":"list"}'
 ask 14-stop-unknown '{"action":"stop","name":"nope","work_dir":"/x"}'
 ask 15-stop-service "{\"action\":\"stop\",\"name\":\"web\",\"work_dir\":\"$acme\",\"correlation_id\":\"proof-stop\"}"
-ask 16-restart-service "{\"action\":\"start\",\"spec\":$(spec web service 'echo ready; exec sleep 300')}"
+started 16-restart-service "{\"action\":\"start\",\"spec\":$(spec web service 'echo ready; exec sleep 300')}"
 ask 17-unknown-action '{"action":"bogus"}'
 ask 18-not-json 'notjson'
 "$next" daemon >"$out/19-second-daemon.stdout" 2>"$out/19-second-daemon.stderr" && echo 0 >"$out/19-second-daemon.exit" || echo $? >"$out/19-second-daemon.exit"
 
+# 4b. A job's lines: its log, its last line in the listing, its last lines asked, and its terminal attached to.
+started 19a-start-echo "{\"action\":\"start\",\"spec\":$(spec echo service 'stty -echo; echo ready; exec cat')}"
+sleep 0.3
+ask 19b-lines-tail "{\"action\":\"lines\",\"name\":\"web\",\"work_dir\":\"$acme\",\"tail\":5}"
+ask 19c-list-last-lines "{\"action\":\"list\",\"work_dir\":\"$acme\"}"
+python3 -I -c 'import json, socket, sys, time
+conn = socket.socket(socket.AF_UNIX)
+conn.connect(sys.argv[1])
+conn.sendall(json.dumps({"action": "attach", "name": "echo", "work_dir": sys.argv[2], "cols": 80, "rows": 24}).encode() + b"\n")
+stream = conn.makefile("rb", buffering=0)
+answer = b""
+while not answer.endswith(b"\n"):
+    answer += stream.read(1)
+print(answer.decode(), end="")
+conn.sendall(b"typed into its terminal\n")
+seen = b""
+deadline = time.time() + 5
+while seen.count(b"typed into its terminal") < 1 and time.time() < deadline:
+    seen += conn.recv(4096)
+print(seen.decode().replace("\r", ""), end="")' "$socket" "$acme" | normalise >"$out/19d-attach.txt"
+sed -E 's#^[^ ]+  #<T>  #' "$logs/echo.log" >"$out/19e-echo-log.txt"
+ask 19f-stop-echo "{\"action\":\"stop\",\"name\":\"echo\",\"work_dir\":\"$acme\"}"
+
 # 5. A hard kill of the daemon: its service dies with the terminal it held, a service deaf to SIGHUP survives as an orphan.
 # its loop ends once the sandbox goes, so a proof that aborts never leaks it
-ask 20-start-deaf "{\"action\":\"start\",\"spec\":$(spec deaf service "trap '' HUP; while [ -d $root ]; do sleep 1; done")}"
+started 20-start-deaf "{\"action\":\"start\",\"spec\":$(spec deaf service "trap '' HUP; while [ -d $root ]; do sleep 1; done")}"
 web_pid=$(python3 -I "$here/daemon.py" "$socket" '{"action":"list"}' | python3 -I -c 'import json,sys; print(next(j["pid"] for j in json.loads(sys.stdin.read())["jobs"] if j["name"]=="web"))')
 deaf_pid=$(python3 -I "$here/daemon.py" "$socket" '{"action":"list"}' | python3 -I -c 'import json,sys; print(next(j["pid"] for j in json.loads(sys.stdin.read())["jobs"] if j["name"]=="deaf"))')
 normalise <"$global/jobs.json" >"$out/21-index-before-kill.json"
@@ -170,7 +199,7 @@ stop_daemon
 
 # 6. A daemon of another build: every answer is stamped with its build, and next's reads take it as it is.
 start_daemon "$other"
-ask 27-other-build-start "{\"action\":\"start\",\"spec\":$(spec web service 'echo ready; exec sleep 300')}"
+started 27-other-build-start "{\"action\":\"start\",\"spec\":$(spec web service 'echo ready; exec sleep 300')}"
 "$next" status </dev/null 2>&1 | sed -n '/JOBS/,$p' | normalise >"$out/28-status-reads-other-build.txt"
 stop_daemon
 sed -E -i '' "s#(/private)?$root#<SB>#g" "$out"/*.stdout "$out"/*.stderr

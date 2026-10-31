@@ -1,0 +1,2 @@
+<T>  ready
+<T>  typed into its terminal

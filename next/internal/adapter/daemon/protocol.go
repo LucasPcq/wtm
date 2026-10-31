@@ -3,6 +3,7 @@ package daemon
 
 import (
 	"cmp"
+	"encoding/json"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -18,6 +19,9 @@ const (
 	actionStop     = "stop"
 	actionStopAll  = "stop_all"
 	actionShutdown = "shutdown"
+	actionLines    = "lines"
+	actionAttach   = "attach"
+	actionResize   = "resize"
 
 	statusOK    = "ok"
 	statusError = "error"
@@ -31,22 +35,26 @@ type request struct {
 	WorkDir       string `json:"work_dir,omitempty"`
 	CorrelationID string `json:"correlation_id,omitempty"`
 	Spec          *spec  `json:"spec,omitempty"`
+	Tail          int    `json:"tail,omitempty"`
+	Follow        bool   `json:"follow,omitempty"`
+	Cols          int    `json:"cols,omitempty"`
+	Rows          int    `json:"rows,omitempty"`
 }
 
 // answer is one line the daemon writes back.
 type answer struct {
-	Status   string    `json:"status"`
-	Protocol int       `json:"protocol,omitempty"`
-	Version  string    `json:"version,omitempty"`
-	PID      int       `json:"pid,omitempty"`
-	Code     string    `json:"code,omitempty"`
-	Message  string    `json:"message,omitempty"`
-	ExitCode *int      `json:"exit_code,omitempty"`
-	Jobs     []job     `json:"jobs,omitzero"`
-	Job      *job      `json:"job,omitempty"`
-	Outcome  string    `json:"outcome,omitempty"`
-	At       time.Time `json:"at,omitzero"`
-	Text     string    `json:"text,omitempty"`
+	Status   string `json:"status"`
+	Protocol int    `json:"protocol,omitempty"`
+	Version  string `json:"version,omitempty"`
+	PID      int    `json:"pid,omitempty"`
+	Code     string `json:"code,omitempty"`
+	Message  string `json:"message,omitempty"`
+	ExitCode *int   `json:"exit_code,omitempty"`
+	Jobs     []job  `json:"jobs,omitzero"`
+	Job      *job   `json:"job,omitempty"`
+	Outcome  string `json:"outcome,omitempty"`
+	At       stamp  `json:"at,omitzero"`
+	Text     string `json:"text,omitempty"`
 }
 
 // stamp is what an answer says of the daemon that wrote it.
@@ -79,12 +87,45 @@ type job struct {
 	ExitCode  *int           `json:"exit_code,omitempty"`
 	URL       string         `json:"url,omitempty"`
 	Ports     map[string]int `json:"ports,omitempty"`
+	LastLine  *line          `json:"last_line,omitempty"`
 	Outcome   string         `json:"outcome,omitempty"`
 	Status    string         `json:"status,omitempty"`
 }
 
+// line is a line a job printed, on the wire.
+type line struct {
+	At   stamp  `json:"at"`
+	Text string `json:"text"`
+}
+
+// stamp is the time of a line on the wire: RFC 3339, UTC, to the millisecond.
+type stamp time.Time
+
+const stampLayout = "2006-01-02T15:04:05.000Z07:00"
+
+// MarshalJSON writes the time as stampLayout spells it, in UTC.
+func (s stamp) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Time(s).UTC().Format(stampLayout))
+}
+
+// UnmarshalJSON reads a time RFC 3339 spells.
+func (s *stamp) UnmarshalJSON(data []byte) error {
+	var text string
+	if err := json.Unmarshal(data, &text); err != nil {
+		return err
+	}
+	at, err := time.Parse(time.RFC3339Nano, text)
+	*s = stamp(at)
+	return err
+}
+
 func jobOf(j run.Job) job {
-	return job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, SharedDir: j.SharedDir, State: string(j.State), Hold: string(j.Hold), Reaped: j.Reaped, PID: j.PID, StartedAt: j.StartedAt, ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports, Status: legacyStatus(j)}
+	wire := job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, SharedDir: j.SharedDir, State: string(j.State), Hold: string(j.Hold), Reaped: j.Reaped, PID: j.PID, StartedAt: j.StartedAt, ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports, Status: legacyStatus(j)}
+	if j.LastLine != nil {
+		wire.LastLine = &line{At: stamp(j.LastLine.At), Text: j.LastLine.Text}
+	}
+
+	return wire
 }
 
 // legacyStatus is the legacy daemon's word for how j stands.
@@ -111,7 +152,12 @@ func (j job) runJob(legacy bool) run.Job {
 	}
 
 	hold, state := run.Hold(j.Hold), run.State(j.State)
-	return run.Job{Name: j.Name, WorkDir: j.WorkDir, Up: hold == run.HoldClaim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Hold: hold, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: j.StartedAt, SharedDir: j.SharedDir}
+	read := run.Job{Name: j.Name, WorkDir: j.WorkDir, Up: hold == run.HoldClaim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Hold: hold, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: j.StartedAt, SharedDir: j.SharedDir}
+	if j.LastLine != nil {
+		read.LastLine = &run.Line{At: time.Time(j.LastLine.At), Text: j.LastLine.Text}
+	}
+
+	return read
 }
 
 // legacyUp reports whether a job of the legacy status is up: running in the
@@ -161,6 +207,7 @@ type spec struct {
 	WorkDir string            `json:"work_dir"`
 	Env     map[string]string `json:"env,omitempty"`
 	Unset   []string          `json:"unset,omitempty"`
+	LogDir  string            `json:"log_dir,omitempty"`
 	Origin  *origin           `json:"origin,omitempty"`
 }
 
@@ -172,7 +219,7 @@ type origin struct {
 }
 
 func specOf(s run.Spec) *spec {
-	wire := &spec{Job: configOf(s.Job), WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset}
+	wire := &spec{Job: configOf(s.Job), WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir}
 	if s.Origin != nil {
 		wire.Origin = &origin{Root: s.Origin.Root, CommonDir: s.Origin.CommonDir, Branch: s.Origin.Branch, CorrelationID: s.Origin.CorrelationID}
 	}
@@ -181,7 +228,7 @@ func specOf(s run.Spec) *spec {
 }
 
 func (s spec) runSpec() run.Spec {
-	runSpec := run.Spec{Job: s.Job.job(), WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset}
+	runSpec := run.Spec{Job: s.Job.job(), WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir}
 	if s.Origin != nil {
 		runSpec.Origin = &run.Origin{Root: s.Origin.Root, CommonDir: s.Origin.CommonDir, Branch: s.Origin.Branch, CorrelationID: s.Origin.CorrelationID}
 	}

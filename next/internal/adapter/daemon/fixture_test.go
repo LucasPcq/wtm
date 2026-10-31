@@ -1,6 +1,7 @@
 package daemon_test
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -23,6 +24,32 @@ type jobs struct {
 	outcome  run.Outcome
 	requests []any
 	returned chan struct{}
+	// lateAfter is how long after the client typed the job prints once more, none when zero.
+	lateAfter time.Duration
+	typed     typed
+}
+
+// typed keeps what a client typed into a job's terminal, safe to read while it is written, and closes done at the first key.
+type typed struct {
+	mu   sync.Mutex
+	got  []byte
+	done chan struct{}
+}
+
+func (t *typed) Write(p []byte) (int, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if len(t.got) == 0 && t.done != nil {
+		close(t.done)
+	}
+	t.got = append(t.got, p...)
+	return len(p), nil
+}
+
+func (t *typed) String() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return string(t.got)
 }
 
 func (j *jobs) record(req any) {
@@ -55,6 +82,43 @@ func (j *jobs) Stop(req run.Stop) (run.Outcome, error) {
 func (j *jobs) StopAll(req run.StopAll) ([]run.StoppedJob, error) {
 	j.record(req)
 	return []run.StoppedJob{{Job: web, Outcome: run.OutcomeStopped}}, j.err
+}
+
+func (j *jobs) Lines(ctx context.Context, req run.Tail, out func(run.Line)) (run.Job, error) {
+	j.record(req)
+	for _, line := range j.lines {
+		out(run.Line{At: started, Text: line})
+	}
+	if req.Follow {
+		<-ctx.Done()
+		return run.Job{}, ctx.Err()
+	}
+	return web, j.err
+}
+
+func (j *jobs) Attach(req run.Window) (run.Session, error) {
+	j.record(req)
+	if j.err != nil {
+		return run.Session{}, j.err
+	}
+	stream := make(chan []byte, 2)
+	stream <- []byte("live")
+	// The job ends once the client typed into it: a session that ended first would hang up on its keys.
+	j.typed.done = make(chan struct{})
+	go func() {
+		<-j.typed.done
+		if j.lateAfter > 0 {
+			time.Sleep(j.lateAfter)
+			stream <- []byte("|late")
+		}
+		close(stream)
+	}()
+	return run.Session{History: []byte("history|"), Stream: stream, Input: &j.typed, Release: func() {}}, nil
+}
+
+func (j *jobs) Resize(req run.Window) error {
+	j.record(req)
+	return j.err
 }
 
 func (j *jobs) seen() []any {
