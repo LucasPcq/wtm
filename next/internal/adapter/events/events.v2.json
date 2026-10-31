@@ -165,6 +165,57 @@
     "ready": { "description": "The stream sent its snapshots: every event after it is a change.", "type": "object", "required": ["type"], "properties": { "type": { "const": "ready" } } },
     "repo.added": { "description": "A repository joined those wtm knows.", "type": "object", "required": ["type"], "properties": { "type": { "const": "repo.added" } } },
     "repo.removed": { "description": "A repository left those wtm knows: it is gone, or no longer initialized.", "type": "object", "required": ["type"], "properties": { "type": { "const": "repo.removed" } } },
+    "job_worktree": {
+      "description": "The worktree a job runs in, as its client named it to the run daemon, which reads no more of it.",
+      "type": "object",
+      "required": ["branch", "path"],
+      "properties": { "branch": { "type": "string" }, "path": { "type": "string", "minLength": 1 } }
+    },
+    "job": {
+      "type": "object",
+      "required": ["name", "kind", "hold"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["service", "task"] },
+        "url": { "type": "string", "minLength": 1, "description": "Where the job answers; absent when it publishes none." },
+        "hold": { "enum": ["own", "detached", "claim"], "description": "What of the job the run daemon holds: a process of its own (own), a stack its launcher left running (detached), a worktree's hold on a shared job another worktree runs (claim)." }
+      }
+    },
+    "job.started": {
+      "description": "The run daemon started a job: a foreground service is up, a detached launcher left its stack running, a task began. Published by the daemon itself.",
+      "type": "object",
+      "required": ["type", "worktree", "job"],
+      "properties": { "type": { "const": "job.started" }, "worktree": { "$ref": "#/$defs/job_worktree" }, "job": { "$ref": "#/$defs/job" } }
+    },
+    "job.stopped": {
+      "description": "A job stopped because a client asked. Published by the run daemon itself.",
+      "type": "object",
+      "required": ["type", "worktree", "job"],
+      "properties": { "type": { "const": "job.stopped" }, "worktree": { "$ref": "#/$defs/job_worktree" }, "job": { "$ref": "#/$defs/job" } }
+    },
+    "job.crashed": {
+      "description": "A service ended on its own, or a task failed. Published by the run daemon itself.",
+      "type": "object",
+      "required": ["type", "worktree", "job"],
+      "properties": {
+        "type": { "const": "job.crashed" },
+        "worktree": { "$ref": "#/$defs/job_worktree" },
+        "job": { "$ref": "#/$defs/job" },
+        "exit_code": { "type": "integer", "minimum": -1, "description": "Its exit status, -1 when a signal killed it." },
+        "last_lines": { "type": "array", "items": { "type": "string" }, "description": "The last lines it printed, oldest first." }
+      }
+    },
+    "job.exited": {
+      "description": "A task ran to its end, exit code 0. Published by the run daemon itself.",
+      "type": "object",
+      "required": ["type", "worktree", "job"],
+      "properties": {
+        "type": { "const": "job.exited" },
+        "worktree": { "$ref": "#/$defs/job_worktree" },
+        "job": { "$ref": "#/$defs/job" },
+        "exit_code": { "const": 0 }
+      }
+    },
     "event": {
       "description": "One event of every type this schema lists, its type first: what an operation reports as it runs, without the line the stream stamps on it.",
       "oneOf": [
@@ -183,7 +234,11 @@
         { "$ref": "#/$defs/snapshot" },
         { "$ref": "#/$defs/ready" },
         { "$ref": "#/$defs/repo.added" },
-        { "$ref": "#/$defs/repo.removed" }
+        { "$ref": "#/$defs/repo.removed" },
+        { "$ref": "#/$defs/job.started" },
+        { "$ref": "#/$defs/job.stopped" },
+        { "$ref": "#/$defs/job.crashed" },
+        { "$ref": "#/$defs/job.exited" }
       ]
     }
   },
@@ -203,6 +258,10 @@
     { "if": { "properties": { "type": { "const": "snapshot" } } }, "then": { "$ref": "#/$defs/snapshot", "required": ["repo"] } },
     { "if": { "properties": { "type": { "const": "ready" } } }, "then": { "$ref": "#/$defs/ready", "not": { "required": ["repo"] } } },
     { "if": { "properties": { "type": { "const": "repo.added" } } }, "then": { "$ref": "#/$defs/repo.added", "required": ["repo"] } },
-    { "if": { "properties": { "type": { "const": "repo.removed" } } }, "then": { "$ref": "#/$defs/repo.removed", "required": ["repo"] } }
+    { "if": { "properties": { "type": { "const": "repo.removed" } } }, "then": { "$ref": "#/$defs/repo.removed", "required": ["repo"] } },
+    { "if": { "properties": { "type": { "const": "job.started" } } }, "then": { "$ref": "#/$defs/job.started", "required": ["repo"] } },
+    { "if": { "properties": { "type": { "const": "job.stopped" } } }, "then": { "$ref": "#/$defs/job.stopped", "required": ["repo"] } },
+    { "if": { "properties": { "type": { "const": "job.crashed" } } }, "then": { "$ref": "#/$defs/job.crashed", "required": ["repo"] } },
+    { "if": { "properties": { "type": { "const": "job.exited" } } }, "then": { "$ref": "#/$defs/job.exited", "required": ["repo"] } }
   ]
 }

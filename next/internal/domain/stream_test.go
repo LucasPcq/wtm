@@ -39,7 +39,7 @@ func TestReadyCarriesItsEnvelopeAlone(t *testing.T) {
 }
 
 func TestALineOfAnUnknownTypeKeepsItsEnvelope(t *testing.T) {
-	line, err := UnmarshalLine([]byte(`{"v":2,"type":"job.started","ts":"t","repo":{"root":"/repo","common_dir":"/repo/.git"},"job":{"name":"web"}}`))
+	line, err := UnmarshalLine([]byte(`{"v":2,"type":"job.restarted","ts":"t","repo":{"root":"/repo","common_dir":"/repo/.git"},"job":{"name":"web"}}`))
 
 	require.ErrorIs(t, err, ErrUnknownEventType)
 	assert.Equal(t, Line{V: 2, TS: "t", Repo: &Repo{Root: "/repo", CommonDir: "/repo/.git"}}, line)

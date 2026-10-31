@@ -9,18 +9,36 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
-// A Job is one job the daemon knows: its name, the worktree it runs in, whether it is up (running, detached or joined), its kind, its State (empty for a Claim, which runs no process), whether it is a Claim a worktree holds on a shared job another worktree runs, its url, the code its process exited with (-1 when a signal killed it), when the daemon started it, and the main checkout a shared job runs in.
+// A Job is one job the daemon knows: its name, the worktree it runs in, whether it is up (running, detached or joined), its kind, its State (empty for a claim, which runs no process), what of it the daemon holds (Hold), whether the daemon Reaped it (an orphan stopped as it started), the PID of a process of the daemon's own, its url, the ports it binds, the code its process exited with (-1 when a signal killed it), when the daemon started it (zero once it is no longer up), and the main checkout a shared job runs in.
 type Job struct {
 	Name      string
 	WorkDir   string
 	Up        bool
 	Kind      project.JobKind
 	State     State
-	Claim     bool
+	Hold      Hold
+	Reaped    bool
+	PID       int
 	URL       string
+	Ports     map[string]int
 	ExitCode  *int
 	StartedAt time.Time
 	SharedDir string
+}
+
+// Hold is what of a job the daemon holds.
+type Hold string
+
+// The holds of a job.
+const (
+	HoldOwn      Hold = "own"      // a process of the daemon's, which it drains, a task or a launcher included
+	HoldDetached Hold = "detached" // a stack its launcher left running (a service with a stop command)
+	HoldClaim    Hold = "claim"    // a worktree's hold on a shared job another worktree runs
+)
+
+// Holds returns every Hold.
+func Holds() []Hold {
+	return []Hold{HoldOwn, HoldDetached, HoldClaim}
 }
 
 // State is a job's state, as wtm's events report it.

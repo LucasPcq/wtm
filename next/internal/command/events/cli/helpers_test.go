@@ -8,6 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	jobrun "github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
@@ -61,6 +62,9 @@ func changes(t *testing.T) []string {
 	feat := worktree.Identity{Branch: "feat/b", Path: "/code/.trees/feat-b", Parent: "main", Isolation: project.Isolated, CreatedAt: "2026-10-16T12:00:00Z"}
 	numbered := feat
 	numbered.Ordinal = new(2)
+	web := domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/b", Path: "/code/.trees/feat-b"}, Job: domain.EventJob{Name: "web", Kind: project.Service, Hold: jobrun.HoldOwn}}
+	crashed := web
+	crashed.ExitCode, crashed.LastLines = new(1), []string{"listen EADDRINUSE"}
 	return []string{
 		line(t, app, domain.OperationStarted{Command: "create", Surface: "cli"}),
 		line(t, app, domain.WorktreeCreated{Worktree: feat}),
@@ -70,6 +74,10 @@ func changes(t *testing.T) []string {
 		line(t, app, domain.WorktreeProvisioned{Worktree: numbered, Hook: "make setup", ExitCode: new(2)}),
 		line(t, app, domain.UnitFinished{Subject: "feat/b", Status: domain.StatusDone}),
 		line(t, app, domain.OperationFinished{Command: "create", Surface: "cli", OK: true}),
-		`{"v":2,"type":"job.started","ts":"2026-10-16T12:00:02Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"job":{"name":"web"}}`,
+		line(t, app, domain.JobStarted{JobChange: web}),
+		line(t, app, domain.JobCrashed{JobChange: crashed}),
+		line(t, app, domain.JobStopped{JobChange: web}),
+		line(t, app, domain.JobExited{JobChange: domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/b", Path: "/code/.trees/feat-b"}, Job: domain.EventJob{Name: "migrate", Kind: project.Task, Hold: jobrun.HoldOwn}, ExitCode: new(0)}}),
+		`{"v":2,"type":"job.restarted","ts":"2026-10-16T12:00:02Z","repo":{"root":"/code/app","common_dir":"/code/app/.git"},"job":{"name":"web"}}`,
 	}
 }

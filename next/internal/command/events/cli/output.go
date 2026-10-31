@@ -46,6 +46,14 @@ func drawLine(w io.Writer, received events.Received) {
 		output.SuccessLine(w, "watching "+root(line))
 	case domain.RepoRemoved:
 		output.WarningLine(w, "no longer watching "+root(line))
+	case domain.JobStarted:
+		output.SuccessLine(w, prefix+"started "+e.Job.Name+" in "+e.Worktree.Branch)
+	case domain.JobStopped:
+		output.SuccessLine(w, prefix+"stopped "+e.Job.Name+" in "+e.Worktree.Branch)
+	case domain.JobExited:
+		output.SuccessLine(w, prefix+e.Job.Name+" finished in "+e.Worktree.Branch)
+	case domain.JobCrashed:
+		output.ErrorLine(w, prefix+e.Job.Name+" crashed in "+e.Worktree.Branch+exitCode(e.ExitCode))
 	case domain.OperationStarted, domain.UnitFinished, domain.OperationFinished, domain.UnitStarted, domain.PhaseStarted, domain.PhaseFinished, domain.Output, nil:
 	}
 }
@@ -60,10 +68,14 @@ func drawProvisioned(w io.Writer, e domain.WorktreeProvisioned, prefix string) {
 	if e.Hook != "" {
 		failed += "  " + e.Hook
 	}
-	if e.ExitCode != nil {
-		failed += exitCodeLabel + strconv.Itoa(*e.ExitCode) + ")"
+	output.ErrorLine(w, failed+exitCode(e.ExitCode))
+}
+
+func exitCode(code *int) string {
+	if code == nil {
+		return ""
 	}
-	output.ErrorLine(w, failed)
+	return exitCodeLabel + strconv.Itoa(*code) + ")"
 }
 
 func worktrees(count int) string {

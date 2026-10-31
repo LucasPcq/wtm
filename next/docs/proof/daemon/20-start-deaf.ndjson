@@ -1,0 +1,1 @@
+{"status":"ok","protocol":2,"version":"<NEXT>","pid":<PID>,"job":{"name":"deaf","kind":"service","work_dir":"<SB>/acme","state":"running","hold":"own","pid":<PID>,"started_at":"<T>","status":"running"}}

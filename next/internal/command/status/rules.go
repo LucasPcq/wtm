@@ -462,15 +462,17 @@ func (f Facts) held(path string) []Job {
 	}
 
 	for _, job := range f.Jobs {
-		if job.WorkDir == path && !job.Claim {
+		if job.WorkDir == path && job.Hold != run.HoldClaim {
 			add(jobOf(job))
 		}
 	}
 	for _, claim := range f.Jobs {
-		if claim.WorkDir != path || !claim.Claim || claim.SharedDir == "" {
+		if claim.WorkDir != path || claim.Hold != run.HoldClaim || claim.SharedDir == "" {
 			continue
 		}
-		at := slices.IndexFunc(f.Jobs, func(job run.Job) bool { return job.Name == claim.Name && job.WorkDir == claim.SharedDir && !job.Claim })
+		at := slices.IndexFunc(f.Jobs, func(job run.Job) bool {
+			return job.Name == claim.Name && job.WorkDir == claim.SharedDir && job.Hold != run.HoldClaim
+		})
 		if at < 0 {
 			continue
 		}

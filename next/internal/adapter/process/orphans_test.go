@@ -1,0 +1,88 @@
+package process
+
+import (
+	"os"
+	"syscall"
+	"testing"
+	"time"
+
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestAGroupIsIdentifiedByTheStartItsRecordSays(t *testing.T) {
+	child, _ := spawned(t, "sleep 30", false)
+	time.Sleep(50 * time.Millisecond)
+	pgid := child.PID()
+
+	assert.Equal(t, map[int]run.Group{pgid: {Alive: true, Identified: true}}, Orphans{}.Probe(map[int]time.Time{pgid: time.Now()}))
+	assert.Equal(t, map[int]run.Group{pgid: {Alive: true}}, Orphans{}.Probe(map[int]time.Time{pgid: time.Now().Add(-time.Hour)}))
+}
+
+func TestAGroupGoneOrNotOursIsNotAlive(t *testing.T) {
+	child, _ := spawned(t, "exit 0", false)
+	child.Wait()
+
+	groups := Orphans{}.Probe(map[int]time.Time{child.PID(): time.Now(), 1: time.Now(), 0: time.Now()})
+
+	assert.Equal(t, map[int]run.Group{child.PID(): {}, 1: {}, 0: {}}, groups)
+}
+
+func TestReapStopsTheGroupsEvenDeafToSIGTERM(t *testing.T) {
+	deaf, out := spawned(t, "trap '' TERM; echo ready; while :; do sleep 1; done", false)
+	plain, _ := spawned(t, "sleep 30", false)
+	assert.Eventually(t, func() bool { return out.String() == "ready\n" }, 5*time.Second, 10*time.Millisecond)
+
+	Orphans{}.Reap([]int{deaf.PID(), plain.PID()})
+
+	assert.Equal(t, -1, deaf.Wait())
+	assert.Equal(t, -1, plain.Wait())
+}
+
+func TestElapsedIsReadAsPsWritesIt(t *testing.T) {
+	cases := map[string]struct {
+		etime string
+		want  time.Duration
+		ok    bool
+	}{
+		"minutes": {etime: "01:05", want: 65 * time.Second, ok: true},
+		"hours":   {etime: "02:00:01", want: 2*time.Hour + time.Second, ok: true},
+		"days":    {etime: "3-00:00:10", want: 72*time.Hour + 10*time.Second, ok: true},
+		"garbage": {etime: "soon"},
+		"seconds": {etime: "12"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, ok := parseElapsed(c.etime)
+
+			assert.Equal(t, c.ok, ok)
+			assert.Equal(t, c.want, got)
+		})
+	}
+}
+
+func TestThisProcesssOwnGroupIsNeverAJobs(t *testing.T) {
+	groups := Orphans{}.Probe(map[int]time.Time{os.Getpid(): time.Now(), syscall.Getpgrp(): time.Now()})
+
+	for pgid, group := range groups {
+		assert.False(t, group.Alive, "group %d", pgid)
+	}
+}
+
+func TestAZombieMemberIsNoMemberAlive(t *testing.T) {
+	// The leader execs a sleep that never waits: its background child, once exited, stays a zombie of the group.
+	child, _ := spawned(t, "sleep 0 & exec sleep 30", false)
+	require.Eventually(t, func() bool { return zombies(t, child.PID()) == 1 }, 5*time.Second, 20*time.Millisecond)
+
+	assert.Len(t, groupMembers(time.Now())[child.PID()], 1, "the zombie is left out, the leader counted")
+	assert.True(t, groupAlive(child.PID()))
+}
+
+func TestAGroupThisProcessMayNotSignalIsNotAlive(t *testing.T) {
+	// launchd (pid 1) on macOS, init on Linux: ps lists the group, this process may not signal it.
+	groups := Orphans{}.Probe(map[int]time.Time{1: time.Now()})
+
+	assert.Equal(t, map[int]run.Group{1: {}}, groups)
+}

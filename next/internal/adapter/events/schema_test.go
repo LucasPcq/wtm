@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,7 +37,7 @@ func TestEveryLineThePublisherWritesMatchesTheSchema(t *testing.T) {
 
 // Legacy v1 listed its types in a oneOf: a type it did not know failed the whole line.
 func TestALineOfATypeTheSchemaDoesNotListIsValidAgainstTheEnvelope(t *testing.T) {
-	assert.NoError(t, validates(t, schemaV2(t), `{"v":2,"type":"job.started","ts":"2026-10-16T12:00:00Z","repo":{"root":"/repo","common_dir":"/repo/.git"},"job":{"name":"web"}}`))
+	assert.NoError(t, validates(t, schemaV2(t), `{"v":2,"type":"job.restarted","ts":"2026-10-16T12:00:00Z","repo":{"root":"/repo","common_dir":"/repo/.git"},"job":{"name":"web"}}`))
 }
 
 func TestTheSchemaRefusesWhatTheContractForbids(t *testing.T) {
@@ -57,7 +58,7 @@ func TestTheSchemaRefusesWhatTheContractForbids(t *testing.T) {
 	}
 }
 
-func TestTheSchemasPhasesAndSurfacesAreTheCoresEveryOne(t *testing.T) {
+func TestTheSchemasPhasesSurfacesAndHoldsAreTheCoresEveryOne(t *testing.T) {
 	data, err := os.ReadFile("events.v2.json")
 	require.NoError(t, err)
 	var doc struct {
@@ -68,10 +69,18 @@ func TestTheSchemasPhasesAndSurfacesAreTheCoresEveryOne(t *testing.T) {
 			Surface struct {
 				Enum []domain.Surface `json:"enum"`
 			} `json:"surface"`
+			Job struct {
+				Properties struct {
+					Hold struct {
+						Enum []run.Hold `json:"enum"`
+					} `json:"hold"`
+				} `json:"properties"`
+			} `json:"job"`
 		} `json:"$defs"`
 	}
 	require.NoError(t, json.Unmarshal(data, &doc))
 
 	assert.Equal(t, domain.Phases(), doc.Defs.Phase.Enum)
 	assert.Equal(t, domain.Surfaces(), doc.Defs.Surface.Enum)
+	assert.Equal(t, run.Holds(), doc.Defs.Job.Properties.Hold.Enum)
 }

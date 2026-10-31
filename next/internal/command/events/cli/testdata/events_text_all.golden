@@ -5,3 +5,7 @@
   ✓ app · changed feat/b  head, jobs
   ✓ app · provisioned feat/b
   ✗ app · on_create failed for feat/b  make setup (exit 2)
+  ✓ app · started web in feat/b
+  ✗ app · web crashed in feat/b (exit 1)
+  ✓ app · stopped web in feat/b
+  ✓ app · migrate finished in feat/b

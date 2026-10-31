@@ -1,0 +1,1 @@
+{"status":"ok","protocol":2,"version":"<NEXT>","pid":<PID>,"jobs":[{"name":"db","kind":"service","work_dir":"<SB>/acme","state":"running","hold":"detached","started_at":"<T>","status":"detached"}]}

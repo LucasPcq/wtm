@@ -1,0 +1,4 @@
+
+  ✗ the request is invalid: a daemon already serves this socket
+  → wtm-next daemon --help
+

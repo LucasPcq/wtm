@@ -1,6 +1,7 @@
 package events
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
@@ -24,6 +26,9 @@ const (
 	// lockWait is how long a daemon starting waits for the lock: a client probing whether a daemon holds it takes it for an instant.
 	lockWait  = 250 * time.Millisecond
 	lockRetry = 10 * time.Millisecond
+	// acceptRetry is the first wait after an accept that failed, doubling up to acceptRetryMax.
+	acceptRetry    = 5 * time.Millisecond
+	acceptRetryMax = time.Second
 
 	actionPublish   = "publish"
 	actionSubscribe = "subscribe"
@@ -50,10 +55,46 @@ type response struct {
 	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
-// ServeParams is where [Serve] listens, SocketPath, and how long it waits with no subscriber and no request before it stops, Idle.
+// ServeParams is where [Serve] listens, SocketPath; how long it waits with no
+// subscriber, no request and nothing Busy before it stops, Idle; the Relay it
+// serves (a new one when nil); and what a run daemon it hosts plugs in: Ready,
+// run once the lock is held and before it listens, Other, which answers a
+// request of another action than the bus's (its first line, read from conn;
+// stop stops the daemon), Busy, which keeps it from idling out while true,
+// and Stopping, run once it stopped listening, before the requests in flight
+// end. A nil hook does nothing; with no Other an action not the bus's is
+// refused as unknown.
 type ServeParams struct {
 	SocketPath string
 	Idle       time.Duration
+	Relay      *Relay
+	Ready      func()
+	Other      func(conn net.Conn, line []byte, stop func())
+	Busy       func() bool
+	Stopping   func()
+}
+
+// A Relay hands each event published on the bus to the subscribers of its
+// repository: the daemon's own, which a run daemon hosted in its process
+// publishes on directly.
+type Relay struct {
+	hub *hub
+}
+
+// NewRelay returns a Relay with no subscriber.
+func NewRelay() *Relay {
+	return &Relay{hub: newHub(subscriberQueue)}
+}
+
+// Publish relays line to the subscribers of its repository, without a round
+// trip through the socket; a line that names no repository, or cannot be
+// written, is dropped.
+func (r *Relay) Publish(line domain.Line) {
+	payload, err := domain.MarshalLine(line)
+	if err != nil || line.Repo == nil {
+		return
+	}
+	r.hub.publish(delivery{repo: Resolved(line.Repo.CommonDir), payload: payload})
 }
 
 // Serve runs the bus's daemon until ctx is done or it idles out: it relays each
@@ -75,9 +116,12 @@ func Serve(ctx context.Context, params ServeParams) error {
 	}
 	defer lock.Close()
 
+	if params.Ready != nil {
+		params.Ready()
+	}
 	// The lock proves no daemon listens on a socket file left behind: one that died without removing it.
 	_ = os.Remove(params.SocketPath)
-	listener, err := net.Listen("unix", params.SocketPath)
+	listener, err := listenOwned(params.SocketPath)
 	if err != nil {
 		return err
 	}
@@ -85,8 +129,12 @@ func Serve(ctx context.Context, params ServeParams) error {
 
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
-	d := &daemon{hub: newHub(subscriberQueue), last: time.Now()}
-	go d.idleOut(ctx, idleOutParams{Stop: stop, Idle: params.Idle})
+	relay := params.Relay
+	if relay == nil {
+		relay = NewRelay()
+	}
+	d := &daemon{hub: relay.hub, last: time.Now(), other: params.Other, stop: stop}
+	go d.idleOut(ctx, idleOutParams{Stop: stop, Idle: params.Idle, Busy: params.Busy})
 	context.AfterFunc(ctx, func() {
 		_ = listener.Close()
 		d.hub.close()
@@ -94,34 +142,70 @@ func Serve(ctx context.Context, params ServeParams) error {
 
 	var served sync.WaitGroup
 	defer served.Wait()
+	backoff := acceptRetry
 	for {
 		conn, err := listener.Accept()
-		if err != nil {
+		if err == nil {
+			backoff = acceptRetry
+			served.Go(func() { d.serve(ctx, conn) })
+			continue
+		}
+		if ctx.Err() != nil {
+			if params.Stopping != nil {
+				params.Stopping()
+			}
 			return nil
 		}
-		served.Go(func() { d.serve(ctx, conn) })
+		// A failed accept (too many open files) is no reason to stop the jobs a daemon holds: wait, then accept again, as net/http does.
+		time.Sleep(backoff)
+		backoff = min(2*backoff, acceptRetryMax)
 	}
+}
+
+// listenOwned listens on the unix socket at path, which only this user may connect
+// to: a request on it runs a command as this user. The umask is narrowed
+// around its creation, so the socket is never open to others, even for an
+// instant; nothing else of this process creates a file meanwhile, its
+// requests not being served yet.
+func listenOwned(path string) (net.Listener, error) {
+	umask := syscall.Umask(0o077)
+	listener, err := net.Listen("unix", path)
+	syscall.Umask(umask)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		_ = listener.Close()
+		return nil, err
+	}
+
+	return listener, nil
 }
 
 func lockPath(socketPath string) string {
 	return filepath.Join(filepath.Dir(socketPath), lockName)
 }
 
-// A daemon is the bus's state: its hub, the subscriptions open and when the last request or subscription ended.
+// A daemon is the bus's state: its hub, what answers another action and stops
+// it, the requests and subscriptions in flight and when the last one ended.
 type daemon struct {
-	hub *hub
+	hub   *hub
+	other func(conn net.Conn, line []byte, stop func())
+	stop  func()
 
-	mu          sync.Mutex
-	subscribers int
-	last        time.Time
+	mu     sync.Mutex
+	active int
+	last   time.Time
 }
 
 type idleOutParams struct {
 	Stop func()
 	Idle time.Duration
+	Busy func() bool
 }
 
-// idleOut stops the daemon once it has had no subscriber and no request for params.Idle.
+// idleOut stops the daemon once it has had no subscriber, no request and
+// nothing busy for params.Idle.
 func (d *daemon) idleOut(ctx context.Context, params idleOutParams) {
 	ticker := time.NewTicker(max(params.Idle/4, time.Millisecond))
 	defer ticker.Stop()
@@ -133,20 +217,20 @@ func (d *daemon) idleOut(ctx context.Context, params idleOutParams) {
 		}
 
 		d.mu.Lock()
-		idle := d.subscribers == 0 && time.Since(d.last) >= params.Idle
+		idle := d.active == 0 && time.Since(d.last) >= params.Idle
 		d.mu.Unlock()
-		if idle {
+		if idle && (params.Busy == nil || !params.Busy()) {
 			params.Stop()
 			return
 		}
 	}
 }
 
-// busy records a request or a subscription starting (by 1) or ending (by -1, and 0 for a request served).
+// busy records a request or a subscription starting (by 1) or ending (by -1).
 func (d *daemon) busy(by int) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.subscribers += by
+	d.active += by
 	d.last = time.Now()
 }
 
@@ -154,22 +238,27 @@ func (d *daemon) busy(by int) {
 func (d *daemon) serve(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 
-	decoder := json.NewDecoder(conn)
-	var req request
-	if err := decoder.Decode(&req); err != nil {
+	line, err := bufio.NewReader(conn).ReadBytes('\n')
+	if err != nil {
 		return
 	}
-	d.busy(0)
+	var req request
+	// A line that is no request is the run daemon's to refuse, when one is hosted.
+	if json.Unmarshal(line, &req) != nil && d.other == nil {
+		return
+	}
+	d.busy(1)
+	defer d.busy(-1)
 
 	encoder := json.NewEncoder(conn)
-	switch req.Action {
-	case actionPublish:
+	switch {
+	case req.Action == actionPublish:
 		d.hub.publish(delivery{repo: req.Repo, payload: req.Payload})
 		_ = encoder.Encode(response{Status: statusOK})
-	case actionSubscribe:
-		d.busy(1)
-		defer d.busy(-1)
+	case req.Action == actionSubscribe:
 		d.subscribe(ctx, subscription{Conn: conn, Encoder: encoder, Repos: req.Repos})
+	case d.other != nil:
+		d.other(conn, line, d.stop)
 	default:
 		_ = encoder.Encode(response{Status: statusError, Message: "unknown action: " + req.Action})
 	}

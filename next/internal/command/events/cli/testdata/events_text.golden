@@ -5,3 +5,7 @@
   ✓ changed feat/b  head, jobs
   ✓ provisioned feat/b
   ✗ on_create failed for feat/b  make setup (exit 2)
+  ✓ started web in feat/b
+  ✗ web crashed in feat/b (exit 1)
+  ✓ stopped web in feat/b
+  ✓ migrate finished in feat/b

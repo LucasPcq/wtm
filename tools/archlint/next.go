@@ -35,6 +35,7 @@ const (
 	nextUI          nextLayer = "ui"
 	nextAPI         nextLayer = "api"
 	nextWeb         nextLayer = "web"
+	nextDaemon      nextLayer = "daemon"
 	nextCmd         nextLayer = "cmd"
 )
 
@@ -65,6 +66,7 @@ var nextWhy = map[nextLayer]string{
 	nextUI:          "ui/ is the presentation kit every command's cli shares and knows no command: domain/*, ui/*, the stdlib and third parties, never a command, a service or an adapter",
 	nextAPI:         "the catalogue knows no command: domain/* and the stdlib only",
 	nextWeb:         "the web server speaks to the core through the catalogue alone: api, domain/* and the stdlib, never a command, a service, an adapter or ui/*",
+	nextDaemon:      "the run daemon reaches the world through the ports it declares and is blind to git: domain/* and the stdlib but os/exec and net, never a command, a service, an adapter, ui/*, the catalogue nor the web server",
 	nextCmd:         "the composition root wires what is under next/, never a fake",
 }
 
@@ -85,7 +87,7 @@ func runNext(pass *analysis.Pass, testsOf testFiles) (any, error) {
 	}
 	from, ok := nextPackageOf(rel)
 	if !ok {
-		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under domain/, service/, command/ (its cli/ beside it), adapter/, ui/, api/, web/ or cmd/wtm-next (next/README.md)", rel)
+		pass.Reportf(firstFile(pass).Package, "next/%s is in no row of next/'s import table: place it under domain/, service/, command/ (its cli/ beside it), adapter/, ui/, api/, web/, daemon/ or cmd/wtm-next (next/README.md)", rel)
 		return nil, nil
 	}
 	if sibling := strings.TrimSuffix(from.unit, testSuffix); slices.Contains(nextKits, from.layer) && !siblingExists(pass, rel, sibling) {
@@ -207,6 +209,8 @@ func nextPackageOf(rel string) (nextPackage, bool) {
 		return nextPackage{layer: nextAPI}, true
 	case parts[1] == "web" && !nested:
 		return nextPackage{layer: nextWeb}, true
+	case parts[1] == "daemon" && !nested:
+		return nextPackage{layer: nextDaemon}, true
 	case parts[1] == "domain":
 		return nextPackage{layer: nextDomain}, true
 	case parts[1] == "service" && nested:
@@ -284,6 +288,8 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 		return stdlib || in(nextDomain)
 	case nextService, nextAPI:
 		return stdlib || in(nextDomain)
+	case nextDaemon:
+		return stdlib && !daemonBanned(to.path) || in(nextDomain)
 	case nextWeb:
 		return stdlib || in(nextDomain, nextAPI)
 	case nextCommand:
@@ -302,6 +308,11 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 		return stdlib || thirdParty || to.inNext
 	}
 	return false
+}
+
+// daemonBanned reports whether the run daemon's core may not import the stdlib package at path: it starts no process and opens no socket itself, its ports do.
+func daemonBanned(path string) bool {
+	return path == "os/exec" || path == "net" || strings.HasPrefix(path, "net/")
 }
 
 func testsAlone(roots []string) ([]finding, error) {

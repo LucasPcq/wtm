@@ -308,6 +308,28 @@ import (
 )
 
 var _ http.Handler
+-- github.com/LucasPcq/wtm/next/internal/daemon/daemon.go --
+// Package daemon runs the jobs.
+package daemon
+
+import (
+	"net" // want `next/internal/daemon must not import "net" — the run daemon reaches the world through the ports it declares and is blind to git`
+	_ "os/exec" // want `next/internal/daemon must not import "os/exec" — the run daemon reaches the world through the ports it declares and is blind to git`
+	"time"
+
+	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/daemon must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — the run daemon reaches the world through the ports it declares and is blind to git`
+	_ "github.com/LucasPcq/wtm/next/internal/api" // want `next/internal/daemon must not import "github.com/LucasPcq/wtm/next/internal/api" — the run daemon reaches the world through the ports it declares and is blind to git`
+	_ "github.com/LucasPcq/wtm/next/internal/domain"
+	_ "github.com/LucasPcq/wtm/next/internal/domain/branch"
+	_ "github.com/LucasPcq/wtm/next/internal/service/operation" // want `next/internal/daemon must not import "github.com/LucasPcq/wtm/next/internal/service/operation" — the run daemon reaches the world through the ports it declares and is blind to git`
+	_ "github.com/spf13/cobra" // want `next/internal/daemon must not import "github.com/spf13/cobra" — the run daemon reaches the world through the ports it declares and is blind to git`
+)
+
+var _ net.Listener
+var _ time.Duration
+-- github.com/LucasPcq/wtm/next/internal/daemon/sub/sub.go --
+// Package sub is nested under the run daemon.
+package sub // want `next/internal/daemon/sub is in no row of next/'s import table`
 -- github.com/LucasPcq/wtm/next/internal/web/sub/sub.go --
 // Package sub is a stray package under web.
 package sub // want `next/internal/web/sub is in no row of next/'s import table`
