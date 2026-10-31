@@ -6,6 +6,7 @@ import { githubQuery, readQuery } from '@/api/queries/commands'
 import type { RepositoryOffer } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert } from '@/features/worktrees/components/alert'
 import { CommandLine } from '@/features/worktrees/components/command-line'
 import { MoreMenu } from '@/features/worktrees/components/more-menu'
 import { ActivitySection } from '@/features/worktrees/detail/components/activity-section'
@@ -102,10 +103,11 @@ export function DetailPanel({
         {live.isPending && <Skeleton className="h-32 w-full" />}
         {live.isError && <p className="text-sm text-destructive">{live.error.message}</p>}
         {failed && (
-          <div role="alert" className="flex flex-col gap-2 text-sm">
-            <p className="text-destructive">{sentence(failed.message)}</p>
-            {failed.follow_up && <CommandLine followUp={failed.follow_up} />}
-          </div>
+          <Alert
+            tone="red"
+            description={sentence(failed.message)}
+            below={failed.follow_up && <CommandLine followUp={failed.follow_up} />}
+          />
         )}
         <Callout repo={repo} problems={shown?.problems ?? []} />
         {detail && sections.shown.map((id) => <Fragment key={id}>{section(id, detail)}</Fragment>)}
