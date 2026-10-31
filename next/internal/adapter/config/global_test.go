@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -79,4 +80,23 @@ func TestTheProjectIsCheckedBeforeTheShellAndTheShellErrorStandsAlone(t *testing
 
 	assert.EqualError(t, bad, "invalid env strategy: must be example, main, or parent")
 	assert.EqualError(t, shell, "invalid shell type: must be zsh, bash, or fish")
+}
+
+func TestTheGlobalConfigIsLoadedAloneWithItsProxyValidated(t *testing.T) {
+	dir := t.TempDir()
+	write := func(content string) string {
+		path := filepath.Join(dir, "config.toml")
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+		return path
+	}
+
+	global, err := LoadGlobal(write("[proxy]\nport = 5000\n"))
+	require.NoError(t, err)
+	_, invalid := LoadGlobal(write("[proxy]\nport = 70000\n"))
+	absent, none := LoadGlobal(filepath.Join(dir, "absent.toml"))
+
+	assert.Equal(t, 5000, global.ProxyPort())
+	assert.ErrorContains(t, invalid, "invalid [proxy] port 70000")
+	require.NoError(t, none)
+	assert.Equal(t, 11080, absent.ProxyPort(), "the default port")
 }

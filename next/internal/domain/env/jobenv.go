@@ -20,13 +20,13 @@ const (
 	BranchKey         = "WTM_BRANCH"   // the branch of the worktree a job runs in
 	ordinalKey        = "WTM_ORDINAL"
 	portOffsetKey     = "WTM_PORT_OFFSET"
-	projectKey        = "WTM_PROJECT"
+	ProjectKey        = "WTM_PROJECT" // the host label of the repository a job runs in
 	isolationKey      = "WTM_ISOLATION"
 )
 
 // JobKeys returns the names of every variable wtm itself sets in a job's environment, the job's port variables aside.
 func JobKeys() []string {
-	return []string{WorktreeKey, BranchKey, ordinalKey, portOffsetKey, projectKey, isolationKey, ComposeProjectKey}
+	return []string{WorktreeKey, BranchKey, ordinalKey, portOffsetKey, ProjectKey, isolationKey, ComposeProjectKey}
 }
 
 // NotInherited returns the variables a worktree's hooks and commands never take from the caller's environment: those wtm itself sets (JobKeys), and every port run declares, which are the caller's worktree's, never theirs.
@@ -56,7 +56,7 @@ func jobEnv(params JobParams) map[string]string {
 		BranchKey:     params.Branch,
 		ordinalKey:    strconv.Itoa(params.Ordinal),
 		portOffsetKey: strconv.Itoa(params.Offset()),
-		projectKey:    worktree.HostLabel(params.Project()),
+		ProjectKey:    worktree.HostLabel(params.Project()),
 		isolationKey:  string(params.Isolation.Effective()),
 	}
 	if name := params.composeProject(); name != "" {

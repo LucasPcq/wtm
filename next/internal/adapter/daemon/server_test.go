@@ -17,11 +17,11 @@ import (
 func TestEveryAnswerIsStampedWithTheProtocolAndTheBuild(t *testing.T) {
 	listed := web
 	listed.LastLine = &run.Line{At: started, Text: "GET / 200"}
-	socket, _ := served(t, &jobs{listed: []run.Job{listed}}, "1.0")
+	socket, _ := served(t, &jobs{listed: []run.Job{listed}, proxy: run.Proxy{Port: 11080, PublicPort: 80}}, "1.0")
 
 	answers := asked(t, socket, `{"action":"list"}`)
 
-	assert.Equal(t, []map[string]any{{"status": "ok", "protocol": 2.0, "version": "1.0", "jobs": []any{map[string]any{
+	assert.Equal(t, []map[string]any{{"status": "ok", "protocol": 2.0, "version": "1.0", "proxy": map[string]any{"port": 11080.0, "public_port": 80.0}, "jobs": []any{map[string]any{
 		"name": "web", "kind": "service", "work_dir": "/wt/a", "state": "running", "hold": "own", "status": "running", "pid": 4242.0,
 		"started_at": "2026-10-31T12:00:00.000Z", "url": "http://localhost:3100", "ports": map[string]any{"PORT": 3100.0},
 		"last_line": map[string]any{"at": "2026-10-31T12:00:00.000Z", "text": "GET / 200"},
@@ -44,12 +44,13 @@ func TestAStartIsHandedTheSpecAsTheClientSentIt(t *testing.T) {
 	daemonJobs := &jobs{}
 	socket, _ := served(t, daemonJobs, "1.0")
 
-	asked(t, socket, `{"action":"start","spec":{"job":{"name":"web","kind":"service","cmd":"pnpm dev","cwd":"apps/web","ports":{"PORT":3000},"url":{"port":"PORT"}},"work_dir":"/wt/a","env":{"PORT":"3100"},"unset":["PORT"],"origin":{"root":"/repo","common_dir":"/repo/.git","branch":"feat/a","correlation_id":"c1"}}}`)
+	asked(t, socket, `{"action":"start","spec":{"job":{"name":"web","kind":"service","cmd":"pnpm dev","cwd":"apps/web","ports":{"PORT":3000},"url":{"port":"PORT"}},"work_dir":"/wt/a","env":{"PORT":"3100"},"unset":["PORT"],"origin":{"root":"/repo","common_dir":"/repo/.git","branch":"feat/a","correlation_id":"c1"},"routes":[{"job":"web","host":"web.feat-a.acme.localhost","port":"PORT"}]}}`)
 
 	assert.Equal(t, []any{run.Spec{
 		Job:     project.Job{Name: "web", Kind: project.Service, Cmd: "pnpm dev", Cwd: "apps/web", Ports: map[string]int{"PORT": 3000}, URL: &project.URL{Port: "PORT"}},
 		WorkDir: "/wt/a", Env: map[string]string{"PORT": "3100"}, Unset: []string{"PORT"},
 		Origin: &run.Origin{Root: "/repo", CommonDir: "/repo/.git", Branch: "feat/a", CorrelationID: "c1"},
+		Routes: []run.Route{{Job: "web", Host: "web.feat-a.acme.localhost", Port: "PORT"}},
 	}}, daemonJobs.seen())
 }
 

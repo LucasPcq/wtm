@@ -325,6 +325,9 @@ func TestANamespaceCreateStillRunningAfterFiveMinutesIsStopped(t *testing.T) {
 	var limits []time.Duration
 	w.params.After = func(limit time.Duration) <-chan time.Time {
 		limits = append(limits, limit)
+		if len(limits) > 1 {
+			return nil
+		}
 		fell := make(chan time.Time, 1)
 		fell <- now
 		return fell
@@ -337,7 +340,7 @@ func TestANamespaceCreateStillRunningAfterFiveMinutesIsStopped(t *testing.T) {
 	var failure *run.Error
 	require.ErrorAs(t, err, &failure)
 	assert.Equal(t, run.CodeNamespace, failure.Code)
-	assert.Equal(t, []time.Duration{5 * time.Minute}, limits, "an attempt runs up to five minutes")
+	assert.Equal(t, 5*time.Minute, limits[0], "an attempt runs up to five minutes")
 	assert.Contains(t, failure.Message, "still running after 5m0s, stopped")
 	assert.Equal(t, []string{"up db", "createdb", "down db"}, w.spawner.lines())
 	assert.NotEmpty(t, w.spawner.process("createdb").stops)

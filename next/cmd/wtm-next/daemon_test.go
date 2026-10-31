@@ -1,9 +1,14 @@
 package main
 
 import (
+	"errors"
 	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -94,4 +99,45 @@ func TestTheDaemonKeepsAJobsLogAndHandsOutItsLinesAndItsTerminal(t *testing.T) {
 	log, err := os.ReadFile(filepath.Join(logs, "echo.log"))
 	require.NoError(t, err)
 	assert.Regexp(t, `(?m)^\S+  ready\n\S+  typed\n$`, string(log))
+}
+
+func TestTheDaemonsProxyServesAServiceUnderItsNameWhileItRuns(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, "web via "+r.Host) }))
+	t.Cleanup(backend.Close)
+	backendPort := strconv.Itoa(backend.Listener.Addr().(*net.TCPAddr).Port)
+	free, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	proxyPort := free.Addr().(*net.TCPAddr).Port
+	require.NoError(t, free.Close())
+	socket := serving(t, daemonParams{ProxyPort: proxyPort})
+	client := daemon.Daemon{SocketPath: socket, Version: version}
+	spec := run.Spec{
+		Job:     project.Job{Name: "web", Kind: project.Service, Cmd: "sleep 30", Ports: map[string]int{"PORT": 3000}, URL: &project.URL{Port: "PORT"}},
+		WorkDir: t.TempDir(),
+		Env:     map[string]string{"PORT": backendPort, "WTM_WORKTREE": "feat-a", "WTM_PROJECT": "acme"},
+		Routes:  []run.Route{{Job: "web", Host: "web.feat-a.acme.localhost", Port: "PORT"}},
+	}
+
+	web, err := client.Start(t.Context(), spec, nil)
+	require.NoError(t, err)
+	body := proxied(t, proxyPort, "web.feat-a.acme.localhost")
+	_, err = client.Stop(t.Context(), run.Stop{Name: "web", WorkDir: spec.WorkDir})
+	require.NoError(t, err)
+
+	assert.Equal(t, "http://web.feat-a.acme.localhost:"+strconv.Itoa(proxyPort), web.URL)
+	assert.Equal(t, "web via web.feat-a.acme.localhost", body)
+	assert.Contains(t, proxied(t, proxyPort, "web.feat-a.acme.localhost"), "no job is published under web.feat-a.acme.localhost", "withdrawn once stopped")
+}
+
+func TestWhyTheDaemonServesNoProxyIsInItsLog(t *testing.T) {
+	busy, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = busy.Close() })
+	taken := busy.Addr().(*net.TCPAddr).Port
+
+	unreadable := serving(t, daemonParams{ProxyProblem: errors.New("invalid [proxy] port 99999 in config.toml")})
+	moved := serving(t, daemonParams{ProxyPort: taken})
+
+	assert.Equal(t, "run proxy: invalid [proxy] port 99999 in config.toml — jobs keep their own ports\n", daemonLog(t, unreadable), "said once the log was emptied")
+	assert.Empty(t, daemonLog(t, moved), "a port taken moves the proxy to the next, silently")
 }

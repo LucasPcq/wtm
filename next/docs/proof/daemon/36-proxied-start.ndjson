@@ -1,0 +1,1 @@
+{"status":"ok","protocol":2,"version":"<NEXT>","pid":<PID>,"job":{"name":"web","kind":"service","work_dir":"<SB>/acme","state":"running","hold":"own","pid":<PID>,"started_at":"<T>","url":"http://web.main.acme.localhost:<PROXY_PORT>","ports":{"PORT":<JOB_PORT>},"status":"running"}}

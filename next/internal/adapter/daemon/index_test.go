@@ -26,7 +26,7 @@ func TestTheIndexALegacyDaemonWroteIsTakenOver(t *testing.T) {
 	api := records[0]
 	assert.Equal(t, project.Job{Name: "api", Kind: project.Service, Cmd: "python3 ../../scripts/dev.py api", Cwd: "apps/api", Ports: map[string]int{"PORT": 27841}, URL: &project.URL{Port: "PORT"}}, api.Spec.Job)
 	assert.Equal(t, &run.Origin{Root: "/private/tmp/wtm-sandbox.FI4ic8/acme", CommonDir: "/private/tmp/wtm-sandbox.FI4ic8/acme/.git", Branch: "main"}, api.Spec.Origin)
-	assert.Equal(t, []run.Route{{Job: "api", Host: "api.main.acme.localhost", Port: "PORT"}}, api.Routes)
+	assert.Equal(t, []run.Route{{Job: "api", Host: "api.main.acme.localhost", Port: "PORT"}}, api.Spec.Routes)
 	assert.Equal(t, 2282, api.PGID)
 	assert.True(t, api.Foreground())
 	assert.True(t, records[1].Claim)
@@ -37,12 +37,11 @@ func TestTheIndexALegacyDaemonWroteIsTakenOver(t *testing.T) {
 func TestTheIndexKeepsWhatItSavesInTheLegacyFormat(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "jobs.json")
 	record := run.Record{
-		Spec:      run.Spec{Job: project.Job{Name: "db", Kind: project.Service, Cmd: "up", Stop: "down", Scope: project.Shared, Namespace: &project.Namespace{Name: "app_${WTM_WORKTREE}", Create: "createdb", Remove: "dropdb"}}, WorkDir: "/wt/a", Env: map[string]string{"WTM_BRANCH": "feat/a"}, Unset: []string{"PORT"}, LogDir: "/repo/.git/wtm/logs/feat-a", Origin: &run.Origin{Root: "/repo", CommonDir: "/repo/.git", Branch: "feat/a", CorrelationID: "c1"}},
+		Spec:      run.Spec{Job: project.Job{Name: "db", Kind: project.Service, Cmd: "up", Stop: "down", Scope: project.Shared, Namespace: &project.Namespace{Name: "app_${WTM_WORKTREE}", Create: "createdb", Remove: "dropdb"}}, WorkDir: "/wt/a", Env: map[string]string{"WTM_BRANCH": "feat/a"}, Unset: []string{"PORT"}, LogDir: "/repo/.git/wtm/logs/feat-a", Origin: &run.Origin{Root: "/repo", CommonDir: "/repo/.git", Branch: "feat/a", CorrelationID: "c1"}, Routes: []run.Route{{Job: "db", Host: "db.localhost", Port: "PORT"}}},
 		StartedAt: time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC),
 		Claim:     true,
 		SharedDir: "/repo",
 		MainHolds: true,
-		Routes:    []run.Route{{Job: "db", Host: "db.localhost", Port: "PORT"}},
 	}
 
 	require.NoError(t, (&daemon.Index{Path: path}).Save([]run.Record{record}))

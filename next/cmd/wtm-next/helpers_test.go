@@ -11,6 +11,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"io"
 	"maps"
 	"net"
 	"net/http"
@@ -822,14 +823,26 @@ func stringsOf(values any) []string {
 // servingDaemon runs the daemon, the run daemon and the bus, on a new socket in a short directory until the test ends, and returns its socket.
 func servingDaemon(t *testing.T) string {
 	t.Helper()
+	return serving(t, daemonParams{})
+}
+
+// serving runs the daemon of params as servingDaemon does, its standard error to its log, as a daemon a client starts.
+func serving(t *testing.T, params daemonParams) string {
+	t.Helper()
 	dir, err := os.MkdirTemp("", "wtm-next")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	socket := filepath.Join(dir, "wtm.sock")
+	log, err := os.OpenFile(daemon.LogPath(socket), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = log.Close() })
+	params.Socket, params.Stderr = socket, log
 
 	ctx, cancel := context.WithCancel(context.Background())
 	served := make(chan error, 1)
-	go func() { served <- serveDaemon(ctx, socket) }()
+	go func() {
+		served <- serveDaemon(ctx, params)
+	}()
 	t.Cleanup(func() {
 		cancel()
 		<-served
@@ -840,4 +853,26 @@ func servingDaemon(t *testing.T) string {
 		return err == nil && statErr == nil
 	}, 5*time.Second, 10*time.Millisecond)
 	return socket
+}
+
+// proxied asks the proxy on port for host, as a browser does, and returns the body of its answer.
+func proxied(t *testing.T, port int, host string) string {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:"+strconv.Itoa(port)+"/", nil)
+	require.NoError(t, err)
+	req.Host = host
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	return string(body)
+}
+
+// daemonLog returns the log of the daemon on socket.
+func daemonLog(t *testing.T, socket string) string {
+	t.Helper()
+	log, err := os.ReadFile(daemon.LogPath(socket))
+	require.NoError(t, err)
+	return string(log)
 }

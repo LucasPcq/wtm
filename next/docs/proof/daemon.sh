@@ -4,7 +4,7 @@
 # command exists, in one sandbox (the docs/demos "acme" project): the legacy
 # daemon handing its jobs over to next's, next's daemon starting, stopping and
 # restarting jobs, a hard kill of next's daemon and its recovery, a daemon of
-# another build. Every daemon this script runs it starts itself, as a child it
+# another build, a shared job, the proxy serving a job by name. Every daemon this script runs it starts itself, as a child it
 # holds the handle of, and stops through the protocol, or kills by that handle:
 # it never signals a pid read from a file or an answer. Each step records what
 # the daemon answered; pids, times and the sandbox path are normalised.
@@ -50,7 +50,7 @@ normalise() {
     -e 's#"(pid|pgid|daemon_pid)":[0-9]+#"\1":<PID>#g' \
     -e 's#"(at|started_at|ts)":"[^"]+"#"\1":"<T>"#g' \
     -e 's#up [0-9]+[smh]#up <T>#g' \
-    -e "s#$((port + 2))#<PROXY_PORT>#g" -e "s#$((port + 1))#<API_PORT>#g" -e "s#$port#<WEB_PORT>#g" \
+    -e "s#$((port + 3))#<JOB_PORT>#g" -e "s#$((port + 2))#<PROXY_PORT>#g" -e "s#$((port + 1))#<API_PORT>#g" -e "s#$port#<WEB_PORT>#g" \
     -e "s#\"version\":\"$build\"#\"version\":\"<NEXT>\"#g" \
     -e "s#$next|$other|$legacy#<BIN>#g"
 }
@@ -218,6 +218,31 @@ ask 33-shared-released-by-a "{\"action\":\"stop\",\"name\":\"cache\",\"work_dir\
 ask 34-shared-stopped-by-b "{\"action\":\"stop\",\"name\":\"cache\",\"work_dir\":\"$root/wt-b\"}"
 echo "marker $( [[ -f $shared_marker ]] && echo present || echo removed)" >"$out/34-shared-marker.txt"
 normalise <"$global/jobs.json" >"$out/35-index-after-shared.json"
+stop_daemon
+
+# 8. The proxy, on the sandbox's [proxy] port: a service is served under its name while it runs, an unknown host answered with the names served, the probe with the port it bound.
+site=$root/site
+mkdir -p "$site" && echo "hello from web" >"$site/index.html"
+job_port=$((port + 3))
+proxy_port=$((port + 2))
+routed_spec="{\"job\":{\"name\":\"web\",\"kind\":\"service\",\"cmd\":\"exec python3 -m http.server $job_port --bind 127.0.0.1 --directory $site\",\"ports\":{\"PORT\":3000},\"url\":{\"port\":\"PORT\"}},\"work_dir\":\"$acme\",\"env\":{\"PORT\":\"$job_port\",\"WTM_WORKTREE\":\"main\",\"WTM_PROJECT\":\"acme\",\"WTM_BRANCH\":\"main\"},\"routes\":[{\"job\":\"web\",\"host\":\"web.main.acme.localhost\",\"port\":\"PORT\"}]}"
+# through <host>: asks the proxy for host as a browser does, and prints its status and body.
+through() {
+  curl -s -H "Host: $1" -w '\n%{http_code}\n' "http://127.0.0.1:$proxy_port/"
+}
+start_daemon "$next"
+started 36-proxied-start "{\"action\":\"start\",\"spec\":$routed_spec}"
+ask 37-proxied-list '{"action":"list"}'
+tries=0
+until [[ $(through web.main.acme.localhost | tail -1) == 200 ]]; do
+  ((tries++ < 100)) || { echo "daemon.sh: the proxied service never answered" >&2; exit 1; }
+  sleep 0.05
+done
+through web.main.acme.localhost | normalise >"$out/38-proxied-by-name.txt"
+through docs.main.acme.localhost | normalise >"$out/39-proxied-unknown-host.txt"
+curl -s -o /dev/null -D - -H "Host: probe.wtm.localhost" "http://127.0.0.1:$proxy_port/" | tr -d '\r' | grep -i -e '^HTTP' -e '^X-Wtm-Proxy:' | normalise >"$out/40-proxy-probe.txt"
+ask 41-proxied-stop "{\"action\":\"stop\",\"name\":\"web\",\"work_dir\":\"$acme\"}"
+through web.main.acme.localhost | normalise >"$out/42-proxied-after-stop.txt"
 stop_daemon
 sed -E -i '' "s#(/private)?$root#<SB>#g" "$out"/*.stdout "$out"/*.stderr
 echo "$out"

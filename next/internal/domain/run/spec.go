@@ -3,6 +3,7 @@ package run
 import (
 	"maps"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
 
@@ -14,8 +15,9 @@ import (
 // worktree, its ports included, resolved by the client: the daemon is blind to
 // git) and the variables it never inherits from the daemon, the directory its
 // log is kept in (none keeps none), the Origin its events are published
-// under, none publishing none, and, for a job of shared scope, the Shared
-// context of the main checkout it runs in once for every worktree.
+// under, none publishing none, the Routes its proxy serves it under while it
+// is up, and, for a job of shared scope, the Shared context of the main
+// checkout it runs in once for every worktree.
 type Spec struct {
 	Job     project.Job
 	WorkDir string
@@ -23,6 +25,7 @@ type Spec struct {
 	Unset   []string
 	LogDir  string
 	Origin  *Origin
+	Routes  []Route
 	Shared  *Shared
 }
 
@@ -67,10 +70,9 @@ func (s Spec) Detached() bool {
 
 // A Record is a job up as the daemon's index keeps it, for the next daemon to
 // take over: its Spec, when it started, the process and group a foreground
-// service runs as, whether it is a Claim on a shared job another worktree runs
-// (with the main checkout that runs it, SharedDir, and whether main asked for
-// it itself, MainHolds), and the routes its proxy serves, carried as they
-// were until the proxy reads them.
+// service runs as, and whether it is a Claim on a shared job another worktree
+// runs (with the main checkout that runs it, SharedDir, and whether main asked
+// for it itself, MainHolds).
 type Record struct {
 	Spec      Spec
 	StartedAt time.Time
@@ -79,14 +81,6 @@ type Record struct {
 	Claim     bool
 	SharedDir string
 	MainHolds bool
-	Routes    []Route
-}
-
-// A Route is a name the proxy serves a job's port under.
-type Route struct {
-	Job  string
-	Host string
-	Port string
 }
 
 // Hold returns what of the job the daemon holds: a claim, a detached stack, or
@@ -121,15 +115,24 @@ func (s Spec) Dir() string {
 	return filepath.Join(s.WorkDir, s.Job.Cwd)
 }
 
-// URL returns where the job answers: on localhost at the port its url names,
-// "" when it publishes none or that port is not bound.
-func (s Spec) URL() string {
+// URL returns where the job answers: under its own route's name on the
+// proxy's public port when the proxy is on (publicPort above 0), without a
+// port once that is 80; on localhost at the port its url names otherwise; ""
+// when it publishes none or that port is not bound.
+func (s Spec) URL(publicPort int) string {
 	if s.Job.URL == nil {
 		return ""
 	}
 	port, bound := s.Ports()[s.Job.URL.Port]
 	if !bound {
 		return ""
+	}
+	at := slices.IndexFunc(s.Routes, func(route Route) bool { return route.Job == s.Job.Name })
+	switch {
+	case at >= 0 && publicPort == PrivilegedPort:
+		return "http://" + s.Routes[at].Host
+	case at >= 0 && publicPort > 0:
+		return "http://" + s.Routes[at].Host + ":" + strconv.Itoa(publicPort)
 	}
 
 	return "http://localhost:" + strconv.Itoa(port)
