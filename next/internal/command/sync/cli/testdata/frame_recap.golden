@@ -1,0 +1,26 @@
+
+  Step 9/9 • Confirm
+
+  ✓ Worktrees: feat/a, feat/x
+  · All — set by its flag only
+  ✓ Descendants: with the worktrees under them
+  · Force — no worktree named has uncommitted changes: one picked is kept instead
+  ✓ On conflict: abort it
+  ✓ Parents: fast-forwarded first
+  ✓ Push: kept local
+  · No fetch — set by its flag only
+
+  ┃  Review & confirm
+  ┃
+  ┃  Descendants  feat/b, feat/c
+  ┃  Rebase       feat/a onto main (1 commit)
+  ┃               feat/x onto main (1 commit)
+  ┃               feat/b onto feat/a (1 commit)
+  ┃               feat/c onto feat/b (1 commit)
+  ┃  On conflict  abort the rebase, the worktree left as it was
+
+▌› Yes, sync 4 worktrees
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back

@@ -9,7 +9,7 @@
   ! feat/rebasing is in the middle of an operation (rebasing): left as it is
   ! feat/clash is kept as it is: uncommitted changes
 
-  → wtm sync feat/diverged                     rebase it
+  → wtm go feat/diverged                       reconcile it with origin by hand
   → wtm go feat/rebasing                       finish it in the worktree
   → wtm-next fast-forward feat/clash --force   fast-forward them anyway
 

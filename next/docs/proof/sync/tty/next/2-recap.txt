@@ -1,0 +1,25 @@
+$ wtm sync feat/tty-a; echo EXIT=$?
+
+  Step 9/9 • Confirm
+
+  ✓ Worktrees: feat/tty-a
+  · All — set by its flag only
+  ✓ Descendants: with the worktrees under them
+  · Force — no worktree named has uncommitted changes: one picked is kept instead
+  ✓ On conflict: abort it
+  ✓ Parents: fast-forwarded first
+  · Push — no worktree that may rebase has its branch on origin
+  · No fetch — set by its flag only
+
+  ┃  Review & confirm
+  ┃
+  ┃  Descendants  feat/tty-b
+  ┃  Rebase       feat/tty-a onto main (1 commit), feat/tty-b onto feat/tty-a (1 commit)
+  ┃  On conflict  abort the rebase, the worktree left as it was
+
+▌› Yes, sync 2 worktrees
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

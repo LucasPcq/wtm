@@ -9,6 +9,7 @@
         "clean",
         "prune",
         "fast-forward",
+        "sync",
         "exec",
         "reparent",
         "list",
@@ -1284,7 +1285,8 @@
             "incomplete",
             "interrupted",
             "not_reached",
-            "ruled_out"
+            "ruled_out",
+            "blocked"
           ]
         },
         "status": {
@@ -1357,6 +1359,9 @@
         "base": {
           "type": "boolean"
         },
+        "behind": {
+          "type": "integer"
+        },
         "change": {
           "$ref": "#/$defs/worktree.Change"
         },
@@ -1368,6 +1373,9 @@
         },
         "gone": {
           "type": "boolean"
+        },
+        "operation": {
+          "$ref": "#/$defs/worktree.Operation"
         },
         "origin": {
           "$ref": "#/$defs/worktree.Origin"
@@ -1552,7 +1560,10 @@
         "all",
         "no_orphan",
         "safe",
-        "no_candidate"
+        "no_candidate",
+        "no_descendant",
+        "no_rebase",
+        "nothing_to_push"
       ]
     },
     "domain.TextField": {
@@ -4479,6 +4490,536 @@
             "properties": {
               "path": {
                 "const": "with_prs"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "sync.Blocker": {
+      "description": "What makes a branch unsafe to move in a sync, a safety refusal only force lifts.",
+      "enum": [
+        "dirty"
+      ]
+    },
+    "sync.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "commits": {
+          "type": "integer"
+        },
+        "from": {
+          "type": "string"
+        },
+        "parent": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "pushed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path",
+        "parent",
+        "from",
+        "commits",
+        "pushed"
+      ],
+      "type": "object"
+    },
+    "sync.Onto": {
+      "additionalProperties": false,
+      "properties": {
+        "blockers": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/sync.Blocker"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "branch": {
+          "type": "string"
+        },
+        "children": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "from": {
+          "type": "string"
+        },
+        "operation": {
+          "$ref": "#/$defs/worktree.Operation"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/worktree.Origin"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "phases": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/domain.Phase"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch",
+        "children",
+        "origin",
+        "from",
+        "blockers",
+        "phases"
+      ],
+      "type": "object"
+    },
+    "sync.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "descendants": {
+          "type": "boolean"
+        },
+        "empty": {
+          "type": "boolean"
+        },
+        "ff_parents": {
+          "type": "boolean"
+        },
+        "force": {
+          "type": "boolean"
+        },
+        "keep_conflict": {
+          "type": "boolean"
+        },
+        "left_out": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "onto": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/sync.Onto"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "push": {
+          "type": "boolean"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "worktrees": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/sync.Rebase"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "worktrees",
+        "onto",
+        "left_out",
+        "descendants",
+        "force",
+        "keep_conflict",
+        "ff_parents",
+        "push"
+      ],
+      "type": "object"
+    },
+    "sync.Rebase": {
+      "additionalProperties": false,
+      "properties": {
+        "blockers": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/sync.Blocker"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "commits": {
+          "type": "integer"
+        },
+        "depth": {
+          "type": "integer"
+        },
+        "descendant": {
+          "type": "boolean"
+        },
+        "expect": {
+          "type": "string"
+        },
+        "fork": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "onto": {
+          "type": "string"
+        },
+        "operation": {
+          "$ref": "#/$defs/worktree.Operation"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/worktree.Origin"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parent": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "phases": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/domain.Phase"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standing": {
+          "$ref": "#/$defs/sync.Standing"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "path",
+        "parent",
+        "depth",
+        "descendant",
+        "standing",
+        "origin",
+        "from",
+        "commits",
+        "blockers",
+        "phases"
+      ],
+      "type": "object"
+    },
+    "sync.Standing": {
+      "description": "Where a worktree stands for a sync, the first that applies; only rebases moves it onto its parent.",
+      "enum": [
+        "missing",
+        "busy",
+        "unreadable",
+        "in_cycle",
+        "no_parent",
+        "parent_gone",
+        "unrelated",
+        "parent_left",
+        "diverged",
+        "rebases",
+        "on_parent"
+      ]
+    },
+    "sync.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "sync"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/sync.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/sync.Plan"
+        }
+      }
+    },
+    "sync.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "worktree"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "all"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "descendants"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "force"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "keep_conflict"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "ff_parents"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "push"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "no_fetch"
               },
               "values": {
                 "items": {

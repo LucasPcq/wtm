@@ -1,0 +1,28 @@
+{
+  "base_branch": "main",
+  "base_targeted": false,
+  "base_updated": false,
+  "base_old_tip": "",
+  "base_new_tip": "",
+  "steps": [
+    {
+      "branch": "feat/k2",
+      "source_branch": "feat/k1",
+      "path": "<SB>/acme.trees/feat-k2",
+      "status": "conflict",
+      "old_tip": "<SHA>",
+      "new_tip": "<SHA>",
+      "onto_tip": "<SHA>",
+      "commits_replayed": 2,
+      "push_pending": false,
+      "pushed": false,
+      "conflict_files": [
+        "shared.txt"
+      ],
+      "detail": "rebase conflict (aborted, working tree clean)"
+    }
+  ],
+  "selected_branches": [
+    "feat/k2"
+  ]
+}

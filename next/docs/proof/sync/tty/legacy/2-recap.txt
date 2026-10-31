@@ -1,0 +1,21 @@
+$ wtm sync feat/tty-a; echo EXIT=$?
+
+  Step 4/4 • Confirm
+
+  ✓ Worktrees: feat/tty-a
+  ✓ On conflict: sync normally
+  ⊘ Parent branches — no parent behind its remote
+
+  ┃  Review & confirm
+  ┃
+  ┃  Sync plan
+  ┃  1. feat/tty-a ← main
+  ┃
+  ┃  Rebase 1 worktree(s) onto their parents?
+
+▌▸ Yes, sync
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

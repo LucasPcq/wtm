@@ -1,0 +1,5 @@
+
+  ✗ the request is invalid
+    main is the base branch: sync rebases onto it, never it
+  → wtm-next fast-forward main   bring it up to origin instead
+

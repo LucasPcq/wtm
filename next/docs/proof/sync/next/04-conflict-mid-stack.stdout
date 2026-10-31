@@ -1,0 +1,13 @@
+
+  ✗ sync: 1 done · 1 failed · 1 skipped
+
+  Descendants  feat/k2, feat/k3
+  Rebase       feat/k1 onto main (1 commit), feat/k2 onto feat/k1 (1 commit), feat/k3 onto feat/k2 (1 commit)
+  On conflict  abort the rebase, the worktree left as it was
+
+  ✗ feat/k2  the rebase onto feat/k1 stopped on a conflict in shared.txt: aborted, the worktree left as it was
+  ! feat/k3  not started: what it depends on did not complete
+
+  → wtm-next sync feat/k2 --keep-conflict              resolve the conflict by hand
+  → wtm-next sync feat/k1 --descendants=false --push   push it, force-with-lease
+

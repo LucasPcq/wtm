@@ -16,6 +16,7 @@ $ api $U/api/repos/$A/commands | jq -c ".[] | {name, questions: [.form.fields[]?
 {"name":"clean","questions":["worktree","reparent_children","force"]}
 {"name":"prune","questions":["worktree","reparent_children","force","merged","closed","gone","no_fetch"]}
 {"name":"fast-forward","questions":["worktree","all","force","no_fetch"]}
+{"name":"sync","questions":["worktree","all","descendants","force","keep_conflict","ff_parents","push","no_fetch"]}
 {"name":"exec","questions":["worktree","command","all","jobs","print"]}
 {"name":"reparent","questions":["worktree","to"]}
 {"name":"list","questions":["with_prs","fetch"]}

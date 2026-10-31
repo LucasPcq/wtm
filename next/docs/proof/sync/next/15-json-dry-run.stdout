@@ -1,0 +1,98 @@
+{
+  "v": 2,
+  "command": "sync",
+  "ok": true,
+  "op": "<OP>",
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/solo",
+        "path": "<SB>/acme.trees/feat-solo",
+        "parent": "main",
+        "depth": 1,
+        "descendant": false,
+        "standing": "rebases",
+        "origin": {
+          "ahead": 0,
+          "behind": 0,
+          "state": "up-to-date"
+        },
+        "from": "<SHA>",
+        "fork": "<SHA>",
+        "onto": "<SHA>",
+        "commits": 1,
+        "expect": "<SHA>",
+        "blockers": [],
+        "phases": [
+          "rebase"
+        ]
+      }
+    ],
+    "onto": [
+      {
+        "branch": "main",
+        "path": "<SB>/acme",
+        "children": [
+          "feat/solo"
+        ],
+        "origin": {
+          "ahead": 0,
+          "behind": 0,
+          "state": "up-to-date"
+        },
+        "from": "<SHA>",
+        "blockers": [],
+        "phases": []
+      }
+    ],
+    "left_out": [],
+    "descendants": true,
+    "force": false,
+    "keep_conflict": false,
+    "ff_parents": true,
+    "push": false,
+    "recap": [
+      {
+        "key": "descendants",
+        "label": "Descendants",
+        "path": "descendants",
+        "values": [
+          {
+            "value": "",
+            "note": "none",
+            "text": "none"
+          }
+        ]
+      },
+      {
+        "key": "rebase",
+        "label": "Rebase",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/solo",
+            "params": {
+              "commits": "1",
+              "parent": "main"
+            },
+            "text": "feat/solo onto main (1 commit)"
+          }
+        ]
+      },
+      {
+        "key": "keep_conflict",
+        "label": "On conflict",
+        "path": "keep_conflict",
+        "values": [
+          {
+            "value": "false",
+            "text": "abort the rebase, the worktree left as it was"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<FP>",
+  "follow_ups": [],
+  "warnings": []
+}

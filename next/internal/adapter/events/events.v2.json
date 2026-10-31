@@ -20,7 +20,7 @@
     },
     "phase": {
       "description": "A phase of a subject's work, as phase.started and phase.finished name it: a closed set a surface names one by one.",
-      "enum": ["fast_forward", "worktree", "env", "meta", "ordinal", "ports", "on_create", "move", "on_clean", "remove", "exec"]
+      "enum": ["fast_forward", "worktree", "env", "meta", "ordinal", "ports", "on_create", "move", "on_clean", "remove", "exec", "rebase", "push"]
     },
     "repo": {
       "type": "object",

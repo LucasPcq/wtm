@@ -1,0 +1,11 @@
+$ wtm sync feat/tty-a; echo EXIT=$?
+
+┃  ✓ sync: 2 done
+┃
+┃  Descendants  feat/tty-b
+┃  Rebase       feat/tty-a onto main (1 commit), feat/tty-b onto feat/tty-a (1 commit)
+┃  On conflict  abort the rebase, the worktree left as it was
+
+EXIT=0
+$
+

@@ -1,0 +1,44 @@
+{
+  "v": 2,
+  "command": "sync",
+  "ok": false,
+  "op": "<id>",
+  "follow_ups": [
+    {
+      "command": "sync",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/s"
+          ]
+        },
+        {
+          "path": "descendants",
+          "values": [
+            "true"
+          ]
+        },
+        {
+          "path": "ff_parents",
+          "values": [
+            "true"
+          ]
+        }
+      ],
+      "dry_run": true,
+      "code": "plan.replan",
+      "message": "the plan the facts give now"
+    }
+  ],
+  "warnings": [],
+  "error": {
+    "kind": "precondition",
+    "code": "plan.stale",
+    "message": "the facts changed since the preview",
+    "params": {
+      "expected": "<id>",
+      "found": "<id>"
+    }
+  }
+}

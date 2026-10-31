@@ -1,0 +1,10 @@
+
+  ✓ sync: 1 done
+
+  Descendants   only the named: feat/s2 stays where it is
+  Fast-forward  main (1 commit from origin)
+  Rebase        feat/s1 onto main (1 commit)
+  On conflict   abort the rebase, the worktree left as it was
+
+  → wtm-next sync feat/s1 --descendants=false --push   push it, force-with-lease
+

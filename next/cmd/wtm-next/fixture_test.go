@@ -156,6 +156,27 @@ func mutations() []mutation {
 			},
 		},
 		{
+			name:     "sync",
+			answers:  []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/s"}}},
+			complete: true,
+			// main moves on: feat/s, created from it, is to rebase onto it
+			setup: func(t *testing.T, main string) {
+				gittest.Git(t, main, "worktree", "add", "-q", "-b", "feat/s", filepath.Join(filepath.Dir(main), ".trees", "feat-s"))
+				recordParent(t, main, "feat/s", "main")
+				gittest.Git(t, main, "commit", "-q", "--allow-empty", "-m", "moved on")
+			},
+			// the parent's tip is part of the plan
+			stale: func(t *testing.T, main string) {
+				gittest.Git(t, main, "commit", "-q", "--allow-empty", "-m", "moved on again")
+			},
+			untouched: func(t *testing.T, main string) {
+				assert.NotEqual(t, gittest.Output(t, main, "rev-parse", "main"), gittest.Output(t, main, "rev-parse", "feat/s"))
+			},
+			applied: func(t *testing.T, main string) {
+				assert.Equal(t, gittest.Output(t, main, "rev-parse", "main"), gittest.Output(t, main, "rev-parse", "feat/s"))
+			},
+		},
+		{
 			name:    "exec",
 			answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/old"}}, {Path: "command", Values: []string{"touch ran"}}},
 			setup: func(t *testing.T, main string) {

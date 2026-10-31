@@ -39,6 +39,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
+	synccommand "github.com/LucasPcq/wtm/next/internal/command/sync"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
@@ -174,6 +175,10 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 	require.Nil(t, applied.Envelope.Err)
 	shape.golden("applied", applied.Envelope)
 	for _, followUp := range applied.Envelope.FollowUps {
+		if _, migrated := catalogue().Find(followUp.Command); migrated {
+			assert.NotEmpty(t, commandLine(followUp), "the command line drops answers of %s", followUp.Code)
+			continue
+		}
 		argv, unspelled := spelled(followUp)
 		assert.NotEmpty(t, argv, followUp.Code)
 		assert.Empty(t, unspelled, "the command line drops answers of %s", followUp.Code)
@@ -502,6 +507,8 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[worktree.Blocker]():          {"What makes a worktree unsafe to remove, a safety refusal only force lifts, as a code each surface words its own way.", worktree.Blockers()},
 	reflect.TypeFor[fastforward.Standing]():      {"Where a worktree stands for a fast-forward, the first that applies; only behind moves.", fastforward.Standings()},
 	reflect.TypeFor[fastforward.Blocker]():       {"What makes a worktree behind origin unsafe to fast-forward, a safety refusal only force lifts.", fastforward.Blockers()},
+	reflect.TypeFor[synccommand.Standing]():      {"Where a worktree stands for a sync, the first that applies; only rebases moves it onto its parent.", synccommand.Standings()},
+	reflect.TypeFor[synccommand.Blocker]():       {"What makes a branch unsafe to move in a sync, a safety refusal only force lifts.", synccommand.Blockers()},
 	reflect.TypeFor[worktree.Divergence]():       {"Where a branch stands against origin's branch of the same name.", worktree.Divergences()},
 	reflect.TypeFor[worktree.Operation]():        {"What git stopped in the middle of in a worktree, to continue or abort there.", worktree.Operations()},
 	reflect.TypeFor[project.EnvStrategy]():       {"Where a worktree's .env files are copied from.", project.EnvStrategies()},

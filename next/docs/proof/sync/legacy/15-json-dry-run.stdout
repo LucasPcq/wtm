@@ -1,0 +1,24 @@
+{
+  "base_branch": "main",
+  "base_targeted": true,
+  "base_updated": false,
+  "base_old_tip": "<SHA>",
+  "base_new_tip": "<SHA>",
+  "steps": [
+    {
+      "branch": "feat/solo",
+      "source_branch": "main",
+      "path": "<SB>/acme.trees/feat-solo",
+      "status": "synced",
+      "old_tip": "<SHA>",
+      "new_tip": "<SHA>",
+      "onto_tip": "<SHA>",
+      "commits_replayed": 1,
+      "push_pending": true,
+      "pushed": false
+    }
+  ],
+  "selected_branches": [
+    "feat/solo"
+  ]
+}

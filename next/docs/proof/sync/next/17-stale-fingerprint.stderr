@@ -1,0 +1,4 @@
+
+  ✗ the facts changed since the preview
+  → wtm-next sync feat/s2 --dry-run   the plan the facts give now
+

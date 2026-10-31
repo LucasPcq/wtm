@@ -1,0 +1,8 @@
+
+  sync · dry run, nothing applied
+  Descendants  only the named: feat/b, feat/c stay where they are
+  Rebase       feat/a onto main (1 commit)
+  On conflict  abort the rebase, the worktree left as it was
+  fingerprint  4b9188359a42a5c6b3934a6f
+  → wtm-next sync feat/a --descendants=false --expect-fingerprint 4b9188359a42a5c6b3934a6f   apply this plan
+

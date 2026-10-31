@@ -11,17 +11,17 @@
 
   feat/a
   ! main has 2 commits it lacks
-  → wtm sync feat/a   sync it onto main
+  → wtm-next sync feat/a   sync it onto main
 
   feat/b
   ! main has 2 commits it lacks
-  → wtm sync feat/b   sync it onto main
+  → wtm-next sync feat/b   sync it onto main
   ! apps/web/.env is missing
   → wtm env feat/b   rebuild it
 
   feat/old
   ! main has 2 commits it lacks
-  → wtm sync feat/old   sync it onto main
+  → wtm-next sync feat/old   sync it onto main
   ! predates the isolation choice: run up and run start refuse it
   → wtm env feat/old --isolation isolated   isolate it
 

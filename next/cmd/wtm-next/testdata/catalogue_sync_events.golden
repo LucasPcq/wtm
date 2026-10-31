@@ -1,0 +1,33 @@
+[
+  {
+    "type": "operation.started",
+    "command": "sync",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "feat/s"
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/s",
+    "phase": "rebase"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/s",
+    "phase": "rebase",
+    "failed": false
+  },
+  {
+    "type": "unit.finished",
+    "subject": "feat/s",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "sync",
+    "surface": "api",
+    "ok": true
+  }
+]

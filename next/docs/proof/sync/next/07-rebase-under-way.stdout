@@ -1,0 +1,11 @@
+
+  ! sync: 2 skipped
+
+  Descendants  feat/k3
+  Left as is   feat/k2 (an operation is under way), feat/k3 (its parent is left as it is)
+
+  ! feat/k2 is in the middle of an operation (rebasing): left as it is
+  ! feat/k3 stays on feat/k2, which this sync leaves as it is
+
+  → wtm go feat/k2   finish it in the worktree
+

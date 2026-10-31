@@ -15,7 +15,7 @@
 
   feat/a
   ! main has 2 commits it lacks
-  → wtm sync feat/a   sync it onto main
+  → wtm-next sync feat/a   sync it onto main
 
   feat/b
   ! its directory is gone
@@ -23,7 +23,7 @@
 
   feat/old
   ! main has 2 commits it lacks
-  → wtm sync feat/old   sync it onto main
+  → wtm-next sync feat/old   sync it onto main
   ! predates the isolation choice: run up and run start refuse it
   → wtm env feat/old --isolation isolated   isolate it
   ✗ interrupted

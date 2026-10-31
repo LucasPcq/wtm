@@ -1,0 +1,12 @@
+$ wtm sync feat/tty-b --dry-run; echo EXIT=$?
+
+┃  Sync plan
+┃  1.  feat/tty-b ← feat/tty-a
+┃
+┃  ✓ feat/tty-b rebased onto feat/tty-a   2 commits
+┃
+┃  1 branch(es) ready to push (force-with-lease).
+
+EXIT=0
+$
+

@@ -31,7 +31,7 @@ type Skip string
 const (
 	SkipFlagOnly        Skip = "flag_only"        // only its flag sets it: a form does not ask it
 	SkipExists          Skip = "exists"           // the target worktree exists: nothing is created
-	SkipNotBehind       Skip = "not_behind"       // the source is not behind origin: nothing to fast-forward
+	SkipNotBehind       Skip = "not_behind"       // the branch it would fast-forward (create's source, what sync rebases onto) is not behind origin
 	SkipHeld            Skip = "held"             // the source holds the changes being extracted: it is not fast-forwarded
 	SkipRunUnread       Skip = "run_unread"       // run.toml could not be read
 	SkipNothingIsolated Skip = "nothing_isolated" // run.toml declares nothing a worktree isolates
@@ -40,11 +40,14 @@ const (
 	SkipNoOrphan        Skip = "no_orphan"        // no worktree removed leaves a child behind
 	SkipSafe            Skip = "safe"             // nothing asked is unsafe: nothing to force
 	SkipNoCandidate     Skip = "no_candidate"     // nothing to pick from: no worktree is done with
+	SkipNoDescendant    Skip = "no_descendant"    // no worktree asked has worktrees under it
+	SkipNoRebase        Skip = "no_rebase"        // nothing is rebased: no conflict can stop it
+	SkipNothingToPush   Skip = "nothing_to_push"  // nothing would be pushed: no branch that may move is on origin
 )
 
 // Skips returns every Skip.
 func Skips() []Skip {
-	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe, SkipNoCandidate}
+	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe, SkipNoCandidate, SkipNoDescendant, SkipNoRebase, SkipNothingToPush}
 }
 
 // Answer is the value a question settled on, and where that value came from.
@@ -55,17 +58,19 @@ type Answer[T any] struct {
 
 // Option is one value a choice offers, with what the repository knows of it: facts each surface words its own way, never copy.
 type Option struct {
-	Value    string                `json:"value"`
-	Tag      OptionTag             `json:"tag,omitempty"`          // what sets it apart, empty when nothing does
-	Base     bool                  `json:"base,omitempty"`         // the configured base branch
-	Detached bool                  `json:"detached,omitempty"`     // a worktree on no branch, valued by its path
-	Parent   string                `json:"parent,omitempty"`       // the branch a worktree is rebased onto, empty when it has none
-	Gone     bool                  `json:"gone,omitempty"`         // Parent is no branch any more
-	Origin   *worktree.Origin      `json:"origin,omitempty"`       // where the branch stands against origin's, nil when origin has none
-	Changes  int                   `json:"changes,omitempty"`      // the uncommitted changes the worktree holds
-	Change   *worktree.Change      `json:"change,omitempty"`       // the uncommitted change it is
-	PR       *worktree.PullRequest `json:"pull_request,omitempty"` // the pull request it is
-	Problem  *FieldError           `json:"problem,omitempty"`      // the problem picking it raises, nil when it raises none
+	Value     string                `json:"value"`
+	Tag       OptionTag             `json:"tag,omitempty"`          // what sets it apart, empty when nothing does
+	Base      bool                  `json:"base,omitempty"`         // the configured base branch
+	Detached  bool                  `json:"detached,omitempty"`     // a worktree on no branch, valued by its path
+	Parent    string                `json:"parent,omitempty"`       // the branch a worktree is rebased onto, empty when it has none
+	Gone      bool                  `json:"gone,omitempty"`         // Parent is no branch any more
+	Behind    int                   `json:"behind,omitempty"`       // the commits of Parent the worktree lacks
+	Operation worktree.Operation    `json:"operation,omitempty"`    // what git stopped in the middle of in the worktree
+	Origin    *worktree.Origin      `json:"origin,omitempty"`       // where the branch stands against origin's, nil when origin has none
+	Changes   int                   `json:"changes,omitempty"`      // the uncommitted changes the worktree holds
+	Change    *worktree.Change      `json:"change,omitempty"`       // the uncommitted change it is
+	PR        *worktree.PullRequest `json:"pull_request,omitempty"` // the pull request it is
+	Problem   *FieldError           `json:"problem,omitempty"`      // the problem picking it raises, nil when it raises none
 }
 
 // OptionTag is what sets an option apart, as a code each surface words its own way.

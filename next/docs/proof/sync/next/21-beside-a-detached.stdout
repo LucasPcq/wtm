@@ -1,0 +1,8 @@
+
+  = sync: 1 unchanged
+
+  Descendants      none
+  On their parent  feat/solo
+
+  → wtm-next sync feat/solo --descendants=false --push   push it, force-with-lease
+

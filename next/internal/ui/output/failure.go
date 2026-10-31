@@ -51,6 +51,7 @@ var reasonLabels = map[domain.Reason]string{
 	domain.ReasonInterrupted: "interrupted",
 	domain.ReasonNotReached:  "not reached",
 	domain.ReasonRuledOut:    "left as it is",
+	domain.ReasonBlocked:     "not started: what it depends on did not complete",
 }
 
 // An Unfinished is an item of an operation that did not end done: the subject it worked on, how and why it stopped.

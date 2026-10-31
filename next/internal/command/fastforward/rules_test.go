@@ -92,7 +92,7 @@ func TestAWorktreeLeftAsItIsSaysWhatMovesItOn(t *testing.T) {
 		code     string
 		command  string
 	}{
-		"diverged": {worktree: seeded{branch: "feat/x", offset: worktree.AheadBehind{Ahead: 1, Behind: 2}}, code: fastforward.CodeDiverged, command: "sync"},
+		"diverged": {worktree: seeded{branch: "feat/x", offset: worktree.AheadBehind{Ahead: 1, Behind: 2}}, code: fastforward.CodeDiverged, command: domain.CommandGo},
 		"busy":     {worktree: seeded{branch: "feat/x", offset: worktree.AheadBehind{Behind: 1}, state: worktree.Bisecting{Branch: "feat/x"}}, code: fastforward.CodeBusy, command: domain.CommandGo},
 		"missing":  {worktree: seeded{branch: "feat/x", missing: true, state: worktree.Rebasing{Branch: "feat/x"}}, code: fastforward.CodeMissing, command: domain.CommandClean},
 	}

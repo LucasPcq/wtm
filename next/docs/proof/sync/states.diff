@@ -1,0 +1,426 @@
+=== 00-before: exit legacy , next 
+=== 01-dry-run: exit legacy 0, next 0
+=== 02-named-alone: exit legacy 2, next 0
+--- legacy/02-named-alone
++++ next/02-named-alone
+@@ -5,10 +5,10 @@
+ feat/k1 (at origin): shared.txt: base|k1.txt: k1
+ feat/k2 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line
+ feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+-feat/s1 (at origin): shared.txt: base|s1.txt: s1
++feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+ feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
+ feat/solo (at origin): shared.txt: base|solo.txt: solo
+-main (not at origin): shared.txt: base
++main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+ <SB>/acme 
+ <SB>/acme.trees/feat-dirty ?? wip.txt
+=== 03-stack: exit legacy 0, next 0
+--- legacy/03-stack
++++ next/03-stack
+@@ -6,7 +6,7 @@
+ feat/k2 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line
+ feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
+ feat/solo (at origin): shared.txt: base|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+=== 04-conflict-mid-stack: exit legacy 0, next 24
+--- legacy/04-conflict-mid-stack
++++ next/04-conflict-mid-stack
+@@ -6,7 +6,7 @@
+ feat/k2 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line
+ feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
+ feat/solo (at origin): shared.txt: base|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+=== 05-conflict-json: exit legacy 1, next 24
+--- legacy/05-conflict-json
++++ next/05-conflict-json
+@@ -6,7 +6,7 @@
+ feat/k2 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line
+ feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
+ feat/solo (at origin): shared.txt: base|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+=== 06-keep-conflict: exit legacy 1, next 24
+--- legacy/06-keep-conflict
++++ next/06-keep-conflict
+@@ -6,7 +6,7 @@
+ feat/k2 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line
+ feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
+ feat/solo (at origin): shared.txt: base|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+=== 07-rebase-under-way: exit legacy 0, next 0
+--- legacy/07-rebase-under-way
++++ next/07-rebase-under-way
+@@ -6,7 +6,7 @@
+ feat/k2 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line
+ feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
+ feat/solo (at origin): shared.txt: base|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+=== 08-resumed: exit legacy 0, next 0
+--- legacy/08-resumed
++++ next/08-resumed
+@@ -4,9 +4,9 @@
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
+ feat/solo (at origin): shared.txt: base|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+=== 09-dirty-named: exit legacy 0, next 23
+--- legacy/09-dirty-named
++++ next/09-dirty-named
+@@ -4,9 +4,9 @@
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
+ feat/solo (at origin): shared.txt: base|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+=== 10-dirty-forced: exit legacy 2, next 0
+--- legacy/10-dirty-forced
++++ next/10-dirty-forced
+@@ -1,12 +1,12 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
+ feat/solo (at origin): shared.txt: base|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+=== 11-gone: exit legacy 1, next 0
+--- legacy/11-gone
++++ next/11-gone
+@@ -1,12 +1,12 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
+ feat/solo (at origin): shared.txt: base|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+=== 12-base: exit legacy 0, next 2
+--- legacy/12-base
++++ next/12-base
+@@ -1,12 +1,12 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
+ feat/solo (at origin): shared.txt: base|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+=== 13-unknown: exit legacy 11, next 2
+--- legacy/13-unknown
++++ next/13-unknown
+@@ -1,12 +1,12 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
+ feat/solo (at origin): shared.txt: base|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+=== 14-part-of-a-branch: exit legacy 0, next 2
+--- legacy/14-part-of-a-branch
++++ next/14-part-of-a-branch
+@@ -1,12 +1,12 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
+ feat/solo (at origin): shared.txt: base|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+=== 15-json-dry-run: exit legacy 0, next 0
+--- legacy/15-json-dry-run
++++ next/15-json-dry-run
+@@ -1,12 +1,12 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
+ feat/solo (at origin): shared.txt: base|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+=== 16-expect-fingerprint: exit legacy 2, next 0
+--- legacy/16-expect-fingerprint
++++ next/16-expect-fingerprint
+@@ -1,13 +1,13 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
+-feat/solo (at origin): shared.txt: base|solo.txt: solo
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
++feat/solo (not at origin): shared.txt: base|shared.txt: main's line (teammate)|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+ <SB>/acme 
+=== 17-stale-fingerprint: exit legacy 2, next 25
+--- legacy/17-stale-fingerprint
++++ next/17-stale-fingerprint
+@@ -1,13 +1,13 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
+-feat/solo (at origin): shared.txt: base|solo.txt: solo
++feat/s2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
++feat/solo (not at origin): shared.txt: base|shared.txt: main's line (teammate)|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+ <SB>/acme 
+=== 18-push: exit legacy 0, next 0
+--- legacy/18-push
++++ next/18-push
+@@ -1,13 +1,13 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
+-feat/solo (at origin): shared.txt: base|solo.txt: solo
++feat/s2 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
++feat/solo (not at origin): shared.txt: base|shared.txt: main's line (teammate)|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+ <SB>/acme 
+=== 19-quiet: exit legacy 0, next 0
+--- legacy/19-quiet
++++ next/19-quiet
+@@ -1,13 +1,13 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
+-feat/solo (at origin): shared.txt: base|solo.txt: solo
++feat/s2 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
++feat/solo (not at origin): shared.txt: base|shared.txt: main's line (teammate)|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+ <SB>/acme 
+=== 20-no-terminal: exit legacy 1, next 0
+--- legacy/20-no-terminal
++++ next/20-no-terminal
+@@ -1,13 +1,13 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
+-feat/solo (at origin): shared.txt: base|solo.txt: solo
++feat/s2 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
++feat/solo (not at origin): shared.txt: base|shared.txt: main's line (teammate)|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+ <SB>/acme 
+=== 21-beside-a-detached: exit legacy 1, next 0
+--- legacy/21-beside-a-detached
++++ next/21-beside-a-detached
+@@ -1,13 +1,13 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
+-feat/solo (at origin): shared.txt: base|solo.txt: solo
++feat/s2 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
++feat/solo (not at origin): shared.txt: base|shared.txt: main's line (teammate)|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+ <SB>/acme 
+=== 22-cycle-elsewhere: exit legacy 1, next 0
+--- legacy/22-cycle-elsewhere
++++ next/22-cycle-elsewhere
+@@ -1,13 +1,13 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
+-feat/solo (at origin): shared.txt: base|solo.txt: solo
++feat/s2 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
++feat/solo (not at origin): shared.txt: base|shared.txt: main's line (teammate)|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+ <SB>/acme 
+=== 23-cycle-named: exit legacy 1, next 23
+--- legacy/23-cycle-named
++++ next/23-cycle-named
+@@ -1,13 +1,13 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
+-feat/solo (at origin): shared.txt: base|solo.txt: solo
++feat/s2 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
++feat/solo (not at origin): shared.txt: base|shared.txt: main's line (teammate)|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+ <SB>/acme 
+=== 24-all: exit legacy 1, next 0
+--- legacy/24-all
++++ next/24-all
+@@ -1,13 +1,13 @@
+ ## branches
+-feat/dirty (at origin): shared.txt: base|dirty.txt: dirty
+-feat/dirty-kid (not on origin): shared.txt: base|dirty.txt: dirty
++feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
++feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+ feat/gone (not on origin): shared.txt: base
+ feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+ feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+-feat/k3 (at origin): shared.txt: base|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
++feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+ feat/s1 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+-feat/s2 (at origin): shared.txt: base|s1.txt: s1|s2.txt: s2
+-feat/solo (at origin): shared.txt: base|solo.txt: solo
++feat/s2 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
++feat/solo (not at origin): shared.txt: base|shared.txt: main's line (teammate)|solo.txt: solo
+ main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+ ## worktrees
+ <SB>/acme 

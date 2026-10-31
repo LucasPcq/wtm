@@ -1,0 +1,17 @@
+$ wtm sync feat/tty-b --dry-run; echo EXIT=$?
+
+  Step 5/8 • On conflict
+
+  ✓ Worktrees: feat/tty-b
+  · All — set by its flag only
+  · Descendants — no worktree asked has worktrees under it
+  · Force — no worktree named has uncommitted changes: one picked is kept instead
+
+  Leave a rebase that stops on a conflict in progress, to resolve, instead of aborting it; the
+  worktrees under it are skipped either way
+
+▌› Abort it, the worktree left as it was
+   Leave the rebase in progress, to resolve
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

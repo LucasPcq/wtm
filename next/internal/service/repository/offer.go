@@ -41,7 +41,7 @@ var byAction = map[worktree.Action]struct{ command, label string }{
 	worktree.ActionRunDown:     {"run down", "Stop the profile"},
 	worktree.ActionLogs:        {"run logs", "View the logs"},
 	worktree.ActionFastForward: {domain.CommandFastForward, "Fast-forward from origin"},
-	worktree.ActionSync:        {"sync", "Sync onto its parent"},
+	worktree.ActionSync:        {domain.CommandSync, "Sync onto its parent"},
 	worktree.ActionReparent:    {domain.CommandReparent, "Change the parent"},
 	worktree.ActionClean:       {domain.CommandClean, "Clean (delete the worktree)"},
 }

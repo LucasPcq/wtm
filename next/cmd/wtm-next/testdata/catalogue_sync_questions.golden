@@ -1,0 +1,87 @@
+{
+  "fields": [
+    {
+      "kind": "multi_select",
+      "path": "worktree",
+      "origin": "request",
+      "picked": [
+        "feat/s"
+      ],
+      "options": [
+        {
+          "value": "feat/s",
+          "parent": "main",
+          "behind": 1
+        }
+      ]
+    },
+    {
+      "kind": "confirm",
+      "path": "all",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "descendants",
+      "origin": "default",
+      "skip": "no_descendant",
+      "value": true,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "force",
+      "origin": "default",
+      "skip": "safe",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "keep_conflict",
+      "origin": "default",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "ff_parents",
+      "origin": "default",
+      "skip": "not_behind",
+      "value": true,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "push",
+      "origin": "default",
+      "skip": "nothing_to_push",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "no_fetch",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    }
+  ],
+  "problems": []
+}

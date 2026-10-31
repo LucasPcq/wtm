@@ -21,6 +21,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./clean.sh "$wtm" "$next" clean
 ./prune.sh "$wtm" "$next" prune
 ./fast-forward.sh "$wtm" "$next" fast-forward
+./sync.sh "$wtm" "$next" sync
 ./exec.sh "$wtm" "$next" exec
 ./reparent.sh "$wtm" "$next" reparent
 ./checkout.sh "$wtm" "$next" checkout
@@ -448,7 +449,7 @@ The reference is the legacy `wtm fast-forward` of 0.30.1. Its output differs by 
   - 9, a legacy bug: legacy runs `git merge --ff-only` on the rebase's detached HEAD and reports `✓ 1 fast-forwarded` though the branch did not move; next leaves a worktree in the middle of an operation (a rebase, a bisect, a merge, a cherry-pick…) as it is, `skipped`, its warning followed by `→ wtm go feat/rebasing   finish it in the worktree` (`TestAWorktreeInTheMiddleOfAnOperationIsLeftAsItIsAndNamesHowToFinishIt`; `provision.Service.FastForward` refuses a worktree stopped in a merge or a cherry-pick too, `TestASourceWorktreeStoppedInAMergeIsLeftWhereItIs`).
   - 6, 15 and 22: legacy refuses a dirty worktree under `--yes` before anything moves (exit 1, text on stderr, nothing on stdout in JSON), naming only the first, and its wizard fails it as an item instead. Next refuses the request when the worktree is named, exit 23 (`fast-forward.unsafe`), one problem per blocker on its entry (`fast-forward.dirty`) and the request forced as its follow-up; with `--all` (22), or a request naming none (the wizard's default pick confirmed as it was), the command chose it, so it is kept (`fast-forward.kept`, the last one followed by one request forcing every kept worktree, `→ wtm-next fast-forward feat/clash --force`), and the others move. The default pick leaves a dirty worktree out; an unattended run naming none takes the default pick, the worktrees behind origin (21). A dirty worktree with nothing to move (up to date, ahead) is no refusal (legacy refused it).
   - 3: legacy calls an ahead branch `already up to date`; next says `ahead of origin`, `done`/`unchanged`. Legacy's picker tags ahead and diverged branches `already up to date` too; next's options carry where each stands as last fetched (`1 ahead`, `1 ahead, 1 behind`, `1 behind`).
-  - 4 and 5: both skip, exit 0; next names why with what moves it on (`→ wtm sync feat/diverged   rebase it`), in every mode, where legacy hints at sync only in its wizard's recap.
+  - 4 and 5: both skip, exit 0; next names why with what moves it on (`→ wtm go feat/diverged   reconcile it with origin by hand`: sync rebases onto the parent, never onto origin), in every mode, where legacy hints at sync only in its wizard's recap.
   - 8: both fail the item, exit 1; next's line is a fixed message per code, git's own words after it, and in JSON the message alone with git's words under `error.params.cause` (`fast-forward.failed`).
   - 10 and 12: legacy matches a part of a branch's name (`ff uptodate` moves `feat/uptodate`) and refuses a branch no worktree holds with exit 11; next takes a worktree's branch or path only, as `clean`, and refuses any other name as an invalid request, exit 2.
   - 11: legacy fast-forwards and reports the worktree twice; next refuses the second entry (`distinct`, exit 2).
@@ -558,6 +559,52 @@ The reference is the legacy `wtm checkout` of 0.30.1. Its output differs by desi
   - 17: legacy has no dry run nor fingerprint (exit 2).
   - The output is the uniform tally, recap and follow-ups: legacy's `Reused your existing local branch` is the `(existing)` mark of the Branch row, a branch kept behind origin is the `!` warning `checkout.behind_origin` (legacy: a plain line, B11), and the plan's warnings come before the step into the worktree.
   - The tty: next's picker tags the fork `fork` and the branch a worktree holds `worktree exists`, a draft `· draft`; legacy shows the fork named `main` as `linked` (B4). With `--from`, legacy reads origin as last fetched, since no branch list refreshed it, and skips the fast-forward (`source already up to date`) of a branch 1 commit behind (B3); next fetches the pull request's branch before it reads the repository, asks it, titled `Branch update` since it moves the pull request's own branch and not a source (legacy: `Source update`), and, kept, warns of it on the outcome. Next asks two steps more, its filters, shown set by their flag only. A pull request picked that cannot be checked out (a fork's, one a worktree holds) is refused at the recap, `Cannot apply this plan` with its problem and follow-up, where legacy disabled it in the list: the engine's select step does not check its field's problems.
+
+# Proof: `wtm sync` (legacy `flow/sync`) vs `wtm-next sync`
+
+The reference is the legacy `wtm sync` of 0.30.1. Its output differs by design (next speaks the v2 envelope, fetches origin once before it plans, takes the worktrees under the one named by default and refuses a named worktree it cannot rebase safely with exit 23), so the proof compares what each leaves on disk and keeps both outputs side by side.
+
+- `sync.sh <wtm> <wtm-next> sync`: two identical sandboxes (the `docs/demos` "acme" project with `shared.txt` on main, a bare `origin`, and two stacks pushed to it, main → `feat/s1` → `feat/s2` and main → `feat/k1` → `feat/k2` → `feat/k3`, then a teammate's change to `shared.txt` on origin's main, unfetched, which `feat/k2` changes its own way; `feat/dirty` → `feat/dirty-kid` with an untracked file in `feat/dirty`, `feat/solo`, and `feat/gone`, its directory deleted), the same scenarios run by each binary in order; after each, the exit code, stdout, stderr and the state (each branch's commits by subject and whether it stands at origin's tip, each worktree with a rebase under way and its uncommitted files). Paths, op ids, commits and fingerprints are normalised. `sync/states.diff` holds the differences. Then, in a fresh sandbox per side, the wizard in tmux at 100×40 on a stack main → `feat/tty-a` → `feat/tty-b`: `sync/tty/legacy/` and `sync/tty/next/`.
+  1. `feat/s1 --dry-run`
+  2. `feat/s1 --descendants=false --yes` (next only)
+  3. `feat/s1 --yes`
+  4. `feat/k1 --yes`: the conflict mid-stack
+  5. `feat/k2 --yes --output json`
+  6. `feat/k2 --keep-conflict --yes`
+  7. `feat/k2 --yes` while its rebase is under way
+  8. the conflict resolved by hand and continued, then `feat/k2 --yes`
+  9. `feat/dirty --yes`
+  10. `feat/dirty --force --yes` (next only)
+  11. `feat/gone --yes`
+  12. `main --yes`
+  13. a name that is no worktree
+  14. a part of a branch's name, `--dry-run`
+  15. `--dry-run --output json`
+  16. `--expect-fingerprint` with that fingerprint (next only)
+  17. `--expect-fingerprint` with a stale fingerprint (next only)
+  18. `feat/s1 --push --yes`
+  19. `-q`
+  20. no worktree, without a terminal
+  21. `feat/solo --yes` beside a worktree on no branch
+  22. `feat/solo --yes` with `feat/s1` and `feat/s2` each the other's parent
+  23. `feat/s1 --yes`, named in that cycle
+  24. `--all --yes`
+- The differences, each listed in the spec (`spec-sync.md`, D1–D21) and approved by the owner (2026-10-31):
+  - 1, a legacy bug (B3): legacy's dry run reads origin as last fetched and says `Base main … (already up to date / no fast-forward)`; next's fetches, so its plan fast-forwards main from origin first, as the apply does.
+  - 2 and 3: legacy syncs the worktree named alone (`--descendants` is no flag of it, exit 2, so legacy's 3 rebases `feat/s1` and leaves `feat/s2`); next takes the worktrees under it by default and names them (`Descendants  feat/s2`), `--descendants=false` the named alone, its recap naming those left out.
+  - 4, the conflict mid-stack: legacy, asked for `feat/k1` alone, rebases it and leaves the rest; next rebases `feat/k1`, stops on `feat/k2`'s conflict, aborts it (the worktree as it was) and skips `feat/k3` (`blocked`), exit 24 (`sync.conflict`), followed by `wtm-next sync feat/k2 --keep-conflict` to resolve it by hand. Legacy's conflict exits 1 (5, 6).
+  - 6 and 7: both leave the rebase in progress; legacy's footer says how to continue, next's follow-ups enter the worktree then sync what is left (`→ wtm go feat/k2`, `→ wtm-next sync feat/k2`); with the rebase under way (7), both leave it, next naming `go` to finish it.
+  - 8, a legacy bug (B1 and B4): once the conflict is resolved by hand, legacy reads `feat/k2` as diverged from origin and skips it and `feat/k3` for good, exit 0; next reads that `feat/k2` holds every commit origin has (its reflog), stands on its parent, and rebases `feat/k3` onto it from its fork point, replaying its own commit alone.
+  - 9 and 10: legacy skips a dirty worktree, exit 0, with nothing to force it; next refuses it named, exit 23 (`sync.unsafe`), followed by `--force`, which rebases it with its changes stashed around the rebase, the worktree under it following; one the command chose (a descendant, `--all`, the default pick) is kept with `sync.kept`.
+  - 11, a legacy bug (B8): legacy fails on a gone directory with git's words, exit 1; next leaves it, followed by `clean`.
+  - 12: legacy refreshes the base alone; next refuses naming it, exit 2, followed by `wtm-next fast-forward main`.
+  - 13 and 14: legacy matches a part of a branch's name and refuses an unknown one with exit 11; next takes a worktree's branch or path only, exit 2.
+  - 16 and 17: legacy has no fingerprint (exit 2).
+  - 18: both force-push; next leases on origin's tip as planned, a teammate's push since refusing it, and never pushes a branch origin has never had.
+  - 20: legacy refuses a run without a terminal and without `--yes` (exit 1); next applies its default pick, the worktrees that need a sync, none at that point (`= sync: nothing to do`).
+  - 21 to 24, legacy bugs (B2, B5): one worktree on no branch makes every legacy sync fail with `cycle detected in worktree parent chain at ""`, and a cycle anywhere refuses every run; next ignores the worktree on no branch, syncs `feat/solo` beside the cycle, refuses only the run naming its member (`sync.cycle`, exit 23, followed by `reparent <it> --to main`), and with `--all` leaves the cycle's members, each with that follow-up.
+  - The tty: legacy asks On conflict, Parent branches (when a parent is behind origin), Confirm, then whether to push once the rebases ran; next asks Descendants (when a worktree named has some, naming them), On conflict, Parents and Push before the recap, which names every worktree it rebases. Next's wizard asks on origin as last fetched while its plan fetches first, so it asks each question the fetch could make matter: On conflict when a worktree may rebase, Parents when a branch rebased onto is on origin, Push when a worktree that may rebase is on origin, Force when a worktree named has uncommitted changes. 5 is a dry run on `feat/tty-b`, already on its parent; a run with nothing to do ends without a confirmation (`TestNothingToSyncEndsWithoutAskingToConfirm`).
+  - Next takes each worktree's lock (legacy none) and its first Ctrl+C lets the git step under way finish.
 
 # Proof: `wtm-next ui`, the local web server
 

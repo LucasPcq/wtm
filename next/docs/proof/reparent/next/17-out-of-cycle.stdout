@@ -4,5 +4,5 @@
   Worktrees   feat/a (feat/b → main)
   New parent  main
 
-  → wtm sync feat/a   rebase onto the new parent
+  → wtm-next sync feat/a   rebase onto the new parent
 

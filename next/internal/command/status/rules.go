@@ -624,7 +624,6 @@ const (
 	commandEnv        = domain.CommandEnv
 	commandConfigEdit = "config edit"
 	commandRunStart   = "run start"
-	commandSync       = "sync"
 	pathFrom          = "from"
 	pathJob           = "job"
 	pathDetach        = "detach"
@@ -650,7 +649,7 @@ func Problems(params ProblemsParams) []Problem {
 		problems = append(problems, Problem{Code: CodeBehindOrigin, Message: "origin has " + commits(params.BehindOrigin) + " it lacks", Fix: fix(CodeBehindOrigin, "fast-forward it", domain.CommandFastForward, params.Branch)})
 	}
 	if params.Sync {
-		problems = append(problems, Problem{Code: CodeBehind, Message: params.Parent + " has " + commits(params.Lacks) + " it lacks", Fix: fix(CodeBehind, "sync it onto "+params.Parent, commandSync, params.Branch)})
+		problems = append(problems, Problem{Code: CodeBehind, Message: params.Parent + " has " + commits(params.Lacks) + " it lacks", Fix: fix(CodeBehind, "sync it onto "+params.Parent, domain.CommandSync, params.Branch)})
 	}
 	for _, missing := range params.Missing {
 		problems = append(problems, missingProblem(params.Branch, missing))

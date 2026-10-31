@@ -18,7 +18,7 @@ $ wtm status feat; echo EXIT=$?
 ┃  api  stopped  port 23471
 ┃
 ┃  ! main has 2 commits it lacks
-┃  → wtm sync feat/a   sync it onto main
+┃  → wtm-next sync feat/a   sync it onto main
 
 EXIT=0
 $

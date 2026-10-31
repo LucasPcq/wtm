@@ -1,0 +1,15 @@
+$ wtm sync feat/tty-a; echo EXIT=$?
+
+  Step 3/9 • Descendants
+
+  ✓ Worktrees: feat/tty-a
+  · All — set by its flag only
+
+  Sync the worktree under feat/tty-a too?
+    feat/tty-b under feat/tty-a
+
+▌› Yes, sync it too
+   No, only the worktrees asked
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+
