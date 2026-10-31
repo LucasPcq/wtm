@@ -79,3 +79,10 @@ func TestAZombieMemberIsNoMemberAlive(t *testing.T) {
 	assert.Len(t, groupMembers(time.Now())[child.PID()], 1, "the zombie is left out, the leader counted")
 	assert.True(t, groupAlive(child.PID()))
 }
+
+func TestAGroupThisProcessMayNotSignalIsNotAlive(t *testing.T) {
+	// launchd (pid 1) on macOS, init on Linux: ps lists the group, this process may not signal it.
+	groups := Orphans{}.Probe(map[int]time.Time{1: time.Now()})
+
+	assert.Equal(t, map[int]run.Group{1: {}}, groups)
+}

@@ -40,12 +40,13 @@ func (Orphans) Probe(started map[int]time.Time) map[int]run.Group {
 
 	members := groupMembers(time.Now())
 	for pgid, at := range started {
-		if pgid == os.Getpid() || pgid == syscall.Getpgrp() {
+		// A group this process may not signal is someone else's, which ps lists all the same: it reads as gone, never reaped.
+		if pgid == os.Getpid() || pgid == syscall.Getpgrp() || !reachable(pgid) {
 			continue
 		}
-		// A ps that failed identifies none, as the signal says which group is reached: nothing is reaped, nothing alive is called gone.
+		// A ps that failed identifies none: nothing is reaped, nothing reached is called gone.
 		if members == nil {
-			groups[pgid] = run.Group{Alive: reachable(pgid)}
+			groups[pgid] = run.Group{Alive: true}
 			continue
 		}
 		for _, member := range members[pgid] {
