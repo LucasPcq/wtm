@@ -52,3 +52,29 @@ func (w *world) settled(t *testing.T, name string, state run.State) run.Job {
 	require.Eventually(t, func() bool { return w.job(t, name).State == state }, 2*time.Second, time.Millisecond)
 	return w.job(t, name)
 }
+
+// relaunching starts the stack db, then starts it again with a launcher that runs until it is stopped, and returns the job of the first launch.
+func (w *world) relaunching(t *testing.T) *job {
+	t.Helper()
+	_, err := w.Start(stack("db"), nil)
+	require.NoError(t, err)
+	w.mu.Lock()
+	first := w.jobs[key{workDir: "/wt/a", name: "db"}]
+	w.mu.Unlock()
+	w.spawner.mu.Lock()
+	delete(w.spawner.scripts, "up db")
+	w.spawner.mu.Unlock()
+	go func() { _, _ = w.Start(stack("db"), nil) }()
+	require.Eventually(t, func() bool { return len(w.spawner.lines()) == 2 }, time.Second, time.Millisecond)
+	return first
+}
+
+// given waits until the worktree /wt/a holds j as its job db again: the launcher stopped gave it back.
+func (w *world) given(t *testing.T, j *job) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		return w.jobs[key{workDir: "/wt/a", name: "db"}] == j
+	}, time.Second, time.Millisecond)
+}

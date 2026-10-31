@@ -401,3 +401,40 @@ func TestAShutdownDuringAStacksFirstLaunchLeavesItIndexed(t *testing.T) {
 	assert.True(t, w.job(t, "db").Up, "the stack may be partly up: the next daemon's stop takes it down")
 	assert.Equal(t, []string{"/wt/a:db"}, w.index.names())
 }
+
+func TestAStopWhoseStackOthersTookDownMeanwhileEndsQuietly(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(0)})
+	first := w.relaunching(t)
+	launcher := w.spawner.process("up db")
+	launcher.afterStop = func() {
+		w.given(t, first)
+		_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+		require.NoError(t, err)
+		_, err = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+		require.NoError(t, err)
+	}
+
+	outcome, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+
+	require.NoError(t, err)
+	assert.Equal(t, run.OutcomeStopped, outcome)
+	assert.Equal(t, []string{"up db", "up db", "down db"}, w.spawner.lines(), "the stack is stopped once")
+}
+
+func TestAStopNeverRunsTheStopCommandOnALaunchStartedMeanwhile(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(0)})
+	first := w.relaunching(t)
+	launcher := w.spawner.process("up db")
+	launcher.afterStop = func() {
+		w.given(t, first)
+		go func() { _, _ = w.Start(stack("db"), nil) }()
+		require.Eventually(t, func() bool { return len(w.spawner.lines()) == 3 }, time.Second, time.Millisecond)
+	}
+
+	outcome, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+
+	require.NoError(t, err)
+	assert.Equal(t, run.OutcomeStopped, outcome)
+	assert.Equal(t, []string{"up db", "up db", "up db"}, w.spawner.lines(), "the new launch is not stopped under it")
+	w.spawner.process("up db").end(0)
+}

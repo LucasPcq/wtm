@@ -48,7 +48,9 @@ type fakeProcess struct {
 	exited chan struct{}
 	code   int
 	stops  []time.Duration
-	mu     sync.Mutex
+	// afterStop runs once a stop ended the process, before Stop returns: what other clients do while the stopping one waits.
+	afterStop func()
+	mu        sync.Mutex
 }
 
 func (p *fakeProcess) PID() int { return p.pid }
@@ -61,9 +63,13 @@ func (p *fakeProcess) Wait() int {
 func (p *fakeProcess) Stop(grace time.Duration) {
 	p.mu.Lock()
 	p.stops = append(p.stops, grace)
+	after := p.afterStop
 	p.mu.Unlock()
 	p.end(-1)
 	<-p.exited
+	if after != nil {
+		after()
+	}
 }
 
 func (p *fakeProcess) end(code int) {

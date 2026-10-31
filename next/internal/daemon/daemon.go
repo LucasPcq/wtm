@@ -301,7 +301,7 @@ func (d *Daemon) Stop(req run.Stop) (run.Outcome, error) {
 		return run.OutcomeNotRunning, nil
 	}
 	j.stopped, j.stopID = true, req.CorrelationID
-	process, done := j.process, j.done
+	process, done, previous := j.process, j.done, j.previous
 	if j.record.Claim {
 		delete(d.jobs, k)
 	}
@@ -319,6 +319,11 @@ func (d *Daemon) Stop(req run.Stop) (run.Outcome, error) {
 		}
 		d.mu.Lock()
 		stack := d.jobs[k]
+		// Another stop may have taken the stack down meanwhile, or a new start put its own launcher there: neither is this stop's to run.
+		if stack == nil || (stack != j && stack != previous) || !stack.up() {
+			d.mu.Unlock()
+			return run.OutcomeStopped, nil
+		}
 		stack.stopped, stack.stopID = true, req.CorrelationID
 		d.mu.Unlock()
 		if err := d.stopStack(stack); err != nil {
