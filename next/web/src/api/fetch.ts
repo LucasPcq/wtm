@@ -1,12 +1,14 @@
 import { token } from '@/api/token'
-import type { DomainEnvelope, WebRefusal } from './types.gen'
+import type { DomainEnvelope, DomainError, WebRefusal } from './types.gen'
 
 export class HttpError extends Error {
   readonly status: number
+  readonly refusal: DomainError | undefined
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, refusal?: DomainError) {
     super(message)
     this.status = status
+    this.refusal = refusal
   }
 }
 
@@ -28,10 +30,9 @@ export async function refusable(path: string, body: unknown): Promise<DomainEnve
 export async function json<T>(path: string, body?: unknown): Promise<T> {
   const response = await request(path, body === undefined ? {} : { method: 'POST', body: JSON.stringify(body) })
   const read: unknown = await response.json().catch(() => undefined)
-  if (!response.ok)
-    throw new HttpError(
-      response.status,
-      (read as WebRefusal | DomainEnvelope | undefined)?.error?.message ?? response.statusText,
-    )
+  if (!response.ok) {
+    const refusal = (read as WebRefusal | DomainEnvelope | undefined)?.error ?? undefined
+    throw new HttpError(response.status, refusal?.message ?? response.statusText, refusal)
+  }
   return read as T
 }

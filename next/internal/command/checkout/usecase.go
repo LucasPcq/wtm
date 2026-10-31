@@ -195,8 +195,11 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return facts, nil
 	}
 
-	// Fetched before the branches are read again, so where the branch stands against origin, and whether a fast-forward is asked, is what origin holds now, not as last fetched.
-	fetched := u.Git.FetchRef(ctx, pr.Branch)
+	// Fetched before the branches are read again, so where the branch stands against origin, and whether a fast-forward is asked, is what origin holds now, not as last fetched; a surface that fetched it a moment ago reads it as then, with NoFetch.
+	var fetched error
+	if !req.NoFetch {
+		fetched = u.Git.FetchRef(ctx, pr.Branch)
+	}
 	if facts.Snapshot, err = u.Git.Snapshot(ctx); err != nil {
 		return Facts{}, err
 	}
@@ -222,8 +225,27 @@ func unavailable(err error) error {
 		return domain.AsError(domain.AsErrorParams{Err: err, Code: CodeGitHubUnavailable, Message: err.Error()})
 	}
 
-	return &domain.Error{Kind: domain.KindPrecondition, Code: CodeGitHubUnavailable, Message: err.Error()}
+	refusal := &domain.Error{Kind: domain.KindPrecondition, Code: CodeGitHubUnavailable, Message: err.Error()}
+	switch {
+	case errors.Is(err, worktree.ErrGitHubCLIMissing):
+		refusal.Params = domain.Params{ParamReason: ReasonGHMissing}
+	case errors.Is(err, worktree.ErrGitHubSignedOut):
+		refusal.Params = domain.Params{ParamReason: ReasonSignedOut}
+	case errors.Is(err, worktree.ErrNotOnGitHub):
+		refusal.Params = domain.Params{ParamReason: ReasonNotOnGitHub}
+	}
+	return refusal
 }
+
+// ParamReason names, on a CodeGitHubUnavailable refusal, why GitHub could not be asked when a person fixes it outside wtm; it is absent for any other failure of gh.
+const ParamReason = "reason"
+
+// The reasons a CodeGitHubUnavailable refusal names.
+const (
+	ReasonGHMissing   = "gh_missing"
+	ReasonSignedOut   = "signed_out"
+	ReasonNotOnGitHub = "not_on_github"
+)
 
 // ----------------------------------------------------------------------------
 // The steps of Apply

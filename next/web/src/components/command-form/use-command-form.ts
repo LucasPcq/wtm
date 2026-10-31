@@ -10,12 +10,18 @@ export function useCommandForm({
   repo,
   command,
   form: initial,
+  extend = (answers) => answers,
+  onAnswered,
 }: {
   repo: string
   command: ApiCommandName
   form: DomainForm
+  extend?: (answers: DomainAnswered[]) => DomainAnswered[]
+  onAnswered?: (sent: DomainAnswered[], answered: DomainForm) => void
 }) {
   const [asked, setAsked] = useState(initial)
+  // the last ask that failed (GitHub down, the server gone), until one goes through
+  const [failure, setFailure] = useState<Error>()
   // each call is numbered: an answer overtaken by a later call's is dropped, never kept over it
   const calls = useRef(0)
 
@@ -24,7 +30,7 @@ export function useCommandForm({
     validators: {
       onChangeAsyncDebounceMs: 300,
       onChangeAsync: async () => {
-        await check()
+        await check().catch(() => undefined)
         return undefined
       },
     },
@@ -34,14 +40,25 @@ export function useCommandForm({
   const answers = (): DomainAnswered[] =>
     answersOf(asked.fields, form.state.values, (key) => form.getFieldMeta(key)?.isDirty ?? false)
 
+  // extend adds what only the questions take, never the plan nor the run
   const check = async () => {
     const call = ++calls.current
-    const answered = await questions(repo, command, answers())
-    if (call === calls.current) setAsked(answered)
-    return answered
+    const sent = extend(answers())
+    try {
+      const answered = await questions(repo, command, sent)
+      onAnswered?.(sent, answered)
+      if (call === calls.current) {
+        setAsked(answered)
+        setFailure(undefined)
+      }
+      return answered
+    } catch (error) {
+      if (call === calls.current) setFailure(error instanceof Error ? error : new Error(String(error)))
+      throw error
+    }
   }
 
-  return { form, asked, answers, check, problems: problemsByKey(asked.fields, asked.problems) }
+  return { form, asked, answers, check, failure, problems: problemsByKey(asked.fields, asked.problems) }
 }
 
 export type CommandForm = ReturnType<typeof useCommandForm>['form']

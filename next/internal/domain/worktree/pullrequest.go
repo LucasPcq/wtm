@@ -2,6 +2,7 @@ package worktree
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 )
 
@@ -90,6 +91,13 @@ func (r Repository) finishedAt(pr PullRequest, w Worktree) (string, bool) {
 
 // ErrPullRequestsUnavailable is why the pull requests could not be listed, wrapped with what to do about it.
 var ErrPullRequestsUnavailable = errors.New("pull requests unavailable")
+
+// The reasons GitHub cannot be asked that a person fixes outside wtm, each an ErrPullRequestsUnavailable saying what to do.
+var (
+	ErrGitHubCLIMissing = fmt.Errorf("%w: install gh, GitHub's CLI", ErrPullRequestsUnavailable)
+	ErrGitHubSignedOut  = fmt.Errorf("%w: run `gh auth login`", ErrPullRequestsUnavailable)
+	ErrNotOnGitHub      = fmt.Errorf("%w: origin is not a GitHub repository", ErrPullRequestsUnavailable)
+)
 
 // ErrPullRequestNotFound is a pull request number the repository has none of.
 var ErrPullRequestNotFound = errors.New("pull request not found")

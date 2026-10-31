@@ -33,6 +33,8 @@ func words(q checkout.Questions, field domain.Field) form.Words {
 		return form.Words{Flag: "--mine", Label: "Mine", Help: "List only your pull requests"}
 	case checkout.PathReview:
 		return form.Words{Flag: "--review", Label: "Review requested", Help: "List only the pull requests waiting for your review"}
+	case checkout.PathNoFetch:
+		return form.Words{Flag: "--no-fetch", Label: "No fetch", Help: "Read the pull request's branch as last fetched"}
 	}
 
 	return form.Words{}

@@ -80,7 +80,7 @@ Every surface draws its actions from one canonical list, in this order, in secti
 | Selection bar | Always the same four: Fast-forward, Run a command, Reparent, a divider, Remove. | `wtm/Selection Bar` |
 | Row context menu | Right-click on a row in List or Tree, or the row's "⋯" (shown on hover and focus). | `wtm/Menu` |
 | Detail menu | The "⋯" in the detail's header: the same menu for the open worktree. | `wtm/Menu` |
-| Detail callout | The one action of the moment, with a button that runs it. | `wtm/Callout` |
+| Detail callout | The one action of the moment, with a button that runs it. | `wtm/Alert` |
 
 - **A row shows its state, never its verbs:** no button in a List row or a Tree node.
 - **The selection bar never changes its set.** In a narrow window the buttons keep their icon and lose their label, which moves to a tooltip; nothing folds into "…". An action that applies to some selected rows stays enabled and its dialog lists the others under Left as they are. An action that applies to none is disabled, with a tooltip on its wrapper. Prune is not there: it is a repository action.
@@ -129,15 +129,26 @@ Every multi-worktree list (Remove's, Prune's, the Fast-forward and Run pickers, 
 - A selected row the search hides stays selected: "2 of 9 selected · 2 hidden by the search". The header's box reflects the visible rows only.
 - The body scrolls (`max-h` 90vh); the header and footer stay.
 
-## Callout and Alert
+## Alert
 
-`wtm/Callout`, in the detail panel: the one action of the moment. A tinted surface (the tone's fill at 8%, its stroke at 35%), an icon, a one-line title stating the fact.
+`wtm/Alert` is every alert: the detail panel's callout, a dialog's plan-wide problem, a run's failure, GitHub unavailable. One anatomy, shadcn's grid (`features/worktrees/components/alert.tsx` over shadcn's `Alert`): a tinted surface (the tone's fill at 8%, its stroke at 35%), the icon top-aligned with the title, the title (the fact, 14 medium) and its description (13 muted) in the second column.
 
-- **A problem** is amber: the description, then a full-width primary button with the fix ("Reparent onto main"), then its consequence below in 12 muted ("It rebases onto main on its next sync.").
-- **A failure** is red, with the command to copy when the web cannot run the fix (a crashed job).
-- **A suggestion** is muted: the action is a small outline button on the title line ("Prune", "Fast-forward").
+- **A compact action** sits on the title line, at the right: a small outline button ("Prune", "New branch") or a short command to copy.
+- **A full-width fix** sits below, across the whole width: a primary button with the fix ("Reparent onto main") and its consequence in 12 muted ("It rebases onto main on its next sync."), or a long command as a `wtm/Command Line`.
+- **Tones:** amber when the person has something to do or the plan goes on without it (a problem, GitHub unavailable, a failed fetch); red when it failed or refuses the plan (a crashed job, a lock held, a run that failed); muted for a suggestion (a merged pull request: Prune).
+- A warning with only the core's message is the title-less Alert: its one line in the second column.
 
-`wtm/Alert`, first in a dialog's body: a technical problem for the whole plan. The same tinted surface: an icon, a title, a description, and the fix as a `wtm/Command Line` when it is a command (`gh auth login`). Amber when the plan goes on without it (GitHub unavailable, a failed fetch), red when it refuses the plan (a lock held).
+In the detail panel it is the one action of the moment (status's first problem, its region named "To do"); in a dialog it is first in the body.
+
+## Create's first step
+
+Create's step 1 opens on `wtm/Start From`, `New branch | Pull request`, above its fields; it is one dialog, never a second entry.
+
+- **New branch** is Create's Branches and Source branch.
+- **Pull request** replaces them with the picker: a `wtm/Search Field` ("Search by title or number"; a number no listed pull request is, is looked up on GitHub once typing pauses, which finds a closed or merged one too, and shown beside the prefix matches, chosen only by a click or Enter, never replacing a pull request picked; one GitHub does not know says so under the search), `wtm/PR Filters` (All · Mine · To review, no counts), then each pull request on two lines: `#N title`, then `author · into base · draft` or its state. A fork's, or one already in a worktree, is muted and cannot be chosen, its line saying why, with its command to copy (`gh pr checkout N`, `wtm go <worktree>`). A refusal of the one chosen is the field's error, and Next says what to do in its tooltip.
+- **The Parent field is always there.** Until a pull request is chosen it is disabled, "Set by the pull request's base"; once one is, it reads the base ("main · the pull request's base").
+- GitHub unavailable (gh missing, signed out, origin elsewhere) is an amber `wtm/Alert` with "New branch" as its action, the Parent greyed; no pull request open is a `wtm/Empty` under the search, its action "New branch".
+- Then Create's own steps, Confirm (the `wtm/Branch Plan` names the pull request on its line 2 with its link icon, its tag "Fetched from origin", "From origin, as last fetched" when origin could not be fetched (`checkout.fetch_failed` on its row), or "Existing branch"), progress and outcome.
 
 ## Empty states
 
@@ -156,6 +167,7 @@ A warning is drawn where its subject is, on the steps and on Done: one whose par
 
 ## In Pencil
 
+- **Copy the `.pen` before any structural change** (a component's nodes, a slot): there is no other undo than the app's.
 - **Build from `wtm/` components** and the shadcn kit; never redraw one by hand. A shape drawn twice becomes a component. Every component has at least one instance; one with none is deleted.
 - **One area per feature, in flow order** (Components, App shell, Worktrees, Selection, Create, Remove, Prune, Fast-forward, Run a command, Reparent, Explorations), frames left to right in the order the person meets them, each named "Flow — state".
 - **One data set:** the 9 worktrees of `acme` (main, feat/billing, feat/billing-ui, fix/login-redirect, chore/deps-october, feat/search, feat/search-docs, spike/gui-poc, feat/onboarding). Each flow fixes their state in its area's note and keeps it through every frame.
@@ -170,6 +182,7 @@ Through the `pencil` MCP `execute` tool, never Read or Grep on the `.pen` file:
 
 - Inserting, moving or deleting a node inside a component that sits in other components' slots can drop its instances from those slot overrides (every row of a list vanishes). Count the resolved nodes of the areas before and after; restructure by adding nodes and toggling `enabled` rather than moving them.
 - Never edit a slot's default child once instances exist: it resets that slot in every instance.
+- **Never edit a component that fills another component's slot** (`wtm/Run Outcome Row` in `wtm/Run Outcome`, `wtm/Worktree Item` in `wtm/Worktree Group`): it resets that slot in every instance, file-wide. Make a new component instead.
 - A slot whose override is a replacement is addressed by the replacement's own id (`instance/replacementId`), not the slot's; `Replace(path, node)` swaps it.
 - A failed call rolls back but can still lose an instance's descendant overrides: re-read what it touched.
 - A long call can time out at about 55 s yet apply its work: check before retrying, and keep exports in calls of their own.

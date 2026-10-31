@@ -83,6 +83,15 @@
       "no_first": false,
       "rememberable": false,
       "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "no_fetch",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
     }
   ],
   "problems": []
