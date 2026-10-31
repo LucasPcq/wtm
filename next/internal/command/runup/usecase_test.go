@@ -59,10 +59,9 @@ func TestATaskThatFailsStopsItsWorktreeAloneAndIsOfferedAgainWithItsProfile(t *t
 	assert.Equal(t, map[string]runup.JobStatus{"migrate": runup.JobFailed, "db": runup.JobNotStarted, "api": runup.JobNotStarted, "web": runup.JobNotStarted}, statusesOf(failed))
 	assert.Equal(t, []string{"migrating", "no such table"}, failed.Detail.Jobs[0].Lines)
 	assert.Equal(t, domain.StatusDone, itemOf(t, result.Items, featB).Status, "one worktree failing stops none of the others")
-	assert.Equal(t, []string{runup.CodeRetry, runup.CodeLogs, runup.CodeDown}, followUpCodes(result.FollowUps), "nothing is left up in feat/a: no run down for it")
+	assert.Equal(t, []string{runup.CodeRetry}, followUpCodes(result.FollowUps), "run logs and run down are the legacy daemon's until next runs them: neither is offered")
 	retry := result.FollowUps[0]
 	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{featA}}, {Path: runup.PathProfile, Values: []string{"full"}}}, retry.Answers, "the retry names the worktree and the profile")
-	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{featB}}}, result.FollowUps[2].Answers)
 }
 
 func TestAServiceThatEndedOnceStartedFailsItsWorktreeCrashed(t *testing.T) {

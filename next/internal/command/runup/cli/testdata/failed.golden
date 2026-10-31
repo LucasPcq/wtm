@@ -12,6 +12,4 @@
   full output:  /repo/main/.git/wtm/logs/feat%2Fb/migrate.log
 
   → wtm-next run up feat/b --profile dev   start it again where it did not pass
-  → wtm run logs feat/a                    follow feat/a's output
-  → wtm run down feat/a                    stop feat/a's jobs
 
