@@ -49,8 +49,11 @@ export function useSyncPlan({
 
   // a cycle refuses the whole request: a selection reviews again without its members, which it lists as can't sync
   const first = useQuery(dryRunQuery(repo, 'sync', reviewOf(given, picking)))
-  const cycle = !picking && given.length > 1 && first.data?.error?.code === 'sync.cycle' ? first.data.error : undefined
-  const cycled = cycle?.params?.worktrees?.split(', ') ?? []
+  const refused = first.data?.error?.code === 'sync.cycle' ? first.data.error : undefined
+  const members = refused?.params?.worktrees?.split(', ') ?? []
+  // a selection made only of the cycle's members is refused whole
+  const cycle = !picking && given.some((name) => !members.includes(name)) ? refused : undefined
+  const cycled = cycle ? members : []
   const named = given.filter((name) => !cycled.includes(name))
   const second = useQuery({ ...dryRunQuery(repo, 'sync', reviewOf(named, false)), enabled: cycle !== undefined })
   const review = cycle ? second : first
@@ -70,7 +73,10 @@ export function useSyncPlan({
   const going = rows.filter(isNamed)
   const untouched = going.length === named.length && going.every((rebase) => named.includes(rebase.worktree))
   const chosen = picking && untouched
-  const forced = going.some(unsafe) || ontos.some((onto) => (onto.blockers ?? []).length > 0 && ontoTicked(onto))
+  // a dirty main's consent counts only while the parents are fast-forwarded
+  const forced =
+    going.some(unsafe) ||
+    (switches.ff_parents && ontos.some((onto) => (onto.blockers ?? []).length > 0 && ontoTicked(onto)))
   const answers = [...requestOf({ chosen, named: going.map((rebase) => rebase.worktree), forced, switches }), noFetch]
   const asking = reviewed !== undefined && (chosen || going.length > 0)
   const planned = useQuery({

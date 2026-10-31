@@ -36,9 +36,9 @@ export function RunOutcome({
       }
     })
   const acted = toCheck.flatMap((row) => (row.act && row.followUp ? [row.followUp] : []))
-  const merged = groups.map((group) =>
-    group.kind === 'check' ? { ...group, rows: [...toCheck, ...group.rows] } : group,
-  )
+  // into the first group to check only: a command may have more than one (sync's worktrees left out)
+  const first = groups.findIndex((group) => group.kind === 'check')
+  const merged = groups.map((group, i) => (i === first ? { ...group, rows: [...toCheck, ...group.rows] } : group))
   const shown = outcomeOrder.flatMap((kind) => merged.filter((group) => group.kind === kind && group.rows.length > 0))
 
   return (

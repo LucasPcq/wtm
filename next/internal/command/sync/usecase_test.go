@@ -59,6 +59,26 @@ func TestWithoutDescendantsTheNamedWorktreeAloneIsRebased(t *testing.T) {
 	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{featB, featC}}}, leftOut.Answers, "their own sync, the core's to spell")
 }
 
+func TestTheWorktreesLeftOutAreSyncedWithTheRunsChoicesAndNeverAfterAFailure(t *testing.T) {
+	w := newWorld(t)
+	req := naming(featA)
+	req.Descendants, req.KeepConflict, req.FFParents = new(false), true, new(false)
+
+	outcome := w.run(t, req)
+
+	at := slices.IndexFunc(outcome.Result.FollowUps, func(f domain.FollowUp) bool { return f.Code == sync.CodeLeftOut })
+	require.GreaterOrEqual(t, at, 0)
+	assert.Equal(t, []domain.Answered{
+		{Path: domain.PathWorktree, Values: []string{featB, featC}},
+		{Path: sync.PathKeepConflict, Values: []string{"true"}},
+		{Path: sync.PathFFParents, Values: []string{"false"}},
+	}, outcome.Result.FollowUps[at].Answers)
+
+	failed := sync.Plan{LeftOut: []string{featB}}
+	items := []sync.Item{{Subject: featA, Status: domain.StatusFailed, Err: &domain.Error{Code: sync.CodeConflict}}}
+	assert.NotContains(t, followUpCodes(sync.FollowUpsOf(failed, items)), sync.CodeLeftOut)
+}
+
 func TestAConflictMidStackIsAbortedAndTheWorktreesUnderItSkipped(t *testing.T) {
 	w := newWorld(t)
 	w.conflicting(t)

@@ -4,11 +4,11 @@ import type { DomainAnswered } from '@/api/types.gen'
 import { Dialog } from '@/components/ui/dialog'
 import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
 import { useReparentNow } from '@/features/worktrees/hooks/use-reparent-now'
-import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
+import { useRun } from '@/features/worktrees/hooks/use-run'
 import { openSync, useSyncDialog } from '@/features/worktrees/hooks/use-sync-dialog'
 import { SyncProgress } from '@/features/worktrees/sync/components/sync-progress'
 import { SyncWizard } from '@/features/worktrees/sync/components/sync-wizard'
-import { summaryOf } from '@/features/worktrees/sync/utils/recap'
+import { ranWell, summaryOf } from '@/features/worktrees/sync/utils/recap'
 import { changedSincePlan } from '@/features/worktrees/utils/changed'
 
 // one sync at a time: opened while one runs, or one that failed is still to be read, the dialog shows it
@@ -26,7 +26,7 @@ export function SyncDialog({ repo }: { repo: string }) {
   const told = (envelope: Applied<'sync'> | undefined, refused: string | undefined) => {
     if (useSyncDialog.getState().open) return
     const summary = summaryOf({ units: [], ...(envelope && { envelope }), ...(refused !== undefined && { refused }) })
-    if (succeeded(envelope)) return void toast.success(summary)
+    if (ranWell(envelope)) return void toast.success(summary)
     toast.error(summary, { action: { label: 'Details', onClick: () => useSyncDialog.setState({ open: true }) } })
   }
 

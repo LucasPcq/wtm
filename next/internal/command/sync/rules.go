@@ -858,7 +858,7 @@ const (
 	CodeLeftOut = Name + ".left_out"
 )
 
-// next are the steps after the run: for each conflict, aborted, the same worktree synced again with its conflict left in progress, or, left in progress, finishing it in the worktree then syncing what is left; then, unpushed, the push of every worktree synced; then, the descendants left out (CodeLeftOut), their own sync.
+// next are the steps after the run: for each conflict, aborted, the same worktree synced again with its conflict left in progress, or, left in progress, finishing it in the worktree then syncing what is left; then, unpushed, the push of every worktree synced; then, unless the run stopped on a failure or a cancel, the descendants left out (CodeLeftOut), their own sync with the run's choices.
 func (p Plan) next(items []Item) []domain.FollowUp {
 	form := Questions{}.Form()
 	var synced []string
@@ -882,14 +882,27 @@ func (p Plan) next(items []Item) []domain.FollowUp {
 		}
 		followUps = append(followUps, domain.FollowUp{Command: Name, Answers: domain.AnswersOf(form, Request{Worktrees: synced, Descendants: new(false), Push: true}), Code: CodePush, Message: message})
 	}
-	if len(p.LeftOut) > 0 {
+	// a run that stopped has its own next step: the worktrees it left wait for it
+	stopped := slices.ContainsFunc(items, func(item Item) bool {
+		return item.Status == domain.StatusFailed || item.Status == domain.StatusCancelled || item.Reason == domain.ReasonInterrupted
+	})
+	if len(p.LeftOut) > 0 && !stopped {
 		message := "sync them too"
 		if len(p.LeftOut) == 1 {
 			message = "sync it too"
 		}
-		followUps = append(followUps, domain.FollowUp{Command: Name, Answers: domain.AnswersOf(form, Request{Worktrees: p.LeftOut}), Code: CodeLeftOut, Message: message})
+		again := Request{Worktrees: p.LeftOut, Push: p.Push, KeepConflict: p.KeepConflict, FFParents: p.parentsAnswer()}
+		followUps = append(followUps, domain.FollowUp{Command: Name, Answers: domain.AnswersOf(form, again), Code: CodeLeftOut, Message: message})
 	}
 	return followUps
+}
+
+// parentsAnswer is the plan's answer on fast-forwarding the parents first as a request spells it: none for the default, yes.
+func (p Plan) parentsAnswer() *bool {
+	if p.FFParents {
+		return nil
+	}
+	return new(false)
 }
 
 // descendantsAnswer is the plan's answer on the descendants as a request spells it: none for the default, yes.

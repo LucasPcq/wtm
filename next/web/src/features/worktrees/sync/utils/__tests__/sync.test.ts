@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import type { SyncPlan } from '@/api/types.gen'
 import { requestOf, rootOf } from '@/features/worktrees/sync/utils/plan'
-import { summaryOf } from '@/features/worktrees/sync/utils/recap'
+import { ranWell, recapOf, summaryOf } from '@/features/worktrees/sync/utils/recap'
 import { searchedStack, stackOf } from '@/features/worktrees/sync/utils/stack'
 import type { Progress } from '@/features/worktrees/utils/progress'
 import { envelope } from '@/test/fixtures'
@@ -72,7 +72,13 @@ test('a switch is sent only off its default, and force only when a worktree with
 
 const ran = (
   call: Parameters<typeof syncPlanOf>[0],
-  items: { subject: string; status: string; error?: { code: string }; detail?: { pushed: boolean } }[],
+  items: {
+    subject: string
+    status: string
+    reason?: string
+    error?: { code: string; params?: Record<string, string> }
+    detail?: { pushed: boolean }
+  }[],
   ok = true,
   world: World = {},
 ) =>
@@ -103,4 +109,22 @@ test('one sentence ends a run, in the dialog as in the toast: rebases counted, a
   expect(summaryOf(ran(named, [{ subject: 'feat/billing', status: 'cancelled' }], false))).toBe(
     'Cancelled: 0 of 2 synced.',
   )
+})
+
+test('a run whose one miss is a refused fast-forward first ran well; a cancel shows the branch it never reached', () => {
+  const named = { answers: [{ path: 'worktree', values: ['feat/billing'] }] }
+  const forwardRefused = [
+    { subject: 'main', status: 'skipped', error: { code: 'sync.ff_failed', params: { children: 'feat/billing' } } },
+    { subject: 'feat/billing', status: 'done', detail: { pushed: false } },
+    { subject: 'feat/billing-ui', status: 'done', detail: { pushed: false } },
+  ]
+  expect(ranWell(ran(named, forwardRefused).envelope)).toBe(true)
+
+  const cancelled = ['main', 'feat/billing', 'feat/billing-ui'].map((subject) => ({
+    subject,
+    status: 'skipped',
+    reason: 'interrupted',
+  }))
+  const failed = recapOf(ran(named, cancelled, false), () => {}).groups.find((group) => group.kind === 'failed')
+  expect(failed?.rows.map((row) => row.title)).toEqual(['main', 'feat/billing', 'feat/billing-ui'])
 })

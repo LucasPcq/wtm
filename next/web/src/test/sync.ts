@@ -25,9 +25,19 @@ const cascade = (names: string[]) => candidates.filter((w) => names.includes(w))
 // synced: the worktrees a run synced already, which stand on their parents; dirty: those with a change
 // dirtyOnto: branches rebased onto with a change; cycle: worktrees whose parents lead back to them; busy: worktrees
 // mid-rebase
-export type World = { synced?: string[]; dirty?: string[]; dirtyOnto?: string[]; cycle?: string[]; busy?: string[] }
+export type World = {
+  synced?: string[]
+  dirty?: string[]
+  dirtyOnto?: string[]
+  cycle?: string[]
+  busy?: string[]
+  diverged?: string[]
+}
 
-export function syncPlanOf(call: WebCall, { synced = [], dirty = dirtyOnes, dirtyOnto = [], busy = [] }: World = {}) {
+export function syncPlanOf(
+  call: WebCall,
+  { synced = [], dirty = dirtyOnes, dirtyOnto = [], busy = [], diverged = [] }: World = {},
+) {
   const all = yes(call, 'all')
   const named = answerOf(call, 'worktree') ?? []
   const force = yes(call, 'force')
@@ -39,15 +49,31 @@ export function syncPlanOf(call: WebCall, { synced = [], dirty = dirtyOnes, dirt
   const asked = named.length > 0 && !all
 
   const worktreesPlanned: SyncRebase[] = chosen.map((branch) => {
-    if (busy.includes(branch))
+    if (busy.includes(branch) || diverged.includes(branch))
       return {
         worktree: branch,
         path: `/acme.trees/${branch.replace('/', '-')}`,
         parent: parentOf(branch),
         depth: 1,
         descendant: !roots.includes(branch),
-        standing: 'busy',
-        operation: 'rebasing',
+        ...(busy.includes(branch)
+          ? { standing: 'busy' as const, operation: 'rebasing' as const }
+          : { standing: 'diverged' as const }),
+        commits: 0,
+        origin: null,
+        from: 'a41c9e2aa1',
+        blockers: [],
+        phases: [],
+      }
+    // under a parent this sync leaves (busy, diverged), a worktree stays with it
+    if (busy.includes(parentOf(branch)) || diverged.includes(parentOf(branch)))
+      return {
+        worktree: branch,
+        path: `/acme.trees/${branch.replace('/', '-')}`,
+        parent: parentOf(branch),
+        depth: 2,
+        descendant: !roots.includes(branch),
+        standing: 'parent_left',
         commits: 0,
         origin: null,
         from: 'a41c9e2aa1',
@@ -177,6 +203,13 @@ export function syncDryRun(call: WebCall, world: World = {}) {
     plan,
     warnings: [
       ...keptWarnings(plan),
+      ...plan.worktrees
+        .filter((r) => r.standing === 'diverged')
+        .map((r) => ({
+          code: 'sync.diverged',
+          message: `origin has commits on ${r.worktree} it never held: left as it is`,
+          params: { worktree: r.worktree },
+        })),
       ...plan.worktrees
         .filter((r) => r.standing === 'busy')
         .map((r) => ({

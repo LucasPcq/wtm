@@ -97,9 +97,10 @@ export function StackStep({
           checked,
           disabled: false,
           label: `Fast-forward ${name} first`,
+          // checked, a dirty one takes its own consent too; unchecked, the parents are rebased onto as they stand
           onCheck: (on) => {
-            if (dirty) onOntoTick(onto, on)
-            if (!dirty || (on && !switches.ff_parents)) onSwitch('ff_parents', on)
+            if (dirty && on) onOntoTick(onto, true)
+            onSwitch('ff_parents', on)
           },
         }
       : undefined

@@ -168,3 +168,24 @@ test("Descendants off ends with the one left out to sync in its own plan, the co
     '1feat/billing-uionto feat/billing · 2 commits',
   ])
 })
+
+test('a warning of a worktree shows once on Done, in To check, beside the worktrees Descendants left', async () => {
+  const world = { diverged: ['feat/search'] }
+  server.use(
+    http.post('/api/repos/r1/commands/sync', async ({ request }) => {
+      const call = (await request.json()) as WebCall
+      return call.dry_run ? syncDryRun(call, world) : syncRun(call, { world })
+    }),
+  )
+  const app = await renderApp('/r/r1/worktrees')
+  for (const name of ['feat/billing', 'feat/search'])
+    await app.user.click(await screen.findByRole('checkbox', { name: `Select ${name}` }))
+  await app.user.click(within(screen.getByRole('toolbar', { name: 'Selection' })).getByRole('button', { name: 'Sync' }))
+  const dialog = await screen.findByRole('dialog')
+  await app.user.click(await within(dialog).findByRole('switch', { name: 'Sync the worktrees under the ones picked' }))
+  await app.user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await app.user.click(await within(dialog).findByRole('button', { name: 'Sync' }))
+
+  await within(dialog).findByRole('region', { name: 'Left as they are' })
+  expect(within(dialog).getAllByText('Origin has commits on feat/search it never held: left as it is')).toHaveLength(1)
+})

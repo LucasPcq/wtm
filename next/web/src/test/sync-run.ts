@@ -146,7 +146,16 @@ export function syncRun(
         items,
         plan,
         follow_ups,
-        warnings: keptWarnings(plan),
+        warnings: [
+          ...keptWarnings(plan),
+          ...plan.worktrees
+            .filter((one) => one.standing === 'diverged')
+            .map((one) => ({
+              code: 'sync.diverged',
+              message: `origin has commits on ${one.worktree} it never held: left as it is`,
+              params: { worktree: one.worktree },
+            })),
+        ],
       })}\n\n`,
     ].join(''),
   )

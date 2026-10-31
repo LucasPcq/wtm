@@ -58,7 +58,7 @@ export function SyncWizard({
   const confirming = step === 'confirm'
 
   // any opener (a row, a follow-up) may name a worktree that needs consent: once the review lands, it opens step 1
-  if (opening && review.isSuccess) dispatch({ type: 'opened', consent: sync.consent })
+  if (opening && review.isSuccess && !review.isFetching) dispatch({ type: 'opened', consent: sync.consent })
 
   const reparentable = (row: OutcomeRow): OutcomeRow => {
     const followUp = row.followUp

@@ -1,16 +1,8 @@
 import type { Applied } from '@/api/queries/commands'
-import type { DomainAnswered, DomainFollowUp, DomainPhase, DomainWarning, SyncPlan, SyncRebase } from '@/api/types.gen'
-import { moves, unsafe } from '@/features/worktrees/sync/utils/plan'
-import {
-  failureHelp,
-  failureWords,
-  isFailure,
-  phaseWords,
-  standingTone,
-  standingWords,
-} from '@/features/worktrees/sync/utils/words'
+import type { DomainAnswered, DomainPhase, DomainWarning } from '@/api/types.gen'
+import { failureHelp, failureWords, isFailure, phaseWords } from '@/features/worktrees/sync/utils/words'
 import { subjectsOf } from '@/features/worktrees/utils/actions'
-import { changes, commits } from '@/features/worktrees/utils/counts'
+import { commits } from '@/features/worktrees/utils/counts'
 import { type OutcomeGroup, type OutcomeRow, outputOf } from '@/features/worktrees/utils/outcome'
 import type { Progress } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'
@@ -19,64 +11,6 @@ import { sentence } from '@/features/worktrees/utils/sentence'
 type Item = Applied<'sync'>['items'][number]
 
 const followUpWords: Record<string, string> = { 'sync.force': 'Sync anyway', 'sync.parents': 'Fast-forward first' }
-
-const reparentLabel = (followUp: DomainFollowUp) => {
-  const to = followUp.answers?.find((answer) => answer.path === 'to')?.values[0]
-  return to ? `Reparent onto ${to}` : 'Reparent'
-}
-
-// the worktrees the plan leaves as they are, each with why and its fix: a reparent runs in the dialog, anything else
-// is copied
-export function leftRowsOf({
-  plan,
-  review,
-  warnings,
-  changesOf,
-  onReparent,
-}: {
-  plan: SyncPlan
-  review: SyncRebase[]
-  warnings: DomainWarning[]
-  changesOf: (worktree: string) => number | undefined
-  onReparent: (followUp: DomainFollowUp) => void
-}): OutcomeRow[] {
-  const inPlan = (worktree: string) => (plan.worktrees ?? []).some((rebase) => rebase.worktree === worktree)
-  // a worktree step 1 showed as one it cannot rebase (mid-rebase, folder gone, diverged…) is left all the same when the
-  // command's own pick never named it
-  const kept = [
-    ...(plan.worktrees ?? []).filter((rebase) => !moves(rebase)),
-    ...review.filter(
-      (rebase) => !inPlan(rebase.worktree) && !['rebases', 'on_parent', 'in_cycle'].includes(rebase.standing),
-    ),
-  ]
-  return [
-    ...kept.map((rebase): OutcomeRow => {
-      const followUp = warnings.find((warning) => warning.params?.worktree === rebase.worktree)?.follow_up
-      const reparent = followUp?.command === 'reparent' ? followUp : undefined
-      return {
-        key: rebase.worktree,
-        tone: unsafe(rebase) ? 'attention' : standingTone[rebase.standing],
-        title: rebase.worktree,
-        message: unsafe(rebase)
-          ? `${changes(changesOf(rebase.worktree))}: kept · needs a sync after`
-          : standingWords[rebase.standing](rebase),
-        // a dirty one kept is checked on step 1, never forced from here
-        followUp: unsafe(rebase) || reparent ? undefined : followUp,
-        act: reparent && (() => onReparent(reparent)),
-        actLabel: reparent && reparentLabel(reparent),
-      }
-    }),
-    ...(plan.left_out ?? []).map((worktree) => {
-      const parent = review.find((rebase) => rebase.worktree === worktree)?.parent
-      return {
-        key: worktree,
-        tone: 'attention' as const,
-        title: worktree,
-        message: `stays on ${parent ? `${parent}'s old tip` : 'its parent'} · needs a sync after`,
-      }
-    }),
-  ]
-}
 
 // what a run did, in the house's groups: what couldn't sync or push (with what stopped under it), what to check, the
 // worktrees synced, then the branches fast-forwarded first; a follow-up the web runs is a button on the row it serves
@@ -144,13 +78,12 @@ export function recapOf(
   const unpushed = push ? subjectsOf(push) : []
   const leftOut = followUpOf('sync.left_out')
   const leftNames = leftOut ? subjectsOf(leftOut) : []
+  // a branch rebased onto shows here only when a cancel stopped it before it moved
   const failed = items.filter(
     (item) =>
-      !onto.includes(item.subject) &&
-      (item.status === 'failed' ||
-        item.status === 'cancelled' ||
-        item.reason === 'blocked' ||
-        item.reason === 'interrupted'),
+      item.reason === 'interrupted' ||
+      (!onto.includes(item.subject) &&
+        (item.status === 'failed' || item.status === 'cancelled' || item.reason === 'blocked')),
   )
   const worktreesFailed = failed.filter((item) => item.status === 'failed')
   const done = items.filter((item) => item.status === 'done' && item.reason !== 'unchanged')
@@ -271,4 +204,19 @@ export function summaryOf(progress: Progress<'sync'>): string {
   if (failed && !(synced === asked && plan?.push)) return `${synced} of ${asked} synced.`
   if (plan?.push) return pushed === synced ? `${synced} synced and pushed.` : `${synced} synced, ${pushed} pushed.`
   return `${synced} synced.`
+}
+
+// a run ran well when every worktree did what it was asked: a branch rebased onto that git refused to fast-forward is
+// one to check, never a failure
+export const ranWell = (envelope: Applied<'sync'> | undefined) => {
+  const onto = (envelope?.plan?.onto ?? []).map((branch) => branch.branch)
+  return (
+    envelope?.ok === true &&
+    envelope.items.every(
+      (item) =>
+        item.status === 'done' ||
+        (item.status === 'skipped' && item.reason === 'ruled_out') ||
+        (onto.includes(item.subject) && item.error?.code === 'sync.ff_failed'),
+    )
+  )
 }
