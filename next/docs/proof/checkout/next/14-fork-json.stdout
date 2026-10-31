@@ -1,0 +1,25 @@
+{
+  "v": 2,
+  "command": "checkout",
+  "ok": false,
+  "op": "<OP>",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "pr",
+        "code": "checkout.fork",
+        "params": {
+          "command": "gh pr checkout 5",
+          "number": "5"
+        },
+        "flag": "<number>",
+        "message": "pull request #5 is from a fork: wtm checks out only this repository's branches, `gh pr checkout 5` checks it out"
+      }
+    ]
+  }
+}

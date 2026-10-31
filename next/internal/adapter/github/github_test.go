@@ -171,3 +171,75 @@ func TestThePullRequestsOfBranchesSayWhyGHCannotBeAsked(t *testing.T) {
 	assert.EqualError(t, signedOutErr, "pull requests unavailable: run `gh auth login`")
 	assert.ErrorIs(t, garbledErr, worktree.ErrPullRequestsUnavailable)
 }
+
+func TestTheOpenPullRequestsAreListedWithWhatAPickerShowsOfThem(t *testing.T) {
+	gh, log := loggedGH(t, `[{"number": 42, "url": "u42", "state": "OPEN", "headRefName": "feat/a", "headRefOid": "abc", "baseRefName": "main",
+		"isCrossRepository": false, "title": "Add a", "isDraft": true, "author": {"login": "alice"}},
+		{"number": 43, "url": "u43", "state": "OPEN", "headRefName": "main", "baseRefName": "main", "isCrossRepository": true, "author": {"login": "bob"}}]`)
+
+	prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.OpenPullRequests(t.Context(), worktree.AllPullRequests)
+
+	require.NoError(t, err)
+	assert.Equal(t, []worktree.PullRequest{
+		{Number: 42, URL: "u42", Branch: "feat/a", Head: "abc", State: worktree.PullRequestOpen, Title: "Add a", Draft: true, Base: "main", Author: "alice"},
+		{Number: 43, URL: "u43", Branch: "main", State: worktree.PullRequestOpen, Base: "main", Author: "bob", Fork: true},
+	}, prs, "a fork's is listed, marked")
+	assert.Equal(t, "pr list --state open --limit 50 --json number,url,state,headRefName,headRefOid,baseRefName,isCrossRepository,title,isDraft,author\n", readLog(t, log))
+}
+
+func TestTheOpenPullRequestsAreNarrowedToMineOrThoseAskingMyReview(t *testing.T) {
+	tests := []struct {
+		name   string
+		filter worktree.PullRequestFilter
+		want   string
+	}{
+		{"mine", worktree.MyPullRequests, " --author @me\n"},
+		{"review", worktree.ReviewRequested, " --search review-requested:@me\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gh, log := loggedGH(t, `[]`)
+
+			prs, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.OpenPullRequests(t.Context(), tt.filter)
+
+			require.NoError(t, err)
+			assert.Empty(t, prs)
+			assert.True(t, strings.HasSuffix(readLog(t, log), tt.want), readLog(t, log))
+		})
+	}
+}
+
+func TestAPullRequestIsReadByItsNumberWhateverItsState(t *testing.T) {
+	gh, log := loggedGH(t, `{"number": 7, "url": "u7", "state": "MERGED", "headRefName": "feat/a", "headRefOid": "abc", "baseRefName": "release", "author": {"login": "alice"}}`)
+
+	pr, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequest(t.Context(), 7)
+
+	require.NoError(t, err)
+	assert.Equal(t, worktree.PullRequest{Number: 7, URL: "u7", Branch: "feat/a", Head: "abc", State: worktree.PullRequestMerged, Base: "release", Author: "alice"}, pr)
+	assert.True(t, strings.HasPrefix(readLog(t, log), "pr view 7 --json "), readLog(t, log))
+}
+
+func TestANumberTheRepositoryHasNoPullRequestOfIsNotFound(t *testing.T) {
+	gh := refusingGH(t, "GraphQL: Could not resolve to a PullRequest with the number of 99. (repository.pullRequest)")
+
+	_, err := github.GitHub{Dir: t.TempDir(), Binary: gh}.PullRequest(t.Context(), 99)
+
+	require.ErrorIs(t, err, worktree.ErrPullRequestNotFound)
+	assert.NotErrorIs(t, err, worktree.ErrPullRequestsUnavailable)
+	assert.EqualError(t, err, "pull request #99: pull request not found")
+}
+
+func TestAPullRequestGHCannotReadSaysWhy(t *testing.T) {
+	signedOut := fakeGH(t, 1, "{}")
+	noForge := refusingGH(t, "none of the git remotes configured for this repository point to a known GitHub host")
+
+	_, signedOutErr := github.GitHub{Dir: t.TempDir(), Binary: signedOut}.PullRequest(t.Context(), 1)
+	_, listErr := github.GitHub{Dir: t.TempDir(), Binary: signedOut}.OpenPullRequests(t.Context(), worktree.AllPullRequests)
+	_, noForgeErr := github.GitHub{Dir: t.TempDir(), Binary: noForge}.PullRequest(t.Context(), 1)
+
+	assert.EqualError(t, signedOutErr, "pull requests unavailable: run `gh auth login`")
+	assert.EqualError(t, listErr, "pull requests unavailable: run `gh auth login`")
+	assert.EqualError(t, noForgeErr, "pull requests unavailable: origin is not a GitHub repository")
+	_, noRemoteErr := github.GitHub{Dir: t.TempDir(), Binary: refusingGH(t, "no git remotes found")}.OpenPullRequests(t.Context(), worktree.AllPullRequests)
+	assert.EqualError(t, noRemoteErr, "pull requests unavailable: origin is not a GitHub repository")
+}

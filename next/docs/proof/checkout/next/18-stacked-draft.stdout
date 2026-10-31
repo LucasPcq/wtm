@@ -1,0 +1,12 @@
+
+  ✓ checkout: 1 done
+
+  Pull request  #8 Stacked draft on feat/local
+  Branch        feat/draft (resumes origin/feat/draft)
+  Parent        feat/local
+  Env           example
+  Isolation     isolated
+  feat/draft    ../acme.trees/feat-draft · 3 ports settled (offset +70)
+
+  → wtm go feat/draft   jump in
+

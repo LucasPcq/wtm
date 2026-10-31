@@ -1,0 +1,22 @@
+## branches
+feat/behind origin/feat/behind
+feat/diverged origin/feat/diverged
+feat/held origin/feat/held
+feat/local origin/feat/local
+feat/own origin/feat/own
+feat/remote origin/feat/remote
+main origin/main
+## worktrees
+<SB>/acme
+  refs/heads/main
+<SB>/acme.trees/feat-remote
+  refs/heads/feat/remote
+<SB>/held
+  refs/heads/feat/held
+## .git/wtm/worktrees/feat%2Fremote/meta.json
+{
+  "source_branch": "main",
+  "env_strategy": "example",
+  "ordinal": 1,
+  "isolation": "isolated"
+}

@@ -1,0 +1,26 @@
+$ wtm checkout --from main; echo EXIT=$?
+
+  Step 8/8 • Confirm
+
+  ✓ Pull request: #2
+  ✓ Parent branch: main · --from
+  ✓ Env strategy: config default
+  ✓ Isolation: isolated
+  ✓ Branch update: keep as-is
+  · Mine — set by its flag only
+  · Review requested — set by its flag only
+
+  ┃  Review & confirm
+  ┃
+  ┃  Pull request  #2 Local branch in sync
+  ┃  Branch        feat/local (existing)
+  ┃  Parent        main
+  ┃  Env           example
+  ┃  Isolation     isolated
+
+▌› Yes, check out
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

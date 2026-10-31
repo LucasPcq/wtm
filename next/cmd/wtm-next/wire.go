@@ -22,6 +22,7 @@ import (
 	reposjson "github.com/LucasPcq/wtm/next/internal/adapter/registry"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
+	"github.com/LucasPcq/wtm/next/internal/command/checkout"
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	cleancli "github.com/LucasPcq/wtm/next/internal/command/clean/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
@@ -60,6 +61,7 @@ type wireParams struct {
 type app struct {
 	Create      create.UseCase
 	Extract     extract.UseCase
+	Checkout    checkout.UseCase
 	Clean       clean.UseCase
 	Prune       prune.UseCase
 	FastForward fastforward.UseCase
@@ -129,6 +131,14 @@ func wire(params wireParams) app {
 			Shield:     shell.Shield,
 			Operations: operations,
 			Provision:  provisions,
+		},
+		Checkout: checkout.UseCase{
+			Git:          refFetchedOnce{Repo: repo, fetch: askedOnce(func(ctx context.Context, name string) (struct{}, error) { return struct{}{}, repo.FetchRef(ctx, name) })},
+			PullRequest:  askedOnce(gh.PullRequest),
+			PullRequests: askedOnce(gh.OpenPullRequests),
+			Repository:   facts,
+			Operations:   operations,
+			Provision:    provisions,
 		},
 		Clean: clean.UseCase{
 			Git:          repo,
@@ -214,6 +224,40 @@ type fetchedOnce struct {
 func (f fetchedOnce) RefreshOrigin(ctx context.Context, branches []string) error {
 	f.once.Do(func() { *f.err = f.Repo.RefreshOrigin(ctx, branches) })
 	return *f.err
+}
+
+// askedOnce answers each key as ask does, asking it once per opened command, as fetchedOnce does for prune: checkout's wizard asks GitHub and fetches the pull request's branch at each of its steps, and a run plans again once it holds the branch's lock. An interrupted ask is not kept.
+func askedOnce[K comparable, V any](ask func(ctx context.Context, key K) (V, error)) func(ctx context.Context, key K) (V, error) {
+	type answer struct {
+		value V
+		err   error
+	}
+	var mu sync.Mutex
+	asked := map[K]answer{}
+	return func(ctx context.Context, key K) (V, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if kept, ok := asked[key]; ok {
+			return kept.value, kept.err
+		}
+		value, err := ask(ctx, key)
+		if ctx.Err() == nil {
+			asked[key] = answer{value, err}
+		}
+		return value, err
+	}
+}
+
+// refFetchedOnce is the repository as checkout reads it, each branch fetched once per opened command.
+type refFetchedOnce struct {
+	git.Repo
+	fetch func(ctx context.Context, name string) (struct{}, error)
+}
+
+// FetchRef fetches the branch name from origin the first time, and says again how that went every time after.
+func (r refFetchedOnce) FetchRef(ctx context.Context, name string) error {
+	_, err := r.fetch(ctx, name)
+	return err
 }
 
 // facts reads the repository params locates, as every use case decides from it.

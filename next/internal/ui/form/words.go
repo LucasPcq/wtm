@@ -95,6 +95,7 @@ var tagWords = map[domain.OptionTag]string{
 	domain.TagRemote:     "on origin",
 	domain.TagCurrent:    "current",
 	domain.TagMain:       "main",
+	domain.TagFork:       "fork",
 }
 
 // Options are the rows of a select list that offer options, each read as its words say, else as its facts word it.

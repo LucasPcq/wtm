@@ -13,6 +13,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	reposjson "github.com/LucasPcq/wtm/next/internal/adapter/registry"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
+	"github.com/LucasPcq/wtm/next/internal/command/checkout"
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
@@ -37,6 +38,7 @@ const (
 var (
 	openCreate      = opener(func(a app) create.UseCase { return a.Create })
 	openExtract     = opener(func(a app) extract.UseCase { return a.Extract })
+	openCheckout    = opener(func(a app) checkout.UseCase { return a.Checkout })
 	openClean       = opener(func(a app) clean.UseCase { return a.Clean })
 	openPrune       = opener(func(a app) prune.UseCase { return a.Prune })
 	openFastForward = opener(func(a app) fastforward.UseCase { return a.FastForward })

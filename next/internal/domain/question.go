@@ -12,15 +12,16 @@ type Origin string
 
 // The origins of an answer.
 const (
-	OriginRequest    Origin = "request"    // a flag or the request
-	OriginRemembered Origin = "remembered" // the answer remembered in config.toml
-	OriginConfig     Origin = "config"     // a value of the project's configuration
-	OriginDefault    Origin = "default"    // the question's default
+	OriginRequest     Origin = "request"      // a flag or the request
+	OriginRemembered  Origin = "remembered"   // the answer remembered in config.toml
+	OriginConfig      Origin = "config"       // a value of the project's configuration
+	OriginDefault     Origin = "default"      // the question's default
+	OriginPullRequest Origin = "pull_request" // a fact of the pull request asked: the branch it merges into
 )
 
 // Origins returns every Origin.
 func Origins() []Origin {
-	return []Origin{OriginRequest, OriginRemembered, OriginConfig, OriginDefault}
+	return []Origin{OriginRequest, OriginRemembered, OriginConfig, OriginDefault, OriginPullRequest}
 }
 
 // Skip says why a question is not asked, as a code each surface words its own way; empty when it is asked.
@@ -54,15 +55,17 @@ type Answer[T any] struct {
 
 // Option is one value a choice offers, with what the repository knows of it: facts each surface words its own way, never copy.
 type Option struct {
-	Value    string           `json:"value"`
-	Tag      OptionTag        `json:"tag,omitempty"`      // what sets it apart, empty when nothing does
-	Base     bool             `json:"base,omitempty"`     // the configured base branch
-	Detached bool             `json:"detached,omitempty"` // a worktree on no branch, valued by its path
-	Parent   string           `json:"parent,omitempty"`   // the branch a worktree is rebased onto, empty when it has none
-	Gone     bool             `json:"gone,omitempty"`     // Parent is no branch any more
-	Origin   *worktree.Origin `json:"origin,omitempty"`   // where the branch stands against origin's, nil when origin has none
-	Changes  int              `json:"changes,omitempty"`  // the uncommitted changes the worktree holds
-	Change   *worktree.Change `json:"change,omitempty"`   // the uncommitted change it is
+	Value    string                `json:"value"`
+	Tag      OptionTag             `json:"tag,omitempty"`          // what sets it apart, empty when nothing does
+	Base     bool                  `json:"base,omitempty"`         // the configured base branch
+	Detached bool                  `json:"detached,omitempty"`     // a worktree on no branch, valued by its path
+	Parent   string                `json:"parent,omitempty"`       // the branch a worktree is rebased onto, empty when it has none
+	Gone     bool                  `json:"gone,omitempty"`         // Parent is no branch any more
+	Origin   *worktree.Origin      `json:"origin,omitempty"`       // where the branch stands against origin's, nil when origin has none
+	Changes  int                   `json:"changes,omitempty"`      // the uncommitted changes the worktree holds
+	Change   *worktree.Change      `json:"change,omitempty"`       // the uncommitted change it is
+	PR       *worktree.PullRequest `json:"pull_request,omitempty"` // the pull request it is
+	Problem  *FieldError           `json:"problem,omitempty"`      // the problem picking it raises, nil when it raises none
 }
 
 // OptionTag is what sets an option apart, as a code each surface words its own way.
@@ -75,11 +78,12 @@ const (
 	TagRemote     OptionTag = "remote"      // a branch only origin has
 	TagCurrent    OptionTag = "current"     // the worktree the caller stands in
 	TagMain       OptionTag = "main"        // the main worktree
+	TagFork       OptionTag = "fork"        // a pull request whose branch is a fork's
 )
 
 // OptionTags returns every OptionTag.
 func OptionTags() []OptionTag {
-	return []OptionTag{TagLocal, TagCheckedOut, TagRemote, TagCurrent, TagMain}
+	return []OptionTag{TagLocal, TagCheckedOut, TagRemote, TagCurrent, TagMain, TagFork}
 }
 
 // Choice is a question with a closed set of options: its answer, its options, the reason it is not asked (Skip, empty when it is), and the answer remembered for it.

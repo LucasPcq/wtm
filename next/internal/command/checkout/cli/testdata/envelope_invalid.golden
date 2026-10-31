@@ -1,0 +1,39 @@
+{
+  "v": 2,
+  "command": "checkout",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "pr",
+        "code": "checkout.checked_out_elsewhere",
+        "params": {
+          "branch": "feat/held",
+          "number": "4",
+          "path": "/elsewhere/feat-held"
+        },
+        "flag": "<number>",
+        "message": "branch feat/held of pull request #4 is checked out at /elsewhere/feat-held",
+        "follow_up": {
+          "command": "go",
+          "answers": [
+            {
+              "path": "worktree",
+              "values": [
+                "feat/held"
+              ]
+            }
+          ],
+          "code": "checkout.jump_in",
+          "message": "jump in"
+        }
+      }
+    ]
+  }
+}

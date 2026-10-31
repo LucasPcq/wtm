@@ -1,0 +1,9 @@
+
+  checkout · dry run, nothing applied
+  Pull request  #1 Add the remote feature
+  Branch        feat/remote (resumes origin/feat/remote)
+  Parent        main
+  Env           example
+  fingerprint  374104d08efd55580922bf5a
+  → wtm-next checkout 1 --expect-fingerprint 374104d08efd55580922bf5a   apply this plan
+

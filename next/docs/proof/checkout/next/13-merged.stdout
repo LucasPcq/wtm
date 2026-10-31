@@ -1,0 +1,14 @@
+
+  ✓ checkout: 1 done
+
+  Pull request  #10 Merged already
+  Branch        feat/merged (resumes origin/feat/merged)
+  Parent        main
+  Env           example
+  Isolation     isolated
+  feat/merged   ../acme.trees/feat-merged · 3 ports settled (offset +60)
+
+  ! pull request #10 is merged
+
+  → wtm go feat/merged   jump in
+

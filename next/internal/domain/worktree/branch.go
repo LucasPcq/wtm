@@ -1,6 +1,12 @@
 package worktree
 
-import "strconv"
+import (
+	"errors"
+	"strconv"
+)
+
+// ErrNoRemoteBranch is a branch origin no longer has: a fetch of it moves no ref, so its remote-tracking branch, left as last fetched, says nothing any more.
+var ErrNoRemoteBranch = errors.New("origin has no such branch")
 
 // Branch is a branch as git lists it: its name, without `origin/` for a branch of origin, and the commit at its tip.
 type Branch struct {

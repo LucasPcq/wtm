@@ -1,0 +1,19 @@
+$ wtm checkout --from main; echo EXIT=$?
+
+  Step 3/8 • Env strategy
+
+  ✓ Pull request: #2
+  ✓ Parent branch: main · --from
+
+  Where its .env files come from: config, example, main or parent; config.toml's strategy by
+  default
+
+▌› config default (example)
+   example — from .env.example
+   main — the main checkout's .env
+   parent — the source worktree's .env
+
+   [ ] Always use this answer in this repo
+
+  ↑↓ navigate • tab always use • / filter • enter confirm • esc back
+

@@ -1,0 +1,4 @@
+
+  ✗ fetch PR: get PR: gh [pr view 99 --json number,title,author,headRefName,baseRefName,url,isCrossRepository,isDraft]: exit status 1
+    GraphQL: Could not resolve to a PullRequest with the number of 99. (repository.pullRequest)
+

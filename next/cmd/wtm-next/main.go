@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
+	checkoutcli "github.com/LucasPcq/wtm/next/internal/command/checkout/cli"
 	cleancli "github.com/LucasPcq/wtm/next/internal/command/clean/cli"
 	createcli "github.com/LucasPcq/wtm/next/internal/command/create/cli"
 	eventscli "github.com/LucasPcq/wtm/next/internal/command/events/cli"
@@ -45,6 +46,7 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 	return []*cobra.Command{
 		createcli.New(streams, env, openCreate, commandLine),
 		extractcli.New(streams, env, openExtract, commandLine),
+		checkoutcli.New(streams, env, openCheckout, commandLine),
 		cleancli.New(streams, env, openClean, commandLine),
 		prunecli.New(streams, env, openPrune, commandLine),
 		fastforwardcli.New(streams, env, openFastForward, commandLine),

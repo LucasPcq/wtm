@@ -1,0 +1,23 @@
+
+  Step 8/8 • Confirm
+
+  ✓ Pull request: #1
+  ✓ Parent branch: main
+  ✓ Env strategy: config default
+  · Isolation — run.toml declares nothing a worktree isolates
+  · Branch update — nothing to fast-forward: the branch is not a local one behind origin
+  · Mine — set by its flag only
+  · Review requested — set by its flag only
+
+  ┃  Review & confirm
+  ┃
+  ┃  Pull request  #1 Add the remote feature
+  ┃  Branch        feat/remote (resumes origin/feat/remote)
+  ┃  Parent        main
+  ┃  Env           example
+
+▌› Yes, check out
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back

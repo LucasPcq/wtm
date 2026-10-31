@@ -1,0 +1,46 @@
+
+  Create a worktree from a pull request's branch, with env provisioning, metadata, and hooks.
+  A local branch of the pull request's name is checked out as-is, keeping commits you never
+  pushed; it is fast-forwarded when it is behind origin if you accept, or with --ff.
+  Otherwise the branch is created from origin's, tracking it.
+  Its parent, the branch `wtm sync` rebases it onto, is the branch the pull request merges into
+  unless --from names another. A pull request from a fork is refused: `gh pr checkout` does it.
+  Needs gh, GitHub's CLI, signed in. Without a number, the wizard lists the open pull requests.
+
+  Usage:
+    wtm-next checkout [number] [flags]
+
+  Examples:
+    # Pick among the open pull requests
+    wtm checkout
+
+    # Only the ones waiting for your review
+    wtm checkout --review
+
+    wtm checkout 42
+
+    # See the plan first, then apply exactly that plan
+    wtm checkout 42 --dry-run
+    wtm checkout 42 --expect-fingerprint <hash>
+
+    # No prompts, with the v2 JSON envelope
+    wtm checkout 42 --yes --output json
+
+  Flags:
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --env-from string             Where its .env files come from: config, example, main or parent; config.toml's strategy by default
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+        --ff                          Fast-forward the pull request's branch to origin first when it exists locally and is behind
+        --from string                 The parent wtm sync rebases it onto; the branch the pull request merges into by default
+    -h, --help                        help for checkout
+        --isolation string            How it stands against its source: isolated or verbatim; run.toml's isolation by default
+        --mine                        List only your pull requests
+        --output string               Output format: text or json (default "text")
+        --remember stringArray        The answers to always use in this repository: env_from, isolation, fast_forward (repeatable)
+        --review                      List only the pull requests waiting for your review
+    -y, --yes                         Run unattended: no question, no confirmation; what is not given takes its default (pull request number required; the parent defaults to the branch the pull request merges into)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

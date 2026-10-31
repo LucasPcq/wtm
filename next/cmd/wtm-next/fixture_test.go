@@ -75,6 +75,27 @@ func mutations() []mutation {
 			},
 		},
 		{
+			name:    "checkout",
+			answers: []domain.Answered{{Path: "pr", Values: []string{"7"}}},
+			// pull request 7's branch is on origin alone, and gh is a stand-in that knows that pull request
+			setup: func(t *testing.T, main string) {
+				gittest.Git(t, main, "branch", "feat/pr")
+				gittest.PushBranch(t, main, "feat/pr")
+				gittest.Git(t, main, "branch", "-D", "feat/pr")
+				fakeGH(t)
+			},
+			// the env strategy settles where the new worktree's .env comes from: a plan made before no longer holds
+			stale: func(t *testing.T, main string) {
+				writeConfig(t, main, "[env]\nstrategy = \"main\"\n")
+			},
+			untouched: func(t *testing.T, main string) {
+				assert.NoDirExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-pr"))
+			},
+			applied: func(t *testing.T, main string) {
+				assert.DirExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-pr"))
+			},
+		},
+		{
 			name:    "clean",
 			answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/old"}}},
 			setup: func(t *testing.T, main string) {
@@ -172,6 +193,16 @@ func mutations() []mutation {
 			},
 		},
 	}
+}
+
+// fakeGH puts first on the PATH a gh, signed in, that knows one open pull request, 7, of the branch feat/pr into main.
+func fakeGH(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	pr := `{"number":7,"url":"https://github.com/acme/acme/pull/7","state":"OPEN","headRefName":"feat/pr","baseRefName":"main","isCrossRepository":false,"title":"Add a feature","isDraft":false,"author":{"login":"alice"}}`
+	script := "#!/bin/sh\ncase \"$1 $2\" in\n'auth status') exit 0;;\n'pr list') echo '[" + pr + "]';;\n'pr view') echo '" + pr + "';;\n*) exit 1;;\nesac\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755))
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
 // pushOnOrigin moves origin's branch name on by one commit the repository at main has not fetched, as a teammate's push does.

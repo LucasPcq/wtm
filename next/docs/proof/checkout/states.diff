@@ -1,0 +1,329 @@
+=== 00-before: exit legacy , next 
+=== 01-origin-only: exit legacy 0, next 0
+=== 02-local-json: exit legacy 0, next 0
+=== 03-behind-kept: exit legacy 0, next 0
+=== 04-diverged-ff: exit legacy 0, next 0
+=== 05-fork: exit legacy 1, next 2
+=== 06-held: exit legacy 10, next 2
+=== 07-deleted-on-origin: exit legacy 1, next 2
+=== 08-not-found: exit legacy 1, next 2
+=== 09-no-number: exit legacy 1, next 2
+=== 10-not-a-number: exit legacy 2, next 2
+=== 11-own-parent: exit legacy 0, next 2
+--- legacy/11-own-parent
++++ next/11-own-parent
+@@ -15,8 +15,6 @@
+   refs/heads/feat/diverged
+ <SB>/acme.trees/feat-local
+   refs/heads/feat/local
+-<SB>/acme.trees/feat-own
+-  refs/heads/feat/own
+ <SB>/acme.trees/feat-remote
+   refs/heads/feat/remote
+ <SB>/held
+@@ -42,13 +40,6 @@
+   "ordinal": 2,
+   "isolation": "isolated"
+ }
+-## .git/wtm/worktrees/feat%2Fown/meta.json
+-{
+-  "source_branch": "feat/own",
+-  "env_strategy": "example",
+-  "ordinal": 5,
+-  "isolation": "isolated"
+-}
+ ## .git/wtm/worktrees/feat%2Fremote/meta.json
+ {
+   "source_branch": "main",
+=== 12-base-only-on-origin: exit legacy 0, next 0
+--- legacy/12-base-only-on-origin
++++ next/12-base-only-on-origin
+@@ -18,8 +18,6 @@
+   refs/heads/feat/local
+ <SB>/acme.trees/feat-on-release
+   refs/heads/feat/on-release
+-<SB>/acme.trees/feat-own
+-  refs/heads/feat/own
+ <SB>/acme.trees/feat-remote
+   refs/heads/feat/remote
+ <SB>/held
+@@ -47,15 +45,8 @@
+ }
+ ## .git/wtm/worktrees/feat%2Fon-release/meta.json
+ {
+-  "source_branch": "release/1.0",
++  "source_branch": "origin/release/1.0",
+   "env_strategy": "example",
+-  "ordinal": 6,
+-  "isolation": "isolated"
+-}
+-## .git/wtm/worktrees/feat%2Fown/meta.json
+-{
+-  "source_branch": "feat/own",
+-  "env_strategy": "example",
+   "ordinal": 5,
+   "isolation": "isolated"
+ }
+=== 13-merged: exit legacy 0, next 0
+--- legacy/13-merged
++++ next/13-merged
+@@ -21,8 +21,6 @@
+   refs/heads/feat/merged
+ <SB>/acme.trees/feat-on-release
+   refs/heads/feat/on-release
+-<SB>/acme.trees/feat-own
+-  refs/heads/feat/own
+ <SB>/acme.trees/feat-remote
+   refs/heads/feat/remote
+ <SB>/held
+@@ -52,20 +50,13 @@
+ {
+   "source_branch": "main",
+   "env_strategy": "example",
+-  "ordinal": 7,
++  "ordinal": 6,
+   "isolation": "isolated"
+ }
+ ## .git/wtm/worktrees/feat%2Fon-release/meta.json
+ {
+-  "source_branch": "release/1.0",
++  "source_branch": "origin/release/1.0",
+   "env_strategy": "example",
+-  "ordinal": 6,
+-  "isolation": "isolated"
+-}
+-## .git/wtm/worktrees/feat%2Fown/meta.json
+-{
+-  "source_branch": "feat/own",
+-  "env_strategy": "example",
+   "ordinal": 5,
+   "isolation": "isolated"
+ }
+=== 14-fork-json: exit legacy 1, next 2
+--- legacy/14-fork-json
++++ next/14-fork-json
+@@ -21,8 +21,6 @@
+   refs/heads/feat/merged
+ <SB>/acme.trees/feat-on-release
+   refs/heads/feat/on-release
+-<SB>/acme.trees/feat-own
+-  refs/heads/feat/own
+ <SB>/acme.trees/feat-remote
+   refs/heads/feat/remote
+ <SB>/held
+@@ -52,20 +50,13 @@
+ {
+   "source_branch": "main",
+   "env_strategy": "example",
+-  "ordinal": 7,
++  "ordinal": 6,
+   "isolation": "isolated"
+ }
+ ## .git/wtm/worktrees/feat%2Fon-release/meta.json
+ {
+-  "source_branch": "release/1.0",
++  "source_branch": "origin/release/1.0",
+   "env_strategy": "example",
+-  "ordinal": 6,
+-  "isolation": "isolated"
+-}
+-## .git/wtm/worktrees/feat%2Fown/meta.json
+-{
+-  "source_branch": "feat/own",
+-  "env_strategy": "example",
+   "ordinal": 5,
+   "isolation": "isolated"
+ }
+=== 15-mine-and-review: exit legacy 1, next 2
+--- legacy/15-mine-and-review
++++ next/15-mine-and-review
+@@ -21,8 +21,6 @@
+   refs/heads/feat/merged
+ <SB>/acme.trees/feat-on-release
+   refs/heads/feat/on-release
+-<SB>/acme.trees/feat-own
+-  refs/heads/feat/own
+ <SB>/acme.trees/feat-remote
+   refs/heads/feat/remote
+ <SB>/held
+@@ -52,20 +50,13 @@
+ {
+   "source_branch": "main",
+   "env_strategy": "example",
+-  "ordinal": 7,
++  "ordinal": 6,
+   "isolation": "isolated"
+ }
+ ## .git/wtm/worktrees/feat%2Fon-release/meta.json
+ {
+-  "source_branch": "release/1.0",
++  "source_branch": "origin/release/1.0",
+   "env_strategy": "example",
+-  "ordinal": 6,
+-  "isolation": "isolated"
+-}
+-## .git/wtm/worktrees/feat%2Fown/meta.json
+-{
+-  "source_branch": "feat/own",
+-  "env_strategy": "example",
+   "ordinal": 5,
+   "isolation": "isolated"
+ }
+=== 16-signed-out: exit legacy 1, next 25
+--- legacy/16-signed-out
++++ next/16-signed-out
+@@ -21,8 +21,6 @@
+   refs/heads/feat/merged
+ <SB>/acme.trees/feat-on-release
+   refs/heads/feat/on-release
+-<SB>/acme.trees/feat-own
+-  refs/heads/feat/own
+ <SB>/acme.trees/feat-remote
+   refs/heads/feat/remote
+ <SB>/held
+@@ -52,20 +50,13 @@
+ {
+   "source_branch": "main",
+   "env_strategy": "example",
+-  "ordinal": 7,
++  "ordinal": 6,
+   "isolation": "isolated"
+ }
+ ## .git/wtm/worktrees/feat%2Fon-release/meta.json
+ {
+-  "source_branch": "release/1.0",
++  "source_branch": "origin/release/1.0",
+   "env_strategy": "example",
+-  "ordinal": 6,
+-  "isolation": "isolated"
+-}
+-## .git/wtm/worktrees/feat%2Fown/meta.json
+-{
+-  "source_branch": "feat/own",
+-  "env_strategy": "example",
+   "ordinal": 5,
+   "isolation": "isolated"
+ }
+=== 17-dry-run: exit legacy 2, next 0
+--- legacy/17-dry-run
++++ next/17-dry-run
+@@ -21,8 +21,6 @@
+   refs/heads/feat/merged
+ <SB>/acme.trees/feat-on-release
+   refs/heads/feat/on-release
+-<SB>/acme.trees/feat-own
+-  refs/heads/feat/own
+ <SB>/acme.trees/feat-remote
+   refs/heads/feat/remote
+ <SB>/held
+@@ -52,20 +50,13 @@
+ {
+   "source_branch": "main",
+   "env_strategy": "example",
+-  "ordinal": 7,
++  "ordinal": 6,
+   "isolation": "isolated"
+ }
+ ## .git/wtm/worktrees/feat%2Fon-release/meta.json
+ {
+-  "source_branch": "release/1.0",
++  "source_branch": "origin/release/1.0",
+   "env_strategy": "example",
+-  "ordinal": 6,
+-  "isolation": "isolated"
+-}
+-## .git/wtm/worktrees/feat%2Fown/meta.json
+-{
+-  "source_branch": "feat/own",
+-  "env_strategy": "example",
+   "ordinal": 5,
+   "isolation": "isolated"
+ }
+=== 18-stacked-draft: exit legacy 0, next 0
+--- legacy/18-stacked-draft
++++ next/18-stacked-draft
+@@ -24,8 +24,6 @@
+   refs/heads/feat/merged
+ <SB>/acme.trees/feat-on-release
+   refs/heads/feat/on-release
+-<SB>/acme.trees/feat-own
+-  refs/heads/feat/own
+ <SB>/acme.trees/feat-remote
+   refs/heads/feat/remote
+ <SB>/held
+@@ -48,7 +46,7 @@
+ {
+   "source_branch": "feat/local",
+   "env_strategy": "example",
+-  "ordinal": 8,
++  "ordinal": 7,
+   "isolation": "isolated"
+ }
+ ## .git/wtm/worktrees/feat%2Flocal/meta.json
+@@ -62,20 +60,13 @@
+ {
+   "source_branch": "main",
+   "env_strategy": "example",
+-  "ordinal": 7,
++  "ordinal": 6,
+   "isolation": "isolated"
+ }
+ ## .git/wtm/worktrees/feat%2Fon-release/meta.json
+ {
+-  "source_branch": "release/1.0",
++  "source_branch": "origin/release/1.0",
+   "env_strategy": "example",
+-  "ordinal": 6,
+-  "isolation": "isolated"
+-}
+-## .git/wtm/worktrees/feat%2Fown/meta.json
+-{
+-  "source_branch": "feat/own",
+-  "env_strategy": "example",
+   "ordinal": 5,
+   "isolation": "isolated"
+ }
+=== 19-deleted-since-fetched: exit legacy 1, next 2
+--- legacy/19-deleted-since-fetched
++++ next/19-deleted-since-fetched
+@@ -24,8 +24,6 @@
+   refs/heads/feat/merged
+ <SB>/acme.trees/feat-on-release
+   refs/heads/feat/on-release
+-<SB>/acme.trees/feat-own
+-  refs/heads/feat/own
+ <SB>/acme.trees/feat-remote
+   refs/heads/feat/remote
+ <SB>/held
+@@ -48,7 +46,7 @@
+ {
+   "source_branch": "feat/local",
+   "env_strategy": "example",
+-  "ordinal": 8,
++  "ordinal": 7,
+   "isolation": "isolated"
+ }
+ ## .git/wtm/worktrees/feat%2Flocal/meta.json
+@@ -62,20 +60,13 @@
+ {
+   "source_branch": "main",
+   "env_strategy": "example",
+-  "ordinal": 7,
++  "ordinal": 6,
+   "isolation": "isolated"
+ }
+ ## .git/wtm/worktrees/feat%2Fon-release/meta.json
+ {
+-  "source_branch": "release/1.0",
++  "source_branch": "origin/release/1.0",
+   "env_strategy": "example",
+-  "ordinal": 6,
+-  "isolation": "isolated"
+-}
+-## .git/wtm/worktrees/feat%2Fown/meta.json
+-{
+-  "source_branch": "feat/own",
+-  "env_strategy": "example",
+   "ordinal": 5,
+   "isolation": "isolated"
+ }

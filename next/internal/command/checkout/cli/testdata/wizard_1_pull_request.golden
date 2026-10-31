@@ -1,0 +1,11 @@
+
+  Step 1/8 • Pull request
+
+  The open pull request whose branch to check out
+
+▌› #1     Add the remote feature                alice
+   #2     A draft with a title long enough to…  bob · draft
+   #3     From a fork                           stranger                                      fork
+   #4     Held by a worktree                    alice                              worktree exists
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel

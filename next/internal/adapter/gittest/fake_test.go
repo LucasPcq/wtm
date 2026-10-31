@@ -96,3 +96,13 @@ func TestAFakeConflictRefusesAMoveUnlessResolvedAndAResolvedOneKeepsTheSource(t 
 	source, _ := fake.Changes(t.Context(), "/repo")
 	assert.Equal(t, changes, source)
 }
+
+func TestABranchOriginDeletedIsNoRemoteBranchToFetchForTheFakeAndGit(t *testing.T) {
+	params := FakeParams{Main: TempDir(t) + "/main", Branch: "main", Remote: []string{"main", "gone"}, Deleted: []string{"gone"}}
+
+	fakeErr := NewFake(params).FetchRef(t.Context(), "gone")
+	gitErr := Build(t, params).FetchRef(t.Context(), "gone")
+
+	assert.ErrorIs(t, fakeErr, worktree.ErrNoRemoteBranch)
+	assert.ErrorIs(t, gitErr, worktree.ErrNoRemoteBranch)
+}

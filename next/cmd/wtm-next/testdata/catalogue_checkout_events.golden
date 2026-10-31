@@ -1,0 +1,80 @@
+[
+  {
+    "type": "operation.started",
+    "command": "checkout",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "feat/pr"
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/pr",
+    "phase": "worktree"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/pr",
+    "phase": "worktree",
+    "failed": false
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/pr",
+    "phase": "env"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/pr",
+    "phase": "env",
+    "failed": false
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/pr",
+    "phase": "meta"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/pr",
+    "phase": "meta",
+    "failed": false
+  },
+  {
+    "type": "worktree.created",
+    "worktree": {
+      "branch": "feat/pr",
+      "path": "<root>/.trees/feat-pr",
+      "parent": "main",
+      "ordinal": null,
+      "isolation": "isolated",
+      "is_main": false,
+      "created_at": "<time>"
+    }
+  },
+  {
+    "type": "worktree.provisioned",
+    "worktree": {
+      "branch": "feat/pr",
+      "path": "<root>/.trees/feat-pr",
+      "parent": "main",
+      "ordinal": null,
+      "isolation": "isolated",
+      "is_main": false,
+      "created_at": "<time>"
+    },
+    "ok": true
+  },
+  {
+    "type": "unit.finished",
+    "subject": "feat/pr",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "checkout",
+    "surface": "api",
+    "ok": true
+  }
+]

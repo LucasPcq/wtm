@@ -1,0 +1,10 @@
+
+  ✓ Checked out PR #4 (feat/diverged)
+
+  env   3 ports settled (offset +40)
+  path  <SB>/acme.trees/feat-diverged
+
+  ! feat/diverged has diverged from origin (1 ahead, 1 behind) — the worktree starts from your local branch, missing commits that are on origin.
+
+  → wtm go feat/diverged
+

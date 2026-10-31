@@ -1,0 +1,18 @@
+$ wtm checkout --from main; echo EXIT=$?
+
+  Step 3/6 • Env strategy
+
+  ✓ Pull request: #2
+  ✓ Parent branch: main · --from
+
+  How to provision .env files in the new worktree
+
+▌▸ Use config default (example)
+   example — copy .env.example → .env
+   main — copy .env from the main checkout
+   parent — copy .env from source worktree
+
+   [ ] Always use this answer in this repo
+
+  ↑↓ navigate • tab always use • / filter • enter confirm • esc back
+

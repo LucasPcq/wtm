@@ -1,0 +1,109 @@
+{
+  "v": 2,
+  "command": "checkout",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/remote",
+      "status": "done",
+      "detail": {
+        "path": "/repo/.trees/feat-remote",
+        "metadata": {
+          "source_branch": "origin/feat/draft",
+          "created_at": "2026-10-16T12:00:00Z",
+          "env_strategy": "example",
+          "isolation": "isolated"
+        },
+        "existing_branch": false,
+        "upstream": "origin/feat/remote"
+      }
+    }
+  ],
+  "plan": {
+    "pull_request": {
+      "number": 1,
+      "url": "https://github.com/acme/acme/pull/1",
+      "branch": "feat/remote",
+      "state": "open",
+      "title": "Add the remote feature",
+      "base": "main",
+      "author": "alice"
+    },
+    "path": "/repo/.trees/feat-remote",
+    "action": "resume",
+    "upstream": "origin/feat/remote",
+    "phases": [
+      "worktree",
+      "env",
+      "meta"
+    ],
+    "from": "origin/feat/draft",
+    "env_from": "example",
+    "recap": [
+      {
+        "key": "pr",
+        "label": "Pull request",
+        "path": "pr",
+        "values": [
+          {
+            "value": "1",
+            "text": "#1 Add the remote feature"
+          }
+        ]
+      },
+      {
+        "key": "branch",
+        "label": "Branch",
+        "values": [
+          {
+            "value": "feat/remote",
+            "note": "resumes",
+            "params": {
+              "upstream": "origin/feat/remote"
+            },
+            "text": "feat/remote (resumes origin/feat/remote)"
+          }
+        ]
+      },
+      {
+        "key": "parent",
+        "label": "Parent",
+        "path": "from",
+        "values": [
+          {
+            "value": "origin/feat/draft",
+            "text": "origin/feat/draft"
+          }
+        ]
+      },
+      {
+        "key": "env_from",
+        "label": "Env",
+        "path": "env_from",
+        "values": [
+          {
+            "value": "example",
+            "text": "example"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "go",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/remote"
+          ]
+        }
+      ],
+      "code": "checkout.go",
+      "message": "jump in"
+    }
+  ],
+  "warnings": []
+}

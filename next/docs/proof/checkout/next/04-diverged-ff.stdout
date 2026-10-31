@@ -1,0 +1,14 @@
+
+  ✓ checkout: 1 done
+
+  Pull request   #4 Local branch diverged from origin
+  Branch         feat/diverged (existing)
+  Parent         main
+  Env            example
+  Isolation      isolated
+  feat/diverged  ../acme.trees/feat-diverged · 3 ports settled (offset +40)
+
+  ! branch feat/diverged has diverged from origin (1 ahead, 1 behind) and can't be fast-forwarded: the worktree starts from your local branch, missing commits that are on origin — you may have to rebase or resolve conflicts later
+
+  → wtm go feat/diverged   jump in
+

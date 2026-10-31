@@ -1,0 +1,10 @@
+
+  checkout · dry run, nothing applied
+  Pull request  #8 Stacked draft on feat/local
+  Branch        feat/draft (resumes origin/feat/draft)
+  Parent        feat/local
+  Env           example
+  Isolation     isolated
+  fingerprint  <FP>
+  → wtm checkout 8 --expect-fingerprint <FP>   apply this plan
+

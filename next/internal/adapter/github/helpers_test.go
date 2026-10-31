@@ -61,3 +61,29 @@ func branchesNamed(n int) []string {
 	}
 	return names
 }
+
+// loggedGH writes a gh that answers auth status and any other call with answer, appending each call's arguments to the log it returns.
+func loggedGH(t *testing.T, answer string) (string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	path, log := filepath.Join(dir, "gh"), filepath.Join(dir, "calls.log")
+	script := "#!/bin/sh\nif [ \"$1\" = auth ]; then exit 0; fi\necho \"$*\" >>" + log + "\ncat <<'JSON'\n" + answer + "\nJSON\n"
+	require.NoError(t, os.WriteFile(path, []byte(script), 0o755))
+	return path, log
+}
+
+// refusingGH writes a gh that answers auth status and fails any other call with message on its stderr.
+func refusingGH(t *testing.T, message string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "gh")
+	script := "#!/bin/sh\nif [ \"$1\" = auth ]; then exit 0; fi\necho '" + message + "' >&2\nexit 1\n"
+	require.NoError(t, os.WriteFile(path, []byte(script), 0o755))
+	return path
+}
+
+func readLog(t *testing.T, path string) string {
+	t.Helper()
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return string(content)
+}

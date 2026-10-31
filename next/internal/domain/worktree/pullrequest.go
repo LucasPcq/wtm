@@ -5,18 +5,31 @@ import (
 	"slices"
 )
 
-// A PullRequest is a pull request of the repository: its number, its page, the branch it would merge and the commit its head last stood at, whether it is open, merged or closed, its title, whether it is a draft, its checks counted and its review decision as GitHub spells it (APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED, empty when none is required).
+// A PullRequest is a pull request of the repository: its number, its page, the branch it would merge and the commit its head last stood at, whether it is open, merged or closed, its title, whether it is a draft, its checks counted, its review decision as GitHub spells it (APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED, empty when none is required), the branch it would merge into, who opened it, and whether its branch is a fork's rather than this repository's.
 type PullRequest struct {
-	Number   int
-	URL      string
-	Branch   string
-	Head     string
-	State    PullRequestState
-	Title    string
-	Draft    bool
-	Checks   Checks
-	Decision string
+	Number   int              `json:"number"`
+	URL      string           `json:"url"`
+	Branch   string           `json:"branch"`
+	Head     string           `json:"head,omitempty"`
+	State    PullRequestState `json:"state"`
+	Title    string           `json:"title,omitempty"`
+	Draft    bool             `json:"draft,omitempty"`
+	Checks   Checks           `json:"checks,omitzero"`
+	Decision string           `json:"decision,omitempty"`
+	Base     string           `json:"base,omitempty"`
+	Author   string           `json:"author,omitempty"`
+	Fork     bool             `json:"fork,omitempty"`
 }
+
+// A PullRequestFilter narrows the open pull requests listed: all of them, the user's own, or those asking for the user's review.
+type PullRequestFilter string
+
+// The filters of the open pull requests.
+const (
+	AllPullRequests PullRequestFilter = ""
+	MyPullRequests  PullRequestFilter = "mine"
+	ReviewRequested PullRequestFilter = "review_requested"
+)
 
 // Checks counts a pull request's checks by outcome.
 type Checks struct {
@@ -77,6 +90,9 @@ func (r Repository) finishedAt(pr PullRequest, w Worktree) (string, bool) {
 
 // ErrPullRequestsUnavailable is why the pull requests could not be listed, wrapped with what to do about it.
 var ErrPullRequestsUnavailable = errors.New("pull requests unavailable")
+
+// ErrPullRequestNotFound is a pull request number the repository has none of.
+var ErrPullRequestNotFound = errors.New("pull request not found")
 
 // Progress is where an open pull request's review stands: its title, whether it is a draft, its checks counted and GitHub's review decision.
 type Progress struct {

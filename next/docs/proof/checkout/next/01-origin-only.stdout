@@ -1,0 +1,12 @@
+
+  ✓ checkout: 1 done
+
+  Pull request  #1 Add the remote feature
+  Branch        feat/remote (resumes origin/feat/remote)
+  Parent        main
+  Env           example
+  Isolation     isolated
+  feat/remote   ../acme.trees/feat-remote · 3 ports settled (offset +10)
+
+  → wtm go feat/remote   jump in
+

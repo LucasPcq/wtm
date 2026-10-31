@@ -1,0 +1,11 @@
+
+  ✓ checkout: 1 done
+
+  Pull request  #1 Add the remote feature
+  Branch        feat/remote (resumes origin/feat/remote)
+  Parent        main
+  Env           example
+  feat/remote   ../.trees/feat-remote
+
+  → wtm go feat/remote   jump in
+
