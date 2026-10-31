@@ -605,12 +605,12 @@ func clashRefusal(clashes []clash, req Request) *domain.Error {
 	lifted := true
 	for _, c := range clashes {
 		port := strconv.Itoa(c.Port)
-		holder := c.HeldBy + "'s " + c.HeldJob
+		template, holder := "{worktree}'s {job} would bind {port}, which {held_by}'s {held_job} holds", c.HeldBy+"'s "+c.HeldJob
 		if c.Foreign {
-			holder = c.HeldJob + " of another repository, in " + c.HeldBy
+			template, holder = "{worktree}'s {job} would bind {port}, which {held_job}, a job outside this repository's worktrees, holds in {held_by}", c.HeldJob+", a job outside this repository's worktrees, in "+c.HeldBy
 		}
 		lines = append(lines, port+" ("+holder+")")
-		fields = append(fields, domain.FieldError{Path: domain.PathWorktree, Code: CodePortClash, Template: "{worktree}'s {job} would bind {port}, which " + holder + " holds", Params: domain.Params{"worktree": c.Worktree, "job": c.Job, "port": port, "held_by": c.HeldBy, "held_job": c.HeldJob}})
+		fields = append(fields, domain.FieldError{Path: domain.PathWorktree, Code: CodePortClash, Template: template, Params: domain.Params{"worktree": c.Worktree, "job": c.Job, "port": port, "held_by": c.HeldBy, "held_job": c.HeldJob}})
 		lifted = lifted && c.lifts()
 	}
 	refusal := &domain.Error{Kind: domain.KindRefused, Code: CodePortClash, Message: "nothing started: ports another worktree holds: " + strings.Join(lines, ", "), Fields: fields}

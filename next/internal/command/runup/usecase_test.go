@@ -325,6 +325,8 @@ func TestAPortAnotherRepositoryHoldsIsRefusedWithNoExclusiveStart(t *testing.T) 
 	assert.Equal(t, runup.CodePortClash, refused.Code)
 	assert.Nil(t, refused.FollowUp, "stopping this repository's worktrees frees no port of another")
 	assert.Contains(t, refused.Message, "/elsewhere/repo")
+	assert.Equal(t, "{worktree}'s {job} would bind {port}, which {held_job}, a job outside this repository's worktrees, holds in {held_by}", refused.Fields[0].Template, "the holder travels in the params")
+	assert.Equal(t, "/elsewhere/repo", refused.Fields[0].Params["held_by"])
 	assert.Equal(t, runup.CodePortClash, exclusive.Code)
 }
 
@@ -433,4 +435,34 @@ func TestAJoinCutShortTheDaemonTookRecordsItsNamespace(t *testing.T) {
 	assert.Equal(t, domain.StatusCancelled, item.Status)
 	assert.Equal(t, runup.JobJoined, statusesOf(item)["db"])
 	assert.Equal(t, []string{"db"}, w.stored(t, featA).Namespaces)
+}
+
+// A task cut short that ran to its end before the daemon answered is listed ended, no longer up: it ran, and its exit code says how.
+func TestATaskCutShortThatRanToItsEndIsDone(t *testing.T) {
+	w := newWorld(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	w.daemon.onStart = func(spec run.Spec) {
+		if spec.Job.Name == "migrate" {
+			cancel()
+		}
+	}
+	w.daemon.cut = map[string]bool{key(w.at(featA), "migrate"): true}
+
+	result, _ := w.applyIn(ctx, t, starting("full", featA))
+
+	item := itemOf(t, result.Items, featA)
+	assert.Equal(t, domain.StatusCancelled, item.Status)
+	assert.Equal(t, map[string]runup.JobStatus{"migrate": runup.JobDone, "db": runup.JobNotStarted, "api": runup.JobNotStarted, "web": runup.JobNotStarted}, statusesOf(item))
+}
+
+func TestTheOutcomesPlanOfAWorktreeTheStartNumberedNamesItsPorts(t *testing.T) {
+	w := newWorld(t)
+
+	outcome, err := w.usecase.Run(t.Context(), starting("full", fresh), domain.RunOptions{})
+
+	require.NoError(t, err)
+	planned := outcome.Plan.Worktrees[0]
+	assert.True(t, planned.Numbered)
+	assert.Equal(t, map[string]int{"PORT": 4030}, planned.Jobs[2].Ports)
+	assert.Equal(t, "app_feat-fresh", planned.Jobs[1].Namespace)
 }

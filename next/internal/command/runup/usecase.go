@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"maps"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -132,7 +133,7 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 	result := u.Apply(ctx, plan, report)
 	op.Finished(result.Failure())
 
-	outcome.Result, outcome.Plan = &result, plan.applied(result)
+	outcome.Result, outcome.Plan = &result, u.renumbered(plan).applied(result)
 	outcome.Warnings = op.Warnings(append(outcome.Warnings, result.Warnings...))
 	return outcome, nil
 }
@@ -202,6 +203,24 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	wg.Wait()
 
 	return Result{Items: items, Warnings: warnings, FollowUps: plan.next(items)}
+}
+
+// renumbered is plan with each worktree the start numbered planned again from the ordinal it now records, so the outcome's plan names the ports and namespaces its detail reports.
+func (u UseCase) renumbered(plan Plan) Plan {
+	worktrees := slices.Clone(plan.Worktrees)
+	for i, t := range worktrees {
+		if t.Numbered {
+			continue
+		}
+		record, err := u.Meta.Load(t.Branch)
+		if err != nil || record.Ordinal == 0 {
+			continue
+		}
+		t.Numbered = true
+		worktrees[i] = plan.facts.plan(t, plan.facts.jobsOf(plan.Profile), record.Ordinal)
+	}
+	plan.Worktrees = worktrees
+	return plan
 }
 
 // daemonFailure is why no job could start: a daemon of another build holding jobs, followed by its restart, or the daemon not starting.
@@ -421,10 +440,9 @@ func (s *starting) job(ctx context.Context, index int) bool {
 	case err != nil && ctx.Err() != nil:
 		// The start was cut short: the daemon says whether it took it, and what it took keeps running.
 		s.item.Status, s.item.Reason = domain.StatusCancelled, domain.ReasonInterrupted
-		if s.took(planned.Name) {
-			result.Status = JobStarted
-			if planned.Action == ActionJoin {
-				result.Status = JobJoined
+		if now, ran := s.ran(planned.Name); ran {
+			s.became(result, now, declared)
+			if result.Status == JobJoined {
 				s.recordNamespace(ctx, declared)
 			}
 		}
@@ -447,18 +465,46 @@ func (s *starting) job(ctx context.Context, index int) bool {
 	return true
 }
 
-// tookWithin bounds how long a start cut short asks the daemon whether it took it.
-const tookWithin = 2 * time.Second
+// ranWithin bounds how long a start cut short asks the daemon whether it ran the job.
+const ranWithin = 2 * time.Second
 
-// took reports whether the daemon lists the job of name up in the worktree, as it does once it took its start.
-func (s *starting) took(name string) bool {
-	ctx, cancel := context.WithTimeout(context.Background(), tookWithin)
+// ran returns the job of name as the daemon now lists it in the worktree, and whether this start ran it: listed, and not as it stood when the start was planned (a task that ran to its end within the start is listed ended, no longer up).
+func (s *starting) ran(name string) (run.Job, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), ranWithin)
 	defer cancel()
 	jobs, err := s.Daemon.Jobs(ctx)
 	if _, skewed := errors.AsType[*run.Skewed](err); err != nil && !skewed {
-		return false
+		return run.Job{}, false
 	}
-	return slices.Contains(run.UpIn(jobs, s.target.Path), name)
+	now, listed := s.listing(jobs, name)
+	before, was := s.listing(s.plan.facts.Jobs, name)
+	return now, listed && (!was || !reflect.DeepEqual(now, before))
+}
+
+// listing is the job of name jobs list in the worktree, and whether they list it.
+func (s *starting) listing(jobs []run.Job, name string) (run.Job, bool) {
+	at := slices.IndexFunc(jobs, func(job run.Job) bool { return job.Name == name && job.WorkDir == s.target.Path })
+	if at < 0 {
+		return run.Job{}, false
+	}
+	return jobs[at], true
+}
+
+// became is what the job the start ran became, as the daemon lists it now: up, started or joined; a task ended, done or failed by its exit code; a service ended, crashed.
+func (s *starting) became(result *JobResult, now run.Job, declared project.Job) {
+	result.ExitCode = now.ExitCode
+	switch {
+	case now.Up && declared.Scope == project.Shared && !s.target.Main:
+		result.Status = JobJoined
+	case now.Up:
+		result.Status, result.ExitCode = JobStarted, nil
+	case declared.Kind == project.Task && (now.ExitCode == nil || *now.ExitCode == 0):
+		result.Status = JobDone
+	case declared.Kind == project.Task:
+		result.Status = JobFailed
+	default:
+		result.Status = JobCrashed
+	}
 }
 
 func jobFailure(job string, err error, exitCode *int) *domain.Error {
