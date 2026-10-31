@@ -51,7 +51,7 @@ test("the main worktree's menu keeps every action in place, those it can't take 
     'Sync',
     'Reparent',
     'Run a command',
-    'Start the profile',
+    'Start a profile',
     'Stop the profile',
     'View the logs',
     'Go to the worktree',

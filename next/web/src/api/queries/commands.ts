@@ -17,10 +17,14 @@ import type {
   FastforwardDetail,
   FastforwardPlan,
   ListDetail,
+  ListJob,
   PruneDetail,
   PrunePlan,
   ReparentDetail,
   ReparentPlan,
+  RunState,
+  RunupDetail,
+  RunupPlan,
   StatusDetail,
   SyncDetail,
   SyncPlan,
@@ -44,6 +48,7 @@ type Mutation = {
   exec: { plan: ExecPlan; detail: ExecDetail }
   reparent: { plan: ReparentPlan; detail: ReparentDetail }
   sync: { plan: SyncPlan; detail: SyncDetail }
+  'run-up': { plan: RunupPlan; detail: RunupDetail }
 }
 export type MutationCommand = keyof Mutation
 export type Planned<C extends MutationCommand> = Mutation[C]['plan']
@@ -68,6 +73,16 @@ export const narrowed = <Detail, Plan = never>(envelope: DomainEnvelope): Narrow
 
 export const worktreeCount = ({ items }: Read<'list'> | Read<'tree'>) =>
   items.filter(({ detail }) => !(detail && 'virtual' in detail && detail.virtual)).length
+
+// a claim on a shared service is the worktree's hold on a job another runs: it counts where that job runs
+export const jobCounts = (jobs: ListJob[]) => {
+  const counts: Record<RunState, number> = { starting: 0, running: 0, crashed: 0, exited: 0, stopped: 0 }
+  for (const job of jobs) if (job.hold !== 'claim') counts[job.state] += 1
+  return counts
+}
+
+export const jobsUp = ({ items }: Read<'list'>) =>
+  items.reduce((up, { detail }) => up + jobCounts(detail?.jobs ?? []).running, 0)
 
 export const run = (repo: string, command: ApiCommandName, call: WebCall) =>
   json<DomainEnvelope>(`/api/repos/${repo}/commands/${command}`, call)
