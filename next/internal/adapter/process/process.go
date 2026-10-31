@@ -2,6 +2,7 @@
 package process
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"sync"
@@ -26,12 +27,13 @@ const (
 
 // A Child is a job's process, the leader of its own group.
 type Child struct {
-	cmd     *exec.Cmd
-	output  *os.File
-	exited  chan struct{}
-	drained chan struct{}
-	code    int
-	once    sync.Once
+	cmd      *exec.Cmd
+	terminal bool
+	output   *os.File
+	exited   chan struct{}
+	drained  chan struct{}
+	code     int
+	once     sync.Once
 }
 
 // Spawn starts command: under a terminal of its own, in a session of its own,
@@ -47,7 +49,7 @@ func Spawn(command run.Command) (*Child, error) {
 		return nil, err
 	}
 
-	child := &Child{cmd: cmd, output: output, exited: make(chan struct{}), drained: make(chan struct{})}
+	child := &Child{cmd: cmd, terminal: command.Terminal, output: output, exited: make(chan struct{}), drained: make(chan struct{})}
 	go child.drain(command.Output)
 	go child.reap()
 
@@ -147,6 +149,25 @@ func (c *Child) Stop(grace time.Duration) {
 	for groupAlive(c.PID()) && time.Now().Before(deadline) {
 		time.Sleep(groupPoll)
 	}
+}
+
+// errNoTerminal is the error of typing into, or sizing, a child run through a pipe.
+var errNoTerminal = errors.New("the job runs under no terminal")
+
+// Write types p into the child's terminal.
+func (c *Child) Write(p []byte) (int, error) {
+	if !c.terminal {
+		return 0, errNoTerminal
+	}
+	return c.output.Write(p)
+}
+
+// Resize sizes the child's terminal, cols by rows.
+func (c *Child) Resize(cols, rows int) error {
+	if !c.terminal {
+		return errNoTerminal
+	}
+	return pty.Setsize(c.output, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
 }
 
 // signalGroup sends signal to the group pgid, a group gone or not ours

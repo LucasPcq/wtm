@@ -1,6 +1,8 @@
 package daemon_test
 
 import (
+	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -293,4 +295,81 @@ func TestEnsureTakesEveryJobADaemonOfAnotherProtocolListsAsHeld(t *testing.T) {
 	assert.Equal(t, run.CodeSkew, refusal.Code)
 	<-requests
 	assert.Empty(t, requests, "it is not asked to stop")
+}
+
+func TestLinesHandsOutEachLineAndReturnsTheJob(t *testing.T) {
+	socket, _ := served(t, &jobs{lines: []string{"ready"}}, "1.0")
+	var lines []run.Line
+
+	job, err := daemon.Daemon{SocketPath: socket}.Lines(t.Context(), run.Tail{Name: "web", WorkDir: "/wt/a", Lines: 10}, func(line run.Line) { lines = append(lines, line) })
+
+	require.NoError(t, err)
+	assert.Equal(t, web, job)
+	assert.Equal(t, []run.Line{{At: started, Text: "ready"}}, lines)
+}
+
+func TestAFollowEndsWhenItsReaderLeaves(t *testing.T) {
+	socket, _ := servedConcurrently(t, &jobs{lines: []string{"ready"}})
+	ctx, cancel := context.WithCancel(t.Context())
+	got := make(chan string, 1)
+
+	go func() {
+		_, err := daemon.Daemon{SocketPath: socket}.Lines(ctx, run.Tail{Name: "web", WorkDir: "/wt/a", Follow: true}, func(line run.Line) { got <- line.Text })
+		got <- err.Error()
+	}()
+	assert.Equal(t, "ready", <-got)
+	cancel()
+
+	assert.Contains(t, <-got, "context canceled")
+}
+
+func TestAnAttachedTerminalReadsTheJobAndTypesIntoIt(t *testing.T) {
+	daemonJobs := &jobs{}
+	socket, _ := servedConcurrently(t, daemonJobs)
+
+	conn, err := daemon.Daemon{SocketPath: socket}.Attach(t.Context(), run.Window{Name: "web", WorkDir: "/wt/a", Cols: 80, Rows: 24})
+	require.NoError(t, err)
+	defer conn.Close()
+	_, err = conn.Write([]byte("q"))
+	require.NoError(t, err)
+	read, err := io.ReadAll(conn)
+
+	require.NoError(t, err)
+	assert.Equal(t, "history|live", string(read))
+	assert.Eventually(t, func() bool { return daemonJobs.typed.String() == "q" }, time.Second, time.Millisecond)
+	assert.Equal(t, []any{run.Window{Name: "web", WorkDir: "/wt/a", Cols: 80, Rows: 24}}, daemonJobs.seen())
+}
+
+func TestAnAttachTheDaemonRefusesFailsWithItsCode(t *testing.T) {
+	socket, _ := served(t, &jobs{err: &run.Error{Code: run.CodeJobNotFound, Message: "no job web running in /wt/a"}}, "1.0")
+
+	_, err := daemon.Daemon{SocketPath: socket}.Attach(t.Context(), run.Window{Name: "web", WorkDir: "/wt/a"})
+
+	var refusal *run.Error
+	require.ErrorAs(t, err, &refusal)
+	assert.Equal(t, run.CodeJobNotFound, refusal.Code)
+}
+
+func TestAResizeTheDaemonRefusesFailsWithItsCode(t *testing.T) {
+	socket, _ := served(t, &jobs{err: &run.Error{Code: run.CodeNoTerminal, Message: "job migrate runs under no terminal"}}, "1.0")
+
+	err := daemon.Daemon{SocketPath: socket}.Resize(t.Context(), run.Window{Name: "migrate", WorkDir: "/wt/a", Cols: 80, Rows: 24})
+
+	var refusal *run.Error
+	require.ErrorAs(t, err, &refusal)
+	assert.Equal(t, run.CodeNoTerminal, refusal.Code)
+}
+
+func TestAnAttachedTerminalKeepsReceivingPastAWritesDeadline(t *testing.T) {
+	socket, _ := servedConcurrently(t, &jobs{lateAfter: 1500 * time.Millisecond})
+
+	conn, err := daemon.Daemon{SocketPath: socket}.Attach(t.Context(), run.Window{Name: "web", WorkDir: "/wt/a"})
+	require.NoError(t, err)
+	defer conn.Close()
+	_, err = conn.Write([]byte("q"))
+	require.NoError(t, err)
+	read, err := io.ReadAll(conn)
+
+	require.NoError(t, err)
+	assert.Equal(t, "history|live|late", string(read), "what the job prints a while after the attach still arrives")
 }

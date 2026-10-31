@@ -125,3 +125,31 @@ func asked(t *testing.T, socket, request string) []map[string]any {
 		answers = append(answers, a)
 	}
 }
+
+// servedConcurrently serves the protocol as served does, each connection in a goroutine of its own, as the daemon does: a follow or an attach holds its connection.
+func servedConcurrently(t *testing.T, jobs daemon.Jobs) (string, *sync.WaitGroup) {
+	t.Helper()
+	socket := filepath.Join(socketDir(t), "wtm.sock")
+	listener, err := net.Listen("unix", socket)
+	require.NoError(t, err)
+	var serving sync.WaitGroup
+	t.Cleanup(func() {
+		_ = listener.Close()
+		serving.Wait()
+	})
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			serving.Go(func() {
+				defer conn.Close()
+				if line, err := bufio.NewReader(conn).ReadBytes('\n'); err == nil {
+					daemon.Server{Jobs: jobs, Version: "1.0"}.Serve(conn, line)
+				}
+			})
+		}
+	}()
+	return socket, &serving
+}

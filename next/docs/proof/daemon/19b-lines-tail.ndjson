@@ -1,0 +1,2 @@
+{"status":"line","protocol":2,"version":"<NEXT>","pid":<PID>,"at":"<T>","text":"ready"}
+{"status":"ok","protocol":2,"version":"<NEXT>","pid":<PID>,"job":{"name":"web","kind":"service","work_dir":"<SB>/acme","state":"running","hold":"own","pid":<PID>,"started_at":"<T>","last_line":{"at":"<T>","text":"ready"},"status":"running"}}

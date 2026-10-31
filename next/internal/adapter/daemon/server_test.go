@@ -15,13 +15,16 @@ import (
 )
 
 func TestEveryAnswerIsStampedWithTheProtocolAndTheBuild(t *testing.T) {
-	socket, _ := served(t, &jobs{listed: []run.Job{web}}, "1.0")
+	listed := web
+	listed.LastLine = &run.Line{At: started, Text: "GET / 200"}
+	socket, _ := served(t, &jobs{listed: []run.Job{listed}}, "1.0")
 
 	answers := asked(t, socket, `{"action":"list"}`)
 
 	assert.Equal(t, []map[string]any{{"status": "ok", "protocol": 2.0, "version": "1.0", "jobs": []any{map[string]any{
 		"name": "web", "kind": "service", "work_dir": "/wt/a", "state": "running", "hold": "own", "status": "running", "pid": 4242.0,
 		"started_at": "2026-10-31T12:00:00Z", "url": "http://localhost:3100", "ports": map[string]any{"PORT": 3100.0},
+		"last_line": map[string]any{"at": "2026-10-31T12:00:00Z", "text": "GET / 200"},
 	}}}}, answers)
 }
 
@@ -135,4 +138,36 @@ func TestAListOfNoJobIsAnEmptyList(t *testing.T) {
 	answers := asked(t, socket, `{"action":"list"}`)
 
 	assert.Equal(t, []any{}, answers[0]["jobs"])
+}
+
+func TestLinesAreSentThenHowTheJobStands(t *testing.T) {
+	daemonJobs := &jobs{lines: []string{"ready", "GET / 200"}}
+	socket, _ := served(t, daemonJobs, "1.0")
+
+	answers := asked(t, socket, `{"action":"lines","name":"web","work_dir":"/wt/a","tail":2}`)
+
+	assert.Len(t, answers, 3)
+	assert.Equal(t, "ready", answers[0]["text"])
+	assert.Equal(t, "GET / 200", answers[1]["text"])
+	assert.Equal(t, "ok", answers[2]["status"])
+	assert.Equal(t, "web", answers[2]["job"].(map[string]any)["name"])
+	assert.Equal(t, []any{run.Tail{Name: "web", WorkDir: "/wt/a", Lines: 2}}, daemonJobs.seen())
+}
+
+func TestTheLinesOfAJobTheDaemonDoesNotKnowAreRefused(t *testing.T) {
+	socket, _ := served(t, &jobs{err: &run.Error{Code: run.CodeJobNotFound, Message: "no job nope in /wt/a"}}, "1.0")
+
+	answers := asked(t, socket, `{"action":"lines","name":"nope","work_dir":"/wt/a"}`)
+
+	assert.Equal(t, run.CodeJobNotFound, answers[len(answers)-1]["code"])
+}
+
+func TestAResizeIsHandedTheSizeAndAnswered(t *testing.T) {
+	daemonJobs := &jobs{}
+	socket, _ := served(t, daemonJobs, "1.0")
+
+	answers := asked(t, socket, `{"action":"resize","name":"web","work_dir":"/wt/a","cols":120,"rows":40}`)
+
+	assert.Equal(t, "ok", answers[0]["status"])
+	assert.Equal(t, []any{run.Window{Name: "web", WorkDir: "/wt/a", Cols: 120, Rows: 40}}, daemonJobs.seen())
 }

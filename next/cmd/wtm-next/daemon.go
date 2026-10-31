@@ -12,6 +12,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
+	"github.com/LucasPcq/wtm/next/internal/adapter/joblog"
 	"github.com/LucasPcq/wtm/next/internal/adapter/process"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	rundaemon "github.com/LucasPcq/wtm/next/internal/daemon"
@@ -48,6 +49,8 @@ func serveDaemon(ctx context.Context, socket string) error {
 		Spawn:   spawn,
 		Orphans: process.Orphans{},
 		Index:   &daemon.Index{Path: daemon.IndexPath(socket)},
+		OpenLog: openLog,
+		ReadLog: joblog.Last,
 		Exists:  dirExists,
 		Publish: relay.Publish,
 	})
@@ -74,6 +77,15 @@ func spawn(command run.Command) (rundaemon.Process, error) {
 		return nil, err
 	}
 	return child, nil
+}
+
+// openLog opens a job's log, as the run daemon's port takes it.
+func openLog(file run.LogFile) (rundaemon.Log, error) {
+	log, err := joblog.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	return log, nil
 }
 
 // dirExists reports whether the directory at path is there.

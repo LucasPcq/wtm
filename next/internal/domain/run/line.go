@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+// MaxTail is the most lines a client may ask of a job's past: the daemon keeps
+// that many of each job it runs.
+const MaxTail = 1000
+
 // maxPending is how much of a line with no newline yet a Splitter holds before
 // it gives it out as a line of its own: a job redrawing one line for ever
 // (a progress bar) must not grow it without end.

@@ -10,6 +10,8 @@ const (
 	CodeTaskFailed     = "daemon.task_failed"     // a task that exited non-zero
 	CodeStopFailed     = "daemon.stop_failed"     // a stop command that failed
 	CodeStopping       = "daemon.stopping"        // a start once the daemon is stopping
+	CodeJobNotFound    = "daemon.job_not_found"   // lines, an attach or a resize of a job the daemon does not hold
+	CodeNoTerminal     = "daemon.no_terminal"     // a resize of a job that runs under no terminal
 	CodeSkew           = "daemon.skew"            // a daemon of another build or protocol holding jobs: run daemon restart hands them over
 	CodeLegacy         = "daemon.legacy"          // the legacy wtm's daemon holding jobs: run daemon restart hands them over
 	CodeBusy           = "daemon.busy"            // a process holding the socket that is no run daemon

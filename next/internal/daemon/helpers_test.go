@@ -16,16 +16,19 @@ type world struct {
 	orphans *orphans
 	index   *index
 	bus     *bus
+	logs    *logs
 	gone    map[string]bool
 }
 
 func newWorld(t *testing.T, scripts map[string]script) *world {
 	t.Helper()
-	w := &world{spawner: newSpawner(scripts), orphans: &orphans{}, index: &index{}, bus: &bus{}, gone: map[string]bool{}}
+	w := &world{spawner: newSpawner(scripts), orphans: &orphans{}, index: &index{}, bus: &bus{}, logs: newLogs(), gone: map[string]bool{}}
 	w.Daemon = New(Params{
 		Spawn:   w.spawner.spawn,
 		Orphans: w.orphans,
 		Index:   w.index,
+		OpenLog: w.logs.open,
+		ReadLog: w.logs.read,
 		Exists:  func(path string) bool { return !w.gone[path] },
 		Publish: w.bus.publish,
 		Now:     func() time.Time { return now },

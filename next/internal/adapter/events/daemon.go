@@ -238,7 +238,8 @@ func (d *daemon) busy(by int) {
 func (d *daemon) serve(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 
-	line, err := bufio.NewReader(conn).ReadBytes('\n')
+	reader := bufio.NewReader(conn)
+	line, err := reader.ReadBytes('\n')
 	if err != nil {
 		return
 	}
@@ -258,7 +259,8 @@ func (d *daemon) serve(ctx context.Context, conn net.Conn) {
 	case req.Action == actionSubscribe:
 		d.subscribe(ctx, subscription{Conn: conn, Encoder: encoder, Repos: req.Repos})
 	case d.other != nil:
-		d.other(conn, line, d.stop)
+		// What the client sent past its request line is in the reader: an attached terminal's first keys.
+		d.other(buffered{Conn: conn, reader: reader}, line, d.stop)
 	default:
 		_ = encoder.Encode(response{Status: statusError, Message: "unknown action: " + req.Action})
 	}
@@ -268,6 +270,16 @@ type subscription struct {
 	Conn    net.Conn
 	Encoder *json.Encoder
 	Repos   []string
+}
+
+// buffered is a connection read through the reader that read its request.
+type buffered struct {
+	net.Conn
+	reader *bufio.Reader
+}
+
+func (b buffered) Read(p []byte) (int, error) {
+	return b.reader.Read(p)
 }
 
 // subscribe streams until the hub ends the subscription (a full queue, the

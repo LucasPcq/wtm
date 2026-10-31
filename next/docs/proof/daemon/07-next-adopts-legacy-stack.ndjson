@@ -1,1 +1,1 @@
-{"status":"ok","protocol":2,"version":"<NEXT>","pid":<PID>,"jobs":[{"name":"db","kind":"service","work_dir":"<SB>/acme","state":"running","hold":"detached","started_at":"<T>","status":"detached"}]}
+{"status":"ok","protocol":2,"version":"<NEXT>","pid":<PID>,"jobs":[{"name":"db","kind":"service","work_dir":"<SB>/acme","state":"running","hold":"detached","started_at":"<T>","last_line":{"at":"<T>","text":"db launched"},"status":"detached"}]}
