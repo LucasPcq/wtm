@@ -1,0 +1,7 @@
+
+  Base  main  <SHA>  (already up to date / no fast-forward)
+
+  ✗ feat/gone failed — cannot check working tree: git status: exit status 128
+
+  = Everything is in sync with origin — nothing to push.
+

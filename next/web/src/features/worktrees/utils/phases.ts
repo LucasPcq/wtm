@@ -12,6 +12,8 @@ export const phaseLabel: Record<DomainPhase, string> = {
   on_clean: 'Run the on_clean hooks',
   remove: 'Remove the worktree',
   exec: 'Run the command',
+  rebase: 'Rebase onto its parent',
+  push: 'Push to origin',
 }
 
 export const phaseDuring: Record<DomainPhase, string> = {
@@ -26,4 +28,6 @@ export const phaseDuring: Record<DomainPhase, string> = {
   on_clean: 'the on_clean hooks',
   remove: 'the removal of the worktree',
   exec: 'the command',
+  rebase: 'the rebase onto its parent',
+  push: 'the push to origin',
 }

@@ -1,0 +1,100 @@
+{
+  "v": 2,
+  "command": "sync",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "feat/s",
+      "status": "done",
+      "detail": {
+        "path": "<root>/.trees/feat-s",
+        "parent": "main",
+        "from": "<id>",
+        "commits": 0,
+        "pushed": false
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/s",
+        "path": "<root>/.trees/feat-s",
+        "parent": "main",
+        "depth": 1,
+        "descendant": false,
+        "standing": "rebases",
+        "origin": null,
+        "from": "<id>",
+        "fork": "<id>",
+        "commits": 0,
+        "blockers": [],
+        "phases": [
+          "rebase"
+        ]
+      }
+    ],
+    "onto": [
+      {
+        "branch": "main",
+        "path": "<root>/main",
+        "children": [
+          "feat/s"
+        ],
+        "origin": null,
+        "from": "<id>",
+        "blockers": [],
+        "phases": []
+      }
+    ],
+    "left_out": [],
+    "descendants": true,
+    "force": false,
+    "keep_conflict": false,
+    "ff_parents": true,
+    "push": false,
+    "recap": [
+      {
+        "key": "descendants",
+        "label": "Descendants",
+        "path": "descendants",
+        "values": [
+          {
+            "value": "",
+            "note": "none",
+            "text": "none under the named"
+          }
+        ]
+      },
+      {
+        "key": "rebase",
+        "label": "Rebase",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/s",
+            "params": {
+              "commits": "0",
+              "parent": "main"
+            },
+            "text": "feat/s onto main (0 commits)"
+          }
+        ]
+      },
+      {
+        "key": "keep_conflict",
+        "label": "On conflict",
+        "path": "keep_conflict",
+        "values": [
+          {
+            "value": "false",
+            "text": "abort the rebase, the worktree left as it was"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

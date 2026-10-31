@@ -1,0 +1,66 @@
+
+  Rebase each worktree onto its parent, the branch it was created from, parents before children:
+  origin is fetched once, the branches rebased onto but not rebased (the base branch among them)
+  are fast-forwarded to origin first, then each worktree is rebased in turn, after catching up
+  with its own branch on origin. Without arguments, the wizard asks which worktrees to sync, those
+  that need it checked; unattended, those that need it are synced. A worktree is named by its
+  branch or its path; --all asks for every worktree.
+
+  By default the worktrees under each one named are synced too, and the plan names each of them;
+  --descendants=false syncs the named alone. --ff-parents=false rebases onto the parents as they
+  stand.
+
+  A rebase that stops on a conflict is aborted, the worktree left as it was, and the worktrees
+  under it are skipped; --keep-conflict leaves it in progress to resolve, then sync it again to
+  sync what is left. --push force-pushes each branch synced, leasing on origin's branch as fetched.
+
+  A worktree in the middle of a rebase, a bisect or a merge, whose directory is gone, whose parent
+  is gone or leads back to it, or on whose branch origin has commits it never held is left as it
+  is, with what moves it on.
+
+  A worktree with uncommitted changes is unsafe: named, it refuses the whole run before anything
+  moves, unless --force, which stashes its changes around the rebase; not named, it is kept as it
+  is, with the line that forces it. --force lifts that refusal only: it still asks to confirm,
+  unless --yes.
+
+  Usage:
+    wtm-next sync [worktree...] [flags]
+
+  Examples:
+    # Pick the worktrees to sync
+    wtm sync
+
+    # A worktree and every worktree under it
+    wtm sync feat/login
+
+    # That worktree alone
+    wtm sync feat/login --descendants=false
+
+    # Every worktree, then force-push them, no prompts
+    wtm sync --all --push --yes
+
+    # See the plan first, then apply exactly that plan
+    wtm sync feat/login --dry-run
+    wtm sync feat/login --expect-fingerprint <hash>
+
+    # For a script or an agent, with the v2 JSON envelope
+    wtm sync --all --yes --output json
+
+  Flags:
+        --all                         Sync every worktree; one with uncommitted changes is left as it is unless --force
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+        --descendants                 Sync the worktrees under those named too (default true)
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+        --ff-parents                  Fast-forward the branches rebased onto but not rebased, the base among them, to origin first (default true)
+        --force                       Rebase a worktree that has uncommitted changes, stashed around the rebase
+    -h, --help                        help for sync
+        --keep-conflict               Leave a rebase that stops on a conflict in progress, to resolve, instead of aborting it; the worktrees under it are skipped either way
+        --no-fetch                    Read origin's branches as last fetched
+        --output string               Output format: text or json (default "text")
+        --push                        Force-push each branch synced to origin, leasing on origin's branch as fetched
+    -y, --yes                         Run unattended: no question, no confirmation (without worktrees, those that need a sync; the worktrees under those named come too; nothing is pushed unless --push; a worktree named with uncommitted changes still refuses the run unless --force)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

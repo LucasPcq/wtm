@@ -17,5 +17,5 @@
   api  running  http://api.feat-a.acme.localhost:23462  up <AGE>
 
   ! main has 2 commits it lacks
-  → wtm sync feat/a   sync it onto main
+  → wtm-next sync feat/a   sync it onto main
 

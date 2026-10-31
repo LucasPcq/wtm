@@ -1,0 +1,5 @@
+
+  ✗ nothing synced: feat/dirty can't be rebased safely
+    feat/dirty has uncommitted changes
+  → wtm-next sync feat/dirty --force   sync anyway, its changes stashed around the rebase
+

@@ -1,0 +1,17 @@
+$ wtm sync feat/tty-a; echo EXIT=$?
+
+  Step 2/4 • On conflict
+
+  ✓ Worktrees: feat/tty-a
+
+  About to sync 1 worktree(s) onto their parent.
+
+  Choose what happens when a rebase hits a conflict.
+  Aborting rewinds it and leaves the worktree clean.
+  Keeping it leaves the rebase there for you to resolve.
+
+▌▸ Abort the rebase
+   Keep the conflict
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

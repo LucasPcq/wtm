@@ -242,13 +242,9 @@ const (
 	CodeBusy        = Name + ".busy"
 	CodeMissing     = Name + ".missing"
 	CodeFetchFailed = Name + ".fetch_failed"
-	CodeSync        = Name + ".sync"
 	CodeGo          = Name + ".go"
 	CodeClean       = Name + ".clean"
 )
-
-// commandSync rebases a worktree onto its parent: not migrated yet.
-const commandSync = "sync"
 
 // warnings are what the plan cannot see to or leaves as it is: the fetch that failed, each worktree left, by why, with the command that moves it on, then each worktree kept (kept).
 func (f Facts) warnings(planned Plan) []domain.Warning {
@@ -297,7 +293,10 @@ func leftWarning(a Advance) (domain.Warning, bool) {
 	switch a.Standing {
 	case StandingDiverged:
 		params["ahead"], params["behind"] = strconv.Itoa(a.Origin.Ahead), strconv.Itoa(a.Origin.Behind)
-		return domain.Warning{Code: CodeDiverged, Message: a.Worktree + " has diverged from origin (" + params["ahead"] + " ahead, " + params["behind"] + " behind): left as it is", Params: params, FollowUp: &domain.FollowUp{Command: commandSync, Answers: on, Code: CodeSync, Message: "rebase it"}}, true
+		// sync rebases onto the parent, never onto origin: only a merge or a rebase by hand reconciles the two
+		enter := domain.Enter(a.Worktree)
+		enter.Code, enter.Message = CodeGo, "reconcile it with origin by hand"
+		return domain.Warning{Code: CodeDiverged, Message: a.Worktree + " has diverged from origin (" + params["ahead"] + " ahead, " + params["behind"] + " behind): left as it is", Params: params, FollowUp: &enter}, true
 	case StandingNoOrigin:
 		return domain.Warning{Code: CodeNoOrigin, Message: "origin has no branch " + a.Worktree + ": nothing to fast-forward it to", Params: params}, true
 	case StandingBusy:

@@ -1,0 +1,12 @@
+
+  Step 1/9 • Worktrees
+
+  The worktrees to sync, by branch or by path; those that need a sync are checked
+
+▌› [x] feat/a
+   [ ] feat/b
+   [ ] feat/c
+   [ ] feat/dirty                                                                         1 change
+   [x] feat/x
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel

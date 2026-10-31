@@ -19,6 +19,7 @@ import (
 	reparentcli "github.com/LucasPcq/wtm/next/internal/command/reparent/cli"
 	resolvecli "github.com/LucasPcq/wtm/next/internal/command/resolve/cli"
 	statuscli "github.com/LucasPcq/wtm/next/internal/command/status/cli"
+	synccli "github.com/LucasPcq/wtm/next/internal/command/sync/cli"
 	treecli "github.com/LucasPcq/wtm/next/internal/command/tree/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -50,6 +51,7 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		cleancli.New(streams, env, openClean, commandLine),
 		prunecli.New(streams, env, openPrune, commandLine),
 		fastforwardcli.New(streams, env, openFastForward, commandLine),
+		synccli.New(streams, env, openSync, commandLine),
 		execcli.New(streams, env, openExec, commandLine),
 		reparentcli.New(streams, env, openReparent, commandLine),
 		listcli.New(streams, env, openList, commandLine),

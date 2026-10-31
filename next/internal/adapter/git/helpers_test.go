@@ -239,3 +239,40 @@ func porcelain(t *testing.T, dir string) []string {
 	require.NoError(t, err)
 	return strings.FieldsFunc(string(out), func(r rune) bool { return r == '\n' })
 }
+
+// childOfMain is a repository with an origin, its main holding shared.txt, and a worktree on child, a branch from main with a commit of its own.
+func childOfMain(t *testing.T) (git.Repo, string) {
+	t.Helper()
+	repo, _ := newRepoWithOrigin(t)
+	commitFile(t, repo.Dir, "shared.txt", "base")
+	child := filepath.Join(gittest.TempDir(t), "child")
+	gittest.Git(t, repo.Dir, "worktree", "add", "-q", "-b", "child", child, "main")
+	commitFile(t, child, "child.txt", "its own")
+	return repo, child
+}
+
+// conflictingChild is childOfMain where child and main then each change shared.txt their own way.
+func conflictingChild(t *testing.T) (git.Repo, string) {
+	t.Helper()
+	repo, child := childOfMain(t)
+	commitFile(t, child, "shared.txt", "child's line")
+	commitFile(t, repo.Dir, "shared.txt", "main's line")
+	return repo, child
+}
+
+// resolveByHand rebases child onto main, stops on its conflict, and resolves it as a user does: a new line, added, then continued.
+func resolveByHand(t *testing.T, repo git.Repo, child string) {
+	t.Helper()
+	_, err := repo.Rebase(t.Context(), worktree.Rebase{Path: child, Onto: worktree.LocalBranch{Name: "main"}, Upstream: forkOf(t, repo, "child", "main"), Keep: true})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(child, "shared.txt"), []byte("resolved\n"), 0o644))
+	gittest.Git(t, child, "add", "shared.txt")
+	gittest.Git(t, child, "-c", "core.editor=true", "rebase", "--continue")
+}
+
+func forkOf(t *testing.T, repo git.Repo, branch, base string) string {
+	t.Helper()
+	fork, err := repo.ForkPoint(t.Context(), worktree.Span{Branch: branch, Base: base})
+	require.NoError(t, err)
+	return fork.Commit
+}

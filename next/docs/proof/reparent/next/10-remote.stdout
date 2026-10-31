@@ -4,6 +4,6 @@
   Worktrees   feat/c (main → origin/remote-only)
   New parent  origin/remote-only
 
-  → wtm sync feat/c                      rebase onto the new parent
+  → wtm-next sync feat/c                 rebase onto the new parent
   → wtm reparent feat/c --to main   move feat/c back onto main
 

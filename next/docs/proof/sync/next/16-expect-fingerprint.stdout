@@ -1,0 +1,9 @@
+
+  ✓ sync: 1 done
+
+  Descendants  none under the named
+  Rebase       feat/solo onto main (1 commit)
+  On conflict  abort the rebase, the worktree left as it was
+
+  → wtm-next sync feat/solo --descendants=false --push   push it, force-with-lease
+

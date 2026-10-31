@@ -8,5 +8,5 @@
 
   fingerprint  d303fd7f10eedd3b4fe8da56
   → wtm-next fast-forward feat/behind feat/latest feat/diverged --expect-fingerprint d303fd7f10eedd3b4fe8da56   apply this plan
-  → wtm sync feat/diverged   rebase it
+  → wtm go feat/diverged   reconcile it with origin by hand
 

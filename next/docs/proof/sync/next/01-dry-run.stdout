@@ -1,0 +1,9 @@
+
+  sync · dry run, nothing applied
+  Descendants   feat/s2
+  Fast-forward  main (1 commit from origin)
+  Rebase        feat/s1 onto main (1 commit), feat/s2 onto feat/s1 (1 commit)
+  On conflict   abort the rebase, the worktree left as it was
+  fingerprint  <FP>
+  → wtm-next sync feat/s1 --expect-fingerprint <FP>   apply this plan
+

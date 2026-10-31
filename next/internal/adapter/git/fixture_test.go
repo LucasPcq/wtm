@@ -35,6 +35,10 @@ type port interface {
 	FastForwardRef(ctx context.Context, name string) error
 	MergeFFOnly(ctx context.Context, merge worktree.Merge) error
 	Snapshot(ctx context.Context) (worktree.Snapshot, error)
+	ForkPoint(ctx context.Context, span worktree.Span) (worktree.Fork, error)
+	Rebase(ctx context.Context, rebase worktree.Rebase) (worktree.Rebased, error)
+	Push(ctx context.Context, push worktree.Push) error
+	NeverHeld(ctx context.Context, name string) (int, error)
 }
 
 // implementation is one port under test: its root directory and at, which

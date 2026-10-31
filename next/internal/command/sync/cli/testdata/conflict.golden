@@ -1,0 +1,13 @@
+
+  ✗ sync: 1 done · 1 failed · 1 skipped
+
+  Descendants  feat/b, feat/c
+  Rebase       feat/a onto main (1 commit), feat/b onto feat/a (1 commit), feat/c onto feat/b (1 commit)
+  On conflict  abort the rebase, the worktree left as it was
+
+  ✗ feat/b  the rebase onto feat/a stopped on a conflict in shared.txt: aborted, the worktree left as it was
+  ! feat/c  not started: what it depends on did not complete
+
+  → wtm-next sync feat/b --keep-conflict              resolve the conflict by hand
+  → wtm-next sync feat/a --descendants=false --push   push it, force-with-lease
+

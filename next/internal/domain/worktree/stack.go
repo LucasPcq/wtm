@@ -131,7 +131,7 @@ func (s Stack) Ancestors(branch string) []string {
 	return found
 }
 
-// Cascade returns roots and the branches under them to rebase, each parent before its children, level by level from the stack's roots whatever the order roots are given in: the main worktree, the base branch and virtual roots are never a step. A member of a cycle among roots refuses the cascade with a *CycleError (a cycle's members being roots, roots is the only way to reach one); a cycle out of reach does not, where the legacy sync refuses any cycle: whether it should is sync's migration to decide.
+// Cascade returns roots and the branches under them to rebase, each parent before its children, level by level from the stack's roots whatever the order roots are given in: the main worktree, the base branch and virtual roots are never a step. A member of a cycle among roots refuses the cascade with a *CycleError (a cycle's members being roots, roots is the only way to reach one); a cycle out of reach does not: sync refuses only the run that names a member of a cycle, and leaves one it chose as it is.
 func (s Stack) Cascade(roots []string) ([]string, error) {
 	var steps []string
 	kept := map[string]bool{}

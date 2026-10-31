@@ -25,7 +25,7 @@ type Phase string
 
 // The phases of a subject's work.
 const (
-	PhaseFastForward Phase = "fast_forward" // its source branch fast-forwarded to origin, before the worktree is added
+	PhaseFastForward Phase = "fast_forward" // its branch, or its source branch before the worktree is added, fast-forwarded to origin
 	PhaseWorktree    Phase = "worktree"     // git adds the worktree
 	PhaseEnv         Phase = "env"          // its .env files copied
 	PhaseMeta        Phase = "meta"         // its meta record written
@@ -36,11 +36,13 @@ const (
 	PhaseOnClean     Phase = "on_clean"     // the project's on_clean hooks, before a worktree is removed
 	PhaseRemove      Phase = "remove"       // git removes the worktree, its branch and its meta record go
 	PhaseExec        Phase = "exec"         // a command exec runs in the worktree
+	PhaseRebase      Phase = "rebase"       // sync rebases its branch onto its parent
+	PhasePush        Phase = "push"         // sync force-pushes its branch to origin
 )
 
 // Phases returns every Phase, in the order a subject's work runs them.
 func Phases() []Phase {
-	return []Phase{PhaseFastForward, PhaseWorktree, PhaseEnv, PhaseMeta, PhaseOrdinal, PhasePorts, PhaseOnCreate, PhaseMove, PhaseOnClean, PhaseRemove, PhaseExec}
+	return []Phase{PhaseFastForward, PhaseWorktree, PhaseEnv, PhaseMeta, PhaseOrdinal, PhasePorts, PhaseOnCreate, PhaseMove, PhaseOnClean, PhaseRemove, PhaseExec, PhaseRebase, PhasePush}
 }
 
 // PhaseStarted reports that a phase of a subject's work begins; Log is the file its output goes to, if any.

@@ -155,7 +155,8 @@ func TestAWorktreeAheadOfOriginIsSaidAheadNotUpToDate(t *testing.T) {
 	assert.Equal(t, "feat/ahead (ahead of origin)", outcome.Plan.Recap[0].Values[0].Text)
 }
 
-func TestADivergedWorktreeIsLeftWithTheSyncThatRebasesIt(t *testing.T) {
+// sync rebases onto the parent, never onto origin: following up a branch diverged from origin with it sent the user to a command that leaves it as it is.
+func TestADivergedWorktreeIsLeftWithTheWayInToReconcileItByHand(t *testing.T) {
 	w := newWorld(t)
 
 	outcome, _ := w.run(t, naming(diverged))
@@ -163,7 +164,8 @@ func TestADivergedWorktreeIsLeftWithTheSyncThatRebasesIt(t *testing.T) {
 	require.Equal(t, []string{fastforward.CodeDiverged}, codes(outcome.Warnings))
 	warning := outcome.Warnings[0]
 	assert.Equal(t, domain.Params{"worktree": diverged, "ahead": "1", "behind": "1"}, warning.Params)
-	assert.Equal(t, "sync", warning.FollowUp.Command)
+	assert.Equal(t, domain.CommandGo, warning.FollowUp.Command)
+	assert.Equal(t, fastforward.CodeGo, warning.FollowUp.Code)
 	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{diverged}}}, warning.FollowUp.Answers)
 }
 

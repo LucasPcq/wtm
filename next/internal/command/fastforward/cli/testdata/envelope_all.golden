@@ -182,7 +182,7 @@
       },
       "message": "feat/diverged has diverged from origin (1 ahead, 1 behind): left as it is",
       "follow_up": {
-        "command": "sync",
+        "command": "go",
         "answers": [
           {
             "path": "worktree",
@@ -191,8 +191,8 @@
             ]
           }
         ],
-        "code": "fast-forward.sync",
-        "message": "rebase it"
+        "code": "fast-forward.go",
+        "message": "reconcile it with origin by hand"
       }
     },
     {

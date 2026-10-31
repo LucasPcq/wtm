@@ -41,6 +41,7 @@ type Fake struct {
 	diffstats map[string]worktree.Diffstat
 	conflicts map[string]worktree.ConflictKind
 	moves     []worktree.Move
+	rebases   map[string][]string
 	dates     map[string]time.Time
 }
 
@@ -66,6 +67,7 @@ type FakeParams struct {
 	Diffstats map[string]worktree.Diffstat     // what Diffstat measures, by worktree (fake only)
 	Conflicts map[string]worktree.ConflictKind // the paths a move conflicts on, by path (fake only)
 	Dates     map[string]time.Time             // when a local branch's tip was committed, Committed when not given (fake only)
+	Rebases   map[string][]string              // the files a rebase of a branch stops on a conflict in, by branch (fake only)
 }
 
 // Committed is when the tip of a local branch was committed, unless FakeParams.Dates says otherwise.
@@ -93,6 +95,7 @@ func NewFake(params FakeParams) *Fake {
 		diffstats: map[string]worktree.Diffstat{},
 		conflicts: params.Conflicts,
 		dates:     params.Dates,
+		rebases:   params.Rebases,
 	}
 
 	for dir, stat := range params.Diffstats {

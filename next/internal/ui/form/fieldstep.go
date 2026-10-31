@@ -352,11 +352,12 @@ func (s *TextStep) Answer() string {
 // ----------------------------------------------------------------------------
 // A multi-select
 
-// MultiSelectStep asks any of a field's options, those the field picks (the answer so far, else its default pick) picked, each tag in the Tone a command's own step gives it (muted otherwise); none picked is refused with the Empty problem of its words.
+// MultiSelectStep asks any of a field's options, those the field picks (the answer so far, else its default pick) picked, each tag in the Tone a command's own step gives it (muted otherwise); none picked is refused with the Empty problem of its words. Chosen answers no value when the field's default pick is confirmed as it was: the command's choice, not the user's, so the command picks again on its own facts (prune, fast-forward and sync tell a worktree the user named from one they chose).
 type MultiSelectStep struct {
 	Asked
-	Tone  func(option domain.Option) widget.Tone
-	picks *widget.MultiSelect
+	Tone   func(option domain.Option) widget.Tone
+	Chosen bool
+	picks  *widget.MultiSelect
 }
 
 // Open builds the multi-select.
@@ -381,8 +382,13 @@ func (s *MultiSelectStep) Widget() widget.Widget {
 	return s.picks
 }
 
-// Answer records the options picked.
+// Answer records the options picked, or none with Chosen when they are the field's default pick, untouched.
 func (s *MultiSelectStep) Answer() string {
-	s.sheet.Answer(s.at, domain.Answered{Path: s.path(), Values: s.picks.Values()})
-	return strings.Join(s.picks.Values(), ", ")
+	picked := s.picks.Values()
+	answer := domain.Answered{Path: s.path(), Values: picked}
+	if field, ok := s.sheet.Field(s.at).(domain.MultiSelectField); ok && s.Chosen && field.Origin == domain.OriginDefault && slices.Equal(picked, field.Picked) {
+		answer.Values = nil
+	}
+	s.sheet.Answer(s.at, answer)
+	return strings.Join(picked, ", ")
 }

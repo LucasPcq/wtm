@@ -1,0 +1,216 @@
+{
+  "v": 2,
+  "command": "sync",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-a",
+        "parent": "main",
+        "from": "a",
+        "commits": 1,
+        "pushed": true
+      }
+    },
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-b",
+        "parent": "feat/a",
+        "from": "b",
+        "commits": 1,
+        "pushed": true
+      }
+    },
+    {
+      "subject": "feat/c",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-c",
+        "parent": "feat/b",
+        "from": "c",
+        "commits": 1,
+        "pushed": true
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/a",
+        "path": "/repo/wt-feat-a",
+        "parent": "main",
+        "depth": 1,
+        "descendant": false,
+        "standing": "rebases",
+        "origin": {
+          "ahead": 0,
+          "behind": 0,
+          "state": "up-to-date"
+        },
+        "from": "a",
+        "fork": "root",
+        "commits": 1,
+        "expect": "a",
+        "blockers": [],
+        "phases": [
+          "rebase",
+          "push"
+        ]
+      },
+      {
+        "worktree": "feat/b",
+        "path": "/repo/wt-feat-b",
+        "parent": "feat/a",
+        "depth": 2,
+        "descendant": true,
+        "standing": "rebases",
+        "origin": {
+          "ahead": 0,
+          "behind": 0,
+          "state": "up-to-date"
+        },
+        "from": "b",
+        "fork": "a",
+        "commits": 1,
+        "expect": "b",
+        "blockers": [],
+        "phases": [
+          "rebase",
+          "push"
+        ]
+      },
+      {
+        "worktree": "feat/c",
+        "path": "/repo/wt-feat-c",
+        "parent": "feat/b",
+        "depth": 3,
+        "descendant": true,
+        "standing": "rebases",
+        "origin": {
+          "ahead": 0,
+          "behind": 0,
+          "state": "up-to-date"
+        },
+        "from": "c",
+        "fork": "b",
+        "commits": 1,
+        "expect": "c",
+        "blockers": [],
+        "phases": [
+          "rebase",
+          "push"
+        ]
+      }
+    ],
+    "onto": [
+      {
+        "branch": "main",
+        "path": "/repo/main",
+        "children": [
+          "feat/a"
+        ],
+        "origin": {
+          "ahead": 0,
+          "behind": 0,
+          "state": "up-to-date"
+        },
+        "from": "moved on",
+        "blockers": [],
+        "phases": []
+      }
+    ],
+    "left_out": [],
+    "descendants": true,
+    "force": false,
+    "keep_conflict": false,
+    "ff_parents": true,
+    "push": true,
+    "recap": [
+      {
+        "key": "descendants",
+        "label": "Descendants",
+        "path": "descendants",
+        "values": [
+          {
+            "value": "feat/b",
+            "text": "feat/b"
+          },
+          {
+            "value": "feat/c",
+            "text": "feat/c"
+          }
+        ]
+      },
+      {
+        "key": "rebase",
+        "label": "Rebase",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "params": {
+              "commits": "1",
+              "parent": "main"
+            },
+            "text": "feat/a onto main (1 commit)"
+          },
+          {
+            "value": "feat/b",
+            "note": "descendant",
+            "params": {
+              "commits": "1",
+              "parent": "feat/a"
+            },
+            "text": "feat/b onto feat/a (1 commit)"
+          },
+          {
+            "value": "feat/c",
+            "note": "descendant",
+            "params": {
+              "commits": "1",
+              "parent": "feat/b"
+            },
+            "text": "feat/c onto feat/b (1 commit)"
+          }
+        ]
+      },
+      {
+        "key": "push",
+        "label": "Push",
+        "path": "push",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          },
+          {
+            "value": "feat/b",
+            "text": "feat/b"
+          },
+          {
+            "value": "feat/c",
+            "text": "feat/c"
+          }
+        ]
+      },
+      {
+        "key": "keep_conflict",
+        "label": "On conflict",
+        "path": "keep_conflict",
+        "values": [
+          {
+            "value": "false",
+            "text": "abort the rebase, the worktree left as it was"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

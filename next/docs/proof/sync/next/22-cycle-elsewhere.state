@@ -1,0 +1,23 @@
+## branches
+feat/dirty (not at origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+feat/dirty-kid (not on origin): shared.txt: base|shared.txt: main's line (teammate)|dirty.txt: dirty
+feat/gone (not on origin): shared.txt: base
+feat/k1 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1
+feat/k2 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line
+feat/k3 (not at origin): shared.txt: base|shared.txt: main's line (teammate)|k1.txt: k1|shared.txt: k2's line|k3.txt: k3
+feat/s1 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1
+feat/s2 (at origin): shared.txt: base|shared.txt: main's line (teammate)|s1.txt: s1|s2.txt: s2
+feat/solo (not at origin): shared.txt: base|shared.txt: main's line (teammate)|solo.txt: solo
+main (at origin): shared.txt: base|shared.txt: main's line (teammate)
+## worktrees
+<SB>/acme 
+<SB>/acme.trees/detached 
+<SB>/acme.trees/feat-dirty ?? wip.txt
+<SB>/acme.trees/feat-dirty-kid 
+<SB>/acme.trees/feat-gone: gone
+<SB>/acme.trees/feat-k1 
+<SB>/acme.trees/feat-k2 
+<SB>/acme.trees/feat-k3 
+<SB>/acme.trees/feat-s1 
+<SB>/acme.trees/feat-s2 
+<SB>/acme.trees/feat-solo 

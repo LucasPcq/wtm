@@ -1,0 +1,184 @@
+{
+  "v": 2,
+  "command": "sync",
+  "ok": false,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/k2",
+      "status": "failed",
+      "error": {
+        "kind": "conflict",
+        "code": "sync.conflict",
+        "message": "the rebase onto feat/k1 stopped on a conflict in shared.txt: aborted, the worktree left as it was",
+        "params": {
+          "count": "1",
+          "files": "shared.txt",
+          "kept": "false",
+          "parent": "feat/k1",
+          "path": "<SB>/acme.trees/feat-k2",
+          "worktree": "feat/k2"
+        }
+      },
+      "detail": {}
+    },
+    {
+      "subject": "feat/k3",
+      "status": "skipped",
+      "reason": "blocked",
+      "detail": {}
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/k2",
+        "path": "<SB>/acme.trees/feat-k2",
+        "parent": "feat/k1",
+        "depth": 2,
+        "descendant": false,
+        "standing": "rebases",
+        "origin": {
+          "ahead": 0,
+          "behind": 0,
+          "state": "up-to-date"
+        },
+        "from": "<SHA>",
+        "fork": "<SHA>",
+        "commits": 1,
+        "expect": "<SHA>",
+        "blockers": [],
+        "phases": [
+          "rebase"
+        ]
+      },
+      {
+        "worktree": "feat/k3",
+        "path": "<SB>/acme.trees/feat-k3",
+        "parent": "feat/k2",
+        "depth": 3,
+        "descendant": true,
+        "standing": "rebases",
+        "origin": {
+          "ahead": 0,
+          "behind": 0,
+          "state": "up-to-date"
+        },
+        "from": "<SHA>",
+        "fork": "<SHA>",
+        "commits": 1,
+        "expect": "<SHA>",
+        "blockers": [],
+        "phases": [
+          "rebase"
+        ]
+      }
+    ],
+    "onto": [
+      {
+        "branch": "feat/k1",
+        "path": "<SB>/acme.trees/feat-k1",
+        "children": [
+          "feat/k2"
+        ],
+        "origin": {
+          "ahead": 2,
+          "behind": 1,
+          "state": "diverged"
+        },
+        "from": "<SHA>",
+        "blockers": [],
+        "phases": []
+      }
+    ],
+    "left_out": [],
+    "descendants": true,
+    "force": false,
+    "keep_conflict": false,
+    "ff_parents": true,
+    "push": false,
+    "recap": [
+      {
+        "key": "descendants",
+        "label": "Descendants",
+        "path": "descendants",
+        "values": [
+          {
+            "value": "feat/k3",
+            "text": "feat/k3"
+          }
+        ]
+      },
+      {
+        "key": "rebase",
+        "label": "Rebase",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/k2",
+            "params": {
+              "commits": "1",
+              "parent": "feat/k1"
+            },
+            "text": "feat/k2 onto feat/k1 (1 commit)"
+          },
+          {
+            "value": "feat/k3",
+            "note": "descendant",
+            "params": {
+              "commits": "1",
+              "parent": "feat/k2"
+            },
+            "text": "feat/k3 onto feat/k2 (1 commit)"
+          }
+        ]
+      },
+      {
+        "key": "keep_conflict",
+        "label": "On conflict",
+        "path": "keep_conflict",
+        "values": [
+          {
+            "value": "false",
+            "text": "abort the rebase, the worktree left as it was"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "sync",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/k2"
+          ]
+        },
+        {
+          "path": "keep_conflict",
+          "values": [
+            "true"
+          ]
+        }
+      ],
+      "code": "sync.resolve",
+      "message": "resolve the conflict by hand"
+    }
+  ],
+  "warnings": [],
+  "error": {
+    "kind": "conflict",
+    "code": "sync.conflict",
+    "message": "the rebase onto feat/k1 stopped on a conflict in shared.txt: aborted, the worktree left as it was",
+    "params": {
+      "count": "1",
+      "files": "shared.txt",
+      "kept": "false",
+      "parent": "feat/k1",
+      "path": "<SB>/acme.trees/feat-k2",
+      "worktree": "feat/k2"
+    }
+  }
+}

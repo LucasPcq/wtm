@@ -1,0 +1,12 @@
+
+  ✗ feat/k2 conflict on feat/k1 — left in progress (1 file); descendants skipped
+
+  Conflicts left in progress — resolve, then continue the rebase:
+
+  feat/k2  <SB>/acme.trees/feat-k2
+     conflicting:
+        shared.txt
+     → resolve, then: git rebase --continue    (abort: git rebase --abort)
+
+  = Everything is in sync with origin — nothing to push.
+

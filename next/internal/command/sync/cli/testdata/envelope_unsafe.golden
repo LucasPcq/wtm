@@ -1,0 +1,46 @@
+{
+  "v": 2,
+  "command": "sync",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "refused",
+    "code": "sync.unsafe",
+    "message": "nothing synced: feat/dirty can't be rebased safely",
+    "params": {
+      "worktrees": "feat/dirty"
+    },
+    "follow_up": {
+      "command": "sync",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/dirty"
+          ]
+        },
+        {
+          "path": "force",
+          "values": [
+            "true"
+          ]
+        }
+      ],
+      "code": "sync.force",
+      "message": "sync anyway, its changes stashed around the rebase"
+    },
+    "fields": [
+      {
+        "path": "worktree[0]",
+        "code": "sync.dirty",
+        "params": {
+          "value": "feat/dirty"
+        },
+        "flag": "<worktree>[0]",
+        "message": "feat/dirty has uncommitted changes"
+      }
+    ]
+  }
+}

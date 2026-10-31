@@ -1,0 +1,8 @@
+
+  ✓ sync: 4 done
+
+  Rebase       feat/a onto main (1 commit), feat/x onto main (1 commit), feat/b onto feat/a (1 commit), feat/c onto feat/b (1 commit)
+  On conflict  abort the rebase, the worktree left as it was
+
+  → wtm-next sync feat/a feat/b feat/c --descendants=false --push   push them, force-with-lease
+

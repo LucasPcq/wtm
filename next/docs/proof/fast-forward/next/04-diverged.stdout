@@ -5,5 +5,5 @@
 
   ! feat/diverged has diverged from origin (1 ahead, 1 behind): left as it is
 
-  → wtm sync feat/diverged   rebase it
+  → wtm go feat/diverged   reconcile it with origin by hand
 

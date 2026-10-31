@@ -16,6 +16,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/reparent"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
+	"github.com/LucasPcq/wtm/next/internal/command/sync"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
 )
 
@@ -28,6 +29,7 @@ func catalogue() api.Catalogue {
 		api.Bind(clean.Name, openClean, clean.UseCase.Questions, clean.UseCase.Run),
 		api.Bind(prune.Name, openPrune, prune.UseCase.Questions, prune.UseCase.Run),
 		api.Bind(fastforward.Name, openFastForward, fastforward.UseCase.Questions, fastforward.UseCase.Run),
+		api.Bind(sync.Name, openSync, sync.UseCase.Questions, sync.UseCase.Run),
 		api.Bind(exec.Name, openExec, exec.UseCase.Questions, exec.UseCase.Run),
 		api.Bind(reparent.Name, openReparent, reparent.UseCase.Questions, reparent.UseCase.Run),
 		api.Bind(list.Name, openList, list.UseCase.Questions, list.UseCase.Run),

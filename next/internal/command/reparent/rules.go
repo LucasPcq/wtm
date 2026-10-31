@@ -260,9 +260,6 @@ func (p Plan) undoable(branch, from string) bool {
 	return p.facts.Candidate(from) && p.facts.Stack.Within(from, []string{branch}) == ""
 }
 
-// commandSync rebases a worktree onto its parent: not migrated yet.
-const commandSync = "sync"
-
 // next are the steps after the moves: the sync of every worktree moved, then the undo of each.
 func (p Plan) next(items []Item) []domain.FollowUp {
 	var moved []string
@@ -280,6 +277,6 @@ func (p Plan) next(items []Item) []domain.FollowUp {
 		return nil
 	}
 
-	sync := domain.FollowUp{Command: commandSync, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: moved}}, Code: CodeSync, Message: "rebase onto the new parent"}
+	sync := domain.FollowUp{Command: domain.CommandSync, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: moved}}, Code: CodeSync, Message: "rebase onto the new parent"}
 	return append([]domain.FollowUp{sync}, undos...)
 }

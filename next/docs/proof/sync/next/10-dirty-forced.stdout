@@ -1,0 +1,9 @@
+
+  ✓ sync: 2 done
+
+  Descendants  feat/dirty-kid
+  Rebase       feat/dirty onto main (1 commit; uncommitted changes stashed around it), feat/dirty-kid onto feat/dirty (0 commits)
+  On conflict  abort the rebase, the worktree left as it was
+
+  → wtm-next sync feat/dirty --descendants=false --push   push it, force-with-lease
+

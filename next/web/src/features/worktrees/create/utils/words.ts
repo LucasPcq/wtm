@@ -89,6 +89,9 @@ export const skipWords: Record<DomainSkip, string | null> = {
   no_orphan: 'no child worktree is left behind',
   safe: 'every worktree is safe to remove',
   no_candidate: 'no worktree is done with',
+  no_descendant: 'no worktree named has worktrees under it',
+  no_rebase: 'nothing is rebased',
+  nothing_to_push: 'nothing would be pushed',
 }
 
 export const actionWords: Record<CreateAction, string> = {

@@ -1,0 +1,10 @@
+
+  ! sync: 1 skipped
+
+  Descendants  none under the named
+  Left as is   feat/gone (its directory is gone)
+
+  ! feat/gone's directory is gone: left as it is
+
+  → wtm-next clean feat/gone   remove what is left of it
+

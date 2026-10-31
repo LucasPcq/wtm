@@ -1,0 +1,11 @@
+$ wtm sync feat/tty-a; echo EXIT=$?
+
+┃  Base  main  <SHA>  (already up to date / no fast-forward)
+┃
+┃  ✓ feat/tty-a rebased onto main   1 commit
+┃
+┃  1 branch(es) ready to push (force-with-lease).
+
+EXIT=0
+$
+

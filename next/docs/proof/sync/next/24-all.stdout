@@ -1,0 +1,15 @@
+
+  ! sync: 6 unchanged · 3 skipped
+
+  On their parent  feat/k1, feat/dirty, feat/solo, feat/k2, feat/dirty-kid, feat/k3
+  Left as is       feat/gone (its directory is gone), feat/s1 (its parents lead back to it), feat/s2 (its parents lead back to it)
+
+  ! feat/gone's directory is gone: left as it is
+  ! the parents of feat/s1 lead back to it: left as it is
+  ! the parents of feat/s2 lead back to it: left as it is
+
+  → wtm-next sync feat/k1 feat/dirty feat/solo feat/k2 feat/k3 --descendants=false --push   push them, force-with-lease
+  → wtm-next clean feat/gone                                                                remove what is left of it
+  → wtm-next reparent feat/s1 --to main                                                     move it onto main
+  → wtm-next reparent feat/s2 --to main                                                     move it onto main
+

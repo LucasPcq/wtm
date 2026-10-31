@@ -25,6 +25,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/reparent"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
+	synccommand "github.com/LucasPcq/wtm/next/internal/command/sync"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 )
@@ -42,6 +43,7 @@ var (
 	openClean       = opener(func(a app) clean.UseCase { return a.Clean })
 	openPrune       = opener(func(a app) prune.UseCase { return a.Prune })
 	openFastForward = opener(func(a app) fastforward.UseCase { return a.FastForward })
+	openSync        = opener(func(a app) synccommand.UseCase { return a.Sync })
 	openExec        = opener(func(a app) exec.UseCase { return a.Exec })
 	openReparent    = opener(func(a app) reparent.UseCase { return a.Reparent })
 	openList        = opener(func(a app) list.UseCase { return a.List })

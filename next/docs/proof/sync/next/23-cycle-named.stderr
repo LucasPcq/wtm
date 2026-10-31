@@ -1,0 +1,4 @@
+
+  ✗ nothing synced: the parents of feat/s1 lead back to it
+  → wtm-next reparent feat/s1 --to main   move it onto main
+

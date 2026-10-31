@@ -1,0 +1,16 @@
+$ wtm sync feat/tty-a; echo EXIT=$?
+
+┃  Base  main  <SHA>  (already up to date / no fast-forward)
+┃
+┃  ✓ feat/tty-a rebased onto main   1 commit
+
+  Push 1 rebased branch(es) to origin?
+
+  Force-pushes the rebased branches with --force-with-lease. No or Esc skips the push — branches sta
+
+▌▸ Keep local
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   Push to origin
+
+  ↑↓ navigate • enter confirm • / filter • esc cancel
+

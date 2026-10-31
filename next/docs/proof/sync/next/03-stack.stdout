@@ -1,0 +1,10 @@
+
+  ✓ sync: 1 done · 1 unchanged
+
+  Descendants      feat/s2
+  Rebase           feat/s2 onto feat/s1 (1 commit)
+  On conflict      abort the rebase, the worktree left as it was
+  On their parent  feat/s1
+
+  → wtm-next sync feat/s1 feat/s2 --descendants=false --push   push them, force-with-lease
+
