@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -71,10 +72,16 @@ func served(t *testing.T, jobs daemon.Jobs, version string) (string, *atomic.Int
 // servedAt serves the protocol on socket, as served does, and returns the number of shutdowns it was asked.
 func servedAt(t *testing.T, socket string, jobs daemon.Jobs, version string) *atomic.Int32 {
 	t.Helper()
+	// As the daemon does, the lock beside the socket is held while it serves and freed only once its listener closed, which a client waits for before it starts the next.
+	lock := holdLock(t, filepath.Join(filepath.Dir(socket), "wtm.lock"))
 	_ = os.Remove(socket)
 	listener, err := net.Listen("unix", socket)
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = listener.Close() })
+	stop := sync.OnceFunc(func() {
+		_ = listener.Close()
+		_ = lock.Close()
+	})
+	t.Cleanup(stop)
 	shutdowns := &atomic.Int32{}
 	go func() {
 		for {
@@ -83,7 +90,7 @@ func servedAt(t *testing.T, socket string, jobs daemon.Jobs, version string) *at
 				return
 			}
 			if line, err := bufio.NewReader(conn).ReadBytes('\n'); err == nil {
-				daemon.Server{Jobs: jobs, Version: version, Stop: func() { shutdowns.Add(1); _ = listener.Close() }}.Serve(conn, line)
+				daemon.Server{Jobs: jobs, Version: version, Stop: func() { shutdowns.Add(1); stop() }}.Serve(conn, line)
 			}
 			_ = conn.Close()
 		}

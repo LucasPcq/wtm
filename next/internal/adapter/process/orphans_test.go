@@ -9,6 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAGroupIsIdentifiedByTheStartItsRecordSays(t *testing.T) {
@@ -68,4 +69,13 @@ func TestThisProcesssOwnGroupIsNeverAJobs(t *testing.T) {
 	for pgid, group := range groups {
 		assert.False(t, group.Alive, "group %d", pgid)
 	}
+}
+
+func TestAZombieMemberIsNoMemberAlive(t *testing.T) {
+	// The leader execs a sleep that never waits: its background child, once exited, stays a zombie of the group.
+	child, _ := spawned(t, "sleep 0 & exec sleep 30", false)
+	require.Eventually(t, func() bool { return zombies(t, child.PID()) == 1 }, 5*time.Second, 20*time.Millisecond)
+
+	assert.Len(t, groupMembers(time.Now())[child.PID()], 1, "the zombie is left out, the leader counted")
+	assert.True(t, groupAlive(child.PID()))
 }

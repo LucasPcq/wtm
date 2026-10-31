@@ -131,7 +131,9 @@ func (c *Child) Wait() int {
 
 // Stop stops the child's whole group as a terminal's hangup would: SIGTERM,
 // then SIGKILL once grace passed with the child still running, and SIGKILL to
-// any member left once it exited. It returns once the child exited.
+// any member left once it exited. It returns once no member of the group is
+// alive, a couple of seconds at most: a member its leader left is reaped by
+// the init process, in its own time.
 func (c *Child) Stop(grace time.Duration) {
 	signalGroup(c.PID(), syscall.SIGTERM)
 	select {
@@ -141,6 +143,10 @@ func (c *Child) Stop(grace time.Duration) {
 		<-c.exited
 	}
 	signalGroup(c.PID(), syscall.SIGKILL)
+	deadline := time.Now().Add(reapGrace)
+	for groupAlive(c.PID()) && time.Now().Before(deadline) {
+		time.Sleep(groupPoll)
+	}
 }
 
 // signalGroup sends signal to the group pgid, a group gone or not ours

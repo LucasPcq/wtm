@@ -28,26 +28,31 @@ type Orphans struct{}
 // nothing: the probe never keeps a daemon from starting.
 func (Orphans) Probe(started map[int]time.Time) map[int]run.Group {
 	groups := make(map[int]run.Group, len(started))
-	alive := false
+	reached := false
 	for pgid := range started {
+		groups[pgid] = run.Group{}
 		// This process's own group is never a job's: a record naming it is read as gone, never reaped.
-		groups[pgid] = run.Group{Alive: pgid != os.Getpid() && pgid != syscall.Getpgrp() && groupAlive(pgid)}
-		alive = alive || groups[pgid].Alive
+		reached = reached || pgid != os.Getpid() && pgid != syscall.Getpgrp() && reachable(pgid)
 	}
-	if !alive {
+	if !reached {
 		return groups
 	}
 
-	starts := groupStarts(time.Now())
+	members := groupMembers(time.Now())
 	for pgid, at := range started {
-		if !groups[pgid].Alive {
+		if pgid == os.Getpid() || pgid == syscall.Getpgrp() {
 			continue
 		}
-		for _, member := range starts[pgid] {
-			if member.Sub(at).Abs() <= startSkew {
-				groups[pgid] = run.Group{Alive: true, Identified: true}
-				break
-			}
+		// A ps that failed identifies none, as the signal says which group is reached: nothing is reaped, nothing alive is called gone.
+		if members == nil {
+			groups[pgid] = run.Group{Alive: reachable(pgid)}
+			continue
+		}
+		for _, member := range members[pgid] {
+			group := groups[pgid]
+			group.Alive = true
+			group.Identified = group.Identified || member.Sub(at).Abs() <= startSkew
+			groups[pgid] = group
 		}
 	}
 
@@ -73,16 +78,30 @@ func (Orphans) Reap(pgids []int) {
 	reaped.Wait()
 }
 
-// groupAlive reports whether this process may signal a member of the group
-// pgid: one it may not is someone else's, which reads as gone.
+// groupAlive reports whether a member of the group pgid is alive: one this
+// process may signal (one it may not is someone else's, which reads as gone)
+// that is no zombie. A member that exited is still reached by a signal until
+// its parent reaps it, the init process for one its group's leader left, in
+// its own time: counting it would read a group stopped as alive.
 func groupAlive(pgid int) bool {
+	if !reachable(pgid) {
+		return false
+	}
+	members := groupMembers(time.Now())
+	return members == nil || len(members[pgid]) > 0
+}
+
+// reachable reports whether this process may signal a member of the group
+// pgid, a zombie included.
+func reachable(pgid int) bool {
 	return pgid > 1 && syscall.Kill(-pgid, 0) == nil
 }
 
-// groupStarts returns when each process of each group started, read from one
-// ps, now being when it ran; nil when ps fails.
-func groupStarts(now time.Time) map[int][]time.Time {
-	out, err := exec.Command("ps", "-Ao", "pgid=,etime=").Output()
+// groupMembers returns when each process of each group that is no zombie
+// started, read from one ps, now being when it ran; nil when ps fails, never
+// nil otherwise.
+func groupMembers(now time.Time) map[int][]time.Time {
+	out, err := exec.Command("ps", "-Ao", "pgid=,etime=,stat=").Output()
 	if err != nil {
 		return nil
 	}
@@ -90,7 +109,7 @@ func groupStarts(now time.Time) map[int][]time.Time {
 	starts := map[int][]time.Time{}
 	for line := range strings.Lines(string(out)) {
 		fields := strings.Fields(line)
-		if len(fields) != 2 {
+		if len(fields) != 3 || strings.HasPrefix(fields[2], "Z") {
 			continue
 		}
 		pgid, err := strconv.Atoi(fields[0])
