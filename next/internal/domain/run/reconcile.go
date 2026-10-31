@@ -58,10 +58,10 @@ func Reconcile(params ReconcileParams) Decision {
 		}
 		return Decision{}
 	}
-	if !params.WorkDirExists || (!record.Claim && !record.Spec.Detached()) {
+	if !params.WorkDirExists || record.Hold() == HoldOwn {
 		return Decision{}
 	}
-	if record.Claim {
+	if record.Hold() == HoldClaim {
 		return Decision{Keep: true}
 	}
 

@@ -66,7 +66,7 @@ var nextWhy = map[nextLayer]string{
 	nextUI:          "ui/ is the presentation kit every command's cli shares and knows no command: domain/*, ui/*, the stdlib and third parties, never a command, a service or an adapter",
 	nextAPI:         "the catalogue knows no command: domain/* and the stdlib only",
 	nextWeb:         "the web server speaks to the core through the catalogue alone: api, domain/* and the stdlib, never a command, a service, an adapter or ui/*",
-	nextDaemon:      "the run daemon reaches the world through the ports it declares and is blind to git: domain/* and the stdlib, never a command, a service, an adapter, ui/*, the catalogue nor the web server",
+	nextDaemon:      "the run daemon reaches the world through the ports it declares and is blind to git: domain/* and the stdlib but os/exec and net, never a command, a service, an adapter, ui/*, the catalogue nor the web server",
 	nextCmd:         "the composition root wires what is under next/, never a fake",
 }
 
@@ -286,8 +286,10 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 	switch from.layer {
 	case nextDomain:
 		return stdlib || in(nextDomain)
-	case nextService, nextAPI, nextDaemon:
+	case nextService, nextAPI:
 		return stdlib || in(nextDomain)
+	case nextDaemon:
+		return stdlib && !daemonBanned(to.path) || in(nextDomain)
 	case nextWeb:
 		return stdlib || in(nextDomain, nextAPI)
 	case nextCommand:
@@ -306,6 +308,11 @@ func nextAdmits(imp nextImport, to nextTarget) bool {
 		return stdlib || thirdParty || to.inNext
 	}
 	return false
+}
+
+// daemonBanned reports whether the run daemon's core may not import the stdlib package at path: it starts no process and opens no socket itself, its ports do.
+func daemonBanned(path string) bool {
+	return path == "os/exec" || path == "net" || strings.HasPrefix(path, "net/")
 }
 
 func testsAlone(roots []string) ([]finding, error) {

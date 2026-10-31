@@ -18,14 +18,14 @@ func TestAServiceIsUpOnceStartedListedIndexedAndAnnounced(t *testing.T) {
 	job, err := w.Start(service("web"), nil)
 
 	require.NoError(t, err)
-	want := run.Job{Name: "web", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, PID: 1000, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}, StartedAt: now}
+	want := run.Job{Name: "web", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldOwn, PID: 1000, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}, StartedAt: now}
 	assert.Equal(t, want, job)
 	assert.Equal(t, []run.Job{want}, w.List(""))
 	assert.Equal(t, []string{"/wt/a:web"}, w.index.names())
 	assert.True(t, w.Busy())
 	require.Len(t, w.bus.lines, 1)
 	assert.Equal(t, domain.Line{V: domain.StreamVersion, TS: "2026-10-31T12:00:00Z", Repo: &domain.Repo{Root: "/repo", CommonDir: "/repo/.git"}, CorrelationID: "start-1",
-		Event: domain.JobStarted{JobChange: domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/a", Path: "/wt/a"}, Job: domain.EventJob{Name: "web", Kind: project.Service, URL: "http://localhost:3100"}}}}, w.bus.lines[0])
+		Event: domain.JobStarted{JobChange: domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/a", Path: "/wt/a"}, Job: domain.EventJob{Name: "web", Kind: project.Service, URL: "http://localhost:3100", Hold: run.HoldOwn}}}}, w.bus.lines[0])
 }
 
 func TestTheServiceRunsWithItsCommandWhereAndWithWhatItsSpecSays(t *testing.T) {
@@ -171,7 +171,7 @@ func TestADetachedLauncherLeavesItsStackUpWithNoProcessOfTheDaemons(t *testing.T
 	job, err := w.Start(stack("db"), func(line run.Line) { lines = append(lines, line.Text) })
 
 	require.NoError(t, err)
-	assert.Equal(t, run.Job{Name: "db", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, Detached: true, Ports: map[string]int{}, StartedAt: now}, job)
+	assert.Equal(t, run.Job{Name: "db", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldDetached, Ports: map[string]int{}, StartedAt: now}, job)
 	assert.Equal(t, []string{"Container db Started"}, lines)
 	assert.False(t, w.spawner.commands[0].Terminal)
 	assert.False(t, w.Busy(), "a stack keeps no daemon up")
@@ -295,22 +295,58 @@ func TestAdoptReapsOrphansListsCrashedAndKeepsStacksAndClaims(t *testing.T) {
 
 	assert.Equal(t, []int{100}, w.orphans.reaped, "only a group identified as the job's is reaped")
 	assert.Equal(t, []run.Job{
-		{Name: "api", WorkDir: "/wt/a", Kind: project.Service, State: run.Crashed, PID: 200, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}},
-		{Name: "cache", WorkDir: "/wt/a", Up: true, Kind: project.Service, Claim: true, Detached: true, Ports: map[string]int{}, SharedDir: "/repo"},
-		{Name: "db", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, Detached: true, Ports: map[string]int{}, StartedAt: now},
-		{Name: "web", WorkDir: "/wt/a", Kind: project.Service, State: run.Stopped, Reaped: true, PID: 100, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}},
+		{Name: "api", WorkDir: "/wt/a", Kind: project.Service, State: run.Crashed, Hold: run.HoldOwn, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}},
+		{Name: "cache", WorkDir: "/wt/a", Up: true, Kind: project.Service, Hold: run.HoldClaim, Ports: map[string]int{}, SharedDir: "/repo"},
+		{Name: "db", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldDetached, Ports: map[string]int{}, StartedAt: now},
+		{Name: "web", WorkDir: "/wt/a", Kind: project.Service, State: run.Stopped, Hold: run.HoldOwn, Reaped: true, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}},
 	}, w.List(""))
 	assert.Equal(t, []string{"/wt/a:cache", "/wt/a:db"}, w.index.names())
 }
 
-func TestAFrozenIndexIsNeverWritten(t *testing.T) {
-	w := newWorld(t, nil)
-	w.index.frozen = true
-	w.index.records = []run.Record{{Spec: stack("db"), StartedAt: now}}
-
-	w.Adopt()
-	_, err := w.Start(service("web"), nil)
+func TestAStackStaysIndexedWhileItsLauncherRunsAgain(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0)})
+	_, err := w.Start(stack("db"), nil)
 	require.NoError(t, err)
+	delete(w.spawner.scripts, "up db")
 
+	go func() { _, _ = w.Start(stack("db"), nil) }()
+	require.Eventually(t, func() bool { return len(w.spawner.lines()) == 2 }, time.Second, time.Millisecond)
+	w.save()
+
+	assert.Equal(t, []string{"/wt/a:db"}, w.index.names(), "a daemon killed now would lose the stack")
+	w.spawner.process("up db").end(0)
+}
+
+func TestAShutdownDuringARelaunchHandsTheStackOver(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0)})
+	_, err := w.Start(stack("db"), nil)
+	require.NoError(t, err)
+	delete(w.spawner.scripts, "up db")
+	relaunched := make(chan error)
+	go func() { _, err := w.Start(stack("db"), nil); relaunched <- err }()
+	require.Eventually(t, func() bool { return len(w.spawner.lines()) == 2 }, time.Second, time.Millisecond)
+
+	w.Shutdown()
+
+	require.NoError(t, <-relaunched)
+	assert.True(t, w.job(t, "db").Up)
 	assert.Equal(t, []string{"/wt/a:db"}, w.index.names())
+	assert.Equal(t, []string{"up db", "up db"}, w.spawner.lines(), "the stack is left to the next daemon, never stopped")
+}
+
+func TestAStopDuringARelaunchStopsTheStackItself(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(0)})
+	_, err := w.Start(stack("db"), nil)
+	require.NoError(t, err)
+	delete(w.spawner.scripts, "up db")
+	go func() { _, _ = w.Start(stack("db"), nil) }()
+	require.Eventually(t, func() bool { return len(w.spawner.lines()) == 2 }, time.Second, time.Millisecond)
+
+	outcome, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+
+	require.NoError(t, err)
+	assert.Equal(t, run.OutcomeStopped, outcome)
+	assert.Equal(t, []string{"up db", "up db", "down db"}, w.spawner.lines())
+	assert.Equal(t, run.Stopped, w.job(t, "db").State)
+	assert.Empty(t, w.index.names())
 }

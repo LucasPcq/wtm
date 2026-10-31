@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -57,7 +58,7 @@ func TestTheSchemaRefusesWhatTheContractForbids(t *testing.T) {
 	}
 }
 
-func TestTheSchemasPhasesAndSurfacesAreTheCoresEveryOne(t *testing.T) {
+func TestTheSchemasPhasesSurfacesAndHoldsAreTheCoresEveryOne(t *testing.T) {
 	data, err := os.ReadFile("events.v2.json")
 	require.NoError(t, err)
 	var doc struct {
@@ -68,10 +69,18 @@ func TestTheSchemasPhasesAndSurfacesAreTheCoresEveryOne(t *testing.T) {
 			Surface struct {
 				Enum []domain.Surface `json:"enum"`
 			} `json:"surface"`
+			Job struct {
+				Properties struct {
+					Hold struct {
+						Enum []run.Hold `json:"enum"`
+					} `json:"hold"`
+				} `json:"properties"`
+			} `json:"job"`
 		} `json:"$defs"`
 	}
 	require.NoError(t, json.Unmarshal(data, &doc))
 
 	assert.Equal(t, domain.Phases(), doc.Defs.Phase.Enum)
 	assert.Equal(t, domain.Surfaces(), doc.Defs.Surface.Enum)
+	assert.Equal(t, run.Holds(), doc.Defs.Job.Properties.Hold.Enum)
 }

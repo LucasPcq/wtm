@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -227,9 +228,9 @@ func eventsOfEachType() []domain.Event {
 		domain.Ready{},
 		domain.RepoAdded{},
 		domain.RepoRemoved{},
-		domain.JobStarted{JobChange: domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/a", Path: "/repo/.trees/feat-a"}, Job: domain.EventJob{Name: "web", Kind: project.Service, URL: "http://localhost:3100"}}},
-		domain.JobStopped{JobChange: domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/a", Path: "/repo/.trees/feat-a"}, Job: domain.EventJob{Name: "web", Kind: project.Service}}},
-		domain.JobCrashed{JobChange: domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/a", Path: "/repo/.trees/feat-a"}, Job: domain.EventJob{Name: "web", Kind: project.Service}, ExitCode: new(1), LastLines: []string{"listen EADDRINUSE"}}},
-		domain.JobExited{JobChange: domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/a", Path: "/repo/.trees/feat-a"}, Job: domain.EventJob{Name: "migrate", Kind: project.Task}, ExitCode: new(0)}},
+		domain.JobStarted{JobChange: domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/a", Path: "/repo/.trees/feat-a"}, Job: domain.EventJob{Name: "web", Kind: project.Service, URL: "http://localhost:3100", Hold: run.HoldOwn}}},
+		domain.JobStopped{JobChange: domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/a", Path: "/repo/.trees/feat-a"}, Job: domain.EventJob{Name: "web", Kind: project.Service, Hold: run.HoldOwn}}},
+		domain.JobCrashed{JobChange: domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/a", Path: "/repo/.trees/feat-a"}, Job: domain.EventJob{Name: "web", Kind: project.Service, Hold: run.HoldOwn}, ExitCode: new(1), LastLines: []string{"listen EADDRINUSE"}}},
+		domain.JobExited{JobChange: domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/a", Path: "/repo/.trees/feat-a"}, Job: domain.EventJob{Name: "migrate", Kind: project.Task, Hold: run.HoldOwn}, ExitCode: new(0)}},
 	}
 }

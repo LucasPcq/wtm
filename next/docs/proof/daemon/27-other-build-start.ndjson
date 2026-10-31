@@ -1,1 +1,1 @@
-{"status":"ok","protocol":2,"version":"0.31.0-other","pid":<PID>,"job":{"name":"web","kind":"service","work_dir":"<SB>/acme","state":"running","hold":"own","pid":<PID>,"started_at":"<T>"}}
+{"status":"ok","protocol":2,"version":"0.31.0-other","pid":<PID>,"job":{"name":"web","kind":"service","work_dir":"<SB>/acme","state":"running","hold":"own","pid":<PID>,"started_at":"<T>","status":"running"}}

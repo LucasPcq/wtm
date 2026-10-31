@@ -3,12 +3,19 @@ package daemon
 import (
 	"encoding/json"
 	"errors"
-	"io"
+	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 )
+
+// writeTimeout bounds a write to a client: one that stopped reading is let go rather than holding a job's output.
+const writeTimeout = time.Second
+
+// errClientGone is the error of a write to a client already let go.
+var errClientGone = errors.New("the client stopped reading")
 
 // Jobs is what the server asks of the run daemon it serves.
 type Jobs interface {
@@ -27,15 +34,27 @@ type Server struct {
 	Stop    func()
 }
 
-// Serve answers the request line on conn, the connection it came from.
-func (s Server) Serve(conn io.Writer, line []byte) {
+// Serve answers the request line on conn, the connection it came from. A
+// client that stops reading is let go: a write it does not take within a
+// second fails, and every write after it is dropped, so a job's output never
+// waits on it.
+func (s Server) Serve(conn net.Conn, line []byte) {
 	encoder := json.NewEncoder(conn)
 	var writing sync.Mutex
+	gone := false
 	reply := func(a answer) error {
 		a.Protocol, a.Version, a.PID = run.ProtocolVersion, s.Version, os.Getpid()
 		writing.Lock()
 		defer writing.Unlock()
-		return encoder.Encode(a)
+		if gone {
+			return errClientGone
+		}
+		_ = conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+		if err := encoder.Encode(a); err != nil {
+			gone = true
+			return err
+		}
+		return nil
 	}
 
 	var req request

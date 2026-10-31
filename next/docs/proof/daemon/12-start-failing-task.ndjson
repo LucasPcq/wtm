@@ -1,2 +1,2 @@
 {"status":"line","protocol":2,"version":"<NEXT>","pid":<PID>,"at":"<T>","text":"no database"}
-{"status":"error","protocol":2,"version":"<NEXT>","pid":<PID>,"code":"daemon.task_failed","message":"task broken exited with code 3","exit_code":3,"job":{"name":"broken","kind":"task","work_dir":"<SB>/acme","state":"crashed","hold":"own","pid":<PID>,"exit_code":3}}
+{"status":"error","protocol":2,"version":"<NEXT>","pid":<PID>,"code":"daemon.task_failed","message":"task broken exited with code 3","exit_code":3,"job":{"name":"broken","kind":"task","work_dir":"<SB>/acme","state":"crashed","hold":"own","pid":<PID>,"exit_code":3,"status":"crashed"}}

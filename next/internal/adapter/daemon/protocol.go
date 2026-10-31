@@ -22,10 +22,6 @@ const (
 	statusOK    = "ok"
 	statusError = "error"
 	statusLine  = "line"
-
-	holdOwn      = "own"
-	holdDetached = "detached"
-	holdClaim    = "claim"
 )
 
 // request is the one line a client writes.
@@ -46,7 +42,7 @@ type answer struct {
 	Code     string    `json:"code,omitempty"`
 	Message  string    `json:"message,omitempty"`
 	ExitCode *int      `json:"exit_code,omitempty"`
-	Jobs     []job     `json:"jobs,omitempty"`
+	Jobs     []job     `json:"jobs,omitzero"`
 	Job      *job      `json:"job,omitempty"`
 	Outcome  string    `json:"outcome,omitempty"`
 	At       time.Time `json:"at,omitzero"`
@@ -68,7 +64,8 @@ func (a answer) failure() error {
 }
 
 // job is a job as the daemon reports it. Status is the legacy daemon's word
-// for how it stands, read from one alone.
+// for how it stands: written for a legacy client, which counts the jobs a
+// daemon holds by it, and read from a legacy daemon alone.
 type job struct {
 	Name      string         `json:"name"`
 	Kind      string         `json:"kind,omitempty"`
@@ -87,27 +84,34 @@ type job struct {
 }
 
 func jobOf(j run.Job) job {
-	hold := holdOwn
+	return job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, SharedDir: j.SharedDir, State: string(j.State), Hold: string(j.Hold), Reaped: j.Reaped, PID: j.PID, StartedAt: j.StartedAt, ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports, Status: legacyStatus(j)}
+}
+
+// legacyStatus is the legacy daemon's word for how j stands.
+func legacyStatus(j run.Job) string {
 	switch {
-	case j.Claim:
-		hold = holdClaim
-	case j.Detached:
-		hold = holdDetached
+	case j.Hold == run.HoldClaim:
+		return "joined"
+	case j.Reaped:
+		return "reaped"
+	case j.State == run.Running && j.Hold == run.HoldDetached:
+		return "detached"
+	case j.State == run.Running, j.State == run.Crashed:
+		return string(j.State)
 	}
 
-	return job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, SharedDir: j.SharedDir, State: string(j.State), Hold: hold, Reaped: j.Reaped, PID: j.PID, StartedAt: j.StartedAt, ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports}
+	return "stopped"
 }
 
 // runJob is the job as the client reads it, from a daemon of this protocol, or
 // of the legacy wtm when legacy.
 func (j job) runJob(legacy bool) run.Job {
 	if legacy {
-		return run.Job{Name: j.Name, WorkDir: j.WorkDir, Up: legacyUp(j.Status), Kind: project.JobKind(j.Kind), State: cmp.Or(run.State(j.State), legacyState(j.Status)), Claim: legacyClaim(j.Status), Detached: j.Status == "detached", PID: j.PID, URL: j.URL, ExitCode: j.ExitCode, StartedAt: j.StartedAt, SharedDir: j.SharedDir}
+		return run.Job{Name: j.Name, WorkDir: j.WorkDir, Up: legacyUp(j.Status), Kind: project.JobKind(j.Kind), State: cmp.Or(run.State(j.State), legacyState(j.Status)), Hold: legacyHold(j.Status), PID: j.PID, URL: j.URL, ExitCode: j.ExitCode, StartedAt: j.StartedAt, SharedDir: j.SharedDir}
 	}
 
-	claim := j.Hold == holdClaim
-	state := run.State(j.State)
-	return run.Job{Name: j.Name, WorkDir: j.WorkDir, Up: claim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Claim: claim, Detached: j.Hold == holdDetached, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: j.StartedAt, SharedDir: j.SharedDir}
+	hold, state := run.Hold(j.Hold), run.State(j.State)
+	return run.Job{Name: j.Name, WorkDir: j.WorkDir, Up: hold == run.HoldClaim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Hold: hold, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: j.StartedAt, SharedDir: j.SharedDir}
 }
 
 // legacyUp reports whether a job of the legacy status is up: running in the
@@ -122,10 +126,17 @@ func legacyUp(status string) bool {
 	return false
 }
 
-// legacyClaim reports whether a job of the legacy status is a claim a worktree
-// holds on a shared job another runs.
-func legacyClaim(status string) bool {
-	return status == "joined" || status == "attached"
+// legacyHold is what the legacy daemon holds of a job of status: a claim
+// (joined, attached as older daemons say), a detached stack, or its own.
+func legacyHold(status string) run.Hold {
+	switch status {
+	case "joined", "attached":
+		return run.HoldClaim
+	case "detached":
+		return run.HoldDetached
+	}
+
+	return run.HoldOwn
 }
 
 // legacyState is the state of a job of the legacy status, for a daemon too old
@@ -181,15 +192,26 @@ func (s spec) runSpec() run.Spec {
 // config is a job of run.toml with the keys the legacy wtm's index spells it
 // with, the protocol's and the index's.
 type config struct {
-	Name      string           `json:"name"`
-	Kind      string           `json:"kind"`
-	Cmd       string           `json:"cmd"`
-	Stop      string           `json:"stop,omitempty"`
-	Cwd       string           `json:"cwd,omitempty"`
-	Ports     map[string]int   `json:"ports,omitempty"`
-	URL       *urlConfig       `json:"url,omitempty"`
+	Name  string         `json:"name"`
+	Kind  string         `json:"kind"`
+	Cmd   string         `json:"cmd"`
+	Stop  string         `json:"stop,omitempty"`
+	Cwd   string         `json:"cwd,omitempty"`
+	Ports map[string]int `json:"ports,omitempty"`
+	URL   *urlConfig     `json:"url,omitempty"`
+	legacyKeys
 	Scope     string           `json:"scope,omitempty"`
 	Namespace *namespaceConfig `json:"namespace,omitempty"`
+}
+
+// legacyKeys are the keys of a job of run.toml the legacy index keeps that the
+// run daemon never reads: an index taken over keeps them, written back where
+// and as legacy wrote them.
+type legacyKeys struct {
+	Probe       *bool    `json:"probe,omitempty"`
+	BindsNoPort bool     `json:"binds_no_port,omitempty"`
+	Runs        []string `json:"runs,omitempty"`
+	Touches     []string `json:"touches,omitempty"`
 }
 
 type urlConfig struct {

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
@@ -25,6 +26,9 @@ const (
 	// lockWait is how long a daemon starting waits for the lock: a client probing whether a daemon holds it takes it for an instant.
 	lockWait  = 250 * time.Millisecond
 	lockRetry = 10 * time.Millisecond
+	// acceptRetry is the first wait after an accept that failed, doubling up to acceptRetryMax.
+	acceptRetry    = 5 * time.Millisecond
+	acceptRetryMax = time.Second
 
 	actionPublish   = "publish"
 	actionSubscribe = "subscribe"
@@ -117,15 +121,11 @@ func Serve(ctx context.Context, params ServeParams) error {
 	}
 	// The lock proves no daemon listens on a socket file left behind: one that died without removing it.
 	_ = os.Remove(params.SocketPath)
-	listener, err := net.Listen("unix", params.SocketPath)
+	listener, err := listenOwned(params.SocketPath)
 	if err != nil {
 		return err
 	}
 	defer os.Remove(params.SocketPath)
-	// A request on it runs a command as this user: no one else may connect.
-	if err := os.Chmod(params.SocketPath, 0o600); err != nil {
-		return err
-	}
 
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
@@ -142,16 +142,44 @@ func Serve(ctx context.Context, params ServeParams) error {
 
 	var served sync.WaitGroup
 	defer served.Wait()
+	backoff := acceptRetry
 	for {
 		conn, err := listener.Accept()
-		if err != nil {
+		if err == nil {
+			backoff = acceptRetry
+			served.Go(func() { d.serve(ctx, conn) })
+			continue
+		}
+		if ctx.Err() != nil {
 			if params.Stopping != nil {
 				params.Stopping()
 			}
 			return nil
 		}
-		served.Go(func() { d.serve(ctx, conn) })
+		// A failed accept (too many open files) is no reason to stop the jobs a daemon holds: wait, then accept again, as net/http does.
+		time.Sleep(backoff)
+		backoff = min(2*backoff, acceptRetryMax)
 	}
+}
+
+// listenOwned listens on the unix socket at path, which only this user may connect
+// to: a request on it runs a command as this user. The umask is narrowed
+// around its creation, so the socket is never open to others, even for an
+// instant; nothing else of this process creates a file meanwhile, its
+// requests not being served yet.
+func listenOwned(path string) (net.Listener, error) {
+	umask := syscall.Umask(0o077)
+	listener, err := net.Listen("unix", path)
+	syscall.Umask(umask)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		_ = listener.Close()
+		return nil, err
+	}
+
+	return listener, nil
 }
 
 func lockPath(socketPath string) string {

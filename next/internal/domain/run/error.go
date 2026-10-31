@@ -10,11 +10,12 @@ const (
 	CodeTaskFailed     = "daemon.task_failed"     // a task that exited non-zero
 	CodeStopFailed     = "daemon.stop_failed"     // a stop command that failed
 	CodeStopping       = "daemon.stopping"        // a start once the daemon is stopping
-	CodeSkew           = "daemon.skew"            // a daemon of another build or protocol holding jobs
-	CodeLegacy         = "daemon.legacy"          // the legacy wtm's daemon holding jobs
+	CodeSkew           = "daemon.skew"            // a daemon of another build or protocol holding jobs: run daemon restart hands them over
+	CodeLegacy         = "daemon.legacy"          // the legacy wtm's daemon holding jobs: run daemon restart hands them over
 	CodeBusy           = "daemon.busy"            // a process holding the socket that is no run daemon
 	CodeSocketTooLong  = "daemon.socket_path_too_long"
 	CodeStartFailed    = "daemon.start_failed" // a daemon that did not start
+	CodeStopTimeout    = "daemon.stop_timeout" // a daemon asked to stop that did not
 )
 
 // An Error is what a run daemon refused or failed: its Code, its Message, and

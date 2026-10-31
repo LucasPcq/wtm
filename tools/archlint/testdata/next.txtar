@@ -313,7 +313,9 @@ var _ http.Handler
 package daemon
 
 import (
-	"net"
+	"net" // want `next/internal/daemon must not import "net" — the run daemon reaches the world through the ports it declares and is blind to git`
+	_ "os/exec" // want `next/internal/daemon must not import "os/exec" — the run daemon reaches the world through the ports it declares and is blind to git`
+	"time"
 
 	_ "github.com/LucasPcq/wtm/next/internal/adapter/git" // want `next/internal/daemon must not import "github.com/LucasPcq/wtm/next/internal/adapter/git" — the run daemon reaches the world through the ports it declares and is blind to git`
 	_ "github.com/LucasPcq/wtm/next/internal/api" // want `next/internal/daemon must not import "github.com/LucasPcq/wtm/next/internal/api" — the run daemon reaches the world through the ports it declares and is blind to git`
@@ -324,6 +326,7 @@ import (
 )
 
 var _ net.Listener
+var _ time.Duration
 -- github.com/LucasPcq/wtm/next/internal/daemon/sub/sub.go --
 // Package sub is nested under the run daemon.
 package sub // want `next/internal/daemon/sub is in no row of next/'s import table`

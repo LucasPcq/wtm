@@ -12,7 +12,7 @@ import (
 var started = time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC)
 
 // web is a foreground service up, as the run daemon lists it.
-var web = run.Job{Name: "web", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, PID: 4242, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}, StartedAt: started}
+var web = run.Job{Name: "web", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldOwn, PID: 4242, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}, StartedAt: started}
 
 // jobs is a run daemon a test scripts: what it lists, prints, refuses, and every request it got.
 type jobs struct {
@@ -22,6 +22,7 @@ type jobs struct {
 	err      error
 	outcome  run.Outcome
 	requests []any
+	returned chan struct{}
 }
 
 func (j *jobs) record(req any) {
@@ -39,6 +40,9 @@ func (j *jobs) Start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 	j.record(spec)
 	for _, line := range j.lines {
 		out(run.Line{At: started, Text: line})
+	}
+	if j.returned != nil {
+		close(j.returned)
 	}
 	return web, j.err
 }

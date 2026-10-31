@@ -142,27 +142,22 @@ func (o *orphans) Reap(pgids []int) {
 	slices.Sort(o.reaped)
 }
 
-// index is an index in memory, frozen or not.
+// index is an index in memory.
 type index struct {
 	mu      sync.Mutex
 	records []run.Record
-	frozen  bool
-	saves   int
 }
 
-func (i *index) Load() ([]run.Record, bool) {
+func (i *index) Load() []run.Record {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	return slices.Clone(i.records), i.frozen
+	return slices.Clone(i.records)
 }
 
 func (i *index) Save(records []run.Record) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	i.saves++
-	if !i.frozen {
-		i.records = records
-	}
+	i.records = records
 	return nil
 }
 

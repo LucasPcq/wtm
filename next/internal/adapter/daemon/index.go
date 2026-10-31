@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
@@ -15,9 +16,19 @@ import (
 const branchKey = "WTM_BRANCH"
 
 // Index is the daemon's index of the jobs up, the file at Path, in the legacy
-// wtm's format so a daemon of either takes over what the other left.
+// wtm's format so a daemon of either takes over what the other left, byte for
+// byte: the keys of a job's config it does not read are kept from Load to the
+// Saves after it. Safe for concurrent use; not to be copied once used.
 type Index struct {
 	Path string
+
+	mu   sync.Mutex
+	kept map[jobKey]legacyKeys
+}
+
+type jobKey struct {
+	workDir string
+	name    string
 }
 
 // state is the file: its version and the jobs up.
@@ -62,36 +73,43 @@ type eventOrigin struct {
 
 // Load returns the records of the index: none when it is absent, cannot be
 // read (a daemon killed mid-write leaves the previous file, atomic writes
-// aside) or is of another version, and whether a newer wtm wrote it.
-func (i Index) Load() ([]run.Record, bool) {
+// aside) or is of another version, an older or a newer wtm's.
+func (i *Index) Load() []run.Record {
 	data, err := os.ReadFile(i.Path)
 	if err != nil {
-		return nil, false
+		return nil
 	}
 	var file state
 	if json.Unmarshal(data, &file) != nil {
-		return nil, false
+		return nil
 	}
-	read, frozen := run.IndexAccess(file.Version)
-	if !read {
-		return nil, frozen
+	if read, _ := run.IndexAccess(file.Version); !read {
+		return nil
 	}
 
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.kept = map[jobKey]legacyKeys{}
 	records := make([]run.Record, 0, len(file.Jobs))
 	for _, r := range file.Jobs {
+		i.kept[jobKey{workDir: r.WorkDir, name: r.Name}] = r.Config.legacyKeys
 		records = append(records, r.runRecord())
 	}
 
-	return records, false
+	return records
 }
 
 // Save replaces the index with records, atomically, unless a newer wtm wrote
 // it: its record of what it started is left as it is.
-func (i Index) Save(records []run.Record) error {
+func (i *Index) Save(records []run.Record) error {
 	file := state{Version: run.IndexVersion, Jobs: make([]record, 0, len(records))}
+	i.mu.Lock()
 	for _, r := range records {
-		file.Jobs = append(file.Jobs, recordOf(r))
+		wire := recordOf(r)
+		wire.Config.legacyKeys = i.kept[jobKey{workDir: wire.WorkDir, name: wire.Name}]
+		file.Jobs = append(file.Jobs, wire)
 	}
+	i.mu.Unlock()
 	data, err := json.Marshal(file)
 	if err != nil {
 		return err

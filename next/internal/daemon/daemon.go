@@ -54,15 +54,19 @@ type key struct {
 }
 
 // A job is what the daemon knows of one: its record; its state and how it
-// ended; its process while one of the daemon's runs it; whether a stop reached
-// it and for which command; and done, closed once the end of its process is
+// ended; whether it was taken over from the daemon before (adopted); its
+// process while one of the daemon's runs it; the job up it replaces while its
+// launcher runs again (previous, a detached stack); whether a stop reached it
+// and for which command; and done, closed once the end of its process is
 // settled.
 type job struct {
 	record   run.Record
 	state    run.State
 	reaped   bool
+	adopted  bool
 	exitCode *int
 	process  Process
+	previous *job
 	stopped  bool
 	stopID   string
 	done     chan struct{}
@@ -86,7 +90,7 @@ func New(params Params) *Daemon {
 // process died with it is listed crashed, a detached stack and a claim come
 // back as they were. It then rewrites the index.
 func (d *Daemon) Adopt() {
-	records, _ := d.params.Index.Load()
+	records := d.params.Index.Load()
 	started := map[int]time.Time{}
 	for _, record := range records {
 		if record.Foreground() && record.PGID > 1 {
@@ -109,7 +113,7 @@ func (d *Daemon) Adopt() {
 		if decision.Reaped {
 			reap = append(reap, record.PGID)
 		}
-		d.jobs[k] = &job{record: record, state: decision.State, reaped: decision.Reaped, done: closed()}
+		d.jobs[k] = &job{record: record, state: decision.State, reaped: decision.Reaped, adopted: true, done: closed()}
 	}
 	d.mu.Unlock()
 
@@ -155,6 +159,9 @@ func (d *Daemon) Start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 		return run.Job{}, &run.Error{Code: run.CodeLaunchFailed, Message: fmt.Sprintf("start job %s: %v", spec.Job.Name, err)}
 	}
 	j := &job{record: run.Record{Spec: spec, StartedAt: d.params.Now(), PID: process.PID(), PGID: process.PID()}, state: run.Running, process: process, done: make(chan struct{})}
+	if previous != nil && previous.up() {
+		j.previous = previous
+	}
 	d.jobs[k] = j
 	d.mu.Unlock()
 
@@ -163,7 +170,7 @@ func (d *Daemon) Start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 		d.publish(j, publishParams{Event: domain.JobStarted{JobChange: j.change(nil)}})
 		return d.runTask(j, output)
 	case spec.Detached():
-		return d.launch(launchParams{Job: j, Previous: previous, Output: output})
+		return d.launch(launchParams{Job: j, Output: output})
 	}
 	d.publish(j, publishParams{Event: domain.JobStarted{JobChange: j.change(nil)}})
 	d.save()
@@ -184,18 +191,16 @@ func (d *Daemon) runTask(j *job, output *tail) (run.Job, error) {
 	return view, &run.Error{Code: run.CodeTaskFailed, Message: fmt.Sprintf("task %s exited with code %d", view.Name, *view.ExitCode), ExitCode: view.ExitCode}
 }
 
-// launchParams is a detached launcher started, the job it replaces in its
-// worktree (a stack up whose launcher runs again, nil for none), and its
-// output.
+// launchParams is a detached launcher started, and its output.
 type launchParams struct {
-	Job      *job
-	Previous *job
-	Output   *tail
+	Job    *job
+	Output *tail
 }
 
 // launch waits for a detached launcher to exit: its stack is then up, with no
 // process of the daemon's; a launcher that failed gives the worktree back the
-// stack it had, if any. A stop that reached the launcher has the last word.
+// stack it had, if any, and so does a shutdown that stopped it, for the next
+// daemon. A stop a client sent has the last word.
 func (d *Daemon) launch(params launchParams) (run.Job, error) {
 	j := params.Job
 	code := j.process.Wait()
@@ -204,17 +209,20 @@ func (d *Daemon) launch(params launchParams) (run.Job, error) {
 	d.mu.Lock()
 	j.process = nil
 	stopped := j.stopped
+	k := keyOf(j.record.Spec)
 	switch {
+	case stopped && d.stopping && j.previous != nil:
+		d.jobs[k] = j.previous
 	case stopped:
 		j.state = run.Stopped
 	case code != 0:
 		j.exitCode = &code
-		k := keyOf(j.record.Spec)
 		delete(d.jobs, k)
-		if params.Previous != nil {
-			d.jobs[k] = params.Previous
+		if j.previous != nil {
+			d.jobs[k] = j.previous
 		}
 	}
+	j.previous = nil
 	d.mu.Unlock()
 	defer close(j.done)
 	if !stopped && code != 0 {
@@ -304,6 +312,10 @@ func (d *Daemon) Stop(req run.Stop) (run.Outcome, error) {
 	case process != nil:
 		process.Stop(d.params.Grace)
 		<-done
+		// A launcher stopped may have started its stack, or be starting one again: its stop command takes it down, unless a shutdown leaves it to the next daemon.
+		if j.record.Hold() == run.HoldDetached && !d.isStopping() {
+			return run.OutcomeStopped, d.stopStack(j)
+		}
 	default:
 		if err := d.stopStack(j); err != nil {
 			return "", err
@@ -358,6 +370,13 @@ func (d *Daemon) StopAll(req run.StopAll) ([]run.StoppedJob, error) {
 	stopping.Wait()
 
 	return reached, cmp.Or(slices.DeleteFunc(errs, func(err error) bool { return err == nil })...)
+}
+
+func (d *Daemon) isStopping() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	return d.stopping
 }
 
 // Shutdown refuses every later start and stops every process of the daemon's
@@ -431,8 +450,7 @@ func (j *job) viewLocked() run.Job {
 		Up:        j.up(),
 		Kind:      spec.Job.Kind,
 		State:     j.state,
-		Claim:     j.record.Claim,
-		Detached:  spec.Detached(),
+		Hold:      j.record.Hold(),
 		Reaped:    j.reaped,
 		URL:       spec.URL(),
 		Ports:     spec.Ports(),
@@ -442,8 +460,8 @@ func (j *job) viewLocked() run.Job {
 	if view.Up {
 		view.StartedAt = j.record.StartedAt
 	}
-	// A detached stack's launcher is gone and a claim runs nothing: a pid would point at nothing, or in time at a stranger.
-	if !view.Claim && !view.Detached {
+	// A detached stack's launcher is gone, a claim runs nothing, and a process taken over from the daemon before is dead or reaped: a pid would point at nothing, or in time at a stranger.
+	if view.Hold == run.HoldOwn && !j.adopted {
 		view.PID = j.record.PID
 	}
 
@@ -460,7 +478,7 @@ func (j *job) up() bool {
 
 // save rewrites the index with the jobs up a next daemon can take over: the
 // foreground services, the detached stacks and the claims, never a task nor a
-// launcher still running.
+// launcher still running, but the stack a launcher running again replaces.
 func (d *Daemon) save() {
 	d.saving.Lock()
 	defer d.saving.Unlock()
@@ -468,9 +486,12 @@ func (d *Daemon) save() {
 	d.mu.Lock()
 	var records []run.Record
 	for _, j := range d.jobs {
-		spec := j.record.Spec
-		kept := j.record.Claim || (j.state == run.Running && (j.record.Foreground() || spec.Detached() && j.process == nil))
-		if kept {
+		hold := j.record.Hold()
+		switch {
+		// A stack launched again stays up while its launcher runs: a daemon killed then must hand it over.
+		case j.process != nil && j.previous != nil:
+			records = append(records, j.previous.record)
+		case hold == run.HoldClaim, j.state == run.Running && (j.record.Foreground() || hold == run.HoldDetached && j.process == nil):
 			records = append(records, j.record)
 		}
 	}
@@ -516,7 +537,7 @@ func (j *job) change(code *int) domain.JobChange {
 
 	return domain.JobChange{
 		Worktree: domain.JobWorktree{Branch: branch, Path: spec.WorkDir},
-		Job:      domain.EventJob{Name: spec.Job.Name, Kind: spec.Job.Kind, URL: spec.URL(), Detached: spec.Detached()},
+		Job:      domain.EventJob{Name: spec.Job.Name, Kind: spec.Job.Kind, URL: spec.URL(), Hold: j.record.Hold()},
 		ExitCode: code,
 	}
 }

@@ -1,2 +1,2 @@
 {"status":"line","protocol":2,"version":"<NEXT>","pid":<PID>,"at":"<T>","text":"2 migrations applied"}
-{"status":"ok","protocol":2,"version":"<NEXT>","pid":<PID>,"job":{"name":"migrate","kind":"task","work_dir":"<SB>/acme","state":"exited","hold":"own","pid":<PID>,"exit_code":0}}
+{"status":"ok","protocol":2,"version":"<NEXT>","pid":<PID>,"job":{"name":"migrate","kind":"task","work_dir":"<SB>/acme","state":"exited","hold":"own","pid":<PID>,"exit_code":0,"status":"stopped"}}

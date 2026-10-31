@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
@@ -171,12 +172,12 @@ type JobWorktree struct {
 	Path   string `json:"path"`
 }
 
-// EventJob is the job a job event is about: its name, its kind, its URL, and whether it is detached (a stack its launcher left running).
+// EventJob is the job a job event is about: its name, its kind, its URL, and what of it the run daemon holds.
 type EventJob struct {
-	Name     string          `json:"name"`
-	Kind     project.JobKind `json:"kind"`
-	URL      string          `json:"url,omitempty"`
-	Detached bool            `json:"detached,omitempty"`
+	Name string          `json:"name"`
+	Kind project.JobKind `json:"kind"`
+	URL  string          `json:"url,omitempty"`
+	Hold run.Hold        `json:"hold"`
 }
 
 // JobStarted reports that the run daemon started a job: a foreground service is up, a detached launcher left its stack running, a task began.

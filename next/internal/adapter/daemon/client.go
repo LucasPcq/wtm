@@ -53,6 +53,13 @@ func LogPath(socket string) string {
 	return filepath.Join(filepath.Dir(socket), logName)
 }
 
+// EmptyLog empties the log of the daemon listening on socket, as that daemon
+// starts, once it holds the lock: a daemon that loses the race to another
+// leaves the winner's log as it is.
+func EmptyLog(socket string) {
+	_ = os.Truncate(LogPath(socket), 0)
+}
+
 // IndexPath returns the index of jobs of the daemon listening on socket.
 func IndexPath(socket string) string {
 	return filepath.Join(filepath.Dir(socket), indexName)
@@ -79,7 +86,7 @@ func (d Daemon) Jobs(ctx context.Context) ([]run.Job, error) {
 	}
 	skew := run.SkewOf(listing.stamp(), d.Version)
 	if skew == run.SkewProtocol {
-		return nil, &run.Error{Code: run.CodeSkew, Message: fmt.Sprintf("the run daemon speaks protocol %d, this wtm %d: restart it (wtm run daemon restart)", listing.Protocol, run.ProtocolVersion)}
+		return nil, &run.Error{Code: run.CodeSkew, Message: fmt.Sprintf("the run daemon speaks protocol %d, this wtm %d", listing.Protocol, run.ProtocolVersion)}
 	}
 
 	jobs := make([]run.Job, 0, len(listing.Jobs))
@@ -92,15 +99,14 @@ func (d Daemon) Jobs(ctx context.Context) ([]run.Job, error) {
 
 // indexed returns the jobs the index says are up with no daemon to ask.
 func (d Daemon) indexed() ([]run.Job, error) {
-	records, _ := Index{Path: IndexPath(d.SocketPath)}.Load()
 	var jobs []run.Job
-	for _, record := range records {
-		spec := record.Spec
-		if !record.Claim && !spec.Detached() {
+	for _, record := range (&Index{Path: IndexPath(d.SocketPath)}).Load() {
+		spec, hold := record.Spec, record.Hold()
+		if hold == run.HoldOwn {
 			return nil, run.ErrUnknown
 		}
-		job := run.Job{Name: spec.Job.Name, WorkDir: spec.WorkDir, Up: true, Kind: spec.Job.Kind, Claim: record.Claim, Detached: !record.Claim, SharedDir: record.SharedDir}
-		if !record.Claim {
+		job := run.Job{Name: spec.Job.Name, WorkDir: spec.WorkDir, Up: true, Kind: spec.Job.Kind, Hold: hold, SharedDir: record.SharedDir}
+		if hold == run.HoldDetached {
 			job.State, job.StartedAt = run.Running, record.StartedAt
 		}
 		jobs = append(jobs, job)
@@ -190,7 +196,7 @@ func (d Daemon) reach(ctx context.Context, params reachParams) (answer, error) {
 	if !errors.Is(err, errNoDaemon) {
 		return answered, err
 	}
-	records, _ := Index{Path: IndexPath(d.SocketPath)}.Load()
+	records := (&Index{Path: IndexPath(d.SocketPath)}).Load()
 	if !slices.ContainsFunc(records, func(record run.Record) bool { return params.WorkDir == "" || record.Spec.WorkDir == params.WorkDir }) {
 		return answer{}, err
 	}
@@ -231,6 +237,10 @@ func (d Daemon) Ensure(ctx context.Context) error {
 			up++
 		}
 	}
+	// A daemon of another protocol spells its jobs in a shape this wtm cannot read: each one it lists is taken as held.
+	if skew == run.SkewProtocol {
+		up = len(listing.Jobs)
+	}
 	if skew == run.SkewNone {
 		return nil
 	}
@@ -248,7 +258,7 @@ func (d Daemon) Ensure(ctx context.Context) error {
 // then starts one.
 func (d Daemon) afterBus(ctx context.Context) error {
 	if err := d.poll(ctx, pollParams{Within: startWait, Done: d.unlocked}); err != nil {
-		return &run.Error{Code: run.CodeBusy, Message: "a process that is no run daemon holds its socket " + d.SocketPath + " (an older wtm-next's event bus): it stops once idle, try again in a minute"}
+		return &run.Error{Code: run.CodeBusy, Message: "a process that is no run daemon holds its socket " + d.SocketPath + " (an older wtm-next's event bus): it stops once idle"}
 	}
 
 	return d.launch(ctx)
@@ -269,7 +279,7 @@ func skewed(params skewedParams) error {
 		code, daemon = run.CodeLegacy, "the legacy wtm "+cmp.Or(params.Daemon, "of an older build")
 	}
 
-	return &run.Error{Code: code, Message: fmt.Sprintf("the run daemon is %s, this is wtm %s, and it runs %d job(s): restart it to hand them over to this wtm (wtm run daemon restart)", daemon, params.Client, params.Up)}
+	return &run.Error{Code: code, Message: fmt.Sprintf("the run daemon is %s, this is wtm %s, and it runs %d job(s)", daemon, params.Client, params.Up)}
 }
 
 // Shutdown asks the daemon to stop and returns once it is gone: its foreground
@@ -288,7 +298,7 @@ func (d Daemon) Shutdown(ctx context.Context) error {
 	}
 
 	if err := d.poll(ctx, pollParams{Within: shutdownWait, Done: d.unlocked}); err != nil {
-		return &run.Error{Code: run.CodeStartFailed, Message: fmt.Sprintf("the run daemon did not stop within %v", shutdownWait)}
+		return &run.Error{Code: run.CodeStopTimeout, Message: fmt.Sprintf("the run daemon did not stop within %v", shutdownWait)}
 	}
 
 	return nil

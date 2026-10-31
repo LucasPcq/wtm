@@ -22,9 +22,9 @@ func TestALegacyDaemonsJobsAreReadAsItSpellsThem(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, []run.Job{
-		{Name: "web", WorkDir: "/wt/a", Up: true, State: run.Running, Detached: true},
-		{Name: "api", WorkDir: "/wt/a", State: run.Stopped},
-		{Name: "db", WorkDir: "/wt/b", Up: true, Claim: true},
+		{Name: "web", WorkDir: "/wt/a", Up: true, State: run.Running, Hold: run.HoldDetached},
+		{Name: "api", WorkDir: "/wt/a", State: run.Stopped, Hold: run.HoldOwn},
+		{Name: "db", WorkDir: "/wt/b", Up: true, Hold: run.HoldClaim},
 	}, jobs)
 	assert.Equal(t, map[string]any{"action": "list"}, <-requests)
 }
@@ -39,8 +39,8 @@ func TestALegacyJobIsReadWithHowItStandsAndAStateTheDaemonSaysWins(t *testing.T)
 	require.NoError(t, err)
 	exit := 1
 	assert.Equal(t, []run.Job{
-		{Name: "api", WorkDir: "/wt/a", Kind: project.Service, State: run.Crashed, URL: "http://api.a.acme.localhost", ExitCode: &exit, StartedAt: time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC), SharedDir: "/repo"},
-		{Name: "migrate", WorkDir: "/wt/a", Kind: project.Task, State: run.Exited},
+		{Name: "api", WorkDir: "/wt/a", Kind: project.Service, State: run.Crashed, Hold: run.HoldOwn, URL: "http://api.a.acme.localhost", ExitCode: &exit, StartedAt: time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC), SharedDir: "/repo"},
+		{Name: "migrate", WorkDir: "/wt/a", Kind: project.Task, State: run.Exited, Hold: run.HoldOwn},
 	}, jobs)
 }
 
@@ -82,20 +82,20 @@ func TestWithNoDaemonTheStacksAndClaimsOfTheIndexAreUp(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, []run.Job{
-		{Name: "db", WorkDir: "/repo", Up: true, Kind: project.Service, State: run.Running, Detached: true, StartedAt: started},
-		{Name: "db", WorkDir: "/wt/a", Up: true, Kind: project.Service, Claim: true, SharedDir: "/repo"},
+		{Name: "db", WorkDir: "/repo", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldDetached, StartedAt: started},
+		{Name: "db", WorkDir: "/wt/a", Up: true, Kind: project.Service, Hold: run.HoldClaim, SharedDir: "/repo"},
 	}, jobs)
 }
 
 func TestADaemonOfThisProtocolIsReadAsItReports(t *testing.T) {
-	claim := run.Job{Name: "db", WorkDir: "/wt/a", Up: true, Kind: project.Service, Claim: true, Detached: true, Ports: map[string]int{}, SharedDir: "/repo"}
+	claim := run.Job{Name: "db", WorkDir: "/wt/a", Up: true, Kind: project.Service, Hold: run.HoldClaim, Ports: map[string]int{}, SharedDir: "/repo"}
 	reaped := run.Job{Name: "worker", WorkDir: "/wt/a", Kind: project.Service, State: run.Stopped, Reaped: true, PID: 77}
 	socket, _ := served(t, &jobs{listed: []run.Job{web, claim, reaped}}, "1.0")
 
 	got, err := daemon.Daemon{SocketPath: socket, Version: "0.9"}.Jobs(t.Context())
 
 	require.NoError(t, err)
-	claim.Detached, claim.Ports = false, nil
+	claim.Ports = nil
 	assert.Equal(t, []run.Job{web, claim, reaped}, got, "a build skew changes nothing of a read")
 }
 
@@ -169,14 +169,14 @@ func TestEnsureReplacesASkewedDaemonHoldingNoJob(t *testing.T) {
 	assert.Equal(t, 1, launched)
 }
 
-func TestEnsureRefusesASkewedDaemonHoldingJobsNamingTheRestart(t *testing.T) {
+func TestEnsureRefusesASkewedDaemonHoldingJobs(t *testing.T) {
 	cases := map[string]struct {
 		answer string
 		code   string
 		says   string
 	}{
-		"build":  {answer: `{"status":"ok","protocol":2,"version":"0.9","jobs":[{"name":"web","work_dir":"/wt/a","state":"running","hold":"own"}]}`, code: run.CodeSkew, says: "the run daemon is wtm 0.9, this is wtm 1.0, and it runs 1 job(s): restart it to hand them over to this wtm (wtm run daemon restart)"},
-		"legacy": {answer: `{"status":"ok","version":"0.30.1","daemon_pid":12,"jobs":[{"name":"web","status":"running"},{"name":"db","status":"detached"},{"name":"api","status":"crashed"}]}`, code: run.CodeLegacy, says: "the run daemon is the legacy wtm 0.30.1, this is wtm 1.0, and it runs 2 job(s): restart it to hand them over to this wtm (wtm run daemon restart)"},
+		"build":  {answer: `{"status":"ok","protocol":2,"version":"0.9","jobs":[{"name":"web","work_dir":"/wt/a","state":"running","hold":"own"}]}`, code: run.CodeSkew, says: "the run daemon is wtm 0.9, this is wtm 1.0, and it runs 1 job(s)"},
+		"legacy": {answer: `{"status":"ok","version":"0.30.1","daemon_pid":12,"jobs":[{"name":"web","status":"running"},{"name":"db","status":"detached"},{"name":"api","status":"crashed"}]}`, code: run.CodeLegacy, says: "the run daemon is the legacy wtm 0.30.1, this is wtm 1.0, and it runs 2 job(s)"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -281,4 +281,16 @@ func TestShutdownAsksTheDaemonAndWaitsForItsLock(t *testing.T) {
 	require.NoError(t, daemon.Daemon{SocketPath: socket}.Shutdown(t.Context()), "none answering is no error")
 
 	assert.Equal(t, int32(1), shutdowns.Load())
+}
+
+func TestEnsureTakesEveryJobADaemonOfAnotherProtocolListsAsHeld(t *testing.T) {
+	socket, requests := serve(t, `{"status":"ok","protocol":3,"version":"2.0","jobs":[{"name":"web","shape":"new"}]}`)
+
+	err := daemon.Daemon{SocketPath: socket, Version: "1.0", StartDaemon: func() error { t.Fatal("started a daemon"); return nil }}.Ensure(t.Context())
+
+	var refusal *run.Error
+	require.ErrorAs(t, err, &refusal)
+	assert.Equal(t, run.CodeSkew, refusal.Code)
+	<-requests
+	assert.Empty(t, requests, "it is not asked to stop")
 }

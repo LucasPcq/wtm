@@ -35,11 +35,10 @@ type Orphans interface {
 
 // Index is the daemon's record of the jobs up, for the next daemon.
 type Index interface {
-	// Load returns the records of the index, none when it is absent or cannot
-	// be read, and whether it is frozen: written by a newer wtm, which Save
-	// then leaves alone.
-	Load() (records []run.Record, frozen bool)
-	// Save replaces the index with records, unless it is frozen.
+	// Load returns the records of the index, none when it is absent, cannot
+	// be read, or a newer wtm wrote it.
+	Load() []run.Record
+	// Save replaces the index with records, unless a newer wtm wrote it.
 	Save(records []run.Record) error
 }
 

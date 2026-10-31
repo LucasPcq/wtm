@@ -25,11 +25,14 @@ func TestADetachedChildRunsInASessionOfItsOwnWithTheEnvironmentGiven(t *testing.
 	assert.Equal(t, fields[2], fields[1], "the child does not lead a group of its own")
 }
 
-func TestADetachedChildWritesItsStandardErrorToItsLogEmptiedFirst(t *testing.T) {
+func TestADetachedChildAppendsItsStandardErrorToItsLog(t *testing.T) {
 	log := filepath.Join(t.TempDir(), "daemon.log")
 	require.NoError(t, os.WriteFile(log, []byte("an older start\n"), 0o600))
 
 	require.NoError(t, Detached(DetachedParams{Name: "sh", Args: []string{"-c", "echo out; echo listen: invalid argument >&2"}, Log: log}))
 
-	require.Eventually(t, func() bool { data, _ := os.ReadFile(log); return string(data) == "listen: invalid argument\n" }, 5*time.Second, 20*time.Millisecond)
+	require.Eventually(t, func() bool {
+		data, _ := os.ReadFile(log)
+		return string(data) == "an older start\nlisten: invalid argument\n"
+	}, 5*time.Second, 20*time.Millisecond)
 }

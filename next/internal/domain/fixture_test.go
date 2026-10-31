@@ -4,6 +4,7 @@ import (
 	"maps"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
@@ -30,10 +31,10 @@ var everyEvent = []Event{
 	JobStarted{JobChange: job},
 	JobStopped{JobChange: job},
 	JobCrashed{JobChange: JobChange{Worktree: job.Worktree, Job: job.Job, ExitCode: new(1), LastLines: []string{"listen EADDRINUSE"}}},
-	JobExited{JobChange: JobChange{Worktree: job.Worktree, Job: EventJob{Name: "migrate", Kind: project.Task}, ExitCode: new(0)}},
+	JobExited{JobChange: JobChange{Worktree: job.Worktree, Job: EventJob{Name: "migrate", Kind: project.Task, Hold: run.HoldOwn}, ExitCode: new(0)}},
 }
 
-var job = JobChange{Worktree: JobWorktree{Branch: "feat/x", Path: "/trees/feat-x"}, Job: EventJob{Name: "web", Kind: project.Service, URL: "http://localhost:3100"}}
+var job = JobChange{Worktree: JobWorktree{Branch: "feat/x", Path: "/trees/feat-x"}, Job: EventJob{Name: "web", Kind: project.Service, URL: "http://localhost:3100", Hold: run.HoldOwn}}
 
 // wrapper is an error that wraps inner, so a test sees whether AsError looks through wrapping.
 type wrapper struct{ inner error }

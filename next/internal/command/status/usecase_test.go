@@ -270,8 +270,8 @@ func TestASharedJobAWorktreeHoldsReadsAsItsOwnersInstanceOnce(t *testing.T) {
 		Run: project.Run{Declared: true, Jobs: []project.Job{{Name: "db", Kind: project.Service, Scope: project.Shared}}},
 		Jobs: []run.Job{
 			{Name: "db", WorkDir: mainPath, State: run.Crashed, ExitCode: &exit, URL: "http://db.main.localhost", SharedDir: mainPath},
-			{Name: "db", WorkDir: "/repo/.trees/feat/a", Claim: true, Up: true, URL: "http://stale.localhost", SharedDir: mainPath},
-			{Name: "db", WorkDir: "/repo/.trees/feat/a", Claim: true, Up: true, SharedDir: mainPath},
+			{Name: "db", WorkDir: "/repo/.trees/feat/a", Hold: run.HoldClaim, Up: true, URL: "http://stale.localhost", SharedDir: mainPath},
+			{Name: "db", WorkDir: "/repo/.trees/feat/a", Hold: run.HoldClaim, Up: true, SharedDir: mainPath},
 		},
 	})
 

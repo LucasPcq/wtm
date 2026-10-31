@@ -7,7 +7,7 @@ import (
 )
 
 // DetachedParams is a child [Detached] starts: Name run with Args, with Env,
-// its standard error appended to the file at Log, emptied first ("" for none).
+// its standard error appended to the file at Log ("" for none).
 type DetachedParams struct {
 	Name string
 	Args []string
@@ -25,7 +25,7 @@ func Detached(params DetachedParams) error {
 	cmd.Env = params.Env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if params.Log != "" {
-		log, err := os.OpenFile(params.Log, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+		log, err := os.OpenFile(params.Log, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 		if err != nil {
 			return err
 		}

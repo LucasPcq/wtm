@@ -1,12 +1,17 @@
 package daemon_test
 
 import (
+	"net"
+	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEveryAnswerIsStampedWithTheProtocolAndTheBuild(t *testing.T) {
@@ -15,7 +20,7 @@ func TestEveryAnswerIsStampedWithTheProtocolAndTheBuild(t *testing.T) {
 	answers := asked(t, socket, `{"action":"list"}`)
 
 	assert.Equal(t, []map[string]any{{"status": "ok", "protocol": 2.0, "version": "1.0", "jobs": []any{map[string]any{
-		"name": "web", "kind": "service", "work_dir": "/wt/a", "state": "running", "hold": "own", "pid": 4242.0,
+		"name": "web", "kind": "service", "work_dir": "/wt/a", "state": "running", "hold": "own", "status": "running", "pid": 4242.0,
 		"started_at": "2026-10-31T12:00:00Z", "url": "http://localhost:3100", "ports": map[string]any{"PORT": 3100.0},
 	}}}}, answers)
 }
@@ -84,4 +89,50 @@ func TestAShutdownIsAnsweredThenStopsTheDaemon(t *testing.T) {
 
 	assert.Equal(t, "ok", answers[0]["status"])
 	assert.Equal(t, int32(1), shutdowns.Load())
+}
+
+func TestAClientThatStopsReadingNeverHoldsTheJobsOutput(t *testing.T) {
+	daemonJobs := &jobs{lines: slices.Repeat([]string{strings.Repeat("x", 1024)}, 5000), returned: make(chan struct{})}
+	socket, _ := served(t, daemonJobs, "1.0")
+	conn, err := net.Dial("unix", socket)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	_, err = conn.Write([]byte(`{"action":"start","spec":{"job":{"name":"migrate","kind":"task","cmd":"make migrate"},"work_dir":"/wt/a"}}` + "\n"))
+	require.NoError(t, err)
+
+	select {
+	case <-daemonJobs.returned:
+	case <-time.After(5 * time.Second):
+		require.Fail(t, "the job's output waited on a client that does not read")
+	}
+}
+
+func TestEachJobCarriesTheLegacyWordForALegacyClient(t *testing.T) {
+	exit := 1
+	listed := []run.Job{
+		web,
+		{Name: "db", WorkDir: "/wt/a", Up: true, State: run.Running, Hold: run.HoldDetached},
+		{Name: "cache", WorkDir: "/wt/b", Up: true, Hold: run.HoldClaim},
+		{Name: "api", WorkDir: "/wt/a", State: run.Crashed, Hold: run.HoldOwn, ExitCode: &exit},
+		{Name: "worker", WorkDir: "/wt/a", State: run.Stopped, Hold: run.HoldOwn, Reaped: true},
+		{Name: "migrate", WorkDir: "/wt/a", State: run.Exited, Hold: run.HoldOwn},
+	}
+	socket, _ := served(t, &jobs{listed: listed}, "1.0")
+
+	answers := asked(t, socket, `{"action":"list"}`)
+
+	var words []any
+	for _, job := range answers[0]["jobs"].([]any) {
+		words = append(words, job.(map[string]any)["status"])
+	}
+	assert.Equal(t, []any{"running", "detached", "joined", "crashed", "reaped", "stopped"}, words)
+}
+
+func TestAListOfNoJobIsAnEmptyList(t *testing.T) {
+	socket, _ := served(t, &jobs{}, "1.0")
+
+	answers := asked(t, socket, `{"action":"list"}`)
+
+	assert.Equal(t, []any{}, answers[0]["jobs"])
 }

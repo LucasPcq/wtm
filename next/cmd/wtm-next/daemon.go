@@ -47,7 +47,7 @@ func serveDaemon(ctx context.Context, socket string) error {
 	jobs := rundaemon.New(rundaemon.Params{
 		Spawn:   spawn,
 		Orphans: process.Orphans{},
-		Index:   daemon.Index{Path: daemon.IndexPath(socket)},
+		Index:   &daemon.Index{Path: daemon.IndexPath(socket)},
 		Exists:  dirExists,
 		Publish: relay.Publish,
 	})
@@ -55,7 +55,10 @@ func serveDaemon(ctx context.Context, socket string) error {
 		SocketPath: socket,
 		Idle:       daemonIdle,
 		Relay:      relay,
-		Ready:      jobs.Adopt,
+		Ready: func() {
+			daemon.EmptyLog(socket)
+			jobs.Adopt()
+		},
 		Other: func(conn net.Conn, line []byte, stop func()) {
 			daemon.Server{Jobs: jobs, Version: version, Stop: stop}.Serve(conn, line)
 		},

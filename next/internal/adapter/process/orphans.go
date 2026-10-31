@@ -1,6 +1,7 @@
 package process
 
 import (
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -29,7 +30,8 @@ func (Orphans) Probe(started map[int]time.Time) map[int]run.Group {
 	groups := make(map[int]run.Group, len(started))
 	alive := false
 	for pgid := range started {
-		groups[pgid] = run.Group{Alive: groupAlive(pgid)}
+		// This process's own group is never a job's: a record naming it is read as gone, never reaped.
+		groups[pgid] = run.Group{Alive: pgid != os.Getpid() && pgid != syscall.Getpgrp() && groupAlive(pgid)}
 		alive = alive || groups[pgid].Alive
 	}
 	if !alive {
@@ -63,7 +65,9 @@ func (Orphans) Reap(pgids []int) {
 			for groupAlive(pgid) && time.Now().Before(deadline) {
 				time.Sleep(groupPoll)
 			}
-			signalGroup(pgid, syscall.SIGKILL)
+			if groupAlive(pgid) {
+				signalGroup(pgid, syscall.SIGKILL)
+			}
 		})
 	}
 	reaped.Wait()

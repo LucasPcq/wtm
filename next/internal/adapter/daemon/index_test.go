@@ -20,9 +20,8 @@ func TestTheIndexALegacyDaemonWroteIsTakenOver(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "jobs.json")
 	require.NoError(t, os.WriteFile(path, data, 0o600))
 
-	records, frozen := daemon.Index{Path: path}.Load()
+	records := (&daemon.Index{Path: path}).Load()
 
-	assert.False(t, frozen)
 	require.Len(t, records, 3)
 	api := records[0]
 	assert.Equal(t, project.Job{Name: "api", Kind: project.Service, Cmd: "python3 ../../scripts/dev.py api", Cwd: "apps/api", Ports: map[string]int{"PORT": 27841}, URL: &project.URL{Port: "PORT"}}, api.Spec.Job)
@@ -47,10 +46,9 @@ func TestTheIndexKeepsWhatItSavesInTheLegacyFormat(t *testing.T) {
 		Routes:    []run.Route{{Job: "db", Host: "db.localhost", Port: "PORT"}},
 	}
 
-	require.NoError(t, daemon.Index{Path: path}.Save([]run.Record{record}))
-	records, frozen := daemon.Index{Path: path}.Load()
+	require.NoError(t, (&daemon.Index{Path: path}).Save([]run.Record{record}))
+	records := (&daemon.Index{Path: path}).Load()
 
-	assert.False(t, frozen)
 	assert.Equal(t, []run.Record{record}, records)
 	info, err := os.Stat(path)
 	require.NoError(t, err)
@@ -66,11 +64,10 @@ func TestAnIndexANewerWtmWroteIsReadNorWritten(t *testing.T) {
 	newer := `{"version":3,"jobs":[{"shape":"new"}]}`
 	require.NoError(t, os.WriteFile(path, []byte(newer), 0o600))
 
-	records, frozen := daemon.Index{Path: path}.Load()
-	require.NoError(t, daemon.Index{Path: path}.Save(nil))
+	records := (&daemon.Index{Path: path}).Load()
+	require.NoError(t, (&daemon.Index{Path: path}).Save(nil))
 
 	assert.Empty(t, records)
-	assert.True(t, frozen)
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	assert.Equal(t, newer, string(data))
@@ -80,12 +77,24 @@ func TestAnIndexOfAnOlderVersionIsReplaced(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "jobs.json")
 	require.NoError(t, os.WriteFile(path, []byte(`{"version":1,"jobs":[{"name":"web"}]}`), 0o600))
 
-	records, frozen := daemon.Index{Path: path}.Load()
-	require.NoError(t, daemon.Index{Path: path}.Save(nil))
+	records := (&daemon.Index{Path: path}).Load()
+	require.NoError(t, (&daemon.Index{Path: path}).Save(nil))
 
 	assert.Empty(t, records)
-	assert.False(t, frozen)
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	assert.Equal(t, `{"version":2,"jobs":[]}`, string(data))
+}
+
+func TestAnIndexTakenOverIsWrittenBackByteForByte(t *testing.T) {
+	legacy := `{"version":2,"jobs":[{"name":"api","work_dir":"/repo","config":{"name":"api","kind":"service","cmd":"pnpm dev","cwd":"apps/api","ports":{"PORT":3001},"url":{"port":"PORT"},"probe":false,"binds_no_port":true,"runs":["migrate"],"touches":["apps/api"]},"env":{"PORT":"3001","WTM_BRANCH":"main"},"routes":[{"job":"api","host":"api.main.acme.localhost","port":"PORT"}],"log_dir":"/repo/.git/wtm/logs/main","started_at":"2026-10-31T00:51:37.358833+01:00","pid":2282,"pgid":2282,"origin":{"repo":{"root":"/repo","common_dir":"/repo/.git"}}},{"name":"db","work_dir":"/wt/a","config":{"name":"db","kind":"service","cmd":"docker compose up -d","stop":"docker compose down","scope":"shared","namespace":{"name":"app","create":"createdb app","remove":"dropdb app"}},"started_at":"2026-10-31T00:53:08.536943+01:00","joined":true,"shared_dir":"/repo","main_holds":true}]}`
+	path := filepath.Join(t.TempDir(), "jobs.json")
+	require.NoError(t, os.WriteFile(path, []byte(legacy), 0o600))
+	index := &daemon.Index{Path: path}
+
+	require.NoError(t, index.Save(index.Load()))
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, legacy, string(data))
 }

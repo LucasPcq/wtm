@@ -1,6 +1,8 @@
 package process
 
 import (
+	"os"
+	"syscall"
 	"testing"
 	"time"
 
@@ -57,5 +59,13 @@ func TestElapsedIsReadAsPsWritesIt(t *testing.T) {
 			assert.Equal(t, c.ok, ok)
 			assert.Equal(t, c.want, got)
 		})
+	}
+}
+
+func TestThisProcesssOwnGroupIsNeverAJobs(t *testing.T) {
+	groups := Orphans{}.Probe(map[int]time.Time{os.Getpid(): time.Now(), syscall.Getpgrp(): time.Now()})
+
+	for pgid, group := range groups {
+		assert.False(t, group.Alive, "group %d", pgid)
 	}
 }

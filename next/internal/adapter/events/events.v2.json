@@ -173,12 +173,12 @@
     },
     "job": {
       "type": "object",
-      "required": ["name", "kind"],
+      "required": ["name", "kind", "hold"],
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "kind": { "enum": ["service", "task"] },
         "url": { "type": "string", "minLength": 1, "description": "Where the job answers; absent when it publishes none." },
-        "detached": { "type": "boolean", "description": "A stack its launcher left running (a service with a stop command), no process of the daemon's." }
+        "hold": { "enum": ["own", "detached", "claim"], "description": "What of the job the run daemon holds: a process of its own (own), a stack its launcher left running (detached), a worktree's hold on a shared job another worktree runs (claim)." }
       }
     },
     "job.started": {

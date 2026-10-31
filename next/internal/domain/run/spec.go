@@ -78,10 +78,23 @@ type Route struct {
 	Port string
 }
 
+// Hold returns what of the job the daemon holds: a claim, a detached stack, or
+// a process of its own.
+func (r Record) Hold() Hold {
+	switch {
+	case r.Claim:
+		return HoldClaim
+	case r.Spec.Detached():
+		return HoldDetached
+	}
+
+	return HoldOwn
+}
+
 // Foreground reports whether the record is a process the daemon drains, the
-// one kind it can find orphaned: a service with no stop command, no claim.
+// one kind it can find orphaned: a service it holds itself, no task.
 func (r Record) Foreground() bool {
-	return !r.Claim && r.Spec.Job.Kind == project.Service && !r.Spec.Detached()
+	return r.Hold() == HoldOwn && r.Spec.Job.Kind == project.Service
 }
 
 // Dir returns the directory the job runs in: its cwd, read from its worktree

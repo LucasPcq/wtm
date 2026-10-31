@@ -119,8 +119,16 @@ python3 -I "$here/daemon.py" "$socket" '{"action":"list"}' | by_name | normalise
 ask 04-legacy-stop-unknown '{"action":"stop","name":"nope","work_dir":"/x"}'
 # 2. Asked to stop through its own protocol, it stops its services and leaves the stack in the index it shares with next.
 ask 05-legacy-shutdown '{"action":"shutdown"}'
-tries=0
-while [[ -S $socket ]]; do ((tries++ < 200)) || exit 1; sleep 0.05; done
+# gone once its lock is free: the kernel releases it as the process exits, its services stopped and its index written
+python3 -I -c 'import fcntl, sys, time
+lock = open(sys.argv[1], "a")
+for _ in range(600):
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        sys.exit(0)
+    except BlockingIOError:
+        time.sleep(0.05)
+sys.exit(1)' "$global/wtm.lock"
 by_name <"$global/jobs.json" | normalise >"$out/06-index-left-by-legacy.json"
 
 # 3. next's daemon takes the stack over, and stops it with its stop command.
@@ -143,7 +151,8 @@ ask 18-not-json 'notjson'
 "$next" daemon >"$out/19-second-daemon.stdout" 2>"$out/19-second-daemon.stderr" && echo 0 >"$out/19-second-daemon.exit" || echo $? >"$out/19-second-daemon.exit"
 
 # 5. A hard kill of the daemon: its service dies with the terminal it held, a service deaf to SIGHUP survives as an orphan.
-ask 20-start-deaf "{\"action\":\"start\",\"spec\":$(spec deaf service "trap '' HUP; while :; do sleep 1; done")}"
+# its loop ends once the sandbox goes, so a proof that aborts never leaks it
+ask 20-start-deaf "{\"action\":\"start\",\"spec\":$(spec deaf service "trap '' HUP; while [ -d $root ]; do sleep 1; done")}"
 web_pid=$(python3 -I "$here/daemon.py" "$socket" '{"action":"list"}' | python3 -I -c 'import json,sys; print(next(j["pid"] for j in json.loads(sys.stdin.read())["jobs"] if j["name"]=="web"))')
 deaf_pid=$(python3 -I "$here/daemon.py" "$socket" '{"action":"list"}' | python3 -I -c 'import json,sys; print(next(j["pid"] for j in json.loads(sys.stdin.read())["jobs"] if j["name"]=="deaf"))')
 normalise <"$global/jobs.json" >"$out/21-index-before-kill.json"
