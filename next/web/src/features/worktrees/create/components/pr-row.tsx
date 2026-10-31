@@ -1,6 +1,6 @@
 import type { DomainOption, WorktreePullRequest } from '@/api/types.gen'
 import { CommandLine } from '@/features/worktrees/components/command-line'
-import { CopyCommand } from '@/features/worktrees/create/components/copy-command'
+import { CopyCommand } from '@/features/worktrees/components/copy-command'
 import { optionLine } from '@/features/worktrees/create/utils/checkout-words'
 import { cn } from '@/lib/utils'
 

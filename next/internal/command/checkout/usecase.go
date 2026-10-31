@@ -225,27 +225,8 @@ func unavailable(err error) error {
 		return domain.AsError(domain.AsErrorParams{Err: err, Code: CodeGitHubUnavailable, Message: err.Error()})
 	}
 
-	refusal := &domain.Error{Kind: domain.KindPrecondition, Code: CodeGitHubUnavailable, Message: err.Error()}
-	switch {
-	case errors.Is(err, worktree.ErrGitHubCLIMissing):
-		refusal.Params = domain.Params{ParamReason: ReasonGHMissing}
-	case errors.Is(err, worktree.ErrGitHubSignedOut):
-		refusal.Params = domain.Params{ParamReason: ReasonSignedOut}
-	case errors.Is(err, worktree.ErrNotOnGitHub):
-		refusal.Params = domain.Params{ParamReason: ReasonNotOnGitHub}
-	}
-	return refusal
+	return &domain.Error{Kind: domain.KindPrecondition, Code: CodeGitHubUnavailable, Message: err.Error(), Params: domain.UnavailableParams(err)}
 }
-
-// ParamReason names, on a CodeGitHubUnavailable refusal, why GitHub could not be asked when a person fixes it outside wtm; it is absent for any other failure of gh.
-const ParamReason = "reason"
-
-// The reasons a CodeGitHubUnavailable refusal names.
-const (
-	ReasonGHMissing   = "gh_missing"
-	ReasonSignedOut   = "signed_out"
-	ReasonNotOnGitHub = "not_on_github"
-)
 
 // ----------------------------------------------------------------------------
 // The steps of Apply

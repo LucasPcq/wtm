@@ -3,6 +3,7 @@ import type { MutationCommand } from '@/api/queries/commands'
 import { Details } from '@/features/worktrees/components/details'
 import { Timeline } from '@/features/worktrees/components/timeline'
 import { doneOf, type Progress, took } from '@/features/worktrees/utils/progress'
+import { plural } from '@/lib/plural'
 
 export function RunSteps<C extends MutationCommand>({
   progress,
@@ -19,7 +20,7 @@ export function RunSteps<C extends MutationCommand>({
 
   const { total } = doneOf(progress)
   return (
-    <Details label={`${total} step${total === 1 ? '' : 's'}`} summary={took(progress)} quiet>
+    <Details label={plural(total, 'step')} summary={took(progress)} quiet>
       <Timeline units={progress.units} settled />
       {children}
     </Details>

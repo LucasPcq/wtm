@@ -99,6 +99,30 @@ var (
 	ErrNotOnGitHub      = fmt.Errorf("%w: origin is not a GitHub repository", ErrPullRequestsUnavailable)
 )
 
+// ParamReason names, on a refusal or a warning that GitHub could not be asked, why when a person fixes it outside wtm: one of the Reason constants; it is absent for any other failure of gh.
+const ParamReason = "reason"
+
+// The reasons ParamReason names.
+const (
+	ReasonGHMissing   = "gh_missing"
+	ReasonSignedOut   = "signed_out"
+	ReasonNotOnGitHub = "not_on_github"
+)
+
+// UnavailableReason is why err, a failure to ask GitHub, happened when a person fixes it outside wtm, empty otherwise.
+func UnavailableReason(err error) string {
+	switch {
+	case errors.Is(err, ErrGitHubCLIMissing):
+		return ReasonGHMissing
+	case errors.Is(err, ErrGitHubSignedOut):
+		return ReasonSignedOut
+	case errors.Is(err, ErrNotOnGitHub):
+		return ReasonNotOnGitHub
+	}
+
+	return ""
+}
+
 // ErrPullRequestNotFound is a pull request number the repository has none of.
 var ErrPullRequestNotFound = errors.New("pull request not found")
 

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
 // Kind classifies a failure by what the caller can do about it; the command line maps each kind onto an exit code.
@@ -48,6 +50,15 @@ const MetaNewer = ".meta_newer"
 
 // Params holds the named values a message or a code carries, for the JSON envelope and for templates.
 type Params map[string]string
+
+// UnavailableParams are the params of a refusal or a warning that GitHub could not be asked for err: its reason when a person fixes it outside wtm (worktree.ParamReason), nil otherwise.
+func UnavailableParams(err error) Params {
+	if reason := worktree.UnavailableReason(err); reason != "" {
+		return Params{worktree.ParamReason: reason}
+	}
+
+	return nil
+}
 
 // Error is a failure as a use case reports it: its kind, its stable code, a human message, and what the caller can do next.
 type Error struct {

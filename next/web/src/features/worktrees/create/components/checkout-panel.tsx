@@ -46,7 +46,7 @@ export function CheckoutPanel({
   // the form could not be asked (GitHub unavailable, the server's refusal): the step keeps its shape, and a new branch
   // is the way on
   const refusal = form.error instanceof HttpError ? form.error.refusal : undefined
-  const why = form.isError ? blockedBy(refusal, form.error.message) : 'Asking GitHub for its pull requests'
+  const why = form.isError ? blockedBy(refusal) : 'Asking GitHub for its pull requests'
 
   return (
     <>

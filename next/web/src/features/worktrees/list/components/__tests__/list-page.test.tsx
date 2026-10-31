@@ -206,13 +206,22 @@ test('a list whose GitHub could not be asked says why, and claims no pull reques
       if (!(await request.clone().text()).includes('with_prs')) return undefined
       return HttpResponse.json({
         ...envelope('list', [listDetail('main', { main: true }), listDetail('feat/billing')]),
-        warnings: [{ code: 'list.prs_unavailable', message: 'pull requests unavailable: run `gh auth login`' }],
+        warnings: [
+          {
+            code: 'list.prs_unavailable',
+            message: 'pull requests unavailable: run `gh auth login`',
+            params: { reason: 'signed_out' },
+          },
+        ],
       })
     }),
   )
 
   await renderApp('/r/r1/worktrees')
 
-  expect(await screen.findByText('Pull requests unavailable: run `gh auth login`')).toBeTruthy()
+  expect(
+    await screen.findByText("gh isn't signed in to GitHub. Pull requests and their checks aren't shown."),
+  ).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Copy gh auth login' })).toBeTruthy()
   expect(screen.queryByText('none')).toBeNull()
 })

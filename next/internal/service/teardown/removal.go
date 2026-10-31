@@ -265,7 +265,7 @@ func (f Facts) Warnings(params WarningsParams) []domain.Warning {
 		warnings = append(warnings, domain.Warning{Code: params.Command + domain.JobsUnknown, Message: run.UnknownMessage(f.JobsErr) + " — a job may still run in a worktree removed"})
 	}
 	if f.PRsErr != nil {
-		warnings = append(warnings, domain.Warning{Code: params.Command + domain.PRsUnavailable, Message: "couldn't ask for pull requests (" + f.PRsErr.Error() + "): " + params.Unasked})
+		warnings = append(warnings, domain.Warning{Code: params.Command + domain.PRsUnavailable, Message: "couldn't ask for pull requests (" + f.PRsErr.Error() + "): " + params.Unasked, Params: domain.UnavailableParams(f.PRsErr)})
 	}
 
 	for _, r := range params.Removals {

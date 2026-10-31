@@ -222,7 +222,7 @@ test('GitHub failing on a later ask is said above the picker', async () => {
   await user.click(await row(dialog, /#231/))
 
   const alert = await within(dialog).findByRole('alert')
-  expect(within(alert).getByText("Couldn't ask GitHub")).toBeTruthy()
+  expect(within(alert).getByText("GitHub couldn't be asked")).toBeTruthy()
   expect(within(alert).getByText(/HTTP 502/)).toBeTruthy()
 })
 
@@ -245,7 +245,7 @@ test('a refusal of the form that is not GitHub is a red Alert, and Next says to 
   await app.user.click(await within(dialog).findByRole('radio', { name: 'Pull request' }))
 
   expect(await within(dialog).findByText('No wtm config here')).toBeTruthy()
-  expect(within(dialog).queryByText("Couldn't ask GitHub")).toBeNull()
+  expect(within(dialog).queryByText("GitHub couldn't be asked")).toBeNull()
   await app.user.hover(within(dialog).getByRole('button', { name: 'Next' }))
   expect(await screen.findByRole('tooltip')).toHaveProperty('textContent', "Checkout can't start: see the error above")
 })

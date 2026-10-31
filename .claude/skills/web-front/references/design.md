@@ -142,6 +142,8 @@ Every multi-worktree list (Remove's, Prune's, the Fast-forward and Run pickers, 
 
 In the detail panel it is the one action of the moment (status's first problem, its region named "To do"); in a dialog it is first in the body.
 
+**GitHub unavailable** is one `GitHubAlert` everywhere (`features/worktrees/components/github-alert.tsx`): the detail's Review section, every dialog's `<command>.prs_unavailable` warning, checkout's form. Its words are `features/worktrees/utils/github.ts`, over the core's `params.reason` (gh missing, signed out, origin not on GitHub): the reason as its title, what the command goes without (by the warning's code) as its description, the fix (`gh auth login`) on the title line; any other failure of gh says the core's message under "GitHub couldn't be asked". A screen only adds what is its own (checkout's "A new branch still works." and its New branch action, which pushes the fix below). The list says it as a footer line, in the same words, its fix to copy beside it.
+
 ## Create's first step
 
 Create's step 1 opens on `wtm/Start From`, `New branch | Pull request`, above its fields; it is one dialog, never a second entry.

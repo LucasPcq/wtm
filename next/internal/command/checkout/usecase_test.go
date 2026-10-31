@@ -185,9 +185,9 @@ func TestAPullRequestGitHubCannotBeAskedOfRefusesThePlan(t *testing.T) {
 
 func TestARefusalOfGitHubNamesTheReasonAPersonFixes(t *testing.T) {
 	reasons := map[error]domain.Params{
-		worktree.ErrGitHubCLIMissing:        {checkout.ParamReason: checkout.ReasonGHMissing},
-		worktree.ErrGitHubSignedOut:         {checkout.ParamReason: checkout.ReasonSignedOut},
-		worktree.ErrNotOnGitHub:             {checkout.ParamReason: checkout.ReasonNotOnGitHub},
+		worktree.ErrGitHubCLIMissing:        {worktree.ParamReason: worktree.ReasonGHMissing},
+		worktree.ErrGitHubSignedOut:         {worktree.ParamReason: worktree.ReasonSignedOut},
+		worktree.ErrNotOnGitHub:             {worktree.ParamReason: worktree.ReasonNotOnGitHub},
 		worktree.ErrPullRequestsUnavailable: nil,
 	}
 	for err, params := range reasons {

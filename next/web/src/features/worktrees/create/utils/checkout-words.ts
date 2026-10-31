@@ -11,8 +11,9 @@ import type {
 import type { FieldWords } from '@/components/command-form/command-fields'
 import type { StepKey } from '@/features/worktrees/create/utils/steps'
 import { createWords } from '@/features/worktrees/create/utils/words'
-import { prState } from '@/features/worktrees/utils/github'
+import { type GitHubReason, githubWords, prState } from '@/features/worktrees/utils/github'
 import { sentence } from '@/features/worktrees/utils/sentence'
+import { plural } from '@/lib/plural'
 
 // checkout's questions in Create's dialog: the filters and no_fetch are answered by the screen, never asked
 export type CheckoutQuestion = Exclude<
@@ -27,8 +28,6 @@ export const checkoutSteps: Record<CheckoutQuestion, StepKey> = {
   env_from: 'environment',
   isolation: 'environment',
 }
-
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
 
 // the help of the fast-forward names the branch and how far behind it is, as the chosen pull request's option says
 export const checkoutWords = (chosen: DomainOption | undefined): Record<CheckoutQuestion, FieldWords> => {
@@ -127,41 +126,15 @@ export const isRowWarning = (warning: DomainWarning): warning is DomainWarning &
 export const rowWarningLine = (warning: DomainWarning & { code: RowWarning }) =>
   warningWords[warning.code](warning.params ?? {})
 
-type Unavailable = 'gh_missing' | 'signed_out' | 'not_on_github'
-
-type UnavailableWords = { title: string; description: string; next: string; command?: string }
-
-const unavailableWords: Record<Unavailable, UnavailableWords> = {
-  gh_missing: {
-    title: "The GitHub CLI isn't installed",
-    description:
-      'wtm lists pull requests through gh. Install it from cli.github.com, then sign in. A new branch still works.',
-    next: 'Install gh to list pull requests',
-  },
-  signed_out: {
-    title: "gh isn't signed in to GitHub",
-    description: 'Sign in, then open this again. A new branch still works.',
-    next: 'Sign in to gh to list pull requests',
-    command: 'gh auth login',
-  },
-  not_on_github: {
-    title: "origin isn't on GitHub",
-    description: 'Pull requests come from GitHub, and origin is elsewhere. A new branch still works.',
-    next: 'Pull requests need origin on GitHub',
-  },
+// what Next says while the form cannot be asked: GitHub's reason, or any other refusal
+const nextWhy: Record<GitHubReason, string> = {
+  gh_missing: 'Install gh to list pull requests',
+  signed_out: 'Sign in to gh to list pull requests',
+  not_on_github: 'Pull requests need origin on GitHub',
 }
 
-const isUnavailable = (reason: string | undefined): reason is Unavailable =>
-  reason !== undefined && Object.hasOwn(unavailableWords, reason)
-
-// any other failure of gh says what the core says; a refusal that is not GitHub's is no GitHub Alert at all
-export function unavailableLine(refusal: DomainError | undefined, message: string): UnavailableWords | undefined {
-  if (refusal?.code !== 'checkout.github_unavailable') return undefined
-  const reason = refusal.params?.reason
-  if (isUnavailable(reason)) return unavailableWords[reason]
-  return { title: "Couldn't ask GitHub", description: sentence(message), next: "GitHub couldn't be asked" }
+export function blockedBy(refusal: DomainError | undefined) {
+  if (refusal?.code !== 'checkout.github_unavailable') return "Checkout can't start: see the error above"
+  const reason = githubWords(refusal).reason
+  return reason ? nextWhy[reason] : "GitHub couldn't be asked"
 }
-
-// what Next says while the form cannot be asked
-export const blockedBy = (refusal: DomainError | undefined, message: string) =>
-  unavailableLine(refusal, message)?.next ?? "Checkout can't start: see the error above"

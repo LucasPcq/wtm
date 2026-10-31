@@ -141,7 +141,8 @@ test('a GitHub read that failed says why in the review, not that there is no pul
   const { detail } = await openDetail('feat/billing')
 
   const review = await within(detail).findByRole('region', { name: 'Review' })
-  expect(await within(review).findByText('the server went away')).toBeTruthy()
+  expect(await within(review).findByText("GitHub couldn't be asked")).toBeTruthy()
+  expect(within(review).getByText('The server went away')).toBeTruthy()
   expect(within(review).queryByText('No pull request.')).toBeNull()
 })
 

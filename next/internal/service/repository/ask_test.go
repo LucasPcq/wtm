@@ -68,6 +68,16 @@ func TestWhatAReadCouldNotAskIsAWarningUnderItsCommandsCodes(t *testing.T) {
 	}, warnings)
 }
 
+func TestAForgeAPersonCanFixNamesItsReasonOnTheWarning(t *testing.T) {
+	asked := repository.Asked{PRsErr: worktree.ErrGitHubSignedOut}
+
+	warnings := asked.Warnings("list")
+
+	assert.Equal(t, []domain.Warning{
+		{Code: "list.prs_unavailable", Message: worktree.ErrGitHubSignedOut.Error(), Params: domain.Params{worktree.ParamReason: worktree.ReasonSignedOut}},
+	}, warnings)
+}
+
 func TestAnInterruptedReadWarnsOfNothingItCouldNotAsk(t *testing.T) {
 	asked := repository.Asked{JobsErr: run.ErrUnknown, PRsErr: errors.New("context canceled"), Interrupted: true}
 

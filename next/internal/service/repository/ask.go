@@ -71,7 +71,7 @@ func (a Asked) Warnings(command string) []domain.Warning {
 		warnings = append(warnings, domain.Warning{Code: command + domain.JobsUnknown, Message: run.UnknownMessage(a.JobsErr)})
 	}
 	if a.PRsErr != nil {
-		warnings = append(warnings, domain.Warning{Code: command + domain.PRsUnavailable, Message: a.PRsErr.Error()})
+		warnings = append(warnings, domain.Warning{Code: command + domain.PRsUnavailable, Message: a.PRsErr.Error(), Params: domain.UnavailableParams(a.PRsErr)})
 	}
 
 	return warnings

@@ -11,6 +11,7 @@ import { BranchPlan } from '@/features/worktrees/create/components/branch-plan'
 import { planWide } from '@/features/worktrees/utils/outcome'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
 import { refusalOf, sentence } from '@/features/worktrees/utils/sentence'
+import { plural } from '@/lib/plural'
 
 export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswered[] }) {
   const dry = useQuery(dryRunQuery(repo, 'create', answers))
@@ -37,7 +38,7 @@ export function Confirm({ repo, answers }: { repo: string; answers: DomainAnswer
   const hooks = plan?.on_create ?? []
   const hooked = (branch: (typeof made)[number]) => hooks.length > 0 && (branch.phases ?? []).includes('on_create')
   const summary = [
-    steps > 0 && `${steps} step${steps === 1 ? '' : 's'}`,
+    steps > 0 && plural(steps, 'step'),
     made.some(hooked) && `on_create hook${hooks.length === 1 ? '' : 's'}`,
   ]
     .filter(Boolean)

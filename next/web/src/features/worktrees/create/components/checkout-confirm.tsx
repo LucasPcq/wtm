@@ -13,6 +13,7 @@ import { isRowWarning, rowWarningLine, tagOf } from '@/features/worktrees/create
 import { envFromShort, isolationShort } from '@/features/worktrees/create/utils/words'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
 import { refusalOf, sentence } from '@/features/worktrees/utils/sentence'
+import { plural } from '@/lib/plural'
 
 export function CheckoutConfirm({ repo, answers }: { repo: string; answers: DomainAnswered[] }) {
   const dry = useQuery(reviewQuery(repo, 'checkout', answers))
@@ -39,10 +40,7 @@ export function CheckoutConfirm({ repo, answers }: { repo: string; answers: Doma
   const phases = plan.phases ?? []
   const hooks = plan.on_create ?? []
   const hooked = hooks.length > 0 && phases.includes('on_create')
-  const summary = [
-    `${phases.length} step${phases.length === 1 ? '' : 's'}`,
-    hooked && `on_create hook${hooks.length === 1 ? '' : 's'}`,
-  ]
+  const summary = [plural(phases.length, 'step'), hooked && `on_create hook${hooks.length === 1 ? '' : 's'}`]
     .filter(Boolean)
     .join(', ')
 

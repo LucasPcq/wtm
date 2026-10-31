@@ -43,6 +43,9 @@
   "warnings": [
     {
       "code": "prune.prs_unavailable",
+      "params": {
+        "reason": "signed_out"
+      },
       "message": "couldn't ask for pull requests (pull requests unavailable: run `gh auth login`): open ones aren't checked, merged ones don't count as pushed"
     }
   ]

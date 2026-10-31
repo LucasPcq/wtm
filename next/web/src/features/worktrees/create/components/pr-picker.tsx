@@ -19,6 +19,7 @@ import {
   prFilters,
   refusalLine,
 } from '@/features/worktrees/create/utils/checkout-words'
+import { withoutScheme } from '@/lib/url'
 
 const pr = keyOf('pr')
 const mine = keyOf('mine')
@@ -67,7 +68,8 @@ export function PrPicker({
     return (of.title ?? '').toLowerCase().includes(typed.toLowerCase())
   }
   const shown = [...options.filter(matches), ...(found && !listed && paused === typed ? [found] : [])]
-  const base = options[0]?.pull_request?.url.replace(/^https?:\/\//, '').replace(/\/pull\/\d+$/, '')
+  const url = options[0]?.pull_request?.url
+  const base = url && withoutScheme(url).replace(/\/pull\/\d+$/, '')
 
   const choose = (value: string) => {
     form.setFieldValue(pr, [value])
