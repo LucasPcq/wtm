@@ -1,6 +1,6 @@
 $ wtm checkout --from main; echo EXIT=$?
 
-  Step 5/8 • Branch update
+  Step 5/9 • Branch update
 
   ✓ Pull request: #2
   ✓ Parent branch: main · --from
