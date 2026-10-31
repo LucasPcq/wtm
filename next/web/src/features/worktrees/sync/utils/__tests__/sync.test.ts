@@ -1,8 +1,11 @@
 import { expect, test } from 'vitest'
 import type { SyncPlan } from '@/api/types.gen'
 import { requestOf, rootOf } from '@/features/worktrees/sync/utils/plan'
+import { summaryOf } from '@/features/worktrees/sync/utils/recap'
 import { searchedStack, stackOf } from '@/features/worktrees/sync/utils/stack'
-import { syncPlanOf } from '@/test/sync'
+import type { Progress } from '@/features/worktrees/utils/progress'
+import { envelope } from '@/test/fixtures'
+import { syncPlanOf, type World } from '@/test/sync'
 
 const names = (nodes: ReturnType<typeof stackOf>): unknown[] =>
   nodes.map((node) => (node.children.length > 0 ? [node.name, names(node.children)] : node.name))
@@ -65,4 +68,39 @@ test('a switch is sent only off its default, and force only when a worktree with
     { path: 'push', values: ['true'] },
     { path: 'keep_conflict', values: ['true'] },
   ])
+})
+
+const ran = (
+  call: Parameters<typeof syncPlanOf>[0],
+  items: { subject: string; status: string; error?: { code: string }; detail?: { pushed: boolean } }[],
+  ok = true,
+  world: World = {},
+) =>
+  ({
+    units: [],
+    envelope: { ...envelope('sync', []), ok, items, plan: syncPlanOf(call, world) },
+  }) as unknown as Progress<'sync'>
+
+test('one sentence ends a run, in the dialog as in the toast: rebases counted, a push alone said so', () => {
+  const pushOnly = {
+    answers: [
+      { path: 'worktree', values: ['feat/billing', 'feat/billing-ui'] },
+      { path: 'descendants', values: ['false'] },
+      { path: 'push', values: ['true'] },
+    ],
+  }
+  const synced = ['feat/billing', 'feat/billing-ui']
+  const pushed = synced.map((subject) => ({ subject, status: 'done', detail: { pushed: true } }))
+  expect(summaryOf(ran(pushOnly, pushed, true, { synced }))).toBe('2 pushed.')
+
+  const named = { answers: [{ path: 'worktree', values: ['feat/billing'] }] }
+  const refused = [
+    { subject: 'main', status: 'done' },
+    { subject: 'feat/billing', status: 'failed', error: { code: 'sync.push_failed' } },
+    { subject: 'feat/billing-ui', status: 'skipped' },
+  ]
+  expect(summaryOf(ran(named, refused, false))).toBe('1 of 2 synced.')
+  expect(summaryOf(ran(named, [{ subject: 'feat/billing', status: 'cancelled' }], false))).toBe(
+    'Cancelled: 0 of 2 synced.',
+  )
 })

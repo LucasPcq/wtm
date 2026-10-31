@@ -1,6 +1,6 @@
 import type { CreateAction, CreateRequest, DomainSkip } from '@/api/types.gen'
 import type { FieldWords, OptionWords } from '@/components/command-form/command-fields'
-import type { OutcomeLabels } from '@/features/worktrees/utils/outcome'
+import type { OutcomeKind } from '@/features/worktrees/utils/outcome'
 
 // The core words its questions for the command line; the web says them its own way. Each record is exhaustive over
 // what the schema publishes, so a question, an option, a reason or a phase the core adds fails the build until it
@@ -97,7 +97,7 @@ export const actionWords: Record<CreateAction, string> = {
   unchanged: 'Already open, left as it is',
 }
 
-export const outcomeWords: OutcomeLabels = {
+export const outcomeWords: Record<OutcomeKind, string> = {
   failed: "Couldn't create",
   check: 'To check',
   done: 'Ready',

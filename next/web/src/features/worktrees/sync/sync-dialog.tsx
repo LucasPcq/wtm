@@ -8,6 +8,7 @@ import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
 import { openSync, useSyncDialog } from '@/features/worktrees/hooks/use-sync-dialog'
 import { SyncProgress } from '@/features/worktrees/sync/components/sync-progress'
 import { SyncWizard } from '@/features/worktrees/sync/components/sync-wizard'
+import { summaryOf } from '@/features/worktrees/sync/utils/recap'
 import { changedSincePlan } from '@/features/worktrees/utils/changed'
 
 // one sync at a time: opened while one runs, or one that failed is still to be read, the dialog shows it
@@ -21,18 +22,12 @@ export function SyncDialog({ repo }: { repo: string }) {
     useSyncDialog.setState({ open: false })
   }
 
-  // hidden while it ran, the run ends on a toast; its Details opens the outcome
-  const told = (envelope: Applied<'sync'> | undefined) => {
+  // hidden while it ran, the run ends on a toast in the words Done uses; its Details opens the outcome
+  const told = (envelope: Applied<'sync'> | undefined, refused: string | undefined) => {
     if (useSyncDialog.getState().open) return
-    const plan = envelope?.plan
-    const asked = (plan?.worktrees ?? []).filter((rebase) => (rebase.phases ?? []).includes('rebase'))
-    const synced = (envelope?.items ?? []).filter(
-      (item) => item.status === 'done' && asked.some((rebase) => rebase.worktree === item.subject),
-    )
-    if (succeeded(envelope)) return void toast.success(`${synced.length} synced.`)
-    toast.error(`${synced.length} of ${asked.length} synced.`, {
-      action: { label: 'Details', onClick: () => useSyncDialog.setState({ open: true }) },
-    })
+    const summary = summaryOf({ units: [], ...(envelope && { envelope }), ...(refused !== undefined && { refused }) })
+    if (succeeded(envelope)) return void toast.success(summary)
+    toast.error(summary, { action: { label: 'Details', onClick: () => useSyncDialog.setState({ open: true }) } })
   }
 
   // a run's next step opens the dialog again on its plan: sync is never a direct run

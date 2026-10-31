@@ -5,15 +5,18 @@ export type Step = 'worktrees' | 'confirm'
 
 export type Tick = { on: boolean; risk: string }
 
-type WizardState = { step: Step; checked: Record<string, Tick>; switches: Switches }
+// opening: the review has not landed yet, which decides once whether a named worktree needs consent on step 1
+type WizardState = { step: Step; opening: boolean; checked: Record<string, Tick>; switches: Switches }
 
 type WizardAction =
   | { type: 'step'; step: Step }
+  | { type: 'opened'; consent: boolean }
   | { type: 'check'; rows: { worktree: string; risk: string }[]; on: boolean }
   | { type: 'switch'; name: keyof Switches; on: boolean }
 
 export const initialWizard = ({ answers, step }: { answers: DomainAnswered[]; step: Step }): WizardState => ({
   step,
+  opening: true,
   checked: {},
   switches: switchesOf(answers),
 })
@@ -22,6 +25,8 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
   switch (action.type) {
     case 'step':
       return { ...state, step: action.step }
+    case 'opened':
+      return { ...state, opening: false, step: action.consent ? 'worktrees' : state.step }
     case 'check':
       return {
         ...state,

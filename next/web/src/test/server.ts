@@ -10,7 +10,8 @@ import { envelope, followUp, offers, statusDetail, treeDetail } from '@/test/fix
 import { prunePlan, pruneRun } from '@/test/prune'
 import { answeringReparent } from '@/test/reparent'
 import { line, streamed } from '@/test/stream'
-import { answeringSync, syncDryRun, syncRun } from '@/test/sync'
+import { answeringSync, syncDryRun } from '@/test/sync'
+import { syncRun } from '@/test/sync-run'
 
 export { line, repo, streamed, worktrees }
 

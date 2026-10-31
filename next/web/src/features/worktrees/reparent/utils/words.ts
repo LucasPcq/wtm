@@ -3,13 +3,13 @@ import type { DomainError, ReparentMove } from '@/api/types.gen'
 import type { Told } from '@/features/worktrees/hooks/use-direct-run'
 import { moved } from '@/features/worktrees/reparent/utils/plan'
 import { listed } from '@/features/worktrees/utils/listed'
-import type { OutcomeLabels } from '@/features/worktrees/utils/outcome'
+import type { OutcomeKind } from '@/features/worktrees/utils/outcome'
 import { isRefusal, refusedWhy } from '@/features/worktrees/utils/reparent'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
 export const title = 'Change parent'
 
-export const outcomeWords: OutcomeLabels = {
+export const outcomeWords: Record<OutcomeKind, string> = {
   failed: "Couldn't reparent",
   check: 'To check',
   done: 'Reparented',

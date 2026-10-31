@@ -1,15 +1,8 @@
 import type { SyncBlocker, SyncRebase, SyncStanding } from '@/api/types.gen'
+import { changes, commits } from '@/features/worktrees/utils/counts'
+import { listed } from '@/features/worktrees/utils/listed'
 import { operationWords } from '@/features/worktrees/utils/operation'
-import type { OutcomeLabels, OutcomeTone } from '@/features/worktrees/utils/outcome'
-import { plural } from '@/lib/plural'
-
-export const commits = (n: number) => plural(n, 'commit')
-
-export const changes = (n: number | undefined) =>
-  n ? `${n} uncommitted ${n === 1 ? 'change' : 'changes'}` : 'uncommitted changes'
-
-export const names = (list: string[]) =>
-  list.length < 2 ? (list[0] ?? '') : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`
+import type { OutcomeKind, OutcomeTone } from '@/features/worktrees/utils/outcome'
 
 // the core words its standings for the command line; the web says each its own way, so a standing it adds fails the
 // build until it has words
@@ -42,6 +35,16 @@ export const standingTone: Record<SyncStanding, OutcomeTone> = {
   on_parent: 'muted',
 }
 
+// what a worktree of the plan does, from its own phases: a rebase onto its parent, else its own origin's commits
+// taken, else a push alone
+export function phaseWords(rebase: SyncRebase, onto = rebase.parent): string {
+  const phases = rebase.phases ?? []
+  if (phases.includes('rebase')) return `onto ${onto} · ${commits(rebase.commits)}`
+  if (phases.includes('fast_forward')) return `fast-forwarded to origin · ${commits(rebase.origin?.behind ?? 0)}`
+  if (phases.includes('push')) return 'pushed to origin'
+  return standingWords[rebase.standing](rebase)
+}
+
 export const blockerWords: Record<SyncBlocker, (count: number | undefined) => string> = {
   dirty: (count) => changes(count),
 }
@@ -55,7 +58,7 @@ export const failureWords: Record<Failure, (params: Record<string, string>) => s
   'sync.failed': () => 'git refused it; nothing changed',
   'sync.dirty': () => 'it gained uncommitted changes since the plan',
   'sync.busy': () => 'an operation began in it since the plan',
-  'sync.push_failed': () => 'git refused the push; its rebase stands',
+  'sync.push_failed': () => 'rebased, but origin refused the push',
   'sync.ff_failed': ({ children }) => `couldn't take origin's commits: ${children} rebased onto it as it stands`,
 }
 
@@ -74,11 +77,10 @@ export const failureHelp: Record<Failure, (params: Record<string, string>) => st
   'sync.ff_failed': () => 'The worktrees on it were rebased onto it as it stood.',
 }
 
-export const outcomeWords: OutcomeLabels = {
+export const outcomeWords: Record<OutcomeKind, string> = {
   failed: "Couldn't sync",
   check: 'To check',
   done: 'Synced',
-  along: 'Fast-forwarded',
 }
 
 export type Switch = 'push' | 'keep_conflict'
@@ -99,9 +101,11 @@ export const switchWords: Record<Switch, { title: string; on: string; off: strin
 export const sentenceWords = {
   pushed: 'Pushed after each rebase, with force-with-lease: refused if origin moved since.',
   pushOnly: 'Pushed with force-with-lease: refused if origin moved since.',
+  forwardOnly: (branches: string[]) =>
+    `${listed(branches)} ${branches.length === 1 ? 'takes' : 'take'} origin's commits; no worktree is rebased.`,
   notPushed: 'Not pushed: origin keeps the old tips until you push.',
   kept: 'A conflict stays in progress for you to finish in its worktree; the ones under it wait.',
   stopped: 'A conflict stops that rebase and leaves the worktree as it was; the ones under it wait.',
   asItStands: (onto: string[]) =>
-    `${names(onto)} ${onto.length === 1 ? "isn't" : "aren't"} fast-forwarded first: each rebases onto it as it stands.`,
+    `${listed(onto)} ${onto.length === 1 ? "isn't" : "aren't"} fast-forwarded first: each rebases onto it as it stands.`,
 }

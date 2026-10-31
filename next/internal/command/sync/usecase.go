@@ -145,7 +145,7 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 			continue
 		}
 		item := u.forward(ctx, plan, o, report)
-		if item.Status == domain.StatusFailed {
+		if item.Err != nil {
 			stands[o.Branch] = o.From
 		}
 		items = append(items, item)
@@ -253,10 +253,10 @@ func (u UseCase) forked(ctx context.Context, facts Facts, branch string) error {
 // ----------------------------------------------------------------------------
 // The steps of Apply
 
-// CodeFFFailed fails the item of a branch rebased onto that could not be fast-forwarded: the worktrees on it are rebased onto it as it stands.
+// CodeFFFailed is why a branch rebased onto could not be fast-forwarded: its item is skipped, never failed, since the worktrees on it are rebased onto it as it stands and the run goes on.
 const CodeFFFailed = Name + ".ff_failed"
 
-// forward fast-forwards o, a branch rebased onto, to the commit of origin planned, between its phase events: in its worktree, or, held by none, its ref moved. Its item is done with the commits it took, or failed with why, its children rebased onto it as it stands. Once ctx is cancelled, it is not started.
+// forward fast-forwards o, a branch rebased onto, to the commit of origin planned, between its phase events: in its worktree, or, held by none, its ref moved. Its item is done with the commits it took, or skipped with why (CodeFFFailed), its children rebased onto it as it stands: a refused fast-forward never fails the run. Once ctx is cancelled, it is not started.
 func (u UseCase) forward(ctx context.Context, plan Plan, o Onto, report domain.Report) Item {
 	item := Item{Subject: o.Branch}
 	if ctx.Err() != nil {
@@ -271,7 +271,7 @@ func (u UseCase) forward(ctx context.Context, plan Plan, o Onto, report domain.R
 	report(domain.PhaseFinished{Subject: o.Branch, Phase: domain.PhaseFastForward, Failed: cause != ""})
 	if cause != "" {
 		children := strings.Join(o.Children, ", ")
-		item.Status, item.Err = domain.StatusFailed, &domain.Error{Kind: domain.KindConflict, Code: CodeFFFailed, Message: "couldn't fast-forward " + o.Branch + ": " + cause + ": " + children + " rebased onto it as it stands", Params: domain.Params{"branch": o.Branch, "cause": cause, "children": children}}
+		item.Status, item.Err = domain.StatusSkipped, &domain.Error{Kind: domain.KindConflict, Code: CodeFFFailed, Message: "couldn't fast-forward " + o.Branch + ": " + cause + ": " + children + " rebased onto it as it stands", Params: domain.Params{"branch": o.Branch, "cause": cause, "children": children}}
 		return item
 	}
 

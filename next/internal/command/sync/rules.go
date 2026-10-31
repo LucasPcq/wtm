@@ -850,14 +850,15 @@ const (
 	CodeStashed    = Name + ".stashed"
 )
 
-// The codes of the steps after a run: resolving an aborted conflict by hand (CodeResolve), syncing what is left once a conflict left in progress is resolved (CodeResume), and pushing what was synced and not pushed (CodePush).
+// The codes of the steps after a run: resolving an aborted conflict by hand (CodeResolve), syncing what is left once a conflict left in progress is resolved (CodeResume), pushing what was synced and not pushed (CodePush), and syncing the descendants a run left out (CodeLeftOut).
 const (
 	CodeResolve = Name + ".resolve"
 	CodeResume  = Name + ".resume"
 	CodePush    = Name + ".push"
+	CodeLeftOut = Name + ".left_out"
 )
 
-// next are the steps after the run: for each conflict, aborted, the same worktree synced again with its conflict left in progress, or, left in progress, finishing it in the worktree then syncing what is left; then, unpushed, the push of every worktree synced.
+// next are the steps after the run: for each conflict, aborted, the same worktree synced again with its conflict left in progress, or, left in progress, finishing it in the worktree then syncing what is left; then, unpushed, the push of every worktree synced; then, the descendants left out (CodeLeftOut), their own sync.
 func (p Plan) next(items []Item) []domain.FollowUp {
 	form := Questions{}.Form()
 	var synced []string
@@ -880,6 +881,13 @@ func (p Plan) next(items []Item) []domain.FollowUp {
 			message = "push it, force-with-lease"
 		}
 		followUps = append(followUps, domain.FollowUp{Command: Name, Answers: domain.AnswersOf(form, Request{Worktrees: synced, Descendants: new(false), Push: true}), Code: CodePush, Message: message})
+	}
+	if len(p.LeftOut) > 0 {
+		message := "sync them too"
+		if len(p.LeftOut) == 1 {
+			message = "sync it too"
+		}
+		followUps = append(followUps, domain.FollowUp{Command: Name, Answers: domain.AnswersOf(form, Request{Worktrees: p.LeftOut}), Code: CodeLeftOut, Message: message})
 	}
 	return followUps
 }

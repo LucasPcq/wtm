@@ -13,7 +13,7 @@ import { RunningFooter } from '@/features/worktrees/components/running-footer'
 import { useReparentNow } from '@/features/worktrees/hooks/use-reparent-now'
 import { useRun } from '@/features/worktrees/hooks/use-run'
 import { listed } from '@/features/worktrees/utils/listed'
-import type { Act, OutcomeLabels } from '@/features/worktrees/utils/outcome'
+import type { Act, OutcomeKind } from '@/features/worktrees/utils/outcome'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
 import { current, doneOf, ending, type Progress } from '@/features/worktrees/utils/progress'
 import { plain } from '@/features/worktrees/utils/removal'
@@ -24,7 +24,7 @@ export type RemovalWords = {
   title: string
   past: string
   noun: string
-  outcome: OutcomeLabels
+  outcome: Record<OutcomeKind, string>
   dataKept: string
 }
 

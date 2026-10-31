@@ -1,4 +1,4 @@
-import type { DomainAnswered } from '@/api/types.gen'
+import type { DomainAnswered, DomainPhase } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress as Bar } from '@/components/ui/progress'
@@ -36,22 +36,24 @@ export function SyncProgress({
   onFollow: (answers: DomainAnswered[]) => void
 }) {
   const { done, total } = doneOf(progress)
-  const { cancelled, failure } = ending(progress)
+  const { cancelled } = ending(progress)
   const items = progress.envelope?.items ?? []
   const refused = progress.refused ?? (items.some((item) => item.error) ? undefined : progress.envelope?.error?.message)
-  const { groups, warnings, synced, asked, pushed } = recapOf(progress, onFollow)
-  const plan = progress.envelope?.plan
+  const { groups, warnings, summary } = recapOf(progress, onFollow)
   const rebaseUnits = progress.units.filter((unit) => unit.phases.some((run) => run.phase === 'rebase'))
 
+  // each row from its own phases: a rebase onto its parent, its own origin's commits taken, a push alone
   const words = (unit: Unit, state: UnitState) => {
-    const forward = unit.phases.every((run) => run.phase === 'fast_forward')
+    const has = (phase: DomainPhase) => unit.phases.some((run) => run.phase === phase)
     const now = unit.phases.find((run) => run.state === 'now')?.phase
     if (state === 'failed') return 'failed'
-    if (state === 'todo') return unit.onto ? `waits for ${unit.onto}` : 'waiting'
-    if (forward) return state === 'done' ? 'fast-forwarded to origin' : 'fast-forwarding to origin'
-    if (state === 'done') return unit.onto ? `onto ${unit.onto}` : 'synced'
+    if (state === 'todo') return has('rebase') && unit.onto ? `waits for ${unit.onto}` : 'waiting'
+    if (state === 'done') {
+      if (has('rebase')) return `onto ${unit.onto}`
+      return has('fast_forward') ? 'fast-forwarded to origin' : 'pushed to origin'
+    }
     if (now === 'push') return 'pushing to origin'
-    if (now === 'fast_forward') return "taking origin's commits"
+    if (now === 'fast_forward') return has('rebase') ? "taking origin's commits" : 'fast-forwarding to origin'
     return `rebasing onto ${unit.onto ?? 'its parent'}`
   }
 
@@ -61,21 +63,16 @@ export function SyncProgress({
       return state === 'now' || state === 'todo'
     })
     if (!at) return `${rebaseUnits.length} of ${rebaseUnits.length}`
+    const pushing = at.phases.find((run) => run.state === 'now')?.phase === 'push'
     const k = rebaseUnits.indexOf(at)
-    if (k < 0) return `Fast-forwarding ${at.subject}`
-    const verb = at.phases.find((run) => run.state === 'now')?.phase === 'push' ? 'pushing' : 'rebasing'
-    return `${k + 1} of ${rebaseUnits.length} · ${verb} ${at.subject}${verb === 'rebasing' && at.onto ? ` onto ${at.onto}` : ''}`
+    if (k < 0) return `${pushing ? 'Pushing' : 'Fast-forwarding'} ${at.subject}`
+    return `${k + 1} of ${rebaseUnits.length} · ${pushing ? 'pushing' : 'rebasing'} ${at.subject}${!pushing && at.onto ? ` onto ${at.onto}` : ''}`
   }
 
   const description = () => {
     if (running && progress.cancelling) return 'Cancelling: the worktree under way finishes first.'
     if (running) return total === 0 ? 'Planning' : under()
-    if (cancelled) return `Cancelled: ${synced} of ${asked} synced.`
-    if (asked === 0 && pushed > 0) return `${pushed} pushed.`
-    if (failure && synced === asked && plan?.push) return `${synced} synced, ${pushed} pushed.`
-    if (failure) return `${synced} of ${asked} synced${pushed > 0 ? `, ${pushed} pushed` : ''}.`
-    if (plan?.push) return pushed === synced ? `${synced} synced and pushed.` : `${synced} synced, ${pushed} pushed.`
-    return `${synced} synced.`
+    return summary
   }
 
   return (

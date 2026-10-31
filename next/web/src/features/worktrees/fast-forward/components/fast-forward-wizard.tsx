@@ -31,8 +31,8 @@ import {
 } from '@/features/worktrees/fast-forward/utils/plan'
 import { leftRow } from '@/features/worktrees/fast-forward/utils/recap'
 import { initialWizard, wizardReducer } from '@/features/worktrees/fast-forward/utils/wizard-state'
-import { commits } from '@/features/worktrees/fast-forward/utils/words'
 import type { Start } from '@/features/worktrees/hooks/use-run'
+import { commits } from '@/features/worktrees/utils/counts'
 import { planWide } from '@/features/worktrees/utils/outcome'
 
 export function FastForwardWizard({

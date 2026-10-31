@@ -4,8 +4,9 @@ import { expect, test } from 'vitest'
 import type { WebCall } from '@/api/types.gen'
 import { renderApp } from '@/test/render'
 import { server } from '@/test/server'
-import { syncDryRun, syncRun } from '@/test/sync'
+import { syncDryRun } from '@/test/sync'
 import { fromHeader, fromMenu, order, recorded } from '@/test/sync-app'
+import { syncRun } from '@/test/sync-run'
 
 test("a row's Sync opens on Confirm: its plan in run order, main's fast-forward unnumbered, the one under it following", async () => {
   const { dialog } = await fromMenu('feat/billing')
@@ -131,6 +132,7 @@ test('several branches rebased onto share one answer: each line says so, and one
     await app.user.click(await screen.findByRole('checkbox', { name: `Select ${name}` }))
   await app.user.click(within(screen.getByRole('toolbar', { name: 'Selection' })).getByRole('button', { name: 'Sync' }))
   const dialog = await screen.findByRole('dialog')
+  await app.user.click(await within(dialog).findByRole('checkbox', { name: 'Sync fix/login' }))
 
   expect(await within(dialog).findByText('fast-forwarded to origin first · 1 commit, with main')).toBeTruthy()
   expect(within(dialog).getByText('fast-forwarded to origin first · 3 commits, with feat/billing')).toBeTruthy()
@@ -198,4 +200,95 @@ test('from the header, a worktree under one picked follows it, on Confirm as on 
   expect(await order(dialog)).toContain('2feat/billing-uionto feat/billing · 2 commits · follows feat/billing')
   const runs = within(dialog).getByRole('region', { name: 'How it runs' })
   expect(within(runs).getByText('feat/billing-ui follows feat/billing.')).toBeTruthy()
+})
+
+test("main with a change, behind origin, is forced only with its own consent: another worktree's is not enough", async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/sync', async ({ request }) => {
+      const call = (await request.json()) as WebCall
+      return call.dry_run
+        ? syncDryRun(call, { dirtyOnto: ['main'] })
+        : syncRun(call, { world: { dirtyOnto: ['main'] } })
+    }),
+  )
+  const { user, dialog } = await fromMenu('fix/login')
+  expect(await within(dialog).findByText('uncommitted changes: check it to fast-forward it anyway')).toBeTruthy()
+
+  await user.click(await within(dialog).findByRole('checkbox', { name: 'Sync fix/login' }))
+  // forced through fix/login's consent, main still waits for its own: it says it stays as it stands
+  expect(await within(dialog).findByText('rebased onto as it stands · 3 commits behind origin')).toBeTruthy()
+  const next = within(dialog).getByRole('button', { name: 'Next' })
+  await user.hover(next)
+  expect(
+    (await screen.findAllByText('Check main too: forcing one forces every dirty worktree')).length,
+  ).toBeGreaterThan(0)
+  expect(next.getAttribute('aria-disabled')).toBe('true')
+
+  await user.click(within(dialog).getByRole('checkbox', { name: 'Fast-forward main first' }))
+  await waitFor(() => expect(next.getAttribute('aria-disabled')).toBe('false'))
+  await user.click(next)
+
+  expect(await order(dialog)).toContain('mainfast-forwarded to origin first · 3 commits · its changes stashed')
+})
+
+test('two dirty descendants: checking one forces the other, which keeps its own box, never held as following', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/sync', async ({ request }) =>
+      syncDryRun((await request.json()) as WebCall, { dirty: ['feat/billing-ui', 'feat/search-docs'] }),
+    ),
+  )
+  const app = await renderApp('/r/r1/worktrees')
+  for (const name of ['feat/billing', 'feat/search'])
+    await app.user.click(await screen.findByRole('checkbox', { name: `Select ${name}` }))
+  await app.user.click(within(screen.getByRole('toolbar', { name: 'Selection' })).getByRole('button', { name: 'Sync' }))
+  const dialog = await screen.findByRole('dialog')
+
+  await app.user.click(await within(dialog).findByRole('checkbox', { name: 'Sync feat/billing-ui' }))
+
+  // forced along, an unchecked one is never said to follow
+  expect(await within(dialog).findByText('feat/billing-ui follows.')).toBeTruthy()
+  const other = await within(dialog).findByRole('checkbox', { name: 'Sync feat/search-docs' })
+  await waitFor(() =>
+    expect(within(dialog).getByRole('button', { name: 'Next' }).getAttribute('aria-disabled')).toBe('true'),
+  )
+  expect(other.hasAttribute('disabled')).toBe(false)
+  await app.user.click(other)
+  await waitFor(() =>
+    expect(within(dialog).getByRole('button', { name: 'Next' }).getAttribute('aria-disabled')).toBe('false'),
+  )
+})
+
+test('a cycle in a selection is a row it cannot sync, with its fix: the others stay on step 1', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/sync', async ({ request }) =>
+      syncDryRun((await request.json()) as WebCall, { cycle: ['feat/search'] }),
+    ),
+  )
+  const app = await renderApp('/r/r1/worktrees')
+  for (const name of ['feat/billing', 'feat/search'])
+    await app.user.click(await screen.findByRole('checkbox', { name: `Select ${name}` }))
+  await app.user.click(within(screen.getByRole('toolbar', { name: 'Selection' })).getByRole('button', { name: 'Sync' }))
+  const dialog = await screen.findByRole('dialog')
+
+  const cant = await within(dialog).findByRole('region', { name: "Can't sync" })
+  expect(within(cant).getByText('its parents lead back to it')).toBeTruthy()
+  expect(within(cant).getByRole('button', { name: 'Reparent onto main' })).toBeTruthy()
+  expect(within(dialog).getByRole('checkbox', { name: 'Sync feat/billing' }).getAttribute('data-state')).toBe('checked')
+  expect(within(dialog).queryByRole('alert')).toBeNull()
+})
+
+test('from the header, a worktree step 1 shows mid-rebase is left on Confirm, with its fix', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/sync', async ({ request }) =>
+      syncDryRun((await request.json()) as WebCall, { busy: ['feat/search-docs'] }),
+    ),
+  )
+  const { user, dialog } = await fromHeader()
+  expect(await within(dialog).findByText('mid-rebase: finish it in its worktree')).toBeTruthy()
+
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+
+  const left = await within(dialog).findByRole('region', { name: 'Left as they are' })
+  expect(within(left).getByText('mid-rebase: finish it in its worktree')).toBeTruthy()
+  expect(within(left).getByRole('button', { name: /Copy wtm go feat\/search-docs/ })).toBeTruthy()
 })

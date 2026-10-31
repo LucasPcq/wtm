@@ -7,4 +7,5 @@
   On conflict   abort the rebase, the worktree left as it was
 
   → wtm-next sync feat/s1 --descendants=false --push   push it, force-with-lease
+  → wtm-next sync feat/s2                              sync it too
 

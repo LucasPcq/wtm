@@ -1,8 +1,6 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { RefreshCw } from 'lucide-react'
 import { useReducer, useState } from 'react'
-import { dryRunQuery, planQuery, questionsQuery } from '@/api/queries/commands'
-import type { DomainAnswered, DomainFollowUp, DomainWarning, SyncRebase } from '@/api/types.gen'
+import type { DomainAnswered, DomainFollowUp, DomainWarning } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
@@ -12,26 +10,19 @@ import { CommandLine } from '@/features/worktrees/components/command-line'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import type { Left } from '@/features/worktrees/components/left-item'
+import { LeftRow } from '@/features/worktrees/components/left-row'
+import { LeftSection } from '@/features/worktrees/components/left-section'
 import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { ReasonButton } from '@/features/worktrees/components/reason-button'
 import { Stepper } from '@/features/worktrees/components/stepper'
 import type { Start } from '@/features/worktrees/hooks/use-run'
 import { StackStep } from '@/features/worktrees/sync/components/stack-step'
 import { SyncConfirm } from '@/features/worktrees/sync/components/sync-confirm'
-import {
-  moves,
-  noFetch,
-  pushOnly,
-  rebasesOf,
-  requestOf,
-  riskOf,
-  unitsOf,
-  unsafe,
-  valuesOf,
-} from '@/features/worktrees/sync/utils/plan'
+import { useSyncPlan } from '@/features/worktrees/sync/hooks/use-sync-plan'
+import { pushOnly, riskOf, unitsOf, valuesOf } from '@/features/worktrees/sync/utils/plan'
 import { stackOf } from '@/features/worktrees/sync/utils/stack'
 import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/sync/utils/wizard-state'
-import { names } from '@/features/worktrees/sync/utils/words'
+import type { OutcomeRow } from '@/features/worktrees/utils/outcome'
 import { refusalOf } from '@/features/worktrees/utils/sentence'
 
 export function SyncWizard({
@@ -56,86 +47,30 @@ export function SyncWizard({
   onCancel: () => void
 }) {
   const opensOn: Step = picking || deciding ? 'worktrees' : 'confirm'
-  const [{ step, checked, switches }, dispatch] = useReducer(
+  const [{ step, opening, checked, switches }, dispatch] = useReducer(
     wizardReducer,
     { answers: asked, step: opensOn },
     initialWizard,
   )
   const [query, setQuery] = useState('')
+  const sync = useSyncPlan({ repo, asked, picking, checked, switches })
+  const { review, reviewed, rows, plan, planned, refusal, fresh, empty, fingerprint, why } = sync
   const confirming = step === 'confirm'
 
-  // the form never fetches: it gives the header's own pick and each worktree's uncommitted changes
-  const form = useQuery(questionsQuery(repo, 'sync'))
-  const field = form.data?.fields.find((one) => one.path === 'worktree')
-  const options = field?.kind === 'multi_select' ? field.options : []
-  const picked = field?.kind === 'multi_select' ? field.picked : []
-  const named = picking ? picked : (valuesOf(asked, 'worktree') ?? [])
-  const changesOf = (worktree: string) => options.find((option) => option.value === worktree)?.changes
+  // any opener (a row, a follow-up) may name a worktree that needs consent: once the review lands, it opens step 1
+  if (opening && review.isSuccess) dispatch({ type: 'opened', consent: sync.consent })
 
-  // the review is forced over what step 1 shows, so each dirty worktree shows its risk; the one fetch of the flow
-  const review = useQuery(
-    dryRunQuery(repo, 'sync', [
-      picking ? { path: 'all', values: ['true'] } : { path: 'worktree', values: named },
-      { path: 'force', values: ['true'] },
-    ]),
-  )
-  const reviewed = review.data?.error ? undefined : review.data?.plan
-  const rows = reviewed?.worktrees ?? []
-
-  // a tick holds for the risk it was given under, an untick whatever the risk
-  const ticked = (rebase: SyncRebase) => {
-    const tick = checked[rebase.worktree]
-    return tick && (!tick.on || tick.risk === riskOf(rebase)) ? tick : undefined
+  const reparentable = (row: OutcomeRow): OutcomeRow => {
+    const followUp = row.followUp
+    if (followUp?.command !== 'reparent') return row
+    const to = valuesOf(followUp.answers ?? [], 'to')?.[0] ?? 'its base'
+    return { ...row, followUp: undefined, act: () => onReparent(followUp), actLabel: `Reparent onto ${to}` }
   }
-  const isNamed = (rebase: SyncRebase) => ticked(rebase)?.on ?? (named.includes(rebase.worktree) && !unsafe(rebase))
-  const going = rows.filter(isNamed)
-  const untouched = going.length === named.length && going.every((rebase) => named.includes(rebase.worktree))
-  const chosen = picking && untouched
-  const answers = [
-    ...requestOf({ chosen, named: going.map((rebase) => rebase.worktree), forced: going.some(unsafe), switches }),
-    noFetch,
-  ]
-  const asking = reviewed !== undefined && (chosen || going.length > 0)
-  const planned = useQuery({
-    ...planQuery(repo, 'sync', { answers, readAt: review.dataUpdatedAt }),
-    enabled: asking && !review.isFetching,
-    placeholderData: keepPreviousData,
-  })
-  const plan = asking && !planned.isError && !planned.data?.error ? planned.data?.plan : undefined
-  const fingerprint = planned.data?.fingerprint
-  // forced for one dirty worktree checked, the plan forces every dirty one: none moves unless checked too
-  const unconsented = (plan?.worktrees ?? []).filter((rebase) => unsafe(rebase) && moves(rebase) && !isNamed(rebase))
-  const fresh =
-    plan !== undefined &&
-    !planned.isPlaceholderData &&
-    !planned.isFetching &&
-    !review.isFetching &&
-    unconsented.length === 0
-  const refusal = review.data?.error ?? (asking ? planned.data?.error : undefined)
-  const empty = fresh && plan.empty === true
-  const behind = (reviewed?.onto ?? []).filter(moves).map((onto) => onto.branch)
-  const count = plan ? (pushOnly(plan) ? (plan.worktrees ?? []) : rebasesOf(plan)).filter(moves).length : 0
-
-  const why = () => {
-    if (review.isFetching) return 'Fetching origin'
-    if (refusal?.follow_up?.command === 'reparent')
-      return `Reparent ${names(valuesOf(refusal.follow_up.answers ?? [], 'worktree') ?? [])} to sync it`
-    if (refusal) return refusalOf(refusal)
-    if (planned.isFetching) return 'Planning'
-    if (unconsented.length > 0)
-      return `Check ${names(unconsented.map((rebase) => rebase.worktree))} too: forcing one forces every dirty worktree`
-    if (going.length === 0 && !chosen) {
-      const held = rows.filter((rebase) => named.includes(rebase.worktree) && unsafe(rebase))
-      if (held.length > 0)
-        return `Check ${names(held.map((rebase) => rebase.worktree))} to sync ${held.length === 1 ? 'it' : 'them'} anyway`
-      return 'Check a worktree to sync it'
-    }
-    return undefined
-  }
+  const cantSync = sync.cantSync.map(reparentable)
 
   const primary = () => {
-    if (plan && pushOnly(plan)) return count > 1 ? `Push ${count} worktrees` : 'Push'
-    return count > 1 ? `Sync ${count} worktrees` : 'Sync'
+    if (plan && pushOnly(plan)) return sync.count > 1 ? `Push ${sync.count} worktrees` : 'Push'
+    return sync.count > 1 ? `Sync ${sync.count} worktrees` : 'Sync'
   }
 
   const refused = () =>
@@ -158,7 +93,7 @@ export function SyncWizard({
     )
 
   const body = () => {
-    if (review.isPending || (confirming && asking && !planned.data)) return <Skeleton className="h-40 w-full" />
+    if (review.isPending || (confirming && sync.asking && !planned.data)) return <Skeleton className="h-40 w-full" />
     if (review.isError) return <Alert tone="red" description={review.error.message} />
     if (planned.isError) return <Alert tone="red" description={planned.error.message} />
     if (review.data.error) return refused()
@@ -167,15 +102,24 @@ export function SyncWizard({
       return (
         <>
           {refused()}
+          <LeftSection label="Can't sync">
+            {cantSync.map((row) => (
+              <LeftRow key={row.key} row={row} />
+            ))}
+          </LeftSection>
           <StackStep
             stack={stackOf(reviewed ?? { onto: [], worktrees: [] })}
             plan={plan}
             picking={picking}
-            isNamed={isNamed}
+            isNamed={sync.isNamed}
             onCheck={(list, on) =>
               dispatch({ type: 'check', rows: list.map((r) => ({ worktree: r.worktree, risk: riskOf(r) })), on })
             }
-            changesOf={changesOf}
+            ontoTicked={sync.ontoTicked}
+            onOntoTick={(onto, on) =>
+              dispatch({ type: 'check', rows: [{ worktree: onto.branch, risk: sync.ontoRisk(onto) }], on })
+            }
+            changesOf={sync.changesOf}
             switches={switches}
             onSwitch={(name, on) => {
               // off, the worktrees under the named stay where they are: none checked anyway goes on its own
@@ -194,7 +138,8 @@ export function SyncWizard({
       )
 
     if (refusal) return refused()
-    if (!plan) return <Skeleton className="h-40 w-full" />
+    // nothing to plan: say what is missing, never a skeleton that waits for ever
+    if (!plan) return sync.asking ? <Skeleton className="h-40 w-full" /> : <Alert tone="amber" title={why()} />
     if (empty)
       return (
         <>
@@ -216,10 +161,19 @@ export function SyncWizard({
       <SyncConfirm
         plan={plan}
         warnings={planned.data?.warnings ?? []}
-        left={left}
+        reviewWarnings={review.data?.warnings ?? []}
+        left={[
+          ...cantSync,
+          ...left.map(({ worktree, why: reason }) => ({
+            key: worktree,
+            tone: 'muted' as const,
+            title: worktree,
+            message: reason,
+          })),
+        ]}
         review={rows}
-        behind={behind}
-        changesOf={changesOf}
+        behind={sync.behind}
+        changesOf={sync.changesOf}
         onReparent={onReparent}
       />
     )
@@ -229,7 +183,11 @@ export function SyncWizard({
     <>
       <DialogHeader>
         <DialogTitle>Sync worktrees</DialogTitle>
-        <DialogDescription>Each worktree is rebased onto its parent, parents first.</DialogDescription>
+        <DialogDescription>
+          {plan && pushOnly(plan)
+            ? 'Each worktree is pushed to origin, with force-with-lease.'
+            : 'Each worktree is rebased onto its parent, parents first.'}
+        </DialogDescription>
       </DialogHeader>
 
       <DialogBand>
@@ -274,7 +232,9 @@ export function SyncWizard({
               <ReasonButton
                 disabled={!fresh || !fingerprint}
                 why={why()}
-                onClick={() => plan && fingerprint && onStart({ answers, fingerprint, units: unitsOf(plan) })}
+                onClick={() =>
+                  plan && fingerprint && onStart({ answers: sync.answers, fingerprint, units: unitsOf(plan) })
+                }
               >
                 {primary()}
               </ReasonButton>

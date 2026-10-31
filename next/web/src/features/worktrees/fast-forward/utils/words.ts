@@ -5,12 +5,9 @@ import type {
   FastforwardStanding,
   WorktreeDivergence,
 } from '@/api/types.gen'
+import { changes } from '@/features/worktrees/utils/counts'
 import { operationWords } from '@/features/worktrees/utils/operation'
-import type { OutcomeLabels, OutcomeTone } from '@/features/worktrees/utils/outcome'
-
-export const commits = (n: number) => (n === 1 ? '1 commit' : `${n} commits`)
-
-const changes = (n: number) => (n === 1 ? '1 uncommitted change' : `${n} uncommitted changes`)
+import type { OutcomeKind, OutcomeTone } from '@/features/worktrees/utils/outcome'
 
 // the core words its standings for the command line; the web says each its own way, so a standing it adds fails the
 // build until it has words
@@ -62,7 +59,7 @@ export const failureWords: Record<string, string> = {
   'fast-forward.busy': 'an operation began in it since the plan',
 }
 
-export const outcomeWords: OutcomeLabels = {
+export const outcomeWords: Record<OutcomeKind, string> = {
   failed: "Couldn't fast-forward",
   check: 'To check',
   done: 'Fast-forwarded',

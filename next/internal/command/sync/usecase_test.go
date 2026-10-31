@@ -3,6 +3,7 @@ package sync_test
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -54,6 +55,8 @@ func TestWithoutDescendantsTheNamedWorktreeAloneIsRebased(t *testing.T) {
 	assert.Equal(t, b, w.tip(t, featB))
 	assert.Equal(t, []string{featB, featC}, outcome.Plan.LeftOut)
 	assert.Equal(t, "only the named: feat/b, feat/c stay where they are", outcome.Plan.Recap[0].Values[0].Text)
+	leftOut := outcome.Result.FollowUps[slices.IndexFunc(outcome.Result.FollowUps, func(f domain.FollowUp) bool { return f.Code == sync.CodeLeftOut })]
+	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{featB, featC}}}, leftOut.Answers, "their own sync, the core's to spell")
 }
 
 func TestAConflictMidStackIsAbortedAndTheWorktreesUnderItSkipped(t *testing.T) {
@@ -392,7 +395,7 @@ func TestEachBranchFastForwardedFirstIsAnItemBeforeTheWorktrees(t *testing.T) {
 	assert.Empty(t, forwarded.Detail.Parent)
 }
 
-func TestABranchFastForwardRefusedAtApplyFailsItsItemAndItsChildRebasesOntoItAsItStands(t *testing.T) {
+func TestABranchFastForwardRefusedAtApplySkipsItsItemAndItsChildRebasesOntoItAsItStands(t *testing.T) {
 	w := newWorld(t)
 	gittest.Git(t, w.main, "branch", "topic", "main")
 	gittest.Git(t, w.main, "push", "-q", "origin", "topic")
@@ -409,10 +412,11 @@ func TestABranchFastForwardRefusedAtApplyFailsItsItemAndItsChildRebasesOntoItAsI
 	require.Len(t, result.Items, 2)
 	refused := result.Items[0]
 	assert.Equal(t, "topic", refused.Subject)
-	require.Equal(t, domain.StatusFailed, refused.Status)
+	require.Equal(t, domain.StatusSkipped, refused.Status, "a refused fast-forward never fails the run")
 	assert.Equal(t, sync.CodeFFFailed, refused.Err.Code)
 	assert.Equal(t, solo, refused.Err.Params["children"])
 	assert.Equal(t, domain.StatusDone, result.Items[1].Status, result.Items[1].Err)
+	assert.Nil(t, result.Failure(), "every worktree synced: the run succeeded")
 }
 
 func TestABranchToFastForwardIsInterruptedByACancelBeforeIt(t *testing.T) {
@@ -429,4 +433,14 @@ func TestABranchToFastForwardIsInterruptedByACancelBeforeIt(t *testing.T) {
 	assert.Equal(t, "main", result.Items[0].Subject)
 	assert.Equal(t, domain.ReasonInterrupted, result.Items[0].Reason)
 	assert.Equal(t, main, w.tip(t, "main"))
+}
+
+func TestARefusedFastForwardBesideAConflictLeavesTheConflictTheRunsFailure(t *testing.T) {
+	result := sync.Result{Items: []sync.Item{
+		{Subject: "main", Status: domain.StatusSkipped, Err: &domain.Error{Kind: domain.KindConflict, Code: sync.CodeFFFailed}},
+		{Subject: featB, Status: domain.StatusFailed, Err: &domain.Error{Kind: domain.KindConflict, Code: sync.CodeConflict}},
+	}}
+
+	require.NotNil(t, result.Failure())
+	assert.Equal(t, sync.CodeConflict, result.Failure().Code)
 }

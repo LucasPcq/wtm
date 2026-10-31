@@ -4,13 +4,10 @@ import { phaseDuring } from '@/features/worktrees/utils/phases'
 import type { Unit } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
-// what needs the person first comes first: what failed, then what to check, then what went, then what went along
-// with it (sync's branches fast-forwarded first)
-export const outcomeOrder = ['failed', 'check', 'done', 'along'] as const
+// what needs the person first comes first: what failed, then what to check, then what went
+export const outcomeOrder = ['failed', 'check', 'done'] as const
 
 export type OutcomeKind = (typeof outcomeOrder)[number]
-
-export type OutcomeLabels = Record<Exclude<OutcomeKind, 'along'>, string> & { along?: string }
 
 // a row with no tone is a plain next step: nothing went wrong, nothing to check
 export type OutcomeTone = Exclude<Tone, 'busy'>
@@ -42,7 +39,14 @@ export type Act = {
   run: (followUps: DomainFollowUp[]) => void
 }
 
-export type OutcomeGroup = { kind: OutcomeKind; rows: OutcomeRow[] }
+// label: a group named its own way (sync's "Couldn't push", a second done group "Fast-forwarded"); action: one button
+// on its label line for every row of it
+export type OutcomeGroup = {
+  kind: OutcomeKind
+  rows: OutcomeRow[]
+  label?: string | undefined
+  action?: { label: string; run: () => void }
+}
 
 export const outputOf = (unit: Unit | undefined) => {
   if (!unit || unit.lines.length === 0) return undefined

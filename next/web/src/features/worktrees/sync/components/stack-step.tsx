@@ -1,20 +1,14 @@
-import { type ReactNode, useId } from 'react'
-import type { SyncPlan, SyncRebase } from '@/api/types.gen'
-import { Switch } from '@/components/ui/switch'
+import type { SyncOnto, SyncPlan, SyncRebase } from '@/api/types.gen'
 import { ListHeader } from '@/features/worktrees/components/list-header'
+import { OptionSwitch } from '@/features/worktrees/sync/components/option-switch'
+import { StackBranches } from '@/features/worktrees/sync/components/stack-branches'
 import { type Box, StackRow } from '@/features/worktrees/sync/components/stack-row'
 import { markedOf, moves, rootOf, type Switches, unsafe } from '@/features/worktrees/sync/utils/plan'
 import { rebasesIn, type StackNode, searchedStack } from '@/features/worktrees/sync/utils/stack'
-import {
-  changes,
-  commits,
-  names,
-  standingTone,
-  standingWords,
-  switchWords,
-} from '@/features/worktrees/sync/utils/words'
+import { standingTone, standingWords, switchWords } from '@/features/worktrees/sync/utils/words'
+import { changes, commits } from '@/features/worktrees/utils/counts'
+import { listed } from '@/features/worktrees/utils/listed'
 import { plural } from '@/lib/plural'
-import { cn } from '@/lib/utils'
 
 // step 1 holds every choice: the stack as a tree, each box one the core takes (a worktree named, a dirty one forced,
 // main's fast-forward first), then the switches
@@ -24,6 +18,8 @@ export function StackStep({
   picking,
   isNamed,
   onCheck,
+  ontoTicked,
+  onOntoTick,
   changesOf,
   switches,
   onSwitch,
@@ -35,6 +31,8 @@ export function StackStep({
   picking: boolean
   isNamed: (rebase: SyncRebase) => boolean
   onCheck: (rebases: SyncRebase[], on: boolean) => void
+  ontoTicked: (onto: SyncOnto) => boolean
+  onOntoTick: (onto: SyncOnto, on: boolean) => void
   changesOf: (worktree: string) => number | undefined
   switches: Switches
   onSwitch: (name: keyof Switches, on: boolean) => void
@@ -46,7 +44,8 @@ export function StackStep({
   const planned = (worktree: string) => plan?.worktrees?.find((rebase) => rebase.worktree === worktree)
   const follows = (rebase: SyncRebase) => {
     const ran = planned(rebase.worktree)
-    return !isNamed(rebase) && ran?.descendant === true && moves(ran)
+    // a dirty one forced through another's consent keeps its own box, never "follows"
+    return !isNamed(rebase) && !unsafe(rebase) && ran?.descendant === true && moves(ran)
   }
   const leftOut = (rebase: SyncRebase) => !isNamed(rebase) && (plan?.left_out ?? []).includes(rebase.worktree)
   const selectable = (rebase: SyncRebase) =>
@@ -59,9 +58,12 @@ export function StackStep({
   const descendantsTitle =
     picking || tops.length > 1
       ? 'Sync the worktrees under the ones picked'
-      : `Sync the ${plural(under.length, 'worktree')} under ${names(tops)}`
+      : `Sync the ${plural(under.length, 'worktree')} under ${listed(tops)}`
   // a descendant checked anyway is named, yet follows all the same
-  const followers = (plan?.worktrees ?? []).filter((rebase) => following(rebase.worktree) && moves(rebase))
+  // a dirty one forced along, not checked, waits for its consent: it does not follow
+  const followers = (plan?.worktrees ?? []).filter(
+    (rebase) => following(rebase.worktree) && moves(rebase) && (!unsafe(rebase) || isNamed(rebase)),
+  )
   const kept = (plan?.worktrees ?? []).filter((rebase) => rebase.descendant && !moves(rebase) && unsafe(rebase))
   const ontoMoving = stack.flatMap((node) => (node.kind === 'onto' && moves(node.onto) ? [node.name] : []))
 
@@ -69,42 +71,54 @@ export function StackStep({
     if (!switches.descendants) {
       const left = plan?.left_out ?? []
       if (left.length === 0) return ''
-      return `${names(left)} ${left.length === 1 ? 'stays where it is, and needs' : 'stay where they are, and need'} a sync after.`
+      return `${listed(left)} ${left.length === 1 ? 'stays where it is, and needs' : 'stay where they are, and need'} a sync after.`
     }
     const follow = followers.map((rebase) => rebase.worktree)
     const parts = [
-      follow.length > 0 && `${names(follow)} ${follow.length === 1 ? 'follows' : 'follow'}`,
+      follow.length > 0 && `${listed(follow)} ${follow.length === 1 ? 'follows' : 'follow'}`,
       kept.length > 0 &&
-        `${names(kept.map((rebase) => rebase.worktree))} ${kept.length === 1 ? 'is' : 'are'} kept (uncommitted changes)`,
+        `${listed(kept.map((rebase) => rebase.worktree))} ${kept.length === 1 ? 'is' : 'are'} kept (uncommitted changes)`,
     ].filter(Boolean)
     return parts.length > 0 ? `${parts.join('; ')}.` : ''
   }
 
-  const ontoRow = (name: string, behind: number, canMove: boolean) => {
+  // a branch rebased onto: its box is the one ff_parents answer; a dirty one is fast-forwarded only checked itself, its
+  // changes stashed around it
+  const ontoRow = (onto: SyncOnto) => {
+    const name = onto.branch
+    const behind = onto.origin?.behind ?? 0
     const others = ontoMoving.filter((other) => other !== name)
-    const along = others.length > 0 ? `, with ${names(others)}` : ''
-    const box: Box | undefined = canMove
+    const along = others.length > 0 ? `, with ${listed(others)}` : ''
+    const dirty = (onto.blockers ?? []).length > 0
+    const forwarded = moves(plan?.onto?.find((one) => one.branch === name) ?? { phases: [] })
+    const checked = switches.ff_parents && (!dirty || ontoTicked(onto))
+    const box: Box | undefined = moves(onto)
       ? {
-          checked: switches.ff_parents,
+          checked,
           disabled: false,
           label: `Fast-forward ${name} first`,
-          onCheck: (on) => onSwitch('ff_parents', on),
+          onCheck: (on) => {
+            if (dirty) onOntoTick(onto, on)
+            if (!dirty || (on && !switches.ff_parents)) onSwitch('ff_parents', on)
+          },
         }
       : undefined
-    const dirty = plan?.onto?.find((onto) => onto.branch === name)?.blockers?.length
     const line = () => {
-      if (!canMove) return 'rebased onto as it stands'
-      if (switches.ff_parents) return `fast-forwarded to origin first · ${commits(behind)}${along}`
+      if (!moves(onto)) return 'rebased onto as it stands'
+      // forced through another's consent, a dirty one still waits for its own
+      if (forwarded && !(dirty && !ontoTicked(onto)))
+        return `fast-forwarded to origin first · ${commits(behind)}${along}`
       return `rebased onto as it stands · ${commits(behind)} behind origin${along}`
     }
-    return (
-      <StackRow
-        name={name}
-        box={box}
-        attention={dirty ? ['uncommitted changes: kept as it is'] : []}
-        lines={[line()]}
-      />
-    )
+    const attention = () => {
+      if (!dirty) return []
+      return [
+        checked
+          ? 'uncommitted changes: stashed, then put back'
+          : 'uncommitted changes: check it to fast-forward it anyway',
+      ]
+    }
+    return <StackRow name={name} box={box} attention={attention()} lines={[line()]} />
   }
 
   const rebaseRow = (rebase: SyncRebase) => {
@@ -182,13 +196,9 @@ export function StackStep({
             )
           }
         />
-        <Branches
+        <StackBranches
           nodes={shown}
-          row={(node) =>
-            node.kind === 'onto'
-              ? ontoRow(node.name, node.onto.origin?.behind ?? 0, moves(node.onto))
-              : rebaseRow(node.rebase)
-          }
+          row={(node) => (node.kind === 'onto' ? ontoRow(node.onto) : rebaseRow(node.rebase))}
         />
       </div>
 
@@ -211,66 +221,6 @@ export function StackStep({
           />
         ))}
       </div>
-    </div>
-  )
-}
-
-// the rail runs under each box: an elbow to every child, hidden past the last one
-function Branches({
-  nodes,
-  row,
-  child = false,
-}: {
-  nodes: StackNode[]
-  row: (node: StackNode) => ReactNode
-  child?: boolean
-}) {
-  return (
-    <ul
-      aria-label={child ? undefined : 'Worktrees'}
-      className={cn('flex flex-col', child ? 'ml-[7px] border-l pl-[12px]' : 'px-4 py-2')}
-    >
-      {nodes.map((node) => (
-        <li
-          key={node.name}
-          aria-label={node.name}
-          className={cn(
-            'relative',
-            child && 'before:absolute before:top-[17px] before:-left-[12px] before:w-[10px] before:border-t',
-            child &&
-              'last:after:absolute last:after:top-[18px] last:after:bottom-0 last:after:-left-[13px] last:after:w-px last:after:bg-background',
-          )}
-        >
-          {row(node)}
-          {node.children.length > 0 && <Branches nodes={node.children} row={row} child />}
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-function OptionSwitch({
-  title,
-  line,
-  on,
-  onSwitch,
-}: {
-  title: string
-  line: string
-  on: boolean
-  onSwitch: (on: boolean) => void
-}) {
-  const id = useId()
-
-  return (
-    <div className="flex items-start gap-4 px-4 py-3">
-      <Switch id={id} checked={on} onCheckedChange={onSwitch} className="mt-0.5" />
-      <span className="flex min-w-0 flex-col gap-1">
-        <label htmlFor={id} className="cursor-pointer text-sm font-medium">
-          {title}
-        </label>
-        {line && <span className="text-xs text-muted-foreground">{line}</span>}
-      </span>
     </div>
   )
 }
