@@ -1,6 +1,6 @@
 $ wtm checkout --from main; echo EXIT=$?
 
-  Step 8/8 • Confirm
+  Step 9/9 • Confirm
 
   ✓ Pull request: #2
   ✓ Parent branch: main · --from
@@ -9,6 +9,7 @@ $ wtm checkout --from main; echo EXIT=$?
   ✓ Branch update: keep as-is
   · Mine — set by its flag only
   · Review requested — set by its flag only
+  · No fetch — set by its flag only
 
   ┃  Review & confirm
   ┃

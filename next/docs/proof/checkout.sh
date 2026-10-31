@@ -27,7 +27,7 @@ fake_gh() {
   cat >"$1/gh" <<'SH'
 #!/usr/bin/env bash
 root=$(cd "$(dirname "$0")/.." && pwd)
-if [[ $1 == auth ]]; then [[ -f $root/gh.signed-out ]] && { echo "You are not logged into any GitHub hosts." >&2; exit 1; }; exit 0; fi
+if [[ $1 == auth ]]; then [[ -f $root/gh.signed-out ]] && { echo "You are not logged into any GitHub hosts. To log in, run: gh auth login" >&2; exit 1; }; exit 0; fi
 exec python3 - "$root/prs.json" "$@" <<'PY'
 import json, sys
 prs, args = json.load(open(sys.argv[1])), sys.argv[2:]
