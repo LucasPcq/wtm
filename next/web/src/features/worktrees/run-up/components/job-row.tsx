@@ -1,24 +1,18 @@
-import { ChevronRight, CircleCheck, CircleDashed, CircleX, LoaderCircle, type LucideIcon } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { type Tone, toneIcon } from '@/features/worktrees/components/glyph'
+import { toneIcon } from '@/features/worktrees/components/glyph'
 import { StepOutput } from '@/features/worktrees/components/step-output'
 import { terminalLine } from '@/features/worktrees/exec/utils/output'
+import { phaseLook } from '@/features/worktrees/utils/phase-look'
 import type { PhaseRun } from '@/features/worktrees/utils/progress'
 import { cn } from '@/lib/utils'
-
-const look: Record<PhaseRun['state'], { icon: LucideIcon; tone: Tone }> = {
-  todo: { icon: CircleDashed, tone: 'muted' },
-  now: { icon: LoaderCircle, tone: 'busy' },
-  done: { icon: CircleCheck, tone: 'ok' },
-  failed: { icon: CircleX, tone: 'failed' },
-}
 
 // one job while the profile starts: folded, its lines live behind its chevron
 export function JobRow({ name, run, said }: { name: string; run: PhaseRun; said: string }) {
   const [open, setOpen] = useState(false)
-  const { icon: Icon, tone } = look[run.state]
+  const { icon: Icon, tone } = phaseLook[run.state]
   const lines = run.lines ?? []
 
   return (

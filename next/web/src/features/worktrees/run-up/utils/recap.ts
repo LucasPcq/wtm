@@ -1,6 +1,6 @@
 import type { Applied } from '@/api/queries/commands'
 import type { DomainWarning, RunupJobStatus } from '@/api/types.gen'
-import { resultLook } from '@/features/worktrees/run-up/utils/words'
+import { resultWords } from '@/features/worktrees/run-up/utils/words'
 import {
   itemWarnings,
   type OutcomeGroup,
@@ -19,7 +19,7 @@ export const jobsSaid = (item: RunUpItem) => {
   return order
     .flatMap((status) => {
       const names = jobs.filter((job) => job.status === status).map((job) => job.name)
-      return names.length > 0 ? [`${names.join(', ')} ${resultLook[status].said}`] : []
+      return names.length > 0 ? [`${names.join(', ')} ${resultWords[status]}`] : []
     })
     .join(' · ')
 }
