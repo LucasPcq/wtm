@@ -239,18 +239,10 @@ func restartDaemon(ctx context.Context, p restartParams) error {
 		return nil
 	}
 
-	output.Frame(p.Err, func(w io.Writer) {
-		if protocol {
-			output.Message(w, "The run daemon speaks another protocol: its jobs can't be read.")
-			output.Message(w, "Stops:  every service it runs itself")
-			output.Message(w, "Kept:   its stacks, in its index")
-			return
-		}
-		stops, kept := restartReach(jobs)
-		output.Message(w, "The run daemon is "+daemonOf(skewed)+".")
-		output.Message(w, "Stops:  "+cmp.Or(strings.Join(stops, ", "), "nothing"))
-		output.Message(w, "Kept:   "+cmp.Or(strings.Join(kept, ", "), "nothing"))
-	})
+	// What stops is said where the question is asked; --yes asks none, and --quiet then says none.
+	if !p.Quiet || !p.Yes {
+		p.found(foundParams{Jobs: jobs, Skewed: skewed, Protocol: protocol})
+	}
 	if !p.Yes {
 		if !p.CanAsk {
 			return &domain.Error{Kind: domain.KindInvalid, Code: codeRestartUnconfirmed, Message: "nothing restarted: pass --yes to restart it unattended"}
@@ -269,6 +261,29 @@ func restartDaemon(ctx context.Context, p restartParams) error {
 	}
 	p.said("The run daemon restarted as wtm-next " + version)
 	return nil
+}
+
+// foundParams are what a restart found of the daemon it replaces: its jobs, its skew, or that it speaks another protocol.
+type foundParams struct {
+	Jobs     []run.Job
+	Skewed   *run.Skewed
+	Protocol bool
+}
+
+// found says on Err what a restart found: which jobs stop and which are kept.
+func (p restartParams) found(f foundParams) {
+	output.Frame(p.Err, func(w io.Writer) {
+		if f.Protocol {
+			output.Message(w, "The run daemon speaks another protocol: its jobs can't be read.")
+			output.Message(w, "Stops:  every service it runs itself")
+			output.Message(w, "Kept:   its stacks, in its index")
+			return
+		}
+		stops, kept := restartReach(f.Jobs)
+		output.Message(w, "The run daemon is "+daemonOf(f.Skewed)+".")
+		output.Message(w, "Stops:  "+cmp.Or(strings.Join(stops, ", "), "nothing"))
+		output.Message(w, "Kept:   "+cmp.Or(strings.Join(kept, ", "), "nothing"))
+	})
 }
 
 // said writes what the restart did on Out, framed, unless Quiet.
