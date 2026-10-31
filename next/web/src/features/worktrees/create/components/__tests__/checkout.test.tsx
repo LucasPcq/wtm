@@ -258,3 +258,29 @@ test('each opening starts on a new branch', async () => {
 
   expect(await within(await screen.findByRole('dialog')).findByRole('textbox', { name: 'Branches' })).toBeTruthy()
 })
+
+// Enter before the lookup answered found no target: a number typed and entered at once did nothing.
+test('a number typed and entered at once is chosen', async () => {
+  const { user, dialog } = await openCheckout()
+
+  await user.type(await within(dialog).findByRole('textbox', { name: 'Search pull requests' }), '205{Enter}')
+
+  await waitFor(async () => expect((await row(dialog, /#205/)).getAttribute('aria-pressed')).toBe('true'))
+})
+
+// A refused pull request was marked fetched: a later ask read its stale branch as last fetched.
+test('a pull request refused is fetched again by the next ask', async () => {
+  const { user, dialog, calls } = await openCheckout()
+  await user.type(await within(dialog).findByRole('textbox', { name: 'Search pull requests' }), '198{Enter}')
+  await within(dialog).findByText("#198's branch is gone from origin: there is nothing to check out.")
+
+  await user.click(within(dialog).getByRole('combobox', { name: 'Parent' }))
+  await user.click(await screen.findByRole('option', { name: 'feat/search' }))
+
+  const asking = () =>
+    calls.filter(
+      (call) => call.dry_run === undefined && call.answers?.some((a) => a.path === 'pr' && a.values[0] === '198'),
+    )
+  await waitFor(() => expect(asking().some((call) => call.answers?.some((a) => a.path === 'from'))).toBe(true))
+  expect(asking().some((call) => call.answers?.some((a) => a.path === 'no_fetch'))).toBe(false)
+})

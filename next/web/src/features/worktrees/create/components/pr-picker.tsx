@@ -74,9 +74,11 @@ export function PrPicker({
     onAsk()
   }
 
+  // a number entered before its lookup answered is chosen as typed: the form's own ask refuses it if it must
   const enter = () => {
     const target = listed ?? (paused === typed ? found : undefined)
-    if (target && !target.problem) choose(target.value)
+    if (target) return target.problem ? undefined : choose(target.value)
+    if (byNumber) choose(typed)
   }
 
   const pick = (to: PrFilter) => {

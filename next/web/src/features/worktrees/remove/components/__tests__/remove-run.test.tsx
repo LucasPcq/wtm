@@ -191,10 +191,13 @@ test('an apply refused because a worktree changed goes back to the worktrees, sa
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Remove' }))
 
-  const alerts = await within(dialog).findAllByRole('alert')
-  expect(alerts.map((alert) => alert.textContent)).toContain(
-    'feat/billing-ui changed since the plan, so nothing was removed. Check the worktrees again.',
-  )
+  await within(dialog).findByText(/changed since the plan/)
+  expect(
+    within(dialog)
+      .getAllByRole('alert')
+      .map((alert) => alert.textContent),
+    'one message for one event',
+  ).toEqual(['feat/billing-ui changed since the plan, so nothing was removed. Check the worktrees again.'])
   expect(within(dialog).queryByText('Removed'), 'no outcome: nothing ran').toBeNull()
   await waitFor(() => expect(within(dialog).getByText('Uncommitted changes')).toBeTruthy())
   expect(

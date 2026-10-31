@@ -79,7 +79,10 @@ export function RemoveWizard({
   // person checked it under that very risk: the two reads land in any order
   const consented = (plan?.worktrees ?? []).every((removal) => !unsafe(removal) || ticked(removal)?.on)
   const fresh = plan !== undefined && !planned.isPlaceholderData && !planned.isFetching && consented
-  const unplanned = planned.isError ? planned.error.message : planned.data?.error?.message
+  // a plan's refusal speaks for the choices on screen only: not a placeholder's, not under the notice that already says
+  // why nothing was removed
+  const refused = planned.isError ? planned.error.message : planned.data?.error?.message
+  const unplanned = going.length === 0 || planned.isPlaceholderData || notice ? undefined : refused
 
   // the step is the one reached, unless the facts moved under it: once the worktrees were confirmed, one that left the
   // run or joined it since (its risk changed) sends the wizard back to say it; children all gone leave nothing to ask
