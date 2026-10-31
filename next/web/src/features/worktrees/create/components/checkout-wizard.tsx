@@ -80,10 +80,11 @@ export function CheckoutWizard({
         <Stepper steps={stepper} />
       </DialogBand>
 
+      {at === 0 && startFrom}
+
       <DialogScroll>
         {step && (
           <div className="flex flex-col gap-6">
-            {at === 0 && startFrom}
             {failure && <FormFailure error={failure} onNewBranch={onNewBranch} />}
             {at === 0 && (
               <PrPicker

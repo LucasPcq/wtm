@@ -43,6 +43,7 @@ Type does the ranking: a title is 14 medium foreground, a second line 12–13 mu
 - **The title is the command's name**, one line, the same at every step and through the run: Create worktrees, Remove worktrees, Prune worktrees, Fast-forward worktrees, Run a command, Change parent. The subject lives in the body.
 - **The description carries the state:** what the command does before the run, "Step 3 of 4 · Run the on_clean hooks" while it runs, one sentence of outcome at the end ("2 pruned.", "1 of 2 removed.").
 - **The band always ends on its rule**, empty or not: a `wtm/Stepper` before the run, a `wtm/Progress` during it, nothing after. The header never ends on a hole.
+- **The dialog's fixed header** holds the title, the stepper and Create's `wtm/Start From`; only the body under it scrolls.
 - **The body, in this order:** a `wtm/Alert` for a technical problem of the whole plan; the main list; the **Left as they are** section (its own label and list box, 24 below the main list, muted names: business states that keep a row out of the plan: diverged, ahead, mid-rebase, not on origin, already there, main, no longer finished); then `wtm/Details`, the one fold, always last.
 - **A technical problem never sits in a list, a business state never sits in an Alert.** A failed fetch, GitHub unavailable or a lock held is about the tool; diverged or mid-rebase is about the branch.
 
@@ -137,6 +138,7 @@ Every multi-worktree list (Remove's, Prune's, the Fast-forward and Run pickers, 
 - **A full-width fix** sits below, across the whole width: a primary button with the fix ("Reparent onto main") and its consequence in 12 muted ("It rebases onto main on its next sync."), or a long command as a `wtm/Command Line`.
 - **Tones:** amber when the person has something to do or the plan goes on without it (a problem, GitHub unavailable, a failed fetch); red when it failed or refuses the plan (a crashed job, a lock held, a run that failed); muted for a suggestion (a merged pull request: Prune).
 - A warning with only the core's message is the title-less Alert: its one line in the second column.
+- **No empty row:** a title alone (with or without its compact action) is one thin row, its icon, title and action centred on it; a description keeps its icon on its first line; nothing leaves a row or padding under the last line.
 
 In the detail panel it is the one action of the moment (status's first problem, its region named "To do"); in a dialog it is first in the body.
 

@@ -284,3 +284,15 @@ test('a pull request refused is fetched again by the next ask', async () => {
   await waitFor(() => expect(asking().some((call) => call.answers?.some((a) => a.path === 'from'))).toBe(true))
   expect(asking().some((call) => call.answers?.some((a) => a.path === 'no_fetch'))).toBe(false)
 })
+
+// Start From scrolled away with a long list: the dialog's fixed header holds it, the list scrolls under it.
+test('New branch | Pull request stays out of the scrolling body', async () => {
+  const { dialog } = await openCheckout()
+
+  const toggle = within(dialog).getByRole('radio', { name: 'Pull request' })
+
+  expect(toggle.closest('[data-slot=scroll-area]')).toBeNull()
+  expect(
+    within(dialog).getByRole('textbox', { name: 'Search pull requests' }).closest('[data-slot=scroll-area]'),
+  ).not.toBeNull()
+})

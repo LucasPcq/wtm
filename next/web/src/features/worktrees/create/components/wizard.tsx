@@ -47,10 +47,11 @@ export function Wizard({
         <Stepper steps={stepper} />
       </DialogBand>
 
+      {at === 0 && startFrom}
+
       <DialogScroll>
         {step && (
           <div className="flex flex-col gap-6">
-            {at === 0 && startFrom}
             {failure && <Alert tone="red" description={sentence(failure.message)} />}
             <CommandFields
               form={form}

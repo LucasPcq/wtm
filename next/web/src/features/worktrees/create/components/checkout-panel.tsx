@@ -64,8 +64,9 @@ export function CheckoutPanel({
         />
       </DialogBand>
 
+      {startFrom}
+
       <DialogScroll>
-        {startFrom}
         {form.isPending && <Skeleton className="h-48 w-full" />}
         {form.isError && <FormFailure error={form.error} onNewBranch={onNewBranch} />}
         <ParentPlaceholder />

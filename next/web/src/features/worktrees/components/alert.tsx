@@ -33,11 +33,15 @@ export function Alert({
   const { box, icon: color, glyph } = look[tone]
   const Icon = icon ?? glyph
 
-  // explicit rows: shadcn's icon spans two, which leaves an empty row under an Alert of one line
+  // explicit rows: shadcn's icon spans two, which leaves an empty row under an Alert of one line. A title alone centres
+  // its icon and action on its row; a description, which may wrap, keeps its icon on its first line
+  const oneLine = !description && !below
+
   return (
     <Box
       className={cn(
         'gap-y-1 px-4 py-3 text-foreground *:[svg]:row-span-1 has-[>svg]:grid-cols-[auto_1fr_auto] has-[>svg]:gap-x-3',
+        oneLine && 'items-center *:[svg]:translate-y-0',
         box,
         className,
       )}
@@ -51,7 +55,15 @@ export function Alert({
         </AlertDescription>
       )}
       {action && (
-        <div className={cn('col-start-3 row-start-1 self-start', title && description && 'row-span-2')}>{action}</div>
+        <div
+          className={cn(
+            'col-start-3 row-start-1',
+            oneLine ? 'self-center' : 'self-start',
+            title && description && 'row-span-2',
+          )}
+        >
+          {action}
+        </div>
       )}
       {below && <div className="col-span-3 mt-2 flex flex-col gap-2">{below}</div>}
     </Box>
