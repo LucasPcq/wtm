@@ -2,9 +2,11 @@ package runup_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -126,13 +128,19 @@ func TestASharedServiceStartedFromTheMainCheckoutNamesIt(t *testing.T) {
 func TestAWorktreeWithNoOrdinalIsNumberedBeforeItsJobsStart(t *testing.T) {
 	w := newWorld(t)
 
-	planned, _ := w.plan(t, starting("", fresh))
-	result, _ := w.apply(t, starting("", fresh))
+	planned, _ := w.plan(t, starting("full", fresh))
+	result, _ := w.apply(t, starting("full", fresh))
 
 	assert.False(t, planned.Worktrees[0].Numbered)
-	require.Equal(t, domain.StatusDone, itemOf(t, result.Items, fresh).Status)
+	item := itemOf(t, result.Items, fresh)
+	require.Equal(t, domain.StatusDone, item.Status, item.Err)
 	assert.Equal(t, 3, w.stored(t, fresh).Ordinal)
 	assert.Equal(t, "4030", w.daemon.specOf(t, w.at(fresh), "api").Env["PORT"])
+	api := item.Detail.Jobs[2]
+	require.Len(t, api.Ports, 1, "its ports are the ordinal's once numbered")
+	assert.Equal(t, 4030, api.Ports[0].Port)
+	assert.True(t, *api.Ports[0].Listening, "and they are checked")
+	assert.Equal(t, "app_feat-fresh", item.Detail.Jobs[1].Namespace)
 }
 
 func TestADaemonOfAnotherBuildHoldingJobsRefusesTheStartWithItsRestart(t *testing.T) {
@@ -221,13 +229,26 @@ func TestACancelLeavesWhatTheDaemonTookAndStartsNothingMore(t *testing.T) {
 	w := newWorld(t)
 	ctx, cancel := context.WithCancel(t.Context())
 	w.daemon.onStart = func(run.Spec) { cancel() }
-	w.daemon.refuse = map[string]error{key(w.at(featA), "api"): context.Canceled}
 
 	result, _ := w.applyIn(ctx, t, starting("", featA))
 
 	item := itemOf(t, result.Items, featA)
 	assert.Equal(t, domain.StatusCancelled, item.Status)
 	assert.Equal(t, map[string]runup.JobStatus{"api": runup.JobStarted, "web": runup.JobNotStarted}, statusesOf(item))
+}
+
+// A start cut short before the daemon took it started nothing: the daemon lists no such job.
+func TestAStartCutShortTheDaemonNeverTookIsNotStarted(t *testing.T) {
+	w := newWorld(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	w.daemon.onStart = func(run.Spec) { cancel() }
+	w.daemon.refuse = map[string]error{key(w.at(featA), "api"): context.Canceled}
+
+	result, _ := w.applyIn(ctx, t, starting("", featA))
+
+	item := itemOf(t, result.Items, featA)
+	assert.Equal(t, domain.StatusCancelled, item.Status)
+	assert.Equal(t, map[string]runup.JobStatus{"api": runup.JobNotStarted, "web": runup.JobNotStarted}, statusesOf(item))
 }
 
 func TestARepositoryWithNoRunTomlIsRefusedFollowedByRunInit(t *testing.T) {
@@ -251,6 +272,165 @@ func TestADaemonThatCannotBeMadeSureOfFailsEveryWorktree(t *testing.T) {
 		assert.Equal(t, domain.StatusFailed, item.Status)
 		assert.Equal(t, runup.CodeDaemonSkew, item.Err.Code)
 		assert.Equal(t, "run daemon restart", item.Err.FollowUp.Command)
+		assert.Equal(t, map[string]runup.JobStatus{"api": runup.JobNotStarted, "web": runup.JobNotStarted}, statusesOf(item), "every job of the plan is listed, none started")
 	}
 	assert.Empty(t, w.daemon.started)
+}
+
+func TestACancelDuringThePortCheckIsInterruptedAndWarnsOfNoPort(t *testing.T) {
+	w := newWorld(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	w.onListen = cancel
+
+	result, _ := w.applyIn(ctx, t, starting("", featA))
+
+	item := itemOf(t, result.Items, featA)
+	assert.Equal(t, domain.StatusCancelled, item.Status)
+	assert.Equal(t, domain.ReasonInterrupted, item.Reason)
+	assert.Empty(t, item.Warnings)
+	assert.Nil(t, item.Detail.Jobs[0].Ports[0].Listening, "a check cut short says nothing of a port")
+}
+
+func TestAJobRunTomlKeepsOutOfTheCheckIsNeitherCheckedNorWarnedOf(t *testing.T) {
+	w := newWorld(t)
+	w.silent = []int{4010, 7010}
+
+	result, _ := w.apply(t, starting("probed", featA))
+
+	item := itemOf(t, result.Items, featA)
+	assert.Equal(t, []string{runup.CodePortSilent}, codes(item.Warnings))
+	assert.Equal(t, "api", item.Warnings[0].Params["job"])
+	assert.Nil(t, item.Detail.Jobs[1].Ports[0].Listening, "probe = false")
+}
+
+// A runner up in one worktree and its child up in another: no worktree runs a job twice.
+func TestARunnerAndItsChildUpInTwoWorktreesAreNoConflict(t *testing.T) {
+	w := newWorld(t)
+	w.up("turbo", featA, nil)
+	w.up("web", featB, nil)
+
+	_, _, err := w.usecase.Plan(t.Context(), starting("alone", featA, featB))
+
+	assert.NoError(t, err)
+}
+
+func TestAPortAnotherRepositoryHoldsIsRefusedWithNoExclusiveStart(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = append(w.daemon.listed, run.Job{Name: "api", WorkDir: "/elsewhere/repo", Up: true, State: run.Running, Hold: run.HoldOwn, Ports: map[string]int{"PORT": 4010}})
+	yes := true
+
+	refused := w.refused(t, starting("", featA))
+	exclusive := w.refused(t, runup.Request{Worktrees: []string{featA}, Exclusive: &yes})
+
+	assert.Equal(t, runup.CodePortClash, refused.Code)
+	assert.Nil(t, refused.FollowUp, "stopping this repository's worktrees frees no port of another")
+	assert.Contains(t, refused.Message, "/elsewhere/repo")
+	assert.Equal(t, runup.CodePortClash, exclusive.Code)
+}
+
+func TestExclusiveLiftsAClashWithAnotherWorktree(t *testing.T) {
+	w := newWorld(t)
+	w.up("api", "main", map[string]int{"PORT": 4000})
+	yes := true
+
+	planned, _ := w.plan(t, runup.Request{Worktrees: []string{verbatim}, Exclusive: &yes})
+
+	assert.Equal(t, []string{"main"}, []string{planned.Others[0].Worktree})
+}
+
+func TestADaemonOfAnotherBuildHoldingNoJobIsNoRefusal(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.skewed = &run.Skewed{Skew: run.SkewLegacy}
+
+	_, _, err := w.usecase.Plan(t.Context(), starting("", featA))
+
+	assert.NoError(t, err, "Ensure replaces it")
+}
+
+func TestTheRecapListsTheJobsOfEachWorktree(t *testing.T) {
+	w := newWorld(t)
+	w.up("api", featB, nil)
+
+	planned, _ := w.plan(t, starting("", featA, featB))
+
+	var labels []string
+	for _, row := range planned.Recap {
+		labels = append(labels, row.Label)
+	}
+	assert.Equal(t, []string{"Worktrees", "Profile", "Jobs in " + featA, "Jobs in " + featB}, labels)
+	assert.Equal(t, "api (up)", planned.Recap[3].Values[0].Value)
+}
+
+func TestAWorktreeWhoseNumberingFailsFailsAlone(t *testing.T) {
+	w := newWorld(t)
+	writeFile(t, filepath.Join(w.stateDir, "worktrees", "feat%2Fb", "meta.json"), "not json")
+
+	result, _ := w.apply(t, starting("", fresh))
+
+	item := itemOf(t, result.Items, fresh)
+	assert.Equal(t, domain.StatusFailed, item.Status)
+	assert.Equal(t, runup.CodeUnnumbered, item.Err.Code)
+	assert.Equal(t, runup.JobNotStarted, item.Detail.Jobs[0].Status)
+}
+
+func TestAWorktreeWhoseJobsCouldNotStopIsAWarning(t *testing.T) {
+	w := newWorld(t)
+	w.up("api", featB, nil)
+	w.daemon.stopErr = errors.New("connection reset")
+	yes := true
+
+	result, _ := w.apply(t, runup.Request{Worktrees: []string{featA}, Exclusive: &yes})
+
+	assert.Equal(t, []string{runup.CodeStopFailed}, codes(result.Warnings))
+	assert.Equal(t, domain.StatusDone, itemOf(t, result.Items, featA).Status)
+}
+
+func TestANamespaceTheRecordCannotKeepIsAWarning(t *testing.T) {
+	w := newWorld(t)
+	w.usecase.Meta = unwritable{w.meta}
+
+	result, _ := w.apply(t, starting("full", featA))
+
+	item := itemOf(t, result.Items, featA)
+	assert.Equal(t, domain.StatusDone, item.Status)
+	assert.Equal(t, []string{runup.CodeNamespaceUnrecorded}, codes(item.Warnings))
+}
+
+func TestTheSettleCatchesACrashWithinItAndLeavesOneAfterIt(t *testing.T) {
+	for name, c := range map[string]struct {
+		settle, crash time.Duration
+		want          runup.JobStatus
+	}{
+		"within": {settle: 300 * time.Millisecond, crash: 50 * time.Millisecond, want: runup.JobCrashed},
+		"after":  {settle: 50 * time.Millisecond, crash: 2 * time.Second, want: runup.JobStarted},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t)
+			w.usecase.Settle = c.settle
+			w.daemon.late = map[string]time.Duration{key(w.at(featA), "api"): c.crash}
+
+			result, _ := w.apply(t, runup.Request{Worktrees: []string{featA}, Profile: "alone", NoProbe: true})
+
+			assert.Equal(t, c.want, itemOf(t, result.Items, featA).Detail.Jobs[0].Status)
+		})
+	}
+}
+
+// The daemon took the join before the cancel: its namespace exists, and clean must find it in the record.
+func TestAJoinCutShortTheDaemonTookRecordsItsNamespace(t *testing.T) {
+	w := newWorld(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	w.daemon.onStart = func(spec run.Spec) {
+		if spec.Job.Name == "db" {
+			cancel()
+		}
+	}
+	w.daemon.cut = map[string]bool{key(w.at(featA), "db"): true}
+
+	result, _ := w.applyIn(ctx, t, starting("full", featA))
+
+	item := itemOf(t, result.Items, featA)
+	assert.Equal(t, domain.StatusCancelled, item.Status)
+	assert.Equal(t, runup.JobJoined, statusesOf(item)["db"])
+	assert.Equal(t, []string{"db"}, w.stored(t, featA).Namespaces)
 }

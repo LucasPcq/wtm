@@ -60,7 +60,7 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		statuscli.New(streams, env, openStatus, commandLine),
 		treecli.New(streams, env, openTree, commandLine),
 		eventscli.New(streams, env, systemStream(), commandLine),
-		runCmd(runupcli.New(streams, env, openRunUp, commandLine), runDaemonCmd()),
+		runCmd(runupcli.New(streams, env, openRunUp, commandLine), runDaemonCmd(streams)),
 		uiCmd(env),
 		daemonCmd(),
 	}

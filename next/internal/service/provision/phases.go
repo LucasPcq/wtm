@@ -69,7 +69,7 @@ func (s Service) Number(ctx context.Context, branch string) (int, error) {
 
 // allocate picks the lowest ordinal no other worktree holds and records it in
 // the worktree's meta.json, under the ordinals' lock so two runs cannot pick
-// the same one.
+// the same one; one the record holds already is kept.
 func (p *provisioning) allocate(ctx context.Context) (int, error) {
 	var ordinal int
 	held, err := p.Service.Meta.LockOrdinals(ctx, func() error {
@@ -80,6 +80,11 @@ func (p *provisioning) allocate(ctx context.Context) (int, error) {
 
 		ordinal = worktree.FreeOrdinal(taken)
 		written, err := p.Service.Meta.Update(ctx, worktree.MetaUpdate{Branch: p.Worktree.Branch, Change: func(meta *worktree.Meta) error {
+			// Another run numbered the worktree first: its ordinal stands.
+			if meta.Ordinal > 0 {
+				ordinal = meta.Ordinal
+				return nil
+			}
 			meta.Ordinal = ordinal
 			return nil
 		}})

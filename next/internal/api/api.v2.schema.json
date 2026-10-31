@@ -4337,7 +4337,7 @@
       "description": "What became of one job of a start.",
       "enum": [
         "started",
-        "up",
+        "already_running",
         "joined",
         "done",
         "failed",

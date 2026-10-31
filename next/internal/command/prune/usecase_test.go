@@ -266,6 +266,15 @@ func TestJobsUpMakeAWorktreeUnsafeAndTheJobsTheDaemonCannotTellAreWarnedOf(t *te
 	assert.Contains(t, codes(warnings), prune.Name+domain.JobsUnknown)
 }
 
+func TestADaemonOfAnotherBuildIsWarnedOfWithItsRestart(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.usecase.Jobs = func(context.Context) ([]run.Job, error) { return nil, &run.Skewed{Skew: run.SkewLegacy} }
+
+	_, warnings := w.plan(t, prune.Request{Merged: true})
+
+	assert.Contains(t, codes(warnings), prune.Name+domain.DaemonSkew)
+}
+
 func TestNothingDoneWithIsAnEmptyPlanAndAnEmptyApply(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.usecase.PullRequests = func(context.Context, []string) ([]worktree.PullRequest, error) { return nil, nil }

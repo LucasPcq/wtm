@@ -90,7 +90,7 @@ type Port struct {
 // leftUp reports whether the start left a job up in its worktree.
 func (d Detail) leftUp() bool {
 	return slices.ContainsFunc(d.Jobs, func(job JobResult) bool {
-		return job.Status == JobStarted || job.Status == JobUp || job.Status == JobJoined
+		return job.Status == JobStarted || job.Status == JobAlreadyRunning || job.Status == JobJoined
 	})
 }
 
@@ -183,7 +183,7 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	if err := u.Daemon.Ensure(ctx); err != nil {
 		failure := u.daemonFailure(err)
 		for i, t := range plan.Worktrees {
-			items[i] = Item{Subject: t.Worktree, Status: domain.StatusFailed, Err: failure}
+			items[i] = Item{Subject: t.Worktree, Status: domain.StatusFailed, Err: failure, Detail: plan.notStarted(t)}
 		}
 		return Result{Items: items}
 	}
@@ -325,12 +325,7 @@ type starting struct {
 
 // start starts the jobs of t, in order, between its unit's events: it numbers the worktree first when it has no ordinal, reads its environment, starts each job (a task to its end), stops at the first that fails, then checks the ports its services declare and that none of them ended since.
 func (u UseCase) start(ctx context.Context, plan Plan, t Target, report domain.Report) Item {
-	s := &starting{UseCase: u, plan: plan, target: t, report: report, item: Item{Subject: t.Worktree}}
-	detail := &Detail{Path: t.Path, Profile: plan.Profile, Jobs: make([]JobResult, 0, len(t.Jobs))}
-	for _, job := range t.Jobs {
-		detail.Jobs = append(detail.Jobs, JobResult{Name: job.Name, Kind: job.Kind, Status: JobNotStarted, Namespace: job.Namespace})
-	}
-	s.item.Detail = detail
+	s := &starting{UseCase: u, plan: plan, target: t, report: report, item: Item{Subject: t.Worktree, Detail: plan.notStarted(t)}}
 	if ctx.Err() != nil {
 		s.item.Status, s.item.Reason = domain.StatusSkipped, domain.ReasonNotReached
 		return s.item
@@ -354,10 +349,14 @@ func (u UseCase) start(ctx context.Context, plan Plan, t Target, report domain.R
 	}
 
 	s.check(ctx)
-	if s.item.Status == "" {
+	switch {
+	case s.item.Status != "":
+	case ctx.Err() != nil:
+		s.item.Status, s.item.Reason = domain.StatusCancelled, domain.ReasonInterrupted
+	default:
 		s.item.Status = domain.StatusDone
 	}
-	if s.item.Status == domain.StatusDone && !slices.ContainsFunc(s.item.Detail.Jobs, func(job JobResult) bool { return job.Status != JobUp }) {
+	if s.item.Status == domain.StatusDone && !slices.ContainsFunc(s.item.Detail.Jobs, func(job JobResult) bool { return job.Status != JobAlreadyRunning }) {
 		s.item.Reason = domain.ReasonUnchanged
 	}
 	return s.item
@@ -372,6 +371,12 @@ func (s *starting) prepare(ctx context.Context) *domain.Error {
 			return domain.AsError(domain.AsErrorParams{Err: err, Code: CodeUnnumbered, Message: "couldn't number " + s.target.Worktree + ": its ports are unknown"})
 		}
 		ordinal = numbered
+		// Its ports and namespaces were unknown to the plan: they are the ordinal's now.
+		s.target.Numbered = true
+		s.target = s.plan.facts.plan(s.target, s.plan.facts.jobsOf(s.plan.Profile), ordinal)
+		for i, job := range s.target.Jobs {
+			s.item.Detail.Jobs[i].Namespace = job.Namespace
+		}
 	}
 	s.ordinal = ordinal
 
@@ -412,11 +417,17 @@ func (s *starting) job(ctx context.Context, index int) bool {
 	result.URL, result.Ports = started.URL, resultPorts(planned.Ports)
 	switch {
 	case up:
-		result.Status, result.URL = JobUp, s.plan.facts.urlOf(planned.Name, s.target.Path)
+		result.Status, result.URL = JobAlreadyRunning, s.plan.facts.urlOf(planned.Name, s.target.Path)
 	case err != nil && ctx.Err() != nil:
-		// The daemon took the start: what it launched keeps running, the rest is not reached.
-		result.Status = JobStarted
+		// The start was cut short: the daemon says whether it took it, and what it took keeps running.
 		s.item.Status, s.item.Reason = domain.StatusCancelled, domain.ReasonInterrupted
+		if s.took(planned.Name) {
+			result.Status = JobStarted
+			if planned.Action == ActionJoin {
+				result.Status = JobJoined
+				s.recordNamespace(ctx, declared)
+			}
+		}
 		return false
 	case err != nil:
 		result.Status, result.Lines = JobFailed, lines
@@ -434,6 +445,20 @@ func (s *starting) job(ctx context.Context, index int) bool {
 		result.Status = JobStarted
 	}
 	return true
+}
+
+// tookWithin bounds how long a start cut short asks the daemon whether it took it.
+const tookWithin = 2 * time.Second
+
+// took reports whether the daemon lists the job of name up in the worktree, as it does once it took its start.
+func (s *starting) took(name string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), tookWithin)
+	defer cancel()
+	jobs, err := s.Daemon.Jobs(ctx)
+	if _, skewed := errors.AsType[*run.Skewed](err); err != nil && !skewed {
+		return false
+	}
+	return slices.Contains(run.UpIn(jobs, s.target.Path), name)
 }
 
 func jobFailure(job string, err error, exitCode *int) *domain.Error {
@@ -506,8 +531,9 @@ func (s *starting) logFile(spec run.Spec) string {
 	return filepath.Join(dir, spec.Job.Name+".log")
 }
 
-// recordNamespace records in the worktree's meta record that it holds a namespace of job's data, which clean drops with it; a record it cannot keep is a warning.
+// recordNamespace records in the worktree's meta record that it holds a namespace of job's data, which clean drops with it, a cancel notwithstanding: the daemon made it; a record it cannot keep is a warning.
 func (s *starting) recordNamespace(ctx context.Context, job project.Job) {
+	ctx = context.WithoutCancel(ctx)
 	if _, made, _ := env.NamespaceFor(job, s.env); !made || s.target.Branch == "" {
 		return
 	}
@@ -533,9 +559,17 @@ func (s *starting) check(ctx context.Context) {
 		}
 	}
 	if within := s.probeBudget(); len(probed) > 0 && within > 0 {
-		s.markPorts(s.Listening(ctx, probed, within))
+		answered := s.Listening(ctx, probed, within)
+		// A check cut short says nothing of the ports it did not reach.
+		if ctx.Err() != nil {
+			return
+		}
+		s.markPorts(answered)
 	}
 	sleep(ctx, s.Settle-time.Since(s.launched))
+	if ctx.Err() != nil {
+		return
+	}
 
 	jobs, err := s.Daemon.Jobs(ctx)
 	if _, skewed := errors.AsType[*run.Skewed](err); err != nil && !skewed {
@@ -572,10 +606,13 @@ func (s *starting) probeBudget() time.Duration {
 	}
 }
 
-// markPorts records which ports of the services started answered, and warns of each job one of whose ports none did.
+// markPorts records which ports of the services started answered, and warns of each job one of whose ports none did; a job run.toml keeps out of the check (probe = false, binds_no_port) is left unchecked.
 func (s *starting) markPorts(answered map[int]bool) {
 	for i := range s.item.Detail.Jobs {
 		result := &s.item.Detail.Jobs[i]
+		if declared, _ := s.plan.facts.declared(result.Name); declared.NoProbe || declared.BindsNoPort {
+			continue
+		}
 		var silent []string
 		for p := range result.Ports {
 			port := &result.Ports[p]

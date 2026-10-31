@@ -212,6 +212,10 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, ctx.Err()
 	}
 	facts.JobsErr, facts.PRsErr, facts.PullRequests = answered.JobsErr, answered.PRsErr, answered.PullRequests
+	if answered.Skewed != nil {
+		skew := repository.SkewWarning(repository.SkewWarningParams{Command: Name, Skewed: answered.Skewed, Restart: u.Repository.Restart})
+		facts.Skew = &skew
+	}
 	facts.Behind = repository.Behind(ctx, u.Git, repo, facts.PullRequests, linked)
 
 	// Every candidate is checked, for the picker and the plan; only those going hold nothing for each other: a request naming some checks against every other worktree, which stays.

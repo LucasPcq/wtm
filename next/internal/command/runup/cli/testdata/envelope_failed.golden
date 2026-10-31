@@ -199,8 +199,26 @@
         ]
       },
       {
-        "key": "jobs",
-        "label": "Jobs",
+        "key": "jobs:feat/a",
+        "label": "Jobs in feat/a",
+        "values": [
+          {
+            "value": "migrate",
+            "text": "migrate"
+          },
+          {
+            "value": "api",
+            "text": "api"
+          },
+          {
+            "value": "web",
+            "text": "web"
+          }
+        ]
+      },
+      {
+        "key": "jobs:feat/b",
+        "label": "Jobs in feat/b",
         "values": [
           {
             "value": "migrate",

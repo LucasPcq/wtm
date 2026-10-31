@@ -110,7 +110,7 @@ func SkewWarning(params SkewWarningParams) domain.Warning {
 	warning := domain.Warning{Code: params.Command + domain.DaemonSkew, Message: params.Skewed.Error(), Params: domain.Params{"skew": string(params.Skewed.Skew), "daemon": params.Skewed.Daemon}}
 	if params.Restart != nil {
 		restart := *params.Restart
-		restart.Code, restart.Message = params.Command+".restart_daemon", "hand its jobs over to this wtm"
+		restart.Code, restart.Message = params.Command+".restart_daemon", "restart it: its services stop, its stacks are kept"
 		warning.FollowUp = &restart
 	}
 	return warning

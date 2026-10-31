@@ -146,7 +146,7 @@
       "follow_up": {
         "command": "run daemon restart",
         "code": "status.restart_daemon",
-        "message": "hand its jobs over to this wtm"
+        "message": "restart it: its services stop, its stacks are kept"
       }
     }
   ]

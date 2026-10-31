@@ -57,6 +57,21 @@ func TestAnExistingWorktreeIsNumberedPastItsNeighboursAndKeepsItsRecord(t *testi
 	assert.Equal(t, worktree.Meta{SourceBranch: "main", Ordinal: 2}, recorded)
 }
 
+// Two starts of one worktree may both find it unnumbered: the second keeps the ordinal the first recorded.
+func TestAnOrdinalAlreadyRecordedIsKept(t *testing.T) {
+	w, files := inMemory(t, seeds{
+		Worktrees: []worktree.Worktree{{Path: "/trees/b", State: worktree.OnBranch{Branch: "feat/b"}}},
+		Store:     storetest.FakeParams{Meta: map[string]worktree.Meta{"feat/b": {Ordinal: 5}}},
+	})
+
+	ordinal, err := w.service.Number(t.Context(), "feat/b")
+
+	require.NoError(t, err)
+	assert.Equal(t, 5, ordinal)
+	recorded, _ := files.Meta("feat/b")
+	assert.Equal(t, 5, recorded.Ordinal)
+}
+
 func TestAWorktreeWithNoRecordIsNumberedAndRecorded(t *testing.T) {
 	w, files := inMemory(t, seeds{Worktrees: []worktree.Worktree{{Path: "/trees/b", State: worktree.OnBranch{Branch: "feat/b"}}}})
 

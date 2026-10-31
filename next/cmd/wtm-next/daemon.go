@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bufio"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +23,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/proxy"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	rundaemon "github.com/LucasPcq/wtm/next/internal/daemon"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -164,25 +168,95 @@ func startDaemon() error {
 // commandRestartDaemon is the follow-up that restarts the run daemon, as a follow-up names it.
 const commandRestartDaemon = "run daemon restart"
 
-// runDaemonCmd is run daemon, the commands on the run daemon itself: restart, which hands the jobs of a daemon of another build, or of the legacy wtm, over to one of this build.
-func runDaemonCmd() *cobra.Command {
+// runDaemonCmd is run daemon, the commands on the run daemon itself: restart, which replaces a daemon of another build, or of the legacy wtm, by one of this build.
+func runDaemonCmd(streams *output.Streams) *cobra.Command {
 	cmd := &cobra.Command{Use: "daemon", Short: "Manage the run daemon", Args: cobra.NoArgs}
-	cmd.AddCommand(&cobra.Command{
+	restart := &cobra.Command{
 		Use:   "restart",
 		Short: "Restart the run daemon, as this build",
-		Long:  "Stop the run daemon, whatever its build, and start one of this build. Every service it runs itself stops with it, a shared one included; its detached stacks (a service with a stop command, docker compose up -d) keep running and are handed over to the new one through its index. Start the others again with run up.",
+		Long:  "Replace a run daemon of another build, or of the legacy wtm, by one of this build; a daemon of this build is left alone. Every service the daemon runs itself stops with it, in every repository, a shared one included; its detached stacks (a service with a stop command, docker compose up -d) and the holds worktrees have on shared services are handed over to the new one through its index. It says which jobs stop and which are kept, then asks; --yes restarts without asking.",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			runs := runDaemon()
-			if err := runs.Shutdown(cmd.Context()); err != nil {
-				return err
-			}
-			if err := runs.Ensure(cmd.Context()); err != nil {
-				return err
-			}
-			output.SuccessLine(cmd.OutOrStdout(), "The run daemon restarted as wtm-next "+version)
-			return nil
-		},
-	})
+	}
+	yes := restart.Flags().BoolP("yes", "y", false, "Restart without asking")
+	restart.RunE = func(cmd *cobra.Command, _ []string) error {
+		runs := runDaemon()
+		return restartDaemon(cmd.Context(), restartParams{Jobs: runs.Jobs, Shutdown: runs.Shutdown, Ensure: runs.Ensure, In: streams.In, Out: cmd.OutOrStdout(), CanAsk: streams.CanPrompt(), Yes: *yes})
+	}
+	cmd.AddCommand(restart)
 	return cmd
+}
+
+// restartParams are the daemon a restart replaces, through what reads its jobs, stops it and starts one of this build; where it asks and says; whether it can ask; and whether --yes answered.
+type restartParams struct {
+	Jobs     func(ctx context.Context) ([]run.Job, error)
+	Shutdown func(ctx context.Context) error
+	Ensure   func(ctx context.Context) error
+	In       io.Reader
+	Out      io.Writer
+	CanAsk   bool
+	Yes      bool
+}
+
+// The codes of a restart not made: unattended without --yes, or declined.
+const (
+	codeRestartUnconfirmed = "run.restart_unconfirmed"
+	codeRestartDeclined    = "run.restart_declined"
+)
+
+// restartDaemon replaces a daemon of another build by one of this build, once the user saw what stops and agreed; a daemon of this build, or none, is left as it is, and one that died leaving jobs in its index is taken over by a new one.
+func restartDaemon(ctx context.Context, p restartParams) error {
+	jobs, err := p.Jobs(ctx)
+	skewed, isSkewed := errors.AsType[*run.Skewed](err)
+	switch {
+	case errors.Is(err, run.ErrUnknown):
+		if err := p.Ensure(ctx); err != nil {
+			return err
+		}
+		output.SuccessLine(p.Out, "A run daemon of this build took over the jobs its index held")
+		return nil
+	case err != nil && !isSkewed:
+		return err
+	case err == nil:
+		output.Message(p.Out, "The run daemon is of this build, or none runs: nothing to restart")
+		return nil
+	}
+
+	stops, kept := restartReach(jobs)
+	output.Message(p.Out, strings.TrimSuffix(skewed.Error(), ": restart it to start jobs beside its own")+".")
+	output.Message(p.Out, "Stops:  "+cmp.Or(strings.Join(stops, ", "), "nothing"))
+	output.Message(p.Out, "Kept:   "+cmp.Or(strings.Join(kept, ", "), "nothing"))
+	if !p.Yes {
+		if !p.CanAsk {
+			return &domain.Error{Kind: domain.KindInvalid, Code: codeRestartUnconfirmed, Message: "nothing restarted: pass --yes to restart it unattended"}
+		}
+		fmt.Fprint(p.Out, "  Restart it? [y/N] ")
+		answer, _ := bufio.NewReader(p.In).ReadString('\n')
+		if !strings.EqualFold(strings.TrimSpace(answer), "y") {
+			return &domain.Error{Kind: domain.KindCancelled, Code: codeRestartDeclined, Message: "nothing restarted"}
+		}
+	}
+	if err := p.Shutdown(ctx); err != nil {
+		return err
+	}
+	if err := p.Ensure(ctx); err != nil {
+		return err
+	}
+	output.SuccessLine(p.Out, "The run daemon restarted as wtm-next "+version)
+	return nil
+}
+
+// restartReach are the jobs up a restart stops, the services the daemon runs itself, and those it keeps, the detached stacks and the holds on shared services, each by its name and worktree.
+func restartReach(jobs []run.Job) (stops, kept []string) {
+	for _, job := range jobs {
+		if !job.Up {
+			continue
+		}
+		named := job.Name + " (" + job.WorkDir + ")"
+		if job.Hold == run.HoldOwn {
+			stops = append(stops, named)
+			continue
+		}
+		kept = append(kept, named)
+	}
+	return stops, kept
 }
