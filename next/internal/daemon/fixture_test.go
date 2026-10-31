@@ -170,8 +170,9 @@ func (o *orphans) Reap(pgids []int) {
 type index struct {
 	mu      sync.Mutex
 	records []run.Record
-	// stall, while set, holds each Save until it is closed: a job's end waiting on its index.
-	stall chan struct{}
+	// stall, while set, holds each Save until it is closed: a job's end waiting on its index; stalled counts the Saves it holds.
+	stall   chan struct{}
+	stalled int
 }
 
 func (i *index) Load() []run.Record {
@@ -183,6 +184,9 @@ func (i *index) Load() []run.Record {
 func (i *index) Save(records []run.Record) error {
 	i.mu.Lock()
 	stall := i.stall
+	if stall != nil {
+		i.stalled++
+	}
 	i.mu.Unlock()
 	if stall != nil {
 		<-stall
@@ -316,4 +320,28 @@ func failsFirst(times int, why string) script {
 		}
 		p.end(0)
 	}
+}
+
+// holds is a script that runs until release is closed, then exits with code.
+func holds(release <-chan struct{}, code int) script {
+	return func(p *fakeProcess, _ func(string)) {
+		<-release
+		p.end(code)
+	}
+}
+
+// stalling holds every Save from now until the function it returns is called.
+func (i *index) stalling() func() {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	stall := make(chan struct{})
+	i.stall = stall
+	return func() { close(stall) }
+}
+
+// holding reports how many Saves the stall holds.
+func (i *index) holding() int {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return i.stalled
 }

@@ -18,6 +18,10 @@ const (
 	// namespaceBudget bounds the retries of a namespace's create: its service was started moments ago, and a first refusal means it does not accept connections yet far more often than a wrong command.
 	namespaceBudget = 30 * time.Second
 	namespaceRetry  = time.Second
+	// namespaceHang bounds one attempt of a create, far past the budget: a database made from a large template takes minutes.
+	namespaceHang = 5 * time.Minute
+	// pendingPoll is how often a start waiting on a shared job being stopped looks again: a stack's stop command has no channel to wait on.
+	pendingPoll = 10 * time.Millisecond
 )
 
 // startShared starts a job of shared scope: it runs once, in the main
@@ -36,62 +40,98 @@ func (d *Daemon) startShared(spec run.Spec, out func(run.Line)) (run.Job, error)
 	own, served := keyOf(spec), key{workDir: shared.WorkDir, name: spec.Job.Name}
 	mainAsks := own == served
 
-	d.mu.Lock()
-	if d.stopping {
-		d.mu.Unlock()
-		return run.Job{}, &run.Error{Code: run.CodeStopping, Message: "the run daemon is stopping"}
+	runs := spec
+	runs.WorkDir, runs.Env, runs.LogDir = shared.WorkDir, shared.Env, shared.LogDir
+	if spec.Origin != nil {
+		origin := *spec.Origin
+		origin.Branch = shared.Env[env.BranchKey]
+		runs.Origin = &origin
 	}
-	if held := d.jobs[own]; held != nil && held.up() && (!mainAsks || held.record.MainHolds) {
-		d.mu.Unlock()
-		return run.Job{}, &run.Error{Code: run.CodeJobRunning, Message: fmt.Sprintf("job %s is already running in %s", spec.Job.Name, spec.WorkDir)}
-	}
-	up := d.realLocked(served) != nil
-	d.mu.Unlock()
-
-	if !up {
-		runs := spec
-		runs.WorkDir, runs.Env, runs.LogDir = shared.WorkDir, shared.Env, shared.LogDir
-		if spec.Origin != nil {
-			origin := *spec.Origin
-			origin.Branch = shared.Env[env.BranchKey]
-			runs.Origin = &origin
+	var service, hold *job
+	mine, launched := 0, false
+	for service == nil {
+		d.mu.Lock()
+		if d.stopping {
+			d.mu.Unlock()
+			return run.Job{}, &run.Error{Code: run.CodeStopping, Message: "the run daemon is stopping"}
 		}
+		if held := d.jobs[own]; held != nil && held.up() && (!mainAsks || held.record.MainHolds) {
+			d.mu.Unlock()
+			return run.Job{}, &run.Error{Code: run.CodeJobRunning, Message: fmt.Sprintf("job %s is already running in %s", spec.Job.Name, spec.WorkDir)}
+		}
+		// A job being stopped, or a stack whose first launch runs, is waited for: a claim on it would hold a job about to be gone.
+		if pending := d.jobs[served]; pending != nil && pending.up() && (pending.stopped || pending.process != nil && pending.record.Spec.Detached()) {
+			// A stack's done closed once its launcher ended: only a process's tells when it ends.
+			var ended <-chan struct{}
+			if pending.process != nil {
+				ended = pending.done
+			}
+			d.mu.Unlock()
+			if d.waited != nil {
+				d.waited()
+			}
+			select {
+			case <-ended:
+			case <-time.After(pendingPoll):
+			}
+			continue
+		}
+		// Posted under the lock that found the job up: a release deciding nobody holds it marks it stopping under the same lock.
+		if service = d.realLocked(served); service != nil {
+			hold = service
+			if mainAsks {
+				service.record.MainHolds = true
+				service.mainHold++
+				mine = service.mainHold
+			} else {
+				hold = &job{record: run.Record{Spec: spec, StartedAt: d.params.Now(), Claim: true, SharedDir: shared.WorkDir}, done: closed(), unannounced: true}
+				d.jobs[own] = hold
+			}
+			d.mu.Unlock()
+			break
+		}
+		// This start launched it, and it is gone already: a task that ended, a service that died at once.
+		if launched {
+			d.mu.Unlock()
+			return run.Job{}, &run.Error{Code: run.CodeLaunchFailed, Message: fmt.Sprintf("job %s ended as soon as it started", spec.Job.Name)}
+		}
+		d.mu.Unlock()
+
+		// Started, or started by another worktree meanwhile: looked at again.
 		var refusal *run.Error
-		if _, err := d.start(runs, out); err != nil && !(errors.As(err, &refusal) && refusal.Code == run.CodeJobRunning) {
+		_, err := d.start(runs, out)
+		if err != nil && !(errors.As(err, &refusal) && refusal.Code == run.CodeJobRunning) {
 			return run.Job{}, err
 		}
+		launched = err == nil
 	}
 
-	d.mu.Lock()
-	service := d.realLocked(served)
-	if service == nil {
-		d.mu.Unlock()
-		return run.Job{}, &run.Error{Code: run.CodeLaunchFailed, Message: fmt.Sprintf("the shared job %s is not up in %s", spec.Job.Name, shared.WorkDir)}
+	// The job may have ended, or this worktree let go of it, while its namespace was made: the hold this start took is gone then. Read under the lock.
+	stands := func() bool {
+		return d.jobs[own] == hold && hold.up() && (!mainAsks || hold.record.MainHolds && hold.mainHold == mine)
 	}
-	if mainAsks {
-		service.record.MainHolds = true
-	} else {
-		d.jobs[own] = &job{record: run.Record{Spec: spec, StartedAt: d.params.Now(), Claim: true, SharedDir: shared.WorkDir}, done: closed()}
-	}
-	d.mu.Unlock()
-
 	if err := d.createNamespace(spec, service); err != nil {
-		// Never announced, the hold leaves in silence.
-		_, _ = d.letGo(letGoParams{Job: d.jobOf(own)})
+		_, _ = d.letGo(letGoParams{Job: hold, Stands: stands})
 		return run.Job{}, err
 	}
+	d.mu.Lock()
+	held := stands()
+	hold.unannounced = false
+	d.mu.Unlock()
+	if !held {
+		return run.Job{}, &run.Error{Code: run.CodeLaunchFailed, Message: fmt.Sprintf("job %s ended, or was let go, while its namespace was made", spec.Job.Name)}
+	}
 	d.save()
-	claim := d.jobOf(own)
 	if !mainAsks {
-		d.publish(claim, publishParams{Event: domain.JobStarted{JobChange: d.change(claim, nil)}})
+		d.publish(hold, publishParams{Event: domain.JobStarted{JobChange: d.change(hold, nil)}})
 	}
 
-	return d.view(claim), nil
+	return d.view(hold), nil
 }
 
 // createNamespace creates the namespace of spec's job for its worktree, if it
-// has one, retrying its create within a budget, and notes it in the log of the
-// service that serves it.
+// has one, retrying its create while its budget lasts, each attempt stopped
+// once it hangs, and notes it in the log of the service that serves it.
 func (d *Daemon) createNamespace(spec run.Spec, service *job) error {
 	namespace, ok, err := env.NamespaceFor(spec.Job, spec.Env)
 	if err != nil {
@@ -105,24 +145,37 @@ func (d *Daemon) createNamespace(spec run.Spec, service *job) error {
 	command.Line, command.Dir, command.Terminal = spec.Job.Namespace.Create, spec.WorkDir, false
 	command.Env = maps.Clone(command.Env)
 	maps.Copy(command.Env, namespace.Env)
-	// A budget of wall-clock time, not the daemon's clock, which stamps what it records.
-	deadline := time.Now().Add(cmp.Or(d.params.NamespaceBudget, namespaceBudget))
+	// Wall-clock time, not the daemon's clock, which stamps what it records. The budget bounds when an attempt starts, not how long it runs.
+	retries := time.Now().Add(cmp.Or(d.params.NamespaceBudget, namespaceBudget))
+	retry := cmp.Or(d.params.NamespaceRetry, namespaceRetry)
+	why := ""
 	for {
+		if d.isStopping() {
+			return &run.Error{Code: run.CodeStopping, Message: "the run daemon is stopping"}
+		}
 		said := newOutput(d.params.Now)
 		command.Output = said.write
-		code, err := d.run(command)
+		code, err := d.runUntil(command, namespaceHang)
 		last := said.end()
 		if err == nil && code == 0 {
 			break
 		}
-		if time.Now().After(deadline) {
-			why := fmt.Sprintf("exit %d", code)
-			if len(last) > 0 {
-				why = last[len(last)-1]
-			}
+		// The last attempt's words, else an earlier one's: one stopped may have said nothing.
+		switch {
+		case len(last) > 0:
+			why = last[len(last)-1]
+		case err != nil && !d.isStopping():
+			why = fmt.Sprintf("still running after %s, stopped", namespaceHang)
+		}
+		// No attempt starts once the budget is spent.
+		if time.Until(retries) <= retry {
+			why = cmp.Or(why, fmt.Sprintf("exit %d", code))
 			return &run.Error{Code: run.CodeNamespace, Message: fmt.Sprintf("job %s: could not create namespace %s: %s (the create runs on every start, so it must be safe to run again)", spec.Job.Name, namespace.Name, why), ExitCode: &code}
 		}
-		time.Sleep(cmp.Or(d.params.NamespaceRetry, namespaceRetry))
+		select {
+		case <-time.After(retry):
+		case <-d.quit:
+		}
 	}
 
 	if service.output != nil {
@@ -131,13 +184,34 @@ func (d *Daemon) createNamespace(spec run.Spec, service *job) error {
 	return nil
 }
 
-// run runs command to its end and returns its exit code.
-func (d *Daemon) run(command run.Command) (int, error) {
+// errDeadline is the error of a command stopped once it ran too long.
+var errDeadline = errors.New("stopped once it ran too long")
+
+// runUntil runs command and returns its exit code; one still running after
+// limit, or once the daemon stops, is stopped, its whole group, and fails with
+// errDeadline: a create that hangs never holds its start, nor the daemon's
+// shutdown.
+func (d *Daemon) runUntil(command run.Command, limit time.Duration) (int, error) {
 	process, err := d.params.Spawn(command)
 	if err != nil {
 		return -1, err
 	}
-	return process.Wait(), nil
+	exited := make(chan int, 1)
+	go func() { exited <- process.Wait() }()
+	select {
+	case code := <-exited:
+		return code, nil
+	case <-d.params.After(limit):
+	case <-d.quit:
+	}
+	select {
+	case code := <-exited:
+		// It ended as its limit fell.
+		return code, nil
+	default:
+	}
+	process.Stop(d.params.Grace)
+	return <-exited, errDeadline
 }
 
 // release lets a worktree go of the shared job j (a claim, or the job itself
@@ -146,15 +220,16 @@ func (d *Daemon) run(command run.Command) (int, error) {
 // holding it, [run.OutcomeReleased] otherwise. Its namespace stays: stopping
 // is not destroying.
 func (d *Daemon) release(j *job, correlation string) (run.Outcome, error) {
-	return d.letGo(letGoParams{Job: j, CorrelationID: correlation, Announce: true})
+	return d.letGo(letGoParams{Job: j, CorrelationID: correlation})
 }
 
-// letGoParams is a hold let go of, for the command of CorrelationID, and
-// whether a claim's release is announced: not for one never announced.
+// letGoParams is a hold let go of, for the command of CorrelationID; Stands,
+// when set, tells under the lock whether the hold is still the caller's to
+// let go.
 type letGoParams struct {
 	Job           *job
 	CorrelationID string
-	Announce      bool
+	Stands        func() bool
 }
 
 // letGo lets go of a hold on a shared job, as release says.
@@ -165,36 +240,57 @@ func (d *Daemon) letGo(params letGoParams) (run.Outcome, error) {
 	}
 	name := j.record.Spec.Job.Name
 	d.mu.Lock()
+	if params.Stands != nil && !params.Stands() {
+		d.mu.Unlock()
+		return run.OutcomeNotRunning, nil
+	}
+	announce := j.record.Claim && !j.unannounced
 	served := key{workDir: j.record.SharedDir, name: name}
 	if j.record.Claim {
-		delete(d.jobs, keyOf(j.record.Spec))
+		// Gone already, let go of by another release, or replaced by a newer claim of the same worktree.
+		k := keyOf(j.record.Spec)
+		if d.jobs[k] != j {
+			d.mu.Unlock()
+			return run.OutcomeNotRunning, nil
+		}
+		delete(d.jobs, k)
 	} else {
 		j.record.MainHolds = false
 		served = keyOf(j.record.Spec)
 	}
 	service := d.realLocked(served)
 	held := service != nil && (service.record.MainHolds || d.claimsLocked(served) > 0)
+	// Marked stopping under the lock that found nobody holding it: no claim lands on it now. A daemon stopping halts, never releases: the job stays for the next one.
+	halting := service != nil && !held && !d.stopping
+	if halting {
+		service.stopped, service.stopID = true, correlation
+	}
 	d.mu.Unlock()
 
 	d.save()
-	if j.record.Claim && params.Announce {
+	if announce {
 		d.publish(j, publishParams{Event: domain.JobStopped{JobChange: d.change(j, nil)}, CorrelationID: correlation})
 	}
 	switch {
 	case service == nil:
 		return run.OutcomeStopped, nil
-	case held:
+	case !halting:
 		return run.OutcomeReleased, nil
 	}
 
-	return d.halt(service, correlation)
+	outcome, err := d.halt(service, correlation)
+	if outcome == run.OutcomeNotRunning {
+		// It ended on its own since it was marked: let go all the same.
+		return run.OutcomeStopped, err
+	}
+	return outcome, err
 }
 
 // realLocked returns the shared job k names when it is up, the job itself and
-// not a claim; the lock is held.
+// not a claim, nor one whose stop runs; the lock is held.
 func (d *Daemon) realLocked(k key) *job {
 	j := d.jobs[k]
-	if j == nil || j.record.Claim || !j.up() {
+	if j == nil || j.record.Claim || !j.up() || j.stopped {
 		return nil
 	}
 	return j

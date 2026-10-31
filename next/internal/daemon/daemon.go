@@ -42,6 +42,8 @@ type Params struct {
 
 	NamespaceBudget time.Duration
 	NamespaceRetry  time.Duration
+	// After is the timer a namespace's create attempt hangs against, time.After when nil.
+	After func(time.Duration) <-chan time.Time
 }
 
 // A Daemon holds the jobs of the machine. Its methods are safe for concurrent
@@ -52,9 +54,14 @@ type Daemon struct {
 	mu       sync.Mutex
 	jobs     map[key]*job
 	stopping bool
+	// quit is closed once the daemon stops: what waits outside the job table (a namespace's create) ends with it.
+	quit chan struct{}
 
 	// saving serializes the writes of the index, each from a snapshot taken under it: a slow write never lands after a newer one.
 	saving sync.Mutex
+
+	// waited, set by a test, runs each time a shared start waits on a job being stopped or launched.
+	waited func()
 }
 
 type key struct {
@@ -83,6 +90,10 @@ type job struct {
 	stopped  bool
 	stopID   string
 	done     chan struct{}
+	// mainHold numbers the main checkout's holds of a shared job: a start lets go only of the one it took, never a newer one.
+	mainHold int
+	// unannounced marks a claim whose start has not announced it yet, nor will its release.
+	unannounced bool
 }
 
 // New returns a daemon over params, holding no job until [Daemon.Adopt].
@@ -91,8 +102,11 @@ func New(params Params) *Daemon {
 		params.Now = time.Now
 	}
 	params.Grace = cmp.Or(params.Grace, stopGrace)
+	if params.After == nil {
+		params.After = time.After
+	}
 
-	return &Daemon{params: params, jobs: map[key]*job{}}
+	return &Daemon{params: params, jobs: map[key]*job{}, quit: make(chan struct{})}
 }
 
 // ----------------------------------------------------------------------------
@@ -253,6 +267,7 @@ func (d *Daemon) launch(j *job) (run.Job, error) {
 		if j.previous != nil {
 			d.jobs[k] = j.previous
 		}
+		d.dropDanglingClaimsLocked()
 	}
 	j.previous = nil
 	d.mu.Unlock()
@@ -397,6 +412,7 @@ func (d *Daemon) stopStack(j *job) error {
 
 	d.mu.Lock()
 	j.state = run.Stopped
+	d.dropDanglingClaimsLocked()
 	d.mu.Unlock()
 	d.save()
 	d.publish(j, publishParams{Event: domain.JobStopped{JobChange: d.change(j, nil)}, CorrelationID: j.stopID})
@@ -450,6 +466,9 @@ func (d *Daemon) isStopping() bool {
 // to the index, for the next daemon.
 func (d *Daemon) Shutdown() {
 	d.mu.Lock()
+	if !d.stopping {
+		close(d.quit)
+	}
 	d.stopping = true
 	var running []*job
 	for _, j := range d.jobs {
