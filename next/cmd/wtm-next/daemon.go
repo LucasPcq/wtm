@@ -171,22 +171,35 @@ const commandRestartDaemon = "run daemon restart"
 // runDaemonCmd is run daemon, the commands on the run daemon itself: restart, which replaces a daemon of another build, or of the legacy wtm, by one of this build.
 func runDaemonCmd(streams *output.Streams) *cobra.Command {
 	cmd := &cobra.Command{Use: "daemon", Short: "Manage the run daemon", Args: cobra.NoArgs}
-	restart := &cobra.Command{
+	cmd.AddCommand(restartCmd(streams, func() restartParams {
+		runs := runDaemon()
+		return restartParams{Jobs: runs.Jobs, Shutdown: runs.Shutdown, Ensure: runs.Ensure}
+	}))
+	return cmd
+}
+
+// restartCmd is run daemon restart over the daemon daemon gives, asking on streams.
+func restartCmd(streams *output.Streams, daemon func() restartParams) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "restart",
 		Short: "Restart the run daemon, as this build",
 		Long:  "Replace a run daemon of another build, or of the legacy wtm, by one of this build; a daemon of this build is left alone. Every service the daemon runs itself stops with it, in every repository, a shared one included; its detached stacks (a service with a stop command, docker compose up -d) and the holds worktrees have on shared services are handed over to the new one through its index. It says which jobs stop and which are kept, then asks; --yes restarts without asking.",
 		Args:  cobra.NoArgs,
 	}
-	yes := restart.Flags().BoolP("yes", "y", false, "Restart without asking")
-	restart.RunE = func(cmd *cobra.Command, _ []string) error {
-		runs := runDaemon()
-		return restartDaemon(cmd.Context(), restartParams{Jobs: runs.Jobs, Shutdown: runs.Shutdown, Ensure: runs.Ensure, In: streams.In, Out: cmd.OutOrStdout(), CanAsk: streams.CanPrompt(), Yes: *yes})
+	yes := cmd.Flags().BoolP("yes", "y", false, "Restart without asking")
+	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
+		failing := cli.Run{Command: commandRestartDaemon, Streams: streams}
+		p := daemon()
+		p.In, p.Out, p.CanAsk, p.Yes = streams.In, cmd.OutOrStdout(), streams.CanPrompt(), *yes
+		if failure := domain.AsError(domain.AsErrorParams{Err: restartDaemon(cmd.Context(), p)}); failure != nil {
+			return failing.FailWith(failure, nil)
+		}
+		return nil
 	}
-	cmd.AddCommand(restart)
 	return cmd
 }
 
-// restartParams are the daemon a restart replaces, through what reads its jobs, stops it and starts one of this build; where it asks and says; whether it can ask; and whether --yes answered.
+// restartParams are the daemon a restart replaces, through what reads its jobs, stops it and starts one of this build; where it asks and says; whether it can ask; and whether --yes answered. Its failures are *domain.Error, by kind: unattended without --yes invalid, declined cancelled.
 type restartParams struct {
 	Jobs     func(ctx context.Context) ([]run.Job, error)
 	Shutdown func(ctx context.Context) error
@@ -212,19 +225,29 @@ func restartDaemon(ctx context.Context, p restartParams) error {
 		if err := p.Ensure(ctx); err != nil {
 			return err
 		}
-		output.SuccessLine(p.Out, "A run daemon of this build took over the jobs its index held")
+		output.Frame(p.Out, func(w io.Writer) {
+			output.SuccessLine(w, "A run daemon of this build took over the jobs its index held")
+		})
 		return nil
 	case err != nil && !isSkewed:
 		return err
 	case err == nil:
-		output.Message(p.Out, "The run daemon is of this build, or none runs: nothing to restart")
+		output.Frame(p.Out, func(w io.Writer) {
+			output.Message(w, "The run daemon is of this build, or none runs: nothing to restart")
+		})
 		return nil
 	}
 
 	stops, kept := restartReach(jobs)
-	output.Message(p.Out, strings.TrimSuffix(skewed.Error(), ": restart it to start jobs beside its own")+".")
-	output.Message(p.Out, "Stops:  "+cmp.Or(strings.Join(stops, ", "), "nothing"))
-	output.Message(p.Out, "Kept:   "+cmp.Or(strings.Join(kept, ", "), "nothing"))
+	daemon := "of another build (" + cmp.Or(skewed.Daemon, "older") + ")"
+	if skewed.Skew == run.SkewLegacy {
+		daemon = "the legacy wtm's"
+	}
+	output.Frame(p.Out, func(w io.Writer) {
+		output.Message(w, "The run daemon is "+daemon+".")
+		output.Message(w, "Stops:  "+cmp.Or(strings.Join(stops, ", "), "nothing"))
+		output.Message(w, "Kept:   "+cmp.Or(strings.Join(kept, ", "), "nothing"))
+	})
 	if !p.Yes {
 		if !p.CanAsk {
 			return &domain.Error{Kind: domain.KindInvalid, Code: codeRestartUnconfirmed, Message: "nothing restarted: pass --yes to restart it unattended"}
@@ -241,7 +264,7 @@ func restartDaemon(ctx context.Context, p restartParams) error {
 	if err := p.Ensure(ctx); err != nil {
 		return err
 	}
-	output.SuccessLine(p.Out, "The run daemon restarted as wtm-next "+version)
+	output.Frame(p.Out, func(w io.Writer) { output.SuccessLine(w, "The run daemon restarted as wtm-next "+version) })
 	return nil
 }
 

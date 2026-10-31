@@ -17,6 +17,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
+	"github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
+	"github.com/spf13/cobra"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -185,6 +188,33 @@ func TestARestartSaysWhatStopsAndWhatIsKeptThenAsks(t *testing.T) {
 			refused, ok := errors.AsType[*domain.Error](err)
 			require.True(t, ok, err)
 			assert.Equal(t, c.kind, refused.Kind)
+		})
+	}
+}
+
+// The exit code is the failure's: declined is cancelled, 19; unattended without --yes, 2.
+func TestARestartExitsWithItsFailuresCode(t *testing.T) {
+	for name, c := range map[string]struct {
+		answer string
+		ask    bool
+		want   int
+	}{
+		"declined":   {answer: "n\n", ask: true, want: cli.ExitCancelled},
+		"unattended": {want: cli.ExitUsage},
+		"confirmed":  {answer: "y\n", ask: true, want: cli.ExitOK},
+	} {
+		t.Run(name, func(t *testing.T) {
+			streams, in, _, _ := output.Test()
+			in.WriteString(c.answer)
+			streams.SetStdinTerminal(c.ask)
+			streams.Err.SetTerminal(c.ask)
+			r := &restarting{jobs: []run.Job{{Name: "web", WorkDir: "/wt/a", Up: true, Hold: run.HoldOwn}}}
+			skewed := &run.Skewed{Skew: run.SkewLegacy}
+			root := cli.NewRoot(version, streams, []*cobra.Command{runCmd(restartCmd(streams, func() restartParams { return r.params(skewed, false, false) }))})
+
+			code := cli.Execute(t.Context(), root, []string{"run", "restart"})
+
+			assert.Equal(t, c.want, code)
 		})
 	}
 }
