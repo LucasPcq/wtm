@@ -21,6 +21,7 @@ type Outcome string
 // The outcomes of a stop.
 const (
 	OutcomeStopped    Outcome = "stopped"     // the job was up and is stopped
+	OutcomeReleased   Outcome = "released"    // a worktree let go of a shared job other worktrees still hold, which runs on
 	OutcomeNotRunning Outcome = "not_running" // nothing of that name was up in that worktree
 )
 

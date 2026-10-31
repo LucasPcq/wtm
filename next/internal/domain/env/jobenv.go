@@ -16,8 +16,8 @@ import (
 // The variables wtm sets in the environment of a worktree's jobs and hooks. ComposeProjectKey is also the key wtm owns in the .env files docker compose reads.
 const (
 	ComposeProjectKey = "COMPOSE_PROJECT_NAME"
-	worktreeKey       = "WTM_WORKTREE"
-	branchKey         = "WTM_BRANCH"
+	WorktreeKey       = "WTM_WORKTREE" // the slug of the worktree a job runs in
+	BranchKey         = "WTM_BRANCH"   // the branch of the worktree a job runs in
 	ordinalKey        = "WTM_ORDINAL"
 	portOffsetKey     = "WTM_PORT_OFFSET"
 	projectKey        = "WTM_PROJECT"
@@ -26,7 +26,7 @@ const (
 
 // JobKeys returns the names of every variable wtm itself sets in a job's environment, the job's port variables aside.
 func JobKeys() []string {
-	return []string{worktreeKey, branchKey, ordinalKey, portOffsetKey, projectKey, isolationKey, ComposeProjectKey}
+	return []string{WorktreeKey, BranchKey, ordinalKey, portOffsetKey, projectKey, isolationKey, ComposeProjectKey}
 }
 
 // NotInherited returns the variables a worktree's hooks and commands never take from the caller's environment: those wtm itself sets (JobKeys), and every port run declares, which are the caller's worktree's, never theirs.
@@ -52,8 +52,8 @@ type JobParams struct {
 // jobEnv returns the variables a job of the worktree runs with: the WTM_ variables, COMPOSE_PROJECT_NAME unless the isolation is verbatim, and each port declared by exactly one job, offset for this worktree unless that job is shared.
 func jobEnv(params JobParams) map[string]string {
 	env := map[string]string{
-		worktreeKey:   worktree.Slug(params.Branch),
-		branchKey:     params.Branch,
+		WorktreeKey:   worktree.Slug(params.Branch),
+		BranchKey:     params.Branch,
 		ordinalKey:    strconv.Itoa(params.Ordinal),
 		portOffsetKey: strconv.Itoa(params.Offset()),
 		projectKey:    worktree.HostLabel(params.Project()),

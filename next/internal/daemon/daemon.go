@@ -25,8 +25,10 @@ const (
 // Params is what a [Daemon] reaches the world through: how it starts a
 // process, finds orphans, keeps its index, keeps each job's log and reads it
 // back, and tells whether a worktree is still there; where it publishes its
-// job events (nil publishes none); its clock (time.Now when nil); and how long
-// a stopped job has to exit before it is killed (5 seconds when zero).
+// job events (nil publishes none); its clock (time.Now when nil); how long
+// a stopped job has to exit before it is killed (5 seconds when zero); and how
+// long a shared job's namespace create is retried, and how often (30 seconds,
+// every second, when zero).
 type Params struct {
 	Spawn   Spawn
 	Orphans Orphans
@@ -37,6 +39,9 @@ type Params struct {
 	Publish Publish
 	Now     func() time.Time
 	Grace   time.Duration
+
+	NamespaceBudget time.Duration
+	NamespaceRetry  time.Duration
 }
 
 // A Daemon holds the jobs of the machine. Its methods are safe for concurrent
@@ -131,6 +136,7 @@ func (d *Daemon) Adopt() {
 		}
 		d.jobs[k] = &job{record: record, state: decision.State, reaped: decision.Reaped, adopted: true, last: last[i], done: closed()}
 	}
+	d.dropDanglingClaimsLocked()
 	d.mu.Unlock()
 
 	if len(reap) > 0 {
@@ -149,7 +155,17 @@ func (d *Daemon) Adopt() {
 // failing with [run.CodeLaunchFailed]; a foreground service only until it is
 // up, the daemon then watching it. It refuses a job already running in that
 // worktree, [run.CodeJobRunning], and any start once the daemon is stopping.
+// A job of shared scope runs once, in its main checkout, every other worktree
+// claiming it (see startShared).
 func (d *Daemon) Start(spec run.Spec, out func(run.Line)) (run.Job, error) {
+	if spec.Job.Scope == project.Shared {
+		return d.startShared(spec, out)
+	}
+	return d.start(spec, out)
+}
+
+// start starts the process of the job spec asks for, in the worktree it names.
+func (d *Daemon) start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 	if strings.TrimSpace(spec.Job.Cmd) == "" {
 		return run.Job{}, &run.Error{Code: run.CodeEmptyCommand, Message: fmt.Sprintf("job %s has no cmd", spec.Job.Name)}
 	}
@@ -177,7 +193,7 @@ func (d *Daemon) Start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 		output.end()
 		return run.Job{}, &run.Error{Code: run.CodeLaunchFailed, Message: fmt.Sprintf("start job %s: %v", spec.Job.Name, err)}
 	}
-	j := &job{record: run.Record{Spec: spec, StartedAt: d.params.Now(), PID: process.PID(), PGID: process.PID()}, state: run.Running, process: process, output: output, done: make(chan struct{})}
+	j := &job{record: run.Record{Spec: spec, StartedAt: d.params.Now(), PID: process.PID(), PGID: process.PID(), SharedDir: sharedDir(spec)}, state: run.Running, process: process, output: output, done: make(chan struct{})}
 	if previous != nil && previous.up() && spec.Detached() {
 		j.previous = previous
 	}
@@ -189,12 +205,12 @@ func (d *Daemon) Start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 
 	switch {
 	case spec.Job.Kind == project.Task:
-		d.publish(j, publishParams{Event: domain.JobStarted{JobChange: j.change(nil)}})
+		d.publish(j, publishParams{Event: domain.JobStarted{JobChange: d.change(j, nil)}})
 		return d.runTask(j)
 	case spec.Detached():
 		return d.launch(j)
 	}
-	d.publish(j, publishParams{Event: domain.JobStarted{JobChange: j.change(nil)}})
+	d.publish(j, publishParams{Event: domain.JobStarted{JobChange: d.change(j, nil)}})
 	d.save()
 	go func() { d.settle(j, process.Wait()) }()
 
@@ -247,7 +263,7 @@ func (d *Daemon) launch(j *job) (run.Job, error) {
 
 	d.save()
 	if !stopped {
-		d.publish(j, publishParams{Event: domain.JobStarted{JobChange: j.change(nil)}})
+		d.publish(j, publishParams{Event: domain.JobStarted{JobChange: d.change(j, nil)}})
 	}
 
 	return d.view(j), nil
@@ -271,20 +287,28 @@ func (d *Daemon) settle(j *job, code int) {
 		j.state = run.Crashed
 	}
 	state, stopID := j.state, j.stopID
+	// A shared job that ended takes its claims with it, which its events name as they held it: a claim on nothing would refuse its worktree's next start.
+	held := d.heldLocked(j)
+	d.dropDanglingClaimsLocked()
 	d.mu.Unlock()
 
 	// Closed once announced: a stop returns with the job.stopped on the bus and the index written.
 	defer close(j.done)
 	d.save()
+	change := func(code *int) domain.JobChange {
+		change := d.change(j, code)
+		change.HeldBy = held
+		return change
+	}
 	switch state {
 	case run.Stopped:
-		d.publish(j, publishParams{Event: domain.JobStopped{JobChange: j.change(nil)}, CorrelationID: stopID})
+		d.publish(j, publishParams{Event: domain.JobStopped{JobChange: change(nil)}, CorrelationID: stopID})
 	case run.Exited:
-		d.publish(j, publishParams{Event: domain.JobExited{JobChange: j.change(&code)}})
+		d.publish(j, publishParams{Event: domain.JobExited{JobChange: change(&code)}})
 	default:
-		change := j.change(&code)
-		change.LastLines = last
-		d.publish(j, publishParams{Event: domain.JobCrashed{JobChange: change}})
+		crashed := change(&code)
+		crashed.LastLines = last
+		d.publish(j, publishParams{Event: domain.JobCrashed{JobChange: crashed}})
 	}
 }
 
@@ -293,8 +317,8 @@ func (d *Daemon) settle(j *job, code int) {
 
 // Stop stops a job: a process of the daemon's has its group stopped, a
 // detached stack runs its stop command (failing with [run.CodeStopFailed] when
-// it exits non-zero), a claim is let go. A job not up is [run.OutcomeNotRunning],
-// and one that ended leaves the listing.
+// it exits non-zero), a shared job is let go (see release). A job not up is
+// [run.OutcomeNotRunning], and one that ended leaves the listing.
 func (d *Daemon) Stop(req run.Stop) (run.Outcome, error) {
 	k := key{workDir: req.WorkDir, name: req.Name}
 	d.mu.Lock()
@@ -304,16 +328,29 @@ func (d *Daemon) Stop(req run.Stop) (run.Outcome, error) {
 		d.mu.Unlock()
 		return run.OutcomeNotRunning, nil
 	}
-	j.stopped, j.stopID = true, req.CorrelationID
-	process, done, previous := j.process, j.done, j.previous
-	if j.record.Claim {
-		delete(d.jobs, k)
+	shared := j.record.Spec.Job.Scope == project.Shared
+	d.mu.Unlock()
+
+	if shared {
+		return d.release(j, req.CorrelationID)
 	}
+	return d.halt(j, req.CorrelationID)
+}
+
+// halt stops j itself, for the command of correlation: a process of the
+// daemon's has its group stopped, a detached stack runs its stop command.
+func (d *Daemon) halt(j *job, correlation string) (run.Outcome, error) {
+	k := keyOf(j.record.Spec)
+	d.mu.Lock()
+	if !j.up() {
+		d.mu.Unlock()
+		return run.OutcomeNotRunning, nil
+	}
+	j.stopped, j.stopID = true, correlation
+	process, done, previous := j.process, j.done, j.previous
 	d.mu.Unlock()
 
 	switch {
-	case j.record.Claim:
-		d.save()
 	case process != nil:
 		process.Stop(d.params.Grace)
 		<-done
@@ -328,7 +365,7 @@ func (d *Daemon) Stop(req run.Stop) (run.Outcome, error) {
 			d.mu.Unlock()
 			return run.OutcomeStopped, nil
 		}
-		stack.stopped, stack.stopID = true, req.CorrelationID
+		stack.stopped, stack.stopID = true, correlation
 		d.mu.Unlock()
 		if err := d.stopStack(stack); err != nil {
 			return "", err
@@ -362,14 +399,15 @@ func (d *Daemon) stopStack(j *job) error {
 	j.state = run.Stopped
 	d.mu.Unlock()
 	d.save()
-	d.publish(j, publishParams{Event: domain.JobStopped{JobChange: j.change(nil)}, CorrelationID: j.stopID})
+	d.publish(j, publishParams{Event: domain.JobStopped{JobChange: d.change(j, nil)}, CorrelationID: j.stopID})
 
 	return nil
 }
 
 // StopAll stops every job up in req's worktree, every job of the machine when
-// it names none, together, and returns each as it stood with what the stop
-// did; it fails with the first stop that failed, once every stop ended.
+// it names none, together, its shared jobs released after, and returns each as
+// it stood with what the stop did; it fails with the first stop that failed,
+// once every stop ended.
 func (d *Daemon) StopAll(req run.StopAll) ([]run.StoppedJob, error) {
 	var reached []run.StoppedJob
 	for _, view := range d.List(req.WorkDir) {
@@ -379,13 +417,23 @@ func (d *Daemon) StopAll(req run.StopAll) ([]run.StoppedJob, error) {
 	}
 
 	errs := make([]error, len(reached))
+	stop := func(i int) {
+		reached[i].Outcome, errs[i] = d.Stop(run.Stop{Name: reached[i].Job.Name, WorkDir: reached[i].Job.WorkDir, CorrelationID: req.CorrelationID})
+	}
 	var stopping sync.WaitGroup
+	var shared []int
 	for i := range reached {
-		stopping.Go(func() {
-			reached[i].Outcome, errs[i] = d.Stop(run.Stop{Name: reached[i].Job.Name, WorkDir: reached[i].Job.WorkDir, CorrelationID: req.CorrelationID})
-		})
+		if d.isShared(keyOf(run.Spec{Job: project.Job{Name: reached[i].Job.Name}, WorkDir: reached[i].Job.WorkDir})) {
+			shared = append(shared, i)
+			continue
+		}
+		stopping.Go(func() { stop(i) })
 	}
 	stopping.Wait()
+	// One after the other: whether a shared job stops depends on the claims its releases leave.
+	for _, i := range shared {
+		stop(i)
+	}
 
 	return reached, cmp.Or(slices.DeleteFunc(errs, func(err error) bool { return err == nil })...)
 }
@@ -403,17 +451,18 @@ func (d *Daemon) isStopping() bool {
 func (d *Daemon) Shutdown() {
 	d.mu.Lock()
 	d.stopping = true
-	var running []run.Stop
-	for k, j := range d.jobs {
+	var running []*job
+	for _, j := range d.jobs {
 		if j.process != nil {
-			running = append(running, run.Stop{Name: k.name, WorkDir: k.workDir})
+			running = append(running, j)
 		}
 	}
 	d.mu.Unlock()
 
+	// Halted, never released: a shared job's claims stay in the index for the next daemon, which drops those its job is gone from.
 	var stopping sync.WaitGroup
-	for _, req := range running {
-		stopping.Go(func() { _, _ = d.Stop(req) })
+	for _, j := range running {
+		stopping.Go(func() { _, _ = d.halt(j, "") })
 	}
 	stopping.Wait()
 }
@@ -519,12 +568,24 @@ func fits(w run.Window) bool {
 	return w.Cols >= 1 && w.Rows >= 1 && w.Cols <= maxWindow && w.Rows <= maxWindow
 }
 
-// find returns the job of k, failing with [run.CodeJobNotFound] when the
+// servingLocked returns the job of k, the shared job it claims for a claim;
+// the lock is held.
+func (d *Daemon) servingLocked(k key) *job {
+	j := d.jobs[k]
+	if j != nil && j.record.Claim {
+		if claimed := d.jobs[key{workDir: j.record.SharedDir, name: k.name}]; claimed != nil {
+			return claimed
+		}
+	}
+	return j
+}
+
+// find returns the job of k (for a claim, the shared job it claims), failing with [run.CodeJobNotFound] when the
 // daemon does not know it.
 func (d *Daemon) find(k key) (*job, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	j := d.jobs[k]
+	j := d.servingLocked(k)
 	if j == nil {
 		return nil, &run.Error{Code: run.CodeJobNotFound, Message: fmt.Sprintf("no job %s in %s", k.name, k.workDir)}
 	}
@@ -537,7 +598,7 @@ func (d *Daemon) find(k key) (*job, error) {
 func (d *Daemon) running(k key) (*job, Process, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	j := d.jobs[k]
+	j := d.servingLocked(k)
 	if j == nil || j.process == nil {
 		return nil, nil, &run.Error{Code: run.CodeJobNotFound, Message: fmt.Sprintf("no job %s running in %s", k.name, k.workDir)}
 	}
@@ -700,19 +761,32 @@ func (d *Daemon) publish(j *job, params publishParams) {
 	})
 }
 
-// change is what a job event says of j, ended with code (nil for none).
-func (j *job) change(code *int) domain.JobChange {
+// change is what a job event says of j, ended with code (nil for none), and
+// for a shared job, the worktrees holding it.
+func (d *Daemon) change(j *job, code *int) domain.JobChange {
+	spec := j.record.Spec
+	change := domain.JobChange{
+		Worktree: worktreeOf(j),
+		Job:      domain.EventJob{Name: spec.Job.Name, Kind: spec.Job.Kind, URL: spec.URL(), Hold: j.record.Hold()},
+		ExitCode: code,
+	}
+	if spec.Job.Scope == project.Shared && !j.record.Claim {
+		d.mu.Lock()
+		change.HeldBy = d.holdersLocked(j)
+		d.mu.Unlock()
+	}
+
+	return change
+}
+
+// worktreeOf is the worktree a job event names for j.
+func worktreeOf(j *job) domain.JobWorktree {
 	spec := j.record.Spec
 	branch := ""
 	if spec.Origin != nil {
 		branch = spec.Origin.Branch
 	}
-
-	return domain.JobChange{
-		Worktree: domain.JobWorktree{Branch: branch, Path: spec.WorkDir},
-		Job:      domain.EventJob{Name: spec.Job.Name, Kind: spec.Job.Kind, URL: spec.URL(), Hold: j.record.Hold()},
-		ExitCode: code,
-	}
+	return domain.JobWorktree{Branch: branch, Path: spec.WorkDir}
 }
 
 // ----------------------------------------------------------------------------

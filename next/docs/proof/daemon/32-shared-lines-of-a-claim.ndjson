@@ -1,0 +1,4 @@
+{"status":"line","protocol":2,"version":"<NEXT>","pid":<PID>,"at":"<T>","text":"cache up"}
+{"status":"line","protocol":2,"version":"<NEXT>","pid":<PID>,"at":"<T>","text":"[wtm] namespace app_a ready for a"}
+{"status":"line","protocol":2,"version":"<NEXT>","pid":<PID>,"at":"<T>","text":"[wtm] namespace app_b ready for b"}
+{"status":"ok","protocol":2,"version":"<NEXT>","pid":<PID>,"job":{"name":"cache","kind":"service","work_dir":"<SB>/acme","shared_dir":"<SB>/acme","state":"running","hold":"detached","started_at":"<T>","last_line":{"at":"<T>","text":"[wtm] namespace app_b ready for b"},"status":"detached"}}

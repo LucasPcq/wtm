@@ -125,14 +125,54 @@ func (w settling) linkNamespace(link project.EnvValueLink, job project.Job) (str
 
 // namespace returns the namespace's name for the worktree. It fails with errNamespaceUnknownToken when its name or one of its env values holds a placeholder other than {worktree} and {ordinal}.
 func (w settling) namespace(namespace project.Namespace) (string, error) {
-	replacer := strings.NewReplacer(tokenWorktree, w.Slug, tokenOrdinal, strconv.Itoa(w.Ordinal))
+	name, _, err := expandNamespace(namespace, w.Slug, w.Ordinal)
+	return name, err
+}
+
+// expandNamespace returns the namespace's name and env for the worktree of slug and ordinal, each {worktree} and {ordinal} replaced. It fails with errNamespaceUnknownToken when its name or one of its env values holds another placeholder.
+func expandNamespace(namespace project.Namespace, slug string, ordinal int) (string, map[string]string, error) {
+	replacer := strings.NewReplacer(tokenWorktree, slug, tokenOrdinal, strconv.Itoa(ordinal))
+	env := make(map[string]string, len(namespace.Env))
+	for key, value := range namespace.Env {
+		env[key] = replacer.Replace(value)
+	}
 	name := replacer.Replace(namespace.Name)
-	for _, value := range slices.AppendSeq([]string{namespace.Name}, maps.Values(namespace.Env)) {
-		if leftover := namespaceToken.FindString(replacer.Replace(value)); leftover != "" {
-			return "", fmt.Errorf("%w: %s", errNamespaceUnknownToken, leftover)
+	for _, value := range slices.AppendSeq([]string{name}, maps.Values(env)) {
+		if leftover := namespaceToken.FindString(value); leftover != "" {
+			return "", nil, fmt.Errorf("%w: %s", errNamespaceUnknownToken, leftover)
 		}
 	}
-	return name, nil
+	return name, env, nil
+}
+
+// NamespaceKey is the variable a job's namespace command reads the namespace's name from.
+const NamespaceKey = "WTM_NAMESPACE"
+
+// A NamespaceRun is how a job's namespace is created for a worktree: its
+// Name, and the variables its command runs with over the job's own (the name,
+// the worktree, its ordinal, and the namespace's own env, expanded).
+type NamespaceRun struct {
+	Name string
+	Env  map[string]string
+}
+
+// NamespaceFor returns how the namespace of job is created in the worktree
+// whose job environment is jobEnv (the variables JobKeys names, as a client
+// resolves them), and whether there is one to create: none when the job
+// declares no namespace or no create command, or the worktree's isolation is
+// verbatim, where every worktree shares the job's one set of data.
+func NamespaceFor(job project.Job, jobEnv map[string]string) (NamespaceRun, bool, error) {
+	if job.Namespace == nil || strings.TrimSpace(job.Namespace.Create) == "" || project.Isolation(jobEnv[isolationKey]) == project.Verbatim {
+		return NamespaceRun{}, false, nil
+	}
+	ordinal, _ := strconv.Atoi(jobEnv[ordinalKey])
+	name, env, err := expandNamespace(*job.Namespace, jobEnv[WorktreeKey], ordinal)
+	if err != nil {
+		return NamespaceRun{}, false, fmt.Errorf("job %s: %w", job.Name, err)
+	}
+	maps.Copy(env, map[string]string{NamespaceKey: name, WorktreeKey: jobEnv[WorktreeKey], ordinalKey: strconv.Itoa(ordinal)})
+
+	return NamespaceRun{Name: name, Env: env}, true, nil
 }
 
 // valueOrigin returns the named origin of the url the job publishes, empty when jobs are not addressed by name or it publishes none.

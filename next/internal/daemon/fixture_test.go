@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -282,3 +283,37 @@ func (m *memoryLog) Write(lines []run.Line) {
 }
 
 func (m *memoryLog) Close() {}
+
+// shared is the shared job name of the worktree at workDir, its main checkout /repo: a stack when stop is set, a foreground service otherwise.
+func shared(name, workDir, stop string) run.Spec {
+	slug := strings.ReplaceAll(strings.TrimPrefix(workDir, "/wt/"), "/", "_")
+	spec := run.Spec{
+		Job:     project.Job{Name: name, Kind: project.Service, Cmd: "up " + name, Stop: stop, Scope: project.Shared},
+		WorkDir: workDir,
+		Env:     map[string]string{"WTM_WORKTREE": slug, "WTM_BRANCH": "feat/" + slug, "WTM_ISOLATION": "isolated"},
+		Origin:  &run.Origin{Root: "/repo", CommonDir: "/repo/.git", Branch: "feat/" + slug},
+		Shared:  &run.Shared{WorkDir: "/repo", Env: map[string]string{"WTM_WORKTREE": "main", "WTM_BRANCH": "main"}},
+	}
+	if workDir == "/repo" {
+		spec.Env, spec.Origin.Branch = spec.Shared.Env, "main"
+	}
+	return spec
+}
+
+// failsFirst is a script that exits 1 the first times times it runs, saying why, then 0.
+func failsFirst(times int, why string) script {
+	var mu sync.Mutex
+	ran := 0
+	return func(p *fakeProcess, printed func(string)) {
+		mu.Lock()
+		ran++
+		failing := ran <= times
+		mu.Unlock()
+		if failing {
+			printed(why + "\n")
+			p.end(1)
+			return
+		}
+		p.end(0)
+	}
+}

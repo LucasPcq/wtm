@@ -13,8 +13,9 @@ import (
 // worktree it runs in, the environment it runs with (every variable of the
 // worktree, its ports included, resolved by the client: the daemon is blind to
 // git) and the variables it never inherits from the daemon, the directory its
-// log is kept in (none keeps none), and the Origin its events are published
-// under, none publishing none.
+// log is kept in (none keeps none), the Origin its events are published
+// under, none publishing none, and, for a job of shared scope, the Shared
+// context of the main checkout it runs in once for every worktree.
 type Spec struct {
 	Job     project.Job
 	WorkDir string
@@ -22,6 +23,15 @@ type Spec struct {
 	Unset   []string
 	LogDir  string
 	Origin  *Origin
+	Shared  *Shared
+}
+
+// Shared is where a shared job really runs, as its client resolves it: the
+// main checkout's directory, environment and log directory.
+type Shared struct {
+	WorkDir string
+	Env     map[string]string
+	LogDir  string
 }
 
 // An Origin is what the events of a job carry that only its client knows: the

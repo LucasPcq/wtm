@@ -249,7 +249,7 @@ func TestStopAllStopsEveryJobUpOfTheWorktreeTogether(t *testing.T) {
 
 func TestShutdownStopsTheDaemonsProcessesAndLeavesStacksAndClaims(t *testing.T) {
 	w := newWorld(t, map[string]script{"up db": exits(0)})
-	w.index.records = []run.Record{{Claim: true, SharedDir: "/repo", Spec: run.Spec{Job: stack("db").Job, WorkDir: "/wt/b"}}}
+	w.index.records = []run.Record{{Claim: true, SharedDir: "/repo", Spec: run.Spec{Job: stack("db").Job, WorkDir: "/wt/b"}}, {SharedDir: "/repo", Spec: run.Spec{Job: stack("db").Job, WorkDir: "/repo"}, StartedAt: now}}
 	w.Adopt()
 	for _, spec := range []run.Spec{service("web"), stack("db")} {
 		_, err := w.Start(spec, nil)
@@ -259,7 +259,7 @@ func TestShutdownStopsTheDaemonsProcessesAndLeavesStacksAndClaims(t *testing.T) 
 	w.Shutdown()
 
 	assert.Equal(t, run.Stopped, w.job(t, "web").State)
-	assert.Equal(t, []string{"/wt/a:db", "/wt/b:db"}, w.index.names())
+	assert.Equal(t, []string{"/repo:db", "/wt/a:db", "/wt/b:db"}, w.index.names())
 	_, err := w.Start(service("api"), nil)
 	var refusal *run.Error
 	require.ErrorAs(t, err, &refusal)
@@ -292,6 +292,8 @@ func TestAdoptReapsOrphansListsCrashedAndKeepsStacksAndClaims(t *testing.T) {
 		record(gone, 400),
 		record(stack("db"), 0),
 		{Claim: true, SharedDir: "/repo", Spec: run.Spec{Job: stack("cache").Job, WorkDir: "/wt/a"}},
+		{Claim: true, SharedDir: "/repo", Spec: run.Spec{Job: stack("gone").Job, WorkDir: "/wt/a"}},
+		{SharedDir: "/repo", Spec: run.Spec{Job: stack("cache").Job, WorkDir: "/repo"}, StartedAt: now},
 	}
 	w.orphans.groups = map[int]run.Group{100: {Alive: true, Identified: true}, 300: {Alive: true}}
 
@@ -303,8 +305,8 @@ func TestAdoptReapsOrphansListsCrashedAndKeepsStacksAndClaims(t *testing.T) {
 		{Name: "cache", WorkDir: "/wt/a", Up: true, Kind: project.Service, Hold: run.HoldClaim, Ports: map[string]int{}, SharedDir: "/repo"},
 		{Name: "db", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldDetached, Ports: map[string]int{}, StartedAt: now},
 		{Name: "web", WorkDir: "/wt/a", Kind: project.Service, State: run.Stopped, Hold: run.HoldOwn, Reaped: true, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}},
-	}, w.List(""))
-	assert.Equal(t, []string{"/wt/a:cache", "/wt/a:db"}, w.index.names())
+	}, w.List("/wt/a"))
+	assert.Equal(t, []string{"/repo:cache", "/wt/a:cache", "/wt/a:db"}, w.index.names(), "a claim on a shared job not up is dropped")
 }
 
 func TestAStackStaysIndexedWhileItsLauncherRunsAgain(t *testing.T) {
@@ -716,4 +718,15 @@ func TestAReaderLeavingWhileTheJobsEndSettlesEndsTheFollow(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		require.Fail(t, "the follow waited on the job's end after its reader left")
 	}
+}
+
+func TestAStartsClientIsLetGoOnceItsStartReturned(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0, "Container db Started")})
+	var lines []string
+
+	_, err := w.Start(stack("db"), func(line run.Line) { lines = append(lines, line.Text) })
+	require.NoError(t, err)
+	w.jobOf(key{workDir: "/wt/a", name: "db"}).output.note("[wtm] namespace app_b ready for b")
+
+	assert.Equal(t, []string{"Container db Started"}, lines, "a line noted later is no longer that client's")
 }

@@ -33,6 +33,9 @@ func newWorld(t *testing.T, scripts map[string]script) *world {
 		Publish: w.bus.publish,
 		Now:     func() time.Time { return now },
 		Grace:   time.Millisecond,
+
+		NamespaceBudget: 50 * time.Millisecond,
+		NamespaceRetry:  time.Millisecond,
 	})
 	return w
 }
