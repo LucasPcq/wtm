@@ -1426,6 +1426,12 @@
         "pull_request": {
           "$ref": "#/$defs/worktree.PullRequest"
         },
+        "running_in": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "tag": {
           "$ref": "#/$defs/domain.OptionTag"
         },
@@ -3075,6 +3081,19 @@
             }
           ]
         },
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/list.Job"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "last_commit_at": {
           "anyOf": [
             {
@@ -3177,6 +3196,7 @@
         "condition",
         "services",
         "urls",
+        "jobs",
         "actions"
       ],
       "type": "object"
@@ -3187,6 +3207,43 @@
         "merged",
         "closed"
       ]
+    },
+    "list.Job": {
+      "additionalProperties": false,
+      "properties": {
+        "exit_code": {
+          "type": "integer"
+        },
+        "hold": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/project.JobKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "started_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/run.State"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "state",
+        "hold"
+      ],
+      "type": "object"
     },
     "list.PR": {
       "additionalProperties": false,

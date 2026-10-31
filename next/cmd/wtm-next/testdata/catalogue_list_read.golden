@@ -32,6 +32,7 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
         "actions": [
           {
             "action": "go",

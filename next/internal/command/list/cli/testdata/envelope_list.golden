@@ -36,6 +36,7 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
         "actions": [
           {
             "action": "go",
@@ -201,6 +202,14 @@
           "web"
         ],
         "urls": [],
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "running",
+            "hold": "own"
+          }
+        ],
         "actions": [
           {
             "action": "go",
@@ -411,6 +420,7 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
         "actions": [
           {
             "action": "go",
@@ -597,6 +607,7 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
         "actions": [
           {
             "action": "go",
@@ -713,6 +724,7 @@
         "condition": "missing",
         "services": [],
         "urls": [],
+        "jobs": [],
         "actions": [
           {
             "action": "go",

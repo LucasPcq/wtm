@@ -126,3 +126,14 @@ func TestAWorktreeShowsTheProfileOfItsOwnJobsAlone(t *testing.T) {
 	assert.Empty(t, questions.Worktrees.Options[0].Profile)
 	assert.Equal(t, []string{"db"}, questions.Worktrees.Options[0].Up)
 }
+
+func TestAProfileSaysWhichOfTheWorktreesPickedRunIt(t *testing.T) {
+	w := newWorld(t)
+	w.up("api", featB, nil)
+	w.daemon.listed[0].Profile = "dev"
+
+	questions := w.questions(t, starting("", featA, featB))
+
+	assert.Equal(t, []string{featB}, questions.Profiles[0].RunningIn)
+	assert.Empty(t, questions.Profiles[1].RunningIn)
+}
