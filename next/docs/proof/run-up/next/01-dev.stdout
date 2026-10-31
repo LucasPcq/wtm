@@ -6,6 +6,3 @@
   Jobs       api, web
   feat/a     api  http://api.feat-a.acme.localhost:24352, web  http://web.feat-a.acme.localhost:24352
 
-  → wtm run logs feat/a   follow feat/a's output
-  → wtm run down feat/a   stop feat/a's jobs
-

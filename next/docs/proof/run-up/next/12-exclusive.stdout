@@ -7,6 +7,3 @@
   Stops first  main, feat/a, feat/b
   feat/v       api  http://api.feat-v.acme.localhost:24352, web  http://web.feat-v.acme.localhost:24352
 
-  → wtm run logs feat/v   follow feat/v's output
-  → wtm run down feat/v   stop feat/v's jobs
-

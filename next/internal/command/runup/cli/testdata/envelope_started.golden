@@ -151,33 +151,6 @@
       }
     ]
   },
-  "follow_ups": [
-    {
-      "command": "run logs",
-      "answers": [
-        {
-          "path": "worktree",
-          "values": [
-            "feat/a"
-          ]
-        }
-      ],
-      "code": "run-up.logs",
-      "message": "follow feat/a's output"
-    },
-    {
-      "command": "run down",
-      "answers": [
-        {
-          "path": "worktree",
-          "values": [
-            "feat/a"
-          ]
-        }
-      ],
-      "code": "run-up.down",
-      "message": "stop feat/a's jobs"
-    }
-  ],
+  "follow_ups": [],
   "warnings": []
 }

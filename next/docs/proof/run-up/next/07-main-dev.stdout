@@ -6,6 +6,3 @@
   Jobs       api, web
   main       api  http://api.main.acme.localhost:24352, web  http://web.main.acme.localhost:24352
 
-  → wtm run logs main   follow main's output
-  → wtm run down main   stop main's jobs
-
