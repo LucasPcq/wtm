@@ -61,8 +61,14 @@ export function RunUpWizard({
   const profileField = optionsOf(form.data?.fields, 'profile')
   const profiles = profileField?.options ?? []
   const picked = profile || (profileField?.kind === 'select' ? profileField.value : '')
-  // opened on Confirm with no profile the core can pick (no default among several): the profile is asked first
-  if (step === 'confirm' && form.isSuccess && picked === '') dispatch({ type: 'go', to: 'profile' })
+  const runsIt = profiles.find((one) => one.value === picked)?.running_in ?? []
+  // opened on Confirm with no profile the core can pick (no default among several), or the default one the worktrees
+  // run already: the profile is asked first, the default kept as the answer so that Next goes on to Confirm
+  const defaulted = step === 'confirm' && form.isSuccess && profile === ''
+  if (defaulted && (picked === '' || chosen.every((worktree) => runsIt.includes(worktree)))) {
+    dispatch({ type: 'pick', profile: picked })
+    dispatch({ type: 'go', to: 'profile' })
+  }
 
   const answers: DomainAnswered[] = [
     { path: 'worktree', values: chosen },
@@ -90,6 +96,7 @@ export function RunUpWizard({
   const runBlocked = (): string | undefined => {
     if (unplanned) return 'The plan was refused'
     if (!plan || !fingerprint || planned.isFetching) return 'Planning…'
+    if (plan.empty) return `${plan.profile} runs there already: nothing to start`
     return undefined
   }
 
