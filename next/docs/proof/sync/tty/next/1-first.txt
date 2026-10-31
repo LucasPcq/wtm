@@ -9,7 +9,7 @@ $ wtm sync feat/tty-a; echo EXIT=$?
     feat/tty-b under feat/tty-a
 
 ▌› Yes, sync it too
-   No, only the worktrees named
+   No, only the worktrees asked
 
   ↑↓ navigate • / filter • enter confirm • esc cancel
 

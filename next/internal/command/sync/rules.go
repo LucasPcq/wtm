@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"cmp"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,13 +24,14 @@ type Facts struct {
 	FetchErr   error             // why origin could not be fetched: the plan stands on its branches as last fetched
 }
 
-// A Check is what a worktree holds: whether its directory is gone, its uncommitted changes, the commits of its parent it lacks, the commits of origin's branch it never held, and where it forked from its parent, the commit its rebase replays after, with its own commits since, which Plan alone reads.
+// A Check is what a worktree holds: whether its directory is gone, its uncommitted changes, the commits of its parent it lacks, the commits of origin's branch it never held, and where it forked from its parent, the commit its rebase replays after, with its own commits since, and whether it shares no commit with its parent, both of which Plan alone reads.
 type Check struct {
-	Missing bool
-	Changes int
-	Behind  int
-	Never   int
-	Fork    worktree.Fork
+	Missing   bool
+	Changes   int
+	Behind    int
+	Never     int
+	Fork      worktree.Fork
+	Unrelated bool // it shares no commit with its parent
 }
 
 // Dirty reports whether the worktree holds uncommitted changes.
@@ -82,9 +84,15 @@ func (f Facts) picked() []string {
 	return names
 }
 
-// under are the worktrees under each worktree req names, by the named one, those named themselves left out; none for a named one with none under it.
+// under are the worktrees under each root of req, by the root, the roots themselves left out; none for a root with none under it. Its roots are the worktrees it names, else those its default pick picks; with All, none: every worktree is in.
 func (f Facts) under(req Request) map[string][]string {
 	names, _, _ := f.named(req)
+	switch {
+	case req.All:
+		return map[string][]string{}
+	case !req.named():
+		names = f.picked()
+	}
 	under := map[string][]string{}
 	for _, name := range names {
 		steps, _ := f.Stack.Cascade([]string{name})
@@ -108,7 +116,7 @@ func (f Facts) remoteTip(name string) string {
 // ----------------------------------------------------------------------------
 // The decision of each worktree
 
-// A Standing is where a worktree stands for a sync, the first that applies: its directory gone, an operation git stopped in the middle of, its meta record unreadable, its parents leading back to it, no parent recorded, its parent no branch any more, its parent left as it is by this run, origin holding commits on its branch it never held, then whether it rebases, its parent having commits it lacks or moving in this run, or already stands on its parent.
+// A Standing is where a worktree stands for a sync, the first that applies: its directory gone, an operation git stopped in the middle of, its meta record unreadable, its parents leading back to it, no parent recorded, its parent no branch any more, no commit shared with its parent, its parent left as it is by this run, origin holding commits on its branch it never held, then whether it rebases, its parent having commits it lacks or moving in this run, or already stands on its parent.
 type Standing string
 
 // The standings of a worktree.
@@ -119,6 +127,7 @@ const (
 	StandingInCycle    Standing = "in_cycle"
 	StandingNoParent   Standing = "no_parent"
 	StandingParentGone Standing = "parent_gone"
+	StandingUnrelated  Standing = "unrelated"
 	StandingParentLeft Standing = "parent_left"
 	StandingDiverged   Standing = "diverged"
 	StandingRebases    Standing = "rebases"
@@ -127,7 +136,7 @@ const (
 
 // Standings returns every Standing.
 func Standings() []Standing {
-	return []Standing{StandingMissing, StandingBusy, StandingUnreadable, StandingInCycle, StandingNoParent, StandingParentGone, StandingParentLeft, StandingDiverged, StandingRebases, StandingOnParent}
+	return []Standing{StandingMissing, StandingBusy, StandingUnreadable, StandingInCycle, StandingNoParent, StandingParentGone, StandingUnrelated, StandingParentLeft, StandingDiverged, StandingRebases, StandingOnParent}
 }
 
 // A Blocker is what makes a branch unsafe to move: a safety refusal, which only Force lifts.
@@ -141,7 +150,7 @@ func Blockers() []Blocker {
 	return []Blocker{BlockerDirty}
 }
 
-// A Rebase is one worktree of the cascade: its name, its path, its parent and how deep it sits in the stack (1 under a root), whether it is there as a descendant of a worktree named rather than named itself, where it stands, the operation git stopped in the middle of in it when busy, its branch against origin's (null when origin has none), the commit it stands at, where it forked from its parent, its own commits, the commit origin's branch stands at (the lease of its push), what makes it unsafe, and the phases of its sync, none when the plan leaves it as it is.
+// A Rebase is one worktree of the cascade: its name, its path, its parent and how deep it sits in the stack (1 under a root), whether it is there as a descendant of a worktree named rather than named itself, where it stands, the operation git stopped in the middle of in it when busy, its branch against origin's (null when origin has none), the commit it stands at, where it forked from its parent, the commit of its parent it is rebased onto as planned (none when its parent rebases in this run too, and the rebase goes onto it as it then stands), its own commits, the commit origin's branch stands at (the lease of its push), what makes it unsafe, and the phases of its sync, none when the plan leaves it as it is.
 type Rebase struct {
 	Worktree   string             `json:"worktree"`
 	Path       string             `json:"path"`
@@ -153,6 +162,7 @@ type Rebase struct {
 	Origin     *worktree.Origin   `json:"origin"`
 	From       string             `json:"from"`
 	Fork       string             `json:"fork,omitempty"`
+	Onto       string             `json:"onto,omitempty"`
 	Commits    int                `json:"commits"`
 	Expect     string             `json:"expect,omitempty"`
 	Blockers   []Blocker          `json:"blockers"`
@@ -220,6 +230,7 @@ func (f Facts) decide(req Request) decided {
 	}
 
 	steps, cycled := f.cascade(roots, req.All || req.WithDescendants())
+	descendant := func(branch string) bool { return !req.All && !slices.Contains(roots, branch) }
 	d := decided{problems: problems, plan: Plan{Descendants: req.WithDescendants(), Force: req.Force, KeepConflict: req.KeepConflict, FFParents: req.WithParents(), Push: req.Push}}
 	for _, name := range cycled {
 		if _, named := entries[name]; named {
@@ -233,14 +244,15 @@ func (f Facts) decide(req Request) decided {
 		if !named {
 			at = -1
 		}
-		rebases = append(rebases, f.rebase(f.checkout(branch), at, req.named() && !named))
+		rebases = append(rebases, f.rebase(f.checkout(branch), at, descendant(branch)))
 	}
 
 	ontos := f.ontos(rebases)
 	moving := map[string]bool{}
+	tips := map[string]string{} // the commit each branch rebased onto stands at as planned, when it does not rebase in this run
 	for i := range ontos {
 		f.decideOnto(&ontos[i], req)
-		moving[ontos[i].Branch] = ontos[i].moves()
+		moving[ontos[i].Branch], tips[ontos[i].Branch] = ontos[i].moves(), cmp.Or(ontos[i].To, ontos[i].From)
 	}
 	left := map[string]bool{}
 	for i := range rebases {
@@ -248,6 +260,14 @@ func (f Facts) decide(req Request) decided {
 		r.Standing = f.standing(*r, left, moving)
 		f.decideRebase(r, req)
 		moving[r.Worktree], left[r.Worktree] = r.moves(), r.left()
+		if !slices.Contains(r.Phases, domain.PhaseRebase) {
+			tips[r.Worktree] = r.From
+			if r.moves() {
+				tips[r.Worktree] = r.Expect
+			}
+			continue
+		}
+		r.Onto = tips[r.Parent]
 	}
 
 	d.plan.Worktrees, d.plan.Onto, d.plan.LeftOut = rebases, ontos, []string{}
@@ -339,6 +359,8 @@ func (f Facts) standing(r Rebase, left, moving map[string]bool) Standing {
 		return StandingNoParent
 	case f.ParentGone(r.Parent):
 		return StandingParentGone
+	case check.Unrelated:
+		return StandingUnrelated
 	case left[r.Parent]:
 		return StandingParentLeft
 	case r.Origin != nil && r.Origin.State == worktree.Diverged && check.Never > 0:
@@ -481,6 +503,7 @@ const (
 	CodeInCycle      = Name + ".in_cycle"
 	CodeNoParent     = Name + ".no_parent"
 	CodeParentGone   = Name + ".parent_gone"
+	CodeUnrelated    = Name + ".unrelated"
 	CodeParentLeft   = Name + ".parent_left"
 	CodeDiverged     = Name + ".diverged"
 	CodeOntoBehind   = Name + ".onto_behind"
@@ -555,7 +578,7 @@ func (f Facts) leftWarning(r Rebase) (domain.Warning, bool) {
 	case StandingUnreadable:
 		params["cause"] = f.RecordErrs[r.Worktree].Error()
 		return domain.Warning{Code: CodeUnreadable, Message: "couldn't read the record of " + r.Worktree + ", which names its parent: left as it is: " + params["cause"], Params: params}, true
-	case StandingInCycle, StandingParentGone:
+	case StandingInCycle, StandingParentGone, StandingUnrelated:
 		return f.parentWarning(r, params), true
 	case StandingNoParent:
 		return domain.Warning{Code: CodeNoParent, Message: r.Worktree + " records no parent to rebase onto: left as it is", Params: params}, true
@@ -573,13 +596,18 @@ func (f Facts) leftWarning(r Rebase) (domain.Warning, bool) {
 	return domain.Warning{}, false
 }
 
-// parentWarning is the warning of a worktree whose parent is no branch any more or leads back to it, followed by its move onto the base branch, when there is one to move onto.
+// parentWarning is the warning of a worktree whose parent is no branch any more, shares no commit with it or leads back to it, followed by its move onto the base branch, when there is one to move onto.
 func (f Facts) parentWarning(r Rebase, params domain.Params) domain.Warning {
 	warning := domain.Warning{Code: CodeParentGone, Message: r.Worktree + "'s parent " + r.Parent + " is no branch any more: left as it is", Params: params}
-	if r.Standing == StandingInCycle {
+	switch r.Standing {
+	case StandingInCycle:
 		warning = domain.Warning{Code: CodeInCycle, Message: "the parents of " + r.Worktree + " lead back to it: left as it is", Params: params}
+	case StandingUnrelated:
+		params["parent"] = r.Parent
+		warning = domain.Warning{Code: CodeUnrelated, Message: r.Worktree + " shares no commit with its parent " + r.Parent + ": left as it is", Params: params}
 	}
-	if reparent, ok := f.reparent(r.Worktree); ok {
+	// moving onto the base helps only a worktree not on it already
+	if reparent, ok := f.reparent(r.Worktree); ok && r.Parent != f.ExistingBase() {
 		warning.FollowUp = &reparent
 	}
 	return warning
@@ -594,7 +622,7 @@ func (f Facts) reparent(branch string) (domain.FollowUp, bool) {
 	return domain.FollowUp{Command: domain.CommandReparent, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: domain.PathTo, Values: []string{base}}}, Code: CodeReparent, Message: "move it onto " + base}, true
 }
 
-// kept warns of each branch the command chose and kept for its blockers, the last followed by the request that forces them: the worktrees kept named, forced, or the request forced when only a branch rebased onto is kept.
+// kept warns of each branch the command chose and kept for its blockers, the last followed by the request that forces them: the request with the worktrees kept named and forced, or forced alone when only a branch rebased onto is kept.
 func kept(planned Plan, req Request) []domain.Warning {
 	var warnings []domain.Warning
 	var names []string
@@ -623,7 +651,7 @@ func kept(planned Plan, req Request) []domain.Warning {
 	forced := req
 	forced.Force, forced.Caller = true, domain.Caller{}
 	if len(names) > 0 {
-		forced = Request{Worktrees: names, Force: true, Descendants: planned.descendantsAnswer()}
+		forced.Worktrees, forced.All = names, false
 	}
 	warnings[len(warnings)-1].FollowUp = &domain.FollowUp{Command: Name, Answers: domain.AnswersOf(Questions{}.Form(), forced), Code: CodeForce, Message: "sync them anyway, their changes stashed around the rebase"}
 	return warnings
@@ -689,8 +717,8 @@ const (
 	NoteNone       = "none"
 )
 
-// recap is the plan row by row: the descendants of the named worktrees, when it names some, the branches fast-forwarded first, the worktrees rebased, each onto its parent with its commits, those pushed, what a conflict does, those already on their parent, then those left as they are, each with why.
-func (p Plan) recap(named bool) []domain.RecapRow {
+// recap is the plan row by row: the descendants of its roots, unless it asks for every worktree, the branches fast-forwarded first, the worktrees rebased, each onto its parent with its commits, those pushed, what a conflict does, those already on their parent, then those left as they are, each with why.
+func (p Plan) recap(rooted bool) []domain.RecapRow {
 	var forwarded, rebased, pushed, current, left []domain.RecapValue
 	for _, o := range p.Onto {
 		if o.moves() {
@@ -714,7 +742,7 @@ func (p Plan) recap(named bool) []domain.RecapRow {
 	}
 
 	var rows []domain.RecapRow
-	if named {
+	if rooted {
 		rows = append(rows, domain.RecapRow{Key: "descendants", Label: "Descendants", Path: PathDescendants, Values: p.descendants()})
 	}
 	for _, row := range []domain.RecapRow{
@@ -756,7 +784,7 @@ func (p Plan) descendants() []domain.RecapValue {
 	case !p.Descendants:
 		return []domain.RecapValue{{Note: NoteOnlyNamed, Text: "only the named"}}
 	case len(values) == 0:
-		return []domain.RecapValue{{Note: NoteNone, Text: "none under the named"}}
+		return []domain.RecapValue{{Note: NoteNone, Text: "none"}}
 	}
 	return values
 }
@@ -787,6 +815,7 @@ var leftWords = map[Standing]string{
 	StandingInCycle:    "its parents lead back to it",
 	StandingNoParent:   "no parent recorded",
 	StandingParentGone: "its parent is gone",
+	StandingUnrelated:  "no commit shared with its parent",
 	StandingParentLeft: "its parent is left as it is",
 	StandingDiverged:   "origin has commits it never held",
 	StandingRebases:    "uncommitted changes",

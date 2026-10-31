@@ -126,6 +126,27 @@ func (r refusingRebase) Rebase(ctx context.Context, rebase worktree.Rebase) (wor
 	return r.Repo.Rebase(ctx, rebase)
 }
 
+// refusingPush rebases as git does but refuses every push, as origin does a rejected lease.
+type refusingPush struct {
+	git.Repo
+}
+
+func (refusingPush) Push(context.Context, worktree.Push) error {
+	return errRefused
+}
+
+// cancellingRebase rebases as git does, then cancels the run, as a first Ctrl+C during the rebase.
+type cancellingRebase struct {
+	git.Repo
+	cancel context.CancelFunc
+}
+
+func (c cancellingRebase) Rebase(ctx context.Context, rebase worktree.Rebase) (worktree.Rebased, error) {
+	rebased, err := c.Repo.Rebase(ctx, rebase)
+	c.cancel()
+	return rebased, err
+}
+
 // A seeded is one worktree of facts built by hand: its branch and its parent ("" for none), the commits of its parent it lacks, its uncommitted changes, whether its directory is gone, where it stands against origin's branch (none when off origin) and the commits of origin it never held, and its state, on its branch by default.
 type seeded struct {
 	branch    string

@@ -5,8 +5,8 @@ $ wtm sync feat/tty-a; echo EXIT=$?
   ✓ Worktrees: feat/tty-a
   · All — set by its flag only
   ✓ Descendants: with the worktrees under them
-  · Force — no worktree named has uncommitted changes
-  ✓ On conflict: aborted
+  · Force — no worktree named has uncommitted changes: one picked is kept instead
+  ✓ On conflict: abort it
   ✓ Parents: fast-forwarded first
   · Push — no worktree that may rebase has its branch on origin
   · No fetch — set by its flag only

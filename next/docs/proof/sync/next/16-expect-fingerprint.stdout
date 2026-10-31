@@ -1,7 +1,7 @@
 
   ✓ sync: 1 done
 
-  Descendants  none under the named
+  Descendants  none
   Rebase       feat/solo onto main (1 commit)
   On conflict  abort the rebase, the worktree left as it was
 

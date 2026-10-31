@@ -69,6 +69,23 @@ func (f *Fake) Rebase(_ context.Context, rebase worktree.Rebase) (worktree.Rebas
 	return worktree.Rebased{}, nil
 }
 
+// UpdateBranch moves the local branch update.Branch to the history ending on update.To, refused unless it stands at update.From.
+func (f *Fake) UpdateBranch(_ context.Context, update worktree.BranchUpdate) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.enter("UpdateBranch", update.Branch); err != nil {
+		return err
+	}
+
+	local, ok := f.local[update.Branch]
+	to := f.upTo(update.To)
+	if !ok || local.tip() != update.From || to == nil {
+		return fmt.Errorf("gittest: %s does not stand at %s, or %s is no commit", update.Branch, update.From, update.To)
+	}
+	f.local[update.Branch] = slices.Clone(to)
+	return nil
+}
+
 // Push sets origin's branch push.Branch, and its remote branch, to the local one, refused when origin's does not stand at push.Expect ("" when origin has none); one origin has already is pushed, as git does, whatever was expected.
 func (f *Fake) Push(_ context.Context, push worktree.Push) error {
 	f.mu.Lock()

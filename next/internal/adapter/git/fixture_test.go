@@ -39,6 +39,7 @@ type port interface {
 	Rebase(ctx context.Context, rebase worktree.Rebase) (worktree.Rebased, error)
 	Push(ctx context.Context, push worktree.Push) error
 	NeverHeld(ctx context.Context, name string) (int, error)
+	UpdateBranch(ctx context.Context, update worktree.BranchUpdate) error
 }
 
 // implementation is one port under test: its root directory and at, which

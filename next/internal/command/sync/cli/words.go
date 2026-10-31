@@ -23,12 +23,12 @@ func words(q sync.Questions, field domain.Field) form.Words {
 		}}
 	case sync.PathDescendants:
 		them := "them"
-		if under := q.Descendants.Under; len(under) == 1 && len(slices.Collect(maps.Values(under))[0]) == 1 {
+		if count(q.Descendants.Under) == 1 {
 			them = "it"
 		}
 		return form.Words{Flag: "--descendants", Label: "Descendants", Help: descendantsHelp(q.Descendants.Under), Options: map[string]form.OptionWords{
 			"true":  {Label: "Yes, sync " + them + " too", Short: "with the worktrees under them"},
-			"false": {Label: "No, only the worktrees named", Short: "only the named"},
+			"false": {Label: "No, only the worktrees asked", Short: "only those asked"},
 		}}
 	case sync.PathForce:
 		return form.Words{Flag: "--force", Label: "Force", Help: forceHelp(q.Unsafe), Options: map[string]form.OptionWords{
@@ -37,8 +37,8 @@ func words(q sync.Questions, field domain.Field) form.Words {
 		}}
 	case sync.PathKeepConflict:
 		return form.Words{Flag: "--keep-conflict", Label: "On conflict", Help: "Leave a rebase that stops on a conflict in progress, to resolve, instead of aborting it; the worktrees under it are skipped either way", Options: map[string]form.OptionWords{
-			"true":  {Label: "Leave the rebase in progress, to resolve", Short: "left in progress"},
-			"false": {Label: "Abort it, the worktree left as it was", Short: "aborted"},
+			"true":  {Label: "Leave the rebase in progress, to resolve", Short: "leave it in progress"},
+			"false": {Label: "Abort it, the worktree left as it was", Short: "abort it"},
 		}}
 	case sync.PathFFParents:
 		return form.Words{Flag: "--ff-parents", Label: "Parents", Help: parentsHelp(q.Behind), Options: map[string]form.OptionWords{
@@ -60,18 +60,17 @@ func words(q sync.Questions, field domain.Field) form.Words {
 // descendantsHelp asks whether the worktrees under those named come too, naming how many and under which; the schema's words when none is known.
 func descendantsHelp(under map[string][]string) string {
 	if len(under) == 0 {
-		return "Sync the worktrees under those named too (default true)"
+		return "Sync the worktrees under those asked too"
 	}
 
 	named := slices.Sorted(maps.Keys(under))
-	count := 0
 	lines := make([]string, 0, len(named))
 	for _, name := range named {
-		count += len(under[name])
 		lines = append(lines, "  "+strings.Join(under[name], ", ")+" under "+name)
 	}
-	question := "Sync the " + strconv.Itoa(count) + " worktrees under " + strings.Join(named, ", ") + " too?"
-	if count == 1 {
+	n := count(under)
+	question := "Sync the " + strconv.Itoa(n) + " worktrees under " + strings.Join(named, ", ") + " too?"
+	if n == 1 {
 		question = "Sync the worktree under " + strings.Join(named, ", ") + " too?"
 	}
 	return question + "\n" + strings.Join(lines, "\n")
@@ -91,7 +90,7 @@ func forceHelp(unsafe []sync.Rebase) string {
 
 func parentsHelp(behind []sync.Onto) string {
 	if len(behind) == 0 {
-		return "Fast-forward the branches rebased onto but not rebased, the base among them, to origin first (default true)"
+		return "Fast-forward the branches rebased onto but not rebased, the base among them, to origin first"
 	}
 
 	lines := []string{"These branches are rebased onto and behind origin:"}
@@ -99,4 +98,15 @@ func parentsHelp(behind []sync.Onto) string {
 		lines = append(lines, "  "+o.Branch+" ("+strconv.Itoa(o.Origin.Behind)+" behind)")
 	}
 	return strings.Join(lines, "\n")
+}
+
+// count is how many worktrees are under the roots of under, each once: subtrees of two roots may overlap.
+func count(under map[string][]string) int {
+	distinct := map[string]bool{}
+	for _, below := range under {
+		for _, name := range below {
+			distinct[name] = true
+		}
+	}
+	return len(distinct)
 }

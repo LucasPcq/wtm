@@ -14,7 +14,7 @@ var skipped = map[domain.Skip]string{
 	domain.SkipNoOrphan:        "no child worktree is left behind",
 	domain.SkipSafe:            "every worktree is safe to remove",
 	domain.SkipNoCandidate:     "no worktree is done with",
-	domain.SkipNoDescendant:    "no worktree named has worktrees under it",
+	domain.SkipNoDescendant:    "no worktree asked has worktrees under it",
 	domain.SkipNoRebase:        "nothing is rebased",
 	domain.SkipNothingToPush:   "nothing would be pushed",
 }

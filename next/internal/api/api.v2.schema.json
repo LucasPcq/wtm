@@ -4744,6 +4744,9 @@
         "from": {
           "type": "string"
         },
+        "onto": {
+          "type": "string"
+        },
         "operation": {
           "$ref": "#/$defs/worktree.Operation"
         },
@@ -4807,6 +4810,7 @@
         "in_cycle",
         "no_parent",
         "parent_gone",
+        "unrelated",
         "parent_left",
         "diverged",
         "rebases",

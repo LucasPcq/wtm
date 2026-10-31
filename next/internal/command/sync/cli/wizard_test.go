@@ -14,6 +14,10 @@ func TestTheWizardDrawsItsKeyScreens(t *testing.T) {
 	d.looksLike("worktrees")
 
 	d.Keys("enter")
+	assert.Equal(t, stepDescendants, d.Wizard.Current(), "a worktree picked has worktrees under it")
+	assert.Contains(t, d.Screen(), "Sync the 2 worktrees under feat/a too?")
+
+	d.Keys("enter")
 	assert.Equal(t, stepKeepConflict, d.Wizard.Current())
 	d.looksLike("keep_conflict")
 
@@ -40,12 +44,20 @@ func TestAWorktreeNamedWithWorktreesUnderItAsksWhetherTheyComeToo(t *testing.T) 
 	assert.Equal(t, sync.Request{Worktrees: []string{featA}, Descendants: new(false)}, d.s.Request())
 }
 
-func TestTheDefaultPickConfirmedAsItWasNamesNone(t *testing.T) {
+func TestTheDefaultPickConfirmedAsItWasNamesNoneAndNamesItsDescendants(t *testing.T) {
 	d := open(t, sessionParams{App: newWorld(seed{}).usecase()})
 
-	d.Keys("enter")
+	d.Keys("enter", "enter", "enter", "enter", "enter")
 
-	assert.Equal(t, sync.Request{}, d.s.Request())
+	require.Equal(t, stepRecap, d.Wizard.Current())
+	assert.Equal(t, sync.Request{Descendants: new(true), FFParents: new(true)}, d.s.Request())
+	var descendants []string
+	for _, r := range d.s.Preview().Plan.Worktrees {
+		if r.Descendant {
+			descendants = append(descendants, r.Worktree)
+		}
+	}
+	assert.Equal(t, []string{featB, featC}, descendants, "the worktrees under the pick are named as descendants")
 }
 
 func TestNothingToSyncEndsWithoutAskingToConfirm(t *testing.T) {

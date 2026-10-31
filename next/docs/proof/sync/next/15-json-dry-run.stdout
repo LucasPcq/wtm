@@ -19,6 +19,7 @@
         },
         "from": "<SHA>",
         "fork": "<SHA>",
+        "onto": "<SHA>",
         "commits": 1,
         "expect": "<SHA>",
         "blockers": [],
@@ -59,7 +60,7 @@
           {
             "value": "",
             "note": "none",
-            "text": "none under the named"
+            "text": "none"
           }
         ]
       },

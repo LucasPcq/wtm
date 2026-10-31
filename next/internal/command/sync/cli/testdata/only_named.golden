@@ -3,6 +3,6 @@
   Descendants  only the named: feat/b, feat/c stay where they are
   Rebase       feat/a onto main (1 commit)
   On conflict  abort the rebase, the worktree left as it was
-  fingerprint  d210cbe62a5e71fcfc02d7ca
-  → wtm-next sync feat/a --descendants=false --expect-fingerprint d210cbe62a5e71fcfc02d7ca   apply this plan
+  fingerprint  4b9188359a42a5c6b3934a6f
+  → wtm-next sync feat/a --descendants=false --expect-fingerprint 4b9188359a42a5c6b3934a6f   apply this plan
 

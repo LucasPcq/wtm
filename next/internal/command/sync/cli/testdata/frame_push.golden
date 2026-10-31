@@ -3,9 +3,9 @@
 
   ✓ Worktrees: feat/a, feat/x
   · All — set by its flag only
-  · Descendants — no worktree named has worktrees under it
-  · Force — no worktree named has uncommitted changes
-  ✓ On conflict: aborted
+  ✓ Descendants: with the worktrees under them
+  · Force — no worktree named has uncommitted changes: one picked is kept instead
+  ✓ On conflict: abort it
   ✓ Parents: fast-forwarded first
 
   Force-push each branch synced to origin, leasing on origin's branch as fetched

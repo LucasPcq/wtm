@@ -6,9 +6,9 @@
   that need it checked; unattended, those that need it are synced. A worktree is named by its
   branch or its path; --all asks for every worktree.
 
-  By default the worktrees under each one named are synced too, and the plan names each of them;
-  --descendants=false syncs the named alone. --ff-parents=false rebases onto the parents as they
-  stand.
+  By default the worktrees under each one asked, named or picked, are synced too, and the plan
+  names each of them; --descendants=false syncs those asked alone. --ff-parents=false rebases
+  onto the parents as they stand.
 
   A rebase that stops on a conflict is aborted, the worktree left as it was, and the worktrees
   under it are skipped; --keep-conflict leaves it in progress to resolve, then sync it again to
@@ -49,10 +49,10 @@
   Flags:
         --all                         Sync every worktree; one with uncommitted changes is left as it is unless --force
         --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
-        --descendants                 Sync the worktrees under those named too (default true)
+        --descendants                 Sync the worktrees under those asked too
     -n, --dry-run                     Show the plan and its fingerprint, apply nothing
         --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
-        --ff-parents                  Fast-forward the branches rebased onto but not rebased, the base among them, to origin first (default true)
+        --ff-parents                  Fast-forward the branches rebased onto but not rebased, the base among them, to origin first
         --force                       Rebase a worktree that has uncommitted changes, stashed around the rebase
     -h, --help                        help for sync
         --keep-conflict               Leave a rebase that stops on a conflict in progress, to resolve, instead of aborting it; the worktrees under it are skipped either way

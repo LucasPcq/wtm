@@ -4,10 +4,12 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/command/sync"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -230,7 +232,7 @@ func TestPushForcePushesEachBranchSyncedOverTheTipPlanned(t *testing.T) {
 	assert.Empty(t, outcome.Result.FollowUps)
 }
 
-func TestAPushOverATeammatesCommitIsRefusedAndTheRebaseKept(t *testing.T) {
+func TestATeammatesPushSinceTheDryRunMakesItsPlanStale(t *testing.T) {
 	w := newWorld(t)
 	req := naming(solo)
 	req.Push = true
@@ -273,4 +275,101 @@ func TestAPushAloneIsAChangeTheItemSaysIsDone(t *testing.T) {
 	assert.Equal(t, domain.StatusDone, item.Status)
 	assert.Empty(t, item.Reason)
 	assert.True(t, item.Detail.Pushed)
+}
+
+func TestAPushRefusedAtApplyFailsTheItemKeepsItsRebaseAndStopsTheWorktreesUnderIt(t *testing.T) {
+	w := newWorld(t)
+	w.usecase.Git = refusingPush{Repo: w.repo}
+	req := naming(featA)
+	req.Push = true
+
+	outcome := w.run(t, req)
+
+	items := itemsOf(outcome)
+	require.Equal(t, domain.StatusFailed, items[featA].Status)
+	assert.Equal(t, sync.CodePushFailed, items[featA].Err.Code)
+	require.NotNil(t, items[featA].Detail, "the rebase that went through is reported")
+	assert.False(t, items[featA].Detail.Pushed)
+	assert.True(t, w.holds(t, featA, "main"))
+	assert.Equal(t, domain.ReasonBlocked, items[featB].Reason)
+}
+
+func TestAFirstCancelLetsTheRebaseFinishAndStartsNoPush(t *testing.T) {
+	w := newWorld(t)
+	req := naming(solo)
+	req.Push = true
+	planned, _ := w.plan(t, req)
+	ctx, cancel := context.WithCancel(t.Context())
+	w.usecase.Git = cancellingRebase{Repo: w.repo, cancel: cancel}
+
+	result := w.usecase.Apply(ctx, planned, (&operationtest.Recorder{}).Add)
+
+	item := result.Items[0]
+	assert.Equal(t, domain.StatusCancelled, item.Status)
+	assert.Equal(t, domain.ReasonInterrupted, item.Reason)
+	assert.True(t, w.holds(t, solo, "main"), "the rebase under way finished")
+	assert.NotEqual(t, w.tip(t, solo), gittest.Output(t, w.main, "ls-remote", "origin", "refs/heads/"+solo)[:40], "nothing pushed")
+}
+
+func TestTheRebaseGoesOntoTheParentAsPlannedNotAsItStandsLater(t *testing.T) {
+	w := newWorld(t)
+	planned, _ := w.plan(t, naming(solo))
+	onto := w.tip(t, "main")
+	w.commit(t, "main", "later.txt", "after the plan")
+
+	w.usecase.Apply(t.Context(), planned, (&operationtest.Recorder{}).Add)
+
+	assert.Equal(t, onto, w.tip(t, solo+"~1"))
+}
+
+func TestABranchRebasedOntoThatNoWorktreeHoldsMovesToTheCommitPlanned(t *testing.T) {
+	w := newWorld(t)
+	gittest.Git(t, w.main, "branch", "topic", "main")
+	gittest.Git(t, w.main, "push", "-q", "origin", "topic")
+	w.pushedOnOrigin(t, "topic")
+	gittest.Git(t, w.main, "fetch", "-q", "origin")
+	planned := w.tip(t, "origin/topic")
+	w.pushedOnOrigin(t, "topic")
+	// a push from here moves origin/topic too: back to the fetch the plan stands on
+	gittest.Git(t, w.main, "update-ref", "refs/remotes/origin/topic", planned)
+	w.recordParent(t, solo, "topic")
+
+	outcome, err := w.usecase.Run(t.Context(), sync.Request{Worktrees: []string{solo}, NoFetch: true}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusDone, itemsOf(outcome)[solo].Status, itemsOf(outcome)[solo].Err)
+	assert.Equal(t, planned, w.tip(t, "topic"), "origin's later push is the next run's")
+	assert.True(t, w.holds(t, solo, "topic"))
+}
+
+// A worktree that shares no commit with its parent failed every plan while its fork point was read for every worktree.
+func TestAWorktreeSharingNoCommitWithItsParentIsLeftAndFailsNoOtherSync(t *testing.T) {
+	w := newWorld(t)
+	gittest.Git(t, w.at(orphan), "checkout", "-q", "--orphan", "feat/alone")
+	gittest.Git(t, w.at(orphan), "commit", "-q", "--allow-empty", "-m", "unrelated")
+	w.record(t, "feat/alone", worktree.Meta{SourceBranch: "main", CreatedAt: createdAt.Format(time.RFC3339)})
+
+	elsewhere := w.run(t, naming(solo))
+	all, err := w.usecase.Run(t.Context(), sync.Request{All: true}, domain.RunOptions{})
+
+	assert.Equal(t, domain.StatusDone, itemsOf(elsewhere)[solo].Status)
+	require.NoError(t, err)
+	assert.Equal(t, sync.StandingUnrelated, standings(all.Plan)["feat/alone"])
+	assert.Contains(t, codes(all.Warnings), sync.CodeUnrelated)
+}
+
+// The fork point read from the parent's reflog counts a commit the parent held then lost to a reset as the parent's: rebasing from it dropped the commit from the child.
+func TestACommitTheParentLostToAResetStaysInTheChild(t *testing.T) {
+	w := newWorld(t)
+	w.commit(t, "main", "mistake.txt", "meant for solo")
+	w.startFrom(t, solo, "main")
+	w.commit(t, solo, "solo2.txt", "more")
+	gittest.Git(t, w.main, "reset", "-q", "--hard", "HEAD~1")
+	w.commit(t, "main", "fix.txt", "the real next commit")
+
+	outcome := w.run(t, sync.Request{Worktrees: []string{solo}, NoFetch: true})
+
+	require.Equal(t, domain.StatusDone, itemsOf(outcome)[solo].Status, itemsOf(outcome)[solo].Err)
+	assert.FileExists(t, filepath.Join(w.at(solo), "mistake.txt"))
+	assert.Equal(t, 2, rebaseOf(outcome.Plan, solo).Commits, "the commit moved and its own")
 }

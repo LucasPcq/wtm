@@ -19,6 +19,7 @@
         },
         "from": "a",
         "fork": "root",
+        "onto": "moved on",
         "commits": 1,
         "expect": "a",
         "blockers": [],
@@ -154,7 +155,7 @@
       }
     ]
   },
-  "fingerprint": "dc47dfe53a524f84cae6afe8",
+  "fingerprint": "026d5ef6f1e128e773b83ccb",
   "follow_ups": [],
   "warnings": []
 }

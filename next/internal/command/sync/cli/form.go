@@ -51,7 +51,7 @@ func skipped(_ *session, skip domain.Skip) string {
 	case domain.SkipAll:
 		return "every worktree is asked"
 	case domain.SkipSafe:
-		return "no worktree named has uncommitted changes"
+		return "no worktree named has uncommitted changes: one picked is kept instead"
 	case domain.SkipNotBehind:
 		return "no branch rebased onto is on origin"
 	case domain.SkipNothingToPush:

@@ -144,3 +144,33 @@ func TestTheCommitsReplayedAreTheWorktreesOwnSinceItsForkPoint(t *testing.T) {
 	assert.Equal(t, "fork", rebaseOf(planned, "feat/a").Fork)
 	assert.Equal(t, 3, rebaseOf(planned, "feat/a").Commits)
 }
+
+func TestTheForcedFollowUpOfAKeptWorktreeKeepsTheRestOfTheRequest(t *testing.T) {
+	facts := factsOf(seeded{branch: "main"}, seeded{branch: "feat/a", parent: "main", behind: 1}, seeded{branch: "feat/b", parent: "feat/a", changes: 1})
+	req := naming("feat/a")
+	req.Push, req.KeepConflict, req.FFParents = true, true, new(false)
+
+	_, warnings, err := sync.Decide(facts, req)
+
+	require.NoError(t, err)
+	require.Equal(t, []string{sync.CodeKept}, codes(warnings))
+	forced := sync.Request{}
+	for _, answer := range warnings[0].FollowUp.Answers {
+		forced, err = forced.Answer(answer.Path, answer.Values)
+		require.NoError(t, err)
+	}
+	assert.Equal(t, sync.Request{Worktrees: []string{"feat/b"}, Force: true, Push: true, KeepConflict: true, FFParents: new(false)}, forced)
+}
+
+func TestAWorktreeSharingNoCommitWithTheBaseItIsOnHasNoReparentToFollow(t *testing.T) {
+	facts := factsOf(seeded{branch: "main"}, seeded{branch: "feat/x", parent: "main"})
+	check := facts.Checks["feat/x"]
+	check.Unrelated = true
+	facts.Checks["feat/x"] = check
+
+	_, warnings, err := sync.Decide(facts, naming("feat/x"))
+
+	require.NoError(t, err)
+	require.Equal(t, []string{sync.CodeUnrelated}, codes(warnings))
+	assert.Nil(t, warnings[0].FollowUp, "it is on main already")
+}

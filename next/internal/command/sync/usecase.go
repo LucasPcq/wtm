@@ -3,6 +3,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 
@@ -120,15 +121,15 @@ func (u UseCase) Plan(ctx context.Context, req Request, fetched error) (Plan, []
 		return Plan{}, nil, err
 	}
 
-	// Where each worktree forked from its parent, the commit its rebase replays after: read before any branch moves, so a parent rebased first still has its children replay their own commits alone.
-	for _, w := range facts.candidates() {
-		if err := u.forked(ctx, facts, w.Branch()); err != nil {
+	// Where each worktree of the cascade forked from its parent, the commit its rebase replays after: read before any branch moves, so a parent rebased first still has its children replay their own commits alone.
+	for _, r := range facts.decide(resolved).plan.Worktrees {
+		if err := u.forked(ctx, facts, r.Worktree); err != nil {
 			return Plan{}, nil, err
 		}
 	}
 
 	planned, warnings, err := Decide(facts, resolved)
-	planned.Recap, planned.Empty = planned.recap(resolved.named()), planned.empty()
+	planned.Recap, planned.Empty = planned.recap(!resolved.All), planned.empty()
 	return planned, warnings, err
 }
 
@@ -138,16 +139,20 @@ func (u UseCase) Plan(ctx context.Context, req Request, fetched error) (Plan, []
 // Apply carries out the plan, reporting each step: it fast-forwards the branches rebased onto, then syncs each worktree of the cascade in turn, parents before children; a failure stops the worktrees under the one that failed, never the others, and the branches it leaves stand as they are. Once ctx is cancelled, the worktrees not yet started are skipped.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	var warnings []domain.Warning
+	stands := map[string]string{} // the commit each branch rebased onto stands at when its fast-forward failed
 	for _, o := range plan.Onto {
-		if o.moves() {
-			warnings = append(warnings, u.forward(ctx, plan, o, report)...)
+		if !o.moves() {
+			continue
+		}
+		if warning, failed := u.forward(ctx, plan, o, report); failed {
+			warnings, stands[o.Branch] = append(warnings, warning), o.From
 		}
 	}
 
 	stopped := map[string]bool{}
 	items := make([]Item, 0, len(plan.Worktrees))
 	for _, r := range plan.Worktrees {
-		item := u.sync(ctx, plan, r, stopped[r.Parent], report)
+		item := u.sync(ctx, plan, r, ontoOf(r, stands), stopped[r.Parent], report)
 		stopped[r.Worktree] = item.Status == domain.StatusFailed || item.Reason == domain.ReasonBlocked || item.Reason == domain.ReasonInterrupted
 		items = append(items, item)
 	}
@@ -236,6 +241,9 @@ func (u UseCase) forked(ctx context.Context, facts Facts, branch string) error {
 	}
 
 	fork, err := u.Git.ForkPoint(ctx, worktree.Span{Branch: branch, Base: parent})
+	if errors.Is(err, worktree.ErrNoCommonHistory) {
+		check.Unrelated, err = true, nil
+	}
 	check.Fork = fork
 	facts.Checks[branch] = check
 	return err
@@ -247,34 +255,66 @@ func (u UseCase) forked(ctx context.Context, facts Facts, branch string) error {
 // CodeFFFailed warns of a branch rebased onto that could not be fast-forwarded: the worktrees on it are rebased onto it as it stands.
 const CodeFFFailed = Name + ".ff_failed"
 
-// forward fast-forwards o, a branch rebased onto, to the commit of origin planned, between its phase events; a failure is a warning, its children rebased onto it as it stands.
-func (u UseCase) forward(ctx context.Context, plan Plan, o Onto, report domain.Report) []domain.Warning {
+// forward fast-forwards o, a branch rebased onto, to the commit of origin planned, between its phase events: in its worktree, or, held by none, its ref moved; a failure is its warning, and reports it failed, its children rebased onto it as it stands. Once ctx is cancelled, it is not started.
+func (u UseCase) forward(ctx context.Context, plan Plan, o Onto, report domain.Report) (domain.Warning, bool) {
 	if ctx.Err() != nil {
-		return nil
+		return domain.Warning{}, false
 	}
 	shielded, release := u.Shield(ctx)
 	defer release()
 
 	report(domain.PhaseStarted{Subject: o.Branch, Phase: domain.PhaseFastForward})
-	forwarded := u.Provision.FastForward(shielded, provision.FastForwardParams{Subject: o.Branch, CheckedOutAt: o.Path, Force: plan.Force, Onto: o.To})
-	report(domain.PhaseFinished{Subject: o.Branch, Phase: domain.PhaseFastForward, Failed: forwarded.Failed()})
-	if !forwarded.Failed() {
-		return nil
+	cause := u.forwardCause(shielded, plan, o)
+	report(domain.PhaseFinished{Subject: o.Branch, Phase: domain.PhaseFastForward, Failed: cause != ""})
+	if cause == "" {
+		return domain.Warning{}, false
 	}
 
-	cause := "its worktree has uncommitted changes"
-	switch {
-	case forwarded.Busy:
-		cause = "its worktree is in the middle of an operation"
-	case forwarded.Err != nil:
-		cause = forwarded.Err.Error()
-	}
 	children := strings.Join(o.Children, ", ")
-	return []domain.Warning{{Code: CodeFFFailed, Message: "couldn't fast-forward " + o.Branch + ": " + cause + ": " + children + " rebased onto it as it stands", Params: domain.Params{"branch": o.Branch, "cause": cause, "children": children}}}
+	return domain.Warning{Code: CodeFFFailed, Message: "couldn't fast-forward " + o.Branch + ": " + cause + ": " + children + " rebased onto it as it stands", Params: domain.Params{"branch": o.Branch, "cause": cause, "children": children}}, true
+}
+
+// forwardCause fast-forwards o and says why it could not, "" when it did. A branch no worktree holds is moved to the commit planned, not to origin's as it stands now, after checking it is a fast-forward of where it stands.
+func (u UseCase) forwardCause(ctx context.Context, plan Plan, o Onto) string {
+	if o.Path == "" {
+		ahead, err := u.Git.IsAncestor(ctx, worktree.Ancestry{Ancestor: o.From, Descendant: o.To})
+		switch {
+		case err != nil:
+			return err.Error()
+		case !ahead:
+			return "origin's branch is no fast-forward of it"
+		}
+		if err := u.Git.UpdateBranch(ctx, worktree.BranchUpdate{Branch: o.Branch, From: o.From, To: o.To}); err != nil {
+			return err.Error()
+		}
+		return ""
+	}
+
+	forwarded := u.Provision.FastForward(ctx, provision.FastForwardParams{Subject: o.Branch, CheckedOutAt: o.Path, Force: plan.Force, Onto: o.To})
+	switch {
+	case !forwarded.Failed():
+		return ""
+	case forwarded.Busy:
+		return "its worktree is in the middle of an operation"
+	case forwarded.Err != nil:
+		return forwarded.Err.Error()
+	}
+	return "its worktree has uncommitted changes"
+}
+
+// ontoOf is the commit r is rebased onto: its parent's as planned, unless that parent's fast-forward failed, which leaves it where it stood, or its parent as it stands once rebased in this run, when it rebases too.
+func ontoOf(r Rebase, stands map[string]string) worktree.Ref {
+	if tip, failed := stands[r.Parent]; failed {
+		return worktree.Revision{Hash: tip}
+	}
+	if r.Onto != "" {
+		return worktree.Revision{Hash: r.Onto}
+	}
+	return worktree.LocalBranch{Name: r.Parent}
 }
 
 // sync syncs one worktree between its unit events, each git step shielded from a cancel, as the plan settled it: its own origin's commits brought in, the rebase onto its parent, then the push. A worktree the plan leaves stands as it is, with no event; one whose parent stopped, or reached after a cancel, is skipped.
-func (u UseCase) sync(ctx context.Context, plan Plan, r Rebase, parentStopped bool, report domain.Report) (item Item) {
+func (u UseCase) sync(ctx context.Context, plan Plan, r Rebase, onto worktree.Ref, parentStopped bool, report domain.Report) (item Item) {
 	item.Subject = r.Worktree
 	detail := &Detail{Path: r.Path, Parent: r.Parent, From: r.From}
 	switch {
@@ -299,9 +339,14 @@ func (u UseCase) sync(ctx context.Context, plan Plan, r Rebase, parentStopped bo
 	defer release()
 
 	item.Status = domain.StatusDone
-	for _, phase := range r.Phases {
+	for i, phase := range r.Phases {
+		// a first Ctrl+C lets the git step under way finish, and starts no other
+		if i > 0 && ctx.Err() != nil {
+			item.Status, item.Reason = domain.StatusCancelled, domain.ReasonInterrupted
+			break
+		}
 		report(domain.PhaseStarted{Subject: r.Worktree, Phase: phase})
-		failure, warning := u.step(shielded, plan, r, phase, detail)
+		failure, warning := u.step(shielded, plan, stepParams{Rebase: r, Phase: phase, Onto: onto, Detail: detail})
 		report(domain.PhaseFinished{Subject: r.Worktree, Phase: phase, Failed: failure != nil})
 		if warning != nil {
 			item.Warnings = append(item.Warnings, *warning)
@@ -318,16 +363,25 @@ func (u UseCase) sync(ctx context.Context, plan Plan, r Rebase, parentStopped bo
 	return item
 }
 
-// step runs one phase of r's sync, recording in detail what it did: the failure it stops on, and the warning it leaves.
-func (u UseCase) step(ctx context.Context, plan Plan, r Rebase, phase domain.Phase, detail *Detail) (*domain.Error, *domain.Warning) {
+// stepParams are one phase of a worktree's sync: the worktree as planned, the phase, the commit its rebase goes onto, and the Detail the step records what it did in.
+type stepParams struct {
+	Rebase
+	Phase  domain.Phase
+	Onto   worktree.Ref
+	Detail *Detail
+}
+
+// step runs one phase of a worktree's sync, recording in its detail what it did: the failure it stops on, and the warning it leaves.
+func (u UseCase) step(ctx context.Context, plan Plan, s stepParams) (*domain.Error, *domain.Warning) {
+	r, detail := s.Rebase, s.Detail
 	params := domain.Params{"worktree": r.Worktree, "parent": r.Parent, "path": r.Path}
-	switch phase {
+	switch s.Phase {
 	case domain.PhaseFastForward:
 		// Onto the commit planned, which the fingerprint covers: origin's branch may have moved on since.
 		forwarded := u.Provision.FastForward(ctx, provision.FastForwardParams{Subject: r.Worktree, CheckedOutAt: r.Path, Force: plan.Force, Onto: r.Expect})
 		return forwardFailure(forwarded, params), nil
 	case domain.PhaseRebase:
-		rebased, err := u.Git.Rebase(ctx, worktree.Rebase{Path: r.Path, Onto: worktree.LocalBranch{Name: r.Parent}, Upstream: r.Fork, Keep: plan.KeepConflict, Autostash: plan.Force && len(r.Blockers) > 0})
+		rebased, err := u.Git.Rebase(ctx, worktree.Rebase{Path: r.Path, Onto: s.Onto, Upstream: r.Fork, Keep: plan.KeepConflict, Autostash: plan.Force && len(r.Blockers) > 0})
 		failure := rebaseFailure(rebased, err, params)
 		if failure == nil {
 			detail.Commits = r.Commits

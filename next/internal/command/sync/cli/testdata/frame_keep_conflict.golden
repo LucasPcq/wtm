@@ -3,8 +3,8 @@
 
   ✓ Worktrees: feat/a, feat/x
   · All — set by its flag only
-  · Descendants — no worktree named has worktrees under it
-  · Force — no worktree named has uncommitted changes
+  ✓ Descendants: with the worktrees under them
+  · Force — no worktree named has uncommitted changes: one picked is kept instead
 
   Leave a rebase that stops on a conflict in progress, to resolve, instead of aborting it; the
   worktrees under it are skipped either way

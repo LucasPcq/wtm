@@ -40,7 +40,7 @@ const (
 	SkipNoOrphan        Skip = "no_orphan"        // no worktree removed leaves a child behind
 	SkipSafe            Skip = "safe"             // nothing asked is unsafe: nothing to force
 	SkipNoCandidate     Skip = "no_candidate"     // nothing to pick from: no worktree is done with
-	SkipNoDescendant    Skip = "no_descendant"    // no worktree named has worktrees under it
+	SkipNoDescendant    Skip = "no_descendant"    // no worktree asked has worktrees under it
 	SkipNoRebase        Skip = "no_rebase"        // nothing is rebased: no conflict can stop it
 	SkipNothingToPush   Skip = "nothing_to_push"  // nothing would be pushed: no branch that may move is on origin
 )

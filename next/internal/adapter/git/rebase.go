@@ -4,31 +4,70 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-// ForkPoint returns where span.Branch forked from span.Base, with the branch's own commits after it: git's fork point, read from the base's reflog, so it is found even after the base was rewritten; their merge base when the reflog no longer knows it. Both are local branches.
+// ForkPoint returns where span.Branch forked from span.Base, with the branch's own commits after it: git's fork point, read from the base's reflog, so it is found even after the base was rewritten, but only when every commit it would skip was rewritten onto the base (forkKept); else, a commit the base held then lost to a reset, their merge base, which skips none. Both are local branches; two that share no commit fail with worktree.ErrNoCommonHistory.
 func (r Repo) ForkPoint(ctx context.Context, span worktree.Span) (worktree.Fork, error) {
 	base, branch := headsPrefix+span.Base, headsPrefix+span.Branch
-	out, err := r.git(ctx, "merge-base", "--fork-point", base, branch)
-	// git exits 1 when the reflog holds no fork point
+	merged, err := r.git(ctx, "merge-base", base, branch)
+	// git exits 1 when the two share no commit
 	if failed, ok := errors.AsType[*Error](err); ok && failed.Exit == 1 {
-		out, err = r.git(ctx, "merge-base", base, branch)
+		return worktree.Fork{}, worktree.ErrNoCommonHistory
 	}
 	if err != nil {
 		return worktree.Fork{}, err
 	}
 
-	fork := worktree.Fork{Commit: strings.TrimSpace(string(out))}
+	fork := worktree.Fork{Commit: strings.TrimSpace(string(merged))}
+	// git exits 1 when the reflog holds no fork point: the merge base it is
+	if point, err := r.git(ctx, "merge-base", "--fork-point", base, branch); err == nil {
+		kept, err := r.forkKept(ctx, fork.Commit, strings.TrimSpace(string(point)), base)
+		if err != nil {
+			return worktree.Fork{}, err
+		}
+		if kept {
+			fork.Commit = strings.TrimSpace(string(point))
+		}
+	} else if failed, ok := errors.AsType[*Error](err); !ok || failed.Exit != 1 {
+		return worktree.Fork{}, err
+	}
+
 	count, err := r.git(ctx, "rev-list", "--count", fork.Commit+".."+branch, "--")
 	if err != nil {
 		return worktree.Fork{}, err
 	}
 	fork.Own, err = strconv.Atoi(strings.TrimSpace(string(count)))
 	return fork, err
+}
+
+// replayed is how a commit is known again once rewritten: a rebase, an amend or a resolved conflict keeps its author, its author date and its subject.
+const replayed = "--format=%an%x00%ae%x00%ad%x00%s"
+
+// forkKept reports whether a rebase from point, the fork point, past merge, the merge base, loses nothing: point is after merge, and every commit it skips, between the two, has its rewritten counterpart on base since merge. A commit base held, and the branch was created from, then lost to a reset has none: skipping it would drop it from the branch.
+func (r Repo) forkKept(ctx context.Context, merge, point, base string) (bool, error) {
+	if point == merge {
+		return false, nil
+	}
+	skipped, err := r.git(ctx, "log", replayed, "--date=raw", merge+".."+point, "--")
+	if err != nil {
+		return false, err
+	}
+	onBase, err := r.git(ctx, "log", replayed, "--date=raw", merge+".."+base, "--")
+	if err != nil {
+		return false, err
+	}
+
+	rewritten := map[string]bool{}
+	for line := range strings.Lines(string(onBase)) {
+		rewritten[line] = true
+	}
+	lines := slices.Collect(strings.Lines(string(skipped)))
+	return len(lines) > 0 && !slices.ContainsFunc(lines, func(line string) bool { return !rewritten[line] }), nil
 }
 
 // Rebase replays, in the worktree at rebase.Path, its branch's commits after rebase.Upstream onto rebase.Onto. A rebase that stops on a conflict reports the files it stopped in and is aborted, the worktree back as it was, or left in progress with rebase.Keep; any other failure aborts it and is returned. With rebase.Autostash, a stash that no longer applies is kept in git's stash, which Stashed says.
@@ -81,6 +120,12 @@ func (r Repo) unmerged(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	return strings.FieldsFunc(string(out), func(c rune) bool { return c == 0 }), nil
+}
+
+// UpdateBranch moves the local branch update.Branch to update.To, refused unless it still stands at update.From; it checks nothing else: a branch checked out somewhere is the caller's to keep out.
+func (r Repo) UpdateBranch(ctx context.Context, update worktree.BranchUpdate) error {
+	_, err := r.git(ctx, "update-ref", headsPrefix+update.Branch, update.To, update.From)
+	return err
 }
 
 // Push force-pushes the local branch push.Branch to origin's branch of the same name, refused unless origin's stands at push.Expect, "" meaning origin has none.

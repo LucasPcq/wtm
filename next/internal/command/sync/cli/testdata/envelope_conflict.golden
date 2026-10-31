@@ -56,6 +56,7 @@
         },
         "from": "a",
         "fork": "root",
+        "onto": "moved on",
         "commits": 1,
         "expect": "a",
         "blockers": [],

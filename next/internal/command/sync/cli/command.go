@@ -20,9 +20,9 @@ const (
 		"that need it checked; unattended, those that need it are synced. A worktree is named by its\n" +
 		"branch or its path; --all asks for every worktree.\n" +
 		"\n" +
-		"By default the worktrees under each one named are synced too, and the plan names each of them;\n" +
-		"--descendants=false syncs the named alone. --ff-parents=false rebases onto the parents as they\n" +
-		"stand.\n" +
+		"By default the worktrees under each one asked, named or picked, are synced too, and the plan\n" +
+		"names each of them; --descendants=false syncs those asked alone. --ff-parents=false rebases\n" +
+		"onto the parents as they stand.\n" +
 		"\n" +
 		"A rebase that stops on a conflict is aborted, the worktree left as it was, and the worktrees\n" +
 		"under it are skipped; --keep-conflict leaves it in progress to resolve, then sync it again to\n" +

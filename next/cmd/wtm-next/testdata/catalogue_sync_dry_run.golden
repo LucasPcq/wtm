@@ -15,6 +15,7 @@
         "origin": null,
         "from": "<id>",
         "fork": "<id>",
+        "onto": "<id>",
         "commits": 0,
         "blockers": [],
         "phases": [
@@ -50,7 +51,7 @@
           {
             "value": "",
             "note": "none",
-            "text": "none under the named"
+            "text": "none"
           }
         ]
       },

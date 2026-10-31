@@ -3,15 +3,16 @@
 
   ✓ Worktrees: feat/a, feat/x
   · All — set by its flag only
-  · Descendants — no worktree named has worktrees under it
-  · Force — no worktree named has uncommitted changes
-  ✓ On conflict: aborted
+  ✓ Descendants: with the worktrees under them
+  · Force — no worktree named has uncommitted changes: one picked is kept instead
+  ✓ On conflict: abort it
   ✓ Parents: fast-forwarded first
   ✓ Push: kept local
   · No fetch — set by its flag only
 
   ┃  Review & confirm
   ┃
+  ┃  Descendants  feat/b, feat/c
   ┃  Rebase       feat/a onto main (1 commit)
   ┃               feat/x onto main (1 commit)
   ┃               feat/b onto feat/a (1 commit)

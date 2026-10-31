@@ -1,5 +1,10 @@
 package worktree
 
+import "errors"
+
+// ErrNoCommonHistory is the error of a branch and its base that share no commit: there is no fork point to rebase from.
+var ErrNoCommonHistory = errors.New("no common history")
+
 // A Fork is where a branch forked from its base: the commit, and the branch's own commits after it.
 type Fork struct {
 	Commit string
@@ -25,6 +30,13 @@ type Rebased struct {
 // Conflicted reports whether the rebase stopped on a conflict.
 func (r Rebased) Conflicted() bool {
 	return len(r.Conflicts) > 0
+}
+
+// A BranchUpdate moves the local branch Branch from the commit From to the commit To, only while it still stands at From.
+type BranchUpdate struct {
+	Branch string
+	From   string
+	To     string
 }
 
 // A Push sends the local branch Branch to origin's branch of the same name, overwriting it only while it stands at Expect: a commit, or "" for a branch origin must not have yet.

@@ -145,3 +145,78 @@ func TestAPushIsRefusedOnceOriginMovedPastTheCommitExpected(t *testing.T) {
 	var gitErr *git.Error
 	require.ErrorAs(t, err, &gitErr)
 }
+
+func TestTheFakeAndGitForkABranchWithCommitsItsBaseLacksFromTheirLastSharedCommit(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			fork, err := impl.port.ForkPoint(t.Context(), worktree.Span{Branch: "unmerged", Base: "main"})
+
+			require.NoError(t, err)
+			assert.Equal(t, tip(t, impl.port, worktree.LocalBranch{Name: "main"}), fork.Commit)
+			assert.Equal(t, 1, fork.Own)
+		})
+	}
+}
+
+// A commit main held, which child was created from, then lost to a reset is in main's reflog: the fork point alone would skip it, and the rebase would drop it from child.
+func TestACommitMovedFromTheParentIntoTheChildByAResetIsReplayedNotDropped(t *testing.T) {
+	repo, _ := newRepoWithOrigin(t)
+	commitFile(t, repo.Dir, "mistake.txt", "meant for child")
+	child := filepath.Join(gittest.TempDir(t), "child")
+	gittest.Git(t, repo.Dir, "worktree", "add", "-q", "-b", "child", child, "main")
+	commitFile(t, child, "child.txt", "its own")
+	gittest.Git(t, repo.Dir, "reset", "-q", "--hard", "HEAD~1")
+	commitFile(t, repo.Dir, "main.txt", "moved on")
+
+	fork, err := repo.ForkPoint(t.Context(), worktree.Span{Branch: "child", Base: "main"})
+	require.NoError(t, err)
+	assert.Equal(t, 2, fork.Own, "the commit moved and its own")
+
+	_, err = repo.Rebase(t.Context(), worktree.Rebase{Path: child, Onto: worktree.LocalBranch{Name: "main"}, Upstream: fork.Commit})
+
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(child, "mistake.txt"))
+	assert.Equal(t, head(t, repo.Dir, "main"), head(t, child, "HEAD~2"))
+}
+
+// A stack split: child is created from parent's tip, then parent is reset two commits back, which now belong to child alone.
+func TestAStackSplitByAResetOfTheParentKeepsTheCommitsTheChildTookOver(t *testing.T) {
+	repo, child := childOfMain(t)
+	commitFile(t, repo.Dir, "one.txt", "1")
+	commitFile(t, repo.Dir, "two.txt", "2")
+	gittest.Git(t, child, "reset", "-q", "--hard", "main")
+	commitFile(t, child, "child.txt", "its own")
+	gittest.Git(t, repo.Dir, "reset", "-q", "--hard", "HEAD~2")
+
+	fork, err := repo.ForkPoint(t.Context(), worktree.Span{Branch: "child", Base: "main"})
+
+	require.NoError(t, err)
+	assert.Equal(t, head(t, repo.Dir, "main"), fork.Commit)
+	assert.Equal(t, 3, fork.Own)
+}
+
+func TestTwoBranchesThatShareNoCommitHaveNoForkPoint(t *testing.T) {
+	repo := newRepo(t)
+	gittest.Git(t, repo.Dir, "checkout", "-q", "--orphan", "alone")
+	gittest.Git(t, repo.Dir, "commit", "-q", "--allow-empty", "-m", "unrelated")
+
+	_, err := repo.ForkPoint(t.Context(), worktree.Span{Branch: "alone", Base: "main"})
+
+	require.ErrorIs(t, err, worktree.ErrNoCommonHistory)
+}
+
+func TestTheFakeAndGitMoveABranchOnlyFromTheCommitItStandsAt(t *testing.T) {
+	for _, impl := range implementations(t) {
+		t.Run(impl.name, func(t *testing.T) {
+			require.NoError(t, impl.port.Fetch(t.Context()))
+			from, to := tip(t, impl.port, worktree.LocalBranch{Name: "feature"}), tip(t, impl.port, worktree.RemoteBranch{Name: "feature"})
+
+			stale := impl.port.UpdateBranch(t.Context(), worktree.BranchUpdate{Branch: "feature", From: to, To: to})
+			moved := impl.port.UpdateBranch(t.Context(), worktree.BranchUpdate{Branch: "feature", From: from, To: to})
+
+			require.Error(t, stale)
+			require.NoError(t, moved)
+			assert.Equal(t, to, tip(t, impl.port, worktree.LocalBranch{Name: "feature"}))
+		})
+	}
+}

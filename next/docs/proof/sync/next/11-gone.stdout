@@ -1,7 +1,7 @@
 
   ! sync: 1 skipped
 
-  Descendants  none under the named
+  Descendants  none
   Left as is   feat/gone (its directory is gone)
 
   ! feat/gone's directory is gone: left as it is
