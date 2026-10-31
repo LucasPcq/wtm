@@ -80,7 +80,7 @@ test('Descendants off, each worktree left is listed once, with the reason that h
   expect(within(left).getByText('its parent feat/search is left as it is')).toBeTruthy()
   expect(within(left).getByText("stays on feat/billing's old tip · needs a sync after")).toBeTruthy()
   const runs = within(dialog).getByRole('region', { name: 'How it runs' })
-  expect(within(runs).getByText('feat/billing-ui stays where it is; each needs a sync after.')).toBeTruthy()
+  expect(within(runs).getByText('feat/billing-ui stays where it is, and needs a sync after.')).toBeTruthy()
 })
 
 test('a worktree left under a parent that only pushes stays on it as it is, on the list as in How it runs', async () => {
@@ -94,7 +94,7 @@ test('a worktree left under a parent that only pushes stays on it as it is, on t
   const left = await within(dialog).findByRole('region', { name: 'Left as they are' })
   expect(within(left).getByText('stays on feat/billing as it is · needs a sync after')).toBeTruthy()
   const runs = within(dialog).getByRole('region', { name: 'How it runs' })
-  expect(within(runs).getByText('feat/billing-ui stays where it is; each needs a sync after.')).toBeTruthy()
+  expect(within(runs).getByText('feat/billing-ui stays where it is, and needs a sync after.')).toBeTruthy()
 })
 
 test("unchecking a dirty main clears its consent: a clean branch's box never brings it back forced", async () => {

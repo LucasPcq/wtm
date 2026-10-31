@@ -77,7 +77,7 @@ export function SyncConfirm({
   const descendants = () => {
     if (!plan.descendants)
       return leftOut.length > 0
-        ? `${listed(leftOut)} ${leftOut.length === 1 ? 'stays where it is' : 'stay where they are'}; each needs a sync after.`
+        ? `${listed(leftOut)} ${leftOut.length === 1 ? 'stays where it is, and needs' : 'stay where they are; each needs'} a sync after.`
         : undefined
     const byRoot = new Map<string, typeof followers>()
     for (const rebase of followers) {
