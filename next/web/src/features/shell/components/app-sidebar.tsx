@@ -117,5 +117,6 @@ function WorktreeCount({ repo }: { repo: string }) {
 // waits for it, until the jobs read (LUC-345) gives the page and this badge their own
 function JobsUp({ repo }: { repo: string }) {
   const list = useQuery({ ...readQuery(repo, 'list'), enabled: false })
-  return list.data && <SidebarMenuBadge>{jobsUp(list.data)}</SidebarMenuBadge>
+  const up = list.data ? jobsUp(list.data) : 0
+  return up > 0 && <SidebarMenuBadge>{up}</SidebarMenuBadge>
 }

@@ -23,5 +23,5 @@ export async function renderApp(path: string) {
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { user, router }
+  return { user, router, queryClient }
 }

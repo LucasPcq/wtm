@@ -5,14 +5,15 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/co
 import { Progress as Bar } from '@/components/ui/progress'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
+import { PhaseRow } from '@/features/worktrees/components/phase-row'
 import { RunFailure } from '@/features/worktrees/components/run-failure'
 import { RunOutcome } from '@/features/worktrees/components/run-outcome'
 import { RunningFooter } from '@/features/worktrees/components/running-footer'
 import type { RunUpRan } from '@/features/worktrees/hooks/use-run-up-dialog'
-import { JobRow } from '@/features/worktrees/run-up/components/job-row'
+import { countOf, sharedOf } from '@/features/worktrees/run-up/utils/plan'
 import { recapOf } from '@/features/worktrees/run-up/utils/recap'
-import { startedWords, underWay, where } from '@/features/worktrees/run-up/utils/words'
-import { doneOf, ending, type PhaseRun, type Progress } from '@/features/worktrees/utils/progress'
+import { sharedSuffix, startedWords, underWay, where } from '@/features/worktrees/run-up/utils/words'
+import { ending, type PhaseRun, type Progress } from '@/features/worktrees/utils/progress'
 
 // a shared service is joined by each worktree: its row says where the least advanced one stands
 const rank: Record<PhaseRun['state'], number> = { failed: 0, now: 1, todo: 2, done: 3 }
@@ -34,7 +35,7 @@ export function RunUpProgress({
 }) {
   const envelope = progress.envelope
   const items = envelope?.items ?? []
-  const { done, total } = doneOf(progress)
+  const { done, total } = countOf(progress.units, ran.plan)
   const { cancelled } = ending(progress)
   const failed = items.filter((item) => item.status === 'failed').length
   const refused =
@@ -57,12 +58,13 @@ export function RunUpProgress({
       unit.phases.filter((run) => run.job === name).map((run) => ({ run, job: planOf(unit.subject, name) })),
     )
     const least = runs.toSorted((a, b) => rank[a.run.state] - rank[b.run.state])[0]
-    return least ? [{ name, ...least }] : []
+    const service = ran.plan && sharedOf(ran.plan).find((one) => one.name === name)
+    return least ? [{ name, ...least, suffix: service ? sharedSuffix(service) : '' }] : []
   })
 
   const description = () => {
-    if (running && progress.cancelling) return `Cancelling · ${done} of ${total} started`
-    if (running) return `Starting ${ran.profile} ${where(ran.worktrees)} · ${done} of ${total} started`
+    if (running && progress.cancelling) return `Cancelling · ${done} of ${total} up`
+    if (running) return `Starting ${ran.profile} ${where(ran.worktrees)} · ${done} of ${total} up`
     if (items.length === 0) return 'Nothing started.'
     if (cancelled) return 'Cancelled: what started keeps running.'
     if (failed > 0) return `${ran.profile} didn't start in ${failed} of ${items.length}.`
@@ -90,8 +92,14 @@ export function RunUpProgress({
           <>
             {shared.length > 0 && (
               <Group title="Shared services">
-                {shared.map(({ name, run, job }) => (
-                  <JobRow key={name} name={name} run={run} said={underWay(run, job, cancelling)} />
+                {shared.map(({ name, run, job, suffix }) => (
+                  <PhaseRow
+                    key={name}
+                    name={name}
+                    run={run}
+                    label={`${underWay(run, job, cancelling)}${suffix}`}
+                    lines={run.lines ?? []}
+                  />
                 ))}
               </Group>
             )}
@@ -100,11 +108,12 @@ export function RunUpProgress({
                 {unit.phases
                   .filter((run) => !(run.job && joined(unit.subject, run.job)))
                   .map((run) => (
-                    <JobRow
+                    <PhaseRow
                       key={run.job}
                       name={run.job ?? ''}
                       run={run}
-                      said={underWay(run, planOf(unit.subject, run.job ?? ''), cancelling)}
+                      label={underWay(run, planOf(unit.subject, run.job ?? ''), cancelling)}
+                      lines={run.lines ?? []}
                     />
                   ))}
               </Group>

@@ -9,11 +9,10 @@ import { phaseLook } from '@/features/worktrees/utils/phase-look'
 import type { PhaseRun } from '@/features/worktrees/utils/progress'
 import { cn } from '@/lib/utils'
 
-// one job while the profile starts: folded, its lines live behind its chevron
-export function JobRow({ name, run, said }: { name: string; run: PhaseRun; said: string }) {
+// one step of a run under way, a worktree's command or a job: folded, its lines live behind its chevron
+export function PhaseRow({ name, run, label, lines }: { name: string; run: PhaseRun; label: string; lines: string[] }) {
   const [open, setOpen] = useState(false)
   const { icon: Icon, tone } = phaseLook[run.state]
-  const lines = run.lines ?? []
 
   return (
     <Collapsible asChild open={open} onOpenChange={setOpen}>
@@ -21,10 +20,10 @@ export function JobRow({ name, run, said }: { name: string; run: PhaseRun; said:
         <div className="flex min-h-8 items-center gap-3 text-sm">
           <Icon className={cn(toneIcon({ tone }), 'size-4')} aria-hidden="true" />
           <span className="shrink-0 font-medium">{name}</span>
-          <span className="min-w-0 flex-1 truncate text-muted-foreground">{said}</span>
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">{label}</span>
           {run.state !== 'todo' && (
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label={`Lines of ${name}`}>
+              <Button variant="ghost" size="icon-sm" aria-label={`Output of ${name}`}>
                 <ChevronRight
                   className={cn('transition-transform motion-reduce:transition-none', open && 'rotate-90')}
                 />
@@ -37,7 +36,7 @@ export function JobRow({ name, run, said }: { name: string; run: PhaseRun; said:
             <>
               <StepOutput lines={lines.map(terminalLine)} log={run.log} />
               {run.state === 'now' && (
-                <p className="mt-1 text-xs text-muted-foreground">Following its log · the last lines</p>
+                <p className="mt-1 text-xs text-muted-foreground">Following its output · the last lines</p>
               )}
             </>
           )}

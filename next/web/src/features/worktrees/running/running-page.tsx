@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Activity, Play } from 'lucide-react'
 import { readQuery } from '@/api/queries/commands'
+import { reposQuery } from '@/api/queries/repos'
 import { Centered } from '@/components/centered'
 import { PageHeader } from '@/components/page-header'
 import { StatePage } from '@/components/state-page'
@@ -14,24 +15,27 @@ import { RunUpDialog } from '@/features/worktrees/run-up/run-up-dialog'
 import { RunGroup } from '@/features/worktrees/running/components/run-group'
 import { groupsOf } from '@/features/worktrees/running/utils/groups'
 import { plural } from '@/lib/plural'
+import { repoName } from '@/lib/repo'
 
 // shortcut: the jobs come from list's read, counted here; the jobs read of its own (with its counts, its order and the
 // shared services' group) replaces it
 export function RunningPage({ repo }: { repo: string }) {
   const list = useQuery(readQuery(repo, 'list'))
   const { progress, running } = useRun(repo, 'run-up')
-  const plan = useRunUpDialog((dialog) => dialog.ran.plan)
+  const { plan } = useRunUpDialog(repo).ran
+  const root = useQuery(reposQuery).data?.find((known) => known.id === repo)?.root
   const now = useQuery({ queryKey: ['now'], queryFn: () => Date.now(), refetchInterval: clockEvery }).data ?? 0
 
-  // past its end, a start's progress holds until the read after it lands: its groups would vanish in between
-  const overlay = running || list.isFetching ? progress : undefined
+  // past its end, a start's progress holds until the first read after it lands: its groups would vanish in between
+  const ended = progress?.endedAt
+  const overlay = running || (ended !== undefined && list.dataUpdatedAt < ended) ? progress : undefined
   const groups = list.data ? groupsOf({ read: list.data, progress: overlay, plan }) : []
   const up = groups.reduce((count, group) => count + group.counts.running, 0)
   const crashed = groups.reduce((count, group) => count + group.counts.crashed, 0)
 
   const description = () => {
     if (!list.data) return 'Reading the jobs…'
-    if (groups.length === 0) return 'Nothing running'
+    if (groups.length === 0) return root ? `Nothing running in ${repoName(root)}` : 'Nothing running'
     const where = `${plural(up, 'job')} up in ${plural(groups.length, 'worktree')}`
     return crashed > 0 ? `${where} · ${crashed} crashed` : where
   }
@@ -49,8 +53,9 @@ export function RunningPage({ repo }: { repo: string }) {
     if (groups.length === 0)
       return (
         <Centered>
-          <StatePage icon={<Activity />} title="Nothing is running" action={start}>
-            Start a profile to run its jobs in the worktrees you pick.
+          <StatePage icon={<Activity />} title="Nothing is running">
+            Start a profile to run a worktree's jobs. They keep running when this page closes, and show here, live, from
+            any worktree.
           </StatePage>
         </Centered>
       )
