@@ -73,7 +73,17 @@ const repoOf = (client: QueryClient, line: WtmEventsV2) =>
 function invalidate(client: QueryClient, line: WtmEventsV2) {
   if (line.type === 'repo.added' || line.type === 'repo.removed')
     return client.invalidateQueries({ queryKey: ['repos'] })
-  if (line.type.startsWith('worktree.') || line.type.startsWith('job.') || line.type === 'operation.finished') {
+  // a job's event changes the reads that list jobs, never a dialog's questions nor its plan: a start of N jobs would
+  // ask them N times
+  if (line.type.startsWith('job.')) {
+    const id = repoOf(client, line)
+    return Promise.all(
+      (['list', 'status'] as const).map((read) =>
+        client.invalidateQueries({ queryKey: id ? ['repo', id, read] : ['repo'] }),
+      ),
+    )
+  }
+  if (line.type.startsWith('worktree.') || line.type === 'operation.finished') {
     const id = repoOf(client, line)
     return client.invalidateQueries({ queryKey: id ? ['repo', id] : ['repo'] })
   }

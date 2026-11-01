@@ -1,18 +1,60 @@
-import { GitBranch, Link2 } from 'lucide-react'
+import { Clock, Database, GitBranch, Layers, Link2, type LucideIcon, Square, SquareStop } from 'lucide-react'
 import type { ReactNode } from 'react'
-import type { DomainWarning, RunupPlan } from '@/api/types.gen'
+import type { DomainOption, DomainWarning, RunupPlan } from '@/api/types.gen'
+import { ItemList } from '@/features/worktrees/components/item-list'
+import { type Left, LeftItem } from '@/features/worktrees/components/left-item'
 import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
-import { firstOf, howItRuns, numberedOf, sharedOf } from '@/features/worktrees/run-up/utils/plan'
+import {
+  firstOf,
+  type HowItRuns,
+  howItRuns,
+  orderedOf,
+  type Shared,
+  sharedOf,
+} from '@/features/worktrees/run-up/utils/plan'
 import { planned, sharedLine } from '@/features/worktrees/run-up/utils/words'
 import { planWide } from '@/features/worktrees/utils/outcome'
 import { cn } from '@/lib/utils'
 
-export function ConfirmStep({ plan, warnings }: { plan: RunupPlan; warnings: DomainWarning[] }) {
+const howIcon: Record<HowItRuns['kind'], LucideIcon> = {
+  stops: SquareStop,
+  together: Layers,
+  namespace: Database,
+  others: Square,
+  keeps: Clock,
+}
+
+// options are the worktrees that start, holds the shared services up in the main checkout, others the worktrees
+// outside the start whose jobs run now; a plan is none when every worktree chosen runs the profile already
+export function ConfirmStep({
+  plan,
+  warnings,
+  options,
+  holds,
+  others,
+  left,
+}: {
+  plan: RunupPlan | undefined
+  warnings: DomainWarning[]
+  options: DomainOption[]
+  holds: string[]
+  others: string[]
+  left: Left[]
+}) {
+  const leftRows = left.map(({ worktree, why }) => <LeftItem key={worktree} worktree={worktree} why={why} />)
+  if (!plan) return <ItemList left={leftRows}>{[]}</ItemList>
+
   const targets = plan.worktrees ?? []
   const shared = sharedOf(plan)
   const first = firstOf(plan)
   const several = targets.length > 1
-  const sentences = howItRuns(plan)
+  const idle = options.every(({ up, crashed }) => (up?.length ?? 0) === 0 && !crashed)
+
+  const sharedLines = shared.map((service: Shared) => (
+    <Line key={service.name} icon={<Link2 className="size-4 text-muted-foreground" />} name={service.name}>
+      {sharedLine(service, holds.includes(service.name))}
+    </Line>
+  ))
 
   return (
     <>
@@ -20,25 +62,20 @@ export function ConfirmStep({ plan, warnings }: { plan: RunupPlan; warnings: Dom
       <p className="flex items-center gap-2 text-sm">
         <GitBranch className="size-4 text-muted-foreground" aria-hidden="true" />
         <span className="font-medium">{several ? `${targets.length} worktrees` : targets[0]?.worktree}</span>
-        <span className="text-muted-foreground">profile {plan.profile}</span>
+        <span className="text-muted-foreground">
+          {[plan.profile && `profile ${plan.profile}`, idle && 'nothing running there yet'].filter(Boolean).join(' · ')}
+        </span>
       </p>
 
-      {shared.length > 0 && (
-        <Block title={several ? 'Shared services, joined once' : 'Shared services'}>
-          {shared.map((service) => (
-            <Line key={service.name} icon={<Link2 className="size-4 text-muted-foreground" />} name={service.name}>
-              {sharedLine(service)}
-            </Line>
-          ))}
-        </Block>
-      )}
+      {several && shared.length > 0 && <Block title="Shared services, joined once">{sharedLines}</Block>}
 
-      {numberedOf(plan).map(({ worktree, jobs }) => (
+      {orderedOf(plan).map(({ worktree, jobs }) => (
         <Block key={worktree} title={several ? worktree : 'In this order'}>
+          {!several && sharedLines}
           {jobs.map((job) => {
             const { said, mono } = planned(job, first)
             return (
-              <Line key={job.name} icon={<Ordinal value={job.number} />} name={job.name} mono={mono}>
+              <Line key={job.name} icon={job.number && <Ordinal value={job.number} />} name={job.name} mono={mono}>
                 {said}
               </Line>
             )
@@ -46,12 +83,18 @@ export function ConfirmStep({ plan, warnings }: { plan: RunupPlan; warnings: Dom
         </Block>
       ))}
 
+      <ItemList left={leftRows}>{[]}</ItemList>
+
       <Block title="How it runs">
-        {sentences.map((sentence) => (
-          <li key={sentence} className="ml-5 list-disc text-sm marker:text-muted-foreground">
-            {sentence}
-          </li>
-        ))}
+        {howItRuns(plan, others).map(({ kind, text }) => {
+          const Icon = howIcon[kind]
+          return (
+            <li key={text} className="flex items-start gap-2 text-sm">
+              <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              {text}
+            </li>
+          )
+        })}
       </Block>
     </>
   )

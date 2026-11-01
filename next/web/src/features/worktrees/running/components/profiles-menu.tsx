@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Play } from 'lucide-react'
+import { Layers, Play } from 'lucide-react'
 import { questionsQuery } from '@/api/queries/commands'
 import {
   DropdownMenuItem,
@@ -39,23 +39,31 @@ export function ProfilesMenu({ repo, worktree }: { repo: string; worktree: strin
             <DropdownMenuItem
               key={profile.value}
               disabled={running}
-              className="flex-col items-start gap-0.5"
+              className="items-start [&>svg]:mt-0.5"
               onSelect={() => openRunUp(repo, { worktrees: [worktree], profile: profile.value })}
             >
-              <span className="flex w-full items-center gap-2">
-                <span className="flex-1 font-medium">{profile.value}</span>
-                {running && <span className="text-xs text-muted-foreground">running</span>}
-                {!running && profile.default && <span className="text-xs text-muted-foreground">default</span>}
+              <Play />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="font-medium">{profile.value}</span>
+                <span className="text-xs text-muted-foreground">{jobsSummary(profile.jobs)}</span>
               </span>
-              <span className="text-xs text-muted-foreground">{jobsSummary(profile.jobs)}</span>
+              {running && <span className="text-xs text-muted-foreground">running</span>}
+              {!running && profile.default && <span className="text-xs text-muted-foreground">default</span>}
             </DropdownMenuItem>
           )
         })}
         {profiles.length > shown && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => openRunUp(repo, { worktrees: [worktree], step: 'profile' })}>
-              All {profiles.length} profiles…
+            <DropdownMenuItem
+              className="items-start [&>svg]:mt-0.5"
+              onSelect={() => openRunUp(repo, { worktrees: [worktree], step: 'profile' })}
+            >
+              <Layers />
+              <span className="flex flex-col gap-0.5">
+                All {profiles.length} profiles…
+                <span className="text-xs text-muted-foreground">opens Start a profile</span>
+              </span>
             </DropdownMenuItem>
           </>
         )}

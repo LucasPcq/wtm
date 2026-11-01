@@ -35,7 +35,11 @@ export function runUpQuestionsOf(answers: DomainAnswered[] = []) {
         kind: 'multi_select',
         path: 'worktree',
         picked,
-        options: worktrees.map((w) => ({ value: w.branch, ...running[w.branch] })),
+        options: worktrees.map((w) => ({
+          value: w.branch,
+          ...running[w.branch],
+          ...(w.main && { holds: ['postgres'] }),
+        })),
       },
       {
         kind: 'select',
@@ -171,9 +175,10 @@ export const runUpRun =
 export const answeringRunUp = (
   dryRun: (call: WebCall) => Response | Promise<Response> = runUpPlan,
   run: (call: WebCall) => Response = runUpRun(),
+  questions: typeof runUpQuestionsOf = runUpQuestionsOf,
 ) => [
   http.post('/api/repos/r1/commands/run-up/questions', async ({ request }) =>
-    HttpResponse.json(runUpQuestionsOf(((await request.json()) as WebCall).answers)),
+    HttpResponse.json(questions(((await request.json()) as WebCall).answers)),
   ),
   http.post('/api/repos/r1/commands/run-up', async ({ request }) => {
     const call = (await request.json()) as WebCall
@@ -196,6 +201,7 @@ export const runningWorktrees: ListDetail[] = worktrees.map((w) =>
   w.branch === 'feat/billing'
     ? {
         ...w,
+        profile: 'dev',
         jobs: [
           job('api', { state: 'crashed', exit_code: 1, url: 'http://api.feat-billing.acme.localhost' }),
           job('migrate', { kind: 'task', state: 'exited' }),
@@ -231,3 +237,39 @@ export function heldRun() {
   }
   return { run, finish: () => finish() }
 }
+
+// a run.toml of jobs and no profile: the core asks none and starts every job
+export function noProfileQuestionsOf(answers: DomainAnswered[] = []) {
+  const { fields, problems } = runUpQuestionsOf(answers)
+  return {
+    fields: fields.map((field) =>
+      field.path === 'profile' ? ({ ...field, value: '', options: [], skip: 'one_profile' } as DomainField) : field,
+    ),
+    problems,
+  }
+}
+
+// a plan refused with code until the request gives consent (force, exclusive), then planned as any other
+export const refusedUntil =
+  ({ code, consent, followUp }: { code: string; consent: 'force' | 'exclusive'; followUp: boolean }) =>
+  (call: WebCall) => {
+    if (asked(call.answers, consent)[0] === 'true') return runUpPlan(call)
+    return HttpResponse.json(
+      {
+        ...envelope('run-up', []),
+        ok: false,
+        error: {
+          kind: 'refused',
+          code,
+          message:
+            code === 'run-up.unsafe'
+              ? "migrate changes data feat/search doesn't own: the shared db has no namespace"
+              : 'port 3040 is held by web of feat/billing',
+          ...(followUp && {
+            follow_up: { command: 'run-up', answers: [{ path: consent, values: ['true'] }], code, message: 'lift it' },
+          }),
+        },
+      },
+      { status: 403 },
+    )
+  }

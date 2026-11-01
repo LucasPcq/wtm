@@ -1,5 +1,6 @@
 import type { Applied } from '@/api/queries/commands'
 import type { DomainOption, RunupJobPlan, RunupJobStatus } from '@/api/types.gen'
+import { named, type Shared } from '@/features/worktrees/run-up/utils/plan'
 import type { PhaseRun } from '@/features/worktrees/utils/progress'
 
 export const resultWords: Record<RunupJobStatus, string> = {
@@ -16,10 +17,12 @@ export const resultWords: Record<RunupJobStatus, string> = {
 export const jobsSummary = (jobs: string[] = []) =>
   jobs.length > 3 ? `${jobs.slice(0, 3).join(', ')} +${jobs.length - 3}` : jobs.join(', ')
 
-// what a worktree runs now, as the picker's second line
-export function runsNow({ up = [], profile }: Pick<DomainOption, 'up' | 'profile'>) {
-  if (up.length === 0) return 'nothing running'
-  return [profile && `running ${profile}`, `${up.length} up`].filter(Boolean).join(' · ')
+// what a worktree runs now, as the picker's second line: its own jobs, or the shared services it runs for all
+export function runsNow({ up = [], crashed = 0, holds = [], profile }: DomainOption) {
+  if (up.length === 0 && crashed === 0) return holds.length > 0 ? `holds ${named(holds)}` : 'nothing running'
+  return [profile && `running ${profile}`, up.length > 0 && `${up.length} up`, crashed > 0 && `${crashed} crashed`]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 export function profileLine({ jobs, default: isDefault, running_in }: DomainOption) {
@@ -37,10 +40,23 @@ export function planned(job: RunupJobPlan, first: string[]): { said: string; mon
   return { said: ports.map((port) => `:${port}`).join(' '), mono: true }
 }
 
-export function sharedLine({ holders, namespaces }: { holders: number; namespaces: string[] }) {
-  if (holders > 1)
-    return `runs once in main: the ${holders} join it${namespaces.length > 0 ? ', a namespace each' : ''}`
-  return `runs once in main: joins it${namespaces[0] ? `, with ${namespaces[0]} of its own` : ''}`
+// a shared service as Confirm says it: up already in main or started there, then joined, with each its namespace
+export function sharedLine({ holders, namespaces }: Shared, up: boolean) {
+  const own = () => {
+    if (namespaces.length === 0) return ''
+    return holders > 1 ? ', a namespace each' : `, with ${namespaces[0]} of its own`
+  }
+  const who = () => {
+    if (holders === 2) return 'both join it'
+    return holders > 2 ? `the ${holders} join it` : 'joins it'
+  }
+  return `${holders > 1 ? '' : 'shared, '}${up ? 'already up' : 'starts in main'}: ${who()}${own()}`
+}
+
+// a shared service's row while the start runs, once for all the worktrees joining it
+export const sharedSuffix = ({ holders, namespaces }: Shared) => {
+  if (namespaces.length === 0) return ''
+  return holders > 1 ? ' · a namespace for each' : ` · ${namespaces[0]}`
 }
 
 // a job under way, as its row says it; a step done says what it became once the outcome tells

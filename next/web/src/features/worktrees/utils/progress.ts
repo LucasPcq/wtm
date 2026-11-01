@@ -33,6 +33,8 @@ export type Progress<C extends MutationCommand> = {
   cancelling?: 'asked' | 'forced'
   envelope?: Applied<C>
   refused?: string
+  // when it ended, by the page's clock: what reads landed after it
+  endedAt?: number
 }
 
 const kept = 200

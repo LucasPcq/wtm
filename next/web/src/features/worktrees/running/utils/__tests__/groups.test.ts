@@ -11,8 +11,8 @@ test('only the worktrees that hold jobs are groups, a crash first and the counts
 
   const [billing] = groups
   expect(groups.map((group) => group.worktree)).toEqual(['feat/billing'])
-  expect(billing?.rows.map((row) => row.name)).toEqual(['api', 'web', 'migrate'])
-  expect(billing && groupLine(billing)).toBe('profile dev · 1 up · 1 crashed · 1 exited')
+  expect(billing?.rows.map((row) => row.name)).toEqual(['api', 'web'])
+  expect(billing && groupLine(billing)).toBe('profile dev · 1 up · 1 crashed')
 })
 
 test('a worktree a start brings up is a group before the read lists its jobs, each job saying where it stands', () => {
@@ -68,7 +68,15 @@ test('what a start brought up stays greyed until a read lists it', () => {
 
   expect(groupsOf({ read: fresh, progress, plan })[0]?.rows).toEqual([
     { name: 'web', job: job('web') },
-    { name: 'migrate', said: 'done' },
     { name: 'api', said: 'up' },
   ])
+})
+
+// After a start and a run down of both worktrees, the page kept their groups and said jobs ran there.
+test('a worktree whose jobs are all stopped or exited is no group', () => {
+  const down = read('list', [
+    listDetail('feat/search', { jobs: [job('web', { state: 'stopped' }), job('migrate', { state: 'exited' })] }),
+  ])
+
+  expect(groupsOf({ read: down, progress: undefined, plan: undefined })).toEqual([])
 })

@@ -1,1 +1,0 @@
-import{n as e}from"./fetch-B5KFIMK5.js";import{t}from"./queryOptions-Cwo2_v4f.js";var n=t({queryKey:[`repos`],queryFn:()=>e(`/api/repos`)});export{n as t};
