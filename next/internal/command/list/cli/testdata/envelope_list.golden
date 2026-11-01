@@ -36,6 +36,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -198,9 +200,24 @@
         "finished": null,
         "condition": "changed",
         "services": [
+          "db",
           "web"
         ],
         "urls": [],
+        "jobs": [
+          {
+            "name": "db",
+            "kind": "service",
+            "hold": "claim"
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "running",
+            "hold": "own"
+          }
+        ],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -411,6 +428,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -597,6 +616,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -713,6 +734,8 @@
         "condition": "missing",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",

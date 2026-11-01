@@ -26,7 +26,7 @@ export const menu: Record<MenuAction, { section: Section; label: string; icon: L
   sync: { section: 'Branch', label: 'Sync', icon: RefreshCw, runs: 'copy' },
   reparent: { section: 'Branch', label: 'Reparent', icon: GitBranch, runs: 'web' },
   exec: { section: 'Run', label: 'Run a command', icon: SquareTerminal, runs: 'web' },
-  run_up: { section: 'Run', label: 'Start the profile', icon: Play, runs: 'copy' },
+  run_up: { section: 'Run', label: 'Start a profile', icon: Play, runs: 'web' },
   run_down: { section: 'Run', label: 'Stop the profile', icon: Square, runs: 'copy' },
   logs: { section: 'Run', label: 'View the logs', icon: ScrollText, runs: 'copy' },
   go: { section: 'Open', label: 'Go to the worktree', icon: FolderOpen, runs: 'copy' },

@@ -2,12 +2,15 @@ import type { Applied, MutationCommand } from '@/api/queries/commands'
 import type { OperationLine } from '@/api/queries/operations'
 import type { DomainItem, DomainPhase } from '@/api/types.gen'
 
+// a start runs the phase job once per job: job tells them apart, and lines are that job's own
 export type PhaseRun = {
   phase: DomainPhase
+  job?: string
   state: 'todo' | 'now' | 'done' | 'failed'
   startedAt?: string
   endedAt?: string
   log?: string
+  lines?: string[]
 }
 
 export type Unit = { subject: string; phases: PhaseRun[]; lines: string[]; status?: DomainItem['status'] }
@@ -18,12 +21,20 @@ export const todo = (subject: string, phases: DomainPhase[]): Unit => ({
   lines: [],
 })
 
+export const jobsTodo = (subject: string, jobs: string[]): Unit => ({
+  subject,
+  phases: jobs.map((job) => ({ phase: 'job', job, state: 'todo' })),
+  lines: [],
+})
+
 export type Progress<C extends MutationCommand> = {
   operation?: string
   units: Unit[]
   cancelling?: 'asked' | 'forced'
   envelope?: Applied<C>
   refused?: string
+  // when it ended, by the page's clock: what reads landed after it
+  endedAt?: number
 }
 
 const kept = 200
@@ -45,7 +56,9 @@ function step(unit: Unit, line: OperationLine): Unit {
       return {
         ...unit,
         phases: upsert(unit.phases, {
+          ...unit.phases.find((run) => same(run, line)),
           phase: line.phase,
+          ...(line.job && { job: line.job }),
           state: 'now',
           startedAt: line.ts,
           ...(line.log && { log: line.log }),
@@ -55,14 +68,23 @@ function step(unit: Unit, line: OperationLine): Unit {
       return {
         ...unit,
         phases: upsert(unit.phases, {
-          ...unit.phases.find((run) => run.phase === line.phase),
+          ...unit.phases.find((run) => same(run, line)),
           phase: line.phase,
+          ...(line.job && { job: line.job }),
           state: line.failed ? 'failed' : 'done',
           endedAt: line.ts,
         }),
       }
     case 'phase.output':
-      return { ...unit, lines: [...unit.lines, line.line].slice(-kept) }
+      return {
+        ...unit,
+        lines: [...unit.lines, line.line].slice(-kept),
+        phases: line.job
+          ? unit.phases.map((run) =>
+              run.job === line.job ? { ...run, lines: [...(run.lines ?? []), line.line].slice(-kept) } : run,
+            )
+          : unit.phases,
+      }
     case 'unit.finished':
       return { ...unit, status: line.status }
     default:
@@ -70,8 +92,13 @@ function step(unit: Unit, line: OperationLine): Unit {
   }
 }
 
+const same = (
+  run: { phase: DomainPhase; job?: string | undefined },
+  other: { phase: DomainPhase; job?: string | undefined },
+) => run.phase === other.phase && run.job === other.job
+
 const upsert = (phases: PhaseRun[], run: PhaseRun) =>
-  phases.some((p) => p.phase === run.phase) ? phases.map((p) => (p.phase === run.phase ? run : p)) : [...phases, run]
+  phases.some((p) => same(p, run)) ? phases.map((p) => (same(p, run) ? run : p)) : [...phases, run]
 
 export function current({ units }: { units: Unit[] }) {
   const all = units.flatMap((unit) => unit.phases.map((run) => ({ subject: unit.subject, run })))

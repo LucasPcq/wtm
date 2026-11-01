@@ -165,3 +165,25 @@ test('an operation finished leaves its worktrees under way until the read after 
   const released = seen.findIndex((at, i) => at.held === 0 && seen.slice(0, i).some((before) => before.held > 0))
   expect(seen[released]?.reads).toBe(2)
 })
+
+// The Running page filled only once the whole start finished: a job's own events read nothing again.
+test("a job's event reads its repository again, as the job comes up, crashes or stops", async () => {
+  const client = new QueryClient()
+  client.setQueryData(['repos'], [repo])
+  client.setQueryData(['repo', 'r1', 'list', []], { ok: true })
+  client.setQueryData(['repo', 'r1', 'status', []], { ok: true })
+  client.setQueryData(['repo', 'r1', 'run-up', 'dry_run', []], { ok: true })
+  serve(
+    200,
+    'data: {"v":2,"type":"job.started","repo":{"root":"/acme","common_dir":"/acme/.git"},"worktree":{"branch":"feat/a","path":"/acme.trees/feat-a"},"job":{"name":"web","kind":"service","hold":"own"}}\n\n',
+  )
+
+  await client.fetchQuery(eventsQuery)
+
+  expect(client.getQueryState(['repo', 'r1', 'list', []])?.isInvalidated).toBe(true)
+  expect(client.getQueryState(['repo', 'r1', 'status', []])?.isInvalidated).toBe(true)
+  expect(
+    client.getQueryState(['repo', 'r1', 'run-up', 'dry_run', []])?.isInvalidated,
+    'a dialog open on a plan is not asked again at each job',
+  ).toBe(false)
+})

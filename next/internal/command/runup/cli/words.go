@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
@@ -40,14 +41,23 @@ func words(q runup.Questions, field domain.Field) form.Words {
 func worktreeWords(q runup.Questions) map[string]form.OptionWords {
 	labels := map[string]form.OptionWords{}
 	for _, option := range q.Worktrees.Options {
-		if len(option.Up) == 0 {
-			continue
+		var said []string
+		if len(option.Up) > 0 {
+			running := strings.Join(option.Up, ", ")
+			if option.Profile != "" {
+				running = option.Profile + ": " + running
+			}
+			said = append(said, "runs "+running)
 		}
-		running := strings.Join(option.Up, ", ")
-		if option.Profile != "" {
-			running = option.Profile + ": " + running
+		if option.Crashed > 0 {
+			said = append(said, strconv.Itoa(option.Crashed)+" crashed")
 		}
-		labels[option.Value] = form.OptionWords{Label: option.Value + " — runs " + running}
+		if len(option.Holds) > 0 {
+			said = append(said, "holds "+strings.Join(option.Holds, ", "))
+		}
+		if len(said) > 0 {
+			labels[option.Value] = form.OptionWords{Label: option.Value + " — " + strings.Join(said, " · ")}
+		}
 	}
 	return labels
 }

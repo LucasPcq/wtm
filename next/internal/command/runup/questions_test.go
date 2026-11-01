@@ -1,10 +1,12 @@
 package runup_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -124,5 +126,32 @@ func TestAWorktreeShowsTheProfileOfItsOwnJobsAlone(t *testing.T) {
 	questions := w.questions(t, starting("", featA))
 
 	assert.Empty(t, questions.Worktrees.Options[0].Profile)
-	assert.Equal(t, []string{"db"}, questions.Worktrees.Options[0].Up)
+	assert.Empty(t, questions.Worktrees.Options[0].Up, "a shared service main runs for every worktree is not one of its own jobs")
+	assert.Equal(t, []string{"db"}, questions.Worktrees.Options[0].Holds)
+}
+
+func TestAWorktreeCountsItsOwnJobsUpAndCrashedNotItsClaims(t *testing.T) {
+	w := newWorld(t)
+	w.up("api", featB, nil)
+	w.up("web", featB, nil)
+	w.daemon.listed[1].Up, w.daemon.listed[1].State = false, run.Crashed
+	w.daemon.listed = append(w.daemon.listed, run.Job{Name: "db", WorkDir: w.at(featB), Up: true, Hold: run.HoldClaim, SharedDir: w.main})
+
+	questions := w.questions(t, starting("", featA))
+
+	b := questions.Worktrees.Options[slices.IndexFunc(questions.Worktrees.Options, func(o domain.Option) bool { return o.Value == featB })]
+	assert.Equal(t, []string{"api"}, b.Up)
+	assert.Equal(t, 1, b.Crashed)
+	assert.Empty(t, b.Holds)
+}
+
+func TestAProfileSaysWhichOfTheWorktreesPickedRunIt(t *testing.T) {
+	w := newWorld(t)
+	w.up("api", featB, nil)
+	w.daemon.listed[0].Profile = "dev"
+
+	questions := w.questions(t, starting("", featA, featB))
+
+	assert.Equal(t, []string{featB}, questions.Profiles[0].RunningIn)
+	assert.Empty(t, questions.Profiles[1].RunningIn)
 }

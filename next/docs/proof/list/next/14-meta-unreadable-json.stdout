@@ -36,6 +36,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -191,6 +193,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -367,6 +371,8 @@
         "condition": "missing",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -462,6 +468,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -594,6 +602,25 @@
         "condition": "changed",
         "services": [],
         "urls": [],
+        "jobs": [
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "stopped",
+            "hold": "own",
+            "url": "http://api.feat-a.acme.localhost:<PROXY_PORT>",
+            "started_at": "<T>"
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "stopped",
+            "hold": "own",
+            "url": "http://web.feat-a.acme.localhost:<PROXY_PORT>",
+            "started_at": "<T>"
+          }
+        ],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -770,6 +797,8 @@
         "condition": "missing",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -865,6 +894,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",

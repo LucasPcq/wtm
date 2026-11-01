@@ -36,6 +36,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -201,6 +203,25 @@
           "http://api.feat-a.acme.localhost:<PROXY_PORT>",
           "http://web.feat-a.acme.localhost:<PROXY_PORT>"
         ],
+        "jobs": [
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "running",
+            "hold": "own",
+            "url": "http://api.feat-a.acme.localhost:<PROXY_PORT>",
+            "started_at": "<T>"
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "running",
+            "hold": "own",
+            "url": "http://web.feat-a.acme.localhost:<PROXY_PORT>",
+            "started_at": "<T>"
+          }
+        ],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -392,6 +413,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -568,6 +591,8 @@
         "condition": "missing",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -663,6 +688,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -779,6 +806,8 @@
         "condition": "missing",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -874,6 +903,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",

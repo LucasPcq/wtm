@@ -69,7 +69,10 @@ export function useRun<C extends MutationCommand>(repo: string, command: C) {
   const start = async (params: Start, ended?: Ended<C>) => {
     useRuns.setState({ [key]: { progress: { units: params.units }, running: true } })
     const envelope = await answer(params)
-    useRuns.setState((runs) => ({ [key]: runs[key] && { ...runs[key], running: false } }))
+    useRuns.setState((runs) => {
+      const ended = runs[key]
+      return { [key]: ended && { running: false, progress: { ...ended.progress, endedAt: Date.now() } } }
+    })
     ended?.(envelope, useRuns.getState()[key]?.progress.refused)
     await client.invalidateQueries({ queryKey: repoKey(repo) })
   }
@@ -113,6 +116,7 @@ const doing: Record<MutationCommand, string> = {
   prune: 'Pruning',
   exec: 'Running a command',
   reparent: 'Reparenting',
+  'run-up': 'Starting',
 }
 
 export const isMutation = (command: string): command is MutationCommand => Object.hasOwn(doing, command)

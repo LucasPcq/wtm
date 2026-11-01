@@ -6,10 +6,11 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/co
 import { Progress as Bar } from '@/components/ui/progress'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
+import { PhaseRow } from '@/features/worktrees/components/phase-row'
 import { RunFailure } from '@/features/worktrees/components/run-failure'
 import { RunOutcome } from '@/features/worktrees/components/run-outcome'
 import { RunningFooter } from '@/features/worktrees/components/running-footer'
-import { TargetRow } from '@/features/worktrees/exec/components/target-row'
+import { targetLabel } from '@/features/worktrees/exec/utils/output'
 import { recapOf } from '@/features/worktrees/exec/utils/recap'
 import { passedWords, retryCode } from '@/features/worktrees/exec/utils/words'
 import type { Ran } from '@/features/worktrees/hooks/use-exec-dialog'
@@ -79,7 +80,13 @@ export function ExecProgress({
         {running ? (
           <ul aria-label="Worktrees" className="flex flex-col gap-1">
             {units.map((unit) => (
-              <TargetRow key={unit.subject} unit={unit} now={now} cancelling={progress.cancelling !== undefined} />
+              <PhaseRow
+                key={unit.subject}
+                name={unit.subject}
+                run={unit.phases[0] ?? { phase: 'exec', state: 'todo' }}
+                label={targetLabel(unit, now, progress.cancelling !== undefined)}
+                lines={unit.lines}
+              />
             ))}
           </ul>
         ) : (
