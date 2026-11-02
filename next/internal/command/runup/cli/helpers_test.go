@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -22,7 +23,12 @@ func runUp(t *testing.T, w world, words ...string) formtest.Printed {
 // runUpAt runs run up at a terminal on which the user types keys.
 func runUpAt(t *testing.T, w world, keys string, words ...string) formtest.Printed {
 	t.Helper()
-	return formtest.Run(t.Context(), func(streams *output.Streams) *cobra.Command {
+	return runUpIn(t.Context(), w, keys, words...)
+}
+
+// runUpIn runs run up at a terminal, as runUpAt, under ctx.
+func runUpIn(ctx context.Context, w world, keys string, words ...string) formtest.Printed {
+	return formtest.Run(ctx, func(streams *output.Streams) *cobra.Command {
 		streams.In = strings.NewReader(keys)
 		streams.SetStdinTerminal(true)
 		streams.Err.SetTerminal(true)

@@ -12,7 +12,7 @@ import (
 
 // key answers a key: the job's while it has the keyboard, the filter's while
 // it is typed, else the view's.
-func (m *Model) key(msg tea.KeyMsg) tea.Cmd {
+func (m *model) key(msg tea.KeyMsg) tea.Cmd {
 	if m.focused {
 		return m.focusKey(msg)
 	}
@@ -66,7 +66,7 @@ func (m *Model) key(msg tea.KeyMsg) tea.Cmd {
 
 // focus hands the keyboard to the job selected, when it is attached and reads
 // a terminal of its own.
-func (m *Model) focus() tea.Cmd {
+func (m *model) focus() tea.Cmd {
 	e, found := m.selectedEntry()
 	if !found {
 		return nil
@@ -86,7 +86,7 @@ func (m *Model) focus() tea.Cmd {
 
 // focusKey types the key into the job, Ctrl+C included; esc twice within the
 // window gives the keyboard back, a lone esc being the job's.
-func (m *Model) focusKey(msg tea.KeyMsg) tea.Cmd {
+func (m *model) focusKey(msg tea.KeyMsg) tea.Cmd {
 	now := m.now()
 	if msg.Type == tea.KeyEsc && !msg.Alt {
 		if !m.lastEsc.IsZero() && now.Sub(m.lastEsc) <= focusExitWindow {
@@ -105,13 +105,15 @@ func (m *Model) focusKey(msg tea.KeyMsg) tea.Cmd {
 		return nil
 	}
 	if _, err := m.conn.Write(encoded); err != nil {
-		m.failed = err
+		m.focused = false
+		m.say(fmt.Sprintf(typeFailedFmt, m.label(m.bound.key), err))
+		return m.resize()
 	}
 	return nil
 }
 
 // filterKey types into the filter; the cursor moves off a job the filter hides.
-func (m *Model) filterKey(msg tea.KeyMsg) tea.Cmd {
+func (m *model) filterKey(msg tea.KeyMsg) tea.Cmd {
 	switch msg.String() {
 	case "ctrl+c":
 		return tea.Quit
@@ -136,7 +138,7 @@ func (m *Model) filterKey(msg tea.KeyMsg) tea.Cmd {
 }
 
 // dismiss takes the band off the frame, its rows given back to the pane.
-func (m *Model) dismiss() tea.Cmd {
+func (m *model) dismiss() tea.Cmd {
 	if len(m.band()) == 0 {
 		return nil
 	}
@@ -144,7 +146,7 @@ func (m *Model) dismiss() tea.Cmd {
 	return m.resize()
 }
 
-func (m *Model) move(delta int) tea.Cmd {
+func (m *model) move(delta int) tea.Cmd {
 	list := m.visible()
 	if len(list) == 0 {
 		return nil
@@ -158,7 +160,7 @@ func (m *Model) move(delta int) tea.Cmd {
 	return m.selectKey(list[min(max(at+delta, 0), len(list)-1)].key)
 }
 
-func (m *Model) scroll(lines int) {
+func (m *model) scroll(lines int) {
 	if m.pane != nil {
 		m.pane.scroll(lines)
 	}
@@ -169,7 +171,7 @@ func (m *Model) scroll(lines int) {
 
 // mouse sends the wheel to what it is over, the list or the pane, and opens
 // the address a click lands on; the job with the keyboard keeps the mouse off.
-func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
+func (m *model) mouse(msg tea.MouseMsg) tea.Cmd {
 	if m.focused || m.filtering {
 		return nil
 	}
@@ -219,7 +221,7 @@ func urlAt(view string, x, y int) (string, bool) {
 }
 
 // selectedURL is the address of the job selected, empty when it has none.
-func (m *Model) selectedURL() string {
+func (m *model) selectedURL() string {
 	e, found := m.selectedEntry()
 	if !found {
 		return ""
@@ -229,7 +231,7 @@ func (m *Model) selectedURL() string {
 
 // open opens url in the browser; a job with none opens nothing, and a browser
 // that refuses is said.
-func (m *Model) open(url string) tea.Cmd {
+func (m *model) open(url string) tea.Cmd {
 	if url == "" || m.params.Open == nil {
 		return nil
 	}

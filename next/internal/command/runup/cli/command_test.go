@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"context"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -108,6 +110,19 @@ func TestCtrlCInTheLiveViewLeavesItWithTheStartsExit(t *testing.T) {
 	assert.True(t, viewOpened(got))
 }
 
+// B12: a Ctrl+C during the start, once a job is up, ends the run cancelled (19), no view opened on it.
+func TestACtrlCDuringTheStartExitsCancelledWithoutTheView(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	w := newWorld()
+	w.daemon.interrupt = cancel
+
+	got := runUpIn(ctx, w, "q", featA, "--yes")
+
+	assert.Equal(t, uicli.ExitCancelled, got.Code, got.Stderr)
+	assert.False(t, viewOpened(got))
+}
+
 func TestTheLiveViewOpensOnlyForAPersonAtATerminalOnJobsLeftUp(t *testing.T) {
 	for name, c := range map[string]struct {
 		words    []string
@@ -117,7 +132,7 @@ func TestTheLiveViewOpensOnlyForAPersonAtATerminalOnJobsLeftUp(t *testing.T) {
 		"nothing_up":  {words: []string{featB, "--yes"}, terminal: true},
 		"json":        {words: []string{featA, "--yes", "--output", "json"}, terminal: true},
 		"quiet":       {words: []string{featA, "--yes", "--quiet"}, terminal: true},
-		"dry_run":     {words: []string{featA, "--dry-run"}, terminal: false},
+		"dry_run":     {words: []string{featA, "--dry-run", "--yes"}, terminal: true},
 		"no_terminal": {words: []string{featA, "--yes"}, terminal: false},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -129,4 +144,18 @@ func TestTheLiveViewOpensOnlyForAPersonAtATerminalOnJobsLeftUp(t *testing.T) {
 			assert.False(t, viewOpened(got))
 		})
 	}
+}
+
+// Legacy's cursor followed the start; the view opens on the first job the start launched, not on a shared service it may not focus.
+func TestTheViewOpensOnTheFirstJobTheStartLaunched(t *testing.T) {
+	app, err := newWorld().open(t.Context(), mainPath)
+	require.NoError(t, err)
+	outcome, err := app.Run(t.Context(), runup.Request{Worktrees: []string{featA}}, domain.RunOptions{})
+	require.NoError(t, err)
+	streams, _, _, _ := output.Test()
+
+	params := (&upCommand{io: uicli.Run{Streams: streams}}).viewOf(outcome)
+
+	assert.Equal(t, "api", params.Job)
+	assert.Equal(t, []string{"migrate", "api", "web"}, params.Worktrees[0].Jobs)
 }

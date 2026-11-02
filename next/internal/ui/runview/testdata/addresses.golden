@@ -3,7 +3,7 @@
   │ JOBS                   │ │ Where to reach it                                                                     │
   │                        │ │                                                                                       │
   │ shared                 │ │ shared                                                                                │
-  │ ›• db               1m │ │   db  PGPORT :26653                                                                   │
+  │ ›• db               1m │ │   db  PGPORT :26653 · acme_feat-b                                                     │
   │                        │ │                                                                                       │
   │ feat/b                 │ │ feat/b                                                                                │
   │  ✓ migrate             │ │   api  http://api.feat-b.acme.localhost:11080                                         │

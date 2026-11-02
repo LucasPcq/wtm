@@ -12,7 +12,7 @@ import (
 
 // View draws the frame, exactly as many rows as the terminal has: the band of
 // notices, the list beside the pane, the help row.
-func (m *Model) View() string {
+func (m *model) View() string {
 	if m.width <= 0 || m.height <= 0 {
 		return ""
 	}
@@ -36,7 +36,7 @@ func (m *Model) View() string {
 
 // drawBand draws the notices, the last row saying how to dismiss them, kept
 // when the frame is too short for them all.
-func (m *Model) drawBand(l layout) []string {
+func (m *model) drawBand(l layout) []string {
 	band := m.band()
 	if l.notice.height == 0 || len(band) == 0 {
 		return nil
@@ -59,7 +59,7 @@ func (m *Model) drawBand(l layout) []string {
 	return lines
 }
 
-func (m *Model) drawBody(l layout) []string {
+func (m *model) drawBody(l layout) []string {
 	if l.pane.height < minPanelRows || l.pane.width < minPanelCols {
 		return make([]string, l.pane.height)
 	}
@@ -73,7 +73,7 @@ func (m *Model) drawBody(l layout) []string {
 // ----------------------------------------------------------------------------
 // The list
 
-func (m *Model) drawList(l layout) string {
+func (m *model) drawList(l layout) string {
 	width := l.sidebar.width - borderWidth
 	lines := append([]string{m.st.Muted.Render(jobsTitle), ""}, m.drawRows(width-2, l.listRows)...)
 
@@ -82,7 +82,7 @@ func (m *Model) drawList(l layout) string {
 
 // drawRows draws the rows of the list from its offset, the heading of the
 // group it opens in pinned on top once its own scrolled away.
-func (m *Model) drawRows(width, height int) []string {
+func (m *model) drawRows(width, height int) []string {
 	all := rows(m.visible())
 	if len(all) == 0 {
 		return []string{m.st.Muted.Render(truncate(m.empty(), width))}
@@ -120,7 +120,7 @@ func pinnedHeading(all []row, offset int) (row, bool) {
 	return row{}, false
 }
 
-func (m *Model) heading(r row, width int) string {
+func (m *model) heading(r row, width int) string {
 	style := m.st.NewStyle().Bold(true)
 	if r.shared {
 		style = style.Foreground(output.ColorSuccess)
@@ -128,7 +128,7 @@ func (m *Model) heading(r row, width int) string {
 	return style.Render(truncate(r.heading, width))
 }
 
-func (m *Model) jobRow(e entry, width int) string {
+func (m *model) jobRow(e entry, width int) string {
 	cursor, name := " ", " "+e.name
 	if e.key == m.selected {
 		selected := m.st.NewStyle().Foreground(output.ColorPrimary).Bold(true)
@@ -137,7 +137,7 @@ func (m *Model) jobRow(e entry, width int) string {
 	return spread(cursor+m.mark(markOf(e))+name, m.st.Muted.Render(uptime(e.job, m.now())), width)
 }
 
-func (m *Model) mark(of mark) string {
+func (m *model) mark(of mark) string {
 	switch of {
 	case markStarting:
 		return m.st.Warning.Render(glyphStarting)
@@ -152,7 +152,7 @@ func (m *Model) mark(of mark) string {
 	return m.st.Muted.Render(glyphStopped)
 }
 
-func (m *Model) empty() string {
+func (m *model) empty() string {
 	if m.filter != "" {
 		return fmt.Sprintf(noMatchFmt, m.filter)
 	}
@@ -162,7 +162,7 @@ func (m *Model) empty() string {
 // ----------------------------------------------------------------------------
 // The pane
 
-func (m *Model) drawPane(l layout) string {
+func (m *model) drawPane(l layout) string {
 	e, found := m.selectedEntry()
 	title, body := "", []string{m.note(m.empty(), l.paneCols)}
 	switch {
@@ -182,7 +182,7 @@ func (m *Model) drawPane(l layout) string {
 	return m.box(m.focused).Width(l.pane.width - borderWidth).Height(l.pane.height - borderWidth).Render(strings.Join(lines, "\n"))
 }
 
-func (m *Model) box(focused bool) lipgloss.Style {
+func (m *model) box(focused bool) lipgloss.Style {
 	border := output.ColorMuted
 	if focused {
 		border = output.ColorPrimary
@@ -192,7 +192,7 @@ func (m *Model) box(focused bool) lipgloss.Style {
 
 // title names the job, by its worktree too unless it is a shared service, its
 // state and its address, and on the right what the pane shows of it.
-func (m *Model) title(e entry, width int) string {
+func (m *model) title(e entry, width int) string {
 	name := e.name
 	if !e.shared {
 		name += separator + e.branch
@@ -206,7 +206,7 @@ func (m *Model) title(e entry, width int) string {
 
 // origin says what the pane shows: the job as it prints, its log, or a point
 // the reader scrolled back to.
-func (m *Model) origin(e entry) string {
+func (m *model) origin(e entry) string {
 	switch {
 	case m.focused:
 		return labelFocus
@@ -220,7 +220,7 @@ func (m *Model) origin(e entry) string {
 	return labelHistory
 }
 
-func (m *Model) output(e entry, width int) []string {
+func (m *model) output(e entry, width int) []string {
 	if !e.listed {
 		return []string{m.note(paneNotStarted, width)}
 	}
@@ -241,13 +241,13 @@ func (m *Model) output(e entry, width int) []string {
 }
 
 // note is the view speaking in the pane, in place of a job's output.
-func (m *Model) note(text string, width int) string {
+func (m *model) note(text string, width int) string {
 	return strings.Repeat(" ", titleIndent) + m.st.Muted.Render(truncate(text, width-titleIndent))
 }
 
 // reach draws where each job up answers: the shared services, then each
 // worktree's jobs, a job with no address left out.
-func (m *Model) reach(width int) []string {
+func (m *model) reach(width int) []string {
 	var lines []string
 	group := ""
 	for _, e := range entries(m.params, m.jobs, "") {
@@ -265,7 +265,11 @@ func (m *Model) reach(width int) []string {
 			group = heading
 			lines = append(lines, m.heading(row{heading: heading, shared: e.shared}, width))
 		}
-		lines = append(lines, output.Indent+e.name+"  "+m.address(e))
+		line := output.Indent + e.name + "  " + m.address(e)
+		if namespaces := m.namespaces(e); e.shared && len(namespaces) > 0 {
+			line += separator + strings.Join(namespaces, ", ")
+		}
+		lines = append(lines, line)
 	}
 	if len(lines) == 0 {
 		return []string{m.note(reachNothing, width)}
@@ -277,8 +281,19 @@ func (m *Model) reach(width int) []string {
 	return lines
 }
 
+// namespaces are those the worktrees of the view hold in the shared service of e.
+func (m *model) namespaces(e entry) []string {
+	var held []string
+	for _, wt := range m.params.Worktrees {
+		if name := wt.Namespaces[e.name]; name != "" {
+			held = append(held, name)
+		}
+	}
+	return held
+}
+
 // address is a job's URL, else the ports it binds.
-func (m *Model) address(e entry) string {
+func (m *model) address(e entry) string {
 	if e.job.URL != "" {
 		return link(e.job.URL)
 	}
@@ -290,7 +305,7 @@ func (m *Model) address(e entry) string {
 }
 
 // reached is where a job answers, in its title: its URL, else its ports.
-func (m *Model) reached(e entry) string {
+func (m *model) reached(e entry) string {
 	if e.job.URL != "" {
 		return link(e.job.URL)
 	}
@@ -312,7 +327,7 @@ func link(url string) string {
 // drawHelp is the keys on the left, cut at a whole segment, and on the right
 // what the view has to say: how many jobs run, else what it answered a key
 // with, else the error it met.
-func (m *Model) drawHelp(width int) string {
+func (m *model) drawHelp(width int) string {
 	if m.focused {
 		e, _ := m.selectedEntry()
 		return m.st.Muted.Render(truncate(fmt.Sprintf(focusHintFmt, e.name, e.branch), width))
@@ -329,7 +344,7 @@ func (m *Model) drawHelp(width int) string {
 	return spread(m.st.Muted.Render(segments(help, max(width-ansi.StringWidth(status)-1, 0))), status, width)
 }
 
-func (m *Model) status(width int) string {
+func (m *model) status(width int) string {
 	switch {
 	case m.err != nil:
 		return m.st.Danger.Render(truncate(m.err.Error(), width))

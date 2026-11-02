@@ -17,9 +17,15 @@ const settleWithin = 100 * time.Millisecond
 // message, runs the command it returns, and feeds back what that produces; a
 // command still waiting after settleWithin (the poll, the frame clock, a
 // stream's end) is dropped, so the loop settles.
+//
+// A dropped command's goroutine still waits: the frame clock on the model's
+// wake, the stream's end on its msgs, until the test's context ends. It may
+// take a wake or a stream's end a later command waits for, so no test waits
+// for either through the driver: a test of a stream's end sends endedMsg
+// itself, and the frame clock is tested on a model no driver runs.
 type driver struct {
 	t      *testing.T
-	m      *Model
+	m      *model
 	daemon *daemon
 	quit   bool
 }
@@ -29,7 +35,7 @@ func open(t *testing.T, d *daemon, params Params, width, height int) *driver {
 	t.Helper()
 	params.Daemon = d
 	params.Out = io.Discard
-	m := New(t.Context(), params)
+	m := newModel(t.Context(), params)
 	m.now = func() time.Time { return now }
 	dr := &driver{t: t, m: m, daemon: d}
 	dr.send(tea.WindowSizeMsg{Width: width, Height: height})

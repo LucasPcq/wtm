@@ -277,27 +277,89 @@ func TestTheLayoutDropsTheListBeforeThePaneGrowsUnreadable(t *testing.T) {
 	assert.Equal(t, 2, layoutAt(120, 6, 3).notice.height, "the band takes no row the body needs")
 }
 
-func TestAJobThatRunsAgainIsAttachedAgainOnceItsStreamEnded(t *testing.T) {
+// The daemon lets go of a client that falls behind while its job runs on: the view attaches again.
+func TestAStreamThatEndedWhileItsJobRunsIsAttachedAgain(t *testing.T) {
 	d := &daemon{}
 	view := opened(t, d, 120, 30)
 	view.keys("down", "down")
 	view.send(endedMsg{conn: view.m.conn})
-	require.True(t, view.m.ended)
-	view.refresh()
-	require.Equal(t, 2, d.attaches(), "an ended stream is kept while the job is the same")
-
-	_, jobs := board()
-	jobs[3].StartedAt = now
-	d.set(jobs)
 	view.refresh()
 
 	assert.Equal(t, 3, d.attaches(), "db, api, then api again")
 	assert.False(t, view.m.ended)
 }
 
+func TestTheOutputOfAJobThatEndedIsKept(t *testing.T) {
+	d := &daemon{}
+	view := opened(t, d, 120, 30)
+	view.keys("down", "down")
+	_, _ = view.m.pane.Write([]byte("last words\r\n"))
+
+	_, jobs := board()
+	jobs[3].Up, jobs[3].State, jobs[3].StartedAt = false, run.Stopped, time.Time{}
+	d.set(jobs)
+	view.send(endedMsg{conn: view.m.conn})
+	view.refresh()
+
+	assert.Equal(t, 2, d.attaches())
+	assert.Contains(t, view.screen(), "last words")
+}
+
+// The emulator answers a job's queries (cursor position, device attributes) into a pipe: unread, its next write would block the view for good.
+func TestAJobAskingWhereTheCursorIsDoesNotFreezeTheView(t *testing.T) {
+	p := newPane(paneParams{at: size{cols: 20, rows: 4}})
+	t.Cleanup(p.close)
+	written := make(chan struct{})
+	go func() {
+		_, _ = p.Write([]byte("\x1b[6n\x1b[c\x1b]11;?\x07"))
+		_, _ = p.Write([]byte("still here"))
+		close(written)
+	}()
+
+	select {
+	case <-written:
+	case <-time.After(time.Second):
+		t.Fatal("the pane's write never returned")
+	}
+	assert.Contains(t, formtest.Plain(p.render()), "still here")
+}
+
+// A crash notice takes rows from the pane: the pane and the job's terminal shrink with it.
+func TestANoticeThatGrowsTheBandResizesThePaneAndTheJob(t *testing.T) {
+	d := &daemon{}
+	view := opened(t, d, 120, 30)
+	view.keys("down", "down")
+	_, _ = view.m.pane.Write([]byte("one\r\ntwo\r\nthree\r\n"))
+	before := view.m.pane.size.rows
+
+	_, jobs := board()
+	jobs[5].Up, jobs[5].State, jobs[5].ExitCode = false, run.Crashed, &exit3
+	d.set(jobs)
+	view.refresh()
+
+	require.Equal(t, before-2, view.m.pane.size.rows, "the band's notice and its dismiss line")
+	assert.Equal(t, run.Window{Name: "api", WorkDir: featBDir, Cols: 87, Rows: before - 2}, d.resized[len(d.resized)-1])
+	formtest.Golden(t, "band_over_output", view.screen())
+}
+
+// A write the job's terminal refuses gives the keyboard back and says why.
+func TestAKeyTheJobCannotTakeEndsTheFocus(t *testing.T) {
+	d := &daemon{}
+	term := piped(d)
+	view := opened(t, d, 120, 30)
+	view.keys("down", "down", "enter")
+	require.True(t, view.m.focused)
+	require.NoError(t, term.job.Close())
+
+	view.keys("x")
+
+	assert.False(t, view.m.focused)
+	assert.Contains(t, view.screen(), "! could not type into api · feat/b")
+}
+
 // The clock watches every pane, not the one it was started on: a pane selected later is drawn as it is written.
 func TestAWriteToAnyPaneGivesAFrame(t *testing.T) {
-	m := New(t.Context(), Params{})
+	m := newModel(t.Context(), Params{})
 	frame := m.frame()
 
 	_, _ = newPane(paneParams{wake: m.wake}).Write([]byte("ready\r\n"))

@@ -27,6 +27,8 @@ const (
 	bandDismiss    = "esc dismisses this report"
 	crashedFmt     = "%s · %s %s since the view opened"
 	openFailedFmt  = "could not open the browser: %v"
+	typeFailedFmt  = "could not type into %s: %v"
+	streamBrokeFmt = "%s: its output stopped: %v"
 
 	stateNotStarted = "not started"
 	stateJoinedFmt  = "joined, running in %s"

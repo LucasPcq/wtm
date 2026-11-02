@@ -30,7 +30,7 @@ var (
 // its seed task and api.
 func board() ([]Worktree, []run.Job) {
 	worktrees := []Worktree{
-		{Branch: "feat/b", Path: featBDir, Jobs: []string{"migrate", "db", "api", "web"}},
+		{Branch: "feat/b", Path: featBDir, Jobs: []string{"migrate", "db", "api", "web"}, Namespaces: map[string]string{"db": "acme_feat-b"}},
 		{Branch: "feat/a", Path: featADir, Jobs: []string{"seed", "api"}},
 	}
 	jobs := []run.Job{

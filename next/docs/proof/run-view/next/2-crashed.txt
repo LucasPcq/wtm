@@ -2,19 +2,19 @@
   ! flaky · feat/b crashed (exit 1) since the view opened
   esc dismisses this report
   ╭────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────╮
-  │ JOBS                   │ │ db · joined, running in main · :24393                                            live │
+  │ JOBS                   │ │ api · feat/b · running · http://api.feat-b.acme.localhost:24392                  live │
   │                        │ │                                                                                       │
-  │ shared                 │ │db listening on 24393                                                                  │
-  │ ›• db               0s │ │                                                                                       │
+  │ shared                 │ │  api v1.4.2  ready in 312 ms                                                          │
+  │  • db              00s │ │  ➜  Local:   http://localhost:24401/                                                  │
   │                        │ │                                                                                       │
-  │ feat/b                 │ │                                                                                       │
-  │  ✓ migrate             │ │                                                                                       │
-  │  • api              0s │ │                                                                                       │
-  │  • web              0s │ │                                                                                       │
-  │  ✗ flaky               │ │                                                                                       │
-  │                        │ │                                                                                       │
-  │                        │ │                                                                                       │
-  │                        │ │                                                                                       │
+  │ feat/b                 │ │00:00:00 GET /health 200 2ms                                                           │
+  │  ✓ migrate             │ │00:00:00 POST /session 201 18ms                                                        │
+  │ ›• api             00s │ │00:00:00 GET /users/me 200 6ms                                                         │
+  │  • web             00s │ │00:00:00 GET /health 200 1ms                                                           │
+  │  ✗ flaky               │ │00:00:00 GET /health 200 2ms                                                           │
+  │                        │ │00:00:00 POST /session 201 18ms                                                        │
+  │                        │ │00:00:00 GET /users/me 200 6ms                                                         │
+  │                        │ │00:00:00 GET /health 200 1ms                                                           │
   │                        │ │                                                                                       │
   │                        │ │                                                                                       │
   │                        │ │                                                                                       │

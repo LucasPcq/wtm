@@ -25,12 +25,14 @@ type Daemon interface {
 }
 
 // A Worktree is one the view shows the jobs of: its branch, which heads its
-// group (its path when it has none), its path, and the jobs it declares, in
-// order, listed even before the daemon knows them.
+// group (its path when it has none), its path, the jobs it declares, in
+// order, listed even before the daemon knows them, and the namespace it holds
+// in each shared service, by the service's name.
 type Worktree struct {
-	Branch string
-	Path   string
-	Jobs   []string
+	Branch     string
+	Path       string
+	Jobs       []string
+	Namespaces map[string]string
 }
 
 // Params is what the view shows and where: the daemon it asks, the worktrees
@@ -56,7 +58,7 @@ func Run(ctx context.Context, params Params) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	m := New(ctx, params)
+	m := newModel(ctx, params)
 	defer m.close()
 
 	// The terminal's own file, not the stream around it: Bubble Tea sizes the view, and follows its resizes, only on a file.

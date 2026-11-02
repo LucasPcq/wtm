@@ -33,10 +33,10 @@ type binding struct {
 	live    bool
 }
 
-// The Model is the view's Bubble Tea model: the jobs as the daemon last listed
+// A model is the view's Bubble Tea model: the jobs as the daemon last listed
 // them, the list's cursor and filter, the band of notices, and the pane of the
 // job selected.
-type Model struct {
+type model struct {
 	ctx    context.Context
 	params Params
 	st     *output.Styles
@@ -70,9 +70,9 @@ type Model struct {
 	ended   bool  // the live stream of the binding ended: its pane is kept
 }
 
-// New returns the view of params, its first listing not yet asked.
-func New(ctx context.Context, params Params) *Model {
-	return &Model{
+// newModel returns the view of params, its first listing not yet asked.
+func newModel(ctx context.Context, params Params) *model {
+	return &model{
 		ctx:     ctx,
 		params:  params,
 		st:      output.StylesOf(params.Out),
@@ -103,19 +103,22 @@ type (
 		lines []string
 		err   error
 	}
-	endedMsg struct{ conn net.Conn }
+	endedMsg struct {
+		conn net.Conn
+		err  error // why the stream broke; nil when it ended
+	}
 	saidMsg  struct{ text string }
 	frameMsg struct{}
 	pollMsg  struct{}
 )
 
 // Init asks the first listing, starts the poll and listens for the streams' ends.
-func (m *Model) Init() tea.Cmd {
+func (m *model) Init() tea.Cmd {
 	return tea.Batch(m.list(), poll(), m.listen(), m.frame())
 }
 
 // Update answers one message.
-func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -144,18 +147,21 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// close lets go of the job attached.
-func (m *Model) close() {
+// close lets go of the job attached and of its pane.
+func (m *model) close() {
 	if m.conn != nil {
 		_ = m.conn.Close()
 		m.conn = nil
+	}
+	if m.pane != nil {
+		m.pane.close()
 	}
 }
 
 // ----------------------------------------------------------------------------
 // The listing
 
-func (m *Model) list() tea.Cmd {
+func (m *model) list() tea.Cmd {
 	ctx, daemon := m.ctx, m.params.Daemon
 	return func() tea.Msg {
 		jobs, err := daemon.Jobs(ctx)
@@ -172,7 +178,7 @@ func poll() tea.Cmd {
 
 // listed takes a listing in: the jobs, the crashes since the last one as
 // notices, the cursor kept on its job while it is listed.
-func (m *Model) listed(msg jobsMsg) tea.Cmd {
+func (m *model) listed(msg jobsMsg) tea.Cmd {
 	if msg.err != nil && msg.jobs == nil {
 		m.err = msg.err
 		return nil
@@ -182,33 +188,49 @@ func (m *Model) listed(msg jobsMsg) tea.Cmd {
 	m.notice(entries(m.params, m.jobs, ""))
 	m.listedOnce = true
 
-	return m.selectKey(m.resolve())
+	// A notice takes its rows from the pane: the pane and the job's terminal follow.
+	return tea.Batch(m.resize(), m.selectKey(m.resolve()))
 }
 
 // notice adds to the band each job that was up at the last listing and has
 // crashed or failed since; a notice brings the band back once dismissed.
-func (m *Model) notice(list []entry) {
+func (m *model) notice(list []entry) {
 	up := map[key]bool{}
 	for _, e := range list {
 		if e.job.Up {
 			up[e.key] = true
 		}
 		if m.listedOnce && m.up[e.key] && markOf(e) == markFailed {
-			m.notices = append(m.notices, fmt.Sprintf(crashedFmt, e.name, e.branch, m.state(e)))
-			m.dismissed = false
+			m.say(fmt.Sprintf(crashedFmt, e.name, e.branch, m.state(e)))
 		}
 	}
 	m.up = up
 }
 
+// say adds text to the band's notices, the band shown again if it was dismissed.
+func (m *model) say(text string) {
+	m.notices = append(m.notices, text)
+	m.dismissed = false
+}
+
+// label names the job of k by its worktree's branch.
+func (m *model) label(k key) string {
+	for _, wt := range m.params.Worktrees {
+		if wt.Path == k.dir {
+			return k.name + separator + branchOf(wt)
+		}
+	}
+	return k.name
+}
+
 // visible is the list as filtered.
-func (m *Model) visible() []entry {
+func (m *model) visible() []entry {
 	return entries(m.params, m.jobs, m.filter)
 }
 
 // resolve is the job the cursor stays on: the one it was on while listed,
 // else the job asked first, else the first one.
-func (m *Model) resolve() key {
+func (m *model) resolve() key {
 	list := m.visible()
 	for _, e := range list {
 		if e.key == m.selected {
@@ -228,7 +250,7 @@ func (m *Model) resolve() key {
 	return list[0].key
 }
 
-func (m *Model) selectedEntry() (entry, bool) {
+func (m *model) selectedEntry() (entry, bool) {
 	for _, e := range m.visible() {
 		if e.key == m.selected {
 			return e, true
@@ -239,7 +261,7 @@ func (m *Model) selectedEntry() (entry, bool) {
 
 // selectKey moves the cursor to k, scrolls the list to keep it in sight and
 // fills the pane for it.
-func (m *Model) selectKey(k key) tea.Cmd {
+func (m *model) selectKey(k key) tea.Cmd {
 	if k != m.selected {
 		m.selected, m.focused = k, false
 	}
@@ -259,7 +281,7 @@ func rowIndex(all []row, k key) int {
 
 // listViewport is how many rows the list scrolls in: one is kept for the
 // heading it pins once its own scrolled away.
-func (m *Model) listViewport() int {
+func (m *model) listViewport() int {
 	return max(m.layout().listRows-1, 1)
 }
 
@@ -269,15 +291,17 @@ func (m *Model) listViewport() int {
 // fill binds the pane to the job selected: its live stream while it runs, its
 // log once it ended, nothing for a job not started. Only the job selected is
 // attached: a second client would size its terminal behind a pane nobody reads.
-func (m *Model) fill() tea.Cmd {
+func (m *model) fill() tea.Cmd {
 	e, found := m.selectedEntry()
 	if !found || !e.listed || m.width == 0 {
 		m.release()
 		return nil
 	}
 	want := binding{key: e.key, started: e.job.StartedAt, live: attachable(e)}
-	// A stream that ended keeps its pane until the job runs again.
-	if want == m.bound || (m.ended && m.bound.key == e.key && !want.live) {
+	// A stream that ended keeps its pane until the job runs again; while the
+	// job runs on (the daemon let a client that fell behind go), it is attached
+	// again.
+	if (want == m.bound && !m.ended) || (m.ended && m.bound.key == e.key && !want.live) {
 		return nil
 	}
 
@@ -291,20 +315,25 @@ func (m *Model) fill() tea.Cmd {
 }
 
 // release drops the pane and the stream that fed it.
-func (m *Model) release() {
+func (m *model) release() {
 	m.close()
 	m.pane, m.bound, m.pending, m.failed, m.ended, m.focused = nil, binding{}, false, nil, false, false
 }
 
-func (m *Model) attach(b binding) tea.Cmd {
+func (m *model) attach(b binding) tea.Cmd {
 	ctx, daemon, at := m.ctx, m.params.Daemon, m.paneSize()
 	return func() tea.Msg {
 		conn, err := daemon.Attach(ctx, run.Window{Name: b.key.name, WorkDir: b.key.dir, Cols: at.cols, Rows: at.rows})
+		// The view left while the daemon answered: nobody would close it.
+		if err == nil && ctx.Err() != nil {
+			_ = conn.Close()
+			return nil
+		}
 		return attachedMsg{bound: b, at: at, conn: conn, err: err}
 	}
 }
 
-func (m *Model) attached(msg attachedMsg) tea.Cmd {
+func (m *model) attached(msg attachedMsg) tea.Cmd {
 	if msg.bound != m.bound || m.pane == nil {
 		if msg.conn != nil {
 			_ = msg.conn.Close()
@@ -334,16 +363,24 @@ type drainParams struct {
 }
 
 // drain writes what the job prints into its pane until the stream ends, then
-// says so: nothing else would tell the view a job stopped printing.
+// says so, and why when it broke: nothing else would tell the view a job
+// stopped printing. A panic of the emulator ends the stream rather than the
+// process, which would leave the terminal raw and on the alternate screen.
 func drain(p drainParams) {
-	_, _ = io.Copy(p.pane, p.conn)
-	select {
-	case p.msgs <- endedMsg{conn: p.conn}:
-	case <-p.done:
-	}
+	ended := endedMsg{conn: p.conn}
+	defer func() {
+		if r := recover(); r != nil {
+			ended.err = fmt.Errorf("terminal emulator: %v", r)
+		}
+		select {
+		case p.msgs <- ended:
+		case <-p.done:
+		}
+	}()
+	_, ended.err = io.Copy(p.pane, p.conn)
 }
 
-func (m *Model) listen() tea.Cmd {
+func (m *model) listen() tea.Cmd {
 	msgs, done := m.msgs, m.ctx.Done()
 	return func() tea.Msg {
 		select {
@@ -357,16 +394,20 @@ func (m *Model) listen() tea.Cmd {
 
 // streamEnded keeps the pane of a job whose stream ended, what it printed last
 // being what is worth reading, and takes the keyboard back.
-func (m *Model) streamEnded(msg endedMsg) tea.Cmd {
+func (m *model) streamEnded(msg endedMsg) tea.Cmd {
 	_ = msg.conn.Close()
 	if msg.conn != m.conn {
 		return nil
 	}
 	m.conn, m.ended, m.focused = nil, true, false
-	return nil
+	if msg.err == nil {
+		return nil
+	}
+	m.say(fmt.Sprintf(streamBrokeFmt, m.label(m.bound.key), msg.err))
+	return m.resize()
 }
 
-func (m *Model) history(b binding) tea.Cmd {
+func (m *model) history(b binding) tea.Cmd {
 	ctx, daemon := m.ctx, m.params.Daemon
 	return func() tea.Msg {
 		var lines []string
@@ -377,7 +418,7 @@ func (m *Model) history(b binding) tea.Cmd {
 	}
 }
 
-func (m *Model) historyRead(msg historyMsg) {
+func (m *model) historyRead(msg historyMsg) {
 	if msg.bound != m.bound || m.pane == nil {
 		return
 	}
@@ -394,7 +435,7 @@ func (m *Model) historyRead(msg historyMsg) {
 
 // frame waits for a pane to be written, then gives a frame a moment later, so
 // that a job printing fast is drawn at the frame rate, never once per write.
-func (m *Model) frame() tea.Cmd {
+func (m *model) frame() tea.Cmd {
 	wake, done := m.wake, m.ctx.Done()
 	return func() tea.Msg {
 		select {
@@ -407,13 +448,13 @@ func (m *Model) frame() tea.Cmd {
 	}
 }
 
-func (m *Model) paneSize() size {
+func (m *model) paneSize() size {
 	l := m.layout()
 	return size{cols: l.paneCols, rows: l.paneRows}
 }
 
 // resize sizes the pane to the frame, and the job's terminal behind it.
-func (m *Model) resize() tea.Cmd {
+func (m *model) resize() tea.Cmd {
 	if m.pane == nil || !m.pane.resize(m.paneSize()) || m.conn == nil {
 		return nil
 	}
@@ -422,7 +463,7 @@ func (m *Model) resize() tea.Cmd {
 
 // resizeJob sizes the terminal of the job attached; a job under none refuses,
 // which changes nothing worth saying.
-func (m *Model) resizeJob(at size) tea.Cmd {
+func (m *model) resizeJob(at size) tea.Cmd {
 	ctx, daemon, b := m.ctx, m.params.Daemon, m.bound
 	return func() tea.Msg {
 		_ = daemon.Resize(ctx, run.Window{Name: b.key.name, WorkDir: b.key.dir, Cols: at.cols, Rows: at.rows})
@@ -431,13 +472,13 @@ func (m *Model) resizeJob(at size) tea.Cmd {
 }
 
 // band is the notices on screen: none once dismissed.
-func (m *Model) band() []string {
+func (m *model) band() []string {
 	if m.dismissed || len(m.notices) == 0 {
 		return nil
 	}
 	return append(append([]string{}, m.notices...), bandDismiss)
 }
 
-func (m *Model) layout() layout {
+func (m *model) layout() layout {
 	return layoutAt(m.width, m.height, len(m.band()))
 }

@@ -2,6 +2,7 @@ package runview
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"sync"
 
@@ -53,7 +54,20 @@ func newPane(params paneParams) *pane {
 	at := sized(params.at)
 	p := &pane{term: vt.NewEmulator(at.cols, at.rows), size: at, crlf: params.crlf, wake: params.wake}
 	p.term.SetScrollbackSize(scrollbackLines)
+	// The emulator answers a job's queries (cursor position, device attributes,
+	// colours) into a pipe that blocks its next write until read. The answers are
+	// dropped, not typed into the job: the history an attach replays holds old
+	// queries, whose answers would reach the job as stray input.
+	go func() { _, _ = io.Copy(io.Discard, p.term) }()
 	return p
+}
+
+// close ends the reading of the emulator's answers. It closes the pipe they
+// are written to, never the emulator, whose Close races its Read.
+func (p *pane) close() {
+	if answers, ok := p.term.InputPipe().(*io.PipeWriter); ok {
+		_ = answers.Close()
+	}
 }
 
 func sized(s size) size {

@@ -202,7 +202,7 @@ func failedExit(job run.Job) bool {
 
 // state words what a job is doing, as the pane's title says it: from the
 // daemon's listing, never from what the start said of it.
-func (m *Model) state(e entry) string {
+func (m *model) state(e entry) string {
 	job := e.job
 	switch {
 	case !e.listed:
@@ -235,7 +235,7 @@ func withExit(word string, code *int) string {
 }
 
 // mainName names the main checkout at dir: its branch, else its directory.
-func (m *Model) mainName(dir string) string {
+func (m *model) mainName(dir string) string {
 	if m.params.Main != "" {
 		return m.params.Main
 	}
@@ -278,7 +278,7 @@ func onPipe(e entry) bool {
 // refusal is why the keyboard cannot be handed to a job attached, empty when
 // it can: a task reads no terminal, and a shared service another worktree's
 // hold reaches is read-only.
-func (m *Model) refusal(e entry) string {
+func (m *model) refusal(e entry) string {
 	if e.job.Kind == project.Task {
 		return fmt.Sprintf(noTerminalFmt, e.name)
 	}
