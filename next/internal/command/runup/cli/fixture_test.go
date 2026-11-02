@@ -25,6 +25,7 @@ const (
 	mainPath    = "/repo/main"
 	featA       = "feat/a"
 	featB       = "feat/b"
+	featC       = "feat/c"
 	fingerprint = "0123456789abcdef01234567"
 )
 
@@ -61,9 +62,10 @@ func newWorld() world {
 			Worktrees: []worktree.Worktree{
 				{Path: pathOf(featA), State: worktree.OnBranch{Branch: featA}},
 				{Path: pathOf(featB), State: worktree.OnBranch{Branch: featB}},
+				{Path: pathOf(featC), State: worktree.OnBranch{Branch: featC}},
 			},
 		}),
-		store:  storetest.NewFake(storetest.FakeParams{Meta: map[string]worktree.Meta{featA: {SourceBranch: "main", Ordinal: 1}, featB: {SourceBranch: "main", Ordinal: 2}}}),
+		store:  storetest.NewFake(storetest.FakeParams{Meta: map[string]worktree.Meta{featA: {SourceBranch: "main", Ordinal: 1}, featB: {SourceBranch: "main", Ordinal: 2}, featC: {SourceBranch: "main", Ordinal: 3}}}),
 		config: configtest.NewFake(configtest.FakeParams{Config: &project.Config{Worktrees: project.Worktrees{BasePath: project.DefaultBasePath, BaseBranch: project.DefaultBaseBranch}}, Run: runConfig}),
 		locks:  &operationtest.Locks{},
 		daemon: &daemon{},

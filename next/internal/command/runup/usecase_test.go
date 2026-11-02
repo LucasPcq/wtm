@@ -179,6 +179,16 @@ func TestAPortAnotherWorktreeHoldsIsRefusedFollowedByTheExclusiveStart(t *testin
 	assert.Contains(t, refused.FollowUp.Answers, domain.Answered{Path: runup.PathExclusive, Values: []string{"true"}})
 }
 
+func TestAPortClashOfAStartInSeveralWorktreesOffersNoExclusiveStart(t *testing.T) {
+	w := newWorld(t)
+	w.up("api", "main", map[string]int{"PORT": 4000})
+
+	refused := w.refused(t, starting("", verbatim, featA))
+
+	assert.Equal(t, runup.CodePortClash, refused.Code)
+	assert.Nil(t, refused.FollowUp, "--exclusive starts one worktree only: offered beside two, it is refused in turn")
+}
+
 func TestAJobThatChangesForeignDataIsRefusedUnlessForced(t *testing.T) {
 	w := newWorld(t)
 

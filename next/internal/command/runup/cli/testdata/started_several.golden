@@ -1,0 +1,16 @@
+
+  ✓ run up: 2 done
+
+  Worktrees       feat/a, feat/c
+  Profile         dev
+  Jobs in feat/a  migrate, api, web
+  Jobs in feat/c  migrate, api, web
+
+  Addresses
+    feat/a
+      api  http://api.feat-a.main.localhost:11080
+      web  http://web.feat-a.main.localhost:11080
+    feat/c
+      api  http://api.feat-c.main.localhost:11080
+      web  http://web.feat-c.main.localhost:11080
+

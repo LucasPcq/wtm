@@ -1,0 +1,16 @@
+
+  ✓ run up: 2 done
+
+  Worktrees       feat/a, feat/b
+  Profile         dev
+  Jobs in feat/a  api, web
+  Jobs in feat/b  api, web
+
+  Addresses
+    feat/a
+      api  http://api.feat-a.acme.localhost:24352
+      web  http://web.feat-a.acme.localhost:24352
+    feat/b
+      api  http://api.feat-b.acme.localhost:24352
+      web  http://web.feat-b.acme.localhost:24352
+

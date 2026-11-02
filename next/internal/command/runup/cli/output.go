@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
@@ -14,32 +15,42 @@ func drawOutcome(w io.Writer, outcome runup.Outcome, view output.View) {
 	output.DrawApplied(w, outcome, output.AppliedParams{Command: Use, View: view, Block: addresses(outcome), Excerpt: excerpt(outcome)})
 }
 
-// addresses draws where each job that answers at a URL is reached, one job per line, under its worktree's branch when the start ran in several.
+// addresses draws where each job that answers at a URL is reached, one job per line, the URLs in one column, under each worktree's branch when the start ran in several.
 func addresses(outcome runup.Outcome) func(io.Writer) {
+	type reached struct {
+		subject string
+		jobs    []runup.JobResult
+	}
+
 	return func(w io.Writer) {
-		var reached []runup.Item
+		var all []reached
+		width := 0
 		for _, item := range outcome.Result.Items {
-			if item.Detail != nil && len(item.Detail.Reached()) > 0 {
-				reached = append(reached, item)
+			if item.Detail == nil {
+				continue
+			}
+			if jobs := item.Detail.Reached(); len(jobs) > 0 {
+				all = append(all, reached{subject: item.Subject, jobs: jobs})
+				for _, job := range jobs {
+					width = max(width, len(job.Name))
+				}
 			}
 		}
-		if len(reached) == 0 {
+		if len(all) == 0 {
 			return
 		}
 
 		output.Blank(w)
 		output.SectionTitle(w, addressesTitle)
-		for _, item := range reached {
+		for _, r := range all {
 			indent := output.Indent
 			if len(outcome.Result.Items) > 1 {
-				output.Message(w, output.Indent+item.Subject)
+				output.Message(w, output.Indent+r.subject)
 				indent += output.Indent
 			}
-			var rows [][]string
-			for _, job := range item.Detail.Reached() {
-				rows = append(rows, []string{indent + job.Name, job.URL})
+			for _, job := range r.jobs {
+				output.Message(w, fmt.Sprintf("%s%-*s  %s", indent, width, job.Name, job.URL))
 			}
-			output.Columns(w, rows)
 		}
 	}
 }

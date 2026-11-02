@@ -172,6 +172,7 @@ run_side() {
     scenario 12-exclusive run up feat/v --exclusive -d --yes
     # next only: legacy has no dry run nor fingerprint
     scenario 13-dry-run run up feat/a --profile full --dry-run
+    scenario 14-several run up feat/a feat/b -d --yes
   )
   local escaped=${root//\//%2F}
   sed -i '' -E \

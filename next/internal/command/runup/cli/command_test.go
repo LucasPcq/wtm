@@ -34,6 +34,13 @@ func TestAStartThatFailsInOneWorktreeShowsTheJobsLastLinesAndTheLineThatStartsIt
 	formtest.Golden(t, "failed", got.Stdout)
 }
 
+func TestAStartInSeveralWorktreesListsTheAddressesUnderEachBranch(t *testing.T) {
+	got := runUp(t, newWorld(), featA, featC, "--yes")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	formtest.Golden(t, "started_several", got.Stdout)
+}
+
 func TestADryRunShowsThePlanAndTheLineThatAppliesIt(t *testing.T) {
 	got := runUp(t, newWorld(), featA, "--dry-run")
 

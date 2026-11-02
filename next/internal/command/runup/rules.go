@@ -561,7 +561,7 @@ func Decide(f Facts, req Request, params DecideParams) (Plan, []domain.Warning, 
 		return Plan{}, nil, conflictRefusal(conflicts)
 	}
 	if clashes := f.clashes(planned.Worktrees); len(clashes) > 0 && !(exclusive && !slices.ContainsFunc(clashes, func(c clash) bool { return !c.lifts() })) {
-		return Plan{}, nil, clashRefusal(clashes, req)
+		return Plan{}, nil, clashRefusal(clashes, req, len(targets))
 	}
 	if risks := f.risks(targets, jobs); len(risks) > 0 && !req.Force {
 		return Plan{}, nil, foreignRefusal(risks, req)
@@ -599,10 +599,11 @@ func conflictRefusal(conflicts []conflict) *domain.Error {
 	return domain.Invalid(fields)
 }
 
-func clashRefusal(clashes []clash, req Request) *domain.Error {
+// clashRefusal names each port held; it offers the start with --exclusive when stopping the other worktrees frees every one, a start in one worktree only, as --exclusive refuses several.
+func clashRefusal(clashes []clash, req Request, targets int) *domain.Error {
 	var lines []string
 	fields := make([]domain.FieldError, 0, len(clashes))
-	lifted := true
+	lifted := targets == 1
 	for _, c := range clashes {
 		port := strconv.Itoa(c.Port)
 		template, holder := "{worktree}'s {job} would bind {port}, which {held_by}'s {held_job} holds", c.HeldBy+"'s "+c.HeldJob
