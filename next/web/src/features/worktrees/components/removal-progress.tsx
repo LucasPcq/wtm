@@ -18,6 +18,7 @@ import { phaseLabel } from '@/features/worktrees/utils/phases'
 import { current, doneOf, ending, type Progress } from '@/features/worktrees/utils/progress'
 import { plain } from '@/features/worktrees/utils/removal'
 import { recapOf, type Teardown } from '@/features/worktrees/utils/removal-recap'
+import { plural } from '@/lib/plural'
 
 // a command that removes worktrees says itself in these: its dialog's title, what became of each, its run
 export type RemovalWords = {
@@ -58,7 +59,7 @@ export function RemovalProgress({
   const error = progress.envelope?.error
   const refused =
     progress.refused ?? (items.some((item) => item.error) || error?.kind === 'cancelled' ? undefined : error?.message)
-  const { groups, warnings, data } = recapOf(progress, words.command)
+  const { groups, warnings, data, paid } = recapOf(progress, words.command)
   const reparentNow = useReparentNow(repo)
   const reparenting = useRun(repo, 'reparent').running
   const act: Act = {
@@ -81,6 +82,7 @@ export function RemovalProgress({
   )
 
   const description = () => {
+    if (ok && removed.length === 0 && paid > 0) return `${plural(paid, 'owed namespace')} dropped.`
     if (ok && !branched) return `${removed.length} ${words.past}.`
     if (ok)
       return names.length === 1
