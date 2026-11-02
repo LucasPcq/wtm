@@ -4,5 +4,8 @@
   Worktrees  feat/a
   Profile    dev
   Jobs       migrate, api, web
-  feat/a     api  http://api.feat-a.main.localhost:11080, web  http://web.feat-a.main.localhost:11080
+
+  Addresses
+    api  http://api.feat-a.main.localhost:11080
+    web  http://web.feat-a.main.localhost:11080
 

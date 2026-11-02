@@ -88,6 +88,13 @@ type Port struct {
 	Listening *bool  `json:"listening"`
 }
 
+// Reached are the jobs of the start that answer at a URL: those it started or found running.
+func (d Detail) Reached() []JobResult {
+	return slices.DeleteFunc(slices.Clone(d.Jobs), func(job JobResult) bool {
+		return job.URL == "" || (job.Status != JobStarted && job.Status != JobAlreadyRunning)
+	})
+}
+
 // leftUp reports whether the start left a job up in its worktree.
 func (d Detail) leftUp() bool {
 	return slices.ContainsFunc(d.Jobs, func(job JobResult) bool {
@@ -133,7 +140,9 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 	result := u.Apply(ctx, plan, report)
 	op.Finished(result.Failure())
 
-	outcome.Result, outcome.Plan = &result, u.renumbered(plan).applied(result)
+	applied := u.renumbered(plan)
+	applied.Recap = applied.recap()
+	outcome.Result, outcome.Plan = &result, applied
 	outcome.Warnings = op.Warnings(append(outcome.Warnings, result.Warnings...))
 	return outcome, nil
 }

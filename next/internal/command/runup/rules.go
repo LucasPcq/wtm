@@ -802,26 +802,6 @@ const (
 // runs says whether wtm-next runs a command: the legacy run logs and run down act on the legacy daemon's jobs, never on next's, so their follow-ups wait for LUC-343 and LUC-341 to turn them on here.
 var runs = map[string]bool{commandRunLogs: false, commandRunDown: false}
 
-// applied is the plan once applied, as Run reports it: its recap, then where each job of each worktree answers.
-func (p Plan) applied(result Result) Plan {
-	p.Recap = p.recap()
-	for _, item := range result.Items {
-		if item.Detail == nil {
-			continue
-		}
-		var reached []string
-		for _, job := range item.Detail.Jobs {
-			if job.URL != "" && (job.Status == JobStarted || job.Status == JobAlreadyRunning) {
-				reached = append(reached, job.Name+"  "+job.URL)
-			}
-		}
-		if len(reached) > 0 {
-			p.Recap = append(p.Recap, domain.RecapRow{Key: "reach", Label: item.Subject, Values: domain.RecapValues(reached)})
-		}
-	}
-	return p
-}
-
 // next are the follow-ups of a start: the start again where it did not pass, then each worktree's output and the stop of what it left up.
 func (p Plan) next(items []Item) []domain.FollowUp {
 	var followUps []domain.FollowUp

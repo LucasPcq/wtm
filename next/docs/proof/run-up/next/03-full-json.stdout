@@ -184,20 +184,6 @@
             "text": "web"
           }
         ]
-      },
-      {
-        "key": "reach",
-        "label": "feat/b",
-        "values": [
-          {
-            "value": "api  http://api.feat-b.acme.localhost:24352",
-            "text": "api  http://api.feat-b.acme.localhost:24352"
-          },
-          {
-            "value": "web  http://web.feat-b.acme.localhost:24352",
-            "text": "web  http://web.feat-b.acme.localhost:24352"
-          }
-        ]
       }
     ]
   },

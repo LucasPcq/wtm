@@ -134,20 +134,6 @@
             "text": "web"
           }
         ]
-      },
-      {
-        "key": "reach",
-        "label": "feat/a",
-        "values": [
-          {
-            "value": "api  http://api.feat-a.main.localhost:11080",
-            "text": "api  http://api.feat-a.main.localhost:11080"
-          },
-          {
-            "value": "web  http://web.feat-a.main.localhost:11080",
-            "text": "web  http://web.feat-a.main.localhost:11080"
-          }
-        ]
       }
     ]
   },
