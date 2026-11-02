@@ -1,4 +1,5 @@
 import type { RunupJobPlan, RunupPlan } from '@/api/types.gen'
+import { jobPlan } from '@/features/worktrees/utils/job-plan'
 import { jobsTodo, type PhaseRun, type Unit } from '@/features/worktrees/utils/progress'
 
 export type Shared = { name: string; holders: number; namespaces: string[] }
@@ -92,9 +93,7 @@ export const unitsOf = (plan: RunupPlan): Unit[] =>
 // what a start brings up, counted: each worktree's own jobs, and each shared service once, up once every worktree
 // joined it
 export function countOf(units: Unit[], plan: RunupPlan | undefined): { done: number; total: number } {
-  const joined = (worktree: string, name: string) =>
-    plan?.worktrees?.find((target) => target.worktree === worktree)?.jobs?.find((job) => job.name === name)?.action ===
-    'join'
+  const joined = (worktree: string, name: string) => jobPlan(plan, worktree, name)?.action === 'join'
   const runs = units.flatMap((unit) => unit.phases.map((run) => ({ run, shared: joined(unit.subject, run.job ?? '') })))
   const own = runs.filter(({ shared }) => !shared).map(({ run }) => run)
   const shared = new Map<string, PhaseRun[]>()

@@ -140,8 +140,7 @@ A glyph never changes colour to mean "resolved": it changes icon.
 
 Every multi-worktree list (Remove's, Prune's, the Fast-forward and Run pickers, Reparent's selection) has a `wtm/List Header` inside its box: a tri-state box acting on the visible rows, and "k of n selected".
 
-- **A `wtm/Search Field` always sits above the header**, inside the same box, whatever the number of rows.
-- **The search is a row of the list box it filters, never a field above it** (`SearchRow`, `features/worktrees/components/search-row.tsx`): borderless and transparent, as tall as a row, the rows' horizontal padding, its muted icon in their checkbox or radio column, a faint fill on keyboard focus. Every searchable list in a dialog uses it, a picker's `ListHeader` and Start a profile's Profile step alike.
+- **A search always sits at the top of the list box it filters, a row of it, whatever the number of rows** (`wtm/Search Field`, `SearchRow` in `features/worktrees/components/search-row.tsx`): borderless and transparent, as tall as a row, the rows' horizontal padding, its muted icon in their checkbox or radio column, a faint fill on keyboard focus, never a bordered field above the box. A picker's `ListHeader` puts it above its header; Start a profile's Profile step and Create's pull request picker use it too.
 - A selected row the search hides stays selected: "2 of 9 selected · 2 hidden by the search". The header's box reflects the visible rows only.
 - The body scrolls (`max-h` 90vh); the header and footer stay.
 

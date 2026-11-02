@@ -4,6 +4,7 @@ import type { DomainOption, DomainWarning, RunupPlan } from '@/api/types.gen'
 import { ItemList } from '@/features/worktrees/components/item-list'
 import { type Left, LeftItem } from '@/features/worktrees/components/left-item'
 import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
+import { JobSection } from '@/features/worktrees/run-up/components/job-section'
 import {
   firstOf,
   type HowItRuns,
@@ -67,10 +68,10 @@ export function ConfirmStep({
         </span>
       </p>
 
-      {several && shared.length > 0 && <Block title="Shared services, joined once">{sharedLines}</Block>}
+      {several && shared.length > 0 && <JobSection title="Shared services, joined once">{sharedLines}</JobSection>}
 
       {orderedOf(plan).map(({ worktree, jobs }) => (
-        <Block key={worktree} title={several ? worktree : 'In this order'}>
+        <JobSection key={worktree} title={several ? worktree : 'In this order'}>
           {!several && sharedLines}
           {jobs.map((job) => {
             const { said, mono } = planned(job, first)
@@ -80,12 +81,12 @@ export function ConfirmStep({
               </Line>
             )
           })}
-        </Block>
+        </JobSection>
       ))}
 
       <ItemList left={leftRows}>{[]}</ItemList>
 
-      <Block title="How it runs">
+      <JobSection title="How it runs">
         {howItRuns(plan, others).map(({ kind, text }) => {
           const Icon = howIcon[kind]
           return (
@@ -95,17 +96,8 @@ export function ConfirmStep({
             </li>
           )
         })}
-      </Block>
+      </JobSection>
     </>
-  )
-}
-
-function Block({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="flex flex-col gap-2">
-      <h3 className="text-xs font-medium text-muted-foreground">{title}</h3>
-      <ul className="flex flex-col gap-2">{children}</ul>
-    </section>
   )
 }
 

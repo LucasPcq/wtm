@@ -1,7 +1,8 @@
 import { jobCounts, type Read } from '@/api/queries/commands'
 import type { ListJob, RunState, RunupPlan } from '@/api/types.gen'
-import { underWay } from '@/features/worktrees/run-up/utils/words'
+import { jobPlan } from '@/features/worktrees/utils/job-plan'
 import type { Progress } from '@/features/worktrees/utils/progress'
+import { underWay } from '@/features/worktrees/utils/run-words'
 
 // a job the read lists, or one a start of this page is bringing up that the read does not list yet
 export type RunningRow = { name: string } & ({ job: ListJob } | { said: string })
@@ -28,16 +29,13 @@ export function groupsOf({
   progress: Progress<'run-up'> | undefined
   plan: RunupPlan | undefined
 }): RunningGroup[] {
-  const planOf = (worktree: string, name: string) =>
-    plan?.worktrees?.find((target) => target.worktree === worktree)?.jobs?.find((job) => job.name === name)
-
   return read.items.flatMap(({ subject, detail }) => {
     const own = (detail?.jobs ?? []).filter((job) => job.hold !== 'claim')
     const unit = progress?.units.find((one) => one.subject === subject)
     // a job of the start says where it stands until the read lists it as the start left it: not yet brought up, or
     // listed stopped from a run before
     const coming = (unit?.phases ?? []).flatMap((run) => {
-      const job = run.job && planOf(subject, run.job)
+      const job = run.job && jobPlan(plan, subject, run.job)
       if (!run.job || !job || job.action === 'join') return []
       const now = own.find((one) => one.name === run.job)
       const stale = !now || now.state === 'stopped' || run.state === 'todo' || run.state === 'now'

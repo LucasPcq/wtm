@@ -1,7 +1,7 @@
 import { useStore } from '@tanstack/react-form'
 import { useDebouncedValue } from '@tanstack/react-pacer'
 import { useQuery } from '@tanstack/react-query'
-import { CircleX, GitPullRequest, Plus, Search } from 'lucide-react'
+import { CircleX, GitPullRequest, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { pullRequestQuery } from '@/api/queries/commands'
 import type { DomainFieldError, DomainOption } from '@/api/types.gen'
@@ -9,8 +9,8 @@ import { keyOf } from '@/components/command-form/answers'
 import type { CommandForm } from '@/components/command-form/use-command-form'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { SearchRow } from '@/features/worktrees/components/search-row'
 import { PrRow } from '@/features/worktrees/create/components/pr-row'
 import {
   checkoutWords,
@@ -108,22 +108,15 @@ export function PrPicker({
       </div>
 
       <div className="flex flex-col rounded-lg border">
-        <InputGroup className="rounded-b-none border-0 border-b shadow-none">
-          <InputGroupAddon>
-            <Search />
-          </InputGroupAddon>
-          <InputGroupInput
-            aria-label="Search pull requests"
+        <div className="border-b">
+          <SearchRow
+            label="Search pull requests"
             placeholder="Search by title or number"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter') return
-              e.preventDefault()
-              enter()
-            }}
+            query={query}
+            onQuery={setQuery}
+            onEnter={enter}
           />
-        </InputGroup>
+        </div>
 
         {!empty && !typed && (
           <ToggleGroup

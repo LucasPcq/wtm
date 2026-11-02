@@ -266,7 +266,12 @@ export const refusedUntil =
               ? "migrate changes data feat/search doesn't own: the shared db has no namespace"
               : 'port 3040 is held by web of feat/billing',
           ...(followUp && {
-            follow_up: { command: 'run-up', answers: [{ path: consent, values: ['true'] }], code, message: 'lift it' },
+            follow_up: {
+              command: 'run-up',
+              answers: [{ path: consent, values: ['true'] }],
+              code: `run-up.${consent}`,
+              message: 'lift it',
+            },
           }),
         },
       },

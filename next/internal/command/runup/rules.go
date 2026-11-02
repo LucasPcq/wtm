@@ -62,7 +62,7 @@ func (f Facts) worktreeOptions() []domain.Option {
 		slices.Sort(up)
 		slices.Sort(holds)
 		options[i].Up, options[i].Holds = up, holds
-		options[i].Profile = f.profileOf(w.Path)
+		options[i].Profile = run.ProfileIn(f.Jobs, w.Path)
 	}
 	return options
 }
@@ -70,16 +70,6 @@ func (f Facts) worktreeOptions() []domain.Option {
 // up are the jobs up in the worktree at path, claims included.
 func (f Facts) up(path string) []run.Job {
 	return slices.DeleteFunc(slices.Clone(f.Jobs), func(job run.Job) bool { return !job.Up || job.WorkDir != path })
-}
-
-// profileOf is the profile the jobs the worktree at path runs itself were started under, when they say one: a claim, and a shared service run there for every worktree, are another start's.
-func (f Facts) profileOf(path string) string {
-	for _, job := range f.up(path) {
-		if job.Profile != "" && job.Hold != run.HoldClaim && !f.shared(job.Name) {
-			return job.Profile
-		}
-	}
-	return ""
 }
 
 func (f Facts) named(name string) (worktree.Worktree, bool) {

@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { toneIcon } from '@/features/worktrees/components/glyph'
 import { StepOutput } from '@/features/worktrees/components/step-output'
-import { terminalLine } from '@/features/worktrees/exec/utils/output'
 import { phaseLook } from '@/features/worktrees/utils/phase-look'
 import type { PhaseRun } from '@/features/worktrees/utils/progress'
+import { terminalLine } from '@/features/worktrees/utils/terminal-line'
 import { cn } from '@/lib/utils'
 
 // one step of a run under way, a worktree's command or a job: folded, its lines live behind its chevron

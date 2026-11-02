@@ -5,6 +5,15 @@ import { CommandLine } from '@/features/worktrees/components/command-line'
 
 type Consent = { label: string; to: 'force' | 'exclusive' }
 
+// the follow-ups of a refusal the person consents to on Confirm, by their code; any other is a command to copy
+const consents: Record<'run-up.force' | 'run-up.exclusive', Consent> = {
+  'run-up.force': { label: 'Start anyway', to: 'force' },
+  'run-up.exclusive': { label: "Stop the others' jobs", to: 'exclusive' },
+}
+
+const consented = (code: string | undefined): code is keyof typeof consents =>
+  code !== undefined && Object.hasOwn(consents, code)
+
 // a refusal the person can lift is never a dead end: their consent plans again, and Confirm shows the new plan before
 // anything starts
 export function Refusal({
@@ -16,14 +25,8 @@ export function Refusal({
   message: string
   onConsent: (to: Consent['to']) => void
 }) {
-  const consent = (): Consent | undefined => {
-    if (refusal?.code === 'run-up.unsafe') return { label: 'Start anyway', to: 'force' }
-    // stopping the others lifts a clash only when the core says so: a port a job outside the repository holds stays
-    if (refusal?.code === 'run-up.port_clash' && refusal.follow_up)
-      return { label: "Stop the others' jobs", to: 'exclusive' }
-    return undefined
-  }
-  const lift = consent()
+  const code = refusal?.follow_up?.code
+  const lift = consented(code) ? consents[code] : undefined
 
   return (
     <Alert

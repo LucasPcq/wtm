@@ -121,7 +121,7 @@ func TestARequestReadsBackAsTheAnswersItWasGiven(t *testing.T) {
 func TestAWorktreeShowsTheProfileOfItsOwnJobsAlone(t *testing.T) {
 	w := newWorld(t)
 	w.up("db", "main", nil)
-	w.daemon.listed[0].Profile = "full"
+	w.daemon.listed[0].Profile, w.daemon.listed[0].SharedDir = "full", w.main // the daemon names the main checkout of a shared service it runs
 
 	questions := w.questions(t, starting("", featA))
 

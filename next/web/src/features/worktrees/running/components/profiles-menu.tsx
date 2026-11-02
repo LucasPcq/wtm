@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { openRunUp } from '@/features/worktrees/hooks/use-run-up-dialog'
-import { jobsSummary } from '@/features/worktrees/run-up/utils/words'
+import { jobsSummary } from '@/features/worktrees/utils/run-words'
 
 // a menu shows five: past them the dialog, which has the search, lists them all
 const shown = 5

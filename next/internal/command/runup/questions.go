@@ -7,6 +7,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 )
 
 // ----------------------------------------------------------------------------
@@ -210,7 +211,7 @@ func (f Facts) profileOptions(targets []Target) []domain.Option {
 	for _, profile := range f.Run.Profiles {
 		option := domain.Option{Value: profile.Name, Default: profile.Default, Jobs: profile.Jobs}
 		for _, t := range targets {
-			if f.profileOf(t.Path) == profile.Name {
+			if run.ProfileIn(f.Jobs, t.Path) == profile.Name {
 				option.RunningIn = append(option.RunningIn, t.Worktree)
 			}
 		}

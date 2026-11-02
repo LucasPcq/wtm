@@ -6,11 +6,13 @@ export function SearchRow({
   placeholder,
   query,
   onQuery,
+  onEnter,
 }: {
   label: string
   placeholder: string
   query: string
   onQuery: (query: string) => void
+  onEnter?: () => void
 }) {
   return (
     <label className="flex h-10 items-center gap-3 px-4 text-muted-foreground has-focus-visible:bg-muted/50">
@@ -20,6 +22,11 @@ export function SearchRow({
         placeholder={placeholder}
         value={query}
         onChange={(event) => onQuery(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' || !onEnter) return
+          event.preventDefault()
+          onEnter()
+        }}
         className="h-full min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
       />
     </label>

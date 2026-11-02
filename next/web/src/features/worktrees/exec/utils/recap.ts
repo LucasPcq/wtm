@@ -1,6 +1,6 @@
 import type { Applied } from '@/api/queries/commands'
 import type { DomainWarning } from '@/api/types.gen'
-import { duration, terminalLine } from '@/features/worktrees/exec/utils/output'
+import { duration } from '@/features/worktrees/exec/utils/output'
 import { warningLine } from '@/features/worktrees/exec/utils/words'
 import {
   itemWarnings,
@@ -9,6 +9,7 @@ import {
   type OutcomeRow,
   planWide,
 } from '@/features/worktrees/utils/outcome'
+import { terminalLine } from '@/features/worktrees/utils/terminal-line'
 
 type ExecItem = Applied<'exec'>['items'][number]
 
