@@ -80,7 +80,7 @@ test('Descendants off, each worktree left is listed once, with the reason that h
   expect(within(left).getByText('its parent feat/search is left as it is')).toBeTruthy()
   expect(within(left).getByText("stays on feat/billing's old tip · needs a sync after")).toBeTruthy()
   const runs = within(dialog).getByRole('region', { name: 'How it runs' })
-  expect(within(runs).getByText('feat/billing-ui stays where it is, and needs a sync after.')).toBeTruthy()
+  expect(within(runs).getByText('feat/billing-ui stays as it is; sync it after.')).toBeTruthy()
 })
 
 test('a worktree left under a parent that only pushes stays on it as it is, on the list as in How it runs', async () => {
@@ -94,7 +94,7 @@ test('a worktree left under a parent that only pushes stays on it as it is, on t
   const left = await within(dialog).findByRole('region', { name: 'Left as they are' })
   expect(within(left).getByText('stays on feat/billing as it is · needs a sync after')).toBeTruthy()
   const runs = within(dialog).getByRole('region', { name: 'How it runs' })
-  expect(within(runs).getByText('feat/billing-ui stays where it is, and needs a sync after.')).toBeTruthy()
+  expect(within(runs).getByText('feat/billing-ui stays as it is; sync it after.')).toBeTruthy()
 })
 
 test("unchecking a dirty main clears its consent: a clean branch's box never brings it back forced", async () => {
@@ -113,4 +113,28 @@ test("unchecking a dirty main clears its consent: a clean branch's box never bri
     expect(last).not.toContainEqual({ path: 'force', values: ['true'] })
   })
   expect(main.getAttribute('data-state')).toBe('unchecked')
+})
+
+test('two dirty descendants kept read as a count, on step 1 as on Confirm: the line never grows with the names', async () => {
+  answering({ dirty: ['feat/billing-ui', 'feat/search-docs'] })
+  const { user, dialog } = await fromSelection('feat/billing', 'feat/search')
+
+  expect(await within(dialog).findByText('2 worktrees kept: uncommitted changes.')).toBeTruthy()
+  await waitFor(() => expect(nextOf(dialog).getAttribute('aria-disabled')).toBe('false'))
+  await user.click(nextOf(dialog))
+
+  const runs = await within(dialog).findByRole('region', { name: 'How it runs' })
+  expect(within(runs).getByText('2 worktrees kept: uncommitted changes.')).toBeTruthy()
+})
+
+test('one follows and one is kept: both counted on one line, the root named on Confirm', async () => {
+  answering({ dirty: ['feat/search-docs'] })
+  const { user, dialog } = await fromSelection('feat/billing', 'feat/search')
+
+  expect(await within(dialog).findByText('1 worktree follows · 1 kept: uncommitted changes.')).toBeTruthy()
+  await waitFor(() => expect(nextOf(dialog).getAttribute('aria-disabled')).toBe('false'))
+  await user.click(nextOf(dialog))
+
+  const runs = await within(dialog).findByRole('region', { name: 'How it runs' })
+  expect(within(runs).getByText('1 worktree follows feat/billing · 1 kept: uncommitted changes.')).toBeTruthy()
 })

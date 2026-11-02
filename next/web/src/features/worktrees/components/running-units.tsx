@@ -20,8 +20,12 @@ export function RunningUnits({ rows }: { rows: { subject: string; state: UnitSta
         return (
           <li key={subject} className="flex min-h-8 items-center gap-3 text-sm">
             <Icon className={cn(toneIcon({ tone }), 'size-4')} aria-hidden="true" />
-            <span className="font-medium">{subject}</span>
-            <span className="text-muted-foreground">{words}</span>
+            <span title={subject} className="max-w-1/2 shrink-0 truncate font-medium">
+              {subject}
+            </span>
+            <span title={words} className="min-w-0 flex-1 truncate text-muted-foreground">
+              {words}
+            </span>
           </li>
         )
       })}

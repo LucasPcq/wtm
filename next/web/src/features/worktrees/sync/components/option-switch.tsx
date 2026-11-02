@@ -18,10 +18,14 @@ export function OptionSwitch({
     <div className="flex items-start gap-4 px-4 py-3">
       <Switch id={id} checked={on} onCheckedChange={onSwitch} className="mt-0.5" />
       <span className="flex min-w-0 flex-col gap-1">
-        <label htmlFor={id} className="cursor-pointer text-sm font-medium">
+        <label htmlFor={id} title={title} className="cursor-pointer truncate text-sm font-medium">
           {title}
         </label>
-        {line && <span className="text-xs text-muted-foreground">{line}</span>}
+        {line && (
+          <span title={line} className="truncate text-xs text-muted-foreground">
+            {line}
+          </span>
+        )}
       </span>
     </div>
   )

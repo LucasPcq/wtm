@@ -118,7 +118,10 @@
 }
 
 @layer base {
-  * {
+  /* a pseudo-element is no element: without its own selector it draws its border in currentColor */
+  *,
+  ::before,
+  ::after {
     @apply border-border outline-ring/50;
     /* every native scrollbar thin and muted, in both themes, its track the surface it scrolls */
     scrollbar-width: thin;

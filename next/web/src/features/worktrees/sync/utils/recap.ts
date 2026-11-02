@@ -54,7 +54,7 @@ export function recapOf(
       output: output(),
       go: followUpOf('sync.go', item.subject),
       act: again && (() => run(again.answers ?? [])),
-      actLabel: resolve ? 'Run again, keep the conflict' : 'Sync the rest',
+      actLabel: resolve ? 'Resolve by hand' : 'Sync the rest',
     }
   }
 

@@ -11,10 +11,14 @@ export function LeftRow({ row }: { row: OutcomeRow }) {
   return (
     <Item role="listitem" aria-label={row.title} className="items-center gap-3 rounded-none px-4 py-3">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <ItemTitle className="min-w-0">{row.title}</ItemTitle>
+        <ItemTitle title={row.title} className="block w-full min-w-0 truncate">
+          {row.title}
+        </ItemTitle>
         <span className="flex items-center gap-1.5 text-xs">
           <Icon className={toneIcon({ tone: row.tone ?? 'muted' })} aria-hidden="true" />
-          {row.message}
+          <span title={row.message} className="truncate">
+            {row.message}
+          </span>
         </span>
       </div>
       {row.act && (

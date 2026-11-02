@@ -53,15 +53,19 @@ export function StackRow({
         )}
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="text-sm leading-5 font-medium">{name}</span>
+        <span title={name} className="truncate text-sm leading-5 font-medium">
+          {name}
+        </span>
         {attention.map((line) => (
           <span key={line} className="flex items-center gap-1.5 text-xs">
             <TriangleAlert className={toneIcon({ tone: 'attention' })} aria-hidden="true" />
-            {line}
+            <span title={line} className="truncate">
+              {line}
+            </span>
           </span>
         ))}
         {lines.map((line) => (
-          <span key={line} className="text-xs text-muted-foreground">
+          <span key={line} title={line} className="truncate text-xs text-muted-foreground">
             {line}
           </span>
         ))}

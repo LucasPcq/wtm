@@ -17,8 +17,8 @@ test("a row's Sync opens on Confirm: its plan in run order, main's fast-forward 
     '2feat/billing-uionto feat/billing · 2 commits · follows feat/billing',
   ])
   const runs = within(dialog).getByRole('region', { name: 'How it runs' })
-  expect(within(runs).getByText('feat/billing-ui follows feat/billing.')).toBeTruthy()
-  expect(within(runs).getByText('Not pushed: origin keeps the old tips until you push.')).toBeTruthy()
+  expect(within(runs).getByText('1 worktree follows feat/billing.')).toBeTruthy()
+  expect(within(runs).getByText('Not pushed: origin keeps the old tips.')).toBeTruthy()
   expect(within(dialog).queryByRole('switch')).toBeNull()
   expect(await within(dialog).findByRole('button', { name: 'Sync 2 worktrees' })).toBeTruthy()
 })
@@ -71,7 +71,7 @@ test('main unchecked rebases onto it as it stands, and Confirm says so', async (
     '1feat/billingonto main as it stands · 4 commits',
     '2feat/billing-uionto feat/billing · 2 commits · follows feat/billing',
   ])
-  expect(within(dialog).getByText("main isn't fast-forwarded first: each rebases onto it as it stands.")).toBeTruthy()
+  expect(within(dialog).getByText('main not fast-forwarded first: rebased onto as it stands.')).toBeTruthy()
 })
 
 test('the header opens on every stack, the command picking those that need a sync; one with a change unchecked', async () => {
@@ -199,7 +199,7 @@ test('from the header, a worktree under one picked follows it, on Confirm as on 
 
   expect(await order(dialog)).toContain('2feat/billing-uionto feat/billing · 2 commits · follows feat/billing')
   const runs = within(dialog).getByRole('region', { name: 'How it runs' })
-  expect(within(runs).getByText('feat/billing-ui follows feat/billing.')).toBeTruthy()
+  expect(within(runs).getByText('1 worktree follows feat/billing.')).toBeTruthy()
 })
 
 test("main with a change, behind origin, is forced only with its own consent: another worktree's is not enough", async () => {
@@ -246,7 +246,7 @@ test('two dirty descendants: checking one forces the other, which keeps its own 
   await app.user.click(await within(dialog).findByRole('checkbox', { name: 'Sync feat/billing-ui' }))
 
   // forced along, an unchecked one is never said to follow
-  expect(await within(dialog).findByText('feat/billing-ui follows.')).toBeTruthy()
+  expect(await within(dialog).findByText('1 worktree follows.')).toBeTruthy()
   const other = await within(dialog).findByRole('checkbox', { name: 'Sync feat/search-docs' })
   await waitFor(() =>
     expect(within(dialog).getByRole('button', { name: 'Next' }).getAttribute('aria-disabled')).toBe('true'),

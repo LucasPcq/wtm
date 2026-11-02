@@ -79,7 +79,9 @@ export function SyncProgress({
     <>
       <DialogHeader>
         <DialogTitle>Sync worktrees</DialogTitle>
-        <DialogDescription>{description()}</DialogDescription>
+        <DialogDescription title={description()} className="truncate">
+          {description()}
+        </DialogDescription>
       </DialogHeader>
       <DialogBand>{running && <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />}</DialogBand>
 

@@ -5,7 +5,7 @@ import { StackBranches } from '@/features/worktrees/sync/components/stack-branch
 import { type Box, StackRow } from '@/features/worktrees/sync/components/stack-row'
 import { markedOf, moves, rootOf, type Switches, unsafe } from '@/features/worktrees/sync/utils/plan'
 import { rebasesIn, type StackNode, searchedStack } from '@/features/worktrees/sync/utils/stack'
-import { standingTone, standingWords, switchWords } from '@/features/worktrees/sync/utils/words'
+import { sentenceWords, standingTone, standingWords, switchWords } from '@/features/worktrees/sync/utils/words'
 import { changes, commits } from '@/features/worktrees/utils/counts'
 import { listed } from '@/features/worktrees/utils/listed'
 import { plural } from '@/lib/plural'
@@ -70,16 +70,13 @@ export function StackStep({
   const descendantsLine = () => {
     if (!switches.descendants) {
       const left = plan?.left_out ?? []
-      if (left.length === 0) return ''
-      return `${listed(left)} ${left.length === 1 ? 'stays where it is, and needs' : 'stay where they are, and need'} a sync after.`
+      return left.length === 0 ? '' : sentenceWords.leftOut(left)
     }
-    const follow = followers.map((rebase) => rebase.worktree)
-    const parts = [
-      follow.length > 0 && `${listed(follow)} ${follow.length === 1 ? 'follows' : 'follow'}`,
-      kept.length > 0 &&
-        `${listed(kept.map((rebase) => rebase.worktree))} ${kept.length === 1 ? 'is' : 'are'} kept (uncommitted changes)`,
-    ].filter(Boolean)
-    return parts.length > 0 ? `${parts.join('; ')}.` : ''
+    const line = sentenceWords.descendants(
+      followers.map((rebase) => rebase.worktree),
+      kept.map((rebase) => rebase.worktree),
+    )
+    return line && `${line}.`
   }
 
   // a branch rebased onto: its box is the one ff_parents answer; a dirty one is fast-forwarded only checked itself, its
@@ -88,7 +85,10 @@ export function StackStep({
     const name = onto.branch
     const behind = onto.origin?.behind ?? 0
     const others = ontoMoving.filter((other) => other !== name)
-    const along = others.length > 0 ? `, with ${listed(others)}` : ''
+    const along = () => {
+      if (others.length === 0) return ''
+      return `, with ${others.length === 1 ? others[0] : `${others.length} others`}`
+    }
     const dirty = (onto.blockers ?? []).length > 0
     const forwarded = moves(plan?.onto?.find((one) => one.branch === name) ?? { phases: [] })
     const checked = switches.ff_parents && (!dirty || ontoTicked(onto))
@@ -108,8 +108,8 @@ export function StackStep({
       if (!moves(onto)) return 'rebased onto as it stands'
       // forced through another's consent, a dirty one still waits for its own
       if (forwarded && !(dirty && !ontoTicked(onto)))
-        return `fast-forwarded to origin first · ${commits(behind)}${along}`
-      return `rebased onto as it stands · ${commits(behind)} behind origin${along}`
+        return `fast-forwarded to origin first · ${commits(behind)}${along()}`
+      return `rebased onto as it stands · ${commits(behind)} behind origin${along()}`
     }
     const attention = () => {
       if (!dirty) return []

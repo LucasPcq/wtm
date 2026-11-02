@@ -27,8 +27,12 @@ export function PlanRow({
           {lead}
         </span>
       )}
-      <span className="shrink-0 font-medium">{title}</span>
-      <span className="min-w-0 flex-1 text-muted-foreground">{message}</span>
+      <span title={title} className="max-w-1/2 shrink-0 truncate font-medium">
+        {title}
+      </span>
+      <span title={message} className="min-w-0 flex-1 truncate text-muted-foreground">
+        {message}
+      </span>
     </li>
   )
 }

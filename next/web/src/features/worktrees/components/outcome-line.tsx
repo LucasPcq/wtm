@@ -43,8 +43,14 @@ export function OutcomeLine({
           ) : (
             <span className="size-4 shrink-0" />
           )}
-          {row.title && <span className="shrink-0 font-medium">{row.title}</span>}
-          <span className={cn('min-w-0 flex-1', row.title && 'text-muted-foreground')}>{row.message}</span>
+          {row.title && (
+            <span title={row.title} className="max-w-1/2 shrink-0 truncate font-medium">
+              {row.title}
+            </span>
+          )}
+          <span title={row.message} className={cn('min-w-0 flex-1 truncate', row.title && 'text-muted-foreground')}>
+            {row.message}
+          </span>
           {row.act && (
             <Button
               variant="outline"

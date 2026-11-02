@@ -11,7 +11,6 @@ import { leftRowsOf } from '@/features/worktrees/sync/utils/left'
 import { leftOutWords, markedOf, moves, rootOf, unsafe } from '@/features/worktrees/sync/utils/plan'
 import { phaseWords, sentenceWords } from '@/features/worktrees/sync/utils/words'
 import { commits } from '@/features/worktrees/utils/counts'
-import { listed } from '@/features/worktrees/utils/listed'
 import { type OutcomeRow, planWide } from '@/features/worktrees/utils/outcome'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
 
@@ -75,22 +74,15 @@ export function SyncConfirm({
   }
 
   const descendants = () => {
-    if (!plan.descendants)
-      return leftOut.length > 0
-        ? `${listed(leftOut)} ${leftOut.length === 1 ? 'stays where it is, and needs' : 'stay where they are; each needs'} a sync after.`
-        : undefined
-    const byRoot = new Map<string, typeof followers>()
-    for (const rebase of followers) {
-      const root = rootOf(marked, rebase.worktree)
-      byRoot.set(root, [...(byRoot.get(root) ?? []), rebase])
-    }
-    const parts = [
-      ...[...byRoot].map(
-        ([root, rows]) => `${listed(rows.map((r) => r.worktree))} ${rows.length === 1 ? 'follows' : 'follow'} ${root}`,
-      ),
-      ...kept.map((rebase) => `${rebase.worktree} is kept (uncommitted changes)`),
-    ]
-    return parts.length > 0 ? `${parts.join('; ')}.` : undefined
+    if (!plan.descendants) return leftOut.length > 0 ? sentenceWords.leftOut(leftOut) : undefined
+    // one root is named; under several, each row says the one it follows
+    const roots = new Set(followers.map((rebase) => rootOf(marked, rebase.worktree)))
+    const line = sentenceWords.descendants(
+      followers.map((rebase) => rebase.worktree),
+      kept.map((rebase) => rebase.worktree),
+      roots.size === 1 ? [...roots][0] : undefined,
+    )
+    return line ? `${line}.` : undefined
   }
   const descendantsSentence = descendants()
 

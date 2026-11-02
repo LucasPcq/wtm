@@ -1,8 +1,8 @@
 import type { SyncBlocker, SyncRebase, SyncStanding } from '@/api/types.gen'
 import { changes, commits } from '@/features/worktrees/utils/counts'
-import { listed } from '@/features/worktrees/utils/listed'
 import { operationWords } from '@/features/worktrees/utils/operation'
 import type { OutcomeKind, OutcomeTone } from '@/features/worktrees/utils/outcome'
+import { plural } from '@/lib/plural'
 
 // the core words its standings for the command line; the web says each its own way, so a standing it adds fails the
 // build until it has words
@@ -88,24 +88,40 @@ export type Switch = 'push' | 'keep_conflict'
 export const switchWords: Record<Switch, { title: string; on: string; off: string }> = {
   push: {
     title: 'Push to origin',
-    on: 'Each is pushed after its rebase, with force-with-lease: refused if origin moved since.',
-    off: 'Each stays local; origin keeps its old tips until you push.',
+    on: 'Each rebase is pushed; refused if origin moved since.',
+    off: 'Nothing is pushed: origin keeps the old tips.',
   },
   keep_conflict: {
     title: 'Leave a conflict to resolve',
-    on: 'A conflict stays in progress for you to finish in its worktree.',
-    off: 'A conflict stops that rebase and leaves the worktree as it was.',
+    on: 'A conflict stays in progress, to resolve in its worktree.',
+    off: 'A conflict cancels that rebase; nothing changes.',
   },
 }
 
+// one line each at the dialog's width, whatever the number of worktrees: a list of names is a count past one
+const subject = (names: string[], many: 'worktrees' | 'branches') =>
+  names.length === 1 ? (names[0] ?? '') : `${names.length} ${many}`
+
 export const sentenceWords = {
-  pushed: 'Pushed after each rebase, with force-with-lease: refused if origin moved since.',
-  pushOnly: 'Pushed with force-with-lease: refused if origin moved since.',
+  pushed: 'Each rebase is pushed; refused if origin moved since.',
+  pushOnly: 'Pushed only; refused if origin moved since.',
   forwardOnly: (branches: string[]) =>
-    `${listed(branches)} ${branches.length === 1 ? 'takes' : 'take'} origin's commits; no worktree is rebased.`,
-  notPushed: 'Not pushed: origin keeps the old tips until you push.',
-  kept: 'A conflict stays in progress for you to finish in its worktree; the ones under it wait.',
-  stopped: 'A conflict stops that rebase and leaves the worktree as it was; the ones under it wait.',
+    `${subject(branches, 'branches')} ${branches.length === 1 ? 'takes' : 'take'} origin's commits; nothing is rebased.`,
+  notPushed: 'Not pushed: origin keeps the old tips.',
+  kept: 'A conflict stays to resolve; the ones under it wait.',
+  stopped: 'A conflict cancels that rebase; the ones under it wait.',
   asItStands: (onto: string[]) =>
-    `${listed(onto)} ${onto.length === 1 ? "isn't" : "aren't"} fast-forwarded first: each rebases onto it as it stands.`,
+    `${subject(onto, 'branches')} not fast-forwarded first: rebased onto as ${onto.length === 1 ? 'it stands' : 'they stand'}.`,
+  // the worktrees under the ones picked, counted (each row names its own): those that follow, those kept for their changes
+  descendants: (follow: string[], kept: string[], root?: string) =>
+    [
+      follow.length > 0 &&
+        `${plural(follow.length, 'worktree')} ${follow.length === 1 ? 'follows' : 'follow'}${root ? ` ${root}` : ''}`,
+      kept.length > 0 &&
+        `${follow.length > 0 ? kept.length : plural(kept.length, 'worktree')} kept: uncommitted changes`,
+    ]
+      .filter(Boolean)
+      .join(' · '),
+  leftOut: (left: string[]) =>
+    `${subject(left, 'worktrees')} ${left.length === 1 ? 'stays as it is; sync it' : 'stay as they are; sync them'} after.`,
 }

@@ -31,7 +31,7 @@ test('done, the run counts the rebases, lists main apart, and offers to push the
   expect(within(dialog).getByText('Each worktree is pushed to origin, with force-with-lease.')).toBeTruthy()
   expect(await order(dialog)).toEqual(['feat/billingpushed to origin', 'feat/billing-uipushed to origin'])
   const runs = within(dialog).getByRole('region', { name: 'How it runs' })
-  expect(within(runs).getByText('Pushed with force-with-lease: refused if origin moved since.')).toBeTruthy()
+  expect(within(runs).getByText('Pushed only; refused if origin moved since.')).toBeTruthy()
 })
 
 test('a conflict mid-stack fails its row, blocks the one under it, and runs again keeping the conflict', async () => {
@@ -47,15 +47,16 @@ test('a conflict mid-stack fails its row, blocks the one under it, and runs agai
 
   expect(await within(dialog).findByText('0 of 2 synced.')).toBeTruthy()
   const failed = within(dialog).getByRole('region', { name: "Couldn't sync" })
-  expect(within(failed).getByText('conflicts with main; nothing changed')).toBeTruthy()
+  // one line, truncated at the dialog's width: the whole reason shows on hover
+  expect(within(failed).getByText('conflicts with main; nothing changed').title).toBe(
+    'conflicts with main; nothing changed',
+  )
   expect(within(failed).getByText("blocked: feat/billing didn't sync")).toBeTruthy()
 
-  await user.click(within(failed).getByRole('button', { name: /^Run again, keep the conflict/ }))
+  await user.click(within(failed).getByRole('button', { name: /^Resolve by hand/ }))
 
   const runs = await within(dialog).findByRole('region', { name: 'How it runs' })
-  expect(
-    within(runs).getByText('A conflict stays in progress for you to finish in its worktree; the ones under it wait.'),
-  ).toBeTruthy()
+  expect(within(runs).getByText('A conflict stays to resolve; the ones under it wait.')).toBeTruthy()
 })
 
 test("reparent's next step opens Sync on the worktree moved, never a command to copy", async () => {
@@ -131,7 +132,7 @@ test('"Sync anyway" opens its plan on step 1: the worktree with a change is chec
   expect(within(dialog).getByText('uncommitted changes: check it to sync it anyway')).toBeTruthy()
 })
 
-test('"Run again, keep the conflict" after a forced run asks the consent again on step 1, never a skeleton', async () => {
+test('"Resolve by hand" after a forced run asks the consent again on step 1, never a skeleton', async () => {
   server.use(
     http.post('/api/repos/r1/commands/sync', async ({ request }) => {
       const call = (await request.json()) as WebCall
@@ -143,7 +144,7 @@ test('"Run again, keep the conflict" after a forced run asks the consent again o
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Sync' }))
 
-  await user.click(await within(dialog).findByRole('button', { name: /^Run again, keep the conflict/ }))
+  await user.click(await within(dialog).findByRole('button', { name: /^Resolve by hand/ }))
 
   const box = await within(dialog).findByRole('checkbox', { name: 'Sync fix/login' })
   expect(box.getAttribute('data-state')).toBe('unchecked')
