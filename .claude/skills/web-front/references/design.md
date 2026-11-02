@@ -130,6 +130,7 @@ A glyph never changes colour to mean "resolved": it changes icon.
 `wtm/Worktree Item` in a `wtm/Worktree Group` (the list box).
 
 - **Every line holds on one line**, at any number of worktrees and at the dialog's width: a row, a callout's line, a status, a switch's line, a sentence of a plan. Shorter words first (in the screen's Records); a list of names is a count past one ("2 worktrees kept: uncommitted changes"); an unbounded value (a branch name) is `truncate`d with the full text in its `title`.
+- **A tree's connectors are `Rail`** (`features/worktrees/components/rail.tsx`), the one drawing: each child draws its piece of the rail and its elbow in the border colour, the last stopping at its elbow, over any surface (no mask). The Tree, sync's step 1 and any new tree use it with their own elbow height and indent.
 - **Line 1 is the name, alone.** The reason a row is here (a pull request merged, a branch deleted on origin) is line 2, 12 muted, with its glyph and a link icon to the pull request. No badge.
 - **A leading checkbox means "in this run"**, in every list where a row can be left out. There is one control and one meaning: no segmented choice, no undecided state.
 - **The safety rule:** an unsafe row starts unchecked, with its amber reason ("1 commit on no other branch"). Checking it turns that line into the red loss ("Its 1 commit on no other branch is lost.") and tags the row "anyway". The consequence shows where it is decided. A worktree is never touched unless asked for.

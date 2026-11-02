@@ -1,4 +1,5 @@
 import { ArrowDownToLine, ArrowUpFromLine, type LucideIcon } from 'lucide-react'
+import { NameLine } from '@/features/worktrees/components/name-line'
 
 const glyph: Record<'forward' | 'push', { icon: LucideIcon; label: string }> = {
   forward: { icon: ArrowDownToLine, label: "Takes origin's commits" },
@@ -27,12 +28,7 @@ export function PlanRow({
           {lead}
         </span>
       )}
-      <span title={title} className="max-w-1/2 shrink-0 truncate font-medium">
-        {title}
-      </span>
-      <span title={message} className="min-w-0 flex-1 truncate text-muted-foreground">
-        {message}
-      </span>
+      <NameLine name={title} line={message} />
     </li>
   )
 }

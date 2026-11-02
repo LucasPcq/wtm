@@ -113,7 +113,7 @@ export function recapOf(
                 {
                   key: 'push',
                   tone: 'attention' as const,
-                  message: `Not pushed: origin keeps the old ${unpushed.length === 1 ? 'tip' : 'tips'} until you push`,
+                  message: `Not pushed: origin keeps the old ${unpushed.length === 1 ? 'tip' : 'tips'}`,
                   act: () => run(push.answers ?? []),
                   actLabel: unpushed.length === 1 ? 'Push it' : 'Push them',
                 },

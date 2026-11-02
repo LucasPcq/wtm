@@ -1,5 +1,6 @@
 import { CircleCheck, CircleMinus, CircleX, LoaderCircle, type LucideIcon } from 'lucide-react'
 import { type Tone, toneIcon } from '@/features/worktrees/components/glyph'
+import { NameLine } from '@/features/worktrees/components/name-line'
 import { cn } from '@/lib/utils'
 
 export type UnitState = 'todo' | 'now' | 'done' | 'failed'
@@ -20,12 +21,7 @@ export function RunningUnits({ rows }: { rows: { subject: string; state: UnitSta
         return (
           <li key={subject} className="flex min-h-8 items-center gap-3 text-sm">
             <Icon className={cn(toneIcon({ tone }), 'size-4')} aria-hidden="true" />
-            <span title={subject} className="max-w-1/2 shrink-0 truncate font-medium">
-              {subject}
-            </span>
-            <span title={words} className="min-w-0 flex-1 truncate text-muted-foreground">
-              {words}
-            </span>
+            <NameLine name={subject} line={words} />
           </li>
         )
       })}

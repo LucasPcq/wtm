@@ -18,6 +18,9 @@ test('done, the run counts the rebases, lists main apart, and offers to push the
   expect(within(synced).getByText('onto main · 4 commits')).toBeTruthy()
   const forwarded = within(dialog).getByRole('region', { name: 'Fast-forwarded' })
   expect(within(forwarded).getByText('3 commits from origin')).toBeTruthy()
+  // the same words as Confirm's
+  const toCheck = within(dialog).getByRole('region', { name: 'To check' })
+  expect(within(toCheck).getByText('Not pushed: origin keeps the old tips')).toBeTruthy()
 
   // synced, they stand on their parents: their plan only pushes
   server.use(
@@ -31,7 +34,7 @@ test('done, the run counts the rebases, lists main apart, and offers to push the
   expect(within(dialog).getByText('Each worktree is pushed to origin, with force-with-lease.')).toBeTruthy()
   expect(await order(dialog)).toEqual(['feat/billingpushed to origin', 'feat/billing-uipushed to origin'])
   const runs = within(dialog).getByRole('region', { name: 'How it runs' })
-  expect(within(runs).getByText('Pushed only; refused if origin moved since.')).toBeTruthy()
+  expect(within(runs).getByText('Each is pushed to origin; refused if origin moved since.')).toBeTruthy()
 })
 
 test('a conflict mid-stack fails its row, blocks the one under it, and runs again keeping the conflict', async () => {

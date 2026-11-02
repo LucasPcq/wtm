@@ -5,6 +5,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { CommandLine } from '@/features/worktrees/components/command-line'
 import { CopyPath } from '@/features/worktrees/components/copy-path'
 import { toneIcon } from '@/features/worktrees/components/glyph'
+import { NameLine } from '@/features/worktrees/components/name-line'
 import { StepOutput } from '@/features/worktrees/components/step-output'
 import type { OutcomeRow, OutcomeTone } from '@/features/worktrees/utils/outcome'
 import { cn } from '@/lib/utils'
@@ -43,14 +44,13 @@ export function OutcomeLine({
           ) : (
             <span className="size-4 shrink-0" />
           )}
-          {row.title && (
-            <span title={row.title} className="max-w-1/2 shrink-0 truncate font-medium">
-              {row.title}
+          {row.title ? (
+            <NameLine name={row.title} line={row.message} />
+          ) : (
+            <span title={row.message} className="min-w-0 flex-1 truncate">
+              {row.message}
             </span>
           )}
-          <span title={row.message} className={cn('min-w-0 flex-1 truncate', row.title && 'text-muted-foreground')}>
-            {row.message}
-          </span>
           {row.act && (
             <Button
               variant="outline"

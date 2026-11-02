@@ -94,7 +94,7 @@ export const switchWords: Record<Switch, { title: string; on: string; off: strin
   keep_conflict: {
     title: 'Leave a conflict to resolve',
     on: 'A conflict stays in progress, to resolve in its worktree.',
-    off: 'A conflict cancels that rebase; nothing changes.',
+    off: 'A conflict cancels that rebase; its worktree is untouched.',
   },
 }
 
@@ -104,7 +104,7 @@ const subject = (names: string[], many: 'worktrees' | 'branches') =>
 
 export const sentenceWords = {
   pushed: 'Each rebase is pushed; refused if origin moved since.',
-  pushOnly: 'Pushed only; refused if origin moved since.',
+  pushOnly: 'Each is pushed to origin; refused if origin moved since.',
   forwardOnly: (branches: string[]) =>
     `${subject(branches, 'branches')} ${branches.length === 1 ? 'takes' : 'take'} origin's commits; nothing is rebased.`,
   notPushed: 'Not pushed: origin keeps the old tips.',
