@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -19,6 +20,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
 
@@ -96,6 +98,7 @@ func (w world) open(context.Context, string) (runup.UseCase, error) {
 			NewOpID:   func() string { return "op-1" },
 			Now:       func() time.Time { return startedAt },
 		},
+		Teardown:  teardown.Service{Owed: owing{}},
 		Provision: provision.Service{Git: w.git, Meta: w.store},
 	}, nil
 }
@@ -153,4 +156,14 @@ func answering(_ context.Context, ports []int, _ time.Duration) map[int]bool {
 		answered[port] = true
 	}
 	return answered
+}
+
+// owing is a pending-removals.toml that owes nothing.
+type owing struct{}
+
+func (owing) Load() ([]env.OwedDrop, error) { return nil, nil }
+
+func (owing) Update(_ context.Context, change func([]env.OwedDrop) []env.OwedDrop) error {
+	change(nil)
+	return nil
 }

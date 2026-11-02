@@ -1,10 +1,12 @@
 $ wtm prune --merged; echo EXIT=$?
 
-  Step 8/8 • Confirm
+  Step 10/10 • Confirm
 
   ✓ Worktrees: feat/bad, feat/dirty, feat/merged, feat/squash
   ✓ Reparent children: leave orphaned
   ✓ Force: forced
+  · Data — no data waits on a service down
+  · Keep data — set by its flag only
   ✓ Merged: yes · --merged
   · Closed — set by its flag only
   · Gone — set by its flag only

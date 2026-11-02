@@ -1,0 +1,9 @@
+
+  ✓ clean: 1 done
+
+  Remove  feat/c
+  Data    acme_feat-c in db (kept until db is up: it is down)
+
+  ! feat/c  acme_feat-c stays in db: db is down; it is dropped once db is up (the next run up or prune)
+  ! couldn't ask for pull requests (pull requests unavailable: run `gh auth login`): open ones aren't checked, merged ones don't count as pushed
+

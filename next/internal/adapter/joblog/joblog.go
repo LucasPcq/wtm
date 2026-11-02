@@ -29,6 +29,14 @@ const (
 	fileMode = 0o600
 )
 
+// Purge removes dir, the logs of a worktree's jobs, with every log in it.
+func Purge(dir string) error {
+	if dir == "" {
+		return nil
+	}
+	return os.RemoveAll(dir)
+}
+
 // Path returns the log of the job named job in dir, "" for a name no file can
 // carry.
 func Path(dir, job string) string {

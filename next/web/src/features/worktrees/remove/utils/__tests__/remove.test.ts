@@ -13,8 +13,10 @@ const removal = (worktree: string, blockers: TeardownRemoval['blockers'] = []): 
 test('the request takes the checked worktrees and forces only when an unsafe one is among them', () => {
   const [a, b] = [removal('feat/a'), removal('feat/b', ['dirty'])]
 
-  expect(requestOf({ going: [a], reparent: false })).toEqual([{ path: 'worktree', values: ['feat/a'] }])
-  expect(requestOf({ going: [a, b], reparent: true })).toEqual([
+  expect(requestOf({ going: [a], reparent: false, dropData: false })).toEqual([
+    { path: 'worktree', values: ['feat/a'] },
+  ])
+  expect(requestOf({ going: [a, b], reparent: true, dropData: false })).toEqual([
     { path: 'worktree', values: ['feat/a', 'feat/b'] },
     { path: 'force', values: ['true'] },
     { path: 'reparent_children', values: ['true'] },

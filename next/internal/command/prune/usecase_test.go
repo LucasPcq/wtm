@@ -11,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -252,18 +253,47 @@ func TestNoFetchReadsOriginAsLastFetchedAndOnlyGoneFetches(t *testing.T) {
 	assert.True(t, fetched)
 }
 
-func TestJobsUpMakeAWorktreeUnsafeAndTheJobsTheDaemonCannotTellAreWarnedOf(t *testing.T) {
-	w := newWorld(t, seed{Jobs: []run.Job{{Name: "web", WorkDir: "", Up: true}}})
-	w.usecase.Jobs = func(context.Context) ([]run.Job, error) {
-		return []run.Job{{Name: "web", WorkDir: w.at(merged), Up: true}}, nil
-	}
+// D13: jobs up made a worktree unsafe (prune.jobs_running); they are stopped as the first phase of its removal.
+func TestJobsUpAreStoppedFirstAndTheJobsTheDaemonCannotTellAreWarnedOf(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.daemon.listed = []run.Job{{Name: "web", WorkDir: w.at(merged), Up: true, Hold: run.HoldOwn}}
 
 	planned, _ := w.plan(t, prune.Request{})
-	w.usecase.Jobs = func(context.Context) ([]run.Job, error) { return nil, run.ErrUnknown }
+	outcome, err := w.usecase.Run(t.Context(), prune.Request{Worktrees: []string{merged}}, domain.RunOptions{})
+	w.daemon.jobsErr = run.ErrUnknown
 	_, warnings := w.plan(t, prune.Request{Merged: true})
 
-	assert.Contains(t, keptOf(planned), merged)
+	require.NoError(t, err)
+	assert.NotContains(t, keptOf(planned), merged)
+	assert.Equal(t, domain.StatusDone, outcome.Result.Items[0].Status)
+	assert.Equal(t, []string{"stop web wt-feat-merged", "stop_all wt-feat-merged"}, w.daemon.calls)
 	assert.Contains(t, codes(warnings), prune.Name+domain.JobsUnknown)
+}
+
+func TestPrunePaysTheDropsOwedFirstThenOwesWhatItCannotDrop(t *testing.T) {
+	w := newWorld(t, seed{})
+	writeFile(t, filepath.Join(w.stateDir, "pending-removals.toml"), "[[pending]]\n  job = \"db\"\n  worktree = \"feat-old\"\n  ordinal = 4\n")
+	w.daemon.listed = []run.Job{{Name: "db", WorkDir: w.main, Up: true, Hold: run.HoldOwn, SharedDir: w.main}}
+	w.record(t, merged, worktree.Meta{SourceBranch: "main", Ordinal: 1, Namespaces: []string{"db"}})
+
+	outcome, err := w.usecase.Run(t.Context(), prune.Request{Worktrees: []string{merged}}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Contains(t, codes(outcome.Warnings), "prune.owed_paid")
+	assert.Equal(t, "app_feat-old\napp_feat-merged\n", readFile(t, filepath.Join(w.main, "dropped.txt")), "the debt first, then the worktree pruned")
+	assert.Equal(t, []teardown.Dropped{{Job: "db", Name: "app_feat-merged", Status: teardown.NamespaceDropped}}, outcome.Result.Items[0].Detail.Namespaces)
+	assert.NoFileExists(t, filepath.Join(w.stateDir, "pending-removals.toml"))
+}
+
+func TestADropOwedToAServiceDownStaysOwedAndIsCounted(t *testing.T) {
+	w := newWorld(t, seed{})
+	writeFile(t, filepath.Join(w.stateDir, "pending-removals.toml"), "[[pending]]\n  job = \"db\"\n  worktree = \"feat-old\"\n  ordinal = 4\n")
+
+	outcome, err := w.usecase.Run(t.Context(), prune.Request{Worktrees: []string{merged}}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Contains(t, codes(outcome.Warnings), "prune.owed")
+	assert.FileExists(t, filepath.Join(w.stateDir, "pending-removals.toml"))
 }
 
 func TestADaemonOfAnotherBuildIsWarnedOfWithItsRestart(t *testing.T) {

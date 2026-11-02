@@ -1,0 +1,13 @@
+
+  ✓ run up: 1 done
+
+  Worktrees  feat/d
+  Profile    data
+  Jobs       db (joined, in main), api, web
+
+  ! dropped acme_feat-c from db, owed since its worktree was removed
+
+  Addresses
+    api  http://api.feat-d.acme.localhost:24392
+    web  http://web.feat-d.acme.localhost:24392
+

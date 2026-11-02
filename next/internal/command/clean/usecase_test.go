@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -472,37 +473,57 @@ func TestAWorktreeOnNoBranchIsFoundByAPathFromWhereTheCallerStands(t *testing.T)
 	assert.NoDirExists(t, w.at("detached"))
 }
 
-func TestJobsUpRefuseTheRemovalUntilForcedThenAreNamed(t *testing.T) {
+// D13, B19: jobs up refused the removal (clean.jobs_running), and a worktree that only held a claim on a shared service counted as running jobs.
+func TestTheWorktreesOwnJobsAreStoppedAndItsClaimLetGoOfOnceItsDataIsDropped(t *testing.T) {
 	w := newWorld(t, seed{})
-	w.usecase.Jobs = func(context.Context) ([]run.Job, error) {
-		return []run.Job{{Name: "web", WorkDir: w.at(plain), Up: true}, {Name: "api", WorkDir: w.at(parent), Up: true}}, nil
-	}
+	w.daemon.listed = append(dbUp(w.main, w.at(plain)), run.Job{Name: "web", WorkDir: w.at(plain), Up: true, Hold: run.HoldOwn})
+	w.record(t, plain, worktree.Meta{SourceBranch: "main", Ordinal: 1, Namespaces: []string{"db"}})
 
-	_, err := w.usecase.Run(t.Context(), removing(plain), domain.RunOptions{DryRun: true})
-	refused := failureOf(t, err)
-	_, warnings := w.plan(t, clean.Request{Worktrees: []string{plain}, Force: true})
+	outcome, err := w.usecase.Run(t.Context(), removing(plain), domain.RunOptions{})
 
-	require.Len(t, refused.Fields, 1)
-	assert.Equal(t, "clean.jobs_running", refused.Fields[0].Code)
-	require.NotNil(t, refused.Fields[0].FollowUp)
-	assert.Equal(t, "run down", refused.Fields[0].FollowUp.Command)
-	assert.Equal(t, []string{"clean.jobs_left"}, codes(warnings))
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusDone, outcome.Result.Items[0].Status)
+	assert.Equal(t, []string{"stop web wt-feat-plain", "stop_all wt-feat-plain"}, w.daemon.calls)
+	assert.Equal(t, []teardown.Dropped{{Job: "db", Name: "app_feat-plain", Status: teardown.NamespaceDropped}}, outcome.Result.Items[0].Detail.Namespaces)
+	assert.Equal(t, "app_feat-plain:5432\n", readFile(t, filepath.Join(w.main, "dropped.txt")), "dropped from the main checkout with the worktree's ports")
+	assert.Empty(t, outcome.Warnings)
 }
 
-func TestAForcedWorktreeGitFailsToRemoveIsNotSaidRemovedWithItsJobsNorItsData(t *testing.T) {
+func TestAJobThatWillNotStopKeepsTheWorktreeUnlessForced(t *testing.T) {
+	for name, force := range map[string]bool{"kept": false, "forced": true} {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t, seed{Jobs: []run.Job{{Name: "web", Up: true, Hold: run.HoldOwn}}})
+			w.daemon.listed[0].WorkDir = w.at(plain)
+			w.daemon.stuck = []string{"web"}
+
+			outcome, err := w.usecase.Run(t.Context(), clean.Request{Worktrees: []string{plain}, Force: force}, domain.RunOptions{})
+
+			require.NoError(t, err)
+			item := outcome.Result.Items[0]
+			if force {
+				assert.Equal(t, domain.StatusDone, item.Status)
+				assert.Equal(t, []string{"clean.jobs_left"}, codes(item.Warnings))
+				return
+			}
+			assert.Equal(t, domain.StatusFailed, item.Status)
+			assert.Equal(t, "clean.stop_failed", item.Err.Code)
+			assert.True(t, w.stands(t, plain))
+		})
+	}
+}
+
+func TestAForcedWorktreeGitFailsToRemoveKeepsItsDataAndItsClaim(t *testing.T) {
 	w := newWorld(t, seed{})
 	w.usecase.Teardown.Git = failingRemove{w.repo, w.at(plain)}
-	w.record(t, plain, worktree.Meta{SourceBranch: "main", Namespaces: []string{"acme_feat_plain"}})
-	w.usecase.Jobs = func(context.Context) ([]run.Job, error) {
-		return []run.Job{{Name: "web", WorkDir: w.at(plain), Up: true}}, nil
-	}
+	w.daemon.listed = dbUp(w.main, w.at(plain))
+	w.record(t, plain, worktree.Meta{SourceBranch: "main", Ordinal: 1, Namespaces: []string{"db"}})
 
 	outcome, err := w.usecase.Run(t.Context(), clean.Request{Worktrees: []string{plain}, Force: true}, domain.RunOptions{})
 
 	require.NoError(t, err)
 	assert.Equal(t, domain.StatusFailed, outcome.Result.Items[0].Status)
-	assert.NotContains(t, codes(outcome.Warnings), "clean.jobs_left")
-	assert.NotContains(t, codes(outcome.Warnings), "clean.data_kept")
+	assert.Empty(t, w.daemon.calls)
+	assert.NoFileExists(t, filepath.Join(w.main, "dropped.txt"))
 }
 
 func TestJobsTheDaemonCannotTellAreWarnedOfAndRefuseNothing(t *testing.T) {
@@ -563,26 +584,75 @@ func TestCommitsAMergedPullRequestHoldsAsItsHeadAreNotUnpushed(t *testing.T) {
 	}
 }
 
-func TestTheDataAWorktreeHoldsInSharedServicesIsNamedAsKept(t *testing.T) {
+func TestTheDataOfAServiceDownIsOwedUntilItIsUp(t *testing.T) {
 	w := newWorld(t, seed{})
-	w.record(t, plain, worktree.Meta{SourceBranch: "main", Namespaces: []string{"acme_feat_plain"}})
+	w.record(t, plain, worktree.Meta{SourceBranch: "main", Ordinal: 1, Namespaces: []string{"db"}})
 
-	_, warnings := w.plan(t, removing(plain))
+	planned, _ := w.plan(t, removing(plain))
+	outcome, err := w.usecase.Run(t.Context(), removing(plain), domain.RunOptions{})
 
-	require.Equal(t, []string{"clean.data_kept"}, codes(warnings))
-	assert.Equal(t, "acme_feat_plain", warnings[0].Params["namespaces"])
+	require.NoError(t, err)
+	assert.Equal(t, teardown.DataDefer, planned.Worktrees[0].Data[0].Status)
+	assert.Equal(t, []string{"clean.data_deferred"}, codes(outcome.Result.Items[0].Warnings))
+	owed := readFile(t, filepath.Join(w.stateDir, "pending-removals.toml"))
+	assert.Contains(t, owed, "schema = 2")
+	assert.Contains(t, owed, `job = "db"`)
+	assert.Contains(t, owed, `name = "app_feat-plain"`)
+	assert.Contains(t, owed, `DB_PORT = "5432"`)
+}
+
+func TestDropDataStartsTheServiceToDropTheDataNow(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.record(t, plain, worktree.Meta{SourceBranch: "main", Ordinal: 1, Namespaces: []string{"db"}})
+
+	outcome, err := w.usecase.Run(t.Context(), clean.Request{Worktrees: []string{plain}, DropData: true}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, teardown.NamespaceDropped, outcome.Result.Items[0].Detail.Namespaces[0].Status)
+	assert.Equal(t, []string{"start db", "stop_all wt-feat-plain", "stop db main"}, w.daemon.calls)
+	assert.NoFileExists(t, filepath.Join(w.stateDir, "pending-removals.toml"))
+}
+
+func TestKeepDataKeepsTheDataAndRefusesDropData(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.daemon.listed = dbUp(w.main)
+	w.record(t, plain, worktree.Meta{SourceBranch: "main", Ordinal: 1, Namespaces: []string{"db"}})
+
+	outcome, err := w.usecase.Run(t.Context(), clean.Request{Worktrees: []string{plain}, KeepData: true}, domain.RunOptions{})
+	_, both := w.usecase.Run(t.Context(), clean.Request{Worktrees: []string{plain}, KeepData: true, DropData: true}, domain.RunOptions{DryRun: true})
+
+	require.NoError(t, err)
+	assert.Equal(t, []teardown.Dropped{{Job: "db", Name: "app_feat-plain", Status: teardown.NamespaceKept, Reason: teardown.ReasonKeepData}}, outcome.Result.Items[0].Detail.Namespaces)
+	assert.Equal(t, []string{"clean.data_kept"}, codes(outcome.Result.Items[0].Warnings))
+	assert.NoFileExists(t, filepath.Join(w.main, "dropped.txt"))
+	assert.Equal(t, map[string][]string{"keep_data": {"clean.data_both_ways"}}, fieldCodes(failureOf(t, both).Fields))
+}
+
+func TestTheDataQuestionIsAskedOnlyWhenAServiceHoldingDataIsDown(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.record(t, plain, worktree.Meta{SourceBranch: "main", Ordinal: 1, Namespaces: []string{"db"}})
+
+	down := w.questions(t, removing(plain))
+	kept := w.questions(t, clean.Request{Worktrees: []string{plain}, KeepData: true})
+	w.daemon.listed = dbUp(w.main)
+	up := w.questions(t, removing(plain))
+
+	assert.Equal(t, []string{"db"}, down.Down)
+	assert.Empty(t, down.DropData.Skip)
+	assert.Equal(t, domain.SkipNoDataOwed, kept.DropData.Skip)
+	assert.Equal(t, domain.SkipNoDataOwed, up.DropData.Skip)
 }
 
 // Only the records of worktrees were read: a branch no worktree holds lost its record, and the data it named went unmentioned.
-func TestTheDataABranchNoWorktreeHoldsKeepsIsNamedToo(t *testing.T) {
+func TestTheDataABranchNoWorktreeHoldsIsPlannedToo(t *testing.T) {
 	w := newWorld(t, seed{})
 	gittest.Git(t, w.main, "branch", "feat/left", "main")
-	w.record(t, "feat/left", worktree.Meta{SourceBranch: "main", Namespaces: []string{"acme_feat_left"}})
+	w.record(t, "feat/left", worktree.Meta{SourceBranch: "main", Ordinal: 3, Namespaces: []string{"db"}})
 
-	_, warnings := w.plan(t, removing("feat/left"))
+	planned, _ := w.plan(t, removing("feat/left"))
 
-	require.Equal(t, []string{"clean.data_kept"}, codes(warnings))
-	assert.Equal(t, "acme_feat_left", warnings[0].Params["namespaces"])
+	require.Len(t, planned.Worktrees[0].Data, 1)
+	assert.Equal(t, "app_feat-left", planned.Worktrees[0].Data[0].Name)
 }
 
 func TestACancelSkipsTheWorktreesNotStarted(t *testing.T) {

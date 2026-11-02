@@ -33,8 +33,10 @@ const (
 	PhasePorts       Phase = "ports"        // its ports settled in its .env files
 	PhaseOnCreate    Phase = "on_create"    // the project's on_create hooks
 	PhaseMove        Phase = "move"         // extract moves its changes
+	PhaseStopJobs    Phase = "stop_jobs"    // the run daemon stops the jobs a worktree runs for itself, before it is removed
 	PhaseOnClean     Phase = "on_clean"     // the project's on_clean hooks, before a worktree is removed
 	PhaseRemove      Phase = "remove"       // git removes the worktree, its branch and its meta record go
+	PhaseDropData    Phase = "drop_data"    // the namespaces a removed worktree made in shared services dropped
 	PhaseExec        Phase = "exec"         // a command exec runs in the worktree
 	PhaseRebase      Phase = "rebase"       // sync rebases its branch onto its parent
 	PhasePush        Phase = "push"         // sync force-pushes its branch to origin
@@ -43,7 +45,7 @@ const (
 
 // Phases returns every Phase, in the order a subject's work runs them.
 func Phases() []Phase {
-	return []Phase{PhaseFastForward, PhaseWorktree, PhaseEnv, PhaseMeta, PhaseOrdinal, PhasePorts, PhaseOnCreate, PhaseMove, PhaseOnClean, PhaseRemove, PhaseExec, PhaseRebase, PhasePush, PhaseJob}
+	return []Phase{PhaseFastForward, PhaseWorktree, PhaseEnv, PhaseMeta, PhaseOrdinal, PhasePorts, PhaseOnCreate, PhaseMove, PhaseStopJobs, PhaseOnClean, PhaseRemove, PhaseDropData, PhaseExec, PhaseRebase, PhasePush, PhaseJob}
 }
 
 // PhaseStarted reports that a phase of a subject's work begins; Job names the job a PhaseJob starts, Log the file its output goes to, if any.

@@ -5,6 +5,6 @@ export const removeWords: RemovalWords = {
   past: 'removed',
   noun: 'removal',
   outcome: { failed: "Couldn't remove", check: 'To check', done: 'Removed' },
-  dataKept: 'clean.data_kept',
+  command: 'clean',
 }
 export const unsafeCode = 'clean.unsafe'

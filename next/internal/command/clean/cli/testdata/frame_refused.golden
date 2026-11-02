@@ -1,9 +1,11 @@
 
-  Step 4/4 • Cannot apply this plan
+  Step 6/6 • Cannot apply this plan
 
   ✓ Worktrees: feat/dirty
   · Reparent children — no child worktree is left behind
   ✓ Force: not forced
+  · Data — no data waits on a service down
+  · Keep data — set by its flag only
 
   ┃  Review & confirm
   ┃

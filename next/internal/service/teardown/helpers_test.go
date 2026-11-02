@@ -17,7 +17,7 @@ func (w world) facts(t *testing.T, config project.Config, names ...string) teard
 	t.Helper()
 	snapshot, err := w.git.Snapshot(t.Context())
 	require.NoError(t, err)
-	facts := teardown.Facts{Repository: worktree.Repository{Config: config, Snapshot: snapshot, MainPath: "/repo/main"}, Records: map[string]worktree.Meta{}}
+	facts := teardown.Facts{Repository: worktree.Repository{Config: config, Run: w.run, Snapshot: snapshot, MainPath: "/repo/main"}, Records: map[string]worktree.Meta{}}
 	for _, w2 := range snapshot.Worktrees {
 		if record, err := w.store.Load(w2.Branch()); err == nil {
 			facts.Records[w2.Branch()] = record
@@ -26,6 +26,8 @@ func (w world) facts(t *testing.T, config project.Config, names ...string) teard
 	checked := w.worktrees(t, facts, names...)
 	facts.Checks, err = w.service.Read(t.Context(), teardown.ReadParams{Worktrees: checked, Going: teardown.Branches(checked)})
 	require.NoError(t, err)
+	facts.Envs = w.service.Envs(facts, checked)
+	facts.Settle(checked, w.daemon.listed, nil)
 	return facts
 }
 
@@ -57,6 +59,29 @@ func (w world) removeIn(ctx context.Context, t *testing.T, facts teardown.Facts,
 	return removed, events
 }
 
+// batch removes the worktrees of names, their data under choice, forced or not.
+func (w world) batch(t *testing.T, facts teardown.Facts, choice teardown.Choice, force bool, names ...string) ([]teardown.Removed, []domain.Warning, []domain.Event) {
+	t.Helper()
+	var removals []teardown.Removal
+	for _, name := range names {
+		removals = append(removals, w.removal(t, facts, name).With(choice))
+	}
+	var events []domain.Event
+	removed, warnings := w.service.Batch(t.Context(), teardown.BatchParams{Command: command, Facts: facts, Removals: removals, Force: force, Report: func(e domain.Event) { events = append(events, e) }})
+	return removed, warnings, events
+}
+
+// phases are the phases events started, in order.
+func phases(events []domain.Event) []domain.Phase {
+	var found []domain.Phase
+	for _, event := range events {
+		if started, ok := event.(domain.PhaseStarted); ok {
+			found = append(found, started.Phase)
+		}
+	}
+	return found
+}
+
 func base() project.Config {
 	return project.Config{Worktrees: project.Worktrees{BaseBranch: "main"}}
 }
@@ -67,4 +92,20 @@ func codes(warnings []domain.Warning) []string {
 		found = append(found, warning.Code)
 	}
 	return found
+}
+
+// plainData are the namespaces of a plan as its JSON shows them.
+func plainData(data []teardown.Namespace) []teardown.Namespace {
+	found := make([]teardown.Namespace, 0, len(data))
+	for _, n := range data {
+		found = append(found, teardown.Namespace{Job: n.Job, Name: n.Name, Status: n.Status, Reason: n.Reason})
+	}
+	return found
+}
+
+// payParams are the repository as a command paying the drops owed reads it.
+func (w world) payParams(t *testing.T) teardown.PayParams {
+	t.Helper()
+	facts := w.facts(t, base())
+	return teardown.PayParams{Command: command, Repository: facts.Repository, Records: facts.Records}
 }

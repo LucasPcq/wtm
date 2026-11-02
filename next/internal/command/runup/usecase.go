@@ -23,6 +23,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 )
 
 // ----------------------------------------------------------------------------
@@ -50,6 +51,7 @@ type UseCase struct {
 	Repository repository.Service
 	Operations operation.Service
 	Provision  provision.Service
+	Teardown   teardown.Service
 }
 
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, or a refusal before the apply).
@@ -176,10 +178,18 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // CodeDaemonUnavailable fails a start that could not begin: the run daemon of this build could not be made sure of.
 const CodeDaemonUnavailable = Name + ".daemon_unavailable"
 
+// The codes of the drops removed worktrees owed, paid by a start: one dropped, one withdrawn (a worktree reaches its namespace again), one that failed, one the queue could not forget.
+const (
+	CodeOwedPaid       = Name + teardown.OwedPaid
+	CodeOwedWithdrawn  = Name + teardown.OwedWithdrawn
+	CodeDropFailed     = Name + teardown.DropFailed
+	CodeOwedUnrecorded = Name + teardown.OwedUnrecorded
+)
+
 // CodeStopFailed warns of a worktree whose jobs an exclusive start could not stop.
 const CodeStopFailed = Name + ".stop_failed"
 
-// Apply makes sure of a run daemon of this build, stops the other worktrees' jobs when the plan says so, then starts each worktree's jobs, the worktrees at once, each one's in order; a worktree that fails stops none of the others. Once ctx is cancelled, the jobs the daemon took keep running and the jobs not reached are not started. The items keep the plan's order.
+// Apply makes sure of a run daemon of this build, stops the other worktrees' jobs when the plan says so, then starts each worktree's jobs, the worktrees at once, each one's in order; a worktree that fails stops none of the others. Then the namespaces removed worktrees owe a shared service now up are dropped (teardown.Service.Pay). Once ctx is cancelled, the jobs the daemon took keep running and the jobs not reached are not started. The items keep the plan's order.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	// The worktrees report from several goroutines; a surface draws one event at a time.
 	var mu sync.Mutex
@@ -210,6 +220,12 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 		wg.Go(func() { items[i] = u.start(ctx, plan, t, serial) })
 	}
 	wg.Wait()
+
+	// A shared service this start brought up takes back what removed worktrees owe it.
+	if ctx.Err() == nil {
+		paid := u.Teardown.Pay(ctx, teardown.PayParams{Command: Name, Repository: plan.facts.Repository, Records: plan.facts.Records})
+		warnings = append(warnings, paid.Warnings...)
+	}
 
 	return Result{Items: items, Warnings: warnings, FollowUps: plan.next(items)}
 }
@@ -335,9 +351,6 @@ const (
 // defaultProbe is how long a start waits for the ports its services declare when run.toml does not say.
 const defaultProbe = 15 * time.Second
 
-// logsDir is where the jobs' logs go under wtm's state: a directory per worktree, a log per job.
-const logsDir = "logs"
-
 // starting is one worktree's start under way: what it starts from, and its item.
 type starting struct {
 	UseCase
@@ -420,7 +433,7 @@ func (s *starting) prepare(ctx context.Context) *domain.Error {
 	if err != nil {
 		return domain.AsError(domain.AsErrorParams{Err: err, Code: CodeEnvUnavailable, Message: "couldn't read the main checkout's environment"})
 	}
-	s.shared = &run.Shared{WorkDir: main.Path, Env: mainEnv, LogDir: s.logDir(main.Branch)}
+	s.shared = &run.Shared{WorkDir: main.Path, Env: mainEnv, LogDir: run.LogDir(s.StateDir, main.Branch)}
 	return nil
 }
 
@@ -532,7 +545,7 @@ func (s *starting) spec(job project.Job) run.Spec {
 		WorkDir: s.target.Path,
 		Env:     withPorts(s.env, s.plan.facts.jobParams(s.target, s.ordinal).JobPorts(job)),
 		Unset:   env.NotInherited(s.plan.facts.Run),
-		LogDir:  s.logDir(s.target.Branch),
+		LogDir:  run.LogDir(s.StateDir, s.target.Branch),
 		Origin:  &run.Origin{Root: s.plan.facts.MainPath, CommonDir: s.CommonDir, Branch: s.target.Branch, CorrelationID: s.plan.correlationID},
 		Routes:  s.routes(job),
 	}
@@ -564,14 +577,6 @@ func (s *starting) routes(job project.Job) []run.Route {
 		}
 	}
 	return routes
-}
-
-// logDir is where the jobs of branch keep their logs; none for a worktree on no branch.
-func (s *starting) logDir(branch string) string {
-	if branch == "" || s.StateDir == "" {
-		return ""
-	}
-	return filepath.Join(s.StateDir, logsDir, worktree.StateSegment(branch))
 }
 
 // logFile is the log the job spec starts writes to, none when it keeps none.

@@ -25,7 +25,7 @@ export type RemovalWords = {
   past: string
   noun: string
   outcome: Record<OutcomeKind, string>
-  dataKept: string
+  command: Teardown
 }
 
 export function RemovalProgress({
@@ -58,7 +58,7 @@ export function RemovalProgress({
   const error = progress.envelope?.error
   const refused =
     progress.refused ?? (items.some((item) => item.error) || error?.kind === 'cancelled' ? undefined : error?.message)
-  const { groups, warnings, kept } = recapOf(progress, words.dataKept)
+  const { groups, warnings, data } = recapOf(progress, words.command)
   const reparentNow = useReparentNow(repo)
   const reparenting = useRun(repo, 'reparent').running
   const act: Act = {
@@ -105,7 +105,7 @@ export function RemovalProgress({
         {!running && <RunFailure message={refused} />}
         {!running && <RunOutcome groups={groups} labels={words.outcome} warnings={toCheck} act={act} />}
         <RunSteps progress={progress} running={running}>
-          {kept.map((line) => (
+          {data.map((line) => (
             <p key={line} className="flex items-start gap-2 text-xs text-muted-foreground">
               <Database className="mt-px size-3.5 shrink-0" aria-hidden="true" />
               {line}

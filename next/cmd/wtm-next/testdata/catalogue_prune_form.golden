@@ -24,6 +24,22 @@
     },
     {
       "kind": "confirm",
+      "path": "drop_data",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "keep_data",
+      "value": false,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
       "path": "merged",
       "value": false,
       "no_first": false,

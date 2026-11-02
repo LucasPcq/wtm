@@ -15,7 +15,7 @@ import (
 
 //go-sumtype:decl Change
 
-// A Change is what an update decided to do with a file: [Write] or [Keep].
+// A Change is what an update decided to do with a file: [Write], [Keep] or [Remove].
 type Change interface{ change() }
 
 // Write replaces the file with Data.
@@ -24,8 +24,12 @@ type Write struct{ Data []byte }
 // Keep leaves the file as it is.
 type Keep struct{}
 
-func (Write) change() {}
-func (Keep) change()  {}
+// Remove deletes the file, when it exists.
+type Remove struct{}
+
+func (Write) change()  {}
+func (Keep) change()   {}
+func (Remove) change() {}
 
 const lockSuffix = ".lock"
 
@@ -78,6 +82,11 @@ func update(params UpdateParams) (bool, error) {
 	switch next := change.(type) {
 	case Keep:
 		return false, nil
+	case Remove:
+		if info == nil {
+			return false, nil
+		}
+		return true, os.Remove(params.Path)
 	case Write:
 		if info != nil && bytes.Equal(current, next.Data) {
 			return false, nil

@@ -21,6 +21,23 @@
       "no_first": true,
       "rememberable": false,
       "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "drop_data",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "keep_data",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
     }
   ],
   "problems": []

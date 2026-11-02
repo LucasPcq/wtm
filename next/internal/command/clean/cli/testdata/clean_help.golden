@@ -4,18 +4,20 @@
   A worktree on no branch is named by its path; a branch no worktree holds is deleted alone.
 
   A worktree that is locked, has uncommitted changes, holds commits no other branch nor remote
-  holds, has an open pull request or runs jobs is unsafe: one unsafe worktree refuses the whole
+  holds or has an open pull request is unsafe: one unsafe worktree refuses the whole
   run before anything is removed, unless --force. --force lifts that refusal only: it still
   asks to confirm, unless --yes.
 
-  Each worktree is removed in turn, its on_clean hooks first: a failing hook keeps it. A failure
+  Each worktree is removed in turn: the jobs it runs stopped first (one that will not stop keeps
+  it, unless --force), then its on_clean hooks: a failing hook keeps it. A failure
   does not stop the others. The children a removal leaves behind stay on their removed parent,
   named with the `wtm reparent` that moves them, unless --reparent-children moves them onto the
   nearest worktree that stays, else the base branch.
 
-  Until the run module moves to wtm-next, clean neither stops a worktree's jobs nor drops the
-  data it holds in shared services: jobs up refuse the removal unless --force, and the data
-  kept is named.
+  The data a worktree made in shared services (a database, a bucket) is dropped once it is
+  removed, its claims let go of after the last removal. A service that is down cannot drop it:
+  it is owed until the service next starts (run up or prune drops it then), unless --drop-data
+  starts the service to drop it now. --keep-data keeps it all.
 
   Usage:
     wtm-next clean [worktree...] [flags]
@@ -38,10 +40,12 @@
 
   Flags:
         --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+        --drop-data                   Start a shared service that is down to drop the namespaces the removed worktrees made in it now, rather than once it next starts
     -n, --dry-run                     Show the plan and its fingerprint, apply nothing
         --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
-        --force                       Remove a worktree that is locked, has uncommitted changes, unpushed commits, an open pull request or jobs running
+        --force                       Remove a worktree that is locked, has uncommitted changes, unpushed commits or an open pull request, or whose jobs would not stop
     -h, --help                        help for clean
+        --keep-data                   Keep the namespaces the removed worktrees made in shared services (databases, buckets): nothing is dropped
         --output string               Output format: text or json (default "text")
         --reparent-children           Move the children a removed worktree leaves behind onto its nearest surviving ancestor, else the base branch
     -y, --yes                         Run unattended: no question, no confirmation (worktrees required; children stay orphaned unless --reparent-children; an unsafe worktree still refuses the run unless --force)

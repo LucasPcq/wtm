@@ -25,6 +25,13 @@ func words(q prune.Questions, field domain.Field) form.Words {
 			"true":  {Label: "Yes, prune them anyway", Short: "forced"},
 			"false": {Label: "No", Short: "not forced"},
 		}}
+	case prune.PathDropData:
+		return form.Words{Flag: "--drop-data", Label: "Data", Help: dropDataHelp(q), Options: map[string]form.OptionWords{
+			"true":  {Label: "Start " + services(q) + " and drop it now", Short: "drop now"},
+			"false": {Label: "Keep it until " + services(q) + " next starts", Short: "drop later"},
+		}}
+	case prune.PathKeepData:
+		return form.Words{Flag: "--keep-data", Label: "Keep data", Help: "Keep the namespaces the pruned worktrees made in shared services (databases, buckets): nothing is dropped"}
 	case prune.PathMerged:
 		return form.Words{Flag: "--merged", Label: "Merged", Help: "Prune the worktrees whose pull request merged (none of --merged, --closed, --gone asks for all three)"}
 	case prune.PathClosed:
@@ -75,9 +82,24 @@ func reparentHelp(q prune.Questions) string {
 	return strings.Join(lines, "\n")
 }
 
+func dropDataHelp(q prune.Questions) string {
+	if len(q.Down) == 0 {
+		return "Start a shared service that is down to drop the namespaces the pruned worktrees made in it now, rather than once it next starts"
+	}
+	return "The pruned worktrees made data in " + services(q) + ", which is down: start it to drop that data now, or keep it until it next starts (then run up or prune drops it)"
+}
+
+// services names the shared services down that the data waits on, "the service" when none is known.
+func services(q prune.Questions) string {
+	if len(q.Down) == 0 {
+		return "the service"
+	}
+	return strings.Join(q.Down, ", ")
+}
+
 func forceHelp(q prune.Questions) string {
 	if len(q.Unsafe) == 0 {
-		return "Prune a worktree that is locked, has uncommitted changes, unpushed commits, an open pull request or jobs running"
+		return "Prune a worktree that is locked, has uncommitted changes, unpushed commits or an open pull request, or whose jobs would not stop"
 	}
 
 	lines := []string{"These worktrees are unsafe to remove:"}

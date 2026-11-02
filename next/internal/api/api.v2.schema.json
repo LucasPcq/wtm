@@ -423,6 +423,12 @@
     "clean.Detail": {
       "additionalProperties": false,
       "properties": {
+        "namespaces": {
+          "items": {
+            "$ref": "#/$defs/teardown.Dropped"
+          },
+          "type": "array"
+        },
         "path": {
           "type": "string"
         }
@@ -572,6 +578,54 @@
             "properties": {
               "path": {
                 "const": "force"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "drop_data"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "keep_data"
               },
               "values": {
                 "items": {
@@ -1618,6 +1672,7 @@
         "all",
         "no_orphan",
         "safe",
+        "no_data_owed",
         "no_candidate",
         "no_descendant",
         "no_rebase",
@@ -3415,6 +3470,12 @@
         "branch": {
           "type": "string"
         },
+        "data": {
+          "items": {
+            "$ref": "#/$defs/teardown.Namespace"
+          },
+          "type": "array"
+        },
         "hooks": {
           "items": {
             "type": "string"
@@ -3429,12 +3490,6 @@
         },
         "missing": {
           "type": "boolean"
-        },
-        "namespaces": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
         },
         "path": {
           "type": "string"
@@ -3480,6 +3535,12 @@
     "prune.Detail": {
       "additionalProperties": false,
       "properties": {
+        "namespaces": {
+          "items": {
+            "$ref": "#/$defs/teardown.Dropped"
+          },
+          "type": "array"
+        },
         "path": {
           "type": "string"
         },
@@ -3665,6 +3726,54 @@
             "properties": {
               "path": {
                 "const": "force"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "drop_data"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "keep_data"
               },
               "values": {
                 "items": {
@@ -5660,6 +5769,55 @@
       },
       "type": "array"
     },
+    "teardown.DataReason": {
+      "description": "Why a namespace a removed worktree made in a shared service is not dropped with it.",
+      "enum": [
+        "keep_data",
+        "shared_name",
+        "service_down"
+      ]
+    },
+    "teardown.DataStatus": {
+      "description": "What a removal's plan does with a namespace its worktree made in a shared service.",
+      "enum": [
+        "drop",
+        "start",
+        "defer",
+        "keep"
+      ]
+    },
+    "teardown.DropStatus": {
+      "description": "What became of a namespace a removed worktree made in a shared service.",
+      "enum": [
+        "dropped",
+        "deferred",
+        "kept",
+        "failed"
+      ]
+    },
+    "teardown.Dropped": {
+      "additionalProperties": false,
+      "properties": {
+        "job": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/teardown.DataReason"
+        },
+        "status": {
+          "$ref": "#/$defs/teardown.DropStatus"
+        }
+      },
+      "required": [
+        "job",
+        "name",
+        "status"
+      ],
+      "type": "object"
+    },
     "teardown.Move": {
       "additionalProperties": false,
       "properties": {
@@ -5683,6 +5841,29 @@
       ],
       "type": "object"
     },
+    "teardown.Namespace": {
+      "additionalProperties": false,
+      "properties": {
+        "job": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/teardown.DataReason"
+        },
+        "status": {
+          "$ref": "#/$defs/teardown.DataStatus"
+        }
+      },
+      "required": [
+        "job",
+        "name",
+        "status"
+      ],
+      "type": "object"
+    },
     "teardown.Removal": {
       "additionalProperties": false,
       "properties": {
@@ -5702,6 +5883,12 @@
         "branch": {
           "type": "string"
         },
+        "data": {
+          "items": {
+            "$ref": "#/$defs/teardown.Namespace"
+          },
+          "type": "array"
+        },
         "hooks": {
           "items": {
             "type": "string"
@@ -5716,12 +5903,6 @@
         },
         "missing": {
           "type": "boolean"
-        },
-        "namespaces": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
         },
         "path": {
           "type": "string"
@@ -6190,8 +6371,7 @@
         "locked",
         "dirty",
         "unpushed",
-        "open_pull_request",
-        "jobs_running"
+        "open_pull_request"
       ]
     },
     "worktree.Change": {

@@ -1,0 +1,18 @@
+$ wtm clean feat/a; echo EXIT=$?
+
+  Step 3/4 • Some shared services are down
+
+  ✓ Worktrees: feat/a
+  ⊘ Reparent children — no orphaned children
+
+  A service that is down cannot drop anything. It holds:
+    acme_feat-a in db
+
+  Kept, it is dropped the next time wtm starts the service — not if it is started some other way.
+
+▌▸ Start db and drop it now
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   Keep it until the service next starts
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

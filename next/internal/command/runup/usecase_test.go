@@ -396,6 +396,20 @@ func TestAWorktreeWhoseJobsCouldNotStopIsAWarning(t *testing.T) {
 	assert.Equal(t, domain.StatusDone, itemOf(t, result.Items, featA).Status)
 }
 
+func TestAStartPaysTheDropsRemovedWorktreesOweTheSharedServiceUp(t *testing.T) {
+	w := newWorld(t)
+	writeFile(t, filepath.Join(w.stateDir, "pending-removals.toml"), "[[pending]]\n  job = \"db\"\n  worktree = \"feat-old\"\n  ordinal = 4\n")
+	w.daemon.listed = []run.Job{{Name: "db", WorkDir: w.main, Up: true, Hold: run.HoldOwn, SharedDir: w.main}}
+
+	result, _ := w.apply(t, starting("full", featA))
+
+	assert.Equal(t, []string{runup.CodeOwedPaid}, codes(result.Warnings))
+	require.Len(t, *w.drops, 1)
+	assert.Equal(t, w.main, (*w.drops)[0].WorkDir)
+	assert.Equal(t, "app_feat-old", (*w.drops)[0].Env["WTM_NAMESPACE"])
+	assert.NoFileExists(t, filepath.Join(w.stateDir, "pending-removals.toml"))
+}
+
 func TestANamespaceTheRecordCannotKeepIsAWarning(t *testing.T) {
 	w := newWorld(t)
 	w.usecase.Meta = unwritable{w.meta}

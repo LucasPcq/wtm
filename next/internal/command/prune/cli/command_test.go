@@ -100,7 +100,7 @@ func TestEachEnvelopeOfPruneHasItsGolden(t *testing.T) {
 
 func TestAFollowUpNamingPruneIsSpelledFromItsSchema(t *testing.T) {
 	forced := domain.FollowUp{Command: prune.Name, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{dirty}}, {Path: prune.PathForce, Values: []string{"true"}}, {Path: prune.PathGone, Values: []string{"true"}}}, DryRun: true}
-	wrong := domain.FollowUp{Command: prune.Name, Answers: []domain.Answered{{Path: "keep_data", Values: []string{"true"}}}}
+	wrong := domain.FollowUp{Command: prune.Name, Answers: []domain.Answered{{Path: "no_such_field", Values: []string{"true"}}}}
 
 	assert.Equal(t, []string{"wtm-next", "prune", dirty, "--force", "--gone", "--dry-run"}, Line(forced))
 	assert.Nil(t, Line(wrong))

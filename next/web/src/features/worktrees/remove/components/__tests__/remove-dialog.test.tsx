@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { expect, onTestFinished, test } from 'vitest'
 import type { WebCall } from '@/api/types.gen'
-import { cleanPlan } from '@/test/clean'
+import { cleanPlan, cleanRun } from '@/test/clean'
 import { envelope, listDetail } from '@/test/fixtures'
 import { answeringClean, liveEvents, selectAndRemove } from '@/test/remove'
 import { renderApp } from '@/test/render'
@@ -221,4 +221,44 @@ test('children left on removed parents are reparented all at once, in one run on
       { path: 'to', values: ['main'] },
     ],
   ])
+})
+
+test('a service down that holds their data asks whether to start it to drop the data now, and the run says so', async () => {
+  const runs: WebCall[] = []
+  server.use(
+    answeringClean(
+      async (call) => {
+        const answer = await cleanPlan(call).json()
+        const start = call.answers?.some((a) => a.path === 'drop_data') ?? false
+        const data = [{ job: 'db', name: 'acme_feat_billing', status: start ? 'start' : 'defer' }]
+        answer.plan.worktrees = answer.plan.worktrees.map((removal: object) => ({ ...removal, data }))
+        return HttpResponse.json(answer)
+      },
+      (call) => {
+        runs.push(call)
+        return cleanRun(call)
+      },
+    ),
+  )
+  const { user, dialog } = await selectAndRemove('feat/billing')
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+
+  expect(
+    await within(dialog).findByText("db is down: the data these worktrees made there can't be dropped yet."),
+  ).toBeTruthy()
+  expect(
+    within(dialog)
+      .getByRole('radio', { name: /^Keep it until db next starts/ })
+      .getAttribute('aria-checked'),
+  ).toBe('true')
+  await user.click(within(dialog).getByRole('radio', { name: /^Start db and drop it now/ }))
+  await user.click(within(dialog).getByRole('button', { name: /^Details/ }))
+  expect(
+    await within(dialog).findByText('acme_feat_billing in db is dropped: db is started for it, then stopped'),
+  ).toBeTruthy()
+  await user.click(within(dialog).getByRole('button', { name: 'Remove' }))
+
+  await within(dialog).findByText(/^1 removed\./)
+  expect(runs[0]?.answers).toContainEqual({ path: 'drop_data', values: ['true'] })
 })

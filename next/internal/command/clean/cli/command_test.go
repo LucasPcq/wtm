@@ -114,7 +114,7 @@ func TestEachEnvelopeOfCleanHasItsGolden(t *testing.T) {
 		"main":         {Words: []string{"main"}, Code: uicli.ExitUsage},
 		"stale":        {Words: []string{plain, "--expect-fingerprint", fingerprint}, Code: uicli.ExitPrecondition},
 		"hook_failed":  {Seed: seed{OnClean: []project.Hook{{Cmd: "make down"}}, RunHooks: hookFails}, Words: []string{plain}, Code: uicli.ExitError},
-		"jobs_unknown": {Seed: seed{JobsErr: run.ErrUnknown}, Words: []string{plain}, Code: uicli.ExitOK},
+		"jobs_unknown": {Seed: seed{JobsErr: run.ErrUnknown}, Words: []string{plain}, Code: uicli.ExitError},
 	} {
 		t.Run(name, func(t *testing.T) {
 			got := runClean(t, newWorld(c.Seed), append(c.Words, "--output", "json")...)
@@ -128,7 +128,7 @@ func TestEachEnvelopeOfCleanHasItsGolden(t *testing.T) {
 
 func TestAFollowUpNamingCleanIsSpelledFromItsSchema(t *testing.T) {
 	forced := domain.FollowUp{Command: clean.Name, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{dirty}}, {Path: clean.PathForce, Values: []string{"true"}}}, DryRun: true}
-	wrong := domain.FollowUp{Command: clean.Name, Answers: []domain.Answered{{Path: "keep_data", Values: []string{"true"}}}}
+	wrong := domain.FollowUp{Command: clean.Name, Answers: []domain.Answered{{Path: "no_such_field", Values: []string{"true"}}}}
 
 	assert.Equal(t, []string{"wtm-next", "clean", dirty, "--force", "--dry-run"}, Line(forced))
 	assert.Nil(t, Line(wrong))

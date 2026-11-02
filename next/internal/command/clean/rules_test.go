@@ -119,17 +119,19 @@ func TestThePlanLocksEachWorktreeRemovedAndEachChildReparented(t *testing.T) {
 	assert.Equal(t, domain.WorktreeLocks([]string{parent, child}), reparenting.Locks())
 }
 
-func TestEachRemovalNamesTheHooksItRunsItsPhasesAndTheDataItKeeps(t *testing.T) {
+func TestEachRemovalNamesTheHooksItRunsItsPhasesAndTheDataItDrops(t *testing.T) {
 	w := newWorld(t, seed{Config: withHook("echo bye {{branch}}")})
-	w.record(t, plain, worktree.Meta{SourceBranch: "main", Namespaces: []string{"acme_feat_plain"}})
+	w.daemon.listed = dbUp(w.main)
+	w.record(t, plain, worktree.Meta{SourceBranch: "main", Namespaces: []string{"db"}})
 	require.NoError(t, os.RemoveAll(w.at(pushed)))
 
 	planned, _ := w.plan(t, removing(plain, pushed))
 
 	require.Len(t, planned.Worktrees, 2)
 	assert.Equal(t, []string{"echo bye feat/plain"}, planned.Worktrees[0].Hooks)
-	assert.Equal(t, []domain.Phase{domain.PhaseOnClean, domain.PhaseRemove}, planned.Worktrees[0].Phases)
-	assert.Equal(t, []string{"acme_feat_plain"}, planned.Worktrees[0].Namespaces)
+	assert.Equal(t, []domain.Phase{domain.PhaseOnClean, domain.PhaseRemove, domain.PhaseDropData}, planned.Worktrees[0].Phases)
+	require.Len(t, planned.Worktrees[0].Data, 1)
+	assert.Equal(t, teardown.DataDrop, planned.Worktrees[0].Data[0].Status)
 	assert.Empty(t, planned.Worktrees[1].Hooks, "its directory is gone: no hook runs there")
 	assert.Equal(t, []domain.Phase{domain.PhaseRemove}, planned.Worktrees[1].Phases)
 }

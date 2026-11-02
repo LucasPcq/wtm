@@ -32,7 +32,7 @@ const (
 	stepWorktrees = iota
 	stepReparent
 	stepForce
-	stepRecap = 7
+	stepRecap = 9
 )
 
 const (
@@ -137,9 +137,9 @@ func (w world) usecase() prune.UseCase {
 	return prune.UseCase{
 		Git:          w.git,
 		Meta:         w.store,
-		Jobs:         func(context.Context) ([]run.Job, error) { return nil, nil },
+		Jobs:         idle{}.Jobs,
 		PullRequests: w.pullRequests,
-		Teardown:     teardown.Service{Git: w.git, Meta: w.store, EnvFiles: w.store, StateDir: "/repo/main/.git/wtm", Gone: repository.GoneIn(w.git), RunHooks: runHooks, Shield: shell.Shield},
+		Teardown:     teardown.Service{Git: w.git, Meta: w.store, EnvFiles: w.store, Daemon: idle{}, Owed: owing{}, StateDir: "/repo/main/.git/wtm", Gone: repository.GoneIn(w.git), RunHooks: runHooks, PurgeLogs: func(string) error { return nil }, Shield: shell.Shield},
 		Repository:   repository.Service{Config: w.config, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}},
 		Operations: operation.Service{
 			Locker:    w.locks,
@@ -152,4 +152,29 @@ func (w world) usecase() prune.UseCase {
 
 func hookFails(context.Context, env.HookChain) error {
 	return &env.HookFailure{Cmd: "make down", Err: errHook}
+}
+
+// idle is a run daemon running nothing, or that cannot tell what it runs (err).
+type idle struct{ err error }
+
+func (d idle) Jobs(context.Context) ([]run.Job, error) { return nil, d.err }
+
+func (idle) Start(context.Context, run.Spec, func(run.Line)) (run.Job, error) {
+	return run.Job{}, nil
+}
+
+func (idle) Stop(context.Context, run.Stop) (run.Outcome, error) {
+	return run.OutcomeNotRunning, nil
+}
+
+func (idle) StopAll(context.Context, run.StopAll) ([]run.StoppedJob, error) { return nil, nil }
+
+// owing is a pending-removals.toml that owes nothing.
+type owing struct{}
+
+func (owing) Load() ([]env.OwedDrop, error) { return nil, nil }
+
+func (owing) Update(_ context.Context, change func([]env.OwedDrop) []env.OwedDrop) error {
+	change(nil)
+	return nil
 }

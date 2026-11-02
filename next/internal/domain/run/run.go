@@ -3,10 +3,12 @@ package run
 
 import (
 	"errors"
+	"path/filepath"
 	"slices"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
 // A Job is one job the daemon knows: its name, the worktree it runs in, the profile it was started under (empty for one started alone), whether it is up (running, detached or joined), its kind, its State (empty for a claim, which runs no process), what of it the daemon holds (Hold), whether the daemon Reaped it (an orphan stopped as it started), the PID of a process of the daemon's own, its url, the ports it binds, the code its process exited with (-1 when a signal killed it), when the daemon started it (zero once it is no longer up), the main checkout a shared job runs in, and the last line it printed (nil before any).
@@ -74,6 +76,27 @@ func UpIn(jobs []Job, dir string) []string {
 	slices.Sort(names)
 
 	return names
+}
+
+// OwnUpIn returns the names of the jobs up the worktree at dir runs for itself (Own), sorted, empty and not nil when none is.
+func OwnUpIn(jobs []Job, dir string) []string {
+	names := []string{}
+	for _, job := range jobs {
+		if job.Up && job.WorkDir == dir && Own(job) {
+			names = append(names, job.Name)
+		}
+	}
+	slices.Sort(names)
+
+	return names
+}
+
+// LogDir is where the jobs of the worktree of branch keep their logs under wtm's state stateDir, a log per job; none for a worktree on no branch.
+func LogDir(stateDir, branch string) string {
+	if branch == "" || stateDir == "" {
+		return ""
+	}
+	return filepath.Join(stateDir, "logs", worktree.StateSegment(branch))
 }
 
 // Own reports whether a worktree runs job for itself: neither its claim on a shared job another worktree runs, nor a shared job it runs for every worktree.

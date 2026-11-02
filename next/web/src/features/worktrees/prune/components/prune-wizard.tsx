@@ -7,6 +7,7 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/co
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert } from '@/features/worktrees/components/alert'
 import { ChildrenStep } from '@/features/worktrees/components/children-step'
+import { DataChoice } from '@/features/worktrees/components/data-choice'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { ItemList } from '@/features/worktrees/components/item-list'
@@ -25,7 +26,7 @@ import { requestOf } from '@/features/worktrees/prune/utils/plan'
 import { notFinished } from '@/features/worktrees/prune/utils/words'
 import { blockerWords } from '@/features/worktrees/utils/blocker-words'
 import { planWide } from '@/features/worktrees/utils/outcome'
-import { kept, riskOf, unitsOf, unsafe } from '@/features/worktrees/utils/removal'
+import { downOf, kept, riskOf, unitsOf, unsafe } from '@/features/worktrees/utils/removal'
 import { sentence } from '@/features/worktrees/utils/sentence'
 import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/utils/wizard-state'
 
@@ -42,7 +43,7 @@ export function PruneWizard({
   onStart: (start: Start) => void
   onCancel: () => void
 }) {
-  const [{ step: chosen, checked, confirmed, reparent }, dispatch] = useReducer(wizardReducer, initialWizard)
+  const [{ step: chosen, checked, confirmed, reparent, dropData }, dispatch] = useReducer(wizardReducer, initialWizard)
   const [dropped, setDropped] = useState<Left[]>([])
 
   // forced, both list every candidate with what makes it unsafe; the review is the one read that fetches origin, and
@@ -74,7 +75,7 @@ export function PruneWizard({
     })
   const going = candidates.filter(isChecked)
   const goingNames = going.map((candidate) => candidate.worktree)
-  const answers = requestOf({ named: worktrees, candidates, going, reparent })
+  const answers = requestOf({ named: worktrees, candidates, going, reparent, dropData })
   // a plan is asked on the rows once read in this opening and settled: until then its key holds nothing, not the plan
   // an earlier opening cached under the same read
   const read = rows.isFetchedAfterMount && !rows.isFetching ? rows.dataUpdatedAt : 0
@@ -214,6 +215,13 @@ export function PruneWizard({
           ))}
         </ItemList>
         <RemovalDetails removals={pruning} />
+        {downOf(pruning).length > 0 && (
+          <DataChoice
+            down={downOf(pruning)}
+            dropData={dropData}
+            onDropData={(on) => dispatch({ type: 'drop_data', dropData: on })}
+          />
+        )}
       </>
     )
   }

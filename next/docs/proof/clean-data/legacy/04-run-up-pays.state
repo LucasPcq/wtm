@@ -1,0 +1,19 @@
+## jobs up (the daemon's index)
+acme db own
+feat-d api own
+feat-d db claim
+feat-d web own
+## .git/wtm/worktrees/feat%2Fd/meta.json
+  "ordinal": 4,
+  "namespaces": [
+    "db"
+## .git/wtm/worktrees/feat%2Ff/meta.json
+  "ordinal": 5,
+## logs
+./feat%2Fd
+./main
+## namespaces made
+acme_feat-b
+acme_feat-d
+## pending-removals.toml
+(none)

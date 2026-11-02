@@ -61,39 +61,7 @@
 === 18-no-branch: exit legacy 1, next 2
 === 19-quiet: exit legacy 0, next 0
 === 20-dry-run: exit legacy 2, next 0
-=== 21-keep-data: exit legacy 0, next 2
---- legacy/21-keep-data
-+++ next/21-keep-data
-@@ -5,6 +5,7 @@
- feat/child
- feat/child2
- feat/detached
-+feat/dry
- feat/fp
- feat/unpushed
- main
-@@ -16,6 +17,7 @@
- <SB>/acme.trees/feat-child
- <SB>/acme.trees/feat-child2
- <SB>/acme.trees/feat-detached
-+<SB>/acme.trees/feat-dry
- <SB>/acme.trees/feat-fp
- <SB>/acme.trees/feat-unpushed
- ## .git/wtm/worktrees/feat%2Fbad/meta.json
-@@ -60,6 +62,13 @@
-   "ordinal": 17,
-   "isolation": "isolated"
- }
-+## .git/wtm/worktrees/feat%2Fdry/meta.json
-+{
-+  "source_branch": "main",
-+  "env_strategy": "example",
-+  "ordinal": 15,
-+  "isolation": "isolated"
-+}
- ## .git/wtm/worktrees/feat%2Ffp/meta.json
- {
-   "source_branch": "main",
+=== 21-keep-data: exit legacy 0, next 0
 === 22-detached-by-path: exit legacy 0, next 0
 --- legacy/22-detached-by-path
 +++ next/22-detached-by-path

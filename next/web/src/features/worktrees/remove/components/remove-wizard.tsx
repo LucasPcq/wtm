@@ -7,6 +7,7 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/co
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert } from '@/features/worktrees/components/alert'
 import { ChildrenStep } from '@/features/worktrees/components/children-step'
+import { DataChoice } from '@/features/worktrees/components/data-choice'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { ItemList } from '@/features/worktrees/components/item-list'
@@ -21,7 +22,7 @@ import type { Start } from '@/features/worktrees/hooks/use-run'
 import { requestOf } from '@/features/worktrees/remove/utils/plan'
 import { searched } from '@/features/worktrees/utils/filters'
 import { planWide } from '@/features/worktrees/utils/outcome'
-import { plain, riskOf, unitsOf, unsafe } from '@/features/worktrees/utils/removal'
+import { downOf, plain, riskOf, unitsOf, unsafe } from '@/features/worktrees/utils/removal'
 import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/utils/wizard-state'
 
 export function RemoveWizard({
@@ -41,7 +42,7 @@ export function RemoveWizard({
   onStart: (start: Start) => void
   onCancel: () => void
 }) {
-  const [{ step: chosen, checked, confirmed, reparent }, dispatch] = useReducer(wizardReducer, initialWizard)
+  const [{ step: chosen, checked, confirmed, reparent, dropData }, dispatch] = useReducer(wizardReducer, initialWizard)
   const [query, setQuery] = useState('')
 
   // forced, the review plans every worktree asked, the unsafe ones with what keeps them: the choices are the person's
@@ -66,7 +67,7 @@ export function RemoveWizard({
       on,
     })
   const going = removals.filter(isChecked)
-  const answers = requestOf({ going, reparent })
+  const answers = requestOf({ going, reparent, dropData })
   const planned = useQuery({
     ...dryRunQuery(repo, 'clean', answers),
     enabled: going.length > 0,
@@ -188,6 +189,13 @@ export function RemoveWizard({
           ))}
         </ItemList>
         <RemovalDetails removals={removing} />
+        {downOf(removing).length > 0 && (
+          <DataChoice
+            down={downOf(removing)}
+            dropData={dropData}
+            onDropData={(on) => dispatch({ type: 'drop_data', dropData: on })}
+          />
+        )}
       </>
     )
   }

@@ -1,0 +1,7 @@
+$ wtm clean feat/a; echo EXIT=$?
+
+┃  = Aborted.
+
+EXIT=19
+$
+

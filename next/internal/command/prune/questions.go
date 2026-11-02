@@ -10,11 +10,13 @@ import (
 // ----------------------------------------------------------------------------
 // The request
 
-// A Request is what the caller asks of prune: the worktrees to remove among those done with, none for every one safe to remove (every one when forced); whether the children they leave behind move onto the nearest worktree that stays; whether a worktree unsafe to remove is removed all the same; which reasons make a worktree done with, none for all three; and whether origin is fetched first. Caller is where the caller stands, which a removal of its own worktree steps out of; it is no field of the form: every surface sets it.
+// A Request is what the caller asks of prune: the worktrees to remove among those done with, none for every one safe to remove (every one when forced); whether the children they leave behind move onto the nearest worktree that stays; whether a worktree unsafe to remove is removed all the same; the data they made in shared services: a service down started to drop it now (DropData), or every namespace kept (KeepData); which reasons make a worktree done with, none for all three; and whether origin is fetched first. Caller is where the caller stands, which a removal of its own worktree steps out of; it is no field of the form: every surface sets it.
 type Request struct {
 	Worktrees        []string      `json:"worktree"`
 	ReparentChildren bool          `json:"reparent_children"`
 	Force            bool          `json:"force"`
+	DropData         bool          `json:"drop_data"`
+	KeepData         bool          `json:"keep_data"`
 	Merged           bool          `json:"merged"`
 	Closed           bool          `json:"closed"`
 	Gone             bool          `json:"gone"`
@@ -32,6 +34,8 @@ func (r Request) From(caller domain.Caller) Request {
 const (
 	PathReparentChildren = "reparent_children"
 	PathForce            = "force"
+	PathDropData         = "drop_data"
+	PathKeepData         = "keep_data"
 	PathMerged           = "merged"
 	PathClosed           = "closed"
 	PathGone             = "gone"
@@ -49,6 +53,10 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 		next.ReparentChildren, err = domain.Yes(path, values)
 	case PathForce:
 		next.Force, err = domain.Yes(path, values)
+	case PathDropData:
+		next.DropData, err = domain.Yes(path, values)
+	case PathKeepData:
+		next.KeepData, err = domain.Yes(path, values)
 	case PathMerged:
 		next.Merged, err = domain.Yes(path, values)
 	case PathClosed:
@@ -76,6 +84,10 @@ func (r Request) Values(path string) []string {
 		return domain.SaidYes(r.ReparentChildren)
 	case PathForce:
 		return domain.SaidYes(r.Force)
+	case PathDropData:
+		return domain.SaidYes(r.DropData)
+	case PathKeepData:
+		return domain.SaidYes(r.KeepData)
 	case PathMerged:
 		return domain.SaidYes(r.Merged)
 	case PathClosed:
@@ -103,12 +115,15 @@ func (r Request) Reasons() []Reason {
 // ----------------------------------------------------------------------------
 // The form
 
-// Questions is the request as a form: the worktrees done with, which the request picks among, those picked unless the request names some, whether to reparent the children they leave behind, named in Orphans, whether to force the picked worktrees Unsafe names, the reasons and the fetch, set by their flags only, and the request's problems as field errors.
+// Questions is the request as a form: the worktrees done with, which the request picks among, those picked unless the request names some, whether to reparent the children they leave behind, named in Orphans, whether to force the picked worktrees Unsafe names, whether to start the shared services Down that their data waits on to drop it now and whether to keep it all, the reasons and the fetch, set by their flags only, and the request's problems as field errors.
 type Questions struct {
 	Worktrees  Worktrees
 	Candidates []Candidate
 	Reparent   domain.Confirm
 	Force      domain.Confirm
+	DropData   domain.Confirm
+	KeepData   domain.Confirm
+	Down       []string
 	Merged     domain.Confirm
 	Closed     domain.Confirm
 	Gone       domain.Confirm
@@ -126,7 +141,7 @@ type Worktrees struct {
 	Skip    domain.Skip
 }
 
-// NewQuestions builds the questions for the request on the facts: every worktree done with, those the request names picked, else each one safe to remove (each one when forced); the children the picked ones leave behind, and whether to reparent them, asked only when there are some; the picked ones unsafe to remove, and whether to force them, asked only when there are some. A switch given stands as given.
+// NewQuestions builds the questions for the request on the facts: every worktree done with, those the request names picked, else each one safe to remove (each one when forced); the children the picked ones leave behind, and whether to reparent them, asked only when there are some; the picked ones unsafe to remove, and whether to force them, asked only when there are some; the services down their data waits on, and whether to start them to drop it now, asked only when there are some and the data is not kept. A switch given stands as given; keeping the data and dropping it now are refused together.
 func NewQuestions(f Facts, req Request) Questions {
 	candidates := f.Candidates(req)
 	picked, problems := f.picked(req, candidates)
@@ -134,6 +149,8 @@ func NewQuestions(f Facts, req Request) Questions {
 		Worktrees:  Worktrees{Picked: names(picked), Origin: domain.OriginDefault, Options: options(candidates)},
 		Candidates: candidates,
 		Orphans:    f.Moves(removals(picked)),
+		Down:       teardown.Down(removals(picked)),
+		KeepData:   flagOnly(req.KeepData),
 		Errors:     problems,
 		Merged:     flagOnly(req.Merged),
 		Closed:     flagOnly(req.Closed),
@@ -148,16 +165,25 @@ func NewQuestions(f Facts, req Request) Questions {
 	}
 	questions.Reparent = confirm(req.ReparentChildren, len(questions.Orphans) == 0, domain.SkipNoOrphan)
 	questions.Force = confirm(req.Force, len(questions.Unsafe) == 0, domain.SkipSafe)
+	questions.DropData = confirm(req.DropData, len(questions.Down) == 0 || req.KeepData, domain.SkipNoDataOwed)
+	if req.DropData && req.KeepData {
+		questions.Errors = append(questions.Errors, domain.FieldError{Path: PathKeepData, Code: CodeDataBothWays, Template: "{path} keeps the data, which --drop-data drops", With: []string{PathDropData}})
+	}
 
 	return questions
 }
 
-// Form is the questions as the schema a surface renders: the worktrees, whether to reparent the children left behind, whether to force the unsafe ones, then the reasons and the fetch, which only their flags set. A zero Questions gives the schema the flags and --help are spelled from.
+// CodeDataBothWays refuses a request that both keeps the data and drops it now.
+const CodeDataBothWays = Name + ".data_both_ways"
+
+// Form is the questions as the schema a surface renders: the worktrees, whether to reparent the children left behind, whether to force the unsafe ones, whether to start the services down their data waits on, then keeping the data, the reasons and the fetch, which only their flags set. A zero Questions gives the schema the flags and --help are spelled from.
 func (q Questions) Form() domain.Form {
 	return domain.Form{Problems: q.Errors, Fields: []domain.Field{
 		domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: domain.PathWorktree, Origin: q.Worktrees.Origin, Skip: q.Worktrees.Skip}, Picked: q.Worktrees.Picked, Options: q.Worktrees.Options},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathReparentChildren, Origin: q.Reparent.Origin, Skip: q.Reparent.Skip}, Value: q.Reparent.Value, NoFirst: true},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathForce, Origin: q.Force.Origin, Skip: q.Force.Skip}, Value: q.Force.Value, NoFirst: true},
+		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathDropData, Origin: q.DropData.Origin, Skip: q.DropData.Skip}, Value: q.DropData.Value, NoFirst: true},
+		flagField(PathKeepData, q.KeepData),
 		flagField(PathMerged, q.Merged),
 		flagField(PathClosed, q.Closed),
 		flagField(PathGone, q.Gone),

@@ -9,7 +9,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
-// words are how the command line words each field of clean's form; the switches name what they decide on the questions observed: the children that would move, the worktrees that are unsafe.
+// words are how the command line words each field of clean's form; the switches name what they decide on the questions observed: the children that would move, the worktrees that are unsafe, the services down that their data waits on.
 func words(q clean.Questions, field domain.Field) form.Words {
 	switch field.Spec().Path {
 	case domain.PathWorktree:
@@ -24,6 +24,13 @@ func words(q clean.Questions, field domain.Field) form.Words {
 			"true":  {Label: "Yes, remove them anyway", Short: "forced"},
 			"false": {Label: "No", Short: "not forced"},
 		}}
+	case clean.PathDropData:
+		return form.Words{Flag: "--drop-data", Label: "Data", Help: dropDataHelp(q), Options: map[string]form.OptionWords{
+			"true":  {Label: "Start " + services(q) + " and drop it now", Short: "drop now"},
+			"false": {Label: "Keep it until " + services(q) + " next starts", Short: "drop later"},
+		}}
+	case clean.PathKeepData:
+		return form.Words{Flag: "--keep-data", Label: "Keep data", Help: "Keep the namespaces the removed worktrees made in shared services (databases, buckets): nothing is dropped"}
 	}
 
 	return form.Words{}
@@ -41,9 +48,24 @@ func reparentHelp(q clean.Questions) string {
 	return strings.Join(lines, "\n")
 }
 
+func dropDataHelp(q clean.Questions) string {
+	if len(q.Down) == 0 {
+		return "Start a shared service that is down to drop the namespaces the removed worktrees made in it now, rather than once it next starts"
+	}
+	return "The removed worktrees made data in " + services(q) + ", which is down: start it to drop that data now, or keep it until it next starts (then run up or prune drops it)"
+}
+
+// services names the shared services down that the data waits on, "the service" when none is known.
+func services(q clean.Questions) string {
+	if len(q.Down) == 0 {
+		return "the service"
+	}
+	return strings.Join(q.Down, ", ")
+}
+
 func forceHelp(q clean.Questions) string {
 	if len(q.Unsafe) == 0 {
-		return "Remove a worktree that is locked, has uncommitted changes, unpushed commits, an open pull request or jobs running"
+		return "Remove a worktree that is locked, has uncommitted changes, unpushed commits or an open pull request, or whose jobs would not stop"
 	}
 
 	lines := []string{"These worktrees are unsafe to remove:"}

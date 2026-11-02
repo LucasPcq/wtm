@@ -63,13 +63,13 @@ func TestAnEntryBlankRepeatedOrTheMainWorktreeIsAProblemOfItsOwn(t *testing.T) {
 
 func TestTheAnswersOfTheFormGiveBackTheRequest(t *testing.T) {
 	w := newWorld(t, seed{})
-	req := clean.Request{Worktrees: []string{parent, dirty}, ReparentChildren: true, Force: true}
+	req := clean.Request{Worktrees: []string{parent, dirty}, ReparentChildren: true, Force: true, DropData: true}
 
 	folded, err := domain.Fold(clean.Request{}, w.questions(t, req).Form().Answers())
 
 	require.NoError(t, err)
 	assert.Equal(t, req, folded)
-	for _, path := range []string{domain.PathWorktree, clean.PathReparentChildren, clean.PathForce} {
+	for _, path := range []string{domain.PathWorktree, clean.PathReparentChildren, clean.PathForce, clean.PathDropData} {
 		again, err := clean.Request{}.Answer(path, req.Values(path))
 		require.NoError(t, err)
 		assert.Equal(t, req.Values(path), again.Values(path), path)
@@ -77,7 +77,7 @@ func TestTheAnswersOfTheFormGiveBackTheRequest(t *testing.T) {
 }
 
 func TestAPathNotOfTheRequestIsRefused(t *testing.T) {
-	_, err := clean.Request{}.Answer("keep_data", []string{"true"})
+	_, err := clean.Request{}.Answer("no_fetch", []string{"true"})
 
-	assert.Equal(t, map[string][]string{"keep_data": {domain.CodeUnknown}}, fieldCodes(failureOf(t, err).Fields))
+	assert.Equal(t, map[string][]string{"no_fetch": {domain.CodeUnknown}}, fieldCodes(failureOf(t, err).Fields))
 }

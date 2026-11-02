@@ -1,6 +1,6 @@
 $ wtm clean; echo EXIT=$?
 
-  Step 2/4 • Reparent children
+  Step 2/6 • Reparent children
 
   ✓ Worktrees: feat/tty-dirty, feat/tty-parent
 

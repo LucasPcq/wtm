@@ -5,7 +5,7 @@ export const pruneWords: RemovalWords = {
   past: 'pruned',
   noun: 'prune',
   outcome: { failed: "Couldn't prune", check: 'To check', done: 'Pruned' },
-  dataKept: 'prune.data_kept',
+  command: 'prune',
 }
 
 export const notFinished = 'prune.not_finished'

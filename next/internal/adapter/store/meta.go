@@ -1,4 +1,4 @@
-// Package store reads and writes a worktree's meta.json and the .env files wtm provisions.
+// Package store reads and writes a worktree's meta.json, the .env files wtm provisions and pending-removals.toml, the drops removed worktrees owe.
 package store
 
 import (

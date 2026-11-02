@@ -9,11 +9,13 @@ export function requestOf({
   candidates,
   going,
   reparent,
+  dropData,
 }: {
   named: string[]
   candidates: PruneCandidate[]
   going: PruneCandidate[]
   reparent: boolean
+  dropData: boolean
 }): DomainAnswered[] {
   const safe = candidates.filter((candidate) => !unsafe(candidate))
   const own = named.length === 0 && going.length === safe.length && going.every((candidate) => !unsafe(candidate))
@@ -22,6 +24,7 @@ export function requestOf({
     ...(own ? [] : [{ path: 'worktree', values: going.map((candidate) => candidate.worktree) }]),
     ...(!own && going.some(unsafe) ? [{ path: 'force', values: ['true'] }] : []),
     ...(reparent ? [{ path: 'reparent_children', values: ['true'] }] : []),
+    ...(dropData ? [{ path: 'drop_data', values: ['true'] }] : []),
     { path: 'no_fetch', values: ['true'] },
   ]
 }

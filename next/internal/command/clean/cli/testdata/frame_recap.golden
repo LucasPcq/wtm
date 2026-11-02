@@ -1,9 +1,11 @@
 
-  Step 4/4 • Confirm
+  Step 6/6 • Confirm
 
   ✓ Worktrees: feat/dirty, feat/parent
   ✓ Reparent children: leave orphaned
   ✓ Force: forced
+  · Data — no data waits on a service down
+  · Keep data — set by its flag only
 
   ┃  Review & confirm
   ┃

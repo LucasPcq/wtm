@@ -11,7 +11,6 @@ var blockerWords = map[worktree.Blocker]string{
 	worktree.BlockerDirty:           "uncommitted changes",
 	worktree.BlockerUnpushed:        "unpushed commits",
 	worktree.BlockerOpenPullRequest: "an open pull request",
-	worktree.BlockerJobsRunning:     "jobs running",
 }
 
 // Blockers words what makes a worktree unsafe to remove, as the commands that remove one list it.

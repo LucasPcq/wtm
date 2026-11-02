@@ -209,13 +209,15 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 		return Plan{}, nil, teardown.Refusal(teardown.RefusalParams{Command: Name, Blocked: removals(unsafe), Forced: domain.AnswersOf(Questions{}.Form(), forced)})
 	}
 
-	worktrees := picked
+	worktrees := slices.Clone(picked)
 	if len(req.Worktrees) == 0 {
 		worktrees = slices.Clone(candidates)
-		for i, c := range worktrees {
-			if f.leaves(c, req) {
-				worktrees[i].Phases, worktrees[i].Hooks = []domain.Phase{}, nil
-			}
+	}
+	choice := teardown.Choice{KeepData: req.KeepData, DropData: req.DropData}
+	for i, c := range worktrees {
+		worktrees[i].Removal = c.Removal.With(choice)
+		if len(req.Worktrees) == 0 && f.leaves(c, req) {
+			worktrees[i].Phases, worktrees[i].Hooks, worktrees[i].Data = []domain.Phase{}, nil, nil
 		}
 	}
 	planned := Plan{Worktrees: orEmpty(worktrees), Reasons: req.Reasons(), ReparentChildren: req.ReparentChildren, Force: req.Force, facts: f}
@@ -240,22 +242,19 @@ func orEmpty(candidates []Candidate) []Candidate {
 // CodeMetaNewer refuses a request naming a worktree whose record a newer wtm wrote, forced or not, and warns of one the command chose and leaves as it is.
 const CodeMetaNewer = Name + domain.MetaNewer
 
-// CodeUnsafe refuses a request naming a worktree a blocker makes unsafe; CodeForce is its follow-up, the same request forced, and that of the worktrees left as they are; CodeStopJobs is the one that stops a worktree's jobs.
+// CodeUnsafe refuses a request naming a worktree a blocker makes unsafe; CodeForce is its follow-up, the same request forced, and that of the worktrees left as they are.
 const (
-	CodeUnsafe   = Name + teardown.Unsafe
-	CodeForce    = Name + teardown.Force
-	CodeStopJobs = Name + teardown.StopJobs
+	CodeUnsafe = Name + teardown.Unsafe
+	CodeForce  = Name + teardown.Force
 )
 
-// The codes of the plan's warnings: a worktree done with but unsafe to remove, which the command chose and leaves as it is; origin that could not be fetched; jobs a forced removal leaves running; the namespaces a removed worktree keeps in shared services.
+// The codes of the plan's warnings: a worktree done with but unsafe to remove, which the command chose and leaves as it is; origin that could not be fetched.
 const (
 	CodeKept        = Name + ".kept"
 	CodeFetchFailed = Name + ".fetch_failed"
-	CodeJobsLeft    = Name + teardown.JobsLeft
-	CodeDataKept    = Name + teardown.DataKept
 )
 
-// warnings are what the plan cannot see to or leaves behind: origin that could not be fetched, so gone branches are read as last fetched; what a removal cannot see to or leaves behind (teardown.Facts.Warnings), a forge that could not be asked matching no pull request; each worktree kept for being unsafe, the last followed by the request that prunes them all anyway.
+// warnings are what the plan cannot see to or leaves behind: origin that could not be fetched, so gone branches are read as last fetched; what a removal cannot see to (teardown.Facts.Warnings), a forge that could not be asked matching no pull request; each worktree kept for being unsafe, the last followed by the request that prunes them all anyway.
 func (f Facts) warnings(planned Plan, req Request) []domain.Warning {
 	var warnings []domain.Warning
 	if f.FetchErr != nil {
@@ -266,7 +265,7 @@ func (f Facts) warnings(planned Plan, req Request) []domain.Warning {
 	if req.asks(ReasonMerged) || req.asks(ReasonClosed) {
 		unasked = "merged and closed ones match nothing, " + unasked
 	}
-	warnings = append(warnings, f.Warnings(teardown.WarningsParams{Command: Name, Removals: removals(planned.removed()), Unasked: unasked})...)
+	warnings = append(warnings, f.Warnings(teardown.WarningsParams{Command: Name, Unasked: unasked})...)
 
 	for _, c := range planned.Worktrees {
 		if newer := f.Newer[c.Branch]; newer != nil {
@@ -301,8 +300,9 @@ type Plan struct {
 	ReparentChildren bool            `json:"reparent_children"`
 	Force            bool            `json:"force"`
 	domain.Recapped
-	facts    Facts
-	standing string // the worktree removed the caller stands in, empty when none
+	facts         Facts
+	standing      string // the worktree removed the caller stands in, empty when none
+	correlationID string // the operation's, which the run daemon's events carry
 }
 
 // removed are the worktrees the plan removes, kept those it leaves as they are for being unsafe.
@@ -361,7 +361,7 @@ func (p Plan) empty() bool {
 	return !slices.ContainsFunc(p.Worktrees, func(c Candidate) bool { return !c.ruledOut() })
 }
 
-// recap is the plan row by row: the worktrees removed, each with why it is done with and, forced, what it loses; those kept, with what makes them unsafe; then the children left behind, reparented or orphaned.
+// recap is the plan row by row: the worktrees removed, each with why it is done with and, forced, what it loses; those kept, with what makes them unsafe; the data the worktrees removed made in shared services; then the children left behind, reparented or orphaned.
 func (p Plan) recap() []domain.RecapRow {
 	var rows []domain.RecapRow
 	if removed := p.removed(); len(removed) > 0 {
@@ -375,6 +375,9 @@ func (p Plan) recap() []domain.RecapRow {
 		}
 		rows = append(rows, domain.RecapRow{Key: "kept", Label: "Kept", Path: PathForce, Values: values})
 	}
+	if data := teardown.RecappedData(removals(p.removed())); len(data) > 0 {
+		rows = append(rows, domain.RecapRow{Key: "data", Label: "Data", Path: PathDropData, Values: data})
+	}
 	if len(p.Moves) > 0 {
 		rows = append(rows, domain.RecapRow{Key: "children", Label: "Children", Path: PathReparentChildren, Values: teardown.RecappedMoves(p.Moves, p.ReparentChildren)})
 	}
@@ -382,11 +385,14 @@ func (p Plan) recap() []domain.RecapRow {
 	return rows
 }
 
-// recappedPruned are the worktrees removed as the recap's values: each with why it is done with, and, forced, what it loses.
+// recappedPruned are the worktrees removed as the recap's values: each with why it is done with, the jobs it stops and, forced, what it loses.
 func recappedPruned(removed []Candidate) []domain.RecapValue {
 	values := teardown.Recapped(removals(removed))
 	for i, c := range removed {
 		notes := []string{c.said()}
+		if len(c.Jobs) > 0 {
+			notes = append(notes, "stops "+strings.Join(c.Jobs, ", "))
+		}
 		if lost := values[i].Params["blockers"]; lost != "" {
 			notes = append(notes, lost+", forced")
 		}

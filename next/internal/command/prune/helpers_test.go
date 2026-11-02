@@ -191,3 +191,10 @@ func (w world) rawRecord(t *testing.T, name, content string) {
 func warningsOf(warnings []domain.Warning, code string) []domain.Warning {
 	return slices.DeleteFunc(slices.Clone(warnings), func(w domain.Warning) bool { return w.Code != code })
 }
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return string(data)
+}

@@ -1,0 +1,8 @@
+
+  ✓ clean: 1 done
+
+  Remove  feat/d
+  Data    acme_feat-d in db (db started to drop it, then stopped)
+
+  ! couldn't ask for pull requests (pull requests unavailable: run `gh auth login`): open ones aren't checked, merged ones don't count as pushed
+

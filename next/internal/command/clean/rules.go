@@ -103,10 +103,15 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 		return Plan{}, nil, refused
 	}
 	if blocked := teardown.Blocked(removals); len(blocked) > 0 && !req.Force {
-		forced := Request{Worktrees: req.Worktrees, ReparentChildren: req.ReparentChildren, Force: true}
+		forced := req
+		forced.Force, forced.Caller = true, domain.Caller{}
 		return Plan{}, nil, teardown.Refusal(teardown.RefusalParams{Command: Name, Blocked: blocked, Forced: domain.AnswersOf(Questions{}.Form(), forced)})
 	}
 
+	choice := teardown.Choice{KeepData: req.KeepData, DropData: req.DropData}
+	for i, r := range removals {
+		removals[i] = r.With(choice)
+	}
 	planned := Plan{Worktrees: removals, Absent: absent, Moves: f.Moves(removals), ReparentChildren: req.ReparentChildren, Force: req.Force, facts: f, standing: f.Standing(removals)}
 	if planned.Worktrees == nil {
 		planned.Worktrees = []teardown.Removal{}
@@ -118,22 +123,15 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 // CodeMetaNewer refuses a request that would remove a worktree whose record a newer wtm wrote, forced or not.
 const CodeMetaNewer = Name + domain.MetaNewer
 
-// CodeUnsafe refuses a request that would remove a worktree a blocker makes unsafe; CodeForce is its follow-up, the same request forced, and CodeStopJobs the one that stops a worktree's jobs.
+// CodeUnsafe refuses a request that would remove a worktree a blocker makes unsafe; CodeForce is its follow-up, the same request forced.
 const (
-	CodeUnsafe   = Name + teardown.Unsafe
-	CodeForce    = Name + teardown.Force
-	CodeStopJobs = Name + teardown.StopJobs
+	CodeUnsafe = Name + teardown.Unsafe
+	CodeForce  = Name + teardown.Force
 )
 
-// CodeJobsLeft warns of the jobs a forced removal leaves running, CodeDataKept of the namespaces a removed worktree keeps in shared services.
-const (
-	CodeJobsLeft = Name + teardown.JobsLeft
-	CodeDataKept = Name + teardown.DataKept
-)
-
-// warnings are what the plan cannot see to or leaves behind (teardown.Facts.Warnings); a forge that could not be asked leaves open pull requests unchecked and merged ones not counted as pushed.
-func (f Facts) warnings(planned Plan) []domain.Warning {
-	return f.Warnings(teardown.WarningsParams{Command: Name, Removals: planned.Worktrees, Unasked: "open ones aren't checked, merged ones don't count as pushed"})
+// warnings are what the plan cannot see to (teardown.Facts.Warnings); a forge that could not be asked leaves open pull requests unchecked and merged ones not counted as pushed.
+func (f Facts) warnings(Plan) []domain.Warning {
+	return f.Warnings(teardown.WarningsParams{Command: Name, Unasked: "open ones aren't checked, merged ones don't count as pushed"})
 }
 
 // ----------------------------------------------------------------------------
@@ -147,8 +145,9 @@ type Plan struct {
 	ReparentChildren bool               `json:"reparent_children"`
 	Force            bool               `json:"force"`
 	domain.Recapped
-	facts    Facts
-	standing string // the worktree removed the caller stands in, empty when none
+	facts         Facts
+	standing      string // the worktree removed the caller stands in, empty when none
+	correlationID string // the operation's, which the run daemon's events carry
 }
 
 // Locks are the locks the plan needs: the repository shared, and each worktree it removes and each child it reparents exclusive.
@@ -196,7 +195,7 @@ func (r Request) Locks() []domain.Lock {
 // NoteAbsent notes a recap's value that is no worktree, nothing to remove; the others are teardown's.
 const NoteAbsent = "absent"
 
-// recap is the plan row by row: the worktrees removed, if any, each forced one with what it loses, the names that are no worktree, then the children left behind, reparented or orphaned.
+// recap is the plan row by row: the worktrees removed, if any, each forced one with what it loses, the names that are no worktree, the data they made in shared services, then the children left behind, reparented or orphaned.
 func (p Plan) recap() []domain.RecapRow {
 	var rows []domain.RecapRow
 	if len(p.Worktrees) > 0 {
@@ -208,6 +207,9 @@ func (p Plan) recap() []domain.RecapRow {
 			values = append(values, domain.RecapValue{Value: name, Note: NoteAbsent, Text: name + " (no worktree: nothing to remove)"})
 		}
 		rows = append(rows, domain.RecapRow{Key: "absent", Label: "Already absent", Path: domain.PathWorktree, Values: values})
+	}
+	if data := teardown.RecappedData(p.Worktrees); len(data) > 0 {
+		rows = append(rows, domain.RecapRow{Key: "data", Label: "Data", Path: PathDropData, Values: data})
 	}
 
 	if len(p.Moves) > 0 {

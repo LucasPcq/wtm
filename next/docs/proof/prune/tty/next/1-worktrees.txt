@@ -1,6 +1,6 @@
 $ wtm prune --merged; echo EXIT=$?
 
-  Step 1/8 • Worktrees
+  Step 1/10 • Worktrees
 
   The worktrees to prune, among those done with; none for every one safe to remove
 
