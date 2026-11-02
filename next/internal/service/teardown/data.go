@@ -499,22 +499,77 @@ type PayParams struct {
 	Debts   []Debt
 }
 
-// Pay withdraws each drop owed a worktree reaches again under its name (its data that worktree's now), then drops each of the debts from the main checkout with the variables kept for it. A debt is taken out of the queue, under its lock, before its drop: one another run took out first is paid already, and one whose drop fails goes back, warned. Its warnings say what was withdrawn and what failed.
-func (s Service) Pay(ctx context.Context, params PayParams) []domain.Warning {
-	f := params.Facts
-	warnings := s.withdraw(ctx, params)
-	for _, debt := range params.Debts {
-		claimed, err := s.settle(ctx, debt.owed, true)
-		if err != nil || !claimed {
-			continue
+// A Paid is what became of a debt a run planned to pay, which the run reports as an item of its own: done once dropped, or once another run dropped it first (unchanged); failed with the error it failed on; skipped, not reached, when the run stopped first or its service is not up after all; and its warnings.
+type Paid struct {
+	Debt     Debt
+	Status   domain.Status
+	Reason   domain.Reason
+	Err      *domain.Error
+	Warnings []domain.Warning
+}
+
+// The codes of a debt a run could not pay, after the command's name: its drop failed, or the queue could not be written, before the drop (not made) or after a drop that failed (the debt lost).
+const (
+	OwedLost = ".owed_lost"
+)
+
+// Pay withdraws each drop owed a worktree reaches again under its name (its data that worktree's now), then pays each of the debts, in order, while its service is up: it is taken out of the queue, under its lock, then dropped from the main checkout with the variables kept for it. One another run took out first is paid already; one whose drop fails goes back in the queue. It returns what became of each debt, and the warnings of the withdrawals.
+func (s Service) Pay(ctx context.Context, params PayParams) ([]Paid, []domain.Warning) {
+	paid := make([]Paid, 0, len(params.Debts))
+	if ctx.Err() != nil {
+		for _, debt := range params.Debts {
+			paid = append(paid, Paid{Debt: debt, Status: domain.StatusSkipped, Reason: domain.ReasonNotReached})
 		}
-		if err := s.drop(ctx, f, debt.Job, debt.drop, func(string) {}); err != nil {
-			_, _ = s.settle(ctx, debt.owed, false)
-			warnings = append(warnings, domain.Warning{Code: params.Command + DropFailed, Message: "couldn't drop " + debt.Name + " from " + debt.Job + " (" + err.Error() + "): it is still owed", Params: domain.Params{"job": debt.Job, "namespace": debt.Name, "cause": err.Error()}})
-		}
+		return paid, nil
 	}
 
-	return warnings
+	warnings := s.withdraw(ctx, params)
+	if len(params.Debts) == 0 {
+		return paid, warnings
+	}
+	// The services are asked again: a start that planned to bring one up may have failed to.
+	jobs, _ := s.jobs(ctx)
+	f := params.Facts
+	f.Jobs = jobs
+	for _, debt := range params.Debts {
+		paid = append(paid, s.pay(ctx, f, params.Command, debt))
+	}
+	return paid, warnings
+}
+
+// pay pays debt: taken out of the queue, then dropped, put back when the drop fails.
+func (s Service) pay(ctx context.Context, f Facts, command string, debt Debt) Paid {
+	about := domain.Params{"job": debt.Job, "namespace": debt.Name, "worktree": debt.Worktree}
+	if ctx.Err() != nil || !f.up(debt.Job) {
+		return Paid{Debt: debt, Status: domain.StatusSkipped, Reason: domain.ReasonNotReached}
+	}
+
+	claimed, err := s.settle(ctx, debt.owed, true)
+	switch {
+	case err != nil:
+		return Paid{Debt: debt, Status: domain.StatusFailed, Err: &domain.Error{Kind: domain.KindInternal, Code: command + OwedUnrecorded, Message: "couldn't take " + debt.Name + " out of pending-removals.toml: not dropped, still owed", Params: about, Cause: err}}
+	case !claimed:
+		return Paid{Debt: debt, Status: domain.StatusDone, Reason: domain.ReasonUnchanged}
+	}
+
+	err = s.drop(ctx, f, debt.Job, debt.drop, func(string) {})
+	if err == nil {
+		return Paid{Debt: debt, Status: domain.StatusDone}
+	}
+	failed := Paid{Debt: debt, Status: domain.StatusFailed, Err: &domain.Error{Kind: domain.KindInternal, Code: command + DropFailed, Message: "couldn't drop " + debt.Name + " from " + debt.Job + ", still owed", Params: about, Cause: err}}
+	if _, putErr := s.settle(ctx, debt.owed, false); putErr != nil {
+		failed.Warnings = []domain.Warning{{Code: command + OwedLost, Message: "couldn't record " + debt.Name + " again in pending-removals.toml (" + putErr.Error() + "): it is no longer owed, drop it by hand: WTM_NAMESPACE=" + debt.Name + " " + f.removeCommand(debt.Job), Params: about}}
+	}
+	return failed
+}
+
+// removeCommand is the remove command of job's namespace, as run.toml spells it.
+func (f Facts) removeCommand(name string) string {
+	job, declared := f.job(name)
+	if !declared || job.Namespace == nil {
+		return "its remove command"
+	}
+	return job.Namespace.Remove
 }
 
 // withdraw takes out of the queue each drop owed a worktree reaches again under its name, warned.

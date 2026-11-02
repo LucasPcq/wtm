@@ -40,17 +40,18 @@ type UseCase struct {
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, or a refusal before the apply).
 type Outcome = domain.Outcome[Plan, Detail]
 
-// A Result is what the apply did: one Item per worktree of the plan, in its order, and the warnings of the whole run.
+// A Result is what the apply did: one Item per worktree of the plan, in its order, then one per drop owed it planned to pay, and the warnings of the whole run.
 type Result = domain.Result[Detail]
 
-// An Item is what became of one worktree: its status and why, the error it failed on, its warnings, and its Detail once it is removed.
+// An Item is what became of one worktree, or of one drop owed: its status and why, the error it failed on, its warnings, and its Detail once it is removed, or the debt.
 type Item = domain.Unit[Detail]
 
-// A Detail describes a worktree removed as the JSON envelope reports it: where it was, why it was done with, and what became of the namespaces it made in shared services.
+// A Detail describes, as the JSON envelope reports it, a worktree removed: where it was, why it was done with, and what became of the namespaces it made in shared services; or a drop owed the run paid (Owed), its item's subject the namespace.
 type Detail struct {
-	Path       string             `json:"path"`
-	Reason     Reason             `json:"reason"`
+	Path       string             `json:"path,omitempty"`
+	Reason     Reason             `json:"reason,omitempty"`
 	Namespaces []teardown.Dropped `json:"namespaces,omitempty"`
+	Owed       *teardown.Debt     `json:"owed,omitempty"`
 }
 
 // ----------------------------------------------------------------------------
@@ -119,13 +120,13 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // ----------------------------------------------------------------------------
 // Apply
 
-// Apply carries out the plan, reporting each step: it first drops the namespaces earlier removals still owe that the plan pays (teardown.Service.Pay), then removes each worktree in turn (teardown.Service.Batch), a failure stopping none of the others, those it leaves as they are reported ruled out, then reparents the children of the worktrees removed onto the nearest one that stayed, or warns of each one left orphaned; it ends on the step out of a worktree removed under the caller's feet. Once ctx is cancelled, the worktrees not yet started are skipped.
+// Apply carries out the plan, reporting each step: it first drops the namespaces earlier removals still owe that the plan pays (teardown.Service.Pay), each an item after the worktrees, then removes each worktree in turn (teardown.Service.Batch), a failure stopping none of the others, those it leaves as they are reported ruled out, then reparents the children of the worktrees removed onto the nearest one that stayed, or warns of each one left orphaned; it ends on the step out of a worktree removed under the caller's feet. Once ctx is cancelled, the worktrees not yet started are skipped.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
-	paid := u.Teardown.Pay(ctx, teardown.PayParams{Command: Name, Facts: plan.facts.Facts, Debts: plan.Owed})
+	paid, withdrawn := u.Teardown.Pay(ctx, teardown.PayParams{Command: Name, Facts: plan.facts.Facts, Debts: plan.Owed})
 	removed, warnings := u.Teardown.Batch(ctx, teardown.BatchParams{Command: Name, Facts: plan.facts.Facts, Removals: removals(plan.removed()), Force: plan.Force, CorrelationID: plan.correlationID, Report: report})
-	warnings = append(paid, warnings...)
+	warnings = append(withdrawn, warnings...)
 
-	items := make([]Item, 0, len(plan.Worktrees))
+	items := make([]Item, 0, len(plan.Worktrees)+len(paid))
 	for _, c := range plan.Worktrees {
 		if c.ruledOut() {
 			items = append(items, Item{Subject: c.Worktree, Status: domain.StatusSkipped, Reason: domain.ReasonRuledOut})
@@ -133,6 +134,9 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 		}
 		items = append(items, itemOf(c, removed[0]))
 		removed = removed[1:]
+	}
+	for _, p := range paid {
+		items = append(items, Item{Subject: p.Debt.Name, Status: p.Status, Reason: p.Reason, Err: p.Err, Warnings: p.Warnings, Detail: &Detail{Owed: &p.Debt}})
 	}
 
 	// The moves are decided again on what went: a worktree that failed to go is a parent that stays.
@@ -266,6 +270,7 @@ const (
 	CodeOwedUnrecorded     = Name + teardown.OwedUnrecorded
 	CodeReleaseFailed      = Name + teardown.ReleaseFailed
 	CodeOwedWithdrawn      = Name + teardown.OwedWithdrawn
+	CodeOwedLost           = Name + teardown.OwedLost
 	CodeOwed               = Name + teardown.StillOwed
 )
 

@@ -149,33 +149,51 @@ test("an item's warning names its worktree, and two alike stay two", () => {
   expect(new Set(check?.rows.map((row) => row.key)).size).toBe(2)
 })
 
-test('the drops owed a prune paid first are done rows, but the one its warning says failed', () => {
+test('the drops owed a prune paid are said from what became of each: dropped done, failed with its reason', () => {
+  const owed = { job: 'db', worktree: 'feat-old' }
   const paid = narrowed<PruneDetail, PrunePlan>({
     ...envelope('prune', []),
-    items: [],
-    plan: {
-      worktrees: [],
-      owed: [
-        { job: 'db', name: 'acme_feat_old', worktree: 'feat-old' },
-        { job: 'db', name: 'acme_feat_older', worktree: 'feat-older' },
-      ],
-      reasons: ['merged'],
-      reparent_children: false,
-      force: false,
-    },
-    warnings: [
-      { code: 'prune.drop_failed', message: "couldn't drop acme_feat_older", params: { namespace: 'acme_feat_older' } },
+    ok: false,
+    items: [
+      { subject: 'acme_feat_old', status: 'done', detail: { owed: { ...owed, name: 'acme_feat_old' } } },
+      {
+        subject: 'acme_feat_older',
+        status: 'failed',
+        error: {
+          kind: 'internal',
+          code: 'prune.drop_failed',
+          message: "couldn't drop acme_feat_older from db, still owed",
+        },
+        detail: { owed: { ...owed, name: 'acme_feat_older' } },
+      },
+      {
+        subject: 'acme_feat_oldest',
+        status: 'skipped',
+        reason: 'not_reached',
+        detail: { owed: { ...owed, name: 'acme_feat_oldest' } },
+      },
     ],
+    plan: { worktrees: [], reasons: ['merged'], reparent_children: false, force: false },
   })
 
-  const done = recapOf({ units: [], envelope: paid }, 'prune').groups.find((group) => group.kind === 'done')
+  const { groups, paid: count } = recapOf({ units: [], envelope: paid }, 'prune')
 
-  expect(done?.rows).toEqual([
+  expect(count).toBe(1)
+  expect(groups.find((group) => group.kind === 'done')?.rows).toEqual([
     {
-      key: 'owed-db-acme_feat_old',
+      key: 'owed-acme_feat_old',
       tone: 'ok',
       title: 'acme_feat_old',
       message: 'Dropped from db, owed since feat-old was removed',
     },
+  ])
+  expect(groups.find((group) => group.kind === 'failed')?.rows).toEqual([
+    {
+      key: 'owed-acme_feat_older',
+      tone: 'failed',
+      title: 'acme_feat_older',
+      message: "Couldn't drop acme_feat_older from db, still owed",
+    },
+    { key: 'owed-acme_feat_oldest', tone: 'muted', title: 'acme_feat_oldest', message: 'Not dropped: still owed' },
   ])
 })

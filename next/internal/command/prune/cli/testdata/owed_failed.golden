@@ -1,0 +1,9 @@
+
+  ✗ prune: 2 done · 1 failed
+
+  Prune  feat/gone (deleted on origin)
+
+  ✓ dropped acme_feat-old from db, owed since feat-old was removed
+
+  ✗ acme_feat-older  couldn't drop acme_feat-older from db, still owed: exit status 2
+

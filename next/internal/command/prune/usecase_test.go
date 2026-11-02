@@ -2,6 +2,7 @@ package prune_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/teardown"
@@ -284,7 +286,33 @@ func TestPrunePaysTheDropsOwedFirstThenOwesWhatItCannotDrop(t *testing.T) {
 	assert.NotContains(t, codes(outcome.Warnings), "prune.drop_failed")
 	assert.Equal(t, "app_feat-old\napp_feat-merged\n", readFile(t, filepath.Join(w.main, "dropped.txt")), "the debt first, then the worktree pruned")
 	assert.Equal(t, []teardown.Dropped{{Job: "db", Name: "app_feat-merged", Status: teardown.NamespaceDropped}}, outcome.Result.Items[0].Detail.Namespaces)
+	paid := outcome.Result.Items[len(outcome.Result.Items)-1]
+	assert.Equal(t, "app_feat-old", paid.Subject)
+	assert.Equal(t, domain.StatusDone, paid.Status)
+	assert.Equal(t, &teardown.Debt{Job: "db", Name: "app_feat-old", Worktree: "feat-old"}, plainDebt(paid.Detail.Owed))
 	assert.NoFileExists(t, filepath.Join(w.stateDir, "pending-removals.toml"))
+}
+
+func TestADropOwedThatFailsFailsItsItemAndStaysOwed(t *testing.T) {
+	w := newWorld(t, seed{})
+	writeFile(t, filepath.Join(w.stateDir, "pending-removals.toml"), "[[pending]]\n  job = \"db\"\n  worktree = \"feat-old\"\n  ordinal = 4\n")
+	w.daemon.listed = []run.Job{{Name: "db", WorkDir: w.main, Up: true, Hold: run.HoldOwn, SharedDir: w.main}}
+	w.usecase.Teardown.RunHooks = func(context.Context, env.HookChain) error { return errBroken }
+	w.usecase.PullRequests = func(context.Context, []string) ([]worktree.PullRequest, error) { return nil, nil }
+
+	outcome, err := w.usecase.Run(t.Context(), prune.Request{Merged: true}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	require.Len(t, outcome.Result.Items, 1, "nothing to prune: the debt alone")
+	item := outcome.Result.Items[0]
+	assert.Equal(t, domain.StatusFailed, item.Status)
+	assert.Equal(t, "prune.drop_failed", item.Err.Code)
+	assert.NotNil(t, outcome.Failure(), "the run fails with it")
+	doc, err := json.Marshal(outcome.Envelope(domain.EnvelopeParams{Command: prune.Name}))
+	require.NoError(t, err)
+	assert.Contains(t, string(doc), `"subject":"app_feat-old","status":"failed"`)
+	assert.Contains(t, string(doc), `"owed":{"job":"db","name":"app_feat-old","worktree":"feat-old"}`)
+	assert.FileExists(t, filepath.Join(w.stateDir, "pending-removals.toml"))
 }
 
 func TestADropOwedToAServiceDownStaysOwedAndIsCounted(t *testing.T) {
@@ -308,6 +336,19 @@ func TestADropOwedAloneIsNoEmptyPlan(t *testing.T) {
 
 	assert.False(t, planned.Empty, "it drops a database")
 	assert.Equal(t, "owed", planned.Recap[len(planned.Recap)-1].Key)
+}
+
+// The Children question named the children of a worktree prune refuses, unsafe and not forced.
+func TestTheChildrenQuestionAsksOnlyOfTheWorktreesPruneRemoves(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.record(t, child, worktree.Meta{SourceBranch: dirty})
+
+	named := w.questions(t, prune.Request{Worktrees: []string{dirty}})
+	forced := w.questions(t, prune.Request{Worktrees: []string{dirty}, Force: true})
+
+	assert.Empty(t, named.Orphans)
+	assert.Equal(t, domain.SkipNoOrphan, named.Reparent.Skip)
+	assert.Len(t, forced.Orphans, 1)
 }
 
 // The Data question named the data of a worktree prune refuses, unsafe and not forced.

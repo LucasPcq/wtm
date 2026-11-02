@@ -14,6 +14,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 	"github.com/stretchr/testify/require"
 )
 
@@ -197,4 +198,12 @@ func readFile(t *testing.T, path string) string {
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	return string(data)
+}
+
+// plainDebt is debt as its JSON shows it.
+func plainDebt(debt *teardown.Debt) *teardown.Debt {
+	if debt == nil {
+		return nil
+	}
+	return &teardown.Debt{Job: debt.Job, Name: debt.Name, Worktree: debt.Worktree}
 }

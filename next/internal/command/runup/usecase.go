@@ -57,17 +57,18 @@ type UseCase struct {
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, or a refusal before the apply).
 type Outcome = domain.Outcome[Plan, Detail]
 
-// A Result is what the apply did: one Item per worktree, in the plan's order, and what follows.
+// A Result is what the apply did: one Item per worktree, in the plan's order, then one per drop owed it planned to pay, and what follows.
 type Result = domain.Result[Detail]
 
-// An Item is what became of the start in one worktree: its status and why, the error it failed on, its warnings, and its Detail once it began.
+// An Item is what became of the start in one worktree, or of one drop owed: its status and why, the error it failed on, its warnings, and its Detail once it began, or the debt.
 type Item = domain.Unit[Detail]
 
-// A Detail is the start in one worktree, as the JSON envelope reports it: where, the profile, and each job of the profile with what became of it.
+// A Detail is, as the JSON envelope reports it, the start in one worktree: where, the profile, and each job of the profile with what became of it; or a drop owed the start paid (Owed), its item's subject the namespace, its jobs none.
 type Detail struct {
-	Path    string      `json:"path"`
-	Profile string      `json:"profile"`
-	Jobs    []JobResult `json:"jobs"`
+	Path    string         `json:"path,omitempty"`
+	Profile string         `json:"profile"`
+	Jobs    []JobResult    `json:"jobs"`
+	Owed    *teardown.Debt `json:"owed,omitempty"`
 }
 
 // A JobResult is what became of one job: its status, its URL, its log, the ports it binds and whether each answered, the namespace of a shared service's data the worktree holds, and for one that failed or crashed its exit code and last lines.
@@ -178,11 +179,12 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // CodeDaemonUnavailable fails a start that could not begin: the run daemon of this build could not be made sure of.
 const CodeDaemonUnavailable = Name + ".daemon_unavailable"
 
-// The codes of the drops removed worktrees owed, paid by a start: one withdrawn (a worktree reaches its namespace again), one that failed, one the queue could not forget.
+// The codes of the drops removed worktrees owed, paid by a start: one withdrawn (a worktree reaches its namespace again), one that failed, one the queue could not give up or take back.
 const (
 	CodeOwedWithdrawn  = Name + teardown.OwedWithdrawn
 	CodeDropFailed     = Name + teardown.DropFailed
 	CodeOwedUnrecorded = Name + teardown.OwedUnrecorded
+	CodeOwedLost       = Name + teardown.OwedLost
 )
 
 // CodeStopFailed warns of a worktree whose jobs an exclusive start could not stop.
@@ -204,7 +206,8 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 		for i, t := range plan.Worktrees {
 			items[i] = Item{Subject: t.Worktree, Status: domain.StatusFailed, Err: failure, Detail: plan.notStarted(t)}
 		}
-		return Result{Items: items}
+		unpaid, _ := u.Teardown.Pay(canceled(ctx), teardown.PayParams{Command: Name, Facts: plan.facts.teardown(), Debts: plan.Owed})
+		return Result{Items: append(items, paidItems(unpaid)...)}
 	}
 
 	var warnings []domain.Warning
@@ -221,11 +224,25 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	wg.Wait()
 
 	// A shared service this start brought up takes back what removed worktrees owe it.
-	if ctx.Err() == nil {
-		warnings = append(warnings, u.Teardown.Pay(ctx, teardown.PayParams{Command: Name, Facts: plan.facts.teardown(), Debts: plan.Owed})...)
-	}
+	paid, withdrawn := u.Teardown.Pay(ctx, teardown.PayParams{Command: Name, Facts: plan.facts.teardown(), Debts: plan.Owed})
 
-	return Result{Items: items, Warnings: warnings, FollowUps: plan.next(items)}
+	return Result{Items: append(items, paidItems(paid)...), Warnings: append(warnings, withdrawn...), FollowUps: plan.next(items)}
+}
+
+// paidItems are the drops owed a start paid, an item each, its subject the namespace.
+func paidItems(paid []teardown.Paid) []Item {
+	items := make([]Item, 0, len(paid))
+	for _, p := range paid {
+		items = append(items, Item{Subject: p.Debt.Name, Status: p.Status, Reason: p.Reason, Err: p.Err, Warnings: p.Warnings, Detail: &Detail{Jobs: []JobResult{}, Owed: &p.Debt}})
+	}
+	return items
+}
+
+// canceled is a context already done, under which Pay reaches no debt: no job started, so none is paid.
+func canceled(ctx context.Context) context.Context {
+	done, cancel := context.WithCancel(ctx)
+	cancel()
+	return done
 }
 
 // renumbered is plan with each worktree the start numbered planned again from the ordinal it now records, so the outcome's plan names the ports and namespaces its detail reports.

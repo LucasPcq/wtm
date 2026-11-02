@@ -14,6 +14,7 @@ import { useReparentNow } from '@/features/worktrees/hooks/use-reparent-now'
 import { useRun } from '@/features/worktrees/hooks/use-run'
 import { listed } from '@/features/worktrees/utils/listed'
 import type { Act, OutcomeKind } from '@/features/worktrees/utils/outcome'
+import { owedOf } from '@/features/worktrees/utils/owed'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
 import { current, doneOf, ending, type Progress } from '@/features/worktrees/utils/progress'
 import { plain } from '@/features/worktrees/utils/removal'
@@ -48,7 +49,7 @@ export function RemovalProgress({
 }) {
   const names = progress.units.map((unit) => unit.subject)
   const items = progress.envelope?.items ?? []
-  const removed = items.filter((item) => item.status === 'done').map((item) => item.subject)
+  const removed = items.filter((item) => item.status === 'done' && !owedOf(item)).map((item) => item.subject)
   const failed = names.filter((name) => !removed.includes(name))
   const now = current(progress)
   const { done, total } = doneOf(progress)

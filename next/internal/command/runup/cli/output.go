@@ -3,16 +3,39 @@ package cli
 import (
 	"fmt"
 	"io"
+	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
 const addressesTitle = "Addresses"
 
-// drawOutcome draws the conclusion of the start: the tally, the plan, where each job answers, and for a worktree whose start failed the last lines and the log of the job it failed on.
+// drawOutcome draws the conclusion of the start: the tally, the plan but the drops owed it planned, where each job answers, each drop owed made, and for a worktree whose start failed the last lines and the log of the job it failed on.
 func drawOutcome(w io.Writer, outcome runup.Outcome, view output.View) {
-	output.DrawApplied(w, outcome, output.AppliedParams{Command: Use, View: view, Block: addresses(outcome), Excerpt: excerpt(outcome)})
+	outcome.Plan.Recap = slices.DeleteFunc(slices.Clone(outcome.Plan.Recap), func(row domain.RecapRow) bool { return row.Key == runup.RecapOwed })
+	block := func(w io.Writer) {
+		addresses(outcome)(w)
+		drawPaid(w, outcome.Result.Items)
+	}
+	output.DrawApplied(w, outcome, output.AppliedParams{Command: Use, View: view, Block: block, Excerpt: excerpt(outcome)})
+}
+
+// drawPaid draws a line for each drop owed the start made.
+func drawPaid(w io.Writer, items []runup.Item) {
+	first := true
+	for _, item := range items {
+		if item.Detail == nil || item.Detail.Owed == nil || item.Status != domain.StatusDone {
+			continue
+		}
+		if first {
+			output.Blank(w)
+			first = false
+		}
+		debt := item.Detail.Owed
+		output.SuccessLine(w, "dropped "+debt.Name+" from "+debt.Job+", owed since "+debt.Worktree+" was removed")
+	}
 }
 
 // addresses draws where each job that answers at a URL is reached, one job per line, the URLs in one column, under each worktree's branch when the start ran in several.
@@ -44,7 +67,7 @@ func addresses(outcome runup.Outcome) func(io.Writer) {
 		output.SectionTitle(w, addressesTitle)
 		for _, r := range all {
 			indent := output.Indent
-			if len(outcome.Result.Items) > 1 {
+			if len(outcome.Plan.Worktrees) > 1 {
 				output.Message(w, output.Indent+r.subject)
 				indent += output.Indent
 			}

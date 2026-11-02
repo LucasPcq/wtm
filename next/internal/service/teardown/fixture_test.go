@@ -160,9 +160,11 @@ func (d *daemon) StopAll(_ context.Context, req run.StopAll) ([]run.StoppedJob, 
 	return nil, nil
 }
 
-// A queue is pending-removals.toml in memory.
+// A queue is pending-removals.toml in memory; the update of each number in fail fails, the first being 1.
 type queue struct {
-	owed []env.OwedDrop
+	owed    []env.OwedDrop
+	updates int
+	fail    map[int]error
 }
 
 func (q *queue) Load() ([]env.OwedDrop, error) {
@@ -170,6 +172,10 @@ func (q *queue) Load() ([]env.OwedDrop, error) {
 }
 
 func (q *queue) Update(_ context.Context, change func([]env.OwedDrop) []env.OwedDrop) error {
+	q.updates++
+	if err := q.fail[q.updates]; err != nil {
+		return err
+	}
 	q.owed = change(slices.Clone(q.owed))
 	return nil
 }

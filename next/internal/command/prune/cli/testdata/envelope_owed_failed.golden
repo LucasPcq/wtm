@@ -1,0 +1,129 @@
+{
+  "v": 2,
+  "command": "prune",
+  "ok": false,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/gone",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-gone",
+        "reason": "gone"
+      }
+    },
+    {
+      "subject": "acme_feat-old",
+      "status": "done",
+      "detail": {
+        "owed": {
+          "job": "db",
+          "name": "acme_feat-old",
+          "worktree": "feat-old"
+        }
+      }
+    },
+    {
+      "subject": "acme_feat-older",
+      "status": "failed",
+      "error": {
+        "kind": "internal",
+        "code": "prune.drop_failed",
+        "message": "couldn't drop acme_feat-older from db, still owed: exit status 2",
+        "params": {
+          "job": "db",
+          "namespace": "acme_feat-older",
+          "worktree": "feat-older"
+        }
+      },
+      "detail": {
+        "owed": {
+          "job": "db",
+          "name": "acme_feat-older",
+          "worktree": "feat-older"
+        }
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/gone",
+        "branch": "feat/gone",
+        "path": "/repo/wt-feat-gone",
+        "phases": [
+          "remove"
+        ],
+        "blockers": [],
+        "reason": "gone"
+      }
+    ],
+    "owed": [
+      {
+        "job": "db",
+        "name": "acme_feat-old",
+        "worktree": "feat-old"
+      },
+      {
+        "job": "db",
+        "name": "acme_feat-older",
+        "worktree": "feat-older"
+      }
+    ],
+    "reasons": [
+      "gone"
+    ],
+    "reparent_children": false,
+    "force": false,
+    "recap": [
+      {
+        "key": "prune",
+        "label": "Prune",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/gone",
+            "params": {
+              "reason": "gone"
+            },
+            "text": "feat/gone (deleted on origin)"
+          }
+        ]
+      },
+      {
+        "key": "owed",
+        "label": "Owed",
+        "values": [
+          {
+            "value": "acme_feat-old",
+            "params": {
+              "job": "db",
+              "worktree": "feat-old"
+            },
+            "text": "acme_feat-old in db (owed since feat-old was removed)"
+          },
+          {
+            "value": "acme_feat-older",
+            "params": {
+              "job": "db",
+              "worktree": "feat-older"
+            },
+            "text": "acme_feat-older in db (owed since feat-older was removed)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "internal",
+    "code": "prune.drop_failed",
+    "message": "couldn't drop acme_feat-older from db, still owed: exit status 2",
+    "params": {
+      "job": "db",
+      "namespace": "acme_feat-older",
+      "worktree": "feat-older"
+    }
+  }
+}

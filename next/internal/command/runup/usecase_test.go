@@ -406,11 +406,31 @@ func TestAStartPaysTheDropsRemovedWorktreesOweTheSharedServiceUp(t *testing.T) {
 
 	require.Len(t, planned.Owed, 1)
 	assert.Equal(t, "app_feat-old", planned.Owed[0].Name)
-	assert.Empty(t, result.Warnings, "a drop paid is the plan's, done")
+	assert.Empty(t, result.Warnings)
+	paid := result.Items[len(result.Items)-1]
+	assert.Equal(t, "app_feat-old", paid.Subject)
+	assert.Equal(t, domain.StatusDone, paid.Status)
 	require.Len(t, *w.drops, 1)
 	assert.Equal(t, w.main, (*w.drops)[0].WorkDir)
 	assert.Equal(t, "app_feat-old", (*w.drops)[0].Env["WTM_NAMESPACE"])
 	assert.NoFileExists(t, filepath.Join(w.stateDir, "pending-removals.toml"))
+}
+
+func TestAStartCutShortReachesNoDropOwed(t *testing.T) {
+	w := newWorld(t)
+	writeFile(t, filepath.Join(w.stateDir, "pending-removals.toml"), "[[pending]]\n  job = \"db\"\n  worktree = \"feat-old\"\n  ordinal = 4\n")
+	w.daemon.listed = []run.Job{{Name: "db", WorkDir: w.main, Up: true, Hold: run.HoldOwn, SharedDir: w.main}}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	result, _ := w.applyIn(ctx, t, starting("full", featA))
+
+	paid := result.Items[len(result.Items)-1]
+	assert.Equal(t, "app_feat-old", paid.Subject)
+	assert.Equal(t, domain.StatusSkipped, paid.Status)
+	assert.Equal(t, domain.ReasonNotReached, paid.Reason)
+	assert.Empty(t, *w.drops)
+	assert.FileExists(t, filepath.Join(w.stateDir, "pending-removals.toml"))
 }
 
 func TestAStartOfTheSharedServicePaysWhatIsOwedToIt(t *testing.T) {

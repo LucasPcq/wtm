@@ -148,7 +148,7 @@ func NewQuestions(f Facts, req Request) Questions {
 	questions := Questions{
 		Worktrees:  Worktrees{Picked: names(picked), Origin: domain.OriginDefault, Options: options(candidates)},
 		Candidates: candidates,
-		Orphans:    f.Moves(removals(picked)),
+		Orphans:    f.Moves(removals(f.going(req, picked))),
 		Down:       teardown.Down(removals(f.going(req, picked))),
 		KeepData:   flagOnly(req.KeepData),
 		Errors:     problems,

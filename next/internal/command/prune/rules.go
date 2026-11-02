@@ -360,6 +360,9 @@ func (r Request) Locks() []domain.Lock {
 // ----------------------------------------------------------------------------
 // The recap
 
+// RecapOwed keys the recap's row of the drops owed the plan pays.
+const RecapOwed = teardown.RecapOwed
+
 // NoteKept notes a recap's value done with but kept for being unsafe; the others are teardown's.
 const NoteKept = "kept"
 
@@ -386,7 +389,7 @@ func (p Plan) recap() []domain.RecapRow {
 		rows = append(rows, domain.RecapRow{Key: "data", Label: "Data", Path: PathDropData, Values: data})
 	}
 	if len(p.Owed) > 0 {
-		rows = append(rows, domain.RecapRow{Key: "owed", Label: "Owed", Values: teardown.RecappedDebts(p.Owed)})
+		rows = append(rows, domain.RecapRow{Key: RecapOwed, Label: "Owed", Values: teardown.RecappedDebts(p.Owed)})
 	}
 	if len(p.Moves) > 0 {
 		rows = append(rows, domain.RecapRow{Key: "children", Label: "Children", Path: PathReparentChildren, Values: teardown.RecappedMoves(p.Moves, p.ReparentChildren)})

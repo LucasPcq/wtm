@@ -160,8 +160,11 @@ export function PruneWizard({
 
   const back = () => dispatch({ type: 'go', to: step === 'confirm' && moves.length > 0 ? 'children' : 'worktrees' })
 
+  // the button says the plan it applies, not the rows that sent the wizard to Confirm
   const label = () => {
-    if (owedOnly) return `Drop ${plural(plan?.owed?.length ?? rowsPlan?.owed?.length ?? 0, 'owed namespace')}`
+    const owed = (plan ?? rowsPlan)?.owed ?? []
+    if ((plan ? pruning.length === 0 : owedOnly) && owed.length > 0)
+      return `Drop ${plural(owed.length, 'owed namespace')}`
     return count === 1 ? 'Prune' : `Prune ${count} worktrees`
   }
 

@@ -35,6 +35,8 @@ const owed = [
   { job: 'db', name: 'acme_feat_older', worktree: 'feat-older' },
 ]
 
+const debt = (name: string, worktree: string) => ({ job: 'db', name, worktree })
+
 test("drops owed, the plan's only change, go straight to Confirm, and the run says what was dropped and what failed", async () => {
   const prune = answeringPrune(
     async (call) => {
@@ -45,15 +47,21 @@ test("drops owed, the plan's only change, go straight to Confirm, and the run sa
       streamed(
         `event: envelope\ndata: ${JSON.stringify({
           ...envelope('prune', []),
-          items: [],
-          plan: { worktrees: [], owed, reasons: ['merged', 'closed', 'gone'], reparent_children: false, force: false },
-          warnings: [
+          ok: false,
+          items: [
+            { subject: 'acme_feat_old', status: 'done', detail: { owed: debt('acme_feat_old', 'feat-old') } },
             {
-              code: 'prune.drop_failed',
-              message: "couldn't drop acme_feat_older from db (exit status 1): it is still owed",
-              params: { job: 'db', namespace: 'acme_feat_older' },
+              subject: 'acme_feat_older',
+              status: 'failed',
+              error: {
+                kind: 'internal',
+                code: 'prune.drop_failed',
+                message: "couldn't drop acme_feat_older from db, still owed: exit status 1",
+              },
+              detail: { owed: debt('acme_feat_older', 'feat-older') },
             },
           ],
+          plan: { worktrees: [], owed, reasons: ['merged', 'closed', 'gone'], reparent_children: false, force: false },
         })}\n\n`,
       ),
   )
@@ -64,12 +72,24 @@ test("drops owed, the plan's only change, go straight to Confirm, and the run sa
   expect(within(dialog).queryByText('Nothing to prune')).toBeNull()
   await user.click(await within(dialog).findByRole('button', { name: 'Drop 2 owed namespaces' }))
 
-  expect(await within(dialog).findByText('1 owed namespace dropped.')).toBeTruthy()
-  const done = within(dialog).getByRole('region', { name: 'Pruned' })
+  const done = await within(dialog).findByRole('region', { name: 'Pruned' })
   expect(within(done).getByText('Dropped from db, owed since feat-old was removed')).toBeTruthy()
-  expect(within(dialog).getByText(/couldn't drop acme_feat_older/i)).toBeTruthy()
   expect(within(done).queryByText(/acme_feat_older/)).toBeNull()
+  const failed = within(dialog).getByRole('region', { name: "Couldn't prune" })
+  expect(within(failed).getByText(/couldn't drop acme_feat_older from db, still owed/i)).toBeTruthy()
   const applied = prune.applied()
   expect(prune.answered(applied, 'worktree'), 'prune names none: its own pick').toBeUndefined()
   expect(prune.answered(applied, 'force')).toBeUndefined()
+})
+
+test('the button says the plan it applies: owed-only rows, then a plan that also prunes a worktree, prune', async () => {
+  answeringPrune(async (call) => {
+    const forced = call.answers?.some((a) => a.path === 'force') ?? false
+    const answer = await prunePlan(call, { found: forced ? [] : [merged] }).json()
+    return HttpResponse.json({ ...answer, plan: { ...answer.plan, owed, empty: false } })
+  })
+  const { dialog } = await openFromTheHeader()
+
+  expect(await within(dialog).findByRole('button', { name: 'Prune' })).toBeTruthy()
+  expect(within(dialog).queryByRole('button', { name: /^Drop/ })).toBeNull()
 })

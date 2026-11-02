@@ -31,24 +31,18 @@ type AppliedParams struct {
 	Excerpt   func(subject string) (tail []string, log string)
 }
 
-// DrawApplied draws what the apply of a mutation did: the tally (done for a plan that changed something with no item), the applied plan with a row per worktree that stands and the warnings of the items done then of the run, each item left unfinished followed by its own warnings, and the next steps, the result's, then each item's (what repairs what its failure left behind, then what its warnings offer), then what the run's warnings offer. An item's warning reads subject, then its message.
+// DrawApplied draws what the apply of a mutation did: the tally, the applied plan with a row per worktree that stands and the warnings of the items done then of the run, each item left unfinished followed by its own warnings, and the next steps, the result's, then each item's (what repairs what its failure left behind, then what its warnings offer), then what the run's warnings offer. An item's warning reads subject, then its message.
 func DrawApplied[P RecappedPlan, D any](w io.Writer, outcome domain.Outcome[P, D], params AppliedParams) {
 	items := outcome.Result.Items
 	tallied := make([]Tallied, 0, len(items))
 	for _, item := range items {
 		tallied = append(tallied, Tallied{Status: item.Status, Reason: item.Reason})
 	}
-	// A plan with no item that changed something (prune paying a drop owed) is done, not nothing to do.
-	changed := len(items) > 0 || !outcome.Plan.Recaps().Empty && len(outcome.Plan.Recaps().Recap) > 0
-	if len(items) == 0 && changed {
-		SuccessLine(w, params.Command+": done")
-	} else {
-		Tally(w, TallyParams{Command: params.Command, Items: tallied, Note: params.Note})
-	}
+	Tally(w, TallyParams{Command: params.Command, Items: tallied, Note: params.Note})
 
 	var rows []PlanRow
 	var warnings []string
-	if changed {
+	if len(items) > 0 {
 		rows = RecapRows(outcome.Plan.Recaps().Recap)
 	}
 	for _, item := range items {

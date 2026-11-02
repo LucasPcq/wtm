@@ -350,6 +350,9 @@ func RecappedData(removals []Removal) []domain.RecapValue {
 	return values
 }
 
+// RecapOwed is the key of the recap's row of the drops owed a run pays, which a surface that draws what became of each leaves out of its outcome.
+const RecapOwed = "owed"
+
 // RecappedDebts are the drops owed a run pays as a recap row's values.
 func RecappedDebts(debts []Debt) []domain.RecapValue {
 	values := make([]domain.RecapValue, 0, len(debts))

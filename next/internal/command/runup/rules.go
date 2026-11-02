@@ -723,6 +723,9 @@ func (p Plan) Fingerprinted() any {
 // ----------------------------------------------------------------------------
 // The recap
 
+// RecapOwed keys the recap's row of the drops owed the plan pays.
+const RecapOwed = teardown.RecapOwed
+
 // recap is the plan row by row: the worktrees, the profile, the jobs each worktree starts, in order, the worktrees whose jobs stop first, and the drops owed it pays.
 func (p Plan) recap() []domain.RecapRow {
 	names := make([]string, 0, len(p.Worktrees))
@@ -752,7 +755,7 @@ func (p Plan) recap() []domain.RecapRow {
 		rows = append(rows, domain.RecapRow{Key: "stops", Label: "Stops first", Path: PathExclusive, Values: domain.RecapValues(stopped)})
 	}
 	if len(p.Owed) > 0 {
-		rows = append(rows, domain.RecapRow{Key: "owed", Label: "Owed", Values: teardown.RecappedDebts(p.Owed)})
+		rows = append(rows, domain.RecapRow{Key: RecapOwed, Label: "Owed", Values: teardown.RecappedDebts(p.Owed)})
 	}
 	return rows
 }

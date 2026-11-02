@@ -1,12 +1,13 @@
 
-  ✓ run up: 1 done
+  ✓ run up: 2 done
 
   Worktrees  feat/d
   Profile    data
   Jobs       db (joined, in main), api, web
-  Owed       acme_feat-c in db (owed since feat-c was removed)
 
   Addresses
     api  http://api.feat-d.acme.localhost:24392
     web  http://web.feat-d.acme.localhost:24392
+
+  ✓ dropped acme_feat-c from db, owed since feat-c was removed
 

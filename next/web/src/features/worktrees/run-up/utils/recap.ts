@@ -8,6 +8,7 @@ import {
   type OutcomeRow,
   planWide,
 } from '@/features/worktrees/utils/outcome'
+import { owedOf, owedRow } from '@/features/worktrees/utils/owed'
 
 type RunUpItem = Applied<'run-up'>['items'][number]
 
@@ -25,6 +26,7 @@ export const jobsSaid = (item: RunUpItem) => {
 }
 
 const rowOf = (item: RunUpItem): OutcomeRow => {
+  if (owedOf(item)) return owedRow(item)
   const base = { key: item.subject, title: item.subject, path: item.detail?.path }
   if (item.status === 'done') return { ...base, tone: 'ok', message: jobsSaid(item) }
   if (item.status === 'cancelled') return { ...base, tone: 'muted', message: `cancelled · ${jobsSaid(item)}` }

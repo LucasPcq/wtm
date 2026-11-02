@@ -1,6 +1,7 @@
 package teardown_test
 
 import (
+	"context"
 	"slices"
 	"testing"
 
@@ -180,11 +181,13 @@ func TestADropOwedIsPaidOnceItsServiceIsUpWithTheEnvironmentItKept(t *testing.T)
 	facts := w.payFacts(t)
 
 	debts := facts.Payable(nil)
-	warnings := w.service.Pay(t.Context(), teardown.PayParams{Command: command, Facts: facts, Debts: debts})
+	paid, warnings := w.service.Pay(t.Context(), teardown.PayParams{Command: command, Facts: facts, Debts: debts})
 
 	require.Len(t, debts, 1)
 	assert.Equal(t, "acme_feat-gone", debts[0].Name)
 	assert.Empty(t, warnings)
+	require.Len(t, paid, 1)
+	assert.Equal(t, domain.StatusDone, paid[0].Status)
 	require.Len(t, *w.hooks, 1)
 	assert.Equal(t, owed.Env, (*w.hooks)[0].Env)
 	assert.Equal(t, "/repo/main", (*w.hooks)[0].WorkDir)
@@ -212,7 +215,7 @@ func TestADebtIsWithdrawnOnlyWhenAWorktreeReachesTheSameName(t *testing.T) {
 	facts := w.payFacts(t)
 
 	debts := facts.Payable(nil)
-	warnings := w.service.Pay(t.Context(), teardown.PayParams{Command: command, Facts: facts, Debts: debts})
+	_, warnings := w.service.Pay(t.Context(), teardown.PayParams{Command: command, Facts: facts, Debts: debts})
 
 	require.Len(t, debts, 1, "feat/plain, ordinal 1, reaches acme_1 only")
 	assert.Equal(t, "acme_9", debts[0].Name)
@@ -249,27 +252,73 @@ func TestADropOwedToAServiceDownStaysOwed(t *testing.T) {
 	assert.Len(t, facts.Payable([]string{"db"}), 1, "a run that starts db pays it")
 }
 
+func TestADebtWhoseServiceIsNotUpAfterAllIsNotReached(t *testing.T) {
+	w := newWorld(seed{Run: sharedDB(), Owed: []env.OwedDrop{{Job: "db", Worktree: "feat-gone", Ordinal: 7}}})
+	facts := w.payFacts(t)
+	debts := facts.Payable([]string{"db"})
+
+	paid, _ := w.service.Pay(t.Context(), teardown.PayParams{Command: command, Facts: facts, Debts: debts})
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	cancelled, _ := w.service.Pay(ctx, teardown.PayParams{Command: command, Facts: facts, Debts: debts})
+
+	assert.Equal(t, domain.ReasonNotReached, paid[0].Reason, "the start of db failed: no drop_failed noise")
+	assert.Equal(t, domain.StatusSkipped, cancelled[0].Status)
+	assert.Equal(t, domain.ReasonNotReached, cancelled[0].Reason)
+	assert.Empty(t, *w.hooks)
+	assert.Len(t, w.queue.owed, 1)
+}
+
 func TestAFailedDropOwedStaysOwed(t *testing.T) {
 	w := newWorld(seed{Run: sharedDB(), Listed: up(plain), Owed: []env.OwedDrop{{Job: "db", Worktree: "feat-gone", Ordinal: 7}}, RunHooks: hookFails})
 	facts := w.payFacts(t)
 
-	warnings := w.service.Pay(t.Context(), teardown.PayParams{Command: command, Facts: facts, Debts: facts.Payable(nil)})
+	paid, _ := w.service.Pay(t.Context(), teardown.PayParams{Command: command, Facts: facts, Debts: facts.Payable(nil)})
 
-	assert.Equal(t, []string{"sweep.drop_failed"}, codes(warnings))
+	assert.Equal(t, domain.StatusFailed, paid[0].Status)
+	assert.Equal(t, "sweep.drop_failed", paid[0].Err.Code)
+	assert.Empty(t, paid[0].Warnings)
 	assert.Len(t, w.queue.owed, 1)
+}
+
+func TestADebtTheQueueCannotGiveUpIsNotDropped(t *testing.T) {
+	w := newWorld(seed{Run: sharedDB(), Listed: up(plain), Owed: []env.OwedDrop{{Job: "db", Worktree: "feat-gone", Ordinal: 7}}})
+	w.queue.fail = map[int]error{1: errRefused}
+	facts := w.payFacts(t)
+
+	paid, _ := w.service.Pay(t.Context(), teardown.PayParams{Command: command, Facts: facts, Debts: facts.Payable(nil)})
+
+	assert.Equal(t, domain.StatusFailed, paid[0].Status)
+	assert.Equal(t, "sweep.owed_unrecorded", paid[0].Err.Code)
+	assert.Empty(t, *w.hooks, "not taken out, not dropped")
+	assert.Len(t, w.queue.owed, 1)
+}
+
+func TestAFailedDropTheQueueCannotTakeBackIsSaidLost(t *testing.T) {
+	w := newWorld(seed{Run: sharedDB(), Listed: up(plain), Owed: []env.OwedDrop{{Job: "db", Worktree: "feat-gone", Ordinal: 7}}, RunHooks: hookFails})
+	w.queue.fail = map[int]error{2: errRefused}
+	facts := w.payFacts(t)
+
+	paid, _ := w.service.Pay(t.Context(), teardown.PayParams{Command: command, Facts: facts, Debts: facts.Payable(nil)})
+
+	assert.Equal(t, "sweep.drop_failed", paid[0].Err.Code)
+	assert.Equal(t, []string{"sweep.owed_lost"}, codes(paid[0].Warnings))
+	assert.Contains(t, paid[0].Warnings[0].Message, "WTM_NAMESPACE=acme_feat-gone dropdb")
 }
 
 func TestADebtAnotherRunPaidMeanwhileIsNotDroppedTwice(t *testing.T) {
 	w := newWorld(seed{Run: sharedDB(), Listed: up(plain), Owed: []env.OwedDrop{{Job: "db", Worktree: "feat-gone", Ordinal: 7}}})
 	facts := w.payFacts(t)
 	debts := facts.Payable(nil)
-	other := w.service.Pay(t.Context(), teardown.PayParams{Command: command, Facts: facts, Debts: debts})
+	first, _ := w.service.Pay(t.Context(), teardown.PayParams{Command: command, Facts: facts, Debts: debts})
 
-	warnings := w.service.Pay(t.Context(), teardown.PayParams{Command: command, Facts: facts, Debts: debts})
+	second, warnings := w.service.Pay(t.Context(), teardown.PayParams{Command: command, Facts: facts, Debts: debts})
 
-	assert.Empty(t, other)
+	assert.Equal(t, domain.StatusDone, first[0].Status)
+	assert.Equal(t, domain.StatusDone, second[0].Status)
+	assert.Equal(t, domain.ReasonUnchanged, second[0].Reason, "another run paid it")
 	assert.Empty(t, warnings)
-	assert.Len(t, *w.hooks, 1, "the second payer finds it gone: paid")
+	assert.Len(t, *w.hooks, 1)
 	assert.Empty(t, w.queue.owed)
 }
 
