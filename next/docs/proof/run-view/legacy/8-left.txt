@@ -1,0 +1,23 @@
+$ wtm run up feat/b --profile view --yes; echo EXIT=$?
+
+┃   Jobs
+┃
+┃  Profile:      view
+┃
+┃  feat/b
+┃  Running:      db, api, web, flaky
+┃  Completed:    migrate
+┃
+┃  ◈ Shared, running in main
+┃    db   :24393 · acme_feat-b
+┃
+┃  Where to reach it
+┃    api  http://api.feat-b.acme.localhost:24392
+┃    web  http://web.feat-b.acme.localhost:24392
+┃
+┃  → wtm run logs   attach to the output
+┃  → wtm run down   stop the jobs
+
+EXIT=0
+$
+

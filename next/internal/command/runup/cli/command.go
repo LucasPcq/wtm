@@ -45,11 +45,12 @@ const (
 type upCommand struct {
 	io   uicli.Run
 	form *upForm
+	view View
 }
 
-// New returns run up's command, a subcommand of run: its flags and arguments become a runup.Request, answered in the wizard when the user can see and answer it, else run unattended; it draws the outcome on streams, or the v2 JSON envelope with --output json, its follow-ups spelled by commandLine.
-func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (runup.UseCase, error), commandLine output.CommandLine) *cobra.Command {
-	c := &upCommand{io: uicli.Run{Command: runup.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: upFlags}, form: newForm(open)}
+// New returns run up's command, a subcommand of run: its flags and arguments become a runup.Request, answered in the wizard when the user can see and answer it, else run unattended; it draws the outcome on streams, or the v2 JSON envelope with --output json, its follow-ups spelled by commandLine; at a terminal, the jobs it left up are shown live in view first.
+func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (runup.UseCase, error), commandLine output.CommandLine, view View) *cobra.Command {
+	c := &upCommand{io: uicli.Run{Command: runup.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: upFlags}, form: newForm(open), view: view}
 	cmd := &cobra.Command{Use: "up [worktree...]", Short: upShort, Long: upLong, Example: upExample, Args: cobra.ArbitraryArgs, RunE: c.run}
 	c.form.Bind(cmd, &c.io)
 
@@ -57,7 +58,7 @@ func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, 
 }
 
 func (c *upCommand) run(cmd *cobra.Command, args []string) error {
-	return c.form.Launch(cmd, args, c.form.Conclude)
+	return c.form.Launch(cmd, args, c.conclude)
 }
 
 // Line spells a follow-up that names run up, from run up's schema, as wtm-next runs it; none when its answers are not run up's.

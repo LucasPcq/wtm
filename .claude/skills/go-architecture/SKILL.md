@@ -17,7 +17,7 @@ next/
     service/<name>/    what use cases share with I/O: operation, provision, repository, registry, teardown; <name>test kits
     domain/            the pure model and vocabulary; worktree/, project/, env/, dotenv/, run/ by subject
     adapter/<name>/    git, store, config, shell, oplock, events (the bus), registry, webserver, statefile, proxyport, daemon (the run daemon's protocol and jobs.json), process, joblog, proxy (the run proxy), github; <name>test fakes
-    ui/                cli (root, exit codes, env), output (streams, frames, envelope), form (flags, wizard, conclusion), widget (a step's inputs), formtest (the cli tests' kit)
+    ui/                cli (root, exit codes, env), output (streams, frames, envelope), form (flags, wizard, conclusion), widget (a step's inputs), formtest (the cli tests' kit), runview (the live view of jobs over the run daemon)
     api/               the catalogue of commands, and its streams, for a surface other than the CLI
     web/               the local HTTP server over api (wtm-next ui): routes, guard, SSE, HTTP statuses, the embedded front
     daemon/            the run daemon: the jobs of the machine, blind to git, over the ports of its port.go
@@ -39,6 +39,7 @@ next/
 | orchestrates I/O two commands need | `service/<name>/` (concrete, with its own `port.go`) |
 | is a question two commands ask | the fragment of the service that consumes its answers (`service/provision/questions.go`) |
 | is presentation two commands need, or any field kind of the wizard | `ui/output`, `ui/form`, an input in `ui/widget` |
+| shows jobs live: their list and a job's terminal, attached through the run daemon | `ui/runview`, over the port it declares (`runview.Daemon`), which a command's `cli` is handed by `cmd/wtm-next` |
 | talks to git, a file, a process, a socket | `adapter/<name>/`, behind a port |
 | is an in-memory stand-in for an adapter, for tests | `adapter/<name>test/` |
 | checks a promise every use case keeps, for tests | `service/<name>test/` (`operationtest.Contract`) |

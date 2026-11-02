@@ -1,0 +1,30 @@
+
+  ╭────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────╮
+  │ JOBS                   │ │ Where to reach it                                                                     │
+  │                        │ │                                                                                       │
+  │ shared                 │ │ shared                                                                                │
+  │ ›• db               1m │ │   db  PGPORT :26653                                                                   │
+  │                        │ │                                                                                       │
+  │ feat/b                 │ │ feat/b                                                                                │
+  │  ✓ migrate             │ │   api  http://api.feat-b.acme.localhost:11080                                         │
+  │  • api              1m │ │                                                                                       │
+  │  − web                 │ │ feat/a                                                                                │
+  │                        │ │   api  http://api.feat-a.acme.localhost:11080                                         │
+  │ feat/a                 │ │                                                                                       │
+  │  • seed             1m │ │                                                                                       │
+  │  • api              1m │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  ╰────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────────────╯
+
+  ↑↓ job · / filter · pgup/pgdn scroll · enter focus · o open · a addresses · q detach       2 worktrees · 4/6 running

@@ -329,6 +329,11 @@ func repoID(ctx context.Context, dir string) string {
 	return web.RepoID(params.repo())
 }
 
+// openURL opens url in the user's browser.
+func openURL(url string) error {
+	return shell.Detached(shell.DetachedParams{Name: browser(), Args: []string{url}, Env: os.Environ()})
+}
+
 // browser is the command that opens an address in the user's browser.
 func browser() string {
 	if runtime.GOOS == "darwin" {

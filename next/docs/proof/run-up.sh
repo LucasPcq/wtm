@@ -186,7 +186,7 @@ run_side() {
 }
 
 # tty_side <side> <binary>: the wizard in tmux, in a sandbox of its own: the worktrees, the profile, then legacy's
-# live view (left with q) or next's recap and outcome.
+# live view (left with q), or next's recap, its live view once the jobs are started (left with q) and the outcome.
 tty_side() {
   local side=$1 bin=$2 root
   root=$(mktemp -d /tmp/wtmXXXXX)
@@ -234,7 +234,9 @@ tty_side() {
       tmux send-keys -t "$session" Enter
       capture 4-recap 'No, cancel'
       tmux send-keys -t "$session" Enter
-      capture 5-outcome 'EXIT=0'
+      capture 5-view 'JOBS'
+      tmux send-keys -t "$session" q
+      capture 6-outcome 'EXIT=0'
     fi
   )
   sed -i '' -E -e "s#(/private)?$root#<SB>#g" -e 's#wtmx#wtm#g' -e 's#\(([0-9.]+m?s)\)#(<DUR>)#g' -e 's# [0-9]+s │# <UP> │#g' "$tty"/*

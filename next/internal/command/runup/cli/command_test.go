@@ -82,3 +82,51 @@ func TestAFollowUpOfRunUpIsSpelledAsItsCommandLine(t *testing.T) {
 
 	assert.Equal(t, []string{"wtm-next", "run", "up", featB, "--force", "--profile", "dev"}, Line(retry))
 }
+
+func TestAtATerminalTheStartOpensTheLiveViewThenDrawsTheOutcome(t *testing.T) {
+	got := runUpAt(t, newWorld(), "q", "--yes")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	assert.True(t, viewOpened(got))
+	formtest.Golden(t, "started", got.Stdout)
+}
+
+// B13: the legacy view's listing cleared an error of the start, which then exited 0.
+func TestAStartThatFailedInOneWorktreeExitsOneThroughTheLiveView(t *testing.T) {
+	got := runUpAt(t, newWorld(), "q", featA, featB, "--yes")
+
+	assert.Equal(t, uicli.ExitError, got.Code)
+	assert.True(t, viewOpened(got))
+	formtest.Golden(t, "failed", got.Stdout)
+}
+
+// B12: the legacy view, left mid-start, exited 0 on a Ctrl+C; the view now opens on a start done, and leaving it keeps the start's exit.
+func TestCtrlCInTheLiveViewLeavesItWithTheStartsExit(t *testing.T) {
+	got := runUpAt(t, newWorld(), "\x03", featA, featB, "--yes")
+
+	assert.Equal(t, uicli.ExitError, got.Code)
+	assert.True(t, viewOpened(got))
+}
+
+func TestTheLiveViewOpensOnlyForAPersonAtATerminalOnJobsLeftUp(t *testing.T) {
+	for name, c := range map[string]struct {
+		words    []string
+		terminal bool
+	}{
+		"detached":    {words: []string{featA, "--yes", "-d"}, terminal: true},
+		"nothing_up":  {words: []string{featB, "--yes"}, terminal: true},
+		"json":        {words: []string{featA, "--yes", "--output", "json"}, terminal: true},
+		"quiet":       {words: []string{featA, "--yes", "--quiet"}, terminal: true},
+		"dry_run":     {words: []string{featA, "--dry-run"}, terminal: false},
+		"no_terminal": {words: []string{featA, "--yes"}, terminal: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := runUp(t, newWorld(), c.words...)
+			if c.terminal {
+				got = runUpAt(t, newWorld(), "q", c.words...)
+			}
+
+			assert.False(t, viewOpened(got))
+		})
+	}
+}

@@ -60,10 +60,15 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		statuscli.New(streams, env, openStatus, commandLine),
 		treecli.New(streams, env, openTree, commandLine),
 		eventscli.New(streams, env, systemStream(), commandLine),
-		runCmd(runupcli.New(streams, env, openRunUp, commandLine), runDaemonCmd(streams)),
+		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runDaemonCmd(streams)),
 		uiCmd(env),
 		daemonCmd(),
 	}
+}
+
+// liveView is where run up shows the jobs it started: the run daemon of this machine, never started for it, and the browser.
+func liveView() runupcli.View {
+	return runupcli.View{Daemon: runDaemon(), Open: openURL}
 }
 
 // runCmd is run, the parent of the commands that start, watch and stop the jobs of run.toml.

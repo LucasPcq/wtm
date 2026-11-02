@@ -807,7 +807,7 @@ func (p Plan) next(items []Item) []domain.FollowUp {
 		followUps = append(followUps, *retry)
 	}
 	for _, item := range items {
-		if item.Detail == nil || !item.Detail.leftUp() {
+		if item.Detail == nil || !item.Detail.LeftUp() {
 			continue
 		}
 		on := []domain.Answered{{Path: domain.PathWorktree, Values: []string{item.Subject}}}
