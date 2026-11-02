@@ -1,10 +1,10 @@
-import type { TeardownDebt } from '@/api/types.gen'
+import type { DomainItem, TeardownDebt } from '@/api/types.gen'
 import type { OutcomeRow } from '@/features/worktrees/utils/outcome'
 import { sentence } from '@/features/worktrees/utils/sentence'
 
 type Item = {
   subject: string
-  status: string
+  status: DomainItem['status']
   error?: { message: string } | undefined
   detail?: object | undefined
 }
@@ -13,6 +13,22 @@ const owing = (detail: object): detail is { owed: TeardownDebt } => 'owed' in de
 
 // an item of the apply that is a drop owed the run planned to pay, rather than one of its worktrees
 export const owedOf = ({ detail }: Item) => (detail && owing(detail) ? detail.owed : undefined)
+
+// the drops owed counted apart from the worktrees, by what became of them, as the command line's tally counts them
+const owedWords: Record<DomainItem['status'], string> = {
+  done: 'made',
+  failed: 'failed',
+  skipped: 'not made',
+  cancelled: 'not made',
+}
+
+export function owedTally(items: Item[]): string[] {
+  const owed = items.filter(owedOf)
+  return [...new Set(Object.values(owedWords))].flatMap((said) => {
+    const n = owed.filter((item) => owedWords[item.status] === said).length
+    return n > 0 ? [`${n} owed drop${n === 1 ? '' : 's'} ${said}`] : []
+  })
+}
 
 // a drop owed as a row of the outcome, said from what became of it
 export function owedRow(item: Item): OutcomeRow {

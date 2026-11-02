@@ -16,6 +16,7 @@ import { RunUpProgress } from '@/features/worktrees/run-up/components/run-up-pro
 import { RunUpWizard } from '@/features/worktrees/run-up/components/run-up-wizard'
 import { countOf } from '@/features/worktrees/run-up/utils/plan'
 import { startedWords, where } from '@/features/worktrees/run-up/utils/words'
+import { owedOf, owedTally } from '@/features/worktrees/utils/owed'
 
 // resolves once the list read lands after at: never while no list is read, the run then kept until the dialog opens
 const listedAfter = (client: QueryClient, repo: string, at: number) =>
@@ -60,12 +61,16 @@ export function RunUpDialog({ repo }: { repo: string }) {
       // read where it ended: the page keeps its rows until the list lands, then the run has nothing left to show
       return void listedAfter(client, repo, Date.now()).then(run.dismiss)
     }
-    const failed = items.filter((item) => item.status !== 'done').length
-    const said =
-      items.length > 0
-        ? `${ran.profile} didn't start in ${failed} of ${items.length}.`
-        : (envelope?.error?.message ?? refused ?? 'Nothing started.')
-    toast.error(said, { action: { label: 'Details', onClick: () => showRunUp(repo) } })
+    const worktrees = items.filter((item) => !owedOf(item))
+    const failed = worktrees.filter((item) => item.status !== 'done').length
+    // a start whose worktrees all started fails on a drop owed it could not make
+    const started = `${[`${ran.profile} started ${where(worktrees.map((item) => item.subject))}`, ...owedTally(items)].join(' · ')}.`
+    const said = () => {
+      if (failed > 0) return `${ran.profile} didn't start in ${failed} of ${worktrees.length}.`
+      if (worktrees.length > 0) return started
+      return envelope?.error?.message ?? refused ?? 'Nothing started.'
+    }
+    toast.error(said(), { action: { label: 'Details', onClick: () => showRunUp(repo) } })
   }
 
   const content = () => {

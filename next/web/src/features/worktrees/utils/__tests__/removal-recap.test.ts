@@ -176,9 +176,8 @@ test('the drops owed a prune paid are said from what became of each: dropped don
     plan: { worktrees: [], reasons: ['merged'], reparent_children: false, force: false },
   })
 
-  const { groups, paid: count } = recapOf({ units: [], envelope: paid }, 'prune')
+  const { groups } = recapOf({ units: [], envelope: paid }, 'prune')
 
-  expect(count).toBe(1)
   expect(groups.find((group) => group.kind === 'done')?.rows).toEqual([
     {
       key: 'owed-acme_feat_old',

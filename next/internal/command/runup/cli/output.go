@@ -19,8 +19,22 @@ func drawOutcome(w io.Writer, outcome runup.Outcome, view output.View) {
 		addresses(outcome)(w)
 		drawPaid(w, outcome.Result.Items)
 	}
-	output.DrawApplied(w, outcome, output.AppliedParams{Command: Use, View: view, Block: block, Excerpt: excerpt(outcome)})
+	output.DrawApplied(w, outcome, output.AppliedParams{Command: Use, View: view, Noun: owedNoun(outcome.Result.Items), Block: block, Excerpt: excerpt(outcome)})
 }
+
+// owedNoun counts the drops owed the start paid by their noun, apart from the worktrees it started in.
+func owedNoun(items []runup.Item) func(subject string) string {
+	return func(subject string) string {
+		at := slices.IndexFunc(items, func(item runup.Item) bool { return item.Subject == subject })
+		if at < 0 || items[at].Detail == nil || items[at].Detail.Owed == nil {
+			return ""
+		}
+		return owedDrop
+	}
+}
+
+// owedDrop is how the tally counts a drop owed.
+const owedDrop = "owed drop"
 
 // drawPaid draws a line for each drop owed the start made.
 func drawPaid(w io.Writer, items []runup.Item) {

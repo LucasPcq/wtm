@@ -22,7 +22,6 @@ export function recapOf(
   groups: OutcomeGroup[]
   warnings: DomainWarning[]
   data: string[]
-  paid: number
 } {
   const envelope = progress.envelope
   const items = envelope?.items ?? []
@@ -88,7 +87,6 @@ export function recapOf(
       },
     ],
     warnings,
-    paid: owed.filter((item) => item.status === 'done').length,
     data: items.flatMap((item) =>
       (item.detail?.namespaces ?? []).flatMap((dropped) => {
         const fate = droppedWords[dropped.status]

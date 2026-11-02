@@ -72,7 +72,8 @@ test("drops owed, the plan's only change, go straight to Confirm, and the run sa
   expect(within(dialog).queryByText('Nothing to prune')).toBeNull()
   await user.click(await within(dialog).findByRole('button', { name: 'Drop 2 owed namespaces' }))
 
-  const done = await within(dialog).findByRole('region', { name: 'Pruned' })
+  expect(await within(dialog).findByText('1 owed drop made · 1 owed drop failed.')).toBeTruthy()
+  const done = within(dialog).getByRole('region', { name: 'Pruned' })
   expect(within(done).getByText('Dropped from db, owed since feat-old was removed')).toBeTruthy()
   expect(within(done).queryByText(/acme_feat_older/)).toBeNull()
   const failed = within(dialog).getByRole('region', { name: "Couldn't prune" })
