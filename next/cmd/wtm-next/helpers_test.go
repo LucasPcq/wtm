@@ -519,6 +519,7 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[project.Isolation]():         {"How a worktree stands against its source.", project.Isolations()},
 	reflect.TypeFor[project.JobKind]():           {"Whether a job keeps running or runs to its end.", project.JobKinds()},
 	reflect.TypeFor[run.State]():                 {"A job's state.", run.States()},
+	reflect.TypeFor[run.Hold]():                  {"What of a job the run daemon holds: its own process, a stack its launcher left, a claim on a shared job another worktree runs.", run.Holds()},
 	reflect.TypeFor[worktree.PullRequestState](): {"Where a pull request stands.", worktree.PullRequestStates()},
 	reflect.TypeFor[worktree.Action]():           {"An action on a worktree, one entry of the menu every surface shows of it.", worktree.Actions()},
 	reflect.TypeFor[worktree.Unoffered]():        {"Why a worktree does not offer an action, as a code each surface words its own way.", worktree.Unoffereds()},

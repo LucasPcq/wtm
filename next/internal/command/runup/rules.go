@@ -41,13 +41,28 @@ func (f Facts) standingWorktrees() []worktree.Worktree {
 	return slices.DeleteFunc(f.MainFirst(), func(w worktree.Worktree) bool { return f.Gone[w.Path] })
 }
 
-// worktreeOptions are the worktrees run up may start in: each one whose directory stands, the main one first, the caller's tagged current, each with the jobs up in it and the profile they were started under.
+// worktreeOptions are the worktrees run up may start in: each one whose directory stands, the main one first, the caller's tagged current, each with the jobs up in it and the profile they were started under, as the daemon says, whatever run.toml says now.
 func (f Facts) worktreeOptions() []domain.Option {
 	worktrees := f.standingWorktrees()
 	options := domain.WorktreeOptions(worktrees, domain.WorktreeQuery{Cwd: f.Cwd})
 	for i, w := range worktrees {
-		options[i].Up = nonEmptyNames(run.UpIn(f.Jobs, w.Path))
-		options[i].Profile = f.profileOf(w.Path)
+		var up, holds []string
+		for _, job := range f.Jobs {
+			switch {
+			case job.WorkDir != w.Path || job.Hold == run.HoldClaim:
+			case job.State == run.Crashed && run.Own(job):
+				options[i].Crashed++
+			case !job.Up:
+			case !run.Own(job):
+				holds = append(holds, job.Name)
+			default:
+				up = append(up, job.Name)
+			}
+		}
+		slices.Sort(up)
+		slices.Sort(holds)
+		options[i].Up, options[i].Holds = up, holds
+		options[i].Profile = run.ProfileIn(f.Jobs, w.Path)
 	}
 	return options
 }
@@ -55,24 +70,6 @@ func (f Facts) worktreeOptions() []domain.Option {
 // up are the jobs up in the worktree at path, claims included.
 func (f Facts) up(path string) []run.Job {
 	return slices.DeleteFunc(slices.Clone(f.Jobs), func(job run.Job) bool { return !job.Up || job.WorkDir != path })
-}
-
-// nonEmptyNames is names, nil when it holds none, as an option leaves the fact out.
-func nonEmptyNames(names []string) []string {
-	if len(names) == 0 {
-		return nil
-	}
-	return names
-}
-
-// profileOf is the profile the jobs the worktree at path runs itself were started under, when they say one: a claim, and a shared service run there for every worktree, are another start's.
-func (f Facts) profileOf(path string) string {
-	for _, job := range f.up(path) {
-		if job.Profile != "" && job.Hold != run.HoldClaim && !f.shared(job.Name) {
-			return job.Profile
-		}
-	}
-	return ""
 }
 
 func (f Facts) named(name string) (worktree.Worktree, bool) {

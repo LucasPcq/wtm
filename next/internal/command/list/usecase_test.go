@@ -34,7 +34,11 @@ func TestEachWorktreeIsReadTheMainOneFirstThenTheOldest(t *testing.T) {
 			},
 		},
 		Meta: map[string]worktree.Meta{"feat/a": {CreatedAt: newer}, "feat/b": {CreatedAt: older}},
-		Jobs: []run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true, URL: "http://web.feat-a.acme.localhost"}, {Name: "api", WorkDir: "/repo/.trees/feat/a", URL: "http://api.feat-a.acme.localhost"}},
+		Jobs: []run.Job{
+			{Name: "web", WorkDir: "/repo/.trees/feat/a", Profile: "dev", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldOwn, URL: "http://web.feat-a.acme.localhost", StartedAt: created},
+			{Name: "api", WorkDir: "/repo/.trees/feat/a", Profile: "dev", Kind: project.Service, State: run.Crashed, Hold: run.HoldOwn, URL: "http://api.feat-a.acme.localhost", ExitCode: ptr(1)},
+			{Name: "db", WorkDir: "/repo/.trees/feat/a", Profile: "full", Up: true, Kind: project.Service, Hold: run.HoldClaim, SharedDir: mainPath},
+		},
 	})
 
 	read, err := w.usecase.Run(t.Context(), list.Request{}, domain.RunOptions{})
@@ -47,7 +51,13 @@ func TestEachWorktreeIsReadTheMainOneFirstThenTheOldest(t *testing.T) {
 		Branch: "feat/a", Path: "/repo/.trees/feat/a", Record: worktree.RecordRead, Dirty: true, CommitsAhead: 2, Ahead: ptr(2), Changes: &list.Changes{Changed: 1, Untracked: 1},
 		CreatedAt: a.CreatedAt, LastCommitAt: &gittest.Committed, Origin: &worktree.Origin{Ahead: 2, State: worktree.Ahead},
 		Condition: worktree.ConditionChanged,
-		Services:  []string{"web"}, URLs: []string{"http://web.feat-a.acme.localhost"}, Actions: a.Actions,
+		Services:  []string{"db", "web"}, URLs: []string{"http://web.feat-a.acme.localhost"}, Actions: a.Actions,
+		Profile: "dev",
+		Jobs: []list.Job{
+			{Name: "api", Kind: project.Service, State: run.Crashed, Hold: run.HoldOwn, Profile: "dev", URL: "http://api.feat-a.acme.localhost", ExitCode: ptr(1)},
+			{Name: "db", Kind: project.Service, Hold: run.HoldClaim, Profile: "full"},
+			{Name: "web", Kind: project.Service, State: run.Running, Hold: run.HoldOwn, Profile: "dev", URL: "http://web.feat-a.acme.localhost", StartedAt: &created},
+		},
 	}, a)
 	assert.Equal(t, created.Add(time.Hour), *a.CreatedAt)
 	assert.NotNil(t, offerOf(t, a.Actions, worktree.ActionReparent).FollowUp, "wtm recorded feat/a: it can change its parent")
@@ -237,7 +247,9 @@ func TestJobsThatCannotBeToldAreNoServicesAtAll(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Nil(t, detailOf(t, unknown, "main").Services)
+	assert.Nil(t, detailOf(t, unknown, "main").Jobs)
 	assert.Equal(t, []string{}, detailOf(t, none, "main").Services)
+	assert.Equal(t, []list.Job{}, detailOf(t, none, "main").Jobs)
 }
 
 func TestARefreshReadsOriginFetchedFirst(t *testing.T) {

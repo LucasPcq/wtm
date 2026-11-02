@@ -79,3 +79,21 @@ test('a run that took under a second shows no time, as a phase does not', () => 
     took({ units: [{ subject: 'feat/a', phases: [{ ...quick, endedAt: '2026-10-25T12:00:00.4Z' }], lines: [] }] }),
   ).toBe('')
 })
+
+test("a start's jobs are each a phase of their own, with their own lines", () => {
+  let progress: Progress<'run-up'> = { units: [todo('feat/a', [])] }
+  for (const event of [
+    line({ type: 'phase.started', subject: 'feat/a', phase: 'job', job: 'migrate' }),
+    line({ type: 'phase.output', subject: 'feat/a', job: 'migrate', line: 'Applying 2 migrations' }),
+    line({ type: 'phase.finished', subject: 'feat/a', phase: 'job', job: 'migrate', failed: false }),
+    line({ type: 'phase.started', subject: 'feat/a', phase: 'job', job: 'web' }),
+    line({ type: 'phase.output', subject: 'feat/a', job: 'web', line: 'ready' }),
+  ])
+    progress = advance(progress, event)
+
+  expect(progress.units[0]?.phases).toEqual([
+    expect.objectContaining({ phase: 'job', job: 'migrate', state: 'done', lines: ['Applying 2 migrations'] }),
+    expect.objectContaining({ phase: 'job', job: 'web', state: 'now', lines: ['ready'] }),
+  ])
+  expect(progress.units[0]?.lines).toEqual(['Applying 2 migrations', 'ready'])
+})

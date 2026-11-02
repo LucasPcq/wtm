@@ -130,7 +130,7 @@ A glyph never changes colour to mean "resolved": it changes icon.
 `wtm/Worktree Item` in a `wtm/Worktree Group` (the list box).
 
 - **Every line holds on one line**, at any number of worktrees and at the dialog's width: a row, a callout's line, a status, a switch's line, a sentence of a plan. Shorter words first (in the screen's Records); a list of names is a count past one ("2 worktrees kept: uncommitted changes"); an unbounded value (a branch name) is `truncate`d with the full text in its `title`.
-- **A tree's connectors are `Rail`** (`features/worktrees/components/rail.tsx`), the one drawing: each child draws its piece of the rail and its elbow in the border colour, the last stopping at its elbow, over any surface (no mask). The Tree, sync's step 1 and any new tree use it with their own elbow height and indent.
+- **A tree's connectors are `Rail`** (`features/worktrees/components/rail.tsx`), the one drawing: each child draws its piece of the rail and its elbow in the border colour, the last stopping at its elbow, over any surface (no mask). The Tree, sync's step 1, the Running page's groups and any new tree use it with their own elbow height and indent.
 - **Line 1 is the name, alone.** The reason a row is here (a pull request merged, a branch deleted on origin) is line 2, 12 muted, with its glyph and a link icon to the pull request. No badge.
 - **A leading checkbox means "in this run"**, in every list where a row can be left out. There is one control and one meaning: no segmented choice, no undecided state.
 - **The safety rule:** an unsafe row starts unchecked, with its amber reason ("1 commit on no other branch"). Checking it turns that line into the red loss ("Its 1 commit on no other branch is lost.") and tags the row "anyway". The consequence shows where it is decided. A worktree is never touched unless asked for.
@@ -140,7 +140,7 @@ A glyph never changes colour to mean "resolved": it changes icon.
 
 Every multi-worktree list (Remove's, Prune's, the Fast-forward and Run pickers, Reparent's selection) has a `wtm/List Header` inside its box: a tri-state box acting on the visible rows, and "k of n selected".
 
-- **A `wtm/Search Field` always sits above the header**, inside the same box, whatever the number of rows.
+- **A search always sits at the top of the list box it filters, a row of it, whatever the number of rows** (`wtm/Search Field`, `SearchRow` in `features/worktrees/components/search-row.tsx`): borderless and transparent, as tall as a row, the rows' horizontal padding, its muted icon in their checkbox or radio column, a faint fill on keyboard focus, never a bordered field above the box. A picker's `ListHeader` puts it above its header; Start a profile's Profile step and Create's pull request picker use it too. The box clips (`overflow-hidden`) so the fill keeps its rounded corners, and the rows' text starts where the search's does: a checkbox, a radio or an icon slot (a pull request's) sits under the search icon.
 - A selected row the search hides stays selected: "2 of 9 selected · 2 hidden by the search". The header's box reflects the visible rows only.
 - The body scrolls (`max-h` 90vh); the header and footer stay.
 
@@ -182,6 +182,20 @@ Create's step 1 opens on `wtm/Start From`, `New branch | Pull request`, above it
 4. the done group ("Pruned", "Fast-forwarded").
 
 A warning is drawn where its subject is, on the steps and on Done: one whose params name no worktree nor branch is the plan's `wtm/Alert`, first, on both; one with a subject is a reason line on that row during the steps (`create.source_diverged` on its `BranchPlan`) and a "To check" row on Done (`RunOutcome` splits them). A lone group drops its label. Success contracts to a count in the description. A row folds: its folded line is the code's fixed message worded by the screen ("git refused to move the branch"); opened, it shows the output or `error.params.cause` verbatim, and the log's path when there is a log. Steps and folders sit in `wtm/Details`, folded.
+
+## Running
+
+The Running page (`features/worktrees/running/`, frames "Area — Running") lists the jobs per worktree; Start a profile (`features/worktrees/run-up/`) is its one primary. Its own rules, beside the ones above:
+
+- **One primary, one header.** Start a profile (primary, with its icon) in the page header, Stop jobs beside it (outline). The empty state has no button of its own: the header's is the way forward. The sidebar's count shows only while jobs are up.
+- **A group is a worktree with a job up, crashed or starting.** Its name (14 semibold), then the profile the core names for it (list's `profile`) and the counts on line 2 ("profile dev · 2 up · 1 crashed"); its job rows hang from a connector under it, a crash first: `Rail` (`elbow={16} indent={14}`), a vertical rule with an elbow to each job's dot, never a second one drawn by hand. Stopped and exited jobs are not listed until the hidden row comes with the jobs read; a worktree holding only those is no group. A claim on a shared service shows where the service runs, never in the claimer's group.
+- **A job row** is the detail's Run row: the glyph by state (circle-dot running, circle-x crashed, a spinner starting), the name 14 medium, "up 12 min" on the right in 12 muted, a crash in red with its exit code, the address in mono 12 under the name.
+- **A worktree's "⋯" menu is labelled with the worktree (its branch) alone**, never the profile it runs: from it one starts other profiles.
+- **A profile in a menu** is a submenu, "Start a profile ›": each profile with a play icon, the default first, labelled "default"; the one the worktree runs disabled, labelled "running"; each with its jobs summed to three and a count; at most five, then "All N profiles…" ("opens Start a profile"), which opens the dialog. A searchable list never sits in a menu: that is the dialog's picker.
+- **Start a profile** is a dialog of three steps: Worktrees (the picker, each row what it runs now: "running dev · 2 up · 1 crashed", main's "holds postgres"), Profile (every profile, its search always shown, each with its jobs, "the default", "already running in …"; no step when run.toml asks none), Confirm (no control: for one worktree its order, the shared services first and unnumbered; for several, the shared services joined once, then each worktree's jobs; only the jobs that start are numbered, across the run; a worktree that runs the profile already under Left as they are; How it runs, in sentences with their icons). From a worktree, or a profile picked in its menu, it opens on Confirm, on Profile when the core picks none or every worktree runs the default already.
+- **A refusal on Confirm is never a dead end** when the core lets the person lift it: foreign data shows its Alert with "Start anyway" (`force`), a port clash "Stop the others' jobs" (`exclusive`) only when the core offers that follow-up; either plans again and shows the new Confirm before anything starts.
+- **A start runs job by job**: one row per job, the shared services once on top, each row unfolding to its last lines, following; the bar and the description count each worktree's own jobs and each shared service once ("3 of 8 up"). Hidden, it goes on in a toast ("Starting dev in 2 worktrees", "3 of 8 up", Show), and the page greys the rows it brings up with where they stand ("waits for migrate") until the first list read after its end lands; it ends on a toast ("dev started in 2 worktrees", "4 up · 2 joined · 2 done").
+- **Counts are the read's.** Until the jobs read gives its own counts and order, the page and the sidebar count list's `jobs` through one helper (`jobCounts`, `jobsUp` in `api/queries/commands.ts`).
 
 ## In Pencil
 

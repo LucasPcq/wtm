@@ -36,6 +36,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -195,6 +197,8 @@
         "condition": "changed",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -386,6 +390,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -562,6 +568,8 @@
         "condition": "missing",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -657,6 +665,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -773,6 +783,8 @@
         "condition": "missing",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",
@@ -868,6 +880,8 @@
         "condition": "clean",
         "services": [],
         "urls": [],
+        "jobs": [],
+        "profile": "",
         "actions": [
           {
             "action": "go",

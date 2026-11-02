@@ -68,6 +68,10 @@ const runsHere: Record<
     verb: menu.sync.label,
     open: (_repo, fix, runEntry) => runEntry({ action: 'sync', followUp: fix }, []),
   },
+  'run-up': {
+    verb: menu.run_up.label,
+    open: (_repo, fix, runEntry) => runEntry({ action: 'run_up', followUp: fix }, []),
+  },
 }
 
 export function Callout({ repo, problems: [first, ...more] }: { repo: string; problems: StatusProblem[] }) {
