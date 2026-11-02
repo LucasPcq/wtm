@@ -36,6 +36,7 @@ func open(t *testing.T, d *daemon, params Params, width, height int) *driver {
 	params.Daemon = d
 	params.Out = io.Discard
 	m := newModel(t.Context(), params)
+	t.Cleanup(m.close)
 	m.now = func() time.Time { return now }
 	dr := &driver{t: t, m: m, daemon: d}
 	dr.send(tea.WindowSizeMsg{Width: width, Height: height})

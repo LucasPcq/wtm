@@ -159,3 +159,20 @@ func TestTheViewOpensOnTheFirstJobTheStartLaunched(t *testing.T) {
 	assert.Equal(t, "api", params.Job)
 	assert.Equal(t, []string{"migrate", "api", "web"}, params.Worktrees[0].Jobs)
 }
+
+func TestTheViewKnowsTheNamespacesThePlanGivesEachWorktree(t *testing.T) {
+	outcome := runup.Outcome{
+		Plan: runup.Plan{Worktrees: []runup.Target{{Worktree: featB, Path: pathOf(featB), Jobs: []runup.JobPlan{
+			{Name: "db", SharedIn: "main", Namespace: "acme_feat-b"},
+			{Name: "api"},
+		}}}},
+		Result: &runup.Result{Items: []runup.Item{{Subject: featB, Detail: &runup.Detail{Jobs: []runup.JobResult{{Name: "db", Status: runup.JobJoined}, {Name: "api", Status: runup.JobStarted}}}}}},
+	}
+	streams, _, _, _ := output.Test()
+
+	params := (&upCommand{io: uicli.Run{Streams: streams}}).viewOf(outcome)
+
+	assert.Equal(t, map[string]string{"db": "acme_feat-b"}, params.Worktrees[0].Namespaces)
+	assert.Equal(t, "main", params.Main)
+	assert.Equal(t, "api", params.Job)
+}

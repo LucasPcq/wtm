@@ -68,6 +68,10 @@ type model struct {
 	pending bool
 	failed  error // why the binding could not fill the pane: said until it changes
 	ended   bool  // the live stream of the binding ended: its pane is kept
+	// again is the binding attached again once its stream ended while its job
+	// ran on: a second end keeps the pane, so a stream that ends at once is not
+	// attached in a loop.
+	again binding
 }
 
 // newModel returns the view of params, its first listing not yet asked.
@@ -298,11 +302,15 @@ func (m *model) fill() tea.Cmd {
 		return nil
 	}
 	want := binding{key: e.key, started: e.job.StartedAt, live: attachable(e)}
-	// A stream that ended keeps its pane until the job runs again; while the
+	// A stream that ended keeps its pane until the job starts again; while the
 	// job runs on (the daemon let a client that fell behind go), it is attached
-	// again.
-	if (want == m.bound && !m.ended) || (m.ended && m.bound.key == e.key && !want.live) {
+	// again, once per start.
+	ended := m.ended && m.bound.key == e.key
+	if (want == m.bound && !m.ended) || (ended && (!want.live || want == m.again)) {
 		return nil
+	}
+	if ended && want == m.bound {
+		m.again = want
 	}
 
 	m.release()
@@ -364,13 +372,14 @@ type drainParams struct {
 
 // drain writes what the job prints into its pane until the stream ends, then
 // says so, and why when it broke: nothing else would tell the view a job
-// stopped printing. A panic of the emulator ends the stream rather than the
-// process, which would leave the terminal raw and on the alternate screen.
+// stopped printing. A panic while it reads (the emulator is pre-release) ends
+// the stream rather than the process, which would leave the terminal raw and
+// on the alternate screen.
 func drain(p drainParams) {
 	ended := endedMsg{conn: p.conn}
 	defer func() {
 		if r := recover(); r != nil {
-			ended.err = fmt.Errorf("terminal emulator: %v", r)
+			ended.err = fmt.Errorf("reading the stream panicked: %v", r)
 		}
 		select {
 		case p.msgs <- ended:

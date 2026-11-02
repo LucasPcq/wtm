@@ -1,6 +1,10 @@
 package runview
 
 import (
+	"context"
+	"errors"
+	"io"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -360,8 +364,81 @@ func TestAKeyTheJobCannotTakeEndsTheFocus(t *testing.T) {
 // The clock watches every pane, not the one it was started on: a pane selected later is drawn as it is written.
 func TestAWriteToAnyPaneGivesAFrame(t *testing.T) {
 	m := newModel(t.Context(), Params{})
+	t.Cleanup(m.close)
 	frame := m.frame()
 
-	_, _ = newPane(paneParams{wake: m.wake}).Write([]byte("ready\r\n"))
+	p := newPane(paneParams{wake: m.wake})
+	t.Cleanup(p.close)
+	_, _ = p.Write([]byte("ready\r\n"))
 	assert.Equal(t, frameMsg{}, frame())
+}
+
+// A stream that ends at once while its job is listed up must not be attached again and again.
+func TestAStreamThatEndsAtOnceIsAttachedAgainOnlyOnce(t *testing.T) {
+	d := &daemon{attach: func(run.Window) (net.Conn, error) {
+		view, job := net.Pipe()
+		_ = job.Close()
+		return view, nil
+	}}
+	view := opened(t, d, 120, 30)
+	view.keys("down", "down")
+	for range 5 {
+		if conn := view.m.conn; conn != nil {
+			view.send(endedMsg{conn: conn})
+		}
+		view.refresh()
+	}
+
+	assert.Equal(t, 4, d.attaches(), "db and api, each attached once more: %v", d.attached)
+}
+
+func TestAJobThatStartsAgainIsAttachedAgain(t *testing.T) {
+	d := &daemon{}
+	view := opened(t, d, 120, 30)
+	view.keys("down", "down")
+	_, jobs := board()
+	jobs[3].StartedAt = now
+	d.set(jobs)
+	view.refresh()
+
+	assert.Equal(t, 3, d.attaches(), "db, api, then api's new start")
+}
+
+func TestAStreamThatBrokeSaysWhy(t *testing.T) {
+	view := opened(t, &daemon{}, 120, 30)
+	view.keys("down", "down")
+	view.send(endedMsg{conn: view.m.conn, err: errors.New("connection reset by peer")})
+
+	assert.Contains(t, view.screen(), "! api · feat/b: its output stopped: connection reset by peer")
+}
+
+// A panic while a stream is read ends that stream with the panic as its error, not the process.
+func TestAPanicReadingAStreamEndsItWithTheError(t *testing.T) {
+	msgs := make(chan tea.Msg, 1)
+	p := newPane(paneParams{})
+	t.Cleanup(p.close)
+
+	drain(drainParams{conn: panicking{}, pane: p, msgs: msgs, done: t.Context().Done()})
+
+	ended, ok := (<-msgs).(endedMsg)
+	require.True(t, ok)
+	assert.ErrorContains(t, ended.err, "boom")
+}
+
+// An attach the daemon answers once the view has left is closed: nobody else would.
+func TestAnAttachThatLandsAfterTheViewLeftIsClosed(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	var job net.Conn
+	d := &daemon{attach: func(run.Window) (net.Conn, error) {
+		cancel()
+		var view net.Conn
+		view, job = net.Pipe()
+		return view, nil
+	}}
+	m := newModel(ctx, Params{Daemon: d})
+	t.Cleanup(m.close)
+
+	assert.Nil(t, m.attach(binding{key: key{dir: featBDir, name: "api"}, live: true})())
+	_, err := job.Write([]byte("x"))
+	assert.ErrorIs(t, err, io.ErrClosedPipe)
 }

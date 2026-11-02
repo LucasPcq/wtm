@@ -107,6 +107,11 @@ func (d *daemon) attaches() int {
 	return len(d.attached)
 }
 
+// panicking is a stream whose read panics.
+type panicking struct{ net.Conn }
+
+func (panicking) Read([]byte) (int, error) { panic("boom") }
+
 // A terminal is the job's side of an attach: what the view typed, and what
 // the job prints.
 type terminal struct {
