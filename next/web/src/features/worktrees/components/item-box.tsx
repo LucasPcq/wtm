@@ -15,7 +15,10 @@ export function ItemBox({
 
   return (
     // shadcn's group widens its gap when anything inside is size sm: rows touch here
-    <ItemGroup aria-label={label} className="gap-0 rounded-lg border has-data-[size=sm]:gap-0 has-data-[size=xs]:gap-0">
+    <ItemGroup
+      aria-label={label}
+      className="gap-0 overflow-hidden rounded-lg border has-data-[size=sm]:gap-0 has-data-[size=xs]:gap-0"
+    >
       {header && (
         <>
           {header}

@@ -130,6 +130,18 @@ func TestAWorktreeShowsTheProfileOfItsOwnJobsAlone(t *testing.T) {
 	assert.Equal(t, []string{"db"}, questions.Worktrees.Options[0].Holds)
 }
 
+func TestAWorktreeSaysWhatItRunsAsTheDaemonStartedIt(t *testing.T) {
+	w := newWorld(t)
+	w.up("db", "main", nil)
+	w.daemon.listed[0].Profile = "full" // started for main alone: run.toml shares db now, the daemon names no shared directory
+
+	main := w.questions(t, starting("", featA)).Worktrees.Options[0]
+
+	assert.Equal(t, "full", main.Profile)
+	assert.Equal(t, []string{"db"}, main.Up, "what runs is the daemon's to say, not run.toml's as it reads now")
+	assert.Empty(t, main.Holds)
+}
+
 func TestAWorktreeCountsItsOwnJobsUpAndCrashedNotItsClaims(t *testing.T) {
 	w := newWorld(t)
 	w.up("api", featB, nil)

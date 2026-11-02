@@ -41,7 +41,7 @@ func (f Facts) standingWorktrees() []worktree.Worktree {
 	return slices.DeleteFunc(f.MainFirst(), func(w worktree.Worktree) bool { return f.Gone[w.Path] })
 }
 
-// worktreeOptions are the worktrees run up may start in: each one whose directory stands, the main one first, the caller's tagged current, each with the jobs up in it and the profile they were started under.
+// worktreeOptions are the worktrees run up may start in: each one whose directory stands, the main one first, the caller's tagged current, each with the jobs up in it and the profile they were started under, as the daemon says, whatever run.toml says now.
 func (f Facts) worktreeOptions() []domain.Option {
 	worktrees := f.standingWorktrees()
 	options := domain.WorktreeOptions(worktrees, domain.WorktreeQuery{Cwd: f.Cwd})
@@ -50,10 +50,10 @@ func (f Facts) worktreeOptions() []domain.Option {
 		for _, job := range f.Jobs {
 			switch {
 			case job.WorkDir != w.Path || job.Hold == run.HoldClaim:
-			case job.State == run.Crashed && !f.shared(job.Name):
+			case job.State == run.Crashed && run.Own(job):
 				options[i].Crashed++
 			case !job.Up:
-			case f.shared(job.Name):
+			case !run.Own(job):
 				holds = append(holds, job.Name)
 			default:
 				up = append(up, job.Name)

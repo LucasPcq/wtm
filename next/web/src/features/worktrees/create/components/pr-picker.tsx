@@ -107,7 +107,7 @@ export function PrPicker({
         </p>
       </div>
 
-      <div className="flex flex-col rounded-lg border">
+      <div className="flex flex-col overflow-hidden rounded-lg border">
         <div className="border-b">
           <SearchRow
             label="Search pull requests"
