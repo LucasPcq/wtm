@@ -103,9 +103,10 @@ func plainData(data []teardown.Namespace) []teardown.Namespace {
 	return found
 }
 
-// payParams are the repository as a command paying the drops owed reads it.
-func (w world) payParams(t *testing.T) teardown.PayParams {
+// payFacts are the repository as a run paying the drops owed reads it.
+func (w world) payFacts(t *testing.T) teardown.Facts {
 	t.Helper()
 	facts := w.facts(t, base())
-	return teardown.PayParams{Command: command, Repository: facts.Repository, Records: facts.Records}
+	facts.Owed = w.service.Owing()
+	return facts
 }

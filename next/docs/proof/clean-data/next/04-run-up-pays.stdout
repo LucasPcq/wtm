@@ -4,8 +4,7 @@
   Worktrees  feat/d
   Profile    data
   Jobs       db (joined, in main), api, web
-
-  ! dropped acme_feat-c from db, owed since its worktree was removed
+  Owed       acme_feat-c in db (owed since feat-c was removed)
 
   Addresses
     api  http://api.feat-d.acme.localhost:24392

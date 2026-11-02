@@ -401,13 +401,27 @@ func TestAStartPaysTheDropsRemovedWorktreesOweTheSharedServiceUp(t *testing.T) {
 	writeFile(t, filepath.Join(w.stateDir, "pending-removals.toml"), "[[pending]]\n  job = \"db\"\n  worktree = \"feat-old\"\n  ordinal = 4\n")
 	w.daemon.listed = []run.Job{{Name: "db", WorkDir: w.main, Up: true, Hold: run.HoldOwn, SharedDir: w.main}}
 
+	planned, _ := w.plan(t, starting("full", featA))
 	result, _ := w.apply(t, starting("full", featA))
 
-	assert.Equal(t, []string{runup.CodeOwedPaid}, codes(result.Warnings))
+	require.Len(t, planned.Owed, 1)
+	assert.Equal(t, "app_feat-old", planned.Owed[0].Name)
+	assert.Empty(t, result.Warnings, "a drop paid is the plan's, done")
 	require.Len(t, *w.drops, 1)
 	assert.Equal(t, w.main, (*w.drops)[0].WorkDir)
 	assert.Equal(t, "app_feat-old", (*w.drops)[0].Env["WTM_NAMESPACE"])
 	assert.NoFileExists(t, filepath.Join(w.stateDir, "pending-removals.toml"))
+}
+
+func TestAStartOfTheSharedServicePaysWhatIsOwedToIt(t *testing.T) {
+	w := newWorld(t)
+	writeFile(t, filepath.Join(w.stateDir, "pending-removals.toml"), "[[pending]]\n  job = \"db\"\n  worktree = \"feat-old\"\n  ordinal = 4\n")
+
+	full, _ := w.plan(t, starting("full", featA))
+	dev, _ := w.plan(t, starting("dev", featA))
+
+	assert.Len(t, full.Owed, 1, "full starts db")
+	assert.Empty(t, dev.Owed, "dev leaves db down")
 }
 
 func TestANamespaceTheRecordCannotKeepIsAWarning(t *testing.T) {

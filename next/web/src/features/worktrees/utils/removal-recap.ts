@@ -21,6 +21,11 @@ export function recapOf(
   const plan = envelope?.plan
   const warnings = envelope?.warnings ?? []
   const said = [`${command}.data_kept`, `${command}.data_deferred`]
+  // the drops owed the run paid first are done rows of their own, but those its warnings say failed
+  const owed = plan && 'owed' in plan ? (plan.owed ?? []) : []
+  const failed = warnings
+    .filter((warning) => warning.code === `${command}.drop_failed`)
+    .map((warning) => warning.params?.namespace)
   const unitOf = (subject: string) => progress.units.find((unit) => unit.subject === subject)
 
   const moved = (subject: string) =>
@@ -67,7 +72,17 @@ export function recapOf(
             tone: 'ok' as const,
             title: item.subject,
             message: moved(item.subject) || undefined,
-          })),
+          }))
+          .concat(
+            owed
+              .filter(({ name }) => !failed.includes(name))
+              .map(({ job, name, worktree }) => ({
+                key: `owed-${job}-${name}`,
+                tone: 'ok' as const,
+                title: name,
+                message: `Dropped from ${job}, owed since ${worktree} was removed`,
+              })),
+          ),
       },
     ],
     warnings,

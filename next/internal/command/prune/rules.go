@@ -220,11 +220,16 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 			worktrees[i].Phases, worktrees[i].Hooks, worktrees[i].Data = []domain.Phase{}, nil, nil
 		}
 	}
-	planned := Plan{Worktrees: orEmpty(worktrees), Reasons: req.Reasons(), ReparentChildren: req.ReparentChildren, Force: req.Force, facts: f}
+	planned := Plan{Worktrees: orEmpty(worktrees), Owed: f.Payable(nil), Reasons: req.Reasons(), ReparentChildren: req.ReparentChildren, Force: req.Force, facts: f}
 	planned.Moves = f.Moves(removals(planned.removed()))
 	planned.standing = f.Standing(removals(planned.removed()))
 
 	return planned, f.warnings(planned, req), nil
+}
+
+// going are the candidates of picked the plan removes: none that refuses the request, unsafe and not forced, or its record a newer wtm's.
+func (f Facts) going(req Request, picked []Candidate) []Candidate {
+	return slices.DeleteFunc(slices.Clone(picked), func(c Candidate) bool { return f.leaves(c, req) })
 }
 
 // leaves reports whether the command, choosing the worktrees itself, leaves c as it is: unsafe and not forced, or its record a newer wtm's, which no force lifts.
@@ -254,7 +259,7 @@ const (
 	CodeFetchFailed = Name + ".fetch_failed"
 )
 
-// warnings are what the plan cannot see to or leaves behind: origin that could not be fetched, so gone branches are read as last fetched; what a removal cannot see to (teardown.Facts.Warnings), a forge that could not be asked matching no pull request; each worktree kept for being unsafe, the last followed by the request that prunes them all anyway.
+// warnings are what the plan cannot see to or leaves behind: origin that could not be fetched, so gone branches are read as last fetched; what a removal cannot see to (teardown.Facts.Warnings), a forge that could not be asked matching no pull request; the drops still owed to a service down; each worktree kept for being unsafe, the last followed by the request that prunes them all anyway.
 func (f Facts) warnings(planned Plan, req Request) []domain.Warning {
 	var warnings []domain.Warning
 	if f.FetchErr != nil {
@@ -266,6 +271,7 @@ func (f Facts) warnings(planned Plan, req Request) []domain.Warning {
 		unasked = "merged and closed ones match nothing, " + unasked
 	}
 	warnings = append(warnings, f.Warnings(teardown.WarningsParams{Command: Name, Unasked: unasked})...)
+	warnings = append(warnings, f.Unpaid(Name, planned.Owed)...)
 
 	for _, c := range planned.Worktrees {
 		if newer := f.Newer[c.Branch]; newer != nil {
@@ -292,9 +298,10 @@ func (f Facts) warnings(planned Plan, req Request) []domain.Warning {
 // ----------------------------------------------------------------------------
 // The plan
 
-// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the worktrees done with, each removed in its phases or, chosen by the command and unsafe or its record a newer wtm's, left as it is with no phase; the children left behind, the reasons asked, whether the children are reparented and whether the unsafe worktrees are forced; then the recap, which the fingerprint leaves out.
+// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the worktrees done with, each removed in its phases or, chosen by the command and unsafe or its record a newer wtm's, left as it is with no phase; the drops owed it pays first; the children left behind, the reasons asked, whether the children are reparented and whether the unsafe worktrees are forced; then the recap, which the fingerprint leaves out.
 type Plan struct {
 	Worktrees        []Candidate     `json:"worktrees"`
+	Owed             []teardown.Debt `json:"owed,omitempty"`
 	Moves            []teardown.Move `json:"moves,omitempty"`
 	Reasons          []Reason        `json:"reasons"`
 	ReparentChildren bool            `json:"reparent_children"`
@@ -356,12 +363,12 @@ func (r Request) Locks() []domain.Lock {
 // NoteKept notes a recap's value done with but kept for being unsafe; the others are teardown's.
 const NoteKept = "kept"
 
-// empty reports whether applying the plan changes nothing: every worktree the plan holds is kept, or it holds none.
+// empty reports whether applying the plan changes nothing: every worktree the plan holds is kept, or it holds none, and it pays no drop owed.
 func (p Plan) empty() bool {
-	return !slices.ContainsFunc(p.Worktrees, func(c Candidate) bool { return !c.ruledOut() })
+	return len(p.Owed) == 0 && !slices.ContainsFunc(p.Worktrees, func(c Candidate) bool { return !c.ruledOut() })
 }
 
-// recap is the plan row by row: the worktrees removed, each with why it is done with and, forced, what it loses; those kept, with what makes them unsafe; the data the worktrees removed made in shared services; then the children left behind, reparented or orphaned.
+// recap is the plan row by row: the worktrees removed, each with why it is done with and, forced, what it loses; those kept, with what makes them unsafe; the data the worktrees removed made in shared services; the drops owed it pays; then the children left behind, reparented or orphaned.
 func (p Plan) recap() []domain.RecapRow {
 	var rows []domain.RecapRow
 	if removed := p.removed(); len(removed) > 0 {
@@ -377,6 +384,9 @@ func (p Plan) recap() []domain.RecapRow {
 	}
 	if data := teardown.RecappedData(removals(p.removed())); len(data) > 0 {
 		rows = append(rows, domain.RecapRow{Key: "data", Label: "Data", Path: PathDropData, Values: data})
+	}
+	if len(p.Owed) > 0 {
+		rows = append(rows, domain.RecapRow{Key: "owed", Label: "Owed", Values: teardown.RecappedDebts(p.Owed)})
 	}
 	if len(p.Moves) > 0 {
 		rows = append(rows, domain.RecapRow{Key: "children", Label: "Children", Path: PathReparentChildren, Values: teardown.RecappedMoves(p.Moves, p.ReparentChildren)})

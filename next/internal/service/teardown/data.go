@@ -154,13 +154,19 @@ type reachedParams struct {
 	Except string
 }
 
-// reached reports whether a worktree on a branch, but the one named Except, reaches the namespace of Job under Name: dropping it would destroy that worktree's data.
+// reached reports whether a worktree but the one named Except reaches the namespace of Job under Name: dropping it would destroy that worktree's data. The main checkout reaches it as a start there names it, on a branch or not; another worktree on no branch has no record to name it from.
 func (f Facts) reached(params reachedParams) bool {
 	return slices.ContainsFunc(f.Worktrees, func(w worktree.Worktree) bool {
-		if w.Name() == params.Except || w.Branch() == "" {
+		jobParams := f.jobParams(w.Branch())
+		switch {
+		case w.Name() == params.Except:
+			return false
+		case w.Main:
+			jobParams = f.mainParams()
+		case w.Branch() == "":
 			return false
 		}
-		theirs, made, _ := env.NamespaceFor(params.Job, env.HookEnv(f.jobParams(w.Branch()), nil))
+		theirs, made, _ := env.NamespaceFor(params.Job, env.HookEnv(jobParams, nil))
 		return made && theirs.Name == params.Name
 	})
 }
@@ -425,78 +431,120 @@ func (s Service) release(ctx context.Context, params BatchParams, removed []Remo
 // ----------------------------------------------------------------------------
 // The drops owed
 
-// The codes of the drops owed, after the command's name: one paid, one withdrawn (a worktree now reaches its namespace under the same name), those still owed to a service down.
+// The codes of the drops owed, after the command's name: one withdrawn (a worktree reaches its namespace again under the same name), those still owed to a service down.
 const (
-	OwedPaid      = ".owed_paid"
 	OwedWithdrawn = ".owed_withdrawn"
 	StillOwed     = ".owed"
 )
 
-// PayParams are the command paying and the repository as it stands: its run.toml, its worktrees and their records.
-type PayParams struct {
-	Command    string
-	Repository worktree.Repository
-	Records    map[string]worktree.Meta
+// A Debt is a drop owed that a run pays: the shared job, the namespace's name, and the slug of the worktree that owed it.
+type Debt struct {
+	Job      string `json:"job"`
+	Name     string `json:"name"`
+	Worktree string `json:"worktree"`
+	owed     env.OwedDrop
+	drop     env.NamespaceRun
 }
 
-// Paid is what Pay did, as warnings: each drop paid, failed or withdrawn, and, apart, each service still owed for being down.
-type Paid struct {
-	Warnings []domain.Warning
-	Owed     []domain.Warning
-}
-
-// Pay drops each namespace owed whose shared service is up in this repository's main checkout, from there and with the variables kept for it; one a worktree reaches again under the same name is withdrawn, its data now that worktree's; the others stay owed. A queue that cannot be read is none: a debt that cannot be read cannot be paid either.
-func (s Service) Pay(ctx context.Context, params PayParams) Paid {
+// Owing reads the drops owed, for Facts.Owed; a queue that cannot be read owes nothing: a debt that cannot be read cannot be paid either.
+func (s Service) Owing() []env.OwedDrop {
 	owed, err := s.Owed.Load()
-	if err != nil || len(owed) == 0 {
-		return Paid{}
+	if err != nil {
+		return nil
 	}
-	jobs, _ := s.jobs(ctx)
-	f := Facts{Repository: params.Repository, Records: params.Records, Jobs: jobs}
+	return owed
+}
 
-	var paid Paid
-	var settled []env.OwedDrop
-	still := map[string]int{}
-	for _, debt := range owed {
-		job, declared := f.job(debt.Job)
-		drop, droppable, err := debt.Drop(job)
-		if !declared || err != nil || !droppable {
-			still[debt.Job]++
+// Payable are the drops owed a run pays: each whose shared service is up in the main checkout, or among starting (the shared jobs the run itself starts), and that no worktree reaches again under its name (Pay withdraws those).
+func (f Facts) Payable(starting []string) []Debt {
+	var debts []Debt
+	for _, owed := range f.Owed {
+		job, declared := f.job(owed.Job)
+		drop, droppable, err := owed.Drop(job)
+		if !declared || err != nil || !droppable || f.reached(reachedParams{Job: job, Name: drop.Name}) {
 			continue
 		}
-		about := domain.Params{"job": debt.Job, "namespace": drop.Name}
-		switch {
-		case f.reached(reachedParams{Job: job, Name: drop.Name}):
-			settled = append(settled, debt)
-			paid.Warnings = append(paid.Warnings, domain.Warning{Code: params.Command + OwedWithdrawn, Message: drop.Name + " is no longer owed to " + debt.Job + ": a worktree reaches it again under that name", Params: about})
-		case !f.up(debt.Job):
-			still[debt.Job]++
-		default:
-			if err := s.drop(ctx, f, debt.Job, drop, func(string) {}); err != nil {
-				still[debt.Job]++
-				about["cause"] = err.Error()
-				paid.Warnings = append(paid.Warnings, domain.Warning{Code: params.Command + DropFailed, Message: "couldn't drop " + drop.Name + " from " + debt.Job + " (" + err.Error() + "): it is still owed", Params: about})
-				continue
-			}
-			settled = append(settled, debt)
-			paid.Warnings = append(paid.Warnings, domain.Warning{Code: params.Command + OwedPaid, Message: "dropped " + drop.Name + " from " + debt.Job + ", owed since its worktree was removed", Params: about})
+		if f.up(owed.Job) || slices.Contains(starting, owed.Job) {
+			debts = append(debts, Debt{Job: owed.Job, Name: drop.Name, Worktree: owed.Worktree, owed: owed, drop: drop})
 		}
 	}
 
-	if len(settled) > 0 {
-		if err := s.Owed.Update(context.WithoutCancel(ctx), func(held []env.OwedDrop) []env.OwedDrop {
-			return slices.DeleteFunc(held, func(drop env.OwedDrop) bool {
-				return slices.ContainsFunc(settled, func(s env.OwedDrop) bool { return sameDrop(s, drop) })
-			})
-		}); err != nil {
-			paid.Warnings = append(paid.Warnings, domain.Warning{Code: params.Command + OwedUnrecorded, Message: "couldn't take the drops made out of pending-removals.toml (" + err.Error() + "): they are tried again", Params: domain.Params{"cause": err.Error()}})
+	return debts
+}
+
+// Unpaid warns, per shared service, of the drops owed that debts leaves owed: <command>.owed.
+func (f Facts) Unpaid(command string, debts []Debt) []domain.Warning {
+	still := map[string]int{}
+	for _, owed := range f.Owed {
+		paid := slices.ContainsFunc(debts, func(d Debt) bool { return sameDrop(d.owed, owed) })
+		job, _ := f.job(owed.Job)
+		drop, _, _ := owed.Drop(job)
+		if !paid && !f.reached(reachedParams{Job: job, Name: drop.Name}) {
+			still[owed.Job]++
 		}
 	}
+
+	var warnings []domain.Warning
 	for _, job := range slices.Sorted(maps.Keys(still)) {
 		count := strconv.Itoa(still[job])
-		paid.Owed = append(paid.Owed, domain.Warning{Code: params.Command + StillOwed, Message: count + " namespace(s) still owed to " + job + ", dropped once it is up", Params: domain.Params{"job": job, "count": count}})
+		warnings = append(warnings, domain.Warning{Code: command + StillOwed, Message: count + " namespace(s) still owed to " + job + ", dropped once it is up", Params: domain.Params{"job": job, "count": count}})
 	}
-	return paid
+	return warnings
+}
+
+// PayParams are the command paying, the facts it planned on, and the debts it planned to pay.
+type PayParams struct {
+	Command string
+	Facts   Facts
+	Debts   []Debt
+}
+
+// Pay withdraws each drop owed a worktree reaches again under its name (its data that worktree's now), then drops each of the debts from the main checkout with the variables kept for it. A debt is taken out of the queue, under its lock, before its drop: one another run took out first is paid already, and one whose drop fails goes back, warned. Its warnings say what was withdrawn and what failed.
+func (s Service) Pay(ctx context.Context, params PayParams) []domain.Warning {
+	f := params.Facts
+	warnings := s.withdraw(ctx, params)
+	for _, debt := range params.Debts {
+		claimed, err := s.settle(ctx, debt.owed, true)
+		if err != nil || !claimed {
+			continue
+		}
+		if err := s.drop(ctx, f, debt.Job, debt.drop, func(string) {}); err != nil {
+			_, _ = s.settle(ctx, debt.owed, false)
+			warnings = append(warnings, domain.Warning{Code: params.Command + DropFailed, Message: "couldn't drop " + debt.Name + " from " + debt.Job + " (" + err.Error() + "): it is still owed", Params: domain.Params{"job": debt.Job, "namespace": debt.Name, "cause": err.Error()}})
+		}
+	}
+
+	return warnings
+}
+
+// withdraw takes out of the queue each drop owed a worktree reaches again under its name, warned.
+func (s Service) withdraw(ctx context.Context, params PayParams) []domain.Warning {
+	f := params.Facts
+	var warnings []domain.Warning
+	for _, owed := range f.Owed {
+		job, _ := f.job(owed.Job)
+		drop, droppable, _ := owed.Drop(job)
+		if !droppable || !f.reached(reachedParams{Job: job, Name: drop.Name}) {
+			continue
+		}
+		if withdrawn, err := s.settle(ctx, owed, true); err == nil && withdrawn {
+			warnings = append(warnings, domain.Warning{Code: params.Command + OwedWithdrawn, Message: drop.Name + " is no longer owed to " + owed.Job + ": a worktree reaches it again under that name", Params: domain.Params{"job": owed.Job, "namespace": drop.Name}})
+		}
+	}
+	return warnings
+}
+
+// settle takes owed out of the queue (out), reporting whether it was there, or puts it back.
+func (s Service) settle(ctx context.Context, owed env.OwedDrop, out bool) (bool, error) {
+	there := false
+	err := s.Owed.Update(context.WithoutCancel(ctx), func(held []env.OwedDrop) []env.OwedDrop {
+		there = slices.ContainsFunc(held, func(drop env.OwedDrop) bool { return sameDrop(drop, owed) })
+		if !out {
+			return append(slices.DeleteFunc(held, func(drop env.OwedDrop) bool { return sameDrop(drop, owed) }), owed)
+		}
+		return slices.DeleteFunc(held, func(drop env.OwedDrop) bool { return sameDrop(drop, owed) })
+	})
+	return there, err
 }
 
 // jobs are the jobs the run daemon lists, a daemon of another build's among them.

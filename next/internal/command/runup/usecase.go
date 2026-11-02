@@ -178,9 +178,8 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // CodeDaemonUnavailable fails a start that could not begin: the run daemon of this build could not be made sure of.
 const CodeDaemonUnavailable = Name + ".daemon_unavailable"
 
-// The codes of the drops removed worktrees owed, paid by a start: one dropped, one withdrawn (a worktree reaches its namespace again), one that failed, one the queue could not forget.
+// The codes of the drops removed worktrees owed, paid by a start: one withdrawn (a worktree reaches its namespace again), one that failed, one the queue could not forget.
 const (
-	CodeOwedPaid       = Name + teardown.OwedPaid
 	CodeOwedWithdrawn  = Name + teardown.OwedWithdrawn
 	CodeDropFailed     = Name + teardown.DropFailed
 	CodeOwedUnrecorded = Name + teardown.OwedUnrecorded
@@ -189,7 +188,7 @@ const (
 // CodeStopFailed warns of a worktree whose jobs an exclusive start could not stop.
 const CodeStopFailed = Name + ".stop_failed"
 
-// Apply makes sure of a run daemon of this build, stops the other worktrees' jobs when the plan says so, then starts each worktree's jobs, the worktrees at once, each one's in order; a worktree that fails stops none of the others. Then the namespaces removed worktrees owe a shared service now up are dropped (teardown.Service.Pay). Once ctx is cancelled, the jobs the daemon took keep running and the jobs not reached are not started. The items keep the plan's order.
+// Apply makes sure of a run daemon of this build, stops the other worktrees' jobs when the plan says so, then starts each worktree's jobs, the worktrees at once, each one's in order; a worktree that fails stops none of the others. Then the drops owed the plan pays are made (teardown.Service.Pay). Once ctx is cancelled, the jobs the daemon took keep running and the jobs not reached are not started. The items keep the plan's order.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	// The worktrees report from several goroutines; a surface draws one event at a time.
 	var mu sync.Mutex
@@ -223,8 +222,7 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 
 	// A shared service this start brought up takes back what removed worktrees owe it.
 	if ctx.Err() == nil {
-		paid := u.Teardown.Pay(ctx, teardown.PayParams{Command: Name, Repository: plan.facts.Repository, Records: plan.facts.Records})
-		warnings = append(warnings, paid.Warnings...)
+		warnings = append(warnings, u.Teardown.Pay(ctx, teardown.PayParams{Command: Name, Facts: plan.facts.teardown(), Debts: plan.Owed})...)
 	}
 
 	return Result{Items: items, Warnings: warnings, FollowUps: plan.next(items)}
@@ -325,6 +323,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	facts.Cwd = cmp.Or(cwd, req.Caller.Cwd)
 
 	facts.Jobs, facts.JobsErr = u.Daemon.Jobs(ctx)
+	facts.Owed = u.Teardown.Owing()
 	if skewed, ok := errors.AsType[*run.Skewed](facts.JobsErr); ok {
 		facts.Skewed, facts.JobsErr = skewed, nil
 	}

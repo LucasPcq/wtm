@@ -119,11 +119,11 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // ----------------------------------------------------------------------------
 // Apply
 
-// Apply carries out the plan, reporting each step: it first drops the namespaces earlier removals still owe to a shared service now up (teardown.Service.Pay), then removes each worktree in turn (teardown.Service.Batch), a failure stopping none of the others, those it leaves as they are reported ruled out, then reparents the children of the worktrees removed onto the nearest one that stayed, or warns of each one left orphaned; it ends on the step out of a worktree removed under the caller's feet. Once ctx is cancelled, the worktrees not yet started are skipped.
+// Apply carries out the plan, reporting each step: it first drops the namespaces earlier removals still owe that the plan pays (teardown.Service.Pay), then removes each worktree in turn (teardown.Service.Batch), a failure stopping none of the others, those it leaves as they are reported ruled out, then reparents the children of the worktrees removed onto the nearest one that stayed, or warns of each one left orphaned; it ends on the step out of a worktree removed under the caller's feet. Once ctx is cancelled, the worktrees not yet started are skipped.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
-	paid := u.Teardown.Pay(ctx, teardown.PayParams{Command: Name, Repository: plan.facts.Repository, Records: plan.facts.Records})
+	paid := u.Teardown.Pay(ctx, teardown.PayParams{Command: Name, Facts: plan.facts.Facts, Debts: plan.Owed})
 	removed, warnings := u.Teardown.Batch(ctx, teardown.BatchParams{Command: Name, Facts: plan.facts.Facts, Removals: removals(plan.removed()), Force: plan.Force, CorrelationID: plan.correlationID, Report: report})
-	warnings = append(append(paid.Warnings, paid.Owed...), warnings...)
+	warnings = append(paid, warnings...)
 
 	items := make([]Item, 0, len(plan.Worktrees))
 	for _, c := range plan.Worktrees {
@@ -234,7 +234,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	if facts.Checks, err = u.Teardown.Read(ctx, teardown.ReadParams{Worktrees: done, Going: teardown.Branches(worktreesOf(repo, going))}); err != nil {
 		return Facts{}, err
 	}
-	facts.Envs = u.Teardown.Envs(facts.Facts, done)
+	facts.Envs, facts.Owed = u.Teardown.Envs(facts.Facts, done), u.Teardown.Owing()
 	facts.Settle(done, answered.Jobs, answered.PullRequests)
 	return facts, nil
 }
@@ -249,7 +249,7 @@ func worktreesOf(repo worktree.Repository, candidates []Candidate) []worktree.Wo
 // ----------------------------------------------------------------------------
 // The steps of Apply
 
-// The codes of what becomes of a removal and of the drops owed: jobs that would not stop, or left running when forced; an on_clean hook that failed, the hooks skipped or run without the worktree's environment, a worktree git could not remove or whose files stay on disk, a branch or a record that could not be deleted; a namespace owed to a service down, a drop that failed, a namespace kept, the drops owed unrecorded, the shared services not let go of; a drop owed paid, withdrawn, or still owed to a service down.
+// The codes of what becomes of a removal and of the drops owed: jobs that would not stop, or left running when forced; an on_clean hook that failed, the hooks skipped or run without the worktree's environment, a worktree git could not remove or whose files stay on disk, a branch or a record that could not be deleted; a namespace owed to a service down, a drop that failed, a namespace kept, the drops owed unrecorded, the shared services not let go of; a drop owed withdrawn, or still owed to a service down.
 const (
 	CodeStopFailed         = Name + teardown.StopFailed
 	CodeJobsLeft           = Name + teardown.JobsLeft
@@ -265,7 +265,6 @@ const (
 	CodeDataKept           = Name + teardown.DataKept
 	CodeOwedUnrecorded     = Name + teardown.OwedUnrecorded
 	CodeReleaseFailed      = Name + teardown.ReleaseFailed
-	CodeOwedPaid           = Name + teardown.OwedPaid
 	CodeOwedWithdrawn      = Name + teardown.OwedWithdrawn
 	CodeOwed               = Name + teardown.StillOwed
 )

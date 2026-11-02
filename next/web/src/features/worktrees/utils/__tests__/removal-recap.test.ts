@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { narrowed } from '@/api/queries/commands'
-import type { CleanDetail, CleanPlan } from '@/api/types.gen'
+import type { CleanDetail, CleanPlan, PruneDetail, PrunePlan } from '@/api/types.gen'
 import { recapOf } from '@/features/worktrees/utils/removal-recap'
 import { envelope } from '@/test/fixtures'
 
@@ -147,4 +147,35 @@ test("an item's warning names its worktree, and two alike stay two", () => {
     ['feat/b', 'Its directory is gone: the on_clean hooks did not run'],
   ])
   expect(new Set(check?.rows.map((row) => row.key)).size).toBe(2)
+})
+
+test('the drops owed a prune paid first are done rows, but the one its warning says failed', () => {
+  const paid = narrowed<PruneDetail, PrunePlan>({
+    ...envelope('prune', []),
+    items: [],
+    plan: {
+      worktrees: [],
+      owed: [
+        { job: 'db', name: 'acme_feat_old', worktree: 'feat-old' },
+        { job: 'db', name: 'acme_feat_older', worktree: 'feat-older' },
+      ],
+      reasons: ['merged'],
+      reparent_children: false,
+      force: false,
+    },
+    warnings: [
+      { code: 'prune.drop_failed', message: "couldn't drop acme_feat_older", params: { namespace: 'acme_feat_older' } },
+    ],
+  })
+
+  const done = recapOf({ units: [], envelope: paid }, 'prune').groups.find((group) => group.kind === 'done')
+
+  expect(done?.rows).toEqual([
+    {
+      key: 'owed-db-acme_feat_old',
+      tone: 'ok',
+      title: 'acme_feat_old',
+      message: 'Dropped from db, owed since feat-old was removed',
+    },
+  ])
 })

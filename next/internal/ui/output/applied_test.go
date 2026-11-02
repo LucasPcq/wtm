@@ -78,6 +78,15 @@ func TestAnAppliedOutcomeWithNoItemDrawsItsTallyAndTheRunsWarnings(t *testing.T)
 	assert.Equal(t, "  = extract: nothing to do · noted\n\n  ! of the run\n", got)
 }
 
+func TestAPlanThatChangedSomethingWithNoItemIsDoneWithItsRecap(t *testing.T) {
+	plan := recappedPlan{domain.Recapped{Recap: []domain.RecapRow{{Key: "owed", Label: "Owed", Values: []domain.RecapValue{{Value: "acme_feat-old", Text: "acme_feat-old in db"}}}}}}
+	outcome := domain.Outcome[recappedPlan, worktreeDetail]{Plan: plan, Result: &domain.Result[worktreeDetail]{}}
+
+	got := rendered(func(w *bytes.Buffer) { DrawApplied(w, outcome, AppliedParams{Command: "prune"}) })
+
+	assert.Equal(t, "  ✓ prune: done\n\n  Owed  acme_feat-old in db\n", got)
+}
+
 func TestAStepTheWarningsOfEveryItemOfferIsDrawnOnceAfterTheItemsThenTheRuns(t *testing.T) {
 	proxy := domain.Warning{Code: "proxy", Message: "proxy off", FollowUp: &domain.FollowUp{Command: "run proxy status", Message: "says why"}}
 	outcome := domain.Outcome[recappedPlan, worktreeDetail]{

@@ -16,7 +16,7 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what a removal decides from: the repository, the meta record of each worktree on a branch, the records a newer wtm wrote, what each worktree checked holds that makes it unsafe to remove, the job environment of each, where the caller stands, the jobs the run daemon lists, and why the run daemon or the forge could not be asked.
+// Facts are what a removal, or a run paying the drops owed, decides from: the repository, the meta record of each worktree on a branch, the records a newer wtm wrote, what each worktree checked holds that makes it unsafe to remove, the job environment of each, where the caller stands, the jobs the run daemon lists, the drops owed, and why the run daemon or the forge could not be asked.
 type Facts struct {
 	worktree.Repository
 	Records map[string]worktree.Meta       // by branch
@@ -25,6 +25,7 @@ type Facts struct {
 	Envs    map[string]map[string]string   // by the name a worktree is checked by, its job environment (Service.Envs)
 	Cwd     string                         // where the caller stands, through its symbolic links
 	Jobs    []run.Job                      // the jobs the run daemon lists
+	Owed    []env.OwedDrop                 // the drops removed worktrees owe the shared services (Service.Owing)
 	JobsErr error                          // why the run daemon could not tell which jobs are up
 	Skew    *domain.Warning                // the warning of a run daemon of another build, worded by the command
 	PRsErr  error                          // why the forge could not be asked for open pull requests
@@ -344,6 +345,16 @@ func RecappedData(removals []Removal) []domain.RecapValue {
 			value.Text = namespace.Name + " in " + namespace.Job + " (" + fate + ")"
 			values = append(values, value)
 		}
+	}
+
+	return values
+}
+
+// RecappedDebts are the drops owed a run pays as a recap row's values.
+func RecappedDebts(debts []Debt) []domain.RecapValue {
+	values := make([]domain.RecapValue, 0, len(debts))
+	for _, debt := range debts {
+		values = append(values, domain.RecapValue{Value: debt.Name, Params: domain.Params{"job": debt.Job, "worktree": debt.Worktree}, Text: debt.Name + " in " + debt.Job + " (owed since " + debt.Worktree + " was removed)"})
 	}
 
 	return values

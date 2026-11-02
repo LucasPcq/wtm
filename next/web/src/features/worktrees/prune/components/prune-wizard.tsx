@@ -140,8 +140,10 @@ export function PruneWizard({
     return chosen
   }
   const step = stepOf()
-  // forced, the rows keep none: a plan that changes nothing is one with no candidate
-  const nothing = rows.data?.plan?.empty === true
+  // forced, the rows keep none: a plan that changes nothing is one with no candidate; drops owed alone, which the plan
+  // pays, are no pruning: the next run up or prune pays them
+  const rowsPlan = rows.data?.plan
+  const nothing = rowsPlan !== undefined && (rowsPlan.empty === true || (rowsPlan.worktrees ?? []).every(kept))
 
   const state = (of: Step): StepState => {
     const order: Step[] = ['worktrees', 'children', 'confirm']

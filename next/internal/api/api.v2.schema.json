@@ -3585,6 +3585,12 @@
           },
           "type": "array"
         },
+        "owed": {
+          "items": {
+            "$ref": "#/$defs/teardown.Debt"
+          },
+          "type": "array"
+        },
         "reasons": {
           "anyOf": [
             {
@@ -4585,6 +4591,12 @@
               "type": "null"
             }
           ]
+        },
+        "owed": {
+          "items": {
+            "$ref": "#/$defs/teardown.Debt"
+          },
+          "type": "array"
         },
         "profile": {
           "type": "string"
@@ -5785,6 +5797,26 @@
         "defer",
         "keep"
       ]
+    },
+    "teardown.Debt": {
+      "additionalProperties": false,
+      "properties": {
+        "job": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "job",
+        "name",
+        "worktree"
+      ],
+      "type": "object"
     },
     "teardown.DropStatus": {
       "description": "What became of a namespace a removed worktree made in a shared service.",

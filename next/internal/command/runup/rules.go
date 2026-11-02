@@ -11,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 )
 
 // ----------------------------------------------------------------------------
@@ -26,6 +27,7 @@ type Facts struct {
 	Jobs       []run.Job
 	JobsErr    error
 	Skewed     *run.Skewed
+	Owed       []env.OwedDrop // the drops removed worktrees owe the shared services
 }
 
 // standing is the worktree the caller stands in, by its name; none when it stands in none.
@@ -564,7 +566,26 @@ func Decide(f Facts, req Request, params DecideParams) (Plan, []domain.Warning, 
 		return Plan{}, nil, foreignRefusal(risks, req)
 	}
 
+	planned.Owed = f.debts(planned)
 	return planned, f.warnings(planned, req), nil
+}
+
+// debts are the drops removed worktrees owe that the start pays once its jobs are up: each whose shared service is up already, or which it starts or joins.
+func (f Facts) debts(p Plan) []teardown.Debt {
+	var starting []string
+	for _, t := range p.Worktrees {
+		for _, job := range t.Jobs {
+			if f.shared(job.Name) {
+				starting = append(starting, job.Name)
+			}
+		}
+	}
+	return f.teardown().Payable(starting)
+}
+
+// teardown are the facts as teardown pays the drops owed from them.
+func (f Facts) teardown() teardown.Facts {
+	return teardown.Facts{Repository: f.Repository, Records: f.Records, Jobs: f.Jobs, Owed: f.Owed}
 }
 
 func (f Facts) warnings(p Plan, req Request) []domain.Warning {
@@ -654,11 +675,12 @@ func foreignRefusal(risks []risk, req Request) *domain.Error {
 
 // A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the profile started (none when run.toml declares none: every job), in each worktree, in order; whether the other worktrees' jobs are stopped first, and those worktrees; whether the ports go unchecked; then the recap, which the fingerprint leaves out.
 type Plan struct {
-	Profile   string   `json:"profile"`
-	Worktrees []Target `json:"worktrees"`
-	Exclusive bool     `json:"exclusive"`
-	Others    []Other  `json:"others"`
-	NoProbe   bool     `json:"no_probe"`
+	Profile   string          `json:"profile"`
+	Worktrees []Target        `json:"worktrees"`
+	Exclusive bool            `json:"exclusive"`
+	Others    []Other         `json:"others"`
+	NoProbe   bool            `json:"no_probe"`
+	Owed      []teardown.Debt `json:"owed,omitempty"`
 	domain.Recapped
 	correlationID string
 	facts         Facts
@@ -701,7 +723,7 @@ func (p Plan) Fingerprinted() any {
 // ----------------------------------------------------------------------------
 // The recap
 
-// recap is the plan row by row: the worktrees, the profile, the jobs each worktree starts, in order, and the worktrees whose jobs stop first.
+// recap is the plan row by row: the worktrees, the profile, the jobs each worktree starts, in order, the worktrees whose jobs stop first, and the drops owed it pays.
 func (p Plan) recap() []domain.RecapRow {
 	names := make([]string, 0, len(p.Worktrees))
 	for _, t := range p.Worktrees {
@@ -729,6 +751,9 @@ func (p Plan) recap() []domain.RecapRow {
 		}
 		rows = append(rows, domain.RecapRow{Key: "stops", Label: "Stops first", Path: PathExclusive, Values: domain.RecapValues(stopped)})
 	}
+	if len(p.Owed) > 0 {
+		rows = append(rows, domain.RecapRow{Key: "owed", Label: "Owed", Values: teardown.RecappedDebts(p.Owed)})
+	}
 	return rows
 }
 
@@ -748,7 +773,7 @@ func (p Plan) unchanged() bool {
 			return false
 		}
 	}
-	return len(p.Others) == 0
+	return len(p.Others) == 0 && len(p.Owed) == 0
 }
 
 // jobWords is how the recap names one job: its name, and what it does unless it starts.

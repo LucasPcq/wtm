@@ -1,7 +1,18 @@
-import type { TeardownDataStatus, TeardownDropped, TeardownDropStatus, TeardownNamespace } from '@/api/types.gen'
+import type {
+  TeardownDataReason,
+  TeardownDataStatus,
+  TeardownDropped,
+  TeardownDropStatus,
+  TeardownNamespace,
+} from '@/api/types.gen'
 
-const keptWhy = ({ reason }: { reason?: string }) =>
-  reason === 'shared_name' ? 'stays: another worktree reaches it under the same name' : 'stays: its data is kept'
+const keptWords: Record<TeardownDataReason, string> = {
+  keep_data: 'stays: its data is kept',
+  shared_name: 'stays: another worktree reaches it under the same name',
+  service_down: 'stays until its service is up',
+}
+
+const keptWhy = ({ reason }: { reason?: TeardownDataReason }) => keptWords[reason ?? 'keep_data']
 
 export const dataWords: Record<TeardownDataStatus, (namespace: TeardownNamespace) => string> = {
   drop: () => 'is dropped',

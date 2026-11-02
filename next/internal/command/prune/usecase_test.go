@@ -279,7 +279,9 @@ func TestPrunePaysTheDropsOwedFirstThenOwesWhatItCannotDrop(t *testing.T) {
 	outcome, err := w.usecase.Run(t.Context(), prune.Request{Worktrees: []string{merged}}, domain.RunOptions{})
 
 	require.NoError(t, err)
-	assert.Contains(t, codes(outcome.Warnings), "prune.owed_paid")
+	require.Len(t, outcome.Plan.Owed, 1)
+	assert.Equal(t, "app_feat-old", outcome.Plan.Owed[0].Name)
+	assert.NotContains(t, codes(outcome.Warnings), "prune.drop_failed")
 	assert.Equal(t, "app_feat-old\napp_feat-merged\n", readFile(t, filepath.Join(w.main, "dropped.txt")), "the debt first, then the worktree pruned")
 	assert.Equal(t, []teardown.Dropped{{Job: "db", Name: "app_feat-merged", Status: teardown.NamespaceDropped}}, outcome.Result.Items[0].Detail.Namespaces)
 	assert.NoFileExists(t, filepath.Join(w.stateDir, "pending-removals.toml"))
@@ -294,6 +296,31 @@ func TestADropOwedToAServiceDownStaysOwedAndIsCounted(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, codes(outcome.Warnings), "prune.owed")
 	assert.FileExists(t, filepath.Join(w.stateDir, "pending-removals.toml"))
+}
+
+func TestADropOwedAloneIsNoEmptyPlan(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.usecase.PullRequests = func(context.Context, []string) ([]worktree.PullRequest, error) { return nil, nil }
+	writeFile(t, filepath.Join(w.stateDir, "pending-removals.toml"), "[[pending]]\n  job = \"db\"\n  worktree = \"feat-old\"\n  ordinal = 4\n")
+	w.daemon.listed = []run.Job{{Name: "db", WorkDir: w.main, Up: true, Hold: run.HoldOwn, SharedDir: w.main}}
+
+	planned, _ := w.plan(t, prune.Request{Merged: true})
+
+	assert.False(t, planned.Empty, "it drops a database")
+	assert.Equal(t, "owed", planned.Recap[len(planned.Recap)-1].Key)
+}
+
+// The Data question named the data of a worktree prune refuses, unsafe and not forced.
+func TestTheDataQuestionAsksOnlyOfTheWorktreesPruneRemoves(t *testing.T) {
+	w := newWorld(t, seed{})
+	w.record(t, dirty, worktree.Meta{SourceBranch: "main", Ordinal: 1, Namespaces: []string{"db"}})
+
+	named := w.questions(t, prune.Request{Worktrees: []string{dirty}})
+	forced := w.questions(t, prune.Request{Worktrees: []string{dirty}, Force: true})
+
+	assert.Empty(t, named.Down)
+	assert.Equal(t, domain.SkipNoDataOwed, named.DropData.Skip)
+	assert.Equal(t, []string{"db"}, forced.Down)
 }
 
 func TestADaemonOfAnotherBuildIsWarnedOfWithItsRestart(t *testing.T) {
