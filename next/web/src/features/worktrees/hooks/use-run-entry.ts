@@ -10,8 +10,8 @@ import { openFastForward, useFastForwardDialog } from '@/features/worktrees/hook
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
 import { openReparent } from '@/features/worktrees/hooks/use-reparent-dialog'
 import { useReparentNow } from '@/features/worktrees/hooks/use-reparent-now'
-import { openSync } from '@/features/worktrees/hooks/use-sync-dialog'
 import { openRunUp } from '@/features/worktrees/hooks/use-run-up-dialog'
+import { openSync } from '@/features/worktrees/hooks/use-sync-dialog'
 import { type Entry, leftOf, menu, type Subject, subjectsOf } from '@/features/worktrees/utils/actions'
 import { copy } from '@/features/worktrees/utils/copy'
 

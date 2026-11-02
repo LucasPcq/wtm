@@ -6,10 +6,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Rail } from '@/features/worktrees/components/rail'
 import { ProfilesMenu } from '@/features/worktrees/running/components/profiles-menu'
 import { RunningJob } from '@/features/worktrees/running/components/running-job'
 import { groupLine, type RunningGroup } from '@/features/worktrees/running/utils/groups'
-import { rail } from '@/features/worktrees/utils/rail'
 
 export function RunGroup({ repo, group, now }: { repo: string; group: RunningGroup; now: number }) {
   const line = groupLine(group)
@@ -33,11 +33,11 @@ export function RunGroup({ repo, group, now }: { repo: string; group: RunningGro
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <ul className={rail({ row: 'job' })}>
+      <Rail elbow={16} indent={14} className="ml-2">
         {group.rows.map((row) => (
           <RunningJob key={row.name} row={row} now={now} />
         ))}
-      </ul>
+      </Rail>
     </section>
   )
 }

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { toneIcon } from '@/features/worktrees/components/glyph'
+import { NameLine } from '@/features/worktrees/components/name-line'
 import { StepOutput } from '@/features/worktrees/components/step-output'
 import { phaseLook } from '@/features/worktrees/utils/phase-look'
 import type { PhaseRun } from '@/features/worktrees/utils/progress'
@@ -19,8 +20,7 @@ export function PhaseRow({ name, run, label, lines }: { name: string; run: Phase
       <li aria-label={name} className="flex flex-col gap-1">
         <div className="flex min-h-8 items-center gap-3 text-sm">
           <Icon className={cn(toneIcon({ tone }), 'size-4')} aria-hidden="true" />
-          <span className="shrink-0 font-medium">{name}</span>
-          <span className="min-w-0 flex-1 truncate text-muted-foreground">{label}</span>
+          <NameLine name={name} line={label} />
           {run.state !== 'todo' && (
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="icon-sm" aria-label={`Output of ${name}`}>
