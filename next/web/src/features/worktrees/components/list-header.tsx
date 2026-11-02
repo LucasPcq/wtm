@@ -1,5 +1,4 @@
-import { Search } from 'lucide-react'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
+import { SearchRow } from '@/features/worktrees/components/search-row'
 import { TriCheckbox } from '@/features/worktrees/components/tri-checkbox'
 
 // the box never checks an unsafe row (bulk): one click must not force it; a checked row the search hides stays
@@ -31,18 +30,8 @@ export function ListHeader({
 
   return (
     <div className="flex flex-col">
-      <InputGroup className="rounded-none border-0 border-b shadow-none has-[[data-slot=input-group-control]:focus-visible]:ring-0">
-        <InputGroupAddon>
-          <Search />
-        </InputGroupAddon>
-        <InputGroupInput
-          aria-label="Search the worktrees"
-          placeholder="Search worktrees"
-          value={query}
-          onChange={(event) => onQuery(event.target.value)}
-        />
-      </InputGroup>
-      <div className="flex items-center gap-3 px-4 py-2.5 text-xs text-muted-foreground">
+      <SearchRow label="Search the worktrees" placeholder="Search worktrees" query={query} onQuery={onQuery} />
+      <div className="flex items-center gap-3 border-t px-4 py-2.5 text-xs text-muted-foreground">
         <TriCheckbox
           label="Select every worktree shown"
           checked={all()}

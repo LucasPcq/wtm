@@ -1,8 +1,9 @@
-import { Search } from 'lucide-react'
 import { useId, useState } from 'react'
 import type { DomainOption } from '@/api/types.gen'
-import { ChoiceOptions } from '@/components/choice-options'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
+import { Item, ItemContent, ItemDescription, ItemTitle } from '@/components/ui/item'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { ItemList } from '@/features/worktrees/components/item-list'
+import { SearchRow } from '@/features/worktrees/components/search-row'
 import { profileLine } from '@/features/worktrees/run-up/utils/words'
 import { searched } from '@/features/worktrees/utils/filters'
 import { plural } from '@/lib/plural'
@@ -33,28 +34,31 @@ export function ProfileStep({
           For {forWhom} · {plural(options.length, 'profile')} in run.toml.
         </p>
       </div>
-      <InputGroup className="rounded-none border-0 border-b shadow-none has-[[data-slot=input-group-control]:focus-visible]:ring-0">
-        <InputGroupAddon>
-          <Search />
-        </InputGroupAddon>
-        <InputGroupInput
-          aria-label="Search the profiles"
-          placeholder="Search profiles"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </InputGroup>
-      <ChoiceOptions
-        id={`${id}-profile`}
-        label="Profile"
-        value={value}
-        options={visible.map((option) => ({
-          value: option.value,
-          title: option.value,
-          description: profileLine(option),
-        }))}
-        onChange={onChange}
-      />
+      <RadioGroup aria-label="Profile" value={value} onValueChange={onChange} className="gap-0">
+        <ItemList
+          label="Profiles"
+          header={
+            <SearchRow label="Search the profiles" placeholder="Search profiles" query={query} onQuery={setQuery} />
+          }
+        >
+          {visible.map((option) => (
+            <Item key={option.value} asChild className="items-start gap-3 rounded-none px-4 py-3">
+              <label htmlFor={`${id}-${option.value}`}>
+                <RadioGroupItem
+                  id={`${id}-${option.value}`}
+                  aria-label={option.value}
+                  value={option.value}
+                  className="mt-0.5"
+                />
+                <ItemContent className="gap-1">
+                  <ItemTitle className="min-w-0 font-normal">{option.value}</ItemTitle>
+                  <ItemDescription className="text-xs">{profileLine(option)}</ItemDescription>
+                </ItemContent>
+              </label>
+            </Item>
+          ))}
+        </ItemList>
+      </RadioGroup>
     </section>
   )
 }

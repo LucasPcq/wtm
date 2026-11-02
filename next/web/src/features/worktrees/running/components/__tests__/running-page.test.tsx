@@ -64,6 +64,10 @@ test("a worktree's menu offers its profiles, the one it runs disabled, and one p
   const { user } = await renderApp('/r/r1/running')
 
   await user.click(await screen.findByRole('button', { name: 'More for feat/billing' }))
+  // the menu starts other profiles too: its label is the worktree alone, never the profile it runs
+  const menu = await screen.findByRole('menu')
+  expect(within(menu).getByText('feat/billing')).toBeDefined()
+  expect(within(menu).queryByText(/profile dev/)).toBeNull()
   await user.click(await screen.findByRole('menuitem', { name: 'Start a profile' }))
   const dev = await screen.findByRole('menuitem', { name: /^dev/ })
   expect(dev.getAttribute('aria-disabled')).toBe('true')

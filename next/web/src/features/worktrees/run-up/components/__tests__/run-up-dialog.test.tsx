@@ -50,6 +50,23 @@ test('Start a profile asks the worktrees, then the profile, then confirms in ord
   expect(within(dialog).getAllByText('web, api up · postgres joined · migrate done').length).toBe(2)
 })
 
+test('the profile search is a row of the list it filters', async () => {
+  const { user } = await renderApp('/r/r1/running')
+
+  await user.click(await screen.findByRole('button', { name: 'Start a profile' }))
+  const dialog = await screen.findByRole('dialog', { name: 'Start a profile' })
+  await user.click(await within(dialog).findByRole('checkbox', { name: 'Start in feat/search' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+
+  const profiles = await within(dialog).findByRole('list', { name: 'Profiles' })
+  await user.type(within(profiles).getByRole('textbox', { name: 'Search the profiles' }), 'fu')
+  expect(
+    within(profiles)
+      .getAllByRole('radio')
+      .map((radio) => radio.getAttribute('aria-label')),
+  ).toEqual(['full'])
+})
+
 test("a worktree's menu opens on Confirm, its shared services first in its order, unnumbered", async () => {
   const { user } = await renderApp('/r/r1/worktrees')
 
@@ -86,7 +103,7 @@ test('a worktree that runs the default profile already is asked which profile to
   const { user } = await renderApp('/r/r1/worktrees')
 
   const dialog = await fromTheMenu(user, 'feat/billing')
-  expect(await within(dialog).findByText('dev', { selector: 'label' })).toBeDefined()
+  expect(await within(dialog).findByRole('radio', { name: 'dev' })).toBeDefined()
   expect(within(dialog).getByText(/already running in feat\/billing/)).toBeDefined()
 })
 

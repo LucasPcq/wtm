@@ -2,6 +2,7 @@ import { CircleDashed, CircleDot, CircleMinus, CircleX, LoaderCircle, type Lucid
 import type { RunState } from '@/api/types.gen'
 import { type Tone, toneIcon } from '@/features/worktrees/components/glyph'
 import type { RunningRow } from '@/features/worktrees/running/utils/groups'
+import { railItem } from '@/features/worktrees/utils/rail'
 import { uptime } from '@/lib/time'
 import { withoutScheme } from '@/lib/url'
 import { cn } from '@/lib/utils'
@@ -18,7 +19,10 @@ const look: Record<RunState, { icon: LucideIcon; tone: Tone }> = {
 export function RunningJob({ row, now }: { row: RunningRow; now: number }) {
   if (!('job' in row))
     return (
-      <li aria-label={row.name} className="flex items-center gap-3 py-1.5 text-sm text-muted-foreground">
+      <li
+        aria-label={row.name}
+        className={cn(railItem({ row: 'job' }), 'flex items-center gap-3 py-1.5 text-sm text-muted-foreground')}
+      >
         <CircleDashed className="size-4 shrink-0" aria-hidden="true" />
         <span className="flex-1 font-medium">{row.name}</span>
         <span className="text-xs">{row.said}</span>
@@ -37,7 +41,7 @@ export function RunningJob({ row, now }: { row: RunningRow; now: number }) {
   }
 
   return (
-    <li aria-label={job.name} className="flex flex-col gap-0.5 py-1.5">
+    <li aria-label={job.name} className={cn(railItem({ row: 'job' }), 'flex flex-col gap-0.5 py-1.5')}>
       <div className="flex items-center gap-3 text-sm">
         <Icon className={cn(toneIcon({ tone }), 'size-4')} aria-hidden="true" />
         <span className={cn('flex-1 font-medium', tone === 'muted' && 'text-muted-foreground')}>{job.name}</span>
