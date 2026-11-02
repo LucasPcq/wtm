@@ -1,0 +1,15 @@
+$ wtm run up; echo EXIT=$?
+
+  Step 2/8 • Profile
+
+  ✓ Worktrees: main
+
+  The profile of run.toml to start (default: the one marked default, or the only one)
+
+▌› dev — api, web (default)
+   full — migrate, db, cache, api, web
+   broken — fail, web
+   crash — api, crashy
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

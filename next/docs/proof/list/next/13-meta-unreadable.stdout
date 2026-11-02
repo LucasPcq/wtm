@@ -7,4 +7,5 @@
   locked-gone             ! locked                            ✗ missing
   orphan                                                      ✓ clean
   ! couldn't read the record of feat/a: when it was created is not known: unexpected end of JSON input
+  ! the run daemon is the legacy wtm's: restart it to start jobs beside its own
 

@@ -1,0 +1,36 @@
+## jobs up (the daemon's index)
+acme api own dev
+acme db own full
+acme web own dev
+feat-a api own dev
+feat-a web own dev
+feat-b api own full
+feat-b cache stack full
+feat-b db claim full
+feat-b web own full
+## .git/wtm/worktrees/feat%2Fa/meta.json
+  "ordinal": 1,
+  "isolation": "isolated"
+## .git/wtm/worktrees/feat%2Fb/meta.json
+  "ordinal": 2,
+  "namespaces": [
+    "db"
+  "isolation": "isolated"
+## .git/wtm/worktrees/feat%2Fv/meta.json
+  "isolation": "verbatim"
+## logs
+./feat%2Fa/api.log
+./feat%2Fa/fail.log
+./feat%2Fa/web.log
+./feat%2Fb/api.log
+./feat%2Fb/cache.log
+./feat%2Fb/crashy.log
+./feat%2Fb/migrate.log
+./feat%2Fb/web.log
+./main/api.log
+./main/db.log
+./main/web.log
+## namespaces made
+acme_feat-b
+## compose containers
+acme-feat-b-cache-1

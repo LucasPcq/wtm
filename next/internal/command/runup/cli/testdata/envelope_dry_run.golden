@@ -1,0 +1,97 @@
+{
+  "v": 2,
+  "command": "run-up",
+  "ok": true,
+  "op": "op-1",
+  "plan": {
+    "profile": "dev",
+    "worktrees": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "/repo/wt-feat-a",
+        "numbered": true,
+        "jobs": [
+          {
+            "name": "migrate",
+            "kind": "task",
+            "action": "start",
+            "step": 1
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "action": "start",
+            "step": 2,
+            "waits_for": [
+              "migrate"
+            ],
+            "ports": {
+              "PORT": 4010
+            }
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "action": "start",
+            "step": 3,
+            "waits_for": [
+              "migrate"
+            ],
+            "ports": {
+              "PORT": 3010
+            }
+          }
+        ]
+      }
+    ],
+    "exclusive": false,
+    "others": [],
+    "no_probe": false,
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          }
+        ]
+      },
+      {
+        "key": "profile",
+        "label": "Profile",
+        "path": "profile",
+        "values": [
+          {
+            "value": "dev",
+            "text": "dev"
+          }
+        ]
+      },
+      {
+        "key": "jobs",
+        "label": "Jobs",
+        "values": [
+          {
+            "value": "migrate",
+            "text": "migrate"
+          },
+          {
+            "value": "api",
+            "text": "api"
+          },
+          {
+            "value": "web",
+            "text": "web"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "45db16f1c0f950cc90ec87fa",
+  "follow_ups": [],
+  "warnings": []
+}

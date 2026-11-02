@@ -1,0 +1,14 @@
+$ wtm run up; echo EXIT=$?
+
+  Step 3/8 • Other worktrees
+
+  ✓ Worktrees: main
+  ✓ Profile: dev
+
+  Stop the jobs the other worktrees run before starting (one worktree only)
+
+▌› Keep them all running
+   Stop the other worktrees' jobs first
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

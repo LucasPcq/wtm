@@ -79,7 +79,7 @@
           {
             "action": "run_up",
             "follow_up": {
-              "command": "run up",
+              "command": "run-up",
               "answers": [
                 {
                   "path": "worktree",
@@ -238,7 +238,7 @@
           {
             "action": "run_up",
             "follow_up": {
-              "command": "run up",
+              "command": "run-up",
               "answers": [
                 {
                   "path": "worktree",
@@ -429,7 +429,7 @@
           {
             "action": "run_up",
             "follow_up": {
-              "command": "run up",
+              "command": "run-up",
               "answers": [
                 {
                   "path": "worktree",
@@ -911,7 +911,7 @@
           {
             "action": "run_up",
             "follow_up": {
-              "command": "run up",
+              "command": "run-up",
               "answers": [
                 {
                   "path": "worktree",

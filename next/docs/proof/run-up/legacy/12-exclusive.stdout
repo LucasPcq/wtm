@@ -1,0 +1,16 @@
+
+  Profile dev
+
+  › [1/2] api
+  ✓ api started · http://api.feat-v.acme.localhost:24352
+
+  › [2/2] web
+  ✓ web started · http://web.feat-v.acme.localhost:24352
+
+  Where to reach it
+    api  http://api.feat-v.acme.localhost:24352
+    web  http://web.feat-v.acme.localhost:24352
+
+  → wtm run logs   attach to the output
+  → wtm run down   stop the jobs
+

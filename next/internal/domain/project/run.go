@@ -5,16 +5,32 @@ import (
 	"strings"
 )
 
-// Run is the project's run.toml: whether the file exists, its jobs and profiles, the .env keys it links to them, how jobs are addressed, and how worktrees are isolated from one another.
+// Run is the project's run.toml: whether the file exists, its jobs and profiles, the .env keys it links to them, how jobs are addressed, how worktrees are isolated from one another, what a start does about the jobs other worktrees run, and how long it waits for a declared port to answer.
 type Run struct {
-	Declared        bool `json:",omitempty"` // omitted when false: provision.Fingerprinted clears it, so a fingerprint does not depend on it
-	PortOffsetBlock int  // the distance between two worktrees' ports, 0 for the default
-	Jobs            []Job
-	Profiles        []Profile
-	EnvPorts        []EnvPortLink
-	EnvValues       []EnvValueLink
-	Addressing      Addressing
-	Isolation       Isolation
+	Declared         bool `json:",omitempty"` // omitted when false: provision.Fingerprinted clears it, so a fingerprint does not depend on it
+	PortOffsetBlock  int  // the distance between two worktrees' ports, 0 for the default
+	Jobs             []Job
+	Profiles         []Profile
+	EnvPorts         []EnvPortLink
+	EnvValues        []EnvValueLink
+	Addressing       Addressing
+	Isolation        Isolation
+	Concurrency      Concurrency `json:",omitempty"`
+	PortProbeTimeout int         `json:",omitempty"` // seconds; 0 for the default, below 0 for no check
+}
+
+// Concurrency is what a start does about the jobs other worktrees run: keep them, or stop them first; empty when run.toml does not say.
+type Concurrency string
+
+// The concurrencies of a start.
+const (
+	Parallel  Concurrency = "parallel"
+	Exclusive Concurrency = "exclusive"
+)
+
+// Concurrencies returns every Concurrency.
+func Concurrencies() []Concurrency {
+	return []Concurrency{Parallel, Exclusive}
 }
 
 // JobKind says whether a job keeps running or runs to its end.
@@ -40,17 +56,21 @@ const (
 	Shared      Scope = "shared"
 )
 
-// Job is one job of run.toml: how it starts and stops, where, the ports it declares by name, the address it publishes, its scope, and the namespace it creates.
+// Job is one job of run.toml: how it starts and stops, where, the ports it declares by name, the address it publishes, its scope, and the namespace it creates; whether a start checks that its ports answer (NoProbe, run.toml's probe = false) and whether it binds none by design; the declared jobs it starts itself (Runs) and those whose data it changes (Touches).
 type Job struct {
-	Name      string
-	Kind      JobKind
-	Cmd       string
-	Stop      string
-	Cwd       string
-	Ports     map[string]int
-	URL       *URL
-	Scope     Scope
-	Namespace *Namespace
+	Name        string
+	Kind        JobKind
+	Cmd         string
+	Stop        string
+	Cwd         string
+	Ports       map[string]int
+	URL         *URL
+	Scope       Scope
+	Namespace   *Namespace
+	NoProbe     bool     `json:",omitempty"`
+	BindsNoPort bool     `json:",omitempty"`
+	Runs        []string `json:",omitempty"`
+	Touches     []string `json:",omitempty"`
 }
 
 // URL is the address a job publishes: the name of its port that serves it, and the host it answers to (empty for one derived from the job's name).

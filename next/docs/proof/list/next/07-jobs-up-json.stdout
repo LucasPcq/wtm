@@ -79,7 +79,7 @@
           {
             "action": "run_up",
             "follow_up": {
-              "command": "run up",
+              "command": "run-up",
               "answers": [
                 {
                   "path": "worktree",
@@ -244,7 +244,7 @@
           {
             "action": "run_up",
             "follow_up": {
-              "command": "run up",
+              "command": "run-up",
               "answers": [
                 {
                   "path": "worktree",
@@ -435,7 +435,7 @@
           {
             "action": "run_up",
             "follow_up": {
-              "command": "run up",
+              "command": "run-up",
               "answers": [
                 {
                   "path": "worktree",
@@ -917,7 +917,7 @@
           {
             "action": "run_up",
             "follow_up": {
-              "command": "run up",
+              "command": "run-up",
               "answers": [
                 {
                   "path": "worktree",
@@ -1014,5 +1014,19 @@
     }
   ],
   "follow_ups": [],
-  "warnings": []
+  "warnings": [
+    {
+      "code": "list.daemon_skew",
+      "params": {
+        "daemon": "dev",
+        "skew": "legacy"
+      },
+      "message": "the run daemon is the legacy wtm's: restart it to start jobs beside its own",
+      "follow_up": {
+        "command": "run daemon restart",
+        "code": "list.restart_daemon",
+        "message": "restart it: its services stop, its stacks are kept"
+      }
+    }
+  ]
 }

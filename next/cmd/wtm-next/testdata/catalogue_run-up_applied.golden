@@ -1,0 +1,91 @@
+{
+  "v": 2,
+  "command": "run-up",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "path": "<root>/main",
+        "profile": "",
+        "jobs": [
+          {
+            "name": "seed",
+            "kind": "task",
+            "status": "done",
+            "log": "<root>/main/.git/wtm/logs/main/seed.log"
+          },
+          {
+            "name": "lint",
+            "kind": "task",
+            "status": "done",
+            "log": "<root>/main/.git/wtm/logs/main/lint.log"
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "profile": "",
+    "worktrees": [
+      {
+        "worktree": "main",
+        "branch": "main",
+        "path": "<root>/main",
+        "main": true,
+        "numbered": true,
+        "jobs": [
+          {
+            "name": "seed",
+            "kind": "task",
+            "action": "start",
+            "step": 1
+          },
+          {
+            "name": "lint",
+            "kind": "task",
+            "action": "start",
+            "step": 2,
+            "waits_for": [
+              "seed"
+            ]
+          }
+        ]
+      }
+    ],
+    "exclusive": false,
+    "others": [],
+    "no_probe": false,
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "jobs",
+        "label": "Jobs",
+        "values": [
+          {
+            "value": "seed",
+            "text": "seed"
+          },
+          {
+            "value": "lint",
+            "text": "lint"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

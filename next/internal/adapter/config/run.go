@@ -114,6 +114,9 @@ func (f runFile) problems() []string {
 	if f.Addressing != "" && f.Addressing != string(project.AddressPorts) && f.Addressing != string(project.AddressNames) {
 		problems = append(problems, fmt.Sprintf("unknown addressing %q (expected %q or %q)", f.Addressing, project.AddressPorts, project.AddressNames))
 	}
+	if f.Concurrency != "" && !slices.Contains(project.Concurrencies(), project.Concurrency(f.Concurrency)) {
+		problems = append(problems, fmt.Sprintf("unknown concurrency %q (expected %q or %q)", f.Concurrency, project.Parallel, project.Exclusive))
+	}
 	if f.Isolation != "" && !project.Isolation(f.Isolation).Valid() {
 		problems = append(problems, fmt.Sprintf("unknown isolation %q (expected %q or %q)", f.Isolation, project.Isolated, project.Verbatim))
 	}
@@ -140,6 +143,8 @@ func (j jobFile) scopeProblems() []string {
 	switch {
 	case j.Scope != string(project.PerWorktree) && j.Scope != string(project.Shared):
 		return []string{fmt.Sprintf("job %q: unknown scope %q (expected %q)", j.Name, j.Scope, project.Shared)}
+	case j.Scope == string(project.Shared) && j.Kind == string(project.Task):
+		return []string{fmt.Sprintf(`job %q: scope = "shared" only means something on a service: a task runs to its end in each worktree`, j.Name)}
 	case j.Namespace == nil:
 		return nil
 	case j.Scope != string(project.Shared):
@@ -160,9 +165,11 @@ func (j jobFile) scopeProblems() []string {
 // config maps the file onto the run config a use case reads.
 func (f runFile) config() project.Run {
 	config := project.Run{
-		PortOffsetBlock: f.PortOffsetBlock,
-		Addressing:      project.Addressing(f.Addressing),
-		Isolation:       project.Isolation(f.Isolation),
+		PortOffsetBlock:  f.PortOffsetBlock,
+		Addressing:       project.Addressing(f.Addressing),
+		Isolation:        project.Isolation(f.Isolation),
+		Concurrency:      project.Concurrency(f.Concurrency),
+		PortProbeTimeout: f.PortProbeTimeout,
 	}
 
 	for _, job := range f.Jobs {
@@ -181,7 +188,8 @@ func (f runFile) config() project.Run {
 }
 
 func (j jobFile) job() project.Job {
-	job := project.Job{Name: j.Name, Kind: project.JobKind(j.Kind), Cmd: j.Cmd, Stop: j.Stop, Cwd: j.Cwd, Ports: j.Ports, Scope: project.Scope(j.Scope)}
+	job := project.Job{Name: j.Name, Kind: project.JobKind(j.Kind), Cmd: j.Cmd, Stop: j.Stop, Cwd: j.Cwd, Ports: j.Ports, Scope: project.Scope(j.Scope), BindsNoPort: j.BindsNoPort, Runs: j.Runs, Touches: j.Touches}
+	job.NoProbe = j.Probe != nil && !*j.Probe
 
 	if j.URL != nil {
 		job.URL = &project.URL{Port: j.URL.Port, Host: j.URL.Host}

@@ -267,7 +267,7 @@ func TestEachWorktreeReportsItsActionsAsCommandsWithTheirAnswers(t *testing.T) {
 	require.Len(t, actions, len(worktree.Actions()))
 	assert.Equal(t, worktree.ActionRunUp, actions[3].Action)
 	assert.Equal(t, &domain.FollowUp{
-		Command: "run up",
+		Command: domain.CommandRunUp,
 		Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}},
 		Code:    "list.run_up",
 		Message: "Start the profile",

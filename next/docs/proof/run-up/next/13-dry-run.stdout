@@ -1,0 +1,8 @@
+
+  run up · dry run, nothing applied
+  Worktrees  feat/a
+  Profile    full
+  Jobs       migrate, db (joined, in main), cache, api, web
+  fingerprint  <FP>
+  → wtm run up feat/a --profile full --expect-fingerprint <FP>   apply this plan
+

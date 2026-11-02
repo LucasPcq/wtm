@@ -1,0 +1,21 @@
+{
+  "v": 2,
+  "command": "run-up",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "exclusive",
+        "code": "run-up.exclusive_several",
+        "flag": "--exclusive",
+        "message": "--exclusive stops all but one worktree: it cannot start several"
+      }
+    ]
+  }
+}

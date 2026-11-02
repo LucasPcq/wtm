@@ -1,6 +1,6 @@
 $ wtm checkout --from main; echo EXIT=$?
 
-  Step 3/8 • Env strategy
+  Step 3/9 • Env strategy
 
   ✓ Pull request: #2
   ✓ Parent branch: main · --from

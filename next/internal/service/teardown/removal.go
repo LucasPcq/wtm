@@ -24,6 +24,7 @@ type Facts struct {
 	Checks  map[string]Check               // by the name a worktree is checked by
 	Cwd     string                         // where the caller stands, through its symbolic links
 	JobsErr error                          // why the run daemon could not tell which jobs are up
+	Skew    *domain.Warning                // the warning of a run daemon of another build, worded by the command
 	PRsErr  error                          // why the forge could not be asked for open pull requests
 }
 
@@ -263,6 +264,9 @@ func (f Facts) Warnings(params WarningsParams) []domain.Warning {
 	var warnings []domain.Warning
 	if f.JobsErr != nil {
 		warnings = append(warnings, domain.Warning{Code: params.Command + domain.JobsUnknown, Message: run.UnknownMessage(f.JobsErr) + " — a job may still run in a worktree removed"})
+	}
+	if f.Skew != nil {
+		warnings = append(warnings, *f.Skew)
 	}
 	if f.PRsErr != nil {
 		warnings = append(warnings, domain.Warning{Code: params.Command + domain.PRsUnavailable, Message: "couldn't ask for pull requests (" + f.PRsErr.Error() + "): " + params.Unasked, Params: worktree.UnavailableParams(f.PRsErr)})

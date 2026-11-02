@@ -1,0 +1,12 @@
+
+  ✓ run up: 1 done
+
+  Worktrees    feat/v
+  Profile      dev
+  Jobs         api, web
+  Stops first  main, feat/a, feat/b
+
+  Addresses
+    api  http://api.feat-v.acme.localhost:24352
+    web  http://web.feat-v.acme.localhost:24352
+

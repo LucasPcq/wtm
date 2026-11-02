@@ -11,4 +11,5 @@
   feat/login         (branch deleted)
   └─ feat/login-ui
   ! couldn't read the record of feat/a-ui: its parent is not known, so it stands as a root: unexpected end of JSON input
+  ! the run daemon is the legacy wtm's: restart it to start jobs beside its own
 

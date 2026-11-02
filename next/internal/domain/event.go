@@ -38,30 +38,34 @@ const (
 	PhaseExec        Phase = "exec"         // a command exec runs in the worktree
 	PhaseRebase      Phase = "rebase"       // sync rebases its branch onto its parent
 	PhasePush        Phase = "push"         // sync force-pushes its branch to origin
+	PhaseJob         Phase = "job"          // run up starts one job of run.toml, named by the event's Job
 )
 
 // Phases returns every Phase, in the order a subject's work runs them.
 func Phases() []Phase {
-	return []Phase{PhaseFastForward, PhaseWorktree, PhaseEnv, PhaseMeta, PhaseOrdinal, PhasePorts, PhaseOnCreate, PhaseMove, PhaseOnClean, PhaseRemove, PhaseExec, PhaseRebase, PhasePush}
+	return []Phase{PhaseFastForward, PhaseWorktree, PhaseEnv, PhaseMeta, PhaseOrdinal, PhasePorts, PhaseOnCreate, PhaseMove, PhaseOnClean, PhaseRemove, PhaseExec, PhaseRebase, PhasePush, PhaseJob}
 }
 
-// PhaseStarted reports that a phase of a subject's work begins; Log is the file its output goes to, if any.
+// PhaseStarted reports that a phase of a subject's work begins; Job names the job a PhaseJob starts, Log the file its output goes to, if any.
 type PhaseStarted struct {
 	Subject string `json:"subject"`
 	Phase   Phase  `json:"phase"`
+	Job     string `json:"job,omitempty"`
 	Log     string `json:"log,omitempty"`
 }
 
-// PhaseFinished reports that a phase of a subject's work ended, and whether it failed.
+// PhaseFinished reports that a phase of a subject's work ended, and whether it failed; Job names the job a PhaseJob started.
 type PhaseFinished struct {
 	Subject string `json:"subject"`
 	Phase   Phase  `json:"phase"`
+	Job     string `json:"job,omitempty"`
 	Failed  bool   `json:"failed"`
 }
 
-// Output is one line printed by a phase of a subject's work (a hook's output).
+// Output is one line printed by a phase of a subject's work (a hook's output, a job's while it starts, Job naming it).
 type Output struct {
 	Subject string `json:"subject"`
+	Job     string `json:"job,omitempty"`
 	Line    string `json:"line"`
 }
 

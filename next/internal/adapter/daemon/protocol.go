@@ -85,6 +85,7 @@ type job struct {
 	Name      string         `json:"name"`
 	Kind      string         `json:"kind,omitempty"`
 	WorkDir   string         `json:"work_dir"`
+	Profile   string         `json:"profile,omitempty"`
 	SharedDir string         `json:"shared_dir,omitempty"`
 	State     string         `json:"state,omitempty"`
 	Hold      string         `json:"hold,omitempty"`
@@ -127,7 +128,7 @@ func (s *stamp) UnmarshalJSON(data []byte) error {
 }
 
 func jobOf(j run.Job) job {
-	wire := job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, SharedDir: j.SharedDir, State: string(j.State), Hold: string(j.Hold), Reaped: j.Reaped, PID: j.PID, StartedAt: stamp(j.StartedAt), ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports, Status: legacyStatus(j)}
+	wire := job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, Profile: j.Profile, SharedDir: j.SharedDir, State: string(j.State), Hold: string(j.Hold), Reaped: j.Reaped, PID: j.PID, StartedAt: stamp(j.StartedAt), ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports, Status: legacyStatus(j)}
 	if j.LastLine != nil {
 		wire.LastLine = &line{At: stamp(j.LastLine.At), Text: j.LastLine.Text}
 	}
@@ -155,11 +156,11 @@ func legacyStatus(j run.Job) string {
 // of the legacy wtm when legacy.
 func (j job) runJob(legacy bool) run.Job {
 	if legacy {
-		return run.Job{Name: j.Name, WorkDir: j.WorkDir, Up: legacyUp(j.Status), Kind: project.JobKind(j.Kind), State: cmp.Or(run.State(j.State), legacyState(j.Status)), Hold: legacyHold(j.Status), PID: j.PID, URL: j.URL, ExitCode: j.ExitCode, StartedAt: time.Time(j.StartedAt), SharedDir: j.SharedDir}
+		return run.Job{Name: j.Name, WorkDir: j.WorkDir, Profile: j.Profile, Up: legacyUp(j.Status), Kind: project.JobKind(j.Kind), State: cmp.Or(run.State(j.State), legacyState(j.Status)), Hold: legacyHold(j.Status), PID: j.PID, URL: j.URL, ExitCode: j.ExitCode, StartedAt: time.Time(j.StartedAt), SharedDir: j.SharedDir}
 	}
 
 	hold, state := run.Hold(j.Hold), run.State(j.State)
-	read := run.Job{Name: j.Name, WorkDir: j.WorkDir, Up: hold == run.HoldClaim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Hold: hold, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: time.Time(j.StartedAt), SharedDir: j.SharedDir}
+	read := run.Job{Name: j.Name, WorkDir: j.WorkDir, Profile: j.Profile, Up: hold == run.HoldClaim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Hold: hold, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: time.Time(j.StartedAt), SharedDir: j.SharedDir}
 	if j.LastLine != nil {
 		read.LastLine = &run.Line{At: time.Time(j.LastLine.At), Text: j.LastLine.Text}
 	}
@@ -211,6 +212,7 @@ func legacyState(status string) run.State {
 // spec is what a start asks for, on the wire.
 type spec struct {
 	Job     config            `json:"job"`
+	Profile string            `json:"profile,omitempty"`
 	WorkDir string            `json:"work_dir"`
 	Env     map[string]string `json:"env,omitempty"`
 	Unset   []string          `json:"unset,omitempty"`
@@ -235,7 +237,7 @@ type origin struct {
 }
 
 func specOf(s run.Spec) *spec {
-	wire := &spec{Job: configOf(s.Job), WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir, Routes: routesOf(s.Routes)}
+	wire := &spec{Job: configOf(s.Job), Profile: s.Profile, WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir, Routes: routesOf(s.Routes)}
 	if s.Origin != nil {
 		wire.Origin = &origin{Root: s.Origin.Root, CommonDir: s.Origin.CommonDir, Branch: s.Origin.Branch, CorrelationID: s.Origin.CorrelationID}
 	}
@@ -247,7 +249,7 @@ func specOf(s run.Spec) *spec {
 }
 
 func (s spec) runSpec() run.Spec {
-	runSpec := run.Spec{Job: s.Job.job(), WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir, Routes: runRoutes(s.Routes)}
+	runSpec := run.Spec{Job: s.Job.job(), Profile: s.Profile, WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir, Routes: runRoutes(s.Routes)}
 	if s.Origin != nil {
 		runSpec.Origin = &run.Origin{Root: s.Origin.Root, CommonDir: s.Origin.CommonDir, Branch: s.Origin.Branch, CorrelationID: s.Origin.CorrelationID}
 	}
@@ -268,19 +270,13 @@ type config struct {
 	Cwd   string         `json:"cwd,omitempty"`
 	Ports map[string]int `json:"ports,omitempty"`
 	URL   *urlConfig     `json:"url,omitempty"`
-	legacyKeys
-	Scope     string           `json:"scope,omitempty"`
-	Namespace *namespaceConfig `json:"namespace,omitempty"`
-}
-
-// legacyKeys are the keys of a job of run.toml the legacy index keeps that the
-// run daemon never reads: an index taken over keeps them, written back where
-// and as legacy wrote them.
-type legacyKeys struct {
-	Probe       *bool    `json:"probe,omitempty"`
-	BindsNoPort bool     `json:"binds_no_port,omitempty"`
-	Runs        []string `json:"runs,omitempty"`
-	Touches     []string `json:"touches,omitempty"`
+	// The legacy index spells probe = true as the key absent, and so does this one.
+	Probe       *bool            `json:"probe,omitempty"`
+	BindsNoPort bool             `json:"binds_no_port,omitempty"`
+	Runs        []string         `json:"runs,omitempty"`
+	Touches     []string         `json:"touches,omitempty"`
+	Scope       string           `json:"scope,omitempty"`
+	Namespace   *namespaceConfig `json:"namespace,omitempty"`
 }
 
 type urlConfig struct {
@@ -296,7 +292,10 @@ type namespaceConfig struct {
 }
 
 func configOf(j project.Job) config {
-	wire := config{Name: j.Name, Kind: string(j.Kind), Cmd: j.Cmd, Stop: j.Stop, Cwd: j.Cwd, Ports: j.Ports, Scope: string(j.Scope)}
+	wire := config{Name: j.Name, Kind: string(j.Kind), Cmd: j.Cmd, Stop: j.Stop, Cwd: j.Cwd, Ports: j.Ports, Scope: string(j.Scope), BindsNoPort: j.BindsNoPort, Runs: j.Runs, Touches: j.Touches}
+	if j.NoProbe {
+		wire.Probe = new(false)
+	}
 	if j.URL != nil {
 		wire.URL = &urlConfig{Port: j.URL.Port, Host: j.URL.Host}
 	}
@@ -308,7 +307,7 @@ func configOf(j project.Job) config {
 }
 
 func (c config) job() project.Job {
-	j := project.Job{Name: c.Name, Kind: project.JobKind(c.Kind), Cmd: c.Cmd, Stop: c.Stop, Cwd: c.Cwd, Ports: c.Ports, Scope: project.Scope(c.Scope)}
+	j := project.Job{Name: c.Name, Kind: project.JobKind(c.Kind), Cmd: c.Cmd, Stop: c.Stop, Cwd: c.Cwd, Ports: c.Ports, Scope: project.Scope(c.Scope), NoProbe: c.Probe != nil && !*c.Probe, BindsNoPort: c.BindsNoPort, Runs: c.Runs, Touches: c.Touches}
 	if c.URL != nil {
 		j.URL = &project.URL{Port: c.URL.Port, Host: c.URL.Host}
 	}

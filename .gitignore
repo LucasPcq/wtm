@@ -1,5 +1,7 @@
 # Build artifacts
 bin/
+# a go build in the command's own directory writes its binary there
+next/cmd/wtm-next/wtm-next
 dist/
 /wtm
 

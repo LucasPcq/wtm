@@ -21,12 +21,13 @@ type Worktree interface {
 // excerptLines is how many of an item's last lines its conclusion shows.
 const excerptLines = 10
 
-// AppliedParams is what DrawApplied draws an outcome as, beyond the outcome itself: the command it counts for, the note its tally adds, the note of the row of an item done without a change (create's "already open"), the view it draws from, and, when the command keeps them, the last lines an item printed and where the whole of them is (Excerpt, nil for none), drawn under an item that did not end done.
+// AppliedParams is what DrawApplied draws an outcome as, beyond the outcome itself: the command it counts for, the note its tally adds, the note of the row of an item done without a change (create's "already open"), the view it draws from, the block the command draws under the plan (Block, nil for none), and, when the command keeps them, the last lines an item printed and where the whole of them is (Excerpt, nil for none), drawn under an item that did not end done.
 type AppliedParams struct {
 	Command   string
 	Note      string
 	Unchanged string
 	View      View
+	Block     func(w io.Writer)
 	Excerpt   func(subject string) (tail []string, log string)
 }
 
@@ -63,6 +64,9 @@ func DrawApplied[P RecappedPlan, D any](w io.Writer, outcome domain.Outcome[P, D
 		for _, text := range warnings {
 			WarningLine(w, text)
 		}
+	}
+	if params.Block != nil {
+		params.Block(w)
 	}
 
 	drawUnfinished(w, items, params.Excerpt)

@@ -17,6 +17,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
+	"github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
+	"github.com/spf13/cobra"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -140,4 +143,104 @@ func TestWhyTheDaemonServesNoProxyIsInItsLog(t *testing.T) {
 
 	assert.Equal(t, "run proxy: invalid [proxy] port 99999 in config.toml — jobs keep their own ports\n", daemonLog(t, unreadable), "said once the log was emptied")
 	assert.Empty(t, daemonLog(t, moved), "a port taken moves the proxy to the next, silently")
+}
+
+func TestARestartLeavesADaemonOfThisBuildAlone(t *testing.T) {
+	r := &restarting{}
+
+	err := restartDaemon(t.Context(), r.params(nil, true, false))
+
+	require.NoError(t, err)
+	assert.Zero(t, r.shutdowns)
+	assert.Contains(t, r.out.String(), "nothing to restart")
+}
+
+func TestARestartSaysWhatStopsAndWhatIsKeptThenAsks(t *testing.T) {
+	skewed := &run.Skewed{Skew: run.SkewLegacy}
+	for name, c := range map[string]struct {
+		answer string
+		ask    bool
+		yes    bool
+		kind   domain.Kind
+		stops  int
+	}{
+		"confirmed":  {answer: "y\n", ask: true, stops: 1},
+		"declined":   {answer: "n\n", ask: true, kind: domain.KindCancelled},
+		"unattended": {kind: domain.KindInvalid},
+		"yes":        {yes: true, stops: 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := &restarting{jobs: []run.Job{
+				{Name: "web", WorkDir: "/wt/a", Up: true, Hold: run.HoldOwn},
+				{Name: "cache", WorkDir: "/wt/a", Up: true, Hold: run.HoldDetached},
+				{Name: "db", WorkDir: "/wt/b", Up: true, Hold: run.HoldClaim},
+			}, in: c.answer}
+
+			err := restartDaemon(t.Context(), r.params(skewed, c.ask, c.yes))
+
+			assert.Equal(t, c.stops, r.shutdowns)
+			assert.Contains(t, r.said.String(), "Stops:  web (/wt/a)")
+			assert.Contains(t, r.said.String(), "Kept:   cache (/wt/a), db (/wt/b)")
+			assert.NotContains(t, r.out.String(), "Stops", "what it found goes to stderr, beside its question")
+			if c.kind == "" {
+				require.NoError(t, err)
+				return
+			}
+			refused, ok := errors.AsType[*domain.Error](err)
+			require.True(t, ok, err)
+			assert.Equal(t, c.kind, refused.Kind)
+		})
+	}
+}
+
+// The exit code is the failure's: declined is cancelled, 19; unattended without --yes, 2.
+func TestARestartExitsWithItsFailuresCode(t *testing.T) {
+	for name, c := range map[string]struct {
+		answer string
+		ask    bool
+		want   int
+	}{
+		"declined":   {answer: "n\n", ask: true, want: cli.ExitCancelled},
+		"unattended": {want: cli.ExitUsage},
+		"confirmed":  {answer: "y\n", ask: true, want: cli.ExitOK},
+	} {
+		t.Run(name, func(t *testing.T) {
+			streams, in, _, _ := output.Test()
+			in.WriteString(c.answer)
+			streams.SetStdinTerminal(c.ask)
+			streams.Err.SetTerminal(c.ask)
+			r := &restarting{jobs: []run.Job{{Name: "web", WorkDir: "/wt/a", Up: true, Hold: run.HoldOwn}}}
+			skewed := &run.Skewed{Skew: run.SkewLegacy}
+			root := cli.NewRoot(version, streams, []*cobra.Command{runCmd(restartCmd(streams, func() restartParams { return r.params(skewed, false, false) }))})
+
+			code := cli.Execute(t.Context(), root, []string{"run", "restart"})
+
+			assert.Equal(t, c.want, code)
+		})
+	}
+}
+
+// run up sends a daemon of another protocol here: its jobs cannot be read, and it is replaced all the same once agreed.
+func TestARestartReplacesADaemonOfAnotherProtocol(t *testing.T) {
+	r := &restarting{}
+	protocol := &run.Error{Code: run.CodeSkew, Message: "the run daemon speaks protocol 3, this wtm 2"}
+
+	err := restartDaemon(t.Context(), r.params(protocol, false, true))
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, r.shutdowns)
+	assert.Contains(t, r.said.String(), "its jobs can't be read")
+	assert.Contains(t, r.out.String(), "restarted")
+}
+
+func TestARestartUnderQuietSaysNothingOfWhatItDid(t *testing.T) {
+	r := &restarting{}
+	params := r.params(&run.Skewed{Skew: run.SkewLegacy}, false, true)
+	params.Quiet = true
+
+	require.NoError(t, restartDaemon(t.Context(), params))
+
+	assert.Empty(t, r.out.String())
+	assert.Empty(t, r.said.String(), "nothing is asked: nothing is said")
+	assert.Equal(t, 1, r.shutdowns)
 }

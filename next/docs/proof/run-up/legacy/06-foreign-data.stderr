@@ -1,0 +1,5 @@
+
+  ✗ Jobs that change foreign data — data this worktree does not own:
+    migrate changes db — its source's data: this worktree is verbatim
+    pass --force to run them anyway, or give this worktree its own data: wtm env <branch> --isolation isolated
+

@@ -1,0 +1,4 @@
+
+  ✗ the request is invalid
+    --exclusive stops all but one worktree: it cannot start several
+

@@ -22,6 +22,7 @@ type jobs struct {
 	proxy    run.Proxy
 	lines    []string
 	err      error
+	once     error // what the first start alone fails with
 	outcome  run.Outcome
 	requests []any
 	returned chan struct{}
@@ -75,6 +76,13 @@ func (j *jobs) Start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 	}
 	if j.returned != nil {
 		close(j.returned)
+	}
+	j.mu.Lock()
+	once := j.once
+	j.once = nil
+	j.mu.Unlock()
+	if once != nil {
+		return run.Job{}, once
 	}
 	return web, j.err
 }

@@ -36,6 +36,27 @@ func TestAReadAsksTheDaemonAndTheForgeOfItsBranchesBesideReadingTheWorktrees(t *
 	assert.False(t, got.Interrupted)
 }
 
+func TestADaemonOfAnotherBuildIsReadAndWarnedOfWithItsRestart(t *testing.T) {
+	skewed := &run.Skewed{Skew: run.SkewLegacy}
+	params := repository.AskParams{
+		Jobs: func(context.Context) ([]run.Job, error) {
+			return []run.Job{{Name: "web", Up: true, WorkDir: "/wt/a"}}, skewed
+		},
+		Restart: &domain.FollowUp{Command: "run daemon restart"},
+	}
+
+	got := repository.Ask(t.Context(), params, func() {})
+
+	assert.NoError(t, got.JobsErr)
+	assert.Equal(t, []string{"web"}, got.Services("/wt/a"))
+	assert.Equal(t, []domain.Warning{{
+		Code:     "list.daemon_skew",
+		Message:  "the run daemon is the legacy wtm's: restart it to start jobs beside its own",
+		Params:   domain.Params{"skew": "legacy", "daemon": ""},
+		FollowUp: &domain.FollowUp{Command: "run daemon restart", Code: "list.restart_daemon", Message: "restart it: its services stop, its stacks are kept"},
+	}}, got.Warnings("list"))
+}
+
 func TestTheForgeIsAskedOnlyWithPRs(t *testing.T) {
 	params := repository.AskParams{
 		Jobs:         func(context.Context) ([]run.Job, error) { return nil, nil },

@@ -16,6 +16,7 @@ type Service struct {
 	Git      Snapshotter
 	MainPath string
 	Init     *domain.FollowUp // the command that sets wtm up in a repository, offered by the refusal of one with no config; none when nil
+	Restart  *domain.FollowUp // the command that restarts a run daemon of another build, handing its jobs over; none when nil
 }
 
 // Observe reads the repository the command named command decides from: the

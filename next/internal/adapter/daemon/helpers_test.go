@@ -13,6 +13,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 
 	"github.com/stretchr/testify/require"
 )
@@ -152,4 +153,17 @@ func servedConcurrently(t *testing.T, jobs daemon.Jobs) (string, *sync.WaitGroup
 		}
 	}()
 	return socket, &serving
+}
+
+// starts are the specs of the starts fake got, in order.
+func starts(fake *jobs) []any {
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	var specs []any
+	for _, req := range fake.requests {
+		if spec, ok := req.(run.Spec); ok {
+			specs = append(specs, spec)
+		}
+	}
+	return specs
 }
