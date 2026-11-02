@@ -3,6 +3,7 @@ package sync_test
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -54,6 +55,28 @@ func TestWithoutDescendantsTheNamedWorktreeAloneIsRebased(t *testing.T) {
 	assert.Equal(t, b, w.tip(t, featB))
 	assert.Equal(t, []string{featB, featC}, outcome.Plan.LeftOut)
 	assert.Equal(t, "only the named: feat/b, feat/c stay where they are", outcome.Plan.Recap[0].Values[0].Text)
+	leftOut := outcome.Result.FollowUps[slices.IndexFunc(outcome.Result.FollowUps, func(f domain.FollowUp) bool { return f.Code == sync.CodeLeftOut })]
+	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{featB, featC}}}, leftOut.Answers, "their own sync, the core's to spell")
+}
+
+func TestTheWorktreesLeftOutAreSyncedWithTheRunsChoicesAndNeverAfterAFailure(t *testing.T) {
+	w := newWorld(t)
+	req := naming(featA)
+	req.Descendants, req.KeepConflict, req.FFParents = new(false), true, new(false)
+
+	outcome := w.run(t, req)
+
+	at := slices.IndexFunc(outcome.Result.FollowUps, func(f domain.FollowUp) bool { return f.Code == sync.CodeLeftOut })
+	require.GreaterOrEqual(t, at, 0)
+	assert.Equal(t, []domain.Answered{
+		{Path: domain.PathWorktree, Values: []string{featB, featC}},
+		{Path: sync.PathKeepConflict, Values: []string{"true"}},
+		{Path: sync.PathFFParents, Values: []string{"false"}},
+	}, outcome.Result.FollowUps[at].Answers)
+
+	failed := sync.Plan{LeftOut: []string{featB}}
+	items := []sync.Item{{Subject: featA, Status: domain.StatusFailed, Err: &domain.Error{Code: sync.CodeConflict}}}
+	assert.NotContains(t, followUpCodes(sync.FollowUpsOf(failed, items)), sync.CodeLeftOut)
 }
 
 func TestAConflictMidStackIsAbortedAndTheWorktreesUnderItSkipped(t *testing.T) {
@@ -377,4 +400,67 @@ func TestACommitTheParentLostToAResetStaysInTheChild(t *testing.T) {
 	require.Equal(t, domain.StatusDone, itemsOf(outcome)[solo].Status, itemsOf(outcome)[solo].Err)
 	assert.FileExists(t, filepath.Join(w.at(solo), "mistake.txt"))
 	assert.Equal(t, 2, rebaseOf(outcome.Plan, solo).Commits, "the commit moved and its own")
+}
+
+func TestEachBranchFastForwardedFirstIsAnItemBeforeTheWorktrees(t *testing.T) {
+	w := newWorld(t)
+	w.pushedOnOrigin(t, "main")
+
+	outcome := w.run(t, naming(solo))
+
+	assert.Equal(t, []string{"main", solo}, subjectsOf(outcome))
+	forwarded := itemsOf(outcome)["main"]
+	require.Equal(t, domain.StatusDone, forwarded.Status, forwarded.Err)
+	assert.Equal(t, 1, forwarded.Detail.Commits, "the commits it took from origin")
+	assert.Empty(t, forwarded.Detail.Parent)
+}
+
+func TestABranchFastForwardRefusedAtApplySkipsItsItemAndItsChildRebasesOntoItAsItStands(t *testing.T) {
+	w := newWorld(t)
+	gittest.Git(t, w.main, "branch", "topic", "main")
+	gittest.Git(t, w.main, "push", "-q", "origin", "topic")
+	w.pushedOnOrigin(t, "topic")
+	gittest.Git(t, w.main, "fetch", "-q", "origin")
+	w.recordParent(t, solo, "topic")
+	planned, _ := w.plan(t, sync.Request{Worktrees: []string{solo}, NoFetch: true})
+	// topic moves since the plan: its fast-forward to the commit planned is refused
+	moved := gittest.Output(t, w.main, "commit-tree", "topic^{tree}", "-p", "topic", "-m", "local since")
+	gittest.Git(t, w.main, "update-ref", "refs/heads/topic", moved)
+
+	result := w.usecase.Apply(t.Context(), planned, (&operationtest.Recorder{}).Add)
+
+	require.Len(t, result.Items, 2)
+	refused := result.Items[0]
+	assert.Equal(t, "topic", refused.Subject)
+	require.Equal(t, domain.StatusSkipped, refused.Status, "a refused fast-forward never fails the run")
+	assert.Equal(t, sync.CodeFFFailed, refused.Err.Code)
+	assert.Equal(t, solo, refused.Err.Params["children"])
+	assert.Equal(t, domain.StatusDone, result.Items[1].Status, result.Items[1].Err)
+	assert.Nil(t, result.Failure(), "every worktree synced: the run succeeded")
+}
+
+func TestABranchToFastForwardIsInterruptedByACancelBeforeIt(t *testing.T) {
+	w := newWorld(t)
+	w.pushedOnOrigin(t, "main")
+	planned, _ := w.plan(t, naming(solo))
+	main := w.tip(t, "main")
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	result := w.usecase.Apply(ctx, planned, (&operationtest.Recorder{}).Add)
+
+	require.NotEmpty(t, result.Items)
+	assert.Equal(t, "main", result.Items[0].Subject)
+	assert.Equal(t, domain.ReasonInterrupted, result.Items[0].Reason)
+	assert.Equal(t, main, w.tip(t, "main"))
+}
+
+func TestARefusedFastForwardBesideAConflictLeavesTheConflictTheRunsFailure(t *testing.T) {
+	result := sync.Result{Items: []sync.Item{
+		{Subject: "main", Status: domain.StatusSkipped, Err: &domain.Error{Kind: domain.KindConflict, Code: sync.CodeFFFailed}},
+		{Subject: featB, Status: domain.StatusFailed, Err: &domain.Error{Kind: domain.KindConflict, Code: sync.CodeConflict}},
+	}}
+
+	require.NotNil(t, result.Failure())
+	assert.Equal(t, sync.CodeConflict, result.Failure().Code)
 }

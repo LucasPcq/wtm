@@ -1,14 +1,9 @@
 import type { Applied } from '@/api/queries/commands'
 import type { DomainWarning, FastforwardAdvance } from '@/api/types.gen'
 import { unsafe } from '@/features/worktrees/fast-forward/utils/plan'
-import {
-  commits,
-  failureWords,
-  keptWords,
-  standingTone,
-  standingWords,
-} from '@/features/worktrees/fast-forward/utils/words'
+import { failureWords, keptWords, standingTone, standingWords } from '@/features/worktrees/fast-forward/utils/words'
 import type { Told } from '@/features/worktrees/hooks/use-direct-run'
+import { commits } from '@/features/worktrees/utils/counts'
 import { type OutcomeGroup, type OutcomeRow, planWide } from '@/features/worktrees/utils/outcome'
 import type { Progress } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'

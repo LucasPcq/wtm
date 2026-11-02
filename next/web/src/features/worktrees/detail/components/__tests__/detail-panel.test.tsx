@@ -23,7 +23,7 @@ test('each worktree is listed, and its row opens the detail with the problem to 
 
   const detail = await screen.findByRole('complementary', { name: 'feat/billing-ui' })
   expect(await within(detail).findByText('feat/billing has 1 commit it lacks')).toBeTruthy()
-  expect(await within(detail).findByText('wtm sync feat/billing-ui')).toBeTruthy()
+  expect(await within(detail).findByRole('button', { name: 'Sync it onto feat/billing' })).toBeTruthy()
 })
 
 // The header read its link from the list's actions, which the live list, never asked GitHub, does not carry.

@@ -31,7 +31,11 @@ const calloutOf: Record<StatusProblemCode, { tone: Tone; icon: LucideIcon; conse
     consequence: 'It rebases onto its new parent on its next sync.',
   },
   'status.behind_origin': { tone: 'suggestion', icon: FastForward, consequence: null },
-  'status.behind': { tone: 'suggestion', icon: ArrowDownToLine, consequence: null },
+  'status.behind': {
+    tone: 'problem',
+    icon: ArrowDownToLine,
+    consequence: 'Opens its plan first: the worktrees under it follow it.',
+  },
   'status.env_missing': { tone: 'problem', icon: TriangleAlert, consequence: null },
   'status.isolation_pending': { tone: 'problem', icon: TriangleAlert, consequence: null },
   'status.job_crashed': { tone: 'failure', icon: CircleX, consequence: null },
@@ -60,6 +64,10 @@ const runsHere: Record<
   checkout: null,
   prune: { verb: pruneAction.label, open: (repo, fix) => openPrune(repo, subjectsOf(fix)) },
   exec: null,
+  sync: {
+    verb: menu.sync.label,
+    open: (_repo, fix, runEntry) => runEntry({ action: 'sync', followUp: fix }, []),
+  },
 }
 
 export function Callout({ repo, problems: [first, ...more] }: { repo: string; problems: StatusProblem[] }) {

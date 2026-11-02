@@ -10,6 +10,7 @@ import { openFastForward, useFastForwardDialog } from '@/features/worktrees/hook
 import { openRemove } from '@/features/worktrees/hooks/use-remove-dialog'
 import { openReparent } from '@/features/worktrees/hooks/use-reparent-dialog'
 import { useReparentNow } from '@/features/worktrees/hooks/use-reparent-now'
+import { openSync } from '@/features/worktrees/hooks/use-sync-dialog'
 import { type Entry, leftOf, menu, type Subject, subjectsOf } from '@/features/worktrees/utils/actions'
 import { copy } from '@/features/worktrees/utils/copy'
 
@@ -67,6 +68,19 @@ export function useRunEntry(repo: string) {
     openReparent(repo, { worktrees: subjectsOf(followUp), left: leftOf(rows, 'reparent'), picking: rows.length > 1 })
   }
 
+  // sync is a dialog, never a direct run: one worktree opens on Confirm, unless the reads show it dirty or several are
+  // named, which open on the Worktrees step, where every choice sits
+  const sync = (followUp: DomainFollowUp, rows: Subject[]) => {
+    const worktrees = subjectsOf(followUp)
+    const [only] = worktrees
+    openSync(repo, {
+      answers: followUp.answers ?? [],
+      left: leftOf(rows, 'sync'),
+      picking: false,
+      deciding: worktrees.length !== 1 || only === undefined || dirty(only),
+    })
+  }
+
   return (entry: Entry, rows: Subject[]) => {
     if (!('followUp' in entry)) return
 
@@ -78,6 +92,7 @@ export function useRunEntry(repo: string) {
       case 'web':
         if (entry.action === 'fast_forward') return fastForward(entry.followUp, rows)
         if (entry.action === 'reparent') return reparent(entry.followUp, rows)
+        if (entry.action === 'sync') return sync(entry.followUp, rows)
         if (entry.action === 'exec')
           return openExec(repo, { worktrees: subjectsOf(entry.followUp), left: leftOf(rows, entry.action) })
         return openRemove(repo, {

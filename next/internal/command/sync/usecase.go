@@ -39,13 +39,13 @@ type UseCase struct {
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, or a refusal before the apply).
 type Outcome = domain.Outcome[Plan, Detail]
 
-// A Result is what the apply did: one Item per worktree of the cascade, in its order, and the steps after it.
+// A Result is what the apply did: one Item per branch fast-forwarded first, then per worktree of the cascade, in its order, and the steps after it.
 type Result = domain.Result[Detail]
 
-// An Item is what became of one worktree of the cascade: its status and why, the error it failed on, and its Detail once it moved or stands on its parent.
+// An Item is what became of one branch fast-forwarded first or one worktree of the cascade: its status and why, the error it failed on, and its Detail once it moved or stands on its parent.
 type Item = domain.Unit[Detail]
 
-// A Detail describes a worktree synced as the JSON envelope reports it: where it is, the parent it stands on, the commit it stood at before, its own commits replayed, and whether it was pushed.
+// A Detail describes a worktree synced as the JSON envelope reports it: where it is, the parent it stands on, the commit it stood at before, its own commits replayed, and whether it was pushed. Of a branch fast-forwarded first, it has no parent, and Commits are those it took from origin.
 type Detail struct {
 	Path    string `json:"path"`
 	Parent  string `json:"parent"`
@@ -136,28 +136,29 @@ func (u UseCase) Plan(ctx context.Context, req Request, fetched error) (Plan, []
 // ----------------------------------------------------------------------------
 // Apply
 
-// Apply carries out the plan, reporting each step: it fast-forwards the branches rebased onto, then syncs each worktree of the cascade in turn, parents before children; a failure stops the worktrees under the one that failed, never the others, and the branches it leaves stand as they are. Once ctx is cancelled, the worktrees not yet started are skipped.
+// Apply carries out the plan, reporting each step: it fast-forwards the branches rebased onto, then syncs each worktree of the cascade in turn, parents before children, one Item for each in that order; a failure stops the worktrees under the one that failed, never the others, and the branches it leaves stand as they are. Once ctx is cancelled, the branches and worktrees not yet started are skipped.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
-	var warnings []domain.Warning
 	stands := map[string]string{} // the commit each branch rebased onto stands at when its fast-forward failed
+	items := make([]Item, 0, len(plan.Onto)+len(plan.Worktrees))
 	for _, o := range plan.Onto {
 		if !o.moves() {
 			continue
 		}
-		if warning, failed := u.forward(ctx, plan, o, report); failed {
-			warnings, stands[o.Branch] = append(warnings, warning), o.From
+		item := u.forward(ctx, plan, o, report)
+		if item.Err != nil {
+			stands[o.Branch] = o.From
 		}
+		items = append(items, item)
 	}
 
 	stopped := map[string]bool{}
-	items := make([]Item, 0, len(plan.Worktrees))
 	for _, r := range plan.Worktrees {
 		item := u.sync(ctx, plan, r, ontoOf(r, stands), stopped[r.Parent], report)
 		stopped[r.Worktree] = item.Status == domain.StatusFailed || item.Reason == domain.ReasonBlocked || item.Reason == domain.ReasonInterrupted
 		items = append(items, item)
 	}
 
-	return Result{Items: items, Warnings: warnings, FollowUps: plan.next(items)}
+	return Result{Items: items, FollowUps: plan.next(items)}
 }
 
 // ----------------------------------------------------------------------------
@@ -252,13 +253,15 @@ func (u UseCase) forked(ctx context.Context, facts Facts, branch string) error {
 // ----------------------------------------------------------------------------
 // The steps of Apply
 
-// CodeFFFailed warns of a branch rebased onto that could not be fast-forwarded: the worktrees on it are rebased onto it as it stands.
+// CodeFFFailed is why a branch rebased onto could not be fast-forwarded: its item is skipped, never failed, since the worktrees on it are rebased onto it as it stands and the run goes on.
 const CodeFFFailed = Name + ".ff_failed"
 
-// forward fast-forwards o, a branch rebased onto, to the commit of origin planned, between its phase events: in its worktree, or, held by none, its ref moved; a failure is its warning, and reports it failed, its children rebased onto it as it stands. Once ctx is cancelled, it is not started.
-func (u UseCase) forward(ctx context.Context, plan Plan, o Onto, report domain.Report) (domain.Warning, bool) {
+// forward fast-forwards o, a branch rebased onto, to the commit of origin planned, between its phase events: in its worktree, or, held by none, its ref moved. Its item is done with the commits it took, or skipped with why (CodeFFFailed), its children rebased onto it as it stands: a refused fast-forward never fails the run. Once ctx is cancelled, it is not started.
+func (u UseCase) forward(ctx context.Context, plan Plan, o Onto, report domain.Report) Item {
+	item := Item{Subject: o.Branch}
 	if ctx.Err() != nil {
-		return domain.Warning{}, false
+		item.Status, item.Reason = domain.StatusSkipped, domain.ReasonInterrupted
+		return item
 	}
 	shielded, release := u.Shield(ctx)
 	defer release()
@@ -266,12 +269,14 @@ func (u UseCase) forward(ctx context.Context, plan Plan, o Onto, report domain.R
 	report(domain.PhaseStarted{Subject: o.Branch, Phase: domain.PhaseFastForward})
 	cause := u.forwardCause(shielded, plan, o)
 	report(domain.PhaseFinished{Subject: o.Branch, Phase: domain.PhaseFastForward, Failed: cause != ""})
-	if cause == "" {
-		return domain.Warning{}, false
+	if cause != "" {
+		children := strings.Join(o.Children, ", ")
+		item.Status, item.Err = domain.StatusSkipped, &domain.Error{Kind: domain.KindConflict, Code: CodeFFFailed, Message: "couldn't fast-forward " + o.Branch + ": " + cause + ": " + children + " rebased onto it as it stands", Params: domain.Params{"branch": o.Branch, "cause": cause, "children": children}}
+		return item
 	}
 
-	children := strings.Join(o.Children, ", ")
-	return domain.Warning{Code: CodeFFFailed, Message: "couldn't fast-forward " + o.Branch + ": " + cause + ": " + children + " rebased onto it as it stands", Params: domain.Params{"branch": o.Branch, "cause": cause, "children": children}}, true
+	item.Status, item.Detail = domain.StatusDone, &Detail{Path: o.Path, From: o.From, Commits: o.Origin.Behind}
+	return item
 }
 
 // forwardCause fast-forwards o and says why it could not, "" when it did. A branch no worktree holds is moved to the commit planned, not to origin's as it stands now, after checking it is a fast-forward of where it stands.

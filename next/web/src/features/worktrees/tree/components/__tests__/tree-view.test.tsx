@@ -22,9 +22,9 @@ test('a node shows its state, never its verbs: its actions are in its menu, a co
 
   expect(within(node).queryByRole('button', { name: 'Sync' })).toBeNull()
   await user.pointer({ keys: '[MouseRight]', target: node })
-  await user.click(await screen.findByRole('menuitem', { name: /Sync/ }))
+  await user.click(await screen.findByRole('menuitem', { name: /Go to the worktree/ }))
 
-  expect(await screen.findByText('wtm sync feat/billing-ui')).toBeTruthy()
+  expect(await screen.findByText('wtm go feat/billing-ui')).toBeTruthy()
 })
 
 test('a node whose menu is open stays marked, and the menu opens on its branch', async () => {

@@ -20,10 +20,13 @@ export type OutcomeRow = {
   message?: string | undefined
   go?: DomainFollowUp | undefined
   path?: string | undefined
+  // what to do, in prose, once the row opens
+  note?: string | undefined
   output?: { lines: string[]; log?: string | undefined } | undefined
   followUp?: DomainFollowUp | undefined
-  // a fix the web runs: a button in place of the command to copy
+  // a fix the web runs: a button in place of the command to copy, named by actLabel when the row names its own
   act?: (() => void) | undefined
+  actLabel?: string | undefined
 }
 
 // the follow-ups of one command the web runs at once: each its own button, and all of them at once,
@@ -36,7 +39,14 @@ export type Act = {
   run: (followUps: DomainFollowUp[]) => void
 }
 
-export type OutcomeGroup = { kind: OutcomeKind; rows: OutcomeRow[] }
+// label: a group named its own way (sync's "Couldn't push", a second done group "Fast-forwarded"); action: one button
+// on its label line for every row of it
+export type OutcomeGroup = {
+  kind: OutcomeKind
+  rows: OutcomeRow[]
+  label?: string | undefined
+  action?: { label: string; run: () => void }
+}
 
 export const outputOf = (unit: Unit | undefined) => {
   if (!unit || unit.lines.length === 0) return undefined

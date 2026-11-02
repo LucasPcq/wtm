@@ -49,14 +49,14 @@ test('a worktree a run is working on has no box', async () => {
   expect(within(bar()).getByText('5 selected')).toBeTruthy()
 })
 
-test('the selection bar keeps the same four actions whatever is selected, one it cannot run saying why', async () => {
+test('the selection bar keeps the same five actions whatever is selected, one it cannot run saying why', async () => {
   const { user } = await renderApp('/r/r1/worktrees')
   await user.click(await screen.findByRole('checkbox', { name: 'Select main' }))
 
   const buttons = within(bar())
     .getAllByRole('button')
     .map((button) => button.getAttribute('aria-label'))
-  expect(buttons.filter(Boolean)).toEqual(['Fast-forward', 'Run a command', 'Reparent', 'Remove'])
+  expect(buttons.filter(Boolean)).toEqual(['Fast-forward', 'Sync', 'Run a command', 'Reparent', 'Remove'])
   const remove = within(bar()).getByRole('button', { name: 'Remove' })
   expect(remove.hasAttribute('disabled')).toBe(true)
 

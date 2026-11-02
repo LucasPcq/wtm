@@ -21,6 +21,7 @@ import { PruneDialog } from '@/features/worktrees/prune/prune-dialog'
 import { RemoveDialog } from '@/features/worktrees/remove/remove-dialog'
 import { ReparentDialog } from '@/features/worktrees/reparent/reparent-dialog'
 import { useChoice } from '@/features/worktrees/store/ui-store'
+import { SyncDialog } from '@/features/worktrees/sync/sync-dialog'
 import { TreeView } from '@/features/worktrees/tree/tree-view'
 import { type Subject, withPullRequest } from '@/features/worktrees/utils/actions'
 import { countsOf, visibleRows } from '@/features/worktrees/utils/filters'
@@ -75,7 +76,11 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
         description={read && root && `${count} ${count === 1 ? 'worktree' : 'worktrees'} in ${repoName(root)}`}
         action={
           <div className="flex gap-2">
-            <HeaderActions repo={repo} rows={shown.filter(({ subject }) => underWay[subject] === undefined)} />
+            <HeaderActions
+              repo={repo}
+              rows={shown.filter(({ subject }) => underWay[subject] === undefined)}
+              needsSync={(read?.items ?? []).some((item) => item.detail?.needs_sync)}
+            />
             <CreateButton repo={repo} />
           </div>
         }
@@ -85,6 +90,7 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
       <FastForwardDialog repo={repo} />
       <ExecDialog repo={repo} />
       <ReparentDialog repo={repo} />
+      <SyncDialog repo={repo} />
       {selected.length > 0 ? (
         <SelectionBar repo={repo} count={selected.length} rows={selectedRows} onClear={selection.clear} />
       ) : (

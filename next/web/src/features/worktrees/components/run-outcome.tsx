@@ -36,9 +36,9 @@ export function RunOutcome({
       }
     })
   const acted = toCheck.flatMap((row) => (row.act && row.followUp ? [row.followUp] : []))
-  const merged = groups.map((group) =>
-    group.kind === 'check' ? { ...group, rows: [...toCheck, ...group.rows] } : group,
-  )
+  // into the first group to check only: a command may have more than one (sync's worktrees left out)
+  const first = groups.findIndex((group) => group.kind === 'check')
+  const merged = groups.map((group, i) => (i === first ? { ...group, rows: [...toCheck, ...group.rows] } : group))
   const shown = outcomeOrder.flatMap((kind) => merged.filter((group) => group.kind === kind && group.rows.length > 0))
 
   return (
@@ -46,25 +46,33 @@ export function RunOutcome({
       <PlanWarnings warnings={warnings.filter(planWide)} />
       {shown.length > 0 && (
         <div className="flex flex-col gap-6">
-          {shown.map((group) => (
-            <section key={group.kind} aria-label={labels[group.kind]} className="flex flex-col gap-1">
-              {group.kind === 'check' && act && acted.length > 1 ? (
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-xs font-medium text-muted-foreground">{labels[group.kind]}</h3>
-                  <Button variant="outline" size="sm" disabled={act.busy} onClick={() => act.run(acted)}>
-                    {act.all}
-                  </Button>
-                </div>
-              ) : (
-                shown.length > 1 && <h3 className="text-xs font-medium text-muted-foreground">{labels[group.kind]}</h3>
-              )}
-              <ul className="flex flex-col gap-1">
-                {group.rows.map((row) => (
-                  <OutcomeLine key={row.key} row={row} label={act?.label} busy={act?.busy ?? false} />
-                ))}
-              </ul>
-            </section>
-          ))}
+          {shown.map((group) => {
+            const label = group.label ?? labels[group.kind]
+            const action =
+              group.action ??
+              (group.kind === 'check' && act && acted.length > 1
+                ? { label: act.all, run: () => act.run(acted), busy: act.busy }
+                : undefined)
+            return (
+              <section key={label} aria-label={label} className="flex flex-col gap-1">
+                {action ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-xs font-medium text-muted-foreground">{label}</h3>
+                    <Button variant="outline" size="sm" disabled={'busy' in action && action.busy} onClick={action.run}>
+                      {action.label}
+                    </Button>
+                  </div>
+                ) : (
+                  shown.length > 1 && <h3 className="text-xs font-medium text-muted-foreground">{label}</h3>
+                )}
+                <ul className="flex flex-col gap-1">
+                  {group.rows.map((row) => (
+                    <OutcomeLine key={row.key} row={row} label={act?.label} busy={act?.busy ?? false} />
+                  ))}
+                </ul>
+              </section>
+            )
+          })}
         </div>
       )}
     </>

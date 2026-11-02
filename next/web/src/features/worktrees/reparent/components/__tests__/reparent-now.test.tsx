@@ -56,7 +56,7 @@ test("the callout's fix runs at once, and its toast's Undo moves the worktree ba
   const moved = (await screen.findByText('feat/search-docs is on main')).closest('[data-sonner-toast]')
   expect(screen.getByText('It rebases onto it on its next sync.')).toBeTruthy()
   expect(screen.queryByRole('dialog')).toBeNull()
-  expect(screen.getByRole('button', { name: 'Copy wtm sync' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Sync' })).toBeTruthy()
   await user.click(screen.getByRole('button', { name: 'Undo' }))
 
   const undone = (await screen.findByText('feat/search-docs is on feat/search')).closest('[data-sonner-toast]')

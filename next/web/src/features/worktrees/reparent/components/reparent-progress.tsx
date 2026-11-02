@@ -1,7 +1,7 @@
+import type { DomainAnswered } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress as Bar } from '@/components/ui/progress'
-import { CommandLine } from '@/features/worktrees/components/command-line'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { RunFailure } from '@/features/worktrees/components/run-failure'
@@ -26,12 +26,14 @@ export function ReparentProgress({
   onHide,
   onCancel,
   onDone,
+  onSync,
 }: {
   progress: Progress<'reparent'>
   running: boolean
   onHide: () => void
   onCancel: (force: boolean) => void
   onDone: () => void
+  onSync: (answers: DomainAnswered[]) => void
 }) {
   const envelope = progress.envelope
   const items = envelope?.items ?? []
@@ -129,7 +131,9 @@ export function ReparentProgress({
             {sync && (
               <section aria-label="Next" className="flex flex-col gap-2">
                 <h3 className="text-xs font-medium text-muted-foreground">Next</h3>
-                <CommandLine followUp={sync} />
+                <Button variant="outline" className="w-fit" onClick={() => onSync(sync.answers ?? [])}>
+                  {went.length === 1 ? 'Sync it' : 'Sync them'}
+                </Button>
               </section>
             )}
           </>

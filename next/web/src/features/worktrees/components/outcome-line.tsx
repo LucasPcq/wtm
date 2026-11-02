@@ -5,6 +5,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { CommandLine } from '@/features/worktrees/components/command-line'
 import { CopyPath } from '@/features/worktrees/components/copy-path'
 import { toneIcon } from '@/features/worktrees/components/glyph'
+import { NameLine } from '@/features/worktrees/components/name-line'
 import { StepOutput } from '@/features/worktrees/components/step-output'
 import type { OutcomeRow, OutcomeTone } from '@/features/worktrees/utils/outcome'
 import { cn } from '@/lib/utils'
@@ -28,7 +29,11 @@ export function OutcomeLine({
   const [open, setOpen] = useState(false)
   const Icon = glyph[row.tone ?? 'muted']
   const foldable =
-    row.output !== undefined || row.followUp !== undefined || row.go !== undefined || row.path !== undefined
+    row.note !== undefined ||
+    row.output !== undefined ||
+    row.followUp !== undefined ||
+    row.go !== undefined ||
+    row.path !== undefined
 
   return (
     <Collapsible asChild open={open} onOpenChange={setOpen}>
@@ -39,17 +44,22 @@ export function OutcomeLine({
           ) : (
             <span className="size-4 shrink-0" />
           )}
-          {row.title && <span className="shrink-0 font-medium">{row.title}</span>}
-          <span className={cn('min-w-0 flex-1', row.title && 'text-muted-foreground')}>{row.message}</span>
+          {row.title ? (
+            <NameLine name={row.title} line={row.message} />
+          ) : (
+            <span title={row.message} className="min-w-0 flex-1 truncate">
+              {row.message}
+            </span>
+          )}
           {row.act && (
             <Button
               variant="outline"
               size="sm"
-              aria-label={`${label}: ${row.message}`}
+              aria-label={`${row.actLabel ?? label}: ${row.message}`}
               disabled={busy}
               onClick={row.act}
             >
-              {label}
+              {row.actLabel ?? label}
             </Button>
           )}
           {row.followUp && !row.act && !open && <CommandLine followUp={row.followUp} look="copy" />}
@@ -74,6 +84,7 @@ export function OutcomeLine({
                 <CopyPath path={row.path} />
               </div>
             )}
+            {row.note && <p className="text-xs text-pretty text-muted-foreground">{row.note}</p>}
             {row.output && <StepOutput lines={row.output.lines} log={row.output.log} />}
             {row.followUp && <CommandLine followUp={row.followUp} />}
             {row.go && <CommandLine followUp={row.go} />}

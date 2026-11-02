@@ -77,10 +77,10 @@ const leftWarnings = (advances: FastforwardAdvance[]) =>
           message: `${worktree} has diverged from origin (${origin?.ahead} ahead, ${origin?.behind} behind): left as it is`,
           params: { worktree, ahead: String(origin?.ahead), behind: String(origin?.behind) },
           follow_up: {
-            command: 'sync',
+            command: 'go',
             answers: [{ path: 'worktree', values: [worktree] }],
-            code: 'fast-forward.sync',
-            message: 'rebase it',
+            code: 'fast-forward.go',
+            message: 'reconcile it with origin by hand',
           },
         },
       ]
