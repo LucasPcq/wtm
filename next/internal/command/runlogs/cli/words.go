@@ -7,10 +7,10 @@ import (
 )
 
 // words are how the command line words each field of run logs' form.
-func words(_ runlogs.Questions, field domain.Field) form.Words {
+func words(q runlogs.Questions, field domain.Field) form.Words {
 	switch field.Spec().Path {
 	case domain.PathWorktree:
-		return form.Words{Flag: "<worktree>", Label: "Worktrees", Help: "The worktrees whose jobs to read, by branch, or by path on no branch (default: the one you stand in)", Empty: "Select at least one worktree"}
+		return form.Words{Flag: "<worktree>", Label: "Worktrees", Help: "The worktrees whose jobs to read, by branch, or by path on no branch (default: the one you stand in)", Empty: "Select at least one worktree", Options: form.RunningWords(q.Worktrees.Options)}
 	case runlogs.PathJob:
 		return form.Words{Flag: "--job", Label: "Job", Help: "Read this job of run.toml alone (default: every job that ran)"}
 	case runlogs.PathFollow:

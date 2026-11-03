@@ -169,3 +169,28 @@ func counted(count int, noun string) string {
 func shortOf(words Words, value string) string {
 	return cmp.Or(words.Options[value].Short, value)
 }
+
+// RunningWords read each worktree option with what it runs (domain.RunningIn): the jobs up and the profile they were started under, those crashed, the shared services it holds; a worktree that runs nothing keeps its name.
+func RunningWords(options []domain.Option) map[string]OptionWords {
+	labels := map[string]OptionWords{}
+	for _, option := range options {
+		var said []string
+		if len(option.Up) > 0 {
+			running := strings.Join(option.Up, ", ")
+			if option.Profile != "" {
+				running = option.Profile + ": " + running
+			}
+			said = append(said, "runs "+running)
+		}
+		if option.Crashed > 0 {
+			said = append(said, strconv.Itoa(option.Crashed)+" crashed")
+		}
+		if len(option.Holds) > 0 {
+			said = append(said, "holds "+strings.Join(option.Holds, ", "))
+		}
+		if len(said) > 0 {
+			labels[option.Value] = OptionWords{Label: option.Value + " — " + strings.Join(said, " · ")}
+		}
+	}
+	return labels
+}

@@ -16,7 +16,7 @@ const commands: Record<WorktreeAction, string> = {
   exec: 'exec',
   run_up: 'run-up',
   run_down: 'run down',
-  logs: 'run logs',
+  logs: 'run-logs',
   fast_forward: 'fast-forward',
   sync: 'sync',
   reparent: 'reparent',

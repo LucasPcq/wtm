@@ -6,9 +6,12 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
@@ -127,4 +130,24 @@ func TestAtATerminalAWorktreeWhereNothingRanOpensNoView(t *testing.T) {
 	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
 	assert.False(t, viewOpened(got))
 	assert.Contains(t, got.Stdout, "feat/b: no job has run")
+}
+
+func TestAJobOnlyItsLogKnowsIsShownStoppedWithTheLinesRead(t *testing.T) {
+	streams, _, _, _ := output.Test()
+	c := &logsCommand{io: uicli.Run{Streams: streams}, view: View{Daemon: newWorld().daemon}}
+	read := runlogs.Outcome{Items: []runlogs.Item{{Subject: featA, Status: domain.StatusDone, Detail: &runlogs.Detail{Path: pathOf(featA), Jobs: []runlogs.Job{
+		{Name: "migrate", Kind: project.Task, State: runlogs.JobStopped, Lines: []runlogs.Line{{At: at, Text: "migrated"}}},
+	}}}}}
+
+	params, ran := c.viewOf(read, runlogs.Request{})
+	jobs, err := params.Daemon.Jobs(t.Context())
+	require.NoError(t, err)
+	var lines []string
+	listed, err := params.Daemon.Lines(t.Context(), run.Tail{Name: "migrate", WorkDir: pathOf(featA)}, func(line run.Line) { lines = append(lines, line.Text) })
+
+	assert.True(t, ran)
+	assert.Contains(t, jobs, run.Job{Name: "migrate", WorkDir: pathOf(featA), Kind: project.Task, State: run.Stopped}, "the daemon no longer lists it: listed stopped, not not started")
+	require.NoError(t, err)
+	assert.Equal(t, run.Stopped, listed.State)
+	assert.Equal(t, []string{"migrated"}, lines, "its pane holds the lines read from its log")
 }

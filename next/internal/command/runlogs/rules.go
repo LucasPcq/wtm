@@ -183,7 +183,7 @@ func (s Source) Shows(logged bool) bool {
 // Follows reports whether the lines of the source are followed: its service is a process of a daemon of this protocol, running.
 func (s Source) Follows(f Facts) bool {
 	legacy := f.Skewed != nil && f.Skewed.Skew == run.SkewLegacy
-	return !legacy && f.JobsErr == nil && s.Listed && s.Service.Hold == run.HoldOwn && (s.Service.State == run.Running || s.Service.State == run.Starting)
+	return !legacy && s.Listed && s.Service.Hold == run.HoldOwn && (s.Service.State == run.Running || s.Service.State == run.Starting)
 }
 
 // LogPath is the file the source's lines are kept in, "" for a job that keeps none.

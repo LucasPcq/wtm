@@ -30,6 +30,7 @@ other=$(mktemp -d)/wtm-next && (cd ../../.. && go build -ldflags "-X main.versio
 ./daemon.sh "$wtm" "$next" "$other" daemon
 ./run-up.sh "$wtm" "$next" run-up
 ./run-view.sh "$wtm" "$next" run-view
+./run-logs.sh "$wtm" "$next" run-logs
 ./clean-data.sh "$wtm" "$next" clean-data
 git diff --stat .
 ```
@@ -726,3 +727,32 @@ The reference is the legacy `wtm` of 0.30.1. The proof compares what each leaves
   - A drop paid is planned (the plan's `owed`, its recap's `Owed` row in the dry run and the wizard) and reported as an item of the outcome: `✓ dropped acme_feat-c from db, owed since feat-c was removed`, the tally counting it apart from the worktrees (`✓ run up: 1 done · 1 owed drop made`, `✓ prune: 1 owed drop made` for a prune that only pays one). Legacy prints a line after the start, and `= Nothing to prune.` in prune.
   - 7: legacy has no dry run (exit 2); next's plan lists the phases (`stop_jobs`, `remove`, `drop_data`), the jobs it stops and the data (`data: [{job: db, name: acme_feat-f, status: drop}]`).
   - The tty: both ask the Data step only while a service holding data is down. Legacy's cursor is on `Start db and drop it now` and its description names each namespace; next's is on `Keep it until db next starts`, the answer `--yes` takes (`drop_data`, no first), and its help names the services down. Ctrl+C there exits 19 in both.
+
+# Proof: `wtm run logs` (legacy `flow/run/logs`) vs `wtm-next run logs`
+
+The reference is the legacy `wtm run logs` of 0.30.1. next speaks the v2 envelope of a read and never follows unless asked, so the proof keeps both outputs side by side and compares the state on disk, which a read leaves as it was.
+
+- `run-logs.sh <wtm> <wtm-next> run-logs`: two identical sandboxes, one after the other, each with its own HOME (so its own run daemon, socket and index), torn down before the next starts (every job stopped, then the daemon): the `docs/demos` "acme" project with a task `migrate`, a service `crashy` that exits 1 two seconds after it starts, a job `never` never started, a profile `logs` (migrate, api, web, crashy) started in feat/b by each side's own binary, and a worktree feat/c where nothing ran. Each scenario runs with no terminal and is stopped with SIGINT after 3 seconds if still running, then SIGKILL a second later (only legacy needs it: B1); after each, the exit code, stdout, stderr and the state (the index of the jobs up, the jobs' logs, whether a run daemon answers on the sandbox's socket); `run-logs/states.diff` holds the differences. The jobs' own clock times are zeroed and a follow keeps its first four lines, since what a dev server prints in 3 seconds depends on timing. Then, in a fresh sandbox per side, in tmux at 120×36: `run logs` from main (`1-picker`), main unpicked and feat/b picked (`2-view`), `q` (`3-left`), then `run logs feat/c` (`4-nothing-ran`).
+  1. `--job migrate`: a task ended
+  2. `--job crashy`: a service that crashed
+  3. `--job never`: a job declared that never ran
+  4. `--job ghost`: a job run.toml does not declare
+  5. feat/c: a worktree where nothing ran
+  6. feat/b and feat/c, `--job migrate`
+  7. `--job crashy`, JSON
+  8. an unknown worktree, JSON
+  9. `--job crashy`, `-q`
+  10. `--job api`, a running service, followed (next with `--follow`; legacy always follows)
+  11. feat/b, every job
+  12. the run daemon stopped (`run daemon stop`), then `--job crashy`
+- The states are identical but for 12: legacy's read starts a run daemon (`a run daemon answers: yes`, B4), next's never does, its lines coming from the logs.
+- The differences, each an owner-approved departure (the spec's D1–D10, Q1–Q3) or a legacy bug fixed with its test:
+  - **Without a terminal, the lines and an end** (Q1): each job's last lines, `[job] text` (`[job · branch]` over several worktrees, 6), then exit 0 (1, 11); legacy follows every running job until it ends, so `11-all` never ends on its own. `--follow` (`-f`) follows (10), unframed, and SIGINT ends it with exit 0 (B1: legacy ignores SIGINT and SIGTERM, exit 137 once killed; `TestAnInterruptedFollowExitsZero`, `TestAnInterruptedFollowEndsWithoutError`). With `--output json`, `--follow` writes a JSON object per line (`worktree`, `job`, `at`, `text`).
+  - **A line is its text** (B2): legacy printed a line read back from a log with the log's stamp (`[crashy] <TIME>  starting`, 2, 12), a live one without; next prints the text alone, its time in the JSON's `at` (`TestEachJobThatRanIsReadWithItsLastLinesInRunTomlsOrder`). A follow reads the daemon's lines, not the job's raw terminal: a blank line, which the daemon leaves out of a job's lines and its log as legacy's log does, is not printed (legacy's follow, 10, printed the terminal's).
+  - **What ran, said** (B3, B6): a worktree where nothing ran is `= feat/c: no job has run` (5) and a job named that never ran `= feat/b: never has not run` (3; with several worktrees, per worktree, 6); legacy said `= No jobs running in this worktree.` for both, and at a terminal opened its view on `No jobs declared. Add them to run.toml with \`wtm run init\`.` (`tty/legacy/4-nothing-ran.txt`), where next opens no view (`tty/next/4-nothing-ran.txt`; `TestAtATerminalAWorktreeWhereNothingRanOpensNoView`).
+  - **JSON is the v2 envelope of a read** (D1, 7): an item per worktree whose detail lists each job with its `state`, `hold`, `exit_code`, `url`, `profile`, `log` and its own `lines`; legacy printed an array of `{branch, path, lines: [{job, at, text}]}`. Its refusals are envelopes (8; B5: legacy printed text, `TestEachEnvelopeOfRunLogsHasItsGolden`).
+  - **Exit codes** (D3): an undeclared job 2 (legacy 14, 4), an unknown worktree 2 (legacy 1, 8), no run.toml 25 (legacy 16); names are exact branches or paths (D2: legacy matched a part of a branch).
+  - **The read never starts the run daemon** (D4, B4, 12): with none, the lines come from the logs; legacy started one, and replaced one of another build holding no job.
+  - **The picker** (Q2): with no worktree named, at a terminal, the worktrees are asked, the one run from picked, each with what it runs (`feat/b — logs: runs api, web · 1 crashed`, `tty/next/1-picker.txt`), as run up's; legacy's said `2 running`. `--yes` skips it for the worktree run from (legacy's `--yes` too).
+  - **The view** is `ui/runview`, as run up opens it, on the jobs read (`tty/next/2-view.txt`; a task done is `✓`, B7: legacy's `○`), `--job` selected; leaving it prints nothing of the read (`3-left`).
+
