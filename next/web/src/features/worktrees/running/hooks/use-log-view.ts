@@ -10,14 +10,13 @@ export type Note =
   | { kind: 'time'; time: string }
   | { kind: 'older'; time: string }
   | { kind: 'after'; time: string }
-  | { kind: 'no-error' }
 
 export type LogView = {
   query: LogQuery
   only: boolean
   // which match the view is on, counted from the last: a log grows at its end
   fromLast: number
-  // a line the view jumped to that no search names (latest error, a time)
+  // a line the view jumped to that no search names (a time); the latest error is the last of the lines held, as they come
   focus: number | undefined
   note: Note | undefined
   follow: boolean
@@ -60,7 +59,7 @@ function reduce(view: LogView, action: Action): LogView {
     case 'only':
       return { ...view, only: action.only }
     case 'jump':
-      return { ...view, focus: action.focus, note: action.note, follow: action.focus === undefined && view.follow }
+      return { ...view, focus: action.focus, note: action.note, follow: false }
     case 'follow':
       return { ...view, follow: action.follow, ...(action.follow && { focus: undefined, note: undefined }) }
     case 'wrap':

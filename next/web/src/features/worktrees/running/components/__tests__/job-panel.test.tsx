@@ -69,7 +69,7 @@ test('a search counts its matches and steps through them; only matching says how
   expect(within(panel).getByText('1 of 2')).toBeDefined()
 
   await user.click(within(panel).getByRole('tab', { name: 'Only matching' }))
-  expect(shown(panel)).toBe('··· 1 lines hiddenGET /invoices 200··· 1 lines hiddenGET /invoices/inv_0042 200 in 702ms')
+  expect(shown(panel)).toBe('··· 1 line hiddenGET /invoices 200··· 1 line hiddenGET /invoices/inv_0042 200 in 702ms')
   expect(within(panel).getByText('2 of 4 lines')).toBeDefined()
   expect(within(panel).getByText(/Only the lines matching invoice: a text match/)).toBeDefined()
 })
@@ -140,4 +140,20 @@ test("the job's menu offers its address and its log file", async () => {
       .getAllByRole('menuitem')
       .map((item) => item.textContent),
   ).toEqual(['Open the address', 'Copy the address', 'Copy the log file’s path', 'Download the log'])
+})
+
+// In the sandbox, E pressed as the panel opened said no line was an error, then never looked at the lines that came.
+test('the latest error asked before the lines arrive lands on it once they do', async () => {
+  listing()
+  const { user } = await renderApp('/r/r1/running?worktree=feat/billing&job=api')
+  const panel = await panelOf('api')
+
+  await user.keyboard('e')
+
+  await waitFor(() =>
+    expect(within(panel).getByRole('log').querySelector('[aria-current="true"]')?.textContent).toContain(
+      'Cannot find module',
+    ),
+  )
+  expect(within(panel).getByText(/^Latest error: /)).toBeDefined()
 })

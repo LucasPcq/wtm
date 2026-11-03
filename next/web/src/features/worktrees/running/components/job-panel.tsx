@@ -12,7 +12,7 @@ import { LogNote } from '@/features/worktrees/running/components/log-note'
 import { LogStatus } from '@/features/worktrees/running/components/log-status'
 import { LogToolbar } from '@/features/worktrees/running/components/log-toolbar'
 import { useLogView, type Whole } from '@/features/worktrees/running/hooks/use-log-view'
-import { latestError, lineAt, matchingLines, patternOf } from '@/features/worktrees/running/utils/log-search'
+import { clock, latestError, lineAt, matchingLines, patternOf } from '@/features/worktrees/running/utils/log-search'
 
 export type LogLine = { at?: string; text: string; n?: number }
 
@@ -53,14 +53,12 @@ export function JobPanel({
   const lines: LogLine[] = view.whole ? (read?.lines ?? []) : (live.data?.lines ?? [])
   const pattern = patternOf(view.query)
   const matches = pattern instanceof RegExp ? matchingLines(lines, pattern) : []
-  const current = view.focus ?? matches[matches.length - 1 - view.fromLast]
+  const error = view.note?.kind === 'error' ? latestError(lines) : undefined
+  const current = error ?? view.focus ?? matches[matches.length - 1 - view.fromLast]
   const crashed = job.state === 'crashed' || live.data?.ended?.state === 'crashed'
   const exitCode = job.exit_code ?? live.data?.ended?.exit_code
 
-  const latest = () => {
-    const at = latestError(lines)
-    dispatch({ type: 'jump', focus: at, note: at === undefined ? { kind: 'no-error' } : { kind: 'error' } })
-  }
+  const latest = () => dispatch({ type: 'jump', focus: undefined, note: { kind: 'error' } })
 
   const goTo = (time: string) => {
     const at = lineAt(lines, time)
@@ -74,8 +72,7 @@ export function JobPanel({
     if (view.whole) return `${lines.length} lines from the log file`
     if (view.only && pattern instanceof RegExp) return `${matches.length} of ${lines.length} lines`
     if (job.hold === 'detached') return `${lines.length} lines · the launch’s output`
-    if (live.data?.ended || crashed)
-      return `ended ${lines.at(-1)?.at ? new Date(lines.at(-1)?.at ?? '').toLocaleTimeString() : ''} · ${lines.length} lines`
+    if (live.data?.ended || crashed) return `ended ${clock(lines.at(-1)?.at)} · ${lines.length} lines`
     if (lines.length >= 1000) return 'The last 1,000 lines · older ones are in the log file'
     return `${lines.length} lines`
   }
@@ -159,7 +156,7 @@ export function JobPanel({
         timeOpen={timeOpen}
         onTimeOpen={setTimeOpen}
       />
-      <LogNote view={view} dispatch={dispatch} lines={lines} />
+      <LogNote view={view} dispatch={dispatch} lines={lines} error={error !== undefined} />
       <LogLines
         lines={lines}
         pattern={pattern instanceof RegExp ? pattern : undefined}

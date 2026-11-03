@@ -26,7 +26,7 @@ export function JobHeader({
   actions?: ReactNode
 }) {
   const { icon: Icon, tone } = jobLook[job.state ?? 'stopped']
-  const where = [facts?.dir || '.', facts?.command].filter(Boolean).join(' · ')
+  const where = [facts?.dir, facts?.command].filter(Boolean).join(' · ')
 
   return (
     <header className="flex flex-col gap-1 px-6 pt-5 pb-4">

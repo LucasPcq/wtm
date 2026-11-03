@@ -5,7 +5,17 @@ import { instantOn } from '@/features/worktrees/running/utils/log-search'
 
 // why the lines are what they are: a search of text, a jump and its reason, the whole log read; a job's output has no
 // level, so every filter here says it is one of text
-export function LogNote({ view, dispatch, lines }: { view: LogView; dispatch: LogDispatch; lines: { at?: string }[] }) {
+export function LogNote({
+  view,
+  dispatch,
+  lines,
+  error,
+}: {
+  view: LogView
+  dispatch: LogDispatch
+  lines: { at?: string }[]
+  error: boolean
+}) {
   const searching = view.query.text !== ''
   const first = lines.find((line) => line.at)?.at
 
@@ -14,9 +24,9 @@ export function LogNote({ view, dispatch, lines }: { view: LogView; dispatch: Lo
     if (view.whole) return 'The log file, from that time on.'
     switch (view.note?.kind) {
       case 'error':
-        return 'Latest error: the last line matching error, fail, panic or exception. A text match: the job’s output has no level.'
-      case 'no-error':
-        return 'No line here says error, fail, panic or exception.'
+        return error
+          ? 'Latest error: the last line matching error, fail, panic or exception. A text match: the job’s output has no level.'
+          : 'No line here says error, fail, panic or exception.'
       case 'time':
         return `The first line from ${view.note.time}.`
       case 'after':

@@ -69,7 +69,7 @@ export function LogLines({
             const key = 'hidden' in row ? `h${row.hidden}` : `s${row.since}`
             return (
               <p key={key} className="px-6 font-mono text-xs leading-5 text-muted-foreground">
-                {'hidden' in row ? `··· ${row.hidden} lines hidden` : `··· ${row.since} lines since`}
+                {'hidden' in row ? `··· ${counted(row.hidden)} hidden` : `··· ${counted(row.since)} since`}
               </p>
             )
           }
@@ -100,6 +100,8 @@ export function LogLines({
     </div>
   )
 }
+
+const counted = (count: number) => (count === 1 ? '1 line' : `${count} lines`)
 
 function Marked({ text, pattern, current }: { text: string; pattern: RegExp | undefined; current: boolean }) {
   const ranges = pattern ? rangesIn(text, pattern) : []
