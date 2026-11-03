@@ -9,6 +9,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -93,9 +94,21 @@ func (w world) open(context.Context, string) (runlogs.UseCase, error) {
 		Git:        w.git,
 		Daemon:     w.daemon,
 		ReadLog:    w.readLog,
+		ScanLog:    w.scanLog,
+		Meta:       storetest.NewFake(storetest.FakeParams{}),
+		EnvFiles:   storetest.NewFake(storetest.FakeParams{}),
 		StateDir:   stateDir,
 		Repository: repository.Service{Config: w.config, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}, Restart: &domain.FollowUp{Command: "run daemon restart"}},
 	}, nil
+}
+
+func (w world) scanLog(file run.LogFile, visit func(run.Line) bool) error {
+	for _, line := range w.logs[file.Dir+" "+file.Job] {
+		if !visit(line) {
+			break
+		}
+	}
+	return nil
 }
 
 func (w world) readLog(file run.LogFile, n int) ([]run.Line, error) {

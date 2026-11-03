@@ -151,3 +151,22 @@ func TestTailSaysALogThatCannotBeRead(t *testing.T) {
 	assert.NoError(t, noneErr, "a log that does not exist is no failure")
 	assert.Empty(t, none)
 }
+
+func TestEachReadsTheWholeLogItsBackupsFirst(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "web.log")
+	require.NoError(t, os.WriteFile(path+".2", []byte("2026-10-31T10:00:00Z  oldest\n"), 0o600))
+	require.NoError(t, os.WriteFile(path+".1", []byte("2026-10-31T11:00:00Z  older\n"), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte("2026-10-31T12:00:00Z  newest\nno stamp\n"), 0o600))
+
+	var read []run.Line
+	require.NoError(t, Each(run.LogFile{Dir: dir, Job: "web"}, func(line run.Line) bool { read = append(read, line); return true }))
+	var first []string
+	require.NoError(t, Each(run.LogFile{Dir: dir, Job: "web"}, func(line run.Line) bool { first = append(first, line.Text); return len(first) < 2 }))
+
+	assert.Equal(t, []string{"oldest", "older", "newest", "no stamp"}, texts(read))
+	assert.Equal(t, at, read[2].At)
+	assert.True(t, read[3].At.IsZero(), "a line not stamped keeps no time")
+	assert.Equal(t, []string{"oldest", "older"}, first, "visit stops the read")
+	assert.NoError(t, Each(run.LogFile{Dir: dir, Job: "ghost"}, func(run.Line) bool { return true }), "a log that does not exist has no line")
+}

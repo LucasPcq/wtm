@@ -13,6 +13,7 @@
             "name": "seed",
             "kind": "task",
             "state": "stopped",
+            "command": "true",
             "log": "<root>/main/.git/wtm/logs/main/seed.log",
             "lines": [
               {

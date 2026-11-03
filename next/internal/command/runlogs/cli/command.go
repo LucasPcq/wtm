@@ -30,11 +30,17 @@ const (
 		"in unless named, prints each job's lines as `[job] text` and ends; --follow (-f) then prints\n" +
 		"each new line as the jobs print it, until they all ended or Ctrl+C, which exits 0.\n" +
 		"\n" +
+		"--search reads each job's whole log, its rotated files included, for the lines holding\n" +
+		"a text (--regex, --match-case), its newest 1000 matches; --since reads it from a time.\n" +
+		"\n" +
 		"--output json is the read's v2 envelope, each job with its state and its lines; with\n" +
 		"--follow, one typed JSON object per line instead: line, absent, warning, error.\n" +
 		"It never starts the run daemon: with none running, the lines come from the logs."
 	logsExample = `  # Pick worktrees, then watch their jobs live
   wtm run logs
+
+  # Every error api ever logged
+  wtm run logs feat/login --job api --search 'error|panic' --regex
 
   # One job's last lines, for a script or an agent
   wtm run logs feat/login --job api --output json

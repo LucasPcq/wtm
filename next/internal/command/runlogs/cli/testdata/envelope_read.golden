@@ -13,6 +13,7 @@
             "name": "migrate",
             "kind": "task",
             "state": "stopped",
+            "command": "migrate",
             "log": "/repo/main/.git/wtm/logs/feat%2Fa/migrate.log",
             "lines": [
               {
@@ -31,6 +32,7 @@
             "state": "running",
             "hold": "own",
             "url": "http://api.feat-a.localhost",
+            "command": "api",
             "log": "/repo/main/.git/wtm/logs/feat%2Fa/api.log",
             "lines": [
               {
@@ -44,6 +46,7 @@
             "kind": "service",
             "state": "running",
             "hold": "own",
+            "command": "web",
             "log": "/repo/main/.git/wtm/logs/feat%2Fa/web.log",
             "lines": [
               {

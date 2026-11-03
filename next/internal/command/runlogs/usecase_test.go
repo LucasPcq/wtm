@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -319,4 +320,93 @@ func TestWatchSaysWhatNeverRanInTheReadsOrder(t *testing.T) {
 	require.NoError(t, w.usecase.Watch(t.Context(), runlogs.Request{Worktrees: []string{featB, featA}}, out))
 
 	assert.Equal(t, []string{"feat/b nothing", "feat/a migrated"}, said)
+}
+
+func TestASearchReadsTheWholeLogItsBackupsFirst(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, featA, "api", "GET /b", "error twice", "GET /c")
+	writeFile(t, run.LogDir(w.stateDir, featA)+"/api.log.1", "2026-11-03T20:00:00Z  GET /a\n2026-11-03T20:00:01Z  ERROR boom\n")
+
+	for name, c := range map[string]struct {
+		req   runlogs.Request
+		texts []string
+		n     []int
+	}{
+		"text":       {req: runlogs.Request{Search: "error"}, texts: []string{"ERROR boom", "error twice"}, n: []int{2, 4}},
+		"match_case": {req: runlogs.Request{Search: "error", MatchCase: true}, texts: []string{"error twice"}, n: []int{4}},
+		"regex":      {req: runlogs.Request{Search: "^GET /[ab]$", Regex: true}, texts: []string{"GET /a", "GET /b"}, n: []int{1, 3}},
+		"since":      {req: runlogs.Request{Since: at.Add(time.Second).Format(time.RFC3339)}, texts: []string{"error twice", "GET /c"}, n: []int{4, 5}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c.req.Worktrees, c.req.Job = []string{featA}, "api"
+			api := jobOf(t, w.read(t, c.req).Items[0], "api")
+
+			assert.Equal(t, c.texts, textsOf(api))
+			var n []int
+			for _, line := range api.Lines {
+				n = append(n, line.N)
+			}
+			assert.Equal(t, c.n, n, "each line numbered in the whole log")
+			assert.Equal(t, 5, api.Count, "the whole log, its backup included")
+		})
+	}
+}
+
+func TestASearchKeepsItsLastMatches(t *testing.T) {
+	w := newWorld(t)
+	texts := make([]string, run.MaxTail+2)
+	for i := range texts {
+		texts[i] = "hit"
+	}
+	w.logged(t, featA, "api", texts...)
+
+	api := jobOf(t, w.read(t, runlogs.Request{Worktrees: []string{featA}, Job: "api", Search: "hit"}).Items[0], "api")
+
+	assert.Len(t, api.Lines, run.MaxTail)
+	assert.Equal(t, run.MaxTail+2, api.Lines[run.MaxTail-1].N, "the newest matches are kept")
+}
+
+func TestASearchThatIsNoRegularExpressionIsAProblemOfItsField(t *testing.T) {
+	for name, c := range map[string]struct {
+		req  runlogs.Request
+		path string
+		code string
+	}{
+		"regex": {req: runlogs.Request{Worktrees: []string{featA}, Search: "(", Regex: true}, path: runlogs.PathSearch, code: runlogs.CodeRegexInvalid},
+		"since": {req: runlogs.Request{Worktrees: []string{featA}, Since: "14:00"}, path: runlogs.PathSince, code: runlogs.CodeSinceInvalid},
+	} {
+		t.Run(name, func(t *testing.T) {
+			failure := newWorld(t).refused(t, c.req)
+			require.Len(t, failure.Fields, 1)
+			assert.Equal(t, c.path, failure.Fields[0].Path)
+			assert.Equal(t, c.code, failure.Fields[0].Code)
+		})
+	}
+	read := newWorld(t).read(t, runlogs.Request{Worktrees: []string{featA}, Search: "("})
+	assert.Equal(t, domain.StatusDone, read.Items[0].Status, "a search as text is never refused")
+}
+
+func TestADockerComposeStackSaysHowToFollowItsContainers(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, featA, "stack", "Container acme-feat-a-cache-1  Started")
+	stack := ran("stack", w.at(featA), run.Running)
+	stack.Hold = run.HoldDetached
+	w.daemon.listed = []run.Job{stack, ran("api", w.at(featA), run.Running)}
+
+	read := w.read(t, runlogs.Request{Worktrees: []string{featA}})
+
+	assert.Regexp(t, `^docker compose -p \S+ logs -f$`, jobOf(t, read.Items[0], "stack").ComposeLogs, "its project, the worktree's")
+	assert.Equal(t, "docker compose up -d", jobOf(t, read.Items[0], "stack").Command)
+	assert.Empty(t, jobOf(t, read.Items[0], "api").ComposeLogs, "a job of wtm's logs to wtm")
+}
+
+func TestAFollowedSearchStreamsOnlyTheLinesItMatches(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{lines: lines("GET / 200", "POST /x 500 error", "GET / 200")}}
+
+	got, _, err := w.watched(t.Context(), t, runlogs.Request{Worktrees: []string{featA}, Job: "api", Follow: true, Search: "error"})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"feat/a api POST /x 500 error"}, got)
 }

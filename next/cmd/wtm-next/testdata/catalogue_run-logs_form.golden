@@ -24,6 +24,36 @@
       "no_first": true,
       "rememberable": false,
       "remember": false
+    },
+    {
+      "kind": "text",
+      "path": "search",
+      "skip": "flag_only",
+      "value": ""
+    },
+    {
+      "kind": "confirm",
+      "path": "regex",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "match_case",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "text",
+      "path": "since",
+      "skip": "flag_only",
+      "value": ""
     }
   ],
   "problems": []

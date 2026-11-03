@@ -35,6 +35,6 @@ func TestTheQuestionsOfferEveryStandingWorktreeAndEveryJob(t *testing.T) {
 		jobs = append(jobs, option.Value)
 	}
 	assert.Equal(t, []string{"main", featA, featB}, worktrees, "a worktree whose directory is gone is not offered")
-	assert.Equal(t, []string{"api", "web", "migrate", "crashy", "db", "never"}, jobs)
+	assert.Equal(t, []string{"api", "web", "migrate", "crashy", "db", "never", "stack"}, jobs)
 	assert.Empty(t, questions.Errors)
 }

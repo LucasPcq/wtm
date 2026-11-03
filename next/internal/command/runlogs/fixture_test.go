@@ -11,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/joblog"
+	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -24,7 +25,7 @@ const (
 	featB       = "feat/b"
 	gone        = "feat/gone"
 	projectToml = "[worktrees]\nbase_path = \"../.trees\"\nbase_branch = \"main\"\n"
-	// runToml declares two services, a task, a service that crashes, a shared service and a job never started.
+	// runToml declares two services, a task, a service that crashes, a shared service, a job never started and a compose stack.
 	runToml = `
 [[job]]
 name = "api"
@@ -56,6 +57,12 @@ scope = "shared"
 name = "never"
 kind = "service"
 cmd = "never"
+
+[[job]]
+name = "stack"
+kind = "service"
+cmd = "docker compose up -d"
+stop = "docker compose down"
 `
 )
 
@@ -92,6 +99,9 @@ func newWorld(t *testing.T) *world {
 		Git:        repo,
 		Daemon:     w.daemon,
 		ReadLog:    joblog.Tail,
+		ScanLog:    joblog.Each,
+		Meta:       store.Meta{StateDir: stateDir},
+		EnvFiles:   store.EnvFiles{},
 		StateDir:   stateDir,
 		Repository: repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main, Restart: &domain.FollowUp{Command: "run daemon restart"}},
 	}

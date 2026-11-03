@@ -49,7 +49,7 @@ func TestASourceRanWhenItsStateSaysSo(t *testing.T) {
 	up := runlogs.Source{Listed: true, Job: run.Job{Name: "api", Up: true, Hold: run.HoldOwn}}
 
 	assert.False(t, claim.Ran(false), "a claim whose service is gone, with no log, has not run")
-	assert.Equal(t, runlogs.JobNotStarted, runlogs.JobOf(claim, nil, false).State, "as the read says it")
+	assert.Equal(t, runlogs.JobNotStarted, runlogs.JobOf(claim, runlogs.Found{}, false, "").State, "as the read says it")
 	assert.True(t, up.Ran(false))
 	assert.True(t, claim.Ran(true), "a log says it ran")
 }

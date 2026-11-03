@@ -237,3 +237,10 @@ func TestTheViewNeverRepeatsLinesTheDaemonSentBeforeItBrokeOff(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, []string{"api ready"}, lines, "the daemon's lines alone, never the read's after them")
 }
+
+func TestASearchReadsTheWholeLogForTheLinesItMatches(t *testing.T) {
+	got := runLogs(t, newWorld(), featA, "--search", "MIGRAT")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	formtest.Golden(t, "searched", got.Stdout)
+}
