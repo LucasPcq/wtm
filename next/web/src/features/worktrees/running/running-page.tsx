@@ -12,14 +12,18 @@ import { ReasonButton } from '@/features/worktrees/components/reason-button'
 import { clockEvery, useRun } from '@/features/worktrees/hooks/use-run'
 import { openRunUp, useRunUpDialog } from '@/features/worktrees/hooks/use-run-up-dialog'
 import { RunUpDialog } from '@/features/worktrees/run-up/run-up-dialog'
+import { JobPanel } from '@/features/worktrees/running/components/job-panel'
+import { JobSwitcher } from '@/features/worktrees/running/components/job-switcher'
 import { RunGroup } from '@/features/worktrees/running/components/run-group'
-import { groupsOf } from '@/features/worktrees/running/utils/groups'
+import { groupsOf, type RunningGroup } from '@/features/worktrees/running/utils/groups'
+import type { RunningSearch } from '@/features/worktrees/running/utils/search'
 import { plural } from '@/lib/plural'
 import { repoName } from '@/lib/repo'
+import { cn } from '@/lib/utils'
 
 // shortcut: the jobs come from list's read, counted here; the jobs read of its own (with its counts, its order and the
 // shared services' group) replaces it
-export function RunningPage({ repo }: { repo: string }) {
+export function RunningPage({ repo, search }: { repo: string; search: RunningSearch }) {
   const list = useQuery(readQuery(repo, 'list'))
   const { progress, running } = useRun(repo, 'run-up')
   const { plan } = useRunUpDialog(repo).ran
@@ -30,6 +34,10 @@ export function RunningPage({ repo }: { repo: string }) {
   const ended = progress?.endedAt
   const overlay = running || (ended !== undefined && list.dataUpdatedAt < ended) ? progress : undefined
   const groups = list.data ? groupsOf({ read: list.data, progress: overlay, plan }) : []
+  // the job asked for, else the first the list shows
+  const picked =
+    pick(groups, search.worktree, search.job) ??
+    groups.flatMap((group) => pick([group], group.worktree, undefined) ?? [])[0]
   const up = groups.reduce((count, group) => count + group.counts.running, 0)
   const crashed = groups.reduce((count, group) => count + group.counts.crashed, 0)
 
@@ -60,10 +68,42 @@ export function RunningPage({ repo }: { repo: string }) {
         </Centered>
       )
     return (
-      <div className="flex flex-col divide-y px-8 py-2">
-        {groups.map((group) => (
-          <RunGroup key={group.worktree} repo={repo} group={group} now={now} />
-        ))}
+      <div className="@container/page flex h-full min-h-0">
+        <div
+          className={cn(
+            'flex flex-col divide-y overflow-y-auto px-8 py-2',
+            picked ? 'w-[400px] shrink-0 border-r @max-[1100px]/page:hidden' : 'flex-1',
+          )}
+        >
+          {groups.map((group) => (
+            <RunGroup
+              key={group.worktree}
+              repo={repo}
+              group={group}
+              now={now}
+              selected={group.worktree === picked?.group.worktree ? picked.job.name : undefined}
+            />
+          ))}
+        </div>
+        {picked && (
+          <JobPanel
+            key={`${picked.group.worktree}/${picked.job.name}`}
+            repo={repo}
+            worktree={picked.group.worktree}
+            profile={picked.group.profile}
+            job={picked.job}
+            now={now}
+            switcher={
+              <JobSwitcher
+                repo={repo}
+                groups={groups}
+                worktree={picked.group.worktree}
+                job={picked.job.name}
+                className="@min-[1100px]/page:hidden"
+              />
+            }
+          />
+        )}
       </div>
     )
   }
@@ -83,11 +123,18 @@ export function RunningPage({ repo }: { repo: string }) {
         }
       />
       <RunUpDialog repo={repo} />
-      <div className="min-h-0 flex-1 overflow-y-auto" aria-busy={!list.data}>
+      <div className="min-h-0 flex-1 overflow-hidden" aria-busy={!list.data}>
         {body()}
       </div>
     </>
   )
+}
+
+// the job of groups in worktree called job (the first of the worktree when job is none)
+function pick(groups: RunningGroup[], worktree: string | undefined, job: string | undefined) {
+  const group = groups.find((one) => one.worktree === worktree)
+  const row = group?.rows.find((one) => 'job' in one && (job === undefined || one.name === job))
+  return group && row && 'job' in row ? { group, job: row.job } : undefined
 }
 
 function Skeletons() {

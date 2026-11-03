@@ -22,6 +22,7 @@ import type {
   PrunePlan,
   ReparentDetail,
   ReparentPlan,
+  RunlogsDetail,
   RunState,
   RunupDetail,
   RunupPlan,
@@ -36,7 +37,7 @@ import type {
 export const repoKey = (repo: string) => ['repo', repo] as const
 export const githubKey = (repo: string) => ['github', repo] as const
 
-type ReadDetail = { list: ListDetail; tree: TreeDetail; status: StatusDetail }
+type ReadDetail = { list: ListDetail; tree: TreeDetail; status: StatusDetail; 'run-logs': RunlogsDetail }
 export type ReadCommand = keyof ReadDetail
 
 type Mutation = {

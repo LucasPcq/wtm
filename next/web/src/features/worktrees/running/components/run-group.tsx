@@ -11,7 +11,17 @@ import { ProfilesMenu } from '@/features/worktrees/running/components/profiles-m
 import { RunningJob } from '@/features/worktrees/running/components/running-job'
 import { groupLine, type RunningGroup } from '@/features/worktrees/running/utils/groups'
 
-export function RunGroup({ repo, group, now }: { repo: string; group: RunningGroup; now: number }) {
+export function RunGroup({
+  repo,
+  group,
+  now,
+  selected,
+}: {
+  repo: string
+  group: RunningGroup
+  now: number
+  selected: string | undefined
+}) {
   const line = groupLine(group)
 
   return (
@@ -35,7 +45,14 @@ export function RunGroup({ repo, group, now }: { repo: string; group: RunningGro
       </div>
       <Rail elbow={16} indent={14} className="ml-2">
         {group.rows.map((row) => (
-          <RunningJob key={row.name} row={row} now={now} />
+          <RunningJob
+            key={row.name}
+            repo={repo}
+            worktree={group.worktree}
+            row={row}
+            now={now}
+            selected={row.name === selected}
+          />
         ))}
       </Rail>
     </section>
